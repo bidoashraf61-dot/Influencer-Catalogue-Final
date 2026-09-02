@@ -2350,22 +2350,47 @@
      * his opening pose — level, facing the viewer, which is frame one. */
     var fine = window.matchMedia("(pointer: fine)").matches;
 
-    /* The whole render, scrubbed. The cursor's horizontal position is a position
-     * in the film, and every frame between is played through on the way.
+    /* The whole render, with the cursor choosing a destination in it and the
+     * film travelling there.
      *
-     * This replaced a version that picked 36 frames out of the render and jumped
-     * between them to cover a grid of gaze directions. It covered more directions
-     * but it moved in cuts, and cuts are what made it feel mechanical. Running
-     * the film in order is smooth because consecutive frames are what the render
-     * actually is -- his body drifting, the petal crossing, the light shifting are
-     * all continuous rather than things that snap.
+     * The earlier versions eased the cursor and then looked up a frame, which
+     * meant any large move landed as a jump — and cutting between frames that
+     * are not neighbours is what made the pose atlas feel mechanical. This eases
+     * the *time* instead. The cursor names a target moment in the film; the film
+     * scrubs toward it and plays every frame on the way. Nothing is cut, nothing
+     * is reordered, and he arrives by moving rather than by snapping.
      *
-     * Nothing is trimmed and nothing is reordered.
-     */
+     * That also frees the speed to vary, which is what makes the whole render
+     * usable. The gaze does not travel evenly through the eight seconds — it
+     * lingers, doubles back, drifts up. Because the film only has to *reach* the
+     * target rather than track the cursor proportionally, the stretches that go
+     * the wrong way are simply crossed quickly on the way to somewhere useful.
+     *
+     * GAZE is a 9x9 grid over the viewport. Each entry is the moment whose eye
+     * direction best matches that corner of the screen, measured frame by frame
+     * across the render — horizontally and vertically, so looking up and down is
+     * reachable too, which a single left-to-right cut could never offer. */
+    var GAZE_G = 9;
+    var GAZE = [4.1667, 5.625, 5.625, 5.625, 4.4583, 4.5833, 5.0, 5.5833, 5.5833, 4.1667, 4.1667, 5.625, 5.625, 5.625, 4.4583, 4.6667, 5.5833, 5.5833, 4.1667, 4.1667, 4.1667, 5.75, 5.8333, 5.9583, 4.375, 6.25, 6.25, 4.125, 4.125, 4.1667, 4.2083, 6.0, 4.2917, 2.1667, 6.25, 6.25, 4.125, 4.125, 4.125, 3.1667, 2.5833, 1.6667, 2.125, 1.0, 1.2083, 1.9167, 1.9167, 2.0, 4.0417, 3.625, 2.4167, 6.375, 1.2917, 2.25, 1.9583, 1.9167, 2.0, 0.5833, 0.625, 0.625, 0.7083, 0.4167, 0.375, 1.9583, 0.1667, 0.25, 0.3333, 6.4167, 0.6667, 7.625, 0.4167, 2.2917, 1.9583, 0.0833, 0.0417, 0.2917, 6.4583, 6.5, 6.9583, 7.0417, 2.2917];
+
     var duration = 0;
-    var target = 0.5;  // where the pointer says he should be, 0..1
-    var eased = 0.5;   // where he actually is, chasing target
-    var shown = -1;    // the time last written, to skip invisible seeks
+    /* Rest on the pose the centre of the screen asks for.
+     *
+     * Not zero, and not an arbitrary midpoint. Whatever this is, it is the pose
+     * every touch device holds forever — without a fine pointer no pointermove
+     * ever arrives to move him off it — so it should be the one a cursor resting
+     * in the middle of the screen would produce, which is the grid's centre
+     * cell. The poster is rendered from this same moment, so the handover from
+     * still to film shows no shift at all. */
+    var REST = 2.5833;
+    var targetT = REST;   // the moment in the film the cursor is asking for
+    var shownT = REST;    // where the film actually is, travelling toward it
+    /* The film may cross at most this much of itself per frame. Without it a
+     * distant target is reached in one step, which is a cut; with it he travels
+     * there and every frame in between is seen. Four frames a tick at 60Hz is
+     * roughly four times speed — quick enough to feel responsive, slow enough
+     * to read as movement. */
+    var MAX_STEP = 4 / 24;
     /* 0.16 rather than 0.09. At 60fps the old value needed about half a second
      * to close on the cursor, which on a gaze this subtle read as him not
      * responding at all rather than as weight. This lands in roughly a quarter
@@ -2382,9 +2407,18 @@
       else film.pause();
     }
 
+    /* The rest pose has to be seeked to outright. apply() only moves the film
+     * when there is a gap between where it is and where it is wanted, and at
+     * rest there is none — so without this the element sits on its own first
+     * frame while the poster shows a different one, and the handover flicks. */
+    function settle() {
+      try { film.currentTime = REST; } catch (err) { /* not seekable yet */ }
+    }
+
     film.addEventListener("loadedmetadata", function () {
       duration = film.duration || 0;
       prime();
+      settle();
     });
 
     /* Only paint once a real frame is decoded, so the poster does not flick to
@@ -2402,18 +2436,26 @@
     if (fine) {
       window.addEventListener("pointermove", function (ev) {
         var x = ev.clientX / window.innerWidth;
-        target = x < 0 ? 0 : x > 1 ? 1 : x;
+        var y = ev.clientY / window.innerHeight;
+        x = x < 0 ? 0 : x > 1 ? 1 : x;
+        y = y < 0 ? 0 : y > 1 ? 1 : y;
+        var gx = Math.round(x * (GAZE_G - 1));
+        var gy = Math.round(y * (GAZE_G - 1));
+        targetT = GAZE[gy * GAZE_G + gx];
       }, { passive: true });
     }
 
     function apply() {
       if (!duration) return;
-      var t = eased * duration;
-      /* Below a frame's worth of movement the seek would show nothing and only
-       * cost a decode. */
-      if (shown >= 0 && Math.abs(t - shown) < 1 / 48) return;
-      shown = t;
-      try { film.currentTime = t; } catch (err) { /* not seekable yet */ }
+      var gap = targetT - shownT;
+      if (Math.abs(gap) < 1 / 48) return;      /* already there */
+      var step = gap * EASE;
+      if (step > MAX_STEP) step = MAX_STEP;
+      else if (step < -MAX_STEP) step = -MAX_STEP;
+      shownT += step;
+      if (shownT < 0) shownT = 0;
+      else if (shownT > duration) shownT = duration;
+      try { film.currentTime = shownT; } catch (err) { /* not seekable yet */ }
     }
 
     /* Driven from a frame loop rather than from pointermove directly, so the
@@ -2423,12 +2465,11 @@
       requestAnimationFrame(frame);
       var r = hero.getBoundingClientRect();
       if (r.bottom < -200 || r.top > window.innerHeight + 200) return;
-      eased += (target - eased) * EASE;
       apply();
     }
     requestAnimationFrame(frame);
 
-    if (film.readyState >= 1) { duration = film.duration || 0; prime(); }
+    if (film.readyState >= 1) { duration = film.duration || 0; prime(); settle(); }
   })();
 
   /* Initial states are in place — let the stylesheet show them. */

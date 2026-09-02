@@ -124,7 +124,23 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 /* ------------------------------------------------------------------- hero */
 
 .cat-hero { background: var(--white); padding: 48px 0 80px; }
-.cat-hero__logo { width: 148px; height: auto; margin-bottom: 72px; }
+/* Logo left, portfolio out to the site on the right. */
+.cat-topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 20px; margin-bottom: 72px;
+}
+.cat-hero__logo { width: 148px; height: auto; margin: 0; flex: none; }
+.cat-portfolio {
+  display: inline-flex; align-items: center; gap: 9px; flex: none;
+  font-family: var(--heading); font-size: 20px; letter-spacing: .06em;
+  text-transform: uppercase; text-decoration: none;
+  color: var(--ink); background: var(--lime);
+  padding: 13px 26px; min-height: 44px; border-radius: var(--r-pill);
+  border: 1px solid var(--lime);
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.cat-portfolio:hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.cat-portfolio:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 3px; }
 .cat-hero__head { position: relative; }
 .cat-pill {
   display: inline-block; position: relative; z-index: 2;
@@ -453,7 +469,7 @@ a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-off
   border: 1px solid rgba(255,255,255,.2); border-radius: var(--r-pill);
   padding: 3px 10px;
 }
-.cat-tray__actions { display: flex; gap: 12px; margin-left: auto; }
+.cat-tray__actions { display: flex; gap: 12px; margin-left: auto; flex-wrap: wrap; }
 
 /* ----------------------------------------------------------------- modal */
 
@@ -578,6 +594,16 @@ a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-off
   margin: 0 0 28px;
 }
 .cat-footer__note { color: rgba(255,255,255,.5); font-size: 14px; max-width: 52ch; margin: 0; }
+.cat-footer__portfolio {
+  display: inline-flex; align-items: center; gap: 9px;
+  margin-top: 28px; min-height: 44px;
+  font-family: var(--heading); font-size: 22px; letter-spacing: .05em;
+  text-transform: uppercase; text-decoration: none;
+  color: var(--lime); border-bottom: 2px solid transparent;
+  transition: border-color .2s ease;
+}
+.cat-footer__portfolio:hover { border-bottom-color: var(--lime); }
+.cat-footer__portfolio:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; }
 
 /* --------------------------------------------------------- blur on blur */
 
@@ -607,8 +633,14 @@ body.cat-away::after {
 /* ----------------------------------------------------------- responsive */
 
 @media screen and (max-width: 991px) {
+  /* Removing a creator is destructive and 34px is a fiddly target on a
+     phone; the theme brief's floor is 44px below this width. */
+  .cat-card__remove { width: 44px; height: 44px; right: 10px; top: 10px; }
   .cat-hero { padding: 32px 0 60px; }
-  .cat-hero__logo { margin-bottom: 44px; width: 120px; }
+  .cat-topbar { margin-bottom: 44px; }
+  .cat-hero__logo { width: 120px; }
+  .cat-portfolio { font-size: 17px; padding: 11px 18px; letter-spacing: .04em; }
+  .cat-footer__portfolio { font-size: 18px; }
   .cat-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
   .cat-filter__label { min-width: 100%; }
   .cat-modal__panel { padding: 32px 24px; }
@@ -630,8 +662,12 @@ body.cat-away::after {
   .cat-clients__logo { margin-right: 26px; }
   .cat-clients__logo img { height: 34px; }
   .cat-tray__codes { display: none; }
+  /* Three buttons will not sit in one row on a phone — at 320px the primary
+     action was pushed off the right edge entirely. The secondary pair shares
+     a row and the primary gets its own, full width. */
   .cat-tray__actions { margin-left: 0; width: 100%; }
-  .cat-tray__actions .cat-btn { flex: 1; }
+  .cat-tray__actions .cat-btn { flex: 1 1 0; min-width: 0; padding: 14px 12px; }
+  .cat-tray__actions .cat-btn--lime { flex: 1 1 100%; }
 }
 
 @media screen and (max-width: 560px) {
