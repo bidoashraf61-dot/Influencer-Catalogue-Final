@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<title>Scroll-tracked character — HelloVoice</title>
+<style>
+  :root { --ground:#e9dcd2; --ink:#12100e; --red:#ee1515; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink);
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  header { padding:26px 28px 10px; max-width:78ch; }
+  h1 { margin:0 0 8px; font-size:24px; letter-spacing:-.01em; }
+  .sub { margin:0 0 6px; opacity:.66; }
+  .warn {
+    margin:14px 0 0; padding:12px 14px; border-left:3px solid var(--red);
+    background:rgba(238,21,21,.06); font-size:14px;
+  }
+  .rig { position:relative; height:420vh; }
+  .stage {
+    position:sticky; top:0; height:100vh;
+    display:grid; place-items:center;
+  }
+  canvas { width:min(460px,72vw); aspect-ratio:420/560; display:block; }
+  .hud {
+    position:fixed; left:0; right:0; bottom:0; z-index:5;
+    display:flex; flex-wrap:wrap; gap:14px 26px; align-items:center;
+    padding:12px 18px; background:rgba(233,220,210,.94);
+    border-top:1px solid rgba(18,16,14,.16); backdrop-filter:blur(6px);
+  }
+  label { display:flex; align-items:center; gap:8px; font-size:12px; }
+  input[type=range] { width:130px; accent-color:var(--red); }
+  output { font-variant-numeric:tabular-nums; opacity:.6; min-width:3.6em; }
+  .read { margin-left:auto; font-size:12px; opacity:.6; font-variant-numeric:tabular-nums; }
+  .tail { padding:30px 28px 120px; max-width:78ch; }
+  code { background:rgba(18,16,14,.08); padding:1px 5px; border-radius:3px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Scroll-tracked character</h1>
+  <p class="sub">The rig asked for in comment 18, running against the mesh we
+  currently have. Scroll and he turns; the turn is driven by how far through
+  this section you are, not by the cursor.</p>
+  <p class="warn"><strong>This mesh is not the one to ship.</strong> It has no
+  skeleton — <code>0 skins, 0 animations</code> — so nothing on it can be posed
+  or animated; it can only be rotated as one solid object. And it came from a
+  single photograph, so it is only accurate from the front: push the yaw past
+  about 40&deg; with the slider and the face flattens into a plane and the back
+  of the head is a featureless shape. Everything else here is finished and
+  waiting — dropping a rigged <code>.glb</code> at the same path is the whole
+  remaining job.</p>
+</header>
+
+<div class="rig" id="rig">
+  <div class="stage"><canvas id="c"></canvas></div>
+</div>
+
+<div class="tail">
+  <p>Past the end of the track the character holds his last pose, so the section
+  can be followed by anything without a snap back.</p>
+</div>
+
+<div class="hud">
+  <label>Yaw range <input type="range" id="yaw" min="10" max="180" value="55"/><output id="yawOut">55°</output></label>
+  <label>Pitch <input type="range" id="pitch" min="0" max="30" value="8"/><output id="pitchOut">8°</output></label>
+  <label>Smoothing <input type="range" id="ease" min="3" max="40" value="12"/><output id="easeOut">0.12</output></label>
+  <label><input type="checkbox" id="spin"/> full turn</label>
+  <span class="read" id="read">–</span>
+</div>
+
+<script type="importmap">{"imports":{"three":"/assets/vendor/three.module.min.js"}}</script>
+<script type="module">
+import * as THREE from "three";
+import { GLTFLoader } from "/assets/vendor/GLTFLoader.js";
+
+const canvas = document.getElementById("c");
+const rig = document.getElementById("rig");
+const read = document.getElementById("read");
+const yawEl = document.getElementById("yaw");
+const pitchEl = document.getElementById("pitch");
+const easeEl = document.getElementById("ease");
+const spinEl = document.getElementById("spin");
+const yawOut = document.getElementById("yawOut");
+const pitchOut = document.getElementById("pitchOut");
+const easeOut = document.getElementById("easeOut");
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(28, 420 / 560, 0.1, 100);
+
+/* Three lights, not one: a key at front-left, a fill opposite it so the shaded
+   side does not go to black, and a rim behind to lift the silhouette off the
+   ground colour. A single light reads as a clay render. */
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a7b70, 1.5));
+const key = new THREE.DirectionalLight(0xffffff, 2.1); key.position.set(-2, 3, 4); scene.add(key);
+const fill = new THREE.DirectionalLight(0xffe8e0, 0.7); fill.position.set(3, 1, 2); scene.add(fill);
+const rim = new THREE.DirectionalLight(0xffffff, 1.1); rim.position.set(0, 2, -4); scene.add(rim);
+
+let model = null;
+new GLTFLoader().load("/assets/character/character.glb", gltf => {
+  model = gltf.scene;
+  /* Centre on the model's own bounds and frame it, rather than trusting the
+     exporter's origin — a reconstruction's pivot is wherever the solver put
+     it, which here is neither the feet nor the centre of mass. */
+  const box = new THREE.Box3().setFromObject(model);
+  const size = box.getSize(new THREE.Vector3());
+  const mid = box.getCenter(new THREE.Vector3());
+  model.position.sub(mid);
+  const pivot = new THREE.Group();
+  pivot.add(model);
+  scene.add(pivot);
+  model.userData.pivot = pivot;
+  camera.position.set(0, 0, size.y * 2.1);
+  camera.lookAt(0, 0, 0);
+  resize();
+  read.textContent = "model loaded";
+}, undefined, err => { read.textContent = "model failed: " + err; });
+
+function resize() {
+  const r = canvas.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height;
+  camera.updateProjectionMatrix();
+}
+addEventListener("resize", resize);
+
+/* progress through the track: 0 as its top reaches the viewport top,
+   1 as its bottom reaches the viewport bottom — clamped, so the pose holds
+   before and after rather than snapping. */
+function progress() {
+  const r = rig.getBoundingClientRect();
+  const span = r.height - innerHeight;
+  if (span <= 0) return 0;
+  return Math.min(1, Math.max(0, -r.top / span));
+}
+
+let shownYaw = 0, shownPitch = 0;
+function frame() {
+  const k = +easeEl.value / 100;
+  const p = progress();
+  const maxYaw = +yawEl.value * Math.PI / 180;
+  const maxPitch = +pitchEl.value * Math.PI / 180;
+
+  /* Centred on the resting pose: progress 0.5 is face-on, so he turns through
+     the viewer rather than away from a corner. `full turn` overrides that with
+     a single continuous revolution, which is what a rigged model could carry
+     and this one cannot. */
+  const targetYaw = spinEl.checked ? p * Math.PI * 2 : (p - 0.5) * 2 * maxYaw;
+  const targetPitch = (p - 0.5) * 2 * maxPitch;
+
+  shownYaw += (targetYaw - shownYaw) * k;
+  shownPitch += (targetPitch - shownPitch) * k;
+
+  if (model && model.userData.pivot) {
+    model.userData.pivot.rotation.y = shownYaw;
+    model.userData.pivot.rotation.x = shownPitch;
+    renderer.render(scene, camera);
+  }
+  yawOut.textContent = yawEl.value + "°";
+  pitchOut.textContent = pitchEl.value + "°";
+  easeOut.textContent = k.toFixed(2);
+  read.textContent = "progress " + p.toFixed(2) +
+    "   ·   yaw " + (shownYaw * 180 / Math.PI).toFixed(0) + "°";
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

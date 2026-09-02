@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<title>Character cursor test — HelloVoice</title>
+<style>
+  :root { --ground:#e9dcd2; --ink:#12100e; --red:#ee1515; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; background:var(--ground); color:var(--ink);
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:grid; grid-template-rows:auto 1fr auto; cursor:crosshair;
+  }
+  header { padding:22px 28px 0; }
+  h1 { margin:0 0 6px; font-size:24px; letter-spacing:-.01em; }
+  .sub { margin:0; opacity:.62; font-size:15px; max-width:66ch; }
+  .stage { display:grid; place-items:center; padding:16px; }
+  /* the test frames still carry their black ground, so the panel goes black
+     too — otherwise you judge the rectangle instead of the movement */
+  .holder {
+    position:relative; width:min(400px,72vw); aspect-ratio:420/562;
+    background:#000; border-radius:14px; overflow:hidden;
+    box-shadow:0 18px 50px rgba(0,0,0,.22);
+  }
+  .holder canvas { width:100%; height:100%; display:block; }
+  .hint {
+    position:absolute; inset:auto 0 0 0; padding:10px 14px; margin:0;
+    font-size:12px; letter-spacing:.06em; text-transform:uppercase;
+    color:rgba(255,255,255,.72);
+    background:linear-gradient(transparent,rgba(0,0,0,.65));
+    pointer-events:none; transition:opacity .4s ease;
+  }
+  .holder.touched .hint { opacity:0; }
+  footer { padding:0 28px 24px; }
+  .controls {
+    display:flex; flex-wrap:wrap; gap:16px 26px; align-items:center;
+    padding-top:14px; border-top:1px solid rgba(18,16,14,.16);
+  }
+  label { display:flex; align-items:center; gap:9px; font-size:12px; }
+  input[type=range] { width:150px; accent-color:var(--red); }
+  input[type=checkbox] { accent-color:var(--red); width:16px; height:16px; }
+  output { font-variant-numeric:tabular-nums; opacity:.6; min-width:3.4em; }
+  .readout { margin-left:auto; font-size:12px; opacity:.55; font-variant-numeric:tabular-nums; }
+  .note { margin:14px 0 0; font-size:12px; opacity:.6; max-width:76ch; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Character cursor test</h1>
+  <p class="sub">Move the pointer anywhere on this page. This is the unmodified
+  test render — black background and all — wired up only to prove the
+  interaction. Nothing here is keyed or cut out yet.</p>
+</header>
+
+<div class="stage">
+  <div class="holder" id="holder">
+    <canvas id="c" width="420" height="562"></canvas>
+    <p class="hint">Move your mouse</p>
+  </div>
+</div>
+
+<footer>
+  <div class="controls">
+    <label>Follow speed <input type="range" id="ease" min="4" max="60" value="16"/><output id="easeOut">0.16</output></label>
+    <label>Range <input type="range" id="range" min="20" max="100" value="100"/><output id="rangeOut">100%</output></label>
+    <label><input type="checkbox" id="axisY"/> use vertical too</label>
+    <span class="readout" id="readout">frame –</span>
+  </div>
+  <p class="note"><strong>Follow speed</strong> is how fast he catches up to the
+  pointer — low feels heavy and lifelike, high feels twitchy.
+  <strong>Range</strong> limits how much of the clip is used, so you can cut the
+  wilder poses and keep the usable middle.</p>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+  var COUNT = 145;
+  var canvas = document.getElementById("c");
+  var ctx = canvas.getContext("2d", { alpha: false });
+  var holder = document.getElementById("holder");
+  var readout = document.getElementById("readout");
+  var easeEl = document.getElementById("ease");
+  var rangeEl = document.getElementById("range");
+  var axisYEl = document.getElementById("axisY");
+  var easeOut = document.getElementById("easeOut");
+  var rangeOut = document.getElementById("rangeOut");
+
+  // Decode every frame up front. Decoding on demand is exactly what makes this
+  // kind of effect stutter — the first pass over a pose would hitch.
+  var frames = [], ready = 0;
+  for (var i = 0; i < COUNT; i++) {
+    var img = new Image();
+    img.decoding = "async";
+    img.onload = function () { ready++; };
+    img.src = "/assets/char-test/f" + String(i).padStart(3, "0") + ".webp";
+    frames.push(img);
+  }
+
+  // target = where the pointer says he should be; shown chases it each frame
+  var target = 0.5, shown = 0.5, current = -1;
+
+  function onMove(e) {
+    var x = e.clientX / window.innerWidth, v = x;
+    if (axisYEl.checked) {
+      var y = e.clientY / window.innerHeight;
+      v = Math.min(1, Math.max(0, x * 0.75 + y * 0.25));
+    }
+    target = v;
+    holder.classList.add("touched");
+  }
+  window.addEventListener("pointermove", onMove, { passive: true });
+  window.addEventListener("pointerdown", onMove, { passive: true });
+
+  function tick() {
+    var k = parseInt(easeEl.value, 10) / 100;
+    shown += (target - shown) * k;
+    var span = parseInt(rangeEl.value, 10) / 100;
+    var lo = (1 - span) / 2, hi = 1 - lo;
+    var idx = Math.round((lo + shown * (hi - lo)) * (COUNT - 1));
+    if (idx < 0) idx = 0; else if (idx > COUNT - 1) idx = COUNT - 1;
+    if (idx !== current) {
+      var f = frames[idx];
+      if (f && f.complete && f.naturalWidth) {
+        ctx.drawImage(f, 0, 0, canvas.width, canvas.height);
+        current = idx;
+      }
+    }
+    readout.textContent = "frame " + (current < 0 ? "–" : current + 1) + " / " + COUNT +
+      "   ·   loaded " + ready + "/" + COUNT;
+    easeOut.textContent = k.toFixed(2);
+    rangeOut.textContent = rangeEl.value + "%";
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

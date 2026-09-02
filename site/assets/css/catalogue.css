@@ -1,0 +1,658 @@
+/* Influencer proposal catalogue — self-contained, HelloVoice theme.
+   Tokens, type scale and idioms follow docs/THEME-BRIEF.md. Kept standalone
+   rather than piggybacking main.css so the portal cannot inherit site layout
+   rules that fight the grid. */
+
+@font-face {
+  font-family: Bebasneue;
+  src: url(/assets/ref/68efdbc172d0ac625d40c65f_BebasNeue-Regular.ttf) format("truetype");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+@font-face {
+  font-family: "DM Sans";
+  src: url("/assets/ref/68f262b1b60fe57e398c9c09_DMSans-VariableFont_opsz,wght.ttf") format("truetype");
+  font-weight: 100 1000; font-style: normal; font-display: swap;
+}
+
+:root {
+  --black-primary: #000000;
+  --ink: #121212;
+  --gray: #383838;
+  --white: #ffffff;
+  --linen: #e9dcd2;
+  --vivid-red: #ee1515;
+  --vivid-orange: #ff691e;
+  --lime: #e8ff76;
+  --container: 1680px;
+  --pad: 5%;
+  --r-sm: 12px;
+  --r-md: 20px;
+  --r-lg: 28px;
+  --r-pill: 999px;
+  --heading: Bebasneue, Arial, sans-serif;
+  --body: "DM Sans", Arial, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Author display rules outrank the hidden attribute's UA display:none, and
+   both the modal and the gate set one. Put hidden back on top. */
+[hidden] { display: none !important; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--body);
+  background: var(--white);
+  color: var(--ink);
+  overflow-x: hidden;
+}
+
+/* Copy deterrence. This used to be the second layer behind an anonymised
+   page; now that names and exact follower counts are shown, it and the
+   passcode are the only layers. It stops casual copying, not a determined
+   technical user. */
+body, .cat-app {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.cat-form input { -webkit-user-select: text; user-select: text; }
+
+img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
+
+.cat-pad { padding-left: var(--pad); padding-right: var(--pad); }
+.cat-container { max-width: var(--container); margin: 0 auto; }
+
+/* ---------------------------------------------------------------- buttons */
+
+.cat-btn {
+  font-family: var(--heading);
+  font-size: 20px;
+  letter-spacing: .04em;
+  line-height: 1;
+  padding: 16px 32px;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: background .25s ease, color .25s ease, border-color .25s ease;
+}
+.cat-btn--lime { background: var(--lime); color: var(--ink); }
+.cat-btn--lime:hover { background: var(--ink); color: var(--lime); }
+.cat-btn--ghost { background: transparent; color: var(--white); border-color: rgba(255,255,255,.35); }
+.cat-btn--ghost:hover { border-color: var(--lime); color: var(--lime); }
+
+/* ------------------------------------------------------------------- gate */
+
+.cat-locked { overflow: hidden; }
+
+.cat-gate {
+  position: fixed; inset: 0; z-index: 200;
+  background: var(--ink);
+  display: grid; place-items: center;
+  padding: var(--pad);
+}
+.cat-gate__inner { max-width: 560px; text-align: center; }
+.cat-gate__logo { width: 132px; height: auto; margin-bottom: 40px; opacity: .9; }
+.cat-gate__eyebrow {
+  display: inline-block;
+  font-family: var(--heading); font-size: 18px; letter-spacing: .18em;
+  color: var(--ink); background: var(--lime);
+  padding: 6px 18px; border-radius: var(--r-pill);
+  transform: rotate(-4deg); margin: 0 0 24px;
+}
+.cat-gate__title {
+  font-family: var(--heading); font-weight: 400; line-height: .92;
+  font-size: clamp(3.75rem, 1.5rem + 9vw, 9rem);
+  color: var(--white); margin: 0 0 24px;
+}
+.cat-gate__note { color: rgba(255,255,255,.62); font-size: 16px; line-height: 1.6; margin: 0 0 36px; }
+.cat-gate__form { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.cat-gate__input {
+  font-family: var(--body); font-size: 16px;
+  padding: 16px 24px; min-height: 44px; width: 260px;
+  background: transparent; color: var(--white);
+  border: 1px solid rgba(255,255,255,.3); border-radius: var(--r-pill);
+  text-align: center; letter-spacing: .12em;
+}
+.cat-gate__input:focus { outline: none; border-color: var(--lime); }
+.cat-gate__error { color: var(--vivid-red); font-size: 14px; margin: 20px 0 0; }
+
+/* ------------------------------------------------------------------- hero */
+
+.cat-hero { background: var(--white); padding: 48px 0 80px; }
+.cat-hero__logo { width: 148px; height: auto; margin-bottom: 72px; }
+.cat-hero__head { position: relative; }
+.cat-pill {
+  display: inline-block; position: relative; z-index: 2;
+  font-family: var(--heading); font-size: clamp(1.25rem, .6rem + 1.6vw, 2.25rem);
+  letter-spacing: .06em; color: var(--ink); background: var(--lime);
+  padding: 10px 26px; border-radius: var(--r-pill);
+  transform: rotate(-6deg);
+  /* Overlaps the title's cap-height instead of clearing it — the pill and the
+     heading read as one locked-up mark. Scales with the heading so the bite
+     stays proportional at every width. */
+  margin: 0 0 clamp(-3.5rem, -0.6rem - 3.4vw, -0.75rem) clamp(1rem, 3vw, 4rem);
+}
+.cat-hero__title {
+  font-family: var(--heading); font-weight: 400; line-height: 1;
+  font-size: clamp(3.75rem, -0.19rem + 16.8vw, 20rem);
+  margin: 0; color: var(--ink);
+}
+.cat-hero__lead {
+  max-width: 62ch; font-size: 18px; line-height: 1.6;
+  color: var(--gray); margin: 32px 0 0;
+}
+
+.cat-showreel {
+  position: relative; margin-top: 60px;
+  border-radius: var(--r-lg); overflow: hidden;
+  background: var(--ink); aspect-ratio: 21 / 9;
+}
+.cat-showreel__video {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.cat-showreel__label {
+  position: absolute; left: 20px; bottom: 20px;
+  font-family: var(--heading); font-size: 20px; letter-spacing: .14em;
+  color: var(--ink); background: var(--lime);
+  padding: 8px 20px; border-radius: var(--r-pill);
+}
+
+/* ----------------------------------------------------------------- ticker */
+
+/* Deliberately smaller than the site's 179px CTA band: this one separates the
+   hero from the filters rather than closing a page, and at full scale it
+   swallowed the viewport. Solid ink throughout — the outlined variant the site
+   alternates in was hard to read at this size. */
+.cat-ticker {
+  background: var(--vivid-orange); color: var(--ink);
+  width: 100vw; margin-left: calc(50% - 50vw);
+  overflow: hidden; padding: 14px 0;
+}
+.cat-ticker__track {
+  display: flex; align-items: center; width: max-content;
+  will-change: transform;
+  font-family: var(--heading); font-weight: 400;
+  font-size: 28px; letter-spacing: .04em; text-transform: uppercase;
+  white-space: nowrap;
+  animation: cat-marquee 38s linear infinite;
+}
+.cat-ticker__track > span { display: block; }
+/* The separator mark, white against the orange, sized off the text. */
+.cat-ticker__star {
+  flex: none; display: block;
+  width: .62em; height: .62em;
+  margin: 0 .42em;
+  color: var(--white);
+  /* Bebas caps have almost no descender, so the ink sits 0.041em above the
+     line box centre and a flex-centred mark reads low against them. Measured,
+     not guessed, and in em so it survives the mobile step down. */
+  transform: translateY(-0.041em);
+}
+/* Without this the svg is an inline box resting on a text baseline inside its
+   wrapper, which dropped the drawn star ~7.6px below the wrapper's own centre.
+   The wrapper was aligned correctly all along; the artwork inside it was not. */
+.cat-ticker__star svg { display: block; width: 100%; height: 100%; }
+@keyframes cat-marquee { to { transform: translateX(-50%); } }
+
+/* --------------------------------------------------------------- controls */
+
+.cat-controls { background: var(--linen); padding: 60px 0 44px; }
+.cat-filter { display: flex; flex-wrap: wrap; align-items: baseline; gap: 16px; margin-bottom: 20px; }
+.cat-filter__label {
+  font-family: var(--heading); font-size: 22px; letter-spacing: .08em;
+  min-width: 108px; color: var(--ink);
+}
+.cat-filter__chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.cat-chip {
+  font-family: var(--body); font-size: 15px; font-weight: 500;
+  padding: 10px 20px; min-height: 44px;
+  background: var(--ink); color: var(--white);
+  border: 1px solid var(--ink); border-radius: var(--r-pill);
+  cursor: pointer; transition: background .2s ease, color .2s ease;
+}
+.cat-chip i { font-style: normal; opacity: .5; margin-left: 6px; }
+.cat-chip:hover { background: var(--gray); border-color: var(--gray); }
+.cat-chip.is-active { background: var(--lime); color: var(--ink); border-color: var(--lime); }
+.cat-chip.is-active i { opacity: .55; }
+/* Pricing is a range, and the page has to say so where the number is read —
+   next to the results and again in the quote panel. */
+.cat-note {
+  max-width: 68ch; font-size: 13px; line-height: 1.6;
+  color: var(--gray); margin: 12px 0 0;
+}
+.cat-note--modal {
+  margin: 0 0 28px; padding: 12px 16px;
+  background: rgba(18,18,18,.04); border-radius: var(--r-sm);
+  font-size: 12px;
+}
+
+.cat-count {
+  font-size: 14px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--gray); margin: 28px 0 0;
+}
+
+/* --------------------------------------------------------------- summary */
+
+.cat-summary { background: var(--linen); padding: 60px 0 8px; }
+.cat-summary__grid {
+  display: flex; flex-wrap: wrap; gap: 48px;
+  margin: 0 0 28px; padding: 0 0 32px;
+  border-bottom: 1px solid rgba(18,18,18,.12);
+}
+.cat-summary__grid div { margin: 0; }
+.cat-summary__grid dt {
+  font-size: 13px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--gray); margin-bottom: 8px;
+}
+.cat-summary__grid dd {
+  font-family: var(--heading); font-size: 44px; line-height: 1; margin: 0;
+  white-space: nowrap;
+}
+
+/* remove control, selection page only */
+.cat-card__remove {
+  position: absolute; right: 12px; top: 12px; z-index: 4;
+  width: 34px; height: 34px; border-radius: 100%;
+  display: grid; place-items: center; cursor: pointer;
+  color: var(--white); background: rgba(18,18,18,.55);
+  border: 1px solid rgba(255,255,255,.35);
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.cat-card__remove:hover { background: var(--vivid-red); border-color: var(--vivid-red); }
+.cat-card__remove:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
+
+/* the share link row in the save panel */
+.cat-share { display: flex; gap: 10px; margin: 0 0 16px; }
+.cat-share__url {
+  flex: 1; min-width: 0;
+  font-family: var(--body); font-size: 13px;
+  padding: 12px 14px; min-height: 44px;
+  border: 1px solid rgba(18,18,18,.2); border-radius: var(--r-sm);
+  background: var(--white); color: var(--ink);
+  -webkit-user-select: text; user-select: text;
+}
+.cat-share__open {
+  font-family: var(--heading); font-size: 20px; letter-spacing: .04em;
+  color: var(--ink); text-decoration: none; border-bottom: 2px solid var(--lime);
+}
+.cat-share__open:hover { border-bottom-color: var(--ink); }
+
+/* ------------------------------------------------------------------ cards */
+
+.cat-grid-section { background: var(--linen); padding: 8px 0 100px; }
+.cat-grid {
+  display: grid; gap: 28px;
+  grid-template-columns: repeat(auto-fill, minmax(248px, 1fr));
+}
+
+/* 162 cards, each with a background image, were all being rendered at once —
+   with two very wide marquees running this pinned the compositor at ~2fps.
+   The browser now skips the ones nowhere near the viewport. The intrinsic
+   size keeps the scrollbar honest so nothing jumps while scrolling. */
+.cat-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 520px;
+  background: var(--white);
+  border: 2px solid transparent;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  cursor: pointer;
+  transition: border-color .2s ease, box-shadow .2s ease;
+  /* No hover zoom on the media — deliberate, per the theme brief. */
+}
+.cat-card:hover { box-shadow: 0 12px 32px rgba(18,18,18,.1); }
+.cat-card:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 3px; }
+.cat-card[aria-pressed="true"] { border-color: var(--lime); box-shadow: 0 0 0 4px rgba(232,255,118,.5); }
+
+.cat-card__media {
+  position: relative; aspect-ratio: 4 / 5; background: var(--ink);
+  overflow: hidden;  /* the blurred bed is inset -14% and would otherwise bleed onto the card body */
+}
+.cat-card__photo {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center top;
+  background-repeat: no-repeat;
+}
+/* Instagram returns 100px for a third of these accounts. Upscaling that to a
+   330px card reads as a broken image, so the small source sits at close to its
+   native size as a circular portrait over a blurred bed of itself. Both layers
+   are positioned pseudo-elements painting in DOM order — a negative z-index
+   bed would paint *over* the parent's own background, not under it. */
+.cat-card__photo--soft { background-size: 0; }
+.cat-card__photo--soft::before {
+  content: ""; position: absolute; inset: -14%;
+  background-image: inherit;
+  background-size: cover; background-position: center top;
+  filter: blur(24px) saturate(.8) brightness(.55);
+}
+.cat-card__photo--soft::after {
+  content: ""; position: absolute;
+  left: 50%; top: 44%; transform: translate(-50%, -50%);
+  width: 124px; height: 124px; border-radius: 100%;
+  background-image: inherit;
+  background-size: cover; background-position: center;
+  box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 3px rgba(255,255,255,.14);
+}
+
+.cat-card__photo--fallback {
+  display: grid; place-items: center;
+  background: linear-gradient(150deg, #1c1c1c 0%, #121212 60%, #262626 100%);
+}
+.cat-card__photo--fallback::after {
+  content: attr(data-plate);
+  font-family: var(--heading); font-size: 72px; line-height: 1;
+  color: rgba(255,255,255,.22); letter-spacing: .04em;
+}
+/* Transparent shield so the pointer never lands on a saveable image element. */
+.cat-card__shield { position: absolute; inset: 0; z-index: 2; background: transparent; }
+.cat-card__tier {
+  position: absolute; left: 12px; top: 12px; z-index: 3;
+  font-family: var(--heading); font-size: 16px; letter-spacing: .1em;
+  background: var(--white); color: var(--ink);
+  padding: 6px 14px; border-radius: var(--r-pill);
+}
+.cat-card__platform {
+  position: absolute; right: 12px; bottom: 12px; z-index: 4;
+  min-width: 34px; min-height: 44px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  color: var(--white); text-decoration: none;
+  justify-content: flex-end;
+}
+.cat-card__platform svg {
+  width: 18px; height: 18px; display: block;
+  box-sizing: content-box; padding: 8px; border-radius: 100%;
+  background: var(--ink);
+  transition: background .2s ease, color .2s ease;
+}
+a.cat-card__platform:hover svg { background: var(--lime); color: var(--ink); }
+a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; border-radius: var(--r-sm); }
+.cat-card__platform-hint {
+  font-family: var(--body); font-size: 12px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--white); background: rgba(18,18,18,.82);
+  padding: 3px 8px; border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+
+.cat-card__check {
+  position: absolute; right: 12px; top: 12px; z-index: 3;
+  width: 30px; height: 30px; border-radius: 100%;
+  border: 2px solid rgba(255,255,255,.6); background: rgba(18,18,18,.35);
+  transition: background .2s ease, border-color .2s ease;
+}
+.cat-card[aria-pressed="true"] .cat-card__check {
+  background: var(--lime); border-color: var(--lime);
+}
+.cat-card[aria-pressed="true"] .cat-card__check::after {
+  content: ""; position: absolute; left: 9px; top: 5px;
+  width: 7px; height: 13px; border: solid var(--ink);
+  border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+}
+
+.cat-card__body { padding: 20px; }
+/* The code is the reference the client sends back, so it stays legible — but
+   the name is what they actually read, so the name takes the title role. */
+.cat-card__code {
+  font-family: var(--body); font-size: 12px; font-weight: 600;
+  letter-spacing: .16em; text-transform: uppercase;
+  color: var(--gray); margin: 0 0 6px;
+}
+.cat-card__name {
+  font-family: var(--heading); font-weight: 400;
+  font-size: 28px; line-height: 1.02; letter-spacing: .02em;
+  margin: 0 0 14px; color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.cat-card__meta { list-style: none; margin: 0 0 16px; padding: 0; }
+.cat-card__meta li {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 7px 0; border-top: 1px solid rgba(18,18,18,.08);
+  font-size: 14px;
+}
+.cat-card__meta span { color: var(--gray); }
+.cat-card__meta strong { font-weight: 600; }
+.cat-card__price {
+  margin: 0; font-size: 14px; color: var(--gray);
+  border-top: 1px solid rgba(18,18,18,.08); padding-top: 14px;
+}
+.cat-card__price strong {
+  font-family: var(--heading); font-size: 26px; letter-spacing: .04em;
+  color: var(--ink); margin: 0 4px;
+}
+
+.cat-empty {
+  text-align: center; padding: 80px 0;
+  font-family: var(--heading); font-size: 40px; color: var(--gray);
+}
+
+/* ------------------------------------------------------------------ tray */
+
+.cat-tray {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
+  background: var(--ink); color: var(--white);
+  padding: 16px var(--pad);
+  box-shadow: 0 -8px 40px rgba(0,0,0,.3);
+}
+.cat-tray__inner {
+  max-width: var(--container); margin: 0 auto;
+  display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+}
+.cat-tray__count { font-family: var(--heading); font-size: 24px; letter-spacing: .06em; }
+.cat-tray__count strong { color: var(--lime); font-size: 32px; }
+.cat-tray__codes {
+  flex: 1 1 260px; display: flex; gap: 6px; flex-wrap: wrap;
+  max-height: 56px; overflow: hidden;
+  font-size: 12px; color: rgba(255,255,255,.55);
+}
+.cat-tray__codes span {
+  border: 1px solid rgba(255,255,255,.2); border-radius: var(--r-pill);
+  padding: 3px 10px;
+}
+.cat-tray__actions { display: flex; gap: 12px; margin-left: auto; }
+
+/* ----------------------------------------------------------------- modal */
+
+.cat-modal {
+  position: fixed; inset: 0; z-index: 120;
+  background: rgba(0,0,0,.72);
+  display: grid; place-items: center; padding: var(--pad);
+  overflow-y: auto;
+}
+.cat-modal__panel {
+  position: relative;
+  background: var(--white); border-radius: var(--r-lg);
+  padding: 48px; width: min(560px, 100%);
+}
+.cat-modal__close {
+  position: absolute; right: 16px; top: 16px;
+  width: 44px; height: 44px; border-radius: 100%;
+  border: 1px solid rgba(18,18,18,.15); background: transparent;
+  cursor: pointer; color: var(--ink);
+  display: grid; place-items: center;
+}
+.cat-modal__close:hover { border-color: var(--ink); }
+.cat-modal__title {
+  font-family: var(--heading); font-weight: 400; line-height: 1;
+  font-size: clamp(2.5rem, 1.4rem + 4vw, 4.5rem);
+  margin: 0 0 8px;
+}
+.cat-modal__sub { color: var(--gray); font-size: 15px; margin: 0 0 32px; }
+.cat-modal__sub strong { color: var(--ink); }
+
+.cat-form { display: grid; gap: 18px; }
+.cat-form label {
+  display: grid; gap: 8px;
+  font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--gray);
+}
+.cat-form input {
+  font-family: var(--body); font-size: 16px;
+  padding: 14px 18px; min-height: 44px;
+  border: 1px solid rgba(18,18,18,.2); border-radius: var(--r-sm);
+  background: var(--white); color: var(--ink);
+  text-transform: none; letter-spacing: normal;
+}
+.cat-form input:focus { outline: none; border-color: var(--ink); }
+.cat-form__submit { margin-top: 12px; justify-self: start; }
+.cat-form__status { font-size: 14px; margin: 4px 0 0; min-height: 20px; }
+.cat-form__status.is-error { color: var(--vivid-red); }
+.cat-form__status.is-ok { color: #1a7f37; }
+
+/* --------------------------------------------------------------- clients */
+
+/* A white band between the linen filters and the linen grid — the logos read
+   as their own section rather than floating in the results. */
+.cat-clients {
+  background: var(--white);
+  padding: 32px 0 34px;
+  overflow: hidden;
+}
+.cat-clients__caption {
+  font-size: 12px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--gray); margin: 0 0 20px;
+}
+.cat-clients__caption em { font-style: italic; text-transform: none; }
+.cat-clients__track { width: 100vw; margin-left: calc(50% - 50vw); overflow: hidden; }
+.cat-clients__row {
+  display: flex; align-items: center; width: max-content;
+  will-change: transform;
+  animation: cat-marquee 90s linear infinite;
+}
+.cat-clients__logo {
+  flex: none; margin-right: 40px;
+  display: grid; place-items: center;
+}
+.cat-clients__logo img {
+  /* Sized here, not on the wrapper: the markup carries width="64" height="64"
+     attributes, and height:100% on the grid item never beat them — the band
+     ignored every change to the wrapper's height. */
+  height: 42px; width: auto; object-fit: contain;
+  /* The site runs these full colour; keeping that rather than inventing a
+     greyscale treatment the brand never uses. */
+}
+
+/* ------------------------------------------------ selection page actions */
+
+.cat-back {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--heading); font-size: 20px; letter-spacing: .06em;
+  text-transform: uppercase; text-decoration: none;
+  color: var(--ink); background: var(--white);
+  padding: 12px 24px; min-height: 44px; border-radius: var(--r-pill);
+  border: 1px solid rgba(18,18,18,.18);
+  margin-bottom: 28px;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+.cat-back:hover { background: var(--ink); color: var(--white); border-color: var(--ink); }
+.cat-back:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 3px; }
+
+/* The sticky tray is easy to read past on a long page, so the selection ends
+   with the same action stated plainly. */
+.cat-close {
+  background: var(--ink); color: var(--white);
+  padding: 80px 0 88px; text-align: center;
+}
+.cat-close__title {
+  font-family: var(--heading); font-weight: 400; line-height: 1;
+  font-size: clamp(2.5rem, 1.2rem + 5vw, 6rem);
+  margin: 0 0 16px;
+}
+.cat-close__sub {
+  color: rgba(255,255,255,.62); font-size: 16px; line-height: 1.6;
+  max-width: 52ch; margin: 0 auto 32px;
+}
+.cat-close__actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.cat-close__copied {
+  color: var(--lime); font-size: 14px; margin: 18px 0 0; min-height: 20px;
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.cat-footer { background: var(--ink); color: var(--white); padding: 80px 0 140px; }
+.cat-footer__logo {
+  display: block; width: clamp(200px, 34vw, 460px); height: auto;
+  margin: 0 0 28px;
+}
+.cat-footer__note { color: rgba(255,255,255,.5); font-size: 14px; max-width: 52ch; margin: 0; }
+
+/* --------------------------------------------------------- blur on blur */
+
+/* An opaque cover, not filter:blur() on the app. Blurring a subtree of 162
+   cards forces a full offscreen rasterisation and pins the compositor for as
+   long as the window stays unfocused — it hung the renderer outright. This
+   hides exactly as much, and costs one paint. */
+body.cat-away::after {
+  content: "Paused"; position: fixed; inset: 0; z-index: 150;
+  display: grid; place-items: center;
+  font-family: var(--heading); font-size: 48px; letter-spacing: .1em;
+  color: var(--white); background: var(--ink);
+}
+
+/* ---------------------------------------------------------------- print */
+
+@media print {
+  html, body { background: #fff !important; }
+  body * { display: none !important; }
+  body::after {
+    content: "This catalogue is confidential and cannot be printed.";
+    display: block !important;
+    font-family: var(--body); font-size: 14pt; padding: 40pt;
+  }
+}
+
+/* ----------------------------------------------------------- responsive */
+
+@media screen and (max-width: 991px) {
+  .cat-hero { padding: 32px 0 60px; }
+  .cat-hero__logo { margin-bottom: 44px; width: 120px; }
+  .cat-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 20px; }
+  .cat-filter__label { min-width: 100%; }
+  .cat-modal__panel { padding: 32px 24px; }
+}
+
+@media screen and (max-width: 767px) {
+  .cat-grid { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .cat-card__body { padding: 14px; }
+  .cat-card__code { letter-spacing: .12em; margin-bottom: 4px; }
+  .cat-card__name { font-size: 22px; margin-bottom: 10px; }
+  .cat-card__platform { right: 10px; bottom: 10px; }
+  .cat-card__platform svg { width: 16px; height: 16px; padding: 7px; }
+  .cat-card__platform-hint { letter-spacing: .06em; padding: 3px 7px; }
+  .cat-showreel { margin-top: 40px; aspect-ratio: 16 / 9; }
+  .cat-card__meta li { font-size: 12px; padding: 6px 0; }
+  .cat-card__price { font-size: 12px; }
+  .cat-card__price strong { font-size: 20px; }
+  .cat-ticker__track { font-size: 22px; letter-spacing: .02em; }
+  .cat-clients__logo { margin-right: 26px; }
+  .cat-clients__logo img { height: 34px; }
+  .cat-tray__codes { display: none; }
+  .cat-tray__actions { margin-left: 0; width: 100%; }
+  .cat-tray__actions .cat-btn { flex: 1; }
+}
+
+@media screen and (max-width: 560px) {
+  .cat-grid { grid-template-columns: 1fr; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-ticker__track, .cat-clients__row { animation: none; }
+  .cat-card, .cat-btn, .cat-chip, .cat-card__check { transition: none; }
+  body.cat-away .cat-app { transition: none; }
+}
+
+/* The selection page's cards are content, not toggles — no pointer affordance
+   and no selected ring. */
+body[data-page="selection"] .cat-card { cursor: default; }
+body[data-page="selection"] .cat-card:hover { box-shadow: none; }
+body[data-page="selection"] .cat-card__check { display: none; }
+
+@media screen and (max-width: 767px) {
+  .cat-summary__grid { gap: 28px; }
+  .cat-summary__grid dd { font-size: 32px; }
+  .cat-share { flex-wrap: wrap; }
+  .cat-share__url { flex: 1 1 100%; }
+}

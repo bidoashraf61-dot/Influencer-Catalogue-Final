@@ -1,0 +1,224 @@
+/* Hello Voice — typography system.
+ *
+ * Three roles, two embedded families, one system stack. Aliased so a swap
+ * happens in one place. Faces are inlined by build/make_fonts.py into
+ * type.css; this file is the tokens, the scale and the rules.
+ *
+ * Montserrat is a brand-derived choice, not a default: the wordmark is an
+ * oblique geometric grotesque — round bowls, even stroke — and Montserrat
+ * shares that geometry, so it reads as related to the logo rather than merely
+ * near it. It only works tight and uppercase. Roboto underneath is
+ * deliberately neutral. Do not swap either for Inter, Space Grotesk, Poppins
+ * or Helvetica; those are the generic defaults this is avoiding.
+ */
+
+:root {
+  --display: "HV Display", "Helvetica Neue", Arial, sans-serif;
+  --text-face: "HV Text", "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* The reference's stylesheet routes every rule through these two variables,
+     so overriding them here re-faces the entire site from one place. */
+  --_typography---font-family--heading-font: var(--display);
+  --_typography---font-family--body-font: var(--text-face);
+}
+
+/* ---------------------------------------------------------------- display */
+
+/* Bebas is a condensed face and was set at sizes that assume it. Montserrat
+   900 is far wider, so every display size is re-cut here rather than inherited
+   — at the reference's numbers the wordmark would run off the page. */
+
+/* The hero wordmark is a full-bleed lockup, not a headline in a column — the
+   brief's clamp caps it at 96px and leaves it marooned in a 1266px hero.
+   Instead it is re-cut to fill the measure in the new face.
+   Bebas renders at 0.577x Arial and Montserrat at 1.07x, so the reference's
+   19vw becomes 19 x (0.577/1.07) = 10.24vw for the same rendered width. */
+.hero_heading h1,
+[data-hero-title] {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: clamp(2.5rem, 10.24vw, 13rem);
+  letter-spacing: -.045em;
+  line-height: .9;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* HELLO / VOICE reads as the logo's own two-tone lockup rather than one long
+   run of capitals. VOICE takes the single sanctioned flourish. */
+.hero_heading h1 .hv-accent {
+  display: inline-block;
+  transform: skewX(-7deg);
+  margin-left: .06em;
+}
+
+h2,
+.heading_style_h4,
+.heading-style-h3,
+.work_section_title,
+.service_section_title,
+.step_section_title,
+.about_section_title,
+.leader_section_title,
+.about_hero_title,
+.project_hero_title,
+.service_hero_title,
+.blog_hero_title {
+  font-family: var(--display);
+  font-weight: 900;
+  font-size: clamp(1.65rem, 4.2vw, 3rem);
+  letter-spacing: -.03em;
+  line-height: .98;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+h3,
+.work_title,
+.service_item_title,
+.step_title,
+.why_choose_item_title {
+  font-family: var(--display);
+  font-weight: 800;
+  font-size: 1.2rem;
+  letter-spacing: -.015em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  text-wrap: balance;
+}
+
+/* The numerals carry the display face too — they are a headline, not data. */
+.year_text,
+.stats_counter_number,
+.stats_counter_number_suffix,
+.hero_stat_title,
+.logo_big_text,
+.canvas_logo,
+.cta_ticker_text,
+.project_ticker_title {
+  font-family: var(--display);
+  font-weight: 900;
+  letter-spacing: -.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The one flourish the brief allows. */
+.hero_heading h1 .accent,
+.text_gradiant {
+  display: inline-block;
+  transform: skewX(-7deg);
+}
+
+/* ------------------------------------------------------------------- body */
+
+body,
+p,
+.text-case-normal,
+.work_description_text,
+.step_info,
+.year_info_text,
+.testimonial_text,
+.hero_info,
+.brands_testimony_text,
+.about_stats_item_text {
+  font-family: var(--text-face);
+  font-weight: 400;
+  line-height: 1.62;
+}
+
+/* 16px floor. The brief allowed .875rem, but the UX rules rate sub-16px body
+   on mobile as a High-severity legibility failure — so 16px is the base and
+   15px is the smallest any running text gets, on wide screens only. */
+body { font-size: 1rem; }
+
+@media screen and (min-width: 992px) {
+  .work_description_text,
+  .step_info,
+  .year_info_text { font-size: .9375rem; }
+}
+
+.hero_sub_title,
+.step_section_info,
+.service_item_tags_subtitle,
+.card_headline {
+  font-family: var(--text-face);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* Running text holds near a 65-character measure. */
+.hero_info,
+.year_info_text,
+.step_info,
+.work_description_text,
+.testimonial_text,
+.brands_testimony_text { max-width: 65ch; }
+
+/* ---------------------------------------------------------------- utility */
+
+/* Labels, tags, counts and status. Uppercase mono always takes POSITIVE
+   tracking; display type always takes negative. Never the reverse. */
+.project_tag,
+.service_item_tag_text,
+.step_count,
+.works_filter_button,
+.footer_legal_text,
+.hero_stat_info,
+.testimonial_author_profession,
+.brands_testimony_author_designation,
+.works_filter_count,
+.section_caption_text,
+.floating_text {
+  font-family: var(--mono);
+  font-size: .6875rem;
+  font-weight: 500;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.4;
+}
+
+/* Names sit between utility and body — the mono face would make them look
+   like filenames. */
+.testimonial_author_name,
+.brands_testimony_author_name,
+.footer_link_col_heading {
+  font-family: var(--text-face);
+  font-weight: 700;
+  letter-spacing: .01em;
+  text-transform: none;
+}
+
+/* Any column of digits aligns. */
+.stats_counter_visible_height,
+.hero_stat,
+.works_filter_count { font-variant-numeric: tabular-nums; }
+
+/* Nothing goes below 11px. An earlier build shipped 9.4px tags and they
+   failed legibility review. */
+.project_tag,
+.service_item_tag_text,
+.works_filter_button { min-height: 2.75rem; display: inline-flex; align-items: center; }
+
+/* The tagline is a sub-headline, not a second headline. The reference set it
+   at 6vw in a condensed face; in Montserrat that rendered larger than the
+   wordmark itself and took over the hero. It moves to the body face at a
+   supporting size — which is also where the brief puts sub-headlines. */
+.hero_sub_title {
+  font-family: var(--text-face);
+  font-weight: 500;
+  font-size: clamp(1.125rem, 2.1vw, 1.75rem);
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: none;
+  max-width: 18ch;
+}
+
+/* Section headings inherit the same correction: the reference's clamps assume
+   a condensed face, so they are re-cut rather than left to overflow. */
+.year_text { font-size: clamp(3rem, 8.4vw, 10rem); line-height: .9; }
+.logo_big_text { font-size: clamp(2.5rem, 12.9vw, 11rem); line-height: .9; }
+.cta_ticker_text { font-size: clamp(1.75rem, 5.3vw, 6.75rem); }
+.canvas_logo { font-size: clamp(2.5rem, 10.24vw, 12rem); }
+.project_ticker_title { font-size: clamp(1.5rem, 3.2vw, 3.5rem); }

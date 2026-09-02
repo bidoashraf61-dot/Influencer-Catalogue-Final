@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
+<title>Spline 3D test — HelloVoice</title>
+<style>
+  :root { --ground:#e9dcd2; --ink:#12100e; --red:#ee1515; }
+  * { box-sizing:border-box; }
+  body {
+    margin:0; min-height:100vh; background:var(--ground); color:var(--ink);
+    font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+    display:grid; grid-template-rows:auto 1fr auto;
+  }
+  header { padding:22px 28px 0; }
+  h1 { margin:0 0 6px; font-size:24px; letter-spacing:-.01em; }
+  .sub { margin:0; opacity:.62; font-size:15px; max-width:70ch; }
+  .stage { padding:20px 28px; }
+
+  /* the demo's card: black, spotlight, text left / scene right */
+  .card {
+    position:relative; overflow:hidden; border-radius:16px;
+    background:rgba(0,0,0,.96); color:#fff;
+    height:min(560px,68vh); display:flex;
+    box-shadow:0 20px 60px rgba(0,0,0,.28);
+  }
+  /* the spotlight is a radial gradient that chases the pointer — the demo does
+     this with framer-motion springs; a CSS custom property moved on pointermove
+     gets the same result with no library */
+  .card::before {
+    content:""; position:absolute; inset:0; pointer-events:none; z-index:1;
+    background:radial-gradient(220px circle at var(--mx,-999px) var(--my,-999px),
+               rgba(255,255,255,.14), transparent 78%);
+    transition:opacity .25s ease; opacity:0;
+  }
+  .card.lit::before { opacity:1; }
+
+  .card_copy { flex:1; padding:40px; position:relative; z-index:2;
+               display:flex; flex-direction:column; justify-content:center; }
+  .card_copy h2 {
+    margin:0; font-size:clamp(28px,3.4vw,44px); line-height:1.04; font-weight:700;
+    background:linear-gradient(to bottom,#fafafa,#a3a3a3);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .card_copy p { margin:14px 0 0; color:#d4d4d4; max-width:46ch; font-size:15px; }
+  .card_scene { flex:1; position:relative; }
+  .card_scene spline-viewer { width:100%; height:100%; display:block; }
+
+  .loader {
+    position:absolute; inset:0; display:grid; place-items:center;
+    color:#8a8a8a; font-size:13px; letter-spacing:.06em; text-transform:uppercase;
+  }
+  .loader.done { display:none; }
+
+  footer { padding:0 28px 26px; }
+  .note { margin:0; padding-top:14px; border-top:1px solid rgba(18,16,14,.16);
+          font-size:12px; opacity:.62; max-width:82ch; }
+  @media screen and (max-width:800px) {
+    .card { flex-direction:column; height:auto; }
+    .card_scene { height:340px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Spline 3D test</h1>
+  <p class="sub">The scene from the component you sent, running in this site as
+  it actually is — static HTML, no React. Move the pointer over the card: the
+  model tracks it, and the spotlight follows too.</p>
+</header>
+
+<div class="stage">
+  <div class="card" id="card">
+    <div class="card_copy">
+      <h2>Interactive 3D</h2>
+      <p>Bring your UI to life with beautiful 3D scenes. Create immersive
+      experiences that capture attention and enhance your design.</p>
+    </div>
+    <div class="card_scene">
+      <p class="loader" id="loader">Loading scene…</p>
+      <spline-viewer id="viewer"
+        url="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+        loading-anim-type="none"></spline-viewer>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p class="note">This is Spline's own demo robot, not the HelloVoice character —
+  it is here to judge the <em>interaction</em>, not the art. The tracking you see
+  is real 3D: the model's head is rigged and aimed at the pointer in the scene
+  itself, which is why it holds up from any angle. Getting our character to do
+  this needs him built and rigged as 3D geometry in Spline first; there is no
+  model to import today, only renders and video.</p>
+</footer>
+
+<script type="module"
+  src="https://unpkg.com/@splinetool/viewer@1.9.28/build/spline-viewer.js"></script>
+<script>
+(function () {
+  "use strict";
+  var card = document.getElementById("card");
+  var loader = document.getElementById("loader");
+  var viewer = document.getElementById("viewer");
+
+  card.addEventListener("pointermove", function (e) {
+    var r = card.getBoundingClientRect();
+    card.style.setProperty("--mx", (e.clientX - r.left) + "px");
+    card.style.setProperty("--my", (e.clientY - r.top) + "px");
+  }, { passive: true });
+  card.addEventListener("pointerenter", function () { card.classList.add("lit"); });
+  card.addEventListener("pointerleave", function () { card.classList.remove("lit"); });
+
+  /* the viewer fires load once the scene is ready; a timeout covers the case
+     where the CDN or the scene host is unreachable, so the panel never sits on
+     "Loading" forever with no explanation */
+  var settled = false;
+  function done(msg) {
+    if (settled) return;
+    settled = true;
+    if (msg) { loader.textContent = msg; } else { loader.classList.add("done"); }
+  }
+  viewer.addEventListener("load", function () { done(null); });
+  viewer.addEventListener("error", function () { done("Scene failed to load"); });
+  setTimeout(function () {
+    done(viewer.shadowRoot ? null : "Scene did not load — check the network");
+  }, 12000);
+})();
+</script>
+</body>
+</html>
