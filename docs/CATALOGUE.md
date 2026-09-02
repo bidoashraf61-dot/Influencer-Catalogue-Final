@@ -38,7 +38,7 @@ here so nobody later mistakes the current build for the protected one.
 
 What still stands:
 
-- the **passcode** (`Alphaplus@123`, `CATALOGUE_PASSCODE` to change it), which
+- the **passcode** (`Hellovoice123`, `CATALOGUE_PASSCODE` to change it), which
   stops the link being forwarded around an office. It is checked in the
   browser, so it is a lock on a glass door.
 - the **anti-copy layer** in `catalogue.js` — right-click, selection, drag,

@@ -35,7 +35,7 @@ Environment variables:
 
 | variable | default | purpose |
 |---|---|---|
-| `CATALOGUE_PASSCODE` | `Alphaplus@123` | the access code |
+| `CATALOGUE_PASSCODE` | `Hellovoice123` | the access code |
 | `CATALOGUE_EMAIL` | `info@hellovoice.co.uk` | where quote requests are sent |
 | `CATALOGUE_ENDPOINT` | FormSubmit for that address | override the submit endpoint |
 | `CATALOGUE_PREFIX` | `HV` | card code prefix |

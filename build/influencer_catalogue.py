@@ -67,7 +67,7 @@ CITIES = {
 # agency, not the client — the catalogue is a reusable HelloVoice asset.
 PREFIX = os.environ.get("CATALOGUE_PREFIX", "HV")
 
-PASSCODE = os.environ.get("CATALOGUE_PASSCODE", "Alphaplus@123")
+PASSCODE = os.environ.get("CATALOGUE_PASSCODE", "Hellovoice123")
 # Where the quote request is POSTed. Empty string = the page shows a clear
 # "not configured yet" error instead of silently losing a submission.
 # FormSubmit relays the request to this inbox with no backend of our own.
