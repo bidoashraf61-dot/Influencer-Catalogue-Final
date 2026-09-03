@@ -2346,9 +2346,6 @@
     var hero = film && film.closest(".hero_section");
     if (!film || !hero || reduced) return;
 
-    /* Without a pointer there is nothing to follow, so on touch he simply holds
-     * his opening pose — level, facing the viewer, which is frame one. */
-    var fine = window.matchMedia("(pointer: fine)").matches;
 
     /* The whole render, with the cursor choosing a destination in it and the
      * film travelling there.
@@ -2371,7 +2368,7 @@
      * across the render — horizontally and vertically, so looking up and down is
      * reachable too, which a single left-to-right cut could never offer. */
     var GAZE_G = 9;
-    var GAZE = [4.1667, 5.625, 5.625, 5.625, 4.4583, 4.5833, 5.0, 5.5833, 5.5833, 4.1667, 4.1667, 5.625, 5.625, 5.625, 4.4583, 4.6667, 5.5833, 5.5833, 4.1667, 4.1667, 4.1667, 5.75, 5.8333, 5.9583, 4.375, 6.25, 6.25, 4.125, 4.125, 4.1667, 4.2083, 6.0, 4.2917, 2.1667, 6.25, 6.25, 4.125, 4.125, 4.125, 3.1667, 2.5833, 1.6667, 2.125, 1.0, 1.2083, 1.9167, 1.9167, 2.0, 4.0417, 3.625, 2.4167, 6.375, 1.2917, 2.25, 1.9583, 1.9167, 2.0, 0.5833, 0.625, 0.625, 0.7083, 0.4167, 0.375, 1.9583, 0.1667, 0.25, 0.3333, 6.4167, 0.6667, 7.625, 0.4167, 2.2917, 1.9583, 0.0833, 0.0417, 0.2917, 6.4583, 6.5, 6.9583, 7.0417, 2.2917];
+    var GAZE = [4.0417, 4.0417, 4.125, 4.5833, 4.75, 4.8333, 5.0, 5.0, 5.0, 4.0417, 3.9167, 3.875, 4.7083, 4.8333, 5.0, 5.0, 5.0417, 3.4167, 3.8333, 3.8333, 3.7917, 3.75, 5.0417, 5.125, 5.2083, 3.4167, 3.3333, 1.9167, 3.7917, 3.75, 3.7083, 3.6667, 5.25, 3.5, 3.4167, 2.9167, 1.9167, 1.625, 1.4167, 3.6667, 5.3333, 5.4167, 3.4167, 3.3333, 2.9167, 2.0, 1.875, 0.9167, 2.25, 7.0, 5.625, 7.0833, 3.25, 2.7917, 2.0833, 2.2083, 0.7083, 6.25, 2.2917, 2.3333, 2.4583, 2.5, 2.6667, 7.25, 6.5417, 0.1667, 7.1667, 0.25, 0.5, 0.2917, 0.4583, 2.5833, 6.9167, 7.2083, 7.2083, 7.1667, 0.25, 0.25, 0.5, 0.4583, 0.4583];
 
     var duration = 0;
     /* Rest on the pose the centre of the screen asks for.
@@ -2390,13 +2387,11 @@
      * there and every frame in between is seen. Four frames a tick at 60Hz is
      * roughly four times speed — quick enough to feel responsive, slow enough
      * to read as movement. */
-    var MAX_STEP = 4 / 24;
     /* 0.16 rather than 0.09. At 60fps the old value needed about half a second
      * to close on the cursor, which on a gaze this subtle read as him not
      * responding at all rather than as weight. This lands in roughly a quarter
      * of a second — still eased, but the eyes arrive while you are still
      * thinking about having moved. */
-    var EASE = 0.16;
 
     /* Seeking a video the browser has never decoded returns a blank frame on
      * iOS. Playing it muted for one instant and pausing forces the decoder up
@@ -2433,26 +2428,65 @@
     /* The pointer is read against the viewport, not the hero. He keeps
      * answering the cursor while it is anywhere on screen, which is the whole
      * point of him watching you. */
-    if (fine) {
-      window.addEventListener("pointermove", function (ev) {
-        var x = ev.clientX / window.innerWidth;
-        var y = ev.clientY / window.innerHeight;
-        x = x < 0 ? 0 : x > 1 ? 1 : x;
-        y = y < 0 ? 0 : y > 1 ? 1 : y;
-        var gx = Math.round(x * (GAZE_G - 1));
-        var gy = Math.round(y * (GAZE_G - 1));
-        targetT = GAZE[gy * GAZE_G + gx];
-      }, { passive: true });
-    }
+    /* No pointer:fine gate.
+     *
+     * It used to sit here, on the reasoning that a touch device has no cursor to
+     * follow. But the query is read once, at load, and a browser that answers it
+     * "false" at that moment — which some do before the first input arrives —
+     * left the listener unattached for the life of the page: the film held its
+     * rest pose no matter where the cursor went, which is exactly the symptom
+     * that was reported. The gate bought nothing anyway. A device with no
+     * pointer fires no pointermove, so it holds the rest pose regardless. */
+    window.addEventListener("pointermove", function (ev) {
+      var x = ev.clientX / window.innerWidth;
+      var y = ev.clientY / window.innerHeight;
+      x = x < 0 ? 0 : x > 1 ? 1 : x;
+      y = y < 0 ? 0 : y > 1 ? 1 : y;
+      var gx = Math.round(x * (GAZE_G - 1));
+      var gy = Math.round(y * (GAZE_G - 1));
+      targetT = GAZE[gy * GAZE_G + gx];
+      /* Step here as well as in the frame loop.
+       *
+       * The loop was the only caller of apply(), and a browser that has
+       * throttled or suspended requestAnimationFrame — a background tab, a
+       * hidden panel, a machine saving power — stops calling it at all. The
+       * target then updated correctly on every cursor move with nothing acting
+       * on it, and he sat on his rest pose. Measured in that state: target
+       * 4.042, shown 2.583, and zero animation frames in two seconds.
+       *
+       * Stepping from the event too means the cursor always moves him; the loop
+       * is left to do the thing only it can, which is carry the easing onward
+       * after the cursor has stopped. */
+      apply();
+    }, { passive: true });
 
     function apply() {
-      if (!duration) return;
-      var gap = targetT - shownT;
-      if (Math.abs(gap) < 1 / 48) return;      /* already there */
-      var step = gap * EASE;
-      if (step > MAX_STEP) step = MAX_STEP;
-      else if (step < -MAX_STEP) step = -MAX_STEP;
-      shownT += step;
+      /* Read from the element, not from a variable captured at startup.
+       *
+       * The cached copy was set in the loadedmetadata handler and in a
+       * readyState check that ran once. Whenever both missed — the metadata
+       * already in when the script ran, or still absent — it stayed 0, this
+       * returned on every frame, and the film held its rest pose no matter
+       * where the cursor went. That is the bug that was reported, and it is
+       * not reproducible with a synthetic event fired after load, which is why
+       * it survived several passes of testing. */
+      var duration = film.duration;
+      if (!duration || !isFinite(duration)) return;
+      /* Straight to the pose the cursor asks for, rather than travelling there.
+       *
+       * Travelling kept the motion smooth but it is why he did not appear to
+       * follow anything: the lookup picks the closest gaze wherever it sits in
+       * the film, so neighbouring points on screen can be seconds apart in it —
+       * 31 of the 144 neighbouring pairs are over 40 frames apart, the worst
+       * 169. Crossing those meant his eyes ran through the whole performance on
+       * the way, and only pointed at the cursor once it stopped.
+       *
+       * Cutting instead, the gaze is right at every instant. It costs the
+       * in-between motion. That is cheap here because the render barely moves
+       * his body — 17px across every frame the grid uses — so a cut reads as
+       * his eyes flicking rather than as him jumping. */
+      if (Math.abs(targetT - shownT) < 1 / 48) return;
+      shownT = targetT;
       if (shownT < 0) shownT = 0;
       else if (shownT > duration) shownT = duration;
       try { film.currentTime = shownT; } catch (err) { /* not seekable yet */ }

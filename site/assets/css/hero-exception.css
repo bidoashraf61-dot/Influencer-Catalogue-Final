@@ -151,79 +151,171 @@
   .hero_section.is-light { padding-top: 90px; padding-bottom: 72px; }
 }
 
-/* ================================================================= hero film
- * The character arrived as an 8-second film with his own gradient ground baked
- * in, so he no longer needs the CSS ground, the cutout, or the WebGL mesh.
+/* ================================================================= the hero
+ * Rebuilt around the film rather than around the type.
  *
- * He is laid in whole rather than used as a cover layer. Covering was the first
- * attempt and it cost 413px off each side — 37% of a frame that was composed at
- * 16:9 — and it pushed his head up under the wordmark, which is the exact
- * collision the lockup was rebuilt to avoid. Anchored to the bottom at his own
- * ratio, the frame stays whole and the type has the upper third to itself.
+ * The previous version put a wordmark, a line, a social row and a statistic in
+ * four separate places on the left, and the character in the right. Four voices
+ * competing, a dead third of the frame between them, and the film — the only
+ * thing on the page that is actually his — reduced to a backdrop. The pattern
+ * for this kind of hero is the opposite: high-impact visual, minimal text.
+ *
+ * So the film takes the whole frame and the type collapses into one block on a
+ * single baseline at the foot, the way a title card sits under a shot. The
+ * upper two thirds belong to him; everything anyone has to read is in one place
+ * and in one reading order.
  */
+.hero_section.is-light {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  /* A column that hangs from the bottom edge. The three text blocks stack in
+     their own order with real gaps between them — pinning each to its own
+     bottom offset put the line through the slate's rule the moment it wrapped
+     to two lines. */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding-bottom: clamp(1.1rem, 2.2vw, 1.9rem);
+  background-color: #2a0409;
+  background-image: none;
+}
+
+/* The film is the hero, not its background. */
+.hero_section.is-light .hero_image {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
 .hero_section.is-light .hero_film {
   position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  inset: 0;
   width: 100%;
-  height: auto;
-  /* The file's true ratio, not 16/9. It renders 2880x1604, which is 1.798 —
-     close enough to call it 16:9 in conversation and far enough to shave 8px
-     off each side if the box is built at 1.778. Stated exactly, nothing is
-     lost. */
-  aspect-ratio: 2880 / 1604;
-  object-fit: contain;
-  /* Feather the top edge into the ground.
-     The ground is matched to the film's top colour, but the film's own top row
-     is not flat — it runs darker at the corners than at the centre — so a hard
-     join still showed as a faint line straight across the hero. Fading the
-     first few per cent of the film lets the two meet without an edge. */
-  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 7%);
-  mask-image: linear-gradient(to bottom, rgba(0,0,0,0) 0%, #000 7%);
+  height: 100%;
+  object-fit: cover;
   pointer-events: none;
   opacity: 0;
-  transition: opacity .5s ease;
+  transition: opacity .6s ease;
 }
-
 .hero_section.is-light .hero_film.is-ready { opacity: 1; }
-
-/* The ground above the film is matched to the film's own top edge (#44060c,
-   sampled from the frame) so the join is invisible and the hero reads as one
-   continuous space rather than a video pasted onto a panel.
-
-   It was briefly warmed to an orange top stop; the deep oxblood is the version
-   that stays. It sits closer to the film's own upper corners, so the join reads
-   as one space rather than as a ramp arriving at a different colour. The bright warmth
-   that used to sit up here has moved into the film itself, which is lit from
-   below — dark where the type is, glowing where he stands. */
-.hero_section.is-light {
-  background-color: #44060c;
-  background-image: linear-gradient(180deg, #2c0409 0%, #3a050b 55%, #44060c 100%);
-}
-
-/* The floor wash grounded the cutout. The film carries its own floor. */
 .hero_section.is-light .hero_image::after { display: none; }
 
-/* On a phone the hero is tall and narrow, so a true 16:9 band would be 219px of
-   film under a very long column of type. He is given a deeper band and allowed
-   to crop instead — he is centred in frame, so the sides are what go. */
+/* One shade at the foot, carrying every piece of type on the frame. The lower
+   third of the render is its brightest — the floor he stands on glows — and
+   white measured 1.85:1 against it. This takes that ground under 0.18
+   luminance, which is what 4.5:1 against white needs. */
+.hero_section.is-light::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 52%;
+  background-image: linear-gradient(to top,
+    rgba(18, 2, 5, .93) 0%, rgba(18, 2, 5, .78) 26%,
+    rgba(18, 2, 5, .42) 56%, rgba(18, 2, 5, 0) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* The wordmark leaves the top of the frame and joins the block at the foot. */
+.hero_section.is-light .hero_heading {
+  position: relative;
+  z-index: 2;
+  margin: 0 0 clamp(.5rem, 1vw, .85rem);
+  padding: 0 5%;
+}
+.hero_section.is-light .hero_heading h1 {
+  font-size: clamp(2.5rem, 7.2vw, 7rem);
+  line-height: .84;
+  letter-spacing: -.01em;
+  color: var(--white);
+  text-shadow: none;
+  margin: 0;
+  text-align: left;
+}
+.hero_section.is-light .hero_heading h1 .hv-accent { margin-left: .045em; }
+.hero_section.is-light .hero_heading h1 .hv-line2 {
+  display: block;
+  text-transform: uppercase;
+  line-height: .84;
+}
+
+/* The wrapper and container carry no box of their own. Positioning the wrapper
+   is what made it the film's containing block a moment ago, and the film
+   collapsed to zero height inside it. Dissolved with display:contents, the film
+   and both text blocks all resolve against the section, which is the only
+   element here that should own a coordinate space. */
+.hero_section.is-light .hero_wrapper,
+.hero_section.is-light .hero_wrapper > .container { display: contents; }
+
+.hero_section.is-light .hero_content_wrapper {
+  position: relative;
+  z-index: 2;
+  display: block;
+  padding: 0 5%;
+  margin: 0 0 clamp(1.1rem, 2.4vw, 2rem);
+  max-width: none;
+}
+.hero_section.is-light .hero_sub_title {
+  font-family: var(--_typography---font-family--body-font);
+  font-size: clamp(.95rem, 1.35vw, 1.35rem);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: .01em;
+  text-align: left;
+  color: rgba(255, 255, 255, .88);
+  margin: 0;
+  /* Balanced rather than ragged: at 30ch the last word fell to a line of its
+     own under a four-word line, which reads as a mistake rather than a break. */
+  text-wrap: balance;
+  max-width: 34ch;
+}
+
+/* A slate along the very bottom: who to follow on the left, the count on the
+   right, a hairline above them. It reads as the credit strip under a frame
+   rather than as two more things floating on the picture. */
+.hero_section.is-light .hero_proof_area {
+  position: relative;
+  z-index: 2;
+  margin: 0 5%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: clamp(.85rem, 1.5vw, 1.15rem) 0 0;
+  border-top: 1px solid rgba(255, 255, 255, .22);
+}
+.hero_section.is-light .hero_social_links,
+.hero_section.is-light .hero_stat { margin: 0; }
+.hero_section.is-light .hero_stat { flex-direction: row; align-items: center; }
+
+@media screen and (max-width: 991px) {
+  .hero_section.is-light .hero_sub_title { max-width: 26ch; }
+}
+
+/* A phone gets a taller frame — a 16:9 band is 219px, which leaves him a
+   thumbnail — and the same block at the foot, with the slate stacking. */
 @media screen and (max-width: 767px) {
-  .hero_section.is-light .hero_film {
-    aspect-ratio: auto;
-    height: 46vh;
-    object-fit: cover;
+  .hero_section.is-light { aspect-ratio: 3 / 4; }
+  .hero_section.is-light::after { height: 62%; }
+  .hero_section.is-light .hero_film { object-position: 62% 50%; }
+  .hero_section.is-light .hero_heading h1 { font-size: clamp(2.5rem, 13vw, 4.5rem); }
+  .hero_section.is-light .hero_sub_title { font-size: clamp(.9rem, 3.8vw, 1.1rem); max-width: 24ch; }
+  .hero_section.is-light .hero_proof_area {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: clamp(.7rem, 2.5vw, 1rem);
   }
 }
 
-/* Reduced motion keeps the poster frame and never seeks: he simply stands
-   there, facing the viewer, which is exactly frame one. */
 @media (prefers-reduced-motion: reduce) {
   .hero_section.is-light .hero_film { display: none; }
   .hero_section.is-light .hero_image {
     background-image: url("/assets/video/hero-char-poster.jpg");
-    background-repeat: no-repeat;
-    background-position: 50% 100%;
-    background-size: 100% auto;
+    background-size: cover;
+    background-position: 50% 50%;
   }
 }

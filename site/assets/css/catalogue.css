@@ -5,12 +5,12 @@
 
 @font-face {
   font-family: Bebasneue;
-  src: url(/assets/ref/68efdbc172d0ac625d40c65f_BebasNeue-Regular.ttf) format("truetype");
+  src: url(../ref/68efdbc172d0ac625d40c65f_BebasNeue-Regular.ttf) format("truetype");
   font-weight: 400; font-style: normal; font-display: swap;
 }
 @font-face {
   font-family: "DM Sans";
-  src: url("/assets/ref/68f262b1b60fe57e398c9c09_DMSans-VariableFont_opsz,wght.ttf") format("truetype");
+  src: url("../ref/68f262b1b60fe57e398c9c09_DMSans-VariableFont_opsz,wght.ttf") format("truetype");
   font-weight: 100 1000; font-style: normal; font-display: swap;
 }
 

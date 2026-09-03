@@ -26,6 +26,7 @@ import hashlib
 import html
 import json
 import os
+import re
 from pathlib import Path
 
 import openpyxl
@@ -328,6 +329,20 @@ def stamp(rel):
     return f"{rel}?v={h}"
 
 
+def relativise(html, depth):
+    """Rewrite root-absolute asset and page links to be relative to a page
+    sitting `depth` directories below the site root.
+
+    A static host that serves the site at the domain root is the easy case;
+    GitHub Pages serves it under /<repo>/, where every "/assets/..." resolves
+    against the wrong root and the page loads unstyled. Relative links work in
+    both, and need no build-time knowledge of the base path."""
+    prefix = "../" * depth
+    html = re.sub(r'(href|src)="/(?!/)', lambda m: f'{m.group(1)}="{prefix}', html)
+    html = html.replace('url(/assets/', f'url({prefix}assets/')
+    return html
+
+
 def build():
     people = read_roster()
 
@@ -570,7 +585,7 @@ def build():
 """
 
     OUT_HTML.parent.mkdir(parents=True, exist_ok=True)
-    OUT_HTML.write_text(page, encoding="utf-8")
+    OUT_HTML.write_text(relativise(page, 1), encoding="utf-8")
 
     # ---- the selection page ------------------------------------------------
     # A sibling of the catalogue that renders whichever creators the URL
@@ -727,7 +742,7 @@ def build():
                  .replace("{clients_block}", clients_block)
                  .replace("{cards}", cards))
     OUT_SELECTION.parent.mkdir(parents=True, exist_ok=True)
-    OUT_SELECTION.write_text(selection, encoding="utf-8")
+    OUT_SELECTION.write_text(relativise(selection, 2), encoding="utf-8")
 
     print(f"cards          {len(people)}")
     print(f"with photos    {with_photos}  ({with_photos * 100 // max(len(people),1)}%)")

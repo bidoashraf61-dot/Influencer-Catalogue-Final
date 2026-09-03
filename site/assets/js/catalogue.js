@@ -193,7 +193,9 @@
     $("cat-save-form").addEventListener("submit", function (e) {
       e.preventDefault();
       var name = new FormData(e.target).get("selname").trim() || "Selection";
-      var url = location.origin + "/catalogue/selection/" + buildFragment(name, selected);
+      // Resolved against this page, not the origin: under a base path such as
+      // GitHub Pages' /<repo>/ an origin-rooted URL points outside the site.
+      var url = new URL("selection/", location.href).href + buildFragment(name, selected);
       $("cat-share-url").value = url;
       $("cat-share-open").href = url;
       e.target.hidden = true;
