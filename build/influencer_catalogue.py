@@ -336,10 +336,34 @@ def relativise(html, depth):
     A static host that serves the site at the domain root is the easy case;
     GitHub Pages serves it under /<repo>/, where every "/assets/..." resolves
     against the wrong root and the page loads unstyled. Relative links work in
-    both, and need no build-time knowledge of the base path."""
+    both, and need no build-time knowledge of the base path.
+
+    srcset matters as much as src and is easy to miss: it holds several
+    comma-separated URLs, each possibly with a descriptor, and it is the one
+    the browser actually uses on a retina screen. Missing it means the 1x
+    fallback looks fine on a desktop check while every logo silently 404s on a
+    phone."""
     prefix = "../" * depth
-    html = re.sub(r'(href|src)="/(?!/)', lambda m: f'{m.group(1)}="{prefix}', html)
-    html = html.replace('url(/assets/', f'url({prefix}assets/')
+
+    def one(m):
+        return f'{m.group(1)}="{prefix}{m.group(2)}"'
+
+    # single-URL attributes
+    html = re.sub(r'\b(href|src|poster)="/(?!/)([^"]*)"', one, html)
+
+    # srcset: rewrite every candidate inside the attribute
+    def srcset(m):
+        out = []
+        for cand in m.group(1).split(","):
+            cand = cand.strip()
+            if cand.startswith("/") and not cand.startswith("//"):
+                cand = prefix + cand[1:]
+            out.append(cand)
+        return 'srcset="' + ", ".join(out) + '"'
+
+    html = re.sub(r'srcset="([^"]*)"', srcset, html)
+
+    html = html.replace("url(/assets/", f"url({prefix}assets/")
     return html
 
 
