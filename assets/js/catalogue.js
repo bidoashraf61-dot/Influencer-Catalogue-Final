@@ -333,6 +333,14 @@
         email: data.get("email"),
         phone: data.get("phone"),
         selection_name: selectionName || "(unnamed)",
+        // The exact shortlist the client was looking at, reopenable. On the
+        // selection page that is simply this URL; from the roster it is the
+        // same link the Save panel would have produced. The fragment never
+        // reaches a server on its own, but it travels fine inside the payload.
+        selection_link: (PAGE === "selection")
+          ? location.href
+          : new URL("selection/", location.href).href +
+            buildFragment(selectionName || (data.get("company") || "Client") + " selection", selected),
         creators_selected: selected.length,
         tier_split: split || "—",
         indicative_total: lo ? lo.toLocaleString("en-US") + " – " + hi.toLocaleString("en-US") + " SAR" : "—",
