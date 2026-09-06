@@ -59,7 +59,7 @@ header.top .wrap{display:flex;align-items:center;gap:28px}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto;
 text-decoration:none;color:#fff}
 .brand img{display:block;height:26px;width:auto}
-.brand span{opacity:.55;font-weight:400;font-size:14px}
+.brand span{opacity:.55;font-weight:400;font-size:14px;white-space:nowrap}
 .login img{filter:invert(1)}
 nav a{display:inline-block;padding:6px 0;margin-right:20px;color:#fff;
 text-decoration:none;opacity:.65;font-size:14px;border-bottom:2px solid transparent}
@@ -166,6 +166,10 @@ HEAD = (
 
 BASE = ""
 
+# The dashboard's name. It shows in the browser tab, beside the logo in the
+# header, and on the sign-in page — one constant so those three cannot drift.
+NAME = "Influencer Catalogue Admin"
+
 
 def set_base(prefix):
     """Called once at startup. Every href and form action is written through
@@ -188,11 +192,11 @@ def page(title, body, active=""):
     )
     return (
         HEAD
-        + "<title>" + e(title) + " — HelloVoice catalogue</title>"
+        + "<title>" + e(title) + " — " + e(NAME) + "</title>"
         + '<link rel="stylesheet" href="' + u("/static/admin.css") + '"></head><body>'
         + '<header class="top"><div class="wrap">'
         + '<a class="brand" href="' + u("/") + '"><img src="' + u("/static/logo.webp") + '" alt="HelloVoice" '
-          'height="26"><span>catalogue admin</span></a>'
+          'height="26"><span>' + e(NAME) + "</span></a>"
         + "<nav>" + nav + '<a href="' + u("/logout") + '">Sign out</a></nav>'
         + '</div></header><main class="wrap">' + body + "</main></body></html>"
     )
@@ -208,12 +212,12 @@ def login_page(error=None, base=None):
     err = "<div class='err'>Email or password not recognised.</div>" if error else ""
     return (
         HEAD
-        + "<title>Sign in — HelloVoice catalogue</title>"
+        + "<title>Sign in — " + e(NAME) + "</title>"
         + '<link rel="stylesheet" href="' + u("/static/admin.css") + '"></head><body>'
         + '<main class="wrap login">'
         + '<img src="' + u("/static/logo.webp") + '" alt="HelloVoice" height="30" '
           'style="margin-bottom:22px">'
-        + '<h1>Catalogue admin</h1>'
+        + "<h1>" + e(NAME) + "</h1>"
         + "<p class='sub'>Sign in to manage codes, roster and requests.</p>"
         + err
         + "<form method='post' action='" + u("/login") + "' class='card'>"

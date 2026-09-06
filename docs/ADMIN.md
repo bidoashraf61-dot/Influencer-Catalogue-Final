@@ -1,4 +1,4 @@
-# Catalogue admin
+# Influencer Catalogue Admin
 
 A dashboard for issuing access codes, watching who opens the catalogue,
 editing the roster and reading quote requests — plus the API that makes those
