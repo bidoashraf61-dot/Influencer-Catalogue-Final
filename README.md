@@ -1,53 +1,43 @@
-# HelloVoice — influencer catalogue
+# HelloVoice — creator catalogue
 
-The built catalogue portal and the scripts that generate it.
-
-**This repository is private and must stay private.** The built pages carry
-162 creators' names, their `@handles` as profile links, follower counts,
-cities and photos, plus client pricing. The passcode on the page is checked in
-the browser, so it protects nothing here.
-
-## What is in here
+The repo root **is** the published site.
 
 ```
-site/                      the built static site — this is what gets served
-build/influencer_catalogue.py   generates /catalogue/ and /catalogue/selection/
-build/catalogue_photos.py       installs harvested photos by handle
-build/serve.py                  local review server (sends no-store)
-docs/CATALOGUE.md               how it works, and its limits — read this first
+index.html            the roster, 162 creators
+selection/            one named shortlist, driven by the URL fragment
+assets/               only the files those two pages reference
+build/                the scripts that generate them
+docs/CATALOGUE.md     how it works, and its limits — read this first
 ```
 
-## Serving it
+Nothing else is here on purpose. An earlier deployment published the whole
+HelloVoice site and visitors landed on the homepage rather than the catalogue.
 
-Any static host. The document root is `site/`.
+**Live:** GitHub Pages, Source → GitHub Actions. The workflow publishes the
+repo root on every push to `main`.
+
+**Passcode:** `Hellovoice123` — checked in the browser, so it stops a link
+being forwarded, nothing more. This repo is public and the pages carry every
+creator's name, handle and photo; the passcode does not change that.
+
+## Regenerating
+
+From the main working repo, not from here:
 
 ```bash
-python3 build/serve.py          # local review, http://localhost:8811
+python3 build/influencer_catalogue.py   # writes site/catalogue/
+python3 build/catalogue_dist.py         # assembles dist/ — copy that here
 ```
 
-## Rebuilding
+`catalogue_dist.py` resolves assets by reading the built pages, so nothing
+unreferenced ships and nothing referenced is missed.
 
-```bash
-python3 build/influencer_catalogue.py
-```
+## Before sending the link to a client
 
-Environment variables:
-
-| variable | default | purpose |
-|---|---|---|
-| `CATALOGUE_PASSCODE` | `Hellovoice123` | the access code |
-| `CATALOGUE_EMAIL` | `info@hellovoice.co.uk` | where quote requests are sent |
-| `CATALOGUE_ENDPOINT` | FormSubmit for that address | override the submit endpoint |
-| `CATALOGUE_PREFIX` | `HV` | card code prefix |
-| `CATALOGUE_ANON` | unset | `1` restores the anonymised build |
-
-## Before you send the link to a client
-
-1. **Test the quote form on the live domain.** FormSubmit rejects `localhost`
-   outright, so it cannot be verified before deployment. Submit once and
-   confirm the mail arrives at info@hellovoice.co.uk.
-2. **Eight creators have no photo, and seven of those handles are dead** —
-   four Instagram 404s, one deactivated, two TikTok "couldn't find this
-   account". Worth correcting in the roster. See docs/CATALOGUE.md.
+1. **Test the quote form on the live domain.** FormSubmit rejects `localhost`,
+   so it cannot be verified any earlier. Submit once and confirm the mail
+   arrives at info@hellovoice.co.uk.
+2. **Eight creators have no photo, seven of those accounts are dead** — worth
+   correcting in the roster. See docs/CATALOGUE.md.
 3. **The Interest filter is hidden** until `content/interests.json` supplies
-   real categories. The workbook has no niche column.
+   real categories; the workbook has no niche column.

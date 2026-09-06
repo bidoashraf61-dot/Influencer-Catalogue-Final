@@ -1,8 +1,9 @@
-# Publishes site/ to GitHub Pages on every push to main.
+# Publishes the catalogue to GitHub Pages on every push to main.
 #
-# Pages serves the repo under /<repo-name>/, not the domain root, so every
-# asset link in the catalogue is relative rather than root-absolute. Do not
-# "tidy" those back to /assets/... — the page loads unstyled if you do.
+# The repo root IS the site: index.html is the roster, selection/ is one
+# shortlist, assets/ holds only what those two pages reference. Nothing else
+# is served — an earlier deploy published the whole HelloVoice site and
+# visitors landed on the homepage instead of the catalogue.
 name: Deploy catalogue to Pages
 
 on:
@@ -28,32 +29,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-      - name: Disable Jekyll
-        run: touch site/.nojekyll
-      - name: Land the root on the catalogue
-        # The artifact root would otherwise serve the site homepage, whose
-        # links are root-absolute and belong to the main site build. This repo
-        # exists to serve the catalogue, so the root redirects to it and the
-        # shared link is just the domain.
-        run: |
-          cat > site/index.html <<'HTML'
-          <!DOCTYPE html>
-          <html lang="en">
-          <head>
-          <meta charset="utf-8"/>
-          <title>HelloVoice — Creator Catalogue</title>
-          <meta name="robots" content="noindex, nofollow"/>
-          <link rel="canonical" href="catalogue/"/>
-          <meta http-equiv="refresh" content="0; url=catalogue/"/>
-          <script>location.replace("catalogue/" + location.search + location.hash);</script>
-          </head>
-          <body style="font:16px/1.6 system-ui;padding:40px">
-          <p><a href="catalogue/">Open the creator catalogue</a></p>
-          </body>
-          </html>
-          HTML
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: .
       - id: deployment
         uses: actions/deploy-pages@v4
