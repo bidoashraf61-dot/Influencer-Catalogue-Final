@@ -39,7 +39,7 @@
   /* ------------------------------------------------------------- helpers */
 
   function $(id) { return document.getElementById(id); }
-  function all(sel) { return Array.prototype.slice.call(document.querySelectorAll(sel)); }
+  function all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
   // Mirrors simple_hash() in the Python builder (djb2-xor, 32-bit).
   function hash(s) {
@@ -272,18 +272,56 @@
         return;
       }
 
-      // FormSubmit renders top-level keys as rows in the email, so the payload
-      // is flat and human-readable rather than a nested JSON blob. The
-      // selection is spelled out — a list of bare codes would mean cross-
-      // referencing the private key by hand for every enquiry.
-      var lines = selected.map(function (code) {
+      // Every field the card carries, spelled out per creator. A list of bare
+      // codes meant cross-referencing the private key by hand for every
+      // enquiry; this is enough to act on without opening anything else.
+      function detail(code, i) {
         var card = document.querySelector('.cat-card[data-code="' + code + '"]');
-        if (!card) return code;
+        if (!card) return (i + 1) + ". " + code + " (not found in this build)";
+
+        function metaValue(label) {
+          var row = all(".cat-card__meta li", card).filter(function (li) {
+            var k = li.querySelector("span");
+            return k && k.textContent.trim().toLowerCase() === label;
+          })[0];
+          var v = row && row.querySelector("strong");
+          return v ? v.textContent.trim() : "—";
+        }
+
         var nameEl = card.querySelector(".cat-card__name");
-        var who = nameEl ? " — " + nameEl.textContent.trim() : "";
-        return code + who + "  (" + card.dataset.platform + ", " +
-               card.dataset.tier + ", " + card.dataset.city + ")";
+        var link = card.querySelector("a.cat-card__platform");
+        var priceEl = card.querySelector(".cat-card__price");
+        var profile = link ? link.getAttribute("href") : "";
+        var handle = profile
+          ? "@" + profile.replace(/\/$/, "").split("/").pop().replace(/^@/, "")
+          : "";
+
+        return [
+          (i + 1) + ". " + code + (nameEl ? " — " + nameEl.textContent.trim() : ""),
+          "   Platform   " + card.dataset.platform + (handle ? "  " + handle : ""),
+          profile ? "   Profile    " + profile : null,
+          "   Followers  " + metaValue("followers"),
+          "   City       " + card.dataset.city,
+          "   Tier       " + card.dataset.tier,
+          "   Price      " + (priceEl ? priceEl.textContent.replace(/\s+/g, " ").trim() : "—")
+        ].filter(Boolean).join("\n");
+      }
+
+      var lines = selected.map(detail);
+
+      // tier split and the indicative total, so the quote has a starting point
+      var tally = {}, lo = 0, hi = 0;
+      selected.forEach(function (code) {
+        var card = document.querySelector('.cat-card[data-code="' + code + '"]');
+        if (!card) return;
+        var t = card.dataset.tier;
+        tally[t] = (tally[t] || 0) + 1;
+        var p = TIER_PRICE[t];
+        if (p) { lo += p[0]; hi += p[1]; }
       });
+      var split = Object.keys(tally).map(function (t) {
+        return t + " " + tally[t];
+      }).join(", ");
 
       var payload = {
         _subject: (selectionName ? selectionName + " — " : "Catalogue quote request — ") +
@@ -296,7 +334,9 @@
         phone: data.get("phone"),
         selection_name: selectionName || "(unnamed)",
         creators_selected: selected.length,
-        selection: lines.join("\n"),
+        tier_split: split || "—",
+        indicative_total: lo ? lo.toLocaleString("en-US") + " – " + hi.toLocaleString("en-US") + " SAR" : "—",
+        selection: lines.join("\n\n"),
         submitted_at: new Date().toISOString(),
         catalogue: "HelloVoice Creator Roster"
       };
