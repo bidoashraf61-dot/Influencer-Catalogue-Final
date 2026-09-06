@@ -89,7 +89,8 @@ Split: Instagram 128 / TikTok 34. Riyadh 95 / Jeddah 45 / Unspecified 22.
 
 Each card carries: photo, tier chip, a platform mark linking to the profile
 (labelled "Visit profile"), the code, the creator's name, exact follower count,
-city and tier. The tier chip is yellow on black; the platform mark carries the
+city and tier. The tier chip is the site's lime on black, the same accent as
+the Showreel pill; the platform mark carries the
 platform's own colours — Instagram's gradient, TikTok's black with the offset
 cyan and magenta. Tier follower ranges come from each
 tier sheet's own header (`نطاق الفئة`): Nano under 10K, Micro 10K–50K,
