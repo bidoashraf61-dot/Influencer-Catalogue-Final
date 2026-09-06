@@ -244,8 +244,18 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/codes":
             return self.send(200, views.codes_page(db.list_codes(), query.get("new"), query.get("e")))
         if path == "/analytics":
-            days = int(query.get("days", 30))
-            return self.send(200, views.analytics_page(db.stats(days), db.recent_events(200), days))
+            # Two dates off a calendar, not a fixed window. int(query["days"])
+            # used to sit here and raised ValueError on anything non-numeric in
+            # the URL — a hand-edited address was a 500.
+            today = db.now()
+            default_from = today - 29 * 86400
+            start = db.day_bounds(query.get("from", ""), db.day_bounds(
+                time.strftime("%Y-%m-%d", time.gmtime(default_from)), default_from))
+            # `to` is inclusive to the person picking it, so the window runs to
+            # the end of that day rather than its midnight.
+            end = db.day_bounds(query.get("to", ""), today) + 86400
+            return self.send(200, views.analytics_page(
+                db.stats(start=start, end=end), db.recent_events(200)))
         if path == "/roster":
             return self.send(200, views.roster_page(
                 db.list_creators(), query.get("e"), query.get("ok")))

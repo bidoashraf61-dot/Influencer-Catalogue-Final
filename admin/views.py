@@ -12,6 +12,7 @@ variable first rather than inlined.
 
 import html
 import json
+import time
 from datetime import datetime, timezone
 
 from db import code_state, now
@@ -121,6 +122,13 @@ background:var(--ink);color:var(--lime);border-color:var(--ink)}
 .chart{width:100%;height:auto;display:block;overflow:visible}
 .legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--gray);
 margin:0 0 14px}
+.range{display:flex;gap:14px;align-items:end;flex-wrap:wrap;background:var(--white);
+border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 24px}
+.range input[type=date]{font:inherit;font-size:15px;padding:9px 12px;
+border:1px solid var(--line);border-radius:9px;background:var(--white);
+color:var(--ink);min-height:42px}
+.range input[type=date]:focus{outline:none;border-color:var(--ink)}
+.range label{margin-bottom:5px}
 .legend span{display:inline-flex;align-items:center;gap:7px}
 .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
 .hb{display:grid;grid-template-columns:minmax(90px,auto) 1fr auto;gap:12px;
@@ -383,6 +391,10 @@ def codes_page(codes, new_code=None, error=None):
     return page("Access codes", body, "/codes")
 
 
+def pretty_day(ts):
+    return time.strftime("%-d %b %Y", time.gmtime(ts))
+
+
 def pct(part, whole):
     return int(round(part * 100.0 / whole)) if whole else 0
 
@@ -508,7 +520,7 @@ def funnel(s):
     return "".join(out)
 
 
-def analytics_page(s, events, days):
+def analytics_page(s, events):
     def rank(rows, colour=None, key="k"):
         if not rows:
             return "<p class='empty'>Nothing recorded yet.</p>"
@@ -587,13 +599,33 @@ def analytics_page(s, events, days):
         for ev in events
     ) or "<tr><td colspan='5' class='muted'>Nothing recorded yet.</td></tr>"
 
-    def tab(d):
-        on = " class='on'" if d == days else ""
-        return "<a href='" + u("/analytics?days=" + str(d)) + "'" + on + ">" + str(d) + "</a>"
+    # ---- the range picker -------------------------------------------------
+    # Two native date inputs, so the browser supplies its own calendar and its
+    # own locale — a hand-built one would be a lot of JavaScript to arrive at
+    # something worse on a phone.
+    d_from = time.strftime("%Y-%m-%d", time.gmtime(s["start"]))
+    d_to = time.strftime("%Y-%m-%d", time.gmtime(s["end"] - 86400))
+    today = time.strftime("%Y-%m-%d", time.gmtime())
+    span = s["span_days"]
+    picker = (
+        "<form class='range' method='get' action='" + u("/analytics") + "'>"
+        "<div><label for='from'>From</label>"
+        "<input type='date' id='from' name='from' value='" + e(d_from)
+        + "' max='" + today + "'></div>"
+        "<div><label for='to'>To</label>"
+        "<input type='date' id='to' name='to' value='" + e(d_to)
+        + "' max='" + today + "'></div>"
+        "<button class='btn'>Apply</button>"
+        "<span class='muted' style='font-size:13px'>" + str(span)
+        + (" day" if span == 1 else " days")
+        + (", by week" if s["bucket"] == "week" else "") + "</span>"
+        "</form>")
 
     body = (
-        "<h1>Analytics</h1><p class='sub'>Last " + str(days) + " days &nbsp;·&nbsp; "
-        + tab(7) + " · " + tab(30) + " · " + tab(90) + " days</p>"
+        "<h1>Analytics</h1>"
+        "<p class='sub'>" + e(pretty_day(s["start"])) + " – "
+        + e(pretty_day(s["end"] - 86400)) + "</p>"
+        + picker
         + "<div class='grid'>" + cards + "</div>"
 
         + "<h2>Activity</h2><div class='card'>"

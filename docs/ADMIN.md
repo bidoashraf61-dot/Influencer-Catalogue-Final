@@ -287,6 +287,16 @@ fingerprinting, no third-party analytics, nothing leaves the server.
 The numbers were always there; they were laid out as tables of counts, which
 tells you how much happened and not whether any of it went anywhere.
 
+- **The range is a calendar**, two native `<input type="date">` fields and
+  Apply. Native, so the browser supplies its own calendar and its own locale —
+  a hand-built picker would be a lot of JavaScript to arrive at something worse
+  on a phone. `to` is inclusive: pick the 6th and the 6th is counted, right to
+  the end of that day. Dates are read as UTC, matching how SQLite groups the
+  daily chart, so events do not land in the wrong column at the edges. A bad or
+  reversed range falls back rather than erroring — verified with
+  `?from=banana`, a reversed pair, and the old `?days=7`, all 200.
+- Past four months the chart **rolls up to weeks**, because a daily bar across
+  a year is a hairline.
 - **Headline figures** carry their own context — opens says how many of the
   issued codes were used, quote requests says what share of opened codes
   actually asked.
