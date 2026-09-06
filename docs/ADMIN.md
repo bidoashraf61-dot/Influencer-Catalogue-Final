@@ -184,24 +184,56 @@ guessed, because guessing puts a photo on the wrong card.
 
 ### Bulk import
 
-Download the CSV template from the roster page, fill it in, upload it.
-
-**The template has no photo column, and cannot have one.** A spreadsheet cell
-holds text; a photo is bytes. So an import brings in every field except the
-image, and *Attach photos in bulk* on the same page covers the rest.
+Download the template from the roster page, fill it in, upload it. Two
+formats: **.xlsx**, which can carry the photos, and **CSV**, which cannot.
 
 - **A blank code is assigned automatically**; an existing code updates that
   creator rather than duplicating them.
-- **A photo already on file survives a re-import** — the sheet has no photo
-  column, and losing 154 photos to a spreadsheet upload would be a bad day.
 - **Nothing is written unless every row is valid.** A bad tier or a
   non-numeric follower count rejects the whole file and names the rows. A
-  half-imported roster is harder to recover from than a rejected upload.
+  half-imported roster is harder to recover from than a rejected upload. The
+  row it names is the sheet's own line, so blank rows in the middle no longer
+  shift the number.
 - `.xlsx` works **only if openpyxl is installed on the server**. It is not a
   stdlib module, so if it is missing the uploader is told to save as CSV
-  rather than meeting a silent failure. CSV always works.
-- The template ships with a UTF-8 BOM so Excel does not mangle Arabic city
+  rather than meeting a silent failure. CSV always works, minus photos.
+- The CSV template ships with a UTF-8 BOM so Excel does not mangle Arabic city
   names, and the parser accepts `;` delimiters for locales that export that way.
+
+### Photos inside the sheet
+
+A photo is never *in* a cell — a cell holds text. Excel stores pictures as
+floating drawings in `xl/media/`, anchored to a position on the sheet, and the
+cell underneath stays empty. That is why the template's `photo` column is a
+landing place rather than a field: whatever you type there is ignored, and the
+picture you insert on that row is what counts.
+
+**The row a picture's top-left corner sits in is the creator it belongs to.**
+Insert one per row and it lands correctly. Drag a picture down until its corner
+falls into the row below and it attaches to that person instead — which is
+fair, because that is where it visibly is.
+
+Verified end to end: a sheet with pictures on rows 2 and 4 and nothing on row
+3 imported as *"3 added, 2 photos taken from the sheet"*, the images matched
+by content hash to the right two creators and row 3 left with none.
+
+Caveats, all of them visible rather than silent:
+
+- **.xlsx only.** CSV cannot carry an image in any form, and no encoding trick
+  changes that.
+- Reading pictures needs the workbook loaded in full rather than in read-only
+  streaming mode, which does not expose drawings at all. Roster sheets are
+  small, so this costs nothing in practice.
+- Two pictures on one row: the first wins, the second is ignored rather than
+  silently overwriting it.
+- A picture that is not a real image, or is over 6MB, is **named in the result
+  by its row** and skipped. The rest of the import still goes through.
+- **A photo already on file survives a re-import that carries no pictures** —
+  losing 154 photos to a spreadsheet upload would be a bad day. A picture on
+  the sheet replaces it, because putting one there is deliberate.
+
+If your photos are a folder of files rather than something you want to paste
+into Excel, *Attach photos in bulk* above is the faster route.
 
 ---
 

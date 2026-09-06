@@ -239,6 +239,17 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/roster":
             return self.send(200, views.roster_page(
                 db.list_creators(), query.get("e"), query.get("ok")))
+        if path == "/roster/template.xlsx":
+            # The only format that can carry pictures — a CSV is text.
+            try:
+                book = importer.template_xlsx()
+            except RuntimeError as ex:
+                return self.redirect("/roster?e=" + urllib.parse.quote(str(ex)))
+            return self.send(
+                200, book,
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                [("Content-Disposition",
+                  'attachment; filename="creator-import-template.xlsx"')])
         if path == "/roster/template":
             return self.send(200, importer.template_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition",
@@ -380,7 +391,7 @@ class Handler(BaseHTTPRequestHandler):
         if not part or not isinstance(part, dict) or not part.get("data"):
             return self.redirect("/roster?e=" + urllib.parse.quote("Choose a file first."))
         try:
-            rows, errors = importer.parse(part["data"], part.get("filename", ""))
+            rows, errors, photos = importer.parse(part["data"], part.get("filename", ""))
         except RuntimeError as ex:
             return self.redirect("/roster?e=" + urllib.parse.quote(str(ex)))
 
@@ -395,7 +406,8 @@ class Handler(BaseHTTPRequestHandler):
         if not rows:
             return self.redirect("/roster?e=" + urllib.parse.quote("No creator rows found."))
 
-        added = updated = 0
+        added = updated = attached = 0
+        bad_photos = []
         for i, r in enumerate(rows):
             code = r["code"]
             if code and db.creator(code):
@@ -404,13 +416,32 @@ class Handler(BaseHTTPRequestHandler):
                 if not code:
                     code = db.next_code(r["tier"])
                 added += 1
-            r = dict(r, code=code, photo=None, sort=i)
+
             existing = db.creator(code)
-            if existing and existing["photo"]:
-                r["photo"] = existing["photo"]      # never lose a photo on re-import
-            db.upsert_creator(r)
+            # An existing photo survives a re-import; a picture on the sheet
+            # replaces it, because putting one there is an explicit act.
+            photo = existing["photo"] if (existing and existing["photo"]) else None
+            raw = photos.get(r.get("_row"))
+            if raw:
+                ok, why = uploads.photo_bytes(raw)
+                if ok:
+                    photo = uploads.write_photo(raw, code, PHOTO_DIR)
+                    attached += 1
+                else:
+                    bad_photos.append("row " + str(r["_row"]) + " (" + why + ")")
+
+            fields = {k: v for k, v in r.items() if not k.startswith("_")}
+            db.upsert_creator(dict(fields, code=code, photo=photo, sort=i))
 
         msg = str(added) + " added, " + str(updated) + " updated."
+        if attached:
+            msg += " " + str(attached) + (" photo" if attached == 1 else " photos")
+            msg += " taken from the sheet."
+        if bad_photos:
+            shown = ", ".join(bad_photos[:4])
+            if len(bad_photos) > 4:
+                shown += " (+" + str(len(bad_photos) - 4) + " more)"
+            msg += " Pictures skipped: " + shown + "."
         return self.redirect("/roster?ok=" + urllib.parse.quote(msg))
 
     def post_roster_photos(self):
