@@ -105,7 +105,13 @@ def main():
     # GitHub Pages runs Jekyll otherwise, which drops files it does not like.
     (DIST / ".nojekyll").write_text("")
 
-    stray = [m.group(0) for m in re.finditer(r'(?:href|src|poster)="/[^"]*"', roster + shortlist)]
+    # Every asset must be relative so the tree works under any base path. The
+    # dashboard link is the one deliberate exception — the admin service is
+    # mounted at /admin on the domain, not inside this tree — so drop it before
+    # scanning rather than weakening the check for everything else.
+    scanned = re.sub(r'<a class="cat-footer__admin".*?</a>', "", roster + shortlist, flags=re.S)
+    stray = [m.group(0) for m in re.finditer(r'(?:href|src|poster)="/[^"]*"', scanned)]
+
     total = sum(f.stat().st_size for f in DIST.rglob("*") if f.is_file())
 
     print(f"assets copied   {len(assets)}")

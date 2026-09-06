@@ -89,6 +89,13 @@ ANON = os.environ.get("CATALOGUE_ANON", "").lower() in ("1", "true", "yes")
 # passcode is decoration. Unset, the build stays fully static as before.
 API = os.environ.get("CATALOGUE_API", "").rstrip("/")
 
+# The dashboard link in the footer. Off by default: the catalogue is what the
+# client opens, the dashboard is being stood up on its own hostname, and a
+# sign-in link on a client-facing page advertises the login form to everyone
+# who sees it. Set CATALOGUE_ADMIN to a URL to render it — root-absolute is
+# fine, relativise() leaves it alone via the @@ADMIN@@ placeholder in build().
+ADMIN_URL = os.environ.get("CATALOGUE_ADMIN", "")
+
 
 def band(n):
     """Follower band, used only in anonymised mode."""
@@ -230,20 +237,34 @@ def display_name(name):
 
 
 # Drawn marks, one consistent stroke weight. Not emoji, not a font glyph.
+#
+# The brand colour lives on the pill behind the glyph, set in CSS off the
+# --ig / --tt modifier — Instagram's is a gradient, and a gradient inside an
+# SVG needs a <defs> with an id, which would repeat 162 times in one document.
+# TikTok's is the offset cyan/magenta pair, which needs no ids and so is drawn
+# here.
+_TIKTOK_GLYPH = (
+    '<path d="M14.2 3v11.6a3.6 3.6 0 1 1-3.6-3.6"/>'
+    '<path d="M14.2 3.2c.45 2.7 2.05 4.3 4.75 4.6"/>'
+)
+
 PLATFORM_ICONS = {
     "Instagram": (
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">'
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">'
         '<rect x="3" y="3" width="18" height="18" rx="5"/>'
         '<circle cx="12" cy="12" r="4.1"/>'
         '<circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>'
     ),
     "TikTok": (
-        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '
+        '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" '
         'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
-        '<path d="M14.2 3v11.6a3.6 3.6 0 1 1-3.6-3.6"/>'
-        '<path d="M14.2 3.2c.45 2.7 2.05 4.3 4.75 4.6"/></svg>'
+        '<g stroke="#25f4ee" transform="translate(-1,-.85)">' + _TIKTOK_GLYPH + '</g>'
+        '<g stroke="#fe2c55" transform="translate(1,.85)">' + _TIKTOK_GLYPH + '</g>'
+        '<g stroke="currentColor">' + _TIKTOK_GLYPH + '</g></svg>'
     ),
 }
+
+PLATFORM_CLASS = {"Instagram": "cat-card__platform--ig", "TikTok": "cat-card__platform--tt"}
 
 
 def profile_url(platform, handle):
@@ -272,18 +293,19 @@ def card_html(p):
         )
 
     icon = PLATFORM_ICONS.get(p["platform"], "")
+    brand = PLATFORM_CLASS.get(p["platform"], "")
     url = "" if ANON else profile_url(p["platform"], p["_handle"])
     if url:
         # data-noselect keeps the click from also toggling the card underneath.
         platform_html = (
-            f'<a class="cat-card__platform" href="{e(url)}" target="_blank" '
+            f'<a class="cat-card__platform {brand}" href="{e(url)}" target="_blank" '
             f'rel="noopener noreferrer nofollow" data-noselect '
             f'aria-label="Visit {e(p["platform"])} profile">'
             f'<span class="cat-card__platform-hint">Visit profile</span>{icon}</a>'
         )
     else:
         platform_html = (
-            f'<span class="cat-card__platform" title="{e(p["platform"])}">{icon}</span>'
+            f'<span class="cat-card__platform {brand}" title="{e(p["platform"])}">{icon}</span>'
         )
     name = "" if ANON else display_name(p["_name"])
     reach_label = "Reach" if ANON else "Followers"
@@ -292,7 +314,7 @@ def card_html(p):
     name_html = "" if ANON else f'\n          <h3 class="cat-card__name">{e(name)}</h3>'
     label_who = e(p["code"]) if ANON else f"{e(name)}, {e(p['code'])}"
 
-    return f"""      <article class="cat-card" data-tier="{e(p['tier'])}" data-platform="{e(p['platform'])}" data-city="{e(p['city'])}" data-interest="{e(p['interest'])}" data-code="{e(p['code'])}" data-price="{p['price_from']}" tabindex="0" role="button" aria-pressed="false" aria-label="{label_who}, {e(p['tier_label'])} tier, {e(p['city'])}, {e(p['platform'])}, {reach} followers">
+    return f"""      <article class="cat-card" data-tier="{e(p['tier'])}" data-platform="{e(p['platform'])}" data-city="{e(p['city'])}" data-interest="{e(p['interest'])}" data-code="{e(p['code'])}" tabindex="0" role="button" aria-pressed="false" aria-label="{label_who}, {e(p['tier_label'])} tier, {e(p['city'])}, {e(p['platform'])}, {reach} followers">
         <div class="cat-card__media">
           {media}
           <span class="cat-card__shield" aria-hidden="true"></span>
@@ -307,7 +329,6 @@ def card_html(p):
             <li><span>City</span><strong>{e(p['city'])}</strong></li>
             <li><span>Tier</span><strong>{e(p['tier_label'])}</strong></li>
           </ul>
-          <p class="cat-card__price"><strong>{p['price_from']:,} – {p['price_to']:,}</strong> SAR</p>
         </div>
       </article>"""
 
@@ -426,6 +447,16 @@ def build():
     </div>
   </section>""") if logos else ""
 
+    # The dashboard link. @@ADMIN@@ rather than the URL itself because
+    # relativise() rewrites every root-absolute href on the page, and /admin
+    # is one path that must stay rooted: the service is mounted at the domain
+    # root wherever the catalogue happens to sit. Substituted after.
+    admin_link = ("""
+      <a class="cat-footer__admin" href="@@ADMIN@@">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10.5" width="16" height="10" rx="2"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>
+        HelloVoice team sign-in
+      </a>""") if ADMIN_URL else ""
+
     # In API mode the grid ships empty and the browser fills it from the
     # service. Embedding the roster here would defeat the gate.
     cards = "" if API else "\n".join(card_html(p) for p in people)
@@ -519,7 +550,7 @@ def build():
     <div class="cat-pad"><div class="cat-container">
       {filters}
       <p class="cat-count" id="cat-count" aria-live="polite">{len(people)} creators</p>
-      <p class="cat-note">Prices are indicative ranges only. Final rates vary with campaign requirements, deliverables, exclusivity, seasonality and any special agreement, and are confirmed in the quote.</p>
+      <p class="cat-note">Pick the creators you want, then review the selection. Costs are quoted for the shortlist as a whole.</p>
     </div></div>
   </section>
 
@@ -547,6 +578,7 @@ def build():
         See the portfolio at hellovoice.co.uk
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
       </a>
+      {admin_link}
     </div></div>
   </footer>
 
@@ -556,28 +588,8 @@ def build():
       <div class="cat-tray__codes" id="cat-tray-codes"></div>
       <div class="cat-tray__actions">
         <button type="button" class="cat-btn cat-btn--ghost" id="cat-clear">Clear</button>
-        <button type="button" class="cat-btn cat-btn--ghost" id="cat-save">Save selection</button>
-        <button type="button" class="cat-btn cat-btn--lime" id="cat-request">Request a quote</button>
+        <button type="button" class="cat-btn cat-btn--lime" id="cat-save">Review selection</button>
       </div>
-    </div>
-  </div>
-
-  <div class="cat-modal" id="cat-modal" hidden role="dialog" aria-modal="true" aria-labelledby="cat-modal-title">
-    <div class="cat-modal__panel">
-      <button type="button" class="cat-modal__close" id="cat-modal-close" aria-label="Close">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
-      </button>
-      <h2 class="cat-modal__title" id="cat-modal-title">Request a quote</h2>
-      <p class="cat-modal__sub"><strong id="cat-modal-n">0</strong> creators selected</p>
-        <p class="cat-note cat-note--modal">Prices are indicative ranges only. Final rates vary with campaign requirements, deliverables, exclusivity, seasonality and any special agreement, and are confirmed in the quote.</p>
-      <form id="cat-form" class="cat-form" autocomplete="off">
-        <label>Full name<input type="text" name="name" required/></label>
-        <label>Company<input type="text" name="company" required/></label>
-        <label>Email<input type="email" name="email" required/></label>
-        <label>Phone<input type="tel" name="phone" required/></label>
-        <button type="submit" class="cat-btn cat-btn--lime cat-form__submit">Send request</button>
-        <p class="cat-form__status" id="cat-form-status" role="status"></p>
-      </form>
     </div>
   </div>
 
@@ -586,11 +598,11 @@ def build():
       <button type="button" class="cat-modal__close" id="cat-save-close" aria-label="Close">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
       </button>
-      <h2 class="cat-modal__title" id="cat-save-title">Save selection</h2>
-      <p class="cat-modal__sub"><strong id="cat-save-n">0</strong> creators. Name it, then share the link.</p>
+      <h2 class="cat-modal__title" id="cat-save-title">Review selection</h2>
+      <p class="cat-modal__sub"><strong id="cat-save-n">0</strong> creators. Name it, then review the total and request a quote.</p>
       <form id="cat-save-form" class="cat-form" autocomplete="off">
         <label>Selection name<input type="text" name="selname" placeholder="Ramadan skincare push" required/></label>
-        <button type="submit" class="cat-btn cat-btn--lime cat-form__submit">Open selection</button>
+        <button type="submit" class="cat-btn cat-btn--lime cat-form__submit">Review selection</button>
       </form>
       <div id="cat-save-out" hidden>
         <p class="cat-note cat-note--modal">Anyone with this link and the access code sees this selection.</p>
@@ -598,7 +610,7 @@ def build():
           <input type="text" id="cat-share-url" class="cat-share__url" readonly aria-label="Selection link"/>
           <button type="button" class="cat-btn cat-btn--lime" id="cat-share-copy">Copy</button>
         </div>
-        <a class="cat-share__open" id="cat-share-open" href="#">Open the selection &rarr;</a>
+        <a class="cat-share__open" id="cat-share-open" href="#">Review the selection &rarr;</a>
       </div>
     </div>
   </div>
@@ -619,7 +631,8 @@ def build():
 """
 
     OUT_HTML.parent.mkdir(parents=True, exist_ok=True)
-    OUT_HTML.write_text(relativise(page, 1), encoding="utf-8")
+    OUT_HTML.write_text(relativise(page, 1).replace("@@ADMIN@@", ADMIN_URL),
+                        encoding="utf-8")
 
     # ---- the selection page ------------------------------------------------
     # A sibling of the catalogue that renders whichever creators the URL
@@ -684,7 +697,7 @@ def build():
   <section class="cat-summary" aria-label="Summary">
     <div class="cat-pad"><div class="cat-container">
       <dl class="cat-summary__grid" id="sel-summary"></dl>
-      <p class="cat-note">Prices are indicative ranges only. Final rates vary with campaign requirements, deliverables, exclusivity, seasonality and any special agreement, and are confirmed in the quote.</p>
+      <p class="cat-note">The total is an indicative range for this shortlist as a whole. Final rates vary with campaign requirements, deliverables, exclusivity, seasonality and any special agreement, and are confirmed in the quote.</p>
     </div></div>
   </section>
 
@@ -728,6 +741,7 @@ def build():
         See the portfolio at hellovoice.co.uk
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
       </a>
+      {admin_link}
     </div></div>
   </footer>
 
@@ -757,6 +771,15 @@ def build():
         <button type="submit" class="cat-btn cat-btn--lime cat-form__submit">Send request</button>
         <p class="cat-form__status" id="cat-form-status" role="status"></p>
       </form>
+      <div class="cat-done" id="cat-done" hidden role="status">
+        <span class="cat-done__tick" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5.5 5.5L20 7"/></svg>
+        </span>
+        <h3 class="cat-done__title">Thank you for your submission</h3>
+        <p class="cat-done__sub">We have your shortlist and will come back with a full quote, deliverables and availability for each creator.</p>
+        <button type="button" class="cat-btn cat-done__copy" id="cat-done-copy">Copy selection link</button>
+        <p class="cat-done__note" id="cat-done-note"></p>
+      </div>
     </div>
   </div>
 
@@ -778,7 +801,8 @@ def build():
                  .replace("{clients_block}", clients_block)
                  .replace("{cards}", cards))
     OUT_SELECTION.parent.mkdir(parents=True, exist_ok=True)
-    OUT_SELECTION.write_text(relativise(selection, 2), encoding="utf-8")
+    OUT_SELECTION.write_text(
+        relativise(selection, 2).replace("@@ADMIN@@", ADMIN_URL), encoding="utf-8")
 
     print(f"cards          {len(people)}")
     print(f"with photos    {with_photos}  ({with_photos * 100 // max(len(people),1)}%)")
@@ -791,6 +815,7 @@ def build():
     print(f"endpoint       {ENDPOINT or '(not configured — set CATALOGUE_ENDPOINT)'}")
     print(f"request email  {REQUEST_EMAIL}")
     print(f"client logos   {len(logos)}")
+    print(f"admin link     {ADMIN_URL or '(omitted)'}")
     if HAS_INTERESTS:
         print(f"interests      {len(set(p['interest'] for p in people))} values, filter shown")
     else:

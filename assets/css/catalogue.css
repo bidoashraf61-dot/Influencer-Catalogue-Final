@@ -23,6 +23,9 @@
   --vivid-red: #ee1515;
   --vivid-orange: #ff691e;
   --lime: #e8ff76;
+  --yellow: #ffd400;
+  --go: #14884a;
+  --go-soft: #e7f7ed;
   --container: 1680px;
   --pad: 5%;
   --r-sm: 12px;
@@ -369,7 +372,7 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 .cat-card__tier {
   position: absolute; left: 12px; top: 12px; z-index: 3;
   font-family: var(--heading); font-size: 16px; letter-spacing: .1em;
-  background: var(--white); color: var(--ink);
+  background: var(--yellow); color: var(--black-primary);
   padding: 6px 14px; border-radius: var(--r-pill);
 }
 .cat-card__platform {
@@ -383,9 +386,20 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   width: 18px; height: 18px; display: block;
   box-sizing: content-box; padding: 8px; border-radius: 100%;
   background: var(--ink);
-  transition: background .2s ease, color .2s ease;
+  transition: transform .2s ease, box-shadow .2s ease;
 }
-a.cat-card__platform:hover svg { background: var(--lime); color: var(--ink); }
+/* Instagram's mark is a gradient and TikTok's is black; the brand lives on the
+   pill, so hovering must not repaint it. Lift and ring it instead. */
+.cat-card__platform--ig svg {
+  background: radial-gradient(circle at 28% 108%,
+    #fdf497 0%, #fdf497 6%, #fd5949 42%, #d6249f 62%, #285aeb 92%);
+  color: var(--white);
+}
+.cat-card__platform--tt svg { background: #010101; color: var(--white); }
+a.cat-card__platform:hover svg {
+  transform: scale(1.09);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 6px 16px rgba(0,0,0,.32);
+}
 a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; border-radius: var(--r-sm); }
 .cat-card__platform-hint {
   font-family: var(--body); font-size: 12px; font-weight: 600;
@@ -432,15 +446,6 @@ a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-off
 }
 .cat-card__meta span { color: var(--gray); }
 .cat-card__meta strong { font-weight: 600; }
-.cat-card__price {
-  margin: 0; font-size: 14px; color: var(--gray);
-  border-top: 1px solid rgba(18,18,18,.08); padding-top: 14px;
-}
-.cat-card__price strong {
-  font-family: var(--heading); font-size: 26px; letter-spacing: .04em;
-  color: var(--ink); margin: 0 4px;
-}
-
 .cat-empty {
   text-align: center; padding: 80px 0;
   font-family: var(--heading); font-size: 40px; color: var(--gray);
@@ -516,7 +521,35 @@ a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-off
 .cat-form__submit { margin-top: 12px; justify-self: start; }
 .cat-form__status { font-size: 14px; margin: 4px 0 0; min-height: 20px; }
 .cat-form__status.is-error { color: var(--vivid-red); }
-.cat-form__status.is-ok { color: #1a7f37; }
+.cat-form__status.is-ok { color: var(--go); }
+
+/* Once submitted, the panel is the whole message. */
+.cat-modal.is-done .cat-modal__title,
+.cat-modal.is-done .cat-modal__sub,
+.cat-modal.is-done .cat-note--modal { display: none; }
+
+/* Submitted. Green, and carrying the one thing they still need afterwards —
+   the link back to what they just sent. */
+.cat-done {
+  display: grid; justify-items: start; gap: 10px;
+  background: var(--go-soft); border: 1px solid rgba(20,136,74,.28);
+  border-radius: var(--r-md); padding: 26px 24px 24px;
+}
+.cat-done__tick {
+  display: grid; place-items: center; width: 46px; height: 46px;
+  border-radius: 100%; background: var(--go); color: var(--white);
+}
+.cat-done__title {
+  font-family: var(--heading); font-size: 32px; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--go); margin: 2px 0 0;
+}
+.cat-done__sub { margin: 0; font-size: 15px; color: var(--ink); max-width: 44ch; }
+.cat-done__copy {
+  margin-top: 6px; background: var(--go); color: var(--white);
+  border-color: var(--go);
+}
+.cat-done__copy:hover { background: var(--black-primary); border-color: var(--black-primary); color: var(--white); }
+.cat-done__note { margin: 0; font-size: 13px; color: var(--gray); min-height: 18px; }
 
 /* --------------------------------------------------------------- clients */
 
@@ -604,6 +637,21 @@ a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-off
 }
 .cat-footer__portfolio:hover { border-bottom-color: var(--lime); }
 .cat-footer__portfolio:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; }
+/* Deliberately quiet. Clients read this footer; the people who need this link
+   already know it is here. */
+.cat-footer__admin {
+  /* flex, not inline-flex: it must start its own line under the portfolio
+     link, which is inline-flex and would otherwise sit beside it. */
+  display: flex; width: max-content; max-width: 100%;
+  align-items: center; gap: 8px;
+  margin-top: 22px; min-height: 44px;
+  font-family: var(--body); font-size: 13px; font-weight: 600;
+  letter-spacing: .1em; text-transform: uppercase; text-decoration: none;
+  color: rgba(255,255,255,.42);
+  transition: color .2s ease;
+}
+.cat-footer__admin:hover { color: var(--lime); }
+.cat-footer__admin:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; }
 
 /* --------------------------------------------------------- blur on blur */
 
@@ -656,8 +704,6 @@ body.cat-away::after {
   .cat-card__platform-hint { letter-spacing: .06em; padding: 3px 7px; }
   .cat-showreel { margin-top: 40px; aspect-ratio: 16 / 9; }
   .cat-card__meta li { font-size: 12px; padding: 6px 0; }
-  .cat-card__price { font-size: 12px; }
-  .cat-card__price strong { font-size: 20px; }
   .cat-ticker__track { font-size: 22px; letter-spacing: .02em; }
   .cat-clients__logo { margin-right: 26px; }
   .cat-clients__logo img { height: 34px; }

@@ -73,15 +73,25 @@ Source: `Influncer Proposal Catalogue/Alpha_Plus_influncers.xlsx`, sheet
 | Mid-Tier | 70 | 1,450 | 2,900 |
 | Macro | 3 | 2,175 | 4,350 |
 
-Final client prices in SAR, read from the tier sheets. Cards show the **floor
-only** (`from 435 SAR`); the ceiling is available in `TIERS` in the builder if
-you ever want a range on the card.
+Final client prices in SAR, read from the tier sheets.
+
+**No price appears on a card.** The client sees one indicative total for the
+shortlist as a whole, on the selection page, and nothing per creator — so a
+forwarded screenshot of the roster carries no rate card. The per-creator band
+is still in the quote email, which goes to HelloVoice.
+
+That is a presentation change, not a secret. The four tier ranges are in
+`TIER_PRICE` in `catalogue.js` because the browser computes the total, and
+anyone who opens the file can read them. Only the admin service can make the
+total genuinely server-side; see `docs/ADMIN.md`.
 
 Split: Instagram 128 / TikTok 34. Riyadh 95 / Jeddah 45 / Unspecified 22.
 
 Each card carries: photo, tier chip, a platform mark linking to the profile
 (labelled "Visit profile"), the code, the creator's name, exact follower count,
-city, tier, and the tier's price range. Tier follower ranges come from each
+city and tier. The tier chip is yellow on black; the platform mark carries the
+platform's own colours — Instagram's gradient, TikTok's black with the offset
+cyan and magenta. Tier follower ranges come from each
 tier sheet's own header (`نطاق الفئة`): Nano under 10K, Micro 10K–50K,
 Mid 50K–500K, Macro 500K–1M.
 
@@ -213,7 +223,7 @@ A shortlist travels entirely in the URL fragment:
 
 The fragment never reaches the server, so this needs no backend and works on
 any static host. Both directions use it: you shortlist on the catalogue, hit
-**Save selection**, name it and share the link; or the client shortlists and
+**Review selection**, name it and share the link; or the client shortlists and
 sends theirs back.
 
 The selection page shows the name as its heading, a summary (count, per-tier
@@ -242,7 +252,11 @@ attention, not to withhold the remainder.
 
 ## 4. Submission
 
-Selecting cards fills a sticky tray; "Request a quote" collects name, company,
+**Quoting happens on the selection page only.** The roster's tray offers Clear
+and Review selection; the request form lives where the shortlist is settled and
+its total is on screen, so nobody asks for a quote without having seen one.
+
+"Request a quote" collects name, company,
 email and phone and POSTs to FormSubmit, which relays it to
 **info@hellovoice.co.uk** (`CATALOGUE_EMAIL` to change). No backend of ours.
 
@@ -253,6 +267,11 @@ code, so an enquiry is actionable without opening the private key:
 HV-MC-001 — Noha Magdy  (Instagram, Macro, Jeddah)
 HV-NA-001 — Lilian Hassanieh  (Instagram, Nano, Riyadh)
 ```
+
+On success the form is replaced by a green confirmation carrying a **Copy
+selection link** button. The link is captured before the shortlist is cleared —
+reading it afterwards would hand back an emptied selection — so the client
+keeps a way back to exactly what they sent.
 
 The client receives no file, no download and no mail draft — only a
 confirmation.

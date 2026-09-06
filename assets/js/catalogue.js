@@ -137,10 +137,18 @@
     "Macro":    { label: "Macro", from: 2175, to: 4350 }
   };
 
+  // Mirrors PLATFORM_ICONS in the Python builder: the brand colour is the pill
+  // behind the glyph (CSS, off the --ig/--tt modifier) because Instagram's is a
+  // gradient and an in-SVG gradient needs an id repeated on every card.
+  var TT = '<path d="M14.2 3v11.6a3.6 3.6 0 1 1-3.6-3.6"/><path d="M14.2 3.2c.45 2.7 2.05 4.3 4.75 4.6"/>';
   var ICONS = {
-    Instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>',
-    TikTok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.2 3v11.6a3.6 3.6 0 1 1-3.6-3.6"/><path d="M14.2 3.2c.45 2.7 2.05 4.3 4.75 4.6"/></svg>'
+    Instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>',
+    TikTok: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+      '<g stroke="#25f4ee" transform="translate(-1,-.85)">' + TT + '</g>' +
+      '<g stroke="#fe2c55" transform="translate(1,.85)">' + TT + '</g>' +
+      '<g stroke="currentColor">' + TT + '</g></svg>'
   };
+  var BRAND = { Instagram: "cat-card__platform--ig", TikTok: "cat-card__platform--tt" };
 
   function esc(v) {
     return String(v === null || v === undefined ? "" : v)
@@ -169,17 +177,18 @@
 
     var url = profileUrl(c.platform, c.handle);
     var icon = ICONS[c.platform] || "";
+    var brand = BRAND[c.platform] || "";
     var mark = url
-      ? '<a class="cat-card__platform" href="' + esc(url) + '" target="_blank" ' +
+      ? '<a class="cat-card__platform ' + brand + '" href="' + esc(url) + '" target="_blank" ' +
         'rel="noopener noreferrer nofollow" data-noselect aria-label="Visit ' +
         esc(c.platform) + ' profile"><span class="cat-card__platform-hint">Visit profile' +
         "</span>" + icon + "</a>"
-      : '<span class="cat-card__platform" title="' + esc(c.platform) + '">' + icon + "</span>";
+      : '<span class="cat-card__platform ' + brand + '" title="' + esc(c.platform) + '">' + icon + "</span>";
 
     return '<article class="cat-card" data-tier="' + esc(c.tier) +
       '" data-platform="' + esc(c.platform) + '" data-city="' + esc(c.city || "Unspecified") +
       '" data-interest="' + esc(c.interest || "") + '" data-code="' + esc(c.code) +
-      '" data-price="' + meta.from + '" tabindex="0" role="button" aria-pressed="false"' +
+      '" tabindex="0" role="button" aria-pressed="false"' +
       ' aria-label="' + esc(c.name) + ", " + esc(c.code) + ", " + esc(meta.label) +
       " tier, " + esc(c.city || "Unspecified") + ", " + esc(c.platform) + ", " +
       commas(c.followers) + ' followers">' +
@@ -193,8 +202,7 @@
       "<li><span>Followers</span><strong>" + commas(c.followers) + "</strong></li>" +
       "<li><span>City</span><strong>" + esc(c.city || "Unspecified") + "</strong></li>" +
       "<li><span>Tier</span><strong>" + esc(meta.label) + "</strong></li></ul>" +
-      '<p class="cat-card__price"><strong>' + commas(meta.from) + " – " + commas(meta.to) +
-      "</strong> SAR</p></div></article>";
+      "</div></article>";
   }
 
   function chipGroup(label, key, counts) {
@@ -343,13 +351,10 @@
       renderTray();
     });
 
-    wireQuoteForm(function () {
-      selected = [];
-      cards.forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
-      renderTray();
-    });
+    /* -- name a selection and review it -- */
 
-    /* -- name a selection and share it -- */
+    // Quoting happens on the selection page, not here. The roster is for
+    // picking; the total and the request live where the shortlist is settled.
 
     var saveModal = $("cat-save-modal");
     function closeSave() { saveModal.hidden = true; }
@@ -430,12 +435,63 @@
     }
     function closeModal() { modal.hidden = true; }
 
+    var form = $("cat-form");
+    var done = $("cat-done");
+
+    // Set on a successful submission and read by the copy button, because the
+    // selection is cleared the moment the panel closes — reading location.href
+    // then would hand back an emptied link.
+    var doneLink = "";
+
+    function closeAfterDone() {
+      closeModal();
+      modal.classList.remove("is-done");
+      form.hidden = false;
+      done.hidden = true;
+      $("cat-form-status").textContent = "";
+      $("cat-done-note").textContent = "";
+      if (typeof onCleared === "function") onCleared();
+    }
+
     $("cat-request").addEventListener("click", openModal);
-    $("cat-modal-close").addEventListener("click", closeModal);
-    modal.addEventListener("click", function (e) { if (e.target === modal) closeModal(); });
-    document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && !modal.hidden) closeModal();
+    $("cat-modal-close").addEventListener("click", function () {
+      if (done && !done.hidden) closeAfterDone(); else closeModal();
     });
+    modal.addEventListener("click", function (e) {
+      if (e.target !== modal) return;
+      if (done && !done.hidden) closeAfterDone(); else closeModal();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape" || modal.hidden) return;
+      if (done && !done.hidden) closeAfterDone(); else closeModal();
+    });
+
+    if (done) {
+      $("cat-done-copy").addEventListener("click", function () {
+        var btn = $("cat-done-copy");
+        var note = $("cat-done-note");
+        copyText(doneLink,
+          function () {
+            btn.textContent = "Copied";
+            note.textContent = "Anyone with this link and the access code sees this selection.";
+            setTimeout(function () { btn.textContent = "Copy selection link"; }, 2200);
+          },
+          function () { note.textContent = "Could not copy automatically: " + doneLink; });
+      });
+    }
+
+    function succeed(link) {
+      doneLink = link;
+      form.reset();
+      form.hidden = true;
+      $("cat-form-status").textContent = "";
+      // The heading, the count and the pricing caveat all belong to the form
+      // that has just gone. Leaving "Request a quote" above "Thank you for
+      // your submission" reads as though it did not send.
+      modal.classList.add("is-done");
+      done.hidden = false;
+      $("cat-done-copy").focus();
+    }
 
     $("cat-form").addEventListener("submit", function (e) {
       e.preventDefault();
@@ -467,7 +523,10 @@
 
         var nameEl = card.querySelector(".cat-card__name");
         var link = card.querySelector("a.cat-card__platform");
-        var priceEl = card.querySelector(".cat-card__price");
+        // The card no longer shows a price — the client sees a total for the
+        // shortlist and nothing per creator. This email goes to HelloVoice, so
+        // it still carries the per-creator band, read from the tier table.
+        var band = TIER_PRICE[card.dataset.tier];
         var profile = link ? link.getAttribute("href") : "";
         var handle = profile
           ? "@" + profile.replace(/\/$/, "").split("/").pop().replace(/^@/, "")
@@ -480,7 +539,7 @@
           "   Followers  " + metaValue("followers"),
           "   City       " + card.dataset.city,
           "   Tier       " + card.dataset.tier,
-          "   Price      " + (priceEl ? priceEl.textContent.replace(/\s+/g, " ").trim() : "—")
+          "   Price      " + (band ? money(band[0]) + " – " + money(band[1]) + " SAR" : "—")
         ].filter(Boolean).join("\n");
       }
 
@@ -547,14 +606,7 @@
           .then(function (r) { return r.json().catch(function () { return null; }); })
           .then(function (b) {
             if (!b || !b.ok) throw new Error((b && b.reason) || "failed");
-            status.className = "cat-form__status is-ok";
-            status.textContent = "Sent. We will come back to you with a full quote.";
-            e.target.reset();
-            setTimeout(function () {
-              closeModal();
-              if (typeof onCleared === "function") onCleared();
-              status.textContent = "";
-            }, 2200);
+            succeed(payload.selection_link);
           })
           .catch(function () {
             status.className = "cat-form__status is-error";
@@ -588,14 +640,7 @@
           });
         })
         .then(function () {
-          status.className = "cat-form__status is-ok";
-          status.textContent = "Sent. We will come back to you with a full quote.";
-          e.target.reset();
-          setTimeout(function () {
-            closeModal();
-            if (typeof onCleared === "function") onCleared();
-            status.textContent = "";
-          }, 2200);
+          succeed(payload.selection_link);
         })
         .catch(function () {
           status.className = "cat-form__status is-error";
