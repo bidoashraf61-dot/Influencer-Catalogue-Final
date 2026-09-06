@@ -308,6 +308,12 @@
       fetch(CFG.endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        // The page sets <meta name="referrer" content="no-referrer"> so a click
+        // out to a creator's profile does not tell Instagram where it came
+        // from. FormSubmit identifies the form BY the referrer, and without one
+        // rejects every submission with "open this page through a web server".
+        // Send the origin — and only the origin — for this one request.
+        referrerPolicy: "strict-origin",
         body: JSON.stringify(payload)
       })
         .then(function (r) {
