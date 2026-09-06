@@ -2329,181 +2329,114 @@
   });
 
   /* ------------------------------------------------------------- hero film
-   * The hero character is an 8-second film and the pointer drives it: move the
-   * cursor and he follows it, hold still and he settles.
+   * The hero character is an 8-second film and the scroll position drives it:
+   * the page is the transport. At the top of the document he is on his first
+   * frame; by the time the hero has cleared the viewport the film has run out.
    *
-   * The clip is an idle wander rather than a tracking rig, so only a window of
-   * it is usable — see SEG_IN / SEG_OUT below, which is where his gaze actually
-   * crosses from left to right.
+   * It used to be the cursor. That was abandoned because a pre-rendered clip
+   * only contains the gaze directions that were rendered into it, and the
+   * lookup that picked the nearest one ignored where in the film it sat — so
+   * neighbouring points on screen could be seconds apart in the take, and his
+   * eyes ran through the whole performance on the way between them. Scroll has
+   * none of that problem: it is monotonic, so the film runs in its own order
+   * and every frame is seen once, in the order it was shot.
    *
-   * Position is eased rather than set outright. Assigning the pointer straight
-   * to the film makes him snap frame to frame and read as a scrubber being
-   * dragged; approaching the target by a fraction each frame gives him weight
-   * and lets him arrive a beat after the cursor does, which is what reads as
-   * something alive rather than something wired to an input. */
+   * Range is the hero's own height, so the scrub is self-scaling — a tall
+   * viewport gets a long scrub and a short one a short scrub, and neither needs
+   * a magic number. */
   (function heroFilm() {
     var film = $("[data-hero-film]");
     var hero = film && film.closest(".hero_section");
-    if (!film || !hero || reduced) return;
+    if (!film || !hero) return;
 
+    /* Reduced motion keeps the first frame and never seeks. The poster is cut
+     * from frame 0, so what is shown is what the film would show anyway — the
+     * character is still there, he simply does not move. */
+    if (reduced) {
+      film.classList.add("is-ready");
+      return;
+    }
 
-    /* The whole render, with the cursor choosing a destination in it and the
-     * film travelling there.
-     *
-     * The earlier versions eased the cursor and then looked up a frame, which
-     * meant any large move landed as a jump — and cutting between frames that
-     * are not neighbours is what made the pose atlas feel mechanical. This eases
-     * the *time* instead. The cursor names a target moment in the film; the film
-     * scrubs toward it and plays every frame on the way. Nothing is cut, nothing
-     * is reordered, and he arrives by moving rather than by snapping.
-     *
-     * That also frees the speed to vary, which is what makes the whole render
-     * usable. The gaze does not travel evenly through the eight seconds — it
-     * lingers, doubles back, drifts up. Because the film only has to *reach* the
-     * target rather than track the cursor proportionally, the stretches that go
-     * the wrong way are simply crossed quickly on the way to somewhere useful.
-     *
-     * GAZE is a 9x9 grid over the viewport. Each entry is the moment whose eye
-     * direction best matches that corner of the screen, measured frame by frame
-     * across the render — horizontally and vertically, so looking up and down is
-     * reachable too, which a single left-to-right cut could never offer. */
-    var GAZE_G = 9;
-    var GAZE = [4.0417, 4.0417, 4.125, 4.5833, 4.75, 4.8333, 5.0, 5.0, 5.0, 4.0417, 3.9167, 3.875, 4.7083, 4.8333, 5.0, 5.0, 5.0417, 3.4167, 3.8333, 3.8333, 3.7917, 3.75, 5.0417, 5.125, 5.2083, 3.4167, 3.3333, 1.9167, 3.7917, 3.75, 3.7083, 3.6667, 5.25, 3.5, 3.4167, 2.9167, 1.9167, 1.625, 1.4167, 3.6667, 5.3333, 5.4167, 3.4167, 3.3333, 2.9167, 2.0, 1.875, 0.9167, 2.25, 7.0, 5.625, 7.0833, 3.25, 2.7917, 2.0833, 2.2083, 0.7083, 6.25, 2.2917, 2.3333, 2.4583, 2.5, 2.6667, 7.25, 6.5417, 0.1667, 7.1667, 0.25, 0.5, 0.2917, 0.4583, 2.5833, 6.9167, 7.2083, 7.2083, 7.1667, 0.25, 0.25, 0.5, 0.4583, 0.4583];
-
-    var duration = 0;
-    /* Rest on the pose the centre of the screen asks for.
-     *
-     * Not zero, and not an arbitrary midpoint. Whatever this is, it is the pose
-     * every touch device holds forever — without a fine pointer no pointermove
-     * ever arrives to move him off it — so it should be the one a cursor resting
-     * in the middle of the screen would produce, which is the grid's centre
-     * cell. The poster is rendered from this same moment, so the handover from
-     * still to film shows no shift at all. */
-    var REST = 2.5833;
-    var targetT = REST;   // the moment in the film the cursor is asking for
-    var shownT = REST;    // where the film actually is, travelling toward it
-    /* The film may cross at most this much of itself per frame. Without it a
-     * distant target is reached in one step, which is a cut; with it he travels
-     * there and every frame in between is seen. Four frames a tick at 60Hz is
-     * roughly four times speed — quick enough to feel responsive, slow enough
-     * to read as movement. */
-    /* 0.16 rather than 0.09. At 60fps the old value needed about half a second
-     * to close on the cursor, which on a gaze this subtle read as him not
-     * responding at all rather than as weight. This lands in roughly a quarter
-     * of a second — still eased, but the eyes arrive while you are still
-     * thinking about having moved. */
+    var shownT = 0;   // where the film is, so a seek is only issued on a change
+    var state = { p: 0 };
 
     /* Seeking a video the browser has never decoded returns a blank frame on
      * iOS. Playing it muted for one instant and pausing forces the decoder up
      * without the visitor seeing motion. */
     function prime() {
-      var p = film.play();
-      if (p && p.then) p.then(function () { film.pause(); }, function () {});
+      var q = film.play();
+      if (q && q.then) q.then(function () { film.pause(); }, function () {});
       else film.pause();
     }
 
-    /* The rest pose has to be seeked to outright. apply() only moves the film
-     * when there is a gap between where it is and where it is wanted, and at
-     * rest there is none — so without this the element sits on its own first
-     * frame while the poster shows a different one, and the handover flicks. */
-    function settle() {
-      try { film.currentTime = REST; } catch (err) { /* not seekable yet */ }
-    }
-
-    film.addEventListener("loadedmetadata", function () {
-      duration = film.duration || 0;
-      prime();
-      settle();
-    });
-
     /* Only paint once a real frame is decoded, so the poster does not flick to
-     * black in the handover. "seeked" alone is not enough: at rest the film is
-     * already at 0 and the first seek asks it to go to 0, which is not a move
-     * and emits no event. */
+     * black in the handover. "seeked" alone is not enough: at the top of the
+     * page the film is already at 0 and the first seek asks it to go to 0,
+     * which is not a move and emits no event. */
     function markReady() { film.classList.add("is-ready"); }
     film.addEventListener("seeked", markReady, { once: true });
     film.addEventListener("loadeddata", markReady, { once: true });
     if (film.readyState >= 2) markReady();
 
-    /* The pointer is read against the viewport, not the hero. He keeps
-     * answering the cursor while it is anywhere on screen, which is the whole
-     * point of him watching you. */
-    /* No pointer:fine gate.
-     *
-     * It used to sit here, on the reasoning that a touch device has no cursor to
-     * follow. But the query is read once, at load, and a browser that answers it
-     * "false" at that moment — which some do before the first input arrives —
-     * left the listener unattached for the life of the page: the film held its
-     * rest pose no matter where the cursor went, which is exactly the symptom
-     * that was reported. The gate bought nothing anyway. A device with no
-     * pointer fires no pointermove, so it holds the rest pose regardless. */
-    window.addEventListener("pointermove", function (ev) {
-      var x = ev.clientX / window.innerWidth;
-      var y = ev.clientY / window.innerHeight;
-      x = x < 0 ? 0 : x > 1 ? 1 : x;
-      y = y < 0 ? 0 : y > 1 ? 1 : y;
-      var gx = Math.round(x * (GAZE_G - 1));
-      var gy = Math.round(y * (GAZE_G - 1));
-      targetT = GAZE[gy * GAZE_G + gx];
-      /* Step here as well as in the frame loop.
-       *
-       * The loop was the only caller of apply(), and a browser that has
-       * throttled or suspended requestAnimationFrame — a background tab, a
-       * hidden panel, a machine saving power — stops calling it at all. The
-       * target then updated correctly on every cursor move with nothing acting
-       * on it, and he sat on his rest pose. Measured in that state: target
-       * 4.042, shown 2.583, and zero animation frames in two seconds.
-       *
-       * Stepping from the event too means the cursor always moves him; the loop
-       * is left to do the thing only it can, which is carry the easing onward
-       * after the cursor has stopped. */
-      apply();
-    }, { passive: true });
+    film.addEventListener("loadedmetadata", prime);
+    if (film.readyState >= 1) prime();
 
     function apply() {
-      /* Read from the element, not from a variable captured at startup.
-       *
-       * The cached copy was set in the loadedmetadata handler and in a
-       * readyState check that ran once. Whenever both missed — the metadata
-       * already in when the script ran, or still absent — it stayed 0, this
-       * returned on every frame, and the film held its rest pose no matter
-       * where the cursor went. That is the bug that was reported, and it is
-       * not reproducible with a synthetic event fired after load, which is why
-       * it survived several passes of testing. */
+      /* Read the duration from the element rather than caching it at startup.
+       * A cached copy set in a load handler is 0 whenever that handler missed —
+       * metadata already in when the script ran, or still absent — and then
+       * every seek is skipped and the film holds one frame for the whole
+       * scroll. That failure is not reproducible after load, which is why the
+       * cached version survived several passes of testing. */
       var duration = film.duration;
       if (!duration || !isFinite(duration)) return;
-      /* Straight to the pose the cursor asks for, rather than travelling there.
-       *
-       * Travelling kept the motion smooth but it is why he did not appear to
-       * follow anything: the lookup picks the closest gaze wherever it sits in
-       * the film, so neighbouring points on screen can be seconds apart in it —
-       * 31 of the 144 neighbouring pairs are over 40 frames apart, the worst
-       * 169. Crossing those meant his eyes ran through the whole performance on
-       * the way, and only pointed at the cursor once it stopped.
-       *
-       * Cutting instead, the gaze is right at every instant. It costs the
-       * in-between motion. That is cheap here because the render barely moves
-       * his body — 17px across every frame the grid uses — so a cut reads as
-       * his eyes flicking rather than as him jumping. */
-      if (Math.abs(targetT - shownT) < 1 / 48) return;
-      shownT = targetT;
-      if (shownT < 0) shownT = 0;
-      else if (shownT > duration) shownT = duration;
-      try { film.currentTime = shownT; } catch (err) { /* not seekable yet */ }
+      var t = state.p * duration;
+      if (t < 0) t = 0;
+      else if (t > duration) t = duration;
+      /* One frame of the source is 1/24s. Seeking for less than that decodes a
+       * 4K frame to show the same picture — the whole cost and none of the
+       * benefit. */
+      if (Math.abs(t - shownT) < 1 / 24) return;
+      shownT = t;
+      try { film.currentTime = t; } catch (err) { /* not seekable yet */ }
     }
 
-    /* Driven from a frame loop rather than from pointermove directly, so the
-     * easing advances on its own after the cursor stops and he coasts to a
-     * halt instead of freezing mid-turn. Idles while the hero is off screen. */
-    function frame() {
-      requestAnimationFrame(frame);
-      var r = hero.getBoundingClientRect();
-      if (r.bottom < -200 || r.top > window.innerHeight + 200) return;
-      apply();
-    }
-    requestAnimationFrame(frame);
-
-    if (film.readyState >= 1) { duration = film.duration || 0; prime(); settle(); }
+    /* Pinned, so the film gets the screen to itself.
+     *
+     * Without the pin the hero scrolls away while the film is still running and
+     * the last third of the take plays off the top of the viewport — the part
+     * nobody sees is the part he finishes on. Pinning holds the section still
+     * until the film has run out, then releases the page into the section
+     * below, so the whole eight seconds happens in front of the viewer.
+     *
+     * The distance is a viewport and a half rather than a fixed pixel count.
+     * Scroll speed scales with screen size, so a number that feels unhurried on
+     * a laptop feels interminable on a large display; expressing it in screens
+     * keeps the pace the same everywhere. It is a function so a resize
+     * remeasures instead of keeping the height the page loaded at.
+     *
+     * Scrubbed through a proxy value rather than seeking straight from the
+     * scroll position. scrub carries the film on for a beat after the wheel
+     * stops, so he coasts to a halt instead of freezing on the exact frame the
+     * scroll ended on. */
+    gsap.to(state, {
+      p: 1,
+      ease: "none",
+      onUpdate: apply,
+      scrollTrigger: {
+        trigger: hero,
+        start: "top top",
+        end: function () { return "+=" + Math.round(window.innerHeight * 1.5); },
+        pin: true,
+        pinSpacing: true,
+        /* Pins taken at speed can show one frame of the unpinned position
+         * before the pin engages. Pinning a beat early costs nothing and
+         * removes the flash. */
+        anticipatePin: 1,
+        scrub: 0.6,
+        invalidateOnRefresh: true
+      }
+    });
   })();
 
   /* Initial states are in place — let the stylesheet show them. */
