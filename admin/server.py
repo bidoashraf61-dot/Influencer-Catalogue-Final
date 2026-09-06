@@ -64,6 +64,16 @@ ALLOWED_ORIGINS = set()
 # viewer cookie can be SameSite=Lax instead of None.
 BASE = ""
 
+def squash(text):
+    """A name reduced to something a filename can be compared against.
+
+    "Noha Magdy", "noha_magdy" and "NOHA-MAGDY.jpg" are the same person; the
+    separators are whatever the person saving the file happened to type. Only
+    letters and digits survive, so this holds for Arabic names too.
+    """
+    return "".join(ch for ch in (text or "").lower() if ch.isalnum())
+
+
 # Mirrors TIERS in build/influencer_catalogue.py. Kept here so the dashboard can
 # price a selection without importing the static build.
 TIER_PRICE = {
@@ -239,6 +249,10 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/roster":
             return self.send(200, views.roster_page(
                 db.list_creators(), query.get("e"), query.get("ok")))
+        if path == "/roster/export":
+            return self.send(200, self.roster_csv(), "text/csv; charset=utf-8",
+                             [("Content-Disposition",
+                               'attachment; filename="roster.csv"')])
         if path == "/roster/template.xlsx":
             # The only format that can carry pictures — a CSV is text.
             try:
@@ -459,28 +473,40 @@ class Handler(BaseHTTPRequestHandler):
             return self.redirect("/roster?e=" + urllib.parse.quote(
                 "Choose some image files first."))
 
-        # Two indexes, so a file can be named either way. Handles are matched
-        # case-insensitively because a download tends to lowercase them.
-        by_code, by_handle = {}, {}
+        # Three indexes, so a file can be named whichever way it already is.
+        # Most people have never seen the codes — the photo they downloaded is
+        # called after the person or their handle, so match on those too.
+        by_code, by_handle, by_name = {}, {}, {}
         for c in db.list_creators():
             by_code[c["code"].upper()] = c["code"]
             if c["handle"]:
                 by_handle.setdefault(c["handle"].lower(), []).append(c["code"])
+            if c["name"]:
+                by_name.setdefault(squash(c["name"]), []).append(c["code"])
 
         saved, unmatched, rejected, ambiguous = 0, [], [], []
         for part in parts:
             name = Path(part["filename"]).name
-            stem = Path(name).stem.strip()
-            key = stem.upper()
-            code = by_code.get(key)
-            if not code:
-                hits = by_handle.get(stem.lower().lstrip("@"), [])
+            # "Noha Magdy (1).jpg" is what a second download is called. The
+            # suffix is the browser's, not part of anyone's name.
+            stem = re.sub(r"\s*\(\d+\)$", "", Path(name).stem.strip())
+
+            code, clash = by_code.get(stem.upper()), False
+            for index, key in ((by_handle, stem.lower().lstrip("@")),
+                               (by_name, squash(stem))):
+                if code:
+                    break
+                hits = index.get(key, [])
                 if len(hits) > 1:
-                    # Two creators on the same handle across platforms. Guessing
-                    # would silently put the photo on the wrong card.
-                    ambiguous.append(name)
-                    continue
-                code = hits[0] if hits else None
+                    # The same handle or name on two creators. Guessing would
+                    # put the photo on the wrong card, silently.
+                    clash = True
+                    break
+                if hits:
+                    code = hits[0]
+            if clash:
+                ambiguous.append(name)
+                continue
             if not code:
                 unmatched.append(name)
                 continue
@@ -505,11 +531,35 @@ class Handler(BaseHTTPRequestHandler):
 
         msg = str(saved) + (" photo" if saved == 1 else " photos") + " attached."
         msg += listing("No creator matched", unmatched)
-        msg += listing("Ambiguous handle, skipped", ambiguous)
+        msg += listing("Matched two creators, so skipped", ambiguous)
         msg += listing("Rejected", rejected)
 
         key = "ok" if saved else "e"
         return self.redirect("/roster?" + key + "=" + urllib.parse.quote(msg))
+
+    def roster_csv(self):
+        """The roster as the import template, already filled in.
+
+        Two jobs at once: it is the list of codes — which nobody memorises and
+        the dashboard otherwise only shows a screen at a time — and it is a
+        valid import file, so editing a column and uploading it back updates
+        those creators instead of duplicating them.
+        """
+        import csv
+        import io
+        buf = io.StringIO()
+        w = csv.writer(buf)
+        w.writerow(importer.COLUMNS)
+        for c in db.list_creators():
+            w.writerow([
+                c["code"], c["name"], c["platform"], c["handle"] or "",
+                c["followers"] if c["followers"] is not None else "",
+                c["city"] or "", c["tier"], c["interest"] or "",
+                c["note"] or "", "yes" if c["active"] else "no",
+                "on file" if c["photo"] else "",
+            ])
+        # BOM so Excel opens it as UTF-8 rather than mangling Arabic city names
+        return "\ufeff" + buf.getvalue()
 
     def post_roster_delete(self):
         code = self.form_body().get("code")

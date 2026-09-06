@@ -166,12 +166,23 @@ a plain message rather than being written and rendering broken.
 ### Attaching photos in bulk
 
 Select a whole folder of images at once. Each file is matched to a creator by
-its **filename**:
+its **filename**, any of three ways — so in most cases nothing needs renaming:
 
 | file | matches |
 |---|---|
-| `HV-NA-001.jpg` | that code |
-| `noha.mgdi.jpg` | that handle, case-insensitively |
+| `Noha Magdy.jpg`, `noha_magdy.jpg`, `NOHA-MAGDY.jpg` | that name |
+| `noha.mgdi.jpg` | that handle |
+| `HV-MC-001.jpg` | that code |
+
+Case, spaces, dashes and underscores are all equivalent — only letters and
+digits are compared, which holds for Arabic names too — and a `(1)` the
+browser appended to a second download is stripped before matching.
+
+**Nobody has to learn the codes.** They exist for the client-facing cards, not
+for filing photos. If you do want them, *Export the roster (.csv)* on the same
+page lists every creator with their code, handle and whether a photo is on
+file; it is also a valid import file, so a column can be edited and uploaded
+back.
 
 Whatever matches nothing is **listed back by name**, not silently dropped —
 a batch that quietly attached 44 of 50 photos and said "done" would be worse
@@ -179,8 +190,10 @@ than one that failed outright. Files are checked by the same magic bytes and
 6MB limit as a single upload, and a rejected file writes nothing: no image on
 disk, no change to the row.
 
-A handle shared by two creators across platforms is skipped rather than
-guessed, because guessing puts a photo on the wrong card.
+A name or handle that fits two creators is skipped rather than guessed,
+because guessing puts a photo on the wrong card. Verified by giving a second
+creator an existing name: the upload reported *"Matched two creators, so
+skipped"* and neither row changed.
 
 ### Bulk import
 
