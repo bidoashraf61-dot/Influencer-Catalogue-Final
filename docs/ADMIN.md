@@ -163,9 +163,32 @@ the built catalogue reads, so uploading here changes what a client sees.
 Limit 6MB. JPEG, PNG, WebP and GIF are accepted; anything else is rejected with
 a plain message rather than being written and rendering broken.
 
+### Attaching photos in bulk
+
+Select a whole folder of images at once. Each file is matched to a creator by
+its **filename**:
+
+| file | matches |
+|---|---|
+| `HV-NA-001.jpg` | that code |
+| `noha.mgdi.jpg` | that handle, case-insensitively |
+
+Whatever matches nothing is **listed back by name**, not silently dropped —
+a batch that quietly attached 44 of 50 photos and said "done" would be worse
+than one that failed outright. Files are checked by the same magic bytes and
+6MB limit as a single upload, and a rejected file writes nothing: no image on
+disk, no change to the row.
+
+A handle shared by two creators across platforms is skipped rather than
+guessed, because guessing puts a photo on the wrong card.
+
 ### Bulk import
 
 Download the CSV template from the roster page, fill it in, upload it.
+
+**The template has no photo column, and cannot have one.** A spreadsheet cell
+holds text; a photo is bytes. So an import brings in every field except the
+image, and *Attach photos in bulk* on the same page covers the rest.
 
 - **A blank code is assigned automatically**; an existing code updates that
   creator rather than duplicating them.

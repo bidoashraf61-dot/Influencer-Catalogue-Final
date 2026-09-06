@@ -112,10 +112,10 @@ class Handler(BaseHTTPRequestHandler):
         except Exception:
             return {}
 
-    def form_body(self):
+    def form_body(self, multi=()):
         ctype = self.headers.get("Content-Type", "")
         if ctype.startswith("multipart/form-data"):
-            return uploads.parse_multipart(self.body(), ctype)
+            return uploads.parse_multipart(self.body(), ctype, multi=multi)
         return {k: v[0] for k, v in urllib.parse.parse_qs(self.body().decode()).items()}
 
     def send(self, code, body=b"", ctype="text/html; charset=utf-8", headers=None):
@@ -274,6 +274,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_roster_delete()
         if path == "/roster/import":
             return self.post_roster_import()
+        if path == "/roster/photos":
+            return self.post_roster_photos()
         if path == "/requests/handled":
             return self.post_request_handled()
         if path == "/password":
@@ -410,6 +412,73 @@ class Handler(BaseHTTPRequestHandler):
 
         msg = str(added) + " added, " + str(updated) + " updated."
         return self.redirect("/roster?ok=" + urllib.parse.quote(msg))
+
+    def post_roster_photos(self):
+        """Attach many photos at once, matched to creators by filename.
+
+        The roster form takes one photo at a time, which is right for fixing a
+        single creator and wrong after importing eighty of them. A folder of
+        images named for the code or the handle covers both ways people
+        actually hold these files.
+        """
+        parts = self.form_body(multi=("photos",)).get("photos") or []
+        parts = [p for p in parts
+                 if isinstance(p, dict) and p.get("data") and p.get("filename")]
+        if not parts:
+            return self.redirect("/roster?e=" + urllib.parse.quote(
+                "Choose some image files first."))
+
+        # Two indexes, so a file can be named either way. Handles are matched
+        # case-insensitively because a download tends to lowercase them.
+        by_code, by_handle = {}, {}
+        for c in db.list_creators():
+            by_code[c["code"].upper()] = c["code"]
+            if c["handle"]:
+                by_handle.setdefault(c["handle"].lower(), []).append(c["code"])
+
+        saved, unmatched, rejected, ambiguous = 0, [], [], []
+        for part in parts:
+            name = Path(part["filename"]).name
+            stem = Path(name).stem.strip()
+            key = stem.upper()
+            code = by_code.get(key)
+            if not code:
+                hits = by_handle.get(stem.lower().lstrip("@"), [])
+                if len(hits) > 1:
+                    # Two creators on the same handle across platforms. Guessing
+                    # would silently put the photo on the wrong card.
+                    ambiguous.append(name)
+                    continue
+                code = hits[0] if hits else None
+            if not code:
+                unmatched.append(name)
+                continue
+
+            ok, why = uploads.photo_bytes(part["data"])
+            if not ok:
+                rejected.append(name + " (" + why + ")")
+                continue
+
+            filename = uploads.write_photo(part["data"], code, PHOTO_DIR)
+            row = db.creator(code)
+            db.upsert_creator(dict(row, photo=filename))
+            saved += 1
+
+        def listing(label, items):
+            if not items:
+                return ""
+            shown = ", ".join(items[:5])
+            if len(items) > 5:
+                shown += " (+" + str(len(items) - 5) + " more)"
+            return " " + label + ": " + shown + "."
+
+        msg = str(saved) + (" photo" if saved == 1 else " photos") + " attached."
+        msg += listing("No creator matched", unmatched)
+        msg += listing("Ambiguous handle, skipped", ambiguous)
+        msg += listing("Rejected", rejected)
+
+        key = "ok" if saved else "e"
+        return self.redirect("/roster?" + key + "=" + urllib.parse.quote(msg))
 
     def post_roster_delete(self):
         code = self.form_body().get("code")

@@ -31,9 +31,16 @@ def image_kind(data: bytes):
     return None
 
 
-def parse_multipart(body: bytes, content_type: str):
+def parse_multipart(body: bytes, content_type: str, multi=()):
     """Return {field: value} where a file part becomes
-    {"filename": str, "data": bytes}. Non-file parts decode to str."""
+    {"filename": str, "data": bytes}. Non-file parts decode to str.
+
+    Fields named in `multi` always come back as a list, even when the browser
+    sent one part or none — <input multiple> posts one part per file under the
+    same name, and the plain dict would keep only the last of them. Naming them
+    explicitly means existing callers, none of which repeat a field, keep
+    reading a single value.
+    """
     m = re.search(r'boundary="?([^";]+)"?', content_type or "")
     if not m:
         return {}
@@ -53,11 +60,38 @@ def parse_multipart(body: bytes, content_type: str):
         if not name:
             continue
         filename = re.search(r'filename="([^"]*)"', headers)
+        key = name.group(1)
         if filename:
-            out[name.group(1)] = {"filename": filename.group(1), "data": payload}
+            value = {"filename": filename.group(1), "data": payload}
         else:
-            out[name.group(1)] = payload.decode("utf-8", "replace")
+            value = payload.decode("utf-8", "replace")
+        if key in multi:
+            out.setdefault(key, []).append(value)
+        else:
+            out[key] = value
+
+    for key in multi:
+        out.setdefault(key, [])
     return out
+
+
+def photo_bytes(data: bytes):
+    """(ok, error) for one image, without writing it. save_photo() and the bulk
+    uploader apply the same two rules, so a file the roster form would reject
+    is not quietly accepted in a batch of eighty."""
+    if len(data) > MAX_UPLOAD:
+        return False, "over 6MB"
+    if not image_kind(data):
+        return False, "not a JPEG, PNG, WebP or GIF"
+    return True, None
+
+
+def write_photo(data: bytes, code: str, photo_dir: Path):
+    """Write bytes as <CODE>.jpg. Assumes photo_bytes() has passed."""
+    safe = re.sub(r"[^A-Za-z0-9._-]", "", code).strip(".") or "creator"
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    (photo_dir / (safe + ".jpg")).write_bytes(data)
+    return safe + ".jpg"
 
 
 def save_photo(part, code: str, photo_dir: Path):
@@ -71,13 +105,7 @@ def save_photo(part, code: str, photo_dir: Path):
     if not part or not isinstance(part, dict) or not part.get("data"):
         return None, None
     data = part["data"]
-    if len(data) > MAX_UPLOAD:
-        return None, "That image is over 6MB."
-    kind = image_kind(data)
-    if not kind:
-        return None, "That file is not a JPEG, PNG, WebP or GIF."
-
-    safe = re.sub(r"[^A-Za-z0-9._-]", "", code).strip(".") or "creator"
-    photo_dir.mkdir(parents=True, exist_ok=True)
-    (photo_dir / (safe + ".jpg")).write_bytes(data)
-    return safe + ".jpg", None
+    ok, why = photo_bytes(data)
+    if not ok:
+        return None, "That file is " + why + "."
+    return write_photo(data, code, photo_dir), None
