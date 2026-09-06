@@ -164,21 +164,36 @@ HEAD = (
 )
 
 
+BASE = ""
+
+
+def set_base(prefix):
+    """Called once at startup. Every href and form action is written through
+    `u()`, so the dashboard works at the domain root or under /admin without
+    any other change."""
+    global BASE
+    BASE = prefix or ""
+
+
+def u(path):
+    return (BASE + path) if path.startswith("/") else path
+
+
 def page(title, body, active=""):
     links = [("/", "Overview"), ("/codes", "Access codes"), ("/analytics", "Analytics"),
              ("/roster", "Roster"), ("/requests", "Requests")]
     nav = "".join(
-        '<a href="' + href + '"' + (' class="on"' if active == href else "") + ">" + label + "</a>"
+        '<a href="' + u(href) + '"' + (' class="on"' if active == href else "") + ">" + label + "</a>"
         for href, label in links
     )
     return (
         HEAD
         + "<title>" + e(title) + " — HelloVoice catalogue</title>"
-        + '<link rel="stylesheet" href="/static/admin.css"></head><body>'
+        + '<link rel="stylesheet" href="' + u("/static/admin.css") + '"></head><body>'
         + '<header class="top"><div class="wrap">'
-        + '<a class="brand" href="/"><img src="/static/logo.webp" alt="HelloVoice" '
+        + '<a class="brand" href="' + u("/") + '"><img src="' + u("/static/logo.webp") + '" alt="HelloVoice" '
           'height="26"><span>catalogue admin</span></a>'
-        + "<nav>" + nav + '<a href="/logout">Sign out</a></nav>'
+        + "<nav>" + nav + '<a href="' + u("/logout") + '">Sign out</a></nav>'
         + '</div></header><main class="wrap">' + body + "</main></body></html>"
     )
 
@@ -187,19 +202,21 @@ def simple(title, message):
     return page(title, "<h1>" + e(title) + "</h1><p class='sub'>" + e(message) + "</p>")
 
 
-def login_page(error=None):
+def login_page(error=None, base=None):
+    if base is not None:
+        set_base(base)
     err = "<div class='err'>Email or password not recognised.</div>" if error else ""
     return (
         HEAD
         + "<title>Sign in — HelloVoice catalogue</title>"
-        + '<link rel="stylesheet" href="/static/admin.css"></head><body>'
+        + '<link rel="stylesheet" href="' + u("/static/admin.css") + '"></head><body>'
         + '<main class="wrap login">'
-        + '<img src="/static/logo.webp" alt="HelloVoice" height="30" '
+        + '<img src="' + u("/static/logo.webp") + '" alt="HelloVoice" height="30" '
           'style="margin-bottom:22px">'
         + '<h1>Catalogue admin</h1>'
         + "<p class='sub'>Sign in to manage codes, roster and requests.</p>"
         + err
-        + "<form method='post' action='/login' class='card'>"
+        + "<form method='post' action='" + u("/login") + "' class='card'>"
         + "<div style='margin-bottom:14px'><label>Email</label>"
         + "<input name='email' type='email' required autofocus autocomplete='username'></div>"
         + "<div style='margin-bottom:18px'><label>Password</label>"
@@ -234,7 +251,7 @@ def dashboard(s, events, who, message=None, error=None):
         + "<th>Event</th><th>Code</th><th>Detail</th><th class='right'>When</th>"
         + "</tr></thead><tbody>" + rows + "</tbody></table></div>"
         + "<h2>Change your password</h2>"
-        + "<form method='post' action='/password' class='card'><div class='row'>"
+        + "<form method='post' action='" + u("/password") + "' class='card'><div class='row'>"
         + "<div><label>Current password</label><input name='current' type='password' required></div>"
         + "<div><label>New password</label><input name='new' type='password' required></div>"
         + "</div><button class='btn'>Update password</button></form>"
@@ -263,7 +280,7 @@ def codes_page(codes, new_code=None, error=None):
         if ok:
             confirm = "return confirm('Revoke this code? Anyone using it loses access at once.')"
             revoke = (
-                "<form method='post' action='/codes/revoke' class='inline' onsubmit=\""
+                "<form method='post' action='" + u("/codes/revoke") + "' class='inline' onsubmit=\""
                 + confirm + "\"><input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small danger'>Revoke</button></form>"
             )
@@ -280,7 +297,7 @@ def codes_page(codes, new_code=None, error=None):
         "<h1>Access codes</h1><p class='sub'>One code per client. Checked on the server, "
         "so expiry and revocation take effect immediately — not whenever a browser feels "
         "like it.</p>" + banner
-        + "<form method='post' action='/codes/new' class='card'><div class='row'>"
+        + "<form method='post' action='" + u("/codes/new") + "' class='card'><div class='row'>"
         + "<div><label>Issued to</label><input name='label' placeholder='Alpha Plus' required></div>"
         + "<div><label>Expires in (days)</label>"
           "<input name='days' type='number' min='1' placeholder='30'></div>"
@@ -324,8 +341,8 @@ def analytics_page(s, events, days):
 
     body = (
         "<h1>Analytics</h1><p class='sub'>Last " + str(days) + " days. "
-        "<a href='/analytics?days=7'>7</a> · <a href='/analytics?days=30'>30</a> · "
-        "<a href='/analytics?days=90'>90</a></p><div class='grid'>"
+        "<a " + u("/analytics?days=7") + ">7</a> · <a " + u("/analytics?days=30") + ">30</a> · "
+        "<a " + u("/analytics?days=90") + ">90</a></p><div class='grid'>"
         + "<div class='stat'><b>" + str(s["unlocks"]) + "</b><span>Opens</span></div>"
         + "<div class='stat'><b>" + str(s["failures"]) + "</b><span>Rejected attempts</span></div>"
         + "<div class='stat'><b>" + str(s["requests"]) + "</b><span>Quote requests</span></div>"
@@ -363,7 +380,7 @@ def creator_form(c):
     # A thumbnail of what is currently set, so you can see before replacing.
     thumb = ""
     if c is not None and c["photo"]:
-        thumb = ("<img class='thumb' src='/photo/" + e(c["photo"].split("?")[0])
+        thumb = ("<img class='thumb' src='" + u("/photo/") + "" + e(c["photo"].split("?")[0])
                  + "' alt='' loading='lazy'>")
     photo_field = (
         "<div class='photo-pick'>" + thumb
@@ -385,13 +402,13 @@ def creator_form(c):
     if c is not None:
         confirm = "return confirm('Delete " + e(c["code"]) + " permanently?')"
         delete_form = (
-            "<form method='post' action='/roster/delete' class='inline' onsubmit=\""
+            "<form method='post' action='" + u("/roster/delete") + "' class='inline' onsubmit=\""
             + confirm + "\"><input type='hidden' name='code' value='" + e(c["code"])
             + "'><button class='btn small danger' style='margin-left:8px'>Delete</button></form>"
         )
 
     return (
-        "<form method='post' action='/roster/save' enctype='multipart/form-data' "
+        "<form method='post' action='" + u("/roster/save") + "' enctype='multipart/form-data' "
         "style='margin-top:12px'><div class='row'>"
         + code_field
         + "<div><label>Name</label><input name='name' value='" + val("name") + "' required></div>"
@@ -424,7 +441,7 @@ def roster_page(creators, error=None, message=None):
         hidden = "" if c["active"] else " <span class='pill dead'>hidden</span>"
         handle = "@" + c["handle"] if c["handle"] else "—"
         if c["photo"]:
-            shot = ("<img class='thumb sm' src='/photo/" + e(c["photo"].split("?")[0])
+            shot = ("<img class='thumb sm' src='" + u("/photo/") + "" + e(c["photo"].split("?")[0])
                     + "' alt='' loading='lazy'>")
         else:
             shot = "<span class='thumb sm none'>—</span>"
@@ -455,8 +472,8 @@ def roster_page(creators, error=None, message=None):
           "unless every row is valid.</strong> If a tier or platform is wrong the "
           "whole file is rejected and the offending rows are named, so the roster "
           "is never left half updated.</p>"
-        + "<a class='btn ghost' href='/roster/template'>Download the template</a>"
-        + "<form method='post' action='/roster/import' enctype='multipart/form-data' "
+        + "<a class='btn ghost' " + u("/roster/template") + ">Download the template</a>"
+        + "<form method='post' action='" + u("/roster/import") + "' enctype='multipart/form-data' "
           "style='margin-top:18px'>"
         + "<div class='row'><div><label>Spreadsheet (.csv or .xlsx)</label>"
         + "<input type='file' name='sheet' accept='.csv,.xlsx,.xlsm,text/csv' required></div>"
@@ -484,7 +501,7 @@ def requests_page(requests, creators, tiers=None):
                     + "</code><br>No longer in the roster.</div></div>")
 
         if c["photo"]:
-            shot = ("<img class='thumb' src='/photo/" + e(c["photo"].split("?")[0])
+            shot = ("<img class='thumb' src='" + u("/photo/") + "" + e(c["photo"].split("?")[0])
                     + "' alt='' loading='lazy'>")
         else:
             shot = "<span class='thumb none'>—</span>"
@@ -538,7 +555,7 @@ def requests_page(requests, creators, tiers=None):
 
         handled = bool(r["handled_at"])
         btn = (
-            "<form method='post' action='/requests/handled' class='inline'>"
+            "<form method='post' action='" + u("/requests/handled") + "' class='inline'>"
             "<input type='hidden' name='id' value='" + str(r["id"]) + "'>"
             "<input type='hidden' name='handled' value='" + ("0" if handled else "1") + "'>"
             "<button class='btn small" + (" ghost" if handled else "") + "'>"

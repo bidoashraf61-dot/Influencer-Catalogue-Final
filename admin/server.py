@@ -58,6 +58,12 @@ VIEWER_TTL = 12 * 3600
 # so it must be named explicitly — "*" cannot be used with credentials.
 ALLOWED_ORIGINS = set()
 
+# When the dashboard is served under a path (e.g. /admin) rather than its own
+# subdomain, every route and redirect has to carry that prefix. Serving it on
+# the catalogue's own domain means the API is same-origin: no CORS, and the
+# viewer cookie can be SameSite=Lax instead of None.
+BASE = ""
+
 # Mirrors TIERS in build/influencer_catalogue.py. Kept here so the dashboard can
 # price a selection without importing the static build.
 TIER_PRICE = {
@@ -130,6 +136,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send(code, json.dumps(payload), "application/json; charset=utf-8", headers)
 
     def redirect(self, to, headers=None):
+        if to.startswith("/") and BASE and not to.startswith(BASE + "/") and to != BASE:
+            to = BASE + to
         h = [("Location", to)] + list(headers or [])
         self.send(303, b"", "text/plain", h)
 
@@ -179,8 +187,14 @@ class Handler(BaseHTTPRequestHandler):
             ("Access-Control-Allow-Headers", "Content-Type"),
         ])
 
+    def route(self, raw):
+        path = raw.rstrip("/") or "/"
+        if BASE and path.startswith(BASE):
+            path = path[len(BASE):] or "/"
+        return path
+
     def do_GET(self):
-        path = urllib.parse.urlparse(self.path).path.rstrip("/") or "/"
+        path = self.route(urllib.parse.urlparse(self.path).path)
         query = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query))
 
         if path == "/api/roster":
@@ -204,7 +218,7 @@ class Handler(BaseHTTPRequestHandler):
                                  [("Cache-Control", "no-cache")])
             return self.send(404, b"", "text/plain")
         if path == "/login":
-            return self.send(200, views.login_page(query.get("e")))
+            return self.send(200, views.login_page(query.get("e"), BASE))
         if path == "/logout":
             token = auth.unsign(self.cookies().get(ADMIN_COOKIE, ""), SECRET)
             if token:
@@ -235,7 +249,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.send(404, views.simple("Not found", "That page does not exist."))
 
     def do_POST(self):
-        path = urllib.parse.urlparse(self.path).path.rstrip("/") or "/"
+        path = self.route(urllib.parse.urlparse(self.path).path)
 
         if path == "/api/unlock":
             return self.api_unlock()
@@ -430,8 +444,11 @@ class Handler(BaseHTTPRequestHandler):
             expiry = min(expiry, row["expires_at"])
         ticket = auth.sign("%d:%d" % (row["id"], expiry), SECRET)
         max_age = max(0, expiry - db.now())
+        # Cross-origin needs SameSite=None, which needs Secure, which needs
+        # HTTPS. Same-origin needs none of that and is the safer default.
+        policy = "SameSite=None; Secure" if ALLOWED_ORIGINS else "SameSite=Lax"
         cookie = (f"{VIEWER_COOKIE}={ticket}; Path=/; HttpOnly; "
-                  f"SameSite=None; Secure; Max-Age={max_age}")
+                  f"{policy}; Max-Age={max_age}")
         return self.send_json(200, {"ok": True, "label": row["label"],
                                     "roster": self.roster_payload()},
                               self.cors() + [("Set-Cookie", cookie)])
@@ -486,18 +503,24 @@ def main():
     ap.add_argument("--port", type=int, default=8900)
     ap.add_argument("--host", default="127.0.0.1")
     ap.add_argument("--origin", action="append", default=[],
-                    help="catalogue origin allowed to call /api/* (repeatable)")
+                    help="catalogue origin allowed to call /api/* (repeatable). "
+                         "Omit when the catalogue is served from this same origin.")
+    ap.add_argument("--base-path", default="",
+                    help="serve the dashboard under a path, e.g. /admin")
     args = ap.parse_args()
 
     db.init()
     db.purge_expired_sessions()
     ALLOWED_ORIGINS.update(args.origin)
+    global BASE
+    BASE = "/" + args.base_path.strip("/") if args.base_path.strip("/") else ""
+    views.set_base(BASE)
 
     if db.admin_count() == 0:
         print("No admin yet. Create one:\n  python3 admin/seed.py --email you@example.com")
 
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
-    print(f"admin  http://{args.host}:{args.port}")
+    print(f"admin  http://{args.host}:{args.port}{BASE or ''}")
     print(f"origins allowed: {', '.join(ALLOWED_ORIGINS) or '(any — set --origin in production)'}")
     try:
         srv.serve_forever()

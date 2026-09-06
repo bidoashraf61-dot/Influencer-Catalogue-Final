@@ -10,8 +10,10 @@ anywhere Python 3.8+ exists.
 ```bash
 python3 admin/seed.py --email you@hellovoice.co.uk   # create the first admin
 python3 admin/seed.py --import-roster                # load the 162 creators
-python3 admin/server.py --port 8900 --origin https://ugc-catalogue.hellovoice.co.uk
+python3 admin/server.py --port 8900 --base-path /admin
 ```
+
+The dashboard is then at `/admin` **on the catalogue's own domain** — see §2.
 
 ---
 
@@ -37,8 +39,26 @@ it; the two can run side by side while you decide.
 
 ## 2. Deploying behind nginx / openresty
 
-The service listens on localhost and expects a reverse proxy in front. Run it
-under systemd so it survives a reboot:
+The dashboard lives at `/admin` on the same hostname as the catalogue. That is
+not just tidier than a second subdomain — it is the safer arrangement:
+
+- **no CORS.** The catalogue calls `/api/*` on its own origin, so there is no
+  preflight, no reflected `Access-Control-Allow-Origin`, no allow-list to keep
+  correct.
+- **no cross-site cookies.** The viewer ticket can be `SameSite=Lax` instead of
+  `SameSite=None; Secure`. `None` means the cookie rides along on requests
+  originating from any other site; `Lax` does not. Browsers are steadily
+  tightening on `None`, and this setup never needs it.
+- **no new DNS record and no second certificate.**
+
+`--base-path /admin` makes every link, form action, redirect and asset the
+dashboard emits carry the prefix — creator photos included, so one nginx
+location covers the whole dashboard. `/api/*` is deliberately **not** prefixed:
+the catalogue calls it at the root of the domain, so nginx routes it separately.
+Without `--base-path` the service still serves at the root exactly as before;
+both layouts are tested.
+
+### The service
 
 ```ini
 # /etc/systemd/system/hv-catalogue.service
@@ -51,7 +71,7 @@ Type=simple
 User=www-data
 WorkingDirectory=/srv/hv-catalogue
 ExecStart=/usr/bin/python3 /srv/hv-catalogue/admin/server.py \
-          --port 8900 --origin https://ugc-catalogue.hellovoice.co.uk
+          --port 8900 --base-path /admin
 Restart=always
 RestartSec=3
 
@@ -59,30 +79,50 @@ RestartSec=3
 WantedBy=multi-user.target
 ```
 
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now hv-catalogue
+```
+
+### The proxy
+
+Two locations reach the service; everything else is the static catalogue.
+
 ```nginx
-location / {
-    proxy_pass         http://127.0.0.1:8900;
-    proxy_set_header   Host $host;
-    proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header   X-Forwarded-Proto $scheme;
+server {
+    server_name ugc-catalogue.hellovoice.co.uk;
+
+    # the catalogue itself — the dist/ tree
+    root /srv/hv-catalogue/dist;
+    location / { try_files $uri $uri/ =404; }
+
+    # the dashboard
+    location /admin { proxy_pass http://127.0.0.1:8900; include /etc/nginx/hv-proxy.conf; }
+
+    # the API the catalogue calls: unlock, roster, request, event
+    location /api/  { proxy_pass http://127.0.0.1:8900; include /etc/nginx/hv-proxy.conf; }
 }
 ```
 
+```nginx
+# /etc/nginx/hv-proxy.conf
+proxy_set_header Host              $host;
+proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
 `X-Forwarded-For` matters: without it every event logs the proxy's address
-instead of the visitor's.
+instead of the visitor's, and the analytics page becomes a list of `127.0.0.1`.
 
 **Serve it over HTTPS.** Admin sessions and viewer tickets are cookies; over
-plain HTTP they are readable in transit. The viewer cookie is already marked
-`Secure`, so cross-origin unlocking will not work over HTTP at all.
+plain HTTP they are readable in transit.
 
-### Two origins, one service
+### If you do want a separate hostname
 
-The catalogue and the admin are different hostnames, so `/api/*` is called
-cross-origin. Name the catalogue's origin with `--origin` (repeatable). With no
-`--origin` the service reflects any origin — convenient locally, wrong in
-production, and the startup banner says so.
-
----
+Run it at the root (drop `--base-path`) and name the catalogue's origin with
+`--origin https://ugc-catalogue.hellovoice.co.uk`, repeatable. That switches the
+viewer cookie to `SameSite=None; Secure`, which needs HTTPS on both sides. With
+no `--origin` at all the service reflects any origin — convenient locally, wrong
+in production, and the startup banner says so.
 
 ## 3. Access codes
 
@@ -186,9 +226,13 @@ fingerprinting, no third-party analytics, nothing leaves the server.
 Done. Build with the service's URL and the pages stop embedding the roster:
 
 ```bash
-CATALOGUE_API="https://admin.hellovoice.co.uk" python3 build/influencer_catalogue.py
+CATALOGUE_API="https://ugc-catalogue.hellovoice.co.uk" python3 build/influencer_catalogue.py
 python3 build/catalogue_dist.py
 ```
+
+With the same-origin layout of §2 that URL is the catalogue's own domain, so
+every `/api/*` call is same-origin. On a separate hostname, point it at that
+hostname instead and pass the matching `--origin` to the service.
 
 What changes:
 
@@ -220,3 +264,10 @@ Build with `CATALOGUE_API` **only once the service is actually reachable at that
 URL.** A page built against a service that is not running shows the gate and
 refuses every code — the catalogue would be down. Stand the service up, confirm
 `/health`, then rebuild the client.
+
+### There is no admin link on the catalogue
+
+Deliberately. The catalogue is what clients open; a visible "Admin" button
+advertises the login page to every one of them and invites a guess at the
+password. Bookmark `/admin` instead — it is one path on a domain you already
+have open.
