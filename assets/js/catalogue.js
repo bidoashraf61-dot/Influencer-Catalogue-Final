@@ -49,6 +49,38 @@
     return ("0000000" + h.toString(16)).slice(-8);
   }
 
+  /* ------------------------------------------------- remembering a unlock */
+
+  // A session cookie, not sessionStorage. sessionStorage is scoped to ONE tab,
+  // and the selection page opens in a new one — so the client unlocked the
+  // catalogue and was then asked for the very same code again on the page they
+  // had just been sent to. A cookie with no Max-Age is shared by every tab on
+  // this origin and still disappears when the browser closes, which is the
+  // behaviour that was wanted all along.
+  //
+  // sessionStorage stays as the fallback for when cookies are refused, where
+  // one prompt per tab beats no memory at all.
+  var OK = "cat-ok";
+
+  function remember() {
+    try { document.cookie = OK + "=1; Path=/; SameSite=Lax"; } catch (e) { /* blocked */ }
+    try { sessionStorage.setItem(OK, "1"); } catch (e) { /* private mode */ }
+  }
+
+  function forget() {
+    try {
+      document.cookie = OK + "=; Path=/; SameSite=Lax; Max-Age=0";
+    } catch (e) { /* blocked */ }
+    try { sessionStorage.removeItem(OK); } catch (e) { /* private mode */ }
+  }
+
+  function remembered() {
+    try {
+      if (("; " + document.cookie).indexOf("; " + OK + "=1") !== -1) return true;
+    } catch (e) { /* blocked */ }
+    try { return sessionStorage.getItem(OK) === "1"; } catch (e) { return false; }
+  }
+
   /* ---------------------------------------------------------------- gate */
 
   function unlock() {
@@ -85,7 +117,7 @@
 
     if (!CFG.api) {
       if (hash(val) === CFG.passHash) {
-        try { sessionStorage.setItem("cat-ok", "1"); } catch (err) { /* private mode */ }
+        remember();
         unlock();
       } else {
         gateFail();
@@ -107,7 +139,7 @@
           return;
         }
         ROSTER = res.b.roster || [];
-        try { sessionStorage.setItem("cat-ok", "1"); } catch (err) { /* private mode */ }
+        remember();
         unlock();
       })
       .catch(function () {
@@ -116,12 +148,12 @@
       .then(function () { btn.disabled = false; });
   });
 
-  // Survive a refresh within the same tab, not across sessions. The actual
-  // unlock happens at the very bottom of this file: everything it reaches for
-  // must already be assigned, and `var` hoists the declaration but not the
-  // value. Unlocking here silently broke the selection page on any revisit.
-  var wasUnlocked = false;
-  try { wasUnlocked = sessionStorage.getItem("cat-ok") === "1"; } catch (e) { /* private mode */ }
+  // Survive a refresh and a hop to the selection page, not a browser restart.
+  // The actual unlock happens at the very bottom of this file: everything it
+  // reaches for must already be assigned, and `var` hoists the declaration but
+  // not the value. Unlocking here silently broke the selection page on any
+  // revisit.
+  var wasUnlocked = remembered();
 
 
   /* ------------------------------------------------------- roster from API */
@@ -828,7 +860,7 @@
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (b) {
         if (b && b.ok) { ROSTER = b.roster || []; unlock(); }
-        else { try { sessionStorage.removeItem("cat-ok"); } catch (e) {} }
+        else { forget(); }
       })
       .catch(function () { /* leave the gate up */ });
   } else if (wasUnlocked) {

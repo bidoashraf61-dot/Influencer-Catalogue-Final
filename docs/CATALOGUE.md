@@ -239,6 +239,14 @@ summary as "Not in this roster", so a stale link degrades rather than breaks.
 
 ### What this does not do
 
+**One unlock covers both pages.** The code is remembered in a session cookie,
+which every tab on the origin shares and which the browser drops when it
+closes. It used to be `sessionStorage`, scoped to a single tab — so the
+selection page, which opens in a new one, asked the client for the very same
+code they had just typed. A forwarded link still gates a stranger: verified
+with cookies and storage cleared, the page stays locked, names are not
+rendered, and a wrong code is still refused.
+
 **It is a link, not a saved record.** Nothing is stored anywhere. Lose the
 link and the selection is gone; there is no list of past selections, because a
 static page cannot persist one reliably.
