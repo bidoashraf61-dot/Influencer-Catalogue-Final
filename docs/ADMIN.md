@@ -129,9 +129,25 @@ in production, and the startup banner says so.
 Generated as `XXXX-XXXX-XXXX` from an alphabet with no `0/O` or `1/I/l`, because
 these get read down a phone.
 
-**Only a hash is stored.** The code is shown once, when you create it, and
-cannot be recovered — the same reasoning as a password. Lose it and issue
-another. The list shows the last four characters so a row is identifiable.
+**The code is stored as written, and the list shows it in full with a Copy
+button.** It was hashed at first, borrowed from password practice without the
+reason behind it: passwords are hashed because people reuse them elsewhere, so
+a stolen database becomes a key to other services. Nobody reuses a catalogue
+share code — and anyone who can read the `codes` table can already read the
+`creators` table beside it, which is the very thing the code unlocks. The hash
+protected nothing, while "shown once, then gone" cost a real code every time
+someone closed the tab.
+
+The hash stays as the lookup `/api/unlock` uses, so nothing about checking a
+code changed.
+
+**Codes issued before this change cannot be shown.** They were only ever
+hashed; the last four characters are all that was kept. Those rows still work
+and still revoke — they just read `••••-HZBT`. Re-issue if you need the text.
+
+What this does mean: the database now holds live access codes in readable
+form. Back it up somewhere private, and keep treating it as the crown jewels
+(§6) — which it already was.
 
 A code can carry an expiry, a maximum number of uses, or neither. Each unlock
 re-checks state, so revoking is immediate even for someone already holding a

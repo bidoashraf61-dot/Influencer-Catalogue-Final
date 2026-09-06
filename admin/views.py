@@ -105,6 +105,13 @@ margin:16px 0;color:#8a1a1a}
 margin:16px 0;color:#14602b}
 .reveal{font:20px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.08em;
 background:var(--ink);color:var(--lime);padding:14px 18px;border-radius:10px;display:inline-block}
+.copyrow{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+.code-full{font:14px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em;
+background:#f0f0ee;border:1px solid rgba(18,18,18,.12);border-radius:7px;
+padding:4px 9px;user-select:all;white-space:nowrap}
+.code-full.reveal{font-size:20px;letter-spacing:.08em;padding:14px 18px;border-radius:10px;
+background:var(--ink);color:var(--lime);border-color:var(--ink)}
+.btn.tiny{padding:4px 12px;font-size:12px}
 .bars{display:flex;align-items:flex-end;gap:3px;height:90px;margin:8px 0 4px}
 .bars div{flex:1;background:var(--ink);border-radius:3px 3px 0 0;min-height:2px}
 .muted{color:var(--gray)}
@@ -263,14 +270,39 @@ def dashboard(s, events, who, message=None, error=None):
     return page("Overview", body, "/")
 
 
+def copyable(text, extra=""):
+    """A code shown in full with a one-click copy.
+
+    navigator.clipboard is unavailable outside a secure context, which includes
+    plain-http localhost in some browsers, so the fallback selects the text and
+    uses execCommand. Either way the click leaves the code selected, so ctrl-C
+    works even if both are blocked.
+    """
+    value = e(text)
+    js = (
+        "var t=this.previousElementSibling,v=t.textContent.trim();"
+        "var r=document.createRange();r.selectNodeContents(t);"
+        "var s=getSelection();s.removeAllRanges();s.addRange(r);"
+        "var b=this,done=function(){b.textContent='Copied';"
+        "setTimeout(function(){b.textContent='Copy'},1600)};"
+        "if(navigator.clipboard&&navigator.clipboard.writeText){"
+        "navigator.clipboard.writeText(v).then(done,function(){"
+        "try{document.execCommand('copy');done()}catch(e){b.textContent='Press Ctrl-C'}})"
+        "}else{try{document.execCommand('copy');done()}catch(e){b.textContent='Press Ctrl-C'}}"
+    )
+    cls = ("code-full " + extra).strip()
+    return ("<span class='copyrow'><code class='" + cls + "'>" + value + "</code>"
+            "<button type='button' class='btn tiny ghost' onclick=\"" + js + "\">Copy</button>"
+            "</span>")
+
+
 def codes_page(codes, new_code=None, error=None):
     banner = ""
     if new_code:
         banner += (
-            "<div class='note'><strong>New code — copy it now.</strong> "
-            "It is stored only as a hash, so this is the one time it can be shown."
-            "<div style='margin-top:10px'><span class='reveal'>" + e(new_code)
-            + "</span></div></div>"
+            "<div class='note'><strong>New code.</strong> "
+            "It is kept on this page, so you can come back for it."
+            "<div style='margin-top:10px'>" + copyable(new_code, "reveal") + "</div></div>"
         )
     if error:
         banner += "<div class='err'>" + e(error) + "</div>"
@@ -288,9 +320,15 @@ def codes_page(codes, new_code=None, error=None):
                 + confirm + "\"><input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small danger'>Revoke</button></form>"
             )
+        # Codes issued before code_plain existed are hashed and gone; the last
+        # four characters are all that was ever kept of them.
+        plain = c["code_plain"] if "code_plain" in c.keys() else None
+        shown = (copyable(plain) if plain else
+                 "<code title='Issued before codes were stored — cannot be shown'>"
+                 "••••-" + e(c["hint"]) + "</code>")
         rows.append(
-            "<tr><td><strong>" + e(c["label"]) + "</strong><br><code>••••-" + e(c["hint"])
-            + "</code></td><td><span class='pill " + cls + "'>" + e(reason) + "</span></td>"
+            "<tr><td><strong>" + e(c["label"]) + "</strong><br>" + shown
+            + "</td><td><span class='pill " + cls + "'>" + e(reason) + "</span></td>"
             + "<td>" + used + "</td><td class='muted'>" + ts(c["expires_at"]) + "</td>"
             + "<td class='muted'>" + ago(c["last_used"]) + "</td>"
             + "<td class='right'>" + revoke + "</td></tr>"

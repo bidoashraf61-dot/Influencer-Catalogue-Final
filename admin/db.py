@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS admins (
 CREATE TABLE IF NOT EXISTS codes (
   id          INTEGER PRIMARY KEY,
   code_hash   TEXT NOT NULL UNIQUE,
-  hint        TEXT NOT NULL,            -- last 4 chars, so the list is readable
+  hint        TEXT NOT NULL,            -- last 4 chars; all a pre-2026-09 row has
+  code_plain  TEXT,                     -- the code itself, so it can be read back
   label       TEXT NOT NULL,            -- who it was issued to
   created_at  INTEGER NOT NULL,
   expires_at  INTEGER,                  -- NULL = no expiry
@@ -101,6 +102,20 @@ def connect():
 def init():
     with connect() as conn:
         conn.executescript(SCHEMA)
+        migrate(conn)
+
+
+def migrate(conn):
+    """Columns added after a database was first created.
+
+    executescript only creates tables that do not exist; an existing database
+    keeps its original shape, so a new column has to be added explicitly. Each
+    step is idempotent and checked against the live table rather than against a
+    version number nobody remembers to bump.
+    """
+    have = {r["name"] for r in conn.execute("PRAGMA table_info(codes)")}
+    if "code_plain" not in have:
+        conn.execute("ALTER TABLE codes ADD COLUMN code_plain TEXT")
 
 
 def now():
@@ -175,12 +190,25 @@ def purge_expired_sessions():
 
 # ------------------------------------------------------------------- codes --
 
-def create_code(code_hash, hint, label, expires_at=None, max_uses=None):
+def create_code(code_hash, hint, label, expires_at=None, max_uses=None, code_plain=None):
+    """The code is stored as written as well as hashed.
+
+    Hashing alone was the wrong call here, borrowed from passwords without the
+    reason behind it. Passwords are hashed because people reuse them elsewhere,
+    so a stolen database becomes a key to other services. Nobody reuses a
+    catalogue share code, and anyone who can read this table can already read
+    the creators table sitting beside it — the very thing the code unlocks. So
+    the hash protected nothing, while "shown once, then gone forever" cost a
+    real code every time someone closed the tab.
+
+    The hash stays: it is what /api/unlock looks up, and it keeps working for
+    every code issued before this column existed.
+    """
     with connect() as conn:
         cur = conn.execute(
-            "INSERT INTO codes (code_hash, hint, label, created_at, expires_at, max_uses) "
-            "VALUES (?,?,?,?,?,?)",
-            (code_hash, hint, label, now(), expires_at, max_uses),
+            "INSERT INTO codes (code_hash, hint, label, created_at, expires_at, max_uses, code_plain) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (code_hash, hint, label, now(), expires_at, max_uses, code_plain),
         )
         return cur.lastrowid
 

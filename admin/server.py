@@ -347,8 +347,8 @@ class Handler(BaseHTTPRequestHandler):
         expires = db.now() + int(days) * 86400 if days.isdigit() and int(days) > 0 else None
         code = auth.generate_code()
         db.create_code(auth.hash_code(code), auth.code_hint(code), label, expires,
-                       int(max_uses) if max_uses.isdigit() and int(max_uses) > 0 else None)
-        # Shown once. It is stored only as a hash, so it cannot be shown again.
+                       int(max_uses) if max_uses.isdigit() and int(max_uses) > 0 else None,
+                       code_plain=code)
         return self.redirect("/codes?new=" + urllib.parse.quote(code))
 
     def post_code_revoke(self):
