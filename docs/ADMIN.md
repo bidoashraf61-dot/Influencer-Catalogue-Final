@@ -266,7 +266,9 @@ into Excel, *Attach photos in bulk* above is the faster route.
 
 ---
 
-## 5. What is recorded
+## 5. Analytics
+
+### What is recorded
 
 | event | when |
 |---|---|
@@ -280,7 +282,36 @@ Each row keeps the code, timestamp, IP and user agent. That is enough to answer
 "did Alpha Plus open it, and when" without becoming surveillance: no
 fingerprinting, no third-party analytics, nothing leaves the server.
 
----
+### What the page shows
+
+The numbers were always there; they were laid out as tables of counts, which
+tells you how much happened and not whether any of it went anywhere.
+
+- **Headline figures** carry their own context — opens says how many of the
+  issued codes were used, quote requests says what share of opened codes
+  actually asked.
+- **Activity** is an SVG chart with a real axis and gridlines: opens and
+  shortlists per day, quote-request days marked above the column. Days with
+  nothing on them are drawn as gaps rather than skipped, because a chart that
+  only plots active days compresses a quiet fortnight into nothing and reads
+  as steady use.
+- **How far each code got** is the funnel — issued, opened, shortlisted,
+  requested, each with the percentage of the step before. A catalogue opened
+  forty times that produced no shortlist is a different problem from one
+  nobody opened, and a table of totals cannot tell the two apart.
+- **What clients shortlist** breaks the shortlisting down by tier and by
+  platform. Over a few campaigns this is the commercially useful chart: it is
+  demand, in the client's own choices.
+- **Why codes were refused** splits the rejected attempts into unknown,
+  expired, revoked and exhausted. Several *expired* means codes are outliving
+  their campaigns; several *unknown* is someone mistyping, or guessing.
+- **By client** is one row per code: opens, creators shortlisted, whether they
+  asked for a quote, and when they last looked.
+- **Most shortlisted creators** now shows the photo, name, tier and platform
+  rather than a bare code, so it can be read without cross-referencing.
+
+Charts are hand-drawn SVG. No charting library, no CDN, nothing to load — the
+same reason the rest of this service has no dependencies.
 
 ## 6. Security notes, honestly
 

@@ -271,39 +271,113 @@ def recent_events(limit=200):
 
 
 def stats(days=30):
+    """Everything the analytics page draws, in one pass.
+
+    Grouped so the page renders from data rather than computing anything: a
+    view that does arithmetic is a view that quietly disagrees with the numbers
+    beside it.
+    """
     since = now() - days * 86400
     with connect() as conn:
-        out = {}
-        out["unlocks"] = conn.execute(
-            "SELECT COUNT(*) c FROM events WHERE kind='unlock_ok' AND at > ?", (since,)
-        ).fetchone()["c"]
-        out["failures"] = conn.execute(
-            "SELECT COUNT(*) c FROM events WHERE kind='unlock_fail' AND at > ?", (since,)
-        ).fetchone()["c"]
-        out["requests"] = conn.execute(
-            "SELECT COUNT(*) c FROM requests WHERE at > ?", (since,)
-        ).fetchone()["c"]
-        out["live_codes"] = conn.execute(
+        def one(sql, args=()):
+            return conn.execute(sql, args).fetchone()["c"]
+
+        out = {"days": days}
+        out["unlocks"] = one(
+            "SELECT COUNT(*) c FROM events WHERE kind='unlock_ok' AND at > ?", (since,))
+        out["failures"] = one(
+            "SELECT COUNT(*) c FROM events WHERE kind='unlock_fail' AND at > ?", (since,))
+        out["requests"] = one("SELECT COUNT(*) c FROM requests WHERE at > ?", (since,))
+        out["shortlists"] = one(
+            "SELECT COUNT(*) c FROM events WHERE kind='shortlist' AND at > ?", (since,))
+        out["creators_touched"] = one(
+            "SELECT COUNT(DISTINCT detail) c FROM events "
+            "WHERE kind='shortlist' AND at > ? AND detail IS NOT NULL", (since,))
+        out["live_codes"] = one(
             "SELECT COUNT(*) c FROM codes WHERE revoked_at IS NULL "
-            "AND (expires_at IS NULL OR expires_at > ?)", (now(),)
-        ).fetchone()["c"]
+            "AND (expires_at IS NULL OR expires_at > ?)", (now(),))
+
+        # ---- funnel: how far each issued code actually got -----------------
+        out["codes_total"] = one("SELECT COUNT(*) c FROM codes")
+        out["codes_opened"] = one(
+            "SELECT COUNT(DISTINCT code_id) c FROM events "
+            "WHERE kind='unlock_ok' AND at > ? AND code_id IS NOT NULL", (since,))
+        out["codes_shortlisted"] = one(
+            "SELECT COUNT(DISTINCT code_id) c FROM events "
+            "WHERE kind='shortlist' AND at > ? AND code_id IS NOT NULL", (since,))
+        out["codes_requested"] = one(
+            "SELECT COUNT(DISTINCT code_id) c FROM requests "
+            "WHERE at > ? AND code_id IS NOT NULL", (since,))
+
+        # ---- one row per client, so "did they engage" is one glance --------
         out["by_code"] = conn.execute(
-            "SELECT c.label, c.hint, COUNT(e.id) n, MAX(e.at) last "
-            "FROM codes c LEFT JOIN events e ON e.code_id = c.id AND e.kind='unlock_ok' AND e.at > ? "
-            "GROUP BY c.id ORDER BY n DESC", (since,)
-        ).fetchall()
-        out["by_day"] = conn.execute(
-            "SELECT date(at,'unixepoch') d, COUNT(*) n FROM events "
-            "WHERE kind='unlock_ok' AND at > ? GROUP BY d ORDER BY d", (since,)
-        ).fetchall()
+            # max_uses and uses come along because code_state() reads them —
+            # a partial SELECT here raised IndexError on the rendered page.
+            "SELECT c.id, c.label, c.hint, c.revoked_at, c.expires_at,"
+            " c.max_uses, c.uses,"
+            " (SELECT COUNT(*) FROM events e WHERE e.code_id=c.id"
+            "    AND e.kind='unlock_ok' AND e.at > ?) opens,"
+            " (SELECT COUNT(*) FROM events e WHERE e.code_id=c.id"
+            "    AND e.kind='shortlist' AND e.at > ?) shortlists,"
+            " (SELECT COUNT(*) FROM requests r WHERE r.code_id=c.id AND r.at > ?) requests,"
+            " (SELECT MAX(e.at) FROM events e WHERE e.code_id=c.id"
+            "    AND e.kind='unlock_ok' AND e.at > ?) last "
+            "FROM codes c ORDER BY opens DESC, c.created_at DESC",
+            (since, since, since, since)).fetchall()
+
+        # ---- daily activity, three series ---------------------------------
+        ev = conn.execute(
+            "SELECT date(at,'unixepoch') d,"
+            " SUM(CASE WHEN kind='unlock_ok' THEN 1 ELSE 0 END) opens,"
+            " SUM(CASE WHEN kind='shortlist' THEN 1 ELSE 0 END) shortlists "
+            "FROM events WHERE at > ? GROUP BY d", (since,)).fetchall()
+        rq = conn.execute(
+            "SELECT date(at,'unixepoch') d, COUNT(*) n FROM requests "
+            "WHERE at > ? GROUP BY d", (since,)).fetchall()
+        by_day = {}
+        for r in ev:
+            by_day[r["d"]] = {"d": r["d"], "opens": r["opens"] or 0,
+                              "shortlists": r["shortlists"] or 0, "requests": 0}
+        for r in rq:
+            row = by_day.setdefault(r["d"], {"d": r["d"], "opens": 0,
+                                             "shortlists": 0, "requests": 0})
+            row["requests"] = r["n"]
+        # Fill the gaps. A chart that only plots days something happened
+        # compresses a quiet fortnight into nothing and reads as steady use.
+        out["by_day"] = []
+        for i in range(days - 1, -1, -1):
+            key = time.strftime("%Y-%m-%d", time.gmtime(now() - i * 86400))
+            out["by_day"].append(by_day.get(
+                key, {"d": key, "opens": 0, "shortlists": 0, "requests": 0}))
+
+        # ---- which creators draw interest, with enough to recognise them ---
         out["top_creators"] = conn.execute(
-            "SELECT detail, COUNT(*) n FROM events WHERE kind='shortlist' AND at > ? "
-            "GROUP BY detail ORDER BY n DESC LIMIT 15", (since,)
-        ).fetchall()
+            "SELECT e.detail code, COUNT(*) n, cr.name, cr.tier, cr.platform,"
+            " cr.photo, cr.followers "
+            "FROM events e LEFT JOIN creators cr ON cr.code = e.detail "
+            "WHERE e.kind='shortlist' AND e.at > ? AND e.detail IS NOT NULL "
+            "GROUP BY e.detail ORDER BY n DESC, cr.followers DESC LIMIT 12",
+            (since,)).fetchall()
+
+        # ---- what the shortlisting says about demand -----------------------
+        out["by_tier"] = conn.execute(
+            "SELECT cr.tier k, COUNT(*) n FROM events e "
+            "JOIN creators cr ON cr.code = e.detail "
+            "WHERE e.kind='shortlist' AND e.at > ? GROUP BY cr.tier ORDER BY n DESC",
+            (since,)).fetchall()
+        out["by_platform"] = conn.execute(
+            "SELECT cr.platform k, COUNT(*) n FROM events e "
+            "JOIN creators cr ON cr.code = e.detail "
+            "WHERE e.kind='shortlist' AND e.at > ? GROUP BY cr.platform ORDER BY n DESC",
+            (since,)).fetchall()
+
+        # ---- why codes were refused ----------------------------------------
+        out["fail_reasons"] = conn.execute(
+            "SELECT COALESCE(detail,'unknown') k, COUNT(*) n FROM events "
+            "WHERE kind='unlock_fail' AND at > ? GROUP BY k ORDER BY n DESC",
+            (since,)).fetchall()
     return out
 
-
-# ---------------------------------------------------------------- creators --
 
 def upsert_creator(c):
     with connect() as conn:

@@ -68,6 +68,9 @@ nav a.on{opacity:1;border-bottom-color:var(--lime)}
 h1{font-size:26px;margin:32px 0 4px}
 h2{font-size:17px;margin:32px 0 12px}
 .sub{color:var(--gray);margin:0 0 24px}
+/* the 7/30/90 range tabs; nav a.on is the top nav and does not reach here */
+.sub a.on{color:var(--ink);font-weight:600;text-decoration:none;
+background:var(--lime);padding:2px 9px;border-radius:999px}
 .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin:24px 0}
 .stat{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:18px}
 .stat b{display:block;font-size:30px;line-height:1.1;margin-bottom:2px}
@@ -112,6 +115,33 @@ padding:4px 9px;user-select:all;white-space:nowrap}
 .code-full.reveal{font-size:20px;letter-spacing:.08em;padding:14px 18px;border-radius:10px;
 background:var(--ink);color:var(--lime);border-color:var(--ink)}
 .btn.tiny{padding:4px 12px;font-size:12px}
+/* --- analytics ------------------------------------------------------ */
+.stat.hero b{font-size:38px}
+.stat .ctx{display:block;color:var(--gray);font-size:12px;margin-top:6px}
+.chart{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--gray);
+margin:0 0 14px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
+.hb{display:grid;grid-template-columns:minmax(90px,auto) 1fr auto;gap:12px;
+align-items:center;padding:7px 0;font-size:14px}
+.hb .track{background:#f1efec;border-radius:999px;height:9px;overflow:hidden}
+.hb .fill{display:block;height:100%;border-radius:999px;background:var(--ink)}
+.hb .n{font-variant-numeric:tabular-nums;color:var(--gray);min-width:56px;
+text-align:right}
+.funnel{display:grid;gap:2px}
+.fstep{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:14px;
+align-items:center;padding:6px 0}
+.fstep .bar{height:34px;border-radius:8px;background:var(--ink);color:#fff;
+display:flex;align-items:center;padding:0 12px;font-size:14px;font-weight:600;
+min-width:46px;white-space:nowrap}
+.fstep .drop{color:rgba(255,255,255,.62);font-size:12px;margin-left:10px;
+font-weight:400}
+.tface{width:38px;height:38px;border-radius:9px;object-fit:cover;display:block;
+background:#f1efec}
+.tface.none{display:grid;place-items:center;color:var(--gray);font-size:11px}
+.split{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.empty{color:var(--gray);font-size:14px;padding:10px 0}
 .bars{display:flex;align-items:flex-end;gap:3px;height:90px;margin:8px 0 4px}
 .bars div{flex:1;background:var(--ink);border-radius:3px 3px 0 0;min-height:2px}
 .muted{color:var(--gray)}
@@ -353,48 +383,249 @@ def codes_page(codes, new_code=None, error=None):
     return page("Access codes", body, "/codes")
 
 
+def pct(part, whole):
+    return int(round(part * 100.0 / whole)) if whole else 0
+
+
+def hbar(label, n, peak, colour=None, sub=None):
+    """One labelled horizontal bar. Everything on this page that is a ranking
+    uses these rather than a bare number column — the shape of a distribution
+    is the thing you actually want to see."""
+    width = str(pct(n, peak) if peak else 0)
+    style = ("background:" + colour + ";") if colour else ""
+    left = e(label) + ("<br><span class='muted' style='font-size:12px'>"
+                       + e(sub) + "</span>" if sub else "")
+    return ("<div class='hb'><div>" + left + "</div>"
+            "<div class='track'><i class='fill' style='width:" + width + "%;"
+            + style + "'></i></div>"
+            "<div class='n'>" + str(n) + "</div></div>")
+
+
+def activity_chart(by_day):
+    """Opens and shortlists per day, with requests marked above the column.
+
+    Drawn as SVG rather than divs so it can carry a real y-axis and gridlines.
+    The old version was a row of unlabelled bars: you could see that something
+    happened, but not how much or when.
+    """
+    if not by_day:
+        return "<p class='empty'>Nothing recorded yet.</p>"
+
+    W, H = 900.0, 230.0
+    L, R, T, B = 38.0, 8.0, 12.0, 26.0        # gutters
+    plot_w, plot_h = W - L - R, H - T - B
+    peak = max([max(d["opens"], d["shortlists"]) for d in by_day] + [1])
+    # A round top makes the gridline labels whole numbers rather than 3.67
+    step = 1
+    while peak / float(step) > 4:
+        step *= 2 if step < 4 else 5
+    top = step * int((peak + step - 1) / step) or 1
+
+    n = len(by_day)
+    slot = plot_w / n
+    bw = min(9.0, max(2.0, slot / 2.6))
+
+    out = ['<svg class="chart" viewBox="0 0 900 230" role="img" '
+           'aria-label="Opens and shortlists per day">']
+
+    # gridlines + y labels
+    lines = int(top / step)
+    for i in range(lines + 1):
+        v = step * i
+        y = T + plot_h - (v / float(top)) * plot_h
+        out.append('<line x1="' + str(L) + '" y1="' + str(round(y, 1))
+                   + '" x2="' + str(W - R) + '" y2="' + str(round(y, 1))
+                   + '" stroke="#e7e4df" stroke-width="1"/>')
+        out.append('<text x="' + str(L - 8) + '" y="' + str(round(y + 4, 1))
+                   + '" text-anchor="end" font-size="11" fill="#8a8a8a">'
+                   + str(v) + "</text>")
+
+    for i, d in enumerate(by_day):
+        cx = L + slot * i + slot / 2.0
+        for j, (key, colour) in enumerate((("opens", "#121212"),
+                                           ("shortlists", "#b9d400"))):
+            val = d[key]
+            if not val:
+                continue
+            h = (val / float(top)) * plot_h
+            x = cx - bw - 1 + j * (bw + 2)
+            out.append('<rect x="' + str(round(x, 1)) + '" y="'
+                       + str(round(T + plot_h - h, 1)) + '" width="' + str(round(bw, 1))
+                       + '" height="' + str(round(h, 1)) + '" rx="2" fill="' + colour
+                       + '"><title>' + e(d["d"]) + " — " + str(val) + " "
+                       + key + "</title></rect>")
+        if d["requests"]:
+            out.append('<circle cx="' + str(round(cx, 1)) + '" cy="' + str(T + 4)
+                       + '" r="4" fill="#ff691e"><title>' + e(d["d"]) + " — "
+                       + str(d["requests"]) + " quote request(s)</title></circle>")
+
+    # axis + a readable number of date labels
+    out.append('<line x1="' + str(L) + '" y1="' + str(T + plot_h) + '" x2="'
+               + str(W - R) + '" y2="' + str(T + plot_h)
+               + '" stroke="#121212" stroke-width="1"/>')
+    every = max(1, int(n / 8))
+    for i, d in enumerate(by_day):
+        if i % every and i != n - 1:
+            continue
+        out.append('<text x="' + str(round(L + slot * i + slot / 2.0, 1)) + '" y="'
+                   + str(H - 8) + '" text-anchor="middle" font-size="11" '
+                   'fill="#8a8a8a">' + e(d["d"][5:]) + "</text>")
+    out.append("</svg>")
+    return "".join(out)
+
+
+def funnel(s):
+    """Issued -> opened -> shortlisted -> requested, as codes not events.
+
+    The headline counts say how much happened; this says how far it got. A
+    catalogue opened forty times that produced no shortlist is a different
+    problem from one nobody opened.
+    """
+    steps = [
+        ("Codes issued", s["codes_total"], "Every code that exists"),
+        ("Opened", s["codes_opened"], "Entered the code and saw the roster"),
+        ("Shortlisted", s["codes_shortlisted"], "Picked at least one creator"),
+        ("Requested a quote", s["codes_requested"], "Sent the form back"),
+    ]
+    top = max([n for _, n, _ in steps] + [1])
+    out = ["<div class='funnel'>"]
+    prev = None
+    for label, n, why in steps:
+        w = max(4, pct(n, top))
+        drop = ""
+        if prev is not None:
+            drop = ("<span class='drop'>" + str(pct(n, prev)) + "% of previous</span>"
+                    if prev else "<span class='drop'>—</span>")
+        out.append("<div class='fstep'><div>" + e(label)
+                   + "<br><span class='muted' style='font-size:12px'>" + e(why)
+                   + "</span></div>"
+                   "<div><div class='bar' style='width:" + str(w) + "%'>"
+                   + str(n) + "</div></div></div>")
+        if drop:
+            out[-1] = out[-1].replace("</div></div></div>", drop + "</div></div></div>")
+        prev = n
+    out.append("</div>")
+    return "".join(out)
+
+
 def analytics_page(s, events, days):
-    counts = [d["n"] for d in s["by_day"]] or [1]
-    peak = max(counts)
-    bars = "".join(
-        "<div style='height:" + str(max(2, int(d["n"] / peak * 88))) + "px' title='"
-        + e(d["d"]) + ": " + str(d["n"]) + "'></div>"
-        for d in s["by_day"]
-    ) or "<div style='height:2px'></div>"
+    def rank(rows, colour=None, key="k"):
+        if not rows:
+            return "<p class='empty'>Nothing recorded yet.</p>"
+        peak = max(r["n"] for r in rows) or 1
+        return "".join(hbar(r[key] or "—", r["n"], peak, colour) for r in rows)
 
-    by_code = "".join(
-        "<tr><td>" + e(r["label"]) + " <code>••••-" + e(r["hint"]) + "</code></td><td>"
-        + str(r["n"]) + "</td><td class='muted'>" + ago(r["last"]) + "</td></tr>"
-        for r in s["by_code"]
-    ) or "<tr><td colspan='3' class='muted'>No opens yet.</td></tr>"
+    # ---- headline -------------------------------------------------------
+    conv = pct(s["codes_requested"], s["codes_opened"])
+    kpis = [
+        ("Opens", s["unlocks"], str(s["codes_opened"]) + " of " + str(s["codes_total"])
+         + " codes used", "hero"),
+        ("Creators shortlisted", s["shortlists"],
+         str(s["creators_touched"]) + " different creators", ""),
+        ("Quote requests", s["requests"],
+         str(conv) + "% of opened codes asked", "hero" if s["requests"] else ""),
+        ("Rejected attempts", s["failures"],
+         "wrong, expired or revoked codes", ""),
+        ("Live codes", s["live_codes"], "not revoked or expired", ""),
+    ]
+    cards = "".join(
+        "<div class='stat " + cls + "'><b>" + str(v) + "</b><span>" + e(t)
+        + "</span><span class='ctx'>" + e(note) + "</span></div>"
+        for t, v, note, cls in kpis)
 
-    top = "".join(
-        "<tr><td><code>" + e(r["detail"]) + "</code></td><td>" + str(r["n"]) + "</td></tr>"
-        for r in s["top_creators"] if r["detail"]
-    ) or "<tr><td colspan='2' class='muted'>No shortlisting recorded yet.</td></tr>"
+    # ---- per client -----------------------------------------------------
+    rows = []
+    for c in s["by_code"]:
+        ok, reason = code_state(c)
+        cls = "live" if ok else ("warn" if reason in ("expired", "exhausted") else "dead")
+        got = ("<span class='pill live'>yes</span>" if c["requests"]
+               else "<span class='muted'>—</span>")
+        rows.append(
+            "<tr><td><strong>" + e(c["label"]) + "</strong><br>"
+            "<code class='muted' style='font-size:12px'>••••-" + e(c["hint"])
+            + "</code></td>"
+            "<td><span class='pill " + cls + "'>" + e(reason) + "</span></td>"
+            "<td>" + str(c["opens"]) + "</td><td>" + str(c["shortlists"]) + "</td>"
+            "<td>" + got + "</td>"
+            "<td class='right muted'>" + ago(c["last"]) + "</td></tr>")
+    by_code = "".join(rows) or "<tr><td colspan='6' class='muted'>No codes yet.</td></tr>"
 
+    # ---- creators, recognisable ------------------------------------------
+    peak = max([r["n"] for r in s["top_creators"]] + [1])
+    faces = []
+    for r in s["top_creators"]:
+        if r["photo"]:
+            shot = ("<img class='tface' src='" + u("/photo/")
+                    + e(str(r["photo"]).split("?")[0]) + "' alt='' loading='lazy'>")
+        else:
+            shot = "<span class='tface none'>—</span>"
+        who = e(r["name"] or r["code"])
+        meta = " · ".join(x for x in (r["tier"], r["platform"]) if x)
+        faces.append(
+            "<tr><td style='width:46px'>" + shot + "</td>"
+            "<td><strong>" + who + "</strong><br>"
+            "<span class='muted' style='font-size:12px'><code>" + e(r["code"])
+            + "</code>" + (" · " + e(meta) if meta else "") + "</span></td>"
+            "<td style='width:45%'><div class='track' style='background:#f1efec;"
+            "border-radius:999px;height:9px;overflow:hidden'>"
+            "<i style='display:block;height:100%;border-radius:999px;"
+            "background:#121212;width:" + str(pct(r["n"], peak)) + "%'></i></div></td>"
+            "<td class='right'>" + str(r["n"]) + "</td></tr>")
+    top = "".join(faces) or ("<tr><td colspan='4' class='muted'>No shortlisting "
+                             "recorded yet.</td></tr>")
+
+    # ---- event log --------------------------------------------------------
+    tone = {"unlock_ok": "live", "request": "live", "shortlist": "",
+            "unlock_fail": "dead", "admin_fail": "dead"}
     log = "".join(
-        "<tr><td>" + e(ev["kind"]) + "</td><td>" + e(ev["label"] or "—") + "</td>"
+        "<tr><td><span class='pill " + tone.get(ev["kind"], "") + "'>"
+        + e(ev["kind"].replace("_", " ")) + "</span></td>"
+        + "<td>" + e(ev["label"] or "—") + "</td>"
         + "<td class='muted'>" + e(ev["detail"] or "") + "</td>"
         + "<td class='muted'>" + e((ev["ip"] or "")[:24]) + "</td>"
         + "<td class='right muted'>" + ts(ev["at"]) + "</td></tr>"
         for ev in events
     ) or "<tr><td colspan='5' class='muted'>Nothing recorded yet.</td></tr>"
 
+    def tab(d):
+        on = " class='on'" if d == days else ""
+        return "<a href='" + u("/analytics?days=" + str(d)) + "'" + on + ">" + str(d) + "</a>"
+
     body = (
-        "<h1>Analytics</h1><p class='sub'>Last " + str(days) + " days. "
-        "<a href='" + u("/analytics?days=7") + "'>7</a> · "
-        "<a href='" + u("/analytics?days=30") + "'>30</a> · "
-        "<a href='" + u("/analytics?days=90") + "'>90</a></p><div class='grid'>"
-        + "<div class='stat'><b>" + str(s["unlocks"]) + "</b><span>Opens</span></div>"
-        + "<div class='stat'><b>" + str(s["failures"]) + "</b><span>Rejected attempts</span></div>"
-        + "<div class='stat'><b>" + str(s["requests"]) + "</b><span>Quote requests</span></div>"
-        + "</div><h2>Opens per day</h2><div class='card'><div class='bars'>" + bars + "</div></div>"
-        + "<h2>By code</h2><div class='card'><table><thead><tr><th>Code</th><th>Opens</th>"
-        + "<th>Last</th></tr></thead><tbody>" + by_code + "</tbody></table></div>"
+        "<h1>Analytics</h1><p class='sub'>Last " + str(days) + " days &nbsp;·&nbsp; "
+        + tab(7) + " · " + tab(30) + " · " + tab(90) + " days</p>"
+        + "<div class='grid'>" + cards + "</div>"
+
+        + "<h2>Activity</h2><div class='card'>"
+        + "<div class='legend'>"
+          "<span><i style='background:#121212'></i>Opens</span>"
+          "<span><i style='background:#b9d400'></i>Creators shortlisted</span>"
+          "<span><i style='background:#ff691e;border-radius:999px'></i>"
+          "Quote request</span></div>"
+        + activity_chart(s["by_day"]) + "</div>"
+
+        + "<h2>How far each code got</h2><div class='card'>" + funnel(s) + "</div>"
+
+        + "<div class='split'>"
+        + "<div><h2>What clients shortlist</h2><div class='card'>"
+        + "<p class='muted' style='font-size:13px;margin:0 0 6px'>By tier</p>"
+        + rank(s["by_tier"]) 
+        + "<p class='muted' style='font-size:13px;margin:16px 0 6px'>By platform</p>"
+        + rank(s["by_platform"], "#b9d400") + "</div></div>"
+        + "<div><h2>Why codes were refused</h2><div class='card'>"
+        + rank(s["fail_reasons"], "#ee1515") + "</div></div>"
+        + "</div>"
+
+        + "<h2>By client</h2><div class='card'><table><thead><tr><th>Code</th>"
+        + "<th>State</th><th>Opens</th><th>Shortlisted</th><th>Asked for a quote</th>"
+        + "<th class='right'>Last open</th></tr></thead><tbody>" + by_code
+        + "</tbody></table></div>"
+
         + "<h2>Most shortlisted creators</h2><div class='card'><table><thead><tr>"
-        + "<th>Creator</th><th>Times shortlisted</th></tr></thead><tbody>" + top
-        + "</tbody></table></div><h2>Event log</h2><div class='card'><table><thead><tr>"
+        + "<th></th><th>Creator</th><th></th><th class='right'>Times</th></tr></thead>"
+        + "<tbody>" + top + "</tbody></table></div>"
+
+        + "<h2>Event log</h2><div class='card'><table><thead><tr>"
         + "<th>Event</th><th>Code</th><th>Detail</th><th>IP</th>"
         + "<th class='right'>When</th></tr></thead><tbody>" + log + "</tbody></table></div>"
     )
