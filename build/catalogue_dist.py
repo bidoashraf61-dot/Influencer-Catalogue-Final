@@ -64,6 +64,15 @@ def main():
             sys.exit(f"missing {p} — run build/influencer_catalogue.py first")
 
     needed = referenced(CATALOGUE) | referenced(SELECTION)
+
+    # Creator photos are referenced by the built pages only in the static
+    # build. In API mode the roster arrives as JSON and the browser constructs
+    # those URLs at runtime, so parsing the HTML finds none of them and the
+    # whole folder would be left behind — 154 photos silently missing from a
+    # deployment that otherwise looks complete. Always take the folder.
+    photos = SITE / "assets" / "catalogue"
+    if photos.is_dir():
+        needed |= {p.resolve() for p in photos.glob("*.jpg")}
     site_root = SITE.resolve()
     assets = sorted(
         p for p in needed

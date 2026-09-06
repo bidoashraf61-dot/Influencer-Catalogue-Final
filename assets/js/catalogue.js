@@ -14,6 +14,7 @@
   var PAGE = document.body.getAttribute("data-page") || "catalogue";
   var selected = [];
   var selectionName = "";
+  var ROSTER = null;
 
   // A selection travels entirely in the URL fragment — #n=<name>&c=<codes>.
   // The fragment never reaches the server, so this works on any static host
@@ -55,22 +56,64 @@
     $("cat-gate").remove();
     var app = $("cat-app");
     app.hidden = false;
+    if (CFG.api && ROSTER) renderRoster(ROSTER);
     initApp();
   }
+
+  function gateFail(message) {
+    var err = $("cat-gate-error");
+    err.textContent = message || "That code is not right.";
+    err.hidden = false;
+    $("cat-code").value = "";
+    $("cat-code").focus();
+  }
+
+  // What the server says when it refuses. "expired" is worth telling an honest
+  // client plainly — they can ask for a new code instead of retyping.
+  var REFUSALS = {
+    expired: "That code has expired. Ask us for a new one.",
+    revoked: "That code is no longer active. Ask us for a new one.",
+    exhausted: "That code has already been used its maximum number of times.",
+    unknown: "That code is not right."
+  };
 
   var gateForm = $("cat-gate-form");
   gateForm.addEventListener("submit", function (e) {
     e.preventDefault();
     var val = $("cat-code").value.trim();
-    if (hash(val) === CFG.passHash) {
-      try { sessionStorage.setItem("cat-ok", "1"); } catch (err) { /* private mode */ }
-      unlock();
-    } else {
-      var err = $("cat-gate-error");
-      err.hidden = false;
-      $("cat-code").value = "";
-      $("cat-code").focus();
+    var btn = gateForm.querySelector("button");
+
+    if (!CFG.api) {
+      if (hash(val) === CFG.passHash) {
+        try { sessionStorage.setItem("cat-ok", "1"); } catch (err) { /* private mode */ }
+        unlock();
+      } else {
+        gateFail();
+      }
+      return;
     }
+
+    btn.disabled = true;
+    fetch(CFG.api + "/api/unlock", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ code: val })
+    })
+      .then(function (r) { return r.json().then(function (b) { return { r: r, b: b }; }); })
+      .then(function (res) {
+        if (!res.b || !res.b.ok) {
+          gateFail(REFUSALS[res.b && res.b.reason] || "That code is not right.");
+          return;
+        }
+        ROSTER = res.b.roster || [];
+        try { sessionStorage.setItem("cat-ok", "1"); } catch (err) { /* private mode */ }
+        unlock();
+      })
+      .catch(function () {
+        gateFail("Could not reach the server. Please try again.");
+      })
+      .then(function () { btn.disabled = false; });
   });
 
   // Survive a refresh within the same tab, not across sessions. The actual
@@ -79,6 +122,129 @@
   // value. Unlocking here silently broke the selection page on any revisit.
   var wasUnlocked = false;
   try { wasUnlocked = sessionStorage.getItem("cat-ok") === "1"; } catch (e) { /* private mode */ }
+
+
+  /* ------------------------------------------------------- roster from API */
+
+  // In API mode the page ships no roster: it arrives as JSON once the server
+  // has accepted the code. These build the markup the static build would have
+  // emitted, so everything downstream — filters, tray, selection — is unchanged.
+
+  var TIER_META = {
+    "Nano":     { label: "Nano",  from: 435,  to: 870 },
+    "Micro":    { label: "Micro", from: 870,  to: 1740 },
+    "Mid-Tier": { label: "Mid",   from: 1450, to: 2900 },
+    "Macro":    { label: "Macro", from: 2175, to: 4350 }
+  };
+
+  var ICONS = {
+    Instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>',
+    TikTok: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.2 3v11.6a3.6 3.6 0 1 1-3.6-3.6"/><path d="M14.2 3.2c.45 2.7 2.05 4.3 4.75 4.6"/></svg>'
+  };
+
+  function esc(v) {
+    return String(v === null || v === undefined ? "" : v)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+
+  function commas(n) {
+    return (n === null || n === undefined || n === "") ? "—" : Number(n).toLocaleString("en-US");
+  }
+
+  function profileUrl(platform, handle) {
+    if (!handle) return "";
+    return platform === "TikTok"
+      ? "https://www.tiktok.com/@" + handle
+      : "https://www.instagram.com/" + handle + "/";
+  }
+
+  function cardMarkup(c) {
+    var meta = TIER_META[c.tier] || { label: c.tier, from: 0, to: 0 };
+    var photo = c.photo
+      ? '<div class="cat-card__photo" style="background-image:url(' +
+        esc((CFG.photoBase || "assets/catalogue/") + c.photo) + ')"></div>'
+      : '<div class="cat-card__photo cat-card__photo--fallback" data-plate="' +
+        esc(String(c.code).split("-").pop()) + '"></div>';
+
+    var url = profileUrl(c.platform, c.handle);
+    var icon = ICONS[c.platform] || "";
+    var mark = url
+      ? '<a class="cat-card__platform" href="' + esc(url) + '" target="_blank" ' +
+        'rel="noopener noreferrer nofollow" data-noselect aria-label="Visit ' +
+        esc(c.platform) + ' profile"><span class="cat-card__platform-hint">Visit profile' +
+        "</span>" + icon + "</a>"
+      : '<span class="cat-card__platform" title="' + esc(c.platform) + '">' + icon + "</span>";
+
+    return '<article class="cat-card" data-tier="' + esc(c.tier) +
+      '" data-platform="' + esc(c.platform) + '" data-city="' + esc(c.city || "Unspecified") +
+      '" data-interest="' + esc(c.interest || "") + '" data-code="' + esc(c.code) +
+      '" data-price="' + meta.from + '" tabindex="0" role="button" aria-pressed="false"' +
+      ' aria-label="' + esc(c.name) + ", " + esc(c.code) + ", " + esc(meta.label) +
+      " tier, " + esc(c.city || "Unspecified") + ", " + esc(c.platform) + ", " +
+      commas(c.followers) + ' followers">' +
+      '<div class="cat-card__media">' + photo +
+      '<span class="cat-card__shield" aria-hidden="true"></span>' +
+      '<span class="cat-card__tier">' + esc(meta.label) + "</span>" + mark +
+      '<span class="cat-card__check" aria-hidden="true"></span></div>' +
+      '<div class="cat-card__body"><p class="cat-card__code">' + esc(c.code) + "</p>" +
+      '<h3 class="cat-card__name">' + esc(c.name) + "</h3>" +
+      '<ul class="cat-card__meta">' +
+      "<li><span>Followers</span><strong>" + commas(c.followers) + "</strong></li>" +
+      "<li><span>City</span><strong>" + esc(c.city || "Unspecified") + "</strong></li>" +
+      "<li><span>Tier</span><strong>" + esc(meta.label) + "</strong></li></ul>" +
+      '<p class="cat-card__price"><strong>' + commas(meta.from) + " – " + commas(meta.to) +
+      "</strong> SAR</p></div></article>";
+  }
+
+  function chipGroup(label, key, counts) {
+    var keys = Object.keys(counts);
+    if (!keys.length) return "";
+    // Tier reads in size order; everything else by how many there are.
+    var order = ["Nano", "Micro", "Mid-Tier", "Macro"];
+    keys.sort(key === "tier"
+      ? function (a, b) { return order.indexOf(a) - order.indexOf(b); }
+      : function (a, b) { return counts[b] - counts[a]; });
+    var chips = '<button type="button" class="cat-chip is-active" data-filter="' + key +
+      '" data-value="" aria-pressed="true">All</button>';
+    keys.forEach(function (v) {
+      chips += '<button type="button" class="cat-chip" data-filter="' + key +
+        '" data-value="' + esc(v) + '" aria-pressed="false">' + esc(v) +
+        " <i>" + counts[v] + "</i></button>";
+    });
+    return '<div class="cat-filter"><span class="cat-filter__label">' + esc(label) +
+      '</span><div class="cat-filter__chips">' + chips + "</div></div>";
+  }
+
+  function renderRoster(list) {
+    var grid = $("cat-grid");
+    if (!grid) return;
+    grid.innerHTML = list.map(cardMarkup).join("");
+
+    var controls = document.querySelector(".cat-controls .cat-container");
+    if (controls && PAGE !== "selection") {
+      var tally = function (field) {
+        var out = {};
+        list.forEach(function (c) {
+          var v = c[field] || (field === "city" ? "Unspecified" : "");
+          if (v) out[v] = (out[v] || 0) + 1;
+        });
+        return out;
+      };
+      var interests = tally("interest");
+      var html = chipGroup("Tier", "tier", tally("tier")) +
+                 chipGroup("Platform", "platform", tally("platform")) +
+                 chipGroup("City", "city", tally("city"));
+      // Only offer the interest filter when it actually separates anyone —
+      // one value across the whole roster is a claim, not a filter.
+      if (Object.keys(interests).length > 1) {
+        html += chipGroup("Interest", "interest", interests);
+      }
+      var count = $("cat-count");
+      controls.insertAdjacentHTML("afterbegin", html);
+      if (count) count.textContent = list.length + " creators";
+    }
+  }
 
   /* ------------------------------------------------------------- the app */
 
@@ -146,6 +312,17 @@
       if (i === -1) selected.push(code); else selected.splice(i, 1);
       card.setAttribute("aria-pressed", i === -1 ? "true" : "false");
       renderTray();
+
+      // Only additions are recorded, and only the code. It answers "which
+      // creators draw interest" without tracking the person browsing.
+      if (CFG.api && i === -1) {
+        fetch(CFG.api + "/api/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({ kind: "shortlist", detail: code })
+        }).catch(function () { /* analytics must never break selecting */ });
+      }
     }
 
     cards.forEach(function (card) {
@@ -352,6 +529,40 @@
       btn.disabled = true;
       status.className = "cat-form__status";
       status.textContent = "Sending…";
+
+      if (CFG.api) {
+        // Stored against the access code that opened the catalogue, so the
+        // dashboard can show who asked without an inbox in the loop.
+        fetch(CFG.api + "/api/request", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            name: data.get("name"), company: data.get("company"),
+            email: data.get("email"), phone: data.get("phone"),
+            selection_name: selectionName || null,
+            selection: selected.slice()
+          })
+        })
+          .then(function (r) { return r.json().catch(function () { return null; }); })
+          .then(function (b) {
+            if (!b || !b.ok) throw new Error((b && b.reason) || "failed");
+            status.className = "cat-form__status is-ok";
+            status.textContent = "Sent. We will come back to you with a full quote.";
+            e.target.reset();
+            setTimeout(function () {
+              closeModal();
+              if (typeof onCleared === "function") onCleared();
+              status.textContent = "";
+            }, 2200);
+          })
+          .catch(function () {
+            status.className = "cat-form__status is-error";
+            status.textContent = "That did not send. Please try again, or contact us directly.";
+          })
+          .then(function () { btn.disabled = false; });
+        return;
+      }
 
       fetch(CFG.endpoint, {
         method: "POST",
@@ -565,5 +776,17 @@
   window.addEventListener("focus", function () { document.body.classList.remove("cat-away"); });
 
   // Last thing in the file, deliberately — see the note by `wasUnlocked`.
-  if (wasUnlocked) unlock();
+  if (wasUnlocked && CFG.api) {
+    // The tab remembers unlocking, but the server decides. A revoked or expired
+    // code lands back on the gate rather than on an empty page.
+    fetch(CFG.api + "/api/roster", { credentials: "include" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (b) {
+        if (b && b.ok) { ROSTER = b.roster || []; unlock(); }
+        else { try { sessionStorage.removeItem("cat-ok"); } catch (e) {} }
+      })
+      .catch(function () { /* leave the gate up */ });
+  } else if (wasUnlocked) {
+    unlock();
+  }
 })();

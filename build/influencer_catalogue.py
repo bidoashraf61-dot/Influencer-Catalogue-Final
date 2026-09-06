@@ -83,6 +83,12 @@ ENDPOINT = os.environ.get(
 # instead of name and exact count. Everything else is identical.
 ANON = os.environ.get("CATALOGUE_ANON", "").lower() in ("1", "true", "yes")
 
+# CATALOGUE_API points at the admin service. When set, the pages ship no roster
+# at all: the code is checked server-side and the creators arrive as JSON only
+# after it passes. That is the whole point — with the roster embedded, a
+# passcode is decoration. Unset, the build stays fully static as before.
+API = os.environ.get("CATALOGUE_API", "").rstrip("/")
+
 
 def band(n):
     """Follower band, used only in anonymised mode."""
@@ -396,7 +402,7 @@ def build():
     tier_order = ["Nano", "Micro", "Mid-Tier", "Macro"]
     tier_counts = [(TIERS[t]["label"], n) for t, n in tally("tier", tier_order)]
 
-    filters = (
+    filters = "" if API else (
         chips("Tier", "tier", [(t, n) for t, n in tally("tier", tier_order)])
         + chips("Platform", "platform", tally("platform"))
         + chips("City", "city", tally("city"))
@@ -420,7 +426,9 @@ def build():
     </div>
   </section>""") if logos else ""
 
-    cards = "\n".join(card_html(p) for p in people)
+    # In API mode the grid ships empty and the browser fills it from the
+    # service. Embedding the roster here would defeat the gate.
+    cards = "" if API else "\n".join(card_html(p) for p in people)
     with_photos = sum(1 for p in people if p["photo"])
 
     # The band is short phrases separated by the asterisk mark, per
@@ -600,7 +608,9 @@ def build():
 <script>
   window.CATALOGUE_CONFIG = {{
     passHash: "{simple_hash(PASSCODE)}",
-    endpoint: {json.dumps(ENDPOINT)}
+    endpoint: {json.dumps(ENDPOINT)},
+    api: {json.dumps(API)},
+    photoBase: "{'' if not API else 'assets/catalogue/'}"
   }};
 </script>
 <script src="{stamp('/assets/js/catalogue.js')}"></script>
@@ -755,7 +765,9 @@ def build():
 <script>
   window.CATALOGUE_CONFIG = {{
     passHash: "{simple_hash(PASSCODE)}",
-    endpoint: {json.dumps(ENDPOINT)}
+    endpoint: {json.dumps(ENDPOINT)},
+    api: {json.dumps(API)},
+    photoBase: "{'' if not API else 'assets/catalogue/'}"
   }};
 </script>
 <script src="{stamp('/assets/js/catalogue.js')}"></script>
@@ -774,7 +786,8 @@ def build():
     print(f"private key    {OUT_PRIVATE.relative_to(ROOT)}")
     print(f"page           {OUT_HTML.relative_to(ROOT)}")
     print(f"selection page {OUT_SELECTION.relative_to(ROOT)}")
-    print(f"passcode       {PASSCODE}")
+    print(f"passcode       {PASSCODE if not API else '(checked by the admin service)'}")
+    print(f"api            {API or '(none — fully static build)'}")
     print(f"endpoint       {ENDPOINT or '(not configured — set CATALOGUE_ENDPOINT)'}")
     print(f"request email  {REQUEST_EMAIL}")
     print(f"client logos   {len(logos)}")

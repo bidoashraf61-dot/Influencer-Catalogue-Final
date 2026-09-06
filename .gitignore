@@ -2,3 +2,7 @@
 content/catalogue_private.json
 content/_harvest.json
 .DS_Store
+admin/catalogue.db
+admin/catalogue.db-wal
+admin/catalogue.db-shm
+admin/.secret
