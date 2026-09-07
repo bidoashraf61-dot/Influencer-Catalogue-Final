@@ -1,0 +1,43 @@
+services:
+  admin:
+    image: python:3.11-alpine
+    container_name: influencer-catalogue-admin
+    restart: always
+    command: ["python3","-u","/app/admin/server.py",
+              "--host","0.0.0.0","--port","8900","--base-path","/admin",
+              "--origin","https://influencer-catalogue.hellovoice.co.uk"]
+    working_dir: /app
+    volumes:
+      # Code, plus the SQLite database and the signing secret it writes.
+      - ./admin:/app/admin
+      # The identity key, only read at seed time.
+      - ./content:/app/content:ro
+      # The dashboard also reads its own logo from <root>/site/assets/helv/,
+      # so the whole asset tree has to be visible — read-only.
+      - /home/ubuntu/influencer-catalogue/site/assets:/app/site/assets:ro
+      # PHOTO_DIR is <root>/site/assets/catalogue. Bind the LIVE photo folder
+      # writable, nested inside the read-only tree above, so a photo uploaded
+      # in the dashboard is the one a client sees.
+      - /home/ubuntu/influencer-catalogue/site/assets/catalogue:/app/site/assets/catalogue
+    ports:
+      # Local troubleshooting only. Public access is via nginx-proxy-manager.
+      - "127.0.0.1:8900:8900"
+    networks:
+      default: {}
+      proxy:
+        # Pinned high in the pool, away from the sequential addresses Docker
+        # hands out. nginx caches an upstream's IP at config load, so a restart
+        # that changed the IP would 502 /admin until NPM was reloaded — which,
+        # with restart: always, could happen unattended.
+        ipv4_address: 172.18.0.240
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 32M
+
+networks:
+  proxy:
+    external: true
+    name: nginx-proxy-manager_default
