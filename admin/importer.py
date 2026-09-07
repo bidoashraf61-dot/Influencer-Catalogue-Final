@@ -1,8 +1,8 @@
 """Bulk creator import from a spreadsheet.
 
-CSV is the native format — `csv` is stdlib, so it works on any server. `.xlsx`
-is read only when openpyxl happens to be installed; if it is not, the uploader
-is told to save as CSV rather than being left with a silent failure.
+Both formats are read with the standard library — CSV through `csv`, and
+.xlsx through `admin/xlsx.py`, which unzips the workbook itself. Nothing to
+install on the server, on any host.
 
 Nothing is written until every row has been checked. A file with one bad row
 imports nothing and reports the line, rather than leaving the roster half
@@ -14,15 +14,15 @@ the sheet, and the cell they cover stays empty. They can still be read, and
 the anchor's top-left corner names a row, so a picture sitting on a creator's
 row is attached to that creator.
 
-Two consequences worth knowing, because both are visible rather than hidden:
-a picture dragged so its top-left corner falls into the row below attaches to
-whoever is on that row, and reading pictures needs the workbook loaded fully
-rather than in read-only streaming mode, which openpyxl does not expose
-drawings in at all. CSV cannot carry an image in any form.
+The consequence worth knowing, because it is visible rather than hidden: a
+picture dragged so its top-left corner falls into the row below attaches to
+whoever is on that row. CSV cannot carry an image in any form.
 """
 
 import csv
 import io
+
+import xlsx
 
 COLUMNS = ["code", "name", "platform", "handle", "followers",
            "city", "tier", "interest", "note", "active", "photo"]
@@ -52,86 +52,20 @@ def template_csv():
 
 def template_xlsx():
     """The same template as an .xlsx, which is the only format that can carry
-    pictures. Raises RuntimeError when openpyxl is missing, so the caller can
-    say so instead of serving a broken file."""
-    try:
-        import openpyxl
-    except ImportError:
-        raise RuntimeError(
-            "This server cannot write .xlsx (openpyxl is not installed). "
-            "Use the CSV template and attach photos in bulk instead.")
-    import io as _io
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Creators"
-    ws.append(COLUMNS)
-    for row in TEMPLATE_ROWS:
-        ws.append(row)
-    # Wide enough to drop a picture into, and tall enough that one sits on its
-    # own row rather than straddling two.
-    ws.column_dimensions["K"].width = 26
-    for i in (2, 3):
-        ws.row_dimensions[i].height = 60
-    buf = _io.BytesIO()
-    wb.save(buf)
-    return buf.getvalue()
-
-
-def _sheet_images(ws):
-    """{sheet row number: image bytes} for the pictures floating on a sheet.
-
-    The row is the one the picture's top-left corner sits in, which is both the
-    only thing an anchor reliably gives and what the eye reads as "this row's
-    photo". The first picture on a row wins; a second is ignored rather than
-    silently overwriting the first.
-
-    `_data()` and `_from` are openpyxl internals — there is no public API for
-    reading embedded images — so every step is guarded. A picture this cannot
-    read is skipped, never an exception on the whole import.
-    """
-    out = {}
-    for im in getattr(ws, "_images", []) or []:
-        frm = getattr(getattr(im, "anchor", None), "_from", None)
-        if frm is None:
-            continue          # absolute placement: no row to bind it to
-        row = frm.row + 1     # openpyxl counts rows from zero, sheets from one
-        if row in out:
-            continue
-        try:
-            payload = im._data()
-        except Exception:
-            continue
-        if payload:
-            out[row] = payload
-    return out
+    pictures. Written with the stdlib, so there is nothing to install."""
+    rows = [COLUMNS] + [list(r) for r in TEMPLATE_ROWS]
+    # Column K wide enough to drop a picture into, and the example rows tall
+    # enough that one sits on its own row rather than straddling two.
+    return xlsx.write(rows, sheet_name="Creators",
+                      widths={10: 30}, row_heights={2: 60, 3: 60})
 
 
 def _rows_from_xlsx(data):
     """Returns ([(sheet row, cells)], {sheet row: image bytes})."""
     try:
-        import openpyxl
-    except ImportError:
-        raise RuntimeError(
-            "This server cannot read .xlsx (openpyxl is not installed). "
-            "Open the file in Excel and use File → Save As → CSV.")
-    import tempfile
-    import os
-    fd, path = tempfile.mkstemp(suffix=".xlsx")
-    try:
-        os.write(fd, data)
-        os.close(fd)
-        # Not read_only: that mode streams cells and never loads drawings, so
-        # every embedded picture would be invisible. Roster sheets are small.
-        wb = openpyxl.load_workbook(path, data_only=True)
-        ws = wb[wb.sheetnames[0]]
-        table = [(i, ["" if c is None else str(c).strip() for c in row])
-                 for i, row in enumerate(ws.iter_rows(values_only=True), start=1)]
-        return table, _sheet_images(ws)
-    finally:
-        try:
-            os.unlink(path)
-        except OSError:
-            pass
+        return xlsx.read(data)
+    except xlsx.BadWorkbook as ex:
+        raise RuntimeError(str(ex))
 
 
 def _rows_from_csv(data):
