@@ -25,6 +25,15 @@ if [ ! -f "$WB" ]; then
     "https://raw.githubusercontent.com/bidoashraf61-dot/Influencer-Catalogue-2/main/Influncer%20Proposal%20Catalogue/Alpha_Plus_influncers.xlsx"
 fi
 
+# The client logo carousel is not authored here: client_logos() scrapes the
+# built HelloVoice homepage for its client_banner_section, and returns an EMPTY
+# LIST if that file is absent — no error, the banner just silently disappears
+# from the page. The homepage lives in Influencer-Catalogue-2, not this repo,
+# so fetch it before every build.
+mkdir -p "$SRC/site"
+curl -sL -o "$SRC/site/index.html" \
+  "https://raw.githubusercontent.com/bidoashraf61-dot/Influencer-Catalogue-2/main/site/index.html"
+
 # CATALOGUE_API is what strips the roster out of the pages. Without it the build
 # silently reverts to the static one: 306KB with all 162 names in the source.
 cd "$SRC"
@@ -38,6 +47,12 @@ python3 build/catalogue_dist.py
 rsync -a --exclude 'catalogue' "$SRC/assets/" "$DST/assets/"
 cp "$SRC/dist/index.html"           "$DST/index.html"
 cp "$SRC/dist/selection/index.html" "$DST/selection/index.html"
+
+# The banner failing is silent by design upstream, so check it here.
+LOGOS=$(grep -o 'cat-clients__logo' "$DST/index.html" | wc -l)
+if [ "$LOGOS" -lt 2 ]; then
+  echo "WARNING: client logo carousel is empty — site/index.html was probably not fetched" >&2
+fi
 
 sudo docker exec influencer-catalogue nginx -s reload
 
