@@ -74,14 +74,10 @@ def squash(text):
     return "".join(ch for ch in (text or "").lower() if ch.isalnum())
 
 
-# Mirrors TIERS in build/influencer_catalogue.py. Kept here so the dashboard can
-# price a selection without importing the static build.
-TIER_PRICE = {
-    "Nano": (435, 870),
-    "Micro": (870, 1740),
-    "Mid-Tier": (1450, 2900),
-    "Macro": (2175, 4350),
-}
+# Tiers and their price bands live in the database now, editable from the
+# dashboard. Three hard-coded copies of this table used to sit in three
+# programs, and changing a rate meant remembering all three or quoting one
+# price on the page and another in the email.
 
 
 def ts(value):
@@ -258,7 +254,8 @@ class Handler(BaseHTTPRequestHandler):
                 db.stats(start=start, end=end), db.recent_events(200)))
         if path == "/roster":
             return self.send(200, views.roster_page(
-                db.list_creators(), query.get("e"), query.get("ok")))
+                db.list_creators(), query.get("e"), query.get("ok"),
+                cities=db.known_cities(), tiers=db.list_tiers()))
         if path == "/roster/export":
             return self.send(200, self.roster_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition",
@@ -280,7 +277,7 @@ class Handler(BaseHTTPRequestHandler):
                                'attachment; filename="creator-import-template.csv"')])
         if path == "/requests":
             return self.send(200, views.requests_page(db.list_requests(),
-                                                      db.list_creators(), TIER_PRICE))
+                                                      db.list_creators(), db.tier_prices()))
         return self.send(404, views.simple("Not found", "That page does not exist."))
 
     def do_POST(self):
@@ -311,6 +308,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_roster_import()
         if path == "/roster/photos":
             return self.post_roster_photos()
+        if path == "/tiers/save":
+            return self.post_tier_save()
+        if path == "/tiers/delete":
+            return self.post_tier_delete()
         if path == "/requests/handled":
             return self.post_request_handled()
         if path == "/password":
@@ -368,7 +369,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/codes")
 
     def post_roster_save(self):
-        f = self.form_body()
+        f = self.form_body(multi=("city",))
         code = (f.get("code") or "").strip().upper()
         tier = (f.get("tier") or "Nano").strip()
         # Adding: the portal assigns the code from what is already in the
@@ -386,6 +387,8 @@ class Handler(BaseHTTPRequestHandler):
         existing = db.creator(code)
         photo = (existing["photo"] if existing else None)
         saved, err = uploads.save_photo(f.get("photo_file"), code, PHOTO_DIR)
+        if saved:
+            Handler.forget_photo_widths()
         if err:
             return self.redirect("/roster?e=" + urllib.parse.quote(err))
         if saved:
@@ -400,7 +403,10 @@ class Handler(BaseHTTPRequestHandler):
             "handle": (f.get("handle") or "").strip().lstrip("@"),
             "platform": (f.get("platform") or "Instagram").strip(),
             "followers": int(followers) if followers.isdigit() else None,
-            "city": (f.get("city") or "").strip(),
+            # Ticked boxes plus anything typed into "add a city". Both go
+            # through join_cities, so the separator is decided in one place.
+            "city": db.join_cities(
+                list(f.get("city") or []) + db.split_cities(f.get("city_new") or "")) or None,
             "tier": tier,
             "interest": (f.get("interest") or "").strip() or None,
             "photo": photo or None,
@@ -450,6 +456,7 @@ class Handler(BaseHTTPRequestHandler):
                 ok, why = uploads.photo_bytes(raw)
                 if ok:
                     photo = uploads.write_photo(raw, code, PHOTO_DIR)
+                    Handler.forget_photo_widths()
                     attached += 1
                 else:
                     bad_photos.append("row " + str(r["_row"]) + " (" + why + ")")
@@ -527,6 +534,7 @@ class Handler(BaseHTTPRequestHandler):
                 continue
 
             filename = uploads.write_photo(part["data"], code, PHOTO_DIR)
+            Handler.forget_photo_widths()
             row = db.creator(code)
             db.upsert_creator(dict(row, photo=filename))
             saved += 1
@@ -564,12 +572,60 @@ class Handler(BaseHTTPRequestHandler):
             w.writerow([
                 c["code"], c["name"], c["platform"], c["handle"] or "",
                 c["followers"] if c["followers"] is not None else "",
-                c["city"] or "", c["tier"], c["interest"] or "",
+                db.join_cities(db.split_cities(c["city"])), c["tier"],
+                c["interest"] or "",
                 c["note"] or "", "yes" if c["active"] else "no",
                 "on file" if c["photo"] else "",
             ])
         # BOM so Excel opens it as UTF-8 rather than mangling Arabic city names
         return "\ufeff" + buf.getvalue()
+
+    def post_tier_save(self):
+        """Add a tier, or edit one that exists. Both go through here because
+        they are the same operation with a different starting row."""
+        f = self.form_body()
+        name = (f.get("name") or "").strip()
+        was = (f.get("was") or "").strip()          # set when editing
+        code = (f.get("code") or "").strip().upper()[:4]
+        reach = (f.get("reach") or "").strip() or None
+        lo = (f.get("price_from") or "").strip()
+        hi = (f.get("price_to") or "").strip()
+        sort = (f.get("sort") or "").strip()
+
+        def bad(msg):
+            return self.redirect("/roster?e=" + urllib.parse.quote(msg))
+
+        if not name:
+            return bad("A tier needs a name.")
+        if not code.isalnum() or not code:
+            return bad("The code is the middle of a creator code — letters or "
+                       "digits only, like MI.")
+        if not lo.isdigit() or not hi.isdigit():
+            return bad("Both prices must be whole numbers.")
+        lo, hi = int(lo), int(hi)
+        if hi < lo:
+            # Swapping silently would quote a range backwards on every card.
+            return bad("The upper price is below the lower one.")
+
+        if was and was != name:
+            if db.get_tier(name):
+                return bad("There is already a tier called " + name + ".")
+            db.rename_tier(was, name)
+        db.save_tier(name, code, lo, hi, reach,
+                     int(sort) if sort.lstrip("-").isdigit() else 0)
+        return self.redirect("/roster?ok=" + urllib.parse.quote(
+            "Tier " + name + " saved at " + format(lo, ",") + " – "
+            + format(hi, ",") + " SAR."))
+
+    def post_tier_delete(self):
+        name = (self.form_body().get("name") or "").strip()
+        used = db.delete_tier(name)
+        if used:
+            return self.redirect("/roster?e=" + urllib.parse.quote(
+                str(used) + (" creator is" if used == 1 else " creators are")
+                + " still on the " + name + " tier. Move them first."))
+        return self.redirect("/roster?ok=" + urllib.parse.quote(
+            "Tier " + name + " removed."))
 
     def post_roster_delete(self):
         code = self.form_body().get("code")
@@ -610,14 +666,25 @@ class Handler(BaseHTTPRequestHandler):
         cookie = (f"{VIEWER_COOKIE}={ticket}; Path=/; HttpOnly; "
                   f"{policy}; Max-Age={max_age}")
         return self.send_json(200, {"ok": True, "label": row["label"],
-                                    "roster": self.roster_payload()},
+                                    "roster": self.roster_payload(),
+                                    "tiers": self.tier_payload()},
                               self.cors() + [("Set-Cookie", cookie)])
 
     def api_roster(self):
         code_id = self.viewer_code_id()
         if not code_id:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
-        return self.send_json(200, {"ok": True, "roster": self.roster_payload()}, self.cors())
+        return self.send_json(200, {"ok": True, "roster": self.roster_payload(),
+                                    "tiers": self.tier_payload()}, self.cors())
+
+    def tier_payload(self):
+        """Sent with the roster so the page totals a selection at today's
+        rates rather than whatever was hard-coded when it was built."""
+        return [
+            {"name": t["name"], "from": t["price_from"], "to": t["price_to"],
+             "reach": t["reach"]}
+            for t in db.list_tiers()
+        ]
 
     def roster_payload(self):
         return [
@@ -625,10 +692,31 @@ class Handler(BaseHTTPRequestHandler):
                 "code": r["code"], "name": r["name"], "handle": r["handle"],
                 "platform": r["platform"], "followers": r["followers"],
                 "city": r["city"], "tier": r["tier"], "interest": r["interest"],
-                "photo": r["photo"],
+                "photo": r["photo"], "lowres": self.is_lowres(r["photo"]),
             }
             for r in db.list_creators(active_only=True)
         ]
+
+    # Measuring 154 files on every unlock would be wasteful and they rarely
+    # change, so the widths are read once and dropped whenever a photo is
+    # written. Instagram hands back a 100px thumbnail on one path and 320px on
+    # another; a 100px source stretched across a 330px card is the pixelation,
+    # and the card treats those differently rather than upscaling them.
+    _widths = {}
+
+    @classmethod
+    def forget_photo_widths(cls):
+        cls._widths = {}
+
+    def is_lowres(self, photo):
+        if not photo:
+            return False
+        name = str(photo).split("?")[0]
+        if name not in self._widths:
+            path = PHOTO_DIR / name
+            self._widths[name] = uploads.jpeg_width(path) if path.exists() else 0
+        w = self._widths[name]
+        return bool(w) and w <= 150
 
     def api_request(self):
         code_id = self.viewer_code_id()

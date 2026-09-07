@@ -27,8 +27,20 @@ import xlsx
 COLUMNS = ["code", "name", "platform", "handle", "followers",
            "city", "tier", "interest", "note", "active", "photo"]
 
-TIERS = {"nano": "Nano", "micro": "Micro", "mid-tier": "Mid-Tier",
-         "mid": "Mid-Tier", "macro": "Macro"}
+# Aliases people actually type. The real list comes from the database, so a
+# tier added in the dashboard is importable the moment it exists.
+TIER_ALIASES = {"mid": "Mid-Tier", "mid tier": "Mid-Tier"}
+
+
+def tier_lookup():
+    import db
+    out = {}
+    for name in db.tier_names():
+        out[name.lower()] = name
+    for alias, real in TIER_ALIASES.items():
+        if real.lower() in out:
+            out[alias] = out[real.lower()]
+    return out
 PLATFORMS = {"instagram": "Instagram", "ig": "Instagram",
              "tiktok": "TikTok", "tt": "TikTok"}
 
@@ -107,6 +119,7 @@ def parse(data: bytes, filename: str):
         return [], ["No 'name' column found. Download the template and use its headings."], {}
 
     index = {col: header.index(col) for col in COLUMNS if col in header}
+    tiers = tier_lookup()
     rows, errors = [], []
 
     for n, raw in table[1:]:
@@ -119,10 +132,11 @@ def parse(data: bytes, filename: str):
             continue  # a blank name is an empty row, not an error
 
         tier_raw = cell("tier").lower()
-        tier = TIERS.get(tier_raw)
+        tier = tiers.get(tier_raw)
         if not tier:
             errors.append("Row " + str(n) + " (" + person + "): tier '"
-                          + (cell("tier") or "blank") + "' is not Nano, Micro, Mid-Tier or Macro.")
+                          + (cell("tier") or "blank") + "' is not one of "
+                          + ", ".join(sorted(set(tiers.values()))) + ".")
             continue
 
         plat_raw = cell("platform").lower()

@@ -139,6 +139,7 @@
           return;
         }
         ROSTER = res.b.roster || [];
+        adoptTiers(res.b.tiers);
         remember();
         unlock();
       })
@@ -162,12 +163,10 @@
   // has accepted the code. These build the markup the static build would have
   // emitted, so everything downstream — filters, tray, selection — is unchanged.
 
-  var TIER_META = {
-    "Nano":     { label: "Nano",  from: 435,  to: 870 },
-    "Micro":    { label: "Micro", from: 870,  to: 1740 },
-    "Mid-Tier": { label: "Mid",   from: 1450, to: 2900 },
-    "Macro":    { label: "Macro", from: 2175, to: 4350 }
-  };
+  // Only the short label the chip shows; the money comes from TIER_PRICE so
+  // there is one table to keep right rather than two.
+  var TIER_LABEL = { "Mid-Tier": "Mid" };
+  function tierLabel(name) { return TIER_LABEL[name] || name; }
 
   // Mirrors PLATFORM_ICONS in the Python builder: the brand colour is the pill
   // behind the glyph (CSS, off the --ig/--tt modifier) because Instagram's is a
@@ -188,6 +187,15 @@
       .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   }
 
+  // Split a possibly multi-valued data attribute. Mirrors split_cities() in
+  // the builder and in admin/db.py — one separator set across all three.
+  function values(text) {
+    if (!text) return [];
+    return text.split(/[,;\u060c\u061b/]/)
+      .map(function (v) { return v.trim(); })
+      .filter(Boolean);
+  }
+
   function commas(n) {
     return (n === null || n === undefined || n === "") ? "—" : Number(n).toLocaleString("en-US");
   }
@@ -200,9 +208,14 @@
   }
 
   function cardMarkup(c) {
-    var meta = TIER_META[c.tier] || { label: c.tier, from: 0, to: 0 };
+    var label = tierLabel(c.tier);
+    // The static build marks 100px sources so the card shows a small sharp
+    // circle over a blurred backdrop instead of a 3x upscale. API mode drew
+    // them raw, so the same roster looked worse served from the service than
+    // built into the page.
+    var soft = c.lowres ? " cat-card__photo--soft" : "";
     var photo = c.photo
-      ? '<div class="cat-card__photo" style="background-image:url(' +
+      ? '<div class="cat-card__photo' + soft + '" style="background-image:url(' +
         esc((CFG.photoBase || "assets/catalogue/") + c.photo) + ')"></div>'
       : '<div class="cat-card__photo cat-card__photo--fallback" data-plate="' +
         esc(String(c.code).split("-").pop()) + '"></div>';
@@ -221,19 +234,19 @@
       '" data-platform="' + esc(c.platform) + '" data-city="' + esc(c.city || "Unspecified") +
       '" data-interest="' + esc(c.interest || "") + '" data-code="' + esc(c.code) +
       '" tabindex="0" role="button" aria-pressed="false"' +
-      ' aria-label="' + esc(c.name) + ", " + esc(c.code) + ", " + esc(meta.label) +
+      ' aria-label="' + esc(c.name) + ", " + esc(c.code) + ", " + esc(label) +
       " tier, " + esc(c.city || "Unspecified") + ", " + esc(c.platform) + ", " +
       commas(c.followers) + ' followers">' +
       '<div class="cat-card__media">' + photo +
       '<span class="cat-card__shield" aria-hidden="true"></span>' +
-      '<span class="cat-card__tier">' + esc(meta.label) + "</span>" + mark +
+      '<span class="cat-card__tier">' + esc(label) + "</span>" + mark +
       '<span class="cat-card__check" aria-hidden="true"></span></div>' +
       '<div class="cat-card__body"><p class="cat-card__code">' + esc(c.code) + "</p>" +
       '<h3 class="cat-card__name">' + esc(c.name) + "</h3>" +
       '<ul class="cat-card__meta">' +
       "<li><span>Followers</span><strong>" + commas(c.followers) + "</strong></li>" +
       "<li><span>City</span><strong>" + esc(c.city || "Unspecified") + "</strong></li>" +
-      "<li><span>Tier</span><strong>" + esc(meta.label) + "</strong></li></ul>" +
+      "<li><span>Tier</span><strong>" + esc(label) + "</strong></li></ul>" +
       "</div></article>";
   }
 
@@ -266,8 +279,10 @@
       var tally = function (field) {
         var out = {};
         list.forEach(function (c) {
-          var v = c[field] || (field === "city" ? "Unspecified" : "");
-          if (v) out[v] = (out[v] || 0) + 1;
+          var raw = c[field] || (field === "city" ? "Unspecified" : "");
+          var each = field === "city" ? values(raw) : (raw ? [raw] : []);
+          if (!each.length && field === "city") each = ["Unspecified"];
+          each.forEach(function (v) { out[v] = (out[v] || 0) + 1; });
         });
         return out;
       };
@@ -303,7 +318,10 @@
       var shown = 0;
       cards.forEach(function (card) {
         var ok = Object.keys(filters).every(function (k) {
-          return !filters[k] || card.dataset[k] === filters[k];
+          // A field can hold several values — a creator working Riyadh and
+          // Jeddah is "Riyadh, Jeddah" and has to match either chip. Exact
+          // comparison matched neither and quietly hid them from both.
+          return !filters[k] || values(card.dataset[k]).indexOf(filters[k]) !== -1;
         });
         card.hidden = !ok;
         if (ok) shown++;
@@ -705,14 +723,26 @@
     }
   }
 
-  // Tier price ranges, mirrored from TIERS in the Python builder so the page
-  // can total a selection without another data file.
-  var TIER_PRICE = {
+  // Tier price ranges. The builder writes today's bands in as a fallback, and
+  // in API mode the server sends the live ones with the roster — so editing a
+  // band in the dashboard re-prices every selection immediately, without
+  // rebuilding the page. Without that, a rate changed in the dashboard would
+  // show one number here and another in the quote.
+  var TIER_PRICE = CFG.tierPrice || {
     "Nano":     [435, 870],
     "Micro":    [870, 1740],
     "Mid-Tier": [1450, 2900],
     "Macro":    [2175, 4350]
   };
+
+  function adoptTiers(list) {
+    if (!list || !list.length) return;
+    var next = {};
+    list.forEach(function (t) {
+      if (t && t.name) next[t.name] = [Number(t.from) || 0, Number(t.to) || 0];
+    });
+    if (Object.keys(next).length) TIER_PRICE = next;
+  }
 
   function money(n) { return n.toLocaleString("en-US"); }
 
@@ -859,7 +889,7 @@
     fetch(CFG.api + "/api/roster", { credentials: "include" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (b) {
-        if (b && b.ok) { ROSTER = b.roster || []; unlock(); }
+        if (b && b.ok) { ROSTER = b.roster || []; adoptTiers(b.tiers); unlock(); }
         else { forget(); }
       })
       .catch(function () { /* leave the gate up */ });

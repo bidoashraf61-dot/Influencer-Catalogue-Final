@@ -12,10 +12,11 @@ variable first rather than inlined.
 
 import html
 import json
+import re
 import time
 from datetime import datetime, timezone
 
-from db import code_state, now
+from db import code_state, now, split_cities
 
 
 def e(v):
@@ -129,6 +130,28 @@ border:1px solid var(--line);border-radius:9px;background:var(--white);
 color:var(--ink);min-height:42px}
 .range input[type=date]:focus{outline:none;border-color:var(--ink)}
 .range label{margin-bottom:5px}
+.tier-row{display:grid;gap:12px;align-items:end;padding:12px 0;
+border-bottom:1px solid var(--line);
+grid-template-columns:minmax(120px,1.4fr) 76px 110px 110px minmax(110px,1fr) 68px auto}
+.tier-row:last-of-type{border-bottom:0}
+.tier-row input{font:inherit;font-size:15px;padding:9px 11px;width:100%;
+border:1px solid var(--line);border-radius:9px;background:var(--white);
+color:var(--ink);min-height:40px;box-sizing:border-box}
+.tier-row input:focus{outline:none;border-color:var(--ink)}
+.tier-act{display:flex;align-items:center;gap:6px;white-space:nowrap}
+@media (max-width:900px){.tier-row{grid-template-columns:1fr 1fr}
+.tier-act{grid-column:1/-1}}
+.cities{grid-column:1/-1}
+.ticks{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.tick{display:inline-flex;align-items:center;gap:7px;margin:0;padding:7px 13px;
+border:1px solid var(--line);border-radius:999px;background:var(--white);
+cursor:pointer;text-transform:none;letter-spacing:normal;font-size:14px;
+min-height:38px}
+.tick:hover{border-color:var(--ink)}
+.tick input{margin:0;width:15px;height:15px;accent-color:var(--ink)}
+.tick span{color:var(--ink);font-weight:500}
+.tick:has(input:checked){background:var(--ink);border-color:var(--ink)}
+.tick:has(input:checked) span{color:#fff}
 .legend span{display:inline-flex;align-items:center;gap:7px}
 .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
 .hb{display:grid;grid-template-columns:minmax(90px,auto) 1fr auto;gap:12px;
@@ -664,16 +687,122 @@ def analytics_page(s, events):
     return page("Analytics", body, "/analytics")
 
 
-def creator_form(c):
-    """Add/edit form. `c` is None when adding a new creator."""
+def tier_row(t, count):
+    """One tier as an editable form. Editing in place rather than behind a
+    modal because the whole point is comparing the bands against each other."""
+    name = e(t["name"])
+    ident = re.sub(r"[^A-Za-z0-9]", "", t["name"]) or "tier"
+    people = (str(count) + (" creator" if count == 1 else " creators")) if count \
+        else "no creators yet"
+    delete = ""
+    if not count:
+        confirm = "return confirm('Remove the " + name + " tier?')"
+        delete = ("<form method='post' action='" + u("/tiers/delete")
+                  + "' class='inline' onsubmit=\"" + confirm + "\">"
+                  "<input type='hidden' name='name' value='" + name + "'>"
+                  "<button class='btn small ghost'>Remove</button></form>")
+    else:
+        delete = ("<span class='muted' style='font-size:12px'>in use</span>")
+
+    return (
+        "<form method='post' action='" + u("/tiers/save") + "' class='tier-row'>"
+        "<input type='hidden' name='was' value='" + name + "'>"
+        "<div><label for='n" + ident + "'>Tier</label>"
+        "<input id='n" + ident + "' name='name' value='" + name + "' required></div>"
+        "<div><label for='c" + ident + "'>Code</label>"
+        "<input id='c" + ident + "' name='code' value='" + e(t["code"])
+        + "' size='4' maxlength='4' required title='The middle of a creator code, "
+          "e.g. the MI in HV-MI-007'></div>"
+        "<div><label for='f" + ident + "'>Price from</label>"
+        "<input id='f" + ident + "' name='price_from' value='" + str(t["price_from"])
+        + "' inputmode='numeric' required></div>"
+        "<div><label for='t" + ident + "'>Price to</label>"
+        "<input id='t" + ident + "' name='price_to' value='" + str(t["price_to"])
+        + "' inputmode='numeric' required></div>"
+        "<div><label for='r" + ident + "'>Reach</label>"
+        "<input id='r" + ident + "' name='reach' value='" + e(t["reach"] or "")
+        + "' placeholder='10K – 50K'></div>"
+        "<div><label for='s" + ident + "'>Order</label>"
+        "<input id='s" + ident + "' name='sort' value='" + str(t["sort"])
+        + "' size='2'></div>"
+        "<div class='tier-act'><button class='btn small'>Save</button>" + delete
+        + "<span class='muted' style='font-size:12px;margin-left:8px'>" + people
+        + "</span></div></form>")
+
+
+def tiers_section(tiers, used):
+    rows = "".join(tier_row(t, used.get(t["name"], 0)) for t in tiers) or (
+        "<p class='muted'>No tiers yet — add the first one below.</p>")
+    return (
+        "<h2>Tiers &amp; pricing</h2><div class='card'>"
+        "<p class='sub' style='margin-bottom:16px'>Every creator is priced by "
+        "their tier — there is no price on a creator, so changing a band here "
+        "re-prices everyone on it at once, on the cards, in the selection total "
+        "and in the quote.</p>"
+        "<p class='sub' style='margin-bottom:18px'><strong>Code</strong> is the "
+        "middle of a creator code — the <code>MI</code> in <code>HV-MI-007</code> "
+        "— and is used when the next code is assigned. <strong>Reach</strong> is "
+        "the follower range shown on the catalogue ticker. <strong>Order</strong> "
+        "sets the order tiers appear in, smallest first.</p>"
+        + rows
+        + "<h3 style='margin:22px 0 10px;font-size:15px'>Add a tier</h3>"
+        "<form method='post' action='" + u("/tiers/save") + "' class='tier-row'>"
+        "<div><label>Tier</label><input name='name' placeholder='Mega' required></div>"
+        "<div><label>Code</label><input name='code' placeholder='MG' size='4' "
+        "maxlength='4' required></div>"
+        "<div><label>Price from</label><input name='price_from' inputmode='numeric' "
+        "required></div>"
+        "<div><label>Price to</label><input name='price_to' inputmode='numeric' "
+        "required></div>"
+        "<div><label>Reach</label><input name='reach' placeholder='1M+'></div>"
+        "<div><label>Order</label><input name='sort' value='5' size='2'></div>"
+        "<div class='tier-act'><button class='btn'>Add tier</button></div>"
+        "</form></div>")
+
+
+def city_field(c, cities):
+    """Multi-select over the cities already in use, plus a box for new ones.
+
+    A creator who works Riyadh and Jeddah is one creator, not two rows, and the
+    catalogue counts them under both.
+    """
+    chosen = split_cities(c["city"] if c is not None else "")
+    lower = [x.lower() for x in chosen]
+    options = list(cities or [])
+    # Anything on this creator that is not yet a known option still needs a
+    # ticked box, or saving the form would silently drop it.
+    for city in chosen:
+        if city.lower() not in [o.lower() for o in options]:
+            options.append(city)
+
+    boxes = "".join(
+        "<label class='tick'><input type='checkbox' name='city' value='" + e(o) + "'"
+        + (" checked" if o.lower() in lower else "") + "><span>" + e(o) + "</span></label>"
+        for o in options) or "<span class='muted' style='font-size:13px'>None yet.</span>"
+
+    return ("<div class='cities'><label>City</label>"
+            "<div class='ticks'>" + boxes + "</div>"
+            "<input name='city_new' value='' placeholder='Add a city, or several "
+            "separated by commas'></div>")
+
+
+def creator_form(c, cities=None, tiers=None):
+    """Add/edit form. `c` is None when adding a new creator.
+
+    `cities` is every city already on the roster. Checkboxes rather than a
+    <select multiple>: the options stay visible, there is no ctrl-click to
+    explain, and it works on a phone where a multi-select becomes a modal list
+    nobody can tell is multi-select.
+    """
     def val(key, default=""):
         if c is not None and c[key] is not None:
             return e(c[key])
         return default
 
     tier_opts = "".join(
-        "<option" + (" selected" if c is not None and c["tier"] == t else "") + ">" + t + "</option>"
-        for t in ("Nano", "Micro", "Mid-Tier", "Macro")
+        "<option" + (" selected" if c is not None and c["tier"] == t else "") + ">"
+        + e(t) + "</option>"
+        for t in (tiers or ["Nano", "Micro", "Mid-Tier", "Macro"])
     )
     plat_opts = "".join(
         "<option" + (" selected" if c is not None and c["platform"] == p else "") + ">" + p + "</option>"
@@ -723,7 +852,7 @@ def creator_form(c):
         + "' placeholder='no @'></div></div><div class='row'>"
         + "<div><label>Followers</label><input name='followers' value='" + val("followers") + "'></div>"
         + "<div><label>Tier</label><select name='tier'>" + tier_opts + "</select></div>"
-        + "<div><label>City</label><input name='city' value='" + val("city") + "'></div>"
+        + city_field(c, cities)
         + "<div><label>Interest</label><input name='interest' value='" + val("interest") + "'></div>"
         + "</div><div class='row'>"
         + "<div><label>Photo</label>" + photo_field + "</div>"
@@ -736,7 +865,12 @@ def creator_form(c):
     )
 
 
-def roster_page(creators, error=None, message=None):
+def roster_page(creators, error=None, message=None, cities=None, tiers=None):
+    tiers = tiers or []
+    tier_names = [t["name"] for t in tiers]
+    used = {}
+    for c in creators:
+        used[c["tier"]] = used.get(c["tier"], 0) + 1
     err = ""
     if error:
         err += "<div class='err'>" + e(error) + "</div>"
@@ -757,8 +891,9 @@ def roster_page(creators, error=None, message=None):
             + "</strong>" + hidden + "</td><td>" + e(c["platform"])
             + "<br><span class='muted'>" + e(handle) + "</span></td><td>"
             + num(c["followers"]) + "</td><td>" + e(c["tier"]) + "</td><td>"
-            + e(c["city"] or "—") + "</td><td class='right'><details>"
-            + "<summary class='btn small ghost'>Edit</summary>" + creator_form(c)
+            + e(", ".join(split_cities(c["city"])) or "—") + "</td><td class='right'><details>"
+            + "<summary class='btn small ghost'>Edit</summary>"
+            + creator_form(c, cities, tier_names)
             + "</details></td></tr>"
         )
 
@@ -768,7 +903,8 @@ def roster_page(creators, error=None, message=None):
     body = (
         "<h1>Roster</h1><p class='sub'>" + str(len(creators))
         + " creators. Hidden ones stay in the database but never reach a client.</p>" + err
-        + "<h2>Add a creator</h2><div class='card'>" + creator_form(None) + "</div>"
+        + "<h2>Add a creator</h2><div class='card'>"
+        + creator_form(None, cities, tier_names) + "</div>"
         + "<h2>Import a spreadsheet</h2><div class='card'>"
         + "<p class='sub' style='margin-bottom:16px'>Add many creators at once. "
           "Start from the template so the headings match — a code left blank is "
@@ -800,6 +936,7 @@ def roster_page(creators, error=None, message=None):
         + "<p class='muted' style='font-size:13px;margin:0'>Both formats are "
           "read by the server itself — nothing to install, and .xlsx works "
           "wherever this is deployed.</p></form></div>"
+        + tiers_section(tiers, used)
         + "<h2>Attach photos in bulk</h2><div class='card'>"
         + "<p class='sub' style='margin-bottom:16px'>For creators who are "
           "already on the roster. Select a whole folder of images at once "

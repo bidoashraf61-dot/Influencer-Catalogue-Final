@@ -43,6 +43,15 @@ CREATE TABLE IF NOT EXISTS codes (
   uses        INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS tiers (
+  name        TEXT PRIMARY KEY,         -- "Micro". Also what creators.tier holds
+  code        TEXT NOT NULL,            -- "MI", the middle of HV-MI-007
+  price_from  INTEGER NOT NULL,
+  price_to    INTEGER NOT NULL,
+  reach       TEXT,                     -- "10K – 50K", shown on the ticker
+  sort        INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE TABLE IF NOT EXISTS events (
   id         INTEGER PRIMARY KEY,
   code_id    INTEGER REFERENCES codes(id) ON DELETE SET NULL,
@@ -117,6 +126,7 @@ def migrate(conn):
     have = {r["name"] for r in conn.execute("PRAGMA table_info(codes)")}
     if "code_plain" not in have:
         conn.execute("ALTER TABLE codes ADD COLUMN code_plain TEXT")
+    seed_tiers(conn)
 
 
 def now():
@@ -422,6 +432,55 @@ def stats(days=30, start=None, end=None):
     return out
 
 
+# A creator can serve more than one city — Riyadh and Jeddah is common for
+# anyone who travels for shoots. Stored in the one `city` column as a joined
+# string rather than a second table: it is a short list per creator, it has to
+# survive a CSV round trip, and a join table would buy nothing but migrations.
+CITY_SPLIT = ",;\u060c\u061b/"     # includes the Arabic comma and semicolon
+
+
+def split_cities(text):
+    """"Riyadh, Jeddah" -> ["Riyadh", "Jeddah"]. Order kept, duplicates dropped."""
+    if not text:
+        return []
+    out, seen = [], set()
+    buf = ""
+    for ch in str(text):
+        if ch in CITY_SPLIT:
+            buf, part = "", buf.strip()
+        else:
+            buf += ch
+            continue
+        if part and part.lower() not in seen:
+            seen.add(part.lower()); out.append(part)
+    part = buf.strip()
+    if part and part.lower() not in seen:
+        out.append(part)
+    return out
+
+
+def join_cities(values):
+    """The stored form. One place, so the form, the importer and the export
+    cannot drift into three slightly different separators."""
+    out, seen = [], set()
+    for v in values or []:
+        v = (v or "").strip()
+        if v and v.lower() not in seen:
+            seen.add(v.lower()); out.append(v)
+    return ", ".join(out)
+
+
+def known_cities():
+    """Every city already on the roster, most used first — the options offered
+    in the form, so the list grows from real data instead of a hard-coded set."""
+    counts = {}
+    with connect() as conn:
+        for r in conn.execute("SELECT city FROM creators WHERE city IS NOT NULL AND city != ''"):
+            for city in split_cities(r["city"]):
+                counts[city] = counts.get(city, 0) + 1
+    return [c for c, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))]
+
+
 def upsert_creator(c):
     with connect() as conn:
         conn.execute(
@@ -436,7 +495,80 @@ def upsert_creator(c):
         )
 
 
-TIER_CODE = {"Nano": "NA", "Micro": "MI", "Mid-Tier": "MD", "Macro": "MC"}
+# The four the roster shipped with. Only ever used to fill an empty table —
+# once a tier is in the database, that row is the truth and this is history.
+SEED_TIERS = [
+    ("Nano",     "NA", 435,  870,  "Under 10K",   1),
+    ("Micro",    "MI", 870,  1740, "10K – 50K",   2),
+    ("Mid-Tier", "MD", 1450, 2900, "50K – 500K",  3),
+    ("Macro",    "MC", 2175, 4350, "500K – 1M",   4),
+]
+
+
+def seed_tiers(conn=None):
+    own = conn is None
+    conn = conn or connect().__enter__()
+    try:
+        if conn.execute("SELECT COUNT(*) c FROM tiers").fetchone()["c"]:
+            return
+        conn.executemany(
+            "INSERT INTO tiers (name,code,price_from,price_to,reach,sort) "
+            "VALUES (?,?,?,?,?,?)", SEED_TIERS)
+    finally:
+        if own:
+            conn.commit(); conn.close()
+
+
+def list_tiers():
+    with connect() as conn:
+        return conn.execute("SELECT * FROM tiers ORDER BY sort, price_from").fetchall()
+
+
+def get_tier(name):
+    # Not `tier`: next_code() takes a parameter of that name, and the shadowing
+    # made the lookup inside it resolve to the string rather than the function.
+    with connect() as conn:
+        return conn.execute("SELECT * FROM tiers WHERE name = ?", (name,)).fetchone()
+
+
+def tier_prices():
+    """{name: (from, to)} — what prices a selection."""
+    return {t["name"]: (t["price_from"], t["price_to"]) for t in list_tiers()}
+
+
+def tier_names():
+    return [t["name"] for t in list_tiers()]
+
+
+def save_tier(name, code, price_from, price_to, reach=None, sort=0):
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO tiers (name,code,price_from,price_to,reach,sort) "
+            "VALUES (?,?,?,?,?,?) ON CONFLICT(name) DO UPDATE SET "
+            " code=excluded.code, price_from=excluded.price_from, "
+            " price_to=excluded.price_to, reach=excluded.reach, sort=excluded.sort",
+            (name, code, price_from, price_to, reach, sort))
+
+
+def rename_tier(old, new):
+    """Carries the creators across. A tier renamed out from under them would
+    leave rows pointing at a tier that no longer exists, and those creators
+    would price at nothing."""
+    with connect() as conn:
+        conn.execute("UPDATE tiers SET name = ? WHERE name = ?", (new, old))
+        conn.execute("UPDATE creators SET tier = ? WHERE tier = ?", (new, old))
+
+
+def delete_tier(name):
+    """Refuses while creators still use it — returns how many, so the caller
+    can say so rather than orphaning them."""
+    with connect() as conn:
+        used = conn.execute(
+            "SELECT COUNT(*) c FROM creators WHERE tier = ?", (name,)).fetchone()["c"]
+        if used:
+            return used
+        conn.execute("DELETE FROM tiers WHERE name = ?", (name,))
+        return 0
 
 
 def next_code(tier, prefix="HV"):
@@ -447,7 +579,8 @@ def next_code(tier, prefix="HV"):
     creator at once — the UNIQUE constraint on the primary key is the backstop,
     and the caller retries.
     """
-    part = TIER_CODE.get(tier, "XX")
+    row = get_tier(tier)
+    part = row["code"] if row else "XX"
     like = prefix + "-" + part + "-%"
     with connect() as conn:
         rows = conn.execute("SELECT code FROM creators WHERE code LIKE ?", (like,)).fetchall()

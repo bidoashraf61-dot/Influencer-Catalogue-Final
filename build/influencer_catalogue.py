@@ -64,6 +64,29 @@ CITIES = {
     "غير محددة": "Unspecified",
 }
 
+# A creator can serve more than one city. The workbook holds one per row, but
+# the admin service stores "Riyadh, Jeddah", and both feed this page — so the
+# splitting lives here rather than in one of the two callers.
+CITY_SPLIT = ",;\u060c\u061b/"
+
+
+def split_cities(text):
+    parts, buf = [], ""
+    for ch in str(text or "") + ",":
+        if ch in CITY_SPLIT:
+            v = buf.strip(); buf = ""
+            if v and v.lower() not in [p.lower() for p in parts]:
+                parts.append(v)
+        else:
+            buf += ch
+    return parts
+
+
+def city_names(raw):
+    """Sheet value -> display names, each mapped through CITIES."""
+    found = [CITIES.get(p, p) for p in split_cities(raw)]
+    return found or ["Unspecified"]
+
 # Card code prefix. This is client-facing on every card, so it names the
 # agency, not the client — the catalogue is a reusable HelloVoice asset.
 PREFIX = os.environ.get("CATALOGUE_PREFIX", "HV")
@@ -95,6 +118,38 @@ API = os.environ.get("CATALOGUE_API", "").rstrip("/")
 # who sees it. Set CATALOGUE_ADMIN to a URL to render it — root-absolute is
 # fine, relativise() leaves it alone via the @@ADMIN@@ placeholder in build().
 ADMIN_URL = os.environ.get("CATALOGUE_ADMIN", "")
+
+
+def load_tiers_from_admin():
+    """Take the bands from the admin database when there is one.
+
+    Tiers are editable in the dashboard, so its table is the truth. Without
+    this the static build would keep quoting whatever was written above on the
+    day the file was last edited, while the dashboard showed something else —
+    the exact drift that having one editable table was meant to end.
+    """
+    dbfile = ROOT / "admin" / "catalogue.db"
+    if not dbfile.exists():
+        return
+    import sqlite3
+    try:
+        conn = sqlite3.connect("file:%s?mode=ro" % dbfile, uri=True)
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM tiers ORDER BY sort, price_from").fetchall()
+        conn.close()
+    except sqlite3.Error:
+        return                      # no tiers table yet: keep the defaults
+    if not rows:
+        return
+    TIERS.clear()
+    for i, r in enumerate(rows, start=1):
+        TIERS[r["name"]] = {
+            "code": r["code"],
+            "label": "Mid" if r["name"] == "Mid-Tier" else r["name"],
+            "from": r["price_from"], "to": r["price_to"],
+            "order": r["sort"] or i, "reach": r["reach"] or "",
+        }
 
 
 def band(n):
@@ -160,7 +215,7 @@ def read_roster():
             "tier_label": meta["label"],
             "price_from": meta["from"],
             "price_to": meta["to"],
-            "city": CITIES.get((city or "").strip(), "Unspecified"),
+            "cities": city_names(city),
             "platform": platform,
             "interest": interests.get(code, DEFAULT_INTEREST),
             "photo": photo,
@@ -277,6 +332,10 @@ def profile_url(platform, handle):
     return ""
 
 
+def city_label(p):
+    return ", ".join(p["cities"])
+
+
 def card_html(p):
     """One card. Data attributes carry only non-identifying fields."""
     e = html.escape
@@ -314,7 +373,7 @@ def card_html(p):
     name_html = "" if ANON else f'\n          <h3 class="cat-card__name">{e(name)}</h3>'
     label_who = e(p["code"]) if ANON else f"{e(name)}, {e(p['code'])}"
 
-    return f"""      <article class="cat-card" data-tier="{e(p['tier'])}" data-platform="{e(p['platform'])}" data-city="{e(p['city'])}" data-interest="{e(p['interest'])}" data-code="{e(p['code'])}" tabindex="0" role="button" aria-pressed="false" aria-label="{label_who}, {e(p['tier_label'])} tier, {e(p['city'])}, {e(p['platform'])}, {reach} followers">
+    return f"""      <article class="cat-card" data-tier="{e(p['tier'])}" data-platform="{e(p['platform'])}" data-city="{e(city_label(p))}" data-interest="{e(p['interest'])}" data-code="{e(p['code'])}" tabindex="0" role="button" aria-pressed="false" aria-label="{label_who}, {e(p['tier_label'])} tier, {e(city_label(p))}, {e(p['platform'])}, {reach} followers">
         <div class="cat-card__media">
           {media}
           <span class="cat-card__shield" aria-hidden="true"></span>
@@ -326,7 +385,7 @@ def card_html(p):
           <p class="cat-card__code">{e(p['code'])}</p>{name_html}
           <ul class="cat-card__meta">
             <li><span>{reach_label}</span><strong>{reach}</strong></li>
-            <li><span>City</span><strong>{e(p['city'])}</strong></li>
+            <li><span>City</span><strong>{e(city_label(p))}</strong></li>
             <li><span>Tier</span><strong>{e(p['tier_label'])}</strong></li>
           </ul>
         </div>
@@ -395,6 +454,7 @@ def relativise(html, depth):
 
 
 def build():
+    load_tiers_from_admin()
     people = read_roster()
 
     # ---- private key file, never deployed
@@ -407,26 +467,32 @@ def build():
             "followers": p["_followers"],
             "sheet_followers": p["_sheet_followers"],
             "tier": p["tier"],
-            "city": p["city"],
+            "city": city_label(p),
         } for p in people
     }, ensure_ascii=False, indent=1), encoding="utf-8")
 
     def tally(key, order=None):
+        """Counts per value. A creator serving two cities counts in both, so
+        the chip totals add up to more than the roster — which is correct: the
+        number on a chip is how many cards that chip shows."""
         counts = {}
         for p in people:
-            counts[p[key]] = counts.get(p[key], 0) + 1
+            value = p.get(key)
+            for one in (value if isinstance(value, list) else [value]):
+                if one:
+                    counts[one] = counts.get(one, 0) + 1
         items = sorted(counts.items(), key=lambda kv: -kv[1])
         if order:
             items = sorted(counts.items(), key=lambda kv: order.index(kv[0]))
         return items
 
-    tier_order = ["Nano", "Micro", "Mid-Tier", "Macro"]
+    tier_order = sorted(TIERS, key=lambda t: TIERS[t]["order"])
     tier_counts = [(TIERS[t]["label"], n) for t, n in tally("tier", tier_order)]
 
     filters = "" if API else (
         chips("Tier", "tier", [(t, n) for t, n in tally("tier", tier_order)])
         + chips("Platform", "platform", tally("platform"))
-        + chips("City", "city", tally("city"))
+        + chips("City", "city", tally("cities"))
         + (chips("Interest", "interest", tally("interest")) if HAS_INTERESTS else "")
     )
 
@@ -622,7 +688,8 @@ def build():
     passHash: "{simple_hash(PASSCODE)}",
     endpoint: {json.dumps(ENDPOINT)},
     api: {json.dumps(API)},
-    photoBase: "{'' if not API else 'assets/catalogue/'}"
+    tierPrice: {json.dumps({t: [m["from"], m["to"]] for t, m in TIERS.items()})},
+    photoBase: "{'' if not API else '../assets/catalogue/'}"
   }};
 </script>
 <script src="{stamp('/assets/js/catalogue.js')}"></script>
@@ -790,7 +857,8 @@ def build():
     passHash: "{simple_hash(PASSCODE)}",
     endpoint: {json.dumps(ENDPOINT)},
     api: {json.dumps(API)},
-    photoBase: "{'' if not API else 'assets/catalogue/'}"
+    tierPrice: {json.dumps({t: [m["from"], m["to"]] for t, m in TIERS.items()})},
+    photoBase: "{'' if not API else '../../assets/catalogue/'}"
   }};
 </script>
 <script src="{stamp('/assets/js/catalogue.js')}"></script>

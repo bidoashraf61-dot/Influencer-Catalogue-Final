@@ -75,6 +75,30 @@ def parse_multipart(body: bytes, content_type: str, multi=()):
     return out
 
 
+def jpeg_width(path):
+    """Source width without a Pillow dependency.
+
+    A 100px avatar blown up to a 330px card is visibly mush, so the catalogue
+    branches on this and shows those as a small sharp circle over a blurred
+    backdrop instead of a stretched square. Mirrors the same function in
+    build/influencer_catalogue.py.
+    """
+    try:
+        b = path.read_bytes()
+    except OSError:
+        return 0
+    i = 2
+    while i < len(b) - 9:
+        if b[i] != 0xFF:
+            i += 1
+            continue
+        m = b[i + 1]
+        if 0xC0 <= m <= 0xCF and m not in (0xC4, 0xC8, 0xCC):
+            return (b[i + 7] << 8) | b[i + 8]
+        i += 2 + ((b[i + 2] << 8) | b[i + 3])
+    return 0
+
+
 def photo_bytes(data: bytes):
     """(ok, error) for one image, without writing it. save_photo() and the bulk
     uploader apply the same two rules, so a file the roster form would reject
