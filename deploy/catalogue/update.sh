@@ -8,6 +8,11 @@ set -euo pipefail
 SRC=/home/ubuntu/influencer-catalogue-src
 DST=/home/ubuntu/influencer-catalogue/site
 
+# The remote is SSH so this box can push as well as pull; the deploy key is
+# repo-scoped and lives here. Without this git falls back to the agent and
+# fails with "Permission denied (publickey)".
+export GIT_SSH_COMMAND="ssh -o IdentitiesOnly=yes -i /home/ubuntu/.ssh/github_influencer_catalogue"
+
 git -C "$SRC" fetch --depth 1 origin main
 git -C "$SRC" reset --hard origin/main
 
