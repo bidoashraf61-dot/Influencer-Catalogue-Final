@@ -4,8 +4,9 @@ A dashboard for issuing access codes, watching who opens the catalogue,
 editing the roster and reading quote requests — plus the API that makes those
 things real rather than decorative.
 
-**Stdlib Python only.** No pip install, no build step, no framework. It runs
-anywhere Python 3.8+ exists.
+**Stdlib Python only.** No pip install, no build step, no framework — Excel
+files included, which `admin/xlsx.py` reads and writes by unzipping the
+workbook itself. It runs anywhere Python 3.8+ exists.
 
 ```bash
 python3 admin/seed.py --email you@hellovoice.co.uk   # create the first admin
@@ -223,9 +224,11 @@ formats: **.xlsx**, which can carry the photos, and **CSV**, which cannot.
   half-imported roster is harder to recover from than a rejected upload. The
   row it names is the sheet's own line, so blank rows in the middle no longer
   shift the number.
-- `.xlsx` works **only if openpyxl is installed on the server**. It is not a
-  stdlib module, so if it is missing the uploader is told to save as CSV
-  rather than meeting a silent failure. CSV always works, minus photos.
+- **Neither format needs anything installed.** An `.xlsx` is a zip of XML, and
+  `admin/xlsx.py` unzips it with `zipfile` and `xml.etree` — so Excel files
+  work on any host, not only one where somebody remembered to `pip install`.
+  A file that is not a readable workbook is refused with a message naming the
+  fix rather than failing somewhere inside a parser.
 - The CSV template ships with a UTF-8 BOM so Excel does not mangle Arabic city
   names, and the parser accepts `;` delimiters for locales that export that way.
 
@@ -250,9 +253,6 @@ Caveats, all of them visible rather than silent:
 
 - **.xlsx only.** CSV cannot carry an image in any form, and no encoding trick
   changes that.
-- Reading pictures needs the workbook loaded in full rather than in read-only
-  streaming mode, which does not expose drawings at all. Roster sheets are
-  small, so this costs nothing in practice.
 - Two pictures on one row: the first wins, the second is ignored rather than
   silently overwriting it.
 - A picture that is not a real image, or is over 6MB, is **named in the result
