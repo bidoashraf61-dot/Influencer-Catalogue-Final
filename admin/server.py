@@ -254,10 +254,13 @@ class Handler(BaseHTTPRequestHandler):
                 db.stats(start=start, end=end), db.recent_events(200)))
         if path == "/roster":
             return self.send(200, views.roster_page(
-                db.list_creators(), query.get("e"), query.get("ok"),
+                db.list_creators(search=query.get("q")),
+                query.get("e"), query.get("ok"),
                 cities=db.known_cities(), tiers=db.list_tiers(),
                 nationalities=db.known_nationalities(),
-                interests=db.known_interests()))
+                interests=db.known_interests(),
+                editing=(query.get("edit") or "").strip().upper() or None,
+                q=(query.get("q") or "").strip()))
         if path == "/roster/export":
             return self.send(200, self.roster_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition",

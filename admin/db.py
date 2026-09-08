@@ -145,6 +145,20 @@ def migrate(conn):
                 conn.execute("UPDATE creators SET profiles = ? WHERE code = ?",
                              (json.dumps([{"platform": r["platform"], "url": url}]),
                               r["code"]))
+    # A creator with exactly one profile has one audience, and the headline
+    # figure IS that platform's count. The first backfill stored the link but
+    # left followers null, so every card fell back to a single "Followers" row
+    # and the per-platform breakdown never appeared for anybody.
+    for r in conn.execute(
+            "SELECT code, followers, profiles FROM creators "
+            "WHERE profiles IS NOT NULL AND followers IS NOT NULL").fetchall():
+        items = split_profiles(r["profiles"])
+        if len(items) != 1 or items[0]["followers"] is not None:
+            continue
+        items[0]["followers"] = r["followers"]
+        conn.execute("UPDATE creators SET profiles = ? WHERE code = ?",
+                     (join_profiles(items), r["code"]))
+
     seed_tiers(conn)
 
 
@@ -748,13 +762,30 @@ def next_code(tier, prefix="HV"):
     return "%s-%s-%03d" % (prefix, part, highest + 1)
 
 
-def list_creators(active_only=False):
-    q = "SELECT * FROM creators"
+def list_creators(active_only=False, search=None):
+    """The roster, optionally narrowed by a search.
+
+    Filtering in SQL rather than in the page: at 700 creators the difference
+    between sending 700 rows and sending the 6 somebody asked for is the
+    difference between a usable table and a scroll.
+    """
+    where, args = [], []
     if active_only:
-        q += " WHERE active = 1"
+        where.append("active = 1")
+    term = (search or "").strip()
+    if term:
+        like = "%" + term.lower() + "%"
+        where.append("(lower(name) LIKE ? OR lower(code) LIKE ? OR "
+                     "lower(coalesce(handle,'')) LIKE ? OR "
+                     "lower(coalesce(city,'')) LIKE ? OR "
+                     "lower(coalesce(nationality,'')) LIKE ?)")
+        args += [like] * 5
+    q = "SELECT * FROM creators"
+    if where:
+        q += " WHERE " + " AND ".join(where)
     q += " ORDER BY sort, code"
     with connect() as conn:
-        return conn.execute(q).fetchall()
+        return conn.execute(q, args).fetchall()
 
 
 def creator(code):

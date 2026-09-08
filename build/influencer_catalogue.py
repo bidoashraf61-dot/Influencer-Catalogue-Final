@@ -467,7 +467,9 @@ def card_html(p):
     # is more than one to add up.
     counted = [x for x in p["_profiles"] if x.get("followers")] if not ANON else []
     rows = []
-    if len(counted) > 1:
+    # Always name the platform a number belongs to; a total only when there is
+    # more than one number to add up.
+    if counted:
         # Two accounts on one platform need telling apart, so the handle is
         # added — but only where it is doing that work, or every row grows a
         # tail the reader does not need.
@@ -484,9 +486,10 @@ def card_html(p):
         # The sum of the rows above, not the stored headline. Adding a
         # platform to a creator whose headline was typed for one account left
         # a total smaller than the numbers listed right above it.
-        rows.append('<li><span>Total reach</span><strong>'
-                    + format(sum(x["followers"] for x in counted), ",")
-                    + '</strong></li>')
+        if len(counted) > 1:
+            rows.append('<li><span>Total reach</span><strong>'
+                        + format(sum(x["followers"] for x in counted), ",")
+                        + '</strong></li>')
     else:
         rows.append('<li><span>' + reach_label + '</span><strong>' + reach + '</strong></li>')
     if not ANON and p.get("_nationality"):

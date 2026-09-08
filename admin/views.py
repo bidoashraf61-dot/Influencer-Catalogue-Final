@@ -130,6 +130,13 @@ border:1px solid var(--line);border-radius:9px;background:var(--white);
 color:var(--ink);min-height:42px}
 .range input[type=date]:focus{outline:none;border-color:var(--ink)}
 .range label{margin-bottom:5px}
+tr.editrow > td{background:#f6f5f3;border-bottom:2px solid var(--ink);
+padding:18px 20px 24px;text-align:left}
+tr.editrow form{max-width:1100px}
+.rsearch{display:flex;gap:10px;align-items:center;margin:0 0 14px;flex-wrap:wrap}
+.rsearch input{font:inherit;font-size:15px;padding:9px 13px;min-width:260px;
+border:1px solid var(--line);border-radius:9px;background:var(--white)}
+.rsearch input:focus{outline:none;border-color:var(--ink)}
 .tier-row{display:grid;gap:12px;align-items:end;padding:12px 0;
 border-bottom:1px solid var(--line);
 grid-template-columns:minmax(120px,1.4fr) 76px 110px 110px minmax(110px,1fr) 68px auto}
@@ -256,6 +263,13 @@ def set_base(prefix):
     any other change."""
     global BASE
     BASE = prefix or ""
+
+
+def urlencode(**kw):
+    """Query string from the parts that actually have a value, so a link does
+    not carry `edit=&q=` and read as if something is set."""
+    import urllib.parse
+    return urllib.parse.urlencode({k: v for k, v in kw.items() if v})
 
 
 def u(path):
@@ -968,7 +982,7 @@ def creator_form(c, cities=None, tiers=None, interests=None):
 
 
 def roster_page(creators, error=None, message=None, cities=None, tiers=None,
-                nationalities=None, interests=None):
+                nationalities=None, interests=None, editing=None, q=""):
     tiers = tiers or []
     tier_names = [t["name"] for t in tiers]
     used = {}
@@ -988,17 +1002,35 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
                     + "' alt='' loading='lazy'>")
         else:
             shot = "<span class='thumb sm none'>—</span>"
-        return (
-            "<tr><td>" + shot + "</td><td><code>" + e(c["code"]) + "</code></td>"
+        open_now = (editing == c["code"])
+        link = u("/roster") + "?" + urlencode(q=q, edit="" if open_now else c["code"])
+        button = ("<a class='btn small" + ("" if open_now else " ghost") + "' href='"
+                  + link + "#" + e(c["code"]) + "'>"
+                  + ("Close" if open_now else "Edit") + "</a>")
+
+        out = (
+            "<tr id='" + e(c["code"]) + "'><td>" + shot + "</td><td><code>"
+            + e(c["code"]) + "</code></td>"
             + "<td><strong>" + e(c["name"])
             + "</strong>" + hidden + "</td><td>" + e(c["platform"])
             + "<br><span class='muted'>" + e(handle) + "</span></td><td>"
             + num(c["followers"]) + "</td><td>" + e(c["tier"]) + "</td><td>"
-            + e(", ".join(split_cities(c["city"])) or "—") + "</td><td class='right'><details>"
-            + "<summary class='btn small ghost'>Edit</summary>"
-            + creator_form(c, cities, tier_names, interests)
-            + "</details></td></tr>"
-        )
+            + e(", ".join(split_cities(c["city"])) or "—") + "</td>"
+            + "<td class='right'>" + button + "</td></tr>")
+
+        # The form gets a row of its own, spanning every column. It used to sit
+        # inside the last <td> of an eight-column table, so it was squeezed into
+        # whatever width that cell had — which is why the profile link box
+        # collapsed to a sliver and the panel spilled past its edge.
+        #
+        # And it is rendered ONLY for the creator being edited. Building all of
+        # them cost 1MB and 6,390 form controls at 162 creators; at 700 it was
+        # 4.2MB and 27,600, which is the lag.
+        if open_now:
+            out += ("<tr class='editrow'><td colspan='8'>"
+                    + creator_form(c, cities, tier_names, interests)
+                    + "</td></tr>")
+        return out
 
     rows = "".join(row(c) for c in creators) or (
         "<tr><td colspan='8' class='muted'>Roster is empty — import it with seed.py.</td></tr>")
@@ -1077,6 +1109,16 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
           "file is replaced by the one you upload for that creator.</p>"
         + "</form></div>"
         + "<h2>Everyone</h2>"
+        + "<form class='rsearch' method='get' action='" + u("/roster") + "'>"
+          "<input name='q' value='" + e(q) + "' placeholder='Search name, code, "
+          "handle or city' autocomplete='off'>"
+          "<button class='btn small'>Search</button>"
+        + ("<a class='btn small ghost' href='" + u("/roster") + "'>Clear</a>" if q else "")
+        + "<span class='muted' style='font-size:13px'>"
+        + (str(len(creators)) + " match" + ("" if len(creators) == 1 else "es")
+           if q else "Only the creator you open is loaded — the page stays light "
+                     "however long the roster gets.")
+        + "</span></form>"
         + "<p class='sub' style='margin-bottom:12px'>Need the codes? "
           "<a href='" + u("/roster/export") + "'>Export the roster (.csv)</a> — "
           "every creator with their code, handle and whether a photo is on "

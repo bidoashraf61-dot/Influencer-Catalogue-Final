@@ -232,7 +232,11 @@
   function metaRows(c, label) {
     var counted = (c.profiles || []).filter(function (p) { return p.followers; });
     var rows = [];
-    if (counted.length > 1) {
+    // Always name the platform a number belongs to. "Followers 9,575" on a
+    // creator who is on Instagram says less than "Instagram 9,575", and the
+    // moment a second platform is added the rows read the same way rather than
+    // changing shape.
+    if (counted.length) {
       // Two accounts on one platform need telling apart, so the handle is
       // added — but only where it is doing that work, or every row grows a
       // tail the reader does not need.
@@ -252,9 +256,13 @@
       // The sum of the rows above, not the stored headline. Adding a platform
       // to a creator whose headline was typed for one account left a total
       // smaller than the numbers listed right above it.
-      var sum = counted.reduce(function (t, p) { return t + (Number(p.followers) || 0); }, 0);
-      rows.push("<li><span>Total reach</span><strong>" + commas(sum) +
-                "</strong></li>");
+      // A total only when there is more than one number to add up; on a
+      // single platform it would just repeat the line above it.
+      if (counted.length > 1) {
+        var sum = counted.reduce(function (t, p) { return t + (Number(p.followers) || 0); }, 0);
+        rows.push("<li><span>Total reach</span><strong>" + commas(sum) +
+                  "</strong></li>");
+      }
     } else {
       rows.push("<li><span>Followers</span><strong>" + commas(c.followers) +
                 "</strong></li>");
@@ -391,8 +399,12 @@
     var cards = all(".cat-card");
     // Derived from whatever chips the builder rendered, so adding a filter
     // dimension is a builder change alone — this stays correct untouched.
+    // Each dimension holds a SET of chosen values, not one. "Instagram or
+    // Snapchat" is a real question — a client wants both kinds of creator in
+    // front of them — and a single-choice filter could only ask it one platform
+    // at a time.
     var filters = {};
-    all(".cat-chip").forEach(function (c) { filters[c.dataset.filter] = ""; });
+    all(".cat-chip").forEach(function (c) { filters[c.dataset.filter] = []; });
 
     /* -- filtering -- */
 
@@ -400,10 +412,15 @@
       var shown = 0;
       cards.forEach(function (card) {
         var ok = Object.keys(filters).every(function (k) {
-          // A field can hold several values — a creator working Riyadh and
-          // Jeddah is "Riyadh, Jeddah" and has to match either chip. Exact
-          // comparison matched neither and quietly hid them from both.
-          return !filters[k] || values(card.dataset[k]).indexOf(filters[k]) !== -1;
+          // Nothing chosen in a dimension means that dimension is not asking.
+          // Otherwise the card has to carry at least one of the chosen values —
+          // OR within a dimension, AND across them, which is how people read a
+          // set of filters.
+          if (!filters[k].length) return true;
+          var mine = values(card.dataset[k]);
+          return filters[k].some(function (want) {
+            return mine.indexOf(want) !== -1;
+          });
         });
         card.hidden = !ok;
         if (ok) shown++;
@@ -415,11 +432,19 @@
     all(".cat-chip").forEach(function (chip) {
       chip.addEventListener("click", function () {
         var name = chip.dataset.filter;
-        filters[name] = chip.dataset.value;
+        var value = chip.dataset.value;
+        if (!value) {
+          filters[name] = [];                 // the All chip clears the set
+        } else {
+          var at = filters[name].indexOf(value);
+          if (at === -1) filters[name].push(value); else filters[name].splice(at, 1);
+        }
         all('.cat-chip[data-filter="' + name + '"]').forEach(function (c) {
-          var active = c === chip;
-          c.classList.toggle("is-active", active);
-          c.setAttribute("aria-pressed", active ? "true" : "false");
+          var on = c.dataset.value
+            ? filters[name].indexOf(c.dataset.value) !== -1
+            : filters[name].length === 0;     // All lights up when none are
+          c.classList.toggle("is-active", on);
+          c.setAttribute("aria-pressed", on ? "true" : "false");
         });
         apply();
       });
