@@ -256,7 +256,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.roster_page(
                 db.list_creators(), query.get("e"), query.get("ok"),
                 cities=db.known_cities(), tiers=db.list_tiers(),
-                nationalities=db.known_nationalities()))
+                nationalities=db.known_nationalities(),
+                interests=db.known_interests()))
         if path == "/roster/export":
             return self.send(200, self.roster_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition",
@@ -370,7 +371,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/codes")
 
     def post_roster_save(self):
-        f = self.form_body(multi=("city", "p_platform", "p_url", "p_followers"))
+        f = self.form_body(multi=("city", "interest",
+                                  "p_platform", "p_url", "p_followers"))
         code = (f.get("code") or "").strip().upper()
         tier = (f.get("tier") or "Nano").strip()
         # Adding: the portal assigns the code from what is already in the
@@ -438,7 +440,11 @@ class Handler(BaseHTTPRequestHandler):
                 list(f.get("city") or []) + db.split_cities(f.get("city_new") or "")) or None,
             "nationality": (f.get("nationality") or "").strip() or None,
             "tier": tier,
-            "interest": (f.get("interest") or "").strip() or None,
+            # Ticked categories plus anything typed into "add", through the
+            # same joiner the cities use so the separator is decided once.
+            "interest": db.join_cities(
+                list(f.get("interest") or [])
+                + db.split_cities(f.get("interest_new") or "")) or None,
             "photo": photo or None,
             "active": 1 if f.get("active") else 0,
             "note": (f.get("note") or "").strip() or None,

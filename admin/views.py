@@ -828,6 +828,31 @@ def profile_field(c):
             "</div></div>")
 
 
+def interest_field(c, interests):
+    """Interests as a multi-select, the same shape as the cities.
+
+    A creator covers skincare AND hair care; one free-text box meant the same
+    category arrived spelled three ways and the catalogue's Interest filter
+    could never group anything.
+    """
+    chosen = split_cities(c["interest"] if c is not None else "")
+    lower = [x.lower() for x in chosen]
+    options = list(interests or [])
+    for one in chosen:
+        if one.lower() not in [o.lower() for o in options]:
+            options.append(one)
+
+    boxes = "".join(
+        "<label class='tick'><input type='checkbox' name='interest' value='" + e(o) + "'"
+        + (" checked" if o.lower() in lower else "") + "><span>" + e(o) + "</span></label>"
+        for o in options) or "<span class='muted' style='font-size:13px'>None yet.</span>"
+
+    return ("<div class='cities'><label>Interests</label>"
+            "<div class='ticks'>" + boxes + "</div>"
+            "<input name='interest_new' value='' placeholder='Add a category, or "
+            "several separated by commas'></div>")
+
+
 def city_field(c, cities):
     """Multi-select over the cities already in use, plus a box for new ones.
 
@@ -854,7 +879,7 @@ def city_field(c, cities):
             "separated by commas'></div>")
 
 
-def creator_form(c, cities=None, tiers=None):
+def creator_form(c, cities=None, tiers=None, interests=None):
     """Add/edit form. `c` is None when adding a new creator.
 
     `cities` is every city already on the roster. Checkboxes rather than a
@@ -929,7 +954,7 @@ def creator_form(c, cities=None, tiers=None):
         + city_field(c, cities)
         + "<div><label>Nationality</label><input name='nationality' value='"
         + val("nationality") + "' list='nationalities' placeholder='Saudi'></div>"
-        + "<div><label>Interest</label><input name='interest' value='" + val("interest") + "'></div>"
+        + interest_field(c, interests)
         + "</div><div class='row'>"
         + "<div><label>Photo</label>" + photo_field + "</div>"
         + "<div><label>Sort</label><input name='sort' value='" + val("sort", "0") + "'></div>"
@@ -943,7 +968,7 @@ def creator_form(c, cities=None, tiers=None):
 
 
 def roster_page(creators, error=None, message=None, cities=None, tiers=None,
-                nationalities=None):
+                nationalities=None, interests=None):
     tiers = tiers or []
     tier_names = [t["name"] for t in tiers]
     used = {}
@@ -971,7 +996,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
             + num(c["followers"]) + "</td><td>" + e(c["tier"]) + "</td><td>"
             + e(", ".join(split_cities(c["city"])) or "—") + "</td><td class='right'><details>"
             + "<summary class='btn small ghost'>Edit</summary>"
-            + creator_form(c, cities, tier_names)
+            + creator_form(c, cities, tier_names, interests)
             + "</details></td></tr>"
         )
 
@@ -988,7 +1013,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + "<h1>Roster</h1><p class='sub'>" + str(len(creators))
         + " creators. Hidden ones stay in the database but never reach a client.</p>" + err
         + "<h2>Add a creator</h2><div class='card'>"
-        + creator_form(None, cities, tier_names) + "</div>"
+        + creator_form(None, cities, tier_names, interests) + "</div>"
         + "<h2>Import a spreadsheet</h2><div class='card'>"
         + "<p class='sub' style='margin-bottom:16px'>Add many creators at once. "
           "Start from the template so the headings match — a code left blank is "

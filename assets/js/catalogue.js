@@ -249,7 +249,11 @@
         rows.push("<li><span>" + tag + "</span><strong>" +
                   commas(p.followers) + "</strong></li>");
       });
-      rows.push("<li><span>Total reach</span><strong>" + commas(c.followers) +
+      // The sum of the rows above, not the stored headline. Adding a platform
+      // to a creator whose headline was typed for one account left a total
+      // smaller than the numbers listed right above it.
+      var sum = counted.reduce(function (t, p) { return t + (Number(p.followers) || 0); }, 0);
+      rows.push("<li><span>Total reach</span><strong>" + commas(sum) +
                 "</strong></li>");
     } else {
       rows.push("<li><span>Followers</span><strong>" + commas(c.followers) +
@@ -261,6 +265,10 @@
     }
     rows.push("<li><span>City</span><strong>" + esc(c.city || "Unspecified") +
               "</strong></li>");
+    if (c.interest) {
+      rows.push("<li><span>Interests</span><strong>" +
+                esc(values(c.interest).join(", ")) + "</strong></li>");
+    }
     rows.push("<li><span>Tier</span><strong>" + esc(label) + "</strong></li>");
     return rows.join("");
   }
@@ -346,8 +354,12 @@
       var tally = function (field) {
         var out = {};
         list.forEach(function (c) {
+          // city and interest both hold several values per creator, so a
+          // creator counts under each one — the number on a chip is how many
+          // cards it shows.
+          var multi = (field === "city" || field === "interest");
           var raw = c[field] || (field === "city" ? "Unspecified" : "");
-          var each = field === "city" ? values(raw) : (raw ? [raw] : []);
+          var each = multi ? values(raw) : (raw ? [raw] : []);
           if (!each.length && field === "city") each = ["Unspecified"];
           each.forEach(function (v) { out[v] = (out[v] || 0) + 1; });
         });

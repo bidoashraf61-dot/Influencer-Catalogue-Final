@@ -478,13 +478,21 @@ def card_html(p):
                     tag += " @" + who
             rows.append('<li><span>' + e(tag) + '</span><strong>'
                         + format(prof["followers"], ",") + '</strong></li>')
-        rows.append('<li><span>Total reach</span><strong>' + reach + '</strong></li>')
+        # The sum of the rows above, not the stored headline. Adding a
+        # platform to a creator whose headline was typed for one account left
+        # a total smaller than the numbers listed right above it.
+        rows.append('<li><span>Total reach</span><strong>'
+                    + format(sum(x["followers"] for x in counted), ",")
+                    + '</strong></li>')
     else:
         rows.append('<li><span>' + reach_label + '</span><strong>' + reach + '</strong></li>')
     if not ANON and p.get("_nationality"):
         rows.append('<li><span>Nationality</span><strong>'
                     + e(p["_nationality"]) + '</strong></li>')
     rows.append('<li><span>City</span><strong>' + e(city_label(p)) + '</strong></li>')
+    if not ANON and p.get("interest"):
+        rows.append('<li><span>Interests</span><strong>'
+                    + e(", ".join(split_cities(p["interest"]))) + '</strong></li>')
     rows.append('<li><span>Tier</span><strong>' + e(p["tier_label"]) + '</strong></li>')
     meta_rows = "\n".join("            " + r for r in rows)
     label_who = e(p["code"]) if ANON else f"{e(name)}, {e(p['code'])}"

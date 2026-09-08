@@ -489,6 +489,31 @@ def join_cities(values):
     return ", ".join(out)
 
 
+# The categories offered out of the box. The list a dashboard shows has to
+# start somewhere; anything typed into "add" joins it from then on, so this is
+# a starting point rather than a fixed vocabulary.
+DEFAULT_INTERESTS = [
+    "Skincare", "Hair Care", "Make-up", "Fragrance", "Beauty",
+    "Fashion", "Lifestyle", "Food", "Fitness", "Wellness",
+    "Travel", "Motherhood", "Home", "Tech", "Gaming", "Automotive",
+    "Finance", "Education", "Entertainment", "Sports",
+]
+
+
+def known_interests():
+    """The defaults plus everything already in use, most used first — so the
+    list grows from real data instead of needing a code change."""
+    counts = {}
+    with connect() as conn:
+        for r in conn.execute("SELECT interest FROM creators "
+                              "WHERE interest IS NOT NULL AND interest != ''"):
+            for one in split_cities(r["interest"]):
+                counts[one] = counts.get(one, 0) + 1
+    used = sorted(counts, key=lambda k: (-counts[k], k.lower()))
+    lower = {x.lower() for x in used}
+    return used + [x for x in DEFAULT_INTERESTS if x.lower() not in lower]
+
+
 def known_nationalities():
     """Every nationality already on the roster, most used first — the options
     offered in the form, so the list grows from real data."""
