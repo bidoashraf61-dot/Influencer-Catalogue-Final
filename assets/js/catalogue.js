@@ -179,7 +179,20 @@
       '<g stroke="#fe2c55" transform="translate(1,.85)">' + TT + '</g>' +
       '<g stroke="currentColor">' + TT + '</g></svg>'
   };
-  var BRAND = { Instagram: "cat-card__platform--ig", TikTok: "cat-card__platform--tt" };
+  ICONS.Snapchat = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.2c2.4 0 4 1.7 4 4.1 0 1 .1 1.7.3 2.1.3.4.9.4 1.4.3.4-.1.8.2.8.6 0 .5-.6.8-1.2 1-.3.1-.4.3-.3.6.4 1.2 1.6 2.4 3 2.7.3.1.4.4.2.6-.5.6-1.6.9-2.5 1-.2.5-.3 1-.9 1-.5 0-1-.3-1.8-.3-1.1 0-1.6 1.1-3 1.1s-1.9-1.1-3-1.1c-.8 0-1.3.3-1.8.3-.6 0-.7-.5-.9-1-.9-.1-2-.4-2.5-1-.2-.2-.1-.5.2-.6 1.4-.3 2.6-1.5 3-2.7.1-.3 0-.5-.3-.6-.6-.2-1.2-.5-1.2-1 0-.4.4-.7.8-.6.5.1 1.1.1 1.4-.3.2-.4.3-1.1.3-2.1 0-2.4 1.6-4.1 4-4.1z"/></svg>';
+  ICONS.YouTube = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10.2 9.3l5 2.7-5 2.7z" fill="currentColor" stroke="none"/></svg>';
+  ICONS.X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5l15 15M19.5 4.5l-15 15"/></svg>';
+  ICONS.Facebook = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15.2 4.2h-2.1a3.4 3.4 0 0 0-3.4 3.4V10H7.9v3h1.8v7"/><path d="M9.7 13h4.1"/></svg>';
+  var ICON_LINK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13.5a3.5 3.5 0 0 0 5 0l2.5-2.5a3.5 3.5 0 0 0-5-5L11 7.5"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0L6.5 13a3.5 3.5 0 0 0 5 5l1.5-1.5"/></svg>';
+
+  var BRAND = {
+    Instagram: "cat-card__platform--ig",
+    TikTok: "cat-card__platform--tt",
+    Snapchat: "cat-card__platform--sc",
+    YouTube: "cat-card__platform--yt",
+    X: "cat-card__platform--x",
+    Facebook: "cat-card__platform--fb"
+  };
 
   function esc(v) {
     return String(v === null || v === undefined ? "" : v)
@@ -207,6 +220,34 @@
       : "https://www.instagram.com/" + handle + "/";
   }
 
+  // A creator on three platforms has three audiences. One "Followers" row
+  // would have to pick one or invent a total the client cannot check, so each
+  // platform gets its own line and a total appears only when there is more
+  // than one to add up.
+  function metaRows(c, label) {
+    var counted = (c.profiles || []).filter(function (p) { return p.followers; });
+    var rows = [];
+    if (counted.length > 1) {
+      counted.forEach(function (p) {
+        rows.push("<li><span>" + esc(p.platform) + "</span><strong>" +
+                  commas(p.followers) + "</strong></li>");
+      });
+      rows.push("<li><span>Total reach</span><strong>" + commas(c.followers) +
+                "</strong></li>");
+    } else {
+      rows.push("<li><span>Followers</span><strong>" + commas(c.followers) +
+                "</strong></li>");
+    }
+    if (c.nationality) {
+      rows.push("<li><span>Nationality</span><strong>" + esc(c.nationality) +
+                "</strong></li>");
+    }
+    rows.push("<li><span>City</span><strong>" + esc(c.city || "Unspecified") +
+              "</strong></li>");
+    rows.push("<li><span>Tier</span><strong>" + esc(label) + "</strong></li>");
+    return rows.join("");
+  }
+
   function cardMarkup(c) {
     var label = tierLabel(c.tier);
     // The static build marks 100px sources so the card shows a small sharp
@@ -221,14 +262,26 @@
         esc(String(c.code).split("-").pop()) + '"></div>';
 
     var url = profileUrl(c.platform, c.handle);
-    var icon = ICONS[c.platform] || "";
-    var brand = BRAND[c.platform] || "";
-    var mark = url
-      ? '<a class="cat-card__platform ' + brand + '" href="' + esc(url) + '" target="_blank" ' +
-        'rel="noopener noreferrer nofollow" data-noselect aria-label="Visit ' +
-        esc(c.platform) + ' profile"><span class="cat-card__platform-hint">Visit profile' +
-        "</span>" + icon + "</a>"
-      : '<span class="cat-card__platform ' + brand + '" title="' + esc(c.platform) + '">' + icon + "</span>";
+    // One mark per platform the creator is on, each linking to its own
+    // profile. Falls back to the single platform+handle guess for a roster
+    // served by a service that predates stored profiles.
+    var list = (c.profiles && c.profiles.length) ? c.profiles
+      : (url ? [{platform: c.platform, url: url}] : []);
+    var marks = list.map(function (prof) {
+      return '<a class="cat-card__mark ' + (BRAND[prof.platform] || "") + '" href="' +
+        esc(prof.url) + '" target="_blank" rel="noopener noreferrer nofollow" ' +
+        'data-noselect aria-label="Visit ' + esc(prof.platform) + ' profile" title="' +
+        esc(prof.platform) + '">' + (ICONS[prof.platform] || ICON_LINK) + "</a>";
+    });
+    if (!marks.length) {
+      marks = values(c.platform).map(function (name) {
+        return '<span class="cat-card__mark ' + (BRAND[name] || "") + '" title="' +
+          esc(name) + '">' + (ICONS[name] || ICON_LINK) + "</span>";
+      });
+    }
+    var mark = '<div class="cat-card__platform">' +
+      (list.length ? '<span class="cat-card__platform-hint">Visit profile</span>' : "") +
+      '<div class="cat-card__marks">' + marks.join("") + "</div></div>";
 
     return '<article class="cat-card" data-tier="' + esc(c.tier) +
       '" data-platform="' + esc(c.platform) + '" data-city="' + esc(c.city || "Unspecified") +
@@ -243,10 +296,7 @@
       '<span class="cat-card__check" aria-hidden="true"></span></div>' +
       '<div class="cat-card__body"><p class="cat-card__code">' + esc(c.code) + "</p>" +
       '<h3 class="cat-card__name">' + esc(c.name) + "</h3>" +
-      '<ul class="cat-card__meta">' +
-      "<li><span>Followers</span><strong>" + commas(c.followers) + "</strong></li>" +
-      "<li><span>City</span><strong>" + esc(c.city || "Unspecified") + "</strong></li>" +
-      "<li><span>Tier</span><strong>" + esc(label) + "</strong></li></ul>" +
+      '<ul class="cat-card__meta">' + metaRows(c, label) + "</ul>" +
       "</div></article>";
   }
 

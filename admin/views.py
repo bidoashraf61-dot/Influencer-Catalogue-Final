@@ -16,7 +16,7 @@ import re
 import time
 from datetime import datetime, timezone
 
-from db import code_state, now, split_cities
+from db import code_state, now, split_cities, split_profiles, PLATFORMS
 
 
 def e(v):
@@ -141,6 +141,16 @@ color:var(--ink);min-height:40px;box-sizing:border-box}
 .tier-act{display:flex;align-items:center;gap:6px;white-space:nowrap}
 @media (max-width:900px){.tier-row{grid-template-columns:1fr 1fr}
 .tier-act{grid-column:1/-1}}
+.profiles{grid-column:1/-1}
+.prow{display:grid;grid-template-columns:150px 1fr 130px;gap:10px;margin-bottom:8px}
+.prow select,.prow input{font:inherit;font-size:15px;padding:9px 11px;width:100%;
+border:1px solid var(--line);border-radius:9px;background:var(--white);
+color:var(--ink);min-height:40px;box-sizing:border-box}
+.prow select:focus,.prow input:focus{outline:none;border-color:var(--ink)}
+@media (max-width:900px){.prow{grid-template-columns:150px 1fr}
+.prow input[name=p_followers]{grid-column:2}}
+@media (max-width:640px){.prow{grid-template-columns:1fr}
+.prow input[name=p_followers]{grid-column:auto}}
 .cities{grid-column:1/-1}
 .ticks{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .tick{display:inline-flex;align-items:center;gap:7px;margin:0;padding:7px 13px;
@@ -760,6 +770,46 @@ def tiers_section(tiers, used):
         "</form></div>")
 
 
+def profile_field(c):
+    """One row per platform the creator is on: which platform, and the link.
+
+    A link, not a username. Profile URLs are not all one shape — an
+    agency-managed account, a vanity path, a Facebook page id — and building a
+    URL from a handle worked for Instagram and TikTok and nothing else.
+    Pasting what is in the address bar always works.
+    """
+    rows = split_profiles(c["profiles"] if c is not None else None)
+    # Two spare rows, so adding a platform never needs a save-and-reopen.
+    slots = rows + [{"platform": "", "url": ""}, {"platform": "", "url": ""}]
+
+    out = []
+    for row in slots:
+        options = "<option value=''>—</option>" + "".join(
+            "<option" + (" selected" if row["platform"] == p else "") + ">" + e(p)
+            + "</option>" for p in PLATFORMS)
+        # A platform this creator is on that is not in the list still shows.
+        if row["platform"] and row["platform"] not in PLATFORMS:
+            options += "<option selected>" + e(row["platform"]) + "</option>"
+        out.append(
+            "<div class='prow'>"
+            "<select name='p_platform'>" + options + "</select>"
+            "<input name='p_url' value='" + e(row["url"]) + "' "
+            "placeholder='https://www.instagram.com/username' inputmode='url'>"
+            "<input name='p_followers' value='"
+            + (str(row["followers"]) if row.get("followers") else "")
+            + "' placeholder='followers' inputmode='numeric'>"
+            "</div>")
+
+    return ("<div class='row'><div class='profiles'>"
+            "<label>Profiles</label>"
+            "<div class='muted' style='margin:0 0 10px;font-size:13px'>Paste the "
+            "full link to each profile, and the followers on it. Leave a row "
+            "blank to skip it; clearing a row removes that platform. The "
+            "Followers field below is the headline figure — leave it empty and "
+            "it is the sum of these.</div>"
+            + "".join(out) + "</div></div>")
+
+
 def city_field(c, cities):
     """Multi-select over the cities already in use, plus a box for new ones.
 
@@ -804,10 +854,6 @@ def creator_form(c, cities=None, tiers=None):
         + e(t) + "</option>"
         for t in (tiers or ["Nano", "Micro", "Mid-Tier", "Macro"])
     )
-    plat_opts = "".join(
-        "<option" + (" selected" if c is not None and c["platform"] == p else "") + ">" + p + "</option>"
-        for p in ("Instagram", "TikTok")
-    )
     checked = "checked" if (c is None or c["active"]) else ""
     readonly = "readonly" if c is not None else ""
     action_label = "Save changes" if c is not None else "Add creator"
@@ -833,26 +879,38 @@ def creator_form(c, cities=None, tiers=None):
                       "disabled title='Derived from the tier and the existing roster'>"
                       "</div>")
 
-    delete_form = ""
+    # Delete used to be a <form> nested inside the save <form>. HTML forbids
+    # that, so the browser dropped the inner tag and the Delete button became
+    # an ordinary submit belonging to the SAVE form — clicking it saved the
+    # creator instead. Verified: the row parsed to one form, action
+    # /roster/save, with Delete attached to it.
+    #
+    # The delete form is a sibling now and the button reaches it through the
+    # HTML5 `form` attribute, which is exactly what that attribute is for.
+    delete_button = delete_after = ""
     if c is not None:
+        ident = "del-" + re.sub(r"[^A-Za-z0-9]", "", c["code"])
         confirm = "return confirm('Delete " + e(c["code"]) + " permanently?')"
-        delete_form = (
-            "<form method='post' action='" + u("/roster/delete") + "' class='inline' onsubmit=\""
-            + confirm + "\"><input type='hidden' name='code' value='" + e(c["code"])
-            + "'><button class='btn small danger' style='margin-left:8px'>Delete</button></form>"
-        )
+        delete_button = ("<button form='" + ident + "' class='btn small danger' "
+                         "style='margin-left:8px'>Delete</button>")
+        delete_after = (
+            "<form id='" + ident + "' method='post' action='" + u("/roster/delete")
+            + "' onsubmit=\"" + confirm + "\"><input type='hidden' name='code' value='"
+            + e(c["code"]) + "'></form>")
 
     return (
         "<form method='post' action='" + u("/roster/save") + "' enctype='multipart/form-data' "
         "style='margin-top:12px'><div class='row'>"
         + code_field
         + "<div><label>Name</label><input name='name' value='" + val("name") + "' required></div>"
-        + "<div><label>Platform</label><select name='platform'>" + plat_opts + "</select></div>"
-        + "<div><label>Handle</label><input name='handle' value='" + val("handle")
-        + "' placeholder='no @'></div></div><div class='row'>"
+        + "</div>"
+        + profile_field(c)
+        + "<div class='row'>"
         + "<div><label>Followers</label><input name='followers' value='" + val("followers") + "'></div>"
         + "<div><label>Tier</label><select name='tier'>" + tier_opts + "</select></div>"
         + city_field(c, cities)
+        + "<div><label>Nationality</label><input name='nationality' value='"
+        + val("nationality") + "' list='nationalities' placeholder='Saudi'></div>"
         + "<div><label>Interest</label><input name='interest' value='" + val("interest") + "'></div>"
         + "</div><div class='row'>"
         + "<div><label>Photo</label>" + photo_field + "</div>"
@@ -861,11 +919,13 @@ def creator_form(c, cities=None, tiers=None):
         + "<div><label>Visible</label><div style='padding-top:9px'>"
         + "<input type='checkbox' name='active' value='1' " + checked
         + " style='width:auto'> Show to clients</div></div></div>"
-        + "<button class='btn'>" + action_label + "</button>" + delete_form + "</form>"
+        + "<button class='btn'>" + action_label + "</button>" + delete_button
+        + "</form>" + delete_after
     )
 
 
-def roster_page(creators, error=None, message=None, cities=None, tiers=None):
+def roster_page(creators, error=None, message=None, cities=None, tiers=None,
+                nationalities=None):
     tiers = tiers or []
     tier_names = [t["name"] for t in tiers]
     used = {}
@@ -900,8 +960,14 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None):
     rows = "".join(row(c) for c in creators) or (
         "<tr><td colspan='8' class='muted'>Roster is empty — import it with seed.py.</td></tr>")
 
+    # A datalist, not a select: nationality is free text, and offering what is
+    # already in use stops "Saudi", "saudi" and "KSA" becoming three values.
+    suggestions = ("<datalist id='nationalities'>" + "".join(
+        "<option value='" + e(x) + "'>" for x in (nationalities or [])) + "</datalist>")
+
     body = (
-        "<h1>Roster</h1><p class='sub'>" + str(len(creators))
+        suggestions
+        + "<h1>Roster</h1><p class='sub'>" + str(len(creators))
         + " creators. Hidden ones stay in the database but never reach a client.</p>" + err
         + "<h2>Add a creator</h2><div class='card'>"
         + creator_form(None, cities, tier_names) + "</div>"

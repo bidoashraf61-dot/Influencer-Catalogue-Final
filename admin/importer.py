@@ -22,10 +22,25 @@ whoever is on that row. CSV cannot carry an image in any form.
 import csv
 import io
 
+import db
 import xlsx
 
-COLUMNS = ["code", "name", "platform", "handle", "followers",
-           "city", "tier", "interest", "note", "active", "photo"]
+# One column per platform, each holding a full profile link. A column per
+# platform rather than one "profiles" cell because a spreadsheet is edited by
+# eye: it is obvious what goes where, and sorting or filtering on "who is on
+# TikTok" works. platform/handle stay so an older sheet still imports.
+PROFILE_COLUMNS = ["instagram", "tiktok", "snapchat", "youtube", "x", "facebook"]
+PROFILE_LABELS = {"instagram": "Instagram", "tiktok": "TikTok",
+                  "snapchat": "Snapchat", "youtube": "YouTube",
+                  "x": "X", "facebook": "Facebook"}
+
+# Each platform brings a link column and a followers column, side by side, so
+# a row reads left to right as "this profile, that many followers".
+PROFILE_PAIRS = [c for col in PROFILE_COLUMNS for c in (col, col + "_followers")]
+
+COLUMNS = (["code", "name", "followers", "city", "nationality", "tier"]
+           + PROFILE_PAIRS
+           + ["interest", "note", "active", "photo", "platform", "handle"])
 
 # Aliases people actually type. The real list comes from the database, so a
 # tier added in the dashboard is importable the moment it exists.
@@ -44,12 +59,27 @@ def tier_lookup():
 PLATFORMS = {"instagram": "Instagram", "ig": "Instagram",
              "tiktok": "TikTok", "tt": "TikTok"}
 
+def _template_row(**kw):
+    return [kw.get(col, "") for col in COLUMNS]
+
+
 TEMPLATE_ROWS = [
-    ["", "Noha Magdy", "Instagram", "noha.mgdi", "697000", "Jeddah", "Macro",
-     "Skincare", "example row — delete before importing", "yes",
-     "insert the picture on this row (.xlsx only)"],
-    ["", "Omnya Elmasry", "TikTok", "omnyaelmasry.0", "618900", "", "Macro",
-     "", "leave code blank and the portal assigns one", "yes", ""],
+    _template_row(
+        name="Noha Magdy", followers="697000", city="Jeddah",
+        nationality="Egyptian", tier="Macro",
+        instagram="https://www.instagram.com/noha.mgdi/",
+        instagram_followers="697000", interest="Skincare",
+        note="example row — delete before importing", active="yes",
+        photo="insert the picture on this row (.xlsx only)"),
+    _template_row(
+        name="Omnya Elmasry", city="Riyadh, Jeddah", nationality="Saudi",
+        tier="Macro",
+        instagram="https://www.instagram.com/omnyaelmasry.0/",
+        instagram_followers="618900",
+        tiktok="https://www.tiktok.com/@omnyaelmasry.0",
+        tiktok_followers="240000",
+        note="several platforms — leave followers blank above and it is the sum",
+        active="yes"),
 ]
 
 
@@ -69,7 +99,10 @@ def template_xlsx():
     # Column K wide enough to drop a picture into, and the example rows tall
     # enough that one sits on its own row rather than straddling two.
     return xlsx.write(rows, sheet_name="Creators",
-                      widths={10: 30}, row_heights={2: 60, 3: 60})
+                      widths=dict(
+                          [(COLUMNS.index("photo"), 30)]
+                          + [(COLUMNS.index(c), 34) for c in PROFILE_COLUMNS]),
+                      row_heights={2: 60, 3: 60})
 
 
 def _rows_from_xlsx(data):
@@ -139,11 +172,17 @@ def parse(data: bytes, filename: str):
                           + ", ".join(sorted(set(tiers.values()))) + ".")
             continue
 
+        # The platform column is a leftover from when a creator had exactly
+        # one. It is only consulted when the row has no profile links at all,
+        # so a sheet written either way imports.
         plat_raw = cell("platform").lower()
-        platform = PLATFORMS.get(plat_raw)
-        if not platform:
-            errors.append("Row " + str(n) + " (" + person + "): platform '"
-                          + (cell("platform") or "blank") + "' is not Instagram or TikTok.")
+        platform = PLATFORMS.get(plat_raw, "")
+        has_links = any(cell(col) for col in PROFILE_COLUMNS)
+        if not platform and not has_links:
+            errors.append(
+                "Row " + str(n) + " (" + person + "): no profile link. Put the "
+                "full link in at least one of: "
+                + ", ".join(PROFILE_LABELS[c] for c in PROFILE_COLUMNS) + ".")
             continue
 
         followers_raw = cell("followers").replace(",", "").replace(" ", "")
@@ -158,14 +197,49 @@ def parse(data: bytes, filename: str):
         active_raw = cell("active").lower()
         active = 0 if active_raw in ("no", "false", "0", "hidden") else 1
 
+        # A link per platform column. A cell holding a bare username instead of
+        # a link is rescued rather than rejected — it is an easy thing to type,
+        # and refusing the whole file over it would be obnoxious.
+        profiles = []
+        for col in PROFILE_COLUMNS:
+            # NOT `raw`: that is the row this closure reads through cell(), and
+            # shadowing it made every column after the first read characters
+            # out of a string instead of cells out of the row.
+            link = cell(col)
+            if not link:
+                continue
+            label = PROFILE_LABELS[col]
+            if "/" not in link and "." not in link:
+                link = db.profile_url(label, link) or link
+            count = cell(col + "_followers").replace(",", "").replace(" ", "")
+            profiles.append({"platform": label, "url": link,
+                             "followers": int(count) if count.isdigit() else None})
+
+        # An older sheet, with one platform and a handle and no link columns.
+        if not profiles and cell("handle"):
+            legacy = PLATFORMS.get(cell("platform").lower())
+            url = db.profile_url(legacy, cell("handle")) if legacy else ""
+            if url:
+                profiles.append({"platform": legacy, "url": url})
+
+        stored = db.join_profiles(profiles)
+        listed = db.split_profiles(stored)
+        if followers is None:
+            followers = db.total_followers(listed)
+
         rows.append({
             "_row": n,
             "code": cell("code").upper() or None,
             "name": person,
-            "handle": cell("handle").lstrip("@") or None,
-            "platform": platform,
+            # Derived from the links, so they cannot disagree with them.
+            "handle": (db.handle_from_url(listed[0]["url"]) if listed
+                       else cell("handle").lstrip("@")) or None,
+            "platform": (db.join_cities([x["platform"] for x in listed])
+                         or platform),
+            "profiles": stored,
             "followers": followers,
             "city": cell("city") or None,
+            "nationality": cell("nationality") or None,
             "tier": tier,
             "interest": cell("interest") or None,
             "note": cell("note") or None,

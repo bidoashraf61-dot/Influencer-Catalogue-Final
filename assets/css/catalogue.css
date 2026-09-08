@@ -391,12 +391,29 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 }
 /* Instagram's mark is a gradient and TikTok's is black; the brand lives on the
    pill, so hovering must not repaint it. Lift and ring it instead. */
-.cat-card__platform--ig svg {
+.cat-card__marks { display: flex; gap: 7px; align-items: center; }
+.cat-card__mark { display: block; color: var(--white); text-decoration: none; }
+.cat-card__mark svg {
+  width: 18px; height: 18px; display: block;
+  box-sizing: content-box; padding: 8px; border-radius: 100%;
+  background: var(--ink);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+a.cat-card__mark:hover svg {
+  transform: scale(1.09);
+  box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 6px 16px rgba(0,0,0,.32);
+}
+a.cat-card__mark:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; border-radius: 100%; }
+.cat-card__platform--sc svg { background: #fffc00; color: #121212; }
+.cat-card__platform--yt svg { background: #ff0033; color: var(--white); }
+.cat-card__platform--x  svg { background: #000000; color: var(--white); }
+.cat-card__platform--fb svg { background: #1877f2; color: var(--white); }
+.cat-card__platform--ig svg, .cat-card__mark.cat-card__platform--ig svg {
   background: radial-gradient(circle at 28% 108%,
     #fdf497 0%, #fdf497 6%, #fd5949 42%, #d6249f 62%, #285aeb 92%);
   color: var(--white);
 }
-.cat-card__platform--tt svg { background: #010101; color: var(--white); }
+.cat-card__platform--tt svg, .cat-card__mark.cat-card__platform--tt svg { background: #010101; color: var(--white); }
 a.cat-card__platform:hover svg {
   transform: scale(1.09);
   box-shadow: 0 0 0 3px rgba(255,255,255,.9), 0 6px 16px rgba(0,0,0,.32);

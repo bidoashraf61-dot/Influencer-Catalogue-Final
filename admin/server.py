@@ -255,7 +255,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/roster":
             return self.send(200, views.roster_page(
                 db.list_creators(), query.get("e"), query.get("ok"),
-                cities=db.known_cities(), tiers=db.list_tiers()))
+                cities=db.known_cities(), tiers=db.list_tiers(),
+                nationalities=db.known_nationalities()))
         if path == "/roster/export":
             return self.send(200, self.roster_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition",
@@ -369,7 +370,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/codes")
 
     def post_roster_save(self):
-        f = self.form_body(multi=("city",))
+        f = self.form_body(multi=("city", "p_platform", "p_url", "p_followers"))
         code = (f.get("code") or "").strip().upper()
         tier = (f.get("tier") or "Nano").strip()
         # Adding: the portal assigns the code from what is already in the
@@ -397,16 +398,45 @@ class Handler(BaseHTTPRequestHandler):
             photo = f["photo"].strip()
 
         followers = (f.get("followers") or "").replace(",", "").strip()
+
+        # The form posts one p_platform/p_url pair per row, blanks included.
+        # A row with a platform but a bare username instead of a link is
+        # rescued rather than rejected — that is a very easy thing to type.
+        pairs = []
+        platforms = list(f.get("p_platform") or [])
+        urls = list(f.get("p_url") or [])
+        counts = list(f.get("p_followers") or [])
+        for i, url in enumerate(urls):
+            platform = platforms[i] if i < len(platforms) else ""
+            url = (url or "").strip()
+            if not url or not platform:
+                continue
+            if "/" not in url and "." not in url:
+                url = db.profile_url(platform, url) or url
+            pairs.append({"platform": platform, "url": url,
+                          "followers": counts[i] if i < len(counts) else None})
+        profiles = db.join_profiles(pairs)
+        listed = db.split_profiles(profiles)
+
         db.upsert_creator({
             "code": code,
+            # handle and platform are derived from the profiles now. They stay
+            # as columns because photos are matched by handle and the whole
+            # catalogue filters on platform, and deriving them means the two
+            # can never disagree with the links actually shown.
+            "handle": db.handle_from_url(listed[0]["url"]) if listed else "",
+            "platform": db.join_cities([p["platform"] for p in listed]) or "Instagram",
+            "profiles": profiles,
             "name": (f.get("name") or "").strip(),
-            "handle": (f.get("handle") or "").strip().lstrip("@"),
-            "platform": (f.get("platform") or "Instagram").strip(),
-            "followers": int(followers) if followers.isdigit() else None,
+            # The headline figure. Left blank it is the sum across platforms,
+            # so a creator on three of them still sorts and bands correctly.
+            "followers": (int(followers) if followers.isdigit()
+                          else db.total_followers(listed)),
             # Ticked boxes plus anything typed into "add a city". Both go
             # through join_cities, so the separator is decided in one place.
             "city": db.join_cities(
                 list(f.get("city") or []) + db.split_cities(f.get("city_new") or "")) or None,
+            "nationality": (f.get("nationality") or "").strip() or None,
             "tier": tier,
             "interest": (f.get("interest") or "").strip() or None,
             "photo": photo or None,
@@ -569,13 +599,22 @@ class Handler(BaseHTTPRequestHandler):
         w = csv.writer(buf)
         w.writerow(importer.COLUMNS)
         for c in db.list_creators():
+            found = {p["platform"]: p for p in db.split_profiles(c["profiles"])}
+            pairs = []
+            for col in importer.PROFILE_COLUMNS:
+                prof = found.get(importer.PROFILE_LABELS[col])
+                pairs.append(prof["url"] if prof else "")
+                pairs.append(prof["followers"] if prof and prof["followers"] else "")
             w.writerow([
-                c["code"], c["name"], c["platform"], c["handle"] or "",
+                c["code"], c["name"],
                 c["followers"] if c["followers"] is not None else "",
-                db.join_cities(db.split_cities(c["city"])), c["tier"],
+                db.join_cities(db.split_cities(c["city"])),
+                c["nationality"] or "", c["tier"],
+            ] + pairs + [
                 c["interest"] or "",
                 c["note"] or "", "yes" if c["active"] else "no",
                 "on file" if c["photo"] else "",
+                c["platform"], c["handle"] or "",
             ])
         # BOM so Excel opens it as UTF-8 rather than mangling Arabic city names
         return "\ufeff" + buf.getvalue()
@@ -691,8 +730,10 @@ class Handler(BaseHTTPRequestHandler):
             {
                 "code": r["code"], "name": r["name"], "handle": r["handle"],
                 "platform": r["platform"], "followers": r["followers"],
-                "city": r["city"], "tier": r["tier"], "interest": r["interest"],
+                "city": r["city"], "nationality": r["nationality"],
+                "tier": r["tier"], "interest": r["interest"],
                 "photo": r["photo"], "lowres": self.is_lowres(r["photo"]),
+                "profiles": db.split_profiles(r["profiles"]),
             }
             for r in db.list_creators(active_only=True)
         ]

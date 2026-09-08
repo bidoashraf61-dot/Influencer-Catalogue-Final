@@ -216,6 +216,11 @@ def read_roster():
             "price_from": meta["from"],
             "price_to": meta["to"],
             "cities": city_names(city),
+            "_profiles": ([{"platform": platform,
+                            "url": profile_url(platform, handle),
+                            "followers": effective}]
+                          if handle and profile_url(platform, handle) else []),
+            "_nationality": "",
             "platform": platform,
             "interest": interests.get(code, DEFAULT_INTEREST),
             "photo": photo,
@@ -250,27 +255,49 @@ def jpeg_width(path):
     return 0
 
 
+LOGO_MANIFEST = ROOT / "content" / "client_logos.json"
+
+
 def client_logos():
-    """The client banner, read from the built homepage rather than copied, so
-    it cannot drift from the site. Returns unique (src, srcset, alt) in the
-    order the site shows them; empty if the homepage is not built yet."""
-    home = ROOT / "site" / "index.html"
-    if not home.exists():
-        return []
+    """The client banner: (src, srcset, alt) in the order the site shows them.
+
+    Read from the built homepage when one is here, so the banner cannot drift
+    from the site — and cached to content/client_logos.json, which IS
+    committed, so a build elsewhere produces the same banner.
+
+    That cache is the whole point. site/ is a build artefact and is gitignored,
+    so when publishing moved from "build on the Mac, commit dist/" to "build on
+    the server", this function found no homepage, returned [], and the banner
+    vanished from the live site with no error and nothing in the output to say
+    so. A build that quietly drops a section is worse than one that fails.
+    """
     import re
-    page = home.read_text(encoding="utf-8")
-    sec = re.search(r'<section[^>]*client_banner_section.*?</section>', page, re.S)
-    if not sec:
-        return []
-    found = re.findall(
-        r'src="(/assets/clients/[^"]+)"\s+srcset="([^"]+)"\s+alt="([^"]*)"', sec.group(0))
-    seen, out = set(), []
-    for src, srcset, alt in found:
-        if src in seen:
-            continue
-        seen.add(src)
-        out.append((src, srcset, alt))
-    return out
+    home = ROOT / "site" / "index.html"
+    if home.exists():
+        page = home.read_text(encoding="utf-8")
+        sec = re.search(r'<section[^>]*client_banner_section.*?</section>', page, re.S)
+        if sec:
+            found = re.findall(
+                r'src="(/assets/clients/[^"]+)"\s+srcset="([^"]+)"\s+alt="([^"]*)"',
+                sec.group(0))
+            seen, out = set(), []
+            for src, srcset, alt in found:
+                if src in seen:
+                    continue
+                seen.add(src)
+                out.append([src, srcset, alt])
+            if out:
+                LOGO_MANIFEST.parent.mkdir(parents=True, exist_ok=True)
+                LOGO_MANIFEST.write_text(
+                    json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+                return [tuple(x) for x in out]
+
+    if LOGO_MANIFEST.exists():
+        try:
+            return [tuple(x) for x in json.loads(LOGO_MANIFEST.read_text())]
+        except (ValueError, TypeError):
+            pass
+    return []
 
 
 def plate(code):
@@ -319,7 +346,52 @@ PLATFORM_ICONS = {
     ),
 }
 
-PLATFORM_CLASS = {"Instagram": "cat-card__platform--ig", "TikTok": "cat-card__platform--tt"}
+ICON_SNAPCHAT = (
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M12 3.2c2.4 0 4 1.7 4 4.1 0 1 .1 1.7.3 2.1.3.4.9.4 1.4.3.4-.1.8.2.8.6 '
+    '0 .5-.6.8-1.2 1-.3.1-.4.3-.3.6.4 1.2 1.6 2.4 3 2.7.3.1.4.4.2.6-.5.6-1.6.9-2.5 1 '
+    '-.2.5-.3 1-.9 1-.5 0-1-.3-1.8-.3-1.1 0-1.6 1.1-3 1.1s-1.9-1.1-3-1.1c-.8 0-1.3.3-1.8.3 '
+    '-.6 0-.7-.5-.9-1-.9-.1-2-.4-2.5-1-.2-.2-.1-.5.2-.6 1.4-.3 2.6-1.5 3-2.7.1-.3 0-.5-.3-.6 '
+    '-.6-.2-1.2-.5-1.2-1 0-.4.4-.7.8-.6.5.1 1.1.1 1.4-.3.2-.4.3-1.1.3-2.1 0-2.4 1.6-4.1 4-4.1z"/>'
+    "</svg>")
+
+ICON_YOUTUBE = (
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" '
+    'stroke-linejoin="round" aria-hidden="true">'
+    '<rect x="2.5" y="5.5" width="19" height="13" rx="4"/>'
+    '<path d="M10.2 9.3l5 2.7-5 2.7z" fill="currentColor" stroke="none"/></svg>')
+
+ICON_X = (
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+    'stroke-linecap="round" aria-hidden="true">'
+    '<path d="M4.5 4.5l15 15M19.5 4.5l-15 15"/></svg>')
+
+ICON_FACEBOOK = (
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" '
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M15.2 4.2h-2.1a3.4 3.4 0 0 0-3.4 3.4V10H7.9v3h1.8v7"/>'
+    '<path d="M9.7 13h4.1"/></svg>')
+
+ICON_LINK = (
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" '
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+    '<path d="M10 13.5a3.5 3.5 0 0 0 5 0l2.5-2.5a3.5 3.5 0 0 0-5-5L11 7.5"/>'
+    '<path d="M14 10.5a3.5 3.5 0 0 0-5 0L6.5 13a3.5 3.5 0 0 0 5 5l1.5-1.5"/></svg>')
+
+PLATFORM_ICONS["Snapchat"] = ICON_SNAPCHAT
+PLATFORM_ICONS["YouTube"] = ICON_YOUTUBE
+PLATFORM_ICONS["X"] = ICON_X
+PLATFORM_ICONS["Facebook"] = ICON_FACEBOOK
+
+PLATFORM_CLASS = {
+    "Instagram": "cat-card__platform--ig",
+    "TikTok": "cat-card__platform--tt",
+    "Snapchat": "cat-card__platform--sc",
+    "YouTube": "cat-card__platform--yt",
+    "X": "cat-card__platform--x",
+    "Facebook": "cat-card__platform--fb",
+}
 
 
 def profile_url(platform, handle):
@@ -351,26 +423,53 @@ def card_html(p):
             f'data-plate="{e(plate(p["code"]))}"></div>'
         )
 
-    icon = PLATFORM_ICONS.get(p["platform"], "")
-    brand = PLATFORM_CLASS.get(p["platform"], "")
-    url = "" if ANON else profile_url(p["platform"], p["_handle"])
-    if url:
+    # One mark per platform the creator is on, each linking to its own profile.
+    marks = []
+    for prof in ([] if ANON else p["_profiles"]):
+        icon = PLATFORM_ICONS.get(prof["platform"], ICON_LINK)
+        brand = PLATFORM_CLASS.get(prof["platform"], "")
         # data-noselect keeps the click from also toggling the card underneath.
-        platform_html = (
-            f'<a class="cat-card__platform {brand}" href="{e(url)}" target="_blank" '
+        marks.append(
+            f'<a class="cat-card__mark {brand}" href="{e(prof["url"])}" target="_blank" '
             f'rel="noopener noreferrer nofollow" data-noselect '
-            f'aria-label="Visit {e(p["platform"])} profile">'
-            f'<span class="cat-card__platform-hint">Visit profile</span>{icon}</a>'
-        )
-    else:
-        platform_html = (
-            f'<span class="cat-card__platform {brand}" title="{e(p["platform"])}">{icon}</span>'
-        )
+            f'aria-label="Visit {e(prof["platform"])} profile" '
+            f'title="{e(prof["platform"])}">{icon}</a>')
+    if not marks:
+        for name in split_cities(p["platform"]):
+            icon = PLATFORM_ICONS.get(name, ICON_LINK)
+            brand = PLATFORM_CLASS.get(name, "")
+            marks.append(f'<span class="cat-card__mark {brand}" '
+                         f'title="{e(name)}">{icon}</span>')
+    hint = ('<span class="cat-card__platform-hint">Visit profile</span>'
+            if any("<a " in m for m in marks) else "")
+    platform_html = ('<div class="cat-card__platform">' + hint
+                     + '<div class="cat-card__marks">' + "".join(marks)
+                     + "</div></div>")
     name = "" if ANON else display_name(p["_name"])
     reach_label = "Reach" if ANON else "Followers"
     reach = band(p["_followers"]) if ANON else (
         f"{p['_followers']:,}" if p["_followers"] else "—")
     name_html = "" if ANON else f'\n          <h3 class="cat-card__name">{e(name)}</h3>'
+
+    # A creator on three platforms has three audiences. One "Followers" row
+    # would have to pick one of them or invent a total the client cannot check,
+    # so each platform gets its own line and a total is shown only when there
+    # is more than one to add up.
+    counted = [x for x in p["_profiles"] if x.get("followers")] if not ANON else []
+    rows = []
+    if len(counted) > 1:
+        for prof in counted:
+            rows.append('<li><span>' + e(prof["platform"]) + '</span><strong>'
+                        + format(prof["followers"], ",") + '</strong></li>')
+        rows.append('<li><span>Total reach</span><strong>' + reach + '</strong></li>')
+    else:
+        rows.append('<li><span>' + reach_label + '</span><strong>' + reach + '</strong></li>')
+    if not ANON and p.get("_nationality"):
+        rows.append('<li><span>Nationality</span><strong>'
+                    + e(p["_nationality"]) + '</strong></li>')
+    rows.append('<li><span>City</span><strong>' + e(city_label(p)) + '</strong></li>')
+    rows.append('<li><span>Tier</span><strong>' + e(p["tier_label"]) + '</strong></li>')
+    meta_rows = "\n".join("            " + r for r in rows)
     label_who = e(p["code"]) if ANON else f"{e(name)}, {e(p['code'])}"
 
     return f"""      <article class="cat-card" data-tier="{e(p['tier'])}" data-platform="{e(p['platform'])}" data-city="{e(city_label(p))}" data-interest="{e(p['interest'])}" data-code="{e(p['code'])}" tabindex="0" role="button" aria-pressed="false" aria-label="{label_who}, {e(p['tier_label'])} tier, {e(city_label(p))}, {e(p['platform'])}, {reach} followers">
@@ -882,7 +981,13 @@ def build():
     print(f"api            {API or '(none — fully static build)'}")
     print(f"endpoint       {ENDPOINT or '(not configured — set CATALOGUE_ENDPOINT)'}")
     print(f"request email  {REQUEST_EMAIL}")
-    print(f"client logos   {len(logos)}")
+    if logos:
+        print(f"client logos   {len(logos)}")
+    else:
+        # Silence here is how the banner disappeared from production once.
+        print("client logos   NONE — the banner will be missing. Build once")
+        print("               where site/index.html exists to write")
+        print("               content/client_logos.json, and commit it.")
     print(f"admin link     {ADMIN_URL or '(omitted)'}")
     if HAS_INTERESTS:
         print(f"interests      {len(set(p['interest'] for p in people))} values, filter shown")

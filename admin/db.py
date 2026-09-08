@@ -71,9 +71,13 @@ CREATE TABLE IF NOT EXISTS creators (
   platform  TEXT NOT NULL,
   followers INTEGER,
   city      TEXT,
+  nationality TEXT,                     -- who the audience reads them as; not
+                                        -- the same question as where they live
   tier      TEXT NOT NULL,
   interest  TEXT,
   photo     TEXT,
+  profiles  TEXT,                       -- JSON [{platform, url}]: a creator is
+                                        -- on several platforms, not one
   active    INTEGER NOT NULL DEFAULT 1,
   note      TEXT,
   sort      INTEGER NOT NULL DEFAULT 0
@@ -126,6 +130,21 @@ def migrate(conn):
     have = {r["name"] for r in conn.execute("PRAGMA table_info(codes)")}
     if "code_plain" not in have:
         conn.execute("ALTER TABLE codes ADD COLUMN code_plain TEXT")
+
+    cols = {r["name"] for r in conn.execute("PRAGMA table_info(creators)")}
+    if "nationality" not in cols:
+        conn.execute("ALTER TABLE creators ADD COLUMN nationality TEXT")
+    if "profiles" not in cols:
+        conn.execute("ALTER TABLE creators ADD COLUMN profiles TEXT")
+        # Backfill from the single platform+handle each creator had, so nobody
+        # loses their link. It is the same URL the catalogue was already
+        # guessing at render time; storing it is what makes it editable.
+        for r in conn.execute("SELECT code, platform, handle FROM creators").fetchall():
+            url = profile_url(r["platform"], r["handle"])
+            if url:
+                conn.execute("UPDATE creators SET profiles = ? WHERE code = ?",
+                             (json.dumps([{"platform": r["platform"], "url": url}]),
+                              r["code"]))
     seed_tiers(conn)
 
 
@@ -470,6 +489,18 @@ def join_cities(values):
     return ", ".join(out)
 
 
+def known_nationalities():
+    """Every nationality already on the roster, most used first — the options
+    offered in the form, so the list grows from real data."""
+    counts = {}
+    with connect() as conn:
+        for r in conn.execute("SELECT nationality FROM creators "
+                              "WHERE nationality IS NOT NULL AND nationality != ''"):
+            for one in split_cities(r["nationality"]):
+                counts[one] = counts.get(one, 0) + 1
+    return [c for c, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))]
+
+
 def known_cities():
     """Every city already on the roster, most used first — the options offered
     in the form, so the list grows from real data instead of a hard-coded set."""
@@ -484,12 +515,16 @@ def known_cities():
 def upsert_creator(c):
     with connect() as conn:
         conn.execute(
-            "INSERT INTO creators (code,name,handle,platform,followers,city,tier,interest,photo,active,note,sort) "
-            "VALUES (:code,:name,:handle,:platform,:followers,:city,:tier,:interest,:photo,:active,:note,:sort) "
+            "INSERT INTO creators (code,name,handle,platform,followers,city,"
+            "nationality,tier,interest,photo,profiles,active,note,sort) "
+            "VALUES (:code,:name,:handle,:platform,:followers,:city,"
+            ":nationality,:tier,:interest,:photo,:profiles,:active,:note,:sort) "
             "ON CONFLICT(code) DO UPDATE SET "
             " name=excluded.name, handle=excluded.handle, platform=excluded.platform, "
-            " followers=excluded.followers, city=excluded.city, tier=excluded.tier, "
-            " interest=excluded.interest, photo=excluded.photo, active=excluded.active, "
+            " followers=excluded.followers, city=excluded.city, "
+             " nationality=excluded.nationality, tier=excluded.tier, "
+            " interest=excluded.interest, photo=excluded.photo, "
+             " profiles=excluded.profiles, active=excluded.active, "
             " note=excluded.note, sort=excluded.sort",
             c,
         )
@@ -522,6 +557,99 @@ def seed_tiers(conn=None):
 def list_tiers():
     with connect() as conn:
         return conn.execute("SELECT * FROM tiers ORDER BY sort, price_from").fetchall()
+
+
+# The platforms the dashboard offers. A creator can be stored on something
+# else; this is what the dropdown lists, not a constraint.
+PLATFORMS = ["Instagram", "TikTok", "Snapchat", "YouTube", "X", "Facebook"]
+
+PROFILE_PATTERNS = {
+    "Instagram": "https://www.instagram.com/%s/",
+    "TikTok": "https://www.tiktok.com/@%s",
+    "Snapchat": "https://www.snapchat.com/add/%s",
+    "YouTube": "https://www.youtube.com/@%s",
+    "X": "https://x.com/%s",
+    "Facebook": "https://www.facebook.com/%s",
+}
+
+
+def profile_url(platform, handle):
+    """A full URL from a bare handle. Used to migrate the old rows, and to
+    rescue a spreadsheet cell holding a username where a link was asked for."""
+    handle = (handle or "").strip().lstrip("@")
+    if not handle:
+        return ""
+    pattern = PROFILE_PATTERNS.get(platform)
+    return (pattern % handle) if pattern else ""
+
+
+def handle_from_url(url):
+    """The username inside a profile link.
+
+    Derived rather than typed now: the link is what is stored. Kept because
+    photos are matched by handle and the export reads better with one.
+    """
+    text = (url or "").strip().rstrip("/")
+    if not text:
+        return ""
+    text = text.split("?")[0].split("#")[0]
+    return text.rsplit("/", 1)[-1].lstrip("@")
+
+
+def as_count(value):
+    """A follower count from whatever the form or the sheet supplied."""
+    if value is None or value == "":
+        return None
+    text = str(value).replace(",", "").replace(" ", "").strip()
+    return int(text) if text.isdigit() else None
+
+
+def split_profiles(raw):
+    """Stored JSON -> [{"platform", "url"}]. Never raises: a row written by an
+    older version must not take the whole roster page down."""
+    if not raw:
+        return []
+    try:
+        data = json.loads(raw)
+    except (ValueError, TypeError):
+        return []
+    out = []
+    for item in data if isinstance(data, list) else []:
+        if not isinstance(item, dict):
+            continue
+        url = (item.get("url") or "").strip()
+        platform = (item.get("platform") or "").strip()
+        if url and platform:
+            out.append({"platform": platform, "url": url,
+                        "followers": as_count(item.get("followers"))})
+    return out
+
+
+def join_profiles(items):
+    clean, seen = [], set()
+    for item in items or []:
+        url = (item.get("url") or "").strip()
+        platform = (item.get("platform") or "").strip()
+        if not url or not platform:
+            continue
+        # One account per platform; a second row for the same one is a slip in
+        # the form, not a second profile.
+        if platform.lower() in seen:
+            continue
+        seen.add(platform.lower())
+        if not url.lower().startswith(("http://", "https://")):
+            url = "https://" + url.lstrip("/")
+        clean.append({"platform": platform, "url": url,
+                      "followers": as_count(item.get("followers"))})
+    return json.dumps(clean, ensure_ascii=False) if clean else None
+
+
+def total_followers(profiles):
+    """Reach across every platform. Used when nobody typed a headline number:
+    a creator on three platforms has a total, and asking for it twice invites
+    the two to disagree."""
+    counts = [p["followers"] for p in profiles if p.get("followers")]
+    return sum(counts) if counts else None
 
 
 def get_tier(name):
