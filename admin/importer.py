@@ -242,16 +242,20 @@ def parse(data: bytes, filename: str):
             continue  # a blank name is an empty row, not an error
 
         tier_raw = cell("tier").lower()
-        tier = tiers.get(tier_raw)
-        if not tier:
+        tier = tiers.get(tier_raw, "")
+        if tier_raw and not tier:
             errors.append("Row " + str(n) + " (" + person + "): tier '"
-                          + (cell("tier") or "blank") + "' is not one of "
+                          + cell("tier") + "' is not one of "
                           + ", ".join(sorted(set(tiers.values()))) + ".")
             continue
 
         # The platform column is a leftover from when a creator had exactly
         # one. It is only consulted when the row has no profile links at all,
         # so a sheet written either way imports.
+        # The tier can be left out of the sheet entirely: it is derived from
+        # the largest single platform, the same rule the dashboard applies as
+        # you type. An explicit tier still wins, so a judgement call survives
+        # an import.
         plat_raw = cell("platform").lower()
         platform = PLATFORMS.get(plat_raw, "")
         has_links = any(cell(col) for col in PROFILE_COLUMNS)
@@ -311,6 +315,20 @@ def parse(data: bytes, filename: str):
         listed = db.split_profiles(stored)
         if followers is None:
             followers = db.total_followers(listed)
+
+        # Tier from the biggest single platform, not the total: a creator with
+        # 30K on each of four platforms has four Micro audiences, not a Macro
+        # one. Only when the sheet did not say.
+        if not tier:
+            counts = [x["followers"] for x in listed if x.get("followers")]
+            derived = db.tier_for_reach(max(counts)) if counts else None
+            if not derived:
+                errors.append(
+                    "Row " + str(n) + " (" + person + "): no tier, and no "
+                    "follower count to work one out from. Give a tier, or put "
+                    "followers against at least one platform.")
+                continue
+            tier = derived
 
         rows.append({
             "_row": n,

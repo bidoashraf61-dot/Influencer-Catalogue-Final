@@ -139,7 +139,7 @@ border:1px solid var(--line);border-radius:9px;background:var(--white)}
 .rsearch input:focus{outline:none;border-color:var(--ink)}
 .tier-row{display:grid;gap:12px;align-items:end;padding:12px 0;
 border-bottom:1px solid var(--line);
-grid-template-columns:minmax(120px,1.4fr) 76px 110px 110px minmax(110px,1fr) 68px auto}
+grid-template-columns:minmax(110px,1.1fr) 70px 96px 96px minmax(96px,1fr) 100px 100px 58px auto}
 .tier-row:last-of-type{border-bottom:0}
 .tier-row input{font:inherit;font-size:15px;padding:9px 11px;width:100%;
 border:1px solid var(--line);border-radius:9px;background:var(--white);
@@ -744,9 +744,17 @@ def tier_row(t, count):
         "<div><label for='t" + ident + "'>Price to</label>"
         "<input id='t" + ident + "' name='price_to' value='" + str(t["price_to"])
         + "' inputmode='numeric' required></div>"
-        "<div><label for='r" + ident + "'>Reach</label>"
+        "<div><label for='r" + ident + "'>Reach label</label>"
         "<input id='r" + ident + "' name='reach' value='" + e(t["reach"] or "")
         + "' placeholder='10K – 50K'></div>"
+        "<div><label for='rf" + ident + "'>Reach from</label>"
+        "<input id='rf" + ident + "' name='reach_from' value='"
+        + (str(t["reach_from"]) if t["reach_from"] is not None else "")
+        + "' inputmode='numeric' placeholder='10000'></div>"
+        "<div><label for='rt" + ident + "'>Reach to</label>"
+        "<input id='rt" + ident + "' name='reach_to' value='"
+        + (str(t["reach_to"]) if t["reach_to"] is not None else "")
+        + "' inputmode='numeric' placeholder='blank = no ceiling'></div>"
         "<div><label for='s" + ident + "'>Order</label>"
         "<input id='s" + ident + "' name='sort' value='" + str(t["sort"])
         + "' size='2'></div>"
@@ -766,9 +774,12 @@ def tiers_section(tiers, used):
         "and in the quote.</p>"
         "<p class='sub' style='margin-bottom:18px'><strong>Code</strong> is the "
         "middle of a creator code — the <code>MI</code> in <code>HV-MI-007</code> "
-        "— and is used when the next code is assigned. <strong>Reach</strong> is "
-        "the follower range shown on the catalogue ticker. <strong>Order</strong> "
-        "sets the order tiers appear in, smallest first.</p>"
+        "— and is used when the next code is assigned. <strong>Reach label</strong> "
+        "is the text shown on the catalogue ticker; <strong>Reach from/to</strong> "
+        "are that same band as numbers, and are what places a creator in a tier "
+        "from their largest platform. Leave <em>Reach to</em> empty on the top "
+        "tier so it has no ceiling. <strong>Order</strong> sets the order tiers "
+        "appear in, smallest first.</p>"
         + rows
         + "<h3 style='margin:22px 0 10px;font-size:15px'>Add a tier</h3>"
         "<form method='post' action='" + u("/tiers/save") + "' class='tier-row'>"
@@ -779,7 +790,11 @@ def tiers_section(tiers, used):
         "required></div>"
         "<div><label>Price to</label><input name='price_to' inputmode='numeric' "
         "required></div>"
-        "<div><label>Reach</label><input name='reach' placeholder='1M+'></div>"
+        "<div><label>Reach label</label><input name='reach' placeholder='1M+'></div>"
+        "<div><label>Reach from</label><input name='reach_from' "
+        "inputmode='numeric' placeholder='1000000'></div>"
+        "<div><label>Reach to</label><input name='reach_to' "
+        "inputmode='numeric' placeholder='blank = no ceiling'></div>"
         "<div><label>Order</label><input name='sort' value='5' size='2'></div>"
         "<div class='tier-act'><button class='btn'>Add tier</button></div>"
         "</form></div>")
@@ -839,6 +854,7 @@ def profile_field(c):
             + "".join(out)
             + "<button type='button' class='btn small ghost' onclick=\"" + add
             + "\">+ Add another profile</button>"
+            "<div class='muted reach-note' style='margin-top:8px;font-size:13px'></div>"
             "</div></div>")
 
 
@@ -891,6 +907,75 @@ def city_field(c, cities):
             "<div class='ticks'>" + boxes + "</div>"
             "<input name='city_new' value='' placeholder='Add a city, or several "
             "separated by commas'></div>")
+
+
+def reach_script(bands):
+    """Sum the per-platform followers, and pick the tier from the largest one.
+
+    The total is the sum because that is what "total reach" means. The TIER is
+    not: a creator with 30K on each of four platforms has four Micro audiences,
+    not one Macro one. Reach is how far a single post travels, and no post
+    reaches the total — so the band is chosen by the biggest single platform.
+
+    The bands are printed here from the database rather than hard-coded, so
+    editing a tier's Reach from/to changes this immediately.
+    """
+    return ("<script>window.HV_BANDS=" + json.dumps(
+        [{"name": name, "from": low, "to": high} for name, low, high in bands])
+        + ";" + """
+(function(){
+  function num(el){ var v=(el.value||"").replace(/[^0-9]/g,""); return v?parseInt(v,10):0; }
+  function tierFor(n){
+    if(!n) return null;
+    var bands=window.HV_BANDS||[], best=null;
+    for(var i=0;i<bands.length;i++){
+      var b=bands[i], lo=b.from||0;
+      if(n>=lo && (b.to==null || n<b.to)) return b.name;
+      if(n>=lo) best=b.name;              // above every band: the largest tier
+    }
+    return best;
+  }
+  function recalc(form){
+    var rows=form.querySelectorAll(".prow"), total=0, biggest=0, any=false;
+    for(var i=0;i<rows.length;i++){
+      var f=rows[i].querySelector("input[name=p_followers]");
+      var url=rows[i].querySelector("input[name=p_url]");
+      if(!f||!url||!url.value.trim()) continue;
+      var v=num(f);
+      if(v>0){ any=true; total+=v; if(v>biggest) biggest=v; }
+    }
+    var headline=form.querySelector("input[name=followers]");
+    if(headline && any){
+      headline.value=total.toLocaleString("en-US");
+      headline.setAttribute("data-auto","1");
+    }
+    var tier=form.querySelector("select[name=tier]");
+    var want=tierFor(biggest);
+    if(tier && want){
+      for(var j=0;j<tier.options.length;j++){
+        if(tier.options[j].value===want||tier.options[j].text===want){
+          tier.selectedIndex=j; break;
+        }
+      }
+    }
+    var note=form.querySelector(".reach-note");
+    if(note){
+      note.textContent = any
+        ? ("Total " + total.toLocaleString("en-US") +
+           " across " + (biggest?("platforms; largest is " +
+           biggest.toLocaleString("en-US") + ", so the tier is " + (want||"—")):"") + ".")
+        : "";
+    }
+  }
+  document.addEventListener("input", function(e){
+    if(!e.target.name) return;
+    if(e.target.name!=="p_followers" && e.target.name!=="p_url") return;
+    var form=e.target.closest("form"); if(form) recalc(form);
+  });
+  // a row added by "+ Add another profile" is covered: the listener is on the
+  // document, not on the inputs that existed when the page loaded.
+})();
+</script>""")
 
 
 def creator_form(c, cities=None, tiers=None, interests=None):
@@ -963,7 +1048,8 @@ def creator_form(c, cities=None, tiers=None, interests=None):
         + "</div>"
         + profile_field(c)
         + "<div class='row'>"
-        + "<div><label>Followers</label><input name='followers' value='" + val("followers") + "'></div>"
+        + "<div><label>Followers (total)</label><input name='followers' value='"
+        + val("followers") + "' title='Filled in from the platforms above'></div>"
         + "<div><label>Tier</label><select name='tier'>" + tier_opts + "</select></div>"
         + city_field(c, cities)
         + "<div><label>Nationality</label><input name='nationality' value='"
@@ -982,7 +1068,8 @@ def creator_form(c, cities=None, tiers=None, interests=None):
 
 
 def roster_page(creators, error=None, message=None, cities=None, tiers=None,
-                nationalities=None, interests=None, editing=None, q=""):
+                nationalities=None, interests=None, editing=None, q="",
+                bands=None):
     tiers = tiers or []
     tier_names = [t["name"] for t in tiers]
     used = {}
@@ -1042,6 +1129,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
 
     body = (
         suggestions
+        + reach_script(bands or [])
         + "<h1>Roster</h1><p class='sub'>" + str(len(creators))
         + " creators. Hidden ones stay in the database but never reach a client.</p>" + err
         + "<h2>Add a creator</h2><div class='card'>"

@@ -260,7 +260,8 @@ class Handler(BaseHTTPRequestHandler):
                 nationalities=db.known_nationalities(),
                 interests=db.known_interests(),
                 editing=(query.get("edit") or "").strip().upper() or None,
-                q=(query.get("q") or "").strip()))
+                q=(query.get("q") or "").strip(),
+                bands=db.tier_bands()))
         if path == "/roster/export":
             return self.send(200, self.roster_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition",
@@ -666,8 +667,12 @@ class Handler(BaseHTTPRequestHandler):
             if db.get_tier(name):
                 return bad("There is already a tier called " + name + ".")
             db.rename_tier(was, name)
+        rf = (f.get("reach_from") or "").replace(",", "").strip()
+        rt = (f.get("reach_to") or "").replace(",", "").strip()
         db.save_tier(name, code, lo, hi, reach,
-                     int(sort) if sort.lstrip("-").isdigit() else 0)
+                     int(sort) if sort.lstrip("-").isdigit() else 0,
+                     int(rf) if rf.isdigit() else None,
+                     int(rt) if rt.isdigit() else None)
         return self.redirect("/roster?ok=" + urllib.parse.quote(
             "Tier " + name + " saved at " + format(lo, ",") + " – "
             + format(hi, ",") + " SAR."))

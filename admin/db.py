@@ -49,6 +49,8 @@ CREATE TABLE IF NOT EXISTS tiers (
   price_from  INTEGER NOT NULL,
   price_to    INTEGER NOT NULL,
   reach       TEXT,                     -- "10K – 50K", shown on the ticker
+  reach_from  INTEGER,                  -- the same band as numbers, so a
+  reach_to    INTEGER,                  -- follower count can be placed in it
   sort        INTEGER NOT NULL DEFAULT 0
 );
 
@@ -158,6 +160,20 @@ def migrate(conn):
         items[0]["followers"] = r["followers"]
         conn.execute("UPDATE creators SET profiles = ? WHERE code = ?",
                      (join_profiles(items), r["code"]))
+
+    # Existing tiers have a reach as prose only. Give them numbers once, read
+    # off the text they already carry, so a follower count can be placed in a
+    # band. After this the numbers are the truth.
+    tier_cols = {r["name"] for r in conn.execute("PRAGMA table_info(tiers)")}
+    if "reach_from" not in tier_cols:
+        conn.execute("ALTER TABLE tiers ADD COLUMN reach_from INTEGER")
+        conn.execute("ALTER TABLE tiers ADD COLUMN reach_to INTEGER")
+        for r in conn.execute("SELECT name, reach FROM tiers").fetchall():
+            low, high = parse_reach(r["reach"])
+            if low is not None or high is not None:
+                conn.execute(
+                    "UPDATE tiers SET reach_from = ?, reach_to = ? WHERE name = ?",
+                    (low, high, r["name"]))
 
     seed_tiers(conn)
 
@@ -572,11 +588,28 @@ def upsert_creator(c):
 # The four the roster shipped with. Only ever used to fill an empty table —
 # once a tier is in the database, that row is the truth and this is history.
 SEED_TIERS = [
-    ("Nano",     "NA", 435,  870,  "Under 10K",   1),
-    ("Micro",    "MI", 870,  1740, "10K – 50K",   2),
-    ("Mid-Tier", "MD", 1450, 2900, "50K – 500K",  3),
-    ("Macro",    "MC", 2175, 4350, "500K – 1M",   4),
+    ("Nano",     "NA", 435,  870,  "Under 10K",   1, 0,      10000),
+    ("Micro",    "MI", 870,  1740, "10K – 50K",   2, 10000,  50000),
+    ("Mid-Tier", "MD", 1450, 2900, "50K – 500K",  3, 50000,  500000),
+    ("Macro",    "MC", 2175, 4350, "500K – 1M",   4, 500000, None),
 ]
+
+
+def parse_reach(text):
+    """"10K – 50K" -> (10000, 50000). Used once, to give the existing rows
+    numbers; after that the numbers are the truth and this is not consulted."""
+    import re as _re
+    found = []
+    for raw, suffix in _re.findall(r"(\d+(?:\.\d+)?)\s*([KkMm]?)", str(text or "")):
+        value = float(raw) * {"k": 1000, "m": 1000000}.get(suffix.lower(), 1)
+        found.append(int(value))
+    if not found:
+        return (None, None)
+    if len(found) == 1:
+        # "Under 10K" is a ceiling; "1M+" is a floor.
+        return (None, found[0]) if _re.search(r"under|below|<", str(text), _re.I) \
+            else (found[0], None)
+    return (found[0], found[1])
 
 
 def seed_tiers(conn=None):
@@ -586,8 +619,8 @@ def seed_tiers(conn=None):
         if conn.execute("SELECT COUNT(*) c FROM tiers").fetchone()["c"]:
             return
         conn.executemany(
-            "INSERT INTO tiers (name,code,price_from,price_to,reach,sort) "
-            "VALUES (?,?,?,?,?,?)", SEED_TIERS)
+            "INSERT INTO tiers (name,code,price_from,price_to,reach,sort,"
+            "reach_from,reach_to) VALUES (?,?,?,?,?,?,?,?)", SEED_TIERS)
     finally:
         if own:
             conn.commit(); conn.close()
@@ -710,14 +743,45 @@ def tier_names():
     return [t["name"] for t in list_tiers()]
 
 
-def save_tier(name, code, price_from, price_to, reach=None, sort=0):
+def save_tier(name, code, price_from, price_to, reach=None, sort=0,
+              reach_from=None, reach_to=None):
     with connect() as conn:
         conn.execute(
-            "INSERT INTO tiers (name,code,price_from,price_to,reach,sort) "
-            "VALUES (?,?,?,?,?,?) ON CONFLICT(name) DO UPDATE SET "
+            "INSERT INTO tiers (name,code,price_from,price_to,reach,sort,"
+            "reach_from,reach_to) VALUES (?,?,?,?,?,?,?,?) "
+            "ON CONFLICT(name) DO UPDATE SET "
             " code=excluded.code, price_from=excluded.price_from, "
-            " price_to=excluded.price_to, reach=excluded.reach, sort=excluded.sort",
-            (name, code, price_from, price_to, reach, sort))
+            " price_to=excluded.price_to, reach=excluded.reach, "
+            " sort=excluded.sort, reach_from=excluded.reach_from, "
+            " reach_to=excluded.reach_to",
+            (name, code, price_from, price_to, reach, sort, reach_from, reach_to))
+
+
+def tier_bands():
+    """[(name, from, to)] ordered smallest first — what a follower count is
+    placed against, in the browser and on the server alike."""
+    return [(t["name"], t["reach_from"], t["reach_to"])
+            for t in list_tiers()
+            if t["reach_from"] is not None or t["reach_to"] is not None]
+
+
+def tier_for_reach(count):
+    """The tier a creator belongs in, from their BIGGEST single platform.
+
+    Not the sum: a creator with 30K on each of four platforms is four Micro
+    audiences, not one Macro one. Reach is about how far a single post travels,
+    and no post reaches the total.
+    """
+    if not count:
+        return None
+    best = None
+    for name, low, high in tier_bands():
+        low = low or 0
+        if count >= low and (high is None or count < high):
+            return name
+        if count >= low:
+            best = name           # above every band: the largest tier
+    return best
 
 
 def rename_tier(old, new):
