@@ -143,6 +143,7 @@ color:var(--ink);min-height:40px;box-sizing:border-box}
 .tier-act{grid-column:1/-1}}
 .profiles{grid-column:1/-1}
 .prow{display:grid;grid-template-columns:150px 1fr 130px;gap:10px;margin-bottom:8px}
+.profiles>button{margin-top:2px}
 .prow select,.prow input{font:inherit;font-size:15px;padding:9px 11px;width:100%;
 border:1px solid var(--line);border-radius:9px;background:var(--white);
 color:var(--ink);min-height:40px;box-sizing:border-box}
@@ -779,8 +780,9 @@ def profile_field(c):
     Pasting what is in the address bar always works.
     """
     rows = split_profiles(c["profiles"] if c is not None else None)
-    # Two spare rows, so adding a platform never needs a save-and-reopen.
-    slots = rows + [{"platform": "", "url": ""}, {"platform": "", "url": ""}]
+    # One blank row to start, and a button for the rest. Two fixed spares meant
+    # a creator on four platforms had to be saved and reopened twice.
+    slots = rows + [{"platform": "", "url": "", "followers": None}]
 
     out = []
     for row in slots:
@@ -800,14 +802,30 @@ def profile_field(c):
             + "' placeholder='followers' inputmode='numeric'>"
             "</div>")
 
+    # Clones the last row rather than carrying a template string: the row's
+    # markup is written once, above, so the two cannot drift apart.
+    add = (
+        "var box=this.parentNode;"
+        "var rows=box.querySelectorAll('.prow');"
+        "var row=rows[rows.length-1].cloneNode(true);"
+        "var f=row.querySelectorAll('input');"
+        "for(var i=0;i<f.length;i++){f[i].value='';}"
+        "row.querySelector('select').selectedIndex=0;"
+        "box.insertBefore(row,this);"
+        "row.querySelector('select').focus();")
+
     return ("<div class='row'><div class='profiles'>"
             "<label>Profiles</label>"
-            "<div class='muted' style='margin:0 0 10px;font-size:13px'>Paste the "
-            "full link to each profile, and the followers on it. Leave a row "
-            "blank to skip it; clearing a row removes that platform. The "
-            "Followers field below is the headline figure — leave it empty and "
+            "<div class='muted' style='margin:0 0 10px;font-size:13px'>Pick the "
+            "platform, paste the full link, and put the followers on that "
+            "profile. Add a row for each one — the same platform twice is fine "
+            "if a creator runs two accounts. Clearing a row removes it. The "
+            "Followers field below is the headline figure: leave it empty and "
             "it is the sum of these.</div>"
-            + "".join(out) + "</div></div>")
+            + "".join(out)
+            + "<button type='button' class='btn small ghost' onclick=\"" + add
+            + "\">+ Add another profile</button>"
+            "</div></div>")
 
 
 def city_field(c, cities):
