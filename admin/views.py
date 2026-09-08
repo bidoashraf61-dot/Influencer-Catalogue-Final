@@ -978,7 +978,7 @@ def reach_script(bands):
 </script>""")
 
 
-def creator_form(c, cities=None, tiers=None, interests=None):
+def creator_form(c, cities=None, tiers=None, interests=None, q=""):
     """Add/edit form. `c` is None when adding a new creator.
 
     `cities` is every city already on the roster. Checkboxes rather than a
@@ -1040,9 +1040,24 @@ def creator_form(c, cities=None, tiers=None, interests=None):
             + "' onsubmit=\"" + confirm + "\"><input type='hidden' name='code' value='"
             + e(c["code"]) + "'></form>")
 
+    # Two things the form has to carry back with it. `q` is the search that was
+    # running when the editor was opened, so the save can return to that same
+    # view instead of the top of the unfiltered roster. `prev_updated` is what
+    # this form was built from, so a save that would overwrite someone else's
+    # newer edit can be refused instead of silently winning.
+    try:
+        stamp = str(c["updated_at"] or "") if c is not None else ""
+    except (IndexError, KeyError):
+        stamp = ""
+    carried = "<input type='hidden' name='q' value='" + e(q or "") + "'>"
+    if stamp:
+        carried += "<input type='hidden' name='prev_updated' value='" + e(stamp) + "'>"
+
     return (
         "<form method='post' action='" + u("/roster/save") + "' enctype='multipart/form-data' "
-        "style='margin-top:12px'><div class='row'>"
+        "style='margin-top:12px'>"
+        + carried
+        + "<div class='row'>"
         + code_field
         + "<div><label>Name</label><input name='name' value='" + val("name") + "' required></div>"
         + "</div>"
@@ -1115,7 +1130,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         # 4.2MB and 27,600, which is the lag.
         if open_now:
             out += ("<tr class='editrow'><td colspan='8'>"
-                    + creator_form(c, cities, tier_names, interests)
+                    + creator_form(c, cities, tier_names, interests, q)
                     + "</td></tr>")
         return out
 
@@ -1133,7 +1148,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + "<h1>Roster</h1><p class='sub'>" + str(len(creators))
         + " creators. Hidden ones stay in the database but never reach a client.</p>" + err
         + "<h2>Add a creator</h2><div class='card'>"
-        + creator_form(None, cities, tier_names, interests) + "</div>"
+        + creator_form(None, cities, tier_names, interests, q) + "</div>"
         + "<h2>Import a spreadsheet</h2><div class='card'>"
         + "<p class='sub' style='margin-bottom:16px'>Add many creators at once. "
           "Start from the template so the headings match — a code left blank is "

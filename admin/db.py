@@ -12,6 +12,7 @@ import json
 import secrets
 import sqlite3
 import time
+from contextlib import contextmanager
 from pathlib import Path
 
 DB_PATH = Path(__file__).resolve().parent / "catalogue.db"
@@ -108,11 +109,27 @@ CREATE TABLE IF NOT EXISTS sessions (
 """
 
 
+@contextmanager
 def connect():
+    """A connection that is committed AND closed when the block ends.
+
+    sqlite3's own `with conn:` manages the transaction, not the handle: it
+    commits and leaves the connection open. Thirty-five call sites here read
+    as if they closed it, so descriptors piled up until the garbage collector
+    happened to sweep them — measured at 68 still open after 91 reads. The
+    inner `with conn` keeps the commit/rollback every caller already relies on;
+    the finally closes the handle.
+
+    Pass the yielded connection down to do several writes in ONE transaction.
+    """
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
-    return conn
+    try:
+        with conn:
+            yield conn
+    finally:
+        conn.close()
 
 
 def init():
@@ -160,6 +177,14 @@ def migrate(conn):
         items[0]["followers"] = r["followers"]
         conn.execute("UPDATE creators SET profiles = ? WHERE code = ?",
                      (join_profiles(items), r["code"]))
+
+    # Two people editing the same creator used to end with the slower save
+    # silently overwriting the faster one. The column is what a form is checked
+    # against; existing rows are stamped now so the guard works immediately
+    # rather than only for rows touched after this.
+    if "updated_at" not in cols:
+        conn.execute("ALTER TABLE creators ADD COLUMN updated_at INTEGER")
+        conn.execute("UPDATE creators SET updated_at = ?", (now(),))
 
     # Existing tiers have a reach as prose only. Give them numbers once, read
     # off the text they already carry, so a follower count can be placed in a
@@ -567,22 +592,29 @@ def known_cities():
     return [c for c, _ in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0].lower()))]
 
 
-def upsert_creator(c):
-    with connect() as conn:
-        conn.execute(
-            "INSERT INTO creators (code,name,handle,platform,followers,city,"
-            "nationality,tier,interest,photo,profiles,active,note,sort) "
-            "VALUES (:code,:name,:handle,:platform,:followers,:city,"
-            ":nationality,:tier,:interest,:photo,:profiles,:active,:note,:sort) "
-            "ON CONFLICT(code) DO UPDATE SET "
-            " name=excluded.name, handle=excluded.handle, platform=excluded.platform, "
-            " followers=excluded.followers, city=excluded.city, "
-             " nationality=excluded.nationality, tier=excluded.tier, "
-            " interest=excluded.interest, photo=excluded.photo, "
-             " profiles=excluded.profiles, active=excluded.active, "
-            " note=excluded.note, sort=excluded.sort",
-            c,
-        )
+def upsert_creator(c, conn=None):
+    if conn is None:
+        with connect() as own:
+            return upsert_creator(c, own)
+    # Stamped here rather than by each caller, so no write can forget it and
+    # leave a record the staleness check cannot protect.
+    c = dict(c, updated_at=now())
+    conn.execute(
+        "INSERT INTO creators (code,name,handle,platform,followers,city,"
+        "nationality,tier,interest,photo,profiles,active,note,sort,updated_at) "
+        "VALUES (:code,:name,:handle,:platform,:followers,:city,"
+        ":nationality,:tier,:interest,:photo,:profiles,:active,:note,:sort,"
+        ":updated_at) "
+        "ON CONFLICT(code) DO UPDATE SET "
+        " name=excluded.name, handle=excluded.handle, platform=excluded.platform, "
+        " followers=excluded.followers, city=excluded.city, "
+        " nationality=excluded.nationality, tier=excluded.tier, "
+        " interest=excluded.interest, photo=excluded.photo, "
+        " profiles=excluded.profiles, active=excluded.active, "
+        " note=excluded.note, sort=excluded.sort, "
+        " updated_at=excluded.updated_at",
+        c,
+    )
 
 
 # The four the roster shipped with. Only ever used to fill an empty table —
@@ -613,17 +645,14 @@ def parse_reach(text):
 
 
 def seed_tiers(conn=None):
-    own = conn is None
-    conn = conn or connect().__enter__()
-    try:
-        if conn.execute("SELECT COUNT(*) c FROM tiers").fetchone()["c"]:
-            return
-        conn.executemany(
-            "INSERT INTO tiers (name,code,price_from,price_to,reach,sort,"
-            "reach_from,reach_to) VALUES (?,?,?,?,?,?,?,?)", SEED_TIERS)
-    finally:
-        if own:
-            conn.commit(); conn.close()
+    if conn is None:
+        with connect() as own:
+            return seed_tiers(own)
+    if conn.execute("SELECT COUNT(*) c FROM tiers").fetchone()["c"]:
+        return
+    conn.executemany(
+        "INSERT INTO tiers (name,code,price_from,price_to,reach,sort,"
+        "reach_from,reach_to) VALUES (?,?,?,?,?,?,?,?)", SEED_TIERS)
 
 
 def list_tiers():
@@ -691,31 +720,46 @@ def split_profiles(raw):
             continue
         url = (item.get("url") or "").strip()
         platform = (item.get("platform") or "").strip()
-        if url and platform:
+        followers = as_count(item.get("followers"))
+        # Mirrors join_profiles: a platform with a number but no link yet is a
+        # real row, and dropping it on read would hide it just as effectively
+        # as dropping it on write did.
+        if platform and (url or followers):
             out.append({"platform": platform, "url": url,
-                        "followers": as_count(item.get("followers"))})
+                        "followers": followers})
     return out
 
 
 def join_profiles(items):
+    """Rows -> stored JSON. A row survives on a platform plus EITHER a link or
+    a follower count.
+
+    Requiring both used to throw the row away in silence: pick Snapchat, type
+    40,000, save without pasting the link, and the number was gone with no
+    error and a successful-looking save. The count is the valuable half — the
+    link can be pasted later — so a row carrying one is kept.
+    """
     clean, seen = [], set()
     for item in items or []:
         url = (item.get("url") or "").strip()
         platform = (item.get("platform") or "").strip()
-        if not url or not platform:
+        followers = as_count(item.get("followers"))
+        if not platform or (not url and not followers):
             continue
-        if not url.lower().startswith(("http://", "https://")):
+        if url and not url.lower().startswith(("http://", "https://")):
             url = "https://" + url.lstrip("/")
         # Deduplicated by LINK, not by platform. A creator can run two
         # Instagram accounts — a personal one and a brand one, or English and
         # Arabic — and refusing the second was an assumption, not a rule. The
-        # same link twice is still a slip.
-        key = url.rstrip("/").lower()
-        if key in seen:
-            continue
-        seen.add(key)
+        # same link twice is still a slip. A row with no link yet cannot
+        # collide with anything, so it is never deduplicated away.
+        if url:
+            key = url.rstrip("/").lower()
+            if key in seen:
+                continue
+            seen.add(key)
         clean.append({"platform": platform, "url": url,
-                      "followers": as_count(item.get("followers"))})
+                      "followers": followers})
     return json.dumps(clean, ensure_ascii=False) if clean else None
 
 
@@ -805,7 +849,7 @@ def delete_tier(name):
         return 0
 
 
-def next_code(tier, prefix="HV"):
+def next_code(tier, prefix="HV", conn=None):
     """The next free code for a tier, e.g. HV-NA-029.
 
     Derived from what is already in the database rather than from a counter, so
@@ -813,11 +857,13 @@ def next_code(tier, prefix="HV"):
     creator at once — the UNIQUE constraint on the primary key is the backstop,
     and the caller retries.
     """
-    row = get_tier(tier)
+    if conn is None:
+        with connect() as own:
+            return next_code(tier, prefix, own)
+    row = conn.execute("SELECT * FROM tiers WHERE name = ?", (tier,)).fetchone()
     part = row["code"] if row else "XX"
     like = prefix + "-" + part + "-%"
-    with connect() as conn:
-        rows = conn.execute("SELECT code FROM creators WHERE code LIKE ?", (like,)).fetchall()
+    rows = conn.execute("SELECT code FROM creators WHERE code LIKE ?", (like,)).fetchall()
     highest = 0
     for r in rows:
         tail = r["code"].rsplit("-", 1)[-1]
@@ -852,9 +898,11 @@ def list_creators(active_only=False, search=None):
         return conn.execute(q, args).fetchall()
 
 
-def creator(code):
-    with connect() as conn:
-        return conn.execute("SELECT * FROM creators WHERE code = ?", (code,)).fetchone()
+def creator(code, conn=None):
+    if conn is None:
+        with connect() as own:
+            return creator(code, own)
+    return conn.execute("SELECT * FROM creators WHERE code = ?", (code,)).fetchone()
 
 
 def delete_creator(code):

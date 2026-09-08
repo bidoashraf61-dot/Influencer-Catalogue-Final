@@ -32,6 +32,7 @@ import sys
 import time
 import urllib.parse
 from datetime import datetime, timezone
+from email.utils import formatdate
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -220,8 +221,20 @@ class Handler(BaseHTTPRequestHandler):
             name = Path(path[len("/photo/"):]).name
             f = PHOTO_DIR / name
             if f.is_file() and f.parent == PHOTO_DIR:
+                # The roster puts 758 of these on one page. "no-cache" with no
+                # validator left the browser nothing to revalidate against, so
+                # every photo was fetched in full on every visit — 21.1 MB a
+                # page load, and the wait that produced the broken pipes in the
+                # log. With an ETag the same request costs an empty 304.
+                st = f.stat()
+                tag = '"%x-%x"' % (int(st.st_mtime), st.st_size)
+                if self.headers.get("If-None-Match") == tag:
+                    return self.send(304, b"", "image/jpeg",
+                                     [("ETag", tag), ("Cache-Control", "no-cache")])
                 return self.send(200, f.read_bytes(), "image/jpeg",
-                                 [("Cache-Control", "no-cache")])
+                                 [("ETag", tag),
+                                  ("Last-Modified", formatdate(st.st_mtime, usegmt=True)),
+                                  ("Cache-Control", "no-cache")])
             return self.send(404, b"", "text/plain")
         if path == "/login":
             return self.send(200, views.login_page(query.get("e"), BASE))
@@ -392,6 +405,15 @@ class Handler(BaseHTTPRequestHandler):
                     "Could not assign a code — try again."))
 
         existing = db.creator(code)
+        # A form opened before someone else saved must not write its older
+        # values back over the newer ones. Adding has nothing to compare to.
+        seen_at = (f.get("prev_updated") or "").strip()
+        if existing is not None and seen_at:
+            current = str(existing["updated_at"] or "")
+            if current and current != seen_at:
+                return self.redirect("/roster?e=" + urllib.parse.quote(
+                    code + " was changed somewhere else while this form was open. "
+                    "Nothing was overwritten — open it again and redo the change."))
         photo = (existing["photo"] if existing else None)
         saved, err = uploads.save_photo(f.get("photo_file"), code, PHOTO_DIR)
         if saved:
@@ -412,15 +434,19 @@ class Handler(BaseHTTPRequestHandler):
         platforms = list(f.get("p_platform") or [])
         urls = list(f.get("p_url") or [])
         counts = list(f.get("p_followers") or [])
-        for i, url in enumerate(urls):
-            platform = platforms[i] if i < len(platforms) else ""
-            url = (url or "").strip()
-            if not url or not platform:
+        # A row counts if it names a platform and carries EITHER a link or a
+        # follower count. Demanding both threw the count away in silence: pick
+        # Snapchat, type 40,000, save without pasting the link, and the number
+        # was gone with the save still reporting success.
+        for i in range(max(len(urls), len(platforms), len(counts))):
+            platform = (platforms[i] if i < len(platforms) else "").strip()
+            url = (urls[i] if i < len(urls) else "").strip()
+            count = counts[i] if i < len(counts) else None
+            if not platform or (not url and not str(count or "").strip()):
                 continue
-            if "/" not in url and "." not in url:
+            if url and "/" not in url and "." not in url:
                 url = db.profile_url(platform, url) or url
-            pairs.append({"platform": platform, "url": url,
-                          "followers": counts[i] if i < len(counts) else None})
+            pairs.append({"platform": platform, "url": url, "followers": count})
         profiles = db.join_profiles(pairs)
         listed = db.split_profiles(profiles)
 
@@ -430,7 +456,10 @@ class Handler(BaseHTTPRequestHandler):
             # as columns because photos are matched by handle and the whole
             # catalogue filters on platform, and deriving them means the two
             # can never disagree with the links actually shown.
-            "handle": db.handle_from_url(listed[0]["url"]) if listed else "",
+            # The first row that actually has a link: a row may now be a
+            # platform and a number while the link is still to come.
+            "handle": db.handle_from_url(
+                next((p["url"] for p in listed if p.get("url")), "")),
             "platform": db.join_cities([p["platform"] for p in listed]) or "Instagram",
             "profiles": profiles,
             "name": (f.get("name") or "").strip(),
@@ -454,7 +483,15 @@ class Handler(BaseHTTPRequestHandler):
             "note": (f.get("note") or "").strip() or None,
             "sort": int(f["sort"]) if (f.get("sort") or "").isdigit() else 0,
         })
-        return self.redirect("/roster")
+        # Back to the view the edit was made from. Redirecting to a bare
+        # /roster cleared the search and returned to the top of an unpaginated
+        # 759-row list, so a saved creator was nowhere on screen — which reads
+        # exactly like the edit having been lost.
+        back = "/roster"
+        keep = (f.get("q") or "").strip()
+        if keep:
+            back += "?" + urllib.parse.urlencode({"q": keep})
+        return self.redirect(back + "#" + code)
 
     def post_roster_import(self):
         part = self.form_body().get("sheet")
@@ -478,31 +515,37 @@ class Handler(BaseHTTPRequestHandler):
 
         added = updated = attached = 0
         bad_photos = []
-        for i, r in enumerate(rows):
-            code = r["code"]
-            if code and db.creator(code):
-                updated += 1
-            else:
-                if not code:
-                    code = db.next_code(r["tier"])
-                added += 1
-
-            existing = db.creator(code)
-            # An existing photo survives a re-import; a picture on the sheet
-            # replaces it, because putting one there is an explicit act.
-            photo = existing["photo"] if (existing and existing["photo"]) else None
-            raw = photos.get(r.get("_row"))
-            if raw:
-                ok, why = uploads.photo_bytes(raw)
-                if ok:
-                    photo = uploads.write_photo(raw, code, PHOTO_DIR)
-                    Handler.forget_photo_widths()
-                    attached += 1
+        # One transaction for the whole sheet. Parsing already refuses a file
+        # if any row is wrong, but the writing was row by row, so a failure
+        # partway still left everything before it committed — the half-imported
+        # roster that promise exists to prevent. next_code() reads through the
+        # same connection, so it sees rows added earlier in this very
+        # transaction and cannot hand out a code twice.
+        with db.connect() as conn:
+            for i, r in enumerate(rows):
+                code = r["code"]
+                existing = db.creator(code, conn) if code else None
+                if existing:
+                    updated += 1
                 else:
-                    bad_photos.append("row " + str(r["_row"]) + " (" + why + ")")
+                    if not code:
+                        code = db.next_code(r["tier"], conn=conn)
+                    added += 1
+                # An existing photo survives a re-import; a picture on the sheet
+                # replaces it, because putting one there is an explicit act.
+                photo = existing["photo"] if (existing and existing["photo"]) else None
+                raw = photos.get(r.get("_row"))
+                if raw:
+                    ok, why = uploads.photo_bytes(raw)
+                    if ok:
+                        photo = uploads.write_photo(raw, code, PHOTO_DIR)
+                        Handler.forget_photo_widths()
+                        attached += 1
+                    else:
+                        bad_photos.append("row " + str(r["_row"]) + " (" + why + ")")
 
-            fields = {k: v for k, v in r.items() if not k.startswith("_")}
-            db.upsert_creator(dict(fields, code=code, photo=photo, sort=i))
+                fields = {k: v for k, v in r.items() if not k.startswith("_")}
+                db.upsert_creator(dict(fields, code=code, photo=photo, sort=i), conn)
 
         msg = str(added) + " added, " + str(updated) + " updated."
         if attached:
