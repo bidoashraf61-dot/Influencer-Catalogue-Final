@@ -121,16 +121,65 @@ def template_csv():
 
 
 def template_xlsx():
-    """The same template as an .xlsx, which is the only format that can carry
-    pictures. Written with the stdlib, so there is nothing to install."""
+    """The template as an .xlsx — the only format that can carry pictures, and
+    the only one that can carry dropdowns.
+
+    A spreadsheet cell cannot be a set of tick boxes the way the dashboard is.
+    The nearest honest equivalent is Excel's own dropdown, backed by a second
+    sheet listing what the roster actually uses — so the options are visible
+    and a category is picked rather than retyped into a fourth spelling.
+
+    They are offered, not enforced. Interests and cities take several values
+    separated by commas, which no single-select dropdown can express, so a
+    typed cell is still accepted.
+    """
+    tiers = db.tier_names() or ["Nano", "Micro", "Mid-Tier", "Macro"]
+    interests = db.known_interests()
+    cities = db.known_cities()
+    nationalities = db.known_nationalities() or ["Saudi"]
+
     rows = [COLUMNS] + [list(r) for r in TEMPLATE_ROWS]
-    # Column K wide enough to drop a picture into, and the example rows tall
-    # enough that one sits on its own row rather than straddling two.
-    return xlsx.write(rows, sheet_name="Creators",
-                      widths=dict(
-                          [(COLUMNS.index("photo"), 30)]
-                          + [(COLUMNS.index(c), 34) for c in PROFILE_COLUMNS]),
-                      row_heights={2: 60, 3: 60})
+    widths = dict([(COLUMNS.index("photo"), 30), (COLUMNS.index("interest"), 30),
+                   (COLUMNS.index("name"), 22), (COLUMNS.index("city"), 20),
+                   (COLUMNS.index("nationality"), 16),
+                   (COLUMNS.index("note"), 46)]
+                  + [(COLUMNS.index(c), 34) for c in PROFILE_COLUMNS])
+
+    # The reference sheet. The columns are independent lists, so the longest
+    # decides the height and the shorter ones are padded out.
+    lists = [tiers, interests, cities, nationalities,
+             [PROFILE_LABELS[c] for c in PROFILE_COLUMNS], ["yes", "no"]]
+    ref = [["tier", "interest", "city", "nationality", "platform", "active"]]
+    for i in range(max(len(x) for x in lists)):
+        ref.append([(x[i] if i < len(x) else "") for x in lists])
+
+    def letter(index):
+        out, index = "", index + 1
+        while index:
+            index, rem = divmod(index - 1, 26)
+            out = chr(65 + rem) + out
+        return out
+
+    last = len(rows) + 400          # room to paste a whole roster underneath
+
+    def rule(column, ref_col, count):
+        col = letter(COLUMNS.index(column))
+        return (1, "%s2:%s%d" % (col, col, last),
+                "Options!$%s$2:$%s$%d" % (ref_col, ref_col, count + 1))
+
+    validations = [
+        rule("tier", "A", len(tiers)),
+        rule("interest", "B", len(interests)),
+        rule("city", "C", len(cities)),
+        rule("nationality", "D", len(nationalities)),
+        rule("active", "F", 2),
+    ]
+
+    return xlsx.write_book(
+        [("Creators", rows, widths, {2: 60, 3: 60, 4: 60}),
+         ("Options", ref, {0: 14, 1: 20, 2: 18, 3: 18, 4: 16, 5: 10}, {})],
+        validations)
+
 
 
 def _rows_from_xlsx(data):

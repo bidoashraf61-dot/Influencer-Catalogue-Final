@@ -220,6 +220,98 @@ def _ref(col, row):
     return letters + str(row)
 
 
+def write_book(sheets, validations=None):
+    """A workbook of several sheets, with optional dropdown lists.
+
+    `sheets` is [(name, rows, widths, row_heights)]. `validations` is
+    [(sheet_index, "F2:F999", "Options!$A$2:$A$9")] — Excel's own dropdown,
+    which is the closest a spreadsheet gets to the multi-select in the
+    dashboard. They are offered rather than enforced: showErrorMessage is off,
+    so a cell can still hold two categories separated by a comma, which a
+    single-select dropdown could never express.
+    """
+    parts = []
+    for i, (name, rows, widths, heights) in enumerate(sheets, start=1):
+        rules = [v for v in (validations or []) if v[0] == i]
+        parts.append(_sheet_xml(rows, widths, heights, rules))
+
+    types = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+             '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+             '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+             '<Default Extension="xml" ContentType="application/xml"/>'
+             '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
+             + "".join(
+                 '<Override PartName="/xl/worksheets/sheet%d.xml" '
+                 'ContentType="application/vnd.openxmlformats-officedocument.'
+                 'spreadsheetml.worksheet+xml"/>' % i
+                 for i in range(1, len(sheets) + 1))
+             + "</Types>")
+
+    book_rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                 '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                 + "".join(
+                     '<Relationship Id="rId%d" Type="http://schemas.openxmlformats.org/'
+                     'officeDocument/2006/relationships/worksheet" '
+                     'Target="worksheets/sheet%d.xml"/>' % (i, i)
+                     for i in range(1, len(sheets) + 1))
+                 + "</Relationships>")
+
+    book = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            "<sheets>" + "".join(
+                '<sheet name="' + _esc(name) + '" sheetId="%d" r:id="rId%d"/>' % (i, i)
+                for i, (name, _, _, _) in enumerate(sheets, start=1))
+            + "</sheets></workbook>")
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("[Content_Types].xml", types)
+        zf.writestr("_rels/.rels", _ROOT_RELS)
+        zf.writestr("xl/workbook.xml", book)
+        zf.writestr("xl/_rels/workbook.xml.rels", book_rels)
+        for i, xml in enumerate(parts, start=1):
+            zf.writestr("xl/worksheets/sheet%d.xml" % i, xml)
+    return buf.getvalue()
+
+
+def _sheet_xml(rows, widths=None, row_heights=None, rules=()):
+    body = []
+    for r, row in enumerate(rows, start=1):
+        height = (row_heights or {}).get(r)
+        attrs = ' ht="' + str(height) + '" customHeight="1"' if height else ""
+        body.append('<row r="' + str(r) + '"' + attrs + ">")
+        for c, value in enumerate(row):
+            if value is None or value == "":
+                continue
+            body.append('<c r="' + _ref(c, r) + '" t="inlineStr"><is><t xml:space="preserve">'
+                        + _esc(value) + "</t></is></c>")
+        body.append("</row>")
+
+    cols = ""
+    if widths:
+        cols = "<cols>" + "".join(
+            '<col min="' + str(i + 1) + '" max="' + str(i + 1) + '" width="'
+            + str(w) + '" customWidth="1"/>' for i, w in sorted(widths.items())
+        ) + "</cols>"
+
+    # Schema order matters: cols, then sheetData, then dataValidations. Out of
+    # order and Excel calls the file corrupt rather than ignoring the part.
+    valid = ""
+    if rules:
+        valid = ('<dataValidations count="%d">' % len(rules)) + "".join(
+            '<dataValidation type="list" allowBlank="1" showInputMessage="1" '
+            'showErrorMessage="0" sqref="' + _esc(where) + '">'
+            "<formula1>" + _esc(source) + "</formula1></dataValidation>"
+            for _, where, source in rules) + "</dataValidations>"
+
+    return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" '
+            'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'
+            + cols + "<sheetData>" + "".join(body) + "</sheetData>" + valid
+            + "</worksheet>")
+
+
 def write(rows, sheet_name="Sheet1", widths=None, row_heights=None):
     """A workbook of `rows` (lists of values) as bytes.
 
