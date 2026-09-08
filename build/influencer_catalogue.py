@@ -745,7 +745,6 @@ def build():
   <section class="cat-controls" aria-label="Filters">
     <div class="cat-pad"><div class="cat-container">
       {filters}
-      <p class="cat-count" id="cat-count" aria-live="polite">{len(people)} creators</p>
       <p class="cat-note">Pick the creators you want, then review the selection. Costs are quoted for the shortlist as a whole.</p>
     </div></div>
   </section>
