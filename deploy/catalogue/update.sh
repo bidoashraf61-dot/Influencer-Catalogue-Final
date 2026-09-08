@@ -48,6 +48,26 @@ rsync -a --exclude 'catalogue' "$SRC/assets/" "$DST/assets/"
 cp "$SRC/dist/index.html"           "$DST/index.html"
 cp "$SRC/dist/selection/index.html" "$DST/selection/index.html"
 
+# Stamp a ?v=<hash> onto the js/css URLs. The source templates carry one but
+# the dist build drops it, so catalogue.js sits at a URL that never changes —
+# and clients that had already loaded the site kept running an old build for
+# days, showing "Instagram, Snapchat 66" as one chip while the server held the
+# fixed file. The HTML is no-store, so a fresh page always names the current
+# hash and the browser cannot serve a stale copy of a URL it has never seen.
+python3 - "$DST" <<'PYSTAMP'
+import hashlib, re, pathlib, sys
+root = pathlib.Path(sys.argv[1])
+def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
+vjs, vcss = h('assets/js/catalogue.js'), h('assets/css/catalogue.css')
+for page in ('index.html', 'selection/index.html'):
+    f = root / page
+    s = f.read_text()
+    s = re.sub(r'((?:\.\./)?assets/js/catalogue\.js)(\?v=[0-9a-z]+)?', r'\1?v=' + vjs, s)
+    s = re.sub(r'((?:\.\./)?assets/css/catalogue\.css)(\?v=[0-9a-z]+)?', r'\1?v=' + vcss, s)
+    f.write_text(s)
+print("stamped js=%s css=%s" % (vjs, vcss))
+PYSTAMP
+
 # The banner failing is silent by design upstream, so check it here.
 LOGOS=$(grep -o 'cat-clients__logo' "$DST/index.html" | wc -l)
 if [ "$LOGOS" -lt 2 ]; then
