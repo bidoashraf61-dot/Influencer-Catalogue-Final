@@ -273,10 +273,6 @@
     }
     rows.push("<li><span>City</span><strong>" + esc(c.city || "Unspecified") +
               "</strong></li>");
-    if (c.interest) {
-      rows.push("<li><span>Interests</span><strong>" +
-                esc(values(c.interest).join(", ")) + "</strong></li>");
-    }
     rows.push("<li><span>Tier</span><strong>" + esc(label) + "</strong></li>");
     return rows.join("");
   }
@@ -346,7 +342,7 @@
     keys.forEach(function (v) {
       chips += '<button type="button" class="cat-chip" data-filter="' + key +
         '" data-value="' + esc(v) + '" aria-pressed="false">' + esc(v) +
-        " <i>" + counts[v] + "</i></button>";
+        "</button>";
     });
     return '<div class="cat-filter"><span class="cat-filter__label">' + esc(label) +
       '</span><div class="cat-filter__chips">' + chips + "</div></div>";
@@ -385,9 +381,7 @@
       if (Object.keys(interests).length > 1) {
         html += chipGroup("Interest", "interest", interests);
       }
-      var count = $("cat-count");
       controls.insertAdjacentHTML("afterbegin", html);
-      if (count) count.textContent = list.length + " creators";
     }
   }
 
@@ -425,7 +419,10 @@
         card.hidden = !ok;
         if (ok) shown++;
       });
-      $("cat-count").textContent = shown + (shown === 1 ? " creator" : " creators");
+      // How many creators exist, and how many a filter leaves, is commercial
+      // information: it belongs in the dashboard, not on the client page. Only
+      // the empty state is still announced, so a filter that matches nobody
+      // does not read as a broken page.
       $("cat-empty").hidden = shown !== 0;
     }
 
