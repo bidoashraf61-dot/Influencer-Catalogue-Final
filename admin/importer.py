@@ -80,7 +80,35 @@ TEMPLATE_ROWS = [
         tiktok_followers="240000",
         note="several platforms — leave followers blank above and it is the sum",
         active="yes"),
+    _template_row(
+        name="Two accounts, one platform", city="Riyadh", nationality="Saudi",
+        tier="Micro",
+        instagram="https://www.instagram.com/example.en/, "
+                  "https://www.instagram.com/example.ar/",
+        instagram_followers="31000, 18500",
+        note="separate several links in one cell with a comma; followers line "
+             "up in the same order",
+        active="yes"),
 ]
+
+
+MULTI_SPLIT = ",;\u060c\u061b\n\r"
+
+
+def split_multi(text):
+    """One cell holding several values. Commas and semicolons are what people
+    reach for, a line break is what Alt+Enter produces in Excel, and the Arabic
+    pair is here for the same reason the city splitter has them."""
+    out, buf = [], ""
+    for ch in str(text or "") + ",":
+        if ch in MULTI_SPLIT:
+            value = buf.strip()
+            buf = ""
+            if value:
+                out.append(value)
+        else:
+            buf += ch
+    return out
 
 
 def template_csv():
@@ -205,15 +233,23 @@ def parse(data: bytes, filename: str):
             # NOT `raw`: that is the row this closure reads through cell(), and
             # shadowing it made every column after the first read characters
             # out of a string instead of cells out of the row.
-            link = cell(col)
-            if not link:
+            cellval = cell(col)
+            if not cellval:
                 continue
             label = PROFILE_LABELS[col]
-            if "/" not in link and "." not in link:
-                link = db.profile_url(label, link) or link
-            count = cell(col + "_followers").replace(",", "").replace(" ", "")
-            profiles.append({"platform": label, "url": link,
-                             "followers": int(count) if count.isdigit() else None})
+            # A creator can run two accounts on one platform. Rather than a
+            # second column per platform — twelve more headings — one cell
+            # takes several, separated by a comma, semicolon or a line break,
+            # and the followers cell is read the same way, position for
+            # position.
+            links = split_multi(cellval)
+            counts = split_multi(cell(col + "_followers"))
+            for i, link in enumerate(links):
+                if "/" not in link and "." not in link:
+                    link = db.profile_url(label, link) or link
+                count = (counts[i] if i < len(counts) else "").replace(",", "")
+                profiles.append({"platform": label, "url": link,
+                                 "followers": int(count) if count.isdigit() else None})
 
         # An older sheet, with one platform and a handle and no link columns.
         if not profiles and cell("handle"):

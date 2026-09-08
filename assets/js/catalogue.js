@@ -224,12 +224,29 @@
   // would have to pick one or invent a total the client cannot check, so each
   // platform gets its own line and a total appears only when there is more
   // than one to add up.
+  function handleFromUrl(url) {
+    var text = String(url || "").trim().replace(/\/+$/, "").split("?")[0].split("#")[0];
+    return text ? text.split("/").pop().replace(/^@/, "") : "";
+  }
+
   function metaRows(c, label) {
     var counted = (c.profiles || []).filter(function (p) { return p.followers; });
     var rows = [];
     if (counted.length > 1) {
+      // Two accounts on one platform need telling apart, so the handle is
+      // added — but only where it is doing that work, or every row grows a
+      // tail the reader does not need.
+      var repeated = {};
       counted.forEach(function (p) {
-        rows.push("<li><span>" + esc(p.platform) + "</span><strong>" +
+        repeated[p.platform] = (repeated[p.platform] || 0) + 1;
+      });
+      counted.forEach(function (p) {
+        var tag = esc(p.platform);
+        if (repeated[p.platform] > 1) {
+          var who = handleFromUrl(p.url);
+          if (who) tag += " @" + esc(who);
+        }
+        rows.push("<li><span>" + tag + "</span><strong>" +
                   commas(p.followers) + "</strong></li>");
       });
       rows.push("<li><span>Total reach</span><strong>" + commas(c.followers) +

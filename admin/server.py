@@ -599,12 +599,19 @@ class Handler(BaseHTTPRequestHandler):
         w = csv.writer(buf)
         w.writerow(importer.COLUMNS)
         for c in db.list_creators():
-            found = {p["platform"]: p for p in db.split_profiles(c["profiles"])}
+            # Grouped, not keyed: a creator can have two accounts on one
+            # platform, and keying by platform would export only the last of
+            # them — a round trip that silently loses an account is worse than
+            # no export at all.
+            found = {}
+            for prof in db.split_profiles(c["profiles"]):
+                found.setdefault(prof["platform"], []).append(prof)
             pairs = []
             for col in importer.PROFILE_COLUMNS:
-                prof = found.get(importer.PROFILE_LABELS[col])
-                pairs.append(prof["url"] if prof else "")
-                pairs.append(prof["followers"] if prof and prof["followers"] else "")
+                group = found.get(importer.PROFILE_LABELS[col], [])
+                pairs.append(", ".join(x["url"] for x in group))
+                pairs.append(", ".join(str(x["followers"] or "") for x in group)
+                             if any(x["followers"] for x in group) else "")
             w.writerow([
                 c["code"], c["name"],
                 c["followers"] if c["followers"] is not None else "",

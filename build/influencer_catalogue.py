@@ -394,6 +394,13 @@ PLATFORM_CLASS = {
 }
 
 
+def handle_from_url(url):
+    """The username inside a profile link. Mirrors handle_from_url in
+    admin/db.py — the same rule in the one other place that needs it."""
+    text = (url or "").strip().rstrip("/").split("?")[0].split("#")[0]
+    return text.rsplit("/", 1)[-1].lstrip("@") if text else ""
+
+
 def profile_url(platform, handle):
     if not handle:
         return ""
@@ -458,8 +465,18 @@ def card_html(p):
     counted = [x for x in p["_profiles"] if x.get("followers")] if not ANON else []
     rows = []
     if len(counted) > 1:
+        # Two accounts on one platform need telling apart, so the handle is
+        # added — but only where it is doing that work, or every row grows a
+        # tail the reader does not need.
+        repeated = {x["platform"] for x in counted
+                    if sum(1 for y in counted if y["platform"] == x["platform"]) > 1}
         for prof in counted:
-            rows.append('<li><span>' + e(prof["platform"]) + '</span><strong>'
+            tag = prof["platform"]
+            if prof["platform"] in repeated:
+                who = handle_from_url(prof["url"])
+                if who:
+                    tag += " @" + who
+            rows.append('<li><span>' + e(tag) + '</span><strong>'
                         + format(prof["followers"], ",") + '</strong></li>')
         rows.append('<li><span>Total reach</span><strong>' + reach + '</strong></li>')
     else:

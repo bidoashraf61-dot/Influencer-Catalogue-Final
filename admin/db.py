@@ -632,13 +632,16 @@ def join_profiles(items):
         platform = (item.get("platform") or "").strip()
         if not url or not platform:
             continue
-        # One account per platform; a second row for the same one is a slip in
-        # the form, not a second profile.
-        if platform.lower() in seen:
-            continue
-        seen.add(platform.lower())
         if not url.lower().startswith(("http://", "https://")):
             url = "https://" + url.lstrip("/")
+        # Deduplicated by LINK, not by platform. A creator can run two
+        # Instagram accounts — a personal one and a brand one, or English and
+        # Arabic — and refusing the second was an assumption, not a rule. The
+        # same link twice is still a slip.
+        key = url.rstrip("/").lower()
+        if key in seen:
+            continue
+        seen.add(key)
         clean.append({"platform": platform, "url": url,
                       "followers": as_count(item.get("followers"))})
     return json.dumps(clean, ensure_ascii=False) if clean else None
