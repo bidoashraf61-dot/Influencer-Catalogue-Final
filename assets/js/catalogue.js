@@ -354,10 +354,13 @@
       var tally = function (field) {
         var out = {};
         list.forEach(function (c) {
-          // city and interest both hold several values per creator, so a
-          // creator counts under each one — the number on a chip is how many
-          // cards it shows.
-          var multi = (field === "city" || field === "interest");
+          // city, interest and platform all hold several values per creator,
+          // so a creator counts under each one — the number on a chip is how
+          // many cards it shows. Platform was missing from this list, which
+          // turned a creator on three of them into a chip literally labelled
+          // "Instagram, Snapchat, TikTok" that matched only her.
+          var multi = (field === "city" || field === "interest" ||
+                       field === "platform");
           var raw = c[field] || (field === "city" ? "Unspecified" : "");
           var each = multi ? values(raw) : (raw ? [raw] : []);
           if (!each.length && field === "city") each = ["Unspecified"];

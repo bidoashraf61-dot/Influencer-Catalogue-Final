@@ -221,6 +221,9 @@ def read_roster():
                             "followers": effective}]
                           if handle and profile_url(platform, handle) else []),
             "_nationality": "",
+            # A list, so tally() counts a creator under each platform rather
+            # than under the joined string.
+            "_platforms": split_cities(platform),
             "platform": platform,
             "interest": interests.get(code, DEFAULT_INTEREST),
             "photo": photo,
@@ -615,7 +618,7 @@ def build():
 
     filters = "" if API else (
         chips("Tier", "tier", [(t, n) for t, n in tally("tier", tier_order)])
-        + chips("Platform", "platform", tally("platform"))
+        + chips("Platform", "platform", tally("_platforms"))
         + chips("City", "city", tally("cities"))
         + (chips("Interest", "interest", tally("interest")) if HAS_INTERESTS else "")
     )
