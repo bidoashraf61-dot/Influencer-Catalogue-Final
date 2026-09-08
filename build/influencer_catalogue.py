@@ -496,9 +496,6 @@ def card_html(p):
         rows.append('<li><span>Nationality</span><strong>'
                     + e(p["_nationality"]) + '</strong></li>')
     rows.append('<li><span>City</span><strong>' + e(city_label(p)) + '</strong></li>')
-    if not ANON and p.get("interest"):
-        rows.append('<li><span>Interests</span><strong>'
-                    + e(", ".join(split_cities(p["interest"]))) + '</strong></li>')
     rows.append('<li><span>Tier</span><strong>' + e(p["tier_label"]) + '</strong></li>')
     meta_rows = "\n".join("            " + r for r in rows)
     label_who = e(p["code"]) if ANON else f"{e(name)}, {e(p['code'])}"
@@ -529,7 +526,7 @@ def chips(label, name, values):
         out.append(
             f'<button type="button" class="cat-chip" data-filter="{name}" '
             f'data-value="{html.escape(value)}" aria-pressed="false">'
-            f'{html.escape(value)} <i>{count}</i></button>'
+            f'{html.escape(value)}</button>'
         )
     out.append("</div></div>")
     return "".join(out)
