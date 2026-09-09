@@ -16,6 +16,7 @@ import re
 import time
 from datetime import datetime, timezone
 
+import links
 from db import code_state, now, split_cities, split_profiles, PLATFORMS
 
 
@@ -102,6 +103,15 @@ border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;text
 .btn:hover{opacity:.88}
 .btn.ghost{background:transparent;color:var(--ink)}
 .btn.small{padding:6px 14px;font-size:13px}
+.pager{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
+  margin:18px 0 4px;font-size:14px}
+.pager a,.pager .pgnow,.pager .pgoff{padding:7px 12px;border-radius:8px;line-height:1;
+  text-decoration:none}
+.pager a{color:var(--ink);border:1px solid var(--line)}
+.pager a:hover{background:var(--white)}
+.pager .pgnow{background:var(--ink);color:#fff;font-weight:600}
+.pager .pgoff{color:var(--gray);opacity:.55}
+.pager .pgnums{display:flex;gap:6px;flex-wrap:wrap;margin:0 6px}
 .btn.danger{border-color:var(--red);color:var(--red);background:transparent}
 .note{background:#fffbe6;border:1px solid #f0e2a8;border-radius:10px;padding:14px 16px;margin:16px 0}
 .err{background:#fdeaea;border:1px solid #f5c2c2;border-radius:10px;padding:12px 16px;
@@ -277,11 +287,11 @@ def u(path):
 
 
 def page(title, body, active=""):
-    links = [("/", "Overview"), ("/codes", "Access codes"), ("/analytics", "Analytics"),
+    items = [("/", "Overview"), ("/codes", "Access codes"), ("/analytics", "Analytics"),
              ("/roster", "Roster"), ("/requests", "Requests")]
     nav = "".join(
         '<a href="' + u(href) + '"' + (' class="on"' if active == href else "") + ">" + label + "</a>"
-        for href, label in links
+        for href, label in items
     )
     return (
         HEAD
@@ -978,7 +988,7 @@ def reach_script(bands):
 </script>""")
 
 
-def creator_form(c, cities=None, tiers=None, interests=None, q=""):
+def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1):
     """Add/edit form. `c` is None when adding a new creator.
 
     `cities` is every city already on the roster. Checkboxes rather than a
@@ -1050,6 +1060,7 @@ def creator_form(c, cities=None, tiers=None, interests=None, q=""):
     except (IndexError, KeyError):
         stamp = ""
     carried = "<input type='hidden' name='q' value='" + e(q or "") + "'>"
+    carried += "<input type='hidden' name='page' value='" + e(str(page_no or 1)) + "'>"
     if stamp:
         carried += "<input type='hidden' name='prev_updated' value='" + e(stamp) + "'>"
 
@@ -1084,7 +1095,7 @@ def creator_form(c, cities=None, tiers=None, interests=None, q=""):
 
 def roster_page(creators, error=None, message=None, cities=None, tiers=None,
                 nationalities=None, interests=None, editing=None, q="",
-                bands=None):
+                bands=None, page_no=1, pages=1, total=None, per_page=100):
     tiers = tiers or []
     tier_names = [t["name"] for t in tiers]
     used = {}
@@ -1100,8 +1111,11 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         hidden = "" if c["active"] else " <span class='pill dead'>hidden</span>"
         handle = "@" + c["handle"] if c["handle"] else "—"
         if c["photo"]:
-            shot = ("<img class='thumb sm' src='" + u("/photo/") + "" + e(c["photo"].split("?")[0])
-                    + "' alt='' loading='lazy'>")
+            # Not u("/photo/"): that is this service, and 757 of them on one
+            # page is what made saving slow. nginx resizes and serves these,
+            # and checks the signature itself, so none of it reaches Python.
+            shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"]))
+                    + "' alt='' width='44' height='44' loading='lazy' decoding='async'>")
         else:
             shot = "<span class='thumb sm none'>—</span>"
         open_now = (editing == c["code"])
@@ -1130,12 +1144,54 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         # 4.2MB and 27,600, which is the lag.
         if open_now:
             out += ("<tr class='editrow'><td colspan='8'>"
-                    + creator_form(c, cities, tier_names, interests, q)
+                    + creator_form(c, cities, tier_names, interests, q, page_no)
                     + "</td></tr>")
         return out
 
     rows = "".join(row(c) for c in creators) or (
         "<tr><td colspan='8' class='muted'>Roster is empty — import it with seed.py.</td></tr>")
+
+    # How much of the roster this page is showing. It counts the whole result,
+    # not the slice on screen — len(creators) is at most one page now, and
+    # reporting that as the number of matches would be a lie.
+    count = len(creators) if total is None else total
+    first = (page_no - 1) * per_page + 1
+    last = min(count, first + len(creators) - 1)
+    if count == 0:
+        shown = "No matches" if q else "Roster is empty"
+    elif pages <= 1:
+        shown = (str(count) + " match" + ("" if count == 1 else "es")) if q else (
+            str(count) + " creator" + ("" if count == 1 else "s"))
+    else:
+        shown = ("Showing " + str(first) + "\u2013" + str(last) + " of " + str(count)
+                 + (" matches" if q else " creators"))
+
+    def page_link(n, label=None, disabled=False, current=False):
+        if disabled:
+            return "<span class='pgoff'>" + e(label or str(n)) + "</span>"
+        if current:
+            return "<span class='pgnow'>" + e(label or str(n)) + "</span>"
+        href = u("/roster") + "?" + urlencode(q=q, page=(n if n > 1 else ""))
+        return "<a href='" + href + "'>" + e(label or str(n)) + "</a>"
+
+    if pages <= 1:
+        pager = ""
+    else:
+        # First and last are always reachable, plus a window around where you
+        # are; a roster of 5,000 would otherwise print fifty numbered links.
+        window = sorted({1, pages} | {n for n in range(page_no - 2, page_no + 3)
+                                      if 1 <= n <= pages})
+        numbers, previous = [], 0
+        for n in window:
+            if previous and n > previous + 1:
+                numbers.append("<span class='pgoff'>\u2026</span>")
+            numbers.append(page_link(n, current=(n == page_no)))
+            previous = n
+        pager = ("<nav class='pager' aria-label='Roster pages'>"
+                 + page_link(page_no - 1, "\u2190 Previous", disabled=(page_no <= 1))
+                 + "<span class='pgnums'>" + "".join(numbers) + "</span>"
+                 + page_link(page_no + 1, "Next \u2192", disabled=(page_no >= pages))
+                 + "</nav>")
 
     # A datalist, not a select: nationality is free text, and offering what is
     # already in use stops "Saudi", "saudi" and "KSA" becoming three values.
@@ -1217,11 +1273,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
           "handle or city' autocomplete='off'>"
           "<button class='btn small'>Search</button>"
         + ("<a class='btn small ghost' href='" + u("/roster") + "'>Clear</a>" if q else "")
-        + "<span class='muted' style='font-size:13px'>"
-        + (str(len(creators)) + " match" + ("" if len(creators) == 1 else "es")
-           if q else "Only the creator you open is loaded — the page stays light "
-                     "however long the roster gets.")
-        + "</span></form>"
+        + "<span class='muted' style='font-size:13px'>" + e(shown) + "</span></form>"
         + "<p class='sub' style='margin-bottom:12px'>Need the codes? "
           "<a href='" + u("/roster/export") + "'>Export the roster (.csv)</a> — "
           "every creator with their code, handle and whether a photo is on "
@@ -1230,6 +1282,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + "<div class='card'><table><thead><tr><th></th><th>Code</th>"
         + "<th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>City</th>"
         + "<th></th></tr></thead><tbody>" + rows + "</tbody></table></div>"
+        + pager
     )
     return page("Roster", body, "/roster")
 

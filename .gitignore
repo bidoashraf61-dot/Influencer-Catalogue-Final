@@ -21,3 +21,9 @@ Influncer Proposal Catalogue/
 admin/catalogue.db
 admin/catalogue.db-*
 admin/.secret
+
+# The photo-link signing key. nginx checks every creator photograph against it,
+# so committing it to a public repository would make every link forgeable —
+# which is the entire point of signing them. Provisioned by deploy, never here.
+admin/.photo-secret
+deploy/catalogue/secret.conf

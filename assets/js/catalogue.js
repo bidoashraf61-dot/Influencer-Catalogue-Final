@@ -284,9 +284,15 @@
     // them raw, so the same roster looked worse served from the service than
     // built into the page.
     var soft = c.lowres ? " cat-card__photo--soft" : "";
-    var photo = c.photo
+    // photo_url is a signed link the service issued for this roster. The
+    // photographs used to sit at a guessable address — every code is
+    // HV-XX-NNN — so the whole set could be walked without the passcode.
+    // photoBase remains the fallback for a page built with the roster inside
+    // it, where there is no service to sign anything.
+    var src = c.photo_url || (c.photo ? (CFG.photoBase || "assets/catalogue/") + c.photo : "");
+    var photo = src
       ? '<div class="cat-card__photo' + soft + '" style="background-image:url(' +
-        esc((CFG.photoBase || "assets/catalogue/") + c.photo) + ')"></div>'
+        esc(src) + ')"></div>'
       : '<div class="cat-card__photo cat-card__photo--fallback" data-plate="' +
         esc(String(c.code).split("-").pop()) + '"></div>';
 

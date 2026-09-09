@@ -42,6 +42,7 @@ sys.path.insert(0, str(HERE))
 import auth  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
+import links  # noqa: E402
 import uploads  # noqa: E402
 import views  # noqa: E402
 
@@ -49,6 +50,12 @@ SECRET = auth.load_secret(HERE / ".secret")
 # Photos live with the built site so the catalogue and the dashboard share one
 # copy — uploading here updates what a client sees.
 PHOTO_DIR = HERE.parent / "site" / "assets" / "catalogue"
+
+# How many creators the roster shows at once. The whole list on one page came
+# to 311KB of HTML and 757 thumbnails at 759 creators, and grows in a straight
+# line: 1.8MB and 5,000 thumbnails at 5,000 creators. Paging keeps the page the
+# same size however far the roster grows.
+ROSTER_PAGE = 100
 LOGO = HERE.parent / "site" / "assets" / "helv" / "logo-knockout.webp"
 ADMIN_COOKIE = "hv_admin"
 VIEWER_COOKIE = "hv_view"
@@ -266,15 +273,34 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.analytics_page(
                 db.stats(start=start, end=end), db.recent_events(200)))
         if path == "/roster":
+            everyone = db.list_creators(search=query.get("q"))
+            editing = (query.get("edit") or "").strip().upper() or None
+            total = len(everyone)
+            pages = max(1, -(-total // ROSTER_PAGE))
+
+            # Opening a creator has to land on the page that creator is on, or
+            # the form would be rendered into a slice that is not being shown
+            # and the Edit button would appear to do nothing.
+            if editing is not None:
+                at = next((i for i, c in enumerate(everyone)
+                           if c["code"] == editing), None)
+                page = 1 if at is None else at // ROSTER_PAGE + 1
+            else:
+                asked = (query.get("page") or "1").strip()
+                page = int(asked) if asked.isdigit() and int(asked) > 0 else 1
+                page = min(page, pages)
+
+            start = (page - 1) * ROSTER_PAGE
             return self.send(200, views.roster_page(
-                db.list_creators(search=query.get("q")),
+                everyone[start:start + ROSTER_PAGE],
                 query.get("e"), query.get("ok"),
                 cities=db.known_cities(), tiers=db.list_tiers(),
                 nationalities=db.known_nationalities(),
                 interests=db.known_interests(),
-                editing=(query.get("edit") or "").strip().upper() or None,
+                editing=editing,
                 q=(query.get("q") or "").strip(),
-                bands=db.tier_bands()))
+                bands=db.tier_bands(),
+                page_no=page, pages=pages, total=total, per_page=ROSTER_PAGE))
         if path == "/roster/export":
             return self.send(200, self.roster_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition",
@@ -488,9 +514,16 @@ class Handler(BaseHTTPRequestHandler):
         # 759-row list, so a saved creator was nowhere on screen — which reads
         # exactly like the edit having been lost.
         back = "/roster"
-        keep = (f.get("q") or "").strip()
+        keep = {}
+        if (f.get("q") or "").strip():
+            keep["q"] = f["q"].strip()
+        # The roster is paged now, so the page number has to come back with the
+        # search: without it a creator edited on page 6 would be answered with
+        # page 1, which reads exactly like the edit having been lost.
+        if (f.get("page") or "").strip().isdigit() and f["page"].strip() != "1":
+            keep["page"] = f["page"].strip()
         if keep:
-            back += "?" + urllib.parse.urlencode({"q": keep})
+            back += "?" + urllib.parse.urlencode(keep)
         return self.redirect(back + "#" + code)
 
     def post_roster_import(self):
@@ -733,6 +766,20 @@ class Handler(BaseHTTPRequestHandler):
     def post_roster_delete(self):
         code = self.form_body().get("code")
         if code:
+            # The picture is not in the database, it is a file beside the site,
+            # so deleting the row on its own left the photograph on disk — and
+            # a signed link to it kept working. Take it with the record.
+            existing = db.creator(code)
+            if existing is not None and existing["photo"]:
+                stale = PHOTO_DIR / Path(str(existing["photo"]).split("?")[0]).name
+                try:
+                    if stale.parent == PHOTO_DIR and stale.is_file():
+                        stale.unlink()
+                        Handler.forget_photo_widths()
+                except OSError:
+                    # A photo we cannot remove is untidy, not a reason to leave
+                    # the creator in the roster.
+                    pass
             db.delete_creator(code)
         return self.redirect("/roster")
 
@@ -797,6 +844,11 @@ class Handler(BaseHTTPRequestHandler):
                 "city": r["city"], "nationality": r["nationality"],
                 "tier": r["tier"], "interest": r["interest"],
                 "photo": r["photo"], "lowres": self.is_lowres(r["photo"]),
+                # The page builds no photo URL of its own any more. Every code
+                # is HV-XX-NNN, so the pattern was walkable and the whole set
+                # could be pulled without a passcode; nginx now refuses a photo
+                # this service did not sign.
+                "photo_url": links.photo(r["photo"]) if r["photo"] else None,
                 "profiles": db.split_profiles(r["profiles"]),
             }
             for r in db.list_creators(active_only=True)

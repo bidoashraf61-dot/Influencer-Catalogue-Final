@@ -74,6 +74,22 @@ if [ "$LOGOS" -lt 2 ]; then
   echo "WARNING: client logo carousel is empty — site/index.html was probably not fetched" >&2
 fi
 
+# ---- the photo-link signing key --------------------------------------------
+# nginx checks the signature on every creator photograph and refuses anything
+# it did not see signed; the admin service is what signs them. Both sides read
+# the same key. admin/.photo-secret is the original and conf/secret.conf is the
+# nginx-shaped copy, rewritten here so the two cannot drift apart. Neither is in
+# git: this repository is public, and the key in it would make every link
+# forgeable, which is the whole point of signing them.
+SECRET_FILE=/home/ubuntu/influencer-catalogue-admin/admin/.photo-secret
+if [ ! -s "$SECRET_FILE" ]; then
+  ( umask 077; python3 -c 'import os; print(os.urandom(24).hex())' > "$SECRET_FILE" )
+  echo "generated a new photo signing key"
+fi
+( umask 077
+  printf 'map "" $photo_secret { default "%s"; }\n' "$(tr -d '\r\n' < "$SECRET_FILE")" \
+    > /home/ubuntu/influencer-catalogue/conf/secret.conf )
+
 sudo docker exec influencer-catalogue nginx -s reload
 
 echo "published $(git -C "$SRC" rev-parse --short HEAD) (API mode)"
