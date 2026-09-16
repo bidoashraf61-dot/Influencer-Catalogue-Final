@@ -749,48 +749,27 @@
       status.className = "cat-form__status";
       status.textContent = "Sending…";
 
-      if (CFG.api) {
-        // Stored against the access code that opened the catalogue, so the
-        // dashboard can show who asked without an inbox in the loop.
-        fetch(CFG.api + "/api/request", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            name: data.get("name"), company: data.get("company"),
-            email: data.get("email"), phone: data.get("phone"),
-            selection_name: selectionName || null,
-            selection: selected.slice()
-          })
-        })
-          .then(function (r) { return r.json().catch(function () { return null; }); })
-          .then(function (b) {
-            if (!b || !b.ok) throw new Error((b && b.reason) || "failed");
-            succeed(payload.selection_link);
-          })
-          .catch(function () {
-            status.className = "cat-form__status is-error";
-            status.textContent = "That did not send. Please try again, or contact us directly.";
-          })
-          .then(function () { btn.disabled = false; });
-        return;
+      function fail() {
+        status.className = "cat-form__status is-error";
+        status.textContent = "That did not send. Please try again, or contact us directly.";
       }
 
-      fetch(CFG.endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "Accept": "application/json" },
-        // The page sets <meta name="referrer" content="no-referrer"> so a click
-        // out to a creator's profile does not tell Instagram where it came
-        // from. FormSubmit identifies the form BY the referrer, and without one
-        // rejects every submission with "open this page through a web server".
-        // Send the origin — and only the origin — for this one request.
-        referrerPolicy: "strict-origin",
-        body: JSON.stringify(payload)
-      })
-        .then(function (r) {
-          // FormSubmit answers 200 with {"success":"false"} for a rejected
-          // submission — an unactivated address, a bad origin. Trusting the
-          // status code alone told the client "Sent" when nothing was.
+      // The email. FormSubmit answers 200 with {"success":"false"} for a
+      // rejected submission — an unactivated address, a bad origin — so the
+      // status code alone is not enough to call it sent.
+      function sendMail() {
+        if (!CFG.endpoint) return Promise.reject(new Error("no endpoint"));
+        return fetch(CFG.endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Accept": "application/json" },
+          // The page sets <meta name="referrer" content="no-referrer"> so a
+          // click out to a creator's profile does not tell Instagram where it
+          // came from. FormSubmit identifies the form BY the referrer, and
+          // without one rejects every submission. Send the origin — and only
+          // the origin — for this one request.
+          referrerPolicy: "strict-origin",
+          body: JSON.stringify(payload)
+        }).then(function (r) {
           return r.json().catch(function () { return null; }).then(function (body) {
             if (!r.ok) throw new Error("HTTP " + r.status);
             if (body && String(body.success) === "false") {
@@ -798,15 +777,62 @@
             }
             return body;
           });
+        });
+      }
+
+      if (!CFG.api) {
+        sendMail()
+          .then(function () { succeed(payload.selection_link); })
+          .catch(fail)
+          .then(function () { btn.disabled = false; });
+        return;
+      }
+
+      // API mode does BOTH. It used to store the request and stop there, so
+      // the dashboard filled up while info@ received nothing — the email call
+      // below was only ever reached by the static build. The stored copy is
+      // the record; the email is how anyone finds out it arrived.
+      var stored = fetch(CFG.api + "/api/request", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          name: data.get("name"), company: data.get("company"),
+          email: data.get("email"), phone: data.get("phone"),
+          selection_name: selectionName || null,
+          selection: selected.slice()
         })
-        .then(function () {
-          succeed(payload.selection_link);
+      })
+        .then(function (r) { return r.json().catch(function () { return null; }); })
+        .then(function (b) {
+          if (!b || !b.ok) throw new Error((b && b.reason) || "failed");
+          return true;
         })
-        .catch(function () {
-          status.className = "cat-form__status is-error";
-          status.textContent = "That did not send. Please try again, or contact us directly.";
-        })
-        .then(function () { btn.disabled = false; });
+        .catch(function () { return false; });
+
+      var mailed = sendMail()
+        .then(function () { return { ok: true, why: "" }; })
+        .catch(function (err) { return { ok: false, why: String(err && err.message || err) }; });
+
+      Promise.all([stored, mailed]).then(function (res) {
+        var mail = res[1];
+        // Tell the dashboard what happened to the email. This server cannot
+        // reach FormSubmit itself, so this is the only way a rejected email
+        // shows up anywhere.
+        fetch(CFG.api + "/api/event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            kind: mail.ok ? "mail_sent" : "mail_failed",
+            detail: mail.ok ? (selectionName || "quote") : mail.why
+          })
+        }).catch(function () {});
+
+        // Either one reaching us is enough to tell the client it arrived.
+        if (res[0] || mail.ok) succeed(payload.selection_link);
+        else fail();
+      }).then(function () { btn.disabled = false; });
     });
 
   }

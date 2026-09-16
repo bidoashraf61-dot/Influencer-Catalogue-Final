@@ -896,7 +896,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(401, {"ok": False}, self.cors())
         b = self.json_body()
         kind = b.get("kind")
-        if kind not in ("view", "shortlist"):
+        # mail_sent / mail_failed: the quote email goes from the browser to
+        # FormSubmit, which this server cannot reach (Cloudflare refuses it),
+        # so the page reports the outcome here. Without that, a rejected email
+        # is invisible to everyone — which is how quotes went unmailed while
+        # the dashboard showed them arriving.
+        if kind not in ("view", "shortlist", "mail_sent", "mail_failed"):
             return self.send_json(400, {"ok": False}, self.cors())
         db.log(kind, code_id, self.client_ip(), self.headers.get("User-Agent"),
                str(b.get("detail") or "")[:80])

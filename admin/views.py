@@ -646,6 +646,7 @@ def analytics_page(s, events):
 
     # ---- event log --------------------------------------------------------
     tone = {"unlock_ok": "live", "request": "live", "shortlist": "",
+            "mail_sent": "live", "mail_failed": "dead",
             "unlock_fail": "dead", "admin_fail": "dead"}
     log = "".join(
         "<tr><td><span class='pill " + tone.get(ev["kind"], "") + "'>"
