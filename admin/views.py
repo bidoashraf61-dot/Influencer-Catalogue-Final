@@ -1454,8 +1454,20 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
 ROSTER_JS = """<script>
 (function(){
   var id=decodeURIComponent((location.hash||'').slice(1)); if(!id) return;
+  // "near-CODE": a neighbour of a row that was just deleted. Scroll back to
+  // that spot without marking the neighbour as if it had been edited.
+  var near=id.indexOf('near-')===0; if(near) id=id.slice(5);
   var row=document.getElementById(id); if(!row) return;
-  var go=function(){ row.scrollIntoView({block:'center'}); row.classList.add('flash'); };
+  var go=function(){
+    row.scrollIntoView({block:'center'});
+    if(!near) row.classList.add('flash');
+    var msg=document.querySelector('main .ok, main .err');
+    if(msg && near){                     // keep "deleted" in view, not at the top
+      var t=msg.cloneNode(true); t.className+=' toast'; t.style.cssText='position:fixed;left:50%;top:84px;'
+        +'transform:translateX(-50%);bottom:auto;right:auto;z-index:60';
+      document.body.appendChild(t); setTimeout(function(){t.remove();},4000);
+    }
+  };
   if(document.readyState==='complete') go(); else window.addEventListener('load',go);
 })();
 </script>"""

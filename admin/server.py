@@ -839,8 +839,23 @@ class Handler(BaseHTTPRequestHandler):
                     # A photo we cannot remove is untidy, not a reason to leave
                     # the creator in the roster.
                     pass
+            # Where the admin was: the creator just below the deleted one (or
+            # just above, if it was the last), on whatever page that creator
+            # sits once the row is gone. Returning to the top of the page meant
+            # scrolling back down after every delete.
+            everyone = [c["code"] for c in db.list_creators(search=f.get("q"))]
+            near = None
+            if code in everyone:
+                i = everyone.index(code)
+                near = (everyone[i + 1] if i + 1 < len(everyone)
+                        else everyone[i - 1] if i > 0 else None)
             db.delete_creator(code)
-        return self.roster_back(f, ok=(code + " deleted.") if code else None)
+            if near is not None:
+                at = [c["code"] for c in db.list_creators(search=f.get("q"))].index(near)
+                f = dict(f, page=str(at // ROSTER_PAGE + 1))
+            return self.roster_back(f, ("near-" + near) if near else None,
+                                    ok=code + " deleted.")
+        return self.roster_back(f)
 
     # --------------------------------------------------------- selections --
 
