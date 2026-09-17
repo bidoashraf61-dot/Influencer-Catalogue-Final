@@ -56,6 +56,7 @@ PHOTO_DIR = HERE.parent / "site" / "assets" / "catalogue"
 # line: 1.8MB and 5,000 thumbnails at 5,000 creators. Paging keeps the page the
 # same size however far the roster grows.
 ROSTER_PAGE = 100
+links.PHOTO_DIR = PHOTO_DIR
 LOGO = HERE.parent / "site" / "assets" / "helv" / "logo-knockout.webp"
 ADMIN_COOKIE = "hv_admin"
 VIEWER_COOKIE = "hv_view"

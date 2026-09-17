@@ -79,15 +79,44 @@ def signed(uri, expires=None):
     return "%s?s=%s&e=%d" % (uri, sign(uri, exp), exp)
 
 
+# Where the photographs live. Set by the server at start-up; used only to read
+# a file's modification time for the version stamp below.
+PHOTO_DIR = None
+
+
+def version(name):
+    """A stamp that changes whenever the file is replaced.
+
+    nginx caches a resized thumbnail for 90 days and a browser keeps a photo
+    for a day, both keyed on the address. Without this, a photo replaced in the
+    dashboard kept showing the old picture: same name, same address. The stamp
+    is not part of the signature, only of the address and the cache key.
+    """
+    if PHOTO_DIR is None:
+        return ""
+    try:
+        st = (Path(PHOTO_DIR) / name).stat()
+    except OSError:
+        return ""
+    return "%x%x" % (int(st.st_mtime), st.st_size % 4096)
+
+
+def _stamped(url, name):
+    v = version(name)
+    return url + ("&v=" + v if v else "")
+
+
 def thumb(photo, base=""):
     """A small copy for a list. nginx resizes it and caches the result."""
     if not photo:
         return None
-    return base + signed("/thumb/" + str(photo).split("?")[0])
+    name = str(photo).split("?")[0]
+    return base + _stamped(signed("/thumb/" + name), name)
 
 
 def photo(photo_name, base=""):
     """The picture at full size, for a card on the catalogue itself."""
     if not photo_name:
         return None
-    return base + signed("/assets/catalogue/" + str(photo_name).split("?")[0])
+    name = str(photo_name).split("?")[0]
+    return base + _stamped(signed("/assets/catalogue/" + name), name)
