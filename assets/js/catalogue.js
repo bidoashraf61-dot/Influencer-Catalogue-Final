@@ -926,12 +926,19 @@
   }
 
   function initSelection() {
-    var token = readFragment().token;
-    if (CFG.api && token && !CURATED) {
-      fetch(CFG.api + "/api/selection?s=" + encodeURIComponent(token), { credentials: "include" })
+    var frag = readFragment();
+    var token = frag.token;
+    // Ask whether this selection has been priced for the client — by token,
+    // or, for the link the client made themselves, by its name and creators.
+    // Re-pricing then shows on the link the client already has.
+    if (CFG.api && !CURATED && (token || frag.codes.length)) {
+      var ask = token ? "s=" + encodeURIComponent(token)
+        : "n=" + encodeURIComponent(frag.name) + "&c=" + encodeURIComponent(frag.codes.join(","));
+      fetch(CFG.api + "/api/selection?" + ask, { credentials: "include" })
         .then(function (r) { return r.ok ? r.json() : null; })
         .then(function (b) {
           if (b && b.ok) {
+            token = b.token || token;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));

@@ -215,7 +215,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/roster":
             return self.api_roster()
         if path == "/api/selection":
-            return self.api_selection(query.get("s") or "")
+            return self.api_selection(
+                query.get("s") or "", query.get("n") or "",
+                [c for c in (query.get("c") or "").split(",") if c])
         if path == "/health":
             return self.send_json(200, {"ok": True})
         if path == "/static/admin.css":
@@ -422,6 +424,10 @@ class Handler(BaseHTTPRequestHandler):
         label = (form.get("label") or "").strip() or "Unnamed"
         days = form.get("days", "").strip()
         max_uses = form.get("max_uses", "").strip()
+        if days.isdigit() and int(days) > 3650:
+            return self.redirect("/codes?e=" + urllib.parse.quote(
+                "Expiry can be at most 3650 days (10 years). Leave it empty for a code "
+                "that never expires."))
         expires = db.now() + int(days) * 86400 if days.isdigit() and int(days) > 0 else None
         # A passcode typed by the admin ("Alpha Plus122") or, left blank, one
         # generated. Typed ones are matched ignoring case, spaces and dashes.
@@ -846,24 +852,46 @@ class Handler(BaseHTTPRequestHandler):
                 else "https://" + (self.headers.get("Host") or "")).rstrip("/")
 
     def post_selection_new(self):
-        """A blank selection, or one started from a quote request."""
+        """Re-price a selection a client already has: one they sent as a quote
+        request, or one whose link was pasted in. Asking twice for the same
+        request reopens the one already priced rather than starting another."""
         f = self.form_body()
         rid = (f.get("request") or "").strip()
-        codes, name = [], (f.get("name") or "").strip()
+        known = {c["code"] for c in db.list_creators()}
+        code_id = None
         if rid.isdigit():
+            existing = db.selection_for_request(int(rid))
+            if existing is not None:
+                return self.redirect("/selections/edit?id=%d" % existing["id"])
             req = db.request(int(rid))
             if req is None:
                 return self.redirect("/requests")
             codes = [c for c in json.loads(req["selection"] or "[]") if isinstance(c, str)]
-            name = name or req["selection_name"] or ((req["company"] or "Client") + " selection")
-        raw = (f.get("codes") or "").upper()
-        for c in re.findall(r"HV-[A-Z0-9]{2,4}-\d+", raw):
-            if c not in codes:
-                codes.append(c)
-        known = {c["code"] for c in db.list_creators()}
+            # The same name the client's link carries, so that link matches.
+            name = req["selection_name"] or ((req["company"] or "Client") + " selection")
+            code_id = req["code_id"]
+        else:
+            link = (f.get("link") or "").strip()
+            frag = urllib.parse.unquote(link.split("#", 1)[1]) if "#" in link else ""
+            parts = dict(p.split("=", 1) for p in frag.split("&") if "=" in p)
+            if parts.get("s"):
+                sel = db.selection(token=parts["s"])
+                if sel is not None:
+                    return self.redirect("/selections/edit?id=%d" % sel["id"])
+            name = (parts.get("n") or "").strip()
+            codes = [c.strip().upper() for c in (parts.get("c") or "").split(",") if c.strip()]
+            if not codes:
+                return self.redirect("/selections?e=" + urllib.parse.quote(
+                    "That is not a selection link. Paste the whole link the client has, "
+                    "the one containing /selection/#n=…&c=…"))
+            existing = db.selection_for_link(name, codes)
+            if existing is not None:
+                return self.redirect("/selections/edit?id=%d" % existing["id"])
+            name = name or "Selection"
+            rid = ""
         codes = [c for c in codes if c in known]
-        sid = db.save_selection(None, name or "New selection", codes, {}, None, None,
-                                int(rid) if rid.isdigit() else None)
+        sid = db.save_selection(None, name, codes, {}, None, None,
+                                int(rid) if rid.isdigit() else None, code_id)
         return self.redirect("/selections/edit?id=%d" % sid)
 
     def post_selection_save(self):
@@ -908,12 +936,23 @@ class Handler(BaseHTTPRequestHandler):
             db.delete_selection(int(sid))
         return self.redirect("/selections?ok=" + urllib.parse.quote("Selection deleted."))
 
-    def api_selection(self, token):
-        """A prepared selection, for the client's page. Behind the same
-        passcode as the roster: the token alone shows nothing."""
-        if not self.viewer_code_id():
+    def api_selection(self, token, name=None, codes=None):
+        """A priced selection, for the client's page — by its token, or by the
+        name and creators of a link the client already holds. Behind the same
+        passcode as the roster: the link alone shows nothing."""
+        viewer = self.viewer_code_id()
+        if not viewer:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
-        sel = db.selection(token=token) if token else None
+        if token:
+            sel = db.selection(token=token)
+        elif codes:
+            try:
+                viewer_id = int(viewer)
+            except (TypeError, ValueError):
+                viewer_id = None
+            sel = db.selection_for_link(name or "", codes, viewer_id)
+        else:
+            sel = None
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         bands = db.tier_prices()
@@ -928,7 +967,8 @@ class Handler(BaseHTTPRequestHandler):
         total = ([sel["total_from"], sel["total_to"]]
                  if sel["total_from"] is not None else None)
         return self.send_json(200, {"ok": True, "name": sel["name"], "codes": codes,
-                                    "prices": prices, "total": total}, self.cors())
+                                    "prices": prices, "total": total,
+                                    "token": sel["token"]}, self.cors())
 
     def post_request_handled(self):
         f = self.form_body()

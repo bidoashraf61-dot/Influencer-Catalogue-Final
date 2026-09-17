@@ -104,6 +104,7 @@ CREATE TABLE IF NOT EXISTS selections (
   total_from  INTEGER,                  -- a range typed for the whole list;
   total_to    INTEGER,                  -- empty means "add up the creators"
   request_id  INTEGER,                  -- the quote request it was built from
+  code_id     INTEGER,                  -- the client's passcode, when known
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
@@ -235,6 +236,10 @@ def migrate(conn):
         conn.execute("ALTER TABLE tiers ADD COLUMN auto INTEGER NOT NULL DEFAULT 1")
         conn.execute("UPDATE tiers SET auto = 0 WHERE upper(code) LIKE 'HCP%' "
                      "OR upper(name) LIKE 'HCP%'")
+
+    sel_cols = {r["name"] for r in conn.execute("PRAGMA table_info(selections)")}
+    if "code_id" not in sel_cols:
+        conn.execute("ALTER TABLE selections ADD COLUMN code_id INTEGER")
 
     seed_tiers(conn)
 
@@ -1024,22 +1029,49 @@ def selection(sid=None, token=None):
         return conn.execute("SELECT * FROM selections WHERE id = ?", (sid,)).fetchone()
 
 
-def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None):
-    """Create (sid None) or update one prepared selection. Returns its id."""
+def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
+                   code_id=None):
+    """Create (sid None) or update one priced selection. Returns its id."""
     import secrets
     with connect() as conn:
         if sid is None:
             cur = conn.execute(
                 "INSERT INTO selections (token,name,codes,prices,total_from,total_to,"
-                "request_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                "request_id,code_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
                 (secrets.token_urlsafe(9), name, json.dumps(codes), json.dumps(prices),
-                 total_from, total_to, request_id, now(), now()))
+                 total_from, total_to, request_id, code_id, now(), now()))
             return cur.lastrowid
         conn.execute(
             "UPDATE selections SET name=?, codes=?, prices=?, total_from=?, total_to=?, "
             "updated_at=? WHERE id=?",
             (name, json.dumps(codes), json.dumps(prices), total_from, total_to, now(), sid))
         return sid
+
+
+def selection_for_request(rid):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM selections WHERE request_id = ? "
+                            "ORDER BY updated_at DESC LIMIT 1", (rid,)).fetchone()
+
+
+def selection_for_link(name, codes, code_id=None):
+    """The priced selection behind a link a client already holds.
+
+    A client's own link carries only a name and the creators. It matches a
+    priced selection with the same name and the same creators, so re-pricing
+    shows up on the link the client already has. When the selection came from
+    a request, only the passcode that made the request sees it."""
+    want = sorted(codes)
+    with connect() as conn:
+        rows = conn.execute("SELECT * FROM selections WHERE name = ? "
+                            "ORDER BY updated_at DESC", (name,)).fetchall()
+    for r in rows:
+        if sorted(json.loads(r["codes"] or "[]")) != want:
+            continue
+        if r["code_id"] is not None and code_id is not None and r["code_id"] != code_id:
+            continue
+        return r
+    return None
 
 
 def delete_selection(sid):

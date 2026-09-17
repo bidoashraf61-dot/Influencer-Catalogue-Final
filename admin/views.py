@@ -27,7 +27,12 @@ def e(v):
 def ts(value):
     if not value:
         return "—"
-    return datetime.fromtimestamp(value, timezone.utc).strftime("%d %b %Y, %H:%M")
+    # A date past what the calendar library can draw — an access code issued
+    # to expire in ten million days — took the whole Access codes page down.
+    try:
+        return datetime.fromtimestamp(value, timezone.utc).strftime("%d %b %Y, %H:%M")
+    except (ValueError, OverflowError, OSError):
+        return "never (far future)"
 
 
 def ago(value):
@@ -541,7 +546,7 @@ def codes_page(codes, new_code=None, error=None):
           "<div class='price-hint'>Leave empty to generate one. Case, spaces and dashes are ignored "
           "when a client types it.</div></div>"
         + "<div><label>Expires in (days)</label>"
-          "<input name='days' type='number' min='1' placeholder='30'></div>"
+          "<input name='days' type='number' min='1' max='3650' placeholder='empty = never'></div>"
         + "<div><label>Max uses</label>"
           "<input name='max_uses' type='number' min='1' placeholder='unlimited'></div>"
         + "</div><button class='btn'>Create code</button></form>"
@@ -1599,24 +1604,27 @@ def selections_page(sels, error=None, message=None, origin=""):
     for x in sels:
         n = len(json.loads(x["codes"] or "[]"))
         total = _money(x["total_from"], x["total_to"]) if x["total_from"] is not None else "sum of creators"
+        src = ("quote request #" + str(x["request_id"])) if x["request_id"] else "pasted link"
         rows.append(
             "<tr><td><strong><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>"
-            + e(x["name"]) + "</a></strong>"
-            + ("<br><span class='muted'>from request #" + str(x["request_id"]) + "</span>" if x["request_id"] else "")
+            + e(x["name"]) + "</a></strong><br><span class='muted'>from " + src + "</span>"
             + "</td><td>" + str(n) + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
             + "</td><td class='right'><a class='btn small' href='" + u("/selections/edit") + "?id="
-            + str(x["id"]) + "'>Edit prices</a></td></tr>")
-    table = "".join(rows) or "<tr><td colspan='5' class='muted'>No prepared selections yet.</td></tr>"
+            + str(x["id"]) + "'>Adjust prices</a></td></tr>")
+    table = "".join(rows) or ("<tr><td colspan='5' class='muted'>Nothing re-priced yet. Use "
+                              "<em>Price &amp; send</em> on a quote request, or paste a client's "
+                              "selection link above.</td></tr>")
     body = (
-        "<h1>Selections</h1><p class='sub'>Shortlists you prepare for a client, with the prices "
-        "you choose. The client opens the link with their passcode and sees your prices — they "
-        "cannot change them. Start one here, or from a quote request with <em>Price &amp; send</em>.</p>"
+        "<h1>Selections</h1><p class='sub'>Adjust the prices of a selection a client already has, "
+        "then resend it. The client's own link shows your prices as soon as you save, and every "
+        "later change too — they open the same link with their passcode.</p>"
         + note
         + "<form method='post' action='" + u("/selections/new") + "' class='card'><div class='row'>"
-        + "<div><label>Name</label><input name='name' placeholder='Fakeeh — Back to school' required></div>"
-        + "<div style='flex:2'><label>Creator codes</label><input name='codes' "
-          "placeholder='HV-MC-005, HV-MD-012 … (paste any list; codes are picked out)'></div>"
-        + "</div><button class='btn'>Create selection</button></form>"
+        + "<div style='flex:3'><label>Client's selection link</label><input name='link' required "
+          "placeholder='https://influencer-catalogue.hellovoice.co.uk/selection/#n=…&amp;c=…'></div>"
+        + "<div style='align-self:end'><button class='btn'>Adjust prices</button></div>"
+        + "</div><p class='price-hint'>For a selection sent as a quote request, use "
+          "<a href='" + u("/requests") + "'>Price &amp; send</a> on the Requests page instead.</p></form>"
         + "<div class='card'><table><thead><tr><th>Selection</th><th>Creators</th><th>Total</th>"
         + "<th>Updated</th><th></th></tr></thead><tbody>" + table + "</tbody></table></div>"
     )
@@ -1666,14 +1674,15 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
     body = (
         "<p><a href='" + u("/selections") + "'>&larr; All selections</a></p>"
         + "<h1>" + e(sel["name"]) + "</h1>" + note
-        + "<div class='card'><label>Link for the client</label><div class='sel-link'>"
+        + "<div class='card'><label>Link to send the client</label><div class='sel-link'>"
         + "<input id='sel-url' value='" + e(link) + "' readonly>"
         + "<button type='button' class='btn small' onclick=\"var i=document.getElementById('sel-url');"
           "i.select();navigator.clipboard&&navigator.clipboard.writeText(i.value);"
           "this.textContent='Copied'\">Copy link</button>"
         + "<a class='btn small ghost' href='" + e(link) + "' target='_blank' rel='noopener'>Preview</a></div>"
-        + "<p class='price-hint'>The client also needs a passcode. Save before copying — the link always "
-          "shows the latest saved prices.</p></div>"
+        + "<p class='price-hint'>The link the client already has shows these prices too, once saved, "
+          "as long as the creators are the same — so a price change needs no new link. If you add or "
+          "remove creators, send this link instead. The client opens it with their passcode.</p></div>"
         + "<form method='post' action='" + u("/selections/save") + "' enctype='multipart/form-data'>"
         + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
         + "<div class='card'><div class='row'>"
@@ -1691,7 +1700,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
         + "<p class='price-hint'>Leave a price empty to use the creator's standard price. "
           "One figure = a fixed price.</p>"
-        + "<div class='row'><div style='flex:2'><label>Add creators</label>"
+        + "<div class='row'><div style='flex:2'><label>Add creators (optional)</label>"
           "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div></div>"
         + "</div><button class='btn'>Save prices</button></form>"
         + "<form method='post' action='" + u("/selections/delete") + "' style='margin-top:14px' "
