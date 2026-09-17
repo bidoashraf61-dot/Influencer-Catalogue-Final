@@ -840,7 +840,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def site_origin(self):
         """The catalogue's own address, for the links a selection hands out."""
-        return (ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS
+        # ALLOWED_ORIGINS is a set, so it cannot be indexed; with one origin
+        # configured (the catalogue's) any element is the one.
+        return (sorted(ALLOWED_ORIGINS)[0] if ALLOWED_ORIGINS
                 else "https://" + (self.headers.get("Host") or "")).rstrip("/")
 
     def post_selection_new(self):
