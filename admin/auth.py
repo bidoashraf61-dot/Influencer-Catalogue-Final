@@ -65,12 +65,42 @@ def generate_code(groups=3, size=4) -> str:
     )
 
 
+def normalise_code(code: str) -> str:
+    """Letters and digits only, upper case: 'Alpha Plus122', 'alpha-plus-122'
+    and 'ALPHAPLUS122' are one code.
+
+    This used to keep only ALPHABET, the look-alike-free set generated codes
+    are drawn from. That silently threw away I, L, O, 0 and 1 from anything an
+    admin typed, so "Alpha Plus122" was really stored as "APHAPUS22". Generated
+    codes contain none of those characters, so every existing code normalises
+    to exactly what it did before."""
+    return "".join(ch for ch in code.upper() if ch.isascii() and ch.isalnum())
+
+
 def hash_code(code: str) -> str:
     """Codes are looked up by hash on every unlock, so this is a plain fast
-    digest rather than a slow KDF — but the code is normalised first so that
-    'abcd efgh' and 'ABCD-EFGH' are the same code."""
+    digest rather than a slow KDF."""
+    return hashlib.sha256(("hv-catalogue:" + normalise_code(code)).encode()).hexdigest()
+
+
+def legacy_hash_code(code: str) -> str:
+    """The hash under the old, narrower normalisation. Only consulted when the
+    current one finds nothing, so a code typed with a stray look-alike still
+    opens a code issued before the change."""
     normalised = "".join(ch for ch in code.upper() if ch in ALPHABET)
     return hashlib.sha256(("hv-catalogue:" + normalised).encode()).hexdigest()
+
+
+def custom_code_problem(code: str):
+    """Why a passcode an admin typed cannot be used, or None."""
+    n = normalise_code(code)
+    if len(n) < 6:
+        return "A passcode needs at least 6 letters or numbers."
+    if len(code) > 40:
+        return "A passcode can be at most 40 characters."
+    if not any(ch.isdigit() for ch in n) and len(n) < 10:
+        return "Add a number, or make it at least 10 letters, so it is hard to guess."
+    return None
 
 
 def code_hint(code: str) -> str:

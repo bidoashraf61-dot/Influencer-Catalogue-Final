@@ -21,7 +21,7 @@
   // with no backend, and the link IS the selection: nothing is stored.
   function readFragment() {
     var raw = (location.hash || "").replace(/^#/, "");
-    var out = { name: "", codes: [] };
+    var out = { name: "", codes: [], token: "" };
     raw.split("&").forEach(function (pair) {
       var i = pair.indexOf("=");
       if (i === -1) return;
@@ -29,13 +29,19 @@
       try { v = decodeURIComponent(v); } catch (e) { /* leave raw */ }
       if (k === "n") out.name = v;
       if (k === "c") out.codes = v.split(",").map(function (x) { return x.trim(); }).filter(Boolean);
+      if (k === "s") out.token = v;
     });
     return out;
   }
 
   function buildFragment(name, codes) {
-    return "#n=" + encodeURIComponent(name) + "&c=" + codes.join(",");
+    return "#n=" + encodeURIComponent(name) + "&c=" + codes.join(",") +
+      (CURATED ? "&s=" + encodeURIComponent(CURATED.token) : "");
   }
+
+  // A selection prepared and priced in the dashboard. Set on the selection
+  // page when its link carries a token; its prices beat everything else.
+  var CURATED = null;
 
   /* ------------------------------------------------------------- helpers */
 
@@ -321,6 +327,7 @@
     return '<article class="cat-card" data-tier="' + esc(c.tier) +
       '" data-platform="' + esc(c.platform) + '" data-city="' + esc(c.city || "Unspecified") +
       '" data-interest="' + esc(c.interest || "") + '" data-code="' + esc(c.code) +
+      (c.price && c.price.length ? '" data-price="' + esc(c.price.join("-")) : "") +
       '" tabindex="0" role="button" aria-pressed="false"' +
       ' aria-label="' + esc(c.name) + ", " + esc(c.code) + ", " + esc(label) +
       " tier, " + esc(c.city || "Unspecified") + ", " + esc(c.platform) + ", " +
@@ -339,7 +346,9 @@
     var keys = Object.keys(counts);
     if (!keys.length) return "";
     // Tier reads in size order; everything else by how many there are.
-    var order = ["Nano", "Micro", "Mid-Tier", "Macro"];
+    // The order tiers come in from the dashboard, smallest first — so a tier
+    // added there (Mega) sorts in its place instead of at the front.
+    var order = Object.keys(TIER_PRICE);
     keys.sort(key === "tier"
       ? function (a, b) { return order.indexOf(a) - order.indexOf(b); }
       : function (a, b) { return counts[b] - counts[a]; });
@@ -371,10 +380,14 @@
           // "Instagram, Snapchat, TikTok" that matched only her.
           var multi = (field === "city" || field === "interest" ||
                        field === "platform");
-          var raw = c[field] || (field === "city" ? "Unspecified" : "");
+          // A creator with no value for a dimension is simply not offered
+          // under it: "Unspecified" is not something a client filters for.
+          var raw = c[field] || "";
           var each = multi ? values(raw) : (raw ? [raw] : []);
-          if (!each.length && field === "city") each = ["Unspecified"];
-          each.forEach(function (v) { out[v] = (out[v] || 0) + 1; });
+          each.forEach(function (v) {
+            if (!v || /^unspecified$/i.test(v)) return;
+            out[v] = (out[v] || 0) + 1;
+          });
         });
         return out;
       };
@@ -686,7 +699,7 @@
         // The card no longer shows a price — the client sees a total for the
         // shortlist and nothing per creator. This email goes to HelloVoice, so
         // it still carries the per-creator band, read from the tier table.
-        var band = TIER_PRICE[card.dataset.tier];
+        var band = priceOf(code, card);
         var profile = link ? link.getAttribute("href") : "";
         var handle = profile
           ? "@" + profile.replace(/\/$/, "").split("/").pop().replace(/^@/, "")
@@ -699,7 +712,7 @@
           "   Followers  " + metaValue("followers"),
           "   City       " + card.dataset.city,
           "   Tier       " + card.dataset.tier,
-          "   Price      " + (band ? money(band[0]) + " – " + money(band[1]) + " SAR" : "—")
+          "   Price      " + priceText(band)
         ].filter(Boolean).join("\n");
       }
 
@@ -712,9 +725,11 @@
         if (!card) return;
         var t = card.dataset.tier;
         tally[t] = (tally[t] || 0) + 1;
-        var p = TIER_PRICE[t];
+        var p = priceOf(code, card);
         if (p) { lo += p[0]; hi += p[1]; }
       });
+      var fixed = curatedTotal();
+      if (fixed) { lo = fixed[0]; hi = fixed[1]; }
       var split = Object.keys(tally).map(function (t) {
         return t + " " + tally[t];
       }).join(", ");
@@ -739,7 +754,8 @@
             buildFragment(selectionName || (data.get("company") || "Client") + " selection", selected),
         creators_selected: selected.length,
         tier_split: split || "—",
-        indicative_total: lo ? lo.toLocaleString("en-US") + " – " + hi.toLocaleString("en-US") + " SAR" : "—",
+        indicative_total: lo ? priceText([lo, hi]) : "—",
+        price_note: "Indicative only, not a final price. Excludes taxes.",
         selection: lines.join("\n\n"),
         submitted_at: new Date().toISOString(),
         catalogue: "HelloVoice Creator Roster"
@@ -882,7 +898,53 @@
 
   function money(n) { return n.toLocaleString("en-US"); }
 
+  // What one creator costs: the price a prepared selection set, else the
+  // creator's own rate, else their tier's band.
+  function priceOf(code, card) {
+    if (CURATED && CURATED.prices[code]) return CURATED.prices[code];
+    card = card || document.querySelector('.cat-card[data-code="' + code + '"]');
+    if (card && card.dataset.price) {
+      var p = card.dataset.price.split("-").map(Number);
+      if (p[0]) return [p[0], p[1] || p[0]];
+    }
+    return card ? TIER_PRICE[card.dataset.tier] : null;
+  }
+  function priceText(p) {
+    if (!p) return "—";
+    return (p[0] === p[1] ? money(p[0]) : money(p[0]) + " – " + money(p[1])) + " SAR";
+  }
+
+  // The admin's total applies only while the client is looking at exactly the
+  // creators it was set for; remove one and the page adds up what is left.
+  function curatedTotal() {
+    if (!CURATED || !CURATED.total) return null;
+    if (selected.length !== CURATED.codes.length) return null;
+    for (var i = 0; i < selected.length; i++) {
+      if (CURATED.codes.indexOf(selected[i]) === -1) return null;
+    }
+    return CURATED.total;
+  }
+
   function initSelection() {
+    var token = readFragment().token;
+    if (CFG.api && token && !CURATED) {
+      fetch(CFG.api + "/api/selection?s=" + encodeURIComponent(token), { credentials: "include" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (b) {
+          if (b && b.ok) {
+            CURATED = { token: token, name: b.name, codes: b.codes || [],
+                        prices: b.prices || {}, total: b.total };
+            history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
+          }
+          startSelection();
+        })
+        .catch(startSelection);
+      return;
+    }
+    startSelection();
+  }
+
+  function startSelection() {
     var cards = all(".cat-card");
     var byCode = {};
     cards.forEach(function (c) { byCode[c.dataset.code] = c; });
@@ -913,12 +975,14 @@
       selected.forEach(function (code) {
         var t = byCode[code].dataset.tier;
         tiers[t] = (tiers[t] || 0) + 1;
-        var p = TIER_PRICE[t];
+        var p = priceOf(code, byCode[code]);
         if (p) { lo += p[0]; hi += p[1]; }
       });
+      var fixed = curatedTotal();
+      if (fixed) { lo = fixed[0]; hi = fixed[1]; }
       var rows = [
         ["Creators", String(selected.length)],
-        ["Indicative range", selected.length ? money(lo) + " – " + money(hi) + " SAR" : "—"]
+        ["Indicative range", selected.length ? priceText([lo, hi]) : "—"]
       ];
       Object.keys(TIER_PRICE).forEach(function (t) {
         if (tiers[t]) rows.push([t, String(tiers[t])]);
@@ -943,6 +1007,19 @@
       requestAnimationFrame(function () {
         document.body.style.paddingBottom =
           Math.ceil(tray.getBoundingClientRect().height + 16) + "px";
+      });
+    }
+
+    // A prepared selection shows each creator's agreed price on the card.
+    if (CURATED) {
+      cards.forEach(function (card) {
+        var p = CURATED.prices[card.dataset.code];
+        var list = card.querySelector(".cat-card__meta");
+        if (!p || !list || list.querySelector(".cat-card__price")) return;
+        var li = document.createElement("li");
+        li.className = "cat-card__price";
+        li.innerHTML = "<span>Price</span><strong>" + esc(priceText(p)) + "</strong>";
+        list.appendChild(li);
       });
     }
 
@@ -986,6 +1063,9 @@
     });
     window.addEventListener("hashchange", function () {
       var f = readFragment();
+      // Moving between a prepared selection and any other link changes where
+      // the prices come from; start the page over rather than patch the cards.
+      if ((f.token || "") !== (CURATED ? CURATED.token : "")) { location.reload(); return; }
       selectionName = f.name || "Selection";
       selected = f.codes.filter(function (c) { return !!byCode[c]; });
       render();

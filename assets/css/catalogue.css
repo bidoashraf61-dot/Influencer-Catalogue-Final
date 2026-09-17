@@ -756,3 +756,13 @@ body[data-page="selection"] .cat-card__check { display: none; }
   .cat-share { flex-wrap: wrap; }
   .cat-share__url { flex: 1 1 100%; }
 }
+
+/* Price notice on the selection page — meant to be read, not skimmed past. */
+.cat-price-notice{max-width:80ch;margin:4px 0 28px;padding:16px 22px;border-radius:var(--r-sm);
+  background:var(--white);border-left:6px solid var(--vivid-orange);color:var(--ink);
+  box-shadow:0 2px 12px rgba(18,18,18,.06)}
+.cat-price-notice__title{margin:0 0 6px;font-weight:700;font-size:15px;letter-spacing:.01em}
+.cat-price-notice ul{margin:0;padding-left:18px}
+.cat-price-notice li{margin:4px 0;line-height:1.45;font-size:14px}
+.cat-close__sub--note{font-size:13px;opacity:.8;margin-top:-4px}
+.cat-card__price strong{color:inherit;font-weight:700}

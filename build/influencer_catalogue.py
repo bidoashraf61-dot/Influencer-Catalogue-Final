@@ -890,7 +890,13 @@ def build():
   <section class="cat-summary" aria-label="Summary">
     <div class="cat-pad"><div class="cat-container">
       <dl class="cat-summary__grid" id="sel-summary"></dl>
-      <p class="cat-note">The total is an indicative range for this shortlist as a whole. Final rates vary with campaign requirements, deliverables, exclusivity, seasonality and any special agreement, and are confirmed in the quote.</p>
+      <div class="cat-price-notice" role="note">
+        <p class="cat-price-notice__title">Please note</p>
+        <ul>
+          <li><strong>These are indicative prices, not a final price.</strong> Rates vary by creator, season, deliverables, exclusivity and campaign requirements, and are confirmed in our quote.</li>
+          <li><strong>All prices exclude taxes</strong> (VAT is added on the final quote).</li>
+        </ul>
+      </div>
     </div></div>
   </section>
 
@@ -912,6 +918,7 @@ def build():
         Send it back and we will come back with a full quote, deliverables and
         availability for each creator.
       </p>
+      <p class="cat-close__sub cat-close__sub--note">Prices shown are indicative and exclude taxes.</p>
       <div class="cat-close__actions">
         <button type="button" class="cat-btn cat-btn--lime" id="cat-request-2">Request a quote</button>
         <button type="button" class="cat-btn cat-btn--ghost" id="cat-copy-link">Copy link</button>

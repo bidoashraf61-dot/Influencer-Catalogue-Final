@@ -213,6 +213,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/roster":
             return self.api_roster()
+        if path == "/api/selection":
+            return self.api_selection(query.get("s") or "")
         if path == "/health":
             return self.send_json(200, {"ok": True})
         if path == "/static/admin.css":
@@ -323,6 +325,19 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/requests":
             return self.send(200, views.requests_page(db.list_requests(),
                                                       db.list_creators(), db.tier_prices()))
+        if path == "/api/pulse":
+            return self.send_json(200, db.request_pulse(), [("Cache-Control", "no-store")])
+        if path == "/selections":
+            return self.send(200, views.selections_page(
+                db.list_selections(), query.get("e"), query.get("ok"), self.site_origin()))
+        if path == "/selections/edit":
+            sid = query.get("id", "")
+            sel = db.selection(int(sid)) if sid.isdigit() else None
+            if sel is None:
+                return self.redirect("/selections?e=" + urllib.parse.quote("That selection no longer exists."))
+            return self.send(200, views.selection_edit_page(
+                sel, db.list_creators(), db.tier_prices(), self.site_origin(),
+                query.get("e"), query.get("ok")))
         return self.send(404, views.simple("Not found", "That page does not exist."))
 
     def do_POST(self):
@@ -347,6 +362,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_code_revoke()
         if path == "/roster/save":
             return self.post_roster_save()
+        if path == "/selections/new":
+            return self.post_selection_new()
+        if path == "/selections/save":
+            return self.post_selection_save()
+        if path == "/selections/delete":
+            return self.post_selection_delete()
         if path == "/roster/delete":
             return self.post_roster_delete()
         if path == "/roster/import":
@@ -401,7 +422,18 @@ class Handler(BaseHTTPRequestHandler):
         days = form.get("days", "").strip()
         max_uses = form.get("max_uses", "").strip()
         expires = db.now() + int(days) * 86400 if days.isdigit() and int(days) > 0 else None
-        code = auth.generate_code()
+        # A passcode typed by the admin ("Alpha Plus122") or, left blank, one
+        # generated. Typed ones are matched ignoring case, spaces and dashes.
+        code = (form.get("custom") or "").strip()
+        if code:
+            problem = auth.custom_code_problem(code)
+            if problem:
+                return self.redirect("/codes?e=" + urllib.parse.quote(problem))
+            if db.code_by_hash(auth.hash_code(code)):
+                return self.redirect("/codes?e=" + urllib.parse.quote(
+                    "That passcode is already in use. Choose another."))
+        else:
+            code = auth.generate_code()
         db.create_code(auth.hash_code(code), auth.code_hint(code), label, expires,
                        int(max_uses) if max_uses.isdigit() and int(max_uses) > 0 else None,
                        code_plain=code)
@@ -412,6 +444,23 @@ class Handler(BaseHTTPRequestHandler):
         if cid and cid.isdigit():
             db.revoke_code(int(cid))
         return self.redirect("/codes")
+
+    def roster_back(self, f, code=None, ok=None, e=None):
+        """Where a roster action returns to: the same search, the same page,
+        scrolled to the creator it touched. Every early return used to send
+        the admin to page 1, to scroll back down to where they were."""
+        keep = {}
+        if (f.get("q") or "").strip():
+            keep["q"] = f["q"].strip()
+        pg = (f.get("page") or "").strip()
+        if pg.isdigit() and pg != "1":
+            keep["page"] = pg
+        if ok:
+            keep["ok"] = ok
+        if e:
+            keep["e"] = e
+        return self.redirect("/roster" + ("?" + urllib.parse.urlencode(keep) if keep else "")
+                             + ("#" + code if code else ""))
 
     def post_roster_save(self):
         f = self.form_body(multi=("city", "interest",
@@ -427,8 +476,7 @@ class Handler(BaseHTTPRequestHandler):
                     code = candidate
                     break
             if not code:
-                return self.redirect("/roster?e=" + urllib.parse.quote(
-                    "Could not assign a code — try again."))
+                return self.roster_back(f, e="Could not assign a code — try again.")
 
         existing = db.creator(code)
         # A form opened before someone else saved must not write its older
@@ -437,7 +485,7 @@ class Handler(BaseHTTPRequestHandler):
         if existing is not None and seen_at:
             current = str(existing["updated_at"] or "")
             if current and current != seen_at:
-                return self.redirect("/roster?e=" + urllib.parse.quote(
+                return self.roster_back(f, code, e=(
                     code + " was changed somewhere else while this form was open. "
                     "Nothing was overwritten — open it again and redo the change."))
         photo = (existing["photo"] if existing else None)
@@ -445,13 +493,26 @@ class Handler(BaseHTTPRequestHandler):
         if saved:
             Handler.forget_photo_widths()
         if err:
-            return self.redirect("/roster?e=" + urllib.parse.quote(err))
+            return self.roster_back(f, code, e=err)
         if saved:
             photo = saved
         elif (f.get("photo") or "").strip():
             photo = f["photo"].strip()
 
         followers = (f.get("followers") or "").replace(",", "").strip()
+
+        # This creator's own rate per video. Both empty: the tier's band is
+        # used. One figure: a fixed price. Two: a range, in either order.
+        def money(key):
+            v = "".join(ch for ch in (f.get(key) or "") if ch.isdigit())
+            return int(v) if v else None
+        p_from, p_to = money("price_from"), money("price_to")
+        if p_from is None and p_to is not None:
+            p_from = p_to
+        if p_to is None and p_from is not None:
+            p_to = p_from
+        if p_from is not None and p_to < p_from:
+            p_from, p_to = p_to, p_from
 
         # The form posts one p_platform/p_url pair per row, blanks included.
         # A row with a platform but a bare username instead of a link is
@@ -508,23 +569,12 @@ class Handler(BaseHTTPRequestHandler):
             "active": 1 if f.get("active") else 0,
             "note": (f.get("note") or "").strip() or None,
             "sort": int(f["sort"]) if (f.get("sort") or "").isdigit() else 0,
+            "price_from": p_from,
+            "price_to": p_to,
         })
-        # Back to the view the edit was made from. Redirecting to a bare
-        # /roster cleared the search and returned to the top of an unpaginated
-        # 759-row list, so a saved creator was nowhere on screen — which reads
-        # exactly like the edit having been lost.
-        back = "/roster"
-        keep = {}
-        if (f.get("q") or "").strip():
-            keep["q"] = f["q"].strip()
-        # The roster is paged now, so the page number has to come back with the
-        # search: without it a creator edited on page 6 would be answered with
-        # page 1, which reads exactly like the edit having been lost.
-        if (f.get("page") or "").strip().isdigit() and f["page"].strip() != "1":
-            keep["page"] = f["page"].strip()
-        if keep:
-            back += "?" + urllib.parse.urlencode(keep)
-        return self.redirect(back + "#" + code)
+        # Back to the view the edit was made from: same search, same page,
+        # scrolled to this creator, with a note saying it saved.
+        return self.roster_back(f, code, ok=("Saved " + code + "."))
 
     def post_roster_import(self):
         part = self.form_body().get("sheet")
@@ -748,7 +798,8 @@ class Handler(BaseHTTPRequestHandler):
         db.save_tier(name, code, lo, hi, reach,
                      int(sort) if sort.lstrip("-").isdigit() else 0,
                      int(rf) if rf.isdigit() else None,
-                     int(rt) if rt.isdigit() else None)
+                     int(rt) if rt.isdigit() else None,
+                     auto=bool(f.get("auto")))
         return self.redirect("/roster?ok=" + urllib.parse.quote(
             "Tier " + name + " saved at " + format(lo, ",") + " – "
             + format(hi, ",") + " SAR."))
@@ -764,7 +815,8 @@ class Handler(BaseHTTPRequestHandler):
             "Tier " + name + " removed."))
 
     def post_roster_delete(self):
-        code = self.form_body().get("code")
+        f = self.form_body()
+        code = f.get("code")
         if code:
             # The picture is not in the database, it is a file beside the site,
             # so deleting the row on its own left the photograph on disk — and
@@ -781,7 +833,99 @@ class Handler(BaseHTTPRequestHandler):
                     # the creator in the roster.
                     pass
             db.delete_creator(code)
-        return self.redirect("/roster")
+        return self.roster_back(f, ok=(code + " deleted.") if code else None)
+
+    # --------------------------------------------------------- selections --
+
+    def site_origin(self):
+        """The catalogue's own address, for the links a selection hands out."""
+        return (ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS
+                else "https://" + (self.headers.get("Host") or "")).rstrip("/")
+
+    def post_selection_new(self):
+        """A blank selection, or one started from a quote request."""
+        f = self.form_body()
+        rid = (f.get("request") or "").strip()
+        codes, name = [], (f.get("name") or "").strip()
+        if rid.isdigit():
+            req = db.request(int(rid))
+            if req is None:
+                return self.redirect("/requests")
+            codes = [c for c in json.loads(req["selection"] or "[]") if isinstance(c, str)]
+            name = name or req["selection_name"] or ((req["company"] or "Client") + " selection")
+        raw = (f.get("codes") or "").upper()
+        for c in re.findall(r"HV-[A-Z0-9]{2,4}-\d+", raw):
+            if c not in codes:
+                codes.append(c)
+        known = {c["code"] for c in db.list_creators()}
+        codes = [c for c in codes if c in known]
+        sid = db.save_selection(None, name or "New selection", codes, {}, None, None,
+                                int(rid) if rid.isdigit() else None)
+        return self.redirect("/selections/edit?id=%d" % sid)
+
+    def post_selection_save(self):
+        f = self.form_body(multi=("code", "p_from", "p_to", "drop"))
+        sid = (f.get("id") or "").strip()
+        sel = db.selection(int(sid)) if sid.isdigit() else None
+        if sel is None:
+            return self.redirect("/selections")
+
+        def num(v):
+            v = "".join(ch for ch in (v or "") if ch.isdigit())
+            return int(v) if v else None
+
+        codes, prices = [], {}
+        known = {c["code"] for c in db.list_creators()}
+        rows = zip(f.get("code") or [], f.get("p_from") or [], f.get("p_to") or [])
+        remove = set(f.get("drop") or [])
+        for code, lo, hi in rows:
+            code = code.strip().upper()
+            if not code or code in codes or code in remove or code not in known:
+                continue
+            codes.append(code)
+            lo, hi = num(lo), num(hi)
+            if lo is None and hi is not None: lo = hi
+            if hi is None and lo is not None: hi = lo
+            if lo is not None:
+                prices[code] = sorted([lo, hi])
+        for c in re.findall(r"HV-[A-Z0-9]{2,4}-\d+", (f.get("add") or "").upper()):
+            if c in known and c not in codes:
+                codes.append(c)
+        t_from, t_to = num(f.get("total_from")), num(f.get("total_to"))
+        if t_from is None and t_to is not None: t_from = t_to
+        if t_to is None and t_from is not None: t_to = t_from
+        if t_from is not None and t_to < t_from: t_from, t_to = t_to, t_from
+        name = (f.get("name") or "").strip() or sel["name"]
+        db.save_selection(sel["id"], name, codes, prices, t_from, t_to)
+        return self.redirect("/selections/edit?id=%d&ok=%s" % (sel["id"], urllib.parse.quote("Saved.")))
+
+    def post_selection_delete(self):
+        sid = (self.form_body().get("id") or "").strip()
+        if sid.isdigit():
+            db.delete_selection(int(sid))
+        return self.redirect("/selections?ok=" + urllib.parse.quote("Selection deleted."))
+
+    def api_selection(self, token):
+        """A prepared selection, for the client's page. Behind the same
+        passcode as the roster: the token alone shows nothing."""
+        if not self.viewer_code_id():
+            return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+        sel = db.selection(token=token) if token else None
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        bands = db.tier_prices()
+        by = {c["code"]: c for c in db.list_creators(active_only=True)}
+        codes = [c for c in json.loads(sel["codes"] or "[]") if c in by]
+        own = json.loads(sel["prices"] or "{}")
+        prices = {}
+        for c in codes:
+            p = own.get(c) or db.price_of(by[c], bands)
+            if p:
+                prices[c] = list(p)
+        total = ([sel["total_from"], sel["total_to"]]
+                 if sel["total_from"] is not None else None)
+        return self.send_json(200, {"ok": True, "name": sel["name"], "codes": codes,
+                                    "prices": prices, "total": total}, self.cors())
 
     def post_request_handled(self):
         f = self.form_body()
@@ -793,7 +937,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def api_unlock(self):
         code = (self.json_body().get("code") or "").strip()
-        row = db.code_by_hash(auth.hash_code(code)) if code else None
+        row = None
+        if code:
+            row = (db.code_by_hash(auth.hash_code(code))
+                   or db.code_by_hash(auth.legacy_hash_code(code)))
         ok, reason = db.code_state(row)
         ua = self.headers.get("User-Agent")
         if not ok:
@@ -837,6 +984,7 @@ class Handler(BaseHTTPRequestHandler):
         ]
 
     def roster_payload(self):
+        bands = db.tier_prices()
         return [
             {
                 "code": r["code"], "name": r["name"], "handle": r["handle"],
@@ -849,6 +997,9 @@ class Handler(BaseHTTPRequestHandler):
                 # could be pulled without a passcode; nginx now refuses a photo
                 # this service did not sign.
                 "photo_url": links.photo(r["photo"]) if r["photo"] else None,
+                # This creator's price: their own rate if one is set, their
+                # tier's band otherwise. The page prices a selection from this.
+                "price": list(db.price_of(r, bands) or []) or None,
                 "profiles": db.split_profiles(r["profiles"]),
             }
             for r in db.list_creators(active_only=True)

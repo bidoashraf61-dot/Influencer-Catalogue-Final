@@ -52,7 +52,10 @@ CREATE TABLE IF NOT EXISTS tiers (
   reach       TEXT,                     -- "10K – 50K", shown on the ticker
   reach_from  INTEGER,                  -- the same band as numbers, so a
   reach_to    INTEGER,                  -- follower count can be placed in it
-  sort        INTEGER NOT NULL DEFAULT 0
+  sort        INTEGER NOT NULL DEFAULT 0,
+  auto        INTEGER NOT NULL DEFAULT 1 -- 1: a follower band creators are placed
+                                        -- in automatically; 0: a category (HCPs)
+                                        -- a creator is put in by hand and kept in
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -83,7 +86,26 @@ CREATE TABLE IF NOT EXISTS creators (
                                         -- on several platforms, not one
   active    INTEGER NOT NULL DEFAULT 1,
   note      TEXT,
-  sort      INTEGER NOT NULL DEFAULT 0
+  sort      INTEGER NOT NULL DEFAULT 0,
+  price_from INTEGER,                   -- this creator's own rate per video;
+  price_to   INTEGER                    -- empty means "use the tier's band"
+);
+
+-- A shortlist prepared in the dashboard for one client, with the prices the
+-- admin has set on it. The link a client receives names it by token, and the
+-- page takes the codes and prices from here rather than from the URL, so a
+-- client cannot edit their way to a different figure.
+CREATE TABLE IF NOT EXISTS selections (
+  id          INTEGER PRIMARY KEY,
+  token       TEXT NOT NULL UNIQUE,
+  name        TEXT NOT NULL,
+  codes       TEXT NOT NULL,            -- JSON ["HV-MC-001", ...], in order
+  prices      TEXT,                     -- JSON {"HV-MC-001": [from, to], ...}
+  total_from  INTEGER,                  -- a range typed for the whole list;
+  total_to    INTEGER,                  -- empty means "add up the creators"
+  request_id  INTEGER,                  -- the quote request it was built from
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS requests (
@@ -185,6 +207,11 @@ def migrate(conn):
     if "updated_at" not in cols:
         conn.execute("ALTER TABLE creators ADD COLUMN updated_at INTEGER")
         conn.execute("UPDATE creators SET updated_at = ?", (now(),))
+    # A creator's own rate. Empty for everyone to begin with, which keeps every
+    # existing price exactly where it was: on the tier band.
+    if "price_from" not in cols:
+        conn.execute("ALTER TABLE creators ADD COLUMN price_from INTEGER")
+        conn.execute("ALTER TABLE creators ADD COLUMN price_to INTEGER")
 
     # Existing tiers have a reach as prose only. Give them numbers once, read
     # off the text they already carry, so a follower count can be placed in a
@@ -199,6 +226,15 @@ def migrate(conn):
                 conn.execute(
                     "UPDATE tiers SET reach_from = ?, reach_to = ? WHERE name = ?",
                     (low, high, r["name"]))
+
+    # A tier can be a category rather than a follower band — HCPs spans 1K to
+    # 10M and says what a creator is, not how big. Automatic placement must
+    # neither put anyone in it nor take anyone out of it.
+    tier_cols = {r["name"] for r in conn.execute("PRAGMA table_info(tiers)")}
+    if "auto" not in tier_cols:
+        conn.execute("ALTER TABLE tiers ADD COLUMN auto INTEGER NOT NULL DEFAULT 1")
+        conn.execute("UPDATE tiers SET auto = 0 WHERE upper(code) LIKE 'HCP%' "
+                     "OR upper(name) LIKE 'HCP%'")
 
     seed_tiers(conn)
 
@@ -599,12 +635,21 @@ def upsert_creator(c, conn=None):
     # Stamped here rather than by each caller, so no write can forget it and
     # leave a record the staleness check cannot protect.
     c = dict(c, updated_at=now())
+    # The form always says what the price is; an import sheet has no price
+    # column. A write that does not mention the price must not wipe the one an
+    # admin set, so it carries the stored value forward.
+    if "price_from" not in c:
+        row = conn.execute("SELECT price_from, price_to FROM creators WHERE code = ?",
+                           (c["code"],)).fetchone()
+        c["price_from"] = row["price_from"] if row else None
+        c["price_to"] = row["price_to"] if row else None
     conn.execute(
         "INSERT INTO creators (code,name,handle,platform,followers,city,"
-        "nationality,tier,interest,photo,profiles,active,note,sort,updated_at) "
+        "nationality,tier,interest,photo,profiles,active,note,sort,updated_at,"
+        "price_from,price_to) "
         "VALUES (:code,:name,:handle,:platform,:followers,:city,"
         ":nationality,:tier,:interest,:photo,:profiles,:active,:note,:sort,"
-        ":updated_at) "
+        ":updated_at,:price_from,:price_to) "
         "ON CONFLICT(code) DO UPDATE SET "
         " name=excluded.name, handle=excluded.handle, platform=excluded.platform, "
         " followers=excluded.followers, city=excluded.city, "
@@ -612,7 +657,8 @@ def upsert_creator(c, conn=None):
         " interest=excluded.interest, photo=excluded.photo, "
         " profiles=excluded.profiles, active=excluded.active, "
         " note=excluded.note, sort=excluded.sort, "
-        " updated_at=excluded.updated_at",
+        " updated_at=excluded.updated_at, "
+        " price_from=excluded.price_from, price_to=excluded.price_to",
         c,
     )
 
@@ -788,17 +834,18 @@ def tier_names():
 
 
 def save_tier(name, code, price_from, price_to, reach=None, sort=0,
-              reach_from=None, reach_to=None):
+              reach_from=None, reach_to=None, auto=1):
     with connect() as conn:
         conn.execute(
             "INSERT INTO tiers (name,code,price_from,price_to,reach,sort,"
-            "reach_from,reach_to) VALUES (?,?,?,?,?,?,?,?) "
+            "reach_from,reach_to,auto) VALUES (?,?,?,?,?,?,?,?,?) "
             "ON CONFLICT(name) DO UPDATE SET "
             " code=excluded.code, price_from=excluded.price_from, "
             " price_to=excluded.price_to, reach=excluded.reach, "
             " sort=excluded.sort, reach_from=excluded.reach_from, "
-            " reach_to=excluded.reach_to",
-            (name, code, price_from, price_to, reach, sort, reach_from, reach_to))
+            " reach_to=excluded.reach_to, auto=excluded.auto",
+            (name, code, price_from, price_to, reach, sort, reach_from, reach_to,
+             1 if auto else 0))
 
 
 def tier_bands():
@@ -806,7 +853,12 @@ def tier_bands():
     placed against, in the browser and on the server alike."""
     return [(t["name"], t["reach_from"], t["reach_to"])
             for t in list_tiers()
-            if t["reach_from"] is not None or t["reach_to"] is not None]
+            if t["auto"] and (t["reach_from"] is not None or t["reach_to"] is not None)]
+
+
+def manual_tiers():
+    """Tiers a creator is placed in by hand and never moved out of."""
+    return [t["name"] for t in list_tiers() if not t["auto"]]
 
 
 def tier_for_reach(count):
@@ -943,3 +995,74 @@ def mark_handled(rid, handled=True):
     with connect() as conn:
         conn.execute("UPDATE requests SET handled_at = ? WHERE id = ?",
                      (now() if handled else None, rid))
+
+
+# ------------------------------------------------------------------ prices --
+
+def price_of(creator, bands):
+    """(from, to) for one creator: their own rate when one is set, otherwise
+    their tier's band. `bands` is tier_prices(). A single figure is stored as
+    from == to, which is how "1,500 per video" reads."""
+    lo = creator["price_from"] if "price_from" in creator.keys() else None
+    hi = creator["price_to"] if "price_to" in creator.keys() else None
+    if lo or hi:
+        return (lo or hi, hi or lo)
+    return tuple(bands.get(creator["tier"]) or ()) or None
+
+
+# ------------------------------------------------------------- selections --
+
+def list_selections():
+    with connect() as conn:
+        return conn.execute("SELECT * FROM selections ORDER BY updated_at DESC").fetchall()
+
+
+def selection(sid=None, token=None):
+    with connect() as conn:
+        if token is not None:
+            return conn.execute("SELECT * FROM selections WHERE token = ?", (token,)).fetchone()
+        return conn.execute("SELECT * FROM selections WHERE id = ?", (sid,)).fetchone()
+
+
+def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None):
+    """Create (sid None) or update one prepared selection. Returns its id."""
+    import secrets
+    with connect() as conn:
+        if sid is None:
+            cur = conn.execute(
+                "INSERT INTO selections (token,name,codes,prices,total_from,total_to,"
+                "request_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)",
+                (secrets.token_urlsafe(9), name, json.dumps(codes), json.dumps(prices),
+                 total_from, total_to, request_id, now(), now()))
+            return cur.lastrowid
+        conn.execute(
+            "UPDATE selections SET name=?, codes=?, prices=?, total_from=?, total_to=?, "
+            "updated_at=? WHERE id=?",
+            (name, json.dumps(codes), json.dumps(prices), total_from, total_to, now(), sid))
+        return sid
+
+
+def delete_selection(sid):
+    with connect() as conn:
+        conn.execute("DELETE FROM selections WHERE id = ?", (sid,))
+
+
+def request(rid):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM requests WHERE id = ?", (rid,)).fetchone()
+
+
+# ---------------------------------------------------------- notifications --
+
+def request_pulse():
+    """What the dashboard header needs: how many requests nobody has handled,
+    and the newest id, so a page can tell a new one from one it already saw."""
+    with connect() as conn:
+        r = conn.execute(
+            "SELECT (SELECT COUNT(*) FROM requests WHERE handled_at IS NULL) open, "
+            "       (SELECT COALESCE(MAX(id), 0) FROM requests) latest").fetchone()
+        last = conn.execute(
+            "SELECT id, company, name, selection FROM requests ORDER BY id DESC LIMIT 1").fetchone()
+    return {"open": r["open"], "latest": r["latest"],
+            "company": (last["company"] or last["name"] or "") if last else "",
+            "count": len(json.loads(last["selection"] or "[]")) if last else 0}

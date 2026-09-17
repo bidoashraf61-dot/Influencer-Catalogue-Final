@@ -17,7 +17,7 @@ import time
 from datetime import datetime, timezone
 
 import links
-from db import code_state, now, split_cities, split_profiles, PLATFORMS
+from db import code_state, now, split_cities, split_profiles, price_of, PLATFORMS
 
 
 def e(v):
@@ -103,6 +103,20 @@ border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;text
 .btn:hover{opacity:.88}
 .btn.ghost{background:transparent;color:var(--ink)}
 .btn.small{padding:6px 14px;font-size:13px}
+.badge{display:inline-block;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;
+  background:var(--red);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;
+  vertical-align:1px}
+.toast{position:fixed;right:18px;bottom:18px;z-index:50;max-width:360px;padding:14px 18px;border-radius:12px;
+  background:var(--ink);color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:14px}
+.toast a{color:var(--lime);font-weight:600;text-decoration:none}
+tr[id]{scroll-margin-top:90px}
+tr.flash td{animation:flash 2.4s ease-out}
+@keyframes flash{0%,35%{background:#fff7c2}100%{background:transparent}}
+.price-hint{font-size:12px;color:var(--gray);margin-top:4px}
+.pill.own{background:#eef6ff;color:#1d4ed8}
+.sel-table input{max-width:130px}
+.sel-link{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sel-link input{flex:1;min-width:260px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .pager{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
   margin:18px 0 4px;font-size:14px}
 .pager a,.pager .pgnow,.pager .pgoff{padding:7px 12px;border-radius:8px;line-height:1;
@@ -288,9 +302,25 @@ def u(path):
 
 def page(title, body, active=""):
     items = [("/", "Overview"), ("/codes", "Access codes"), ("/analytics", "Analytics"),
-             ("/roster", "Roster"), ("/requests", "Requests")]
+             ("/roster", "Roster"), ("/selections", "Selections"), ("/requests", "Requests")]
+    # Requests nobody has handled yet, counted on every page so a new one is
+    # seen from wherever the admin happens to be. The page script keeps it
+    # live afterwards.
+    try:
+        from db import request_pulse
+        pulse = request_pulse()
+    except Exception:
+        pulse = {"open": 0, "latest": 0}
+
+    def badge(href):
+        if href != "/requests":
+            return ""
+        n = pulse["open"]
+        return ("<span class='badge' id='req-badge'" + ("" if n else " hidden") + ">"
+                + str(n) + "</span>")
     nav = "".join(
-        '<a href="' + u(href) + '"' + (' class="on"' if active == href else "") + ">" + label + "</a>"
+        '<a href="' + u(href) + '"' + (' class="on"' if active == href else "") + ">" + label
+        + badge(href) + "</a>"
         for href, label in items
     )
     return (
@@ -301,8 +331,77 @@ def page(title, body, active=""):
         + '<a class="brand" href="' + u("/") + '"><img src="' + u("/static/logo.webp") + '" alt="HelloVoice" '
           'height="26"><span>' + e(NAME) + "</span></a>"
         + "<nav>" + nav + '<a href="' + u("/logout") + '">Sign out</a></nav>'
-        + '</div></header><main class="wrap">' + body + "</main></body></html>"
+        + '</div></header><main class="wrap">' + body + "</main>"
+        + "<div class='toast' id='req-toast' role='status' hidden></div>"
+        + "<script>window.HV_PULSE=" + json.dumps({"latest": pulse["latest"],
+                                                    "company": pulse.get("company", ""),
+                                                    "count": pulse.get("count", 0),
+                                                    "api": u("/api/pulse"),
+                                                    "requests": u("/requests")})
+        + ";" + PULSE_JS + "</script></body></html>"
     )
+
+
+# Watches for new quote requests while any dashboard page is open: a count on
+# the header, a note in the corner, a short chime, and a desktop notification
+# when the browser allows one. The newest id already announced is remembered
+# per browser, so a request is announced once rather than on every page.
+PULSE_JS = """
+(function(){
+  var P=window.HV_PULSE, KEY='hv_seen_request';
+  var seen=+(localStorage.getItem(KEY)||0);
+  if(!seen){ seen=P.latest; try{localStorage.setItem(KEY,seen);}catch(e){} }
+  var base=document.title.replace(/^\\(\\d+\\)\\s*/,'');
+  function chime(){
+    try{
+      var A=window.AudioContext||window.webkitAudioContext; if(!A) return;
+      var c=new A(), t=c.currentTime;
+      [880,1320].forEach(function(f,i){
+        var o=c.createOscillator(), g=c.createGain();
+        o.frequency.value=f; o.connect(g); g.connect(c.destination);
+        g.gain.setValueAtTime(0.0001,t+i*0.18);
+        g.gain.exponentialRampToValueAtTime(0.25,t+i*0.18+0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001,t+i*0.18+0.3);
+        o.start(t+i*0.18); o.stop(t+i*0.18+0.32);
+      });
+    }catch(e){}
+  }
+  function show(d){
+    var b=document.getElementById('req-badge');
+    if(b){ b.textContent=d.open; b.hidden=!d.open; }
+    document.title=(d.open?'('+d.open+') ':'')+base;
+    if(d.latest>seen){
+      seen=d.latest; try{localStorage.setItem(KEY,seen);}catch(e){}
+      var msg='New quote request'+(d.company?' from '+d.company:'')+
+              (d.count?' — '+d.count+' creator'+(d.count==1?'':'s'):'');
+      var t=document.getElementById('req-toast');
+      if(t){ t.innerHTML=''; var a=document.createElement('a'); a.href=P.requests;
+             a.textContent=msg+' — open'; t.appendChild(a); t.hidden=false;
+             clearTimeout(t._h); t._h=setTimeout(function(){t.hidden=true;},15000); }
+      chime();
+      if(window.Notification && Notification.permission==='granted'){
+        try{ var n=new Notification('HelloVoice catalogue',{body:msg});
+             n.onclick=function(){window.focus();location.href=P.requests;}; }catch(e){}
+      }
+    }
+  }
+  function poll(){
+    fetch(P.api,{credentials:'same-origin'}).then(function(r){return r.ok?r.json():null;})
+      .then(function(d){ if(d) show(d); }).catch(function(){});
+  }
+  // Browsers only allow the permission prompt and sound after a click.
+  document.addEventListener('click',function once(){
+    document.removeEventListener('click',once);
+    if(window.Notification && Notification.permission==='default'){
+      try{Notification.requestPermission();}catch(e){}
+    }
+  });
+  show({open:+(document.getElementById('req-badge')||{}).textContent||0, latest:P.latest,
+        company:P.company, count:P.count});
+  setInterval(poll,20000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) poll(); });
+})();
+"""
 
 
 def simple(title, message):
@@ -437,11 +536,15 @@ def codes_page(codes, new_code=None, error=None):
         "like it.</p>" + banner
         + "<form method='post' action='" + u("/codes/new") + "' class='card'><div class='row'>"
         + "<div><label>Issued to</label><input name='label' placeholder='Alpha Plus' required></div>"
+        + "<div><label>Passcode (optional)</label><input name='custom' maxlength='40' "
+          "placeholder='e.g. Alpha Plus122' autocomplete='off'>"
+          "<div class='price-hint'>Leave empty to generate one. Case, spaces and dashes are ignored "
+          "when a client types it.</div></div>"
         + "<div><label>Expires in (days)</label>"
           "<input name='days' type='number' min='1' placeholder='30'></div>"
         + "<div><label>Max uses</label>"
           "<input name='max_uses' type='number' min='1' placeholder='unlimited'></div>"
-        + "</div><button class='btn'>Generate code</button></form>"
+        + "</div><button class='btn'>Create code</button></form>"
         + "<div class='card'><table><thead><tr><th>Code</th><th>State</th><th>Uses</th>"
         + "<th>Expires</th><th>Last used</th><th></th></tr></thead><tbody>"
         + body_rows + "</tbody></table></div>"
@@ -769,6 +872,11 @@ def tier_row(t, count):
         "<div><label for='s" + ident + "'>Order</label>"
         "<input id='s" + ident + "' name='sort' value='" + str(t["sort"])
         + "' size='2'></div>"
+        "<div><label for='a" + ident + "'>By followers</label>"
+        "<div style='padding-top:9px'><input id='a" + ident + "' type='checkbox' name='auto' value='1'"
+        + (" checked" if t["auto"] else "")
+        + " style='width:auto' title='On: creators are placed in this tier from their followers. "
+          "Off: a category (like HCPs) you assign by hand, and nobody is moved out of it.'></div></div>"
         "<div class='tier-act'><button class='btn small'>Save</button>" + delete
         + "<span class='muted' style='font-size:12px;margin-left:8px'>" + people
         + "</span></div></form>")
@@ -779,10 +887,15 @@ def tiers_section(tiers, used):
         "<p class='muted'>No tiers yet — add the first one below.</p>")
     return (
         "<h2>Tiers &amp; pricing</h2><div class='card'>"
-        "<p class='sub' style='margin-bottom:16px'>Every creator is priced by "
-        "their tier — there is no price on a creator, so changing a band here "
-        "re-prices everyone on it at once, on the cards, in the selection total "
-        "and in the quote.</p>"
+        "<p class='sub' style='margin-bottom:16px'>A creator is priced by their "
+        "tier unless they have their own <em>price per video</em>, so changing a "
+        "band here re-prices everyone on it who has no price of their own — in the "
+        "selection total and in the quote.</p>"
+        "<p class='sub' style='margin-bottom:16px'><strong>By followers</strong>: "
+        "ticked, creators are placed in the tier from their largest platform. "
+        "Unticked, the tier is a category — like <em>HCPs</em> — that you assign by "
+        "hand; nobody is placed in it or moved out of it automatically. Every tier "
+        "with creators in it appears as a filter on the catalogue.</p>"
         "<p class='sub' style='margin-bottom:18px'><strong>Code</strong> is the "
         "middle of a creator code — the <code>MI</code> in <code>HV-MI-007</code> "
         "— and is used when the next code is assigned. <strong>Reach label</strong> "
@@ -807,6 +920,8 @@ def tiers_section(tiers, used):
         "<div><label>Reach to</label><input name='reach_to' "
         "inputmode='numeric' placeholder='blank = no ceiling'></div>"
         "<div><label>Order</label><input name='sort' value='5' size='2'></div>"
+        "<div><label>By followers</label><div style='padding-top:9px'>"
+        "<input type='checkbox' name='auto' value='1' checked style='width:auto'></div></div>"
         "<div class='tier-act'><button class='btn'>Add tier</button></div>"
         "</form></div>")
 
@@ -920,7 +1035,7 @@ def city_field(c, cities):
             "separated by commas'></div>")
 
 
-def reach_script(bands):
+def reach_script(bands, manual=None):
     """Sum the per-platform followers, and pick the tier from the largest one.
 
     The total is the sum because that is what "total reach" means. The TIER is
@@ -933,6 +1048,7 @@ def reach_script(bands):
     """
     return ("<script>window.HV_BANDS=" + json.dumps(
         [{"name": name, "from": low, "to": high} for name, low, high in bands])
+        + ";window.HV_MANUAL=" + json.dumps(list(manual or []))
         + ";" + """
 (function(){
   function num(el){ var v=(el.value||"").replace(/[^0-9]/g,""); return v?parseInt(v,10):0; }
@@ -962,7 +1078,9 @@ def reach_script(bands):
     }
     var tier=form.querySelector("select[name=tier]");
     var want=tierFor(biggest);
-    if(tier && want){
+    // A creator filed under a category tier (HCPs) stays there.
+    var keep=tier && (window.HV_MANUAL||[]).indexOf(tier.value)!==-1;
+    if(tier && want && !keep){
       for(var j=0;j<tier.options.length;j++){
         if(tier.options[j].value===want||tier.options[j].text===want){
           tier.selectedIndex=j; break;
@@ -989,7 +1107,31 @@ def reach_script(bands):
 </script>""")
 
 
-def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1):
+def price_field(c, bands=None):
+    """This creator's own rate per video. Left empty, the tier's band is what
+    a selection uses — which is what every creator had before this existed."""
+    def v(key):
+        try:
+            x = c[key] if c is not None else None
+        except (IndexError, KeyError):
+            x = None
+        return "" if x is None else format(x, ",")
+    band = ""
+    if c is not None and bands and bands.get(c["tier"]):
+        lo, hi = bands[c["tier"]]
+        band = "Empty = tier price (" + format(lo, ",") + " – " + format(hi, ",") + " SAR)"
+    else:
+        band = "Empty = the tier's price range"
+    return (
+        "<div><label>Price per video (SAR)</label>"
+        "<div style='display:flex;gap:6px'>"
+        "<input name='price_from' value='" + v("price_from") + "' placeholder='from' inputmode='numeric'>"
+        "<input name='price_to' value='" + v("price_to") + "' placeholder='to (optional)' inputmode='numeric'>"
+        "</div><div class='price-hint'>" + e(band) + ". One figure = a fixed price.</div></div>"
+    )
+
+
+def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, bands=None):
     """Add/edit form. `c` is None when adding a new creator.
 
     `cities` is every city already on the roster. Checkboxes rather than a
@@ -1049,7 +1191,8 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1):
         delete_after = (
             "<form id='" + ident + "' method='post' action='" + u("/roster/delete")
             + "' onsubmit=\"" + confirm + "\"><input type='hidden' name='code' value='"
-            + e(c["code"]) + "'></form>")
+            + e(c["code"]) + "'><input type='hidden' name='q' value='" + e(q or "")
+            + "'><input type='hidden' name='page' value='" + e(str(page_no or 1)) + "'></form>")
 
     # Two things the form has to carry back with it. `q` is the search that was
     # running when the editor was opened, so the save can return to that same
@@ -1078,6 +1221,7 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1):
         + "<div><label>Followers (total)</label><input name='followers' value='"
         + val("followers") + "' title='Filled in from the platforms above'></div>"
         + "<div><label>Tier</label><select name='tier'>" + tier_opts + "</select></div>"
+        + price_field(c, bands)
         + city_field(c, cities)
         + "<div><label>Nationality</label><input name='nationality' value='"
         + val("nationality") + "' list='nationalities' placeholder='Saudi'></div>"
@@ -1099,6 +1243,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
                 bands=None, page_no=1, pages=1, total=None, per_page=100):
     tiers = tiers or []
     tier_names = [t["name"] for t in tiers]
+    price_bands = {t["name"]: (t["price_from"], t["price_to"]) for t in tiers}
     used = {}
     for c in creators:
         used[c["tier"]] = used.get(c["tier"], 0) + 1
@@ -1107,6 +1252,13 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         err += "<div class='err'>" + e(error) + "</div>"
     if message:
         err += "<div class='ok'>" + e(message) + "</div>"
+
+    def own_price(c):
+        lo, hi = c["price_from"], c["price_to"]
+        if not (lo or hi):
+            return ""
+        txt = format(lo, ",") if lo == hi else format(lo, ",") + "–" + format(hi, ",")
+        return "<br><span class='pill own' title='Own price per video'>" + txt + " SAR</span>"
 
     def row(c):
         hidden = "" if c["active"] else " <span class='pill dead'>hidden</span>"
@@ -1120,7 +1272,10 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         else:
             shot = "<span class='thumb sm none'>—</span>"
         open_now = (editing == c["code"])
-        link = u("/roster") + "?" + urlencode(q=q, edit="" if open_now else c["code"])
+        # Close keeps the page it was opened on; it used to drop to page 1.
+        link = u("/roster") + "?" + urlencode(
+            q=q, edit="" if open_now else c["code"],
+            page=(page_no if open_now and page_no > 1 else ""))
         button = ("<a class='btn small" + ("" if open_now else " ghost") + "' href='"
                   + link + "#" + e(c["code"]) + "'>"
                   + ("Close" if open_now else "Edit") + "</a>")
@@ -1131,7 +1286,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
             + "<td><strong>" + e(c["name"])
             + "</strong>" + hidden + "</td><td>" + e(c["platform"])
             + "<br><span class='muted'>" + e(handle) + "</span></td><td>"
-            + num(c["followers"]) + "</td><td>" + e(c["tier"]) + "</td><td>"
+            + num(c["followers"]) + "</td><td>" + e(c["tier"]) + own_price(c) + "</td><td>"
             + e(", ".join(split_cities(c["city"])) or "—") + "</td>"
             + "<td class='right'>" + button + "</td></tr>")
 
@@ -1145,7 +1300,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         # 4.2MB and 27,600, which is the lag.
         if open_now:
             out += ("<tr class='editrow'><td colspan='8'>"
-                    + creator_form(c, cities, tier_names, interests, q, page_no)
+                    + creator_form(c, cities, tier_names, interests, q, page_no, price_bands)
                     + "</td></tr>")
         return out
 
@@ -1201,11 +1356,11 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
 
     body = (
         suggestions
-        + reach_script(bands or [])
+        + reach_script(bands or [], [t["name"] for t in tiers if not t["auto"]])
         + "<h1>Roster</h1><p class='sub'>" + str(len(creators))
         + " creators. Hidden ones stay in the database but never reach a client.</p>" + err
         + "<h2>Add a creator</h2><div class='card'>"
-        + creator_form(None, cities, tier_names, interests, q) + "</div>"
+        + creator_form(None, cities, tier_names, interests, q, 1, price_bands) + "</div>"
         + "<h2>Import a spreadsheet</h2><div class='card'>"
         + "<p class='sub' style='margin-bottom:16px'>Add many creators at once. "
           "Start from the template so the headings match — a code left blank is "
@@ -1284,8 +1439,21 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + "<th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>City</th>"
         + "<th></th></tr></thead><tbody>" + rows + "</tbody></table></div>"
         + pager
+        + ROSTER_JS
     )
     return page("Roster", body, "/roster")
+
+
+# After a save the page opens at the creator that was edited, and marks it,
+# rather than at the top of the page with the row somewhere below.
+ROSTER_JS = """<script>
+(function(){
+  var id=decodeURIComponent((location.hash||'').slice(1)); if(!id) return;
+  var row=document.getElementById(id); if(!row) return;
+  var go=function(){ row.scrollIntoView({block:'center'}); row.classList.add('flash'); };
+  if(document.readyState==='complete') go(); else window.addEventListener('load',go);
+})();
+</script>"""
 
 
 def requests_page(requests, creators, tiers=None):
@@ -1315,9 +1483,10 @@ def requests_page(requests, creators, tiers=None):
                        + e(c["handle"]) + "</a>")
 
         price = "—"
-        t = tiers.get(c["tier"])
+        t = price_of(c, tiers)
         if t:
-            price = format(t[0], ",") + " – " + format(t[1], ",") + " SAR"
+            price = (format(t[0], ",") if t[0] == t[1]
+                     else format(t[0], ",") + " – " + format(t[1], ",")) + " SAR"
 
         rows = [("Followers", num(c["followers"])), ("Platform", e(c["platform"])),
                 ("City", e(c["city"] or "—")), ("Tier", e(c["tier"])), ("Price", price)]
@@ -1346,7 +1515,7 @@ def requests_page(requests, creators, tiers=None):
             if not c:
                 continue
             split[c["tier"]] = split.get(c["tier"], 0) + 1
-            t = tiers.get(c["tier"])
+            t = price_of(c, tiers)
             if t:
                 lo += t[0]
                 hi += t[1]
@@ -1360,6 +1529,10 @@ def requests_page(requests, creators, tiers=None):
             "<input type='hidden' name='handled' value='" + ("0" if handled else "1") + "'>"
             "<button class='btn small" + (" ghost" if handled else "") + "'>"
             + ("Reopen" if handled else "Mark handled") + "</button></form>"
+            # Start a priced selection from exactly what this client picked.
+            + " <form method='post' action='" + u("/selections/new") + "' class='inline'>"
+            "<input type='hidden' name='request' value='" + str(r["id"]) + "'>"
+            "<button class='btn small ghost'>Price &amp; send</button></form>"
         )
 
         contact = []
@@ -1396,3 +1569,134 @@ def requests_page(requests, creators, tiers=None):
           "exactly as they saw them.</p>" + body_cards
     )
     return page("Requests", body, "/requests")
+
+
+# ------------------------------------------------------------ selections --
+
+def _money(lo, hi):
+    if lo is None:
+        return "—"
+    return (format(lo, ",") if lo == hi else format(lo, ",") + " – " + format(hi, ",")) + " SAR"
+
+
+def selection_link(sel, origin):
+    """What the client is sent. The page reads the creators and prices from
+    the server by token; the name and codes ride along so the link still reads
+    as a selection before anything has loaded."""
+    from urllib.parse import quote
+    codes = json.loads(sel["codes"] or "[]")
+    return (origin + "/selection/#n=" + quote(sel["name"]) + "&c=" + ",".join(codes)
+            + "&s=" + sel["token"])
+
+
+def selections_page(sels, error=None, message=None, origin=""):
+    note = ""
+    if error:
+        note += "<div class='err'>" + e(error) + "</div>"
+    if message:
+        note += "<div class='ok'>" + e(message) + "</div>"
+    rows = []
+    for x in sels:
+        n = len(json.loads(x["codes"] or "[]"))
+        total = _money(x["total_from"], x["total_to"]) if x["total_from"] is not None else "sum of creators"
+        rows.append(
+            "<tr><td><strong><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>"
+            + e(x["name"]) + "</a></strong>"
+            + ("<br><span class='muted'>from request #" + str(x["request_id"]) + "</span>" if x["request_id"] else "")
+            + "</td><td>" + str(n) + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
+            + "</td><td class='right'><a class='btn small' href='" + u("/selections/edit") + "?id="
+            + str(x["id"]) + "'>Edit prices</a></td></tr>")
+    table = "".join(rows) or "<tr><td colspan='5' class='muted'>No prepared selections yet.</td></tr>"
+    body = (
+        "<h1>Selections</h1><p class='sub'>Shortlists you prepare for a client, with the prices "
+        "you choose. The client opens the link with their passcode and sees your prices — they "
+        "cannot change them. Start one here, or from a quote request with <em>Price &amp; send</em>.</p>"
+        + note
+        + "<form method='post' action='" + u("/selections/new") + "' class='card'><div class='row'>"
+        + "<div><label>Name</label><input name='name' placeholder='Fakeeh — Back to school' required></div>"
+        + "<div style='flex:2'><label>Creator codes</label><input name='codes' "
+          "placeholder='HV-MC-005, HV-MD-012 … (paste any list; codes are picked out)'></div>"
+        + "</div><button class='btn'>Create selection</button></form>"
+        + "<div class='card'><table><thead><tr><th>Selection</th><th>Creators</th><th>Total</th>"
+        + "<th>Updated</th><th></th></tr></thead><tbody>" + table + "</tbody></table></div>"
+    )
+    return page("Selections", body, "/selections")
+
+
+def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
+    by = {c["code"]: c for c in creators}
+    codes = json.loads(sel["codes"] or "[]")
+    own = json.loads(sel["prices"] or "{}")
+    note = ""
+    if error:
+        note += "<div class='err'>" + e(error) + "</div>"
+    if message:
+        note += "<div class='ok'>" + e(message) + "</div>"
+
+    lo_sum = hi_sum = 0
+    rows = []
+    for code in codes:
+        c = by.get(code)
+        if c is None:
+            continue
+        default = price_of(c, bands) or (None, None)
+        set_ = own.get(code)
+        eff = set_ or default
+        if eff and eff[0] is not None:
+            lo_sum += eff[0]; hi_sum += eff[1]
+        shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
+                if c["photo"] else "<span class='thumb sm none'>—</span>")
+        val = lambda i: format(set_[i], ",") if set_ else ""
+        rows.append(
+            "<tr><td>" + shot + "</td><td><code>" + e(code) + "</code><br>" + e(c["name"])
+            + ("" if c["active"] else " <span class='pill dead'>hidden</span>")
+            + "<input type='hidden' name='code' value='" + e(code) + "'></td>"
+            + "<td>" + e(c["tier"]) + "<br><span class='muted'>" + num(c["followers"]) + "</span></td>"
+            + "<td class='muted'>" + (_money(*default) if default[0] is not None else "—")
+        )
+        rows[-1] += (
+            "</td><td><input name='p_from' value='" + val(0) + "' placeholder='from' inputmode='numeric'></td>"
+            + "<td><input name='p_to' value='" + val(1) + "' placeholder='to' inputmode='numeric'></td>"
+            + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code) + "'> remove</label></td></tr>")
+    table = "".join(rows) or "<tr><td colspan='7' class='muted'>No creators yet — add some below.</td></tr>"
+    missing = [c for c in codes if c not in by]
+    link = selection_link(sel, origin)
+    tf = "" if sel["total_from"] is None else format(sel["total_from"], ",")
+    tt = "" if sel["total_to"] is None else format(sel["total_to"], ",")
+    body = (
+        "<p><a href='" + u("/selections") + "'>&larr; All selections</a></p>"
+        + "<h1>" + e(sel["name"]) + "</h1>" + note
+        + "<div class='card'><label>Link for the client</label><div class='sel-link'>"
+        + "<input id='sel-url' value='" + e(link) + "' readonly>"
+        + "<button type='button' class='btn small' onclick=\"var i=document.getElementById('sel-url');"
+          "i.select();navigator.clipboard&&navigator.clipboard.writeText(i.value);"
+          "this.textContent='Copied'\">Copy link</button>"
+        + "<a class='btn small ghost' href='" + e(link) + "' target='_blank' rel='noopener'>Preview</a></div>"
+        + "<p class='price-hint'>The client also needs a passcode. Save before copying — the link always "
+          "shows the latest saved prices.</p></div>"
+        + "<form method='post' action='" + u("/selections/save") + "' enctype='multipart/form-data'>"
+        + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
+        + "<div class='card'><div class='row'>"
+        + "<div style='flex:2'><label>Selection name (the client sees this)</label>"
+          "<input name='name' value='" + e(sel["name"]) + "' required></div>"
+        + "<div><label>Total the client sees (SAR)</label><div style='display:flex;gap:6px'>"
+          "<input name='total_from' value='" + tf + "' placeholder='from' inputmode='numeric'>"
+          "<input name='total_to' value='" + tt + "' placeholder='to' inputmode='numeric'></div>"
+          "<div class='price-hint'>Empty = the sum of the creators below (currently "
+        + _money(lo_sum, hi_sum) + ").</div></div>"
+        + "</div></div>"
+        + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
+          "<th>Standard price</th><th>Price for this client</th><th></th><th></th></tr></thead><tbody>"
+        + table + "</tbody></table>"
+        + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
+        + "<p class='price-hint'>Leave a price empty to use the creator's standard price. "
+          "One figure = a fixed price.</p>"
+        + "<div class='row'><div style='flex:2'><label>Add creators</label>"
+          "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div></div>"
+        + "</div><button class='btn'>Save prices</button></form>"
+        + "<form method='post' action='" + u("/selections/delete") + "' style='margin-top:14px' "
+          "onsubmit=\"return confirm('Delete this selection? Its link stops working.')\">"
+          "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
+          "<button class='btn small danger'>Delete selection</button></form>"
+    )
+    return page(sel["name"] + " — Selection", body, "/selections")
