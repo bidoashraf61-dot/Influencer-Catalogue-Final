@@ -1019,7 +1019,9 @@ def price_of(creator, bands):
 
 def list_selections():
     with connect() as conn:
-        return conn.execute("SELECT * FROM selections ORDER BY updated_at DESC").fetchall()
+        return conn.execute(
+            "SELECT s.*, c.label code_label FROM selections s "
+            "LEFT JOIN codes c ON c.id = s.code_id ORDER BY s.updated_at DESC").fetchall()
 
 
 def selection(sid=None, token=None):
@@ -1072,6 +1074,13 @@ def selection_for_link(name, codes, code_id=None):
             continue
         return r
     return None
+
+
+def attach_request(sid, rid):
+    """Tie a selection a client built to the quote request they sent it in."""
+    with connect() as conn:
+        conn.execute("UPDATE selections SET request_id = ?, updated_at = ? WHERE id = ?",
+                     (rid, now(), sid))
 
 
 def delete_selection(sid):

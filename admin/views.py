@@ -1616,23 +1616,31 @@ def selections_page(sels, error=None, message=None, origin=""):
     for x in sels:
         n = len(json.loads(x["codes"] or "[]"))
         total = _money(x["total_from"], x["total_to"]) if x["total_from"] is not None else "sum of creators"
-        src = ("quote request #" + str(x["request_id"])) if x["request_id"] else "pasted link"
+        if x["request_id"]:
+            src = "quote request #" + str(x["request_id"])
+        elif ("code_label" in x.keys() and x["code_label"]):
+            src = "built by " + e(x["code_label"])
+        elif x["code_id"]:
+            src = "built by a client"
+        else:
+            src = "pasted link"
         rows.append(
             "<tr><td><strong><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>"
             + e(x["name"]) + "</a></strong><br><span class='muted'>from " + src + "</span>"
             + "</td><td>" + str(n) + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
             + "</td><td class='right'><a class='btn small' href='" + u("/selections/edit") + "?id="
             + str(x["id"]) + "'>Adjust prices</a></td></tr>")
-    table = "".join(rows) or ("<tr><td colspan='5' class='muted'>Nothing re-priced yet. Use "
-                              "<em>Price &amp; send</em> on a quote request, or paste a client's "
-                              "selection link above.</td></tr>")
+    table = "".join(rows) or ("<tr><td colspan='5' class='muted'>No selections yet. One appears "
+                              "here as soon as a client names a shortlist on the catalogue.</td></tr>")
     body = (
-        "<h1>Selections</h1><p class='sub'>Adjust the prices of a selection a client already has, "
-        "then resend it. The client's own link shows your prices as soon as you save, and every "
-        "later change too — they open the same link with their passcode.</p>"
+        "<h1>Selections</h1><p class='sub'>Every shortlist a client names on the catalogue "
+        "appears here by itself, ready to be priced — there is no link to paste. Adjust the "
+        "prices and the client's own link shows them as soon as you save, and every later change "
+        "too. A client who goes back and adds a creator updates the same selection; the total you "
+        "typed is cleared then, because it was for a different shortlist.</p>"
         + note
         + "<form method='post' action='" + u("/selections/new") + "' class='card'><div class='row'>"
-        + "<div style='flex:3'><label>Client's selection link</label><input name='link' required "
+        + "<div style='flex:3'><label>Or paste a selection link</label><input name='link' required "
           "placeholder='https://influencer-catalogue.hellovoice.co.uk/selection/#n=…&amp;c=…'></div>"
         + "<div style='align-self:end'><button class='btn'>Adjust prices</button></div>"
         + "</div><p class='price-hint'>For a selection sent as a quote request, use "
@@ -1711,7 +1719,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
         + table + "</tbody></table>"
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
         + "<p class='price-hint'>Leave a price empty to use the creator's standard price. "
-          "One figure = a fixed price.</p>"
+          "One figure = a fixed price. The client never sees a price against a creator — these "
+          "add up to the total they see, unless you type a total above.</p>"
         + "<div class='row'><div style='flex:2'><label>Add creators (optional)</label>"
           "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div></div>"
         + "</div><button class='btn'>Save prices</button></form>"

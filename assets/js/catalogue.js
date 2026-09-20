@@ -43,6 +43,25 @@
   // page when its link carries a token; its prices beat everything else.
   var CURATED = null;
 
+  // The shortlist being edited, when the client came back from its page to add
+  // or remove creators. Saving again updates that shortlist.
+  var CARRIED_TOKEN = "";
+
+  // Tell the service about a shortlist a client just named. Answers with the
+  // token that identifies it, or nothing when there is no service to tell.
+  function register(name, codes, token) {
+    if (!CFG.api || !codes.length) return Promise.resolve("");
+    return fetch(CFG.api + "/api/selection", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ name: name, codes: codes, token: token || "" })
+    })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (b) { return (b && b.ok && b.token) || ""; })
+      .catch(function () { return ""; });
+  }
+
   /* ------------------------------------------------------------- helpers */
 
   function $(id) { return document.getElementById(id); }
@@ -548,18 +567,29 @@
     $("cat-save-form").addEventListener("submit", function (e) {
       e.preventDefault();
       var name = new FormData(e.target).get("selname").trim() || "Selection";
-      // Resolved against this page, not the origin: under a base path such as
-      // GitHub Pages' /<repo>/ an origin-rooted URL points outside the site.
-      var url = new URL("selection/", location.href).href + buildFragment(name, selected);
-      $("cat-share-url").value = url;
-      $("cat-share-open").href = url;
-      e.target.hidden = true;
-      $("cat-save-out").hidden = false;
-      $("cat-share-url").focus();
-      $("cat-share-url").select();
-      // Straight to the selection, in a new tab so the catalogue and the
-      // shortlist they just built are both still there.
-      window.open(url, "_blank", "noopener");
+      var codes = selected.slice();
+      var btn = e.target.querySelector("button");
+      if (btn) btn.disabled = true;
+      // Record it so it reaches the dashboard on its own, and so coming back
+      // to add a creator updates the same shortlist rather than making a new
+      // one. If that call fails the link still works, just unpriced.
+      register(name, codes, CARRIED_TOKEN).then(function (token) {
+        CARRIED_TOKEN = token || CARRIED_TOKEN;
+        if (token) CURATED = { token: token, name: name, codes: codes, prices: {}, total: null };
+        // Resolved against this page, not the origin: under a base path such as
+        // GitHub Pages' /<repo>/ an origin-rooted URL points outside the site.
+        var url = new URL("selection/", location.href).href + buildFragment(name, codes);
+        $("cat-share-url").value = url;
+        $("cat-share-open").href = url;
+        e.target.hidden = true;
+        $("cat-save-out").hidden = false;
+        $("cat-share-url").focus();
+        $("cat-share-url").select();
+        if (btn) btn.disabled = false;
+        // Straight to the selection, in a new tab so the catalogue and the
+        // shortlist they just built are both still there.
+        window.open(url, "_blank", "noopener");
+      });
     });
 
     $("cat-share-copy").addEventListener("click", function () {
@@ -586,8 +616,32 @@
       tracks.forEach(function (t) { io.observe(t); });
     }
 
+    // Coming back from a shortlist to add or remove creators: the link says
+    // which ones are already in it, so the catalogue opens with them picked
+    // and saving again updates that same shortlist.
+    var back = readFragment();
+    if (back.codes.length) {
+      selected = back.codes.filter(function (c) { return !!byCode(c); });
+      selectionName = back.name || "";
+      CARRIED_TOKEN = back.token || "";
+      selected.forEach(function (c) {
+        var card = byCode(c);
+        if (card) card.setAttribute("aria-pressed", "true");
+      });
+      var nameField = $("cat-save-form") && $("cat-save-form").querySelector("[name=selname]");
+      if (nameField) nameField.value = selectionName;
+      if (selected.length) {
+        var first = byCode(selected[0]);
+        if (first) first.scrollIntoView({ block: "center" });
+      }
+    }
+
     apply();
     renderTray();
+  }
+
+  function byCode(code) {
+    return document.querySelector('.cat-card[data-code="' + code.replace(/"/g, "") + '"]');
   }
 
 
@@ -1002,6 +1056,9 @@
       // keep the URL in step so what they see is what they can re-share
       var want = buildFragment(selectionName, selected);
       if (location.hash !== want) history.replaceState(null, "", want);
+      all(".cat-back, .cat-close__actions a.cat-btn--ghost[href*='#']").forEach(function (a) {
+        if (a.href.indexOf("#") > -1) a.href = a.href.split("#")[0] + want;
+      });
 
       var closing = $("cat-close");
       if (closing) closing.hidden = selected.length === 0;
@@ -1017,18 +1074,10 @@
       });
     }
 
-    // A prepared selection shows each creator's agreed price on the card.
-    if (CURATED) {
-      cards.forEach(function (card) {
-        var p = CURATED.prices[card.dataset.code];
-        var list = card.querySelector(".cat-card__meta");
-        if (!p || !list || list.querySelector(".cat-card__price")) return;
-        var li = document.createElement("li");
-        li.className = "cat-card__price";
-        li.innerHTML = "<span>Price</span><strong>" + esc(priceText(p)) + "</strong>";
-        list.appendChild(li);
-      });
-    }
+    // Prices are quoted for the shortlist as a whole, never per creator: a
+    // client reading a price against each face compares them against each
+    // other. Only the range in the summary is shown, and a total typed in the
+    // dashboard replaces it there.
 
     // A remove control per card, added here rather than in the markup so the
     // catalogue and the selection page can share one card template.
@@ -1050,6 +1099,15 @@
       card.removeAttribute("role");
       card.removeAttribute("aria-pressed");
     });
+
+    // Back to the catalogue carrying this shortlist, so a client who forgot
+    // someone can add them and save the same selection again.
+    var carry = buildFragment(selectionName, selected);
+    all(".cat-back, .cat-close__actions a[href='../'], .cat-close__actions a[href='/']")
+      .forEach(function (a) {
+        a.href = new URL("../", location.href).href + carry;
+        if (a.classList.contains("cat-btn")) a.textContent = "Add or remove creators";
+      });
 
     wireQuoteForm(function () { selected = []; render(); });
     var second = $("cat-request-2");

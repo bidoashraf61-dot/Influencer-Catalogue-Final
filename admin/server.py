@@ -352,6 +352,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_request()
         if path == "/api/event":
             return self.api_event()
+        if path == "/api/selection":
+            return self.api_selection_save()
         if path == "/login":
             return self.post_login()
 
@@ -874,6 +876,7 @@ class Handler(BaseHTTPRequestHandler):
         rid = (f.get("request") or "").strip()
         known = {c["code"] for c in db.list_creators()}
         code_id = None
+
         if rid.isdigit():
             existing = db.selection_for_request(int(rid))
             if existing is not None:
@@ -885,6 +888,14 @@ class Handler(BaseHTTPRequestHandler):
             # The same name the client's link carries, so that link matches.
             name = req["selection_name"] or ((req["company"] or "Client") + " selection")
             code_id = req["code_id"]
+            # The client's own shortlist is already here — naming it on the
+            # catalogue recorded it. Price THAT one, or the link they hold
+            # would go on showing the standard prices while a second, priced
+            # copy sat in the dashboard.
+            mine = db.selection_for_link(name, [c for c in codes if c in known], code_id)
+            if mine is not None:
+                db.attach_request(mine["id"], int(rid))
+                return self.redirect("/selections/edit?id=%d" % mine["id"])
         else:
             link = (f.get("link") or "").strip()
             frag = urllib.parse.unquote(link.split("#", 1)[1]) if "#" in link else ""
@@ -960,6 +971,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         if token:
             sel = db.selection(token=token)
+            # Prices agreed with one client are for that client. The token is
+            # in a link, and a link travels; the passcode is what identifies
+            # who is reading it.
+            if sel is not None and sel["code_id"] is not None:
+                try:
+                    if int(viewer) != sel["code_id"]:
+                        sel = None
+                except (TypeError, ValueError):
+                    sel = None
         elif codes:
             try:
                 viewer_id = int(viewer)
@@ -1098,6 +1118,47 @@ class Handler(BaseHTTPRequestHandler):
         )
         db.log("request", code_id, self.client_ip(), self.headers.get("User-Agent"), str(rid))
         return self.send_json(200, {"ok": True, "id": rid}, self.cors())
+
+    def api_selection_save(self):
+        """A client naming a shortlist. It is recorded here so it appears in
+        the dashboard by itself, ready to be priced, instead of an admin having
+        to paste the link. Re-saving the same one — the client went back and
+        added a creator — updates it rather than making another."""
+        viewer = self.viewer_code_id()
+        if not viewer:
+            return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+        b = self.json_body()
+        name = (str(b.get("name") or "Selection")).strip()[:120] or "Selection"
+        known = {c["code"] for c in db.list_creators(active_only=True)}
+        codes, seen = [], set()
+        for c in (b.get("codes") or [])[:200]:
+            c = str(c).strip().upper()
+            if c in known and c not in seen:
+                seen.add(c); codes.append(c)
+        if not codes:
+            return self.send_json(400, {"ok": False, "reason": "empty"}, self.cors())
+
+        token = (str(b.get("token") or "")).strip()
+        sel = db.selection(token=token) if token else None
+        if sel is not None and sel["code_id"] is not None and sel["code_id"] != viewer:
+            sel = None                      # another client's selection: never touched
+        if sel is None:
+            sel = db.selection_for_link(name, codes, viewer)
+        if sel is None:
+            sid = db.save_selection(None, name, codes, {}, None, None, None, viewer)
+            return self.send_json(200, {"ok": True, "token": db.selection(sid)["token"]},
+                                  self.cors())
+
+        prices = {k: v for k, v in json.loads(sel["prices"] or "{}").items() if k in codes}
+        stored = json.loads(sel["codes"] or "[]")
+        same = sorted(stored) == sorted(codes)
+        # A total typed for one shortlist cannot stand for a different one, so
+        # a client adding or removing a creator returns it to the sum of the
+        # prices — which the admin can type again.
+        t_from = sel["total_from"] if same else None
+        t_to = sel["total_to"] if same else None
+        db.save_selection(sel["id"], name, codes, prices, t_from, t_to)
+        return self.send_json(200, {"ok": True, "token": sel["token"]}, self.cors())
 
     def api_event(self):
         code_id = self.viewer_code_id()
