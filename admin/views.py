@@ -17,7 +17,8 @@ import time
 from datetime import datetime, timezone
 
 import links
-from db import code_state, now, split_cities, split_profiles, price_of, PLATFORMS
+from db import (code_state, now, split_cities, split_profiles, price_of,
+                account_tiers as db_account_tiers, PLATFORMS)
 
 
 def e(v):
@@ -119,6 +120,9 @@ tr.flash td{animation:flash 2.4s ease-out}
 @keyframes flash{0%,35%{background:#fff7c2}100%{background:transparent}}
 .price-hint{font-size:12px;color:var(--gray);margin-top:4px}
 .pill.own{background:#eef6ff;color:#1d4ed8}
+.stars{font-size:13px;color:#e0a500;letter-spacing:1px}
+.stars .dim{color:#d8d2cc}
+.acct{font-size:12px;color:var(--gray)}
 .sel-table input{max-width:130px}
 .sel-link{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .sel-link input{flex:1;min-width:260px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
@@ -1112,6 +1116,28 @@ def reach_script(bands, manual=None):
 </script>""")
 
 
+def stars(n):
+    """Five stars with n filled — how the rating reads at a glance."""
+    n = int(n or 0)
+    return ("<span class='stars' title='" + str(n) + " of 5'>"
+            + "★" * n + "<span class='dim'>" + "☆" * (5 - n) + "</span></span>")
+
+
+def rating_field(c):
+    """Our own rating of a creator, 1 to 5. Internal: the catalogue never
+    shows it, so it can say what an account manager would say out loud."""
+    try:
+        val = c["rating"] if c is not None else None
+    except (IndexError, KeyError):
+        val = None
+    opts = "<option value=''>— not rated —</option>" + "".join(
+        "<option value='" + str(i) + "'" + (" selected" if val == i else "") + ">"
+        + "★" * i + "☆" * (5 - i) + "</option>" for i in range(1, 6))
+    return ("<div><label>Rating (internal)</label><select name='rating'>" + opts
+            + "</select><div class='price-hint'>Ours, not the client's — never "
+              "shown on the catalogue.</div></div>")
+
+
 def price_field(c, bands=None):
     """This creator's own rate per video. Left empty, the tier's band is what
     a selection uses — which is what every creator had before this existed."""
@@ -1227,6 +1253,7 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, ba
         + val("followers") + "' title='Filled in from the platforms above'></div>"
         + "<div><label>Tier</label><select name='tier'>" + tier_opts + "</select></div>"
         + price_field(c, bands)
+        + rating_field(c)
         + city_field(c, cities)
         + "<div><label>Nationality</label><input name='nationality' value='"
         + val("nationality") + "' list='nationalities' placeholder='Saudi'></div>"
@@ -1288,8 +1315,9 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         out = (
             "<tr id='" + e(c["code"]) + "'><td>" + shot + "</td><td><code>"
             + e(c["code"]) + "</code></td>"
-            + "<td><strong>" + e(c["name"])
-            + "</strong>" + hidden + "</td><td>" + e(c["platform"])
+            + "<td><strong>" + e(c["name"]) + "</strong>" + hidden
+            + (("<br>" + stars(c["rating"])) if ("rating" in c.keys() and c["rating"]) else "")
+            + "</td><td>" + e(c["platform"])
             + "<br><span class='muted'>" + e(handle) + "</span></td><td>"
             + num(c["followers"]) + "</td><td>" + e(c["tier"]) + own_price(c) + "</td><td>"
             + e(", ".join(split_cities(c["city"])) or "—") + "</td>"
@@ -1679,7 +1707,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
             "<tr><td>" + shot + "</td><td><code>" + e(code) + "</code><br>" + e(c["name"])
             + ("" if c["active"] else " <span class='pill dead'>hidden</span>")
             + "<input type='hidden' name='code' value='" + e(code) + "'></td>"
-            + "<td>" + e(c["tier"]) + "<br><span class='muted'>" + num(c["followers"]) + "</span></td>"
+            + "<td>" + e(c["tier"]) + "<br><span class='muted'>" + num(c["followers"]) + "</span>"
+            + "".join("<div class='acct'>" + e(a["platform"] or "") + " " + num(a["followers"])
+                      + " · " + e(a["tier"] or "—") + "</div>"
+                      for a in db_account_tiers(c) if a["followers"]) + "</td>"
             + "<td class='muted'>" + (_money(*default) if default[0] is not None else "—")
         )
         rows[-1] += (
@@ -1708,6 +1739,13 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
         + "<div class='card'><div class='row'>"
         + "<div style='flex:2'><label>Selection name (the client sees this)</label>"
           "<input name='name' value='" + e(sel["name"]) + "' required></div>"
+        + "<div><label>Quoted for</label><select name='platform'>"
+        + "".join("<option value='" + e(v) + "'" + (" selected" if (sel["platform"] or "") == v else "")
+                  + ">" + e(lbl) + "</option>"
+                  for v, lbl in [("", "Every platform they are on")] + [(p, p + " only") for p in PLATFORMS])
+        + "</select><div class='price-hint'>Pick one and each creator is tiered and priced on "
+          "THAT account — a creator who is Mid-Tier on Instagram and Micro on TikTok is quoted "
+          "as Micro for a TikTok campaign.</div></div>"
         + "<div><label>Total the client sees (SAR)</label><div style='display:flex;gap:6px'>"
           "<input name='total_from' value='" + tf + "' placeholder='from' inputmode='numeric'>"
           "<input name='total_to' value='" + tt + "' placeholder='to' inputmode='numeric'></div>"
@@ -1720,7 +1758,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
         + "<p class='price-hint'>Leave a price empty to use the creator's standard price. "
           "One figure = a fixed price. The client never sees a price against a creator — these "
-          "add up to the total they see, unless you type a total above.</p>"
+          "add up to the total they see, unless you type a total above. A price typed here "
+          "becomes that creator's price on the roster as well, so the two never disagree.</p>"
         + "<div class='row'><div style='flex:2'><label>Add creators (optional)</label>"
           "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div></div>"
         + "</div><button class='btn'>Save prices</button></form>"

@@ -580,6 +580,10 @@ class Handler(BaseHTTPRequestHandler):
             "sort": int(f["sort"]) if (f.get("sort") or "").isdigit() else 0,
             "price_from": p_from,
             "price_to": p_to,
+            # Our own star rating of working with them. Internal: it is never
+            # part of what a client is sent.
+            "rating": (int(f["rating"]) if (f.get("rating") or "").isdigit()
+                       and 1 <= int(f["rating"]) <= 5 else None),
         })
         # Back to the view the edit was made from: same search, same page,
         # scrolled to this creator, with a note saying it saved.
@@ -948,12 +952,26 @@ class Handler(BaseHTTPRequestHandler):
         for c in re.findall(r"HV-[A-Z0-9]{2,4}-\d+", (f.get("add") or "").upper()):
             if c in known and c not in codes:
                 codes.append(c)
+        platform = (f.get("platform") or "").strip() or None
         t_from, t_to = num(f.get("total_from")), num(f.get("total_to"))
         if t_from is None and t_to is not None: t_from = t_to
         if t_to is None and t_from is not None: t_to = t_from
         if t_from is not None and t_to < t_from: t_from, t_to = t_to, t_from
         name = (f.get("name") or "").strip() or sel["name"]
-        db.save_selection(sel["id"], name, codes, prices, t_from, t_to)
+        db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform)
+        # A price agreed here is that creator's rate, so it becomes their price
+        # on the roster too — one figure for the creator rather than a private
+        # one per selection that the roster then contradicts.
+        with db.connect() as conn:
+            for code, band in prices.items():
+                cur = db.creator(code, conn)
+                if cur is None:
+                    continue
+                if (cur["price_from"], cur["price_to"]) == (band[0], band[1]):
+                    continue
+                row = {k: cur[k] for k in cur.keys()}
+                row["price_from"], row["price_to"] = band[0], band[1]
+                db.upsert_creator(row, conn)
         return self.redirect("/selections/edit?id=%d&ok=%s" % (sel["id"], urllib.parse.quote("Saved.")))
 
     def post_selection_delete(self):
@@ -994,15 +1012,17 @@ class Handler(BaseHTTPRequestHandler):
         by = {c["code"]: c for c in db.list_creators(active_only=True)}
         codes = [c for c in json.loads(sel["codes"] or "[]") if c in by]
         own = json.loads(sel["prices"] or "{}")
+        platform = sel["platform"] if "platform" in sel.keys() else None
         prices = {}
         for c in codes:
-            p = own.get(c) or db.price_of(by[c], bands)
+            p = own.get(c) or db.price_for(by[c], bands, platform)
             if p:
                 prices[c] = list(p)
         total = ([sel["total_from"], sel["total_to"]]
                  if sel["total_from"] is not None else None)
         return self.send_json(200, {"ok": True, "name": sel["name"], "codes": codes,
                                     "prices": prices, "total": total,
+                                    "platform": platform,
                                     "token": sel["token"]}, self.cors())
 
     def post_request_handled(self):
@@ -1061,8 +1081,16 @@ class Handler(BaseHTTPRequestHandler):
             for t in db.list_tiers()
         ]
 
-    def roster_payload(self):
+    def roster_payload(self, platform=None):
         bands = db.tier_prices()
+        def accounts(r):
+            out = []
+            for a in db.account_tiers(r):
+                band = bands.get(a["tier"]) if a["tier"] else None
+                out.append({"platform": a["platform"], "url": a["url"],
+                            "followers": a["followers"], "tier": a["tier"],
+                            "price": list(band) if band else None})
+            return out
         return [
             {
                 "code": r["code"], "name": r["name"], "handle": r["handle"],
@@ -1070,6 +1098,10 @@ class Handler(BaseHTTPRequestHandler):
                 "city": r["city"], "nationality": r["nationality"],
                 "tier": r["tier"], "interest": r["interest"],
                 "photo": r["photo"], "lowres": self.is_lowres(r["photo"]),
+                # The tier of each account, not only of the biggest one: a
+                # creator can be Mid-Tier on Instagram and Micro on TikTok, and
+                # a campaign booking the TikTok is buying the smaller audience.
+                "accounts": accounts(r),
                 # The page builds no photo URL of its own any more. Every code
                 # is HV-XX-NNN, so the pattern was walkable and the whole set
                 # could be pulled without a passcode; nginx now refuses a photo
@@ -1077,7 +1109,7 @@ class Handler(BaseHTTPRequestHandler):
                 "photo_url": links.photo(r["photo"]) if r["photo"] else None,
                 # This creator's price: their own rate if one is set, their
                 # tier's band otherwise. The page prices a selection from this.
-                "price": list(db.price_of(r, bands) or []) or None,
+                "price": list(db.price_for(r, bands, platform) or []) or None,
                 "profiles": db.split_profiles(r["profiles"]),
             }
             for r in db.list_creators(active_only=True)

@@ -88,7 +88,9 @@ CREATE TABLE IF NOT EXISTS creators (
   note      TEXT,
   sort      INTEGER NOT NULL DEFAULT 0,
   price_from INTEGER,                   -- this creator's own rate per video;
-  price_to   INTEGER                    -- empty means "use the tier's band"
+  price_to   INTEGER,                   -- empty means "use the tier's band"
+  rating     INTEGER                    -- 1-5, how we rate working with them;
+                                        -- internal, never sent to a client
 );
 
 -- A shortlist prepared in the dashboard for one client, with the prices the
@@ -105,6 +107,9 @@ CREATE TABLE IF NOT EXISTS selections (
   total_to    INTEGER,                  -- empty means "add up the creators"
   request_id  INTEGER,                  -- the quote request it was built from
   code_id     INTEGER,                  -- the client's passcode, when known
+  platform    TEXT,                     -- quoted for one platform only, so a
+                                        -- creator is tiered and priced on that
+                                        -- account rather than their biggest
   created_at  INTEGER NOT NULL,
   updated_at  INTEGER NOT NULL
 );
@@ -213,6 +218,8 @@ def migrate(conn):
     if "price_from" not in cols:
         conn.execute("ALTER TABLE creators ADD COLUMN price_from INTEGER")
         conn.execute("ALTER TABLE creators ADD COLUMN price_to INTEGER")
+    if "rating" not in cols:
+        conn.execute("ALTER TABLE creators ADD COLUMN rating INTEGER")
 
     # Existing tiers have a reach as prose only. Give them numbers once, read
     # off the text they already carry, so a follower count can be placed in a
@@ -240,6 +247,8 @@ def migrate(conn):
     sel_cols = {r["name"] for r in conn.execute("PRAGMA table_info(selections)")}
     if "code_id" not in sel_cols:
         conn.execute("ALTER TABLE selections ADD COLUMN code_id INTEGER")
+    if "platform" not in sel_cols:
+        conn.execute("ALTER TABLE selections ADD COLUMN platform TEXT")
 
     seed_tiers(conn)
 
@@ -590,9 +599,8 @@ def join_cities(values):
 # a starting point rather than a fixed vocabulary.
 DEFAULT_INTERESTS = [
     "Skincare", "Hair Care", "Make-up", "Fragrance", "Beauty",
-    "Fashion", "Lifestyle", "Food", "Fitness", "Wellness",
-    "Travel", "Motherhood", "Home", "Tech", "Gaming", "Automotive",
-    "Finance", "Education", "Entertainment", "Sports",
+    "Fashion", "Lifestyle", "Food", "Sports", "Health care",
+    "Travel", "Motherhood", "TV Podcasting", "Gaming", "Finance",
 ]
 
 
@@ -643,18 +651,20 @@ def upsert_creator(c, conn=None):
     # The form always says what the price is; an import sheet has no price
     # column. A write that does not mention the price must not wipe the one an
     # admin set, so it carries the stored value forward.
-    if "price_from" not in c:
-        row = conn.execute("SELECT price_from, price_to FROM creators WHERE code = ?",
+    if "price_from" not in c or "rating" not in c:
+        row = conn.execute("SELECT price_from, price_to, rating FROM creators WHERE code = ?",
                            (c["code"],)).fetchone()
-        c["price_from"] = row["price_from"] if row else None
-        c["price_to"] = row["price_to"] if row else None
+        c.setdefault("price_from", row["price_from"] if row else None)
+        c.setdefault("price_to", row["price_to"] if row else None)
+        c.setdefault("rating", row["rating"] if row else None)
+    c.setdefault("rating", None)
     conn.execute(
         "INSERT INTO creators (code,name,handle,platform,followers,city,"
         "nationality,tier,interest,photo,profiles,active,note,sort,updated_at,"
-        "price_from,price_to) "
+        "price_from,price_to,rating) "
         "VALUES (:code,:name,:handle,:platform,:followers,:city,"
         ":nationality,:tier,:interest,:photo,:profiles,:active,:note,:sort,"
-        ":updated_at,:price_from,:price_to) "
+        ":updated_at,:price_from,:price_to,:rating) "
         "ON CONFLICT(code) DO UPDATE SET "
         " name=excluded.name, handle=excluded.handle, platform=excluded.platform, "
         " followers=excluded.followers, city=excluded.city, "
@@ -663,7 +673,8 @@ def upsert_creator(c, conn=None):
         " profiles=excluded.profiles, active=excluded.active, "
         " note=excluded.note, sort=excluded.sort, "
         " updated_at=excluded.updated_at, "
-        " price_from=excluded.price_from, price_to=excluded.price_to",
+        " price_from=excluded.price_from, price_to=excluded.price_to, "
+        " rating=excluded.rating",
         c,
     )
 
@@ -1002,7 +1013,62 @@ def mark_handled(rid, handled=True):
                      (now() if handled else None, rid))
 
 
+# --------------------------------------------------------- tier per account --
+
+def tier_of(creator, followers):
+    """The tier ONE account of this creator sits in.
+
+    A creator with 120K on Instagram and 20K on TikTok is Mid-Tier on one and
+    Micro on the other; quoting the TikTok account at the Instagram tier prices
+    an audience the campaign will not reach. A creator filed under a category
+    (the HCP tiers) keeps that category, at the band this account earns.
+    """
+    band = tier_for_reach(followers)
+    mine = creator["tier"] if hasattr(creator, "keys") else creator
+    if not band:
+        return mine
+    prefix = None
+    for name in manual_tiers():
+        if mine == name and " - " in name:
+            prefix = name.split(" - ", 1)[0]
+    if prefix:
+        want = prefix + " - " + band
+        return want if get_tier(want) else mine
+    return band if mine not in manual_tiers() else mine
+
+
+def account_tiers(creator):
+    """[(platform, url, followers, tier)] — one row per account with a count."""
+    out = []
+    for p in split_profiles(creator["profiles"] or ""):
+        f = p.get("followers")
+        f = int(f) if str(f or "").isdigit() else None
+        out.append({"platform": p.get("platform"), "url": p.get("url"),
+                    "followers": f, "tier": tier_of(creator, f) if f else None})
+    return out
+
+
 # ------------------------------------------------------------------ prices --
+
+def price_for(creator, bands, platform=None):
+    """(from, to) for a creator, optionally quoted on ONE platform.
+
+    Their own rate still wins — it is a rate for the person, not the account.
+    Otherwise the price is the band of the account being quoted, so a selection
+    built for TikTok prices the TikTok audience.
+    """
+    lo = creator["price_from"] if "price_from" in creator.keys() else None
+    hi = creator["price_to"] if "price_to" in creator.keys() else None
+    if lo or hi:
+        return (lo or hi, hi or lo)
+    if platform:
+        for a in account_tiers(creator):
+            if (a["platform"] or "").lower() == platform.lower() and a["tier"]:
+                band = bands.get(a["tier"])
+                if band:
+                    return tuple(band)
+    return tuple(bands.get(creator["tier"]) or ()) or None
+
 
 def price_of(creator, bands):
     """(from, to) for one creator: their own rate when one is set, otherwise
@@ -1032,21 +1098,23 @@ def selection(sid=None, token=None):
 
 
 def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
-                   code_id=None):
+                   code_id=None, platform=None):
     """Create (sid None) or update one priced selection. Returns its id."""
     import secrets
     with connect() as conn:
         if sid is None:
             cur = conn.execute(
                 "INSERT INTO selections (token,name,codes,prices,total_from,total_to,"
-                "request_id,code_id,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                "request_id,code_id,platform,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
                 (secrets.token_urlsafe(9), name, json.dumps(codes), json.dumps(prices),
-                 total_from, total_to, request_id, code_id, now(), now()))
+                 total_from, total_to, request_id, code_id, platform, now(), now()))
             return cur.lastrowid
         conn.execute(
             "UPDATE selections SET name=?, codes=?, prices=?, total_from=?, total_to=?, "
-            "updated_at=? WHERE id=?",
-            (name, json.dumps(codes), json.dumps(prices), total_from, total_to, now(), sid))
+            "platform=?, updated_at=? WHERE id=?",
+            (name, json.dumps(codes), json.dumps(prices), total_from, total_to,
+             platform, now(), sid))
         return sid
 
 

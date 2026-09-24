@@ -34,9 +34,16 @@
     return out;
   }
 
-  function buildFragment(name, codes) {
+  // A link for a client. With a token the shortlist is on the server, so the
+  // link is just that token — the long form listed every code and ran past a
+  // hundred characters before the name. `full` is for links that stay inside
+  // the site (going back to the catalogue to add someone), where the codes
+  // save a round trip.
+  function buildFragment(name, codes, full) {
+    var token = (CURATED && CURATED.token) || CARRIED_TOKEN || "";
+    if (token && !full) return "#s=" + encodeURIComponent(token);
     return "#n=" + encodeURIComponent(name) + "&c=" + codes.join(",") +
-      (CURATED ? "&s=" + encodeURIComponent(CURATED.token) : "");
+      (token ? "&s=" + encodeURIComponent(token) : "");
   }
 
   // A selection prepared and priced in the dashboard. Set on the selection
@@ -254,8 +261,29 @@
     return text ? text.split("/").pop().replace(/^@/, "") : "";
   }
 
+  // The tier the service worked out for one account of this creator.
+  function accountTier(c, profile) {
+    var list = c.accounts || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].url === profile.url && list[i].tier) return list[i].tier;
+    }
+    return "";
+  }
+
   function metaRows(c, label) {
     var counted = (c.profiles || []).filter(function (p) { return p.followers; });
+    // A selection quoted for one platform shows that account only: the client
+    // is buying it, and the others would price the card against the wrong one.
+    if (CURATED && CURATED.platform) {
+      var only = counted.filter(function (p) {
+        return (p.platform || "").toLowerCase() === CURATED.platform.toLowerCase();
+      });
+      if (only.length) {
+        counted = only;
+        var t = accountTier(c, only[0]);
+        if (t) label = tierLabel(t);
+      }
+    }
     var rows = [];
     // Always name the platform a number belongs to. "Followers 9,575" on a
     // creator who is on Instagram says less than "Instagram 9,575", and the
@@ -275,8 +303,13 @@
           var who = handleFromUrl(p.url);
           if (who) tag += " @" + esc(who);
         }
-        rows.push("<li><span>" + tag + "</span><strong>" +
-                  commas(p.followers) + "</strong></li>");
+        // Each account carries its own tier: 120K on Instagram and 20K on
+        // TikTok are two different audiences, and a campaign booking one of
+        // them is buying that one.
+        var t = accountTier(c, p);
+        rows.push("<li><span>" + tag + "</span><strong>" + commas(p.followers) +
+                  (t ? " <em class=\"cat-card__band\">" + esc(tierLabel(t)) + "</em>" : "") +
+                  "</strong></li>");
       });
       // The sum of the rows above, not the stored headline. Adding a platform
       // to a creator whose headline was typed for one account left a total
@@ -304,6 +337,13 @@
 
   function cardMarkup(c) {
     var label = tierLabel(c.tier);
+    if (CURATED && CURATED.platform) {
+      (c.accounts || []).forEach(function (a) {
+        if (a.tier && (a.platform || "").toLowerCase() === CURATED.platform.toLowerCase()) {
+          label = tierLabel(a.tier);
+        }
+      });
+    }
     // The static build marks 100px sources so the card shows a small sharp
     // circle over a blurred backdrop instead of a 3x upscale. API mode drew
     // them raw, so the same roster looked worse served from the service than
@@ -575,7 +615,8 @@
       // one. If that call fails the link still works, just unpriced.
       register(name, codes, CARRIED_TOKEN).then(function (token) {
         CARRIED_TOKEN = token || CARRIED_TOKEN;
-        if (token) CURATED = { token: token, name: name, codes: codes, prices: {}, total: null };
+        if (token) CURATED = { token: token, name: name, codes: codes, prices: {},
+                               total: null, platform: "" };
         // Resolved against this page, not the origin: under a base path such as
         // GitHub Pages' /<repo>/ an origin-rooted URL points outside the site.
         var url = new URL("selection/", location.href).href + buildFragment(name, codes);
@@ -994,7 +1035,8 @@
           if (b && b.ok) {
             token = b.token || token;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
-                        prices: b.prices || {}, total: b.total };
+                        prices: b.prices || {}, total: b.total,
+                        platform: b.platform || "" };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
           startSelection();
@@ -1011,11 +1053,16 @@
     cards.forEach(function (c) { byCode[c.dataset.code] = c; });
 
     var frag = readFragment();
-    selectionName = frag.name || "Selection";
+    selectionName = frag.name || (CURATED && CURATED.name) || "Selection";
+    // A link is now usually just a token, and the creators come back from the
+    // service with it. The fragment still wins when it lists them: that is a
+    // client who went back to the catalogue and added someone, and their list
+    // is newer than the one the token was saved with.
+    var want = frag.codes.length ? frag.codes : ((CURATED && CURATED.codes) || []);
     // Keep only codes this build actually knows about — a stale link naming a
     // creator who has since left the roster should drop that card, not break.
-    selected = frag.codes.filter(function (code) { return !!byCode[code]; });
-    var dropped = frag.codes.length - selected.length;
+    selected = want.filter(function (code) { return !!byCode[code]; });
+    var dropped = want.length - selected.length;
 
     function render() {
       cards.forEach(function (c) { c.hidden = selected.indexOf(c.dataset.code) === -1; });
@@ -1045,6 +1092,7 @@
         ["Creators", String(selected.length)],
         ["Indicative range", selected.length ? priceText([lo, hi]) : "—"]
       ];
+      if (CURATED && CURATED.platform) rows.splice(1, 0, ["Quoted for", CURATED.platform]);
       Object.keys(TIER_PRICE).forEach(function (t) {
         if (tiers[t]) rows.push([t, String(tiers[t])]);
       });
@@ -1102,7 +1150,7 @@
 
     // Back to the catalogue carrying this shortlist, so a client who forgot
     // someone can add them and save the same selection again.
-    var carry = buildFragment(selectionName, selected);
+    var carry = buildFragment(selectionName, selected, true);
     all(".cat-back, .cat-close__actions a[href='../'], .cat-close__actions a[href='/']")
       .forEach(function (a) {
         a.href = new URL("../", location.href).href + carry;
