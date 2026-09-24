@@ -458,12 +458,20 @@ a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-off
 }
 .cat-card__meta { list-style: none; margin: 0 0 16px; padding: 0; }
 .cat-card__meta li {
-  display: flex; justify-content: space-between; gap: 12px;
+  display: flex; justify-content: space-between; gap: 12px; align-items: flex-start;
   padding: 7px 0; border-top: 1px solid rgba(18,18,18,.08);
   font-size: 14px;
 }
 .cat-card__meta span { color: var(--gray); }
-.cat-card__meta strong { font-weight: 600; }
+/* The number and its tier tag share the right-hand side, and wrap as a pair:
+   the tag moves under the number instead of squeezing it. */
+.cat-card__meta strong {
+  font-weight: 600; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: flex-end; gap: 4px 6px; text-align: right;
+}
+/* The number itself, so it stays one flex item and the tag can wrap past it
+   without the digits being split. */
+.cat-card__meta strong b { font-weight: inherit; white-space: nowrap; }
 .cat-empty {
   text-align: center; padding: 80px 0;
   font-family: var(--heading); font-size: 40px; color: var(--gray);
@@ -768,5 +776,14 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-card__price strong{color:inherit;font-weight:700}
 
 /* The tier of one account, beside that account's follower count. */
+/* The tier of one account, on that account's row. Orange because it is a
+   judgement about the creator rather than a fact off the platform, and the
+   card already spends grey on the platform names.
+   #d75212 is the brand orange taken a step darker: white on #ff691e is too
+   pale to read at 11px. */
 .cat-card__band{font-style:normal;font-size:11px;font-weight:600;letter-spacing:.02em;
-  padding:2px 6px;margin-left:6px;border-radius:999px;background:rgba(18,18,18,.07);color:var(--gray)}
+  padding:2px 7px;border-radius:999px;background:#d75212;color:var(--white);
+  /* A tier like "HCP - Mid-Tier" must not be split down the middle. When it
+     will not fit beside the number it drops whole to the line below, which is
+     what the flex-wrap on the row above is for. */
+  white-space:nowrap;flex:0 0 auto}

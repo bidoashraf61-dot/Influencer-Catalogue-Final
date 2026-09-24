@@ -307,8 +307,8 @@
         // TikTok are two different audiences, and a campaign booking one of
         // them is buying that one.
         var t = accountTier(c, p);
-        rows.push("<li><span>" + tag + "</span><strong>" + commas(p.followers) +
-                  (t ? " <em class=\"cat-card__band\">" + esc(tierLabel(t)) + "</em>" : "") +
+        rows.push("<li><span>" + tag + "</span><strong><b>" + commas(p.followers) +
+                  "</b>" + (t ? "<em class=\"cat-card__band\">" + esc(tierLabel(t)) + "</em>" : "") +
                   "</strong></li>");
       });
       // The sum of the rows above, not the stored headline. Adding a platform
