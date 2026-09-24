@@ -660,11 +660,10 @@
     // Coming back from a shortlist to add or remove creators: the link says
     // which ones are already in it, so the catalogue opens with them picked
     // and saving again updates that same shortlist.
-    var back = readFragment();
-    if (back.codes.length) {
-      selected = back.codes.filter(function (c) { return !!byCode(c); });
-      selectionName = back.name || "";
-      CARRIED_TOKEN = back.token || "";
+    function carryIn(codes, name, token) {
+      selected = codes.filter(function (c) { return !!byCode(c); });
+      selectionName = name || "";
+      CARRIED_TOKEN = token || "";
       selected.forEach(function (c) {
         var card = byCode(c);
         if (card) card.setAttribute("aria-pressed", "true");
@@ -675,6 +674,25 @@
         var first = byCode(selected[0]);
         if (first) first.scrollIntoView({ block: "center" });
       }
+    }
+
+    var back = readFragment();
+    if (back.codes.length) {
+      carryIn(back.codes, back.name, back.token);
+    } else if (back.token && CFG.api) {
+      // Only a token: the shortlist is on the server. Ask for it, so a client
+      // who opened a short link and then came here to add someone still finds
+      // their creators picked rather than an empty catalogue.
+      fetch(CFG.api + "/api/selection?s=" + encodeURIComponent(back.token),
+            { credentials: "include" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (b) {
+          if (!b || !b.ok) return;
+          carryIn(b.codes || [], b.name, b.token || back.token);
+          apply();
+          renderTray();
+        })
+        .catch(function () { /* the catalogue still works, just unpicked */ });
     }
 
     apply();
@@ -1104,8 +1122,12 @@
       // keep the URL in step so what they see is what they can re-share
       var want = buildFragment(selectionName, selected);
       if (location.hash !== want) history.replaceState(null, "", want);
+      // The link back into the catalogue carries the codes, not just the
+      // token: it has to arrive with these creators already picked, and the
+      // long form says so without another round trip. Sharing uses `want`.
+      var carrying = buildFragment(selectionName, selected, true);
       all(".cat-back, .cat-close__actions a.cat-btn--ghost[href*='#']").forEach(function (a) {
-        if (a.href.indexOf("#") > -1) a.href = a.href.split("#")[0] + want;
+        if (a.href.indexOf("#") > -1) a.href = a.href.split("#")[0] + carrying;
       });
 
       var closing = $("cat-close");
