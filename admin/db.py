@@ -724,7 +724,7 @@ def list_tiers():
 
 # The platforms the dashboard offers. A creator can be stored on something
 # else; this is what the dropdown lists, not a constraint.
-PLATFORMS = ["Instagram", "TikTok", "Snapchat", "YouTube", "X", "Facebook"]
+PLATFORMS = ["Instagram", "TikTok", "Snapchat", "YouTube", "X", "Facebook", "Threads"]
 
 PROFILE_PATTERNS = {
     "Instagram": "https://www.instagram.com/%s/",
@@ -733,6 +733,7 @@ PROFILE_PATTERNS = {
     "YouTube": "https://www.youtube.com/@%s",
     "X": "https://x.com/%s",
     "Facebook": "https://www.facebook.com/%s",
+    "Threads": "https://www.threads.com/@%s",
 }
 
 
