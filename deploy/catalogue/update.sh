@@ -37,7 +37,10 @@ curl -sL -o "$SRC/site/index.html" \
 # CATALOGUE_API is what strips the roster out of the pages. Without it the build
 # silently reverts to the static one: 306KB with all 162 names in the source.
 cd "$SRC"
-CATALOGUE_API="/admin" python3 build/influencer_catalogue.py
+# CATALOGUE_DB lets the build read the live tier bands for the ticker. It is
+# opened read-only.
+CATALOGUE_API="/admin" CATALOGUE_DB=/home/ubuntu/influencer-catalogue-admin/admin/catalogue.db \
+  python3 build/influencer_catalogue.py
 python3 build/catalogue_dist.py
 
 # Assets are rsynced from the repo; dist ships none, and the pages still point

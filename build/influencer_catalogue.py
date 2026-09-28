@@ -45,12 +45,17 @@ HARVEST = ROOT / "content" / "_harvest.json"  # optional, from the photo pass
 # full range.
 # `reach` is the tier's follower range as defined in each tier sheet header
 # (نطاق الفئة), not something inferred from the roster.
+# Only a fallback: the live bands come from the admin database (see
+# load_tiers_from_admin), which is where they are edited.
 TIERS = {
-    "Nano":     {"code": "NA", "label": "Nano",  "from": 435,  "to": 870,  "order": 1, "reach": "Under 10K"},
-    "Micro":    {"code": "MI", "label": "Micro", "from": 870,  "to": 1740, "order": 2, "reach": "10K – 50K"},
-    "Mid-Tier": {"code": "MD", "label": "Mid",   "from": 1450, "to": 2900, "order": 3, "reach": "50K – 500K"},
-    "Macro":    {"code": "MC", "label": "Macro", "from": 2175, "to": 4350, "order": 4, "reach": "500K – 1M"},
+    "Nano":  {"code": "NA", "label": "Nano",  "from": 435,   "to": 870,   "order": 1, "reach": "Under 10K"},
+    "Micro": {"code": "MI", "label": "Micro", "from": 870,   "to": 1740,  "order": 2, "reach": "10K – 100K"},
+    "Macro": {"code": "MC", "label": "Macro", "from": 2175,  "to": 4350,  "order": 3, "reach": "100K – 1M"},
+    "Mega":  {"code": "MG", "label": "Mega",  "from": 10000, "to": 50000, "order": 4, "reach": "1M – 100M"},
 }
+# Follower bands only — the HCP categories are not sizes and stay off the
+# ticker.
+BAND_TIERS = set(TIERS)
 
 # The workbook has no niche column, so interests are not per-creator data yet.
 # Drop a {code: interest} map at content/interests.json and it is picked up.
@@ -128,7 +133,10 @@ def load_tiers_from_admin():
     day the file was last edited, while the dashboard showed something else —
     the exact drift that having one editable table was meant to end.
     """
-    dbfile = ROOT / "admin" / "catalogue.db"
+    # On the server the build runs from a checkout while the live database sits
+    # with the admin service, so update.sh points CATALOGUE_DB at it. Without
+    # that the ticker kept printing whatever bands were written above.
+    dbfile = Path(os.environ.get("CATALOGUE_DB") or (ROOT / "admin" / "catalogue.db"))
     if not dbfile.exists():
         return
     import sqlite3
@@ -143,7 +151,10 @@ def load_tiers_from_admin():
     if not rows:
         return
     TIERS.clear()
+    BAND_TIERS.clear()
     for i, r in enumerate(rows, start=1):
+        if "auto" not in r.keys() or r["auto"]:
+            BAND_TIERS.add(r["name"])
         TIERS[r["name"]] = {
             "code": r["code"],
             "label": "Mid" if r["name"] == "Mid-Tier" else r["name"],
@@ -655,7 +666,8 @@ def build():
 
     # The band is short phrases separated by the asterisk mark, per
     # THEME-BRIEF.md — not two long run-on strings.
-    phrases = [f"{TIERS[t]['label']} {TIERS[t]['reach']}" for t in tier_order] + INTERESTS
+    phrases = [f"{TIERS[t]['label']} {TIERS[t]['reach']}" for t in tier_order
+               if t in BAND_TIERS and TIERS[t]["reach"]] + INTERESTS
     ASTERISK = (
         '<i class="cat-ticker__star" aria-hidden="true">'
         '<svg viewBox="0 0 24 24" width="100%" height="100%">'
