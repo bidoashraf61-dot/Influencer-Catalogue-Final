@@ -279,6 +279,11 @@ def migrate(conn):
     if "costs" not in sel_cols:
         conn.execute("ALTER TABLE selections ADD COLUMN costs TEXT")
     creator_cols = {r["name"] for r in conn.execute("PRAGMA table_info(creators)")}
+    if "created_at" not in creator_cols:
+        # When a creator was added, so the roster can be narrowed to a batch
+        # ("everyone added this week"). Creators from before this column have
+        # none: the date was never recorded and is not guessed.
+        conn.execute("ALTER TABLE creators ADD COLUMN created_at INTEGER")
     if "cost" not in creator_cols:
         # The creator's own rate to us, remembered so the next selection
         # starts from it. Internal, like rating: never sent to a client.
@@ -762,13 +767,16 @@ def upsert_creator(c, conn=None):
         c.setdefault("price_to", row["price_to"] if row else None)
         c.setdefault("rating", row["rating"] if row else None)
     c.setdefault("rating", None)
+    # Only ever written on the first insert: the ON CONFLICT branch below
+    # leaves it alone, so an edit does not change when a creator was added.
+    c.setdefault("created_at", c["updated_at"])
     conn.execute(
         "INSERT INTO creators (code,name,handle,platform,followers,city,"
         "nationality,tier,interest,photo,profiles,active,note,sort,updated_at,"
-        "price_from,price_to,rating) "
+        "price_from,price_to,rating,created_at) "
         "VALUES (:code,:name,:handle,:platform,:followers,:city,"
         ":nationality,:tier,:interest,:photo,:profiles,:active,:note,:sort,"
-        ":updated_at,:price_from,:price_to,:rating) "
+        ":updated_at,:price_from,:price_to,:rating,:created_at) "
         "ON CONFLICT(code) DO UPDATE SET "
         " name=excluded.name, handle=excluded.handle, platform=excluded.platform, "
         " followers=excluded.followers, city=excluded.city, "
@@ -1045,7 +1053,7 @@ def next_code(tier, prefix="HV", conn=None):
     return "%s-%s-%03d" % (prefix, part, highest + 1)
 
 
-def list_creators(active_only=False, search=None):
+def list_creators(active_only=False, search=None, added_from=None, added_to=None):
     """The roster, optionally narrowed by a search.
 
     Filtering in SQL rather than in the page: at 700 creators the difference
@@ -1063,6 +1071,13 @@ def list_creators(active_only=False, search=None):
                      "lower(coalesce(city,'')) LIKE ? OR "
                      "lower(coalesce(nationality,'')) LIKE ?)")
         args += [like] * 5
+    # Date added, inclusive at both ends (timestamps; `added_to` is the end
+    # of that day). A creator with no recorded date is left out of a dated
+    # search rather than counted as either side of it.
+    if added_from is not None:
+        where.append("created_at >= ?"); args.append(added_from)
+    if added_to is not None:
+        where.append("created_at <= ?"); args.append(added_to)
     q = "SELECT * FROM creators"
     if where:
         q += " WHERE " + " AND ".join(where)

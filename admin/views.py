@@ -124,6 +124,9 @@ tr.flash td{animation:flash 2.4s ease-out}
 .stars .dim{color:#d8d2cc}
 .acct{font-size:12px;color:var(--gray)}
 .sel-table input{max-width:130px}
+.rsearch .added{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--gray);
+  margin:0;white-space:nowrap}
+.rsearch .added input{width:auto;padding:8px 10px}
 tr.manage-row td{padding-top:0;border-top:0}
 details.manage summary{list-style:none;display:inline-block;cursor:pointer}
 details.manage summary::-webkit-details-marker{display:none}
@@ -1251,7 +1254,8 @@ def price_field(c, bands=None):
     )
 
 
-def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, bands=None):
+def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, bands=None,
+                 dates=("", "")):
     """Add/edit form. `c` is None when adding a new creator.
 
     `cities` is every city already on the roster. Checkboxes rather than a
@@ -1312,7 +1316,8 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, ba
             "<form id='" + ident + "' method='post' action='" + u("/roster/delete")
             + "' onsubmit=\"" + confirm + "\"><input type='hidden' name='code' value='"
             + e(c["code"]) + "'><input type='hidden' name='q' value='" + e(q or "")
-            + "'><input type='hidden' name='page' value='" + e(str(page_no or 1)) + "'></form>")
+            + "'><input type='hidden' name='page' value='" + e(str(page_no or 1)) + "'>"
+            + date_carry(dates) + "</form>")
 
     # Two things the form has to carry back with it. `q` is the search that was
     # running when the editor was opened, so the save can return to that same
@@ -1325,6 +1330,7 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, ba
         stamp = ""
     carried = "<input type='hidden' name='q' value='" + e(q or "") + "'>"
     carried += "<input type='hidden' name='page' value='" + e(str(page_no or 1)) + "'>"
+    carried += date_carry(dates)
     if stamp:
         carried += "<input type='hidden' name='prev_updated' value='" + e(stamp) + "'>"
 
@@ -1359,9 +1365,22 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, ba
     )
 
 
+def date_carry(dates):
+    """The date-added filter, as hidden fields, so a save or delete returns
+    to the same filtered view."""
+    out = ""
+    for name, value in zip(("from", "to"), dates or ("", "")):
+        if value:
+            out += "<input type='hidden' name='" + name + "' value='" + e(value) + "'>"
+    return out
+
+
 def roster_page(creators, error=None, message=None, cities=None, tiers=None,
                 nationalities=None, interests=None, editing=None, q="",
-                bands=None, page_no=1, pages=1, total=None, per_page=100):
+                bands=None, page_no=1, pages=1, total=None, per_page=100,
+                dates=("", "")):
+    d_from, d_to = dates or ("", "")
+    filtered = bool(q or d_from or d_to)
     tiers = tiers or []
     tier_names = [t["name"] for t in tiers]
     price_bands = {t["name"]: (t["price_from"], t["price_to"]) for t in tiers}
@@ -1395,7 +1414,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         open_now = (editing == c["code"])
         # Close keeps the page it was opened on; it used to drop to page 1.
         link = u("/roster") + "?" + urlencode(
-            q=q, edit="" if open_now else c["code"],
+            q=q, **{"from": d_from, "to": d_to}, edit="" if open_now else c["code"],
             page=(page_no if open_now and page_no > 1 else ""))
         button = ("<a class='btn small" + ("" if open_now else " ghost") + "' href='"
                   + link + "#" + e(c["code"]) + "'>"
@@ -1422,7 +1441,8 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         # 4.2MB and 27,600, which is the lag.
         if open_now:
             out += ("<tr class='editrow'><td colspan='8'>"
-                    + creator_form(c, cities, tier_names, interests, q, page_no, price_bands)
+                    + creator_form(c, cities, tier_names, interests, q, page_no, price_bands,
+                                   dates)
                     + "</td></tr>")
         return out
 
@@ -1449,7 +1469,8 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
             return "<span class='pgoff'>" + e(label or str(n)) + "</span>"
         if current:
             return "<span class='pgnow'>" + e(label or str(n)) + "</span>"
-        href = u("/roster") + "?" + urlencode(q=q, page=(n if n > 1 else ""))
+        href = u("/roster") + "?" + urlencode(q=q, **{"from": d_from, "to": d_to},
+                                               page=(n if n > 1 else ""))
         return "<a href='" + href + "'>" + e(label or str(n)) + "</a>"
 
     if pages <= 1:
@@ -1482,7 +1503,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + "<h1>Roster</h1><p class='sub'>" + str(len(creators))
         + " creators. Hidden ones stay in the database but never reach a client.</p>" + err
         + "<h2>Add a creator</h2><div class='card'>"
-        + creator_form(None, cities, tier_names, interests, q, 1, price_bands) + "</div>"
+        + creator_form(None, cities, tier_names, interests, q, 1, price_bands, dates) + "</div>"
         + "<h2>Import a spreadsheet</h2><div class='card'>"
         + "<p class='sub' style='margin-bottom:16px'>Add many creators at once. "
           "Start from the template so the headings match — a code left blank is "
@@ -1549,8 +1570,10 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + "<form class='rsearch' method='get' action='" + u("/roster") + "'>"
           "<input name='q' value='" + e(q) + "' placeholder='Search name, code, "
           "handle or city' autocomplete='off'>"
+          "<label class='added'>Added from<input type='date' name='from' value='" + e(d_from) + "'></label>"
+          "<label class='added'>to<input type='date' name='to' value='" + e(d_to) + "'></label>"
           "<button class='btn small'>Search</button>"
-        + ("<a class='btn small ghost' href='" + u("/roster") + "'>Clear</a>" if q else "")
+        + ("<a class='btn small ghost' href='" + u("/roster") + "'>Clear</a>" if filtered else "")
         + "<span class='muted' style='font-size:13px'>" + e(shown) + "</span></form>"
         + "<p class='sub' style='margin-bottom:12px'>Need the codes? "
           "<a href='" + u("/roster/export") + "'>Export the roster (.csv)</a> — "

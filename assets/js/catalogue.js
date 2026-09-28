@@ -468,7 +468,7 @@
       "taif", "makkah", "mecca", "madinah", "medina", "elmadina elmonawara", "al madinah",
       "najran", "abha", "khamis mushait", "tabuk", "jazan", "jizan", "hail", "qassim",
       "buraidah", "al ahsa", "hofuf", "jubail", "yanbu", "al kharj", "ksa", "saudi arabia",
-      "saudi"],
+      "saudi", "saudi arabia not specified yet"],
     "UAE": ["dubai", "abu dhabi", "sharjah", "ajman", "al ain", "ras al khaimah",
       "umm al quwain", "fujairah", "uae", "united arab emirates", "emirates"],
     "Egypt": ["cairo", "giza", "alexandria", "mansora", "mansoura", "boursaeed", "port said",
@@ -487,7 +487,7 @@
     "mansora": "Mansoura", "jizan": "Jazan"
   };
   // Values that name a country and no city.
-  var COUNTRY_WORDS = ["ksa", "saudi", "saudi arabia", "uae", "united arab emirates",
+  var COUNTRY_WORDS = ["ksa", "saudi", "saudi arabia", "saudi arabia not specified yet", "uae", "united arab emirates",
     "emirates", "egypt", "kuwait", "qatar", "bahrain", "oman", "jordan", "lebanon"];
   var COUNTRY_OF = {};
   Object.keys(PLACES).forEach(function (country) {

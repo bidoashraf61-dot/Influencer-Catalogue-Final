@@ -297,7 +297,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.analytics_page(
                 db.stats(start=start, end=end), db.recent_events(200)))
         if path == "/roster":
-            everyone = db.list_creators(search=query.get("q"))
+            # Date added: two days off a calendar, both inclusive.
+            d_from, d_to = (query.get("from") or "").strip(), (query.get("to") or "").strip()
+            t_from = db.day_bounds(d_from, None) if d_from else None
+            t_to = db.day_bounds(d_to, None) if d_to else None
+            if t_to is not None:
+                t_to += 86400 - 1
+            everyone = db.list_creators(search=query.get("q"), added_from=t_from, added_to=t_to)
             editing = (query.get("edit") or "").strip().upper() or None
             total = len(everyone)
             pages = max(1, -(-total // ROSTER_PAGE))
@@ -324,7 +330,8 @@ class Handler(BaseHTTPRequestHandler):
                 editing=editing,
                 q=(query.get("q") or "").strip(),
                 bands=db.tier_bands(),
-                page_no=page, pages=pages, total=total, per_page=ROSTER_PAGE))
+                page_no=page, pages=pages, total=total, per_page=ROSTER_PAGE,
+                dates=(d_from if t_from is not None else "", d_to if t_to is not None else "")))
         if path == "/roster/export":
             return self.send(200, self.roster_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition",
@@ -519,6 +526,9 @@ class Handler(BaseHTTPRequestHandler):
         keep = {}
         if (f.get("q") or "").strip():
             keep["q"] = f["q"].strip()
+        for k in ("from", "to"):
+            if (f.get(k) or "").strip():
+                keep[k] = f[k].strip()
         pg = (f.get("page") or "").strip()
         if pg.isdigit() and pg != "1":
             keep["page"] = pg
