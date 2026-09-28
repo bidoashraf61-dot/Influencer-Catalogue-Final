@@ -1481,7 +1481,7 @@
       // token: it has to arrive with these creators already picked, and the
       // long form says so without another round trip. Sharing uses `want`.
       var carrying = buildFragment(selectionName, selected, true);
-      all(".cat-back, .cat-close__actions a.cat-btn--ghost[href*='#']").forEach(function (a) {
+      all(".cat-back, .cat-tray__edit, .cat-close__actions a.cat-btn--ghost[href*='#']").forEach(function (a) {
         if (a.href.indexOf("#") > -1) a.href = a.href.split("#")[0] + carrying;
       });
 
@@ -1528,7 +1528,7 @@
     // Back to the catalogue carrying this shortlist, so a client who forgot
     // someone can add them and save the same selection again.
     var carry = buildFragment(selectionName, selected, true);
-    all(".cat-back, .cat-close__actions a[href='../'], .cat-close__actions a[href='/']")
+    all(".cat-back, .cat-tray__edit, .cat-close__actions a[href='../'], .cat-close__actions a[href='/']")
       .forEach(function (a) {
         a.href = new URL("../", location.href).href + carry;
         if (a.classList.contains("cat-btn")) a.textContent = "Add or remove creators";

@@ -766,12 +766,38 @@ body[data-page="selection"] .cat-card__check { display: none; }
 }
 
 /* Price notice on the selection page — meant to be read, not skimmed past. */
-.cat-price-notice{max-width:80ch;margin:4px 0 28px;padding:16px 22px;border-radius:var(--r-sm);
-  background:var(--white);border-left:6px solid var(--vivid-orange);color:var(--ink);
-  box-shadow:0 2px 12px rgba(18,18,18,.06)}
-.cat-price-notice__title{margin:0 0 6px;font-weight:700;font-size:15px;letter-spacing:.01em}
-.cat-price-notice ul{margin:0;padding-left:18px}
-.cat-price-notice li{margin:4px 0;line-height:1.45;font-size:14px}
+/* In the page's own language: an ink panel with the large card radius, a
+   lime Bebas tag like the tier tag on every card (lime only on dark, per the
+   theme brief), and the points in DM Sans. Replaces a white box with an
+   orange rule that belonged to no other part of the page. */
+.cat-price-notice {
+  display: grid; grid-template-columns: auto 1fr; align-items: start;
+  gap: 18px 36px; margin: 4px 0 28px; padding: 28px 32px;
+  background: var(--ink); color: var(--white); border-radius: var(--r-lg);
+}
+.cat-price-notice__title {
+  margin: 2px 0 0; justify-self: start;
+  font-family: var(--heading); font-size: 20px; letter-spacing: .1em; line-height: 1;
+  background: var(--lime); color: var(--ink);
+  padding: 8px 16px 7px; border-radius: var(--r-pill);
+  transform: rotate(-4deg);
+}
+.cat-price-notice ul { list-style: none; margin: 0; padding: 0; }
+.cat-price-notice li {
+  position: relative; padding: 0 0 0 22px; margin: 0;
+  font-size: 15px; line-height: 1.6; color: rgba(255,255,255,.72);
+}
+.cat-price-notice li + li { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.12); }
+.cat-price-notice li::before {
+  content: ""; position: absolute; left: 0; top: .6em;
+  width: 8px; height: 8px; border-radius: 100%; background: var(--lime);
+}
+.cat-price-notice li + li::before { top: calc(12px + .6em); }
+.cat-price-notice strong { color: var(--white); font-weight: 600; }
+@media screen and (max-width: 767px) {
+  .cat-price-notice { grid-template-columns: 1fr; padding: 24px 22px; border-radius: var(--r-md); }
+  .cat-price-notice li { font-size: 14px; }
+}
 .cat-close__sub--note{font-size:13px;opacity:.8;margin-top:-4px}
 .cat-card__price strong{color:inherit;font-weight:700}
 
@@ -796,7 +822,9 @@ body[data-page="selection"] .cat-card__check { display: none; }
    commercial information. Sort sits at the far end. */
 
 .cat-controls { padding: 44px 0 36px; }
-.cat-controls--selection { padding: 8px 0 28px; }
+/* Clear space below the white client band, the same as the catalogue's own
+   filter section, so the bar does not sit tight against the logos. */
+.cat-controls--selection { padding: 52px 0 32px; }
 
 .cat-bar__row {
   display: flex; flex-wrap: wrap; align-items: center;
@@ -998,3 +1026,6 @@ body[data-page="selection"] .cat-card__check { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .cat-top { transition: none; }
 }
+
+/* The selection tray's way back to the catalogue, beside the quote button. */
+.cat-tray__edit { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
