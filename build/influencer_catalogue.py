@@ -616,12 +616,10 @@ def build():
     tier_order = sorted(TIERS, key=lambda t: TIERS[t]["order"])
     tier_counts = [(TIERS[t]["label"], n) for t, n in tally("tier", tier_order)]
 
-    filters = "" if API else (
-        chips("Tier", "tier", [(t, n) for t, n in tally("tier", tier_order)])
-        + chips("Platform", "platform", tally("_platforms"))
-        + chips("City", "city", tally("cities"))
-        + (chips("Interest", "interest", tally("interest")) if HAS_INTERESTS else "")
-    )
+    # The filter bar is drawn by catalogue.js from the cards themselves, in
+    # both modes, so the catalogue and the selection page share one set of
+    # filters and one sort.
+    filters = ""
 
     logos = client_logos()
     logo_row = "".join(
@@ -901,6 +899,10 @@ def build():
   </section>
 
   {{clients_block}}
+
+  <section class="cat-controls cat-controls--selection" aria-label="Filters">
+    <div class="cat-pad"><div class="cat-container"></div></div>
+  </section>
 
   <section class="cat-grid-section">
     <div class="cat-pad"><div class="cat-container">

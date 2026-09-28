@@ -325,17 +325,24 @@
       rows.push("<li><span>Followers</span><strong>" + commas(c.followers) +
                 "</strong></li>");
     }
-    if (c.nationality) {
-      rows.push("<li><span>Nationality</span><strong>" + esc(c.nationality) +
-                "</strong></li>");
-    }
+    // Nationality is held back from the cards until the roster's values have
+    // been checked in the dashboard. The data still arrives; it is not drawn.
     rows.push("<li><span>City</span><strong>" + esc(c.city || "Unspecified") +
               "</strong></li>");
     rows.push("<li><span>Tier</span><strong>" + esc(label) + "</strong></li>");
     return rows.join("");
   }
 
-  function cardMarkup(c) {
+  // Everyone who follows this creator, across the accounts we know counts
+  // for — what "most followers" sorts on. Falls back to the headline figure.
+  function totalFollowers(c) {
+    var sum = (c.profiles || []).reduce(function (t, p) {
+      return t + (Number(p.followers) || 0);
+    }, 0);
+    return sum || Number(c.followers) || 0;
+  }
+
+  function cardMarkup(c, i) {
     var label = tierLabel(c.tier);
     if (CURATED && CURATED.platform) {
       (c.accounts || []).forEach(function (a) {
@@ -387,6 +394,8 @@
       '" data-platform="' + esc(c.platform) + '" data-city="' + esc(c.city || "Unspecified") +
       '" data-interest="' + esc(c.interest || "") + '" data-code="' + esc(c.code) +
       (c.price && c.price.length ? '" data-price="' + esc(c.price.join("-")) : "") +
+      '" data-followers="' + totalFollowers(c) + '" data-name="' + esc(c.name) +
+      '" data-idx="' + (i || 0) +
       '" tabindex="0" role="button" aria-pressed="false"' +
       ' aria-label="' + esc(c.name) + ", " + esc(c.code) + ", " + esc(label) +
       " tier, " + esc(c.city || "Unspecified") + ", " + esc(c.platform) + ", " +
@@ -401,66 +410,397 @@
       "</div></article>";
   }
 
-  function chipGroup(label, key, counts) {
-    var keys = Object.keys(counts);
-    if (!keys.length) return "";
-    // Tier reads in size order; everything else by how many there are.
-    // The order tiers come in from the dashboard, smallest first — so a tier
-    // added there (Mega) sorts in its place instead of at the front.
-    var order = Object.keys(TIER_PRICE);
-    keys.sort(key === "tier"
-      ? function (a, b) { return order.indexOf(a) - order.indexOf(b); }
-      : function (a, b) { return counts[b] - counts[a]; });
-    var chips = '<button type="button" class="cat-chip is-active" data-filter="' + key +
-      '" data-value="" aria-pressed="true">All</button>';
-    keys.forEach(function (v) {
-      chips += '<button type="button" class="cat-chip" data-filter="' + key +
-        '" data-value="' + esc(v) + '" aria-pressed="false">' + esc(v) +
-        "</button>";
-    });
-    return '<div class="cat-filter"><span class="cat-filter__label">' + esc(label) +
-      '</span><div class="cat-filter__chips">' + chips + "</div></div>";
-  }
-
   function renderRoster(list) {
     var grid = $("cat-grid");
     if (!grid) return;
     grid.innerHTML = list.map(cardMarkup).join("");
+  }
 
-    var controls = document.querySelector(".cat-controls .cat-container");
-    if (controls && PAGE !== "selection") {
-      var tally = function (field) {
-        var out = {};
-        list.forEach(function (c) {
-          // city, interest and platform all hold several values per creator,
-          // so a creator counts under each one — the number on a chip is how
-          // many cards it shows. Platform was missing from this list, which
-          // turned a creator on three of them into a chip literally labelled
-          // "Instagram, Snapchat, TikTok" that matched only her.
-          var multi = (field === "city" || field === "interest" ||
-                       field === "platform");
-          // A creator with no value for a dimension is simply not offered
-          // under it: "Unspecified" is not something a client filters for.
-          var raw = c[field] || "";
-          var each = multi ? values(raw) : (raw ? [raw] : []);
-          each.forEach(function (v) {
-            if (!v || /^unspecified$/i.test(v)) return;
-            out[v] = (out[v] || 0) + 1;
-          });
-        });
-        return out;
-      };
-      var interests = tally("interest");
-      var html = chipGroup("Tier", "tier", tally("tier")) +
-                 chipGroup("Platform", "platform", tally("platform")) +
-                 chipGroup("City", "city", tally("city"));
-      // Only offer the interest filter when it actually separates anyone —
-      // one value across the whole roster is a claim, not a filter.
-      if (Object.keys(interests).length > 1) {
-        html += chipGroup("Interest", "interest", interests);
-      }
-      controls.insertAdjacentHTML("afterbegin", html);
+  /* ------------------------------------------------------ places, by country */
+
+  // The roster holds a city, sometimes a country, sometimes a note typed into
+  // the field. Filters group the cities under their country so Riyadh and
+  // Jeddah sit under Saudi Arabia rather than between Dubai and Cairo.
+  // Matching still uses the raw value on the card; this is only how it reads.
+  var COUNTRY_ORDER = ["Saudi Arabia", "UAE", "Egypt", "Kuwait", "Qatar", "Bahrain",
+                       "Oman", "Jordan", "Lebanon"];
+  var PLACES = {
+    "Saudi Arabia": ["riyadh", "jeddah", "jedda", "dammam", "khobar", "al khobar", "dhahran",
+      "taif", "makkah", "mecca", "madinah", "medina", "elmadina elmonawara", "al madinah",
+      "najran", "abha", "khamis mushait", "tabuk", "jazan", "jizan", "hail", "qassim",
+      "buraidah", "al ahsa", "hofuf", "jubail", "yanbu", "al kharj", "ksa", "saudi arabia",
+      "saudi"],
+    "UAE": ["dubai", "abu dhabi", "sharjah", "ajman", "al ain", "ras al khaimah",
+      "umm al quwain", "fujairah", "uae", "united arab emirates", "emirates"],
+    "Egypt": ["cairo", "giza", "alexandria", "mansora", "mansoura", "boursaeed", "port said",
+      "tanta", "zagazig", "egypt"],
+    "Kuwait": ["kuwait", "kuwait city"],
+    "Qatar": ["qatar", "doha"],
+    "Bahrain": ["bahrain", "manama"],
+    "Oman": ["oman", "muscat"],
+    "Jordan": ["jordan", "amman"],
+    "Lebanon": ["lebanon", "beirut"]
+  };
+  // Spellings in the roster that read better another way.
+  var PLACE_LABEL = {
+    "elmadina elmonawara": "Madinah", "al madinah": "Madinah", "medina": "Madinah",
+    "mecca": "Makkah", "jedda": "Jeddah", "al khobar": "Khobar", "boursaeed": "Port Said",
+    "mansora": "Mansoura", "jizan": "Jazan"
+  };
+  // Values that name a country and no city.
+  var COUNTRY_WORDS = ["ksa", "saudi", "saudi arabia", "uae", "united arab emirates",
+    "emirates", "egypt", "kuwait", "qatar", "bahrain", "oman", "jordan", "lebanon"];
+  var COUNTRY_OF = {};
+  Object.keys(PLACES).forEach(function (country) {
+    PLACES[country].forEach(function (p) { COUNTRY_OF[p] = country; });
+  });
+
+  function titleCase(s) {
+    return s.replace(/\b[a-z]/g, function (ch) { return ch.toUpperCase(); });
+  }
+
+  // One raw city value -> {country, label, key}. A value that is a country
+  // on its own ("UAE") is a creator in that country whose city we lack.
+  function place(raw) {
+    var clean = String(raw || "").replace(/\(([^)]*)\)?/g, " ").replace(/[()]/g, " ")
+      .replace(/\s+/g, " ").trim();
+    var k = clean.toLowerCase();
+    // "UAE (Ajman)": a city named in the brackets is more exact than the
+    // country outside them.
+    var inner = ((String(raw).match(/\(([^)]*)/) || [])[1] || "").toLowerCase().trim();
+    if (COUNTRY_OF[inner] && (!COUNTRY_OF[k] || COUNTRY_WORDS.indexOf(k) !== -1)) k = inner;
+    var country = COUNTRY_OF[k];
+    if (!country) {
+      var other = titleCase(clean.toLowerCase()) || "Other";
+      return { country: "Other", label: other, key: "Other|" + other };
     }
+    var label = COUNTRY_WORDS.indexOf(k) !== -1 ? "City not specified"
+      : (PLACE_LABEL[k] || titleCase(k));
+    return { country: country, label: label, key: country + "|" + label };
+  }
+
+  /* ------------------------------------------------------ filters and sort */
+
+  var CHEVRON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  var CROSS = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
+
+  var SORTS = [
+    ["", "Recommended"],
+    ["followers-desc", "Most followers"],
+    ["followers-asc", "Fewest followers"],
+    ["tier-desc", "Tier: largest first"],
+    ["tier-asc", "Tier: smallest first"],
+    ["name", "Name A–Z"]
+  ];
+
+  // How big a tier is. HCP tiers rank alongside the band they mirror, so
+  // "HCP - Macro" sorts with Macro rather than after Mega.
+  var TIER_SIZE = ["nano", "micro", "mid-tier", "mid", "macro", "mega"];
+  function tierRank(name) {
+    var base = String(name || "").replace(/^hcp\s*-\s*/i, "").toLowerCase();
+    var i = TIER_SIZE.indexOf(base);
+    if (i === 3) i = 2;
+    if (i === -1) i = Object.keys(TIER_PRICE).indexOf(name);
+    return i * 2 + (/^hcp/i.test(name) ? 1 : 0);
+  }
+
+  // One filter bar for a set of cards: Tier, Platform, Location, Interest,
+  // each a dropdown of checkboxes, plus a sort. OR within a dimension, AND
+  // across them. Built from the cards themselves, so the selection page gets
+  // options for exactly the creators in that selection.
+  function Controls(host, cards, onChange) {
+    var state = { tier: [], platform: [], place: [], interest: [], sort: "" };
+
+    cards.forEach(function (card) {
+      card._tier = card.dataset.tier ? [card.dataset.tier] : [];
+      card._platform = values(card.dataset.platform);
+      card._interest = values(card.dataset.interest);
+      card._place = values(card.dataset.city).filter(function (v) {
+        return !/^unspecified$/i.test(v);
+      }).map(function (v) { return place(v).key; });
+    });
+
+    function tally(field) {
+      var out = {};
+      cards.forEach(function (c) {
+        c["_" + field].forEach(function (v) { out[v] = (out[v] || 0) + 1; });
+      });
+      return out;
+    }
+
+    function option(dim, value, label, n) {
+      return '<label class="cat-opt"><input type="checkbox" data-dim="' + dim +
+        '" value="' + esc(value) + '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
+        '<span class="cat-opt__label">' + esc(label) + "</span>" +
+        '<span class="cat-opt__n">' + n + "</span></label>";
+    }
+
+    function dropdown(dim, title, body, wide) {
+      return '<div class="cat-dd' + (wide ? " cat-dd--wide" : "") + '" data-dim="' + dim + '">' +
+        '<button type="button" class="cat-dd__btn" aria-expanded="false">' +
+        '<span>' + title + '</span><b class="cat-dd__n" hidden></b>' + CHEVRON + "</button>" +
+        '<div class="cat-dd__panel" role="group" aria-label="' + title + '" hidden>' +
+        '<div class="cat-dd__head"><span>' + title + '</span>' +
+        '<button type="button" class="cat-dd__close" aria-label="Close">' + CROSS + "</button></div>" +
+        '<div class="cat-dd__body">' + body + "</div>" +
+        '<div class="cat-dd__foot"><button type="button" class="cat-dd__clear">Clear</button>' +
+        '<button type="button" class="cat-dd__done">Show creators</button></div></div></div>';
+    }
+
+    var html = "";
+
+    // Tier: follower bands first, healthcare professionals as their own group.
+    var tiers = tally("tier");
+    var tierKeys = Object.keys(tiers).sort(function (a, b) { return tierRank(a) - tierRank(b); });
+    var reg = tierKeys.filter(function (t) { return !/^hcp/i.test(t); });
+    var hcp = tierKeys.filter(function (t) { return /^hcp/i.test(t); });
+    if (tierKeys.length > 1) {
+      var tb = "";
+      if (reg.length) {
+        tb += '<div class="cat-dd__group">' + (hcp.length ? '<p class="cat-dd__title">Creators</p>' : "") +
+          reg.map(function (t) { return option("tier", t, tierLabel(t), tiers[t]); }).join("") + "</div>";
+      }
+      if (hcp.length) {
+        tb += '<div class="cat-dd__group"><p class="cat-dd__title">Healthcare professionals</p>' +
+          hcp.map(function (t) {
+            return option("tier", t, tierLabel(t.replace(/^hcp\s*-\s*/i, "")), tiers[t]);
+          }).join("") + "</div>";
+      }
+      html += dropdown("tier", "Tier", tb);
+    }
+
+    var plats = tally("platform");
+    var platKeys = Object.keys(plats).sort(function (a, b) { return plats[b] - plats[a]; });
+    if (platKeys.length > 1) {
+      html += dropdown("platform", "Platform", '<div class="cat-dd__group">' +
+        platKeys.map(function (p) { return option("platform", p, p, plats[p]); }).join("") + "</div>");
+    }
+
+    // Location: countries in a fixed order, each with its cities by size.
+    var places = tally("place");
+    var byCountry = {};
+    Object.keys(places).forEach(function (key) {
+      var country = key.split("|")[0];
+      (byCountry[country] = byCountry[country] || []).push(key);
+    });
+    var countries = Object.keys(byCountry).sort(function (a, b) {
+      var ia = COUNTRY_ORDER.indexOf(a), ib = COUNTRY_ORDER.indexOf(b);
+      if (a === "Other") return 1;
+      if (b === "Other") return -1;
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
+    });
+    if (Object.keys(places).length > 1) {
+      var lb = countries.map(function (country) {
+        var keys = byCountry[country].sort(function (a, b) {
+          var na = /\|City not specified$/.test(a), nb = /\|City not specified$/.test(b);
+          return (na - nb) || (places[b] - places[a]);
+        });
+        var total = 0;
+        cards.forEach(function (c) {
+          if (c._place.some(function (k) { return k.split("|")[0] === country; })) total++;
+        });
+        return '<div class="cat-dd__group cat-dd__group--country">' +
+          '<label class="cat-opt cat-opt--country"><input type="checkbox" data-country="' +
+          esc(country) + '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
+          '<span class="cat-opt__label">' + esc(country === "Other" ? "Other locations" : country) +
+          '</span><span class="cat-opt__n">' + total + "</span></label>" +
+          '<div class="cat-dd__cities">' +
+          keys.map(function (k) { return option("place", k, k.split("|")[1], places[k]); }).join("") +
+          "</div></div>";
+      }).join("");
+      html += dropdown("place", "Location", lb, true);
+    }
+
+    // Interest only when it separates anyone — one value across the roster
+    // is a claim, not a filter.
+    var ints = tally("interest");
+    var intKeys = Object.keys(ints).sort(function (a, b) { return ints[b] - ints[a]; });
+    if (intKeys.length > 1) {
+      html += dropdown("interest", "Interest", '<div class="cat-dd__group cat-dd__group--cols">' +
+        intKeys.map(function (v) { return option("interest", v, v, ints[v]); }).join("") + "</div>",
+        intKeys.length > 8);
+    }
+
+    var sort = '<label class="cat-sort"><span class="cat-sort__label">Sort</span>' +
+      '<select class="cat-sort__select" aria-label="Sort creators">' +
+      SORTS.map(function (s) { return '<option value="' + s[0] + '">' + s[1] + "</option>"; }).join("") +
+      "</select>" + CHEVRON + "</label>";
+
+    var bar = document.createElement("div");
+    bar.className = "cat-bar";
+    bar.innerHTML = '<div class="cat-bar__row"><div class="cat-bar__filters">' +
+      '<span class="cat-bar__label">Filter</span>' + html + "</div>" + sort + "</div>" +
+      '<div class="cat-active" hidden></div>';
+    host.insertBefore(bar, host.firstChild);
+
+    var active = bar.querySelector(".cat-active");
+    var dds = all(".cat-dd", bar);
+
+    function close(dd) {
+      if (!dd) return;
+      dd.classList.remove("is-open");
+      dd.querySelector(".cat-dd__btn").setAttribute("aria-expanded", "false");
+      dd.querySelector(".cat-dd__panel").hidden = true;
+      document.body.classList.remove("cat-sheet-open");
+    }
+    function closeAll(except) { dds.forEach(function (d) { if (d !== except) close(d); }); }
+    function open(dd) {
+      closeAll(dd);
+      dd.classList.add("is-open");
+      dd.querySelector(".cat-dd__btn").setAttribute("aria-expanded", "true");
+      var panel = dd.querySelector(".cat-dd__panel");
+      panel.hidden = false;
+      // Keep the panel on screen when its button sits near the right edge.
+      panel.style.left = ""; panel.style.right = "";
+      if (window.innerWidth > 767) {
+        var r = panel.getBoundingClientRect();
+        if (r.right > window.innerWidth - 12) { panel.style.left = "auto"; panel.style.right = "0"; }
+      } else {
+        document.body.classList.add("cat-sheet-open");
+      }
+    }
+
+    function labelOf(dim, v) {
+      if (dim === "place") return v.split("|")[1] === "City not specified"
+        ? v.split("|")[0] : v.split("|")[1];
+      if (dim === "tier") return /^hcp/i.test(v) ? "HCP " + tierLabel(v.replace(/^hcp\s*-\s*/i, "")) : tierLabel(v);
+      return v;
+    }
+
+    function sync() {
+      // Checkboxes, counts on the buttons, country tri-state, active pills.
+      all("input[data-dim]", bar).forEach(function (box) {
+        box.checked = state[box.dataset.dim].indexOf(box.value) !== -1;
+      });
+      all("input[data-country]", bar).forEach(function (box) {
+        var cities = all('input[data-dim="place"]', box.closest(".cat-dd__group"));
+        var on = cities.filter(function (c) { return c.checked; }).length;
+        box.checked = on > 0 && on === cities.length;
+        box.indeterminate = on > 0 && on < cities.length;
+      });
+      dds.forEach(function (dd) {
+        var n = state[dd.dataset.dim].length, badge = dd.querySelector(".cat-dd__n");
+        badge.hidden = !n; badge.textContent = n;
+        dd.classList.toggle("has-value", n > 0);
+      });
+      var pills = [];
+      ["tier", "platform", "place", "interest"].forEach(function (dim) {
+        // A whole country picked reads as the country, not ten cities.
+        var shown = state[dim].slice();
+        if (dim === "place") {
+          all("input[data-country]", bar).forEach(function (box) {
+            if (!box.checked) return;
+            var cities = all('input[data-dim="place"]', box.closest(".cat-dd__group"))
+              .map(function (c) { return c.value; });
+            if (cities.length < 2) return;
+            shown = shown.filter(function (v) { return cities.indexOf(v) === -1; });
+            pills.push('<button type="button" class="cat-pill-x" data-country="' + esc(box.dataset.country) +
+              '">' + esc(box.dataset.country === "Other" ? "Other locations" : box.dataset.country) +
+              CROSS + "</button>");
+          });
+        }
+        shown.forEach(function (v) {
+          pills.push('<button type="button" class="cat-pill-x" data-dim="' + dim + '" data-value="' +
+            esc(v) + '" aria-label="Remove ' + esc(labelOf(dim, v)) + '">' + esc(labelOf(dim, v)) +
+            CROSS + "</button>");
+        });
+      });
+      active.hidden = !pills.length;
+      active.innerHTML = pills.join("") +
+        (pills.length ? '<button type="button" class="cat-active__clear">Clear all</button>' : "");
+    }
+
+    function changed() { sync(); onChange(); }
+
+    bar.addEventListener("click", function (e) {
+      var btn = e.target.closest(".cat-dd__btn");
+      if (btn) {
+        var dd = btn.closest(".cat-dd");
+        if (dd.classList.contains("is-open")) close(dd); else open(dd);
+        return;
+      }
+      if (e.target.closest(".cat-dd__done, .cat-dd__close")) { close(e.target.closest(".cat-dd")); return; }
+      if (e.target.closest(".cat-dd__clear")) {
+        state[e.target.closest(".cat-dd").dataset.dim] = [];
+        changed(); return;
+      }
+      var pill = e.target.closest(".cat-pill-x");
+      if (pill) {
+        if (pill.dataset.country) {
+          var group = bar.querySelector('input[data-country="' + pill.dataset.country + '"]')
+            .closest(".cat-dd__group");
+          var drop = all('input[data-dim="place"]', group).map(function (c) { return c.value; });
+          state.place = state.place.filter(function (v) { return drop.indexOf(v) === -1; });
+        } else {
+          state[pill.dataset.dim] = state[pill.dataset.dim].filter(function (v) {
+            return v !== pill.dataset.value;
+          });
+        }
+        changed(); return;
+      }
+      if (e.target.closest(".cat-active__clear")) {
+        state.tier = []; state.platform = []; state.place = []; state.interest = [];
+        changed();
+      }
+    });
+
+    bar.addEventListener("change", function (e) {
+      var box = e.target;
+      if (box.dataset.dim) {
+        var list = state[box.dataset.dim], at = list.indexOf(box.value);
+        if (box.checked && at === -1) list.push(box.value);
+        if (!box.checked && at !== -1) list.splice(at, 1);
+        changed();
+      } else if (box.dataset.country) {
+        // A country picks or clears every city under it.
+        var cities = all('input[data-dim="place"]', box.closest(".cat-dd__group"))
+          .map(function (c) { return c.value; });
+        state.place = state.place.filter(function (v) { return cities.indexOf(v) === -1; });
+        if (box.checked) state.place = state.place.concat(cities);
+        changed();
+      } else if (box.classList.contains("cat-sort__select")) {
+        state.sort = box.value;
+        onChange();
+      }
+    });
+
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest || !e.target.closest(".cat-dd")) closeAll();
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") closeAll();
+    });
+
+    sync();
+
+    return {
+      matches: function (card) {
+        return ["tier", "platform", "place", "interest"].every(function (dim) {
+          if (!state[dim].length) return true;
+          return card["_" + dim].some(function (v) { return state[dim].indexOf(v) !== -1; });
+        });
+      },
+      filtering: function () {
+        return !!(state.tier.length || state.platform.length || state.place.length ||
+                  state.interest.length);
+      },
+      // Sorted copy of `list`; with no sort chosen, the list as given.
+      order: function (list) {
+        var s = state.sort;
+        if (!s) return list.slice();
+        var f = function (c) { return Number(c.dataset.followers) || 0; };
+        var name = function (c) { return (c.dataset.name || "").toLowerCase(); };
+        return list.slice().sort(function (a, b) {
+          if (s === "followers-desc") return f(b) - f(a);
+          if (s === "followers-asc") return f(a) - f(b);
+          if (s === "tier-desc") return (tierRank(b.dataset.tier) - tierRank(a.dataset.tier)) || f(b) - f(a);
+          if (s === "tier-asc") return (tierRank(a.dataset.tier) - tierRank(b.dataset.tier)) || f(b) - f(a);
+          if (s === "name") return name(a).localeCompare(name(b));
+          return 0;
+        });
+      },
+      sorted: function () { return !!state.sort; }
+    };
   }
 
   /* ------------------------------------------------------------- the app */
@@ -469,61 +809,29 @@
     if (PAGE === "selection") { initSelection(); return; }
     var grid = $("cat-grid");
     var cards = all(".cat-card");
-    // Derived from whatever chips the builder rendered, so adding a filter
-    // dimension is a builder change alone — this stays correct untouched.
-    // Each dimension holds a SET of chosen values, not one. "Instagram or
-    // Snapchat" is a real question — a client wants both kinds of creator in
-    // front of them — and a single-choice filter could only ask it one platform
-    // at a time.
-    var filters = {};
-    all(".cat-chip").forEach(function (c) { filters[c.dataset.filter] = []; });
+    var host = document.querySelector(".cat-controls .cat-container");
+    var controls = host ? Controls(host, cards, apply) : null;
 
-    /* -- filtering -- */
+    /* -- filtering and sorting -- */
 
     function apply() {
       var shown = 0;
       cards.forEach(function (card) {
-        var ok = Object.keys(filters).every(function (k) {
-          // Nothing chosen in a dimension means that dimension is not asking.
-          // Otherwise the card has to carry at least one of the chosen values —
-          // OR within a dimension, AND across them, which is how people read a
-          // set of filters.
-          if (!filters[k].length) return true;
-          var mine = values(card.dataset[k]);
-          return filters[k].some(function (want) {
-            return mine.indexOf(want) !== -1;
-          });
-        });
+        var ok = !controls || controls.matches(card);
         card.hidden = !ok;
         if (ok) shown++;
       });
+      if (controls) {
+        var list = controls.sorted() ? controls.order(cards)
+          : cards.slice().sort(function (a, b) { return a.dataset.idx - b.dataset.idx; });
+        list.forEach(function (c) { grid.appendChild(c); });
+      }
       // How many creators exist, and how many a filter leaves, is commercial
       // information: it belongs in the dashboard, not on the client page. Only
       // the empty state is still announced, so a filter that matches nobody
       // does not read as a broken page.
       $("cat-empty").hidden = shown !== 0;
     }
-
-    all(".cat-chip").forEach(function (chip) {
-      chip.addEventListener("click", function () {
-        var name = chip.dataset.filter;
-        var value = chip.dataset.value;
-        if (!value) {
-          filters[name] = [];                 // the All chip clears the set
-        } else {
-          var at = filters[name].indexOf(value);
-          if (at === -1) filters[name].push(value); else filters[name].splice(at, 1);
-        }
-        all('.cat-chip[data-filter="' + name + '"]').forEach(function (c) {
-          var on = c.dataset.value
-            ? filters[name].indexOf(c.dataset.value) !== -1
-            : filters[name].length === 0;     // All lights up when none are
-          c.classList.toggle("is-active", on);
-          c.setAttribute("aria-pressed", on ? "true" : "false");
-        });
-        apply();
-      });
-    });
 
     /* -- selection -- */
 
@@ -1082,19 +1390,37 @@
     selected = want.filter(function (code) { return !!byCode[code]; });
     var dropped = want.length - selected.length;
 
-    function render() {
-      cards.forEach(function (c) { c.hidden = selected.indexOf(c.dataset.code) === -1; });
+    // The same filters and sort as the catalogue, offered over the creators
+    // in this selection only. Filtering narrows what is on screen; it does not
+    // take anyone out of the selection or change its total.
+    var host = document.querySelector(".cat-controls .cat-container");
+    var controls = (host && selected.length > 1)
+      ? Controls(host, selected.map(function (c) { return byCode[c]; }), function () { render(); })
+      : null;
+    if (!controls && host) host.closest(".cat-controls").hidden = true;
 
-      // Order the visible cards the way the link lists them.
+    function render() {
+      var shown = 0;
+      cards.forEach(function (c) {
+        var ok = selected.indexOf(c.dataset.code) !== -1 && (!controls || controls.matches(c));
+        c.hidden = !ok;
+        if (ok) shown++;
+      });
+
+      // Order the visible cards the way the link lists them, or by the sort
+      // the client picked.
       var grid = $("cat-grid");
-      selected.forEach(function (code) {
-        var card = byCode[code];
-        if (card) grid.appendChild(card);
+      var inOrder = selected.map(function (code) { return byCode[code]; }).filter(Boolean);
+      (controls ? controls.order(inOrder) : inOrder).forEach(function (card) {
+        grid.appendChild(card);
       });
 
       $("sel-title").textContent = selectionName;
       document.title = selectionName + " — HelloVoice";
-      $("cat-empty").hidden = selected.length !== 0;
+      $("cat-empty").textContent = selected.length
+        ? "No creators in this selection match those filters."
+        : "This link does not name any creators.";
+      $("cat-empty").hidden = shown !== 0;
 
       // summary: count, per-tier split, indicative total range
       var tiers = {}, lo = 0, hi = 0;
@@ -1234,16 +1560,26 @@
   window.addEventListener("focus", function () { document.body.classList.remove("cat-away"); });
 
   // Last thing in the file, deliberately — see the note by `wasUnlocked`.
-  if (wasUnlocked && CFG.api) {
-    // The tab remembers unlocking, but the server decides. A revoked or expired
-    // code lands back on the gate rather than on an empty page.
+  if (CFG.api) {
+    // Ask the server whether this browser is already in, every time — not
+    // only when the page's own "unlocked" cookie survives. That one ends
+    // when the browser closes, while the server's pass lasts 12 hours, so a
+    // client coming back or hopping to the selection page was asked for a
+    // code the server would have accepted anyway. The server still decides:
+    // a revoked or expired code lands back on the gate.
+    //
+    // While asking, the gate form is hidden (cat-checking), so nobody sees
+    // an access-code screen flash up on every page change.
+    document.body.classList.add("cat-checking");
+    var settle = function () { document.body.classList.remove("cat-checking"); };
     fetch(CFG.api + "/api/roster", { credentials: "include" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (b) {
-        if (b && b.ok) { ROSTER = b.roster || []; adoptTiers(b.tiers); unlock(); }
+        settle();
+        if (b && b.ok) { ROSTER = b.roster || []; adoptTiers(b.tiers); remember(); unlock(); }
         else { forget(); }
       })
-      .catch(function () { /* leave the gate up */ });
+      .catch(settle);
   } else if (wasUnlocked) {
     unlock();
   }

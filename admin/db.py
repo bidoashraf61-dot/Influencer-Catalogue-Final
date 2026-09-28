@@ -249,6 +249,17 @@ def migrate(conn):
         conn.execute("ALTER TABLE selections ADD COLUMN code_id INTEGER")
     if "platform" not in sel_cols:
         conn.execute("ALTER TABLE selections ADD COLUMN platform TEXT")
+    # What each creator costs us, and the margin added on top. The client
+    # price is worked out from these, so the client never sees either.
+    if "margin" not in sel_cols:
+        conn.execute("ALTER TABLE selections ADD COLUMN margin REAL")
+    if "costs" not in sel_cols:
+        conn.execute("ALTER TABLE selections ADD COLUMN costs TEXT")
+    creator_cols = {r["name"] for r in conn.execute("PRAGMA table_info(creators)")}
+    if "cost" not in creator_cols:
+        # The creator's own rate to us, remembered so the next selection
+        # starts from it. Internal, like rating: never sent to a client.
+        conn.execute("ALTER TABLE creators ADD COLUMN cost INTEGER")
 
     seed_tiers(conn)
 
@@ -1099,24 +1110,57 @@ def selection(sid=None, token=None):
 
 
 def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
-                   code_id=None, platform=None):
-    """Create (sid None) or update one priced selection. Returns its id."""
+                   code_id=None, platform=None, margin=None, costs=None):
+    """Create (sid None) or update one priced selection. Returns its id.
+
+    margin and costs are left as they are when not given, so a client
+    re-saving their shortlist from the catalogue cannot wipe the margin an
+    admin set on it."""
     import secrets
     with connect() as conn:
         if sid is None:
             cur = conn.execute(
                 "INSERT INTO selections (token,name,codes,prices,total_from,total_to,"
-                "request_id,code_id,platform,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "request_id,code_id,platform,margin,costs,created_at,updated_at) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (secrets.token_urlsafe(9), name, json.dumps(codes), json.dumps(prices),
-                 total_from, total_to, request_id, code_id, platform, now(), now()))
+                 total_from, total_to, request_id, code_id, platform,
+                 margin if margin is not None else last_margin(conn),
+                 json.dumps(costs or {}), now(), now()))
             return cur.lastrowid
         conn.execute(
             "UPDATE selections SET name=?, codes=?, prices=?, total_from=?, total_to=?, "
             "platform=?, updated_at=? WHERE id=?",
             (name, json.dumps(codes), json.dumps(prices), total_from, total_to,
              platform, now(), sid))
+        if margin is not None or costs is not None:
+            conn.execute("UPDATE selections SET margin=?, costs=? WHERE id=?",
+                         (margin, json.dumps(costs or {}), sid))
         return sid
+
+
+def last_margin(conn=None):
+    """The margin used most recently, so a new selection starts from it
+    rather than from nothing."""
+    if conn is None:
+        with connect() as own:
+            return last_margin(own)
+    row = conn.execute("SELECT margin FROM selections WHERE margin IS NOT NULL "
+                       "ORDER BY updated_at DESC LIMIT 1").fetchone()
+    return row["margin"] if row else None
+
+
+def set_costs(costs, conn):
+    """Remember what each creator costs us, for the next selection."""
+    for code, cost in costs.items():
+        conn.execute("UPDATE creators SET cost = ? WHERE code = ?", (cost, code))
+
+
+def client_price(cost, margin):
+    """Cost plus margin, rounded up to the next 10 SAR so a client never
+    reads a figure like 1,137."""
+    import math
+    return int(math.ceil(cost * (1 + (margin or 0) / 100.0) / 10.0) * 10)
 
 
 def selection_for_request(rid):

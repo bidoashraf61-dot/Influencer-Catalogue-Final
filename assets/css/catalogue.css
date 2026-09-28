@@ -787,3 +787,189 @@ body[data-page="selection"] .cat-card__check { display: none; }
      will not fit beside the number it drops whole to the line below, which is
      what the flex-wrap on the row above is for. */
   white-space:nowrap;flex:0 0 auto}
+
+/* ------------------------------------------------------------ filter bar */
+/* One row of ink pills — one per dimension — each opening a panel of
+   checkboxes, replacing the wall of chips (sixty-odd once cities and tiers
+   grew). A dimension in use turns lime and carries its count, so the row
+   itself says what is filtered. Sort sits at the far end. */
+
+.cat-controls { padding: 44px 0 36px; }
+.cat-controls--selection { padding: 8px 0 28px; }
+
+.cat-bar__row {
+  display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 14px 24px;
+}
+.cat-bar__filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.cat-bar__label {
+  font-family: var(--heading); font-size: 24px; letter-spacing: .08em;
+  color: var(--ink); margin-right: 6px;
+}
+
+.cat-dd { position: relative; }
+.cat-dd__btn {
+  display: inline-flex; align-items: center; gap: 10px;
+  font-family: var(--body); font-size: 15px; font-weight: 600;
+  padding: 10px 18px 10px 22px; min-height: 46px;
+  background: var(--ink); color: var(--white);
+  border: 1px solid var(--ink); border-radius: var(--r-pill);
+  cursor: pointer; transition: background .2s ease, color .2s ease;
+}
+.cat-dd__btn:hover { background: var(--gray); border-color: var(--gray); }
+.cat-dd__btn svg { transition: transform .2s ease; opacity: .7; }
+.cat-dd.is-open .cat-dd__btn svg { transform: rotate(180deg); }
+.cat-dd__btn:focus-visible { outline: 3px solid var(--vivid-orange); outline-offset: 2px; }
+.cat-dd.has-value .cat-dd__btn { background: var(--lime); color: var(--ink); border-color: var(--ink); }
+.cat-dd__n {
+  display: inline-grid; place-items: center;
+  min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--r-pill);
+  background: var(--ink); color: var(--lime); font-size: 12px; font-weight: 700;
+}
+
+.cat-dd__panel {
+  position: absolute; top: calc(100% + 10px); left: 0; z-index: 60;
+  width: 300px; max-height: min(70vh, 560px);
+  display: flex; flex-direction: column;
+  background: var(--white); color: var(--ink);
+  border-radius: var(--r-md);
+  box-shadow: 0 24px 60px rgba(18,18,18,.22), 0 2px 8px rgba(18,18,18,.08);
+}
+.cat-dd--wide .cat-dd__panel { width: 440px; }
+.cat-dd__head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 18px 20px 6px;
+  font-family: var(--heading); font-size: 26px; letter-spacing: .04em;
+}
+.cat-dd__close {
+  width: 34px; height: 34px; border-radius: 100%; border: 0; cursor: pointer;
+  display: grid; place-items: center; background: rgba(18,18,18,.06); color: var(--ink);
+}
+.cat-dd__close:hover { background: rgba(18,18,18,.12); }
+.cat-dd__body { overflow-y: auto; padding: 4px 12px 8px; overscroll-behavior: contain; }
+.cat-dd__group { padding: 6px 0; }
+.cat-dd__group + .cat-dd__group { border-top: 1px solid rgba(18,18,18,.08); }
+.cat-dd__group--cols { display: grid; grid-template-columns: 1fr; }
+.cat-dd--wide .cat-dd__group--cols { grid-template-columns: 1fr 1fr; column-gap: 8px; }
+.cat-dd__title {
+  font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--gray); margin: 8px 8px 4px;
+}
+.cat-dd__cities { padding-left: 26px; }
+.cat-dd--wide .cat-dd__cities { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; }
+.cat-dd__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px 16px; border-top: 1px solid rgba(18,18,18,.08);
+}
+.cat-dd__clear {
+  font: 600 14px var(--body); color: var(--ink); background: none; border: 0;
+  padding: 10px 6px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+.cat-dd__done {
+  font-family: var(--heading); font-size: 19px; letter-spacing: .04em;
+  padding: 11px 22px; min-height: 44px; border-radius: var(--r-pill);
+  background: var(--ink); color: var(--lime); border: 0; cursor: pointer;
+}
+.cat-dd__done:hover { background: var(--gray); }
+
+/* A checkbox row: the native input stays in the tree for keyboard and screen
+   readers; the drawn box is what shows. Ink box, lime tick — lime only ever
+   on dark, per the theme brief. */
+.cat-opt {
+  position: relative; display: flex; align-items: center; gap: 12px;
+  padding: 9px 8px; min-height: 40px; border-radius: 10px; cursor: pointer;
+  font-size: 15px;
+}
+.cat-opt:hover { background: rgba(18,18,18,.05); }
+.cat-opt input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.cat-opt__box {
+  flex: none; width: 20px; height: 20px; border-radius: 6px;
+  border: 1.5px solid rgba(18,18,18,.45); background: var(--white);
+  display: grid; place-items: center; transition: background .15s ease, border-color .15s ease;
+}
+.cat-opt input:checked + .cat-opt__box,
+.cat-opt input:indeterminate + .cat-opt__box { background: var(--ink); border-color: var(--ink); }
+.cat-opt input:checked + .cat-opt__box::after {
+  content: ""; width: 10px; height: 5px; margin-top: -2px;
+  border-left: 2.2px solid var(--lime); border-bottom: 2.2px solid var(--lime);
+  transform: rotate(-45deg);
+}
+.cat-opt input:indeterminate + .cat-opt__box::after {
+  content: ""; width: 10px; height: 2.2px; background: var(--lime); border-radius: 2px;
+}
+.cat-opt input:focus-visible + .cat-opt__box { outline: 3px solid var(--vivid-orange); outline-offset: 2px; }
+.cat-opt__label { flex: 1; min-width: 0; }
+.cat-opt__n { font-size: 12px; color: var(--gray); opacity: .75; font-variant-numeric: tabular-nums; }
+.cat-opt--country { margin-top: 2px; }
+.cat-opt--country .cat-opt__label {
+  font-family: var(--heading); font-size: 21px; letter-spacing: .04em; line-height: 1;
+}
+
+/* Sort: a pill like the filters, native select underneath for keyboards and
+   phones. */
+.cat-sort {
+  position: relative; display: inline-flex; align-items: center; gap: 10px;
+  padding-left: 20px; min-height: 46px; border-radius: var(--r-pill);
+  background: var(--white); border: 1px solid rgba(18,18,18,.18);
+}
+.cat-sort__label {
+  font-family: var(--heading); font-size: 20px; letter-spacing: .06em; color: var(--gray);
+}
+.cat-sort__select {
+  appearance: none; -webkit-appearance: none;
+  font: 600 15px var(--body); color: var(--ink);
+  background: transparent; border: 0; padding: 12px 44px 12px 0; min-height: 44px;
+  cursor: pointer;
+}
+.cat-sort__select:focus-visible { outline: none; }
+.cat-sort:focus-within { border-color: var(--ink); box-shadow: 0 0 0 2px var(--ink); }
+.cat-sort svg { position: absolute; right: 18px; pointer-events: none; }
+
+/* What is filtered, as removable pills. */
+.cat-active { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 18px; }
+.cat-pill-x {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: 500 14px var(--body); color: var(--ink);
+  padding: 7px 12px 7px 16px; min-height: 36px; border-radius: var(--r-pill);
+  background: var(--white); border: 1px solid rgba(18,18,18,.18); cursor: pointer;
+}
+.cat-pill-x svg { opacity: .55; }
+.cat-pill-x:hover { border-color: var(--ink); }
+.cat-pill-x:hover svg { opacity: 1; }
+.cat-active__clear {
+  font: 600 14px var(--body); color: var(--ink); background: none; border: 0;
+  padding: 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
+}
+
+/* Checking the server's pass: show the gate's logo alone, not a form that
+   flashes up and vanishes on every page change. */
+.cat-checking .cat-gate__inner > :not(.cat-gate__logo) { visibility: hidden; }
+.cat-checking .cat-gate__logo { animation: cat-breathe 1.4s ease-in-out infinite; }
+@keyframes cat-breathe { 50% { opacity: .35; } }
+
+@media screen and (max-width: 767px) {
+  .cat-controls { padding: 32px 0 24px; }
+  .cat-bar__label { flex-basis: 100%; margin: 0 0 2px; font-size: 22px; }
+  .cat-bar__filters { gap: 8px; }
+  .cat-dd__btn { font-size: 14px; padding: 9px 14px 9px 18px; min-height: 44px; }
+  .cat-sort { width: 100%; }
+  .cat-sort__select { flex: 1; }
+  /* On a phone the panel is a sheet from the bottom of the screen. */
+  .cat-dd__panel, .cat-dd--wide .cat-dd__panel {
+    position: fixed; left: 0 !important; right: 0 !important; top: auto; bottom: 0;
+    width: auto; max-height: 82vh; border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 130;
+  }
+  .cat-dd--wide .cat-dd__cities, .cat-dd--wide .cat-dd__group--cols { grid-template-columns: 1fr 1fr; }
+  .cat-opt { min-height: 44px; }
+  body.cat-sheet-open { overflow: hidden; }
+  body.cat-sheet-open::after {
+    content: ""; position: fixed; inset: 0; z-index: 120; background: rgba(18,18,18,.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cat-dd__btn, .cat-dd__btn svg, .cat-opt__box { transition: none; }
+  .cat-checking .cat-gate__logo { animation: none; }
+}

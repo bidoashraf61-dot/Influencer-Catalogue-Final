@@ -925,7 +925,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/selections/edit?id=%d" % sid)
 
     def post_selection_save(self):
-        f = self.form_body(multi=("code", "p_from", "p_to", "drop"))
+        f = self.form_body(multi=("code", "p_from", "p_to", "cost", "drop"))
         sid = (f.get("id") or "").strip()
         sel = db.selection(int(sid)) if sid.isdigit() else None
         if sel is None:
@@ -935,15 +935,32 @@ class Handler(BaseHTTPRequestHandler):
             v = "".join(ch for ch in (v or "") if ch.isdigit())
             return int(v) if v else None
 
-        codes, prices = [], {}
+        # The margin is a percentage and may carry a decimal ("27.5").
+        raw_margin = "".join(ch for ch in (f.get("margin") or "") if ch.isdigit() or ch == ".")
+        try:
+            margin = round(float(raw_margin), 2) if raw_margin else None
+        except ValueError:
+            margin = None
+
+        codes, prices, costs = [], {}, {}
         known = {c["code"] for c in db.list_creators()}
-        rows = zip(f.get("code") or [], f.get("p_from") or [], f.get("p_to") or [])
+        cost_in = f.get("cost") or []
+        rows = zip(f.get("code") or [], f.get("p_from") or [], f.get("p_to") or [],
+                   cost_in + [""] * (len(f.get("code") or []) - len(cost_in)))
         remove = set(f.get("drop") or [])
-        for code, lo, hi in rows:
+        for code, lo, hi, cost in rows:
             code = code.strip().upper()
             if not code or code in codes or code in remove or code not in known:
                 continue
             codes.append(code)
+            # A cost decides the price: cost plus the margin. The price boxes
+            # for that creator are only read when no cost is given.
+            cost = num(cost)
+            if cost is not None:
+                costs[code] = cost
+                p = db.client_price(cost, margin)
+                prices[code] = [p, p]
+                continue
             lo, hi = num(lo), num(hi)
             if lo is None and hi is not None: lo = hi
             if hi is None and lo is not None: hi = lo
@@ -958,11 +975,13 @@ class Handler(BaseHTTPRequestHandler):
         if t_to is None and t_from is not None: t_to = t_from
         if t_from is not None and t_to < t_from: t_from, t_to = t_to, t_from
         name = (f.get("name") or "").strip() or sel["name"]
-        db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform)
+        db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
+                          margin=margin, costs=costs)
         # A price agreed here is that creator's rate, so it becomes their price
         # on the roster too — one figure for the creator rather than a private
         # one per selection that the roster then contradicts.
         with db.connect() as conn:
+            db.set_costs(costs, conn)
             for code, band in prices.items():
                 cur = db.creator(code, conn)
                 if cur is None:

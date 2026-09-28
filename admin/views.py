@@ -124,6 +124,15 @@ tr.flash td{animation:flash 2.4s ease-out}
 .stars .dim{color:#d8d2cc}
 .acct{font-size:12px;color:var(--gray)}
 .sel-table input{max-width:130px}
+.sel-table input[readonly]{background:#f3f1ee;color:var(--gray)}
+.sel-table .profit{font-size:12px;color:#14884a;white-space:nowrap}
+.margin-box{display:flex;align-items:center;gap:8px}
+.margin-box input{max-width:110px}
+.money-sum{display:flex;flex-wrap:wrap;gap:28px;margin:4px 0 0}
+.money-sum div{min-width:120px}
+.money-sum dt{font-size:12px;color:var(--gray);text-transform:uppercase;letter-spacing:.06em}
+.money-sum dd{margin:2px 0 0;font-size:20px;font-weight:700}
+.money-sum .gain{color:#14884a}
 .sel-link{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .sel-link input{flex:1;min-width:260px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
 .pager{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
@@ -1683,6 +1692,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
     by = {c["code"]: c for c in creators}
     codes = json.loads(sel["codes"] or "[]")
     own = json.loads(sel["prices"] or "{}")
+    keys = sel.keys()
+    costs = json.loads((sel["costs"] if "costs" in keys else None) or "{}")
+    margin = sel["margin"] if "margin" in keys else None
+    margin_txt = "" if margin is None else ("%g" % margin)
     note = ""
     if error:
         note += "<div class='err'>" + e(error) + "</div>"
@@ -1703,6 +1716,12 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
         shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
                 if c["photo"] else "<span class='thumb sm none'>—</span>")
         val = lambda i: format(set_[i], ",") if set_ else ""
+        # The cost this selection was priced from, else the creator's last
+        # known cost — a starting point the admin can change.
+        cost = costs.get(code)
+        if cost is None and "cost" in c.keys():
+            cost = c["cost"]
+        cost_txt = format(cost, ",") if cost is not None else ""
         rows.append(
             "<tr><td>" + shot + "</td><td><code>" + e(code) + "</code><br>" + e(c["name"])
             + ("" if c["active"] else " <span class='pill dead'>hidden</span>")
@@ -1714,10 +1733,12 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
             + "<td class='muted'>" + (_money(*default) if default[0] is not None else "—")
         )
         rows[-1] += (
-            "</td><td><input name='p_from' value='" + val(0) + "' placeholder='from' inputmode='numeric'></td>"
+            "</td><td><input name='cost' value='" + cost_txt + "' placeholder='cost' inputmode='numeric'>"
+            + "<div class='profit'></div></td>"
+            + "<td><input name='p_from' value='" + val(0) + "' placeholder='from' inputmode='numeric'></td>"
             + "<td><input name='p_to' value='" + val(1) + "' placeholder='to' inputmode='numeric'></td>"
             + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code) + "'> remove</label></td></tr>")
-    table = "".join(rows) or "<tr><td colspan='7' class='muted'>No creators yet — add some below.</td></tr>"
+    table = "".join(rows) or "<tr><td colspan='8' class='muted'>No creators yet — add some below.</td></tr>"
     missing = [c for c in codes if c not in by]
     link = selection_link(sel, origin)
     tf = "" if sel["total_from"] is None else format(sel["total_from"], ",")
@@ -1752,14 +1773,26 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
           "<div class='price-hint'>Empty = the sum of the creators below (currently "
         + _money(lo_sum, hi_sum) + ").</div></div>"
         + "</div></div>"
+        + "<div class='card'><div class='row'>"
+          "<div><label>Profit margin (%)</label><div class='margin-box'>"
+          "<input name='margin' id='sel-margin' value='" + margin_txt + "' placeholder='e.g. 30' "
+          "inputmode='decimal'></div>"
+          "<div class='price-hint'>Added on top of each creator's cost. Client price = cost × "
+          "(1 + margin), rounded up to the next 10 SAR. Internal only — the client never sees "
+          "the cost or the margin.</div></div>"
+          "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
+          "</div></div>"
         + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
-          "<th>Standard price</th><th>Price for this client</th><th></th><th></th></tr></thead><tbody>"
+          "<th>Standard price</th><th>Cost to us</th><th>Price for this client</th><th></th><th></th>"
+          "</tr></thead><tbody>"
         + table + "</tbody></table>"
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
-        + "<p class='price-hint'>Leave a price empty to use the creator's standard price. "
-          "One figure = a fixed price. The client never sees a price against a creator — these "
-          "add up to the total they see, unless you type a total above. A price typed here "
-          "becomes that creator's price on the roster as well, so the two never disagree.</p>"
+        + "<p class='price-hint'>Type a creator's cost and their price is worked out from the "
+          "margin above. With no cost, type the price yourself, or leave it empty to use the "
+          "creator's standard price. One figure = a fixed price. The client never sees a price "
+          "against a creator — these add up to the total they see, unless you type a total above. "
+          "A price set here becomes that creator's price on the roster as well, and a cost is "
+          "remembered for their next selection.</p>"
         + "<div class='row'><div style='flex:2'><label>Add creators (optional)</label>"
           "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div></div>"
         + "</div><button class='btn'>Save prices</button></form>"
@@ -1767,5 +1800,47 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
           "onsubmit=\"return confirm('Delete this selection? Its link stops working.')\">"
           "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
           "<button class='btn small danger'>Delete selection</button></form>"
+        + MARGIN_JS
     )
     return page(sel["name"] + " — Selection", body, "/selections")
+
+
+# Live pricing on the selection page: typing a cost or the margin shows the
+# client price and the profit at once. The server does the same sum on save
+# (db.client_price), so what is shown here is what gets stored.
+MARGIN_JS = """<script>
+(function(){
+  var m=document.getElementById('sel-margin'), sum=document.getElementById('sel-money');
+  if(!m||!sum) return;
+  function n(v){v=String(v||'').replace(/[^0-9.]/g,'');return v===''?null:Number(v);}
+  function fmt(x){return Math.round(x).toLocaleString('en-US')+' SAR';}
+  function price(cost,mg){return Math.ceil(cost*(1+(mg||0)/100)/10)*10;}
+  var rows=[].slice.call(document.querySelectorAll('.sel-table tbody tr')).filter(function(r){
+    return r.querySelector('input[name=cost]');});
+  function run(){
+    var mg=n(m.value), tc=0, tp=0, priced=0;
+    rows.forEach(function(r){
+      var c=r.querySelector('input[name=cost]'), lo=r.querySelector('input[name=p_from]'),
+          hi=r.querySelector('input[name=p_to]'), out=r.querySelector('.profit'),
+          gone=r.querySelector('input[name=drop]').checked, cost=n(c.value);
+      if(cost===null){
+        if(lo.readOnly){lo.value='';hi.value='';}
+        lo.readOnly=hi.readOnly=false; out.textContent=''; return;
+      }
+      var p=price(cost,mg);
+      lo.value=hi.value=p.toLocaleString('en-US'); lo.readOnly=hi.readOnly=true;
+      out.textContent='+'+fmt(p-cost)+' profit';
+      if(!gone){tc+=cost;tp+=p;priced++;}
+    });
+    sum.innerHTML=priced?('<div><dt>Cost ('+priced+')</dt><dd>'+fmt(tc)+'</dd></div>'+
+      '<div><dt>Client price</dt><dd>'+fmt(tp)+'</dd></div>'+
+      '<div><dt>Profit</dt><dd class="gain">'+fmt(tp-tc)+'</dd></div>'):
+      '<div><dt>Profit</dt><dd class="muted" style="font-size:14px;font-weight:400">'+
+      'Type a cost against a creator to see it.</dd></div>';
+  }
+  document.addEventListener('input',function(e){
+    if(e.target===m||e.target.name==='cost') run();});
+  document.addEventListener('change',function(e){if(e.target.name==='drop') run();});
+  run();
+})();
+</script>"""
