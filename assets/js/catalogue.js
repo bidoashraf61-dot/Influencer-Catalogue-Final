@@ -122,6 +122,41 @@
     app.hidden = false;
     if (CFG.api && ROSTER) renderRoster(ROSTER);
     initApp();
+    backToTop();
+  }
+
+  /* --------------------------------------------------------- back to top */
+
+  // A round arrow, bottom right, once the reader is a screen or so down. It
+  // sits above the selection tray when the tray is showing, rather than on
+  // top of its buttons.
+  function backToTop() {
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "cat-top";
+    btn.setAttribute("aria-label", "Back to top");
+    btn.innerHTML = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>';
+    $("cat-app").appendChild(btn);
+
+    var tray = $("cat-tray");
+    // Cheap enough to run on every scroll event: one class toggle, and one
+    // measurement only while the tray is up.
+    function place() {
+      var lift = (tray && !tray.hidden) ? tray.getBoundingClientRect().height : 0;
+      btn.style.bottom = Math.ceil(lift + 20) + "px";
+      btn.classList.toggle("is-shown", window.scrollY > window.innerHeight * 0.8);
+    }
+    window.addEventListener("scroll", place, { passive: true });
+    window.addEventListener("resize", place);
+    // The tray appears and grows as creators are picked, without a scroll.
+    if (tray && "MutationObserver" in window) {
+      new MutationObserver(place).observe(tray, { attributes: true, childList: true, subtree: true });
+    }
+    btn.addEventListener("click", function () {
+      var still = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+    });
+    place();
   }
 
   function gateFail(message) {

@@ -974,3 +974,27 @@ body[data-page="selection"] .cat-card__check { display: none; }
   .cat-dd__btn, .cat-dd__btn svg, .cat-opt__box { transition: none; }
   .cat-checking .cat-gate__logo { animation: none; }
 }
+
+/* ------------------------------------------------------------ back to top */
+
+.cat-top {
+  position: fixed; right: 20px; bottom: 20px; z-index: 95;
+  width: 52px; height: 52px; border-radius: 100%;
+  display: grid; place-items: center; cursor: pointer;
+  background: var(--ink); color: var(--lime);
+  border: 1px solid rgba(255,255,255,.18);
+  box-shadow: 0 10px 30px rgba(18,18,18,.28);
+  opacity: 0; visibility: hidden; transform: translateY(12px);
+  transition: opacity .25s ease, transform .25s ease, visibility .25s, background .2s ease,
+              bottom .2s ease;
+}
+.cat-top.is-shown { opacity: 1; visibility: visible; transform: none; }
+.cat-top:hover { background: var(--lime); color: var(--ink); border-color: var(--ink); }
+.cat-top:focus-visible { outline: 3px solid var(--vivid-orange); outline-offset: 3px; }
+
+@media screen and (max-width: 767px) {
+  .cat-top { right: 14px; width: 48px; height: 48px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-top { transition: none; }
+}
