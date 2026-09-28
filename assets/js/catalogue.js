@@ -528,17 +528,16 @@
       return out;
     }
 
-    function option(dim, value, label, n) {
+    function option(dim, value, label) {
       return '<label class="cat-opt"><input type="checkbox" data-dim="' + dim +
         '" value="' + esc(value) + '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
-        '<span class="cat-opt__label">' + esc(label) + "</span>" +
-        '<span class="cat-opt__n">' + n + "</span></label>";
+        '<span class="cat-opt__label">' + esc(label) + "</span></label>";
     }
 
     function dropdown(dim, title, body, wide) {
       return '<div class="cat-dd' + (wide ? " cat-dd--wide" : "") + '" data-dim="' + dim + '">' +
         '<button type="button" class="cat-dd__btn" aria-expanded="false">' +
-        '<span>' + title + '</span><b class="cat-dd__n" hidden></b>' + CHEVRON + "</button>" +
+        '<span>' + title + '</span>' + CHEVRON + "</button>" +
         '<div class="cat-dd__panel" role="group" aria-label="' + title + '" hidden>' +
         '<div class="cat-dd__head"><span>' + title + '</span>' +
         '<button type="button" class="cat-dd__close" aria-label="Close">' + CROSS + "</button></div>" +
@@ -595,15 +594,11 @@
           var na = /\|City not specified$/.test(a), nb = /\|City not specified$/.test(b);
           return (na - nb) || (places[b] - places[a]);
         });
-        var total = 0;
-        cards.forEach(function (c) {
-          if (c._place.some(function (k) { return k.split("|")[0] === country; })) total++;
-        });
         return '<div class="cat-dd__group cat-dd__group--country">' +
           '<label class="cat-opt cat-opt--country"><input type="checkbox" data-country="' +
           esc(country) + '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
           '<span class="cat-opt__label">' + esc(country === "Other" ? "Other locations" : country) +
-          '</span><span class="cat-opt__n">' + total + "</span></label>" +
+          "</span></label>" +
           '<div class="cat-dd__cities">' +
           keys.map(function (k) { return option("place", k, k.split("|")[1], places[k]); }).join("") +
           "</div></div>";
@@ -679,8 +674,7 @@
         box.indeterminate = on > 0 && on < cities.length;
       });
       dds.forEach(function (dd) {
-        var n = state[dd.dataset.dim].length, badge = dd.querySelector(".cat-dd__n");
-        badge.hidden = !n; badge.textContent = n;
+        var n = state[dd.dataset.dim].length;
         dd.classList.toggle("has-value", n > 0);
       });
       var pills = [];

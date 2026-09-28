@@ -791,8 +791,9 @@ body[data-page="selection"] .cat-card__check { display: none; }
 /* ------------------------------------------------------------ filter bar */
 /* One row of ink pills — one per dimension — each opening a panel of
    checkboxes, replacing the wall of chips (sixty-odd once cities and tiers
-   grew). A dimension in use turns lime and carries its count, so the row
-   itself says what is filtered. Sort sits at the far end. */
+   grew). A dimension in use turns lime, so the row itself says what is
+   filtered. No counts anywhere: how many creators sit behind a filter is
+   commercial information. Sort sits at the far end. */
 
 .cat-controls { padding: 44px 0 36px; }
 .cat-controls--selection { padding: 8px 0 28px; }
@@ -821,11 +822,6 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-dd.is-open .cat-dd__btn svg { transform: rotate(180deg); }
 .cat-dd__btn:focus-visible { outline: 3px solid var(--vivid-orange); outline-offset: 2px; }
 .cat-dd.has-value .cat-dd__btn { background: var(--lime); color: var(--ink); border-color: var(--ink); }
-.cat-dd__n {
-  display: inline-grid; place-items: center;
-  min-width: 22px; height: 22px; padding: 0 6px; border-radius: var(--r-pill);
-  background: var(--ink); color: var(--lime); font-size: 12px; font-weight: 700;
-}
 
 .cat-dd__panel {
   position: absolute; top: calc(100% + 10px); left: 0; z-index: 60;
@@ -899,7 +895,6 @@ body[data-page="selection"] .cat-card__check { display: none; }
 }
 .cat-opt input:focus-visible + .cat-opt__box { outline: 3px solid var(--vivid-orange); outline-offset: 2px; }
 .cat-opt__label { flex: 1; min-width: 0; }
-.cat-opt__n { font-size: 12px; color: var(--gray); opacity: .75; font-variant-numeric: tabular-nums; }
 .cat-opt--country { margin-top: 2px; }
 .cat-opt--country .cat-opt__label {
   font-family: var(--heading); font-size: 21px; letter-spacing: .04em; line-height: 1;
@@ -941,10 +936,16 @@ body[data-page="selection"] .cat-card__check { display: none; }
   padding: 8px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px;
 }
 
-/* Checking the server's pass: show the gate's logo alone, not a form that
-   flashes up and vanishes on every page change. */
-.cat-checking .cat-gate__inner > :not(.cat-gate__logo) { visibility: hidden; }
-.cat-checking .cat-gate__logo { animation: cat-breathe 1.4s ease-in-out infinite; }
+/* Checking the server's pass: show the gate's logo alone, dead centre, not
+   a form that flashes up and vanishes on every page change. The rest of the
+   gate is taken out of the layout (not just hidden), or its height would push
+   the logo up to where it sits above the form. */
+.cat-checking .cat-gate__inner > :not(.cat-gate__logo) { display: none; }
+.cat-checking .cat-gate__inner { display: grid; place-items: center; }
+.cat-checking .cat-gate__logo {
+  display: block; margin: 0;
+  animation: cat-breathe 1.4s ease-in-out infinite;
+}
 @keyframes cat-breathe { 50% { opacity: .35; } }
 
 @media screen and (max-width: 767px) {
