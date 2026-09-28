@@ -63,6 +63,13 @@ VIEWER_COOKIE = "hv_view"
 ADMIN_TTL = 12 * 3600
 VIEWER_TTL = 12 * 3600
 
+# The device cookie: a random ID that marks one browser, so an access code can
+# be limited to a number of devices. Long-lived on purpose — it is what lets
+# the client's own laptop back in next week without taking another slot.
+# 400 days is the most a browser will keep a cookie for.
+DEVICE_COOKIE = "hv_dev"
+DEVICE_TTL = 400 * 86400
+
 # Where the catalogue is served from. The API is called cross-origin from it,
 # so it must be named explicitly — "*" cannot be used with credentials.
 ALLOWED_ORIGINS = set()
@@ -113,9 +120,11 @@ class Handler(BaseHTTPRequestHandler):
         return out
 
     def client_ip(self):
-        # behind nginx the socket address is the proxy, not the visitor
+        # Behind nginx the socket address is the proxy, not the visitor. The
+        # LAST X-Forwarded-For entry is the one our own proxy added; anything
+        # before it came from the client and can be typed by anyone.
         fwd = self.headers.get("X-Forwarded-For", "")
-        return fwd.split(",")[0].strip() if fwd else self.client_address[0]
+        return fwd.split(",")[-1].strip() if fwd else self.client_address[0]
 
     def body(self):
         length = int(self.headers.get("Content-Length") or 0)
@@ -184,9 +193,18 @@ class Handler(BaseHTTPRequestHandler):
         raw = auth.unsign(self.cookies().get(VIEWER_COOKIE, ""), SECRET)
         if not raw or ":" not in raw:
             return None
-        code_id, _, expiry = raw.partition(":")
-        if not expiry.isdigit() or int(expiry) < db.now():
+        parts = raw.split(":")
+        code_id, expiry = parts[0], parts[1] if len(parts) > 1 else ""
+        if not code_id.isdigit() or not expiry.isdigit() or int(expiry) < db.now():
             return None
+        # The pass names the device it was issued to. It must still be this
+        # browser, and the device must still be on the code — removing it in
+        # the dashboard shuts it out on its next request. A pass issued before
+        # devices were counted carries none and simply runs out (12 hours).
+        if len(parts) > 2:
+            mine = db.device_hash(self.cookies().get(DEVICE_COOKIE, ""))
+            if mine != parts[2] or not db.device_allowed(int(code_id), parts[2]):
+                return None
         # Re-check the code every request: revoking must take effect at once,
         # not whenever the cookie happens to lapse.
         with db.connect() as conn:
@@ -263,7 +281,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/":
             return self.send(200, views.dashboard(db.stats(), db.recent_events(12), who))
         if path == "/codes":
-            return self.send(200, views.codes_page(db.list_codes(), query.get("new"), query.get("e")))
+            return self.send(200, views.codes_page(db.list_codes(), query.get("new"), query.get("e"),
+                                                   db.code_devices(), query.get("ok")))
         if path == "/analytics":
             # Two dates off a calendar, not a fixed window. int(query["days"])
             # used to sit here and raised ValueError on anything non-numeric in
@@ -365,6 +384,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_code_new()
         if path == "/codes/revoke":
             return self.post_code_revoke()
+        if path == "/codes/limits":
+            return self.post_code_limits()
+        if path == "/codes/device/remove":
+            return self.post_device_remove()
         if path == "/roster/save":
             return self.post_roster_save()
         if path == "/selections/new":
@@ -426,6 +449,7 @@ class Handler(BaseHTTPRequestHandler):
         label = (form.get("label") or "").strip() or "Unnamed"
         days = form.get("days", "").strip()
         max_uses = form.get("max_uses", "").strip()
+        max_devices = form.get("max_devices", "").strip()
         if days.isdigit() and int(days) > 3650:
             return self.redirect("/codes?e=" + urllib.parse.quote(
                 "Expiry can be at most 3650 days (10 years). Leave it empty for a code "
@@ -445,8 +469,42 @@ class Handler(BaseHTTPRequestHandler):
             code = auth.generate_code()
         db.create_code(auth.hash_code(code), auth.code_hint(code), label, expires,
                        int(max_uses) if max_uses.isdigit() and int(max_uses) > 0 else None,
-                       code_plain=code)
+                       code_plain=code,
+                       max_devices=int(max_devices) if max_devices.isdigit()
+                       and int(max_devices) > 0 else None)
         return self.redirect("/codes?new=" + urllib.parse.quote(code))
+
+    def post_code_limits(self):
+        """Change a code's device limit, use limit and expiry. Empty = none."""
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        row = db.get_code(int(cid)) if cid.isdigit() else None
+        if row is None:
+            return self.redirect("/codes")
+
+        def limit(key):
+            v = (f.get(key) or "").strip()
+            return int(v) if v.isdigit() and int(v) > 0 else None
+
+        # A date from the calendar, inclusive: the code works to the end of it.
+        day = (f.get("expires") or "").strip()
+        start = db.day_bounds(day, None) if day else None
+        expires = start + 86400 - 1 if start is not None else None
+        if day and start is None:
+            return self.redirect("/codes?e=" + urllib.parse.quote("That expiry date is not valid."))
+        db.update_code_limits(row["id"], limit("max_devices"), limit("max_uses"), expires)
+        return self.redirect("/codes?ok=" + urllib.parse.quote(
+            "Saved the limits for " + row["label"] + ".") + "#code-" + str(row["id"]))
+
+    def post_device_remove(self):
+        """Take a device off a code: it loses access at its next request and
+        its slot is free for another."""
+        f = self.form_body()
+        did, cid = (f.get("id") or "").strip(), (f.get("code") or "").strip()
+        if did.isdigit():
+            db.remove_device(int(did))
+        return self.redirect("/codes?ok=" + urllib.parse.quote("Device removed.")
+                             + ("#code-" + cid if cid.isdigit() else ""))
 
     def post_code_revoke(self):
         cid = self.form_body().get("id")
@@ -1067,22 +1125,38 @@ class Handler(BaseHTTPRequestHandler):
             # attacker nothing they could not learn by trying.
             return self.send_json(403, {"ok": False, "reason": reason}, self.cors())
 
+        # Which browser this is. A new one gets an ID now; the code then has
+        # to have room for it.
+        token = self.cookies().get(DEVICE_COOKIE, "")
+        if len(token) < 20:
+            import secrets
+            token = secrets.token_urlsafe(24)
+        device = db.device_hash(token)
+        admitted, why = db.admit_device(row, device, self.client_ip(), ua)
+        if not admitted:
+            db.log("unlock_fail", row["id"], self.client_ip(), ua, why)
+            return self.send_json(403, {"ok": False, "reason": why}, self.cors())
+
         db.bump_code_use(row["id"])
-        db.log("unlock_ok", row["id"], self.client_ip(), ua)
+        db.log("unlock_ok", row["id"], self.client_ip(), ua,
+               "new device" if why == "new" else None)
         expiry = db.now() + VIEWER_TTL
         if row["expires_at"]:
             expiry = min(expiry, row["expires_at"])
-        ticket = auth.sign("%d:%d" % (row["id"], expiry), SECRET)
+        ticket = auth.sign("%d:%d:%s" % (row["id"], expiry, device), SECRET)
         max_age = max(0, expiry - db.now())
         # Cross-origin needs SameSite=None, which needs Secure, which needs
         # HTTPS. Same-origin needs none of that and is the safer default.
         policy = "SameSite=None; Secure" if ALLOWED_ORIGINS else "SameSite=Lax"
         cookie = (f"{VIEWER_COOKIE}={ticket}; Path=/; HttpOnly; "
                   f"{policy}; Max-Age={max_age}")
+        dev_cookie = (f"{DEVICE_COOKIE}={token}; Path=/; HttpOnly; "
+                      f"{policy}; Max-Age={DEVICE_TTL}")
         return self.send_json(200, {"ok": True, "label": row["label"],
                                     "roster": self.roster_payload(),
                                     "tiers": self.tier_payload()},
-                              self.cors() + [("Set-Cookie", cookie)])
+                              self.cors() + [("Set-Cookie", cookie),
+                                             ("Set-Cookie", dev_cookie)])
 
     def api_roster(self):
         code_id = self.viewer_code_id()

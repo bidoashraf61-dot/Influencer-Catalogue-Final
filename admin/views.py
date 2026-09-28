@@ -124,6 +124,13 @@ tr.flash td{animation:flash 2.4s ease-out}
 .stars .dim{color:#d8d2cc}
 .acct{font-size:12px;color:var(--gray)}
 .sel-table input{max-width:130px}
+tr.manage-row td{padding-top:0;border-top:0}
+details.manage summary{list-style:none;display:inline-block;cursor:pointer}
+details.manage summary::-webkit-details-marker{display:none}
+details.manage[open] summary{margin-bottom:12px}
+.manage-body{background:#f7f5f2;border-radius:12px;padding:16px 18px}
+.limits input{max-width:170px}
+table.devices{margin-top:10px;font-size:14px}
 .sel-table input[readonly]{background:#f3f1ee;color:var(--gray)}
 .sel-table .profit{font-size:12px;color:#14884a;white-space:nowrap}
 .margin-box{display:flex;align-items:center;gap:8px}
@@ -509,7 +516,64 @@ def copyable(text, extra=""):
             "</span>")
 
 
-def codes_page(codes, new_code=None, error=None):
+def device_name(ua):
+    """'iPhone · Safari' from a user-agent string — enough to tell a
+    client's phone from their laptop in the list."""
+    ua = ua or ""
+    kind = next((n for k, n in (("iPhone", "iPhone"), ("iPad", "iPad"), ("Android", "Android"),
+                                ("Macintosh", "Mac"), ("Windows", "Windows"), ("Linux", "Linux"))
+                 if k in ua), "Unknown device")
+    app = next((n for k, n in (("Edg/", "Edge"), ("OPR/", "Opera"), ("Firefox/", "Firefox"),
+                               ("CriOS", "Chrome"), ("Chrome/", "Chrome"), ("Safari/", "Safari"))
+                if k in ua), "")
+    return kind + (" · " + app if app else "")
+
+
+def _day(value):
+    return time.strftime("%Y-%m-%d", time.gmtime(value)) if value else ""
+
+
+def code_manage(c, devices):
+    """The panel under a code: its limits, and every device it opened on."""
+    cid = str(c["id"])
+    maxd = c["max_devices"] if "max_devices" in c.keys() else None
+    form = (
+        "<form method='post' action='" + u("/codes/limits") + "' class='row limits'>"
+        "<input type='hidden' name='id' value='" + cid + "'>"
+        "<div><label>Max devices</label><input name='max_devices' type='number' min='1' "
+        "value='" + (str(maxd) if maxd else "") + "' placeholder='no limit'></div>"
+        "<div><label>Max uses</label><input name='max_uses' type='number' min='1' "
+        "value='" + (str(c["max_uses"]) if c["max_uses"] else "") + "' placeholder='unlimited'></div>"
+        "<div><label>Expires on</label><input name='expires' type='date' "
+        "value='" + _day(c["expires_at"]) + "'></div>"
+        "<div style='align-self:end'><button class='btn small'>Save limits</button></div></form>"
+        "<p class='price-hint'>Max devices: how many phones or computers can open the catalogue "
+        "with this code. A device already on the list always gets back in; a new one is refused "
+        "once the list is full, and needs a new code or a slot freed below. Empty = no limit.</p>")
+    if devices:
+        rows = "".join(
+            "<tr><td>" + e(device_name(d["user_agent"])) + "</td>"
+            "<td class='muted'>" + e(d["ip"] or "—") + "</td>"
+            "<td class='muted'>" + ago(d["first_at"]) + "</td>"
+            "<td class='muted'>" + ago(d["last_at"]) + "</td>"
+            "<td class='right'><form method='post' action='" + u("/codes/device/remove") + "' "
+            "class='inline' onsubmit=\"return confirm('Remove this device? It loses access at "
+            "once and its slot is freed.')\"><input type='hidden' name='id' value='" + str(d["id"])
+            + "'><input type='hidden' name='code' value='" + cid + "'>"
+            "<button class='btn small ghost'>Remove</button></form></td></tr>"
+            for d in devices)
+        listing = ("<table class='devices'><thead><tr><th>Device</th><th>IP address</th>"
+                   "<th>First opened</th><th>Last seen</th><th></th></tr></thead><tbody>"
+                   + rows + "</tbody></table>")
+    else:
+        listing = "<p class='muted'>Not opened on any device since device limits began.</p>"
+    return form + listing
+
+
+def codes_page(codes, new_code=None, error=None, devices=(), message=None):
+    by_code = {}
+    for d in devices or ():
+        by_code.setdefault(d["code_id"], []).append(d)
     banner = ""
     if new_code:
         banner += (
@@ -519,6 +583,8 @@ def codes_page(codes, new_code=None, error=None):
         )
     if error:
         banner += "<div class='err'>" + e(error) + "</div>"
+    if message:
+        banner += "<div class='ok'>" + e(message) + "</div>"
 
     rows = []
     for c in codes:
@@ -539,14 +605,24 @@ def codes_page(codes, new_code=None, error=None):
         shown = (copyable(plain) if plain else
                  "<code title='Issued before codes were stored — cannot be shown'>"
                  "••••-" + e(c["hint"]) + "</code>")
+        maxd = c["max_devices"] if "max_devices" in c.keys() else None
+        n = c["devices"] if "devices" in c.keys() else 0
+        full = maxd is not None and n >= maxd
+        devs = (str(n) + " / " + (str(maxd) if maxd else "no limit")
+                + (" <span class='pill warn'>full</span>" if full and ok else ""))
+        manage = ("<details id='code-" + str(c["id"]) + "' class='manage'><summary class='btn small ghost'>"
+                  "Manage</summary><div class='manage-body'>"
+                  + code_manage(c, by_code.get(c["id"], [])) + "</div></details>")
         rows.append(
             "<tr><td><strong>" + e(c["label"]) + "</strong><br>" + shown
             + "</td><td><span class='pill " + cls + "'>" + e(reason) + "</span></td>"
+            + "<td>" + devs + "</td>"
             + "<td>" + used + "</td><td class='muted'>" + ts(c["expires_at"]) + "</td>"
             + "<td class='muted'>" + ago(c["last_used"]) + "</td>"
             + "<td class='right'>" + revoke + "</td></tr>"
+            + "<tr class='manage-row'><td colspan='7'>" + manage + "</td></tr>"
         )
-    body_rows = "".join(rows) or "<tr><td colspan='6' class='muted'>No codes yet.</td></tr>"
+    body_rows = "".join(rows) or "<tr><td colspan='7' class='muted'>No codes yet.</td></tr>"
 
     body = (
         "<h1>Access codes</h1><p class='sub'>One code per client. Checked on the server, "
@@ -562,8 +638,12 @@ def codes_page(codes, new_code=None, error=None):
           "<input name='days' type='number' min='1' max='3650' placeholder='empty = never'></div>"
         + "<div><label>Max uses</label>"
           "<input name='max_uses' type='number' min='1' placeholder='unlimited'></div>"
+        + "<div><label>Max devices</label>"
+          "<input name='max_devices' type='number' min='1' value='5' placeholder='no limit'>"
+          "<div class='price-hint'>Phones or computers this code opens on. Passed to anyone "
+          "else, it will not open. Empty = no limit.</div></div>"
         + "</div><button class='btn'>Create code</button></form>"
-        + "<div class='card'><table><thead><tr><th>Code</th><th>State</th><th>Uses</th>"
+        + "<div class='card'><table><thead><tr><th>Code</th><th>State</th><th>Devices</th><th>Uses</th>"
         + "<th>Expires</th><th>Last used</th><th></th></tr></thead><tbody>"
         + body_rows + "</tbody></table></div>"
     )

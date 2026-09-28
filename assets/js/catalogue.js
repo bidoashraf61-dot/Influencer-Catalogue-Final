@@ -173,6 +173,10 @@
     expired: "That code has expired. Ask us for a new one.",
     revoked: "That code is no longer active. Ask us for a new one.",
     exhausted: "That code has already been used its maximum number of times.",
+    // The code is fine but already open on as many devices as it allows —
+    // the usual sign it was passed on.
+    device_limit: "This code is already in use on its maximum number of devices. " +
+      "Please contact us for your own access code.",
     unknown: "That code is not right."
   };
 

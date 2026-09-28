@@ -128,6 +128,21 @@ CREATE TABLE IF NOT EXISTS requests (
 );
 CREATE INDEX IF NOT EXISTS requests_at ON requests(at DESC);
 
+-- The devices an access code has been opened on. A device is one browser,
+-- known by a random ID in a long-lived cookie (stored here only as a hash).
+-- A code with max_devices set opens on that many and no more, so a code
+-- passed on to someone else does not open for them.
+CREATE TABLE IF NOT EXISTS code_devices (
+  id         INTEGER PRIMARY KEY,
+  code_id    INTEGER NOT NULL REFERENCES codes(id) ON DELETE CASCADE,
+  device     TEXT NOT NULL,            -- sha256 of the device cookie
+  first_at   INTEGER NOT NULL,
+  last_at    INTEGER NOT NULL,
+  ip         TEXT,                     -- where it was last seen
+  user_agent TEXT,
+  UNIQUE (code_id, device)
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
   token      TEXT PRIMARY KEY,
   admin_id   INTEGER NOT NULL REFERENCES admins(id) ON DELETE CASCADE,
@@ -244,6 +259,14 @@ def migrate(conn):
         conn.execute("UPDATE tiers SET auto = 0 WHERE upper(code) LIKE 'HCP%' "
                      "OR upper(name) LIKE 'HCP%'")
 
+    code_cols = {r["name"] for r in conn.execute("PRAGMA table_info(codes)")}
+    if "max_devices" not in code_cols:
+        conn.execute("ALTER TABLE codes ADD COLUMN max_devices INTEGER")
+        # Once, when the limit is introduced: every live code is capped at 5
+        # devices, counted from its next unlock. Codes issued later take the
+        # limit set when they are created.
+        conn.execute("UPDATE codes SET max_devices = 5 WHERE revoked_at IS NULL")
+
     sel_cols = {r["name"] for r in conn.execute("PRAGMA table_info(selections)")}
     if "code_id" not in sel_cols:
         conn.execute("ALTER TABLE selections ADD COLUMN code_id INTEGER")
@@ -336,7 +359,8 @@ def purge_expired_sessions():
 
 # ------------------------------------------------------------------- codes --
 
-def create_code(code_hash, hint, label, expires_at=None, max_uses=None, code_plain=None):
+def create_code(code_hash, hint, label, expires_at=None, max_uses=None, code_plain=None,
+                max_devices=None):
     """The code is stored as written as well as hashed.
 
     Hashing alone was the wrong call here, borrowed from passwords without the
@@ -352,9 +376,9 @@ def create_code(code_hash, hint, label, expires_at=None, max_uses=None, code_pla
     """
     with connect() as conn:
         cur = conn.execute(
-            "INSERT INTO codes (code_hash, hint, label, created_at, expires_at, max_uses, code_plain) "
-            "VALUES (?,?,?,?,?,?,?)",
-            (code_hash, hint, label, now(), expires_at, max_uses, code_plain),
+            "INSERT INTO codes (code_hash, hint, label, created_at, expires_at, max_uses, "
+            "code_plain, max_devices) VALUES (?,?,?,?,?,?,?,?)",
+            (code_hash, hint, label, now(), expires_at, max_uses, code_plain, max_devices),
         )
         return cur.lastrowid
 
@@ -368,7 +392,8 @@ def list_codes():
     with connect() as conn:
         return conn.execute(
             "SELECT c.*, "
-            " (SELECT MAX(at) FROM events e WHERE e.code_id = c.id AND e.kind='unlock_ok') last_used "
+            " (SELECT MAX(at) FROM events e WHERE e.code_id = c.id AND e.kind='unlock_ok') last_used, "
+            " (SELECT COUNT(*) FROM code_devices d WHERE d.code_id = c.id) devices "
             "FROM codes c ORDER BY c.created_at DESC"
         ).fetchall()
 
@@ -376,6 +401,74 @@ def list_codes():
 def revoke_code(code_id):
     with connect() as conn:
         conn.execute("UPDATE codes SET revoked_at = ? WHERE id = ?", (now(), code_id))
+
+
+# ----------------------------------------------------------- devices --
+
+def device_hash(token):
+    import hashlib
+    return hashlib.sha256(("hv-device:" + (token or "")).encode()).hexdigest()
+
+
+def admit_device(code_row, device, ip=None, user_agent=None):
+    """Let this device use this code, if it may. Returns (ok, reason).
+
+    A device already on the code is always let back in. A new one takes a
+    free slot, or is refused with "device_limit" when the code is full.
+    """
+    with connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")        # two new devices at once cannot
+        known = conn.execute(                  # both take the last slot
+            "SELECT id FROM code_devices WHERE code_id = ? AND device = ?",
+            (code_row["id"], device)).fetchone()
+        if known:
+            conn.execute("UPDATE code_devices SET last_at = ?, ip = ?, user_agent = ? "
+                         "WHERE id = ?", (now(), ip, (user_agent or "")[:300], known["id"]))
+            return True, "known"
+        limit = code_row["max_devices"] if "max_devices" in code_row.keys() else None
+        if limit is not None:
+            used = conn.execute("SELECT COUNT(*) FROM code_devices WHERE code_id = ?",
+                                (code_row["id"],)).fetchone()[0]
+            if used >= limit:
+                return False, "device_limit"
+        conn.execute(
+            "INSERT INTO code_devices (code_id, device, first_at, last_at, ip, user_agent) "
+            "VALUES (?,?,?,?,?,?)",
+            (code_row["id"], device, now(), now(), ip, (user_agent or "")[:300]))
+        return True, "new"
+
+
+def device_allowed(code_id, device):
+    """Still on the code? Removing a device in the dashboard ends its access
+    on its next request."""
+    with connect() as conn:
+        return conn.execute("SELECT 1 FROM code_devices WHERE code_id = ? AND device = ?",
+                            (code_id, device)).fetchone() is not None
+
+
+def code_devices(code_id=None):
+    with connect() as conn:
+        if code_id is None:
+            return conn.execute("SELECT * FROM code_devices ORDER BY last_at DESC").fetchall()
+        return conn.execute("SELECT * FROM code_devices WHERE code_id = ? "
+                            "ORDER BY last_at DESC", (code_id,)).fetchall()
+
+
+def remove_device(device_id):
+    with connect() as conn:
+        conn.execute("DELETE FROM code_devices WHERE id = ?", (device_id,))
+
+
+def update_code_limits(code_id, max_devices, max_uses, expires_at):
+    """Change a live code's limits from the dashboard. None = no limit."""
+    with connect() as conn:
+        conn.execute("UPDATE codes SET max_devices = ?, max_uses = ?, expires_at = ? "
+                     "WHERE id = ?", (max_devices, max_uses, expires_at, code_id))
+
+
+def get_code(code_id):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM codes WHERE id = ?", (code_id,)).fetchone()
 
 
 def bump_code_use(code_id):
