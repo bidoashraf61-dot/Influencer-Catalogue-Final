@@ -893,6 +893,7 @@ def build():
         <ul>
           <li><strong>These are indicative prices, not a final price.</strong> Rates vary by creator, season, deliverables, exclusivity and campaign requirements, and are confirmed in our quote.</li>
           <li><strong>All prices exclude taxes</strong> (VAT is added on the final quote).</li>
+          <li><strong>Prices do not include logistics,</strong> including product logistics — getting products to and from creators is quoted separately.</li>
         </ul>
       </div>
     </div></div>
@@ -920,7 +921,7 @@ def build():
         Send it back and we will come back with a full quote, deliverables and
         availability for each creator.
       </p>
-      <p class="cat-close__sub cat-close__sub--note">Prices shown are indicative and exclude taxes.</p>
+      <p class="cat-close__sub cat-close__sub--note">Prices shown are indicative and exclude taxes and logistics.</p>
       <div class="cat-close__actions">
         <button type="button" class="cat-btn cat-btn--lime" id="cat-request-2">Request a quote</button>
         <button type="button" class="cat-btn cat-btn--ghost" id="cat-copy-link">Copy link</button>
