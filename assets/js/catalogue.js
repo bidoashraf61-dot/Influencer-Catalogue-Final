@@ -501,6 +501,16 @@
   // One raw city value -> {country, label, key}. A value that is a country
   // on its own ("UAE") is a creator in that country whose city we lack.
   function place(raw) {
+    // "Kuwait Not Specified yet": a creator in that country whose city we
+    // do not have yet. Filed under the country as "City not specified".
+    var pending = String(raw || "").match(/^\s*(.+?)\s+not specified yet\s*$/i);
+    if (pending) {
+      var named = pending[1].toLowerCase();
+      var land = COUNTRY_OF[named] ||
+        COUNTRY_ORDER.filter(function (c) { return c.toLowerCase() === named; })[0] ||
+        titleCase(named);
+      return { country: land, label: "City not specified", key: land + "|City not specified" };
+    }
     var clean = String(raw || "").replace(/\(([^)]*)\)?/g, " ").replace(/[()]/g, " ")
       .replace(/\s+/g, " ").trim();
     var k = clean.toLowerCase();
@@ -543,6 +553,17 @@
     return i * 2 + (/^hcp/i.test(name) ? 1 : 0);
   }
 
+  // Text for matching: lower case, accents and styled letters (the 𝓓𝓻 some
+  // names use) folded to plain ones, Arabic hamza forms on alef unified, and
+  // spaces squeezed — so "dr hala" finds "𝓓𝓻.𝓗𝓪𝓵𝓪".
+  function fold(text) {
+    var t = String(text || "");
+    try { t = t.normalize("NFKD"); } catch (e) { /* very old browser */ }
+    return t.replace(/[̀-ًͯ-ٟ]/g, "")
+      .replace(/[أإآ]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه")
+      .toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  }
+
   // "50K", "1.2m", "50,000" -> a number; anything else -> null.
   function readCount(text) {
     var m = String(text || "").replace(/[,\s]/g, "").toLowerCase().match(/^(\d+(?:\.\d+)?)([km]?)$/);
@@ -568,7 +589,7 @@
   // options for exactly the creators in that selection.
   function Controls(host, cards, onChange) {
     // followers: [] for no limit, else [min, max] with either end null.
-    var state = { tier: [], platform: [], place: [], interest: [], followers: [], sort: "" };
+    var state = { tier: [], platform: [], place: [], interest: [], followers: [], sort: "", q: "" };
 
     cards.forEach(function (card) {
       card._tier = card.dataset.tier ? [card.dataset.tier] : [];
@@ -698,7 +719,14 @@
 
     var bar = document.createElement("div");
     bar.className = "cat-bar";
-    bar.innerHTML = '<div class="cat-bar__row"><div class="cat-bar__filters">' +
+    // Search by name (or code), above the filters. Matching ignores case and
+    // the decorative letters some creators use in their display names.
+    bar.innerHTML = '<label class="cat-search"><svg viewBox="0 0 24 24" width="18" height="18" ' +
+      'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">' +
+      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>' +
+      '<input type="search" class="cat-search__input" placeholder="Search creators by name" ' +
+      'aria-label="Search creators by name" autocomplete="off" spellcheck="false"/></label>' +
+      '<div class="cat-bar__row"><div class="cat-bar__filters">' +
       '<span class="cat-bar__label">Filter</span>' + html + "</div>" + sort + "</div>" +
       '<div class="cat-active" hidden></div>';
     host.insertBefore(bar, host.firstChild);
@@ -826,6 +854,9 @@
       if (e.target.closest(".cat-active__clear")) {
         state.tier = []; state.platform = []; state.place = []; state.interest = [];
         state.followers = [];
+        state.q = "";
+        var sbox = bar.querySelector(".cat-search__input");
+        if (sbox) sbox.value = "";
         changed();
       }
     });
@@ -837,6 +868,11 @@
     }
     // Typing narrows the cards as you go; the pill and button follow.
     bar.addEventListener("input", function (e) {
+      if (e.target.classList && e.target.classList.contains("cat-search__input")) {
+        state.q = fold(e.target.value);
+        onChange();
+        return;
+      }
       if (!e.target.dataset || !e.target.dataset.range) return;
       var lo = readCount(bar.querySelector('input[data-range="min"]').value);
       var hi = readCount(bar.querySelector('input[data-range="max"]').value);
@@ -874,6 +910,12 @@
 
     return {
       matches: function (card) {
+        if (state.q) {
+          if (card._search === undefined) {
+            card._search = fold((card.dataset.name || "") + " " + (card.dataset.code || ""));
+          }
+          if (card._search.indexOf(state.q) === -1) return false;
+        }
         if (state.followers.length) {
           var f = Number(card.dataset.followers) || 0;
           if (state.followers[0] && f < state.followers[0]) return false;
@@ -886,7 +928,7 @@
       },
       filtering: function () {
         return !!(state.tier.length || state.platform.length || state.place.length ||
-                  state.interest.length || state.followers.length);
+                  state.interest.length || state.followers.length || !!state.q);
       },
       // Sorted copy of `list`; with no sort chosen, the list as given.
       order: function (list) {
@@ -1734,7 +1776,7 @@
 
   ["contextmenu", "dragstart", "selectstart", "copy", "cut"].forEach(function (evt) {
     document.addEventListener(evt, function (e) {
-      if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form, .cat-range, [data-noselect]")) return;
+      if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form, .cat-range, .cat-search, [data-noselect]")) return;
       e.preventDefault();
     });
   });
@@ -1743,7 +1785,7 @@
     var k = (e.key || "").toLowerCase();
     var mod = e.ctrlKey || e.metaKey;
     if (mod && ["s", "p", "u", "c", "x", "a"].indexOf(k) !== -1) {
-      if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form, .cat-range")) return;
+      if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form, .cat-range, .cat-search")) return;
       e.preventDefault();
     }
     if (k === "f12") e.preventDefault();

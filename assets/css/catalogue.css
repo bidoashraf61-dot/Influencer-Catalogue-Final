@@ -1090,3 +1090,18 @@ body[data-page="selection"] .cat-card__check { display: none; }
   background: var(--white); border: 1px solid rgba(18,18,18,.2);
 }
 .cat-range__preset:hover { border-color: var(--ink); }
+
+/* Name search: a wide pill above the filter row. */
+.cat-search {
+  display: flex; align-items: center; gap: 12px; max-width: 560px; margin: 0 0 18px;
+  padding: 0 20px; min-height: 52px; border-radius: var(--r-pill);
+  background: var(--white); border: 1.5px solid rgba(18,18,18,.18); color: var(--gray);
+}
+.cat-search:focus-within { border-color: var(--ink); color: var(--ink); }
+.cat-search__input {
+  flex: 1; min-width: 0; border: 0; outline: none; background: transparent;
+  font: 500 16px var(--body); color: var(--ink); padding: 14px 0;
+  -webkit-user-select: text; user-select: text;
+}
+.cat-search__input::placeholder { color: rgba(18,18,18,.45); }
+@media screen and (max-width: 767px) { .cat-search { max-width: none; } }
