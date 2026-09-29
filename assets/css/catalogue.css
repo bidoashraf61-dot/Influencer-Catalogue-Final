@@ -1062,3 +1062,4 @@ body[data-page="selection"] .cat-card__check { display: none; }
   .cat-places__country { font-size: 24px; }
   .cat-places__country b { font-size: 16px; }
 }
+.cat-places__note { margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: var(--gray); }

@@ -1372,6 +1372,9 @@
   // creators it was set for; remove one and the page adds up what is left.
   function curatedTotal() {
     if (!CURATED || !CURATED.total) return null;
+    // A total of 0 is a box left at zero in the dashboard, not a price:
+    // showing "0 SAR" would tell the client the shortlist is free.
+    if (!(Number(CURATED.total[1]) > 0)) return null;
     if (selected.length !== CURATED.codes.length) return null;
     for (var i = 0; i < selected.length; i++) {
       if (CURATED.codes.indexOf(selected[i]) === -1) return null;
@@ -1444,11 +1447,15 @@
         box.className = "cat-places";
         $("sel-summary").insertAdjacentElement("afterend", box);
       }
-      var countries = {};
+      var countries = {}, several = 0, multiCity = 0;
       selected.forEach(function (code) {
         var card = byCode[code];
         if (!card) return;
         var seen = {};
+        var cityCount = values(card.dataset.city).filter(function (v) {
+          return !/^unspecified$/i.test(v);
+        }).length;
+        if (cityCount > 1) multiCity++;
         var list = values(card.dataset.city).filter(function (v) { return !/^unspecified$/i.test(v); });
         if (!list.length) list = ["Location not specified"];
         list.forEach(function (v) {
@@ -1458,6 +1465,7 @@
           if (!seen[p.country]) { c.n++; seen[p.country] = true; }
           if (p.label) c.cities[p.label] = (c.cities[p.label] || 0) + 1;
         });
+        if (Object.keys(seen).length > 1) several++;
       });
       var names = Object.keys(countries).sort(function (a, b) {
         var ia = COUNTRY_ORDER.indexOf(a), ib = COUNTRY_ORDER.indexOf(b);
@@ -1479,7 +1487,14 @@
             (cities.length ? '<p class="cat-places__cities">' + cities.map(function (city) {
               return esc(city) + " <b>" + c.cities[city] + "</b>";
             }).join('<i aria-hidden="true">·</i>') + "</p>" : "") + "</li>";
-        }).join("") + "</ul>";
+        }).join("") + "</ul>" +
+        // Say why the counts add up to more than the selection, when they do.
+        ((several || multiCity) ? '<p class="cat-places__note">' +
+          (several ? several + (several === 1 ? " creator works" : " creators work") +
+            " in more than one country, so " + (several === 1 ? "is" : "are") +
+            " counted in each. " : "") +
+          (multiCity ? "A creator listed in more than one city is counted in each city." : "") +
+          "</p>" : "");
     }
 
     function render() {

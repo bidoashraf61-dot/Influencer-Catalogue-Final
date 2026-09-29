@@ -1038,7 +1038,9 @@ class Handler(BaseHTTPRequestHandler):
             if c in known and c not in codes:
                 codes.append(c)
         platform = (f.get("platform") or "").strip() or None
-        t_from, t_to = num(f.get("total_from")), num(f.get("total_to"))
+        # 0 is not a total: it would show the client "0 SAR". Treated as empty,
+        # which means "add up the creators".
+        t_from, t_to = num(f.get("total_from")) or None, num(f.get("total_to")) or None
         if t_from is None and t_to is not None: t_from = t_to
         if t_to is None and t_from is not None: t_to = t_from
         if t_from is not None and t_to < t_from: t_from, t_to = t_to, t_from
