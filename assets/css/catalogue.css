@@ -1029,3 +1029,36 @@ body[data-page="selection"] .cat-card__check { display: none; }
 
 /* The selection tray's way back to the catalogue, beside the quote button. */
 .cat-tray__edit { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+
+/* ------------------------------------------- selection: where they are */
+/* Under the summary numbers and in the same voice: an uppercase label, the
+   countries in Bebas with their count, the cities beneath in DM Sans. */
+
+.cat-places { margin: -4px 0 28px; padding: 0 0 28px; border-bottom: 1px solid rgba(18,18,18,.12); }
+.cat-places__label {
+  font-size: 13px; letter-spacing: .14em; text-transform: uppercase;
+  color: var(--gray); margin: 0 0 14px;
+}
+.cat-places__list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; gap: 20px 48px;
+}
+.cat-places__list li { min-width: 0; }
+.cat-places__country {
+  display: flex; align-items: baseline; gap: 10px; margin: 0;
+  font-family: var(--heading); font-size: 30px; line-height: 1; letter-spacing: .02em;
+}
+.cat-places__country b {
+  font-weight: 400; font-size: 18px; letter-spacing: .04em;
+  background: var(--ink); color: var(--lime);
+  padding: 4px 10px 3px; border-radius: var(--r-pill);
+}
+.cat-places__cities { margin: 8px 0 0; font-size: 14px; line-height: 1.6; color: var(--gray); }
+.cat-places__cities b { color: var(--ink); font-weight: 600; }
+.cat-places__cities i { font-style: normal; margin: 0 8px; opacity: .45; }
+
+@media screen and (max-width: 767px) {
+  .cat-places__list { gap: 18px 28px; }
+  .cat-places__country { font-size: 24px; }
+  .cat-places__country b { font-size: 16px; }
+}

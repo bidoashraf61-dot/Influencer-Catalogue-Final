@@ -1432,6 +1432,56 @@
       : null;
     if (!controls && host) host.closest(".cat-controls").hidden = true;
 
+    // Where the creators in this selection are: each country with how many
+    // creators, and the cities under it. A creator serving two cities counts
+    // in both cities but once in the country. Always the whole selection —
+    // the filters narrow the cards, not this.
+    function renderPlaces() {
+      var box = $("sel-places");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "sel-places";
+        box.className = "cat-places";
+        $("sel-summary").insertAdjacentElement("afterend", box);
+      }
+      var countries = {};
+      selected.forEach(function (code) {
+        var card = byCode[code];
+        if (!card) return;
+        var seen = {};
+        var list = values(card.dataset.city).filter(function (v) { return !/^unspecified$/i.test(v); });
+        if (!list.length) list = ["Location not specified"];
+        list.forEach(function (v) {
+          var p = v === "Location not specified"
+            ? { country: "Location not specified", label: "" } : place(v);
+          var c = countries[p.country] = countries[p.country] || { n: 0, cities: {} };
+          if (!seen[p.country]) { c.n++; seen[p.country] = true; }
+          if (p.label) c.cities[p.label] = (c.cities[p.label] || 0) + 1;
+        });
+      });
+      var names = Object.keys(countries).sort(function (a, b) {
+        var ia = COUNTRY_ORDER.indexOf(a), ib = COUNTRY_ORDER.indexOf(b);
+        var late = function (x) { return x === "Other" || x === "Location not specified"; };
+        if (late(a) !== late(b)) return late(a) ? 1 : -1;
+        return ((ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)) ||
+               (countries[b].n - countries[a].n) || a.localeCompare(b);
+      });
+      box.hidden = !names.length;
+      box.innerHTML = '<p class="cat-places__label">Where they are</p><ul class="cat-places__list">' +
+        names.map(function (name) {
+          var c = countries[name];
+          var cities = Object.keys(c.cities).sort(function (a, b) {
+            var na = a === "City not specified", nb = b === "City not specified";
+            return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
+          });
+          return '<li><p class="cat-places__country"><span>' +
+            esc(name === "Other" ? "Other locations" : name) + "</span><b>" + c.n + "</b></p>" +
+            (cities.length ? '<p class="cat-places__cities">' + cities.map(function (city) {
+              return esc(city) + " <b>" + c.cities[city] + "</b>";
+            }).join('<i aria-hidden="true">·</i>') + "</p>" : "") + "</li>";
+        }).join("") + "</ul>";
+    }
+
     function render() {
       var shown = 0;
       cards.forEach(function (c) {
@@ -1477,6 +1527,7 @@
       $("sel-summary").innerHTML = rows.map(function (r) {
         return "<div><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd></div>";
       }).join("");
+      renderPlaces();
 
       // keep the URL in step so what they see is what they can re-share
       var want = buildFragment(selectionName, selected);
