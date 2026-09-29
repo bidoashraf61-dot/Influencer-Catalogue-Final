@@ -543,12 +543,32 @@
     return i * 2 + (/^hcp/i.test(name) ? 1 : 0);
   }
 
+  // "50K", "1.2m", "50,000" -> a number; anything else -> null.
+  function readCount(text) {
+    var m = String(text || "").replace(/[,\s]/g, "").toLowerCase().match(/^(\d+(?:\.\d+)?)([km]?)$/);
+    if (!m) return null;
+    var n = parseFloat(m[1]) * (m[2] === "m" ? 1e6 : m[2] === "k" ? 1e3 : 1);
+    return n > 0 ? Math.round(n) : null;
+  }
+  // 1200000 -> "1.2M", 50000 -> "50K".
+  function short(n) {
+    if (n >= 1e6) return (Math.round(n / 1e5) / 10).toString().replace(/\.0$/, "") + "M";
+    if (n >= 1e3) return (Math.round(n / 1e2) / 10).toString().replace(/\.0$/, "") + "K";
+    return String(n);
+  }
+  function rangeLabel(r) {
+    if (r[0] && r[1]) return "Followers " + short(r[0]) + " – " + short(r[1]);
+    if (r[0]) return "Followers " + short(r[0]) + "+";
+    return "Followers up to " + short(r[1]);
+  }
+
   // One filter bar for a set of cards: Tier, Platform, Location, Interest,
   // each a dropdown of checkboxes, plus a sort. OR within a dimension, AND
   // across them. Built from the cards themselves, so the selection page gets
   // options for exactly the creators in that selection.
   function Controls(host, cards, onChange) {
-    var state = { tier: [], platform: [], place: [], interest: [], sort: "" };
+    // followers: [] for no limit, else [min, max] with either end null.
+    var state = { tier: [], platform: [], place: [], interest: [], followers: [], sort: "" };
 
     cards.forEach(function (card) {
       card._tier = card.dataset.tier ? [card.dataset.tier] : [];
@@ -606,6 +626,22 @@
       }
       html += dropdown("tier", "Tier", tb);
     }
+
+    // Followers: any range, typed as 50K, 1.2M or 50,000. Counted across all
+    // of a creator's accounts — the same figure "Most followers" sorts on.
+    html += dropdown("followers", "Followers",
+      '<div class="cat-range">' +
+      '<label class="cat-range__field"><span>From</span><input type="text" inputmode="decimal" ' +
+      'data-range="min" placeholder="e.g. 50K" autocomplete="off"/></label>' +
+      '<span class="cat-range__dash" aria-hidden="true">–</span>' +
+      '<label class="cat-range__field"><span>To</span><input type="text" inputmode="decimal" ' +
+      'data-range="max" placeholder="no limit" autocomplete="off"/></label></div>' +
+      '<p class="cat-dd__title">Quick picks</p><div class="cat-range__presets">' +
+      [["Under 10K", 0, 10000], ["10K – 100K", 10000, 100000], ["100K – 1M", 100000, 1000000],
+       ["50K+", 50000, null], ["500K+", 500000, null], ["1M+", 1000000, null]].map(function (q) {
+        return '<button type="button" class="cat-range__preset" data-min="' + (q[1] || "") +
+          '" data-max="' + (q[2] || "") + '">' + q[0] + "</button>";
+      }).join("") + "</div>");
 
     var plats = tally("platform");
     var platKeys = Object.keys(plats).sort(function (a, b) { return plats[b] - plats[a]; });
@@ -702,6 +738,12 @@
     }
 
     function sync() {
+      // The range boxes, unless someone is typing in them.
+      all("input[data-range]", bar).forEach(function (box) {
+        if (box === document.activeElement) return;
+        var v = state.followers[box.dataset.range === "min" ? 0 : 1];
+        box.value = v ? short(v) : "";
+      });
       // Checkboxes, counts on the buttons, country tri-state, active pills.
       all("input[data-dim]", bar).forEach(function (box) {
         box.checked = state[box.dataset.dim].indexOf(box.value) !== -1;
@@ -738,6 +780,10 @@
             CROSS + "</button>");
         });
       });
+      if (state.followers.length) {
+        pills.push('<button type="button" class="cat-pill-x" data-range-pill="1">' +
+          esc(rangeLabel(state.followers)) + CROSS + "</button>");
+      }
       active.hidden = !pills.length;
       active.innerHTML = pills.join("") +
         (pills.length ? '<button type="button" class="cat-active__clear">Clear all</button>' : "");
@@ -757,7 +803,13 @@
         state[e.target.closest(".cat-dd").dataset.dim] = [];
         changed(); return;
       }
+      var preset = e.target.closest(".cat-range__preset");
+      if (preset) {
+        setRange(Number(preset.dataset.min) || null, Number(preset.dataset.max) || null);
+        return;
+      }
       var pill = e.target.closest(".cat-pill-x");
+      if (pill && pill.dataset.rangePill) { state.followers = []; changed(); return; }
       if (pill) {
         if (pill.dataset.country) {
           var group = bar.querySelector('input[data-country="' + pill.dataset.country + '"]')
@@ -773,8 +825,22 @@
       }
       if (e.target.closest(".cat-active__clear")) {
         state.tier = []; state.platform = []; state.place = []; state.interest = [];
+        state.followers = [];
         changed();
       }
+    });
+
+    function setRange(min, max) {
+      if (min && max && max < min) { var t = min; min = max; max = t; }
+      state.followers = (min || max) ? [min || null, max || null] : [];
+      changed();
+    }
+    // Typing narrows the cards as you go; the pill and button follow.
+    bar.addEventListener("input", function (e) {
+      if (!e.target.dataset || !e.target.dataset.range) return;
+      var lo = readCount(bar.querySelector('input[data-range="min"]').value);
+      var hi = readCount(bar.querySelector('input[data-range="max"]').value);
+      setRange(lo, hi);
     });
 
     bar.addEventListener("change", function (e) {
@@ -808,6 +874,11 @@
 
     return {
       matches: function (card) {
+        if (state.followers.length) {
+          var f = Number(card.dataset.followers) || 0;
+          if (state.followers[0] && f < state.followers[0]) return false;
+          if (state.followers[1] && f > state.followers[1]) return false;
+        }
         return ["tier", "platform", "place", "interest"].every(function (dim) {
           if (!state[dim].length) return true;
           return card["_" + dim].some(function (v) { return state[dim].indexOf(v) !== -1; });
@@ -815,7 +886,7 @@
       },
       filtering: function () {
         return !!(state.tier.length || state.platform.length || state.place.length ||
-                  state.interest.length);
+                  state.interest.length || state.followers.length);
       },
       // Sorted copy of `list`; with no sort chosen, the list as given.
       order: function (list) {
@@ -1474,7 +1545,33 @@
         return ((ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib)) ||
                (countries[b].n - countries[a].n) || a.localeCompare(b);
       });
-      box.hidden = !names.length;
+      // Creators per platform: a creator on Instagram and TikTok counts on
+      // both, so these can add up to more than the selection too.
+      var plats = {}, multiPlat = 0;
+      selected.forEach(function (code) {
+        var card = byCode[code];
+        if (!card) return;
+        var mine = values(card.dataset.platform);
+        if (mine.length > 1) multiPlat++;
+        mine.forEach(function (pl) { plats[pl] = (plats[pl] || 0) + 1; });
+      });
+      var platNames = Object.keys(plats).sort(function (a, b) {
+        return (plats[b] - plats[a]) || a.localeCompare(b);
+      });
+      var platHtml = platNames.length
+        ? '<p class="cat-places__label cat-places__label--next">On each platform</p>' +
+          '<ul class="cat-places__list cat-places__list--platforms">' +
+          platNames.map(function (pl) {
+            return '<li><p class="cat-places__country"><span class="cat-places__mark ' +
+              (BRAND[pl] || "") + '">' + (ICONS[pl] || ICON_LINK) + "</span><span>" + esc(pl) +
+              "</span><b>" + plats[pl] + "</b></p></li>";
+          }).join("") + "</ul>" +
+          (multiPlat ? '<p class="cat-places__note">' + multiPlat +
+            (multiPlat === 1 ? " creator is" : " creators are") +
+            " on more than one platform, so " + (multiPlat === 1 ? "is" : "are") +
+            " counted on each.</p>" : "")
+        : "";
+      box.hidden = !names.length && !platNames.length;
       box.innerHTML = '<p class="cat-places__label">Where they are</p><ul class="cat-places__list">' +
         names.map(function (name) {
           var c = countries[name];
@@ -1494,7 +1591,7 @@
             " in more than one country, so " + (several === 1 ? "is" : "are") +
             " counted in each. " : "") +
           (multiCity ? "A creator listed in more than one city is counted in each city." : "") +
-          "</p>" : "");
+          "</p>" : "") + platHtml;
     }
 
     function render() {
@@ -1637,7 +1734,7 @@
 
   ["contextmenu", "dragstart", "selectstart", "copy", "cut"].forEach(function (evt) {
     document.addEventListener(evt, function (e) {
-      if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form, [data-noselect]")) return;
+      if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form, .cat-range, [data-noselect]")) return;
       e.preventDefault();
     });
   });
@@ -1646,7 +1743,7 @@
     var k = (e.key || "").toLowerCase();
     var mod = e.ctrlKey || e.metaKey;
     if (mod && ["s", "p", "u", "c", "x", "a"].indexOf(k) !== -1) {
-      if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form")) return;
+      if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form, .cat-range")) return;
       e.preventDefault();
     }
     if (k === "f12") e.preventDefault();

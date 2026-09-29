@@ -1063,3 +1063,30 @@ body[data-page="selection"] .cat-card__check { display: none; }
   .cat-places__country b { font-size: 16px; }
 }
 .cat-places__note { margin: 16px 0 0; font-size: 13px; line-height: 1.6; color: var(--gray); }
+.cat-places__label--next { margin-top: 28px; }
+/* The platform's own mark beside its name, in its brand pill (same classes
+   as the marks on the cards). */
+.cat-places__mark { display: inline-flex; align-self: center; }
+.cat-places__mark svg { width: 30px; height: 30px; padding: 6px; border-radius: 100%; }
+/* :where() keeps this at the lowest weight, so each platform's own colour
+   (set for the card marks) wins; ink is only the fallback. */
+:where(.cat-places__mark) svg { background: var(--ink); color: var(--white); }
+
+/* Followers range: two boxes and a row of quick picks. */
+.cat-range { display: flex; align-items: flex-end; gap: 10px; padding: 8px 8px 4px; }
+.cat-range__field { flex: 1; display: grid; gap: 6px; font-size: 12px; font-weight: 600;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--gray); }
+.cat-range__field input {
+  font: 500 16px var(--body); color: var(--ink); width: 100%; min-height: 44px;
+  padding: 10px 14px; border: 1.5px solid rgba(18,18,18,.25); border-radius: var(--r-sm);
+  background: var(--white); -webkit-user-select: text; user-select: text;
+}
+.cat-range__field input:focus { outline: none; border-color: var(--ink); }
+.cat-range__dash { padding-bottom: 12px; color: var(--gray); }
+.cat-range__presets { display: flex; flex-wrap: wrap; gap: 8px; padding: 2px 8px 10px; }
+.cat-range__preset {
+  font: 500 14px var(--body); color: var(--ink); cursor: pointer;
+  padding: 8px 14px; min-height: 38px; border-radius: var(--r-pill);
+  background: var(--white); border: 1px solid rgba(18,18,18,.2);
+}
+.cat-range__preset:hover { border-color: var(--ink); }
