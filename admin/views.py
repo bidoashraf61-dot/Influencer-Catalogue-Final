@@ -2238,7 +2238,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                "Tier benchmarks for ER and views live in Settings.")
         + step(6, "Client report look",
                "<label>Brand logos on the report</label><div class='logo-grid'>" + uploaded + logo_ticks + "</div>"
-               "<div class='row' style='margin-top:12px'><div><label>Or upload a logo (PNG/JPG/WEBP)</label>"
+               "<div class='row' style='margin-top:12px'><div><label>Or upload a logo — PNG with a transparent background</label>"
                "<input type='file' name='logo_file' accept='image/*' multiple></div></div>"
                "<label style='margin-top:14px'>Sections the client sees</label><div class='ticks'>"
                + "".join("<label class='tick'><input type='checkbox' name='vis_" + key + "' value='1'" + (" checked" if vis[key] else "")

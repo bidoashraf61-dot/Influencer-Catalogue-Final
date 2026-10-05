@@ -14,17 +14,19 @@
 </head>
 <body class="cat-locked" data-page="campaign">
 <!--
-THESIS: A campaign report that reads like a live match-day results package —
-status ticker, highlights first, a league table with medals, stat graphics
-judged against benchmarks — refusing the generic grid of KPI tiles.
-OWN-WORLD: The catalogue's world: Bebas Neue display, DM Sans body, ink
-broadcast bars with lime type, linen bands, lime rotated pill; signal colours
-green / orange / red only for verdicts; drawn platform marks; flags as images.
-STORY: The client sees at once whether the campaign is on track, then the
-posts that made it, who led, how each number compares with its benchmark,
-and what the affiliate links drove; then downloads it.
-FIRST VIEWPORT: Ink scorebug with brand logos, title, LIVE ticker and verdict
-stamp; scope-of-work timeline directly beneath.
+THESIS: A campaign report that reads like a match-day results package — a
+results header with verdict and scoreline, then one tab at a time (overview,
+timeline, content, leaderboard, performance, clicks) — refusing a long page of
+uniform KPI tiles.
+OWN-WORLD: The catalogue's white world: Bebas Neue display, DM Sans body, ink
+type, linen panels, lime for selection and the winner; Strong / Fair / Low
+pills for verdicts; data bars in green, orange, lime-dark and warm grey (client
+decision); drawn platform marks; flags as images.
+STORY: The client sees at once whether the campaign is on track, then opens
+the tab they need: the timeline, the published posts, who led, the charts,
+the affiliate clicks; then downloads it.
+FIRST VIEWPORT: White scorebug with brand logos, title, LIVE ticker, verdict
+stamp and linen scoreline; tabs beneath (Overview first).
 FORM: match-day broadcast results package, structure 6 of 7, seed 2d08ada4.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
 -->
@@ -86,41 +88,17 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       </div></div>
     </header>
 
-    <!-- the scope of work, step by step: right under the header -->
-    <section class="mx-sec mx-sec--progress cat-pad" aria-labelledby="mx-h-progress">
-      <div class="cat-container">
-        <div class="mx-sec__head">
-          <h2 class="mx-h2" id="mx-h-progress">Campaign progress</h2>
-          <p class="mx-status__dates" id="mx-dates"></p>
-        </div>
-        <p class="mx-note" id="mx-note" hidden></p>
-        <div class="mx-gantt" id="mx-gantt"></div>
-      </div>
-    </section>
+    <!-- the report is read one tab at a time; the header above stays -->
+    <nav class="mx-tabs cat-pad" aria-label="Report sections"><div class="cat-container mx-tabs__in" role="tablist">
+      <button type="button" role="tab" class="mx-tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="false">Overview</button>
+      <button type="button" role="tab" class="mx-tab" id="tab-timeline" data-tab="timeline" aria-controls="panel-timeline" aria-selected="false">Timeline</button>
+      <button type="button" role="tab" class="mx-tab" id="tab-content" data-tab="content" aria-controls="panel-content" aria-selected="false">Content</button>
+      <button type="button" role="tab" class="mx-tab" id="tab-leaderboard" data-tab="leaderboard" aria-controls="panel-leaderboard" aria-selected="false">Leaderboard</button>
+      <button type="button" role="tab" class="mx-tab" id="tab-performance" data-tab="performance" aria-controls="panel-performance" aria-selected="false">Performance</button>
+      <button type="button" role="tab" class="mx-tab" id="tab-clicks" data-tab="clicks" aria-controls="panel-clicks" aria-selected="false">Affiliate clicks</button>
+    </div></nav>
 
-    <!-- the posts, first -->
-    <section class="mx-sec cat-pad" aria-labelledby="mx-h-posts">
-      <div class="cat-container">
-        <div class="mx-sec__head">
-          <h2 class="mx-h2" id="mx-h-posts">Highlights</h2>
-          <div class="mx-filters" id="mx-filters" role="toolbar" aria-label="Filter posts"></div>
-        </div>
-        <div class="mx-wall" id="mx-wall"></div>
-      </div>
-    </section>
-
-    <!-- league table -->
-    <section class="mx-sec mx-sec--ink cat-pad" aria-labelledby="mx-h-board">
-      <div class="cat-container">
-        <div class="mx-sec__head">
-          <h2 class="mx-h2" id="mx-h-board">Leaderboard</h2>
-        </div>
-        <div class="mx-podium" id="mx-podium"></div>
-        <div class="mx-table-wrap"><table class="mx-table" id="mx-table"></table></div>
-      </div>
-    </section>
-
-    <!-- targets and benchmarks -->
+    <div class="mx-panelwrap" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" data-panel="overview" hidden>
     <section class="mx-sec cat-pad" aria-labelledby="mx-h-targets">
       <div class="cat-container">
         <div class="mx-sec__head">
@@ -131,17 +109,57 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <div class="mx-bench" id="mx-bench"></div>
       </div>
     </section>
+    </div>
 
-    <!-- performance graphics -->
-    <section class="mx-sec mx-sec--linen cat-pad" aria-labelledby="mx-h-perf">
+    <div class="mx-panelwrap" role="tabpanel" id="panel-timeline" aria-labelledby="tab-timeline" data-panel="timeline" hidden>
+    <section class="mx-sec mx-sec--progress cat-pad" aria-labelledby="mx-h-progress">
+      <div class="cat-container">
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-progress">Campaign progress</h2>
+          <p class="mx-status__dates" id="mx-dates"></p>
+        </div>
+        <p class="mx-note" id="mx-note" hidden></p>
+        <div class="mx-gantt" id="mx-gantt"></div>
+      </div>
+    </section>
+    </div>
+
+    <div class="mx-panelwrap" role="tabpanel" id="panel-content" aria-labelledby="tab-content" data-panel="content" hidden>
+    <section class="mx-sec cat-pad" aria-labelledby="mx-h-posts">
+      <div class="cat-container">
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-posts">Published Content Highlights</h2>
+          <div class="mx-filters" id="mx-filters" role="toolbar" aria-label="Filter posts"></div>
+        </div>
+        <div class="mx-wall" id="mx-wall"></div>
+      </div>
+    </section>
+    </div>
+
+    <div class="mx-panelwrap" role="tabpanel" id="panel-leaderboard" aria-labelledby="tab-leaderboard" data-panel="leaderboard" hidden>
+    <section class="mx-sec cat-pad" aria-labelledby="mx-h-board">
+      <div class="cat-container">
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-board">Leaderboard</h2>
+        </div>
+        <div class="mx-podium" id="mx-podium"></div>
+        <h3 class="mx-table-title">All creators, ranked</h3>
+        <div class="mx-table-wrap"><table class="mx-table" id="mx-table"></table></div>
+      </div>
+    </section>
+    </div>
+
+    <div class="mx-panelwrap" role="tabpanel" id="panel-performance" aria-labelledby="tab-performance" data-panel="performance" hidden>
+    <section class="mx-sec cat-pad" aria-labelledby="mx-h-perf">
       <div class="cat-container">
         <div class="mx-sec__head"><h2 class="mx-h2" id="mx-h-perf">How it grew</h2></div>
         <div class="mx-charts" id="mx-charts"></div>
         <div class="mx-mix" id="mx-mix"></div>
       </div>
     </section>
+    </div>
 
-    <!-- affiliate links -->
+    <div class="mx-panelwrap" role="tabpanel" id="panel-clicks" aria-labelledby="tab-clicks" data-panel="clicks" hidden>
     <section class="mx-sec cat-pad" aria-labelledby="mx-h-clicks" id="mx-clicks-sec">
       <div class="cat-container">
         <div class="mx-sec__head">
@@ -150,6 +168,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <div id="mx-clicks"></div>
       </div>
     </section>
+    </div>
 
     <section class="mx-end cat-pad">
       <div class="cat-container mx-end__in">

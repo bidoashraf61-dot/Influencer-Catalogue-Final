@@ -138,11 +138,12 @@
   function openReport(t) {
     get("/api/campaign?t=" + encodeURIComponent(t)).then(function (b) {
       unlocked();
-      R = b.report;
+      var same = R && R.campaign && R._t === t;
+      R = b.report; R._t = t;
       FILTER = { platform: "", kind: "", section: "campaign" };
       render(t);
       show("report");
-      window.scrollTo(0, 0);
+      if (!same) window.scrollTo(0, 0);
       get("/api/campaigns").then(function (x) { $("mx-all").hidden = (x.campaigns || []).length < 2; }).catch(function () {});
     }).catch(function (err) {
       if (err && err.locked) return lock();
@@ -152,6 +153,33 @@
   window.addEventListener("hashchange", route);
 
   /* ---------------------------------------------------------------- render */
+
+  /* ---------------------------------------------------------------- tabs */
+
+  var TABS = ["overview", "timeline", "content", "leaderboard", "performance", "clicks"];
+  function tabFromHash() { var m = /(?:^|[#&])tab=([a-z]+)/.exec(location.hash || ""); return m && TABS.indexOf(m[1]) >= 0 ? m[1] : "overview"; }
+  function selectTab(name, focus) {
+    TABS.forEach(function (k) {
+      var on = k === name, b = $("tab-" + k), p = $("panel-" + k);
+      if (!b || !p) return;
+      b.setAttribute("aria-selected", on ? "true" : "false");
+      b.tabIndex = on ? 0 : -1;
+      p.hidden = !on;
+      if (on && focus) b.focus();
+    });
+    // Remember the tab in the link without reloading the report.
+    var t = token();
+    if (t) history.replaceState(null, "", "#t=" + t + (name === "overview" ? "" : "&tab=" + name));
+  }
+  document.querySelector(".mx-tabs__in").addEventListener("click", function (e) {
+    var b = e.target.closest(".mx-tab"); if (b) selectTab(b.getAttribute("data-tab"));
+  });
+  document.querySelector(".mx-tabs__in").addEventListener("keydown", function (e) {
+    var i = TABS.indexOf(tabFromHash()), n = null;
+    if (e.key === "ArrowRight") n = TABS[(i + 1) % TABS.length];
+    if (e.key === "ArrowLeft") n = TABS[(i - 1 + TABS.length) % TABS.length];
+    if (n) { e.preventDefault(); selectTab(n, true); }
+  });
 
   function render(t) {
     var c = R.campaign;
@@ -164,12 +192,14 @@
     renderTargets();
     renderCharts();
     renderClicks();
+    $("tab-clicks").hidden = !R.visibility.clicks;
+    selectTab(tabFromHash() === "clicks" && !R.visibility.clicks ? "overview" : tabFromHash());
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
   }
 
   function renderBug(c) {
     var logos = (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="Brand logo">'; }).join("");
-    $("mx-brands").innerHTML = logos ? logos + '<span class="mx-bug__x" aria-hidden="true">×</span><img class="mx-bug__hv" src="../assets/brand/logo-knockout.webp" alt="HelloVoice">' : "";
+    $("mx-brands").innerHTML = logos ? logos + '<span class="mx-bug__x" aria-hidden="true">×</span><img class="mx-bug__hv" src="../assets/brand/logo.png" alt="HelloVoice">' : "";
     $("mx-title").textContent = c.name;
     $("mx-sub").textContent = [c.client, c.platform ? c.platform + " campaign" : ""].filter(Boolean).join(" · ");
     var start = c.starts_at, end = c.ends_at, now = Date.now() / 1000, bits = [];
@@ -420,18 +450,22 @@
     return s + "</svg>";
   }
 
+  // Bars take turns through the brand's colours rather than all ink:
+  // green, orange, lime, then a warm grey — the order repeats.
+  var PALETTE = ["#14884a", "#ff691e", "#b9d400", "#8a7a68"];
   function bars(rows, keyHtml) {
     if (!rows || !rows.length) return '<p class="mx-panel__note">Nothing yet.</p>';
     var peak = Math.max.apply(null, rows.map(function (r) { return r.n; })) || 1;
-    return rows.slice(0, 8).map(function (r) {
-      return '<div class="mx-bar"><span class="mx-bar__k">' + keyHtml(r) + '</span><i style="--w:' + (r.n / peak * 100).toFixed(1) + '%"></i><b>' + r.label + "</b></div>";
+    return rows.slice(0, 8).map(function (r, i) {
+      return '<div class="mx-bar"><span class="mx-bar__k">' + keyHtml(r) + '</span><i style="--w:' + (r.n / peak * 100).toFixed(1)
+        + "%;--c:" + PALETTE[i % PALETTE.length] + '"></i><b>' + r.label + "</b></div>";
     }).join("");
   }
 
   function renderCharts() {
     var h = (R.history || []).map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; });
     $("mx-charts").innerHTML = h.length
-      ? '<div class="mx-chart"><h3>Views so far</h3>' + area(h, "views", "#121212", "Views so far") + "</div>"
+      ? '<div class="mx-chart"><h3>Views so far</h3>' + area(h, "views", "#14884a", "Views so far") + "</div>"
         + '<div class="mx-chart"><h3>Engagement so far</h3>' + area(h, "eng", "#ff691e", "Engagement so far") + "</div>"
       : '<p class="mx-empty-note">The charts fill in as posts are captured, once every 24 hours.</p>';
 
@@ -447,7 +481,7 @@
     var kinds = Object.keys(byKind).map(function (k) { return { k: k, n: byKind[k], label: byKind[k] + (byKind[k] === 1 ? " post" : " posts") }; })
       .sort(function (a, b) { return b.n - a.n; });
     if (kinds.length) mix.push('<div class="mx-panel"><h3>Content mix</h3>' + bars(kinds, function (r) { return esc(KIND[r.k] || r.k); }) + "</div>");
-    var t = R.total, parts = [["Likes", t.likes, "#121212"], ["Comments", t.comments, "#ff691e"], ["Saves", t.saves, "#14884a"], ["Shares", t.shares, "#9ea6ae"]]
+    var t = R.total, parts = [["Likes", t.likes, "#14884a"], ["Comments", t.comments, "#ff691e"], ["Saves", t.saves, "#b9d400"], ["Shares", t.shares, "#8a7a68"]]
       .filter(function (p) { return p[1]; });
     var sum = parts.reduce(function (s, p) { return s + p[1]; }, 0);
     if (sum) mix.push('<div class="mx-panel"><h3>What people did</h3><div class="mx-stack" role="img" aria-label="Interactions breakdown">'
