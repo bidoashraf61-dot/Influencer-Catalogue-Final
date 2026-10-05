@@ -468,7 +468,7 @@
         "<td>" + c.delivered + (c.planned ? " / " + c.planned : "") + "</td>", "<td>" + full(c.views) + "</td>"];
       if (vis.reach) tds.push("<td>" + full(c.reach) + "</td>");
       tds.push("<td>" + full(c.engagement) + "</td>",
-        "<td>" + pct(rate) + " " + sig(g, bench ? "Strong from " + bench[0] + "%, fair from " + bench[1] + "% (" + (R.benchmarks.bands[c.band] || "") + ")" : "") + "</td>");
+        "<td>" + pct(rate) + "</td>");
       if (vis.clicks) tds.push("<td>" + full(c.clicks) + "</td>");
       tds.push('<td><span class="mx-score"><i style="--w:' + c.score + '%"></i>' + c.score.toFixed(0) + "</span></td>");
       return "<tr>" + tds.join("") + "</tr>";
