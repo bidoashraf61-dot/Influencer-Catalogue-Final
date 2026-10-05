@@ -282,6 +282,8 @@
     $("tab-clicks").hidden = !R.visibility.clicks;
     markTab("overview");
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
+    // Arriving from the dashboard's "Download PDF": open the print dialog.
+    try { if (sessionStorage.getItem("hv_print")) { sessionStorage.removeItem("hv_print"); setTimeout(function () { window.print(); }, 900); } } catch (e) {}
   }
 
   function renderBug(c) {

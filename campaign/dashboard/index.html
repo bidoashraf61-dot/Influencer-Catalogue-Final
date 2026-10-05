@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
+<meta name="referrer" content="no-referrer"/>
+<title>Campaign dashboard — HelloVoice</title>
+<link rel="icon" href="../../assets/icons/icon-32.png" type="image/png"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.3/css/flag-icons.min.css"/>
+<link rel="stylesheet" href="../../assets/css/catalogue.css?v=8e5f970f"/>
+<link rel="stylesheet" href="../../assets/css/dashboard.css?v=8e771197"/>
+</head>
+<body class="cat-locked" data-page="campaign">
+<!--
+THESIS: The campaign on one screen — a control-room dashboard of cards, each
+a single answer with a "More" door into its detail — refusing the long scroll.
+OWN-WORLD: The catalogue world compressed: white board, linen KPI strip,
+Bebas figures, DM Sans labels, lime for selection, the brand's four data
+colours (green, orange, lime-dark, warm grey), verdict pills only for verdicts,
+drawn platform marks and real flags.
+STORY: The client sees in one glance whether the campaign is on track and why,
+narrows it by platform, dates or creators, and opens any card for the detail.
+FIRST VIEWPORT: Header with brand, name, LIVE state, verdict and filters; the
+objective bar and six KPI cards; then two rows of cards filling the screen.
+FORM: single-screen dashboard grid with slide-in detail panels.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->
+
+<div class="cat-gate" id="cat-gate" hidden>
+  <div class="cat-gate__inner">
+    <img class="cat-gate__logo" src="../../assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+    <p class="cat-gate__eyebrow">Confidential</p>
+    <h1 class="cat-gate__title">Campaign dashboard</h1>
+    <p class="cat-gate__note">Enter the access code you were given.</p>
+    <form class="cat-gate__form" id="cat-gate-form" autocomplete="off">
+      <input type="password" id="cat-code" class="cat-gate__input" placeholder="Access code"
+             aria-label="Access code" autocomplete="off" spellcheck="false"/>
+      <button type="submit" class="cat-btn cat-btn--lime">Unlock</button>
+    </form>
+    <p class="cat-gate__error" id="cat-gate-error" role="alert" hidden>That code is not right.</p>
+  </div>
+</div>
+
+<main class="cat-app db" id="cat-app" hidden>
+  <header class="db-head">
+    <a href="../../" class="db-head__logo"><img src="../../assets/brand/logo.png" alt="HelloVoice — back to the catalogue"/></a>
+    <div class="db-head__brands" id="db-brands"></div>
+    <div class="db-head__title">
+      <h1 id="db-title">Campaign</h1>
+      <p id="db-sub"></p>
+    </div>
+    <div class="db-head__verdict" id="db-verdict"></div>
+    <div class="db-head__actions">
+      <a class="db-btn" id="db-report" href="../">Full report</a>
+      <a class="db-btn db-btn--lime" id="db-pdf" href="../">Download PDF</a>
+    </div>
+  </header>
+
+  <nav class="db-filters" aria-label="Filters">
+    <div class="db-seg" id="db-platforms" role="group" aria-label="Platform"></div>
+    <div class="db-filter">
+      <label for="db-range">Dates</label>
+      <select id="db-range">
+        <option value="all">Whole campaign</option>
+        <option value="7">Last 7 days</option>
+        <option value="14">Last 14 days</option>
+        <option value="custom">Custom…</option>
+      </select>
+      <span class="db-custom" id="db-custom" hidden>
+        <input type="date" id="db-from" aria-label="From"/> – <input type="date" id="db-to" aria-label="To"/>
+      </span>
+    </div>
+    <div class="db-filter db-pick">
+      <button type="button" class="db-pick__btn" id="db-creators-btn" aria-expanded="false" aria-controls="db-creators">All creators</button>
+      <div class="db-pick__menu" id="db-creators" hidden></div>
+    </div>
+    <button type="button" class="db-reset" id="db-reset" hidden>Clear filters</button>
+    <p class="db-fresh" id="db-fresh"></p>
+  </nav>
+
+  <div class="db-grid" id="db-grid">
+    <section class="db-card db-objective" data-area="obj" id="w-objective"></section>
+    <section class="db-kpis" id="w-kpis" aria-label="Key numbers"></section>
+    <section class="db-card db-trend" id="w-trend"></section>
+    <section class="db-card db-top" id="w-top"></section>
+    <section class="db-card db-stage" id="w-stage"></section>
+    <section class="db-card db-mix" id="w-mix"></section>
+    <section class="db-card db-geo" id="w-geo"></section>
+    <section class="db-card db-plat" id="w-plat"></section>
+    <section class="db-card db-clicks" id="w-clicks"></section>
+    <section class="db-card db-posts" id="w-posts"></section>
+  </div>
+</main>
+
+<!-- detail panel -->
+<div class="db-scrim" id="db-scrim" hidden></div>
+<aside class="db-panel" id="db-panel" role="dialog" aria-modal="true" aria-labelledby="db-panel-title" hidden>
+  <header class="db-panel__head">
+    <h2 id="db-panel-title"></h2>
+    <button type="button" class="db-panel__close" id="db-panel-close" aria-label="Close">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg>
+    </button>
+  </header>
+  <div class="db-panel__body" id="db-panel-body"></div>
+</aside>
+
+<p class="db-empty" id="db-empty" hidden></p>
+
+<script>window.CAMPAIGN_CONFIG = { api: "/admin" };</script>
+<script src="../../assets/js/hv-icons.js?v=f1325cf5"></script>
+<script src="../../assets/js/dashboard.js?v=be60fad9"></script>
+</body>
+</html>
