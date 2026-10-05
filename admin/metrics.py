@@ -270,7 +270,8 @@ def report(campaign, internal=False):
                           if m["campaign_cost"] and t["clicks"] else None)
         creators.append(row)
 
-    scoreboard(creators, bm)
+    objective = objective_of(campaign)
+    scoreboard(creators, bm, OBJECTIVES[objective][1])
     targets = db.campaign_targets(campaign)
     progress = target_progress(campaign, total, targets)
     planned = sum(c["planned"] or 0 for c in creators)
@@ -288,6 +289,8 @@ def report(campaign, internal=False):
            "history": db.content_history(cid), "clicks": clicks,
            "emv_set": bool(rates), "visibility": vis, "factors": f,
            "benchmarks": bm, "targets": targets, "progress": progress, "verdict": verdict,
+           "objective": {"key": objective, "label": OBJECTIVES[objective][0],
+                         "weights": dict(zip(("exposure", "engagement", "er", "clicks"), OBJECTIVES[objective][1]))},
            "updated_at": max([p["metrics_at"] or 0 for p in posts] + [0]) or None}
     if internal:
         exposure = total["exposure"]
@@ -309,17 +312,34 @@ def _avg_grade(grades):
     return "good" if avg >= 1.5 else ("moderate" if avg >= 0.75 else "low")
 
 
-def scoreboard(creators, bm):
-    """A 0–100 score per creator, so the leaderboard ranks results rather
-    than audience size alone:
+# What the leaderboard rewards, chosen per campaign: (reach+views, engagement,
+# engagement rate vs tier benchmark, affiliate clicks). Each row sums to 1.
+OBJECTIVES = {
+    "balanced": ("Balanced", (0.35, 0.25, 0.25, 0.15)),
+    "awareness": ("Awareness", (0.55, 0.15, 0.20, 0.10)),
+    "engagement": ("Engagement", (0.15, 0.40, 0.35, 0.10)),
+    "traffic": ("Traffic / sales", (0.15, 0.15, 0.20, 0.50)),
+}
 
-      35%  exposure (views + reach) against the best in the campaign
-      25%  engagement against the best in the campaign
-      25%  engagement rate against the creator's own tier benchmark
+
+def objective_of(campaign):
+    key = campaign["objective"] if "objective" in campaign.keys() else None
+    return key if key in OBJECTIVES else "balanced"
+
+
+def scoreboard(creators, bm, weights=None):
+    """A 0–100 score per creator, so the leaderboard ranks results rather
+    than audience size alone. Four parts, weighted by the campaign's
+    objective (OBJECTIVES; balanced = 35/25/25/15):
+
+      exposure (views + reach) against the best in the campaign
+      engagement against the best in the campaign
+      engagement rate against the creator's own tier benchmark
            (meeting the "good" mark = full points, capped)
-      15%  link clicks against the best in the campaign
+      link clicks against the best in the campaign
 
     Creators with no counted posts score 0 and are ranked last."""
+    w = weights or OBJECTIVES["balanced"][1]
     def peak(key):
         return max([c[key] or 0 for c in creators] + [0]) or 1
     pe = max([(c["views"] or 0) + (c["reach"] or 0) for c in creators] + [0]) or 1
@@ -331,10 +351,10 @@ def scoreboard(creators, bm):
         rate = c["er"] if c["er"] is not None else c["video_er"]
         target = bm["er"][c["band"]][0] if c["er"] is not None else bm["video_er"][0]
         quality = min(1.0, (rate or 0) / target) if target else 0
-        c["score"] = round(100 * (0.35 * ((c["views"] or 0) + (c["reach"] or 0)) / pe
-                                  + 0.25 * (c["engagement"] or 0) / pg
-                                  + 0.25 * quality
-                                  + 0.15 * (c["clicks"] or 0) / pc), 1)
+        c["score"] = round(100 * (w[0] * ((c["views"] or 0) + (c["reach"] or 0)) / pe
+                                  + w[1] * (c["engagement"] or 0) / pg
+                                  + w[2] * quality
+                                  + w[3] * (c["clicks"] or 0) / pc), 1)
     ranked = sorted(creators, key=lambda c: (-c["score"], c["name"]))
     for i, c in enumerate(ranked):
         c["rank"] = i + 1 if c["posts"] else None
@@ -458,7 +478,7 @@ def client_report(campaign, photo=None, photo_large=None):
                             logos=db.campaign_logos(k), steps=steps),
            "total": total, "creators": creators, "posts": posts, "history": r["history"],
            "visibility": {kk: v for kk, v in vis.items() if kk != "emv"},
-           "updated_at": r["updated_at"], "verdict": r["verdict"],
+           "updated_at": r["updated_at"], "verdict": r["verdict"], "objective": r["objective"],
            "progress": r["progress"] if vis["reach"] else {"elapsed": r["progress"]["elapsed"],
                                                             "items": [i for i in r["progress"]["items"]
                                                                       if i["key"] not in ("reach",)]},

@@ -1409,6 +1409,7 @@ class Handler(BaseHTTPRequestHandler):
         sel_id = (f.get("selection_id") or "").strip()
         db.save_campaign(k["id"], visibility=vis, emv={"*": own_rates} if own_rates else None,
                          targets=targets, phase=phase, steps=steps,
+                         objective=f.get("objective") if f.get("objective") in metrics.OBJECTIVES else "balanced",
                          status_note=(f.get("status_note") or "").strip()[:240] or None, logos=logos,
                          selection_id=int(sel_id) if sel_id.isdigit() else None)
         planned = {}

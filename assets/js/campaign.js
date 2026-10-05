@@ -412,6 +412,16 @@
 
   function renderBoard() {
     var cs = R.creators, vis = R.visibility, bm = R.benchmarks;
+    // The (i) says how this campaign's score was weighted.
+    var o = R.objective || { label: "Balanced", weights: { exposure: .35, engagement: .25, er: .25, clicks: .15 } }, w = o.weights;
+    var info = document.querySelector("#sec-leaderboard .mx-info");
+    if (info) info.setAttribute("data-info", "Scored for this campaign's objective: " + o.label + ". Each creator gets a score out of 100 — "
+      + Math.round(w.exposure * 100) + "% reach and views (compared with the best in the campaign), "
+      + Math.round(w.engagement * 100) + "% engagement (compared with the best), "
+      + Math.round(w.er * 100) + "% engagement rate against the benchmark for creators of their size, and "
+      + Math.round(w.clicks * 100) + "% affiliate clicks (compared with the best). The top three get gold, silver and bronze; creators who have not posted yet are listed last.");
+    var tag = $("mx-objective");
+    if (tag) tag.textContent = "Scored for " + o.label;
     var ranked = cs.filter(function (c) { return c.rank; });
     $("mx-podium").innerHTML = ranked.slice(0, 3).map(function (c) {
       return '<div class="mx-pod mx-pod--' + c.rank + '" style="--medal:' + MEDAL[c.badge] + '"><svg class="mx-medal" viewBox="0 0 40 50" aria-hidden="true">'

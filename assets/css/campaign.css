@@ -406,3 +406,4 @@
 
 @media (max-width: 700px) { .mx-tab { font-size: 18px; padding: 10px 16px; min-height: 42px; } .mx-info { top: -.6em; } }
 @media print { .mx-tabs, .mx-info, .mx-pop, .mx-carousel__nav { display: none !important; } .mx-carousel__track { grid-auto-flow: row; grid-template-columns: repeat(5, 1fr); } }
+.mx-objective { display: inline-block; margin: -14px 0 28px; padding: 6px 14px; border-radius: var(--r-pill); background: var(--linen); font-size: 14px; font-weight: 600; }

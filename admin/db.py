@@ -454,7 +454,7 @@ def migrate(conn):
         conn.execute("ALTER TABLE campaigns ADD COLUMN emv TEXT")
         conn.execute("ALTER TABLE campaigns ADD COLUMN visibility TEXT")
     camp_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
-    for col in ("phase", "status_note", "targets", "logos", "steps"):
+    for col in ("phase", "status_note", "targets", "logos", "steps", "objective"):
         # phase: where the campaign is (see PHASES); status_note: one line the
         # client reads; targets: JSON goals; logos: JSON brand logo files.
         if col not in camp_cols:
@@ -1594,7 +1594,7 @@ def save_campaign(cid, **fields):
     form cannot write a column it was never meant to."""
     allowed = {"name", "client", "code_id", "platform", "starts_at", "ends_at", "status",
                "rules", "destination", "cost", "notes", "emv", "visibility", "phase",
-               "status_note", "targets", "logos", "selection_id", "steps"}
+               "status_note", "targets", "logos", "selection_id", "steps", "objective"}
     bad = set(fields) - allowed
     if bad:
         raise ValueError("not a campaign field: " + ", ".join(sorted(bad)))

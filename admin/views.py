@@ -2176,6 +2176,11 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         "<label class='logo-pick'><input type='checkbox' name='logo' value='" + e(x) + "' checked><img src='"
         + u("/campaigns/logo") + "?n=" + e(x.split("/", 1)[1]) + "' alt=''><span>uploaded</span></label>"
         for x in chosen_logos if x.startswith("upload/"))
+    obj_now = metrics.objective_of(k)
+    obj_opts = "".join(
+        "<option value='" + key + "'" + (" selected" if key == obj_now else "") + ">" + e(label) + " — reach "
+        + str(int(w[0] * 100)) + "% · engagement " + str(int(w[1] * 100)) + "% · eng. rate " + str(int(w[2] * 100))
+        + "% · clicks " + str(int(w[3] * 100)) + "%</option>" for key, (label, w) in metrics.OBJECTIVES.items())
     tgt = lambda key, label, hint: ("<div><label>" + label + "</label><input name='target_" + key + "' inputmode='decimal' value='"
                                     + (("%g" % targets[key]) if key in targets else "") + "' placeholder='" + hint + "'></div>")
 
@@ -2230,7 +2235,9 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                "<div style='flex:2'><label>Affiliate link destination (optional)</label>"
                "<input name='destination' type='url' value='" + e(k["destination"] or "") + "' placeholder='https://brand-store…'></div></div>",
                "A post in the dates carrying any of these counts. Leave the destination empty if this campaign has no affiliate links.")
-        + step(5, "Targets",
+        + step(5, "Objective &amp; targets",
+               "<div class='row'><div style='flex:3'><label>Campaign objective — decides how the leaderboard scores creators</label>"
+               "<select name='objective'>" + obj_opts + "</select></div></div>"
                "<div class='row'>" + tgt("posts", "Posts", "e.g. 24") + tgt("views", "Views", "e.g. 500000")
                + tgt("reach", "Reach", "e.g. 300000") + tgt("engagement", "Engagement", "e.g. 20000")
                + tgt("er", "Avg ER %", "e.g. 3") + tgt("clicks", "Affiliate clicks", "e.g. 1500") + "</div>",
