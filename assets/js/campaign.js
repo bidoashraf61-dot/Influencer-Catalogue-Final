@@ -147,7 +147,7 @@
       get("/api/campaign?t=" + encodeURIComponent(c.token)).then(function (b) {
         var R = b.report, t = R.total || {}, card = document.querySelector('.mx-camp[data-i="' + i + '"]');
         agg.reach += (t.views || 0) + (t.reach || 0); agg.eng += t.engagement || 0; agg.posts += t.posts || 0; agg.clicks += t.clicks || 0;
-        card.querySelector(".mx-camp__prog").innerHTML = progress(R, c.status !== "live");
+        card.querySelector(".mx-camp__prog").innerHTML = progress(R, c.status === "ended");
       }).catch(function () { var card = document.querySelector('.mx-camp[data-i="' + i + '"]'); card.querySelector(".mx-camp__prog").innerHTML = '<p class="mx-camp__wait">Progress is not available right now.</p>'; })
         .then(function () {
           if (--left) return;
@@ -167,30 +167,35 @@
       + "<li><b>3</b><span>The campaign goes live and you follow it here, day by day.</span></li></ol>"
       + '<div class="mx-none__actions"><a class="mx-camp__go" href="../">Browse the creators →</a><a class="mx-none__mail" href="mailto:info@hellovoice.co.uk">Talk to HelloVoice</a></div></div>'
       + '<div class="mx-none__ghost" aria-hidden="true"><div class="mx-camp__head"><div class="mx-none__logo"></div><div><div class="mx-none__line mx-none__line--title"></div><div class="mx-none__line"></div></div><span class="mx-camp__state mx-camp__state--live">Live</span></div>'
-      + '<div class="mx-camp__prog"><div class="mx-pg__head"><span class="mx-pg__label">Objective progress</span><span class="mx-pg__score mx-pg--good"><b>64%</b><em>On pace</em></span></div>'
-      + '<div class="mx-pg__track"><span class="mx-pg__fill mx-pg--good" style="width:64%"></span><span class="mx-pg__pin" style="left:55%"><i></i><em>Today 55%</em></span></div>'
-      + '<div class="mx-pg__scale"><span>0%</span><span>100%</span></div></div><p class="mx-none__tag">Example</p></div></section>';
+      + '<div class="mx-camp__prog"><div class="mx-tl__head"><div><span class="mx-tl__label">Campaign timeline</span><b class="mx-tl__stage">Publishing</b></div><div class="mx-tl__count"><b>Day 6 of 20</b><em>14 days left</em></div></div>'
+      + '<div class="mx-tl__track">' + "ddddddda.".split("").map(function (k) { return '<span class="mx-tl__seg mx-tl__seg--' + ({ d: "done", a: "active", ".": "pending" })[k] + '"></span>'; }).join("") + "</div>"
+      + '<div class="mx-tl__foot"><span></span><span>7 of 9 steps done</span><span></span></div></div><p class="mx-none__tag">Example</p></div></section>';
     show("list");
   }
   function tile(label, value, tone) { return '<div class="mx-sum__tile' + (tone ? " mx-sum__tile--" + tone : "") + '"><b>' + value + "</b><span>" + label + "</span></div>"; }
-  // The objective as one bar: how much is achieved, against a "today" pin
-  // showing where it should be by now. Finished campaigns show the result.
+  // The campaign's timeline: one segment per scope-of-work step, in order,
+  // coloured done / in progress / to come, with the current stage and the
+  // day count above it.
   function progress(R, ended) {
-    var o = R.objective || { label: "Balanced", kpis: [] }, items = (R.progress && R.progress.items) || [];
-    var mine = items.filter(function (x) { return (o.kpis || []).indexOf(x.key) >= 0; }); if (!mine.length) mine = items;
-    var head = '<div class="mx-pg__head"><span class="mx-pg__label">' + (ended ? "Final result" : "Objective progress") + " · <b>" + esc(o.label) + "</b></span>";
-    if (!mine.length) return head + '</div><div class="mx-pg__track mx-pg__track--empty"></div><p class="mx-camp__wait">No targets set for this campaign yet.</p>';
-    var done = mine.reduce(function (a, x) { return a + Math.min(100, x.pct); }, 0) / mine.length;
-    var due = ended ? 100 : mine.reduce(function (a, x) { return a + Math.min(100, x.expected / x.goal * 100); }, 0) / mine.length;
-    var r = due ? done / due : 1, gr = r >= 1 ? "good" : r >= 0.7 ? "moderate" : "low";
-    var word = ended ? { good: "Target met", moderate: "Nearly there", low: "Below target" }[gr] : { good: "On pace", moderate: "Slightly behind", low: "Behind pace" }[gr];
-    var pin = !ended && due > 0 && due < 100;
-    return head + '<span class="mx-pg__score mx-pg--' + gr + '"><b>' + Math.round(done) + '%</b><em>' + word + "</em></span></div>"
-      + '<div class="mx-pg__track" role="img" aria-label="' + Math.round(done) + "% of the objective achieved" + (pin ? ", " + Math.round(due) + "% expected by today" : "") + '">'
-      + '<span class="mx-pg__fill mx-pg--' + gr + '" style="width:' + Math.max(2, done).toFixed(1) + '%"></span>'
-      + (pin ? '<span class="mx-pg__pin" style="left:' + due.toFixed(1) + '%"><i></i><em>Today ' + Math.round(due) + "%</em></span>" : "") + "</div>"
-      + '<div class="mx-pg__scale"><span>0%</span><span>100%</span></div>';
+    var c = R.campaign || {}, steps = (c.steps || []).filter(function (x) { return x.on !== false; });
+    var now = Date.now() / 1000, span = c.starts_at && c.ends_at ? Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400)) : 0;
+    var dn = span ? Math.min(span, Math.max(0, Math.ceil((now - c.starts_at) / 86400))) : 0;
+    var done = ended ? steps.length : steps.filter(function (x) { return x.state === "done"; }).length;
+    var cur = steps.filter(function (x) { return x.state === "active"; })[0];
+    var stage = ended || (steps.length && done === steps.length) ? "Completed" : cur ? cur.label : steps.length && !done ? "Not started" : "In progress";
+    var count = !span ? "" : ended || now > c.ends_at ? "Ran " + span + " days" : now < c.starts_at ? "Starts " + day(c.starts_at) : "Day " + dn + " of " + span;
+    var left = span && !ended && now >= c.starts_at && now <= c.ends_at ? Math.max(0, span - dn) : null;
+    var ST = { done: "Done", active: "In progress", pending: "To come" };
+    var seg = steps.length ? steps.map(function (x) {
+      var st = ended ? "done" : x.state;
+      return '<span class="mx-tl__seg mx-tl__seg--' + st + '" title="' + esc(x.label + " · " + ST[st] + (x.start ? " · " + day(x.start, false) + " – " + day(x.end, false) : "")) + '"></span>';
+    }).join("") : '<span class="mx-tl__seg mx-tl__seg--' + (ended ? "done" : "active") + '" style="flex:' + (span ? Math.max(1, dn) : 1) + '"></span>' + (span && !ended ? '<span class="mx-tl__seg mx-tl__seg--pending" style="flex:' + Math.max(0, span - dn) + '"></span>' : "");
+    return '<div class="mx-tl__head"><div><span class="mx-tl__label">Campaign timeline</span><b class="mx-tl__stage' + (stage === "Completed" ? " is-done" : "") + '">' + esc(stage) + "</b></div>"
+      + '<div class="mx-tl__count">' + (count ? "<b>" + esc(count) + "</b>" : "") + (left != null ? "<em>" + left + (left === 1 ? " day left" : " days left") + "</em>" : "") + "</div></div>"
+      + '<div class="mx-tl__track" role="img" aria-label="' + esc((steps.length ? done + " of " + steps.length + " steps done. " : "") + "Now: " + stage) + '">' + seg + "</div>"
+      + '<div class="mx-tl__foot"><span>' + (c.starts_at ? day(c.starts_at, false) : "") + "</span><span>" + (steps.length ? done + " of " + steps.length + " steps done" : "") + "</span><span>" + (c.ends_at ? day(c.ends_at, false) : "") + "</span></div>";
   }
+
 
 
   function openReport(t) {
