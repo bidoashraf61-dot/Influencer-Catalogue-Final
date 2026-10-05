@@ -483,7 +483,7 @@
     var p = R.progress || { items: [] }, bm = R.benchmarks, t = R.total;
     var ran = Math.round((p.elapsed || 0) * 100);
     $("mx-targets-lede").textContent = p.items.length
-      ? "Line = where it should be today (" + ran + "% of the campaign has run)."
+      ? ""
       : "";
     $("mx-bullets").innerHTML = p.items.length ? p.items.map(function (i) {
       var isRate = i.key === "er", fill = Math.min(100, i.pct), mark = Math.min(100, i.expected / i.goal * 100);
