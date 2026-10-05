@@ -296,8 +296,8 @@
   function renderTop(list) {
     var rows = ranked(list).slice(0, 5);
     $("w-top").innerHTML = head(IC.top, "Top creators", filtered() ? "Ranked by people reached in this view." : "Ranked by score out of 100 — reach and views, engagement, engagement rate against their size, and clicks, weighted for the campaign's objective.", "creators")
-      + '<div class="db-card__body">' + (rows.map(function (r, i) {
-        return '<div class="db-rank"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + esc(r.c.name) + "</b><small>" + r.c.delivered + (r.c.delivered === 1 ? " post · " : " posts · ") + num((r.c.views || 0) + (r.c.reach || 0)) + ' reached</small></span><span class="db-rank__score">' + r.label + "</span></div>";
+      + '<div class="db-card__body"><div class="db-top__cols"><span>Creator</span><b>' + (filtered() ? "Reached" : "Score /100") + "</b></div>" + (rows.map(function (r, i) {
+                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + esc(r.c.name) + "</b><small>" + r.c.delivered + (r.c.delivered === 1 ? " post · " : " posts · ") + num((r.c.views || 0) + (r.c.reach || 0)) + ' reached</small></span><span class="db-rank__score" title="' + (filtered() ? "People reached in this view" : "Score out of 100") + '">' + r.label + "</span></div>";
       }).join("") || '<p class="db-note">No creators in this view.</p>') + "</div>";
   }
 

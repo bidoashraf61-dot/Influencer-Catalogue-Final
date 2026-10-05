@@ -125,15 +125,59 @@
   function showList(list) {
     document.title = "My campaigns — HelloVoice";
     if (!list.length) { empty("There are no campaign reports for this access code yet."); return; }
-    $("mx-list-items").innerHTML = list.map(function (c) {
-      return '<a class="mx-camp" href="dashboard/#t=' + esc(c.token) + '"><div class="mx-camp__logos">'
+    var live = list.filter(function (c) { return c.status === "live"; }).length;
+    $("mx-list-sum").innerHTML = tile("Campaigns", list.length, "") + tile("Live now", live, live ? "go" : "")
+      + tile("Completed", list.length - live, "") + '<span id="mx-sum-totals" class="mx-sum__rest"></span>';
+    $("mx-list-items").innerHTML = list.map(function (c, i) {
+      var now = Date.now() / 1000, span = c.starts_at && c.ends_at ? Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400)) : 0;
+      var dn = span ? Math.min(span, Math.max(0, Math.ceil((now - c.starts_at) / 86400))) : 0;
+      var when = !span ? "" : now < c.starts_at ? "Starts " + day(c.starts_at) : now <= c.ends_at ? "Day " + dn + " of " + span : "Ran " + span + " days";
+      return '<article class="mx-camp" data-i="' + i + '"><div class="mx-camp__head"><div class="mx-camp__logos">'
         + (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("") + "</div>"
-        + '<div><div class="mx-camp__name">' + esc(c.name) + '</div><div class="mx-camp__meta">'
-        + esc([c.client, c.starts_at ? day(c.starts_at) + " – " + day(c.ends_at) : "", c.status === "live" ? "Live" : "Completed"].filter(Boolean).join(" · "))
-        + '</div></div><span class="mx-camp__go">Open dashboard →</span></a>';
+        + '<div class="mx-camp__id"><h2 class="mx-camp__name">' + esc(c.name) + '</h2><div class="mx-camp__meta">'
+        + esc([c.client, c.starts_at ? day(c.starts_at) + " – " + day(c.ends_at) : "", when].filter(Boolean).join(" · ")) + "</div></div>"
+        + '<div class="mx-camp__tags"><span class="mx-camp__state mx-camp__state--' + (c.status === "live" ? "live" : "done") + '">' + (c.status === "live" ? "Live" : "Completed") + '</span><span class="mx-camp__verdict" hidden></span></div></div>'
+        + '<div class="mx-camp__body"><div class="mx-camp__prog"><p class="mx-camp__wait">Loading progress…</p></div><div class="mx-camp__stats"></div></div>'
+        + '<div class="mx-camp__foot"><span class="mx-camp__time">' + (span ? '<span>Campaign time</span><i><b style="width:' + (dn / span * 100).toFixed(1) + '%"></b></i><em>' + Math.round(dn / span * 100) + "%</em>" : "") + "</span>"
+        + '<a class="mx-camp__alt" href="#t=' + esc(c.token) + '">Full report</a><a class="mx-camp__go" href="dashboard/#t=' + esc(c.token) + '">Open dashboard →</a></div></article>';
     }).join("");
     show("list");
     window.scrollTo(0, 0);
+    var agg = { reach: 0, eng: 0, posts: 0, clicks: 0 }, left = list.length;
+    list.forEach(function (c, i) {
+      get("/api/campaign?t=" + encodeURIComponent(c.token)).then(function (b) {
+        var R = b.report, t = R.total || {}, card = document.querySelector('.mx-camp[data-i="' + i + '"]');
+        agg.reach += (t.views || 0) + (t.reach || 0); agg.eng += t.engagement || 0; agg.posts += t.posts || 0; agg.clicks += t.clicks || 0;
+        card.querySelector(".mx-camp__prog").innerHTML = progress(R);
+        card.querySelector(".mx-camp__stats").innerHTML = stat("Posts live", full(t.posts) + (t.planned ? "<small>/" + t.planned + "</small>" : ""))
+          + stat("Reached", num((t.views || 0) + (t.reach || 0))) + stat("Engagement", num(t.engagement))
+          + (R.visibility && R.visibility.clicks ? stat("Link clicks", num(t.clicks)) : stat("Avg eng. rate", pct(t.er)));
+        var v = R.verdict || {}, vb = card.querySelector(".mx-camp__verdict");
+        if (v.label) { vb.textContent = v.label; vb.className = "mx-camp__verdict mx-camp__verdict--" + (v.grade || "none"); vb.hidden = false; }
+      }).catch(function () { var card = document.querySelector('.mx-camp[data-i="' + i + '"]'); card.querySelector(".mx-camp__prog").innerHTML = '<p class="mx-camp__wait">Progress is not available right now.</p>'; })
+        .then(function () {
+          if (--left) return;
+          $("mx-sum-totals").innerHTML = tile("People reached", num(agg.reach), "") + tile("Posts live", full(agg.posts), "") + tile("Engagement", num(agg.eng), "");
+        });
+    });
+  }
+  function tile(label, value, tone) { return '<div class="mx-sum__tile' + (tone ? " mx-sum__tile--" + tone : "") + '"><b>' + value + "</b><span>" + label + "</span></div>"; }
+  function stat(label, value) { return '<div><span>' + label + "</span><b>" + value + "</b></div>"; }
+  // The objective as one bar: achieved vs where it should be today, then
+  // each of its goals as a chip coloured by how it is doing.
+  function progress(R) {
+    var o = R.objective || { label: "Balanced", kpis: [] }, items = (R.progress && R.progress.items) || [];
+    var mine = items.filter(function (x) { return (o.kpis || []).indexOf(x.key) >= 0; }); if (!mine.length) mine = items;
+    if (!mine.length) return '<div class="mx-camp__obj"><span>Objective · <b>' + esc(o.label) + '</b></span></div><p class="mx-camp__wait">No targets set for this campaign.</p>';
+    var done = mine.reduce(function (a, x) { return a + Math.min(100, x.pct); }, 0) / mine.length;
+    var due = mine.reduce(function (a, x) { return a + Math.min(100, x.expected / x.goal * 100); }, 0) / mine.length;
+    var r = due ? done / due : 1, gr = r >= 1 ? "good" : r >= 0.7 ? "moderate" : "low";
+    var NAME = { posts: "Posts", views: "Views", reach: "Reach", engagement: "Engagement", er: "Eng. rate", clicks: "Clicks" };
+    return '<div class="mx-camp__obj"><span>Objective · <b>' + esc(o.label) + '</b></span><em class="mx-camp__pct mx-camp__pct--' + gr + '">' + Math.round(done) + "%</em></div>"
+      + '<div class="mx-camp__bar" role="img" aria-label="' + Math.round(done) + "% of the objective achieved; " + Math.round(due) + '% expected by today"><b class="' + gr + '" style="width:' + done.toFixed(1) + '%"></b>'
+      + (due < 100 ? '<i style="left:' + due.toFixed(1) + '%" title="Where it should be today"></i>' : "") + "</div>"
+      + '<div class="mx-camp__chips">' + mine.map(function (x) { return '<span class="mx-camp__chip mx-camp__chip--' + (x.grade || "none") + '">' + NAME[x.key] + " <b>" + Math.round(x.pct) + "%</b></span>"; }).join("")
+      + (due < 100 ? '<span class="mx-camp__due">│ expected today ' + Math.round(due) + "%</span>" : "") + "</div>";
   }
 
   function openReport(t) {

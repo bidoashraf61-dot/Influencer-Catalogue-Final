@@ -65,8 +65,8 @@
   grid-template-areas:
     "obj obj obj obj obj obj obj obj obj obj obj obj"
     "kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi"
-    "top top top top pst pst pst pst trd trd trd trd"
-    "stg stg stg mix mix geo geo geo plt plt clk clk";
+    "top top top top stg stg stg pst pst pst pst pst"
+    "trd trd trd mix mix geo geo geo plt plt clk clk";
 }
 .db-objective { grid-area: obj; }
 .db-kpis { grid-area: kpi; display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--gap); }
@@ -248,22 +248,14 @@
   .db-rank__score { font-size: 18px; }
 }
 
-/* the two hero cards: ink ground so the people and the posts lead the board */
-.db-card--hero { background: var(--ink); border-color: var(--ink); color: #fff; }
-.db-card--hero .db-card__head h2, .db-card--hero .db-card__head h2 svg { color: var(--lime); }
-.db-card--hero .db-info { border-color: rgba(255,255,255,.55); color: rgba(255,255,255,.75); }
-.db-card--hero .db-more { background: rgba(255,255,255,.12); color: #fff; }
-.db-card--hero .db-more:hover { background: var(--lime); color: var(--ink); }
-.db-card--hero .db-note { color: rgba(255,255,255,.6); }
-.db-top .db-rank { border-bottom-color: rgba(255,255,255,.1); font-size: 14px; grid-template-columns: 28px 38px 1fr auto; flex: 1 1 0; min-height: 0; padding: 0; overflow: hidden; }
-.db-top .db-card__body { justify-content: space-between; }
-.db-top .db-rank img, .db-top .db-rank .db-ava { width: 38px; height: 38px; box-shadow: 0 0 0 2px rgba(255,255,255,.14); }
-.db-top .db-rank small { color: rgba(255,255,255,.6); }
-.db-top .db-rank__n { color: rgba(255,255,255,.6); }
+/* Top creators: bigger faces, the score called out as a lime badge */
+.db-top .db-rank { font-size: 14px; grid-template-columns: 28px 38px 1fr auto; flex: 1 1 0; min-height: 0; padding: 0; overflow: hidden; }
+.db-top .db-rank img, .db-top .db-rank .db-ava { width: 38px; height: 38px; }
 .db-top .db-rank__n svg { width: 24px; height: 30px; }
-.db-top .db-rank__score { color: var(--lime); font-size: 24px; }
-.db-top .db-rank:first-child img { box-shadow: 0 0 0 2px #d6a52b; }
-.db-posts .db-thumb { background: #2a2a2a; }
+.db-top .db-rank.is-1 img { box-shadow: 0 0 0 2px var(--gold, #d6a52b); }
+.db-top .db-rank__score { min-width: 44px; padding: 3px 8px; border-radius: 999px; background: var(--lime); text-align: center; font-size: 20px; line-height: 1.1; }
+.db-top__cols { display: grid; grid-template-columns: 1fr auto; padding: 0 0 4px; border-bottom: 1px solid var(--line); font-size: 10px; font-weight: 500; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); }
+.db-top__cols b { font-weight: 600; color: var(--ink); }
 
 /* all-creators table: photo + name, medals for the top three */
 .db-who { display: flex; align-items: center; gap: 10px; }
@@ -283,5 +275,13 @@
   .db-top .db-rank { grid-template-columns: 24px 30px 1fr auto; font-size: 13px; }
   .db-top .db-rank img, .db-top .db-rank .db-ava { width: 30px; height: 30px; }
   .db-top .db-rank__n svg { width: 19px; height: 24px; }
-  .db-top .db-rank__score { font-size: 20px; }
+  .db-top .db-rank__score { font-size: 18px; }
 }
+
+/* every button answers the pointer: fill and text both change */
+.db-btn, .db-more, .db-seg button, .db-pick__btn, .db-panel__close { transition: background .2s ease, color .2s ease, border-color .2s ease; }
+.db-btn--lime:hover { background: var(--ink); border-color: var(--ink); color: var(--lime); }
+.db-more:hover { background: var(--ink); color: var(--lime); }
+.db-seg button:not([aria-pressed="true"]):hover { background: var(--lime); color: var(--ink); }
+.db-pick__btn:hover { background: var(--ink); border-color: var(--ink); color: var(--lime); }
+.db-panel__close:hover { background: var(--ink); color: var(--lime); }
