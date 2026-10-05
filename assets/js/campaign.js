@@ -154,32 +154,74 @@
 
   /* ---------------------------------------------------------------- render */
 
-  /* ---------------------------------------------------------------- tabs */
+  /* ------------------------------------------------------ section jump bar */
 
-  var TABS = ["overview", "timeline", "content", "leaderboard", "performance", "clicks"];
-  function tabFromHash() { var m = /(?:^|[#&])tab=([a-z]+)/.exec(location.hash || ""); return m && TABS.indexOf(m[1]) >= 0 ? m[1] : "overview"; }
-  function selectTab(name, focus) {
-    TABS.forEach(function (k) {
-      var on = k === name, b = $("tab-" + k), p = $("panel-" + k);
-      if (!b || !p) return;
-      b.setAttribute("aria-selected", on ? "true" : "false");
-      b.tabIndex = on ? 0 : -1;
-      p.hidden = !on;
-      if (on && focus) b.focus();
-    });
-    // Remember the tab in the link without reloading the report.
-    var t = token();
-    if (t) history.replaceState(null, "", "#t=" + t + (name === "overview" ? "" : "&tab=" + name));
-  }
+  // Every section is on the page; the bar only scrolls to one. It must not
+  // touch the URL hash, which carries the report token.
+  var SECS = ["overview", "leaderboard", "content", "performance", "clicks", "timeline"];
+  var LOCK = 0;
   document.querySelector(".mx-tabs__in").addEventListener("click", function (e) {
-    var b = e.target.closest(".mx-tab"); if (b) selectTab(b.getAttribute("data-tab"));
+    var a = e.target.closest(".mx-tab"); if (!a) return;
+    e.preventDefault();
+    var key = a.getAttribute("data-tab"), sec = $("sec-" + key);
+    LOCK = Date.now() + 900;          // let the scroll finish before the observer takes over
+    markTab(key);
+    if (sec) sec.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
   });
-  document.querySelector(".mx-tabs__in").addEventListener("keydown", function (e) {
-    var i = TABS.indexOf(tabFromHash()), n = null;
-    if (e.key === "ArrowRight") n = TABS[(i + 1) % TABS.length];
-    if (e.key === "ArrowLeft") n = TABS[(i - 1 + TABS.length) % TABS.length];
-    if (n) { e.preventDefault(); selectTab(n, true); }
+  function markTab(key) {
+    SECS.forEach(function (k) { var a = $("tab-" + k); if (a) a.classList.toggle("is-on", k === key); });
+    var on = $("tab-" + key); if (on && on.scrollIntoView && on.parentNode.scrollWidth > on.parentNode.clientWidth)
+      on.parentNode.scrollLeft = on.offsetLeft - 16;
+  }
+  if ("IntersectionObserver" in window) {
+    var seen = {};
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) { seen[en.target.id.slice(4)] = en.isIntersecting; });
+      var first = SECS.filter(function (k) { return seen[k] && !$("sec-" + k).hidden; })[0];
+      if (first && Date.now() > LOCK) markTab(first);
+    }, { rootMargin: "-90px 0px -55% 0px" });
+    SECS.forEach(function (k) { var el = $("sec-" + k); if (el) io.observe(el); });
+  }
+
+  /* ------------------------------------------------------- "i" explanations */
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest(".mx-info");
+    document.querySelectorAll(".mx-pop").forEach(function (p) { if (!b || p.previousSibling !== b) { p.previousSibling.setAttribute("aria-expanded", "false"); p.remove(); } });
+    if (!b) return;
+    if (b.nextSibling && b.nextSibling.className === "mx-pop") { b.nextSibling.remove(); b.setAttribute("aria-expanded", "false"); return; }
+    var pop = document.createElement("span");
+    pop.className = "mx-pop"; pop.setAttribute("role", "note");
+    pop.textContent = b.getAttribute("data-info");
+    b.parentNode.insertBefore(pop, b.nextSibling);
+    b.setAttribute("aria-expanded", "true");
   });
+  document.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") document.querySelectorAll(".mx-pop").forEach(function (p) { p.previousSibling.setAttribute("aria-expanded", "false"); p.remove(); });
+  });
+
+  /* ---------------------------------------------------------- carousel */
+
+  function renderCarousel() {
+    var cs = R.creators || [];
+    $("mx-carousel-wrap").hidden = !cs.length;
+    $("mx-carousel").innerHTML = cs.map(function (c) {
+      var marks = (c.profiles || []).filter(function (p) { return p.url; }).map(function (p) {
+        return '<a href="' + esc(p.url) + '" target="_blank" rel="noopener" aria-label="' + esc(c.name) + " on " + esc(p.platform) + '">' + icon(p.platform) + "</a>";
+      }).join("");
+      return '<article class="mx-cc"><a class="mx-cc__photo" href="../creator/#c=' + encodeURIComponent(c.code) + '">'
+        + (c.photo_large || c.photo ? '<img src="' + esc(c.photo_large || c.photo) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
+        + '</a><div class="mx-cc__body"><a class="mx-cc__name" href="../creator/#c=' + encodeURIComponent(c.code) + '">' + esc(c.name) + "</a>"
+        + '<span class="mx-cc__meta">' + esc((R.benchmarks.bands[c.band] || "").replace(/ \(.*/, "")) + (c.followers ? " · " + num(c.followers) + " followers" : "")
+        + '</span><span class="mx-cc__meta">' + c.delivered + (c.planned ? " of " + c.planned : "") + " posts live</span>"
+        + '<div class="mx-tc__links">' + marks + "</div></div></article>";
+    }).join("");
+  }
+  function slide(dir) {
+    var t = $("mx-carousel"); t.scrollBy({ left: dir * Math.max(240, t.clientWidth * 0.8), behavior: "smooth" });
+  }
+  $("mx-car-prev").addEventListener("click", function () { slide(-1); });
+  $("mx-car-next").addEventListener("click", function () { slide(1); });
 
   function render(t) {
     var c = R.campaign;
@@ -192,8 +234,9 @@
     renderTargets();
     renderCharts();
     renderClicks();
+    renderCarousel();
     $("tab-clicks").hidden = !R.visibility.clicks;
-    selectTab(tabFromHash() === "clicks" && !R.visibility.clicks ? "overview" : tabFromHash());
+    markTab("overview");
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
   }
 
@@ -502,7 +545,7 @@
 
   function renderClicks() {
     var vis = R.visibility, cl = R.clicks;
-    $("mx-clicks-sec").hidden = !vis.clicks;
+    $("sec-clicks").hidden = !vis.clicks;
     if (!vis.clicks) return;
     if (!cl || !cl.links || !cl.has_destination) {
       $("mx-clicks").innerHTML = '<p class="mx-empty-note">No affiliate links in this campaign.</p>';

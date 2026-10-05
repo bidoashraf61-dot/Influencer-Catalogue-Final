@@ -219,7 +219,7 @@
 .mx-pod__name a { color: var(--ink); text-decoration: none; }
 .mx-pod__name a:hover { text-decoration: underline; }
 
-.mx-pod__score { font-family: var(--heading); font-size: 52px; line-height: 1; color: var(--go); }
+.mx-pod__score { font-family: var(--heading); font-size: 52px; line-height: 1; color: var(--ink); }
 .mx-pod__score small { font-family: var(--body); font-size: 12px; color: var(--gray); letter-spacing: .1em; display: block; text-transform: uppercase; }
 .mx-pod__line { font-size: 13px; color: var(--gray); margin-top: 10px; }
 .mx-table-wrap { overflow-x: auto; border-radius: var(--r-md); border: 1px solid var(--line); }
@@ -298,7 +298,7 @@
 .mx-clickheads { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
 .mx-clickheads div { padding: 22px; border-radius: var(--r-md); background: var(--linen); color: var(--ink); }
 .mx-clickheads dt { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); }
-.mx-clickheads dd { margin: 6px 0 0; font-family: var(--heading); font-size: 48px; line-height: 1; color: var(--go); }
+.mx-clickheads dd { margin: 6px 0 0; font-family: var(--heading); font-size: 48px; line-height: 1; color: var(--ink); }
 
 /* -------------------------------------------------------- end */
 .mx-end { padding-top: 40px; padding-bottom: 96px; border-top: 1px solid var(--line); }
@@ -353,23 +353,56 @@
 .mx-sec--progress { padding-top: 48px; padding-bottom: 48px; border-bottom: 1px solid var(--line); }
 .mx-sec--progress .mx-note { margin: 0 0 8px; }
 
-/* tabs: one section of the report at a time; the header stays above */
+/* section jump bar: every section is on the page, these scroll to it */
 .mx-tabs { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--line);
   backdrop-filter: saturate(1.2) blur(6px); -webkit-backdrop-filter: saturate(1.2) blur(6px); }
 .mx-tabs__in { display: flex; gap: 6px; overflow-x: auto; padding: 12px 0; scrollbar-width: none; }
 .mx-tabs__in::-webkit-scrollbar { display: none; }
 .mx-tab {
-  flex: none; font-family: var(--heading); font-size: 21px; letter-spacing: .05em; line-height: 1;
-  padding: 12px 20px; min-height: 46px; border-radius: var(--r-pill); border: 1px solid var(--line);
-  background: var(--white); color: var(--ink); cursor: pointer; transition: background .2s ease, border-color .2s ease;
+  flex: none; display: inline-flex; align-items: center; font-family: var(--heading); font-size: 21px; letter-spacing: .05em;
+  line-height: 1; padding: 12px 20px; min-height: 46px; border-radius: var(--r-pill); border: 1px solid var(--line);
+  background: var(--white); color: var(--ink); text-decoration: none; transition: background .2s ease, border-color .2s ease;
 }
 .mx-tab:hover { border-color: var(--ink); }
-.mx-tab[aria-selected="true"] { background: var(--lime); border-color: var(--lime); }
+.mx-tab.is-on { background: var(--lime); border-color: var(--lime); }
 .mx-tab:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
-.mx-panelwrap > .mx-sec { padding-top: 48px; }
-.mx-sec--progress { border-bottom: 0; }
-@media (max-width: 700px) { .mx-tab { font-size: 18px; padding: 10px 16px; min-height: 42px; } }
-@media print {
-  .mx-tabs { display: none !important; }
-  .mx-panelwrap[hidden] { display: block !important; }
+[id^="sec-"] { scroll-margin-top: 84px; }
+#mx-report .mx-sec + .mx-sec { border-top: 1px solid var(--line); }
+
+/* the "i" next to a section title, and its explanation */
+.mx-h2 { position: relative; }
+.mx-info {
+  position: relative; top: -.9em; margin-left: 10px; width: 26px; height: 26px; border-radius: 50%; padding: 0;
+  border: 1.5px solid var(--ink); background: var(--white); color: var(--ink); cursor: pointer; vertical-align: top;
+  font: italic 700 15px/1 Georgia, "Times New Roman", serif; display: inline-grid; place-items: center;
 }
+.mx-info:hover, .mx-info[aria-expanded="true"] { background: var(--lime); border-color: var(--lime); }
+.mx-info:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.mx-pop {
+  position: absolute; left: 0; top: 100%; z-index: 30; margin-top: 10px; width: min(460px, 86vw);
+  font-family: var(--body); font-size: 15px; line-height: 1.55; letter-spacing: 0; text-transform: none; font-weight: 400;
+  background: var(--ink); color: var(--white); padding: 14px 18px; border-radius: 14px;
+  box-shadow: 0 14px 30px rgba(18,18,18,.22);
+}
+
+/* creators-in-this-campaign carousel */
+.mx-carousel { margin-bottom: 44px; }
+.mx-carousel__head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.mx-carousel__nav { display: flex; gap: 8px; }
+.mx-arrow { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line); background: var(--white); color: var(--ink); font-size: 24px; line-height: 1; cursor: pointer; }
+.mx-arrow:hover { background: var(--lime); border-color: var(--lime); }
+.mx-arrow:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.mx-carousel__track { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 230px); gap: 16px; overflow-x: auto;
+  scroll-snap-type: x mandatory; padding: 4px 2px 14px; scrollbar-width: thin; }
+.mx-cc { scroll-snap-align: start; border-radius: var(--r-md); background: var(--linen); overflow: hidden; display: flex; flex-direction: column; }
+.mx-cc__photo { display: block; aspect-ratio: 4 / 5; background: #ddd5cb; }
+.mx-cc__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mx-cc__body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
+.mx-cc__name { font-family: var(--heading); font-size: 26px; line-height: 1; color: var(--ink); text-decoration: none; }
+.mx-cc__name:hover { text-decoration: underline; }
+.mx-cc__meta { font-size: 13px; color: var(--gray); }
+.mx-cc .mx-tc__links { margin-top: 8px; }
+.mx-cc .mx-tc__links a { background: var(--white); }
+
+@media (max-width: 700px) { .mx-tab { font-size: 18px; padding: 10px 16px; min-height: 42px; } .mx-info { top: -.6em; } }
+@media print { .mx-tabs, .mx-info, .mx-pop, .mx-carousel__nav { display: none !important; } .mx-carousel__track { grid-auto-flow: row; grid-template-columns: repeat(5, 1fr); } }

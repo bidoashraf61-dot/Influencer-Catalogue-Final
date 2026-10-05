@@ -88,91 +88,85 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       </div></div>
     </header>
 
-    <!-- the report is read one tab at a time; the header above stays -->
-    <nav class="mx-tabs cat-pad" aria-label="Report sections"><div class="cat-container mx-tabs__in" role="tablist">
-      <button type="button" role="tab" class="mx-tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="false">Overview</button>
-      <button type="button" role="tab" class="mx-tab" id="tab-timeline" data-tab="timeline" aria-controls="panel-timeline" aria-selected="false">Timeline</button>
-      <button type="button" role="tab" class="mx-tab" id="tab-content" data-tab="content" aria-controls="panel-content" aria-selected="false">Content</button>
-      <button type="button" role="tab" class="mx-tab" id="tab-leaderboard" data-tab="leaderboard" aria-controls="panel-leaderboard" aria-selected="false">Leaderboard</button>
-      <button type="button" role="tab" class="mx-tab" id="tab-performance" data-tab="performance" aria-controls="panel-performance" aria-selected="false">Performance</button>
-      <button type="button" role="tab" class="mx-tab" id="tab-clicks" data-tab="clicks" aria-controls="panel-clicks" aria-selected="false">Affiliate clicks</button>
+    <!-- section jump bar: every section is on the page; these scroll to it -->
+    <nav class="mx-tabs cat-pad" aria-label="Jump to a section"><div class="cat-container mx-tabs__in">
+      <a class="mx-tab" href="#sec-overview" data-tab="overview" id="tab-overview">Overview</a>
+      <a class="mx-tab" href="#sec-leaderboard" data-tab="leaderboard" id="tab-leaderboard">Leaderboard</a>
+      <a class="mx-tab" href="#sec-content" data-tab="content" id="tab-content">Content</a>
+      <a class="mx-tab" href="#sec-performance" data-tab="performance" id="tab-performance">Performance</a>
+      <a class="mx-tab" href="#sec-clicks" data-tab="clicks" id="tab-clicks">Affiliate clicks</a>
+      <a class="mx-tab" href="#sec-timeline" data-tab="timeline" id="tab-timeline">Timeline</a>
     </div></nav>
 
-    <div class="mx-panelwrap" role="tabpanel" id="panel-overview" aria-labelledby="tab-overview" data-panel="overview" hidden>
-    <section class="mx-sec cat-pad" aria-labelledby="mx-h-targets">
+    <section class="mx-sec cat-pad" id="sec-overview" aria-labelledby="mx-h-targets">
       <div class="cat-container">
         <div class="mx-sec__head">
-          <h2 class="mx-h2" id="mx-h-targets">Against target</h2>
+          <h2 class="mx-h2" id="mx-h-targets">Overview<button type="button" class="mx-info" aria-label="What is this section?" aria-expanded="false" data-info="The campaign at a glance: the creators in it, and how each goal is tracking against where it should be by today."><span aria-hidden="true">i</span></button></h2>
           <p class="mx-sec__lede" id="mx-targets-lede"></p>
         </div>
+        <div class="mx-carousel" id="mx-carousel-wrap">
+          <div class="mx-carousel__head"><h3 class="mx-table-title">Creators in this campaign</h3>
+            <div class="mx-carousel__nav"><button type="button" class="mx-arrow" id="mx-car-prev" aria-label="Previous creators">‹</button><button type="button" class="mx-arrow" id="mx-car-next" aria-label="Next creators">›</button></div></div>
+          <div class="mx-carousel__track" id="mx-carousel" tabindex="0" aria-label="Creators in this campaign"></div>
+        </div>
+        <h3 class="mx-table-title">Goals</h3>
         <div class="mx-bullets" id="mx-bullets"></div>
         <div class="mx-bench" id="mx-bench"></div>
       </div>
     </section>
-    </div>
 
-    <div class="mx-panelwrap" role="tabpanel" id="panel-timeline" aria-labelledby="tab-timeline" data-panel="timeline" hidden>
-    <section class="mx-sec mx-sec--progress cat-pad" aria-labelledby="mx-h-progress">
+    <section class="mx-sec cat-pad" id="sec-leaderboard" aria-labelledby="mx-h-board">
       <div class="cat-container">
         <div class="mx-sec__head">
-          <h2 class="mx-h2" id="mx-h-progress">Campaign progress</h2>
-          <p class="mx-status__dates" id="mx-dates"></p>
-        </div>
-        <p class="mx-note" id="mx-note" hidden></p>
-        <div class="mx-gantt" id="mx-gantt"></div>
-      </div>
-    </section>
-    </div>
-
-    <div class="mx-panelwrap" role="tabpanel" id="panel-content" aria-labelledby="tab-content" data-panel="content" hidden>
-    <section class="mx-sec cat-pad" aria-labelledby="mx-h-posts">
-      <div class="cat-container">
-        <div class="mx-sec__head">
-          <h2 class="mx-h2" id="mx-h-posts">Published Content Highlights</h2>
-          <div class="mx-filters" id="mx-filters" role="toolbar" aria-label="Filter posts"></div>
-        </div>
-        <div class="mx-wall" id="mx-wall"></div>
-      </div>
-    </section>
-    </div>
-
-    <div class="mx-panelwrap" role="tabpanel" id="panel-leaderboard" aria-labelledby="tab-leaderboard" data-panel="leaderboard" hidden>
-    <section class="mx-sec cat-pad" aria-labelledby="mx-h-board">
-      <div class="cat-container">
-        <div class="mx-sec__head">
-          <h2 class="mx-h2" id="mx-h-board">Leaderboard</h2>
+          <h2 class="mx-h2" id="mx-h-board">Leaderboard<button type="button" class="mx-info" aria-label="What is this section?" aria-expanded="false" data-info="Each creator gets a score out of 100: 35% reach and views (compared with the best in the campaign), 25% engagement (compared with the best), 25% engagement rate against the benchmark for creators of their size, and 15% affiliate clicks (compared with the best). The top three get gold, silver and bronze; creators who have not posted yet are listed last."><span aria-hidden="true">i</span></button></h2>
         </div>
         <div class="mx-podium" id="mx-podium"></div>
         <h3 class="mx-table-title">All creators, ranked</h3>
         <div class="mx-table-wrap"><table class="mx-table" id="mx-table"></table></div>
       </div>
     </section>
-    </div>
 
-    <div class="mx-panelwrap" role="tabpanel" id="panel-performance" aria-labelledby="tab-performance" data-panel="performance" hidden>
-    <section class="mx-sec cat-pad" aria-labelledby="mx-h-perf">
+    <section class="mx-sec cat-pad" id="sec-content" aria-labelledby="mx-h-posts">
       <div class="cat-container">
-        <div class="mx-sec__head"><h2 class="mx-h2" id="mx-h-perf">How it grew</h2></div>
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-posts">Published Content Highlights<button type="button" class="mx-info" aria-label="What is this section?" aria-expanded="false" data-info="Every post, reel, story and video published for the campaign, with its numbers. Strong / Fair / Low compares each post with the benchmark for creators of that size."><span aria-hidden="true">i</span></button></h2>
+          <div class="mx-filters" id="mx-filters" role="toolbar" aria-label="Filter posts"></div>
+        </div>
+        <div class="mx-wall" id="mx-wall"></div>
+      </div>
+    </section>
+
+    <section class="mx-sec cat-pad" id="sec-performance" aria-labelledby="mx-h-perf">
+      <div class="cat-container">
+        <div class="mx-sec__head"><h2 class="mx-h2" id="mx-h-perf">How it grew<button type="button" class="mx-info" aria-label="What is this section?" aria-expanded="false" data-info="How views and engagement grew day by day, which platforms and formats carried the campaign, and where the audience is."><span aria-hidden="true">i</span></button></h2></div>
         <div class="mx-charts" id="mx-charts"></div>
         <div class="mx-mix" id="mx-mix"></div>
       </div>
     </section>
-    </div>
 
-    <div class="mx-panelwrap" role="tabpanel" id="panel-clicks" aria-labelledby="tab-clicks" data-panel="clicks" hidden>
-    <section class="mx-sec cat-pad" aria-labelledby="mx-h-clicks" id="mx-clicks-sec">
+    <section class="mx-sec cat-pad" aria-labelledby="mx-h-clicks" id="sec-clicks">
       <div class="cat-container">
         <div class="mx-sec__head">
-          <h2 class="mx-h2" id="mx-h-clicks">Affiliate link clicks</h2>
+          <h2 class="mx-h2" id="mx-h-clicks">Affiliate link clicks<button type="button" class="mx-info" aria-label="What is this section?" aria-expanded="false" data-info="Taps on each creator's own tracking link — real people only; link previews and bots are not counted."><span aria-hidden="true">i</span></button></h2>
         </div>
         <div id="mx-clicks"></div>
       </div>
     </section>
-    </div>
+
+    <section class="mx-sec mx-sec--progress cat-pad" id="sec-timeline" aria-labelledby="mx-h-progress">
+      <div class="cat-container">
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-progress">Campaign progress<button type="button" class="mx-info" aria-label="What is this section?" aria-expanded="false" data-info="The scope of work step by step, with start and end dates. The red line is today."><span aria-hidden="true">i</span></button></h2>
+          <p class="mx-status__dates" id="mx-dates"></p>
+        </div>
+        <p class="mx-note" id="mx-note" hidden></p>
+        <div class="mx-gantt" id="mx-gantt"></div>
+      </div>
+    </section>
 
     <section class="mx-end cat-pad">
       <div class="cat-container mx-end__in">
-        <button type="button" class="cat-btn cat-btn--lime" id="mx-print">Download PDF</button>
+        <button type="button" class="cat-btn cat-btn--lime" id="mx-print">Download full report (PDF)</button>
         <a class="cat-btn mx-btn-line" id="mx-csv" href="#">Download CSV</a>
         <a class="cat-btn mx-btn-line" href="../">Back to the catalogue</a>
       </div>

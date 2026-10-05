@@ -1591,7 +1591,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(status, {"ok": False}, self.cors())
         db.log("view", self.viewer_code_id(), self.client_ip(), self.headers.get("User-Agent"),
                "campaign:" + k["name"][:60])
-        rep = metrics.client_report(k, photo=links.thumb)
+        rep = metrics.client_report(k, photo=links.thumb, photo_large=links.photo)
         rep["campaign"]["logos"] = [self.logo_url(x, k["token"]) for x in rep["campaign"]["logos"]]
         return self.send_json(200, {"ok": True, "report": rep},
                               self.cors() + [("Cache-Control", "no-store")])

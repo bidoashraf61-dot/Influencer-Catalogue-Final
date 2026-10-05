@@ -407,7 +407,7 @@ def audience_mix(creators, reach_by_code):
     return {"countries": rows, "coverage": covered / all_reach * 100 if all_reach else 0}
 
 
-def client_report(campaign, photo=None):
+def client_report(campaign, photo=None, photo_large=None):
     """The report as the client may see it: no cost, no CPM, no EMV, no
     ratings or notes, and only the sections switched on for them. `photo`
     turns a stored photo name into a signed URL."""
@@ -435,6 +435,7 @@ def client_report(campaign, photo=None):
                                  "clicks", "planned", "delivered", "profiles", "band", "er_grade",
                                  "video_er_grade", "score", "rank", "badge")}
         row["photo"] = pics.get(c["code"])
+        row["photo_large"] = photo_large(c["photo"]) if photo_large and c["photo"] else None
         row["has_analysis"] = c["code"] in have
         if not vis["clicks"]:
             row.pop("clicks")
