@@ -251,7 +251,7 @@ A high-contrast ink-and-paper palette with one acid accent, a scoped verdict tri
 - **Vivid Red** (vivid-red): focus rings (3px outline, 2px offset) on light surfaces, the LIVE dot, the gantt "today" line, error text, and the Low verdict. A "now / attention" signal, never decoration.
 
 ### Tertiary (verdict set)
-- **Go Green** (go-green) with its soft tint (go-green-soft): Strong verdicts, completed stages, completed gantt bars and delivered slots, the submitted-state panel. By client decision it is also the "seen" data colour in the report (see The Seen / Did Rule): views, reach, table score bars, the "Views so far" line, platform and creator-size bars.
+- **Go Green** (go-green) with its soft tint (go-green-soft): Strong verdicts, completed stages, completed gantt bars and delivered slots, the submitted-state panel. It is a verdict colour only; report data uses ink and lime (see The Seen / Did Rule).
 - **Amber** (amber) with soft tint and darkened text tone (amber-soft, amber-text): Fair / moderate verdicts only. Distinct from vivid orange on purpose.
 - **Signal Red tints** (red-soft, red-text): Low verdicts on light surfaces.
 - Signal pills now sit only on light surfaces; there are no on-ink variants in use.
@@ -272,7 +272,7 @@ A high-contrast ink-and-paper palette with one acid accent, a scoped verdict tri
 ### Named Rules
 **The Verdict Hues Rule.** Amber and red appear in data only as verdicts: signal pills, verdict pills, bullet-bar fills. Green is a verdict too, and also the first data colour by client decision; where it must read as a judgement it carries a label (the signal pill's word, the verdict caption).
 
-**The Seen / Did Rule.** Report data uses two colours with fixed meanings, stated in a key at the top of the Performance section: green = people who saw it (views, reach, content-mix reach); orange = what people did (likes, comments, saves, shares, affiliate clicks). Neutral counts (posts counted) are ink. Bars are green unless they count actions (clicks by creator and country are orange). Data is never drawn in ink bars, and lime-dark and warm grey are no longer data colours. Superseded the earlier four-colour variation at the client's request (Oct 2026).
+**The Seen / Did Rule.** Report data uses the brand pair, so it never competes with the verdict hues: ink = people who saw it (views, reach, platform and creator-size bars, the "Views so far" line, score bars); lime = what people did (likes, comments, saves, shares, affiliate clicks; lime-dark #9bb300/#b9d400 for lines and bars on white). Tiles: seen = ink icon plate with lime mark on a warm-grey tile; did = lime plate with ink mark on a pale-lime tile; plain counts = outlined ink. A key at the top of Performance states it. Green, amber and red appear only as verdicts (signal pills, target bars, the objective bar, done stages). Chosen by the client from four directions (Oct 2026).
 
 **The One Acid Rule.** Lime marks the action, the current selection or the winner. It is a fill for those roles, not a data series; the data set uses lime-dark.
 

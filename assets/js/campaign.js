@@ -525,9 +525,9 @@
     return s + "</svg>";
   }
 
-  // Two colours for the whole performance area: green is the main measure
-  // (views, reach, clicks), orange the second (engagement). Bars are green.
-  var C1 = "#14884a", C2 = "#ff691e";
+  // Data colours are the brand pair, so they never compete with the green /
+  // amber / red verdicts: ink = people who saw it, lime = what people did.
+  var C1 = "#121212", C2 = "#b9d400";
   function bars(rows, keyHtml, colour) {
     if (!rows || !rows.length) return '<p class="mx-panel__note">Nothing yet.</p>';
     var peak = Math.max.apply(null, rows.map(function (r) { return r.n; })) || 1;
@@ -565,8 +565,8 @@
   function renderCharts() {
     var h = (R.history || []).map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; });
     $("mx-charts").innerHTML = h.length
-      ? '<div class="mx-chart"><h3>Views so far</h3>' + area(h, "views", "#14884a", "Views so far") + "</div>"
-        + '<div class="mx-chart"><h3>Engagement so far</h3>' + area(h, "eng", "#ff691e", "Engagement so far") + "</div>"
+      ? '<div class="mx-chart"><h3>Views so far</h3>' + area(h, "views", "#121212", "Views so far") + "</div>"
+        + '<div class="mx-chart"><h3>Engagement so far</h3>' + area(h, "eng", "#9bb300", "Engagement so far") + "</div>"
       : '<p class="mx-empty-note">The charts fill in as posts are captured, once every 24 hours.</p>';
 
     var posts = R.posts.filter(function (p) { return p.section === "campaign"; }), mix = [], t = R.total;
@@ -609,8 +609,8 @@
       }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
         + '<p class="mx-panel__note">Weighted by reach' + (R.audience.coverage < 99 ? " · " + R.audience.coverage.toFixed(0) + "% of reach covered" : "") + "</p></div>");
     }
-    $("mx-mix").innerHTML = '<p class="mx-key-line"><span><i class="seen"></i>Green — people who saw it (views, reach)</span>'
-      + '<span><i class="did"></i>Orange — what people did (likes, comments, saves, shares, clicks)</span></p>' + mix.join("");
+    $("mx-mix").innerHTML = '<p class="mx-key-line"><span><i class="seen"></i>Black — people who saw it (views, reach)</span>'
+      + '<span><i class="did"></i>Lime — what people did (likes, comments, saves, shares, clicks)</span></p>' + mix.join("");
   }
 
   /* ----------------------------------------------------------- clicks */

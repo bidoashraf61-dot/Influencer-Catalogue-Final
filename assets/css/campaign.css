@@ -523,3 +523,16 @@
 .mx-key-line i.did { background: var(--vivid-orange); }
 @media (max-width: 520px) { .mx-mix, .mx-clickgrid { grid-template-columns: 1fr; } .mx-tile b { font-size: 32px; } }
 @media print { .mx-mix, .mx-clickgrid { grid-template-columns: 1fr 1fr; } .mx-tile b { font-size: 28px; } .mx-tile > span:last-child { font-size: 12px; } }
+
+/* ink + lime data palette (client choice, Oct 2026): ink = seen, lime = did.
+   Green / amber / red are verdicts only. */
+.mx-tile--seen { background: #f1efea; }
+.mx-tile--seen .mx-tile__ic { background: var(--ink); color: var(--lime); }
+.mx-tile--did { background: #f6fbdc; }
+.mx-tile--did .mx-tile__ic { background: var(--lime); color: var(--ink); }
+.mx-tile--plain { background: #f6f4f0; }
+.mx-tile--plain .mx-tile__ic { background: var(--white); color: var(--ink); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.mx-key-line i.seen { background: var(--ink); }
+.mx-key-line i.did { background: var(--lime); box-shadow: inset 0 0 0 1px #9bb300; }
+.mx-score i::after { background: var(--ink); }
+.mx-cc .mx-tc__links a, .mx-tc__links a { color: var(--ink); }
