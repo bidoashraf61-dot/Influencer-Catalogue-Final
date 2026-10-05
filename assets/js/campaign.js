@@ -155,12 +155,50 @@
 
   /* ---------------------------------------------------------------- render */
 
+  /* ------------------------------------------------------------- icons */
+
+  // One line-icon set for the report chrome, same stroke as the platform marks.
+  function ico(d) { return '<svg class="mx-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + "</svg>"; }
+  var IC = {
+    overview: ico('<rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/>'),
+    leaderboard: ico('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4"/>'),
+    content: ico('<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><circle cx="9" cy="9" r="1.8"/><path d="M20.5 15l-5-5-11 10.5"/>'),
+    performance: ico('<path d="M3 20h18"/><path d="M5 16l5-5 4 3 6-7"/><path d="M16 7h4v4"/>'),
+    clicks: ico('<path d="M9 3.5v4M3.5 9h4M5 5l2.5 2.5"/><path d="M12 12l8 3-3.5 1.5L15 20z"/>'),
+    timeline: ico('<rect x="3.5" y="4.5" width="17" height="16" rx="2.5"/><path d="M8 2.5v4M16 2.5v4M3.5 10h17M8 14h3M13 17h3"/>'),
+    posts: ico('<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><path d="M8 12.5l3 3 5-6"/>'),
+    views: ico('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'),
+    reach: ico('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4.5-6.2"/>'),
+    engagement: ico('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
+    er: ico('<path d="M19 5L5 19"/><circle cx="7" cy="7" r="2.5"/><circle cx="17" cy="17" r="2.5"/>'),
+    platform: ico('<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>'),
+    mix: ico('<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5"/>'),
+    did: ico('<path d="M7 11V5.5a1.5 1.5 0 0 1 3 0V11M10 10V4a1.5 1.5 0 0 1 3 0v6M13 10V5.5a1.5 1.5 0 0 1 3 0V13a7 7 0 0 1-7 7h-.5A5.5 5.5 0 0 1 4 16l-1-3.5a1.5 1.5 0 0 1 2.7-1.2L7 13"/>'),
+    country: ico('<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>'),
+    creator: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>'),
+    device: ico('<rect x="2.5" y="4" width="13" height="10" rx="1.5"/><rect x="17" y="8" width="4.5" height="12" rx="1.2"/><path d="M6 18h6"/>'),
+    app: ico('<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>'),
+    unique: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M17 3.5l1.5 1.5 3-3"/>'),
+    ctr: ico('<path d="M4 20L20 4M8 4h12v12"/>'),
+    chart: ico('<path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/>')
+  };
+  // Panel and bench titles get the matching mark.
+  var H3IC = { "Reached by platform": "platform", "Content mix": "mix", "What people did": "did", "Who was reached": "country",
+    "By creator": "creator", "By app": "app", "By country": "country", "By device": "device",
+    "Engagement rate": "er", "Video engagement": "views", "Click-through": "ctr" };
+  function h3ic(title) { return IC[H3IC[title]] ? IC[H3IC[title]] : ""; }
+
   /* ------------------------------------------------------ section jump bar */
 
   // Every section is on the page; the bar only scrolls to one. It must not
   // touch the URL hash, which carries the report token.
   var SECS = ["overview", "leaderboard", "content", "performance", "clicks", "timeline"];
   var LOCK = 0;
+  SECS.forEach(function (k) {
+    var a = $("tab-" + k); if (a && !a.querySelector(".mx-ico")) a.insertAdjacentHTML("afterbegin", IC[k]);
+    var h = document.querySelector("#sec-" + k + " .mx-h2");
+    if (h && !h.querySelector(".mx-h2__ic")) h.insertAdjacentHTML("afterbegin", '<span class="mx-h2__ic">' + IC[k] + "</span>");
+  });
   document.querySelector(".mx-tabs__in").addEventListener("click", function (e) {
     var a = e.target.closest(".mx-tab"); if (!a) return;
     e.preventDefault();
@@ -347,15 +385,15 @@
     var t = R.total, vis = R.visibility, bm = R.benchmarks, cells = [];
     var g = {}; (R.progress.items || []).forEach(function (i) { g[i.key] = i; });
     function goal(key, val) { var i = g[key]; return i ? sig(i.grade, "Goal " + (key === "er" ? pct(i.goal, 1) : num(i.goal))) : ""; }
-    cells.push(["Posts live", full(t.delivered) + (t.planned ? "<small>/" + t.planned + "</small>" : ""), goal("posts")]);
-    cells.push(["Views", num(t.views), goal("views")]);
-    if (vis.reach && t.reach != null) cells.push(["Reach" + (t.real_share >= 0.999 ? "" : " (est.)"), num(t.reach), goal("reach")]);
-    cells.push(["Engagement", num(t.engagement), goal("engagement")]);
-    cells.push(["Avg eng. rate", pct(t.er), g.er ? goal("er") : sig(t.er_grade, "Against each creator's tier benchmark")]);
+    cells.push(["Posts live", full(t.delivered) + (t.planned ? "<small>/" + t.planned + "</small>" : ""), goal("posts"), "posts"]);
+    cells.push(["Views", num(t.views), goal("views"), "views"]);
+    if (vis.reach && t.reach != null) cells.push(["Reach" + (t.real_share >= 0.999 ? "" : " (est.)"), num(t.reach), goal("reach"), "reach"]);
+    cells.push(["Engagement", num(t.engagement), goal("engagement"), "engagement"]);
+    cells.push(["Avg eng. rate", pct(t.er), g.er ? goal("er") : sig(t.er_grade, "Against each creator's tier benchmark"), "er"]);
     if (vis.clicks && R.clicks && R.clicks.links && R.clicks.has_destination)
-      cells.push(["Link clicks", num(t.clicks), g.clicks ? goal("clicks") : sig(t.ctr_grade, "Strong from " + bm.ctr[0] + "% click-through")]);
+      cells.push(["Link clicks", num(t.clicks), g.clicks ? goal("clicks") : sig(t.ctr_grade, "Strong from " + bm.ctr[0] + "% click-through"), "clicks"]);
     $("mx-scoreline").innerHTML = cells.map(function (c) {
-      return "<div><dt>" + esc(c[0]) + "</dt><dd>" + c[1] + "</dd>" + (c[2] ? "<div class=\"mx-score-line__sig\">" + c[2] + "</div>" : "") + "</div>";
+      return "<div><dt>" + (c[3] ? IC[c[3]] : "") + esc(c[0]) + "</dt><dd>" + c[1] + "</dd>" + (c[2] ? "<div class=\"mx-score-line__sig\">" + c[2] + "</div>" : "") + "</div>";
     }).join("");
   }
 
@@ -487,7 +525,7 @@
       : "";
     $("mx-bullets").innerHTML = p.items.length ? p.items.map(function (i) {
       var isRate = i.key === "er", fill = Math.min(100, i.pct), mark = Math.min(100, i.expected / i.goal * 100);
-      return '<div class="mx-bullet"><div class="mx-bullet__name">' + TLABEL[i.key] + " " + sig(i.grade) + "</div>"
+      return '<div class="mx-bullet"><div class="mx-bullet__name">' + (IC[i.key] || "") + TLABEL[i.key] + " " + sig(i.grade) + "</div>"
         + '<div class="mx-bullet__track" role="img" aria-label="' + TLABEL[i.key] + " " + Math.round(i.pct) + '% of goal">'
         + '<div class="mx-bullet__fill ' + i.grade + '" style="width:' + fill + '%"></div>'
         + (isRate ? "" : '<div class="mx-bullet__mark" style="left:' + mark + '%"><span>by today</span></div>') + "</div>"
@@ -498,7 +536,7 @@
     if (t.video_er != null) ex.push(["Video engagement", t.video_er, t.video_er_grade, "Strong from " + bm.video_er[0] + "%"]);
     if (R.visibility.clicks && t.ctr != null && R.clicks && R.clicks.links) ex.push(["Click-through", t.ctr, t.ctr_grade, "Strong from " + bm.ctr[0] + "%"]);
     $("mx-bench").innerHTML = ex.map(function (x) {
-      return '<div class="mx-bench__item"><h3>' + x[0] + '</h3><div class="mx-bench__val">' + pct(x[1]) + " " + sig(x[2]) + "</div><p>" + x[3] + "</p></div>";
+      return '<div class="mx-bench__item"><h3>' + h3ic(x[0]) + x[0] + '</h3><div class="mx-bench__val">' + pct(x[1]) + " " + sig(x[2]) + "</div><p>" + x[3] + "</p></div>";
     }).join("");
   }
 
@@ -545,8 +583,8 @@
   function renderCharts() {
     var h = (R.history || []).map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; });
     $("mx-charts").innerHTML = h.length
-      ? '<div class="mx-chart"><h3>Views so far</h3>' + area(h, "views", "#14884a", "Views so far") + "</div>"
-        + '<div class="mx-chart"><h3>Engagement so far</h3>' + area(h, "eng", "#ff691e", "Engagement so far") + "</div>"
+      ? '<div class="mx-chart"><h3>' + IC.views + 'Views so far</h3>' + area(h, "views", "#14884a", "Views so far") + "</div>"
+        + '<div class="mx-chart"><h3>' + IC.engagement + 'Engagement so far</h3>' + area(h, "eng", "#ff691e", "Engagement so far") + "</div>"
       : '<p class="mx-empty-note">The charts fill in as posts are captured, once every 24 hours.</p>';
 
     var posts = R.posts.filter(function (p) { return p.section === "campaign"; }), mix = [];
@@ -576,6 +614,7 @@
         + '<p class="mx-panel__note">Weighted by reach' + (R.audience.coverage < 99 ? " · " + R.audience.coverage.toFixed(0) + "% of reach covered" : "") + "</p></div>");
     }
     $("mx-mix").innerHTML = mix.join("");
+    decorateH3("mx-mix");
   }
 
   /* ----------------------------------------------------------- clicks */
@@ -589,8 +628,8 @@
       return;
     }
     var t = R.total;
-    var heads = '<dl class="mx-clickheads"><div><dt>Clicks</dt><dd>' + full(cl.clicks) + "</dd></div><div><dt>Unique people</dt><dd>"
-      + full(cl.uniques) + "</dd></div><div><dt>Click-through</dt><dd>" + pct(t.ctr) + "</dd></div></dl>";
+    var heads = '<dl class="mx-clickheads"><div><dt>' + IC.clicks + 'Clicks</dt><dd>' + full(cl.clicks) + '</dd></div><div><dt>' + IC.unique + 'Unique people</dt><dd>'
+      + full(cl.uniques) + '</dd></div><div><dt>' + IC.ctr + 'Click-through</dt><dd>' + pct(t.ctr) + "</dd></div></dl>";
     if (!cl.clicks) { $("mx-clicks").innerHTML = heads + '<p class="mx-empty-note" style="margin-top:18px">No clicks yet.</p>'; return; }
     var lab = function (rows) { return (rows || []).map(function (r) { return { k: r.k, n: r.n, label: full(r.n) }; }); };
     $("mx-clicks").innerHTML = heads + '<div class="mx-clickgrid">'
@@ -600,6 +639,14 @@
         return r.k && r.k.length === 2 ? flag(r.k) + esc(countryName(r.k)) : esc(r.k || "Unknown");
       }) + "</div>"
       + '<div class="mx-panel"><h3>By device</h3>' + bars(lab(cl.by_device), function (r) { return esc(r.k); }) + "</div></div>";
+    decorateH3("mx-clicks");
+  }
+
+  function decorateH3(id) {
+    var box = $(id); if (!box) return;
+    box.querySelectorAll(".mx-panel > h3").forEach(function (h) {
+      if (!h.querySelector(".mx-ico")) h.insertAdjacentHTML("afterbegin", h3ic(h.textContent.trim()));
+    });
   }
 
   $("mx-print").addEventListener("click", function () { window.print(); });

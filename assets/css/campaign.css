@@ -519,3 +519,22 @@
   .mx-bullet, .mx-bench__item, .mx-chart, .mx-panel, .mx-post, .mx-pod, .mx-cc, .mx-gantt__row, .mx-table tr { break-inside: avoid; }
   .mx-h2, .mx-sec__head, .mx-table-title { break-after: avoid; }
 }
+
+/* icons across the report chrome — one line set, sized per place */
+.mx-ico { width: 18px; height: 18px; flex: none; vertical-align: -3px; }
+.mx-tab { gap: 8px; }
+.mx-tab .mx-ico { width: 18px; height: 18px; }
+.mx-h2 { display: flex; align-items: center; gap: 16px; }
+.mx-h2__ic { display: inline-grid; place-items: center; flex: none; width: clamp(48px, 3.4vw, 64px); height: clamp(48px, 3.4vw, 64px);
+  border-radius: 50%; background: var(--lime); color: var(--ink); }
+.mx-h2__ic .mx-ico { width: 52%; height: 52%; vertical-align: 0; }
+.mx-h2 .mx-info { top: -1.1em; margin-left: -4px; }
+.mx-score-line dt, .mx-clickheads dt { display: flex; align-items: center; gap: 7px; }
+.mx-score-line dt .mx-ico, .mx-clickheads dt .mx-ico { width: 16px; height: 16px; color: var(--ink); }
+.mx-bullet__name { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mx-bullet__name .mx-ico { width: 24px; height: 24px; padding: 6px; box-sizing: content-box; border-radius: 10px; background: var(--linen); }
+.mx-panel h3, .mx-chart h3, .mx-bench__item h3 { display: flex; align-items: center; gap: 8px; }
+.mx-panel h3 .mx-ico, .mx-bench__item h3 .mx-ico { width: 18px; height: 18px; color: var(--ink); }
+.mx-chart h3 .mx-ico { width: 24px; height: 24px; }
+@media (max-width: 700px) { .mx-h2 { gap: 10px; } .mx-tab .mx-ico { width: 16px; height: 16px; } }
+@media print { .mx-h2__ic { width: 30px !important; height: 30px !important; } .mx-tab .mx-ico { display: none; } .mx-bullet__name .mx-ico { width: 14px; height: 14px; padding: 4px; } }
