@@ -298,15 +298,36 @@
     var today = (span > 0 && now >= a && now <= b) ? '<div class="mx-gantt__today" style="' + at(x(now)) + '"><span>Today</span></div>' : "";
     $("mx-gantt").innerHTML = steps.length ? '<div class="mx-gantt__axis" aria-hidden="true">' + axis + "</div>" + rows + today : "";
 
-    // delivery strip: one slot per planned post
-    var t = R.total, planned = t.planned || 0, got = t.delivered || 0;
-    if (planned) {
-      var slots = "";
-      for (var k = 0; k < Math.max(planned, got); k++) slots += '<i class="' + (k < got ? (k < planned ? "on" : "extra") : "") + '"></i>';
-      $("mx-delivery").innerHTML = '<div class="mx-delivery__label"><span>Posts delivered</span><b>' + got + " of " + planned + "</b></div>"
-        + '<div class="mx-slots" role="img" aria-label="' + got + " of " + planned + ' planned posts delivered">' + slots + "</div>";
-    } else $("mx-delivery").innerHTML = "";
+    renderObjectiveBar();
   }
+
+  // The objective bar: how far the campaign is towards the targets its
+  // objective cares about (awareness → views and reach, and so on), with a
+  // marker for where it should be by today.
+  var KLABEL = { posts: "Posts", views: "Views", reach: "Reach", engagement: "Engagement", er: "Avg ER", clicks: "Clicks" };
+  function renderObjectiveBar() {
+    var o = R.objective || { label: "Balanced", kpis: [] }, items = (R.progress && R.progress.items) || [];
+    var mine = items.filter(function (i) { return (o.kpis || []).indexOf(i.key) >= 0; });
+    if (!mine.length) mine = items;
+    var box = $("mx-delivery");
+    if (!mine.length) {
+      box.innerHTML = '<div class="mx-obj"><div class="mx-obj__label"><span>Campaign objective · <b>' + esc(o.label)
+        + '</b></span><span class="mx-obj__pct">No targets set yet</span></div></div>';
+      return;
+    }
+    var done = mine.reduce(function (s, i) { return s + Math.min(100, i.pct); }, 0) / mine.length;
+    var due = mine.reduce(function (s, i) { return s + Math.min(100, i.expected / i.goal * 100); }, 0) / mine.length;
+    var ratio = due ? done / due : 1, g = ratio >= 1 ? "good" : (ratio >= 0.7 ? "moderate" : "low");
+    box.innerHTML = '<div class="mx-obj"><div class="mx-obj__label"><span>Campaign objective · <b>' + esc(o.label) + "</b></span>"
+      + '<span class="mx-obj__pct"><b>' + Math.round(done) + "%</b> achieved " + sig(g, "Where it should be by today: " + Math.round(due) + "%") + "</span></div>"
+      + '<div class="mx-obj__track" role="img" aria-label="' + Math.round(done) + "% of the " + esc(o.label) + ' objective achieved; ' + Math.round(due) + '% expected by today">'
+      + '<i class="mx-obj__fill ' + g + '" style="width:' + done.toFixed(1) + '%"></i>'
+      + '<i class="mx-obj__due" style="left:' + due.toFixed(1) + '%"><span>today</span></i></div>'
+      + '<div class="mx-obj__parts">' + mine.map(function (i) {
+        return '<span><span class="mx-sw ' + i.grade + '"></span>' + KLABEL[i.key] + " <b>" + Math.round(i.pct) + "%</b></span>";
+      }).join("") + "</div></div>";
+  }
+
 
   function short(a, b) {
     // "6–10 Sept" when both days share a month, else "28 Sept – 3 Oct"

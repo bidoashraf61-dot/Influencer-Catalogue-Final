@@ -289,7 +289,7 @@ def report(campaign, internal=False):
            "history": db.content_history(cid), "clicks": clicks,
            "emv_set": bool(rates), "visibility": vis, "factors": f,
            "benchmarks": bm, "targets": targets, "progress": progress, "verdict": verdict,
-           "objective": {"key": objective, "label": OBJECTIVES[objective][0],
+           "objective": {"key": objective, "label": OBJECTIVES[objective][0], "kpis": OBJECTIVE_KPIS[objective],
                          "weights": dict(zip(("exposure", "engagement", "er", "clicks"), OBJECTIVES[objective][1]))},
            "updated_at": max([p["metrics_at"] or 0 for p in posts] + [0]) or None}
     if internal:

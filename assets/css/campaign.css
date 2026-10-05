@@ -407,3 +407,19 @@
 @media (max-width: 700px) { .mx-tab { font-size: 18px; padding: 10px 16px; min-height: 42px; } .mx-info { top: -.6em; } }
 @media print { .mx-tabs, .mx-info, .mx-pop, .mx-carousel__nav { display: none !important; } .mx-carousel__track { grid-auto-flow: row; grid-template-columns: repeat(5, 1fr); } }
 .mx-objective { display: inline-block; margin: -14px 0 28px; padding: 6px 14px; border-radius: var(--r-pill); background: var(--linen); font-size: 14px; font-weight: 600; }
+
+/* the campaign objective bar under the scoreline */
+.mx-obj__label { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 15px; color: var(--gray); margin-bottom: 10px; }
+.mx-obj__label b { color: var(--ink); }
+.mx-obj__pct { display: inline-flex; align-items: center; gap: 10px; }
+.mx-obj__pct b { font-family: var(--heading); font-weight: 400; font-size: 30px; line-height: 1; }
+.mx-obj__track { position: relative; height: 18px; border-radius: 999px; background: #ebe7e0; }
+.mx-obj__fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 999px; max-width: 100%; background: var(--go); }
+.mx-obj__fill.moderate { background: var(--amber); }
+.mx-obj__fill.low { background: var(--vivid-red); }
+.mx-obj__due { position: absolute; top: -6px; bottom: -6px; width: 3px; border-radius: 2px; background: var(--ink); }
+.mx-obj__due span { position: absolute; top: 26px; left: 50%; transform: translateX(-50%); font-size: 11px; font-style: normal; color: var(--gray); white-space: nowrap; }
+.mx-obj__parts { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 26px; font-size: 14px; color: var(--gray); }
+.mx-obj__parts > span { display: inline-flex; align-items: center; gap: 7px; }
+.mx-obj__parts b { color: var(--ink); }
+.mx-sw.good { background: var(--go); } .mx-sw.moderate { background: var(--amber); } .mx-sw.low { background: var(--vivid-red); }
