@@ -26,4 +26,9 @@ admin/.secret
 # so committing it to a public repository would make every link forgeable —
 # which is the entire point of signing them. Provisioned by deploy, never here.
 admin/.photo-secret
+
+# Country lookup for tracking-link clicks, built on the server from the DB-IP
+# Lite CSV (python3 admin/track.py --geo-build …). Large and regenerated.
+admin/geo.db
+admin/geo.db.tmp
 deploy/catalogue/secret.conf

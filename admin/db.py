@@ -9,6 +9,7 @@ so the shape of the data stays in one place.
 
 import calendar
 import json
+import re
 import secrets
 import sqlite3
 import time
@@ -183,6 +184,38 @@ CREATE TABLE IF NOT EXISTS campaign_creators (
   added_at    INTEGER NOT NULL,
   PRIMARY KEY (campaign_id, code)
 );
+
+-- One tracking link per creator per campaign: /go/<slug> counts the tap and
+-- sends the visitor on. A creator taken out of a campaign keeps the row (and
+-- its clicks) with active = 0, so history survives and the link stops.
+CREATE TABLE IF NOT EXISTS links (
+  slug        TEXT PRIMARY KEY,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  code        TEXT NOT NULL,             -- creators.code
+  destination TEXT,                      -- NULL = the campaign's destination
+  active      INTEGER NOT NULL DEFAULT 1,
+  created_at  INTEGER NOT NULL,
+  UNIQUE (campaign_id, code)
+);
+
+-- Every hit on a link. The visitor is a salted hash of IP + browser — never
+-- the IP itself. Bots and link previews are kept (bot = 1) but not counted.
+CREATE TABLE IF NOT EXISTS clicks (
+  id          INTEGER PRIMARY KEY,
+  slug        TEXT NOT NULL,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  code        TEXT NOT NULL,
+  at          INTEGER NOT NULL,
+  visitor     TEXT,
+  app         TEXT,
+  device      TEXT,
+  os          TEXT,
+  country     TEXT,
+  referrer    TEXT,
+  bot         INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS clicks_campaign ON clicks(campaign_id, at);
+CREATE INDEX IF NOT EXISTS clicks_slug     ON clicks(slug);
 """
 
 
@@ -322,6 +355,13 @@ def migrate(conn):
         # The creator's own rate to us, remembered so the next selection
         # starts from it. Internal, like rating: never sent to a client.
         conn.execute("ALTER TABLE creators ADD COLUMN cost INTEGER")
+
+    # Campaigns made before tracking links existed: give every creator in
+    # them a link now, so no campaign is left without.
+    for r in conn.execute("SELECT campaign_id, code FROM campaign_creators x WHERE NOT EXISTS "
+                          "(SELECT 1 FROM links l WHERE l.campaign_id = x.campaign_id "
+                          "AND l.code = x.code)").fetchall():
+        ensure_link(r["campaign_id"], r["code"], conn)
 
     seed_tiers(conn)
 
@@ -1472,6 +1512,7 @@ def add_campaign_creators(cid, codes, costs=None, conn=None):
             "INSERT OR IGNORE INTO campaign_creators (campaign_id,code,cost,sort,added_at) "
             "VALUES (?,?,?,?,?)", (cid, code, costs.get(code), start + i, now()))
         added += cur.rowcount
+        ensure_link(cid, code, conn)
     if added:
         conn.execute("UPDATE campaigns SET updated_at = ? WHERE id = ?", (now(), cid))
     return added
@@ -1487,7 +1528,129 @@ def save_campaign_creators(cid, costs, remove=()):
         for code in remove:
             conn.execute("DELETE FROM campaign_creators WHERE campaign_id = ? AND code = ?",
                          (cid, code))
+            conn.execute("UPDATE links SET active = 0 WHERE campaign_id = ? AND code = ?",
+                         (cid, code))
         conn.execute("UPDATE campaigns SET updated_at = ? WHERE id = ?", (now(), cid))
+
+
+# ------------------------------------------------------------------ links --
+
+SLUG_RE = re.compile(r"^[a-z0-9](?:[a-z0-9-]{1,58}[a-z0-9])$")
+
+
+def slugify(text, limit=24):
+    """Latin letters and digits joined by dashes. Arabic and other scripts
+    drop out, which is why a slug always ends in the creator code."""
+    out = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
+    return out[:limit].strip("-")
+
+
+def campaign_slug(campaign):
+    """The campaign's part of every link and of utm_campaign: its name, else
+    'campaign-<id>' for a name with no Latin letters."""
+    return slugify(campaign["name"]) or "campaign-%d" % campaign["id"]
+
+
+def ensure_link(cid, code, conn):
+    """The creator's link in this campaign, made if missing and switched back
+    on if they were taken out and are now back. Returns the slug."""
+    row = conn.execute("SELECT slug FROM links WHERE campaign_id = ? AND code = ?",
+                       (cid, code)).fetchone()
+    if row:
+        conn.execute("UPDATE links SET active = 1 WHERE slug = ?", (row["slug"],))
+        return row["slug"]
+    k = conn.execute("SELECT id, name FROM campaigns WHERE id = ?", (cid,)).fetchone()
+    base = (campaign_slug(k) + "-" + slugify(code, 20)).strip("-")
+    slug, n = base, 2
+    while conn.execute("SELECT 1 FROM links WHERE slug = ?", (slug,)).fetchone():
+        slug, n = "%s-%d" % (base, n), n + 1
+    conn.execute("INSERT INTO links (slug,campaign_id,code,active,created_at) VALUES (?,?,?,1,?)",
+                 (slug, cid, code, now()))
+    return slug
+
+
+def link(slug):
+    """A link with what a redirect needs: its campaign's destination and name."""
+    with connect() as conn:
+        return conn.execute(
+            "SELECT l.*, k.name campaign_name, k.destination campaign_destination, k.status "
+            "FROM links l JOIN campaigns k ON k.id = l.campaign_id WHERE l.slug = ?",
+            (slug,)).fetchone()
+
+
+def campaign_links(cid):
+    """Every link in a campaign, active ones first, with its counted clicks."""
+    with connect() as conn:
+        return conn.execute(
+            "SELECT l.*, r.name creator_name, "
+            " (SELECT COUNT(*) FROM clicks c WHERE c.slug = l.slug AND c.bot = 0) clicks, "
+            " (SELECT COUNT(DISTINCT c.visitor || date(c.at, 'unixepoch')) FROM clicks c "
+            "   WHERE c.slug = l.slug AND c.bot = 0) uniques, "
+            " (SELECT COUNT(*) FROM clicks c WHERE c.slug = l.slug) hits "
+            "FROM links l LEFT JOIN creators r ON r.code = l.code "
+            "LEFT JOIN campaign_creators x ON x.campaign_id = l.campaign_id AND x.code = l.code "
+            "WHERE l.campaign_id = ? ORDER BY l.active DESC, x.sort, l.code", (cid,)).fetchall()
+
+
+def save_link(slug, destination, new_slug=None):
+    """Change where one link goes, and — only while nobody has clicked it yet —
+    its slug. Once a link has been clicked it is in someone's bio, and
+    renaming it would break it there. Returns an error message or None."""
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM links WHERE slug = ?", (slug,)).fetchone()
+        if row is None:
+            return "That link no longer exists."
+        if new_slug and new_slug != slug:
+            if not SLUG_RE.match(new_slug):
+                return ("A link name is 3–60 lowercase letters, digits and dashes, "
+                        "starting and ending with a letter or digit.")
+            if conn.execute("SELECT 1 FROM clicks WHERE slug = ? LIMIT 1", (slug,)).fetchone():
+                return ("This link has already been clicked — it is out in a bio or a story. "
+                        "Renaming it would break it there, so the name stays.")
+            if conn.execute("SELECT 1 FROM links WHERE slug = ?", (new_slug,)).fetchone():
+                return "That link name is already used. Choose another."
+            conn.execute("UPDATE links SET slug = ? WHERE slug = ?", (new_slug, slug))
+            slug = new_slug
+        conn.execute("UPDATE links SET destination = ? WHERE slug = ?", (destination or None, slug))
+    return None
+
+
+def record_click(link_row, at, visitor, app, device, os_, country, referrer, bot):
+    with connect() as conn:
+        conn.execute(
+            "INSERT INTO clicks (slug,campaign_id,code,at,visitor,app,device,os,country,"
+            "referrer,bot) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (link_row["slug"], link_row["campaign_id"], link_row["code"], at, visitor, app,
+             device, os_, country, (referrer or "")[:300], 1 if bot else 0))
+
+
+def click_stats(cid):
+    """Everything the clicks tab draws, counting people rather than robots.
+
+    Unique = one visitor (hashed device) per link per day, the way link
+    tools usually count it: the same person tapping three times in a minute
+    is one; coming back tomorrow is another."""
+    with connect() as conn:
+        base = "FROM clicks WHERE campaign_id = ? AND bot = 0"
+        tot = conn.execute(
+            "SELECT COUNT(*) n, COUNT(DISTINCT slug || visitor || date(at,'unixepoch')) u, "
+            "MIN(at) first, MAX(at) last " + base, (cid,)).fetchone()
+        bots = conn.execute("SELECT COUNT(*) FROM clicks WHERE campaign_id = ? AND bot = 1",
+                            (cid,)).fetchone()[0]
+
+        def group(col):
+            return [dict(r) for r in conn.execute(
+                "SELECT COALESCE(" + col + ", 'Unknown') k, COUNT(*) n " + base
+                + " GROUP BY 1 ORDER BY n DESC", (cid,))]
+
+        by_day = [dict(r) for r in conn.execute(
+            "SELECT date(at,'unixepoch') d, COUNT(*) n, "
+            "COUNT(DISTINCT slug || visitor) u " + base + " GROUP BY 1 ORDER BY 1", (cid,))]
+        return {"clicks": tot["n"], "uniques": tot["u"], "first": tot["first"],
+                "last": tot["last"], "bots": bots, "by_day": by_day,
+                "by_creator": group("code"), "by_app": group("app"),
+                "by_device": group("device"), "by_os": group("os"),
+                "by_country": group("country")}
 
 
 # ---------------------------------------------------------- notifications --

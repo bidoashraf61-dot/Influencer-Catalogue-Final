@@ -346,8 +346,52 @@ read-only report (later milestone). Full plan: `docs/CAMPAIGN-TRACKER-BRIEF.md`.
 - Two people saving the same campaign: the later save is refused with a
   "reload" message instead of silently overwriting the first.
 
-The tables (`campaigns`, `campaign_creators`) are created on the next start of
-the service; existing data is untouched.
+### Tracking links
+
+Every creator in a campaign gets a link the moment they are added:
+`https://<catalogue domain>/go/<campaign>-<creator code>`. They put it in a
+bio, story link sticker or video description. A tap is recorded and the
+visitor is sent (302, never cached) to the campaign's destination — or the
+link's own — with `utm_source` (the app), `utm_medium=influencer`,
+`utm_campaign` and `utm_content` (creator code) added. UTM tags already on the
+destination are kept, never overwritten.
+
+- **Recorded per tap:** time, app (Instagram / TikTok / Snapchat / Facebook /
+  X from the in-app browser; YouTube and others from the referrer), device,
+  OS, country, referrer, and a salted hash of IP + browser. The IP itself is
+  never stored.
+- **Counted:** people. Link previews (WhatsApp, Facebook, Slack…), crawlers
+  and HEAD requests are kept with `bot = 1` but excluded. **Unique** = one
+  device per link per day.
+- A link's name can change only until its first click — after that it is out
+  in a bio, and renaming would break it there.
+- Taking a creator out switches their link off (visitors see "This link is not
+  active"); adding them back switches the same link on. Deleting a campaign
+  deletes its links and clicks.
+- *Tracking links & clicks* tab: totals, links with copy buttons, clicks per
+  day, by creator, app, country, device; full CSV of every tap.
+
+**Server setup (once):**
+
+1. nginx — the links live at the catalogue's root, not under `/admin`:
+
+   ```nginx
+   location /go/ { proxy_pass http://127.0.0.1:8900; include /etc/nginx/hv-proxy.conf; }
+   ```
+
+2. Country lookup (optional; without it countries read "Unknown"). Download
+   the free *IP to Country Lite* CSV from db-ip.com (CC BY 4.0 — the clicks
+   page credits DB-IP) and build the lookup table beside the service:
+
+   ```bash
+   python3 admin/track.py --geo-build dbip-country-lite-YYYY-MM.csv.gz
+   ```
+
+   Rebuild monthly if you like; `admin/geo.db` is git-ignored. Behind
+   Cloudflare, its `CF-IPCountry` header is used instead and no file is needed.
+
+The tables (`campaigns`, `campaign_creators`, `links`, `clicks`) are created
+on the next start of the service; existing data is untouched.
 
 ## 6. Security notes, honestly
 

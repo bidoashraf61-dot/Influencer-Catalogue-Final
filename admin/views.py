@@ -105,6 +105,16 @@ border-radius:8px;background:var(--white);color:var(--ink)}
 textarea{min-height:64px;resize:vertical}
 input:focus,select:focus,textarea:focus{outline:2px solid var(--ink);outline-offset:-1px}
 .rules{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tabs{display:flex;gap:6px;margin:4px 0 20px;border-bottom:1px solid var(--line)}
+.tabs a{padding:9px 14px;text-decoration:none;color:var(--gray);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs a.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:18px}
+.kpis div{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.kpis b{display:block;font-size:26px;line-height:1.1}
+.kpis span{font-size:12px;color:var(--gray);text-transform:uppercase;letter-spacing:.06em}
+.split{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.linkrow input[readonly]{background:#f6f5f2}
+.linkrow form{display:grid;gap:8px;grid-template-columns:1fr 1fr auto;align-items:end}
 .row{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px}
 .btn{display:inline-block;font:inherit;font-weight:600;padding:10px 20px;border-radius:999px;
 border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;text-decoration:none}
@@ -2102,7 +2112,8 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
 
     body = (
         "<p><a href='" + u("/campaigns") + "'>&larr; All campaigns</a></p>"
-        + "<h1>" + e(k["name"]) + " " + status_pill(k["status"]) + "</h1>" + from_sel + note
+        + "<h1>" + e(k["name"]) + " " + status_pill(k["status"]) + "</h1>" + from_sel
+        + campaign_tabs(k, "setup") + note
         + "<form method='post' action='" + u("/campaigns/save") + "' enctype='multipart/form-data'>"
         + "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
         + "<input type='hidden' name='updated_at' value='" + str(k["updated_at"]) + "'>"
@@ -2152,3 +2163,110 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
           "<button class='btn small danger'>Delete campaign</button></form>"
     )
     return page(k["name"] + " — Campaign", body, "/campaigns")
+
+
+def campaign_tabs(k, on):
+    tabs = [("setup", "/campaigns/edit", "Setup"), ("links", "/campaigns/links", "Tracking links &amp; clicks")]
+    return ("<nav class='tabs'>" + "".join(
+        "<a href='" + u(href) + "?id=" + str(k["id"]) + "'" + (" class='on'" if key == on else "")
+        + ">" + label + "</a>" for key, href, label in tabs) + "</nav>")
+
+
+def link_gone():
+    """What a visitor sees on a link that is off: plain, branded, no admin
+    chrome and nothing about the campaign."""
+    return (HEAD + "<title>Link not active</title><style>body{font-family:system-ui,sans-serif;"
+            "background:#f7f5f0;color:#121212;display:grid;place-items:center;min-height:100vh;margin:0}"
+            "main{max-width:420px;padding:24px;text-align:center}h1{font-size:22px}"
+            "p{color:#6b6b6b}</style></head><body><main><h1>This link is not active</h1>"
+            "<p>The page it pointed to is no longer available through this link.</p>"
+            "</main></body></html>")
+
+
+def _bars(rows, label=lambda r: r["k"], limit=12):
+    if not rows:
+        return "<p class='empty muted'>No clicks yet.</p>"
+    peak = max(r["n"] for r in rows)
+    return "".join(hbar(label(r), r["n"], peak) for r in rows[:limit])
+
+
+def clicks_chart(by_day):
+    """Clicks and unique visitors per day, drawn with the same SVG chart as
+    the Analytics page so the two read alike."""
+    if not by_day:
+        return "<p class='empty muted'>No clicks yet.</p>"
+    return activity_chart([{"d": d["d"], "opens": d["n"], "shortlists": d["u"], "requests": 0}
+                           for d in by_day]).replace(
+        "Opens and shortlists per day", "Clicks and unique visitors per day").replace(
+        " opens</title>", " clicks</title>").replace(" shortlists</title>", " unique</title>") + (
+        "<p class='muted' style='font-size:13px'><span style='color:#121212'>&#9632;</span> clicks &nbsp; "
+        "<span style='color:#b9d400'>&#9632;</span> unique visitors</p>")
+
+
+def campaign_links_page(k, rows, st, origin, has_geo, error=None, message=None):
+    note = ""
+    if error:
+        note += "<div class='err'>" + e(error) + "</div>"
+    if message:
+        note += "<div class='ok'>" + e(message) + "</div>"
+    if not k["destination"]:
+        note += ("<div class='err'>This campaign has no destination yet, so its links lead nowhere. "
+                 "Set <em>Where tracking links send people</em> on the <a href='" + u("/campaigns/edit")
+                 + "?id=" + str(k["id"]) + "'>Setup</a> tab, or give a link its own below.</div>")
+    names = {r["code"]: (r["creator_name"] or r["code"]) for r in rows}
+
+    items = []
+    for r in rows:
+        url = origin + "/go/" + r["slug"]
+        dest = r["destination"] or ""
+        locked = r["hits"] > 0
+        items.append(
+            "<tr class='linkrow'><td><code>" + e(r["code"]) + "</code><br>" + e(names[r["code"]])
+            + ("" if r["active"] else " <span class='pill dead'>off — taken out</span>") + "</td>"
+            + "<td><div class='sel-link'><input value='" + e(url) + "' readonly>"
+            + "<button type='button' class='btn small' onclick=\"var i=this.previousSibling;i.select();"
+              "navigator.clipboard&&navigator.clipboard.writeText(i.value);this.textContent='Copied'\">Copy</button></div>"
+            + "<details><summary class='muted'>Change</summary>"
+            + "<form method='post' action='" + u("/campaigns/link") + "'>"
+            + "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
+            + "<input type='hidden' name='slug' value='" + e(r["slug"]) + "'>"
+            + "<div><label>Link name</label><input name='new_slug' value='" + e(r["slug"]) + "'"
+            + (" readonly title='Already clicked — renaming would break it where it is posted'" if locked else "")
+            + "></div><div><label>Send this creator's visitors to</label><input name='destination' "
+              "type='url' value='" + e(dest) + "' placeholder='campaign default'></div>"
+            + "<div><button class='btn small'>Save</button></div></form></details></td>"
+            + "<td class='right'><strong>" + str(r["clicks"]) + "</strong></td>"
+            + "<td class='right'>" + str(r["uniques"]) + "</td></tr>")
+    table = "".join(items) or ("<tr><td colspan='4' class='muted'>No creators in this campaign yet — "
+                               "add them on the Setup tab and each gets a link here.</td></tr>")
+    body = (
+        "<p><a href='" + u("/campaigns") + "'>&larr; All campaigns</a></p>"
+        + "<h1>" + e(k["name"]) + " " + status_pill(k["status"]) + "</h1>"
+        + campaign_tabs(k, "links") + note
+        + "<div class='kpis'>"
+        + "<div><span>Clicks</span><b>" + format(st["clicks"], ",") + "</b></div>"
+        + "<div><span>Unique visitors</span><b>" + format(st["uniques"], ",") + "</b></div>"
+        + "<div><span>Creators with clicks</span><b>" + str(len(st["by_creator"])) + "</b></div>"
+        + "<div><span>Last click</span><b style='font-size:16px'>" + (ago(st["last"]) if st["last"] else "—") + "</b></div>"
+        + "</div>"
+        + "<h2>Links</h2><div class='card'><p class='price-hint'>Each creator puts their own link in "
+          "their bio, story link sticker or video description. A tap is counted, then the visitor is "
+          "sent on with UTM tags (utm_source = the app, utm_campaign, utm_content = creator code) so the "
+          "client's own analytics sees the same visitors. A link's name is fixed once it has been clicked.</p>"
+        + "<table><thead><tr><th>Creator</th><th>Tracking link</th><th class='right'>Clicks</th>"
+          "<th class='right'>Unique</th></tr></thead><tbody>" + table + "</tbody></table></div>"
+        + "<h2>Clicks over time</h2><div class='card'>" + clicks_chart(st["by_day"]) + "</div>"
+        + "<div class='split'>"
+        + "<div><h2>By creator</h2><div class='card'>" + _bars(st["by_creator"], lambda r: names.get(r["k"], r["k"])) + "</div></div>"
+        + "<div><h2>By app</h2><div class='card'>" + _bars(st["by_app"]) + "</div></div>"
+        + "<div><h2>By country</h2><div class='card'>" + _bars(st["by_country"])
+        + ("" if has_geo else "<p class='price-hint'>Country lookup is not installed on this server yet "
+           "(see docs/ADMIN.md §5b), so countries read Unknown.</p>")
+        + "<p class='price-hint'>IP geolocation by <a href='https://db-ip.com' target='_blank' rel='noopener'>DB-IP</a>.</p></div></div>"
+        + "<div><h2>By device</h2><div class='card'>" + _bars(st["by_device"]) + (_bars(st["by_os"]) if st["by_os"] else "") + "</div></div>"
+        + "</div>"
+        + "<p class='muted' style='margin-top:18px'>Unique = one device per link per day. Link previews and "
+          "bots are recorded but not counted (" + str(st["bots"]) + " so far). "
+          "<a href='" + u("/campaigns/clicks.csv") + "?id=" + str(k["id"]) + "'>Download every click (CSV)</a></p>"
+    )
+    return page(k["name"] + " — Links", body, "/campaigns")

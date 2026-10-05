@@ -13,6 +13,7 @@ Routes
   /analytics            who opened what, when
   /roster               add, edit, deactivate creators
   /requests             quote requests as an inbox
+  /go/<slug>            public tracking link: counts the tap, redirects
   /campaigns            booked creators, dates and detection rules per client
   /api/unlock           POST {code}   -> sets a viewer cookie, returns roster
   /api/roster           GET           -> roster, viewer cookie required
@@ -44,10 +45,14 @@ import auth  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
 import links  # noqa: E402
+import track  # noqa: E402
 import uploads  # noqa: E402
 import views  # noqa: E402
 
 SECRET = auth.load_secret(HERE / ".secret")
+# Salt for the visitor hash on tracking-link clicks: derived from the server
+# secret so it is stable across restarts, but not the secret itself.
+CLICK_SALT = __import__("hashlib").sha256(b"clicks|" + SECRET).hexdigest()
 # Photos live with the built site so the catalogue and the dashboard share one
 # copy — uploading here updates what a client sees.
 PHOTO_DIR = HERE.parent / "site" / "assets" / "catalogue"
@@ -231,6 +236,8 @@ class Handler(BaseHTTPRequestHandler):
         path = self.route(urllib.parse.urlparse(self.path).path)
         query = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query))
 
+        if path.startswith("/go/"):
+            return self.go(path[len("/go/"):])
         if path == "/api/roster":
             return self.api_roster()
         if path == "/api/selection":
@@ -371,6 +378,22 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
                 db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok")))
+        if path == "/campaigns/links":
+            cid = query.get("id", "")
+            k = db.campaign(int(cid)) if cid.isdigit() else None
+            if k is None:
+                return self.redirect("/campaigns?e=" + urllib.parse.quote("That campaign no longer exists."))
+            return self.send(200, views.campaign_links_page(
+                k, db.campaign_links(k["id"]), db.click_stats(k["id"]), self.site_origin(),
+                track.GEO_DB.exists(), query.get("e"), query.get("ok")))
+        if path == "/campaigns/clicks.csv":
+            cid = query.get("id", "")
+            k = db.campaign(int(cid)) if cid.isdigit() else None
+            if k is None:
+                return self.send(404, b"", "text/plain")
+            return self.send(200, self.clicks_csv(k["id"]), "text/csv; charset=utf-8",
+                             [("Content-Disposition", 'attachment; filename="clicks-%s.csv"'
+                               % db.campaign_slug(k))])
         if path == "/campaigns/edit":
             cid = query.get("id", "")
             k = db.campaign(int(cid)) if cid.isdigit() else None
@@ -381,6 +404,42 @@ class Handler(BaseHTTPRequestHandler):
                 k, db.campaign_creators(k["id"]), db.list_codes(), db.rules_of(k), sel,
                 query.get("e"), query.get("ok")))
         return self.send(404, views.simple("Not found", "That page does not exist."))
+
+    def do_HEAD(self):
+        """Link-preview fetchers often ask with HEAD. Only tracking links
+        answer it — logged as a preview, never counted as a click."""
+        path = self.route(urllib.parse.urlparse(self.path).path)
+        if path.startswith("/go/"):
+            return self.go(path[len("/go/"):])
+        return self.send(405, b"", "text/plain")
+
+    def go(self, slug):
+        """A tracking link: record the tap, send the visitor on.
+
+        302 with no-store, so a second tap is a second request we see rather
+        than a redirect the browser remembered. A link that is switched off, or
+        whose campaign has nowhere to send people yet, says so plainly instead
+        of throwing the visitor at an error page."""
+        row = db.link(slug.strip("/").lower()) if slug else None
+        dest = (row["destination"] or row["campaign_destination"]) if row else None
+        if row is None or not row["active"] or not dest:
+            return self.send(404, views.link_gone(), headers=[("Cache-Control", "no-store")])
+        ua = self.headers.get("User-Agent", "")
+        ref = self.headers.get("Referer", "")
+        app = track.app_of(ua, ref)
+        device, os_ = track.device_of(ua)
+        bot = track.is_bot(ua, self.command)
+        ip = self.client_ip()
+        try:
+            db.record_click(row, db.now(), track.visitor(ip, ua, CLICK_SALT), app, device, os_,
+                            track.country_of(ip, self.headers.get("CF-IPCountry")), ref, bot)
+        except Exception as ex:   # a failed log must never cost the visitor the redirect
+            sys.stderr.write("click not recorded: %r\n" % ex)
+        k = {"id": row["campaign_id"], "name": row["campaign_name"]}
+        to = track.with_utm(dest, db.campaign_slug(k), row["code"], app)
+        return self.send(302, b"", "text/plain",
+                         [("Location", to), ("Cache-Control", "no-store"),
+                          ("Referrer-Policy", "no-referrer"), ("X-Robots-Tag", "noindex")])
 
     def do_POST(self):
         path = self.route(urllib.parse.urlparse(self.path).path)
@@ -422,6 +481,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_campaign_save()
         if path == "/campaigns/delete":
             return self.post_campaign_delete()
+        if path == "/campaigns/link":
+            return self.post_campaign_link()
         if path == "/roster/delete":
             return self.post_roster_delete()
         if path == "/roster/import":
@@ -1194,6 +1255,35 @@ class Handler(BaseHTTPRequestHandler):
         if unknown:
             return fail("Saved, but these codes are not in the roster: " + ", ".join(unknown))
         return self.redirect(back + "&ok=" + urllib.parse.quote("Saved."))
+
+    def post_campaign_link(self):
+        """One link's destination override, and its name while unclicked."""
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        back = "/campaigns/links?id=" + cid
+        slug = (f.get("slug") or "").strip()
+        dest = (f.get("destination") or "").strip()
+        if dest and not re.match(r"^https?://[^\s/]+\.[^\s]+$", dest):
+            return self.redirect(back + "&e=" + urllib.parse.quote(
+                "The destination must be a full web address starting with https://"))
+        problem = db.save_link(slug, dest, (f.get("new_slug") or "").strip().lower() or None)
+        if problem:
+            return self.redirect(back + "&e=" + urllib.parse.quote(problem))
+        return self.redirect(back + "&ok=" + urllib.parse.quote("Link saved."))
+
+    def clicks_csv(self, cid):
+        import csv, io
+        out = io.StringIO()
+        w = csv.writer(out)
+        w.writerow(["time (UTC)", "link", "creator", "app", "device", "os", "country",
+                    "referrer", "counted"])
+        with db.connect() as conn:
+            for r in conn.execute("SELECT * FROM clicks WHERE campaign_id = ? ORDER BY at",
+                                  (cid,)):
+                w.writerow([ts(r["at"]), r["slug"], r["code"], r["app"], r["device"], r["os"],
+                            r["country"] or "", r["referrer"] or "",
+                            "no (bot/preview)" if r["bot"] else "yes"])
+        return "\ufeff" + out.getvalue()      # BOM: Excel reads it as UTF-8
 
     def post_campaign_delete(self):
         cid = (self.form_body().get("id") or "").strip()
