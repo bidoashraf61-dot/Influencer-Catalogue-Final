@@ -70,7 +70,65 @@ typography:
     fontWeight: 400
     lineHeight: 1
     letterSpacing: "0.06em"
+  # Campaign dashboard (campaign/dashboard/): a fixed one-screen board, so it
+  # runs a compact ramp instead of the fluid page scale above.
+  dash-micro:
+    fontFamily: "\"DM Sans\", Arial, sans-serif"
+    fontSize: "10px"
+    fontWeight: 500
+    lineHeight: 1.3
+  dash-caption:
+    fontFamily: "\"DM Sans\", Arial, sans-serif"
+    fontSize: "11px"
+    fontWeight: 400
+    lineHeight: 1.4
+  dash-small:
+    fontFamily: "\"DM Sans\", Arial, sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: 1.45
+  dash-body:
+    fontFamily: "\"DM Sans\", Arial, sans-serif"
+    fontSize: "13px"
+    fontWeight: 400
+    lineHeight: 1.45
+  dash-strong:
+    fontFamily: "\"DM Sans\", Arial, sans-serif"
+    fontSize: "14px"
+    fontWeight: 600
+    lineHeight: 1.35
+  dash-figure-sm:
+    fontFamily: "Bebasneue, Arial, sans-serif"
+    fontSize: "18px"
+    fontWeight: 400
+    lineHeight: 1
+  dash-figure:
+    fontFamily: "Bebasneue, Arial, sans-serif"
+    fontSize: "20px"
+    fontWeight: 400
+    lineHeight: 1
+  dash-figure-md:
+    fontFamily: "Bebasneue, Arial, sans-serif"
+    fontSize: "24px"
+    fontWeight: 400
+    lineHeight: 1
+  dash-figure-lg:
+    fontFamily: "Bebasneue, Arial, sans-serif"
+    fontSize: "28px"
+    fontWeight: 400
+    lineHeight: 1
+  dash-kpi:
+    fontFamily: "Bebasneue, Arial, sans-serif"
+    fontSize: "40px"
+    fontWeight: 400
+    lineHeight: 1
+  dash-title:
+    fontFamily: "Bebasneue, Arial, sans-serif"
+    fontSize: "34px"
+    fontWeight: 400
+    lineHeight: 1
 rounded:
+  tick: "3px"      # dashboard step ticks and bar tracks
   bar: "6px"
   track: "8px"
   sm: "12px"
