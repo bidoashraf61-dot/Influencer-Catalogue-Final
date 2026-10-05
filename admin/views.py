@@ -139,6 +139,7 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--ink);outline-off
 .savebar{position:sticky;bottom:0;background:rgba(247,245,240,.95);padding:14px 0;display:flex;gap:10px;border-top:1px solid var(--line);margin-top:20px}
 .steps-table input,.steps-table select{padding:7px 9px;font-size:14px}
 .steps-table td{padding:6px 8px}
+.rec-lead td{font-weight:600}
 .chain{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
 .chain .arrow{color:var(--gray)}
 @media (max-width:820px){.grid2{grid-template-columns:1fr}}
@@ -2238,6 +2239,8 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         + step(5, "Objective &amp; targets",
                "<div class='row'><div style='flex:3'><label>Campaign objective — decides how the leaderboard scores creators</label>"
                "<select name='objective'>" + obj_opts + "</select></div></div>"
+               + recommend_card(metrics.recommend_targets(k))
+               + "<label style='margin-top:16px'>Targets the client sees</label>"
                "<div class='row'>" + tgt("posts", "Posts", "e.g. 24") + tgt("views", "Views", "e.g. 500000")
                + tgt("reach", "Reach", "e.g. 300000") + tgt("engagement", "Engagement", "e.g. 20000")
                + tgt("er", "Avg ER %", "e.g. 3") + tgt("clicks", "Affiliate clicks", "e.g. 1500") + "</div>",
@@ -2878,3 +2881,35 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
         + (rows or "<tr><td colspan='4' class='muted'>No creators match.</td></tr>") + "</tbody></table>"
         + ("<p class='muted'>Showing the first 200 — search to narrow.</p>" if len(shown) > 200 else "") + "</div>")
     return page("Creator analysis", body, "/analysis")
+
+
+def recommend_card(rec):
+    """Recommended targets for this campaign: a safe figure to promise the
+    client and a stretch figure to aim for, with one click to use them."""
+    if not rec["safe"]:
+        return "<p class='price-hint'>" + e(" ".join(rec["notes"])) + "</p>"
+    label = {"posts": "Posts", "views": "Views", "reach": "Reach", "engagement": "Engagement",
+             "er": "Avg ER %", "clicks": "Affiliate clicks"}
+    rows = ""
+    for key in ["posts", "views", "reach", "engagement", "er", "clicks"]:
+        if key not in rec["safe"] or rec["safe"][key] is None:
+            continue
+        lead = key in rec.get("primary", [])
+        fmt_ = (lambda v: "%g%%" % v) if key == "er" else (lambda v: format(v, ","))
+        rows += ("<tr" + (" class='rec-lead'" if lead else "") + "><td>" + label[key]
+                 + (" <span class='pill live'>headline for " + e(rec["objective"]) + "</span>" if lead else "")
+                 + "</td><td class='right'><strong>" + fmt_(rec["safe"][key]) + "</strong></td><td class='right muted'>"
+                 + fmt_(rec["stretch"][key]) + "</td></tr>")
+    data = json.dumps({k: v for k, v in rec["safe"].items() if v is not None})
+    return ("<div class='rec card' style='background:#f7f5f0;margin:14px 0 6px'>"
+            "<div style='display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:baseline'>"
+            "<strong>Recommended targets</strong><button type='button' class='btn small' "
+            "onclick='hvUseSafe(this)' data-safe='" + e(data) + "'>Use safe targets</button></div>"
+            "<table style='margin-top:10px'><thead><tr><th>Target</th><th class='right'>Safe — promise this</th>"
+            "<th class='right'>Stretch — aim for this</th></tr></thead><tbody>" + rows + "</tbody></table>"
+            "<p class='price-hint'>Built from each creator's posts planned: safe uses the fair benchmark for their size "
+            "(or 80% of their own averages when their full analysis is uploaded), stretch the strong benchmark (or 100%). "
+            "Promise the safe figure; it leaves a margin. " + e(" ".join(rec["notes"])) + "</p>"
+            "<script>function hvUseSafe(b){var d=JSON.parse(b.getAttribute('data-safe'));"
+            "Object.keys(d).forEach(function(k){var i=document.querySelector('[name=target_'+k+']');if(i)i.value=d[k];});"
+            "b.textContent='Filled — save to keep';}</script></div>")

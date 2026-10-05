@@ -322,6 +322,77 @@ OBJECTIVES = {
 }
 
 
+# Which targets each objective puts in front of the client.
+OBJECTIVE_KPIS = {"balanced": ["views", "engagement", "er"], "awareness": ["views", "reach"],
+                  "engagement": ["engagement", "er"], "traffic": ["clicks", "views"]}
+SAFE_SHARE = 0.8      # of a creator's own averages, when their analysis is on file
+
+
+def recommend_targets(campaign):
+    """Targets to agree with the client, built creator by creator from what
+    is booked (posts planned) and what each creator usually delivers.
+
+    safe    = what to promise: the "fair" benchmark for the creator's size,
+              or 80% of their own averages when their full analysis is on file
+    stretch = what to aim for: the "strong" benchmark, or 100% of averages
+
+    Each planned post is counted as one video (reel / TikTok), the usual
+    deliverable; reach for a video is its views. Clicks only when the
+    campaign has an affiliate destination."""
+    bm = benchmarks()
+    members = db.campaign_creators(campaign["id"])
+    out = {"safe": {}, "stretch": {}, "notes": [], "basis": []}
+    tot = {"safe": {"views": 0, "engagement": 0, "followers": 0}, "stretch": {"views": 0, "engagement": 0, "followers": 0}}
+    posts = 0
+    unplanned, measured = 0, 0
+    for m in members:
+        n = m["planned"] or 0
+        if not n:
+            unplanned += 1
+            n = 1
+        posts += n
+        a = (db.analysis(m["cc_code"]) or {}).get("data") or {}
+        # The analysis's own follower count when it has one, so averages
+        # and the audience they came from describe the same account.
+        f = a.get("followers") or m["followers"] or 0
+        band = band_of(f)
+        avg_views = a.get("avg_reel_plays") or a.get("avg_views")
+        avg_eng = (a.get("avg_likes") or 0) + (a.get("avg_comments") or 0)
+        if avg_views or avg_eng:
+            measured += 1
+        for kind, share, er_i, vr_i in (("safe", SAFE_SHARE, 1, 1), ("stretch", 1.0, 0, 0)):
+            v = avg_views * share if avg_views else f * bm["view_rate"][vr_i] / 100.0
+            e_ = avg_eng * share if avg_eng else f * bm["er"][band][er_i] / 100.0
+            tot[kind]["views"] += v * n
+            tot[kind]["engagement"] += e_ * n
+            tot[kind]["followers"] += f * n
+        out["basis"].append({"code": m["cc_code"], "name": m["name"] or m["cc_code"], "planned": m["planned"],
+                             "source": "own averages" if (avg_views or avg_eng) else BAND_LABEL[band] + " benchmark"})
+    if not members:
+        out["notes"].append("Add creators first — targets are built from them.")
+        return out
+    for kind, ctr_i in (("safe", 1), ("stretch", 0)):
+        t = tot[kind]
+        o = out[kind]
+        o["posts"] = posts
+        o["views"] = int(round(t["views"], -2))
+        o["reach"] = int(round(t["views"] * 0.85, -2))     # unique people, below total views
+        o["engagement"] = int(round(t["engagement"], -1))
+        o["er"] = round(t["engagement"] / t["followers"] * 100, 1) if t["followers"] else None
+        if campaign["destination"]:
+            o["clicks"] = int(round(t["views"] * bm["ctr"][ctr_i] / 100.0))
+    if unplanned:
+        out["notes"].append("%d creator(s) have no posts planned yet — counted as 1 post each." % unplanned)
+    out["notes"].append("%d of %d creators use their own averages (full analysis on file); the rest use benchmarks."
+                        % (measured, len(members)))
+    if not campaign["destination"]:
+        out["notes"].append("No affiliate destination, so no click target.")
+    key = objective_of(campaign)
+    out["objective"] = OBJECTIVES[key][0]
+    out["primary"] = [k for k in OBJECTIVE_KPIS[key] if k in out["safe"]]
+    return out
+
+
 def objective_of(campaign):
     key = campaign["objective"] if "objective" in campaign.keys() else None
     return key if key in OBJECTIVES else "balanced"
