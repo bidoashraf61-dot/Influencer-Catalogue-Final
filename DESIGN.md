@@ -251,7 +251,7 @@ A high-contrast ink-and-paper palette with one acid accent, a scoped verdict tri
 - **Vivid Red** (vivid-red): focus rings (3px outline, 2px offset) on light surfaces, the LIVE dot, the gantt "today" line, error text, and the Low verdict. A "now / attention" signal, never decoration.
 
 ### Tertiary (verdict set)
-- **Go Green** (go-green) with its soft tint (go-green-soft): Strong verdicts, completed stages, completed gantt bars and delivered slots, the submitted-state panel. It is a verdict colour only; report data uses ink and lime (see The Seen / Did Rule).
+- **Go Green** (go-green) with its soft tint (go-green-soft): Strong verdicts, completed stages, completed gantt bars and delivered slots, the submitted-state panel. By client decision it is also the first categorical data colour in the report (see The Colour-Variation Rule): podium scores, table score bars, affiliate click figures, the "Views so far" line, likes, the first bar in every panel.
 - **Amber** (amber) with soft tint and darkened text tone (amber-soft, amber-text): Fair / moderate verdicts only. Distinct from vivid orange on purpose.
 - **Signal Red tints** (red-soft, red-text): Low verdicts on light surfaces.
 - Signal pills now sit only on light surfaces; there are no on-ink variants in use.
@@ -272,7 +272,7 @@ A high-contrast ink-and-paper palette with one acid accent, a scoped verdict tri
 ### Named Rules
 **The Verdict Hues Rule.** Amber and red appear in data only as verdicts: signal pills, verdict pills, bullet-bar fills. Green is a verdict too, and also the first data colour by client decision; where it must read as a judgement it carries a label (the signal pill's word, the verdict caption).
 
-**The Seen / Engaged / Clicked Rule.** Report data has three fixed meanings, on white, stated in a key at the top of "How it grew": black (ink) = people who saw it (views, reach, the "Views so far" line, platform and creator-size bars, score bars); lime = people who engaged (likes, comments, saves, shares; lime-dark #a4bf00/#c3dd2c for lines and bars on white); orange = people who clicked through (every affiliate tile and bar). Tiles: seen = ink plate with white mark on warm grey; engaged = lime plate with ink mark on pale lime; clicked = orange plate with white mark on pale orange; plain counts = outlined ink. Green, amber and red are verdicts only. All sections are white (the client tried, then dropped, black sections). Chosen by the client, Oct 2026.
+**The Colour-Variation Rule.** The client asked for colour variation instead of uniform ink bars, so report data is never drawn in ink: series and bars use the categorical palette in its fixed order (green, orange, lime-dark, warm grey), and the same metric keeps the same colour everywhere (views and likes green, engagement and comments orange, saves lime-dark, shares warm grey).
 
 **The One Acid Rule.** Lime marks the action, the current selection or the winner. It is a fill for those roles, not a data series; the data set uses lime-dark.
 
