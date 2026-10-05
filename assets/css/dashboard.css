@@ -293,3 +293,8 @@
     "top top top top stg stg stg pst pst pst pst pst"
     "trd trd trd mix mix geo geo geo plt plt plt plt"; }
 .db-grid.no-clicks .db-clicks { display: none; }
+
+/* creator names lead to their full analysis */
+.db-name { color: inherit; text-decoration: none; background-image: linear-gradient(currentColor, currentColor); background-size: 0 1px; background-position: 0 100%; background-repeat: no-repeat; transition: background-size .2s ease; }
+.db-name:hover { background-size: 100% 1px; }
+.db-name:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; border-radius: 3px; }
