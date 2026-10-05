@@ -149,6 +149,40 @@ CREATE TABLE IF NOT EXISTS sessions (
   created_at INTEGER NOT NULL,
   expires_at INTEGER NOT NULL
 );
+
+-- A campaign: creators booked for one client over a set of dates, with the
+-- rules that decide which of their posts count. Built and run from the
+-- dashboard only; the client sees a read-only report of it. Cost is internal.
+CREATE TABLE IF NOT EXISTS campaigns (
+  id           INTEGER PRIMARY KEY,
+  token        TEXT NOT NULL UNIQUE,     -- names the client's report link
+  name         TEXT NOT NULL,
+  client       TEXT,                     -- the brand, as the report shows it
+  code_id      INTEGER REFERENCES codes(id) ON DELETE SET NULL,
+                                         -- the passcode that may view it
+  selection_id INTEGER REFERENCES selections(id) ON DELETE SET NULL,
+  platform     TEXT,                     -- one platform, or NULL for all
+  starts_at    INTEGER,                  -- UTC midnight of the first day
+  ends_at      INTEGER,                  -- last second of the last day
+  status       TEXT NOT NULL DEFAULT 'draft',  -- draft | live | ended
+  rules        TEXT,                     -- JSON {hashtags, mentions, keywords, disclosure}
+  destination  TEXT,                     -- where tracking links send people
+  cost         INTEGER,                  -- what the campaign costs us; internal
+  notes        TEXT,                     -- internal
+  created_at   INTEGER NOT NULL,
+  updated_at   INTEGER NOT NULL
+);
+
+-- Who is in a campaign. The creator's handles are read from the roster, so a
+-- corrected handle there is the one the campaign tracks.
+CREATE TABLE IF NOT EXISTS campaign_creators (
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  code        TEXT NOT NULL,             -- creators.code
+  cost        INTEGER,                   -- this creator's fee to us; internal
+  sort        INTEGER NOT NULL DEFAULT 0,
+  added_at    INTEGER NOT NULL,
+  PRIMARY KEY (campaign_id, code)
+);
 """
 
 
@@ -1312,6 +1346,148 @@ def delete_selection(sid):
 def request(rid):
     with connect() as conn:
         return conn.execute("SELECT * FROM requests WHERE id = ?", (rid,)).fetchone()
+
+
+# -------------------------------------------------------------- campaigns --
+
+CAMPAIGN_STATUSES = ["draft", "live", "ended"]
+RULE_KEYS = ["hashtags", "mentions", "keywords", "disclosure"]
+
+
+def parse_rules(text):
+    """Detection rules typed as one line each way people write them:
+    "#svr #suncare @svr_ksa sunscreen". A word starting with # is a hashtag,
+    with @ a mention, anything else a keyword. Returns the three lists,
+    lowercased and without duplicates, in the order typed."""
+    out = {"hashtags": [], "mentions": [], "keywords": []}
+    for word in (text or "").replace(",", " ").replace("،", " ").split():
+        if word.startswith("#") and len(word) > 1:
+            key, word = "hashtags", "#" + word[1:].lower()
+        elif word.startswith("@") and len(word) > 1:
+            key, word = "mentions", "@" + word[1:].lower()
+        else:
+            key, word = "keywords", word.lower()
+        if word not in out[key]:
+            out[key].append(word)
+    return out
+
+
+def rules_of(campaign):
+    try:
+        got = json.loads(campaign["rules"] or "{}")
+    except (TypeError, ValueError):
+        got = {}
+    return {k: [w for w in got.get(k) or [] if isinstance(w, str)] for k in RULE_KEYS}
+
+
+def list_campaigns():
+    with connect() as conn:
+        return conn.execute(
+            "SELECT k.*, c.label code_label, s.name selection_name, "
+            " (SELECT COUNT(*) FROM campaign_creators x WHERE x.campaign_id = k.id) creators "
+            "FROM campaigns k LEFT JOIN codes c ON c.id = k.code_id "
+            "LEFT JOIN selections s ON s.id = k.selection_id "
+            "ORDER BY k.updated_at DESC").fetchall()
+
+
+def campaign(cid=None, token=None):
+    with connect() as conn:
+        if token is not None:
+            return conn.execute("SELECT * FROM campaigns WHERE token = ?", (token,)).fetchone()
+        return conn.execute("SELECT * FROM campaigns WHERE id = ?", (cid,)).fetchone()
+
+
+def campaigns_for_selection(sid):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM campaigns WHERE selection_id = ? "
+                            "ORDER BY created_at DESC", (sid,)).fetchall()
+
+
+def create_campaign(name, client=None, code_id=None, selection_id=None, platform=None,
+                    codes=(), costs=None):
+    """A new draft campaign, optionally filled from a selection. Returns its id."""
+    costs = costs or {}
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO campaigns (token,name,client,code_id,selection_id,platform,status,"
+            "rules,created_at,updated_at) VALUES (?,?,?,?,?,?,'draft',?,?,?)",
+            (secrets.token_urlsafe(9), name, client, code_id, selection_id, platform,
+             json.dumps({k: [] for k in RULE_KEYS}), now(), now()))
+        cid = cur.lastrowid
+        add_campaign_creators(cid, codes, costs, conn)
+        return cid
+
+
+def save_campaign(cid, **fields):
+    """Update the given columns of one campaign. Unknown keys are refused so a
+    form cannot write a column it was never meant to."""
+    allowed = {"name", "client", "code_id", "platform", "starts_at", "ends_at", "status",
+               "rules", "destination", "cost", "notes"}
+    bad = set(fields) - allowed
+    if bad:
+        raise ValueError("not a campaign field: " + ", ".join(sorted(bad)))
+    if "rules" in fields and not isinstance(fields["rules"], str):
+        fields["rules"] = json.dumps(fields["rules"])
+    if fields.get("status") is not None and fields["status"] not in CAMPAIGN_STATUSES:
+        raise ValueError("unknown status")
+    if not fields:
+        return
+    cols = sorted(fields)
+    with connect() as conn:
+        conn.execute("UPDATE campaigns SET " + ", ".join(c + " = ?" for c in cols)
+                     + ", updated_at = ? WHERE id = ?",
+                     [fields[c] for c in cols] + [now(), cid])
+
+
+def delete_campaign(cid):
+    with connect() as conn:
+        conn.execute("DELETE FROM campaigns WHERE id = ?", (cid,))
+
+
+def campaign_creators(cid):
+    """The creators in a campaign, joined to the roster. A creator deleted
+    from the roster since is still listed (roster columns empty) so nobody
+    disappears from a running campaign without the admin seeing it."""
+    # cc_code is the campaign's own record of who it is; r.code is empty when
+    # the creator has since been deleted from the roster.
+    with connect() as conn:
+        return conn.execute(
+            "SELECT r.*, x.code cc_code, x.cost campaign_cost, x.sort cc_sort, x.added_at "
+            "FROM campaign_creators x LEFT JOIN creators r ON r.code = x.code "
+            "WHERE x.campaign_id = ? ORDER BY x.sort, x.added_at, x.code", (cid,)).fetchall()
+
+
+def add_campaign_creators(cid, codes, costs=None, conn=None):
+    """Add creators by code, keeping their order; ones already in are left as
+    they are. Returns how many were added."""
+    if conn is None:
+        with connect() as own:
+            return add_campaign_creators(cid, codes, costs, own)
+    costs = costs or {}
+    start = conn.execute("SELECT COALESCE(MAX(sort), -1) + 1 FROM campaign_creators "
+                         "WHERE campaign_id = ?", (cid,)).fetchone()[0]
+    added = 0
+    for i, code in enumerate(codes):
+        cur = conn.execute(
+            "INSERT OR IGNORE INTO campaign_creators (campaign_id,code,cost,sort,added_at) "
+            "VALUES (?,?,?,?,?)", (cid, code, costs.get(code), start + i, now()))
+        added += cur.rowcount
+    if added:
+        conn.execute("UPDATE campaigns SET updated_at = ? WHERE id = ?", (now(), cid))
+    return added
+
+
+def save_campaign_creators(cid, costs, remove=()):
+    """Set each creator's cost (None clears it) and take out the ones in
+    `remove`, in one transaction."""
+    with connect() as conn:
+        for code, cost in costs.items():
+            conn.execute("UPDATE campaign_creators SET cost = ? WHERE campaign_id = ? AND code = ?",
+                         (cost, cid, code))
+        for code in remove:
+            conn.execute("DELETE FROM campaign_creators WHERE campaign_id = ? AND code = ?",
+                         (cid, code))
+        conn.execute("UPDATE campaigns SET updated_at = ? WHERE id = ?", (now(), cid))
 
 
 # ---------------------------------------------------------- notifications --

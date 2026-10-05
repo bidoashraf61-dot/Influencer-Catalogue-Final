@@ -323,6 +323,32 @@ tells you how much happened and not whether any of it went anywhere.
 Charts are hand-drawn SVG. No charting library, no CDN, nothing to load — the
 same reason the rest of this service has no dependencies.
 
+## 5b. Campaigns
+
+Booked creators for one client, the dates they post in, and the rules that
+decide which posts count. Built and run here only — the client will see a
+read-only report (later milestone). Full plan: `docs/CAMPAIGN-TRACKER-BRIEF.md`.
+
+- **Start one** from a selection (Selections → open it → *Start campaign*):
+  its creators, passcode, platform and the costs it was priced from are
+  copied in. Or create a blank one on the Campaigns page. A selection can
+  start more than one campaign — a second wave is a new campaign.
+- **Status** is draft → live → ended. Only a live campaign is captured (every
+  24 hours), and it cannot go live without a first and last day.
+- **Rules** are typed as people write them: `#svr @svr_ksa sunscreen`.
+  `#` = hashtag, `@` = mention, anything else a keyword; case ignored.
+  *Required disclosure* (e.g. `#ad #إعلان`) flags campaign posts without it.
+- **Costs** — each creator's fee and the campaign total — are internal and
+  never reach the client. An empty total means the sum of the fees.
+- Handles are read from the roster, so fixing a handle there fixes it in every
+  campaign. A creator deleted from the roster stays listed, marked, rather
+  than vanishing from a running campaign.
+- Two people saving the same campaign: the later save is refused with a
+  "reload" message instead of silently overwriting the first.
+
+The tables (`campaigns`, `campaign_creators`) are created on the next start of
+the service; existing data is untouched.
+
 ## 6. Security notes, honestly
 
 - **Passwords** are PBKDF2-HMAC-SHA256, 240k iterations, per-user salt.

@@ -13,6 +13,7 @@ Routes
   /analytics            who opened what, when
   /roster               add, edit, deactivate creators
   /requests             quote requests as an inbox
+  /campaigns            booked creators, dates and detection rules per client
   /api/unlock           POST {code}   -> sets a viewer cookie, returns roster
   /api/roster           GET           -> roster, viewer cookie required
   /api/request          POST          -> store a quote request
@@ -366,6 +367,18 @@ class Handler(BaseHTTPRequestHandler):
                 return self.redirect("/selections?e=" + urllib.parse.quote("That selection no longer exists."))
             return self.send(200, views.selection_edit_page(
                 sel, db.list_creators(), db.tier_prices(), self.site_origin(),
+                query.get("e"), query.get("ok"), db.campaigns_for_selection(sel["id"])))
+        if path == "/campaigns":
+            return self.send(200, views.campaigns_page(
+                db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok")))
+        if path == "/campaigns/edit":
+            cid = query.get("id", "")
+            k = db.campaign(int(cid)) if cid.isdigit() else None
+            if k is None:
+                return self.redirect("/campaigns?e=" + urllib.parse.quote("That campaign no longer exists."))
+            sel = db.selection(k["selection_id"]) if k["selection_id"] else None
+            return self.send(200, views.campaign_edit_page(
+                k, db.campaign_creators(k["id"]), db.list_codes(), db.rules_of(k), sel,
                 query.get("e"), query.get("ok")))
         return self.send(404, views.simple("Not found", "That page does not exist."))
 
@@ -403,6 +416,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_selection_save()
         if path == "/selections/delete":
             return self.post_selection_delete()
+        if path == "/campaigns/new":
+            return self.post_campaign_new()
+        if path == "/campaigns/save":
+            return self.post_campaign_save()
+        if path == "/campaigns/delete":
+            return self.post_campaign_delete()
         if path == "/roster/delete":
             return self.post_roster_delete()
         if path == "/roster/import":
@@ -1068,6 +1087,119 @@ class Handler(BaseHTTPRequestHandler):
         if sid.isdigit():
             db.delete_selection(int(sid))
         return self.redirect("/selections?ok=" + urllib.parse.quote("Selection deleted."))
+
+    # ---------------------------------------------------------- campaigns --
+
+    def post_campaign_new(self):
+        """A blank campaign from the form on the Campaigns page, or one filled
+        from a selection: its creators, passcode, platform and the costs it
+        was priced from."""
+        f = self.form_body()
+        sid = (f.get("selection") or "").strip()
+        if sid.isdigit():
+            sel = db.selection(int(sid))
+            if sel is None:
+                return self.redirect("/selections?e=" + urllib.parse.quote(
+                    "That selection no longer exists."))
+            known = {c["code"] for c in db.list_creators()}
+            codes = [c for c in json.loads(sel["codes"] or "[]") if c in known]
+            costs = json.loads((sel["costs"] if "costs" in sel.keys() else None) or "{}")
+            client = None
+            if sel["code_id"]:
+                code = db.get_code(sel["code_id"])
+                client = code["label"] if code else None
+            cid = db.create_campaign(sel["name"], client=client, code_id=sel["code_id"],
+                                     selection_id=sel["id"], platform=sel["platform"],
+                                     codes=codes, costs={k: v for k, v in costs.items()
+                                                         if isinstance(v, int)})
+            return self.redirect("/campaigns/edit?id=%d&ok=%s" % (cid, urllib.parse.quote(
+                "Campaign started from the selection. Set its dates and rules, then set it live.")))
+        name = (f.get("name") or "").strip()
+        if not name:
+            return self.redirect("/campaigns?e=" + urllib.parse.quote("Give the campaign a name."))
+        code_id = (f.get("code_id") or "").strip()
+        cid = db.create_campaign(name, client=(f.get("client") or "").strip() or None,
+                                 code_id=int(code_id) if code_id.isdigit() else None)
+        return self.redirect("/campaigns/edit?id=%d" % cid)
+
+    def post_campaign_save(self):
+        f = self.form_body(multi=("code", "cost", "drop"))
+        cid = (f.get("id") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None:
+            return self.redirect("/campaigns")
+        back = "/campaigns/edit?id=%d" % k["id"]
+
+        def fail(msg):
+            return self.redirect(back + "&e=" + urllib.parse.quote(msg))
+
+        # Two people saving the same campaign: the slower one would silently
+        # undo the faster one's changes. Refuse it and let them reload.
+        if (f.get("updated_at") or "").strip() != str(k["updated_at"]):
+            return fail("Someone else saved this campaign while you had it open. "
+                        "Reload the page and make your change again.")
+
+        def money(v):
+            v = "".join(ch for ch in (v or "") if ch.isdigit())
+            return int(v) if v else None
+
+        starts = (f.get("starts") or "").strip()
+        ends = (f.get("ends") or "").strip()
+        t_start = db.day_bounds(starts, None) if starts else None
+        t_end = db.day_bounds(ends, None) if ends else None
+        if (starts and t_start is None) or (ends and t_end is None):
+            return fail("That date is not valid.")
+        if t_end is not None:
+            t_end += 86400 - 1          # the last day counts in full
+        if t_start is not None and t_end is not None and t_end < t_start:
+            return fail("The last day is before the first day.")
+        status = (f.get("status") or "draft").strip()
+        if status not in db.CAMPAIGN_STATUSES:
+            status = "draft"
+        if status == "live" and (t_start is None or t_end is None):
+            return fail("Set the first and last day before setting the campaign live.")
+
+        destination = (f.get("destination") or "").strip()
+        if destination and not re.match(r"^https?://[^\s/]+\.[^\s]+$", destination):
+            return fail("The destination must be a full web address starting with https://")
+
+        rules = db.parse_rules(f.get("rules"))
+        told = db.parse_rules(f.get("disclosure"))
+        rules["disclosure"] = told["hashtags"] + told["keywords"]
+        code_id = (f.get("code_id") or "").strip()
+        platform = (f.get("platform") or "").strip() or None
+        if platform and platform not in db.PLATFORMS:
+            platform = None
+
+        # Creators: fees, removals, then additions.
+        known = {c["code"] for c in db.list_creators()}
+        codes_in = f.get("code") or []
+        fees = f.get("cost") or []
+        costs = {code.strip().upper(): money(fee)
+                 for code, fee in zip(codes_in, fees + [""] * (len(codes_in) - len(fees)))}
+        remove = {c.strip().upper() for c in (f.get("drop") or [])}
+        adds = [c.strip().upper() for c in re.split(r"[\s,;]+", f.get("add") or "") if c.strip()]
+        unknown = [c for c in adds if c not in known]
+        adds = [c for c in adds if c in known and c not in remove]
+
+        db.save_campaign(k["id"], name=(f.get("name") or "").strip() or k["name"],
+                         client=(f.get("client") or "").strip() or None,
+                         code_id=int(code_id) if code_id.isdigit() else None,
+                         platform=platform, starts_at=t_start, ends_at=t_end, status=status,
+                         rules=rules, destination=destination or None,
+                         cost=money(f.get("total_cost")), notes=(f.get("notes") or "").strip() or None)
+        db.save_campaign_creators(k["id"], costs, remove)
+        if adds:
+            db.add_campaign_creators(k["id"], adds)
+        if unknown:
+            return fail("Saved, but these codes are not in the roster: " + ", ".join(unknown))
+        return self.redirect(back + "&ok=" + urllib.parse.quote("Saved."))
+
+    def post_campaign_delete(self):
+        cid = (self.form_body().get("id") or "").strip()
+        if cid.isdigit():
+            db.delete_campaign(int(cid))
+        return self.redirect("/campaigns?ok=" + urllib.parse.quote("Campaign deleted."))
 
     def api_selection(self, token, name=None, codes=None):
         """A priced selection, for the client's page — by its token, or by the

@@ -100,9 +100,11 @@ background:#f1efec;color:var(--gray)}
 .pill.warn{background:#fdf3e3;color:var(--amber)}
 label{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
 color:var(--gray);margin:0 0 6px}
-input,select{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);
+input,select,textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);
 border-radius:8px;background:var(--white);color:var(--ink)}
-input:focus,select:focus{outline:2px solid var(--ink);outline-offset:-1px}
+textarea{min-height:64px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--ink);outline-offset:-1px}
+.rules{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
 .row{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px}
 .btn{display:inline-block;font:inherit;font-weight:600;padding:10px 20px;border-radius:999px;
 border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;text-decoration:none}
@@ -330,7 +332,8 @@ def u(path):
 
 def page(title, body, active=""):
     items = [("/", "Overview"), ("/codes", "Access codes"), ("/analytics", "Analytics"),
-             ("/roster", "Roster"), ("/selections", "Selections"), ("/requests", "Requests")]
+             ("/roster", "Roster"), ("/selections", "Selections"), ("/campaigns", "Campaigns"),
+             ("/requests", "Requests")]
     # Requests nobody has handled yet, counted on every page so a new one is
     # seen from wherever the admin happens to be. The page script keeps it
     # live afterwards.
@@ -1791,7 +1794,7 @@ def selections_page(sels, error=None, message=None, origin=""):
     return page("Selections", body, "/selections")
 
 
-def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
+def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=()):
     by = {c["code"]: c for c in creators}
     codes = json.loads(sel["codes"] or "[]")
     own = json.loads(sel["prices"] or "{}")
@@ -1903,6 +1906,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None):
           "onsubmit=\"return confirm('Delete this selection? Its link stops working.')\">"
           "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
           "<button class='btn small danger'>Delete selection</button></form>"
+        + campaign_start_card(sel, campaigns)
         + MARGIN_JS
     )
     return page(sel["name"] + " — Selection", body, "/selections")
@@ -1947,3 +1951,204 @@ MARGIN_JS = """<script>
   run();
 })();
 </script>"""
+
+
+# ---------------------------------------------------------------- campaigns --
+
+STATUS_PILL = {"draft": "warn", "live": "live", "ended": ""}
+
+
+def status_pill(status):
+    return "<span class='pill " + STATUS_PILL.get(status, "") + "'>" + e(status) + "</span>"
+
+
+def _date_value(value):
+    """A timestamp as the YYYY-MM-DD a date input takes, in UTC like the
+    timestamps themselves."""
+    if not value:
+        return ""
+    return datetime.fromtimestamp(value, timezone.utc).strftime("%Y-%m-%d")
+
+
+def _dates(k):
+    a, b = _date_value(k["starts_at"]), _date_value(k["ends_at"])
+    if not a and not b:
+        return "<span class='muted'>no dates</span>"
+    return e(a or "?") + " → " + e(b or "?")
+
+
+def campaign_start_card(sel, campaigns):
+    """On a selection: turn it into a campaign, or open the ones already made
+    from it. A second campaign from the same shortlist is allowed — a second
+    wave is a new campaign — so the button is always there."""
+    made = "".join(
+        "<li><a href='" + u("/campaigns/edit") + "?id=" + str(k["id"]) + "'>" + e(k["name"])
+        + "</a> " + status_pill(k["status"]) + "</li>" for k in campaigns)
+    return (
+        "<h2>Campaign</h2><div class='card'>"
+        + ("<p>Campaigns started from this selection:</p><ul>" + made + "</ul>" if made else
+           "<p class='muted'>Booked? Start a campaign from this selection. Its creators, client "
+           "passcode, platform and costs are copied in; the campaign is a draft until you set it live.</p>")
+        + "<form method='post' action='" + u("/campaigns/new") + "'>"
+        + "<input type='hidden' name='selection' value='" + str(sel["id"]) + "'>"
+        + "<button class='btn small'>" + ("Start another campaign" if made else "Start campaign")
+        + "</button></form></div>")
+
+
+def campaigns_page(camps, codes, error=None, message=None):
+    note = ""
+    if error:
+        note += "<div class='err'>" + e(error) + "</div>"
+    if message:
+        note += "<div class='ok'>" + e(message) + "</div>"
+    rows = []
+    for k in camps:
+        who = k["client"] or k["code_label"] or "—"
+        src = ("from selection " + e(k["selection_name"])) if k["selection_name"] else "started blank"
+        rows.append(
+            "<tr><td><strong><a href='" + u("/campaigns/edit") + "?id=" + str(k["id"]) + "'>"
+            + e(k["name"]) + "</a></strong><br><span class='muted'>" + src + "</span></td>"
+            + "<td>" + e(who) + "</td><td>" + status_pill(k["status"]) + "</td>"
+            + "<td>" + _dates(k) + "</td><td>" + str(k["creators"]) + "</td>"
+            + "<td class='muted'>" + ago(k["updated_at"]) + "</td>"
+            + "<td class='right'><a class='btn small' href='" + u("/campaigns/edit") + "?id="
+            + str(k["id"]) + "'>Open</a></td></tr>")
+    table = "".join(rows) or ("<tr><td colspan='7' class='muted'>No campaigns yet. Start one from a "
+                              "selection, or create a blank one above.</td></tr>")
+    body = (
+        "<h1>Campaigns</h1><p class='sub'>Creators booked for a client, the dates they post in and "
+        "the rules that decide which posts count. Everything is set here; the client only views "
+        "the report. Start one from a booked <a href='" + u("/selections") + "'>selection</a> "
+        "to copy its creators, passcode and costs, or create a blank one.</p>"
+        + note
+        + "<form method='post' action='" + u("/campaigns/new") + "' class='card'><div class='row'>"
+        + "<div style='flex:2'><label>Campaign name</label><input name='name' required "
+          "placeholder='e.g. SVR Sun Secure — Wave 4'></div>"
+        + "<div><label>Client (brand)</label><input name='client' placeholder='e.g. SVR'></div>"
+        + "<div><label>Passcode that sees it</label>" + code_select(codes, None) + "</div>"
+        + "<div style='align-self:end'><button class='btn'>Create campaign</button></div>"
+        + "</div></form>"
+        + "<div class='card'><table><thead><tr><th>Campaign</th><th>Client</th><th>Status</th>"
+        + "<th>Dates</th><th>Creators</th><th>Updated</th><th></th></tr></thead><tbody>"
+        + table + "</tbody></table></div>"
+    )
+    return page("Campaigns", body, "/campaigns")
+
+
+def code_select(codes, chosen):
+    """The access codes a report can be shown to. Revoked and expired codes
+    are left out unless already chosen, so an old choice is not silently lost."""
+    opts = ["<option value=''>— none yet —</option>"]
+    for c in codes:
+        ok, why = code_state(c)
+        if not ok and c["id"] != chosen:
+            continue
+        label = c["label"] + ("" if ok else " (" + why + ")")
+        opts.append("<option value='" + str(c["id"]) + "'" + (" selected" if c["id"] == chosen else "")
+                    + ">" + e(label) + "</option>")
+    return "<select name='code_id'>" + "".join(opts) + "</select>"
+
+
+def _rules_text(rules):
+    return " ".join(rules["hashtags"] + rules["mentions"] + rules["keywords"])
+
+
+def campaign_edit_page(k, members, codes, rules, selection=None, error=None, message=None):
+    note = ""
+    if error:
+        note += "<div class='err'>" + e(error) + "</div>"
+    if message:
+        note += "<div class='ok'>" + e(message) + "</div>"
+
+    rows, total_cost = [], 0
+    for c in members:
+        code = c["cc_code"]
+        gone = c["code"] is None
+        shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
+                if not gone and c["photo"] else "<span class='thumb sm none'>—</span>")
+        if gone:
+            who = "<span class='pill dead'>no longer in the roster</span>"
+            accounts = ""
+        else:
+            who = e(c["name"]) + ("" if c["active"] else " <span class='pill dead'>hidden</span>")
+            accounts = "".join(
+                "<div class='acct'><a href='" + e(a["url"]) + "' target='_blank' rel='noopener'>"
+                + e(a["platform"] or "link") + "</a> " + num(a["followers"]) + "</div>"
+                for a in split_profiles(c["profiles"])
+                if a.get("url") and (not k["platform"] or a["platform"] == k["platform"]))
+            accounts = accounts or "<span class='muted'>no " + e(k["platform"] or "") + " profile on file</span>"
+        cost = c["campaign_cost"]
+        total_cost += cost or 0
+        rows.append(
+            "<tr><td>" + shot + "</td><td><code>" + e(code) + "</code><br>" + who
+            + "<input type='hidden' name='code' value='" + e(code) + "'></td>"
+            + "<td>" + accounts + "</td>"
+            + "<td><input name='cost' value='" + (format(cost, ",") if cost is not None else "")
+            + "' placeholder='fee to us' inputmode='numeric'></td>"
+            + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code)
+            + "'> remove</label></td></tr>")
+    table = "".join(rows) or "<tr><td colspan='5' class='muted'>No creators yet — add some below.</td></tr>"
+
+    status_opts = "".join(
+        "<option value='" + v + "'" + (" selected" if k["status"] == v else "") + ">" + v.title() + "</option>"
+        for v in ["draft", "live", "ended"])
+    plat_opts = "".join(
+        "<option value='" + e(v) + "'" + (" selected" if (k["platform"] or "") == v else "") + ">" + e(lbl) + "</option>"
+        for v, lbl in [("", "Every platform they are on")] + [(p, p + " only") for p in PLATFORMS])
+    chips = "".join("<span class='pill'>" + e(w) + "</span>"
+                    for w in rules["hashtags"] + rules["mentions"] + rules["keywords"])
+    from_sel = ("<p class='muted'>Started from selection <a href='" + u("/selections/edit") + "?id="
+                + str(selection["id"]) + "'>" + e(selection["name"]) + "</a>.</p>") if selection else ""
+
+    body = (
+        "<p><a href='" + u("/campaigns") + "'>&larr; All campaigns</a></p>"
+        + "<h1>" + e(k["name"]) + " " + status_pill(k["status"]) + "</h1>" + from_sel + note
+        + "<form method='post' action='" + u("/campaigns/save") + "' enctype='multipart/form-data'>"
+        + "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
+        + "<input type='hidden' name='updated_at' value='" + str(k["updated_at"]) + "'>"
+        + "<h2>Details</h2><div class='card'><div class='row'>"
+        + "<div style='flex:2'><label>Campaign name (the client sees this)</label>"
+          "<input name='name' value='" + e(k["name"]) + "' required></div>"
+        + "<div><label>Client (brand)</label><input name='client' value='" + e(k["client"] or "") + "'></div>"
+        + "<div><label>Passcode that sees the report</label>" + code_select(codes, k["code_id"]) + "</div>"
+        + "</div><div class='row'>"
+        + "<div><label>Status</label><select name='status'>" + status_opts + "</select>"
+          "<div class='price-hint'>Only a live campaign is captured every 24 hours.</div></div>"
+        + "<div><label>First day</label><input type='date' name='starts' value='" + _date_value(k["starts_at"]) + "'></div>"
+        + "<div><label>Last day</label><input type='date' name='ends' value='" + _date_value(k["ends_at"]) + "'></div>"
+        + "<div><label>Platform</label><select name='platform'>" + plat_opts + "</select></div>"
+        + "</div></div>"
+        + "<h2>Which posts count</h2><div class='card'>"
+        + "<label>Hashtags, mentions and keywords</label>"
+          "<textarea name='rules' placeholder='#svr #suncare @svr_ksa sunscreen'>" + e(_rules_text(rules)) + "</textarea>"
+          "<div class='rules'>" + chips + "</div>"
+          "<div class='price-hint'>A post in the campaign dates that carries any of these counts as a "
+          "campaign post; the creator's other posts in those dates are kept under All content. "
+          "#word = hashtag, @word = mention, anything else = keyword. Case does not matter.</div>"
+        + "<div class='row' style='margin-top:14px'><div><label>Required disclosure</label>"
+          "<input name='disclosure' value='" + e(" ".join(rules["disclosure"])) + "' placeholder='#ad #إعلان'>"
+          "<div class='price-hint'>A campaign post with none of these is flagged.</div></div>"
+        + "<div style='flex:2'><label>Where tracking links send people</label>"
+          "<input name='destination' type='url' value='" + e(k["destination"] or "") + "' "
+          "placeholder='https://…'><div class='price-hint'>Default for every creator's link.</div></div>"
+        + "</div></div>"
+        + "<h2>Creators</h2><div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th>"
+          "<th>Tracked accounts</th><th>Fee to us (SAR)</th><th></th></tr></thead><tbody>"
+        + table + "</tbody></table>"
+        + "<div class='row' style='margin-top:14px'><div style='flex:2'><label>Add creators</label>"
+          "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div></div>"
+        + "</div>"
+        + "<h2>Internal</h2><div class='card'><div class='row'>"
+        + "<div><label>Total campaign cost to us (SAR)</label><input name='total_cost' value='"
+        + (format(k["cost"], ",") if k["cost"] is not None else "") + "' inputmode='numeric'>"
+          "<div class='price-hint'>Empty = the sum of the fees above (currently "
+        + format(total_cost, ",") + " SAR). Used for CPM. Never shown to the client.</div></div>"
+        + "<div style='flex:2'><label>Notes</label><textarea name='notes'>" + e(k["notes"] or "") + "</textarea></div>"
+        + "</div></div>"
+        + "<button class='btn'>Save campaign</button></form>"
+        + "<form method='post' action='" + u("/campaigns/delete") + "' style='margin-top:14px' "
+          "onsubmit=\"return confirm('Delete this campaign? Its report and links stop working.')\">"
+          "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
+          "<button class='btn small danger'>Delete campaign</button></form>"
+    )
+    return page(k["name"] + " — Campaign", body, "/campaigns")
