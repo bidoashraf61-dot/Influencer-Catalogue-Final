@@ -524,16 +524,41 @@
     return s + "</svg>";
   }
 
-  // Bars take turns through the brand's colours rather than all ink:
-  // green, orange, lime, then a warm grey — the order repeats.
-  var PALETTE = ["#14884a", "#ff691e", "#b9d400", "#8a7a68"];
-  function bars(rows, keyHtml) {
+  // Two colours for the whole performance area: green is the main measure
+  // (views, reach, clicks), orange the second (engagement). Bars are green.
+  var C1 = "#14884a", C2 = "#ff691e";
+  function bars(rows, keyHtml, colour) {
     if (!rows || !rows.length) return '<p class="mx-panel__note">Nothing yet.</p>';
     var peak = Math.max.apply(null, rows.map(function (r) { return r.n; })) || 1;
-    return rows.slice(0, 8).map(function (r, i) {
+    return rows.slice(0, 8).map(function (r) {
       return '<div class="mx-bar"><span class="mx-bar__k">' + keyHtml(r) + '</span><i style="--w:' + (r.n / peak * 100).toFixed(1)
-        + "%;--c:" + PALETTE[i % PALETTE.length] + '"></i><b>' + r.label + "</b></div>";
+        + "%;--c:" + (colour || C1) + '"></i><b>' + r.label + "</b></div>";
     }).join("");
+  }
+
+  // Drawn marks for formats, actions and devices, one stroke weight.
+  var G = function (d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + "</svg>"; };
+  var MARK = {
+    reel: G('<rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 9h18M8 4l2.5 5M14 4l2.5 5"/><path d="M10.5 12.5v4l3.5-2z"/>'),
+    story: G('<circle cx="12" cy="12" r="8.5" stroke-dasharray="3.4 2.2"/><circle cx="12" cy="12" r="4.5"/>'),
+    post: G('<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><circle cx="9" cy="9" r="1.8"/><path d="M20.5 15l-5-5-11 10.5"/>'),
+    video: G('<rect x="2.5" y="5" width="19" height="14" rx="3"/><path d="M10 9.3l5 2.7-5 2.7z"/>'),
+    short: G('<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 9.5l3 2-3 2z"/>'),
+    likes: G('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'),
+    comments: G('<path d="M20 12a7.5 7.5 0 0 1-11 6.6L4 20l1.4-4.4A7.5 7.5 0 1 1 20 12z"/>'),
+    saves: G('<path d="M7 3.5h10a1 1 0 0 1 1 1V21l-6-4-6 4V4.5a1 1 0 0 1 1-1z"/>'),
+    shares: G('<path d="M21 3L10 14M21 3l-7 18-4-7-7-4z"/>'),
+    views: G('<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'),
+    clicks: G('<path d="M9 3.5v4M3.5 9h4M5 5l2.5 2.5M13 13l7 3-3 1-1 3z"/>'),
+    Mobile: G('<rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/>'),
+    Desktop: G('<rect x="2.5" y="4" width="19" height="13" rx="2"/><path d="M8.5 21h7M12 17v4"/>'),
+    Tablet: G('<rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M11 18.5h2"/>')
+  };
+  function tiles(items) {
+    return '<div class="mx-tiles">' + items.map(function (t) {
+      return '<div class="mx-tile' + (t.alt ? " mx-tile--alt" : "") + '"><span class="mx-tile__ic">' + t.icon + "</span><b>" + t.value + "</b><span>" + esc(t.label)
+        + (t.sub ? "<small>" + esc(t.sub) + "</small>" : "") + "</span></div>";
+    }).join("") + "</div>";
   }
 
   function renderCharts() {
@@ -543,26 +568,45 @@
         + '<div class="mx-chart"><h3>Engagement so far</h3>' + area(h, "eng", "#ff691e", "Engagement so far") + "</div>"
       : '<p class="mx-empty-note">The charts fill in as posts are captured, once every 24 hours.</p>';
 
-    var posts = R.posts.filter(function (p) { return p.section === "campaign"; }), mix = [];
+    var posts = R.posts.filter(function (p) { return p.section === "campaign"; }), mix = [], t = R.total;
+    // per post, and the best post
+    var n = posts.length || 1, vids = posts.filter(function (p) { return p.video; });
+    mix.push('<div class="mx-panel"><h3>Per post</h3>' + tiles([
+      { icon: MARK.views, value: num(vids.length ? t.views / vids.length : 0), label: "Views per video" },
+      { icon: MARK.likes, value: num(t.engagement / n), label: "Engagement per post", alt: true },
+      { icon: MARK.post, value: num(posts.length), label: "Posts counted" }
+    ]) + "</div>");
+    var best = posts.slice().sort(function (a, b) { return ((b.views || 0) + (b.reach || 0)) - ((a.views || 0) + (a.reach || 0)); })[0];
+    if (best) mix.push('<div class="mx-panel mx-best"><h3>Best post</h3><a class="mx-best__card" href="' + esc(best.url) + '" target="_blank" rel="noopener">'
+      + '<span class="mx-best__img">' + (best.thumb ? '<img src="' + esc(best.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : icon(best.platform)) + "</span>"
+      + "<span><b>" + esc(best.creator) + "</b><span>" + icon(best.platform) + esc(KIND[best.kind] || best.kind) + " · " + esc(day(best.posted_at)) + "</span>"
+      + "<strong>" + num(best.video ? best.views : best.reach) + "</strong><em>" + (best.video ? "views" : "reached") + " · " + num(best.engagement) + " engagements</em></span></a></div>");
+    // reached by platform (green bars)
     var byPlat = {}, byKind = {};
     posts.forEach(function (p) {
-      var a = byPlat[p.platform] = byPlat[p.platform] || { n: 0, x: 0 }; a.n++; a.x += (p.views || 0) + (p.reach || 0);
-      byKind[p.kind] = (byKind[p.kind] || 0) + 1;
+      var a2 = byPlat[p.platform] = byPlat[p.platform] || { n: 0, x: 0 }; a2.n++; a2.x += (p.views || 0) + (p.reach || 0);
+      var k = byKind[p.kind] = byKind[p.kind] || { n: 0, x: 0 }; k.n++; k.x += (p.views || 0) + (p.reach || 0);
     });
     var plats = Object.keys(byPlat).map(function (k) { return { k: k, n: byPlat[k].x || byPlat[k].n, label: num(byPlat[k].x) }; })
-      .sort(function (a, b) { return b.n - a.n; });
+      .sort(function (a2, b2) { return b2.n - a2.n; });
     if (plats.length) mix.push('<div class="mx-panel"><h3>Reached by platform</h3>' + bars(plats, function (r) { return icon(r.k) + esc(r.k); }) + "</div>");
-    var kinds = Object.keys(byKind).map(function (k) { return { k: k, n: byKind[k], label: byKind[k] + (byKind[k] === 1 ? " post" : " posts") }; })
-      .sort(function (a, b) { return b.n - a.n; });
-    if (kinds.length) mix.push('<div class="mx-panel"><h3>Content mix</h3>' + bars(kinds, function (r) { return esc(KIND[r.k] || r.k); }) + "</div>");
-    var t = R.total, parts = [["Likes", t.likes, "#14884a"], ["Comments", t.comments, "#ff691e"], ["Saves", t.saves, "#b9d400"], ["Shares", t.shares, "#8a7a68"]]
-      .filter(function (p) { return p[1]; });
-    var sum = parts.reduce(function (s, p) { return s + p[1]; }, 0);
-    if (sum) mix.push('<div class="mx-panel"><h3>What people did</h3><div class="mx-stack" role="img" aria-label="Interactions breakdown">'
-      + parts.map(function (p) { return '<i style="width:' + (p[1] / sum * 100) + "%;background:" + p[2] + '"></i>'; }).join("")
-      + '</div><div class="mx-key">' + parts.map(function (p) {
-        return '<div><span class="mx-sw" style="background:' + p[2] + '"></span>' + p[0] + "<b>" + full(p[1]) + "</b></div>";
-      }).join("") + "</div></div>");
+    // content mix: icon tiles
+    var kinds = Object.keys(byKind).sort(function (a2, b2) { return byKind[b2].n - byKind[a2].n; });
+    if (kinds.length) mix.push('<div class="mx-panel"><h3>Content mix</h3>' + tiles(kinds.map(function (k) {
+      return { icon: MARK[k] || MARK.post, value: byKind[k].n, label: (KIND[k] || k) + (byKind[k].n === 1 ? "" : "s"), sub: num(byKind[k].x) + " reached" };
+    })) + "</div>");
+    // what people did: icon tiles
+    var acts = [["likes", "Likes", t.likes], ["comments", "Comments", t.comments], ["saves", "Saves", t.saves], ["shares", "Shares", t.shares]]
+      .filter(function (x) { return x[2]; });
+    if (acts.length) mix.push('<div class="mx-panel"><h3>What people did</h3>' + tiles(acts.map(function (x, i) {
+      return { icon: MARK[x[0]], value: num(x[2]), label: x[1], alt: i % 2 === 1 };
+    })) + "</div>");
+    // reach by creator size
+    var bySize = {};
+    R.creators.forEach(function (c) { if (!c.posts) return; var b2 = c.band || "nano"; bySize[b2] = (bySize[b2] || 0) + (c.views || 0) + (c.reach || 0); });
+    var sizes = ["mega", "macro", "mid", "micro", "nano"].filter(function (k) { return bySize[k]; })
+      .map(function (k) { return { k: k, n: bySize[k], label: num(bySize[k]) }; });
+    if (sizes.length > 1) mix.push('<div class="mx-panel"><h3>Reached by creator size</h3>' + bars(sizes, function (r) { return esc((R.benchmarks.bands[r.k] || r.k).replace(/ \(.*/, "")); }) + "</div>");
     if (R.audience && R.audience.countries.length) {
       mix.push('<div class="mx-panel"><h3>Who was reached</h3>' + bars(R.audience.countries.map(function (c) {
         return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" };
@@ -583,17 +627,22 @@
       return;
     }
     var t = R.total;
-    var heads = '<dl class="mx-clickheads"><div><dt>Clicks</dt><dd>' + full(cl.clicks) + "</dd></div><div><dt>Unique people</dt><dd>"
-      + full(cl.uniques) + "</dd></div><div><dt>Click-through</dt><dd>" + pct(t.ctr) + "</dd></div></dl>";
+    var heads = tiles([{ icon: MARK.clicks, value: full(cl.clicks), label: "Clicks" },
+      { icon: MARK.views, value: full(cl.uniques), label: "Unique people", alt: true },
+      { icon: G('<path d="M4 20L20 4M7 4h13v13"/>'), value: pct(t.ctr), label: "Click-through", sub: t.ctr != null ? (SIG[t.ctr_grade] || "") : "" }]);
     if (!cl.clicks) { $("mx-clicks").innerHTML = heads + '<p class="mx-empty-note" style="margin-top:18px">No clicks yet.</p>'; return; }
     var lab = function (rows) { return (rows || []).map(function (r) { return { k: r.k, n: r.n, label: full(r.n) }; }); };
     $("mx-clicks").innerHTML = heads + '<div class="mx-clickgrid">'
       + '<div class="mx-panel"><h3>By creator</h3>' + bars(lab(cl.by_creator), function (r) { return esc(r.k); }) + "</div>"
-      + '<div class="mx-panel"><h3>By app</h3>' + bars(lab(cl.by_app), function (r) { return (ICONS[r.k] || "") + esc(r.k); }) + "</div>"
+      + '<div class="mx-panel"><h3>By app</h3>' + tiles((cl.by_app || []).slice(0, 6).map(function (r) {
+        return { icon: ICONS[r.k] || MARK.clicks, value: full(r.n), label: r.k };
+      })) + "</div>"
       + '<div class="mx-panel"><h3>By country</h3>' + bars(lab(cl.by_country), function (r) {
         return r.k && r.k.length === 2 ? flag(r.k) + esc(countryName(r.k)) : esc(r.k || "Unknown");
       }) + "</div>"
-      + '<div class="mx-panel"><h3>By device</h3>' + bars(lab(cl.by_device), function (r) { return esc(r.k); }) + "</div></div>";
+      + '<div class="mx-panel"><h3>By device</h3>' + tiles((cl.by_device || []).map(function (r) {
+        return { icon: MARK[r.k] || MARK.Mobile, value: full(r.n), label: r.k };
+      })) + "</div></div>";
   }
 
   $("mx-print").addEventListener("click", function () { window.print(); });

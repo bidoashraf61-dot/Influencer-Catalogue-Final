@@ -1601,9 +1601,59 @@ class Handler(BaseHTTPRequestHandler):
         k, status = self.viewer_campaign(token)
         if k is None:
             return self.send(status, b"", "text/plain")
-        return self.send(200, self.posts_csv(metrics.client_report(k)), "text/csv; charset=utf-8",
+        return self.send(200, self.full_csv(metrics.client_report(k)), "text/csv; charset=utf-8",
                          self.cors() + [("Content-Disposition", 'attachment; filename="campaign-%s.csv"'
                                          % db.campaign_slug(k))])
+
+    def full_csv(self, rep):
+        """The client's whole report as one CSV: summary, targets, creators,
+        posts and clicks, each block under its own heading line, so it opens
+        in Excel as one readable sheet."""
+        import csv, io
+        out = io.StringIO()
+        w = csv.writer(out)
+        c, t = rep["campaign"], rep["total"]
+        f2 = lambda v: "" if v is None else ("%.2f" % v)
+        w.writerow(["CAMPAIGN REPORT"])
+        w.writerow(["Campaign", c["name"]]); w.writerow(["Brand", c.get("client") or ""])
+        w.writerow(["Dates", views._date_value(c.get("starts_at")) + " to " + views._date_value(c.get("ends_at"))])
+        w.writerow(["Objective", (rep.get("objective") or {}).get("label", "")])
+        w.writerow(["Overall", (rep.get("verdict") or {}).get("label", "")])
+        w.writerow(["Data updated", ts(rep.get("updated_at")) if rep.get("updated_at") else ""])
+        w.writerow([])
+        w.writerow(["RESULTS"])
+        for label, key in (("Posts live", "delivered"), ("Posts planned", "planned"), ("Views", "views"), ("Reach", "reach"),
+                           ("Impressions", "impressions"), ("Engagement", "engagement"), ("Likes", "likes"),
+                           ("Comments", "comments"), ("Saves", "saves"), ("Shares", "shares"), ("Affiliate clicks", "clicks")):
+            if key in t:
+                w.writerow([label, t.get(key) if t.get(key) is not None else ""])
+        w.writerow(["Avg engagement rate %", f2(t.get("er"))]); w.writerow(["Video engagement rate %", f2(t.get("video_er"))])
+        if "ctr" in t:
+            w.writerow(["Click-through %", "" if t.get("ctr") is None else "%.3f" % t["ctr"]])
+        items = (rep.get("progress") or {}).get("items") or []
+        if items:
+            w.writerow([]); w.writerow(["TARGETS", "Goal", "Achieved", "% of goal", "Status"])
+            for i in items:
+                w.writerow([i["key"], i["goal"], round(i["actual"], 2) if isinstance(i["actual"], float) else i["actual"],
+                            round(i["pct"]), {"good": "Strong", "moderate": "Fair", "low": "Low"}.get(i["grade"], "")])
+        w.writerow([]); w.writerow(["LEADERBOARD", "Rank", "Creator", "Posts live", "Posts planned", "Followers", "Views",
+                                    "Reach", "Engagement", "ER %", "Video ER %", "Clicks", "Score /100"])
+        for cr in rep["creators"]:
+            w.writerow(["", cr.get("rank") or "", cr["name"], cr.get("delivered"), cr.get("planned") or "", cr.get("followers") or "",
+                        cr.get("views"), cr.get("reach", ""), cr.get("engagement"), f2(cr.get("er")), f2(cr.get("video_er")),
+                        cr.get("clicks", ""), "%.0f" % (cr.get("score") or 0)])
+        w.writerow([])
+        posts = self.posts_csv(rep)[1:].splitlines()          # same columns as the posts export
+        w.writerow(["POSTS"])
+        out.write("\r\n".join(posts) + "\r\n")
+        cl = rep.get("clicks")
+        if cl and cl.get("clicks"):
+            w.writerow([]); w.writerow(["AFFILIATE CLICKS", "Total", cl["clicks"], "Unique people", cl["uniques"]])
+            for title, key in (("By creator", "by_creator"), ("By app", "by_app"), ("By country", "by_country"), ("By device", "by_device")):
+                w.writerow([title])
+                for r in cl.get(key) or []:
+                    w.writerow(["", r["k"], r["n"]])
+        return "\ufeff" + out.getvalue()
 
     def posts_csv(self, rep):
         import csv, io

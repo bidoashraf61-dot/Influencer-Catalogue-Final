@@ -694,10 +694,12 @@ body.cat-away::after {
 
 /* ---------------------------------------------------------------- print */
 
+/* The roster and creator pages refuse to print. The campaign report is the
+   client's own results and must print — its PDF is the browser's print. */
 @media print {
   html, body { background: #fff !important; }
-  body * { display: none !important; }
-  body::after {
+  body:not([data-page="campaign"]) * { display: none !important; }
+  body:not([data-page="campaign"])::after {
     content: "This catalogue is confidential and cannot be printed.";
     display: block !important;
     font-family: var(--body); font-size: 14pt; padding: 40pt;

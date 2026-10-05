@@ -341,7 +341,7 @@
   @page { margin: 12mm; }
   body, .cat-app { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .cat-gate, .mx-top, .mx-filters, .mx-end { display: none !important; }
-  .mx-sec, .mx-band, .mx-status { break-inside: avoid; padding-top: 24px; padding-bottom: 24px; }
+  .mx-sec { padding-top: 24px; padding-bottom: 24px; }
   .mx-wall { grid-template-columns: repeat(4, 1fr); }
   .mx-post { break-inside: avoid; }
   .mx-post__go { display: none; }
@@ -423,3 +423,71 @@
 .mx-obj__parts > span { display: inline-flex; align-items: center; gap: 7px; }
 .mx-obj__parts b { color: var(--ink); }
 .mx-sw.good { background: var(--go); } .mx-sw.moderate { background: var(--amber); } .mx-sw.low { background: var(--vivid-red); }
+
+/* icon tiles — a count with its mark and name, no bar (content mix, what
+   people did, per post, clicks). Green leads, orange is the second measure. */
+.mx-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; }
+.mx-tile { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 12px; align-items: center;
+  padding: 14px; border-radius: 14px; background: #f3f8f4; }
+.mx-tile__ic { grid-row: span 2; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px;
+  background: var(--go); color: var(--white); }
+.mx-tile__ic svg { width: 22px; height: 22px; }
+.mx-tile b { font-family: var(--heading); font-weight: 400; font-size: 30px; line-height: 1; }
+.mx-tile > span:last-child { font-size: 13px; color: var(--gray); line-height: 1.3; }
+.mx-tile small { display: block; font-size: 12px; color: var(--gray); }
+.mx-tile--alt { background: #fff3ec; }
+.mx-tile--alt .mx-tile__ic { background: var(--vivid-orange); }
+.mx-clickgrid .mx-tiles, #mx-clicks > .mx-tiles { margin-bottom: 4px; }
+#mx-clicks > .mx-tiles .mx-tile b { font-size: 40px; }
+
+/* best post */
+.mx-best__card { display: grid; grid-template-columns: 96px 1fr; gap: 14px; align-items: center; text-decoration: none; color: var(--ink); }
+.mx-best__img { width: 96px; height: 120px; border-radius: 12px; overflow: hidden; background: var(--linen); display: grid; place-items: center; }
+.mx-best__img img { width: 100%; height: 100%; object-fit: cover; }
+.mx-best__img svg { width: 34px; color: rgba(18,18,18,.35); }
+.mx-best__card b { display: block; font-size: 16px; }
+.mx-best__card span span { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--gray); }
+.mx-best__card span span svg { width: 15px; height: 15px; }
+.mx-best__card strong { display: block; font-family: var(--heading); font-weight: 400; font-size: 40px; line-height: 1; margin-top: 8px; color: var(--go); }
+.mx-best__card em { font-style: normal; font-size: 13px; color: var(--gray); }
+.mx-best__card:hover strong { text-decoration: underline; }
+
+/* print: the whole report on A4, each section starting cleanly */
+@media print {
+  @page { size: A4; margin: 12mm; }
+  .mx-bug { padding: 0 0 10px; }
+  .mx-bug__title { font-size: 54px; }
+  .mx-ticker { font-size: 14px; padding: 6px 12px; }
+  .mx-verdict { font-size: 22px; padding: 8px 16px; }
+  .mx-score-line dd { font-size: 30px; }
+  #mx-report .mx-sec { padding-top: 18px; padding-bottom: 8px; border-top: 0; }
+  #sec-leaderboard, #sec-content, #sec-performance, #sec-timeline { break-before: page; }
+  .mx-h2 { font-size: 40px; }
+  .mx-panel, .mx-chart, .mx-tile, .mx-pod, .mx-bullet, .mx-cc { break-inside: avoid; }
+  .mx-carousel__track { overflow: visible; grid-auto-flow: row; grid-template-columns: repeat(5, 1fr); grid-auto-columns: auto; }
+  .mx-cc__photo { aspect-ratio: 1; }
+  .mx-wall { grid-template-columns: repeat(3, 1fr) !important; gap: 10px; }
+  .mx-post__media { aspect-ratio: 4 / 3; }
+  .mx-post__body { padding: 10px; gap: 8px; }
+  .mx-nums { grid-template-columns: repeat(3, 1fr) !important; gap: 6px; }
+  .mx-nums dt { font-size: 9px; }
+  .mx-nums dd { font-size: 13px; }
+  .mx-bench { break-inside: avoid; }
+  .mx-table-wrap { overflow: visible; }
+  .mx-gantt { --gl: 150px; }
+  .mx-gantt__today span { display: none; }
+  a[href]::after { content: none !important; }
+  /* the leaderboard fits the page width: no scroll, no score bar */
+  .mx-table { min-width: 0 !important; width: 100%; font-size: 10.5px; }
+  .mx-table th, .mx-table td { padding: 8px 6px; }
+  .mx-table th:last-child, .mx-table td:last-child { padding-right: 6px; }
+  .mx-score i { display: none; }
+  .mx-tc img, .mx-tc .mx-ava { width: 28px; height: 28px; }
+  .mx-tc__links { display: none; }
+  .mx-rank svg { width: 18px; height: 22px; }
+  .mx-sec__head { margin-bottom: 14px; }
+  #sec-overview { break-before: auto; }
+  .mx-podium { margin-bottom: 18px; }
+  .mx-pod__photo { width: 70px; height: 70px; }
+  .mx-pod--1 .mx-pod__photo { width: 84px; height: 84px; }
+}
