@@ -589,7 +589,7 @@
     // content mix: icon tiles
     var kinds = Object.keys(byKind).sort(function (a2, b2) { return byKind[b2].n - byKind[a2].n; });
     if (kinds.length) mix.push('<div class="mx-panel"><h3>Content mix</h3>' + tiles(kinds.map(function (k) {
-      return { icon: MARK[k] || MARK.post, value: byKind[k].n, label: byKind[k].n === 1 ? (KIND[k] || k) : (PLURAL[k] || (KIND[k] || k) + "s"), sub: num(byKind[k].x) + " reached", tone: "seen" };
+      return { icon: MARK[k] || MARK.post, value: byKind[k].n, label: byKind[k].n === 1 ? (KIND[k] || k) : (PLURAL[k] || (KIND[k] || k) + "s"), tone: "plain" };
     })) + "</div>");
     // what people did: icon tiles
     var acts = [["likes", "Likes", t.likes], ["comments", "Comments", t.comments], ["saves", "Saves", t.saves], ["shares", "Shares", t.shares]]
