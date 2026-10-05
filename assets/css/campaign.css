@@ -491,3 +491,35 @@
   .mx-pod__photo { width: 70px; height: 70px; }
   .mx-pod--1 .mx-pod__photo { width: 84px; height: 84px; }
 }
+
+/* roomier performance + clicks panels, bigger type, colour by meaning:
+   green = seen (views, reach), orange = did (engagement, clicks) */
+.mx-mix, .mx-clickgrid { grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 22px; }
+.mx-panel { padding: 28px; }
+.mx-panel h3 { font-size: 14px; margin-bottom: 20px; }
+.mx-tiles { grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+.mx-tile { padding: 18px; column-gap: 16px; }
+.mx-tile__ic { width: 52px; height: 52px; border-radius: 14px; }
+.mx-tile__ic svg { width: 26px; height: 26px; }
+.mx-tile b { font-size: 40px; }
+.mx-tile > span:last-child { font-size: 16px; }
+.mx-tile small { font-size: 14px; margin-top: 2px; }
+.mx-tile--seen { background: #eef6f1; }
+.mx-tile--seen .mx-tile__ic { background: var(--go); }
+.mx-tile--did { background: #fff1e8; }
+.mx-tile--did .mx-tile__ic { background: var(--vivid-orange); }
+.mx-tile--plain { background: #f4f2ee; }
+.mx-tile--plain .mx-tile__ic { background: var(--ink); }
+.mx-bar { font-size: 16px; grid-template-columns: minmax(150px, 1.4fr) minmax(80px, 1.4fr) auto; margin-bottom: 16px; }
+.mx-bar i { height: 12px; }
+.mx-bar__k svg { width: 20px; height: 20px; }
+.mx-bar__k .fi { width: 26px; height: 19px; }
+.mx-panel__note { font-size: 14px !important; }
+#mx-clicks > .mx-tiles .mx-tile b { font-size: 46px; }
+.mx-key-line { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 10px 26px; margin: 0; font-size: 15px; color: var(--gray); }
+.mx-key-line span { display: inline-flex; align-items: center; gap: 8px; }
+.mx-key-line i { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
+.mx-key-line i.seen { background: var(--go); }
+.mx-key-line i.did { background: var(--vivid-orange); }
+@media (max-width: 520px) { .mx-mix, .mx-clickgrid { grid-template-columns: 1fr; } .mx-tile b { font-size: 32px; } }
+@media print { .mx-mix, .mx-clickgrid { grid-template-columns: 1fr 1fr; } .mx-tile b { font-size: 28px; } .mx-tile > span:last-child { font-size: 12px; } }
