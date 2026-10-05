@@ -1,0 +1,129 @@
+/* Campaign report — the client's read-only view of a campaign. Builds on
+   catalogue.css (tokens, gate, hero, summary band) and adds only what a
+   report needs: panels, tables, a content grid, bars and print rules. */
+
+.cmp-hero { padding-bottom: 48px; }
+.cmp-title { font-size: clamp(3rem, 1rem + 9vw, 11rem); overflow-wrap: anywhere; }
+.cmp-fresh {
+  display: inline-flex; align-items: center; gap: 8px; margin: 18px 0 0;
+  font-size: 14px; color: var(--gray);
+}
+.cmp-fresh::before {
+  content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--go);
+}
+
+.cmp-section { padding: 56px 0 0; }
+.cmp-h2 {
+  font-family: var(--heading); font-weight: 400; letter-spacing: .02em;
+  font-size: clamp(2rem, 1.2rem + 2.4vw, 3.5rem); line-height: 1; margin: 0 0 22px;
+}
+.cmp-panel {
+  background: var(--white); border: 1px solid rgba(18,18,18,.12);
+  border-radius: var(--r-md); padding: 22px;
+}
+.cmp-scroll { overflow-x: auto; }
+
+/* KPI band: dd values get a small qualifier underneath */
+.cat-summary__grid dd small {
+  display: block; font-family: var(--body); font-size: 12px; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--gray); margin-top: 6px;
+}
+
+/* chart */
+.cmp-chart svg { width: 100%; height: auto; display: block; }
+.cmp-legend { display: flex; gap: 18px; font-size: 13px; color: var(--gray); margin-top: 10px; }
+.cmp-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; }
+
+/* creators table */
+.cmp-table { width: 100%; border-collapse: collapse; font-size: 15px; min-width: 760px; }
+.cmp-table th {
+  text-align: right; font-weight: 500; font-size: 12px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--gray); padding: 0 10px 12px; border-bottom: 1px solid rgba(18,18,18,.12);
+}
+.cmp-table th:first-child, .cmp-table td:first-child { text-align: left; }
+.cmp-table td { text-align: right; padding: 13px 10px; border-bottom: 1px solid rgba(18,18,18,.08); white-space: nowrap; }
+.cmp-table tr:last-child td { border-bottom: 0; }
+.cmp-table tfoot td { font-weight: 700; border-top: 2px solid var(--ink); }
+
+/* filters */
+.cmp-filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 20px; }
+.cmp-chip {
+  font: inherit; font-size: 14px; cursor: pointer; padding: 9px 16px; min-height: 40px;
+  border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.2); background: var(--white); color: var(--ink);
+}
+.cmp-chip[aria-pressed="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.cmp-chip:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+
+/* content grid */
+.cmp-grid { display: grid; gap: 18px; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+.cmp-post {
+  background: var(--white); border: 1px solid rgba(18,18,18,.12); border-radius: var(--r-md);
+  overflow: hidden; display: flex; flex-direction: column;
+}
+.cmp-post__media {
+  position: relative; aspect-ratio: 4 / 5; background: var(--ink); color: var(--lime);
+  display: grid; place-items: center; font-family: var(--heading); font-size: 30px; letter-spacing: .06em;
+}
+.cmp-post__media img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.cmp-post__tag {
+  position: absolute; left: 12px; top: 12px; z-index: 1; font-family: var(--body); font-size: 12px;
+  letter-spacing: .08em; text-transform: uppercase; background: var(--lime); color: var(--ink);
+  padding: 4px 10px; border-radius: var(--r-pill);
+}
+.cmp-post__body { padding: 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
+.cmp-post__who { font-weight: 700; }
+.cmp-post__meta { font-size: 13px; color: var(--gray); }
+.cmp-post__nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0 0; }
+.cmp-post__nums div { margin: 0; }
+.cmp-post__nums dt { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--gray); }
+.cmp-post__nums dd { margin: 2px 0 0; font-weight: 700; font-size: 16px; }
+.cmp-post__link { margin-top: auto; font-size: 14px; color: var(--ink); }
+.cmp-est { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--gray); font-weight: 500; }
+
+/* bars */
+.cmp-split { display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.cmp-bars h3 { font-size: 13px; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); margin: 0 0 14px; font-weight: 500; }
+.cmp-bar { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(60px, 1.3fr) auto; gap: 12px; align-items: center; margin: 0 0 10px; font-size: 14px; }
+.cmp-bar span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cmp-bar b { font-weight: 700; min-width: 2.5em; text-align: right; }
+.cmp-bar i { display: block; height: 8px; border-radius: 999px; background: rgba(18,18,18,.08); overflow: hidden; }
+.cmp-bar i::after { content: ""; display: block; height: 100%; width: var(--w); background: var(--ink); border-radius: 999px; }
+
+/* campaign list */
+.cmp-list { display: grid; gap: 14px; }
+.cmp-list a {
+  display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 22px 26px; border-radius: var(--r-md); border: 1px solid rgba(18,18,18,.12);
+  text-decoration: none; color: var(--ink); background: var(--white);
+}
+.cmp-list a:hover { border-color: var(--ink); }
+.cmp-list strong { font-family: var(--heading); font-weight: 400; font-size: 34px; line-height: 1; }
+.cmp-status { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; padding: 5px 12px; border-radius: 999px; background: var(--linen); }
+.cmp-status--live { background: var(--go-soft); color: var(--go); }
+
+.cmp-actions { padding-bottom: 80px; }
+.cmp-actions .cat-btn { margin: 0 10px 10px 0; }
+.cmp-btn-outline { background: transparent; color: var(--ink); border: 1px solid var(--ink); text-decoration: none; }
+.cmp-btn-outline:hover { background: var(--ink); color: var(--lime); }
+.cmp-empty { text-align: center; padding: 80px 5%; color: var(--gray); }
+
+@media (max-width: 640px) {
+  .cat-summary__grid { gap: 28px; }
+  .cat-summary__grid dd { font-size: 34px; }
+  .cmp-panel { padding: 16px; }
+}
+
+/* The PDF is the browser's own print-to-PDF: everything interactive goes,
+   colour stays, and sections do not split across pages. */
+@media print {
+  @page { margin: 14mm; }
+  body, .cat-app { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .cat-gate, .cat-portfolio, .cat-back, .cmp-filters, .cmp-actions .cat-btn { display: none !important; }
+  .cmp-hero { padding: 0 0 20px; }
+  .cat-topbar { margin-bottom: 24px; }
+  .cmp-title { font-size: 64px; }
+  .cmp-section { padding-top: 26px; break-inside: avoid; }
+  .cmp-grid { grid-template-columns: repeat(3, 1fr); }
+  .cmp-post { break-inside: avoid; }
+  .cmp-table { min-width: 0; font-size: 12px; }
+}

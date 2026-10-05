@@ -50,6 +50,9 @@ python3 build/catalogue_dist.py
 rsync -a --exclude 'catalogue' "$SRC/assets/" "$DST/assets/"
 cp "$SRC/dist/index.html"           "$DST/index.html"
 cp "$SRC/dist/selection/index.html" "$DST/selection/index.html"
+# The campaign report is hand-written in the repo, not built.
+mkdir -p "$DST/campaign"
+cp "$SRC/campaign/index.html"       "$DST/campaign/index.html"
 
 # Stamp a ?v=<hash> onto the js/css URLs. The source templates carry one but
 # the dist build drops it, so catalogue.js sits at a URL that never changes —
@@ -61,14 +64,15 @@ python3 - "$DST" <<'PYSTAMP'
 import hashlib, re, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
-vjs, vcss = h('assets/js/catalogue.js'), h('assets/css/catalogue.css')
-for page in ('index.html', 'selection/index.html'):
+names = ('js/catalogue.js', 'css/catalogue.css', 'js/campaign.js', 'css/campaign.css')
+stamp = {n: h('assets/' + n) for n in names}
+for page in ('index.html', 'selection/index.html', 'campaign/index.html'):
     f = root / page
     s = f.read_text()
-    s = re.sub(r'((?:\.\./)?assets/js/catalogue\.js)(\?v=[0-9a-z]+)?', r'\1?v=' + vjs, s)
-    s = re.sub(r'((?:\.\./)?assets/css/catalogue\.css)(\?v=[0-9a-z]+)?', r'\1?v=' + vcss, s)
+    for n, v in stamp.items():
+        s = re.sub(r'((?:\.\./)?assets/' + re.escape(n) + r')(\?v=[0-9a-z]+)?', r'\1?v=' + v, s)
     f.write_text(s)
-print("stamped js=%s css=%s" % (vjs, vcss))
+print("stamped " + " ".join("%s=%s" % (n.split('/')[-1], v) for n, v in stamp.items()))
 PYSTAMP
 
 # The banner failing is silent by design upstream, so check it here.

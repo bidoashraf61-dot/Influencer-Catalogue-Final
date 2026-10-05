@@ -216,6 +216,77 @@ CREATE TABLE IF NOT EXISTS clicks (
 );
 CREATE INDEX IF NOT EXISTS clicks_campaign ON clicks(campaign_id, at);
 CREATE INDEX IF NOT EXISTS clicks_slug     ON clicks(slug);
+
+-- A creator's post, reel, story or video inside a campaign's dates. Found by
+-- the capture job or added by hand. `section` is 'campaign' when it matched
+-- the rules, 'other' when it did not (the "All content" tab); the admin can
+-- move it, and a later capture never moves it back.
+CREATE TABLE IF NOT EXISTS content (
+  id            INTEGER PRIMARY KEY,
+  campaign_id   INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  code          TEXT NOT NULL,
+  platform      TEXT NOT NULL,
+  kind          TEXT NOT NULL,             -- post | reel | story | video | short
+  url           TEXT NOT NULL,
+  posted_at     INTEGER,
+  caption       TEXT,
+  thumb         TEXT,                      -- URL as captured; may expire
+  followers     INTEGER,                   -- creator's followers when captured
+  section       TEXT NOT NULL DEFAULT 'campaign',
+  disclosure_ok INTEGER,                   -- NULL = no disclosure required
+  hidden        INTEGER NOT NULL DEFAULT 0,
+  source        TEXT NOT NULL DEFAULT 'capture',   -- capture | manual
+  created_at    INTEGER NOT NULL,
+  UNIQUE (campaign_id, url)
+);
+
+-- The numbers on one piece of content at one moment. A capture keeps at most
+-- one per day per post (a re-run that day replaces it), so each post gets a
+-- daily history. NULL = not visible (hidden likes), not zero.
+CREATE TABLE IF NOT EXISTS snapshots (
+  id         INTEGER PRIMARY KEY,
+  content_id INTEGER NOT NULL REFERENCES content(id) ON DELETE CASCADE,
+  at         INTEGER NOT NULL,
+  likes      INTEGER,
+  comments   INTEGER,
+  views      INTEGER,
+  shares     INTEGER,
+  saves      INTEGER,
+  source     TEXT NOT NULL DEFAULT 'capture'       -- capture | manual
+);
+CREATE INDEX IF NOT EXISTS snapshots_content ON snapshots(content_id, at);
+
+-- Insight screenshots a creator (or the admin) uploads for one post. The
+-- capture job reads the numbers off them (status 'extracted'); only once the
+-- admin approves do they replace the estimates on the client's report.
+CREATE TABLE IF NOT EXISTS insights (
+  id          INTEGER PRIMARY KEY,
+  campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  code        TEXT NOT NULL,
+  content_id  INTEGER REFERENCES content(id) ON DELETE SET NULL,
+  post_url    TEXT,                       -- when the post is not captured yet
+  files       TEXT NOT NULL,              -- JSON ["<name>.jpg", ...]
+  status      TEXT NOT NULL DEFAULT 'pending',  -- pending|extracted|approved|rejected
+  extracted   TEXT,                       -- JSON, as read by Claude
+  approved    TEXT,                       -- JSON, as approved by the admin
+  note        TEXT,
+  uploaded_at INTEGER NOT NULL,
+  decided_at  INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS settings (
+  key   TEXT PRIMARY KEY,
+  value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS capture_runs (
+  id       INTEGER PRIMARY KEY,
+  at       INTEGER NOT NULL,
+  ok       INTEGER NOT NULL,
+  posts    INTEGER,
+  insights INTEGER,
+  errors   TEXT
+);
 """
 
 
@@ -355,6 +426,21 @@ def migrate(conn):
         # The creator's own rate to us, remembered so the next selection
         # starts from it. Internal, like rating: never sent to a client.
         conn.execute("ALTER TABLE creators ADD COLUMN cost INTEGER")
+
+    camp_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
+    if "emv" not in camp_cols:
+        # Per-campaign EMV multipliers (NULL = the workspace defaults) and
+        # what the client's report shows.
+        conn.execute("ALTER TABLE campaigns ADD COLUMN emv TEXT")
+        conn.execute("ALTER TABLE campaigns ADD COLUMN visibility TEXT")
+    cc_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaign_creators)")}
+    if "insights_token" not in cc_cols:
+        conn.execute("ALTER TABLE campaign_creators ADD COLUMN insights_token TEXT")
+    for r in conn.execute("SELECT campaign_id, code FROM campaign_creators "
+                          "WHERE insights_token IS NULL").fetchall():
+        conn.execute("UPDATE campaign_creators SET insights_token = ? "
+                     "WHERE campaign_id = ? AND code = ?",
+                     (secrets.token_urlsafe(18), r["campaign_id"], r["code"]))
 
     # Campaigns made before tracking links existed: give every creator in
     # them a link now, so no campaign is left without.
@@ -1462,12 +1548,13 @@ def save_campaign(cid, **fields):
     """Update the given columns of one campaign. Unknown keys are refused so a
     form cannot write a column it was never meant to."""
     allowed = {"name", "client", "code_id", "platform", "starts_at", "ends_at", "status",
-               "rules", "destination", "cost", "notes"}
+               "rules", "destination", "cost", "notes", "emv", "visibility"}
     bad = set(fields) - allowed
     if bad:
         raise ValueError("not a campaign field: " + ", ".join(sorted(bad)))
-    if "rules" in fields and not isinstance(fields["rules"], str):
-        fields["rules"] = json.dumps(fields["rules"])
+    for key in ("rules", "emv", "visibility"):
+        if key in fields and fields[key] is not None and not isinstance(fields[key], str):
+            fields[key] = json.dumps(fields[key])
     if fields.get("status") is not None and fields["status"] not in CAMPAIGN_STATUSES:
         raise ValueError("unknown status")
     if not fields:
@@ -1492,7 +1579,8 @@ def campaign_creators(cid):
     # the creator has since been deleted from the roster.
     with connect() as conn:
         return conn.execute(
-            "SELECT r.*, x.code cc_code, x.cost campaign_cost, x.sort cc_sort, x.added_at "
+            "SELECT r.*, x.code cc_code, x.cost campaign_cost, x.sort cc_sort, x.added_at, "
+            "x.insights_token "
             "FROM campaign_creators x LEFT JOIN creators r ON r.code = x.code "
             "WHERE x.campaign_id = ? ORDER BY x.sort, x.added_at, x.code", (cid,)).fetchall()
 
@@ -1509,8 +1597,9 @@ def add_campaign_creators(cid, codes, costs=None, conn=None):
     added = 0
     for i, code in enumerate(codes):
         cur = conn.execute(
-            "INSERT OR IGNORE INTO campaign_creators (campaign_id,code,cost,sort,added_at) "
-            "VALUES (?,?,?,?,?)", (cid, code, costs.get(code), start + i, now()))
+            "INSERT OR IGNORE INTO campaign_creators (campaign_id,code,cost,sort,added_at,"
+            "insights_token) VALUES (?,?,?,?,?,?)",
+            (cid, code, costs.get(code), start + i, now(), secrets.token_urlsafe(18)))
         added += cur.rowcount
         ensure_link(cid, code, conn)
     if added:
@@ -1651,6 +1740,282 @@ def click_stats(cid):
                 "by_creator": group("code"), "by_app": group("app"),
                 "by_device": group("device"), "by_os": group("os"),
                 "by_country": group("country")}
+
+
+# --------------------------------------------------------------- settings --
+
+def setting(key, default=None):
+    with connect() as conn:
+        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+    if row is None or row["value"] is None:
+        return default
+    try:
+        return json.loads(row["value"])
+    except ValueError:
+        return row["value"]
+
+
+def set_setting(key, value):
+    with connect() as conn:
+        conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) "
+                     "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                     (key, json.dumps(value)))
+
+
+# ---------------------------------------------------------------- content --
+
+KINDS = ["post", "reel", "story", "video", "short"]
+VIDEO_KINDS = {"reel", "video", "short"}
+METRICS = ["likes", "comments", "views", "shares", "saves"]
+
+
+def match_rules(rules, text):
+    """(section, disclosure_ok) for a caption under a campaign's rules.
+
+    No rules at all = every post in the dates counts. Matching is on whole
+    tags for # and @ (so #svr does not match #svrlove) and on substrings for
+    keywords, case-insensitive. A story has no caption; the capture job sends
+    the sticker and on-screen text it read as the caption instead."""
+    low = (text or "").lower()
+    tags = set(re.findall(r"[#@][\w\u0600-\u06FF.]+", low))
+    tags |= {t.rstrip(".") for t in tags}
+    wanted = rules["hashtags"] + rules["mentions"]
+    if not wanted and not rules["keywords"]:
+        section = "campaign"
+    elif any(t in tags for t in wanted) or any(k in low for k in rules["keywords"]):
+        section = "campaign"
+    else:
+        section = "other"
+    disc = rules["disclosure"]
+    ok = None if not disc else int(any((d in tags) if d[0] in "#@" else (d in low) for d in disc))
+    return section, ok
+
+
+def add_content(cid, item, source="capture", conn=None):
+    """Insert or refresh one post by URL; record today's numbers. Returns
+    (content_id, created). The section an admin chose is never overwritten."""
+    if conn is None:
+        with connect() as own:
+            return add_content(cid, item, source, own)
+    k = conn.execute("SELECT * FROM campaigns WHERE id = ?", (cid,)).fetchone()
+    section, disc = match_rules(rules_of(k), item.get("caption"))
+    row = conn.execute("SELECT id FROM content WHERE campaign_id = ? AND url = ?",
+                       (cid, item["url"])).fetchone()
+    created = row is None
+    if created:
+        cur = conn.execute(
+            "INSERT INTO content (campaign_id,code,platform,kind,url,posted_at,caption,thumb,"
+            "followers,section,disclosure_ok,source,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (cid, item["code"], item["platform"], item["kind"], item["url"], item.get("posted_at"),
+             item.get("caption"), item.get("thumb"), item.get("followers"), section, disc,
+             source, now()))
+        content_id = cur.lastrowid
+    else:
+        content_id = row["id"]
+        conn.execute(
+            "UPDATE content SET caption = COALESCE(?, caption), thumb = COALESCE(?, thumb), "
+            "followers = COALESCE(?, followers), posted_at = COALESCE(posted_at, ?), "
+            "disclosure_ok = ? WHERE id = ?",
+            (item.get("caption"), item.get("thumb"), item.get("followers"),
+             item.get("posted_at"), disc, content_id))
+    if any(item.get(m) is not None for m in METRICS):
+        add_snapshot(content_id, item, source, conn)
+    return content_id, created
+
+
+def add_snapshot(content_id, values, source="capture", conn=None):
+    """Today's numbers for a post. A second capture the same UTC day replaces
+    the first, so a re-run does not double the history."""
+    if conn is None:
+        with connect() as own:
+            return add_snapshot(content_id, values, source, own)
+    t = now()
+    day = t - t % 86400
+    conn.execute("DELETE FROM snapshots WHERE content_id = ? AND source = ? AND at >= ?",
+                 (content_id, source, day))
+    conn.execute("INSERT INTO snapshots (content_id,at,likes,comments,views,shares,saves,source) "
+                 "VALUES (?,?,?,?,?,?,?,?)",
+                 (content_id, t) + tuple(values.get(m) for m in METRICS) + (source,))
+
+
+def campaign_content(cid, include_hidden=True):
+    """Every post with its latest numbers and approved insight values."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT c.*, r.name creator_name, r.photo creator_photo, "
+            " s.likes, s.comments, s.views, s.shares, s.saves, s.at metrics_at "
+            "FROM content c LEFT JOIN creators r ON r.code = c.code "
+            "LEFT JOIN snapshots s ON s.id = (SELECT id FROM snapshots x WHERE x.content_id = c.id "
+            "  ORDER BY x.at DESC, x.id DESC LIMIT 1) "
+            "WHERE c.campaign_id = ?" + ("" if include_hidden else " AND c.hidden = 0")
+            + " ORDER BY COALESCE(c.posted_at, c.created_at) DESC", (cid,)).fetchall()
+        approved = {}
+        for r in conn.execute("SELECT content_id, approved FROM insights WHERE campaign_id = ? "
+                              "AND status = 'approved' AND content_id IS NOT NULL "
+                              "ORDER BY decided_at", (cid,)):
+            try:
+                approved[r["content_id"]] = json.loads(r["approved"] or "{}")
+            except ValueError:
+                pass
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["insights"] = approved.get(r["id"])
+        out.append(d)
+    return out
+
+
+def content_history(cid):
+    """Daily totals across the campaign: for each day, the latest numbers of
+    every post known by then, summed. Drives the "over time" chart."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT s.content_id, date(s.at,'unixepoch') d, s.likes, s.comments, s.views "
+            "FROM snapshots s JOIN content c ON c.id = s.content_id "
+            "WHERE c.campaign_id = ? AND c.hidden = 0 AND c.section = 'campaign' "
+            "ORDER BY s.at", (cid,)).fetchall()
+    latest, days = {}, {}
+    for r in rows:
+        latest[r["content_id"]] = r
+        days[r["d"]] = {k: sum((v[k] or 0) for v in latest.values())
+                        for k in ("likes", "comments", "views")}
+    return [dict(d=d, **v) for d, v in sorted(days.items())]
+
+
+def platform_followers(code, platform):
+    """A creator's follower count on one platform, from the roster — used
+    when a post arrives without one."""
+    c = creator(code)
+    if c is None:
+        return None
+    for a in split_profiles(c["profiles"]):
+        if a["platform"] == platform and a["followers"]:
+            return a["followers"]
+    return c["followers"]
+
+
+def update_content(content_id, **fields):
+    allowed = {"section", "hidden", "kind", "posted_at", "caption", "code", "platform", "followers"}
+    if set(fields) - allowed:
+        raise ValueError("not a content field")
+    if fields.get("section") not in (None, "campaign", "other"):
+        raise ValueError("bad section")
+    cols = sorted(fields)
+    with connect() as conn:
+        conn.execute("UPDATE content SET " + ", ".join(c + " = ?" for c in cols) + " WHERE id = ?",
+                     [fields[c] for c in cols] + [content_id])
+
+
+def delete_content(content_id):
+    with connect() as conn:
+        conn.execute("DELETE FROM content WHERE id = ?", (content_id,))
+
+
+def content_item(content_id):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM content WHERE id = ?", (content_id,)).fetchone()
+
+
+# --------------------------------------------------------------- insights --
+
+INSIGHT_FIELDS = ["reach", "impressions", "views", "likes", "comments", "shares", "saves",
+                  "profile_visits", "link_clicks", "sticker_taps"]
+
+
+def creator_by_insights_token(token):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT x.*, k.name campaign_name, k.ends_at, k.status, r.name creator_name "
+            "FROM campaign_creators x JOIN campaigns k ON k.id = x.campaign_id "
+            "LEFT JOIN creators r ON r.code = x.code WHERE x.insights_token = ?",
+            (token,)).fetchone()
+
+
+def add_insight(cid, code, files, content_id=None, post_url=None, note=None):
+    with connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO insights (campaign_id,code,content_id,post_url,files,note,uploaded_at) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (cid, code, content_id, post_url, json.dumps(files), note, now()))
+        return cur.lastrowid
+
+
+def insight(iid):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM insights WHERE id = ?", (iid,)).fetchone()
+
+
+def campaign_insights(cid):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT i.*, r.name creator_name, c.url content_url, c.kind content_kind "
+            "FROM insights i LEFT JOIN creators r ON r.code = i.code "
+            "LEFT JOIN content c ON c.id = i.content_id WHERE i.campaign_id = ? "
+            "ORDER BY CASE i.status WHEN 'extracted' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, "
+            "i.uploaded_at DESC", (cid,)).fetchall()
+
+
+def clean_insight_values(values):
+    out = {}
+    for k in INSIGHT_FIELDS:
+        v = (values or {}).get(k)
+        if isinstance(v, str):
+            v = "".join(ch for ch in v if ch.isdigit())
+            v = int(v) if v else None
+        if isinstance(v, (int, float)) and v >= 0:
+            out[k] = int(v)
+    return out
+
+
+def set_insight_extracted(iid, values):
+    with connect() as conn:
+        conn.execute("UPDATE insights SET extracted = ?, status = CASE WHEN status = 'pending' "
+                     "THEN 'extracted' ELSE status END WHERE id = ?",
+                     (json.dumps(clean_insight_values(values)), iid))
+
+
+def decide_insight(iid, approve, values=None, content_id=None):
+    with connect() as conn:
+        if approve:
+            conn.execute("UPDATE insights SET status = 'approved', approved = ?, decided_at = ?, "
+                         "content_id = COALESCE(?, content_id) WHERE id = ?",
+                         (json.dumps(clean_insight_values(values)), now(), content_id, iid))
+        else:
+            conn.execute("UPDATE insights SET status = 'rejected', decided_at = ? WHERE id = ?",
+                         (now(), iid))
+
+
+def pending_insights():
+    """Uploads waiting for the capture job to read them."""
+    with connect() as conn:
+        return conn.execute(
+            "SELECT i.id, i.campaign_id, i.code, i.files, i.post_url, c.url content_url, "
+            "c.platform, c.kind FROM insights i LEFT JOIN content c ON c.id = i.content_id "
+            "WHERE i.status = 'pending' ORDER BY i.uploaded_at").fetchall()
+
+
+# ---------------------------------------------------------------- capture --
+
+def capture_jobs(at=None):
+    """Live campaigns inside their dates (plus 7 days, for late numbers)."""
+    at = at or now()
+    with connect() as conn:
+        return conn.execute(
+            "SELECT * FROM campaigns WHERE status = 'live' AND starts_at IS NOT NULL "
+            "AND starts_at <= ? AND (ends_at IS NULL OR ends_at + 7*86400 >= ?)",
+            (at, at)).fetchall()
+
+
+def log_capture_run(ok, posts=None, insights_n=None, errors=None):
+    with connect() as conn:
+        conn.execute("INSERT INTO capture_runs (at,ok,posts,insights,errors) VALUES (?,?,?,?,?)",
+                     (now(), 1 if ok else 0, posts, insights_n, (errors or "")[:4000] or None))
+
+
+def capture_runs(limit=20):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM capture_runs ORDER BY at DESC LIMIT ?",
+                            (limit,)).fetchall()
 
 
 # ---------------------------------------------------------- notifications --

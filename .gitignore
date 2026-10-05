@@ -31,4 +31,7 @@ admin/.photo-secret
 # Lite CSV (python3 admin/track.py --geo-build …). Large and regenerated.
 admin/geo.db
 admin/geo.db.tmp
+
+# Insight screenshots creators upload for campaigns — client data.
+admin/insight_files/
 deploy/catalogue/secret.conf

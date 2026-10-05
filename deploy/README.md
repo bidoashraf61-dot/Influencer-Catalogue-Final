@@ -67,3 +67,33 @@ docker exec -i  influencer-catalogue-admin python3 /app/admin/seed.py --import-r
 
 `seed.py --import-roster` reads `content/catalogue_private.json`, which
 `build/influencer_catalogue.py` regenerates from the workbook.
+
+
+## Campaign tracker release (Oct 2026)
+
+What changes on the server, in order:
+
+1. **Admin code** — pull, then copy the Python files (new: `metrics.py`,
+   `track.py`) and restart:
+
+   ```bash
+   git -C /home/ubuntu/influencer-catalogue-src pull
+   cp /home/ubuntu/influencer-catalogue-src/admin/*.py /home/ubuntu/influencer-catalogue-admin/admin/
+   sudo docker restart influencer-catalogue-admin
+   ```
+
+   The new tables are created on start; nothing existing is touched. Back up
+   `catalogue.db` first anyway.
+2. **nginx** — copy the updated `deploy/catalogue/nginx-default.conf` to
+   `/home/ubuntu/influencer-catalogue/conf/default.conf`. It adds `/go/` and
+   `/insights/`, proxied to the admin container at `172.18.0.240:8900`.
+3. **Site** — run `update.sh`. It now also publishes `campaign/index.html` and
+   stamps `campaign.js` / `campaign.css`. It ends with `nginx -s reload`,
+   which picks up step 2.
+4. **Check:** `https://influencer-catalogue.hellovoice.co.uk/go/nothing` shows
+   "This link is not active" (served by the admin, so the proxy works);
+   `/campaign/` shows the passcode gate; Admin shows Campaigns and Settings.
+5. **Optional:** country lookup — `python3 admin/track.py --geo-build …`
+   inside the admin folder (see `docs/ADMIN.md` §5b).
+6. **Capture job:** Admin → Settings → Create token, then set up the Mac as in
+   `docs/CAPTURE-AGENT.md`.

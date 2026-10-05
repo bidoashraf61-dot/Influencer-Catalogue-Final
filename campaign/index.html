@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
+<meta name="referrer" content="no-referrer"/>
+<title>Campaign report — HelloVoice</title>
+<link rel="icon" href="../assets/icons/icon-32.png" type="image/png"/>
+<link rel="apple-touch-icon" href="../assets/icons/icon-180.png"/>
+<link rel="stylesheet" href="../assets/css/catalogue.css?v=1"/>
+<link rel="stylesheet" href="../assets/css/campaign.css?v=1"/>
+</head>
+<body class="cat-locked" data-page="campaign">
+
+<div class="cat-gate" id="cat-gate" hidden>
+  <div class="cat-gate__inner">
+    <img class="cat-gate__logo" src="../assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+    <p class="cat-gate__eyebrow">Confidential</p>
+    <h1 class="cat-gate__title">Campaign report</h1>
+    <p class="cat-gate__note">Enter the access code you were given.</p>
+    <form class="cat-gate__form" id="cat-gate-form" autocomplete="off">
+      <input type="password" id="cat-code" class="cat-gate__input" placeholder="Access code"
+             aria-label="Access code" autocomplete="off" spellcheck="false"/>
+      <button type="submit" class="cat-btn cat-btn--lime">Unlock</button>
+    </form>
+    <p class="cat-gate__error" id="cat-gate-error" role="alert" hidden>That code is not right.</p>
+  </div>
+</div>
+
+<main class="cat-app" id="cat-app" hidden>
+
+  <header class="cat-hero cmp-hero">
+    <div class="cat-pad"><div class="cat-container">
+      <div class="cat-topbar">
+        <img class="cat-hero__logo" src="../assets/brand/logo.png" alt="HelloVoice"/>
+        <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
+          Portfolio
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+        </a>
+      </div>
+      <a class="cat-back" href="#" id="cmp-back" hidden>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        All campaigns
+      </a>
+      <div class="cat-hero__head">
+        <div class="cat-pill">Campaign report</div>
+        <h1 class="cat-hero__title cmp-title" id="cmp-title">Campaigns</h1>
+      </div>
+      <p class="cat-hero__lead" id="cmp-lead"></p>
+      <p class="cmp-fresh" id="cmp-fresh"></p>
+    </div></div>
+  </header>
+
+  <!-- list of the passcode's campaigns -->
+  <section class="cmp-section" id="cmp-list" hidden>
+    <div class="cat-pad"><div class="cat-container">
+      <div class="cmp-list" id="cmp-list-items"></div>
+    </div></div>
+  </section>
+
+  <!-- one campaign -->
+  <div id="cmp-report" hidden>
+    <section class="cat-summary" aria-label="Results">
+      <div class="cat-pad"><div class="cat-container">
+        <dl class="cat-summary__grid" id="cmp-kpis"></dl>
+        <p class="cat-note" id="cmp-kpi-note"></p>
+      </div></div>
+    </section>
+
+    <section class="cmp-section">
+      <div class="cat-pad"><div class="cat-container">
+        <h2 class="cmp-h2">Over time</h2>
+        <div class="cmp-panel" id="cmp-chart"></div>
+      </div></div>
+    </section>
+
+    <section class="cmp-section">
+      <div class="cat-pad"><div class="cat-container">
+        <h2 class="cmp-h2">Creators</h2>
+        <div class="cmp-panel cmp-scroll"><table class="cmp-table" id="cmp-creators"></table></div>
+      </div></div>
+    </section>
+
+    <section class="cmp-section">
+      <div class="cat-pad"><div class="cat-container">
+        <h2 class="cmp-h2">Content</h2>
+        <div class="cmp-filters" id="cmp-filters"></div>
+        <div class="cmp-grid" id="cmp-posts"></div>
+      </div></div>
+    </section>
+
+    <section class="cmp-section" id="cmp-clicks-wrap" hidden>
+      <div class="cat-pad"><div class="cat-container">
+        <h2 class="cmp-h2">Link clicks</h2>
+        <div class="cmp-split" id="cmp-clicks"></div>
+      </div></div>
+    </section>
+
+    <section class="cmp-section cmp-actions">
+      <div class="cat-pad"><div class="cat-container">
+        <button type="button" class="cat-btn cat-btn--lime" id="cmp-print">Download PDF</button>
+        <a class="cat-btn cmp-btn-outline" id="cmp-csv" href="#">Download CSV</a>
+        <p class="cat-note" id="cmp-method"></p>
+      </div></div>
+    </section>
+  </div>
+
+  <p class="cmp-empty" id="cmp-empty" hidden></p>
+</main>
+
+<script>
+  window.CAMPAIGN_CONFIG = { api: "/admin" };
+</script>
+<script src="../assets/js/campaign.js?v=1"></script>
+</body>
+</html>

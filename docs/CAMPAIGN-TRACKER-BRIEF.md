@@ -1,6 +1,8 @@
 # Campaign Tracker — build brief
 
-Status: **brief, not built.** Agreed 2026-10-05 (brainstorm with Bido).
+Status: **built (M1–M7), not yet deployed.** Agreed 2026-10-05 (brainstorm with Bido).
+How to run it: `docs/ADMIN.md` §5b · capture job: `docs/CAPTURE-AGENT.md` ·
+deploy: `deploy/README.md` → "Campaign tracker release".
 Build locally in this repo → push to `origin` → pull on the live server.
 
 ---
@@ -174,8 +176,9 @@ Labels mark estimates as "est." and real values as "from creator insights".
 | Metric | Formula |
 |---|---|
 | Engagement | likes + comments |
-| Est. reach — post | modelled from engagement (method set in calc module; documented) |
-| Est. reach — story | follower count × story-view factor (configurable) |
+| Est. reach — post | engagement × 10, capped at followers (factor in Settings) |
+| Est. reach — story | followers × 5% (factor in Settings) |
+| Video (reel/video/short) | reach = views; counted as views, not impressions |
 | Est. impressions — post | est. reach × 1.5 |
 | Est. impressions — story | = est. reach |
 | Real reach / impressions | approved insight values (override estimates) |

@@ -375,9 +375,8 @@ destination are kept, never overwritten.
 
 1. nginx — the links live at the catalogue's root, not under `/admin`:
 
-   ```nginx
-   location /go/ { proxy_pass http://127.0.0.1:8900; include /etc/nginx/hv-proxy.conf; }
-   ```
+   Already in `deploy/catalogue/nginx-default.conf` (`/go/` and `/insights/`,
+   proxied from the catalogue container to the admin container).
 
 2. Country lookup (optional; without it countries read "Unknown"). Download
    the free *IP to Country Lite* CSV from db-ip.com (CC BY 4.0 — the clicks
@@ -390,8 +389,51 @@ destination are kept, never overwritten.
    Rebuild monthly if you like; `admin/geo.db` is git-ignored. Behind
    Cloudflare, its `CF-IPCountry` header is used instead and no file is needed.
 
-The tables (`campaigns`, `campaign_creators`, `links`, `clicks`) are created
-on the next start of the service; existing data is untouched.
+### Content, insights and the report
+
+- **Content tab** — every post, reel, story and video the capture job found
+  (or you added by link), with its latest numbers. *Counts as* is decided by
+  the rules on the caption; move a post either way, hide it, or type today's
+  numbers. A capture never undoes your move. Missing `#ad` is flagged.
+- **Insights tab** — each creator has a private upload link (copy it from
+  here and send it on WhatsApp). They upload screenshots of their insights;
+  the capture job reads the numbers; you check them against the screenshot,
+  pick the post, and approve. Approved reach / impressions / views replace the
+  estimates on the client's report. Screenshots are stored in
+  `admin/insight_files/` (git-ignored) and served only to an admin or the job.
+- **Report tab** — results plus the internal block (cost, CPM, cost per
+  engagement, cost per click), the client's report link, and downloads: Excel
+  workbook (Summary with an INTERNAL block, Creators, Posts, Clicks) and a
+  posts CSV.
+- **Setup → Client report** — what the client sees (reach & impressions,
+  clicks, EMV, posts outside the rules) and optional EMV rates for this
+  campaign only. Cost, CPM and ratings are never sent to the client.
+- **Settings** (top bar) — workspace EMV rates (SAR per view, impression,
+  like, comment, share, save, click; empty = EMV hidden), the estimate factors,
+  the capture token, the capture run log, and whether country lookup is
+  installed. Formulas: `docs/CAMPAIGN-TRACKER-BRIEF.md` §11 and `admin/metrics.py`.
+
+### The client's report — `/campaign/#t=<token>`
+
+A static page in the catalogue theme (`campaign/index.html`,
+`assets/js/campaign.js`, `assets/css/campaign.css`). The client opens it with
+their existing passcode; a passcode sees only campaigns linked to it on the
+Setup tab, and never a draft. Without a token it lists the passcode's
+campaigns. Sections: KPI band, over time, creators, content grid with
+filters, link clicks, **Download PDF** (the browser's print-to-PDF with print
+styles) and **Download CSV**. It states "Data updated every 24 hours" and the
+time of the last capture. All data comes from `GET /admin/api/campaign`, which
+returns a client-safe projection built by `metrics.client_report`.
+
+### The capture job
+
+A scheduled Claude task on the team Mac — see `docs/CAPTURE-AGENT.md`. It uses
+`tools/capture.py` and the `/admin/api/capture/*` endpoints with the token from
+Settings.
+
+The tables (`campaigns`, `campaign_creators`, `links`, `clicks`, `content`,
+`snapshots`, `insights`, `settings`, `capture_runs`) are created on the next
+start of the service; existing data is untouched.
 
 ## 6. Security notes, honestly
 

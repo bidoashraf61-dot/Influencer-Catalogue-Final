@@ -14,6 +14,12 @@ Routes
   /roster               add, edit, deactivate creators
   /requests             quote requests as an inbox
   /go/<slug>            public tracking link: counts the tap, redirects
+  /insights/<token>     public: a creator uploads insight screenshots
+  /campaigns …          campaign setup, content, insights, links, report
+  /settings             EMV rates, estimate factors, capture token
+  /api/campaigns        GET  viewer: the passcode's campaigns
+  /api/campaign         GET  viewer: one campaign's report (client-safe)
+  /api/capture/*        capture job (Bearer token): jobs, content, insights
   /campaigns            booked creators, dates and detection rules per client
   /api/unlock           POST {code}   -> sets a viewer cookie, returns roster
   /api/roster           GET           -> roster, viewer cookie required
@@ -45,6 +51,7 @@ import auth  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
 import links  # noqa: E402
+import metrics  # noqa: E402
 import track  # noqa: E402
 import uploads  # noqa: E402
 import views  # noqa: E402
@@ -53,6 +60,11 @@ SECRET = auth.load_secret(HERE / ".secret")
 # Salt for the visitor hash on tracking-link clicks: derived from the server
 # secret so it is stable across restarts, but not the secret itself.
 CLICK_SALT = __import__("hashlib").sha256(b"clicks|" + SECRET).hexdigest()
+# Insight screenshots creators upload. Private: beside the database, never in
+# the site's assets, served only to an admin or the capture job.
+INSIGHT_DIR = HERE / "insight_files"
+INSIGHT_MAX = 12 * 1024 * 1024        # per file
+INSIGHT_FILES = 6                     # per upload
 # Photos live with the built site so the catalogue and the dashboard share one
 # copy — uploading here updates what a client sees.
 PHOTO_DIR = HERE.parent / "site" / "assets" / "catalogue"
@@ -85,6 +97,8 @@ ALLOWED_ORIGINS = set()
 # the catalogue's own domain means the API is same-origin: no CORS, and the
 # viewer cookie can be SameSite=Lax instead of None.
 BASE = ""
+# Where public pages (/go/, /insights/) live: the site root, whatever BASE is.
+BASE_PUBLIC = ""
 
 def squash(text):
     """A name reduced to something a filename can be compared against.
@@ -238,6 +252,16 @@ class Handler(BaseHTTPRequestHandler):
 
         if path.startswith("/go/"):
             return self.go(path[len("/go/"):])
+        if path.startswith("/insights/"):
+            return self.insights_public(path[len("/insights/"):], query)
+        if path == "/api/campaigns":
+            return self.api_campaigns()
+        if path == "/api/campaign":
+            return self.api_campaign(query.get("t") or "")
+        if path == "/api/campaign.csv":
+            return self.api_campaign_csv(query.get("t") or "")
+        if path.startswith("/api/capture/"):
+            return self.capture_get(path[len("/api/capture/"):], query)
         if path == "/api/roster":
             return self.api_roster()
         if path == "/api/selection":
@@ -378,6 +402,39 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
                 db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok")))
+        if path in ("/campaigns/content", "/campaigns/report", "/campaigns/insights",
+                    "/campaigns/export.xlsx", "/campaigns/export.csv", "/campaigns/insight-file"):
+            cid = query.get("id", "")
+            k = db.campaign(int(cid)) if cid.isdigit() else None
+            if k is None:
+                return self.redirect("/campaigns?e=" + urllib.parse.quote("That campaign no longer exists."))
+            if path == "/campaigns/content":
+                return self.send(200, views.campaign_content_page(
+                    k, db.campaign_creators(k["id"]), self.all_posts(k),
+                    query.get("e"), query.get("ok")))
+            if path == "/campaigns/report":
+                return self.send(200, views.campaign_report_page(
+                    k, metrics.report(k, internal=True), self.site_origin()))
+            if path == "/campaigns/insights":
+                return self.send(200, views.campaign_insights_page(
+                    k, db.campaign_insights(k["id"]), db.campaign_creators(k["id"]),
+                    db.campaign_content(k["id"]), self.site_origin(), query.get("e"), query.get("ok")))
+            if path == "/campaigns/insight-file":
+                return self.insight_file(query.get("i", ""), query.get("n", ""), k["id"])
+            if path == "/campaigns/export.csv":
+                return self.send(200, self.posts_csv(metrics.report(k, internal=True)),
+                                 "text/csv; charset=utf-8",
+                                 [("Content-Disposition", 'attachment; filename="posts-%s.csv"'
+                                   % db.campaign_slug(k))])
+            return self.send(200, self.report_xlsx(k),
+                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             [("Content-Disposition", 'attachment; filename="report-%s.xlsx"'
+                               % db.campaign_slug(k))])
+        if path == "/settings":
+            return self.send(200, views.settings_page(
+                db.setting("emv_rates") or {}, metrics.factors(),
+                bool(db.setting("capture_token")), db.capture_runs(), track.GEO_DB.exists(),
+                None, query.get("e"), query.get("ok")))
         if path == "/campaigns/links":
             cid = query.get("id", "")
             k = db.campaign(int(cid)) if cid.isdigit() else None
@@ -452,6 +509,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_event()
         if path == "/api/selection":
             return self.api_selection_save()
+        if path.startswith("/api/capture/"):
+            return self.capture_post(path[len("/api/capture/"):])
+        if path.startswith("/insights/"):
+            return self.insights_upload(path[len("/insights/"):])
         if path == "/login":
             return self.post_login()
 
@@ -483,6 +544,18 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_campaign_delete()
         if path == "/campaigns/link":
             return self.post_campaign_link()
+        if path == "/campaigns/content/add":
+            return self.post_content_add()
+        if path == "/campaigns/content/update":
+            return self.post_content_update()
+        if path == "/campaigns/insights/decide":
+            return self.post_insight_decide()
+        if path == "/campaigns/insights/upload":
+            return self.post_insight_admin_upload()
+        if path == "/settings/save":
+            return self.post_settings()
+        if path == "/settings/token":
+            return self.post_settings_token()
         if path == "/roster/delete":
             return self.post_roster_delete()
         if path == "/roster/import":
@@ -1249,6 +1322,9 @@ class Handler(BaseHTTPRequestHandler):
                          platform=platform, starts_at=t_start, ends_at=t_end, status=status,
                          rules=rules, destination=destination or None,
                          cost=money(f.get("total_cost")), notes=(f.get("notes") or "").strip() or None)
+        vis = {key: f.get("vis_" + key) == "1" for key in ("reach", "clicks", "emv", "all_content")}
+        own_rates = self.rates_from(f)
+        db.save_campaign(k["id"], visibility=vis, emv={"*": own_rates} if own_rates else None)
         db.save_campaign_creators(k["id"], costs, remove)
         if adds:
             db.add_campaign_creators(k["id"], adds)
@@ -1284,6 +1360,427 @@ class Handler(BaseHTTPRequestHandler):
                             r["country"] or "", r["referrer"] or "",
                             "no (bot/preview)" if r["bot"] else "yes"])
         return "\ufeff" + out.getvalue()      # BOM: Excel reads it as UTF-8
+
+    # ------------------------------------------------- content & settings --
+
+    def all_posts(self, k):
+        """Every post (hidden too) with its derived numbers, for the admin."""
+        f = metrics.factors()
+        out = []
+        for c in db.campaign_content(k["id"]):
+            out.append({**c, **metrics.post_numbers(c, f)})
+        return out
+
+    @staticmethod
+    def rates_from(f):
+        rates = {}
+        for a in metrics.EMV_ACTIONS:
+            v = "".join(ch for ch in (f.get("emv_" + a) or "") if ch.isdigit() or ch == ".")
+            try:
+                if v and float(v) > 0:
+                    rates[a] = float(v)
+            except ValueError:
+                pass
+        return rates
+
+    @staticmethod
+    def counts_from(f):
+        out = {}
+        for m in db.METRICS:
+            v = "".join(ch for ch in (f.get(m) or "") if ch.isdigit())
+            out[m] = int(v) if v else None
+        return out
+
+    def post_content_add(self):
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None:
+            return self.redirect("/campaigns")
+        back = "/campaigns/content?id=%d" % k["id"]
+        url = (f.get("url") or "").strip()
+        code = (f.get("code") or "").strip().upper()
+        if not re.match(r"^https://[^\s/]+\.[^\s]+$", url):
+            return self.redirect(back + "&e=" + urllib.parse.quote("The post link must start with https://"))
+        if code not in {m["cc_code"] for m in db.campaign_creators(k["id"])}:
+            return self.redirect(back + "&e=" + urllib.parse.quote("Pick a creator in this campaign."))
+        platform = f.get("platform") if f.get("platform") in db.PLATFORMS else "Instagram"
+        kind = f.get("kind") if f.get("kind") in db.KINDS else "post"
+        posted = db.day_bounds(f.get("posted") or "", None)
+        item = {"code": code, "platform": platform, "kind": kind, "url": url, "posted_at": posted,
+                "caption": (f.get("caption") or "").strip() or None,
+                "followers": db.platform_followers(code, platform), **self.counts_from(f)}
+        _, created = db.add_content(k["id"], item, source="manual")
+        return self.redirect(back + "&ok=" + urllib.parse.quote(
+            "Post added." if created else "That post was already here — its numbers were updated."))
+
+    def post_content_update(self):
+        f = self.form_body()
+        cid, pid = (f.get("id") or "").strip(), (f.get("content") or "").strip()
+        item = db.content_item(int(pid)) if pid.isdigit() else None
+        if item is None or str(item["campaign_id"]) != cid:
+            return self.redirect("/campaigns")
+        back = "/campaigns/content?id=" + cid
+        what = f.get("do")
+        if what in ("campaign", "other"):
+            db.update_content(item["id"], section=what)
+        elif what in ("hide", "unhide"):
+            db.update_content(item["id"], hidden=1 if what == "hide" else 0)
+        elif what == "delete":
+            db.delete_content(item["id"])
+        elif what == "metrics":
+            db.add_snapshot(item["id"], self.counts_from(f), "manual")
+        return self.redirect(back + "&ok=" + urllib.parse.quote("Saved."))
+
+    def post_settings(self):
+        f = self.form_body()
+        db.set_setting("emv_rates", {"*": self.rates_from(f)})
+        fac = {}
+        for key, default in metrics.DEFAULT_FACTORS.items():
+            try:
+                v = float((f.get(key) or "").strip())
+                fac[key] = v if v > 0 else default
+            except ValueError:
+                fac[key] = default
+        db.set_setting("reach_factors", fac)
+        return self.redirect("/settings?ok=" + urllib.parse.quote("Settings saved."))
+
+    def post_settings_token(self):
+        import hashlib, secrets
+        token = "hvcap_" + secrets.token_urlsafe(32)
+        db.set_setting("capture_token", hashlib.sha256(token.encode()).hexdigest())
+        return self.send(200, views.settings_page(
+            db.setting("emv_rates") or {}, metrics.factors(), True, db.capture_runs(),
+            track.GEO_DB.exists(), token))
+
+    # -------------------------------------------------------- client API --
+
+    def api_campaigns(self):
+        """The campaigns this passcode may see. Drafts are never listed."""
+        code_id = self.viewer_code_id()
+        if code_id is None:
+            return self.send_json(401, {"ok": False}, self.cors())
+        with db.connect() as conn:
+            rows = conn.execute(
+                "SELECT token, name, client, status, starts_at, ends_at FROM campaigns "
+                "WHERE code_id = ? AND status != 'draft' ORDER BY starts_at DESC", (code_id,)).fetchall()
+        return self.send_json(200, {"ok": True, "campaigns": [dict(r) for r in rows]},
+                              self.cors() + [("Cache-Control", "no-store")])
+
+    def viewer_campaign(self, token):
+        code_id = self.viewer_code_id()
+        if code_id is None:
+            return None, 401
+        k = db.campaign(token=token) if token else None
+        # Not found and not yours look the same from outside.
+        if k is None or k["code_id"] != code_id or k["status"] == "draft":
+            return None, 404
+        return k, 200
+
+    def api_campaign(self, token):
+        k, status = self.viewer_campaign(token)
+        if k is None:
+            return self.send_json(status, {"ok": False}, self.cors())
+        db.log("view", self.viewer_code_id(), self.client_ip(), self.headers.get("User-Agent"),
+               "campaign:" + k["name"][:60])
+        rep = metrics.client_report(k)
+        return self.send_json(200, {"ok": True, "report": rep},
+                              self.cors() + [("Cache-Control", "no-store")])
+
+    def api_campaign_csv(self, token):
+        k, status = self.viewer_campaign(token)
+        if k is None:
+            return self.send(status, b"", "text/plain")
+        return self.send(200, self.posts_csv(metrics.client_report(k)), "text/csv; charset=utf-8",
+                         self.cors() + [("Content-Disposition", 'attachment; filename="campaign-%s.csv"'
+                                         % db.campaign_slug(k))])
+
+    def posts_csv(self, rep):
+        import csv, io
+        out = io.StringIO()
+        w = csv.writer(out)
+        names = {c["code"]: c["name"] for c in rep["creators"]}
+        cols = ["posted (UTC)", "creator", "platform", "type", "link", "counts", "likes", "comments",
+                "views", "reach", "reach source", "impressions", "ER %", "video ER %", "EMV (SAR)"]
+        w.writerow(cols)
+        for p in rep["posts"]:
+            w.writerow([ts(p.get("posted_at")) if p.get("posted_at") else "", names.get(p["code"], p["code"]),
+                        p["platform"], p["kind"], p["url"],
+                        "campaign" if p.get("section") == "campaign" else "all content",
+                        p.get("likes"), p.get("comments"), p.get("views") or "", p.get("reach", ""),
+                        ("creator insights" if p.get("reach_real") else "estimate") if "reach" in p else "",
+                        p.get("impressions", ""), "%.2f" % p["er"] if p.get("er") is not None else "",
+                        "%.2f" % p["video_er"] if p.get("video_er") is not None else "",
+                        "%.0f" % p["emv"] if p.get("emv") else ""])
+        return "﻿" + out.getvalue()
+
+    def report_xlsx(self, k):
+        """The internal workbook: summary, creators, posts, clicks."""
+        import xlsx
+        r = metrics.report(k, internal=True)
+        t, inn = r["total"], r["internal"]
+        n = lambda v, d=0: "" if v is None else (round(v, d) if d else int(round(v)))
+        summary = [["Campaign", k["name"]], ["Client", k["client"] or ""],
+                   ["Dates", (views._date_value(k["starts_at"]) + " → " + views._date_value(k["ends_at"]))],
+                   ["Status", k["status"]], [""],
+                   ["Posts", t["posts"]], ["Views", n(t["views"])], ["Reach", n(t["reach"])],
+                   ["Impressions", n(t["impressions"])], ["Engagement", n(t["engagement"])],
+                   ["Avg ER %", n(t["er"], 2)], ["Video ER %", n(t["video_er"], 2)],
+                   ["Impressions ER %", n(t["imp_er"], 2)], ["Clicks", t["clicks"]], ["CTR %", n(t["ctr"], 3)],
+                   ["EMV (SAR)", n(t["emv"])], [""], ["INTERNAL — do not send"],
+                   ["Cost (SAR)", n(inn["cost"])], ["CPM (SAR)", n(inn["cpm"], 2)],
+                   ["Cost per engagement (SAR)", n(inn["cpe"], 2)], ["Cost per click (SAR)", n(inn["cpc"], 2)]]
+        creators = [["Code", "Creator", "Followers", "Posts", "Views", "Reach", "Impressions", "Engagement",
+                     "ER %", "Video ER %", "Clicks", "EMV (SAR)", "Fee (SAR)", "CPM (SAR)", "Cost/click (SAR)"]]
+        for c in r["creators"]:
+            creators.append([c["code"], c["name"], c["followers"] or "", c["posts"], n(c["views"]), n(c["reach"]),
+                             n(c["impressions"]), n(c["engagement"]), n(c["er"], 2), n(c["video_er"], 2),
+                             c["clicks"], n(c["emv"]), n(c.get("cost")), n(c.get("cpm"), 2), n(c.get("cpc"), 2)])
+        posts = [["Posted", "Creator", "Platform", "Type", "Link", "Counts", "Likes", "Comments", "Views",
+                  "Reach", "Reach source", "Impressions", "ER %", "Video ER %", "EMV (SAR)", "Disclosure"]]
+        names = {c["code"]: c["name"] for c in r["creators"]}
+        for p in r["posts"]:
+            posts.append([views._date_value(p["posted_at"]), names.get(p["code"], p["code"]), p["platform"],
+                          p["kind"], p["url"], p["section"], p["likes"], p["comments"], p["views"] or "",
+                          n(p["reach"]), "insights" if p["reach_real"] else "estimate", n(p["impressions"]),
+                          n(p["er"], 2), n(p["video_er"], 2), n(p["emv"]) if r["emv_set"] else "",
+                          {None: "", 1: "ok", 0: "missing"}[p["disclosure_ok"]]])
+        cl = [["Link", "Creator", "Clicks", "Unique"]]
+        for l in db.campaign_links(k["id"]):
+            cl.append([l["slug"], names.get(l["code"], l["code"]), l["clicks"], l["uniques"]])
+        return xlsx.write_book([("Summary", summary, {0: 28, 1: 40}, None),
+                                ("Creators", creators, None, None), ("Posts", posts, {4: 50}, None),
+                                ("Clicks", cl, {0: 40}, None)])
+
+    # ----------------------------------------------------------- capture --
+
+    def capture_ok(self):
+        import hashlib, hmac
+        want = db.setting("capture_token")
+        got = self.headers.get("Authorization", "")
+        if not want or not got.startswith("Bearer "):
+            return False
+        return hmac.compare_digest(hashlib.sha256(got[7:].strip().encode()).hexdigest(), want)
+
+    def capture_get(self, what, query):
+        if not self.capture_ok():
+            return self.send_json(401, {"ok": False, "error": "bad or missing token"})
+        if what == "jobs":
+            jobs = []
+            for k in db.capture_jobs():
+                members = db.campaign_creators(k["id"])
+                with db.connect() as conn:
+                    known = [dict(r) for r in conn.execute(
+                        "SELECT id, code, platform, kind, url FROM content WHERE campaign_id = ?", (k["id"],))]
+                jobs.append({
+                    "campaign_id": k["id"], "name": k["name"], "platform": k["platform"],
+                    "starts_at": k["starts_at"], "ends_at": k["ends_at"], "rules": db.rules_of(k),
+                    "creators": [{"code": m["cc_code"], "name": m["name"],
+                                  "profiles": [a for a in db.split_profiles(m["profiles"])
+                                               if a.get("url") and (not k["platform"] or a["platform"] == k["platform"])]}
+                                 for m in members if m["code"]],
+                    "known_posts": known})
+            pend = [{"id": r["id"], "campaign_id": r["campaign_id"], "code": r["code"],
+                     "post_url": r["content_url"] or r["post_url"], "platform": r["platform"], "kind": r["kind"],
+                     "files": json.loads(r["files"] or "[]")} for r in db.pending_insights()]
+            return self.send_json(200, {"ok": True, "now": db.now(), "campaigns": jobs,
+                                        "insights_pending": pend, "kinds": db.KINDS,
+                                        "insight_fields": db.INSIGHT_FIELDS})
+        if what == "insight-file":
+            row = db.insight(int(query["i"])) if (query.get("i") or "").isdigit() else None
+            if row is None:
+                return self.send(404, b"", "text/plain")
+            return self.insight_file(str(row["id"]), query.get("n", ""), row["campaign_id"])
+        return self.send_json(404, {"ok": False})
+
+    def capture_post(self, what):
+        if not self.capture_ok():
+            return self.send_json(401, {"ok": False, "error": "bad or missing token"})
+        body = self.json_body()
+        if what == "content":
+            cid = body.get("campaign_id")
+            k = db.campaign(int(cid)) if str(cid).isdigit() else None
+            if k is None:
+                return self.send_json(404, {"ok": False, "error": "no such campaign"})
+            members = {m["cc_code"] for m in db.campaign_creators(k["id"])}
+            done, created, refused = 0, 0, []
+            for it in body.get("items") or []:
+                why = self.capture_item_problem(it, k, members)
+                if why:
+                    refused.append({"url": it.get("url"), "why": why})
+                    continue
+                item = {"code": it["code"].upper(), "platform": it["platform"], "kind": it["kind"],
+                        "url": it["url"].strip(), "posted_at": self.epoch(it.get("posted_at")),
+                        "caption": (it.get("caption") or None), "thumb": it.get("thumb") or None,
+                        "followers": it.get("followers") if isinstance(it.get("followers"), int)
+                        else db.platform_followers(it["code"].upper(), it["platform"])}
+                for m in db.METRICS:
+                    v = it.get(m)
+                    item[m] = v if isinstance(v, int) and v >= 0 else None
+                _, new = db.add_content(k["id"], item, "capture")
+                done += 1; created += 1 if new else 0
+            return self.send_json(200, {"ok": True, "saved": done, "new": created, "refused": refused})
+        if what == "insight":
+            iid = body.get("id")
+            row = db.insight(int(iid)) if str(iid).isdigit() else None
+            if row is None:
+                return self.send_json(404, {"ok": False})
+            db.set_insight_extracted(row["id"], body.get("values") or {})
+            return self.send_json(200, {"ok": True})
+        if what == "run":
+            db.log_capture_run(bool(body.get("ok")), body.get("posts"), body.get("insights"),
+                               body.get("errors") if isinstance(body.get("errors"), str)
+                               else json.dumps(body.get("errors") or "")[:4000])
+            return self.send_json(200, {"ok": True})
+        return self.send_json(404, {"ok": False})
+
+    @staticmethod
+    def epoch(v):
+        if isinstance(v, (int, float)) and v > 0:
+            return int(v)
+        if isinstance(v, str) and v.strip():
+            text = v.strip().replace("Z", "+00:00")
+            try:
+                d = datetime.fromisoformat(text)
+                if d.tzinfo is None:
+                    d = d.replace(tzinfo=timezone.utc)
+                return int(d.timestamp())
+            except ValueError:
+                return db.day_bounds(text[:10], None)
+        return None
+
+    def capture_item_problem(self, it, k, members):
+        if not isinstance(it, dict):
+            return "not an object"
+        if (it.get("code") or "").upper() not in members:
+            return "creator not in this campaign"
+        if it.get("platform") not in db.PLATFORMS:
+            return "unknown platform"
+        if it.get("kind") not in db.KINDS:
+            return "kind must be one of " + ", ".join(db.KINDS)
+        if not re.match(r"^https://[^\s/]+\.[^\s]+$", (it.get("url") or "").strip()):
+            return "url must start with https://"
+        t = self.epoch(it.get("posted_at"))
+        if t is not None and k["starts_at"] and (t < k["starts_at"] - 86400 or
+                                                (k["ends_at"] and t > k["ends_at"] + 86400)):
+            return "posted outside the campaign dates"
+        return None
+
+    # ---------------------------------------------------------- insights --
+
+    def insight_file(self, iid, name, cid):
+        row = db.insight(int(iid)) if str(iid).isdigit() else None
+        if row is None or row["campaign_id"] != cid:
+            return self.send(404, b"", "text/plain")
+        files = json.loads(row["files"] or "[]")
+        name = Path(name).name
+        if name not in files:
+            return self.send(404, b"", "text/plain")
+        f = INSIGHT_DIR / name
+        if not f.is_file():
+            return self.send(404, b"", "text/plain")
+        kind = uploads.image_kind(f.read_bytes()[:16]) or "jpeg"
+        return self.send(200, f.read_bytes(), "image/" + ("jpeg" if kind == "jpg" else kind),
+                         [("Cache-Control", "private, no-store")])
+
+    def save_insight_files(self, parts):
+        """Store uploaded screenshots under random names. Returns (names, error)."""
+        import secrets
+        files = [p for p in parts if isinstance(p, dict) and p.get("data")]
+        if not files:
+            return None, "Choose at least one screenshot."
+        if len(files) > INSIGHT_FILES:
+            return None, "At most %d screenshots at a time." % INSIGHT_FILES
+        INSIGHT_DIR.mkdir(exist_ok=True)
+        names = []
+        for p in files:
+            if len(p["data"]) > INSIGHT_MAX:
+                return None, "Each screenshot must be under 12 MB."
+            kind = uploads.image_kind(p["data"])
+            if kind not in ("jpg", "png", "webp"):
+                return None, "Screenshots must be JPG, PNG or WEBP images."
+            name = secrets.token_hex(12) + "." + kind
+            (INSIGHT_DIR / name).write_bytes(p["data"])
+            names.append(name)
+        return names, None
+
+    def insights_public(self, token, query):
+        row = db.creator_by_insights_token(token.strip("/"))
+        if row is None or (row["ends_at"] and row["ends_at"] + 30 * 86400 < db.now()):
+            return self.send(404, views.link_gone(), headers=[("Cache-Control", "no-store")])
+        with db.connect() as conn:
+            posts = conn.execute("SELECT id, url, kind, platform, posted_at FROM content WHERE campaign_id = ? "
+                                 "AND code = ? AND hidden = 0 ORDER BY posted_at DESC",
+                                 (row["campaign_id"], row["code"])).fetchall()
+            sent = conn.execute("SELECT COUNT(*) FROM insights WHERE campaign_id = ? AND code = ?",
+                                (row["campaign_id"], row["code"])).fetchone()[0]
+        return self.send(200, views.insights_upload_page(row, posts, sent, query.get("ok"), query.get("e")),
+                         headers=[("Cache-Control", "no-store"), ("X-Robots-Tag", "noindex")])
+
+    def insights_upload(self, token):
+        token = token.strip("/")
+        row = db.creator_by_insights_token(token)
+        if row is None or (row["ends_at"] and row["ends_at"] + 30 * 86400 < db.now()):
+            return self.send(404, views.link_gone())
+        back = (BASE_PUBLIC + "/insights/" + token)
+        if int(self.headers.get("Content-Length") or 0) > INSIGHT_FILES * INSIGHT_MAX + 65536:
+            return self.redirect_plain(back + "?e=" + urllib.parse.quote("That upload is too large."))
+        f = self.form_body(multi=("shots",))
+        names, err = self.save_insight_files(f.get("shots") or [])
+        if err:
+            return self.redirect_plain(back + "?e=" + urllib.parse.quote(err))
+        pid = (f.get("post") or "").strip()
+        item = db.content_item(int(pid)) if pid.isdigit() else None
+        if item is not None and (item["campaign_id"] != row["campaign_id"] or item["code"] != row["code"]):
+            item = None
+        url = (f.get("url") or "").strip()[:500] or None
+        db.add_insight(row["campaign_id"], row["code"], names, item["id"] if item else None,
+                       None if item else url, (f.get("note") or "").strip()[:500] or None)
+        return self.redirect_plain(back + "?ok=1")
+
+    def redirect_plain(self, to):
+        """A redirect that is NOT given the /admin prefix: the creator's page
+        lives at the site root."""
+        self.send(303, b"", "text/plain", [("Location", to)])
+
+    def post_insight_admin_upload(self):
+        f = self.form_body(multi=("shots",))
+        cid = (f.get("id") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None:
+            return self.redirect("/campaigns")
+        back = "/campaigns/insights?id=%d" % k["id"]
+        code = (f.get("code") or "").strip().upper()
+        if code not in {m["cc_code"] for m in db.campaign_creators(k["id"])}:
+            return self.redirect(back + "&e=" + urllib.parse.quote("Pick a creator in this campaign."))
+        names, err = self.save_insight_files(f.get("shots") or [])
+        if err:
+            return self.redirect(back + "&e=" + urllib.parse.quote(err))
+        pid = (f.get("post") or "").strip()
+        item = db.content_item(int(pid)) if pid.isdigit() else None
+        db.add_insight(k["id"], code, names, item["id"] if item and item["campaign_id"] == k["id"] else None)
+        return self.redirect(back + "&ok=" + urllib.parse.quote("Uploaded. The capture job reads it on its next run, or type the numbers yourself."))
+
+    def post_insight_decide(self):
+        f = self.form_body()
+        cid, iid = (f.get("id") or "").strip(), (f.get("insight") or "").strip()
+        row = db.insight(int(iid)) if iid.isdigit() else None
+        if row is None or str(row["campaign_id"]) != cid:
+            return self.redirect("/campaigns")
+        back = "/campaigns/insights?id=" + cid
+        if f.get("do") == "reject":
+            db.decide_insight(row["id"], False)
+            return self.redirect(back + "&ok=" + urllib.parse.quote("Rejected."))
+        pid = (f.get("post") or "").strip()
+        item = db.content_item(int(pid)) if pid.isdigit() else None
+        if item is None or item["campaign_id"] != row["campaign_id"]:
+            return self.redirect(back + "&e=" + urllib.parse.quote(
+                "Choose which post these numbers belong to before approving."))
+        values = {k: f.get(k) for k in db.INSIGHT_FIELDS}
+        if not db.clean_insight_values(values):
+            return self.redirect(back + "&e=" + urllib.parse.quote("Enter at least one number to approve."))
+        db.decide_insight(row["id"], True, values, item["id"])
+        return self.redirect(back + "&ok=" + urllib.parse.quote("Approved — the report now uses these numbers."))
 
     def post_campaign_delete(self):
         cid = (self.form_body().get("id") or "").strip()
@@ -1345,7 +1842,10 @@ class Handler(BaseHTTPRequestHandler):
     # ---------------------------------------------------------- public API --
 
     def api_unlock(self):
-        code = (self.json_body().get("code") or "").strip()
+        body = self.json_body()
+        code = (body.get("code") or "").strip()
+        # The campaign report only needs the pass, not the whole roster.
+        lite = bool(body.get("lite"))
         row = None
         if code:
             row = (db.code_by_hash(auth.hash_code(code))
@@ -1386,9 +1886,10 @@ class Handler(BaseHTTPRequestHandler):
                   f"{policy}; Max-Age={max_age}")
         dev_cookie = (f"{DEVICE_COOKIE}={token}; Path=/; HttpOnly; "
                       f"{policy}; Max-Age={DEVICE_TTL}")
-        return self.send_json(200, {"ok": True, "label": row["label"],
-                                    "roster": self.roster_payload(),
-                                    "tiers": self.tier_payload()},
+        payload = {"ok": True, "label": row["label"]}
+        if not lite:
+            payload.update(roster=self.roster_payload(), tiers=self.tier_payload())
+        return self.send_json(200, payload,
                               self.cors() + [("Set-Cookie", cookie),
                                              ("Set-Cookie", dev_cookie)])
 
