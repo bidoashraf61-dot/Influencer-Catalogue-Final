@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" href="../assets/icons/icon-180.png"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.3/css/flag-icons.min.css"/>
 <link rel="stylesheet" href="../assets/css/catalogue.css?v=8e5f970f"/>
-<link rel="stylesheet" href="../assets/css/campaign.css?v=cf31abc0"/>
+<link rel="stylesheet" href="../assets/css/campaign.css?v=2394a961"/>
 </head>
 <body class="cat-locked" data-page="campaign">
 <!--
@@ -57,6 +57,10 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
           Full catalogue
         </a>
         <a class="mx-link" href="#list" id="mx-all" hidden>All campaigns</a>
+        <a class="cat-btn cat-btn--lime mx-dash" href="dashboard/" id="mx-dash" hidden>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
+          Back to dashboard
+        </a>
         <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">Portfolio
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
         </a>
@@ -169,6 +173,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       <div class="cat-container mx-end__in">
         <button type="button" class="cat-btn cat-btn--lime" id="mx-print">Download full report (PDF)</button>
         <a class="cat-btn mx-btn-line" id="mx-csv" href="#">Download CSV</a>
+        <a class="cat-btn mx-btn-line" id="mx-dash-end" href="dashboard/">Back to dashboard</a>
         <a class="cat-btn mx-btn-line" href="../">Back to the catalogue</a>
       </div>
     </section>
@@ -181,6 +186,6 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   window.CAMPAIGN_CONFIG = { api: "/admin" };
 </script>
 <script src="../assets/js/hv-icons.js?v=f1325cf5"></script>
-<script src="../assets/js/campaign.js?v=55787acb"></script>
+<script src="../assets/js/campaign.js?v=5b8ac3c2"></script>
 </body>
 </html>

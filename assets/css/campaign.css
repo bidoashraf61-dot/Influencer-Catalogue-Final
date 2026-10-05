@@ -538,3 +538,6 @@
 .mx-chart h3 .mx-ico { width: 24px; height: 24px; }
 @media (max-width: 700px) { .mx-h2 { gap: 10px; } .mx-tab .mx-ico { width: 16px; height: 16px; } }
 @media print { .mx-h2__ic { width: 30px !important; height: 30px !important; } .mx-tab .mx-ico { display: none; } .mx-bullet__name .mx-ico { width: 14px; height: 14px; padding: 4px; } }
+
+.mx-dash { display: inline-flex; align-items: center; gap: 8px; }
+@media print { .mx-dash, #mx-dash-end { display: none !important; } }

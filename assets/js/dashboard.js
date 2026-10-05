@@ -10,6 +10,7 @@
   var LINK = (window.HV_ICONS || {}).link || "";
   var R = null, TOKEN = "";
   var F = { platform: "", range: "all", from: "", to: "", creators: [] };
+  var ONE = { post: "Photo", reel: "Reel", story: "Story", video: "Video", short: "Short" };
   var KIND = { post: "Photo posts", reel: "Reels", story: "Stories", video: "Videos", short: "Shorts" };
   var COL = ["#14884a", "#ff691e", "#b9d400", "#8a7a68", "#121212"];
   var SIG = { good: "Strong", moderate: "Fair", low: "Low" };
@@ -68,8 +69,13 @@
 
   function load() {
     TOKEN = token();
+    // No campaign named: one campaign opens straight away; several go to the
+    // "My campaigns" list, whose cards come back here.
     var go = TOKEN ? Promise.resolve(TOKEN) : get("/api/campaigns").then(function (b) {
-      var c = (b.campaigns || [])[0]; if (!c) throw { none: true }; location.replace("#t=" + c.token); return c.token; });
+      var l = b.campaigns || []; if (!l.length) throw { none: true };
+      if (l.length > 1) { location.replace("../#list"); throw { moved: true }; }
+      location.replace("#t=" + l[0].token); return l[0].token; });
+    get("/api/campaigns").then(function (b) { $("db-all").hidden = (b.campaigns || []).length < 2; }).catch(function () {});
     go.then(function (t) { TOKEN = t; return get("/api/campaign?t=" + encodeURIComponent(t)); })
       .then(function (b) {
         R = b.report;
@@ -78,6 +84,7 @@
       })
       .catch(function (err) {
         if (err && err.locked) return lock();
+        if (err && err.moved) return;
         $("cat-gate").hidden = true; $("db-empty").hidden = false;
         $("db-empty").textContent = err && err.none ? "No campaign reports for this access code yet." : "This campaign is not available with your access code.";
       });
@@ -278,7 +285,8 @@
   }
 
   var MEDAL = { 1: "#d6a52b", 2: "#9ea6ae", 3: "#b06f3a" };
-  function medal(n) { return '<svg viewBox="0 0 40 50" aria-label="Rank ' + n + '"><path d="M10 0h8l4 14-6 4z" fill="#ff691e"/><path d="M30 0h-8l-4 14 6 4z" fill="#ee1515"/><circle cx="20" cy="32" r="15" fill="' + MEDAL[n] + '"/><text x="20" y="38" text-anchor="middle" font-family="Bebasneue, Arial" font-size="17" fill="#121212">' + n + "</text></svg>"; }
+  function medalBody(n) { return '<path d="M10 0h8l4 14-6 4z" fill="#ff691e"/><path d="M30 0h-8l-4 14 6 4z" fill="#ee1515"/><circle cx="20" cy="32" r="15" fill="' + MEDAL[n] + '"/><text x="20" y="38" text-anchor="middle" font-family="Bebasneue, Arial" font-size="17" fill="#121212">' + n + "</text>"; }
+  function medal(n) { return '<svg viewBox="0 0 40 50" role="img" aria-label="Rank ' + n + '">' + medalBody(n) + "</svg>"; }
   function ranked(list) {
     if (!filtered()) return R.creators.filter(function (c) { return c.rank; }).map(function (c) { return { c: c, v: c.score, label: c.score.toFixed(0) }; });
     var by = {}; list.forEach(function (p) { by[p.code] = (by[p.code] || 0) + (p.views || 0) + (p.reach || 0); });
@@ -355,9 +363,10 @@
   function renderPosts(list) {
     var top = topPosts(list).slice(0, 3);
     $("w-posts").innerHTML = head(IC.img, "Top posts", "The three posts that reached the most people in this view.", "posts")
-      + '<div class="db-card__body"><div class="db-thumbs">' + (top.map(function (p) {
+      + '<div class="db-card__body"><div class="db-thumbs">' + (top.map(function (p, i) {
         return '<a class="db-thumb" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + (p.thumb ? '<img src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
-          + "<span>" + (ICONS[p.platform] || "") + num(p.video ? p.views : p.reach) + "</span></a>";
+          + '<svg class="db-thumb__n" viewBox="0 0 40 50" aria-hidden="true">' + medalBody(i + 1) + "</svg>"
+          + "<span><em>" + esc(p.creator) + "</em><i>" + (ICONS[p.platform] || "") + num(p.video ? p.views : p.reach) + "<small style=\"font:600 10px var(--body);color:#fff;opacity:.7\">" + (p.video ? "views" : "reached") + "</small></i></span></a>";
       }).join("") || '<p class="db-note">No posts in this view.</p>') + "</div></div>";
   }
 
@@ -387,7 +396,8 @@
       var rows = filtered() ? ranked(list).map(function (r) { return r.c; }) : R.creators;
       return '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th><th>Reach</th><th>Eng.</th><th>ER</th>' + (R.visibility.clicks ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
         + rows.map(function (c, i) { var x = filtered() ? (by[c.code] || {}) : { posts: c.delivered, views: c.views, reach: c.reach, eng: c.engagement };
-          return "<tr><td>" + (filtered() ? i + 1 : (c.rank || "—")) + "</td><td>" + esc(c.name) + "</td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + "</td><td>" + num(x.reach) + "</td><td>" + num(x.eng)
+          var n = filtered() ? i + 1 : c.rank;
+          return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + esc(c.name) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + "</td><td>" + num(x.reach) + "</td><td>" + num(x.eng)
             + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
         + '</tbody></table><p class="db-note" style="margin-top:10px">Score out of 100 is for the whole campaign (' + esc((R.objective || {}).label || "Balanced") + " objective).</p>";
     },
@@ -425,9 +435,25 @@
         + "<h3>By device</h3>" + bars(L(cl.by_device), function (r) { return esc(r.k); });
     }
   };
+  function stats(p) {
+    var er = p.video ? (p.video_er != null ? p.video_er : p.er) : (p.er != null ? p.er : p.imp_er);
+    var out = [];
+    if (p.video) out.push(["Views", full(p.views)]);
+    if (p.reach != null) out.push([p.story ? "Story views" : "Reach", full(p.reach)]);
+    if (!p.video && p.impressions) out.push(["Impressions", full(p.impressions)]);
+    out.push(["Likes", full(p.likes)], ["Comments", full(p.comments)], ["Engagement", full(p.engagement)]);
+    if (p.shares != null) out.push(["Shares", full(p.shares)]);
+    if (p.saves != null) out.push(["Saves", full(p.saves)]);
+    out.push(["Eng. rate", pct(er)]);
+    if (p.view_rate != null && p.video) out.push(["View rate", pct(p.view_rate, 1)]);
+    return out;
+  }
   function post(p) {
     return '<a class="db-post" href="' + esc(p.url) + '" target="_blank" rel="noopener"><div class="db-post__img">' + (p.thumb ? '<img src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
-      + '</div><div class="db-post__body"><b>' + esc(p.creator) + "</b><span>" + esc(p.platform) + " · " + esc(day(p.posted_at)) + "<br>" + (p.video ? num(p.views) + " views" : num(p.reach) + " reached") + " · " + num(p.engagement) + " eng.</span></div></a>";
+      + (p.kind ? '<span class="db-kind">' + esc(ONE[p.kind] || p.kind) + "</span>" : "")
+      + '</div><div class="db-post__body"><b>' + esc(p.creator) + "</b><span>" + (ICONS[p.platform] ? "" : "") + esc(p.platform) + " · " + esc(day(p.posted_at, true)) + "</span></div>"
+      + (p.caption ? '<p class="db-post__cap">' + esc(p.caption) + "</p>" : "")
+      + '<div class="db-post__stats">' + stats(p).map(function (x) { return "<div><small>" + x[0] + "</small><b>" + x[1] + "</b></div>"; }).join("") + "</div></a>";
   }
   var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "Audience countries", plat: "Platforms", clicks: "Affiliate clicks" };
   var lastFocus = null;

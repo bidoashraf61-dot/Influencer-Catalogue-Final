@@ -65,8 +65,8 @@
   grid-template-areas:
     "obj obj obj obj obj obj obj obj obj obj obj obj"
     "kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi"
-    "trd trd trd trd trd top top top top stg stg stg"
-    "mix mix geo geo geo plt plt clk clk clk pst pst";
+    "top top top top pst pst pst pst trd trd trd trd"
+    "stg stg stg mix mix geo geo geo plt plt clk clk";
 }
 .db-objective { grid-area: obj; }
 .db-kpis { grid-area: kpi; display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--gap); }
@@ -161,7 +161,10 @@
 .db-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; flex: 1; min-height: 0; }
 .db-thumb { position: relative; border-radius: 10px; overflow: hidden; background: var(--linen); min-height: 0; }
 .db-thumb img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-.db-thumb span { position: absolute; left: 4px; right: 4px; bottom: 4px; background: rgba(18,18,18,.78); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 6px; border-radius: 6px; display: flex; align-items: center; gap: 4px; }
+.db-thumb span { position: absolute; left: 0; right: 0; bottom: 0; padding: 22px 8px 7px; background: linear-gradient(transparent, rgba(18,18,18,.88)); color: #fff; font-size: 11px; font-weight: 700; display: flex; flex-direction: column; gap: 2px; }
+.db-thumb span em { font-style: normal; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.db-thumb span i { font-style: normal; display: flex; align-items: center; gap: 4px; font-family: var(--heading); font-size: 18px; font-weight: 400; color: var(--lime); }
+.db-thumb .db-thumb__n { position: absolute; top: 6px; left: 6px; width: 22px; height: 28px; }
 .db-thumb span svg { width: 12px; height: 12px; }
 
 /* --------------------------------------------------------------- panel */
@@ -243,4 +246,42 @@
   .db-rank small { display: none; }
   .db-rank__n svg { width: 17px; height: 21px; }
   .db-rank__score { font-size: 18px; }
+}
+
+/* the two hero cards: ink ground so the people and the posts lead the board */
+.db-card--hero { background: var(--ink); border-color: var(--ink); color: #fff; }
+.db-card--hero .db-card__head h2, .db-card--hero .db-card__head h2 svg { color: var(--lime); }
+.db-card--hero .db-info { border-color: rgba(255,255,255,.55); color: rgba(255,255,255,.75); }
+.db-card--hero .db-more { background: rgba(255,255,255,.12); color: #fff; }
+.db-card--hero .db-more:hover { background: var(--lime); color: var(--ink); }
+.db-card--hero .db-note { color: rgba(255,255,255,.6); }
+.db-top .db-rank { border-bottom-color: rgba(255,255,255,.1); font-size: 14px; grid-template-columns: 28px 38px 1fr auto; flex: 1 1 0; min-height: 0; padding: 0; overflow: hidden; }
+.db-top .db-card__body { justify-content: space-between; }
+.db-top .db-rank img, .db-top .db-rank .db-ava { width: 38px; height: 38px; box-shadow: 0 0 0 2px rgba(255,255,255,.14); }
+.db-top .db-rank small { color: rgba(255,255,255,.6); }
+.db-top .db-rank__n { color: rgba(255,255,255,.6); }
+.db-top .db-rank__n svg { width: 24px; height: 30px; }
+.db-top .db-rank__score { color: var(--lime); font-size: 24px; }
+.db-top .db-rank:first-child img { box-shadow: 0 0 0 2px #d6a52b; }
+.db-posts .db-thumb { background: #2a2a2a; }
+
+/* all-creators table: photo + name, medals for the top three */
+.db-who { display: flex; align-items: center; gap: 10px; }
+.db-who img, .db-who .db-ava { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; background: var(--linen); flex: none; }
+.db-table .db-medal svg { width: 22px; height: 28px; display: block; }
+.db-table tr.is-top td { background: #fbfaf5; }
+
+/* all-posts wall: every number under each post */
+.db-post__stats { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); }
+.db-post__stats div { padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.db-post__stats div:nth-child(odd) { border-right: 1px solid var(--line); }
+.db-post__stats small { display: block; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--gray); }
+.db-post__stats b { font-family: var(--heading); font-size: 18px; font-weight: 400; }
+.db-post__cap { padding: 0 10px 8px; font-size: 12px; color: var(--gray); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.db-post__img .db-kind { position: absolute; top: 6px; left: 6px; background: rgba(18,18,18,.78); color: #fff; font-size: 11px; font-weight: 600; padding: 3px 7px; border-radius: 6px; }
+@media (max-height: 820px) and (min-width: 1100px) {
+  .db-top .db-rank { grid-template-columns: 24px 30px 1fr auto; font-size: 13px; }
+  .db-top .db-rank img, .db-top .db-rank .db-ava { width: 30px; height: 30px; }
+  .db-top .db-rank__n svg { width: 19px; height: 24px; }
+  .db-top .db-rank__score { font-size: 20px; }
 }

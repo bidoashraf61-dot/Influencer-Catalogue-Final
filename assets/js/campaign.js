@@ -126,11 +126,11 @@
     document.title = "My campaigns — HelloVoice";
     if (!list.length) { empty("There are no campaign reports for this access code yet."); return; }
     $("mx-list-items").innerHTML = list.map(function (c) {
-      return '<a class="mx-camp" href="#t=' + esc(c.token) + '"><div class="mx-camp__logos">'
+      return '<a class="mx-camp" href="dashboard/#t=' + esc(c.token) + '"><div class="mx-camp__logos">'
         + (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("") + "</div>"
         + '<div><div class="mx-camp__name">' + esc(c.name) + '</div><div class="mx-camp__meta">'
         + esc([c.client, c.starts_at ? day(c.starts_at) + " – " + day(c.ends_at) : "", c.status === "live" ? "Live" : "Completed"].filter(Boolean).join(" · "))
-        + '</div></div><span class="mx-camp__go">Open report →</span></a>';
+        + '</div></div><span class="mx-camp__go">Open dashboard →</span></a>';
     }).join("");
     show("list");
     window.scrollTo(0, 0);
@@ -282,6 +282,7 @@
     $("tab-clicks").hidden = !R.visibility.clicks;
     markTab("overview");
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
+    $("mx-dash").href = $("mx-dash-end").href = "dashboard/#t=" + encodeURIComponent(t); $("mx-dash").hidden = false;
     // Arriving from the dashboard's "Download PDF": open the print dialog.
     try { if (sessionStorage.getItem("hv_print")) { sessionStorage.removeItem("hv_print"); setTimeout(function () { window.print(); }, 900); } } catch (e) {}
   }
