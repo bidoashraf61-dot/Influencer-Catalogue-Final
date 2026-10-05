@@ -2255,7 +2255,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                          + "><span>" + lbl + "</span></label>" for key, lbl in
                          [("reach", "Reach &amp; impressions"), ("clicks", "Affiliate link clicks"),
                           ("all_content", "Posts outside the hashtags")])
-               + "</div><p class='price-hint'>Costs, CPM, EMV, notes and ratings are never shown to the client.</p>")
+               + "</div><p class='price-hint'>These apply to the dashboard and the full report. Costs, CPM, EMV, notes and ratings are never shown to the client.</p>")
         + "<h2>Internal</h2><div class='card'><div class='row'>"
         + "<div><label>Total cost to us (SAR)</label><input name='total_cost' value='"
         + (format(k["cost"], ",") if k["cost"] is not None else "") + "' inputmode='numeric'>"
@@ -2535,7 +2535,8 @@ def campaign_content_page(k, members, posts, error=None, message=None):
 
 def campaign_report_page(k, r, origin):
     t, inn = r["total"], r["internal"]
-    link = origin + "/campaign/#t=" + k["token"]
+    link = origin + "/campaign/dashboard/#t=" + k["token"]
+    full = origin + "/campaign/#t=" + k["token"]
     kp = lambda label, val, sub="": ("<div><span>" + label + "</span><b>" + val + "</b>"
                                      + ("<span>" + sub + "</span>" if sub else "") + "</div>")
     real = int(round(t["real_share"] * 100))
@@ -2552,8 +2553,9 @@ def campaign_report_page(k, r, origin):
         + "<input id='rep-url' value='" + e(link) + "' readonly>"
         + "<button type='button' class='btn small' onclick=\"var i=document.getElementById('rep-url');i.select();"
           "navigator.clipboard&&navigator.clipboard.writeText(i.value);this.textContent='Copied'\">Copy link</button>"
-        + "<a class='btn small ghost' href='" + e(link) + "' target='_blank' rel='noopener'>Open</a></div>"
-        + "<p class='price-hint'>The client opens it with their passcode"
+        + "<a class='btn small ghost' href='" + e(link) + "' target='_blank' rel='noopener'>Open dashboard</a>"
+        + "<a class='btn small ghost' href='" + e(full) + "' target='_blank' rel='noopener'>Open full report</a></div>"
+        + "<p class='price-hint'>The link opens the campaign dashboard; the client can switch to the full report from it. They open it with their passcode"
         + ("" if k["code_id"] else " — <strong>no passcode is set on the Setup tab yet, so nobody can open it</strong>")
         + ". A draft campaign is not shown to the client.</p></div>"
         + "<h2>Results</h2><div class='kpis'>"

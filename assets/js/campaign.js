@@ -124,7 +124,7 @@
 
   function showList(list) {
     document.title = "My campaigns — HelloVoice";
-    if (!list.length) { empty("There are no campaign reports for this access code yet."); return; }
+    if (!list.length) { showNone(); return; }
     var live = list.filter(function (c) { return c.status === "live"; }).length;
     $("mx-list-sum").innerHTML = tile("Campaigns", list.length, "") + tile("Live now", live, live ? "go" : "")
       + tile("Completed", list.length - live, "") + '<span id="mx-sum-totals" class="mx-sum__rest"></span>';
@@ -136,10 +136,9 @@
         + (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("") + "</div>"
         + '<div class="mx-camp__id"><h2 class="mx-camp__name">' + esc(c.name) + '</h2><div class="mx-camp__meta">'
         + esc([c.client, c.starts_at ? day(c.starts_at) + " – " + day(c.ends_at) : "", when].filter(Boolean).join(" · ")) + "</div></div>"
-        + '<div class="mx-camp__tags"><span class="mx-camp__state mx-camp__state--' + (c.status === "live" ? "live" : "done") + '">' + (c.status === "live" ? "Live" : "Completed") + '</span><span class="mx-camp__verdict" hidden></span></div></div>'
-        + '<div class="mx-camp__body"><div class="mx-camp__prog"><p class="mx-camp__wait">Loading progress…</p></div><div class="mx-camp__stats"></div></div>'
-        + '<div class="mx-camp__foot"><span class="mx-camp__time">' + (span ? '<span>Campaign time</span><i><b style="width:' + (dn / span * 100).toFixed(1) + '%"></b></i><em>' + Math.round(dn / span * 100) + "%</em>" : "") + "</span>"
-        + '<a class="mx-camp__alt" href="#t=' + esc(c.token) + '">Full report</a><a class="mx-camp__go" href="dashboard/#t=' + esc(c.token) + '">Open dashboard →</a></div></article>';
+        + '<span class="mx-camp__state mx-camp__state--' + (c.status === "live" ? "live" : "done") + '">' + (c.status === "live" ? "Live" : "Completed") + "</span></div>"
+        + '<div class="mx-camp__row"><div class="mx-camp__prog"><p class="mx-camp__wait">Loading progress…</p></div>'
+        + '<a class="mx-camp__go" href="dashboard/#t=' + esc(c.token) + '">Open dashboard →</a></div></article>';
     }).join("");
     show("list");
     window.scrollTo(0, 0);
@@ -148,12 +147,7 @@
       get("/api/campaign?t=" + encodeURIComponent(c.token)).then(function (b) {
         var R = b.report, t = R.total || {}, card = document.querySelector('.mx-camp[data-i="' + i + '"]');
         agg.reach += (t.views || 0) + (t.reach || 0); agg.eng += t.engagement || 0; agg.posts += t.posts || 0; agg.clicks += t.clicks || 0;
-        card.querySelector(".mx-camp__prog").innerHTML = progress(R);
-        card.querySelector(".mx-camp__stats").innerHTML = stat("Posts live", full(t.posts) + (t.planned ? "<small>/" + t.planned + "</small>" : ""))
-          + stat("Reached", num((t.views || 0) + (t.reach || 0))) + stat("Engagement", num(t.engagement))
-          + (R.visibility && R.visibility.clicks ? stat("Link clicks", num(t.clicks)) : stat("Avg eng. rate", pct(t.er)));
-        var v = R.verdict || {}, vb = card.querySelector(".mx-camp__verdict");
-        if (v.label) { vb.textContent = v.label; vb.className = "mx-camp__verdict mx-camp__verdict--" + (v.grade || "none"); vb.hidden = false; }
+        card.querySelector(".mx-camp__prog").innerHTML = progress(R, c.status !== "live");
       }).catch(function () { var card = document.querySelector('.mx-camp[data-i="' + i + '"]'); card.querySelector(".mx-camp__prog").innerHTML = '<p class="mx-camp__wait">Progress is not available right now.</p>'; })
         .then(function () {
           if (--left) return;
@@ -161,24 +155,43 @@
         });
     });
   }
+  // No campaigns yet: say what will appear here and how to get started,
+  // with a faded preview of a campaign card.
+  function showNone() {
+    $("mx-list-sum").innerHTML = "";
+    $("mx-list-lede").textContent = "Your campaigns will appear here as soon as HelloVoice starts one for you.";
+    $("mx-list-items").innerHTML = '<section class="mx-none"><div class="mx-none__copy"><h2>No campaigns yet</h2>'
+      + "<p>Each campaign gets a live dashboard here: posts going live, people reached, engagement, and how far it is towards its objective, updated every day.</p>"
+      + '<ol class="mx-none__steps"><li><b>1</b><span>Pick creators from the catalogue and send us your shortlist.</span></li>'
+      + "<li><b>2</b><span>We agree the brief, the targets and the dates with you.</span></li>"
+      + "<li><b>3</b><span>The campaign goes live and you follow it here, day by day.</span></li></ol>"
+      + '<div class="mx-none__actions"><a class="mx-camp__go" href="../">Browse the creators →</a><a class="mx-none__mail" href="mailto:info@hellovoice.co.uk">Talk to HelloVoice</a></div></div>'
+      + '<div class="mx-none__ghost" aria-hidden="true"><div class="mx-camp__head"><div class="mx-none__logo"></div><div><div class="mx-none__line mx-none__line--title"></div><div class="mx-none__line"></div></div><span class="mx-camp__state mx-camp__state--live">Live</span></div>'
+      + '<div class="mx-camp__prog"><div class="mx-pg__head"><span class="mx-pg__label">Objective progress</span><span class="mx-pg__score mx-pg--good"><b>64%</b><em>On pace</em></span></div>'
+      + '<div class="mx-pg__track"><span class="mx-pg__fill mx-pg--good" style="width:64%"></span><span class="mx-pg__pin" style="left:55%"><i></i><em>Today 55%</em></span></div>'
+      + '<div class="mx-pg__scale"><span>0%</span><span>100%</span></div></div><p class="mx-none__tag">Example</p></div></section>';
+    show("list");
+  }
   function tile(label, value, tone) { return '<div class="mx-sum__tile' + (tone ? " mx-sum__tile--" + tone : "") + '"><b>' + value + "</b><span>" + label + "</span></div>"; }
-  function stat(label, value) { return '<div><span>' + label + "</span><b>" + value + "</b></div>"; }
-  // The objective as one bar: achieved vs where it should be today, then
-  // each of its goals as a chip coloured by how it is doing.
-  function progress(R) {
+  // The objective as one bar: how much is achieved, against a "today" pin
+  // showing where it should be by now. Finished campaigns show the result.
+  function progress(R, ended) {
     var o = R.objective || { label: "Balanced", kpis: [] }, items = (R.progress && R.progress.items) || [];
     var mine = items.filter(function (x) { return (o.kpis || []).indexOf(x.key) >= 0; }); if (!mine.length) mine = items;
-    if (!mine.length) return '<div class="mx-camp__obj"><span>Objective · <b>' + esc(o.label) + '</b></span></div><p class="mx-camp__wait">No targets set for this campaign.</p>';
+    var head = '<div class="mx-pg__head"><span class="mx-pg__label">' + (ended ? "Final result" : "Objective progress") + " · <b>" + esc(o.label) + "</b></span>";
+    if (!mine.length) return head + '</div><div class="mx-pg__track mx-pg__track--empty"></div><p class="mx-camp__wait">No targets set for this campaign yet.</p>';
     var done = mine.reduce(function (a, x) { return a + Math.min(100, x.pct); }, 0) / mine.length;
-    var due = mine.reduce(function (a, x) { return a + Math.min(100, x.expected / x.goal * 100); }, 0) / mine.length;
+    var due = ended ? 100 : mine.reduce(function (a, x) { return a + Math.min(100, x.expected / x.goal * 100); }, 0) / mine.length;
     var r = due ? done / due : 1, gr = r >= 1 ? "good" : r >= 0.7 ? "moderate" : "low";
-    var NAME = { posts: "Posts", views: "Views", reach: "Reach", engagement: "Engagement", er: "Eng. rate", clicks: "Clicks" };
-    return '<div class="mx-camp__obj"><span>Objective · <b>' + esc(o.label) + '</b></span><em class="mx-camp__pct mx-camp__pct--' + gr + '">' + Math.round(done) + "%</em></div>"
-      + '<div class="mx-camp__bar" role="img" aria-label="' + Math.round(done) + "% of the objective achieved; " + Math.round(due) + '% expected by today"><b class="' + gr + '" style="width:' + done.toFixed(1) + '%"></b>'
-      + (due < 100 ? '<i style="left:' + due.toFixed(1) + '%" title="Where it should be today"></i>' : "") + "</div>"
-      + '<div class="mx-camp__chips">' + mine.map(function (x) { return '<span class="mx-camp__chip mx-camp__chip--' + (x.grade || "none") + '">' + NAME[x.key] + " <b>" + Math.round(x.pct) + "%</b></span>"; }).join("")
-      + (due < 100 ? '<span class="mx-camp__due">│ expected today ' + Math.round(due) + "%</span>" : "") + "</div>";
+    var word = ended ? { good: "Target met", moderate: "Nearly there", low: "Below target" }[gr] : { good: "On pace", moderate: "Slightly behind", low: "Behind pace" }[gr];
+    var pin = !ended && due > 0 && due < 100;
+    return head + '<span class="mx-pg__score mx-pg--' + gr + '"><b>' + Math.round(done) + '%</b><em>' + word + "</em></span></div>"
+      + '<div class="mx-pg__track" role="img" aria-label="' + Math.round(done) + "% of the objective achieved" + (pin ? ", " + Math.round(due) + "% expected by today" : "") + '">'
+      + '<span class="mx-pg__fill mx-pg--' + gr + '" style="width:' + Math.max(2, done).toFixed(1) + '%"></span>'
+      + (pin ? '<span class="mx-pg__pin" style="left:' + due.toFixed(1) + '%"><i></i><em>Today ' + Math.round(due) + "%</em></span>" : "") + "</div>"
+      + '<div class="mx-pg__scale"><span>0%</span><span>100%</span></div>';
   }
+
 
   function openReport(t) {
     get("/api/campaign?t=" + encodeURIComponent(t)).then(function (b) {

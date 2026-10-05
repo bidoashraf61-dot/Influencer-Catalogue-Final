@@ -69,7 +69,7 @@
     "trd trd trd mix mix geo geo geo plt plt clk clk";
 }
 .db-objective { grid-area: obj; }
-.db-kpis { grid-area: kpi; display: grid; grid-template-columns: repeat(6, 1fr); gap: var(--gap); }
+.db-kpis { grid-area: kpi; display: grid; grid-template-columns: repeat(var(--kpis, 6), 1fr); gap: var(--gap); }
 .db-trend { grid-area: trd; } .db-top { grid-area: top; } .db-stage { grid-area: stg; }
 .db-mix { grid-area: mix; } .db-geo { grid-area: geo; } .db-plat { grid-area: plt; } .db-clicks { grid-area: clk; } .db-posts { grid-area: pst; }
 
@@ -285,3 +285,11 @@
 .db-seg button:not([aria-pressed="true"]):hover { background: var(--lime); color: var(--ink); }
 .db-pick__btn:hover { background: var(--ink); border-color: var(--ink); color: var(--lime); }
 .db-panel__close:hover { background: var(--ink); color: var(--lime); }
+
+/* clicks switched off by the admin: Platforms takes the clicks slot */
+.db-grid.no-clicks { grid-template-areas:
+    "obj obj obj obj obj obj obj obj obj obj obj obj"
+    "kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi"
+    "top top top top stg stg stg pst pst pst pst pst"
+    "trd trd trd mix mix geo geo geo plt plt plt plt"; }
+.db-grid.no-clicks .db-clicks { display: none; }

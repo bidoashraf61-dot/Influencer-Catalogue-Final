@@ -72,8 +72,8 @@
     // No campaign named: one campaign opens straight away; several go to the
     // "My campaigns" list, whose cards come back here.
     var go = TOKEN ? Promise.resolve(TOKEN) : get("/api/campaigns").then(function (b) {
-      var l = b.campaigns || []; if (!l.length) throw { none: true };
-      if (l.length > 1) { location.replace("../#list"); throw { moved: true }; }
+      var l = b.campaigns || [];
+      if (l.length !== 1) { location.replace("../#list"); throw { moved: true }; }
       location.replace("#t=" + l[0].token); return l[0].token; });
     get("/api/campaigns").then(function (b) { $("db-all").hidden = (b.campaigns || []).length < 2; }).catch(function () {});
     go.then(function (t) { TOKEN = t; return get("/api/campaign?t=" + encodeURIComponent(t)); })
@@ -224,6 +224,11 @@
       ["Avg eng. rate", pct(t.er), !filtered() ? (g.er ? goal("er") : sig(R.total.er_grade)) : "", "", IC.er, "kpi"],
       ["Link clicks", cl ? num(cl.clicks) : "—", cl && !filtered() ? (g.clicks ? goal("clicks") : sig(R.total.ctr_grade)) : "", "", IC.clicks, "clicks"]
     ];
+    // Sections the admin switched off are left out, not shown empty.
+    var V = R.visibility || {};
+    cards = cards.filter(function (k) { return !(k[0] === "Reach" && V.reach === false) && !(k[0] === "Link clicks" && V.clicks === false); });
+    $("w-kpis").style.setProperty("--kpis", cards.length);
+    $("db-grid").classList.toggle("no-clicks", V.clicks === false);
     $("w-kpis").innerHTML = cards.map(function (k) {
       return '<button type="button" class="db-kpi" data-area="' + k[5] + '"><span class="db-kpi__label">' + k[4] + esc(k[0]) + '</span><span class="db-kpi__value">' + k[1]
         + '</span><span class="db-kpi__foot">' + (k[2] || "<span></span>") + k[3] + "</span></button>";
@@ -297,7 +302,7 @@
     var rows = ranked(list).slice(0, 5);
     $("w-top").innerHTML = head(IC.top, "Top creators", filtered() ? "Ranked by people reached in this view." : "Ranked by score out of 100 — reach and views, engagement, engagement rate against their size, and clicks, weighted for the campaign's objective.", "creators")
       + '<div class="db-card__body"><div class="db-top__cols"><span>Creator</span><b>' + (filtered() ? "Reached" : "Score /100") + "</b></div>" + (rows.map(function (r, i) {
-                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + esc(r.c.name) + "</b><small>" + r.c.delivered + (r.c.delivered === 1 ? " post · " : " posts · ") + num((r.c.views || 0) + (r.c.reach || 0)) + ' reached</small></span><span class="db-rank__score" title="' + (filtered() ? "People reached in this view" : "Score out of 100") + '">' + r.label + "</span></div>";
+                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + esc(r.c.name) + "</b><small>" + r.c.delivered + (r.c.delivered === 1 ? " post · " : " posts · ") + num((r.c.views || 0) + (r.c.reach || 0)) + (R.visibility.reach === false ? " views" : " reached") + '</small></span><span class="db-rank__score" title="' + (filtered() ? "People reached in this view" : "Score out of 100") + '">' + r.label + "</span></div>";
       }).join("") || '<p class="db-note">No creators in this view.</p>') + "</div>";
   }
 
@@ -394,10 +399,10 @@
     creators: function () {
       var list = posts(), by = {}; list.forEach(function (p) { var x = by[p.code] = by[p.code] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
       var rows = filtered() ? ranked(list).map(function (r) { return r.c; }) : R.creators;
-      return '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th><th>Reach</th><th>Eng.</th><th>ER</th>' + (R.visibility.clicks ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
+      return '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>ER</th>' + (R.visibility.clicks ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
         + rows.map(function (c, i) { var x = filtered() ? (by[c.code] || {}) : { posts: c.delivered, views: c.views, reach: c.reach, eng: c.engagement };
           var n = filtered() ? i + 1 : c.rank;
-          return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + esc(c.name) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + "</td><td>" + num(x.reach) + "</td><td>" + num(x.eng)
+          return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + esc(c.name) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
             + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
         + '</tbody></table><p class="db-note" style="margin-top:10px">Score out of 100 is for the whole campaign (' + esc((R.objective || {}).label || "Balanced") + " objective).</p>";
     },
@@ -423,7 +428,7 @@
     plat: function () {
       var by = {}; posts().forEach(function (p) { var x = by[p.platform] = by[p.platform] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
       return '<table class="db-table"><thead><tr><th>Platform</th><th></th><th>Posts</th><th>Views</th><th>Reach</th><th>Engagement</th></tr></thead><tbody>'
-        + Object.keys(by).map(function (k) { var x = by[k]; return "<tr><td>" + (ICONS[k] || "") + " " + esc(k) + "</td><td></td><td>" + x.posts + "</td><td>" + num(x.views) + "</td><td>" + num(x.reach) + "</td><td>" + num(x.eng) + "</td></tr>"; }).join("") + "</tbody></table>";
+        + Object.keys(by).map(function (k) { var x = by[k]; return "<tr><td>" + (ICONS[k] || "") + " " + esc(k) + "</td><td></td><td>" + x.posts + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng) + "</td></tr>"; }).join("") + "</tbody></table>";
     },
     clicks: function () {
       var cl = clicksFor(); if (!cl) return '<p class="db-note">No affiliate links in this campaign.</p>';
