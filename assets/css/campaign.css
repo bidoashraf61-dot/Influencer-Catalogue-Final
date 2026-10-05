@@ -571,3 +571,59 @@
 .mx-key-line i.click { background: var(--vivid-orange); }
 .k-print { display: none !important; }
 .k-screen { display: inline !important; }
+
+/* print, compact: sections flow on from each other — no forced page breaks,
+   no tall gaps; only small pieces (cards, panels, charts, rows) stay whole */
+@media print {
+  #sec-leaderboard, #sec-content, #sec-performance, #sec-timeline, #sec-clicks, #sec-overview { break-before: auto !important; }
+  #mx-report .mx-sec { padding-top: 14px !important; padding-bottom: 6px !important; border-top: 0 !important; }
+  .mx-sec__head { margin-bottom: 10px !important; }
+  .mx-h2 { font-size: 30px !important; }
+  .mx-info { display: none !important; }
+  .mx-bug { padding: 0 0 6px !important; }
+  .mx-bug__brands { margin-bottom: 10px !important; }
+  .mx-bug__brands img { height: 40px !important; }
+  .mx-bug__title { font-size: 44px !important; }
+  .mx-bug__row { margin-top: 12px !important; }
+  .mx-score-line { margin-top: 12px !important; }
+  .mx-score-line > div { padding: 10px 10px 10px 0 !important; }
+  .mx-score-line > div + div { padding-left: 10px !important; }
+  .mx-score-line dd { font-size: 24px !important; }
+  .mx-carousel { margin-bottom: 14px !important; }
+  .mx-carousel__track { grid-template-columns: repeat(7, 1fr) !important; gap: 6px !important; }
+  .mx-cc__body { padding: 6px 8px !important; }
+  .mx-cc__name { font-size: 15px !important; }
+  .mx-cc__meta { font-size: 9px !important; }
+  .mx-bullets { gap: 8px !important; }
+  .mx-bullet { grid-template-columns: 150px 1fr 120px !important; gap: 12px !important; }
+  .mx-bullet__name { font-size: 18px !important; }
+  .mx-bullet__track { height: 14px !important; }
+  .mx-bullet__num b { font-size: 18px !important; }
+  .mx-bench { margin-top: 14px !important; gap: 8px !important; }
+  .mx-bench__item { padding: 10px !important; }
+  .mx-bench__val { font-size: 26px !important; }
+  .mx-podium { gap: 8px !important; margin-bottom: 10px !important; }
+  .mx-pod { padding: 18px 10px 10px !important; }
+  .mx-pod__score { font-size: 30px !important; }
+  .mx-pod__name { font-size: 18px !important; margin: 8px 0 2px !important; }
+  .mx-table-title { font-size: 18px !important; margin-bottom: 6px !important; }
+  .mx-filters { display: none !important; }
+  .mx-wall { gap: 6px !important; }
+  .mx-post__media { aspect-ratio: 16 / 10 !important; }
+  .mx-charts, .mx-mix, .mx-clickgrid { gap: 8px !important; margin-top: 8px !important; }
+  .mx-chart, .mx-panel { padding: 12px !important; }
+  .mx-panel h3 { margin-bottom: 8px !important; }
+  .mx-tiles { gap: 6px !important; }
+  .mx-tile { padding: 8px !important; }
+  .mx-tile__ic { width: 30px !important; height: 30px !important; }
+  .mx-tile__ic svg { width: 16px !important; height: 16px !important; }
+  .mx-tile b { font-size: 22px !important; }
+  .mx-bar { margin-bottom: 6px !important; font-size: 11px !important; }
+  .mx-key-line { font-size: 10px !important; }
+  .mx-gantt__row { min-height: 30px !important; }
+  .mx-gantt__lane { height: 30px !important; }
+  .mx-gantt__bar { top: 7px !important; height: 16px !important; }
+  .mx-note { font-size: 13px !important; }
+  .mx-bullet, .mx-bench__item, .mx-chart, .mx-panel, .mx-post, .mx-pod, .mx-cc, .mx-gantt__row, .mx-table tr { break-inside: avoid; }
+  .mx-h2, .mx-sec__head, .mx-table-title { break-after: avoid; }
+}
