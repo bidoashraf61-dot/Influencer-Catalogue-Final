@@ -534,7 +534,7 @@
   // amber / red verdicts: ink = people who saw it, lime = what people did.
   // These two sections sit on black: white = people who saw it, lime = what
   // people did.
-  var C1 = "#ffffff", C2 = "#e8ff76", C3 = "#ff691e";   // seen, engaged, clicked
+  var C1 = "#121212", C2 = "#c3dd2c", C3 = "#ff691e";   // seen, engaged, clicked
   function bars(rows, keyHtml, colour) {
     if (!rows || !rows.length) return '<p class="mx-panel__note">Nothing yet.</p>';
     var peak = Math.max.apply(null, rows.map(function (r) { return r.n; })) || 1;
@@ -572,8 +572,8 @@
   function renderCharts() {
     var h = (R.history || []).map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; });
     $("mx-charts").innerHTML = h.length
-      ? '<div class="mx-chart"><h3>Views so far</h3>' + area(h, "views", "#ffffff", "Views so far") + "</div>"
-        + '<div class="mx-chart"><h3>Engagement so far</h3>' + area(h, "eng", "#e8ff76", "Engagement so far") + "</div>"
+      ? '<div class="mx-chart"><h3>Views so far</h3>' + area(h, "views", "#121212", "Views so far") + "</div>"
+        + '<div class="mx-chart"><h3>Engagement so far</h3>' + area(h, "eng", "#a4bf00", "Engagement so far") + "</div>"
       : '<p class="mx-empty-note">The charts fill in as posts are captured, once every 24 hours.</p>';
 
     var posts = R.posts.filter(function (p) { return p.section === "campaign"; }), mix = [], t = R.total;
@@ -616,7 +616,7 @@
       }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
         + '<p class="mx-panel__note">Weighted by reach' + (R.audience.coverage < 99 ? " · " + R.audience.coverage.toFixed(0) + "% of reach covered" : "") + "</p></div>");
     }
-    $("mx-mix").innerHTML = '<p class="mx-key-line"><span><i class="seen"></i><b class="k-screen">White</b><b class="k-print">Black</b> — people who saw it (views, reach)</span>'
+    $("mx-mix").innerHTML = '<p class="mx-key-line"><span><i class="seen"></i><b class="k-screen">Black</b> — people who saw it (views, reach)</span>'
       + '<span><i class="did"></i>Lime — people who engaged (likes, comments, saves, shares)</span>'
       + '<span><i class="click"></i>Orange — people who clicked through (affiliate links)</span></p>' + mix.join("");
   }
