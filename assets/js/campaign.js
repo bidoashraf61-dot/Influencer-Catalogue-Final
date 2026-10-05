@@ -534,7 +534,7 @@
   // amber / red verdicts: ink = people who saw it, lime = what people did.
   // These two sections sit on black: white = people who saw it, lime = what
   // people did.
-  var C1 = "#ffffff", C2 = "#e8ff76";
+  var C1 = "#ffffff", C2 = "#e8ff76", C3 = "#ff691e";   // seen, engaged, clicked
   function bars(rows, keyHtml, colour) {
     if (!rows || !rows.length) return '<p class="mx-panel__note">Nothing yet.</p>';
     var peak = Math.max.apply(null, rows.map(function (r) { return r.n; })) || 1;
@@ -617,7 +617,8 @@
         + '<p class="mx-panel__note">Weighted by reach' + (R.audience.coverage < 99 ? " · " + R.audience.coverage.toFixed(0) + "% of reach covered" : "") + "</p></div>");
     }
     $("mx-mix").innerHTML = '<p class="mx-key-line"><span><i class="seen"></i><b class="k-screen">White</b><b class="k-print">Black</b> — people who saw it (views, reach)</span>'
-      + '<span><i class="did"></i>Lime — what people did (likes, comments, saves, shares, clicks)</span></p>' + mix.join("");
+      + '<span><i class="did"></i>Lime — people who engaged (likes, comments, saves, shares)</span>'
+      + '<span><i class="click"></i>Orange — people who clicked through (affiliate links)</span></p>' + mix.join("");
   }
 
   /* ----------------------------------------------------------- clicks */
@@ -631,21 +632,21 @@
       return;
     }
     var t = R.total;
-    var heads = tiles([{ icon: MARK.clicks, value: full(cl.clicks), label: "Clicks", tone: "did" },
-      { icon: MARK.views, value: full(cl.uniques), label: "Unique people", tone: "did" },
-      { icon: G('<path d="M4 20L20 4M7 4h13v13"/>'), value: pct(t.ctr), label: "Click-through", sub: t.ctr != null ? (SIG[t.ctr_grade] || "") : "", tone: "did" }]);
+    var heads = tiles([{ icon: MARK.clicks, value: full(cl.clicks), label: "Clicks", tone: "click" },
+      { icon: MARK.views, value: full(cl.uniques), label: "Unique people", tone: "click" },
+      { icon: G('<path d="M4 20L20 4M7 4h13v13"/>'), value: pct(t.ctr), label: "Click-through", sub: t.ctr != null ? (SIG[t.ctr_grade] || "") : "", tone: "click" }]);
     if (!cl.clicks) { $("mx-clicks").innerHTML = heads + '<p class="mx-empty-note" style="margin-top:18px">No clicks yet.</p>'; return; }
     var lab = function (rows) { return (rows || []).map(function (r) { return { k: r.k, n: r.n, label: full(r.n) }; }); };
     $("mx-clicks").innerHTML = heads + '<div class="mx-clickgrid">'
-      + '<div class="mx-panel"><h3>By creator</h3>' + bars(lab(cl.by_creator), function (r) { return esc(r.k); }, C2) + "</div>"
+      + '<div class="mx-panel"><h3>By creator</h3>' + bars(lab(cl.by_creator), function (r) { return esc(r.k); }, C3) + "</div>"
       + '<div class="mx-panel"><h3>By app</h3>' + tiles((cl.by_app || []).slice(0, 6).map(function (r) {
-        return { icon: ICONS[r.k] || MARK.clicks, value: full(r.n), label: r.k, tone: "did" };
+        return { icon: ICONS[r.k] || MARK.clicks, value: full(r.n), label: r.k, tone: "click" };
       })) + "</div>"
       + '<div class="mx-panel"><h3>By country</h3>' + bars(lab(cl.by_country), function (r) {
         return r.k && r.k.length === 2 ? flag(r.k) + esc(countryName(r.k)) : esc(r.k || "Unknown");
-      }, C2) + "</div>"
+      }, C3) + "</div>"
       + '<div class="mx-panel"><h3>By device</h3>' + tiles((cl.by_device || []).map(function (r) {
-        return { icon: MARK[r.k] || MARK.Mobile, value: full(r.n), label: r.k, tone: "did" };
+        return { icon: MARK[r.k] || MARK.Mobile, value: full(r.n), label: r.k, tone: "click" };
       })) + "</div></div>";
   }
 

@@ -599,3 +599,16 @@
 .mx-key-line b { font-weight: 600; }
 .k-print { display: none; }
 @media print { .k-screen { display: none; } .k-print { display: inline; } }
+
+/* orange = clicked through (affiliate), alongside white = seen, lime = engaged */
+.mx-key-line i.click { background: var(--vivid-orange); }
+.mx-tile--click { background: rgba(255,105,30,.12); }
+.mx-tile--click .mx-tile__ic { background: var(--vivid-orange); color: var(--ink); }
+#sec-clicks .mx-tile--click { background: rgba(255,105,30,.12); }
+#sec-clicks .mx-tile--click .mx-tile__ic { background: var(--vivid-orange); color: var(--ink); }
+#sec-clicks .mx-tile--click b { color: #ff8a4c; }
+@media print {
+  #sec-clicks .mx-tile--click { background: #fff1e8 !important; }
+  #sec-clicks .mx-tile--click b { color: var(--ink) !important; }
+  #sec-clicks .mx-bar i::after { background: var(--vivid-orange) !important; }
+}
