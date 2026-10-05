@@ -536,3 +536,66 @@
 .mx-key-line i.did { background: var(--lime); box-shadow: inset 0 0 0 1px #9bb300; }
 .mx-score i::after { background: var(--ink); }
 .mx-cc .mx-tc__links a, .mx-tc__links a { color: var(--ink); }
+
+/* "How it grew" and "Affiliate link clicks" on black with lime (client
+   choice): white = seen, lime = did. The rest of the report stays white. */
+#sec-performance, #sec-clicks { background: var(--ink); color: var(--white); border-top: 0 !important; }
+#sec-performance .mx-h2, #sec-clicks .mx-h2 { color: var(--white); }
+#sec-performance .mx-info, #sec-clicks .mx-info { background: transparent; border-color: rgba(255,255,255,.6); color: var(--white); }
+#sec-performance .mx-info:hover, #sec-clicks .mx-info:hover, #sec-performance .mx-info[aria-expanded="true"], #sec-clicks .mx-info[aria-expanded="true"] { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+#sec-performance .mx-pop, #sec-clicks .mx-pop { background: var(--white); color: var(--ink); }
+#sec-performance .mx-chart, #sec-performance .mx-panel, #sec-clicks .mx-panel { background: #1b1b1b; border-color: rgba(255,255,255,.1); }
+#sec-performance .mx-chart h3 { color: var(--white); }
+#sec-performance .mx-panel h3, #sec-clicks .mx-panel h3 { color: rgba(255,255,255,.55); }
+#sec-performance .mx-chart svg line { stroke: rgba(255,255,255,.1); }
+#sec-performance .mx-chart svg text { fill: rgba(255,255,255,.55); }
+#sec-performance .mx-key-line { color: rgba(255,255,255,.7); }
+#sec-performance .mx-key-line i.seen { background: var(--white); }
+#sec-performance .mx-key-line i.did { background: var(--lime); box-shadow: none; }
+#sec-performance .mx-tile, #sec-clicks .mx-tile { background: #262626; }
+#sec-performance .mx-tile b, #sec-clicks .mx-tile b { color: var(--white); }
+#sec-performance .mx-tile > span:last-child, #sec-clicks .mx-tile > span:last-child,
+#sec-performance .mx-tile small, #sec-clicks .mx-tile small { color: rgba(255,255,255,.62); }
+#sec-performance .mx-tile--seen .mx-tile__ic, #sec-clicks .mx-tile--seen .mx-tile__ic { background: var(--white); color: var(--ink); }
+#sec-performance .mx-tile--did, #sec-clicks .mx-tile--did { background: rgba(232,255,118,.1); }
+#sec-performance .mx-tile--did .mx-tile__ic, #sec-clicks .mx-tile--did .mx-tile__ic { background: var(--lime); color: var(--ink); }
+#sec-performance .mx-tile--did b, #sec-clicks .mx-tile--did b { color: var(--lime); }
+#sec-performance .mx-tile--plain .mx-tile__ic { background: transparent; color: var(--white); box-shadow: inset 0 0 0 1.5px rgba(255,255,255,.7); }
+#sec-performance .mx-bar, #sec-clicks .mx-bar { color: var(--white); }
+#sec-performance .mx-bar i, #sec-clicks .mx-bar i { background: rgba(255,255,255,.12); }
+#sec-performance .mx-panel__note, #sec-clicks .mx-panel__note { color: rgba(255,255,255,.55); }
+#sec-performance .mx-empty-note, #sec-clicks .mx-empty-note { background: #1b1b1b; color: rgba(255,255,255,.7); }
+#sec-clicks .mx-sig--good { background: rgba(20,136,74,.25); color: #7debac; }
+#sec-clicks .mx-sig--moderate { background: rgba(226,120,15,.25); color: #ffbb75; }
+#sec-clicks .mx-sig--low { background: rgba(238,21,21,.25); color: #ff9393; }
+#sec-performance + #sec-clicks { padding-top: 24px; }
+
+@media print {
+  /* the two black sections print light: no ink-heavy blocks on paper */
+  #sec-performance, #sec-clicks { background: var(--white) !important; color: var(--ink) !important; }
+  #sec-performance .mx-h2, #sec-clicks .mx-h2, #sec-performance .mx-chart h3 { color: var(--ink) !important; }
+  #sec-performance .mx-chart, #sec-performance .mx-panel, #sec-clicks .mx-panel { background: var(--white) !important; border-color: var(--line) !important; }
+  #sec-performance .mx-panel h3, #sec-clicks .mx-panel h3, #sec-performance .mx-key-line,
+  #sec-performance .mx-panel__note, #sec-clicks .mx-panel__note { color: var(--gray) !important; }
+  #sec-performance .mx-chart svg line { stroke: #ece6dc !important; }
+  #sec-performance .mx-chart svg text { fill: #5a5a5a !important; }
+  #sec-performance .mx-chart svg polyline[stroke="#ffffff"], #sec-performance .mx-chart svg circle[fill="#ffffff"] { stroke: var(--ink); fill: var(--ink); }
+  #sec-performance .mx-chart svg polyline[stroke="#ffffff"] { fill: none; }
+  #sec-performance .mx-chart svg path[fill="#ffffff"] { fill: var(--ink); }
+  #sec-performance .mx-chart svg polyline[stroke="#e8ff76"] { stroke: #9bb300; }
+  #sec-performance .mx-chart svg circle[fill="#e8ff76"], #sec-performance .mx-chart svg path[fill="#e8ff76"] { fill: #9bb300; }
+  #sec-performance .mx-key-line i.seen { background: var(--ink) !important; }
+  #sec-performance .mx-tile, #sec-clicks .mx-tile { background: #f4f2ee !important; }
+  #sec-performance .mx-tile--did, #sec-clicks .mx-tile--did { background: #f6fbdc !important; }
+  #sec-performance .mx-tile b, #sec-clicks .mx-tile b { color: var(--ink) !important; }
+  #sec-performance .mx-tile > span:last-child, #sec-clicks .mx-tile > span:last-child { color: var(--gray) !important; }
+  #sec-performance .mx-tile--seen .mx-tile__ic, #sec-clicks .mx-tile--seen .mx-tile__ic { background: var(--ink) !important; color: var(--lime) !important; }
+  #sec-performance .mx-tile--plain .mx-tile__ic { color: var(--ink) !important; box-shadow: inset 0 0 0 1.5px var(--ink) !important; }
+  #sec-performance .mx-bar, #sec-clicks .mx-bar { color: var(--ink) !important; }
+  #sec-performance .mx-bar i, #sec-clicks .mx-bar i { background: #efece6 !important; }
+  #sec-performance .mx-bar i::after { background: var(--ink) !important; }
+  #sec-clicks .mx-bar i::after { background: #9bb300 !important; }
+}
+.mx-key-line b { font-weight: 600; }
+.k-print { display: none; }
+@media print { .k-screen { display: none; } .k-print { display: inline; } }
