@@ -446,6 +446,14 @@
       '<div class="cat-card__body"><p class="cat-card__code">' + esc(c.code) + "</p>" +
       '<h3 class="cat-card__name">' + esc(c.name) + "</h3>" +
       '<ul class="cat-card__meta">' + metaRows(c, label) + "</ul>" +
+      // The creator's passport: their full analysis, or a locked page that
+      // lets the client ask for one. Only where the server is behind the page
+      // — the static build has no passport to open.
+      (CFG.api ? '<a class="cat-card__analysis' + (c.analysis ? " is-ready" : "") + '" href="' +
+        (document.body.getAttribute("data-page") === "selection" ? "../" : "") + "creator/#c=" +
+        encodeURIComponent(c.code) + '" data-noselect>' + (c.analysis ? "Full analysis" : "Analysis — request") +
+        ' <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>' : "") +
       "</div></article>";
   }
 

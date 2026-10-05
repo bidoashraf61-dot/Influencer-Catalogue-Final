@@ -51,8 +51,10 @@ rsync -a --exclude 'catalogue' "$SRC/assets/" "$DST/assets/"
 cp "$SRC/dist/index.html"           "$DST/index.html"
 cp "$SRC/dist/selection/index.html" "$DST/selection/index.html"
 # The campaign report is hand-written in the repo, not built.
-mkdir -p "$DST/campaign"
+# The campaign report and the creator passport are hand-written, not built.
+mkdir -p "$DST/campaign" "$DST/creator"
 cp "$SRC/campaign/index.html"       "$DST/campaign/index.html"
+cp "$SRC/creator/index.html"        "$DST/creator/index.html"
 
 # Stamp a ?v=<hash> onto the js/css URLs. The source templates carry one but
 # the dist build drops it, so catalogue.js sits at a URL that never changes —
@@ -64,9 +66,10 @@ python3 - "$DST" <<'PYSTAMP'
 import hashlib, re, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
-names = ('js/catalogue.js', 'css/catalogue.css', 'js/campaign.js', 'css/campaign.css')
+names = ('js/catalogue.js', 'css/catalogue.css', 'js/campaign.js', 'css/campaign.css',
+         'js/creator.js', 'css/creator.css', 'js/hv-icons.js')
 stamp = {n: h('assets/' + n) for n in names}
-for page in ('index.html', 'selection/index.html', 'campaign/index.html'):
+for page in ('index.html', 'selection/index.html', 'campaign/index.html', 'creator/index.html'):
     f = root / page
     s = f.read_text()
     for n, v in stamp.items():

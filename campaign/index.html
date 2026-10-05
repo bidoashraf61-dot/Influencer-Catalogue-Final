@@ -8,10 +8,26 @@
 <title>Campaign report — HelloVoice</title>
 <link rel="icon" href="../assets/icons/icon-32.png" type="image/png"/>
 <link rel="apple-touch-icon" href="../assets/icons/icon-180.png"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.3/css/flag-icons.min.css"/>
 <link rel="stylesheet" href="../assets/css/catalogue.css?v=1"/>
 <link rel="stylesheet" href="../assets/css/campaign.css?v=1"/>
 </head>
 <body class="cat-locked" data-page="campaign">
+<!--
+THESIS: A campaign report that reads like a live match-day results package —
+status ticker, highlights first, a league table with medals, stat graphics
+judged against benchmarks — refusing the generic grid of KPI tiles.
+OWN-WORLD: The catalogue's world: Bebas Neue display, DM Sans body, ink
+broadcast bars with lime type, linen bands, lime rotated pill; signal colours
+green / orange / red only for verdicts; drawn platform marks; flags as images.
+STORY: The client sees at once whether the campaign is on track, then the
+posts that made it, who led, how each number compares with its benchmark,
+and what the affiliate links drove; then downloads it.
+FIRST VIEWPORT: Ink scorebug with brand logos, title, LIVE ticker and verdict
+stamp; stage rail and delivery strip directly beneath.
+FORM: match-day broadcast results package, structure 6 of 7, seed 2d08ada4.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->
 
 <div class="cat-gate" id="cat-gate" hidden>
   <div class="cat-gate__inner">
@@ -28,90 +44,136 @@
   </div>
 </div>
 
-<main class="cat-app" id="cat-app" hidden>
+<main class="cat-app mx" id="cat-app" hidden>
 
-  <header class="cat-hero cmp-hero">
-    <div class="cat-pad"><div class="cat-container">
-      <div class="cat-topbar">
-        <img class="cat-hero__logo" src="../assets/brand/logo.png" alt="HelloVoice"/>
-        <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
-          Portfolio
+  <nav class="mx-top cat-pad" aria-label="Report navigation">
+    <div class="cat-container mx-top__in">
+      <a href="../" class="mx-top__logo"><img src="../assets/brand/logo.png" alt="HelloVoice — back to the catalogue"/></a>
+      <div class="mx-top__links">
+        <a class="mx-link" href="../" id="mx-catalogue">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          Full catalogue
+        </a>
+        <a class="mx-link" href="#list" id="mx-all" hidden>All campaigns</a>
+        <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">Portfolio
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
         </a>
       </div>
-      <a class="cat-back" href="#" id="cmp-back" hidden>
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-        All campaigns
-      </a>
-      <div class="cat-hero__head">
-        <div class="cat-pill">Campaign report</div>
-        <h1 class="cat-hero__title cmp-title" id="cmp-title">Campaigns</h1>
-      </div>
-      <p class="cat-hero__lead" id="cmp-lead"></p>
-      <p class="cmp-fresh" id="cmp-fresh"></p>
-    </div></div>
-  </header>
+    </div>
+  </nav>
 
-  <!-- list of the passcode's campaigns -->
-  <section class="cmp-section" id="cmp-list" hidden>
-    <div class="cat-pad"><div class="cat-container">
-      <div class="cmp-list" id="cmp-list-items"></div>
-    </div></div>
+  <!-- the passcode's campaigns -->
+  <section class="mx-list cat-pad" id="mx-list" hidden>
+    <div class="cat-container">
+      <h1 class="cat-hero__title mx-list__title">My campaigns</h1>
+      <div class="mx-list__items" id="mx-list-items"></div>
+    </div>
   </section>
 
-  <!-- one campaign -->
-  <div id="cmp-report" hidden>
-    <section class="cat-summary" aria-label="Results">
+  <div id="mx-report" hidden>
+    <!-- scorebug: who, what, live state, verdict -->
+    <header class="mx-bug">
       <div class="cat-pad"><div class="cat-container">
-        <dl class="cat-summary__grid" id="cmp-kpis"></dl>
-        <p class="cat-note" id="cmp-kpi-note"></p>
+        <div class="mx-bug__brands" id="mx-brands"></div>
+        <h1 class="mx-bug__title" id="mx-title"></h1>
+        <p class="mx-bug__sub" id="mx-sub"></p>
+        <div class="mx-bug__row">
+          <p class="mx-ticker" id="mx-ticker"></p>
+          <div class="mx-verdict" id="mx-verdict"></div>
+        </div>
+        <dl class="mx-score-line" id="mx-scoreline"></dl>
+        <div class="mx-delivery" id="mx-delivery"></div>
       </div></div>
+    </header>
+
+    <!-- where the campaign is: compact stage rail; full timeline further down -->
+    <section class="mx-rail cat-pad" aria-label="Campaign stage">
+      <div class="cat-container">
+        <ol class="mx-rail__steps" id="mx-rail"></ol>
+        <p class="mx-note" id="mx-note" hidden></p>
+      </div>
     </section>
 
-    <section class="cmp-section">
-      <div class="cat-pad"><div class="cat-container">
-        <h2 class="cmp-h2">Over time</h2>
-        <div class="cmp-panel" id="cmp-chart"></div>
-      </div></div>
+    <!-- the posts, first -->
+    <section class="mx-sec cat-pad" aria-labelledby="mx-h-posts">
+      <div class="cat-container">
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-posts">Highlights</h2>
+          <div class="mx-filters" id="mx-filters" role="toolbar" aria-label="Filter posts"></div>
+        </div>
+        <div class="mx-wall" id="mx-wall"></div>
+      </div>
     </section>
 
-    <section class="cmp-section">
-      <div class="cat-pad"><div class="cat-container">
-        <h2 class="cmp-h2">Creators</h2>
-        <div class="cmp-panel cmp-scroll"><table class="cmp-table" id="cmp-creators"></table></div>
-      </div></div>
+    <!-- league table -->
+    <section class="mx-sec mx-sec--ink cat-pad" aria-labelledby="mx-h-board">
+      <div class="cat-container">
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-board">Leaderboard</h2>
+        </div>
+        <div class="mx-podium" id="mx-podium"></div>
+        <div class="mx-table-wrap"><table class="mx-table" id="mx-table"></table></div>
+      </div>
     </section>
 
-    <section class="cmp-section">
-      <div class="cat-pad"><div class="cat-container">
-        <h2 class="cmp-h2">Content</h2>
-        <div class="cmp-filters" id="cmp-filters"></div>
-        <div class="cmp-grid" id="cmp-posts"></div>
-      </div></div>
+    <!-- targets and benchmarks -->
+    <section class="mx-sec cat-pad" aria-labelledby="mx-h-targets">
+      <div class="cat-container">
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-targets">Against target</h2>
+          <p class="mx-sec__lede" id="mx-targets-lede"></p>
+        </div>
+        <div class="mx-bullets" id="mx-bullets"></div>
+        <div class="mx-bench" id="mx-bench"></div>
+      </div>
     </section>
 
-    <section class="cmp-section" id="cmp-clicks-wrap" hidden>
-      <div class="cat-pad"><div class="cat-container">
-        <h2 class="cmp-h2">Link clicks</h2>
-        <div class="cmp-split" id="cmp-clicks"></div>
-      </div></div>
+    <!-- performance graphics -->
+    <section class="mx-sec mx-sec--linen cat-pad" aria-labelledby="mx-h-perf">
+      <div class="cat-container">
+        <div class="mx-sec__head"><h2 class="mx-h2" id="mx-h-perf">How it grew</h2></div>
+        <div class="mx-charts" id="mx-charts"></div>
+        <div class="mx-mix" id="mx-mix"></div>
+      </div>
     </section>
 
-    <section class="cmp-section cmp-actions">
-      <div class="cat-pad"><div class="cat-container">
-        <button type="button" class="cat-btn cat-btn--lime" id="cmp-print">Download PDF</button>
-        <a class="cat-btn cmp-btn-outline" id="cmp-csv" href="#">Download CSV</a>
-        <p class="cat-note" id="cmp-method"></p>
-      </div></div>
+    <!-- the scope of work, step by step -->
+    <section class="mx-sec cat-pad" aria-labelledby="mx-h-progress">
+      <div class="cat-container">
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-progress">Campaign progress</h2>
+          <p class="mx-status__dates" id="mx-dates"></p>
+        </div>
+        <div class="mx-gantt" id="mx-gantt"></div>
+      </div>
+    </section>
+
+    <!-- affiliate links -->
+    <section class="mx-sec cat-pad" aria-labelledby="mx-h-clicks" id="mx-clicks-sec">
+      <div class="cat-container">
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-clicks">Affiliate link clicks</h2>
+        </div>
+        <div id="mx-clicks"></div>
+      </div>
+    </section>
+
+    <section class="mx-end cat-pad">
+      <div class="cat-container mx-end__in">
+        <button type="button" class="cat-btn cat-btn--lime" id="mx-print">Download PDF</button>
+        <a class="cat-btn mx-btn-line" id="mx-csv" href="#">Download CSV</a>
+        <a class="cat-btn mx-btn-line" href="../">Back to the catalogue</a>
+      </div>
     </section>
   </div>
 
-  <p class="cmp-empty" id="cmp-empty" hidden></p>
+  <p class="mx-empty" id="mx-empty" hidden></p>
 </main>
 
 <script>
   window.CAMPAIGN_CONFIG = { api: "/admin" };
 </script>
+<script src="../assets/js/hv-icons.js?v=1"></script>
 <script src="../assets/js/campaign.js?v=1"></script>
 </body>
 </html>

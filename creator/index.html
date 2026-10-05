@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
+<meta name="referrer" content="no-referrer"/>
+<title>Creator analysis — HelloVoice</title>
+<link rel="icon" href="../assets/icons/icon-32.png" type="image/png"/>
+<link rel="apple-touch-icon" href="../assets/icons/icon-180.png"/>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.3/css/flag-icons.min.css"/>
+<link rel="stylesheet" href="../assets/css/catalogue.css?v=1"/>
+<link rel="stylesheet" href="../assets/css/creator.css?v=1"/>
+</head>
+<body class="cat-locked" data-page="creator">
+<!--
+THESIS: A creator's full analysis as a talent passport — an identity data
+page, then stamped pages for where their audience lives, how real it is, how
+it grew and what they post — refusing the tabbed analytics dashboard.
+OWN-WORLD: Catalogue world: linen data page on white, ink cover, Bebas Neue
+fields, DM Sans values; audience countries as rotated, double-ruled stamps
+with real flags; lime seal for "analysed", ink seal for "locked".
+STORY: A brand manager sees who this creator is, whether the audience is
+real and in their market, and how they perform against their tier — or
+requests the analysis when it is not on file yet.
+FIRST VIEWPORT: Data page — photo, name, code, tier, handles with platform
+marks, seal; the key numbers strip beneath it.
+FORM: talent passport, structure 5 of 7, seed c4bd3e93.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->
+
+<div class="cat-gate" id="cat-gate" hidden>
+  <div class="cat-gate__inner">
+    <img class="cat-gate__logo" src="../assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+    <p class="cat-gate__eyebrow">Confidential</p>
+    <h1 class="cat-gate__title">Creator analysis</h1>
+    <p class="cat-gate__note">Enter the access code you were given.</p>
+    <form class="cat-gate__form" id="cat-gate-form" autocomplete="off">
+      <input type="password" id="cat-code" class="cat-gate__input" placeholder="Access code"
+             aria-label="Access code" autocomplete="off" spellcheck="false"/>
+      <button type="submit" class="cat-btn cat-btn--lime">Unlock</button>
+    </form>
+    <p class="cat-gate__error" id="cat-gate-error" role="alert" hidden>That code is not right.</p>
+  </div>
+</div>
+
+<main class="cat-app pp" id="cat-app" hidden>
+  <nav class="pp-top cat-pad" aria-label="Page navigation">
+    <div class="cat-container pp-top__in">
+      <a href="../"><img class="pp-top__logo" src="../assets/brand/logo.png" alt="HelloVoice — back to the catalogue"/></a>
+      <div class="pp-top__links">
+        <a class="pp-link" href="../" id="pp-back">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          Back
+        </a>
+        <a class="pp-link" href="../">Full catalogue</a>
+        <a class="pp-link" href="../campaign/">My campaigns</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="cat-pad"><div class="cat-container">
+    <!-- the data page -->
+    <section class="pp-id" id="pp-id" aria-label="Creator identity"></section>
+    <!-- locked: no analysis on file -->
+    <section class="pp-sealed" id="pp-sealed" hidden></section>
+    <!-- the analysis pages -->
+    <div id="pp-pages" hidden>
+      <section class="pp-page" aria-labelledby="pp-h-perf">
+        <h2 class="pp-h2" id="pp-h-perf">Performance</h2>
+        <dl class="pp-stats" id="pp-stats"></dl>
+      </section>
+      <section class="pp-page" aria-labelledby="pp-h-aud">
+        <h2 class="pp-h2" id="pp-h-aud">Audience</h2>
+        <div class="pp-stamps" id="pp-stamps"></div>
+        <div class="pp-grid" id="pp-aud"></div>
+      </section>
+      <section class="pp-page pp-page--split" aria-labelledby="pp-h-real">
+        <div>
+          <h2 class="pp-h2" id="pp-h-real">Is it real?</h2>
+          <div id="pp-cred"></div>
+        </div>
+        <div>
+          <h2 class="pp-h2">Growth</h2>
+          <div id="pp-growth"></div>
+        </div>
+      </section>
+      <section class="pp-page" aria-labelledby="pp-h-content" id="pp-content-sec">
+        <h2 class="pp-h2" id="pp-h-content">Content</h2>
+        <div id="pp-content"></div>
+      </section>
+      <section class="pp-page" aria-labelledby="pp-h-net" id="pp-net-sec">
+        <h2 class="pp-h2" id="pp-h-net">Brands &amp; network</h2>
+        <div class="pp-grid" id="pp-net"></div>
+      </section>
+      <p class="pp-source" id="pp-source"></p>
+    </div>
+  </div></div>
+  <p class="pp-empty" id="pp-empty" hidden></p>
+</main>
+
+<script>
+  window.CREATOR_CONFIG = { api: "/admin" };
+</script>
+<script src="../assets/js/hv-icons.js?v=1"></script>
+<script src="../assets/js/creator.js?v=1"></script>
+</body>
+</html>

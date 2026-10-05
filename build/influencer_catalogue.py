@@ -719,10 +719,15 @@ def build():
     <div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
         <img class="cat-hero__logo" src="/assets/brand/logo.png" alt="HelloVoice"/>
+        <div class="cat-topbar__links"><a class="cat-track" href="/campaign/">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
+          Campaign tracking
+        </a>
         <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
           Portfolio
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
         </a>
+      </div>
       </div>
       <div class="cat-hero__head">
         <div class="cat-pill">Creator Roster</div>
@@ -877,10 +882,15 @@ def build():
     <div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
         <img class="cat-hero__logo" src="/assets/brand/logo.png" alt="HelloVoice"/>
+        <div class="cat-topbar__links"><a class="cat-track" href="/campaign/">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
+          Campaign tracking
+        </a>
         <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
           Portfolio
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
         </a>
+      </div>
       </div>
       <a class="cat-back" href="/catalogue/">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>

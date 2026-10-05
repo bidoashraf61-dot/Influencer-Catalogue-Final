@@ -122,6 +122,25 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--ink);outline-off
 .mini input{padding:5px 7px;font-size:13px;width:80px}
 .shot{max-width:100%;max-height:420px;border:1px solid var(--line);border-radius:8px}
 .grid2{display:grid;gap:18px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.guide{border-color:var(--ink)}
+.guide-head{margin-bottom:10px}
+.guide-steps{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:0;counter-reset:g}
+.guide-steps li{counter-increment:g;font-size:13px;padding:6px 12px;border-radius:999px;background:#f3f1ec;color:var(--gray)}
+.guide-steps li::before{content:counter(g) "  ";font-weight:700}
+.guide-steps li.ok{background:#e7f6ec;color:var(--green)}
+.guide-steps li.ok::before{content:"\\2713  "}
+.step h2{display:flex;align-items:center;gap:10px}
+.step-n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;font-size:14px}
+.logo-grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));max-height:280px;overflow:auto;padding:4px}
+.logo-pick{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:11px;color:var(--gray);margin:0}
+.logo-pick img{width:56px;height:56px;object-fit:contain}
+.logo-pick:has(input:checked){border-color:var(--ink);box-shadow:0 0 0 2px var(--ink) inset;color:var(--ink)}
+.logo-pick input{margin:0;width:auto}
+.savebar{position:sticky;bottom:0;background:rgba(247,245,240,.95);padding:14px 0;display:flex;gap:10px;border-top:1px solid var(--line);margin-top:20px}
+.steps-table input,.steps-table select{padding:7px 9px;font-size:14px}
+.steps-table td{padding:6px 8px}
+.chain{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.chain .arrow{color:var(--gray)}
 @media (max-width:820px){.grid2{grid-template-columns:1fr}}
 .row{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px}
 .btn{display:inline-block;font:inherit;font-weight:600;padding:10px 20px;border-radius:999px;
@@ -350,7 +369,8 @@ def u(path):
 
 def page(title, body, active=""):
     items = [("/", "Overview"), ("/codes", "Access codes"), ("/analytics", "Analytics"),
-             ("/roster", "Roster"), ("/selections", "Selections"), ("/campaigns", "Campaigns"),
+             ("/clients", "Clients"), ("/roster", "Roster"), ("/analysis", "Creator analysis"),
+             ("/selections", "Selections"), ("/campaigns", "Campaigns"),
              ("/requests", "Requests"), ("/settings", "Settings")]
     # Requests nobody has handled yet, counted on every page so a new one is
     # seen from wherever the admin happens to be. The page script keeps it
@@ -2071,12 +2091,34 @@ def _rules_text(rules):
     return " ".join(rules["hashtags"] + rules["mentions"] + rules["keywords"])
 
 
-def campaign_edit_page(k, members, codes, rules, selection=None, error=None, message=None):
-    note = ""
-    if error:
-        note += "<div class='err'>" + e(error) + "</div>"
-    if message:
-        note += "<div class='ok'>" + e(message) + "</div>"
+def campaign_edit_page(k, members, codes, rules, selection=None, error=None, message=None,
+                       logo_names=(), selections=(), rep=None):
+    """Setup as six plain steps, top to bottom, with a checklist that says
+    what is still missing. Every step saves with the one button at the end."""
+    import metrics
+    from db import campaign_targets, campaign_logos
+    note = _notes(error, message)
+    targets = campaign_targets(k)
+    chosen_logos = campaign_logos(k)
+    vis = metrics.visibility(k)
+
+    checks = [("Client passcode chosen", bool(k["code_id"])),
+              ("Dates set", bool(k["starts_at"] and k["ends_at"])),
+              ("Creators added", bool(members)),
+              ("Posts per creator planned", bool(members) and all(m["planned"] for m in members)),
+              ("Hashtags / mentions to track", bool(rules["hashtags"] or rules["mentions"] or rules["keywords"])),
+              ("Targets set", bool(targets)),
+              ("Brand logo chosen", bool(chosen_logos)),
+              ("Current step marked", any(x["state"] == "active" for x in __import__("db").campaign_steps(k))),
+              ("Set live", k["status"] == "live")]
+    done = sum(1 for _, ok in checks if ok)
+    nxt = next((label for label, ok in checks if not ok), None)
+    checklist = ("<div class='card guide'><div class='guide-head'><strong>Setup " + str(done) + " of "
+                 + str(len(checks)) + " done</strong>"
+                 + ("<span class='muted'> — next: " + e(nxt) + "</span>" if nxt else
+                    "<span class='pill live'>ready</span>") + "</div><ol class='guide-steps'>"
+                 + "".join("<li class='" + ("ok" if ok else "") + "'>" + e(label) + "</li>" for label, ok in checks)
+                 + "</ol></div>")
 
     rows, total_cost = [], 0
     for c in members:
@@ -2084,95 +2126,144 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         gone = c["code"] is None
         shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
                 if not gone and c["photo"] else "<span class='thumb sm none'>—</span>")
-        if gone:
-            who = "<span class='pill dead'>no longer in the roster</span>"
-            accounts = ""
-        else:
-            who = e(c["name"]) + ("" if c["active"] else " <span class='pill dead'>hidden</span>")
-            accounts = "".join(
-                "<div class='acct'><a href='" + e(a["url"]) + "' target='_blank' rel='noopener'>"
-                + e(a["platform"] or "link") + "</a> " + num(a["followers"]) + "</div>"
-                for a in split_profiles(c["profiles"])
-                if a.get("url") and (not k["platform"] or a["platform"] == k["platform"]))
-            accounts = accounts or "<span class='muted'>no " + e(k["platform"] or "") + " profile on file</span>"
+        who = ("<span class='pill dead'>no longer in the roster</span>" if gone else
+               e(c["name"]) + ("" if c["active"] else " <span class='pill dead'>hidden</span>"))
+        accounts = "" if gone else ("".join(
+            "<div class='acct'><a href='" + e(a["url"]) + "' target='_blank' rel='noopener'>"
+            + e(a["platform"] or "link") + "</a> " + num(a["followers"]) + "</div>"
+            for a in split_profiles(c["profiles"])
+            if a.get("url") and (not k["platform"] or a["platform"] == k["platform"]))
+            or "<span class='muted'>no " + e(k["platform"] or "") + " profile on file</span>")
         cost = c["campaign_cost"]
         total_cost += cost or 0
         rows.append(
             "<tr><td>" + shot + "</td><td><code>" + e(code) + "</code><br>" + who
-            + "<input type='hidden' name='code' value='" + e(code) + "'></td>"
-            + "<td>" + accounts + "</td>"
+            + "<input type='hidden' name='code' value='" + e(code) + "'></td><td>" + accounts + "</td>"
+            + "<td><input name='planned' value='" + ("" if c["planned"] is None else str(c["planned"]))
+            + "' placeholder='e.g. 2' inputmode='numeric' style='width:80px'></td>"
             + "<td><input name='cost' value='" + (format(cost, ",") if cost is not None else "")
-            + "' placeholder='fee to us' inputmode='numeric'></td>"
-            + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code)
-            + "'> remove</label></td></tr>")
-    table = "".join(rows) or "<tr><td colspan='5' class='muted'>No creators yet — add some below.</td></tr>"
+            + "' placeholder='fee' inputmode='numeric'></td>"
+            + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code) + "'> remove</label></td></tr>")
+    table = "".join(rows) or "<tr><td colspan='6' class='muted'>No creators yet — add some below.</td></tr>"
 
-    status_opts = "".join(
-        "<option value='" + v + "'" + (" selected" if k["status"] == v else "") + ">" + v.title() + "</option>"
-        for v in ["draft", "live", "ended"])
-    plat_opts = "".join(
-        "<option value='" + e(v) + "'" + (" selected" if (k["platform"] or "") == v else "") + ">" + e(lbl) + "</option>"
-        for v, lbl in [("", "Every platform they are on")] + [(p, p + " only") for p in PLATFORMS])
-    chips = "".join("<span class='pill'>" + e(w) + "</span>"
-                    for w in rules["hashtags"] + rules["mentions"] + rules["keywords"])
-    from_sel = ("<p class='muted'>Started from selection <a href='" + u("/selections/edit") + "?id="
-                + str(selection["id"]) + "'>" + e(selection["name"]) + "</a>.</p>") if selection else ""
+    status_opts = "".join("<option value='" + v + "'" + (" selected" if k["status"] == v else "") + ">" + l + "</option>"
+                          for v, l in [("draft", "Draft — the client cannot see it"), ("live", "Live — captured every 24 hours"),
+                                       ("ended", "Ended — kept for the client to read")])
+    from db import campaign_steps
+    state_lbl = [("pending", "Not started"), ("active", "In progress"), ("done", "Done")]
+    step_rows = "".join(
+        "<tr><td><label class='tick'><input type='checkbox' name='step_on_" + x["key"] + "' value='1'"
+        + (" checked" if x["on"] else "") + "><span></span></label></td>"
+        "<td><input name='step_label_" + x["key"] + "' value='" + e(x["label"]) + "'></td>"
+        "<td><input type='date' name='step_start_" + x["key"] + "' value='" + e(x["start"] or "") + "'></td>"
+        "<td><input type='date' name='step_end_" + x["key"] + "' value='" + e(x["end"] or "") + "'></td>"
+        "<td><select name='step_state_" + x["key"] + "'>" + "".join(
+            "<option value='" + v + "'" + (" selected" if x["state"] == v else "") + ">" + l + "</option>"
+            for v, l in state_lbl) + "</select></td></tr>"
+        for x in campaign_steps(k))
+    plat_opts = "".join("<option value='" + e(v) + "'" + (" selected" if (k["platform"] or "") == v else "") + ">" + e(lbl)
+                        + "</option>" for v, lbl in [("", "Every platform they are on")] + [(p, p + " only") for p in PLATFORMS])
+    sel_opts = "<option value=''>— none —</option>" + "".join(
+        "<option value='" + str(x["id"]) + "'" + (" selected" if k["selection_id"] == x["id"] else "") + ">"
+        + e(x["name"]) + "</option>" for x in selections)
+    chips = "".join("<span class='pill'>" + e(w) + "</span>" for w in rules["hashtags"] + rules["mentions"] + rules["keywords"])
+    logo_ticks = "".join(
+        "<label class='logo-pick'><input type='checkbox' name='logo' value='clients/" + e(n) + "'"
+        + (" checked" if ("clients/" + n) in chosen_logos else "") + "><img src='/assets/clients/" + e(n)
+        + "' alt='' loading='lazy'><span>" + e(n.rsplit(".", 1)[0].replace("-", " ")) + "</span></label>"
+        for n in logo_names)
+    uploaded = "".join(
+        "<label class='logo-pick'><input type='checkbox' name='logo' value='" + e(x) + "' checked><img src='"
+        + u("/campaigns/logo") + "?n=" + e(x.split("/", 1)[1]) + "' alt=''><span>uploaded</span></label>"
+        for x in chosen_logos if x.startswith("upload/"))
+    tgt = lambda key, label, hint: ("<div><label>" + label + "</label><input name='target_" + key + "' inputmode='decimal' value='"
+                                    + (("%g" % targets[key]) if key in targets else "") + "' placeholder='" + hint + "'></div>")
 
+    def step(n, title, body, hint=""):
+        return ("<section class='step'><h2><span class='step-n'>" + str(n) + "</span>" + title + "</h2>"
+                + ("<p class='sub'>" + hint + "</p>" if hint else "") + "<div class='card'>" + body + "</div></section>")
+
+    sync = ""
+    if k["selection_id"]:
+        sync = ("<form method='post' action='" + u("/campaigns/sync") + "' class='inline'>"
+                "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
+                "<button class='btn small ghost'>Add creators added to the selection since</button></form>")
     body = (
-        "<p><a href='" + u("/campaigns") + "'>&larr; All campaigns</a></p>"
-        + "<h1>" + e(k["name"]) + " " + status_pill(k["status"]) + "</h1>" + from_sel
-        + campaign_tabs(k, "setup") + note
-        + "<form method='post' action='" + u("/campaigns/save") + "' enctype='multipart/form-data'>"
+        _head(k, "setup") + note + checklist
+        + "<form method='post' action='" + u("/campaigns/save") + "' enctype='multipart/form-data' id='camp-form'>"
         + "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
         + "<input type='hidden' name='updated_at' value='" + str(k["updated_at"]) + "'>"
-        + "<h2>Details</h2><div class='card'><div class='row'>"
-        + "<div style='flex:2'><label>Campaign name (the client sees this)</label>"
-          "<input name='name' value='" + e(k["name"]) + "' required></div>"
-        + "<div><label>Client (brand)</label><input name='client' value='" + e(k["client"] or "") + "'></div>"
-        + "<div><label>Passcode that sees the report</label>" + code_select(codes, k["code_id"]) + "</div>"
-        + "</div><div class='row'>"
-        + "<div><label>Status</label><select name='status'>" + status_opts + "</select>"
-          "<div class='price-hint'>Only a live campaign is captured every 24 hours.</div></div>"
-        + "<div><label>First day</label><input type='date' name='starts' value='" + _date_value(k["starts_at"]) + "'></div>"
-        + "<div><label>Last day</label><input type='date' name='ends' value='" + _date_value(k["ends_at"]) + "'></div>"
-        + "<div><label>Platform</label><select name='platform'>" + plat_opts + "</select></div>"
-        + "</div></div>"
-        + "<h2>Which posts count</h2><div class='card'>"
-        + "<label>Hashtags, mentions and keywords</label>"
-          "<textarea name='rules' placeholder='#svr #suncare @svr_ksa sunscreen'>" + e(_rules_text(rules)) + "</textarea>"
-          "<div class='rules'>" + chips + "</div>"
-          "<div class='price-hint'>A post in the campaign dates that carries any of these counts as a "
-          "campaign post; the creator's other posts in those dates are kept under All content. "
-          "#word = hashtag, @word = mention, anything else = keyword. Case does not matter.</div>"
-        + "<div class='row' style='margin-top:14px'><div><label>Required disclosure</label>"
-          "<input name='disclosure' value='" + e(" ".join(rules["disclosure"])) + "' placeholder='#ad #إعلان'>"
-          "<div class='price-hint'>A campaign post with none of these is flagged.</div></div>"
-        + "<div style='flex:2'><label>Where tracking links send people</label>"
-          "<input name='destination' type='url' value='" + e(k["destination"] or "") + "' "
-          "placeholder='https://…'><div class='price-hint'>Default for every creator's link.</div></div>"
-        + "</div></div>"
-        + "<h2>Creators</h2><div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th>"
-          "<th>Tracked accounts</th><th>Fee to us (SAR)</th><th></th></tr></thead><tbody>"
-        + table + "</tbody></table>"
-        + "<div class='row' style='margin-top:14px'><div style='flex:2'><label>Add creators</label>"
-          "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div></div>"
-        + "</div>"
-        + client_report_card(k)
+        + step(1, "Client &amp; selection",
+               "<div class='row'><div style='flex:2'><label>Campaign name (the client sees this)</label>"
+               "<input name='name' value='" + e(k["name"]) + "' required></div>"
+               "<div><label>Brand name</label><input name='client' value='" + e(k["client"] or "") + "' placeholder='e.g. SVR'></div></div>"
+               "<div class='row'><div><label>Client passcode — who can open the report</label>" + code_select(codes, k["code_id"]) + "</div>"
+               "<div><label>Selection it came from</label><select name='selection_id'>" + sel_opts + "</select></div></div>"
+               + (("<p class='price-hint'>Linked to selection <a href='" + u("/selections/edit") + "?id=" + str(selection["id"]) + "'>"
+                   + e(selection["name"]) + "</a>. </p>" + sync) if selection else
+                  "<p class='price-hint'>Tip: start campaigns from a selection so its creators, passcode and costs come with it.</p>"),
+               "Who the campaign is for. The passcode decides which client sees the report.")
+        + step(2, "Dates &amp; status",
+               "<div class='row'><div><label>First day</label><input type='date' name='starts' value='" + _date_value(k["starts_at"]) + "'></div>"
+               "<div><label>Last day</label><input type='date' name='ends' value='" + _date_value(k["ends_at"]) + "'></div>"
+               "<div><label>Visibility</label><select name='status'>" + status_opts + "</select></div></div>"
+               "<label style='margin-top:6px'>Scope of work — the client follows these steps on the report</label>"
+               "<table class='steps-table'><thead><tr><th>Show</th><th>Step</th><th>Starts</th><th>Ends</th><th>State</th></tr></thead>"
+               "<tbody>" + step_rows + "</tbody></table>"
+               "<div class='row' style='margin-top:12px'><div style='flex:2'><label>Status message for the client</label>"
+               "<input name='status_note' maxlength='240' value='" + e(k["status_note"] or "")
+               + "' placeholder='e.g. Shooting wraps Thursday; publishing starts 14 Oct'></div></div>",
+               "Untick steps this campaign does not include. Mark the one under way as In progress — the client sees it highlighted.")
+        + step(3, "Creators &amp; posts planned",
+               "<table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Accounts tracked</th>"
+               "<th>Posts planned</th><th>Fee to us (SAR)</th><th></th></tr></thead><tbody>" + table + "</tbody></table>"
+               "<div class='row' style='margin-top:14px'><div style='flex:2'><label>Add creators by code</label>"
+               "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div>"
+               "<div><label>Platform tracked</label><select name='platform'>" + plat_opts + "</select></div></div>",
+               "Posts planned is what each creator is booked for; the report counts delivered against it. Fees stay internal.")
+        + step(4, "What counts as a campaign post",
+               "<label>Hashtags, @mentions and keywords</label>"
+               "<textarea name='rules' placeholder='#svr #suncare @svr_ksa sunscreen'>" + e(_rules_text(rules)) + "</textarea>"
+               "<div class='rules'>" + chips + "</div>"
+               "<div class='row' style='margin-top:14px'><div><label>Required disclosure</label>"
+               "<input name='disclosure' value='" + e(" ".join(rules["disclosure"])) + "' placeholder='#ad #إعلان'></div>"
+               "<div style='flex:2'><label>Affiliate link destination (optional)</label>"
+               "<input name='destination' type='url' value='" + e(k["destination"] or "") + "' placeholder='https://brand-store…'></div></div>",
+               "A post in the dates carrying any of these counts. Leave the destination empty if this campaign has no affiliate links.")
+        + step(5, "Targets",
+               "<div class='row'>" + tgt("posts", "Posts", "e.g. 24") + tgt("views", "Views", "e.g. 500000")
+               + tgt("reach", "Reach", "e.g. 300000") + tgt("engagement", "Engagement", "e.g. 20000")
+               + tgt("er", "Avg ER %", "e.g. 3") + tgt("clicks", "Affiliate clicks", "e.g. 1500") + "</div>",
+               "What the campaign should reach by its last day. The report shows progress and says whether it is on track. "
+               "Tier benchmarks for ER and views live in Settings.")
+        + step(6, "Client report look",
+               "<label>Brand logos on the report</label><div class='logo-grid'>" + uploaded + logo_ticks + "</div>"
+               "<div class='row' style='margin-top:12px'><div><label>Or upload a logo (PNG/JPG/WEBP)</label>"
+               "<input type='file' name='logo_file' accept='image/*' multiple></div></div>"
+               "<label style='margin-top:14px'>Sections the client sees</label><div class='ticks'>"
+               + "".join("<label class='tick'><input type='checkbox' name='vis_" + key + "' value='1'" + (" checked" if vis[key] else "")
+                         + "><span>" + lbl + "</span></label>" for key, lbl in
+                         [("reach", "Reach &amp; impressions"), ("clicks", "Affiliate link clicks"),
+                          ("all_content", "Posts outside the hashtags")])
+               + "</div><p class='price-hint'>Costs, CPM, EMV, notes and ratings are never shown to the client.</p>")
         + "<h2>Internal</h2><div class='card'><div class='row'>"
-        + "<div><label>Total campaign cost to us (SAR)</label><input name='total_cost' value='"
+        + "<div><label>Total cost to us (SAR)</label><input name='total_cost' value='"
         + (format(k["cost"], ",") if k["cost"] is not None else "") + "' inputmode='numeric'>"
-          "<div class='price-hint'>Empty = the sum of the fees above (currently "
-        + format(total_cost, ",") + " SAR). Used for CPM. Never shown to the client.</div></div>"
-        + "<div style='flex:2'><label>Notes</label><textarea name='notes'>" + e(k["notes"] or "") + "</textarea></div>"
-        + "</div></div>"
-        + "<button class='btn'>Save campaign</button></form>"
-        + "<form method='post' action='" + u("/campaigns/delete") + "' style='margin-top:14px' "
+          "<div class='price-hint'>Empty = the sum of the fees (" + format(total_cost, ",") + " SAR).</div></div>"
+        + "<div style='flex:2'><label>Internal notes</label><textarea name='notes'>" + e(k["notes"] or "") + "</textarea></div>"
+        + "</div><details><summary>EMV rates for this campaign (internal)</summary><div class='row' style='margin-top:10px'>"
+        + "".join("<div><label>" + a_ + "</label><input name='emv_" + a_ + "' inputmode='decimal' value='"
+                  + ((("%g" % json.loads(k["emv"]).get("*", {}).get(a_)) if (k["emv"] and json.loads(k["emv"]).get("*", {}).get(a_)) else ""))
+                  + "' placeholder='default'></div>" for a_ in ["impressions", "views", "likes", "comments", "shares", "saves", "clicks"])
+        + "</div></details></div>"
+        + "<div class='savebar'><button class='btn'>Save campaign</button>"
+          "<a class='btn ghost' href='" + u("/campaigns/report") + "?id=" + str(k["id"]) + "'>See the report</a></div></form>"
+        + "<form method='post' action='" + u("/campaigns/delete") + "' style='margin-top:24px' "
           "onsubmit=\"return confirm('Delete this campaign? Its report and links stop working.')\">"
           "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
           "<button class='btn small danger'>Delete campaign</button></form>"
     )
     return page(k["name"] + " — Campaign", body, "/campaigns")
-
 
 def campaign_tabs(k, on):
     tabs = [("setup", "/campaigns/edit", "Setup"), ("content", "/campaigns/content", "Content"),
@@ -2222,8 +2313,8 @@ def campaign_links_page(k, rows, st, origin, has_geo, error=None, message=None):
     if message:
         note += "<div class='ok'>" + e(message) + "</div>"
     if not k["destination"]:
-        note += ("<div class='err'>This campaign has no destination yet, so its links lead nowhere. "
-                 "Set <em>Where tracking links send people</em> on the <a href='" + u("/campaigns/edit")
+        note += ("<div class='card muted'>No affiliate destination set — fine if this campaign has no links. "
+                 "To use links, set the destination in step 4 on the <a href='" + u("/campaigns/edit")
                  + "?id=" + str(k["id"]) + "'>Setup</a> tab, or give a link its own below.</div>")
     names = {r["code"]: (r["creator_name"] or r["code"]) for r in rows}
 
@@ -2234,7 +2325,8 @@ def campaign_links_page(k, rows, st, origin, has_geo, error=None, message=None):
         locked = r["hits"] > 0
         items.append(
             "<tr class='linkrow'><td><code>" + e(r["code"]) + "</code><br>" + e(names[r["code"]])
-            + ("" if r["active"] else " <span class='pill dead'>off — taken out</span>") + "</td>"
+            + ("" if r["is_default"] else "<br><span class='pill own'>custom: " + e(r["label"] or "link") + "</span>")
+            + ("" if r["active"] else " <span class='pill dead'>off</span>") + "</td>"
             + "<td><div class='sel-link'><input value='" + e(url) + "' readonly>"
             + "<button type='button' class='btn small' onclick=\"var i=this.previousSibling;i.select();"
               "navigator.clipboard&&navigator.clipboard.writeText(i.value);this.textContent='Copied'\">Copy</button></div>"
@@ -2248,7 +2340,10 @@ def campaign_links_page(k, rows, st, origin, has_geo, error=None, message=None):
               "type='url' value='" + e(dest) + "' placeholder='campaign default'></div>"
             + "<div><button class='btn small'>Save</button></div></form></details></td>"
             + "<td class='right'><strong>" + str(r["clicks"]) + "</strong></td>"
-            + "<td class='right'>" + str(r["uniques"]) + "</td></tr>")
+            + "<td class='right'>" + str(r["uniques"]) + "</td>"
+            + "<td><form method='post' action='" + u("/campaigns/link/toggle") + "'><input type='hidden' name='id' value='"
+            + str(k["id"]) + "'><input type='hidden' name='slug' value='" + e(r["slug"]) + "'><button class='btn tiny ghost'>"
+            + ("Switch off" if r["active"] else "Switch on") + "</button></form></td></tr>")
     table = "".join(items) or ("<tr><td colspan='4' class='muted'>No creators in this campaign yet — "
                                "add them on the Setup tab and each gets a link here.</td></tr>")
     body = (
@@ -2266,7 +2361,8 @@ def campaign_links_page(k, rows, st, origin, has_geo, error=None, message=None):
           "sent on with UTM tags (utm_source = the app, utm_campaign, utm_content = creator code) so the "
           "client's own analytics sees the same visitors. A link's name is fixed once it has been clicked.</p>"
         + "<table><thead><tr><th>Creator</th><th>Tracking link</th><th class='right'>Clicks</th>"
-          "<th class='right'>Unique</th></tr></thead><tbody>" + table + "</tbody></table></div>"
+          "<th class='right'>Unique</th><th></th></tr></thead><tbody>" + table + "</tbody></table></div>"
+        + custom_link_form(k, rows, names)
         + "<h2>Clicks over time</h2><div class='card'>" + clicks_chart(st["by_day"]) + "</div>"
         + "<div class='split'>"
         + "<div><h2>By creator</h2><div class='card'>" + _bars(st["by_creator"], lambda r: names.get(r["k"], r["k"])) + "</div></div>"
@@ -2472,7 +2568,8 @@ def campaign_report_page(k, r, origin):
     return page(k["name"] + " — Report", body, "/campaigns")
 
 
-def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, error=None, message=None):
+def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, error=None, message=None,
+                  bm=None):
     own = (rates or {}).get("*", {})
     inputs = "".join(
         "<div><label>" + e(a) + " (SAR each)</label><input name='emv_" + a + "' inputmode='decimal' value='"
@@ -2502,6 +2599,7 @@ def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, erro
           "Post reach = engagement × the first figure, never more than the creator's followers; "
           "story reach = followers × the second; impressions = reach × the third (stories: = reach). "
           "Video reach = its views.</p></div>"
+        + benchmarks_card(bm)
         + "<button class='btn'>Save settings</button></form>"
         + "<h2>Capture job</h2><div class='card'>"
         + "<p>The scheduled Claude job on the team Mac signs in with this token. "
@@ -2638,3 +2736,138 @@ def insights_upload_page(row, posts, sent, ok=None, error=None):
         + "<button>Send · إرسال</button></form>"
         + ("<p style='margin-top:24px;font-size:13px'>Uploaded so far: " + str(sent) + "</p>" if sent else "")
         + "</main></body></html>")
+
+
+def benchmarks_card(bm):
+    if not bm:
+        return ""
+    import metrics
+    def line(label, name, pair):
+        return ("<tr><td>" + label + "</td><td><input name='" + name + "_good' value='" + ("%g" % pair[0])
+                + "' inputmode='decimal'></td><td><input name='" + name + "_ok' value='" + ("%g" % pair[1])
+                + "' inputmode='decimal'></td></tr>")
+    er_rows = "".join(line(e(metrics.BAND_LABEL[b]), "bm_er_" + b, bm["er"][b])
+                      for b in ["nano", "micro", "mid", "macro", "mega"])
+    other = "".join(line(label, "bm_" + key, bm[key])
+                    for key, label in [("video_er", "Video ER % (engagement ÷ views)"),
+                                       ("view_rate", "Video views ÷ followers %"),
+                                       ("story_rate", "Story reach ÷ followers %"), ("ctr", "Link click-through %")])
+    return ("<h2>Benchmarks</h2><div class='card'><p class='sub'>What the report calls good (green), moderate (amber) "
+            "or low (red). These are industry guides; campaigns add their own targets on the Setup tab.</p>"
+            "<table><thead><tr><th>Engagement rate % by tier</th><th>Good from</th><th>Moderate from</th></tr></thead><tbody>"
+            + er_rows + other + "</tbody></table></div>")
+
+
+def custom_link_form(k, rows, names):
+    codes = []
+    for r in rows:
+        if r["code"] not in codes:
+            codes.append(r["code"])
+    if not codes:
+        return ""
+    opts = "".join("<option value='" + e(c) + "'>" + e(c + " — " + names.get(c, c)) + "</option>" for c in codes)
+    return ("<h2>Add a custom link</h2><form method='post' action='" + u("/campaigns/link/custom") + "' class='card'>"
+            "<input type='hidden' name='id' value='" + str(k["id"]) + "'><div class='row'>"
+            "<div><label>Creator</label><select name='code'>" + opts + "</select></div>"
+            "<div><label>Link name (after /go/)</label><input name='slug' required placeholder='svr-noura-story'></div>"
+            "<div><label>Purpose</label><input name='label' placeholder='e.g. Story swipe-up'></div>"
+            "<div style='flex:2'><label>Sends people to</label><input name='destination' type='url' placeholder='https://… (empty = campaign destination)'></div>"
+            "</div><button class='btn small'>Add link</button><p class='price-hint'>Same domain as the catalogue — "
+            "nothing to buy or set up. Use one when a creator promotes two pages, or you want a story link counted "
+            "apart from the bio link.</p></form>")
+
+
+PHASE_LABEL = dict(__import__("db").PHASES)
+
+
+def clients_page(overview, origin):
+    """One card per client: their passcode, then the chain from shortlist to
+    campaign to report, each a link into the page that controls it."""
+    cards = []
+    for o in overview:
+        c = o["code"]
+        ok, why = code_state(c)
+        sels = "".join(
+            "<li><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>" + e(x["name"]) + "</a> "
+            "<span class='muted'>" + str(len(json.loads(x["codes"] or "[]"))) + " creators</span>"
+            + "".join(" <span class='arrow'>→</span> <a href='" + u("/campaigns/edit") + "?id=" + str(kk["id"]) + "'>"
+                      + e(kk["name"]) + "</a> " + status_pill(kk["status"])
+                      for kk in o["campaigns"] if kk["selection_id"] == x["id"]) + "</li>"
+            for x in o["selections"])
+        loose = [kk for kk in o["campaigns"] if not kk["selection_id"] or
+                 kk["selection_id"] not in {x["id"] for x in o["selections"]}]
+        camps = "".join(
+            "<li><a href='" + u("/campaigns/edit") + "?id=" + str(kk["id"]) + "'>" + e(kk["name"]) + "</a> "
+            + status_pill(kk["status"]) + " <span class='muted'>" + e(PHASE_LABEL.get(kk["phase"] or "", "")) + " · "
+            + str(kk["creators"]) + " creators · " + str(kk["posts"]) + " posts</span> "
+            + "<a class='btn tiny ghost' href='" + u("/campaigns/report") + "?id=" + str(kk["id"]) + "'>Report</a></li>"
+            for kk in o["campaigns"])
+        open_reqs = [r for r in o["requests"] if not r["handled_at"]]
+        cards.append(
+            "<div class='card'><div style='display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap'>"
+            "<div><h3 style='margin:0'>" + e(c["label"]) + "</h3><span class='muted'>passcode · "
+            + ("<span class='pill live'>active</span>" if ok else "<span class='pill dead'>" + e(why) + "</span>")
+            + "</span></div><div class='muted' style='font-size:13px'>"
+            + (str(len(open_reqs)) + " open quote request(s) · " if open_reqs else "")
+            + (str(o["analysis_requests"]) + " analysis request(s)" if o["analysis_requests"] else "") + "</div></div>"
+            + "<div class='grid2' style='margin-top:12px'><div><label>Selections → campaigns</label><ul class='chain-list'>"
+            + (sels or "<li class='muted'>No selections yet.</li>") + "</ul></div>"
+            + "<div><label>All campaigns</label><ul class='chain-list'>" + (camps or "<li class='muted'>None yet.</li>")
+            + "</ul></div></div></div>")
+    body = ("<h1>Clients</h1><p class='sub'>Each client is one passcode. Follow it from the shortlist they picked to the "
+            "campaign it became and the report they see. Everything links to the page that controls it.</p>"
+            + ("".join(cards) or "<div class='card muted'>No clients yet — issue a passcode on Access codes.</div>"))
+    return page("Clients", body, "/clients")
+
+
+def analysis_page(creators, have, requests, origin, q="", error=None, message=None):
+    open_reqs = [r for r in requests if not r["handled_at"]]
+    req_rows = "".join(
+        "<tr><td><code>" + e(r["code"]) + "</code> " + e(r["creator_name"] or "") + "</td><td>" + e(r["code_label"] or "—")
+        + "</td><td class='muted'>" + ago(r["at"]) + "</td><td>"
+        + ("<span class='pill live'>uploaded</span>" if r["code"] in have else "<span class='pill warn'>waiting</span>")
+        + "</td><td><form method='post' action='" + u("/analysis/handled") + "'><input type='hidden' name='id' value='"
+        + str(r["id"]) + "'><button class='btn tiny ghost'>Mark handled</button></form></td></tr>" for r in open_reqs)
+    term = (q or "").strip().lower()
+    shown = [c for c in creators if not term or term in (c["code"] + " " + c["name"]).lower()]
+    rows = "".join(
+        "<tr><td><code>" + e(c["code"]) + "</code></td><td>" + e(c["name"]) + "</td><td>"
+        + ("<span class='pill live'>full analysis · " + ago(have[c["code"]]) + "</span>" if c["code"] in have
+           else "<span class='pill'>locked</span>") + "</td><td>"
+        + "<a class='btn tiny ghost' href='" + e(origin + "/creator/#c=" + c["code"]) + "' target='_blank' rel='noopener'>Preview</a> "
+        + ("<a class='btn tiny ghost' href='" + u("/analysis") + "?q=" + e(c["code"]) + "#edit'>Edit</a>")
+        + "</td></tr>" for c in shown[:200])
+    editor = ""
+    if term and len(shown) == 1:
+        c = shown[0]
+        editor = ("<h2 id='edit'>Edit " + e(c["code"]) + " — " + e(c["name"]) + "</h2><form method='post' action='"
+                  + u("/analysis/save") + "' class='card'><input type='hidden' name='code' value='" + e(c["code"]) + "'>"
+                  "<label>Analysis as JSON</label><textarea name='json' id='an-json' style='min-height:260px;font-family:ui-monospace,monospace;font-size:12px'></textarea>"
+                  "<div class='savebar'><button class='btn small'>Save analysis</button></div></form>"
+                  "<script>fetch('" + u("/analysis/json") + "?c=" + e(c["code"]) + "').then(r=>r.text()).then(t=>{document.getElementById('an-json').value=t});</script>"
+                  + ("<form method='post' action='" + u("/analysis/delete") + "' onsubmit=\"return confirm('Remove this analysis?')\">"
+                     "<input type='hidden' name='code' value='" + e(c["code"]) + "'><button class='btn small danger'>Remove analysis</button></form>"
+                     if c["code"] in have else ""))
+    body = (
+        "<h1>Creator analysis</h1><p class='sub'>Full profile analyses clients open from the catalogue and reports. "
+        "A creator without one shows a locked page with <em>Request full analysis</em>; requests land below.</p>"
+        + _notes(error, message)
+        + "<div class='grid2'><div class='card'><h3 style='margin-top:0'>1 · Download the template</h3>"
+          "<p class='muted'>One workbook, many creators: Overview, Audience, Growth, Posts, Brands, Hashtags, Notable "
+          "followers, Lookalikes — every row starts with the creator code.</p>"
+          "<a class='btn small' href='" + u("/analysis/template.xlsx") + "'>Download template (.xlsx)</a></div>"
+        + "<form class='card' method='post' action='" + u("/analysis/upload") + "' enctype='multipart/form-data'>"
+          "<h3 style='margin-top:0'>2 · Upload it filled in</h3><input type='file' name='file' accept='.xlsx' required>"
+          "<p class='price-hint'>Uploading a creator again replaces their analysis and closes their open requests.</p>"
+          "<button class='btn small'>Upload analyses</button></form></div>"
+        + "<h2>Requests from clients</h2><div class='card'><table><thead><tr><th>Creator</th><th>Client</th><th>Asked</th>"
+          "<th>Status</th><th></th></tr></thead><tbody>" + (req_rows or "<tr><td colspan='5' class='muted'>No open requests.</td></tr>")
+        + "</tbody></table></div>"
+        + editor
+        + "<h2>Creators</h2><form class='card' method='get' action='" + u("/analysis") + "'><div class='row'>"
+          "<div style='flex:3'><input name='q' value='" + e(q) + "' placeholder='Search by code or name'></div>"
+          "<div><button class='btn small'>Search</button></div></div></form>"
+        + "<div class='card'><table><thead><tr><th>Code</th><th>Name</th><th>Analysis</th><th></th></tr></thead><tbody>"
+        + (rows or "<tr><td colspan='4' class='muted'>No creators match.</td></tr>") + "</tbody></table>"
+        + ("<p class='muted'>Showing the first 200 — search to narrow.</p>" if len(shown) > 200 else "") + "</div>")
+    return page("Creator analysis", body, "/analysis")

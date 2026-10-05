@@ -413,6 +413,37 @@ destination are kept, never overwritten.
   the capture token, the capture run log, and whether country lookup is
   installed. Formulas: `docs/CAMPAIGN-TRACKER-BRIEF.md` §11 and `admin/metrics.py`.
 
+### Linked end to end (Oct 2026 update)
+
+- **Clients** (top bar): one card per passcode — its selections, the
+  campaigns each became, open quote and analysis requests, each a link to
+  the page that controls it.
+- **Campaign setup is six steps** with a checklist on top ("Setup 6 of 9
+  done — next: …"): 1 client & selection (with *Add creators added to the
+  selection since*), 2 dates, visibility and the **scope-of-work timeline**
+  (Briefing → Sourcing → Approval → Content prep → Shooting → Logistics →
+  Review → Publishing → Reporting; tick the steps that apply, give each a
+  start and end date and mark Not started / In progress / Done) plus a status
+  message, 3 creators with **posts planned**, 4 what counts + affiliate
+  destination, 5 **targets** (posts, views, reach, engagement, ER, clicks),
+  6 report look: **brand logos** (pick from the client logos or upload) and
+  sections shown. EMV is never shown to clients.
+- **Benchmarks** (Settings): good / moderate thresholds for ER by tier,
+  video ER, video views ÷ followers, story reach ÷ followers and CTR. Every
+  number on the client report carries Strong / Fair / Low against these or
+  against the campaign's targets.
+- **Custom links** (Links tab): extra named links per creator on the same
+  domain; any link can be switched off and on.
+- **Creator analysis** (top bar): download the template (one workbook, many
+  creators: Overview, Audience, Growth, Posts, Brands, Hashtags, Notable
+  followers, Lookalikes), fill it, upload it. Or edit one creator's analysis
+  as JSON. Clients see it at `/creator/#c=<code>` from the catalogue card
+  (*Full analysis*) and from report leaderboards; without one they see a
+  sealed page and can *Request full analysis* — requests are listed there and
+  close themselves when the analysis is uploaded.
+- The client report (`/campaign/`) and the catalogue both link to each other:
+  *Campaign tracking* in the catalogue's top bar, *Full catalogue* on the report.
+
 ### The client's report — `/campaign/#t=<token>`
 
 A static page in the catalogue theme (`campaign/index.html`,

@@ -50,6 +50,7 @@ sys.path.insert(0, str(HERE))
 import auth  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
+import analysis  # noqa: E402
 import links  # noqa: E402
 import metrics  # noqa: E402
 import track  # noqa: E402
@@ -65,6 +66,11 @@ CLICK_SALT = __import__("hashlib").sha256(b"clicks|" + SECRET).hexdigest()
 INSIGHT_DIR = HERE / "insight_files"
 INSIGHT_MAX = 12 * 1024 * 1024        # per file
 INSIGHT_FILES = 6                     # per upload
+# Brand logos uploaded for one campaign (ones not already in assets/clients).
+LOGO_DIR = HERE / "campaign_files"
+# The client logos the catalogue already ships: offered as one-click choices.
+CLIENT_LOGOS = next((p for p in (HERE.parent / "site" / "assets" / "clients",
+                                 HERE.parent / "assets" / "clients") if p.is_dir()), None)
 # Photos live with the built site so the catalogue and the dashboard share one
 # copy — uploading here updates what a client sees.
 PHOTO_DIR = HERE.parent / "site" / "assets" / "catalogue"
@@ -258,6 +264,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_campaigns()
         if path == "/api/campaign":
             return self.api_campaign(query.get("t") or "")
+        if path == "/api/creator":
+            return self.api_creator((query.get("c") or "").strip().upper())
+        if path == "/api/campaign-logo":
+            return self.api_campaign_logo(query.get("t") or "", query.get("n") or "")
         if path == "/api/campaign.csv":
             return self.api_campaign_csv(query.get("t") or "")
         if path.startswith("/api/capture/"):
@@ -430,11 +440,34 @@ class Handler(BaseHTTPRequestHandler):
                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                              [("Content-Disposition", 'attachment; filename="report-%s.xlsx"'
                                % db.campaign_slug(k))])
+        if path == "/clients":
+            return self.send(200, views.clients_page(db.client_overview(), self.site_origin()))
+        if path == "/analysis":
+            return self.send(200, views.analysis_page(
+                db.list_creators(), db.analysis_codes(), db.analysis_requests(), self.site_origin(),
+                query.get("q", ""), query.get("e"), query.get("ok")))
+        if path == "/analysis/template.xlsx":
+            return self.send(200, analysis.template_xlsx(),
+                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             [("Content-Disposition", 'attachment; filename="creator-analysis-template.xlsx"')])
+        if path == "/analysis/json":
+            code = (query.get("c") or "").upper()
+            a = db.analysis(code)
+            return self.send(200, json.dumps(a["data"] if a else {}, indent=2, ensure_ascii=False),
+                             "application/json; charset=utf-8")
+        if path == "/campaigns/logo":
+            # The admin's own preview of an uploaded logo.
+            name = Path(query.get("n") or "").name
+            f = LOGO_DIR / name
+            if not f.is_file():
+                return self.send(404, b"", "text/plain")
+            kind = uploads.image_kind(f.read_bytes()[:16]) or "png"
+            return self.send(200, f.read_bytes(), "image/" + ("jpeg" if kind == "jpg" else kind))
         if path == "/settings":
             return self.send(200, views.settings_page(
                 db.setting("emv_rates") or {}, metrics.factors(),
                 bool(db.setting("capture_token")), db.capture_runs(), track.GEO_DB.exists(),
-                None, query.get("e"), query.get("ok")))
+                None, query.get("e"), query.get("ok"), metrics.benchmarks()))
         if path == "/campaigns/links":
             cid = query.get("id", "")
             k = db.campaign(int(cid)) if cid.isdigit() else None
@@ -459,7 +492,8 @@ class Handler(BaseHTTPRequestHandler):
             sel = db.selection(k["selection_id"]) if k["selection_id"] else None
             return self.send(200, views.campaign_edit_page(
                 k, db.campaign_creators(k["id"]), db.list_codes(), db.rules_of(k), sel,
-                query.get("e"), query.get("ok")))
+                query.get("e"), query.get("ok"), self.client_logo_names(), db.list_selections(),
+                metrics.report(k, internal=True)))
         return self.send(404, views.simple("Not found", "That page does not exist."))
 
     def do_HEAD(self):
@@ -509,6 +543,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_event()
         if path == "/api/selection":
             return self.api_selection_save()
+        if path == "/api/creator/request":
+            return self.api_creator_request()
         if path.startswith("/api/capture/"):
             return self.capture_post(path[len("/api/capture/"):])
         if path.startswith("/insights/"):
@@ -552,6 +588,23 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_insight_decide()
         if path == "/campaigns/insights/upload":
             return self.post_insight_admin_upload()
+        if path == "/campaigns/sync":
+            return self.post_campaign_sync()
+        if path == "/campaigns/link/custom":
+            return self.post_custom_link()
+        if path == "/campaigns/link/toggle":
+            return self.post_link_toggle()
+        if path == "/analysis/upload":
+            return self.post_analysis_upload()
+        if path == "/analysis/save":
+            return self.post_analysis_save()
+        if path == "/analysis/delete":
+            return self.post_analysis_delete()
+        if path == "/analysis/handled":
+            f = self.form_body()
+            if (f.get("id") or "").isdigit():
+                db.handle_analysis_request(int(f["id"]))
+            return self.redirect("/analysis?ok=" + urllib.parse.quote("Marked as handled."))
         if path == "/settings/save":
             return self.post_settings()
         if path == "/settings/token":
@@ -1257,7 +1310,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/campaigns/edit?id=%d" % cid)
 
     def post_campaign_save(self):
-        f = self.form_body(multi=("code", "cost", "drop"))
+        f = self.form_body(multi=("code", "cost", "drop", "planned", "logo", "logo_file"))
         cid = (f.get("id") or "").strip()
         k = db.campaign(int(cid)) if cid.isdigit() else None
         if k is None:
@@ -1322,9 +1375,47 @@ class Handler(BaseHTTPRequestHandler):
                          platform=platform, starts_at=t_start, ends_at=t_end, status=status,
                          rules=rules, destination=destination or None,
                          cost=money(f.get("total_cost")), notes=(f.get("notes") or "").strip() or None)
-        vis = {key: f.get("vis_" + key) == "1" for key in ("reach", "clicks", "emv", "all_content")}
+        vis = {key: f.get("vis_" + key) == "1" for key in ("reach", "clicks", "all_content")}
+        vis["emv"] = False                   # EMV is internal only
         own_rates = self.rates_from(f)
-        db.save_campaign(k["id"], visibility=vis, emv={"*": own_rates} if own_rates else None)
+        targets = {}
+        for key in db.TARGET_KEYS:
+            raw = "".join(ch for ch in (f.get("target_" + key) or "") if ch.isdigit() or ch == ".")
+            try:
+                if raw and float(raw) > 0:
+                    targets[key] = float(raw) if key == "er" else int(float(raw))
+            except ValueError:
+                pass
+        steps = []
+        for key, label in db.DEFAULT_STEPS:
+            st = f.get("step_state_" + key)
+            a, b = (f.get("step_start_" + key) or "").strip(), (f.get("step_end_" + key) or "").strip()
+            steps.append({"key": key, "label": (f.get("step_label_" + key) or "").strip()[:60] or label,
+                          "on": f.get("step_on_" + key) == "1",
+                          "start": a if db.day_bounds(a, None) is not None else None,
+                          "end": b if db.day_bounds(b, None) is not None else None,
+                          "state": st if st in db.STEP_STATES else "pending"})
+        phase = next((x["key"] for x in steps if x["on"] and x["state"] == "active"), None)
+        logos = [x for x in (f.get("logo") or []) if self.logo_ok(x)][:6]
+        up = [p for p in (f.get("logo_file") or []) if isinstance(p, dict) and p.get("data")]
+        for part in up[:3]:
+            kind = uploads.image_kind(part["data"])
+            if kind in ("png", "jpg", "webp") and len(part["data"]) <= 3 * 1024 * 1024:
+                import secrets as _s
+                LOGO_DIR.mkdir(exist_ok=True)
+                name = _s.token_hex(10) + "." + kind
+                (LOGO_DIR / name).write_bytes(part["data"])
+                logos.append("upload/" + name)
+        sel_id = (f.get("selection_id") or "").strip()
+        db.save_campaign(k["id"], visibility=vis, emv={"*": own_rates} if own_rates else None,
+                         targets=targets, phase=phase, steps=steps,
+                         status_note=(f.get("status_note") or "").strip()[:240] or None, logos=logos,
+                         selection_id=int(sel_id) if sel_id.isdigit() else None)
+        planned = {}
+        for code, n in zip(codes_in, (f.get("planned") or []) + [""] * len(codes_in)):
+            n = "".join(ch for ch in (n or "") if ch.isdigit())
+            planned[code.strip().upper()] = int(n) if n else None
+        db.set_planned(k["id"], planned)
         db.save_campaign_creators(k["id"], costs, remove)
         if adds:
             db.add_campaign_creators(k["id"], adds)
@@ -1443,6 +1534,18 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 fac[key] = default
         db.set_setting("reach_factors", fac)
+        bm = metrics.benchmarks()
+        def pair(prefix, current):
+            try:
+                g, o = float(f.get(prefix + "_good") or current[0]), float(f.get(prefix + "_ok") or current[1])
+                return [g, o] if g >= o >= 0 else current
+            except ValueError:
+                return current
+        for b in bm["er"]:
+            bm["er"][b] = pair("bm_er_" + b, bm["er"][b])
+        for key in ("video_er", "view_rate", "story_rate", "ctr"):
+            bm[key] = pair("bm_" + key, bm[key])
+        db.set_setting("benchmarks", bm)
         return self.redirect("/settings?ok=" + urllib.parse.quote("Settings saved."))
 
     def post_settings_token(self):
@@ -1462,9 +1565,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(401, {"ok": False}, self.cors())
         with db.connect() as conn:
             rows = conn.execute(
-                "SELECT token, name, client, status, starts_at, ends_at FROM campaigns "
+                "SELECT token, name, client, status, phase, starts_at, ends_at, logos FROM campaigns "
                 "WHERE code_id = ? AND status != 'draft' ORDER BY starts_at DESC", (code_id,)).fetchall()
-        return self.send_json(200, {"ok": True, "campaigns": [dict(r) for r in rows]},
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
+            out.append(d)
+        return self.send_json(200, {"ok": True, "campaigns": out},
                               self.cors() + [("Cache-Control", "no-store")])
 
     def viewer_campaign(self, token):
@@ -1483,7 +1591,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(status, {"ok": False}, self.cors())
         db.log("view", self.viewer_code_id(), self.client_ip(), self.headers.get("User-Agent"),
                "campaign:" + k["name"][:60])
-        rep = metrics.client_report(k)
+        rep = metrics.client_report(k, photo=links.thumb)
+        rep["campaign"]["logos"] = [self.logo_url(x, k["token"]) for x in rep["campaign"]["logos"]]
         return self.send_json(200, {"ok": True, "report": rep},
                               self.cors() + [("Cache-Control", "no-store")])
 
@@ -1782,6 +1891,147 @@ class Handler(BaseHTTPRequestHandler):
         db.decide_insight(row["id"], True, values, item["id"])
         return self.redirect(back + "&ok=" + urllib.parse.quote("Approved — the report now uses these numbers."))
 
+    # ---------------------------------------------------- logos, links, sync --
+
+    def client_logo_names(self):
+        if CLIENT_LOGOS is None:
+            return []
+        return sorted(p.name for p in CLIENT_LOGOS.iterdir()
+                      if p.suffix == ".webp" and "@2x" not in p.name)
+
+    def logo_ok(self, ref):
+        if ref.startswith("clients/"):
+            return Path(ref).name in self.client_logo_names()
+        if ref.startswith("upload/"):
+            return (LOGO_DIR / Path(ref).name).is_file()
+        return False
+
+    def logo_url(self, ref, token):
+        if ref.startswith("clients/"):
+            return "/assets/clients/" + Path(ref).name
+        return BASE + "/api/campaign-logo?" + urllib.parse.urlencode({"t": token, "n": Path(ref).name})
+
+    def api_campaign_logo(self, token, name):
+        k, status = self.viewer_campaign(token)
+        name = Path(name).name
+        if k is None or ("upload/" + name) not in db.campaign_logos(k):
+            return self.send(404, b"", "text/plain")
+        f = LOGO_DIR / name
+        if not f.is_file():
+            return self.send(404, b"", "text/plain")
+        kind = uploads.image_kind(f.read_bytes()[:16]) or "png"
+        return self.send(200, f.read_bytes(), "image/" + ("jpeg" if kind == "jpg" else kind),
+                         [("Cache-Control", "private, max-age=86400")])
+
+    def post_campaign_sync(self):
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        if not cid.isdigit():
+            return self.redirect("/campaigns")
+        n = db.sync_from_selection(int(cid))
+        return self.redirect("/campaigns/edit?id=%s&ok=%s" % (cid, urllib.parse.quote(
+            ("Added %d creator(s) from the selection." % n) if n else "Already in line with the selection.")))
+
+    def post_custom_link(self):
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        back = "/campaigns/links?id=" + cid
+        dest = (f.get("destination") or "").strip()
+        if dest and not re.match(r"^https?://[^\s/]+\.[^\s]+$", dest):
+            return self.redirect(back + "&e=" + urllib.parse.quote("The destination must start with https://"))
+        problem = db.add_custom_link(int(cid) if cid.isdigit() else 0, (f.get("code") or "").upper(),
+                                     (f.get("slug") or "").strip().lower(), dest,
+                                     (f.get("label") or "").strip()[:60])
+        if problem:
+            return self.redirect(back + "&e=" + urllib.parse.quote(problem))
+        return self.redirect(back + "&ok=" + urllib.parse.quote("Custom link added."))
+
+    def post_link_toggle(self):
+        f = self.form_body()
+        row = db.link((f.get("slug") or "").strip())
+        if row is None or str(row["campaign_id"]) != (f.get("id") or ""):
+            return self.redirect("/campaigns")
+        db.set_link_active(row["slug"], not row["active"])
+        return self.redirect("/campaigns/links?id=%d&ok=%s" % (row["campaign_id"], urllib.parse.quote(
+            "Link switched " + ("off." if row["active"] else "on."))))
+
+    # --------------------------------------------------- creator analysis --
+
+    def post_analysis_upload(self):
+        f = self.form_body()
+        part = f.get("file")
+        if not isinstance(part, dict) or not part.get("data"):
+            return self.redirect("/analysis?e=" + urllib.parse.quote("Choose the filled-in template (.xlsx)."))
+        known = {c["code"] for c in db.list_creators()}
+        try:
+            docs, problems = analysis.parse_workbook(part["data"], known)
+        except Exception as ex:
+            return self.redirect("/analysis?e=" + urllib.parse.quote(str(ex)[:200]))
+        if not docs:
+            return self.redirect("/analysis?e=" + urllib.parse.quote(
+                "No creators found in that file. " + " ".join(problems[:5])))
+        with db.connect() as conn:
+            for code, d in docs.items():
+                db.save_analysis(code, d, d.get("source") or "template upload", conn)
+        msg = "Saved full analysis for %d creator(s)." % len(docs)
+        if problems:
+            msg += " Skipped: " + " ".join(problems[:6])
+        return self.redirect("/analysis?ok=" + urllib.parse.quote(msg))
+
+    def post_analysis_save(self):
+        f = self.form_body()
+        code = (f.get("code") or "").strip().upper()
+        if db.creator(code) is None:
+            return self.redirect("/analysis?e=" + urllib.parse.quote("Unknown creator code."))
+        try:
+            doc = analysis.clean_json(json.loads(f.get("json") or "{}"))
+        except ValueError as ex:
+            return self.redirect("/analysis?q=%s&e=%s" % (code, urllib.parse.quote(str(ex))))
+        db.save_analysis(code, doc, doc.get("source") or "pasted JSON")
+        return self.redirect("/analysis?q=%s&ok=%s" % (code, urllib.parse.quote("Analysis saved for " + code + ".")))
+
+    def post_analysis_delete(self):
+        code = (self.form_body().get("code") or "").strip().upper()
+        db.delete_analysis(code)
+        return self.redirect("/analysis?ok=" + urllib.parse.quote("Analysis removed for " + code + "."))
+
+    def api_creator(self, code):
+        """One creator for the analysis page: the public card facts always,
+        the full analysis when one is uploaded."""
+        code_id = self.viewer_code_id()
+        if code_id is None:
+            return self.send_json(401, {"ok": False}, self.cors())
+        r = db.creator(code)
+        if r is None or not r["active"]:
+            return self.send_json(404, {"ok": False}, self.cors())
+        a = db.analysis(code)
+        with db.connect() as conn:
+            asked = conn.execute("SELECT 1 FROM analysis_requests WHERE code = ? AND code_id = ? "
+                                 "AND handled_at IS NULL", (code, code_id)).fetchone() is not None
+        db.log("view", code_id, self.client_ip(), self.headers.get("User-Agent"), "analysis:" + code)
+        card = {"code": r["code"], "name": r["name"], "tier": r["tier"], "city": r["city"],
+                "nationality": r["nationality"], "interest": r["interest"], "followers": r["followers"],
+                "photo_url": links.photo(r["photo"]) if r["photo"] else None,
+                "profiles": db.split_profiles(r["profiles"]),
+                "band": metrics.band_of(r["followers"])}
+        return self.send_json(200, {"ok": True, "creator": card,
+                                    "analysis": a["data"] if a else None,
+                                    "updated_at": a["updated_at"] if a else None,
+                                    "requested": asked,
+                                    "benchmarks": metrics.benchmarks()},
+                              self.cors() + [("Cache-Control", "no-store")])
+
+    def api_creator_request(self):
+        code_id = self.viewer_code_id()
+        if code_id is None:
+            return self.send_json(401, {"ok": False}, self.cors())
+        code = (self.json_body().get("code") or "").strip().upper()
+        if db.creator(code) is None:
+            return self.send_json(404, {"ok": False}, self.cors())
+        db.request_analysis(code, code_id)
+        db.log("shortlist", code_id, self.client_ip(), self.headers.get("User-Agent"), "analysis request:" + code)
+        return self.send_json(200, {"ok": True}, self.cors())
+
     def post_campaign_delete(self):
         cid = (self.form_body().get("id") or "").strip()
         if cid.isdigit():
@@ -1911,6 +2161,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def roster_payload(self, platform=None):
         bands = db.tier_prices()
+        analysed = db.analysis_codes()
         def accounts(r):
             out = []
             for a in db.account_tiers(r):
@@ -1926,6 +2177,7 @@ class Handler(BaseHTTPRequestHandler):
                 "city": r["city"], "nationality": r["nationality"],
                 "tier": r["tier"], "interest": r["interest"],
                 "photo": r["photo"], "lowres": self.is_lowres(r["photo"]),
+                "analysis": r["code"] in analysed,
                 # The tier of each account, not only of the biggest one: a
                 # creator can be Mid-Tier on Instagram and Micro on TikTok, and
                 # a campaign booking the TikTok is buying the smaller audience.

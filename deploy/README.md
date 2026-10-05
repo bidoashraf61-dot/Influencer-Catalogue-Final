@@ -88,8 +88,9 @@ What changes on the server, in order:
    `/home/ubuntu/influencer-catalogue/conf/default.conf`. It adds `/go/` and
    `/insights/`, proxied to the admin container at `172.18.0.240:8900`.
 3. **Site** — run `update.sh`. It now also publishes `campaign/index.html` and
-   stamps `campaign.js` / `campaign.css`. It ends with `nginx -s reload`,
-   which picks up step 2.
+   `creator/index.html` and stamps their js/css. It ends with `nginx -s reload`,
+   which picks up step 2. The report and passport load country flags from
+   cdnjs (flag-icons 7.2.3).
 4. **Check:** `https://influencer-catalogue.hellovoice.co.uk/go/nothing` shows
    "This link is not active" (served by the admin, so the proxy works);
    `/campaign/` shows the passcode gate; Admin shows Campaigns and Settings.

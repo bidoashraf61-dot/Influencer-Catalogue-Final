@@ -195,7 +195,8 @@ CREATE TABLE IF NOT EXISTS links (
   destination TEXT,                      -- NULL = the campaign's destination
   active      INTEGER NOT NULL DEFAULT 1,
   created_at  INTEGER NOT NULL,
-  UNIQUE (campaign_id, code)
+  label       TEXT,                      -- a custom link's purpose, e.g. "Story swipe-up"
+  is_default  INTEGER NOT NULL DEFAULT 1 -- 1: the creator's automatic link
 );
 
 -- Every hit on a link. The visitor is a salted hash of IP + browser — never
@@ -277,6 +278,25 @@ CREATE TABLE IF NOT EXISTS insights (
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT
+);
+
+-- A creator's full profile analysis (Modash-style): overview, audience,
+-- growth, posts, brands, lookalikes. Uploaded by an admin from a template or
+-- JSON; `data` is the whole document. One per creator.
+CREATE TABLE IF NOT EXISTS creator_analysis (
+  code       TEXT PRIMARY KEY,
+  data       TEXT NOT NULL,
+  source     TEXT,                       -- e.g. "Modash export 2026-10", "manual"
+  updated_at INTEGER NOT NULL
+);
+
+-- A client asking for a creator's full analysis that is not uploaded yet.
+CREATE TABLE IF NOT EXISTS analysis_requests (
+  id         INTEGER PRIMARY KEY,
+  code       TEXT NOT NULL,              -- creators.code
+  code_id    INTEGER REFERENCES codes(id) ON DELETE SET NULL,
+  at         INTEGER NOT NULL,
+  handled_at INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS capture_runs (
@@ -433,9 +453,34 @@ def migrate(conn):
         # what the client's report shows.
         conn.execute("ALTER TABLE campaigns ADD COLUMN emv TEXT")
         conn.execute("ALTER TABLE campaigns ADD COLUMN visibility TEXT")
+    camp_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
+    for col in ("phase", "status_note", "targets", "logos", "steps"):
+        # phase: where the campaign is (see PHASES); status_note: one line the
+        # client reads; targets: JSON goals; logos: JSON brand logo files.
+        if col not in camp_cols:
+            conn.execute("ALTER TABLE campaigns ADD COLUMN " + col + " TEXT")
     cc_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaign_creators)")}
     if "insights_token" not in cc_cols:
         conn.execute("ALTER TABLE campaign_creators ADD COLUMN insights_token TEXT")
+    if "planned" not in cc_cols:
+        # How many posts this creator is booked for — what "delivered" is
+        # counted against on the status board.
+        conn.execute("ALTER TABLE campaign_creators ADD COLUMN planned INTEGER")
+
+    # Links were one per creator per campaign. Custom links (several per
+    # creator, each with its own name and destination) need that rule gone;
+    # SQLite cannot drop a constraint, so the table is rebuilt once.
+    link_sql = (conn.execute("SELECT sql FROM sqlite_master WHERE name = 'links'").fetchone() or [""])[0]
+    if "UNIQUE (campaign_id, code)" in (link_sql or ""):
+        conn.execute("ALTER TABLE links RENAME TO links_old")
+        conn.execute(
+            "CREATE TABLE links (slug TEXT PRIMARY KEY, "
+            "campaign_id INTEGER NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE, "
+            "code TEXT NOT NULL, destination TEXT, active INTEGER NOT NULL DEFAULT 1, "
+            "created_at INTEGER NOT NULL, label TEXT, is_default INTEGER NOT NULL DEFAULT 1)")
+        conn.execute("INSERT INTO links (slug,campaign_id,code,destination,active,created_at,label,is_default) "
+                     "SELECT slug,campaign_id,code,destination,active,created_at,NULL,1 FROM links_old")
+        conn.execute("DROP TABLE links_old")
     for r in conn.execute("SELECT campaign_id, code FROM campaign_creators "
                           "WHERE insights_token IS NULL").fetchall():
         conn.execute("UPDATE campaign_creators SET insights_token = ? "
@@ -446,7 +491,7 @@ def migrate(conn):
     # them a link now, so no campaign is left without.
     for r in conn.execute("SELECT campaign_id, code FROM campaign_creators x WHERE NOT EXISTS "
                           "(SELECT 1 FROM links l WHERE l.campaign_id = x.campaign_id "
-                          "AND l.code = x.code)").fetchall():
+                          "AND l.code = x.code AND l.is_default = 1)").fetchall():
         ensure_link(r["campaign_id"], r["code"], conn)
 
     seed_tiers(conn)
@@ -1548,11 +1593,12 @@ def save_campaign(cid, **fields):
     """Update the given columns of one campaign. Unknown keys are refused so a
     form cannot write a column it was never meant to."""
     allowed = {"name", "client", "code_id", "platform", "starts_at", "ends_at", "status",
-               "rules", "destination", "cost", "notes", "emv", "visibility"}
+               "rules", "destination", "cost", "notes", "emv", "visibility", "phase",
+               "status_note", "targets", "logos", "selection_id", "steps"}
     bad = set(fields) - allowed
     if bad:
         raise ValueError("not a campaign field: " + ", ".join(sorted(bad)))
-    for key in ("rules", "emv", "visibility"):
+    for key in ("rules", "emv", "visibility", "targets", "logos", "steps"):
         if key in fields and fields[key] is not None and not isinstance(fields[key], str):
             fields[key] = json.dumps(fields[key])
     if fields.get("status") is not None and fields["status"] not in CAMPAIGN_STATUSES:
@@ -1580,7 +1626,7 @@ def campaign_creators(cid):
     with connect() as conn:
         return conn.execute(
             "SELECT r.*, x.code cc_code, x.cost campaign_cost, x.sort cc_sort, x.added_at, "
-            "x.insights_token "
+            "x.insights_token, x.planned "
             "FROM campaign_creators x LEFT JOIN creators r ON r.code = x.code "
             "WHERE x.campaign_id = ? ORDER BY x.sort, x.added_at, x.code", (cid,)).fetchall()
 
@@ -1643,10 +1689,10 @@ def campaign_slug(campaign):
 def ensure_link(cid, code, conn):
     """The creator's link in this campaign, made if missing and switched back
     on if they were taken out and are now back. Returns the slug."""
-    row = conn.execute("SELECT slug FROM links WHERE campaign_id = ? AND code = ?",
-                       (cid, code)).fetchone()
+    row = conn.execute("SELECT slug FROM links WHERE campaign_id = ? AND code = ? "
+                       "AND is_default = 1", (cid, code)).fetchone()
     if row:
-        conn.execute("UPDATE links SET active = 1 WHERE slug = ?", (row["slug"],))
+        conn.execute("UPDATE links SET active = 1 WHERE campaign_id = ? AND code = ?", (cid, code))
         return row["slug"]
     k = conn.execute("SELECT id, name FROM campaigns WHERE id = ?", (cid,)).fetchone()
     base = (campaign_slug(k) + "-" + slugify(code, 20)).strip("-")
@@ -1656,6 +1702,29 @@ def ensure_link(cid, code, conn):
     conn.execute("INSERT INTO links (slug,campaign_id,code,active,created_at) VALUES (?,?,?,1,?)",
                  (slug, cid, code, now()))
     return slug
+
+
+def add_custom_link(cid, code, slug, destination, label):
+    """A further link for one creator — a different page, a story swipe-up, a
+    second offer. Same domain, its own name. Returns an error or None."""
+    if not SLUG_RE.match(slug or ""):
+        return ("A link name is 3–60 lowercase letters, digits and dashes, "
+                "starting and ending with a letter or digit.")
+    with connect() as conn:
+        if conn.execute("SELECT 1 FROM links WHERE slug = ?", (slug,)).fetchone():
+            return "That link name is already used. Choose another."
+        if not conn.execute("SELECT 1 FROM campaign_creators WHERE campaign_id = ? AND code = ?",
+                            (cid, code)).fetchone():
+            return "Pick a creator in this campaign."
+        conn.execute("INSERT INTO links (slug,campaign_id,code,destination,active,created_at,label,"
+                     "is_default) VALUES (?,?,?,?,1,?,?,0)",
+                     (slug, cid, code, destination or None, now(), label or None))
+    return None
+
+
+def set_link_active(slug, active):
+    with connect() as conn:
+        conn.execute("UPDATE links SET active = ? WHERE slug = ?", (1 if active else 0, slug))
 
 
 def link(slug):
@@ -1740,6 +1809,170 @@ def click_stats(cid):
                 "by_creator": group("code"), "by_app": group("app"),
                 "by_device": group("device"), "by_os": group("os"),
                 "by_country": group("country")}
+
+
+# ---------------------------------------------------------- status board --
+
+# The scope of work, step by step. Each campaign keeps its own copy (which
+# steps apply, their dates and state) in campaigns.steps; these are the
+# defaults a new campaign starts from. The client's report shows them as a
+# timeline with today marked.
+DEFAULT_STEPS = [("brief", "Briefing & strategy"), ("sourcing", "Sourcing & casting"),
+                 ("approval", "Client approval"), ("prep", "Content preparation"),
+                 ("shooting", "Shooting"), ("logistics", "Logistics & product delivery"),
+                 ("review", "Content review"), ("publishing", "Publishing"),
+                 ("reporting", "Reporting")]
+STEP_STATES = ["pending", "active", "done"]
+PHASES = DEFAULT_STEPS + [("done", "Completed")]
+
+
+def campaign_steps(campaign):
+    """[{key, label, on, start, end, state}] — the campaign's own steps, the
+    defaults filled in for any it has never saved."""
+    try:
+        saved = json.loads(campaign["steps"] or "[]") if "steps" in campaign.keys() else []
+    except ValueError:
+        saved = []
+    by = {x.get("key"): x for x in saved if isinstance(x, dict)}
+    out = []
+    for key, label in DEFAULT_STEPS:
+        x = by.get(key, {})
+        out.append({"key": key, "label": x.get("label") or label, "on": x.get("on", True),
+                    "start": x.get("start"), "end": x.get("end"),
+                    "state": x.get("state") if x.get("state") in STEP_STATES else "pending"})
+    return out
+TARGET_KEYS = ["posts", "views", "reach", "engagement", "er", "clicks"]
+
+
+def campaign_targets(campaign):
+    try:
+        got = json.loads(campaign["targets"] or "{}") if "targets" in campaign.keys() else {}
+    except ValueError:
+        got = {}
+    return {k: got[k] for k in TARGET_KEYS if isinstance(got.get(k), (int, float)) and got[k] > 0}
+
+
+def campaign_logos(campaign):
+    try:
+        got = json.loads(campaign["logos"] or "[]") if "logos" in campaign.keys() else []
+    except ValueError:
+        got = []
+    return [x for x in got if isinstance(x, str)]
+
+
+def set_planned(cid, planned):
+    with connect() as conn:
+        for code, n in planned.items():
+            conn.execute("UPDATE campaign_creators SET planned = ? WHERE campaign_id = ? AND code = ?",
+                         (n, cid, code))
+
+
+# ------------------------------------------------------- creator analysis --
+
+def analysis(code):
+    with connect() as conn:
+        row = conn.execute("SELECT * FROM creator_analysis WHERE code = ?", (code,)).fetchone()
+    if row is None:
+        return None
+    try:
+        data = json.loads(row["data"])
+    except ValueError:
+        data = {}
+    return {"data": data, "source": row["source"], "updated_at": row["updated_at"]}
+
+
+def analysis_codes():
+    with connect() as conn:
+        return {r["code"]: r["updated_at"] for r in conn.execute(
+            "SELECT code, updated_at FROM creator_analysis")}
+
+
+def save_analysis(code, data, source=None, conn=None):
+    if conn is None:
+        with connect() as own:
+            return save_analysis(code, data, source, own)
+    conn.execute("INSERT INTO creator_analysis (code, data, source, updated_at) VALUES (?,?,?,?) "
+                 "ON CONFLICT(code) DO UPDATE SET data = excluded.data, source = excluded.source, "
+                 "updated_at = excluded.updated_at", (code, json.dumps(data), source, now()))
+    # An uploaded analysis answers every open request for it.
+    conn.execute("UPDATE analysis_requests SET handled_at = ? WHERE code = ? AND handled_at IS NULL",
+                 (now(), code))
+
+
+def delete_analysis(code):
+    with connect() as conn:
+        conn.execute("DELETE FROM creator_analysis WHERE code = ?", (code,))
+
+
+def request_analysis(code, code_id):
+    """One open request per creator per client: asking twice is not news."""
+    with connect() as conn:
+        if conn.execute("SELECT 1 FROM analysis_requests WHERE code = ? AND code_id IS ? "
+                        "AND handled_at IS NULL", (code, code_id)).fetchone():
+            return False
+        conn.execute("INSERT INTO analysis_requests (code, code_id, at) VALUES (?,?,?)",
+                     (code, code_id, now()))
+        return True
+
+
+def analysis_requests(open_only=False):
+    with connect() as conn:
+        return conn.execute(
+            "SELECT a.*, r.name creator_name, c.label code_label FROM analysis_requests a "
+            "LEFT JOIN creators r ON r.code = a.code LEFT JOIN codes c ON c.id = a.code_id"
+            + (" WHERE a.handled_at IS NULL" if open_only else "") + " ORDER BY a.at DESC").fetchall()
+
+
+def handle_analysis_request(rid):
+    with connect() as conn:
+        conn.execute("UPDATE analysis_requests SET handled_at = ? WHERE id = ?", (now(), rid))
+
+
+# ---------------------------------------------------------------- clients --
+
+def client_overview():
+    """Every access code with what hangs off it: the chain the admin follows
+    from a client to their shortlists, campaigns and requests."""
+    with connect() as conn:
+        codes = conn.execute("SELECT * FROM codes ORDER BY created_at DESC").fetchall()
+        sels = conn.execute("SELECT id, name, code_id, codes, updated_at FROM selections").fetchall()
+        camps = conn.execute(
+            "SELECT k.id, k.name, k.code_id, k.selection_id, k.status, k.phase, k.starts_at, k.ends_at, "
+            " (SELECT COUNT(*) FROM campaign_creators x WHERE x.campaign_id = k.id) creators, "
+            " (SELECT COUNT(*) FROM content c WHERE c.campaign_id = k.id AND c.hidden = 0 "
+            "   AND c.section = 'campaign') posts "
+            "FROM campaigns k").fetchall()
+        reqs = conn.execute("SELECT id, code_id, company, at, handled_at FROM requests").fetchall()
+        areqs = conn.execute("SELECT code_id, COUNT(*) n FROM analysis_requests "
+                             "WHERE handled_at IS NULL GROUP BY code_id").fetchall()
+    out = []
+    for c in codes:
+        out.append({"code": c,
+                    "selections": [s for s in sels if s["code_id"] == c["id"]],
+                    "campaigns": [k for k in camps if k["code_id"] == c["id"]],
+                    "requests": [r for r in reqs if r["code_id"] == c["id"]],
+                    "analysis_requests": sum(a["n"] for a in areqs if a["code_id"] == c["id"])})
+    return out
+
+
+def sync_from_selection(cid):
+    """Bring a campaign's creators in line with the selection it came from:
+    add anyone added to the selection since. Nobody is removed — a creator
+    already posting stays. Returns how many were added."""
+    k = campaign(cid)
+    if k is None or not k["selection_id"]:
+        return 0
+    sel = selection(k["selection_id"])
+    if sel is None:
+        return 0
+    with connect() as conn:
+        known = {r["code"] for r in conn.execute("SELECT code FROM creators")}
+        codes = [c for c in json.loads(sel["codes"] or "[]") if c in known]
+        try:
+            costs = json.loads(sel["costs"] or "{}")
+        except (ValueError, TypeError):
+            costs = {}
+        return add_campaign_creators(cid, codes, {c: v for c, v in costs.items() if isinstance(v, int)}, conn)
 
 
 # --------------------------------------------------------------- settings --

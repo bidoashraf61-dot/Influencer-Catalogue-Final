@@ -1105,3 +1105,24 @@ body[data-page="selection"] .cat-card__check { display: none; }
 }
 .cat-search__input::placeholder { color: rgba(18,18,18,.45); }
 @media screen and (max-width: 767px) { .cat-search { max-width: none; } }
+
+
+/* ------------------------------------------------ campaign tracking + passport links */
+.cat-topbar__links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.cat-track {
+  display: inline-flex; align-items: center; gap: 9px; flex: none;
+  font-family: var(--heading); font-size: 20px; letter-spacing: .06em; text-transform: uppercase; text-decoration: none;
+  color: var(--white); background: var(--ink); padding: 13px 24px; min-height: 44px; border-radius: var(--r-pill);
+  border: 1px solid var(--ink); transition: background .2s ease, color .2s ease;
+}
+.cat-track:hover { background: var(--lime); color: var(--ink); border-color: var(--lime); }
+.cat-track:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 3px; }
+.cat-card__analysis {
+  display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; min-height: 40px; padding: 0 16px;
+  border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.2); color: var(--ink); text-decoration: none;
+  font-size: 14px; font-weight: 600; position: relative; z-index: 2;
+}
+.cat-card__analysis.is-ready { background: var(--lime); border-color: var(--lime); }
+.cat-card__analysis:hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.cat-card__analysis:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+@media (max-width: 640px) { .cat-track { font-size: 16px; padding: 10px 16px; } }

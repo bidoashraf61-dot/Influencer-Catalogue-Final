@@ -1,0 +1,584 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-05T14:44:15.898336+03:00",
+  "title": "Design System: HelloVoice Influencer Catalogue",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "#121212",
+        "tonalRamp": [
+          "#262626",
+          "#424242",
+          "#5e5e5e",
+          "#7a7a7a",
+          "#969696",
+          "#b2b2b2",
+          "#d1d1d1",
+          "#f2f2f2"
+        ]
+      },
+      "black": {
+        "role": "neutral",
+        "displayName": "Pure Black",
+        "canonical": "#000000",
+        "tonalRamp": [
+          "#262626",
+          "#424242",
+          "#5e5e5e",
+          "#7a7a7a",
+          "#969696",
+          "#b2b2b2",
+          "#d1d1d1",
+          "#f2f2f2"
+        ]
+      },
+      "graphite": {
+        "role": "neutral",
+        "displayName": "Graphite",
+        "canonical": "#383838",
+        "tonalRamp": [
+          "#262626",
+          "#424242",
+          "#5e5e5e",
+          "#7a7a7a",
+          "#969696",
+          "#b2b2b2",
+          "#d1d1d1",
+          "#f2f2f2"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Paper White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#262626",
+          "#424242",
+          "#5e5e5e",
+          "#7a7a7a",
+          "#969696",
+          "#b2b2b2",
+          "#d1d1d1",
+          "#f2f2f2"
+        ]
+      },
+      "linen": {
+        "role": "neutral",
+        "displayName": "Warm Linen",
+        "canonical": "#e9dcd2",
+        "tonalRamp": [
+          "#332519",
+          "#593f2c",
+          "#7f5a3e",
+          "#a47550",
+          "#ba9273",
+          "#cdaf98",
+          "#e1cfc1",
+          "#f7f2ee"
+        ]
+      },
+      "lime": {
+        "role": "primary",
+        "displayName": "Broadcast Lime",
+        "canonical": "#e8ff76",
+        "tonalRamp": [
+          "#404c00",
+          "#6e8500",
+          "#9dbd00",
+          "#ccf500",
+          "#dcff2e",
+          "#e5ff66",
+          "#f0ffa3",
+          "#fbffe5"
+        ]
+      },
+      "vivid-orange": {
+        "role": "secondary",
+        "displayName": "Ticker Orange",
+        "canonical": "#ff691e",
+        "tonalRamp": [
+          "#4c1900",
+          "#852c00",
+          "#bd3f00",
+          "#f55200",
+          "#ff742e",
+          "#ff9966",
+          "#ffc2a3",
+          "#ffeee5"
+        ]
+      },
+      "vivid-red": {
+        "role": "secondary",
+        "displayName": "Live Red",
+        "canonical": "#ee1515",
+        "tonalRamp": [
+          "#470505",
+          "#7c0909",
+          "#b00d0d",
+          "#e41111",
+          "#f13c3c",
+          "#f57070",
+          "#f9a9a9",
+          "#fde7e7"
+        ]
+      },
+      "go-green": {
+        "role": "tertiary",
+        "displayName": "Strong Green",
+        "canonical": "#14884a",
+        "tonalRamp": [
+          "#0a4324",
+          "#11743f",
+          "#18a55a",
+          "#1fd574",
+          "#49e491",
+          "#7aebaf",
+          "#aff3cf",
+          "#e9fcf2"
+        ]
+      },
+      "go-green-soft": {
+        "role": "tertiary",
+        "displayName": "Strong Green Tint",
+        "canonical": "#e7f7ed",
+        "tonalRamp": [
+          "#133921",
+          "#21633a",
+          "#2f8e53",
+          "#3db86b",
+          "#62cb89",
+          "#8cd9a9",
+          "#bae8cb",
+          "#ecf9f1"
+        ]
+      },
+      "amber": {
+        "role": "tertiary",
+        "displayName": "Fair Amber",
+        "canonical": "#e2780f",
+        "tonalRamp": [
+          "#482605",
+          "#7c4208",
+          "#b15e0c",
+          "#e67a0f",
+          "#f2963b",
+          "#f5b270",
+          "#f9d1a9",
+          "#fdf2e7"
+        ]
+      },
+      "amber-soft": {
+        "role": "tertiary",
+        "displayName": "Fair Amber Tint",
+        "canonical": "#fff1e2",
+        "tonalRamp": [
+          "#4c2800",
+          "#854500",
+          "#bd6200",
+          "#f57f00",
+          "#ff9a2e",
+          "#ffb566",
+          "#ffd3a3",
+          "#fff3e5"
+        ]
+      },
+      "amber-text": {
+        "role": "tertiary",
+        "displayName": "Fair Amber Text",
+        "canonical": "#a85507",
+        "tonalRamp": [
+          "#492503",
+          "#7f4005",
+          "#b55c08",
+          "#eb770a",
+          "#f79336",
+          "#f9b06c",
+          "#fbd0a7",
+          "#fef2e7"
+        ]
+      },
+      "red-soft": {
+        "role": "tertiary",
+        "displayName": "Low Red Tint",
+        "canonical": "#fde9e9",
+        "tonalRamp": [
+          "#460606",
+          "#7a0b0b",
+          "#ad1010",
+          "#e01414",
+          "#ee3f3f",
+          "#f27373",
+          "#f7abab",
+          "#fde8e8"
+        ]
+      },
+      "red-text": {
+        "role": "tertiary",
+        "displayName": "Low Red Text",
+        "canonical": "#c01010",
+        "tonalRamp": [
+          "#470606",
+          "#7a0a0a",
+          "#ae0f0f",
+          "#e21313",
+          "#ef3e3e",
+          "#f37272",
+          "#f8aaaa",
+          "#fde7e7"
+        ]
+      },
+      "track-stone": {
+        "role": "neutral",
+        "displayName": "Track Stone",
+        "canonical": "#efece6",
+        "tonalRamp": [
+          "#2f291e",
+          "#514734",
+          "#73654a",
+          "#958360",
+          "#ad9e80",
+          "#c3b8a2",
+          "#dbd4c7",
+          "#f5f3ef"
+        ]
+      },
+      "pending-stone": {
+        "role": "neutral",
+        "displayName": "Pending Stone",
+        "canonical": "#efede8",
+        "tonalRamp": [
+          "#2d291f",
+          "#4e4736",
+          "#6f664d",
+          "#908464",
+          "#a99e84",
+          "#c0b8a5",
+          "#d9d5c9",
+          "#f5f3f0"
+        ]
+      },
+      "medal-gold": {
+        "role": "neutral",
+        "displayName": "Medal Gold",
+        "canonical": "#d6a52b",
+        "tonalRamp": [
+          "#40310c",
+          "#6f5515",
+          "#9e7a1f",
+          "#cd9e28",
+          "#ddb550",
+          "#e6c97f",
+          "#f0deb2",
+          "#fbf6ea"
+        ]
+      },
+      "medal-silver": {
+        "role": "neutral",
+        "displayName": "Medal Silver",
+        "canonical": "#9ea6ae",
+        "tonalRamp": [
+          "#23262a",
+          "#3c4248",
+          "#565e67",
+          "#6f7a85",
+          "#8d96a0",
+          "#acb2b9",
+          "#cdd1d5",
+          "#f1f2f3"
+        ]
+      },
+      "medal-bronze": {
+        "role": "neutral",
+        "displayName": "Medal Bronze",
+        "canonical": "#b06f3a",
+        "tonalRamp": [
+          "#3a2413",
+          "#643f21",
+          "#8e5a2f",
+          "#b8743d",
+          "#cb9162",
+          "#d9af8c",
+          "#e8cfba",
+          "#f9f2ec"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Hairline Rule",
+        "canonical": "rgba(18,18,18,.12)"
+      },
+      "rule-soft": {
+        "role": "neutral",
+        "displayName": "Soft Rule",
+        "canonical": "rgba(18,18,18,.07)"
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Page titles, campaign and creator names; Bebas at poster scale."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Report and passport section heads."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Sub-sections, chart titles, podium and bullet-bar names."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Every headline figure, units at 0.5em."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Notes, ledes, table cells."
+      },
+      "body-lead": {
+        "displayName": "Body Lead",
+        "purpose": "Sealed-state and scorebug sub copy."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase term above a figure; panel heads; table heads."
+      },
+      "action": {
+        "displayName": "Action",
+        "purpose": "Buttons and View on <platform> links."
+      }
+    },
+    "shadows": [
+      {
+        "name": "hover-lift",
+        "value": "0 14px 30px rgba(18,18,18,.18)",
+        "purpose": "Campaign list rows on hover, with translateY(-2px)."
+      },
+      {
+        "name": "card-hover",
+        "value": "0 12px 32px rgba(18,18,18,.1)",
+        "purpose": "Catalogue card hover."
+      },
+      {
+        "name": "floating-panel",
+        "value": "0 24px 60px rgba(18,18,18,.22), 0 2px 8px rgba(18,18,18,.08)",
+        "purpose": "Filter dropdown panels."
+      },
+      {
+        "name": "active-marker",
+        "value": "0 6px 16px rgba(18,18,18,.18)",
+        "purpose": "Current-stage gantt bar only."
+      },
+      {
+        "name": "media-tag",
+        "value": "0 2px 8px rgba(0,0,0,.18)",
+        "purpose": "White platform tags on photos."
+      },
+      {
+        "name": "ruled-impression",
+        "value": "inset 0 0 0 3px <paper>, inset 0 0 0 4px currentColor",
+        "purpose": "Double rule inside stamps and seals; not elevation."
+      }
+    ],
+    "motion": [
+      {
+        "name": "live-pulse",
+        "value": "1.8s cubic-bezier(.2,.8,.2,1) infinite; ring 0 to 12px rgba(238,21,21,.6 to 0)",
+        "purpose": "The LIVE dot on the scorebug; the report's only continuous animation; off under reduced motion."
+      },
+      {
+        "name": "hover-colour",
+        "value": ".2s to .25s ease",
+        "purpose": "Colour and border transitions on buttons, chips, links."
+      },
+      {
+        "name": "lift",
+        "value": ".25s cubic-bezier(.2,.8,.2,1)",
+        "purpose": "Campaign row hover lift."
+      },
+      {
+        "name": "marquee",
+        "value": "linear infinite, 38s ticker / 90s client logos",
+        "purpose": "Catalogue roster only; off under reduced motion."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "catalogue-lg",
+        "value": "991px"
+      },
+      {
+        "name": "report-md",
+        "value": "1000px"
+      },
+      {
+        "name": "passport",
+        "value": "820px"
+      },
+      {
+        "name": "catalogue-md",
+        "value": "767px"
+      },
+      {
+        "name": "report-sm",
+        "value": "700px"
+      },
+      {
+        "name": "catalogue-sm",
+        "value": "560px"
+      },
+      {
+        "name": "report-xs",
+        "value": "420px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Lime Button",
+      "kind": "button",
+      "refersTo": "button-lime",
+      "description": "Primary action on any surface; inverts to ink on hover.",
+      "html": "<button class=\"ds-btn-lime\">Download report</button>",
+      "css": ".ds-btn-lime{font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:20px;letter-spacing:.06em;line-height:1;padding:16px 32px;min-height:44px;border:1px solid transparent;border-radius:999px;background:#e8ff76;color:#121212;cursor:pointer;transition:background .25s ease,color .25s ease}.ds-btn-lime:hover{background:#121212;color:#e8ff76}.ds-btn-lime:focus-visible{outline:3px solid #ee1515;outline-offset:2px}"
+    },
+    {
+      "name": "Line Button",
+      "kind": "button",
+      "refersTo": "button-line",
+      "description": "Secondary action at the end of a report.",
+      "html": "<button class=\"ds-btn-line\">Back to campaigns</button>",
+      "css": ".ds-btn-line{font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:20px;letter-spacing:.06em;line-height:1;padding:16px 32px;min-height:44px;border:1px solid #121212;border-radius:999px;background:transparent;color:#121212;cursor:pointer;transition:background .25s ease,color .25s ease}.ds-btn-line:hover{background:#121212;color:#e8ff76}.ds-btn-line:focus-visible{outline:3px solid #ee1515;outline-offset:2px}"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Report filter; pressed state is ink with lime text.",
+      "html": "<div class=\"ds-row\"><button class=\"ds-chip\" aria-pressed=\"true\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"4.1\"/><circle cx=\"17.3\" cy=\"6.7\" r=\"1.15\" fill=\"currentColor\"/></svg>Instagram</button><button class=\"ds-chip\" aria-pressed=\"false\">All posts</button></div>",
+      "css": ".ds-row{display:flex;gap:8px}.ds-chip{font-family:'DM Sans',Arial,sans-serif;display:inline-flex;align-items:center;gap:8px;font-size:14px;min-height:42px;padding:0 16px;border-radius:999px;border:1px solid rgba(18,18,18,.12);background:#fff;color:#121212;cursor:pointer}.ds-chip:hover{border-color:#121212}.ds-chip[aria-pressed=true]{background:#121212;color:#e8ff76;border-color:#121212}.ds-chip:focus-visible{outline:3px solid #ee1515;outline-offset:2px}"
+    },
+    {
+      "name": "Signal Pills",
+      "kind": "chip",
+      "refersTo": "signal-good",
+      "description": "The only row-level verdict device: Strong, Fair, Low.",
+      "html": "<div class=\"ds-row\"><span class=\"ds-sig ds-sig--good\">Strong</span><span class=\"ds-sig ds-sig--moderate\">Fair</span><span class=\"ds-sig ds-sig--low\">Low</span></div>",
+      "css": ".ds-row{display:flex;gap:8px}.ds-sig{font-family:'DM Sans',Arial,sans-serif;display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;letter-spacing:.02em;padding:3px 10px 3px 8px;border-radius:999px;white-space:nowrap}.ds-sig::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor}.ds-sig--good{color:#14884a;background:#e7f7ed}.ds-sig--moderate{color:#a85507;background:#fff1e2}.ds-sig--low{color:#c01010;background:#fde9e9}"
+    },
+    {
+      "name": "Scorebug",
+      "kind": "custom",
+      "refersTo": "scorebug",
+      "description": "Ink opening band of the campaign report: title, LIVE ticker, verdict pill, scoreline.",
+      "html": "<section class=\"ds-bug\"><h1 class=\"ds-bug__t\">Summer Glow</h1><div class=\"ds-bug__row\"><p class=\"ds-tick\"><span class=\"ds-live\">Live</span><span>Day 12 of 30</span></p><div class=\"ds-verdict ds-verdict--good\">On track<small>overall, against target</small></div></div><dl class=\"ds-line\"><div><dt>Views</dt><dd>1.2M</dd></div><div><dt>Engagement</dt><dd>4.8<small>%</small></dd></div><div><dt>Posts</dt><dd>18<small>/24</small></dd></div></dl></section>",
+      "css": ".ds-bug{background:#121212;color:#fff;padding:36px 28px;font-family:'DM Sans',Arial,sans-serif;}.ds-bug__t{font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:72px;line-height:.9;margin:0}.ds-bug__row{display:flex;justify-content:space-between;align-items:end;gap:20px;flex-wrap:wrap;margin-top:24px}.ds-tick{display:inline-flex;align-items:center;gap:14px;margin:0;font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:22px;letter-spacing:.06em;color:#e8ff76;border:1px solid rgba(232,255,118,.35);border-radius:999px;padding:10px 22px}.ds-tick>span+span{color:rgba(255,255,255,.75)}.ds-live{display:inline-flex;align-items:center;gap:8px}.ds-live::before{content:'';width:10px;height:10px;border-radius:50%;background:#ee1515;animation:ds-pulse 1.8s cubic-bezier(.2,.8,.2,1) infinite}@keyframes ds-pulse{0%{box-shadow:0 0 0 0 rgba(238,21,21,.6)}100%{box-shadow:0 0 0 12px rgba(238,21,21,0)}}@media (prefers-reduced-motion:reduce){.ds-live::before{animation:none}}.ds-verdict{font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:40px;line-height:1;padding:14px 28px;border-radius:999px;transform:rotate(-3deg);background:#e8ff76;color:#121212;letter-spacing:.04em}.ds-verdict small{display:block;font-family:'DM Sans',Arial,sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;opacity:.7;margin-top:4px}.ds-verdict--good{background:#14884a;color:#fff}.ds-line{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));margin:28px 0 0;border-top:1px solid rgba(255,255,255,.16);border-bottom:1px solid rgba(255,255,255,.16)}.ds-line>div{margin:0;padding:18px 18px 16px 0}.ds-line>div+div{padding-left:18px;border-left:1px solid rgba(255,255,255,.12)}.ds-line dt{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.6)}.ds-line dd{margin:8px 0 0;font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:48px;line-height:.95}.ds-line dd small{font-size:.5em;color:rgba(255,255,255,.55)}"
+    },
+    {
+      "name": "Post Card",
+      "kind": "card",
+      "refersTo": "post-card",
+      "description": "Highlights-wall card with platform tag, signal pill and the lime View on button.",
+      "html": "<article class=\"ds-post\"><div class=\"ds-post__m\"><span class=\"ds-post__tag\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" aria-hidden=\"true\"><rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"4.1\"/><circle cx=\"17.3\" cy=\"6.7\" r=\"1.15\" fill=\"currentColor\"/></svg>Reel</span><span class=\"ds-post__s\">Strong</span></div><div class=\"ds-post__b\"><dl class=\"ds-nums\"><div><dt>Views</dt><dd>84K</dd></div><div><dt>Likes</dt><dd>5.1K</dd></div><div><dt>ER</dt><dd>6.2%</dd></div></dl><a class=\"ds-post__go\" href=\"#\">View on Instagram</a></div></article>",
+      "css": ".ds-post{font-family:'DM Sans',Arial,sans-serif;width:260px;display:flex;flex-direction:column;border-radius:20px;overflow:hidden;background:#fff;border:1px solid rgba(18,18,18,.12);box-shadow:0 1px 2px rgba(18,18,18,.04)}.ds-post__m{position:relative;aspect-ratio:4/5;background:#121212}.ds-post__tag{position:absolute;left:12px;top:12px;display:inline-flex;align-items:center;gap:6px;background:#fff;color:#121212;font-size:12px;font-weight:600;padding:5px 10px 5px 6px;border-radius:999px;box-shadow:0 2px 8px rgba(0,0,0,.18)}.ds-post__s{position:absolute;right:12px;top:12px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:999px;color:#14884a;background:#e7f7ed}.ds-post__b{padding:16px 16px 18px;display:flex;flex-direction:column;gap:14px}.ds-nums{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:0}.ds-nums div{margin:0}.ds-nums dt{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#383838}.ds-nums dd{margin:3px 0 0;font-weight:700;font-size:17px}.ds-post__go{display:flex;justify-content:center;align-items:center;min-height:46px;border-radius:999px;background:#e8ff76;color:#121212;font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:19px;letter-spacing:.06em;text-decoration:none;transition:background .2s ease,color .2s ease}.ds-post__go:hover{background:#121212;color:#e8ff76}.ds-post__go:focus-visible{outline:3px solid #ee1515;outline-offset:2px}"
+    },
+    {
+      "name": "Bullet Bar",
+      "kind": "custom",
+      "refersTo": "bullet-bar",
+      "description": "Against-target bar: verdict-coloured fill, ink target mark.",
+      "html": "<div class=\"ds-bul\"><div class=\"ds-bul__n\">Engagement</div><div class=\"ds-bul__t\"><div class=\"ds-bul__f\" style=\"width:72%\"></div><div class=\"ds-bul__mk\" style=\"left:60%\"><span>Target 3.5%</span></div></div><div class=\"ds-bul__v\"><b>4.8%</b>vs 3.5% target</div></div>",
+      "css": ".ds-bul{font-family:'DM Sans',Arial,sans-serif;display:grid;grid-template-columns:150px 1fr 140px;gap:24px;align-items:center;padding-top:24px}.ds-bul__n{font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:28px;line-height:1}.ds-bul__t{position:relative;height:26px;border-radius:8px;background:#efece6}.ds-bul__f{position:absolute;left:0;top:0;bottom:0;border-radius:8px;background:#14884a}.ds-bul__mk{position:absolute;top:-6px;bottom:-6px;width:3px;background:#121212;border-radius:2px}.ds-bul__mk span{position:absolute;top:-20px;left:50%;transform:translateX(-50%);font-size:11px;white-space:nowrap;color:#383838}.ds-bul__v{font-size:15px;text-align:right}.ds-bul__v b{font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:30px;display:block;line-height:1}"
+    },
+    {
+      "name": "Audience Stamps",
+      "kind": "custom",
+      "refersTo": "stamp",
+      "description": "Double-ruled, rotated country stamps; the lead country is lime.",
+      "html": "<div class=\"ds-stamps\"><div class=\"ds-stamp ds-stamp--lead\"><i class=\"ds-flag\" style=\"background:linear-gradient(#006c35,#006c35)\"></i><b>62%</b><span>Saudi Arabia</span></div><div class=\"ds-stamp\"><i class=\"ds-flag\" style=\"background:linear-gradient(#00732f 33%,#fff 33% 66%,#000 66%)\"></i><b>14%</b><span>UAE</span></div></div>",
+      "css": ".ds-stamps{font-family:'DM Sans',Arial,sans-serif;display:flex;flex-wrap:wrap;gap:18px 16px;padding:12px}.ds-stamp{padding:14px 18px 12px;border-radius:12px;color:#121212;border:2px solid currentColor;box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 4px currentColor;display:grid;grid-template-columns:auto auto;gap:2px 12px;align-items:center;min-width:150px;background:#fff;transform:rotate(2deg)}.ds-stamp--lead{background:#e8ff76;box-shadow:inset 0 0 0 3px #e8ff76,inset 0 0 0 4px currentColor;min-width:210px;transform:rotate(-3deg)}.ds-flag{grid-row:span 2;width:38px;height:28px;border-radius:3px;box-shadow:0 0 0 1px rgba(18,18,18,.15)}.ds-stamp b{font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:34px;line-height:.9}.ds-stamp--lead b{font-size:46px}.ds-stamp span{font-size:12px;letter-spacing:.1em;text-transform:uppercase;font-weight:600}"
+    },
+    {
+      "name": "Analysed Seal",
+      "kind": "custom",
+      "refersTo": "seal-analysed",
+      "description": "Rotated round seal on the passport data page.",
+      "html": "<div class=\"ds-pad\"><div class=\"ds-seal\">Analysed<small>Oct 2026</small></div></div>",
+      "css": ".ds-pad{background:#e9dcd2;padding:24px;border-radius:28px;display:inline-block}.ds-seal{width:128px;height:128px;border-radius:50%;display:grid;place-items:center;text-align:center;font-family:Bebasneue,'Bebas Neue',Arial,sans-serif;font-weight:400;font-size:20px;line-height:1;letter-spacing:.08em;transform:rotate(-12deg);color:#121212;background:#e8ff76;border:3px solid currentColor;box-shadow:inset 0 0 0 5px #e8ff76,inset 0 0 0 7px #121212}.ds-seal small{display:block;font-family:'DM Sans',Arial,sans-serif;font-size:10px;letter-spacing:.1em;margin-top:4px}"
+    },
+    {
+      "name": "Gate Input",
+      "kind": "input",
+      "refersTo": "input-gate",
+      "description": "Passcode field on the ink gate.",
+      "html": "<div class=\"ds-gate\"><input class=\"ds-in\" placeholder=\"ACCESS CODE\"/></div>",
+      "css": ".ds-gate{background:#121212;padding:28px}.ds-in{font-family:'DM Sans',Arial,sans-serif;font-size:16px;padding:16px 24px;min-height:44px;width:260px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:999px;text-align:center;letter-spacing:.12em}.ds-in:focus{outline:none;border-color:#e8ff76}"
+    },
+    {
+      "name": "Top Bar Link",
+      "kind": "nav",
+      "refersTo": "link-pill",
+      "description": "Outlined pill links in the report and passport top bars.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-link\" href=\"#\">Catalogue</a><a class=\"ds-link\" href=\"#\">All campaigns</a></nav>",
+      "css": ".ds-nav{display:flex;gap:10px}.ds-link{font-family:'DM Sans',Arial,sans-serif;display:inline-flex;align-items:center;min-height:44px;padding:0 18px;border-radius:999px;border:1px solid rgba(18,18,18,.12);color:#121212;text-decoration:none;font-size:15px;font-weight:500;background:#fff;transition:border-color .2s ease}.ds-link:hover{border-color:#121212}.ds-link:focus-visible{outline:3px solid #ee1515;outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Broadcast Desk",
+    "overview": "A client-facing world built from three materials: solid ink (#121212) bars that behave like broadcast graphics, warm linen (#e9dcd2) bands that hold data, and a single acid lime (#e8ff76) that marks the thing to act on or the thing that won. Display is set in Bebas Neue at poster scale with tight leading; everything read rather than glanced at is DM Sans. Numbers are typeset as headlines, not tiles: a figure in Bebas over a small tracked uppercase label, ruled off from its neighbours by hairlines.\n\nEvery surface opens behind the same dark passcode gate, then alternates white, ink and linen full-bleed sections. The catalogue roster is the incumbent; the campaign report (a match-day results package) and the creator analysis (a talent passport) extend it without new hues, only new devices: the scorebug, the stage rail, the medal podium, the bullet bar, the double-ruled stamp and the round seal. Rotation is the world's one gesture of hand: verdict pills, seals and stamps sit a few degrees off true, as if pressed onto the page.\n\nMotion is nearly absent. The marquees on the catalogue roster and the LIVE pulse on the campaign scorebug are the only continuous animation; everything else is short colour transitions on hover (.2 to .25s ease). All of it stops under reduced motion.",
+    "keyCharacteristics": [
+      "Ink, lime and linen carry the brand; green, amber and red carry judgement.",
+      "Bebas Neue for every name, number and action; DM Sans for every sentence and label.",
+      "Full-bleed alternating bands (white, ink, linen) instead of boxed dashboards.",
+      "Pill geometry for every interactive control; 20px and 28px radii for containers.",
+      "Pressed, slightly rotated marks (verdict, seal, stamps) as the signature gesture.",
+      "Flat by default; shadow only for hover lift, floating panels and the active gantt bar."
+    ],
+    "rules": [
+      {
+        "name": "The Verdict Hues Rule",
+        "body": "Green, amber and red mean good, moderate and low. On data surfaces they appear only in signal pills, verdict pills, bullet-bar fills and completed-stage marks; a chart, bar or panel that is not making a judgement is drawn in ink, lime or stone.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Acid Rule",
+        "body": "Lime is the only saturated brand colour inside the report and passport. It marks the action or the winner; if two lime elements compete in one band, one of them is wrong.",
+        "section": "colors"
+      },
+      {
+        "name": "The Figure-Over-Term Rule",
+        "body": "A metric is a Bebas figure under a small uppercase DM Sans term, in a definition list, separated by hairlines. Never a tile with an icon.",
+        "section": "typography"
+      },
+      {
+        "name": "The Two Faces Rule",
+        "body": "Bebas for names, numbers and actions; DM Sans for anything read as a sentence. No third family.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-At-Rest Rule",
+        "body": "Nothing on a band carries a resting drop shadow beyond a 1 to 2px whisper; lift is a hover response.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** open every client surface with the ink passcode gate and a Bebas title, then alternate white, ink and linen full-bleed bands.",
+      "**Do** set every figure in Bebas over a 12 to 13px uppercase DM Sans term, ruled off by 1px hairlines.",
+      "**Do** use green, amber and red only to state a verdict (signal pill, verdict pill, bullet fill) or a completed stage; draw neutral data in ink, lime or stone.",
+      "**Do** keep every control a full pill at 44px minimum, with lime-to-ink inversion on hover and a 3px vivid-red focus outline on light surfaces.",
+      "**Do** use drawn platform marks from the shared icon set and real flag images for countries.",
+      "**Do** keep the LIVE pulse the only continuous animation in the report and stop it under reduced motion.",
+      "**Do** keep reports printable: exact colours, gate and controls hidden, sections unbroken."
+    ],
+    "donts": [
+      "**Don't** put a kicker or eyebrow label above a heading; the heading names the section on its own.",
+      "**Don't** mark cards, rows or panels with a coloured side border; separation is by band colour and hairlines.",
+      "**Don't** use green, amber or red as decoration, chart series colour or brand accent; vivid orange is the catalogue ticker's band, not a \"moderate\" colour.",
+      "**Don't** build metrics as icon tiles or a tabbed analytics dashboard; use the scoreline, ruled figure lists, bullet bars and panel bars.",
+      "**Don't** use emoji or text glyphs for platforms or countries.",
+      "**Don't** add resting drop shadows or hard offset shadows to cards; lift appears only on hover or floating panels.",
+      "**Don't** introduce a third typeface or set body sentences in Bebas."
+    ]
+  }
+}

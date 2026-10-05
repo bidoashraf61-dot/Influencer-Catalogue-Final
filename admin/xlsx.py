@@ -181,6 +181,51 @@ def read(data):
         return table, _images(zf, sheet_part)
 
 
+def _sheet_rows(zf, part, strings):
+    rows = []
+    for i, row in enumerate(ET.fromstring(zf.read(part)).iter(MAIN + "row"), start=1):
+        cells = []
+        for c in row:
+            if not c.tag.endswith("}c"):
+                continue
+            at = _col(c.get("r") or "")
+            while len(cells) < at:
+                cells.append("")
+            kind = c.get("t")
+            if kind == "inlineStr":
+                text = "".join(t.text or "" for t in c.iter(MAIN + "t"))
+            else:
+                v = c.find(MAIN + "v")
+                text = (v.text or "") if v is not None else ""
+                if kind == "s" and text.strip().isdigit():
+                    idx = int(text)
+                    text = strings[idx] if idx < len(strings) else ""
+            cells.append(text.strip())
+        rows.append(cells)
+    return rows
+
+
+def read_all(data):
+    """{sheet name: [[cell text, ...], ...]} for every sheet in a workbook —
+    for templates whose sheets each hold a different kind of row."""
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(data))
+    except zipfile.BadZipFile:
+        raise BadWorkbook("That file is not a readable .xlsx. Re-save it from Excel as .xlsx.")
+    with zf:
+        if "xl/workbook.xml" not in zf.namelist():
+            raise BadWorkbook("That .xlsx has no workbook inside it — re-save it from Excel.")
+        strings = _shared_strings(zf)
+        rels = _rel_map(zf, "xl/workbook.xml")
+        book = ET.fromstring(zf.read("xl/workbook.xml"))
+        out = {}
+        for sh in book.find(MAIN + "sheets") or []:
+            part = rels.get(sh.get(DOC + "id"))
+            if part and part in zf.namelist():
+                out[sh.get("name") or part] = _sheet_rows(zf, part, strings)
+        return out
+
+
 # ---------------------------------------------------------------- writing --
 
 _CONTENT_TYPES = (
