@@ -382,3 +382,7 @@
   .mx-table { min-width: 0; font-size: 11px; }
   .mx-bug__title { font-size: 64px; }
 }
+
+/* the timeline sits directly under the scorebug: tighter top, ruled bottom */
+.mx-sec--progress { padding-top: 48px; padding-bottom: 48px; border-bottom: 1px solid var(--line); }
+.mx-sec--progress .mx-note { margin: 0 0 8px; }

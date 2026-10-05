@@ -24,7 +24,7 @@ STORY: The client sees at once whether the campaign is on track, then the
 posts that made it, who led, how each number compares with its benchmark,
 and what the affiliate links drove; then downloads it.
 FIRST VIEWPORT: Ink scorebug with brand logos, title, LIVE ticker and verdict
-stamp; stage rail and delivery strip directly beneath.
+stamp; scope-of-work timeline directly beneath.
 FORM: match-day broadcast results package, structure 6 of 7, seed 2d08ada4.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
 -->
@@ -86,11 +86,15 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
       </div></div>
     </header>
 
-    <!-- where the campaign is: compact stage rail; full timeline further down -->
-    <section class="mx-rail cat-pad" aria-label="Campaign stage">
+    <!-- the scope of work, step by step: right under the header -->
+    <section class="mx-sec mx-sec--progress cat-pad" aria-labelledby="mx-h-progress">
       <div class="cat-container">
-        <ol class="mx-rail__steps" id="mx-rail"></ol>
+        <div class="mx-sec__head">
+          <h2 class="mx-h2" id="mx-h-progress">Campaign progress</h2>
+          <p class="mx-status__dates" id="mx-dates"></p>
+        </div>
         <p class="mx-note" id="mx-note" hidden></p>
+        <div class="mx-gantt" id="mx-gantt"></div>
       </div>
     </section>
 
@@ -134,17 +138,6 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
         <div class="mx-sec__head"><h2 class="mx-h2" id="mx-h-perf">How it grew</h2></div>
         <div class="mx-charts" id="mx-charts"></div>
         <div class="mx-mix" id="mx-mix"></div>
-      </div>
-    </section>
-
-    <!-- the scope of work, step by step -->
-    <section class="mx-sec cat-pad" aria-labelledby="mx-h-progress">
-      <div class="cat-container">
-        <div class="mx-sec__head">
-          <h2 class="mx-h2" id="mx-h-progress">Campaign progress</h2>
-          <p class="mx-status__dates" id="mx-dates"></p>
-        </div>
-        <div class="mx-gantt" id="mx-gantt"></div>
       </div>
     </section>
 

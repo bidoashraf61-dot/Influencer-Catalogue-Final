@@ -193,7 +193,7 @@
     $("mx-dates").innerHTML = c.starts_at ? "<b>" + day(c.starts_at) + "</b> → <b>" + day(c.ends_at) + "</b>" : "";
     $("mx-note").hidden = !c.status_note;
     $("mx-note").textContent = c.status_note || "";
-    $("mx-rail").innerHTML = steps.map(function (s) {
+    if ($("mx-rail")) $("mx-rail").innerHTML = steps.map(function (s) {
       return '<li class="is-' + s.state + '"' + (s.state === "active" ? ' aria-current="step"' : "") + "><b>" + esc(s.label) + "</b>"
         + (s.start ? "<span>" + short(s.start, s.end) + "</span>" : "") + "</li>";
     }).join("");
