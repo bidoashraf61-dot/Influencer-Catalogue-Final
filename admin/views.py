@@ -2230,8 +2230,10 @@ MARGIN_JS = """<script>
       var ns=stepOf(nc);
       [].slice.call(document.querySelectorAll('input[name=cost],input[name=p_from],input[name=p_to],input[name=total_from],input[name=total_to]')).forEach(function(i){
         var v=n(i.value); if(v===null) return;
-        var sar=v/rate;
+        // the exact SAR figure is remembered, so switching back and forth loses nothing
+        var sar=(i.dataset.shown===i.value&&i.dataset.sar)?parseFloat(i.dataset.sar):v/rate;
         i.value=num(i.name==='cost'?sar*nr:Math.round(sar*nr/ns)*ns);
+        i.dataset.sar=String(sar); i.dataset.shown=i.value;
       });
       rate=nr; cur=nc; step=ns;
       m.setAttribute('data-rate',String(nr)); m.setAttribute('data-cur',nc);
