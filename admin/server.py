@@ -1373,6 +1373,11 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             margin = None
 
+        raw_max = "".join(ch for ch in (f.get("margin_max") or "") if ch.isdigit() or ch == ".")
+        try:
+            margin_max = round(float(raw_max), 2) if raw_max else None
+        except ValueError:
+            margin_max = None
         codes, prices, costs = [], {}, {}
         known = {c["code"] for c in db.list_creators()}
         cost_in = f.get("cost") or []
@@ -1395,15 +1400,21 @@ class Handler(BaseHTTPRequestHandler):
                 rate = float(fx.rates().get(cur, 1.0))
                 step_c = {"USD": 5, "EGP": 50}.get(cur, 10)
                 costs[code] = cost if cur == "SAR" else round(cost / rate, 2)
-                auto_c = int(math.ceil(cost * (1 + (margin or 0) / 100.0) / step_c) * step_c)
+                # The client's range: from cost + the minimum margin (the lowest
+                # we accept) up to cost + the maximum margin; one price when
+                # no higher maximum is set.
+                auto_lo = int(math.ceil(cost * (1 + (margin or 0) / 100.0) / step_c) * step_c)
+                auto_hi = (int(math.ceil(cost * (1 + margin_max / 100.0) / step_c) * step_c)
+                           if (margin_max is not None and margin_max > (margin or 0)) else auto_lo)
                 lo_c, hi_c = num(lo), num(hi)
                 typed = lo_c if lo_c is not None else hi_c
-                if typed is not None and abs(typed - auto_c) > step_c:
+                if typed is not None:
                     a, b = (lo_c if lo_c is not None else hi_c), (hi_c if hi_c is not None else lo_c)
-                    prices[code] = sorted([fx.to_sar(a, cur), fx.to_sar(b, cur)])
+                    a, b = min(a, b), max(a, b)
+                if typed is not None and (abs(a - auto_lo) > step_c or abs(b - auto_hi) > step_c):
+                    prices[code] = sorted([fx.to_sar(a, cur), fx.to_sar(b, cur)])      # typed by hand: kept
                 else:
-                    p = fx.to_sar(auto_c, cur)
-                    prices[code] = [p, p]
+                    prices[code] = sorted([fx.to_sar(auto_lo, cur), fx.to_sar(auto_hi, cur)])
                 continue
             # Typed in the selection's currency, kept in SAR.
             lo, hi = fx.to_sar(num(lo), cur), fx.to_sar(num(hi), cur)
@@ -1425,7 +1436,7 @@ class Handler(BaseHTTPRequestHandler):
         name = (f.get("name") or "").strip() or sel["name"]
         db.set_selection_currency(sel["id"], cur)
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
-                          margin=margin, costs=costs)
+                          margin=margin, costs=costs, margin_max=margin_max)
         # A price typed here belongs to THIS selection. Only the ones ticked
         # "make default" also become the creator's price on the roster, so a
         # one-off deal does not silently change what every later selection

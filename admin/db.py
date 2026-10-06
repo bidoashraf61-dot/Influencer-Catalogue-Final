@@ -434,6 +434,10 @@ def migrate(conn):
     # price is worked out from these, so the client never sees either.
     if "margin" not in sel_cols:
         conn.execute("ALTER TABLE selections ADD COLUMN margin REAL")
+    if "margin_max" not in sel_cols:
+        # The top of the client's price range: cost x (1 + margin_max). Empty =
+        # one price at the minimum margin.
+        conn.execute("ALTER TABLE selections ADD COLUMN margin_max REAL")
     if "costs" not in sel_cols:
         conn.execute("ALTER TABLE selections ADD COLUMN costs TEXT")
     if "archived_at" not in sel_cols:
@@ -1546,7 +1550,7 @@ def selection(sid=None, token=None):
 
 
 def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
-                   code_id=None, platform=None, margin=None, costs=None):
+                   code_id=None, platform=None, margin=None, costs=None, margin_max=False):
     """Create (sid None) or update one priced selection. Returns its id.
 
     margin and costs are left as they are when not given, so a client
@@ -1557,12 +1561,13 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
         if sid is None:
             cur = conn.execute(
                 "INSERT INTO selections (token,name,codes,prices,total_from,total_to,"
-                "request_id,code_id,platform,margin,costs,created_at,updated_at) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "request_id,code_id,platform,margin,costs,created_at,updated_at,margin_max) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (secrets.token_urlsafe(9), name, json.dumps(codes), json.dumps(prices),
                  total_from, total_to, request_id, code_id, platform,
                  margin if margin is not None else last_margin(conn),
-                 json.dumps(costs or {}), now(), now()))
+                 json.dumps(costs or {}), now(), now(),
+                 None if margin_max is False else margin_max))
             return cur.lastrowid
         conn.execute(
             "UPDATE selections SET name=?, codes=?, prices=?, total_from=?, total_to=?, "
@@ -1572,6 +1577,8 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
         if margin is not None or costs is not None:
             conn.execute("UPDATE selections SET margin=?, costs=? WHERE id=?",
                          (margin, json.dumps(costs or {}), sid))
+        if margin_max is not False:        # not given = left as it is; None = cleared
+            conn.execute("UPDATE selections SET margin_max=? WHERE id=?", (margin_max, sid))
         return sid
 
 

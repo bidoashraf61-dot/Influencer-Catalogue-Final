@@ -1996,6 +1996,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     costs = json.loads((sel["costs"] if "costs" in keys else None) or "{}")
     margin = sel["margin"] if "margin" in keys else None
     margin_txt = "" if margin is None else ("%g" % margin)
+    mmax = sel["margin_max"] if "margin_max" in keys else None
+    margin_max_txt = "" if mmax is None else ("%g" % mmax)
     note = ""
     if error:
         note += "<div class='err'>" + e(error) + "</div>"
@@ -2086,13 +2088,16 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + money_c(lo_sum, hi_sum) + "). Type your own figure to override it; clear it to follow the creators again.</div></div>"
         + "</div></div>"
         + "<div class='card'><div class='row'>"
-          "<div><label>Profit margin (%)</label><div class='margin-box'>"
+          "<div style='display:flex;gap:10px'><div><label>Minimum margin (%)</label><div class='margin-box'>"
           "<input name='margin' id='sel-margin' data-cur='" + cur + "' data-rate='" + str(usable.get(cur, 1))
-        + "' value='" + margin_txt + "' placeholder='e.g. 30' "
-          "inputmode='decimal'></div>"
-          "<div class='price-hint'>Added on top of each creator's cost. Client price = cost × "
-          "(1 + margin), rounded up to the next " + str(step_c) + " " + cur + ". Internal only — the client never sees "
-          "the cost or the margin.</div></div>"
+        + "' value='" + margin_txt + "' placeholder='e.g. 40' "
+          "inputmode='decimal'></div></div>"
+          "<div><label>Maximum margin (%)</label><div class='margin-box'>"
+          "<input name='margin_max' id='sel-margin-max' value='" + margin_max_txt + "' placeholder='e.g. 70' inputmode='decimal'></div></div></div>"
+          "<div class='price-hint'>Cost to us is what we pay the creator, with no profit in it. The client's price runs from "
+          "<b>cost + minimum margin</b> (the lowest price that still covers our profit) up to <b>cost + maximum margin</b>, "
+          "rounded up to the next " + str(step_c) + " " + cur + ". Leave the maximum empty for one price. "
+          "You can type any creator's range, or the total, yourself. Internal only — the client sees only the range.</div></div>"
           "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
           "</div></div>"
         + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
@@ -2126,7 +2131,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
 # (db.client_price), so what is shown here is what gets stored.
 MARGIN_JS = """<script>
 (function(){
-  var m=document.getElementById('sel-margin'), sum=document.getElementById('sel-money');
+  var m=document.getElementById('sel-margin'), mx=document.getElementById('sel-margin-max'), sum=document.getElementById('sel-money');
   if(!m||!sum) return;
   // Everything on this page is in the selection's currency: costs, prices,
   // profit and totals. (Stored in SAR underneath; the catalogue shows the
@@ -2142,22 +2147,27 @@ MARGIN_JS = """<script>
   var rows=[].slice.call(document.querySelectorAll('.sel-table tbody tr')).filter(function(r){
     return r.querySelector('input[name=cost]');});
   var tf=document.querySelector('input[name=total_from]'), tt=document.querySelector('input[name=total_to]');
-  // On load: a price that differs from cost + margin was typed by hand; keep it.
-  (function(){
-    var mg=n(m.value);
+  // The range from the two margins: [cost + minimum margin, cost + maximum margin].
+  function autoRange(cost){
+    var mg=n(m.value), mgx=mx?n(mx.value):null, lo=price(cost,mg);
+    return [lo,(mgx!==null&&mgx>(mg||0))?price(cost,mgx):lo];
+  }
+  // A price range that differs from the automatic one was typed by hand; keep it.
+  function detectManual(){
     rows.forEach(function(r){
-      var cost=n(r.querySelector('input[name=cost]').value), lo=n(r.querySelector('input[name=p_from]').value);
-      if(cost!==null&&lo!==null&&Math.abs(lo-price(cost,mg))>step) r.dataset.manual='1';
+      var cost=n(r.querySelector('input[name=cost]').value), lo=n(r.querySelector('input[name=p_from]').value), hi=n(r.querySelector('input[name=p_to]').value);
+      if(cost!==null&&lo!==null){ var a=autoRange(cost); if(Math.abs(lo-a[0])>step||Math.abs((hi===null?lo:hi)-a[1])>step) r.dataset.manual='1'; }
     });
-  })();
+  }
+  detectManual();
   var totalsSet=false;
   function rowPrice(r,mg){
     var c=r.querySelector('input[name=cost]'), lo=r.querySelector('input[name=p_from]'), hi=r.querySelector('input[name=p_to]');
     var cost=n(c.value), loV=n(lo.value), hiV=n(hi.value), manual=r.dataset.manual==='1';
     if(cost!==null&&!manual){
-      var p=price(cost,mg);
-      lo.value=hi.value=num(p); lo.dataset.auto=hi.dataset.auto='1';
-      return {cost:cost,lo:p,hi:p,auto:true};
+      var a=autoRange(cost);
+      lo.value=num(a[0]); hi.value=num(a[1]); lo.dataset.auto=hi.dataset.auto='1';
+      return {cost:cost,lo:a[0],hi:a[1],auto:true};
     }
     if(lo.dataset.auto&&cost===null){lo.value='';hi.value='';delete lo.dataset.auto;delete hi.dataset.auto;loV=hiV=null;}
     if(loV!==null||hiV!==null){
@@ -2169,29 +2179,29 @@ MARGIN_JS = """<script>
     return {cost:cost,lo:null,hi:null};
   }
   function run(){
-    var mg=n(m.value), tc=0, tpc=0, tlo=0, thi=0, costed=0, counted=0;
+    var mg=n(m.value), tc=0, tpl=0, tph=0, tlo=0, thi=0, costed=0, counted=0;
     rows.forEach(function(r){
       var out=r.querySelector('.profit'), gone=r.querySelector('input[name=drop]').checked, x=rowPrice(r,mg);
       out.textContent='';
       if(x.lo!==null){
-        var mid=(x.lo+x.hi)/2;
         if(x.cost!==null){
-          var pr=mid-x.cost, pc=x.cost?pr/x.cost*100:0;
-          out.textContent=(pr>=0?'+':'')+fmt(pr)+' profit · '+(Math.round(pc*10)/10)+'% margin'+(x.manual?' (your price)':'');
-          out.style.color=pr<0?'#c01010':'';
+          var p1=x.lo-x.cost, p2=x.hi-x.cost, m1=x.cost?p1/x.cost*100:0, m2=x.cost?p2/x.cost*100:0;
+          function sg(v){return (v>=0?'+':'')+num(v);}
+          out.textContent=(p1===p2?sg(p1):sg(p1)+' to '+sg(p2))+' '+cur+' profit · '+(p1===p2?(Math.round(m1*10)/10):(Math.round(m1*10)/10)+'–'+(Math.round(m2*10)/10))+'% margin'+(x.manual?' (your price)':'');
+          out.style.color=p1<0?'#c01010':'';
         } else if(x.standard) out.textContent='standard price';
       }
       if(gone) return;
       if(x.lo!==null){tlo+=x.lo;thi+=x.hi;counted++;}
-      if(x.cost!==null&&x.lo!==null){tc+=x.cost;tpc+=(x.lo+x.hi)/2;costed++;}
+      if(x.cost!==null&&x.lo!==null){tc+=x.cost;tpl+=x.lo;tph+=x.hi;costed++;}
     });
-    var profit=tpc-tc, margin=tc?profit/tc*100:0;
+    var pl=tpl-tc, ph=tph-tc, ml=tc?pl/tc*100:0, mh=tc?ph/tc*100:0, same=Math.round(pl)===Math.round(ph);
     var priceTxt=counted?(thi>tlo?fmt(tlo)+' – '+fmt(thi):fmt(tlo)):'—';
     sum.innerHTML=(costed||counted)?(
       (costed?'<div><dt>Cost ('+costed+')</dt><dd>'+fmt(tc)+'</dd></div>':'')+
       '<div><dt>Client price ('+counted+')</dt><dd>'+priceTxt+'</dd></div>'+
-      (costed?'<div><dt>Profit</dt><dd class="gain">'+fmt(profit)+'</dd></div>'+
-        '<div><dt>Margin on cost</dt><dd class="gain">'+(Math.round(margin*10)/10)+'%</dd></div>':'')):
+      (costed?'<div><dt>Profit'+(same?'':' (min – max)')+'</dt><dd class="gain">'+(same?fmt(pl):fmt(pl)+' – '+fmt(ph))+'</dd></div>'+
+        '<div><dt>Margin on cost</dt><dd class="gain">'+(same?(Math.round(ml*10)/10)+'%':(Math.round(ml*10)/10)+'% – '+(Math.round(mh*10)/10)+'%')+'</dd></div>':'')):
       '<div><dt>Profit</dt><dd class="muted" style="font-size:14px;font-weight:400">'+
       'Type a cost and a price against a creator to see it.</dd></div>';
     // The total the client sees follows the prices, unless typed by hand.
@@ -2204,9 +2214,10 @@ MARGIN_JS = """<script>
       if(tf.dataset.manual!=='1'){tf.value=num(tlo);tt.value=num(thi);}
     }
   }
+  function detectManual0(){}      // margins changed: rows that follow the margins simply follow them
   document.addEventListener('input',function(e){
     var t=e.target;
-    if(t===m||t.name==='cost') run();
+    if(t===m||t===mx||t.name==='cost'){ if(t===m||t===mx) detectManual0(); run(); }
     else if(t.name==='p_from'||t.name==='p_to'){
       var r=t.closest('tr'), cost=n(r.querySelector('input[name=cost]').value), pl=r.querySelector('input[name=p_from]'), ph=r.querySelector('input[name=p_to]');
       // One price typed = a fixed price: the other box was only auto-filled, so it follows.
@@ -2239,11 +2250,7 @@ MARGIN_JS = """<script>
       m.setAttribute('data-rate',String(nr)); m.setAttribute('data-cur',nc);
       [].slice.call(document.querySelectorAll('.cur-lbl')).forEach(function(l){l.textContent=nc;});
       rows.forEach(function(r){delete r.dataset.manual;});
-      var mg=n(m.value);
-      rows.forEach(function(r){   // a price that is not cost + margin stays as typed
-        var cost=n(r.querySelector('input[name=cost]').value), lo=n(r.querySelector('input[name=p_from]').value);
-        if(cost!==null&&lo!==null&&Math.abs(lo-price(cost,mg))>step) r.dataset.manual='1';
-      });
+      detectManual();             // a price that is not cost + margins stays as typed
       totalsSet=true;                    // a total that follows the prices stays that way; a typed one stays typed
       run();
     });
