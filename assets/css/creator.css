@@ -31,7 +31,7 @@
   content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .5;
   background: repeating-radial-gradient(circle at 85% 20%, transparent 0 18px, rgba(18,18,18,.035) 18px 19px);
 }
-.pp-photo { position: relative; z-index: 1; aspect-ratio: 4 / 5; border-radius: var(--r-md); overflow: hidden; background: var(--ink); align-self: start; }
+.pp-photo { position: relative; z-index: 1; aspect-ratio: 1 / 1; border-radius: var(--r-md); overflow: hidden; background: var(--ink); align-self: start; }
 .pp-photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .pp-photo__none { position: absolute; inset: 0; display: grid; place-items: center; font-family: var(--heading); font-size: 40px; color: var(--lime); }
 .pp-fields { position: relative; z-index: 1; display: flex; flex-direction: column; min-width: 0; }

@@ -440,7 +440,7 @@
 .mx-carousel__track { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(200px, 230px); gap: 16px; overflow-x: auto;
   scroll-snap-type: x mandatory; padding: 4px 2px 14px; scrollbar-width: thin; }
 .mx-cc { scroll-snap-align: start; border-radius: var(--r-md); background: var(--linen); overflow: hidden; display: flex; flex-direction: column; }
-.mx-cc__photo { display: block; aspect-ratio: 4 / 5; background: #ddd5cb; }
+.mx-cc__photo { display: block; aspect-ratio: 1 / 1; background: #ddd5cb; }
 .mx-cc__photo img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .mx-cc__body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 4px; }
 .mx-cc__name { font-family: var(--heading); font-size: 26px; line-height: 1; color: var(--ink); text-decoration: none; }

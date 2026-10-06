@@ -328,12 +328,14 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 .cat-card[aria-pressed="true"] { border-color: var(--lime); box-shadow: 0 0 0 4px rgba(232,255,118,.5); }
 
 .cat-card__media {
-  position: relative; aspect-ratio: 4 / 5; background: var(--ink);
+  /* Square, like every profile photo: a 4:5 frame zoomed each one 25% and
+     cut 10% off both sides, which made small sources pixelate further. */
+  position: relative; aspect-ratio: 1 / 1; background: var(--ink);
   overflow: hidden;  /* the blurred bed is inset -14% and would otherwise bleed onto the card body */
 }
 .cat-card__photo {
   position: absolute; inset: 0;
-  background-size: cover; background-position: center top;
+  background-size: cover; background-position: center;
   background-repeat: no-repeat;
 }
 /* Instagram returns 100px for a third of these accounts. Upscaling that to a
