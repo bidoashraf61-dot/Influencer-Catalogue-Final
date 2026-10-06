@@ -685,6 +685,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_content_update()
         if path == "/campaigns/content/bulk":
             return self.post_content_bulk()
+        if path == "/campaigns/content/pending":
+            return self.post_content_pending()
         if path == "/campaigns/insights/decide":
             return self.post_insight_decide()
         if path == "/campaigns/insights/upload":
@@ -1285,7 +1287,8 @@ class Handler(BaseHTTPRequestHandler):
         Each change is its own entry in History, so each can be undone."""
         f = self.form_body(multi=("drop",))
         keep = (f.get("keep") or "").strip().upper()
-        drops = [d.strip().upper() for d in (f.get("drop") or []) if d.strip().upper() != keep]
+        raw = f.get("drop") or []
+        drops = [d.strip().upper() for d in ([raw] if isinstance(raw, str) else raw) if d.strip().upper() != keep]
         if not keep or not drops or db.creator(keep) is None:
             return self.redirect("/roster?tab=dupes&e=" + urllib.parse.quote("Pick the creator to keep."))
         done = []
@@ -1866,6 +1869,28 @@ class Handler(BaseHTTPRequestHandler):
         thumbs.fill_later(k["id"])
         return self.redirect(back + "&ok=" + urllib.parse.quote(
             "Post added." if created else "That post was already here — its numbers were updated."))
+
+    def post_content_pending(self):
+        f = self.form_body(multi=("code", "pending_status", "pending_date"))
+        cid = (f.get("id") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None:
+            return self.redirect("/campaigns")
+        codes, sts, dts = f.get("code") or [], f.get("pending_status") or [], f.get("pending_date") or []
+        as_list = lambda v: [v] if isinstance(v, str) else v
+        codes, sts, dts = as_list(codes), as_list(sts), as_list(dts)
+        mine = {m["cc_code"] for m in db.campaign_creators(k["id"])}
+        pending = {}
+        for i, code in enumerate(codes):
+            code = code.strip().upper()
+            if code not in mine:
+                continue
+            st = (sts[i] if i < len(sts) else "").strip()
+            dt = (dts[i] if i < len(dts) else "").strip()
+            pending[code] = (st if st in db.PENDING_STATUSES else None,
+                             dt if db.day_bounds(dt, None) is not None else None)
+        db.set_pending(k["id"], pending)
+        return self.redirect("/campaigns/content?id=%d&ok=%s#add=status" % (k["id"], urllib.parse.quote("Saved.")))
 
     def post_content_bulk(self):
         """Paste many post links for one creator, or paste a block of numbers.
@@ -3060,6 +3085,7 @@ TRACKED = {
     "/campaigns/content/add": ("campaign", "id", "Added a post"),
     "/campaigns/content/update": ("campaign", "id", "Changed a post"),
     "/campaigns/content/bulk": ("campaign", "id", "Bulk-added posts or numbers"),
+    "/campaigns/content/pending": ("campaign", "id", "Updated who is still to post"),
     "/campaigns/insights/decide": ("campaign", "id", "Reviewed insights"),
     "/campaigns/insights/upload": ("campaign", "id", "Uploaded insights"),
     "/campaigns/sync": ("campaign", "id", "Synced campaign creators"),

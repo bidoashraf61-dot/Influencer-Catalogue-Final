@@ -578,11 +578,11 @@ def login_page(error=None, base=None):
         HEAD
         + "<title>Sign in — " + e(NAME) + "</title>"
         + '<link rel="stylesheet" href="' + u("/static/admin.css") + '"></head><body>'
-        + '<main class="wrap login">'
+        + '<main class="wrap login" style="max-width:400px;margin:12vh auto 0;padding:0 20px">'
         + '<img src="' + u("/static/logo.webp") + '" alt="HelloVoice" height="30" '
           'style="margin-bottom:22px">'
         + "<h1>" + e(NAME) + "</h1>"
-        + "<p class='sub'>Sign in to manage codes, roster and requests.</p>"
+        + "<p class='sub'>Selections, campaigns, creators and clients, in one place.</p>"
         + err
         + "<form method='post' action='" + u("/login") + "' class='card'>"
         + "<div style='margin-bottom:14px'><label>Email</label>"
@@ -1627,6 +1627,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         lo, hi = c["price_from"], c["price_to"]
         if not (lo or hi):
             return ""
+        lo, hi = lo or hi, hi or lo
         txt = format(lo, ",") if lo == hi else format(lo, ",") + "–" + format(hi, ",")
         return "<br><span class='pill own' title='Own price per video'>" + txt + " SAR</span>"
 
@@ -2808,7 +2809,7 @@ def _head(k, tab, error=None, message=None):
     act = ("<form method='post' action='" + u("/selections/new") + "'><input type='hidden' name='mode' value='from_campaign'>"
            "<input type='hidden' name='campaign' value='" + str(k["id"]) + "'>"
            "<button class='btn ghost' title='Make a priced selection from this campaign&#39;s creators'>"
-           + ui.icon("list", 15) + " Selection from this campaign</button></form>") if tab == "setup" and not k["selection_name"] else ""
+           + ui.icon("list", 15) + " Selection from this campaign</button></form>") if tab == "setup" and not k["selection_id"] else ""
     return (ui.header(k["name"], desc + " &middot; " + status_pill(k["status"]),
                       crumbs=[("Campaigns", u("/campaigns")), (k["name"], None)], actions=act,
                       tabs=[(u(h) + "?id=" + str(k["id"]), l, None, key == tab) for key, h, l, _d in CAMP_TABS])
@@ -2927,6 +2928,7 @@ def campaign_content_page(k, members, posts, error=None, message=None):
 
 
 def _content_tools(k, members, posts, opts, plats, kinds):
+    import db as db_mod
     """Four ways to get posts and numbers in, on one screen."""
     cid = str(k["id"])
     posted = {}
@@ -2942,18 +2944,20 @@ def _content_tools(k, members, posts, opts, plats, kinds):
             pill = "<span class='pill warn'>%d of %d posted</span>" % (n, want)
         else:
             pill = "<span class='pill dead'>not yet</span>"
+        cur = m["pending_status"] if "pending_status" in m.keys() else None
+        dt = (m["pending_date"] if "pending_date" in m.keys() else "") or ""
+        opts_st = "".join("<option value='%s'%s>%s</option>" % (e(v), " selected" if cur == v else "", e(v or "—"))
+                          for v in [""] + db_mod.PENDING_STATUSES)
         rows.append("<tr><td><strong>" + e(m["name"] or m["cc_code"]) + "</strong><br><span class='muted'>" + e(m["cc_code"])
-                    + "</span></td><td>" + pill + "</td><td class='right'>" + str(n) + (" / " + str(want) if want else "") + "</td>"
-                    + "<td><form method='post' action='" + u("/campaigns/content/bulk") + "' class='inline-add'>"
-                    "<input type='hidden' name='id' value='" + cid + "'><input type='hidden' name='do' value='links'>"
-                    "<input type='hidden' name='code' value='" + e(m["cc_code"]) + "'>"
-                    "<input type='hidden' name='platform' value='" + e(k["platform"] or "Instagram") + "'>"
-                    "<input name='text' placeholder='Paste post link' aria-label='Post link for " + e(m["name"] or m["cc_code"]) + "'>"
-                    "<button class='btn small'>Add</button></form></td></tr>")
+                    + "</span><input type='hidden' name='code' value='" + e(m["cc_code"]) + "'></td><td>" + pill + "</td>"
+                    "<td class='right'>" + str(n) + (" / " + str(want) if want else "") + "</td>"
+                    "<td><select name='pending_status' aria-label='Where the next post is'>" + opts_st + "</select></td>"
+                    "<td><input type='date' name='pending_date' value='" + e(dt) + "' aria-label='When the next post is expected'></td></tr>")
     status = (ui.empty("users", "No creators yet", "Add creators on the Setup tab first.") if not members else
-              "<p class='sec-desc'>Who still owes a post. Paste a link on a row and press Add.</p>"
-              "<table><thead><tr><th>Creator</th><th>Status</th><th class='right'>Posts</th><th>Add a link</th></tr></thead><tbody>"
-              + "".join(rows) + "</tbody></table>")
+              "<p class='sec-desc'>Who still owes a post, where it is, and when to expect it. Change the rows and press Save.</p>"
+              "<form method='post' action='" + u("/campaigns/content/pending") + "'><input type='hidden' name='id' value='" + cid + "'>"
+              "<table><thead><tr><th>Creator</th><th>Posting</th><th class='right'>Posts</th><th>Next post is</th><th>Expected on</th></tr></thead><tbody>"
+              + "".join(rows) + "</tbody></table><button class='btn lime' style='margin-top:12px'>Save</button></form>")
     links = ("<p class='sec-desc'>Several posts from one creator at once. One link per line.</p>"
              "<form method='post' action='" + u("/campaigns/content/bulk") + "'>"
              "<input type='hidden' name='id' value='" + cid + "'><input type='hidden' name='do' value='links'>"

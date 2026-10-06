@@ -368,6 +368,9 @@ details.card summary::-webkit-details-marker{display:none}
   .app.nav-open .scrim{display:block;position:fixed;inset:0;background:rgba(18,18,18,.45);z-index:35}
   .page{padding:20px 16px 90px}
   .bar{padding:0 12px}
+  .bar .crumbs{overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+  .bar .search-btn,.bar .iconbtn{flex:none}
+  .bar .grow{flex:1 1 0;min-width:0}
   .search-btn{min-width:0;flex:none;width:38px;padding:0;justify-content:center}
   .search-btn span,.search-btn kbd{display:none}
   .card{overflow-x:auto}
