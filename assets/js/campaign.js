@@ -592,7 +592,7 @@
     if (info) info.setAttribute("data-info", "Scored for this campaign's objective: " + o.label + ". Each creator gets a score out of 100 — "
       + Math.round(w.exposure * 100) + "% reach and views (compared with the best in the campaign), "
       + Math.round(w.engagement * 100) + "% engagement (compared with the best), "
-      + Math.round(w.er * 100) + "% engagement rate against the benchmark for creators of their size, and "
+      + Math.round(w.er * 100) + "% engagement rate (reactions per view, compared with the best in the campaign), and "
       + (w.clicks > 0 ? Math.round(w.clicks * 100) + "% affiliate clicks (compared with the best)" : "no clicks — this campaign has no tracking links") + ". The top three get gold, silver and bronze; creators who have not posted yet are listed last.");
     var tag = $("mx-objective");
     if (tag) tag.textContent = "Scored for " + o.label;

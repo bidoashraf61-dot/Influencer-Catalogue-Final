@@ -3398,9 +3398,9 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
               "<p><strong>Value floor</strong> = budget ÷ the most a client should pay per 1,000 views, per engagement or per click. "
               "<strong>Target</strong> = the lower of the floor and the safe estimate.</p>"
               "<p><strong>Creator score</strong> on the report (0–100), weighted by the objective — awareness: exposure 55, "
-              "engagement 15, engagement rate vs size 20, clicks 10 · engagement: 15 / 40 / 35 / 10 · traffic: 15 / 15 / 20 / 50 · "
+              "engagement 15, engagement rate 20, clicks 10 · engagement: 15 / 40 / 35 / 10 · traffic: 15 / 15 / 20 / 50 · "
               "balanced: 35 / 25 / 25 / 15. Exposure and engagement are against the best creator in the campaign; "
-              "the rate against the strong benchmark for the creator's size.</p></div>"
+              "the rate (reactions per view) the same way. Nothing is compared with followers or outside benchmarks.</p></div>"
             + "<details id='library' style='margin-top:20px'><summary><strong>Benchmark library</strong> — edit the guide ranges</summary>"
               "<form method='post' action='" + u("/planner/library") + "' class='card' style='margin-top:10px'>"
               + ("<input type='hidden' name='back' value='" + str(k["id"]) + "'>" if k else "")

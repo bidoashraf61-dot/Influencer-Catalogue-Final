@@ -436,7 +436,7 @@
   function scoreTip() {
     var w = weights(), o = (R.objective || {}).label || "Balanced";
     return "Score out of 100, weighted for the " + o + " objective: views & reach " + Math.round(w.exposure * 100) + ", engagement " + Math.round(w.engagement * 100)
-      + ", engagement rate against the strong mark for the creator's size " + Math.round(w.er * 100) + (w.clicks > 0 ? ", link clicks " + Math.round(w.clicks * 100) : "")
+      + ", engagement rate (reactions per view, against the best creator) " + Math.round(w.er * 100) + (w.clicks > 0 ? ", link clicks " + Math.round(w.clicks * 100) : "")
       + ". Views and engagement are measured against the best creator in the campaign.";
   }
   function renderPosts(list) {
@@ -498,7 +498,7 @@
       // Scoring as one bar: each part's share of the 100 points. Clicks only
       // when the campaign tracks links.
       var w = weights(), parts = [["Views & reach", w.exposure, "#14884a", "vs the top creator"], ["Engagement", w.engagement, "#ff691e", "likes + comments vs the top creator"],
-        ["Engagement rate", w.er, "#b9d400", "vs the strong mark for their size"]];
+        ["Engagement rate", w.er, "#b9d400", "reactions per view vs the best creator"]];
       if (w.clicks > 0) parts.push(["Link clicks", w.clicks, "#121212", "vs the top creator"]);
       out += '<h3>How creators are scored · out of 100</h3><div class="db-scorebar">' + parts.map(function (x) {
         return '<i style="flex:' + x[1] + ";background:" + x[2] + '"><b>' + Math.round(x[1] * 100) + "</b></i>"; }).join("") + '</div><div class="db-scorekey">'

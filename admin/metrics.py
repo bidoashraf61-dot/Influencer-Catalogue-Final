@@ -489,12 +489,14 @@ def objective_of(campaign):
 def scoreboard(creators, bm, weights=None):
     """A 0–100 score per creator, so the leaderboard ranks results rather
     than audience size alone. Four parts, weighted by the campaign's
-    objective (OBJECTIVES; balanced = 35/25/25/15):
+    objective (OBJECTIVES; balanced = 35/25/25/15). Every part is measured
+    against the OTHER creators in this campaign — never against followers or
+    an outside benchmark — as the share of the best creator's result:
 
       exposure (views for videos, reach for posts) against the best in the campaign
-      engagement against the best in the campaign
-      engagement rate against the creator's own tier benchmark
-           (meeting the "good" mark = full points, capped)
+      engagement (likes + comments) against the best in the campaign
+      engagement rate = reactions per view, against the best in the campaign
+           (posts with hidden likes are left out, never counted as zero)
       link clicks against the best in the campaign
 
     Creators with no counted posts score 0 and are ranked last."""
@@ -503,13 +505,17 @@ def scoreboard(creators, bm, weights=None):
         return max([c[key] or 0 for c in creators] + [0]) or 1
     pe = max([c.get("seen") or 0 for c in creators] + [0]) or 1
     pg, pc = peak("engagement"), peak("clicks")
+
+    def per_view(c):
+        # reactions per view: videos first, else per impression for photos
+        r = c["video_er"] if c.get("video_er") is not None else c.get("imp_er")
+        return r or 0
+    pr = max([per_view(c) for c in creators] + [0]) or 1
     for c in creators:
         if not c["posts"]:
             c["score"] = 0.0
             continue
-        rate = c["er"] if c["er"] is not None else c["video_er"]
-        target = bm["er"][c["band"]][0] if c["er"] is not None else bm["video_er"][0]
-        quality = min(1.0, (rate or 0) / target) if target else 0
+        quality = per_view(c) / pr
         c["parts"] = {"exposure": round(100 * w[0] * (c.get("seen") or 0) / pe, 1),
                       "engagement": round(100 * w[1] * (c["engagement"] or 0) / pg, 1),
                       "er": round(100 * w[2] * quality, 1),
