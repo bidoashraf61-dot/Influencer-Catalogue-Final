@@ -158,7 +158,7 @@
     });
   }
   // No campaigns yet: say what will appear here and how to get started,
-  // with a faded preview of a campaign card.
+  // with a full-strength preview of a campaign card.
   function showNone() {
     $("mx-list-sum").innerHTML = "";
     $("mx-list-lede").textContent = "Your campaigns will appear here as soon as HelloVoice starts one for you.";
