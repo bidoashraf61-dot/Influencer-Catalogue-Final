@@ -500,7 +500,7 @@
           + '<td class="r muted">' + range(i.key) + "</td><td>" + sig(met ? "good" : i.grade) + "</td></tr>";
       }).join("");
       var out = head + objectiveBox() + (items.length ? '<h3>Targets agreed</h3><table class="db-table db-goals-t"><thead><tr><th>KPI</th><th class="r">Minimum agreed</th><th class="r">Now</th><th>Progress</th><th class="r">Benchmark range</th><th></th></tr></thead><tbody>' + rows + "</tbody></table>"
-        + '<div class="db-legend2"><span><i class="tick"></i>Where it should be today</span><span><i class="sw" style="background:#14884a"></i>Met / on track</span><span><i class="sw" style="background:#e2780f"></i>Close</span><span><i class="sw" style="background:#ee1515"></i>Behind</span><span class="db-legend2__txt">Minimum agreed = what we commit to · Benchmark = typical for these creators</span></div>'
+        + '<div class="db-legend2"><span><i class="tick"></i>Where it should be today</span><span><i class="sw" style="background:#14884a"></i>Met / on track</span><span><i class="sw" style="background:#e2780f"></i>Close</span><span><i class="sw" style="background:#ee1515"></i>Behind</span></div>'
         : '<p class="db-note">No targets set for this campaign yet.</p>');
       // Benchmarks as gauges: the shaded band is the normal range for these
       // creators, the dot is where the campaign is now.
