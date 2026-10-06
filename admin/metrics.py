@@ -34,11 +34,16 @@ import db
 import plans
 
 DEFAULT_FACTORS = {"reach_per_engagement": 10.0, "story_view_rate": 0.05,
-                   "impressions_per_reach": 1.5, "video_reach_per_view": 0.40}
+                   "impressions_per_reach": 1.5, "video_reach_per_view": 0.40,
+                   "report_reach_per_view": 0.90}
 # video_reach_per_view: unique people ÷ plays for an Instagram reel. Our first
 # 5 posts with real insights (Oct 2026) measured 20–22% on the big creators and
 # 59–79% on the small ones, 22% overall by views and 40% on a simple average;
-# 40% is the working estimate until more insights arrive. Editable in Settings.
+# 40% is the working estimate used when PLANNING a campaign. Editable in Settings.
+# report_reach_per_view: what a campaign report assumes for a reel whose real viewers
+# are not known yet — kept just below its views (a small margin) until the creator's
+# insights arrive and replace it with the measured number. Reports only; planning
+# keeps video_reach_per_view.
 EMV_ACTIONS = ["impressions", "views", "likes", "comments", "shares", "saves", "clicks"]
 
 
@@ -160,7 +165,7 @@ def post_numbers(c, f):
 
     if video:
         out["reach"] = int(ins["reach"]) if ins.get("reach") else \
-            int(round((views or 0) * f.get("video_reach_per_view", DEFAULT_FACTORS["video_reach_per_view"])))
+            int(round((views or 0) * f.get("report_reach_per_view", DEFAULT_FACTORS["report_reach_per_view"])))
         out["impressions"] = 0           # video exposure is counted as views
         out["reach_real"] = bool(ins.get("reach"))
     else:
@@ -713,6 +718,7 @@ def client_report(campaign, photo=None, photo_large=None):
     out["progress"]["all_met"] = bool(its) and all(i["actual"] >= i["goal"] for i in its)
     reach_by = {c["code"]: (c.get("reach") or 0) + (c.get("views") or 0) for c in r["creators"]}
     out["audience"] = audience_mix(r["creators"], reach_by)
+    out["reach_basis"] = {"per_view": factors()["report_reach_per_view"]}
     if vis["clicks"]:
         cl = r["clicks"]
         out["clicks"] = {kk: cl[kk] for kk in ("clicks", "uniques", "by_day", "by_app", "by_device",
