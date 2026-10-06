@@ -150,6 +150,7 @@ border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;text
 .btn.ghost{background:transparent;color:var(--ink)}
 .btn.small{padding:6px 14px;font-size:13px}
 .badge{display:inline-block;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;
+.badge[hidden]{display:none}
   background:var(--red);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;
   vertical-align:1px}
 .toast{position:fixed;right:18px;bottom:18px;z-index:50;max-width:360px;padding:14px 18px;border-radius:12px;
@@ -413,6 +414,8 @@ def page(title, body, active=""):
                                                     "api": u("/api/pulse"),
                                                     "requests": u("/requests"),
                                                     "a_latest": pulse.get("a_latest", 0),
+                                                    "a_creator": pulse.get("a_creator", ""),
+                                                    "a_client": pulse.get("a_client", ""),
                                                     "analysis": u("/analysis")})
         + ";" + PULSE_JS + "</script></body></html>"
     )
@@ -494,7 +497,8 @@ PULSE_JS = """
   });
   show({open:+(document.getElementById('req-badge')||{}).textContent||0, latest:P.latest,
         company:P.company, count:P.count,
-        a_open:+(document.getElementById('an-badge')||{}).textContent||0, a_latest:P.a_latest||0});
+        a_open:+(document.getElementById('an-badge')||{}).textContent||0, a_latest:P.a_latest||0,
+        a_creator:P.a_creator, a_client:P.a_client});
   setInterval(poll,20000);
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) poll(); });
 })();
