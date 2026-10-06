@@ -449,12 +449,15 @@ def weights_for(objective, has_links):
 
 
 def has_links(campaign, clicks=None):
-    """True when the campaign tracks link clicks: a destination is set or it
-    has active tracking links."""
+    """True when the campaign tracks link clicks: a destination is set, or an
+    active link has a destination of its own."""
     if campaign["destination"]:
         return True
     with db.connect() as conn:
-        return bool(conn.execute("SELECT 1 FROM links WHERE campaign_id = ? AND active = 1 LIMIT 1",
+        # Every creator gets an automatic link, but it leads nowhere until a
+        # destination is set — only a link with its own destination counts.
+        return bool(conn.execute("SELECT 1 FROM links WHERE campaign_id = ? AND active = 1 "
+                                 "AND destination IS NOT NULL AND destination != '' LIMIT 1",
                                  (campaign["id"],)).fetchone())
 
 
