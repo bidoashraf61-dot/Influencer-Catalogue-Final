@@ -455,3 +455,15 @@
 .db-top .db-rank { padding: 2px 8px; column-gap: 12px; }
 .db-top .db-top__cols { padding: 0 6px 6px; }
 .db-top .db-card__body { gap: 0; }
+
+/* the verdict: big, solid and impossible to miss */
+.db-verdict { font-family: var(--heading); font-weight: 400; font-size: 26px; letter-spacing: .05em; line-height: 1; text-transform: uppercase;
+  gap: 10px; padding: 9px 8px 8px 16px; border-radius: 999px; box-shadow: 0 6px 18px rgba(18,18,18,.12); }
+.db-verdict::before { width: 11px; height: 11px; background: #fff; animation: db-verdict-pulse 2.2s ease-out infinite; }
+.db-verdict__pct { font-weight: 400; font-size: 24px; letter-spacing: .02em; background: rgba(255,255,255,.95); color: var(--ink); border-radius: 999px; padding: 4px 12px 3px; margin-left: 2px; }
+.db-verdict--good { background: var(--go); color: #fff; }
+.db-verdict--moderate { background: #e2780f; color: #fff; }
+.db-verdict--low { background: #e0241f; color: #fff; }
+@keyframes db-verdict-pulse { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,.7); } 70%, 100% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } }
+@media (prefers-reduced-motion: reduce) { .db-verdict::before { animation: none; } }
+@media (max-width: 640px) { .db-verdict { font-size: 20px; padding: 7px 6px 6px 12px; } .db-verdict__pct { font-size: 18px; padding: 3px 9px 2px; } }
