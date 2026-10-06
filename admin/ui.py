@@ -352,6 +352,12 @@ details.card summary::-webkit-details-marker{display:none}
 .mini-steps{display:flex;gap:5px;margin-bottom:4px}
 .mini-steps span{width:20px;height:20px;border-radius:50%;background:#ece9e3;display:grid;place-items:center;color:#fff}
 .mini-steps span.on{background:var(--green)}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.startbox{border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:10px;background:var(--surface-2,transparent)}
+.startbox h3{margin:0;font-size:15px}
+@media(max-width:760px){.two{grid-template-columns:1fr}}
+.inline-add{display:flex;gap:8px;align-items:center}.inline-add input{min-width:220px;flex:1}
+.card.flat{border:0;box-shadow:none;padding:0;background:transparent}
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
 /* ---- small screens ---- */
 .scrim{display:none}

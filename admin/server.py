@@ -462,7 +462,8 @@ class Handler(BaseHTTPRequestHandler):
                 query.get("e"), query.get("ok"), db.campaigns_for_selection(sel["id"])))
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
-                db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok")))
+                db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok"),
+                selections=db.list_selections()))
         if path in ("/campaigns/content", "/campaigns/report", "/campaigns/insights",
                     "/campaigns/export.xlsx", "/campaigns/export.csv", "/campaigns/insight-file"):
             cid = query.get("id", "")
@@ -682,6 +683,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_content_add()
         if path == "/campaigns/content/update":
             return self.post_content_update()
+        if path == "/campaigns/content/bulk":
+            return self.post_content_bulk()
         if path == "/campaigns/insights/decide":
             return self.post_insight_decide()
         if path == "/campaigns/insights/upload":
@@ -692,6 +695,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_custom_link()
         if path == "/campaigns/link/toggle":
             return self.post_link_toggle()
+        if path == "/analysis/pdf":
+            return self.post_analysis_pdf()
         if path == "/analysis/upload":
             return self.post_analysis_upload()
         if path == "/analysis/save":
@@ -1437,6 +1442,22 @@ class Handler(BaseHTTPRequestHandler):
                 t["key"] = sid
             return self.redirect("/selections/edit?id=%d&ok=%s#st=creators" % (
                 sid, urllib.parse.quote("Created. Add the creators, then set their prices.")))
+        if f.get("mode") == "from_campaign":
+            cid = (f.get("campaign") or "").strip()
+            k = db.campaign(int(cid)) if cid.isdigit() else None
+            if k is None:
+                return self.redirect("/campaigns")
+            known = {c["code"] for c in db.list_creators()}
+            codes = [m["cc_code"] for m in db.campaign_creators(k["id"]) if m["cc_code"] in known]
+            if not codes:
+                return self.redirect("/campaigns/edit?id=%d&e=%s" % (k["id"], urllib.parse.quote("Add creators to the campaign first.")))
+            name = (k["name"] + " — selection")[:120]
+            with history.tracked("selection", None, "Created selection " + name) as t:
+                sid = db.save_selection(None, name, codes, {}, None, None, code_id=k["code_id"],
+                                        platform=k["platform"] if k["platform"] in db.PLATFORMS else None)
+                t["key"] = sid
+            return self.redirect("/selections/edit?id=%d&ok=%s#st=creators" % (
+                sid, urllib.parse.quote("Created from the campaign. Set the prices.")))
         rid = (f.get("request") or "").strip()
         known = {c["code"] for c in db.list_creators()}
         code_id = None
@@ -1845,6 +1866,69 @@ class Handler(BaseHTTPRequestHandler):
         thumbs.fill_later(k["id"])
         return self.redirect(back + "&ok=" + urllib.parse.quote(
             "Post added." if created else "That post was already here — its numbers were updated."))
+
+    def post_content_bulk(self):
+        """Paste many post links for one creator, or paste a block of numbers.
+        links:   one URL per line.
+        numbers: one line per post — the post URL, then likes comments views
+                 shares saves (any separator; missing ones are left alone)."""
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None:
+            return self.redirect("/campaigns")
+        back = "/campaigns/content?id=%d" % k["id"]
+        text = f.get("text") or ""
+        if f.get("do") == "numbers":
+            def norm(x):
+                return re.sub(r"[?#].*$", "", x.strip()).rstrip("/").lower()
+            by_url = {norm(p["url"]): p for p in db.campaign_content(k["id"])}
+            done = miss = 0
+            for line in text.splitlines():
+                m = re.search(r"https?://\S+", line)
+                if not m:
+                    continue
+                post = by_url.get(norm(m.group(0).rstrip(",;")))
+                if not post:
+                    miss += 1
+                    continue
+                nums = re.findall(r"\d[\d,\.]*", line[m.end():])
+                vals = {}
+                for name, raw in zip(("likes", "comments", "views", "shares", "saves"), nums):
+                    digits = raw.replace(",", "").split(".")[0]
+                    if digits.isdigit():
+                        vals[name] = int(digits)
+                if vals:
+                    db.add_snapshot(post["id"], vals, "manual")
+                    done += 1
+            msg = "Numbers saved on %d post%s." % (done, "" if done == 1 else "s")
+            if miss:
+                msg += " %d link%s did not match a post here — add them first." % (miss, "" if miss == 1 else "s")
+            return self.redirect(back + "&ok=" + urllib.parse.quote(msg))
+        code = (f.get("code") or "").strip().upper()
+        if code not in {m["cc_code"] for m in db.campaign_creators(k["id"])}:
+            return self.redirect(back + "&e=" + urllib.parse.quote("Pick a creator in this campaign."))
+        platform = f.get("platform") if f.get("platform") in db.PLATFORMS else "Instagram"
+        kind = f.get("kind") if f.get("kind") in db.KINDS else "post"
+        posted = db.day_bounds(f.get("posted") or "", None)
+        added = seen = 0
+        for line in text.splitlines():
+            m = re.search(r"https://[^\s,;]+\.[^\s,;]+", line)
+            if not m:
+                continue
+            item = {"code": code, "platform": platform, "kind": kind, "url": m.group(0), "posted_at": posted,
+                    "caption": None, "followers": db.platform_followers(code, platform)}
+            _, created = db.add_content(k["id"], item, source="manual")
+            added += 1 if created else 0
+            seen += 0 if created else 1
+        if added:
+            thumbs.fill_later(k["id"])
+        if not added and not seen:
+            return self.redirect(back + "&e=" + urllib.parse.quote("No links found. Paste one https:// link per line."))
+        msg = "%d post%s added." % (added, "" if added == 1 else "s")
+        if seen:
+            msg += " %d already here." % seen
+        return self.redirect(back + "&ok=" + urllib.parse.quote(msg))
 
     def post_content_update(self):
         f = self.form_body()
@@ -2535,6 +2619,45 @@ class Handler(BaseHTTPRequestHandler):
 
     # --------------------------------------------------- creator analysis --
 
+    def post_analysis_pdf(self):
+        """Profile report PDFs -> analyses. Each file is matched to a creator by
+        the handle in its name (report-<handle>-Oct-06-2026.pdf); with one file
+        a creator can be picked instead."""
+        import profile_pdf
+        f = self.form_body(multi=("file",))
+        parts = [p for p in (f.get("file") or []) if isinstance(p, dict) and p.get("data")]
+        if not parts:
+            return self.redirect("/analysis?e=" + urllib.parse.quote("Choose one or more profile report PDFs.") + "#pdf")
+        if not profile_pdf.available():
+            return self.redirect("/analysis?e=" + urllib.parse.quote(
+                "The PDF reader is not installed on this server yet. Ask whoever deploys the admin to install it.") + "#pdf")
+        creators = db.list_creators()
+        by_handle = {}
+        for c in creators:
+            h = (c["handle"] or "").strip().lstrip("@").lower()
+            if h:
+                by_handle[h] = c["code"]
+        picked = (f.get("code") or "").strip().upper()
+        done, bad = [], []
+        for p in parts:
+            name = p.get("filename") or "file.pdf"
+            m = re.match(r"report-(.+?)-[A-Za-z]{3}-\d\d-\d{4}\.pdf$", name)
+            handle = m.group(1) if m else None
+            code = picked if (len(parts) == 1 and picked) else by_handle.get((handle or "").lower())
+            if not code:
+                bad.append(name + " (no creator with handle " + (handle or "?") + " — pick the creator and upload it alone)")
+                continue
+            try:
+                profile_pdf.import_pdf(p["data"], code, handle, source="profile report PDF")
+                done.append(code)
+            except Exception as ex:
+                bad.append(name + " (" + str(ex)[:120] + ")")
+        msg = "Imported %d analysis%s: %s." % (len(done), "" if len(done) == 1 else "es", ", ".join(done)) if done else ""
+        if bad:
+            return self.redirect("/analysis?%s=%s#pdf" % ("ok" if done else "e", urllib.parse.quote(
+                (msg + " " if msg else "") + "Could not import: " + "; ".join(bad))))
+        return self.redirect("/analysis?ok=" + urllib.parse.quote(msg))
+
     def post_analysis_upload(self):
         f = self.form_body()
         part = f.get("file")
@@ -2936,6 +3059,7 @@ TRACKED = {
     "/campaigns/link/toggle": ("campaign", "id", "Switched a tracking link"),
     "/campaigns/content/add": ("campaign", "id", "Added a post"),
     "/campaigns/content/update": ("campaign", "id", "Changed a post"),
+    "/campaigns/content/bulk": ("campaign", "id", "Bulk-added posts or numbers"),
     "/campaigns/insights/decide": ("campaign", "id", "Reviewed insights"),
     "/campaigns/insights/upload": ("campaign", "id", "Uploaded insights"),
     "/campaigns/sync": ("campaign", "id", "Synced campaign creators"),

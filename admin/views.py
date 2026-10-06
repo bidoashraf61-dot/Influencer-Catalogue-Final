@@ -2390,12 +2390,10 @@ def status_button(k):
             "<button class='" + cls + "'>" + label + "</button></form> ")
 
 
-def campaigns_page(camps, codes, error=None, message=None):
-    note = ""
-    if error:
-        note += "<div class='err'>" + e(error) + "</div>"
-    if message:
-        note += "<div class='ok'>" + e(message) + "</div>"
+def campaigns_page(camps, codes, error=None, message=None, selections=()):
+    note = _notes(error, message)
+    n_live = sum(1 for k in camps if k["status"] == "live")
+    n_draft = sum(1 for k in camps if k["status"] == "draft")
     rows = []
     for k in camps:
         who = k["client"] or k["code_label"] or "—"
@@ -2409,26 +2407,36 @@ def campaigns_page(camps, codes, error=None, message=None):
             + "<td class='right nowrap'>" + status_button(k)
             + "<a class='btn small' href='" + u("/campaigns/edit") + "?id="
             + str(k["id"]) + "'>Open</a></td></tr>")
-    table = "".join(rows) or ("<tr><td colspan='7' class='muted'>No campaigns yet. Start one from a "
-                              "selection, or create a blank one above.</td></tr>")
+    sel_opts = "".join("<option value='" + str(x["id"]) + "'>" + e(x["name"])
+                       + (" — " + e(x["code_label"]) if x["code_label"] else "") + "</option>" for x in selections)
+    start = (
+        "<div class='card'><div class='hd'><h2>Start a campaign</h2></div>"
+        "<p class='sec-desc'>Two ways in. From a selection is quicker: its creators, costs and client passcode come across.</p>"
+        "<div class='two'>"
+        "<form method='post' action='" + u("/campaigns/new") + "' class='startbox'>"
+        "<h3>From a selection</h3><label>Pick the booked selection</label>"
+        "<select name='selection' required><option value=''>— choose —</option>" + sel_opts + "</select>"
+        "<button class='btn lime'>" + ui.icon("plus", 15) + " Start from selection</button></form>"
+        "<form method='post' action='" + u("/campaigns/new") + "' class='startbox'>"
+        "<h3>Blank</h3><label>Campaign name</label><input name='name' required placeholder='e.g. SVR Sun Secure — Wave 4'>"
+        "<div class='row'><div><label>Client (brand)</label><input name='client' placeholder='e.g. SVR'></div>"
+        "<div><label>Passcode that sees it</label>" + code_select(codes, None) + "</div></div>"
+        "<button class='btn'>" + ui.icon("plus", 15) + " Create blank campaign</button></form>"
+        "</div></div>")
+    table = (ui.empty("flag", "No campaigns yet", "Start one above. It stays a draft, invisible to the client, until you set it live.")
+             if not camps else
+             "<div class='stat-row'><div class='stat'><b>" + str(n_live) + "</b><span>Live</span></div>"
+             "<div class='stat'><b>" + str(n_draft) + "</b><span>Drafts</span></div>"
+             "<div class='stat'><b>" + str(len(camps)) + "</b><span>Total</span></div></div>"
+             "<div class='card'><table><thead><tr><th>Campaign</th><th>Client</th><th>Status</th>"
+             "<th>Dates</th><th>Creators</th><th>Updated</th><th></th></tr></thead><tbody>"
+             + "".join(rows) + "</tbody></table></div>")
     body = (
-        "<h1>Campaigns</h1><p class='sub'>Creators booked for a client, the dates they post in and "
-        "the rules that decide which posts count. Everything is set here; the client only views "
-        "the report. Start one from a booked <a href='" + u("/selections") + "'>selection</a> "
-        "to copy its creators, passcode and costs, or create a blank one. "
-        "<a href='" + u("/planner") + "'>ROI planner</a> — price a pitch from a budget before a campaign exists.</p>"
-        + note
-        + "<form method='post' action='" + u("/campaigns/new") + "' class='card'><div class='row'>"
-        + "<div style='flex:2'><label>Campaign name</label><input name='name' required "
-          "placeholder='e.g. SVR Sun Secure — Wave 4'></div>"
-        + "<div><label>Client (brand)</label><input name='client' placeholder='e.g. SVR'></div>"
-        + "<div><label>Passcode that sees it</label>" + code_select(codes, None) + "</div>"
-        + "<div style='align-self:end'><button class='btn'>Create campaign</button></div>"
-        + "</div></form>"
-        + "<div class='card'><table><thead><tr><th>Campaign</th><th>Client</th><th>Status</th>"
-        + "<th>Dates</th><th>Creators</th><th>Updated</th><th></th></tr></thead><tbody>"
-        + table + "</tbody></table></div>"
-    )
+        ui.header("Campaigns", "Creators booked for a client, the dates they post in and the rules that decide which posts count. "
+                  "The client only views the report.",
+                  crumbs=[("Work", None), ("Campaigns", None)],
+                  actions="<a class='btn ghost' href='" + u("/planner") + "'>ROI planner</a>")
+        + note + table + start)
     return page("Campaigns", body, "/campaigns")
 
 
@@ -2648,15 +2656,16 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
     )
     return page(k["name"] + " — Campaign", body, "/campaigns")
 
+CAMP_TABS = [("setup", "/campaigns/edit", "Setup", "Dates, creators, rules and the client passcode"),
+             ("content", "/campaigns/content", "Content", "The posts creators published, and their daily numbers"),
+             ("insights", "/campaigns/insights", "Insights", "Audience data creators send in"),
+             ("links", "/campaigns/links", "Tracking links", "Link clicks, per creator"),
+             ("plan", "/calculator", "Goals & ROI", "What the campaign should achieve"),
+             ("report", "/campaigns/report", "Report", "What the client sees")]
+
+
 def campaign_tabs(k, on):
-    tabs = [("setup", "/campaigns/edit", "Setup"), ("content", "/campaigns/content", "Content"),
-            ("insights", "/campaigns/insights", "Insights"),
-            ("links", "/campaigns/links", "Tracking links &amp; clicks"),
-            ("plan", "/calculator", "Goals &amp; ROI"),
-            ("report", "/campaigns/report", "Report")]
-    return ("<nav class='tabs'>" + "".join(
-        "<a href='" + u(href) + "?id=" + str(k["id"]) + "'" + (" class='on'" if key == on else "")
-        + ">" + label + "</a>" for key, href, label in tabs) + "</nav>")
+    return ui.ptabs([(u(href) + "?id=" + str(k["id"]), label, None, key == on) for key, href, label, _d in CAMP_TABS])
 
 
 def link_gone():
@@ -2732,9 +2741,7 @@ def campaign_links_page(k, rows, st, origin, has_geo, error=None, message=None):
     table = "".join(items) or ("<tr><td colspan='4' class='muted'>No creators in this campaign yet — "
                                "add them on the Setup tab and each gets a link here.</td></tr>")
     body = (
-        "<p><a href='" + u("/campaigns") + "'>&larr; All campaigns</a></p>"
-        + "<h1>" + e(k["name"]) + " " + status_pill(k["status"]) + "</h1>"
-        + campaign_tabs(k, "links") + note
+        _head(k, "links") + note
         + "<div class='kpis'>"
         + "<div><span>Clicks</span><b>" + format(st["clicks"], ",") + "</b></div>"
         + "<div><span>Unique visitors</span><b>" + format(st["uniques"], ",") + "</b></div>"
@@ -2797,9 +2804,15 @@ def _notes(error, message):
 
 
 def _head(k, tab, error=None, message=None):
-    return ("<p><a href='" + u("/campaigns") + "'>&larr; All campaigns</a></p>"
-            + "<h1>" + e(k["name"]) + " " + status_pill(k["status"]) + "</h1>"
-            + campaign_tabs(k, tab) + _notes(error, message))
+    desc = next((d for key, _h, _l, d in CAMP_TABS if key == tab), "")
+    act = ("<form method='post' action='" + u("/selections/new") + "'><input type='hidden' name='mode' value='from_campaign'>"
+           "<input type='hidden' name='campaign' value='" + str(k["id"]) + "'>"
+           "<button class='btn ghost' title='Make a priced selection from this campaign&#39;s creators'>"
+           + ui.icon("list", 15) + " Selection from this campaign</button></form>") if tab == "setup" and not k["selection_name"] else ""
+    return (ui.header(k["name"], desc + " &middot; " + status_pill(k["status"]),
+                      crumbs=[("Campaigns", u("/campaigns")), (k["name"], None)], actions=act,
+                      tabs=[(u(h) + "?id=" + str(k["id"]), l, None, key == tab) for key, h, l, _d in CAMP_TABS])
+            + _notes(error, message))
 
 
 def client_report_card(k):
@@ -2908,8 +2921,55 @@ def campaign_content_page(k, members, posts, error=None, message=None):
           "</tr></thead><tbody>" + table + "</tbody></table>"
         + "<p class='price-hint'>est. = estimated (see Settings for how); real = from the creator's own "
           "insights, approved on the Insights tab. ER for videos is engagement ÷ views.</p></div>"
-        + "<h2>Add a post by link</h2>"
-        + "<form method='post' action='" + u("/campaigns/content/add") + "' class='card'>"
+        + _content_tools(k, members, posts, opts, plats, kinds)
+    )
+    return page(k["name"] + " — Content", body, "/campaigns")
+
+
+def _content_tools(k, members, posts, opts, plats, kinds):
+    """Four ways to get posts and numbers in, on one screen."""
+    cid = str(k["id"])
+    posted = {}
+    for p in posts:
+        if not p["hidden"] and p["section"] == "campaign":
+            posted[p["code"]] = posted.get(p["code"], 0) + 1
+    rows = []
+    for m in members:
+        n, want = posted.get(m["cc_code"], 0), m["planned"] or 0
+        if n and (not want or n >= want):
+            pill = "<span class='pill live'>posted</span>"
+        elif n:
+            pill = "<span class='pill warn'>%d of %d posted</span>" % (n, want)
+        else:
+            pill = "<span class='pill dead'>not yet</span>"
+        rows.append("<tr><td><strong>" + e(m["name"] or m["cc_code"]) + "</strong><br><span class='muted'>" + e(m["cc_code"])
+                    + "</span></td><td>" + pill + "</td><td class='right'>" + str(n) + (" / " + str(want) if want else "") + "</td>"
+                    + "<td><form method='post' action='" + u("/campaigns/content/bulk") + "' class='inline-add'>"
+                    "<input type='hidden' name='id' value='" + cid + "'><input type='hidden' name='do' value='links'>"
+                    "<input type='hidden' name='code' value='" + e(m["cc_code"]) + "'>"
+                    "<input type='hidden' name='platform' value='" + e(k["platform"] or "Instagram") + "'>"
+                    "<input name='text' placeholder='Paste post link' aria-label='Post link for " + e(m["name"] or m["cc_code"]) + "'>"
+                    "<button class='btn small'>Add</button></form></td></tr>")
+    status = (ui.empty("users", "No creators yet", "Add creators on the Setup tab first.") if not members else
+              "<p class='sec-desc'>Who still owes a post. Paste a link on a row and press Add.</p>"
+              "<table><thead><tr><th>Creator</th><th>Status</th><th class='right'>Posts</th><th>Add a link</th></tr></thead><tbody>"
+              + "".join(rows) + "</tbody></table>")
+    links = ("<p class='sec-desc'>Several posts from one creator at once. One link per line.</p>"
+             "<form method='post' action='" + u("/campaigns/content/bulk") + "'>"
+             "<input type='hidden' name='id' value='" + cid + "'><input type='hidden' name='do' value='links'>"
+             "<div class='row'><div><label>Creator</label><select name='code' required>" + opts + "</select></div>"
+             "<div><label>Platform</label><select name='platform'>" + plats + "</select></div>"
+             "<div><label>Type</label><select name='kind'>" + kinds + "</select></div>"
+             "<div><label>Posted on</label><input type='date' name='posted'></div></div>"
+             "<label>Post links</label><textarea name='text' rows='6' required placeholder='https://www.instagram.com/reel/…&#10;https://www.instagram.com/p/…'></textarea>"
+             "<button class='btn lime'>Add all</button></form>")
+    numbers = ("<p class='sec-desc'>Today's numbers for many posts at once. One line per post: the post link, then likes, comments, views, shares, saves "
+               "(commas, spaces or tabs between). Copy it straight from a spreadsheet. Leave numbers off to keep them as they are.</p>"
+               "<form method='post' action='" + u("/campaigns/content/bulk") + "'>"
+               "<input type='hidden' name='id' value='" + cid + "'><input type='hidden' name='do' value='numbers'>"
+               "<textarea name='text' rows='7' required placeholder='https://www.instagram.com/reel/abc/  1200  45  18000  30  12'></textarea>"
+               "<button class='btn lime'>Save numbers</button></form>")
+    single = ("<form method='post' action='" + u("/campaigns/content/add") + "' class='card flat'>"
         + "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
         + "<div class='row'><div><label>Creator</label><select name='code' required>" + opts + "</select></div>"
         + "<div><label>Platform</label><select name='platform'>" + plats + "</select></div>"
@@ -2921,9 +2981,10 @@ def campaign_content_page(k, members, posts, error=None, message=None):
           "<textarea name='caption'></textarea></div></div>"
         + "<div class='row mini'>" + "".join("<div><label>" + m + "</label><input name='" + m + "' inputmode='numeric'></div>"
                                              for m in ("likes", "comments", "views", "shares", "saves"))
-        + "</div><button class='btn'>Add post</button></form>"
-    )
-    return page(k["name"] + " — Content", body, "/campaigns")
+        + "</div><button class='btn'>Add post</button></form>")
+    return ui.tabset("add", [("status", "Who has posted", None), ("links", "Paste links", None),
+                             ("numbers", "Paste numbers", None), ("single", "One post, with caption", None)],
+                     {"status": status, "links": links, "numbers": numbers, "single": single})
 
 
 def campaign_report_page(k, r, origin):
@@ -2989,7 +3050,7 @@ def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, erro
         token_box = ("<div class='ok'>New capture token — copy it now, it is not shown again:"
                      + copyable(new_token) + "</div>")
     body = (
-        "<h1>Settings</h1><p class='sub'>Campaign tracker settings for the whole workspace.</p>"
+        ui.header("Settings", "Rates and keys that apply to the whole workspace: how earned media value is worked out, currencies and the capture token.", crumbs=[("System", None), ("Settings", None)])
         + _notes(error, message) + token_box
         + "<form method='post' action='" + u("/settings/save") + "'>"
         + "<h2>EMV rates</h2><div class='card'><div class='row'>" + inputs + "</div>"
@@ -3288,9 +3349,17 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
                      "<input type='hidden' name='code' value='" + e(c["code"]) + "'><button class='btn small danger'>Remove analysis</button></form>"
                      if c["code"] in have else ""))
     body = (
-        "<h1>Creator analysis</h1><p class='sub'>Full profile analyses clients open from the catalogue and reports. "
-        "A creator without one shows a locked page with <em>Request full analysis</em>; requests land below.</p>"
+        ui.header("Creator analysis", "Full profile analyses clients open from the catalogue and reports. A creator without one shows a locked page with Request full analysis; requests land below.", crumbs=[("Library", None), ("Creator analysis", None)])
         + _notes(error, message)
+        + "<div class='card' id='pdf'><div class='hd'><h2>Import profile report PDFs</h2></div>"
+          "<p class='sec-desc'>Drop the report PDFs exported from the analysis tool. Each is read and saved as that creator's full analysis, "
+          "with their photo and post covers. The creator is found from the handle in the file name "
+          "(<code>report-handle-Oct-06-2026.pdf</code>). One file at a time? Pick the creator yourself.</p>"
+          "<form method='post' action='" + u("/analysis/pdf") + "' enctype='multipart/form-data'>"
+          "<div class='row'><div style='flex:2'><label>PDF files</label><input type='file' name='file' accept='application/pdf,.pdf' multiple required></div>"
+          "<div><label>Creator (only for a single file)</label><input name='code' list='an-creators' placeholder='Type a name or code' autocomplete='off'></div></div>"
+          "<datalist id='an-creators'>" + "".join("<option value=\"%s\">%s</option>" % (e(c["code"]), e(c["name"])) for c in creators) + "</datalist>"
+          "<button class='btn lime'>" + ui.icon("upload", 15) + " Import</button></form></div>"
         + "<div class='grid2'><div class='card'><h3 style='margin-top:0'>1 · Download the template</h3>"
           "<p class='muted'>One workbook, many creators, laid out like a profile report: Overview, Audience "
           "(followers and likers), Growth, Posts, Brands (with logos), Hashtags &amp; mentions — every row starts with "
@@ -3403,10 +3472,7 @@ def history_page(rows, later, kind=None, q=None, message=None, error=None, page_
                    + e(r["who"] or "") + "</span></td><td class='right'>" + btn + "</td></tr>")
     table = "".join(out) or "<tr><td colspan='4' class='muted'>Nothing here yet.</td></tr>"
     body = (
-        "<h1>History</h1><p class='sub'>Every change made in the admin, newest first, kept for 90 days. "
-        "<strong>Undo</strong> puts that item back exactly as it was just before the change — a deleted "
-        "creator comes back with their photo, a campaign with its creators, links, posts and clicks. "
-        "An undo is listed too, so it can be taken back the same way (redo).</p>"
+        ui.header("History & undo", "Every change made in the admin, newest first, kept for 90 days. Undo puts an item back exactly as it was before the change. An undo is listed too, so it can be taken back (redo).", crumbs=[("System", None), ("History & undo", None)])
         + note + "<div class='row' style='gap:8px;flex-wrap:wrap;margin:6px 0 14px'>" + tabs + "</div>"
         + "<form class='rsearch' method='get' action='" + u("/history") + "'>"
         + ("<input type='hidden' name='kind' value='" + e(kind) + "'>" if kind else "")
@@ -3547,7 +3613,7 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
         apply = "<form id='apply'></form><p class='price-hint'>Open the planner from a campaign to save these as its goals.</p>"
     notes = "".join("<li>" + e(n) + "</li>" for n in plan["notes"])
     lib_json = json.dumps(lib, indent=1, ensure_ascii=False)
-    body = ((_head(k, "plan", error, message) if k else "<h1>ROI planner</h1>" + _notes(error, message))
+    body = ((_head(k, "plan", error, message) if k else ui.header("ROI planner", "Price a pitch from a budget before a campaign exists.", crumbs=[("Insights", None), ("ROI planner", None)]) + _notes(error, message))
             + "<div class='card' style='background:#fff8ec;border-color:#f3d9a8'><strong>The ROI calculator is the main tool now.</strong> "
               "It does everything on this page and also measures real selections and campaigns. "
               "<a href='" + u("/calculator") + ("?id=" + str(k["id"]) if k else "") + "'>Open the calculator</a>. "
@@ -3599,10 +3665,7 @@ def calculator_page(lib, sources=None, initial=None, ok=None, error=None):
                        "categories": {k: v[0] for k, v in plans.CATEGORIES.items()}},
                       ensure_ascii=False).replace("</", "<\\/")
     body = """
-""" + _notes(error, ok) + """<h1>ROI calculator</h1>
-<p class='sub'>Pick the campaign types and platforms (one or several), type what the client pays, and read what result to accept.
-Everything updates as you type. The numbers come from the benchmark library, which you can edit on the
-<a href='""" + u("/planner") + """#library'>benchmark library</a>.</p>
+""" + _notes(error, ok) + ui.header("ROI calculator", "Pick campaign types and platforms, type what the client pays, and read the result to accept. Numbers come from the benchmark library.", crumbs=[("Insights", None), ("ROI calculator", None)], actions="<a class='btn ghost' href='" + u("/planner") + "#library'>Benchmark library</a>") + """
 <style>
 .cal-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .cal-pills button{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 18px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}

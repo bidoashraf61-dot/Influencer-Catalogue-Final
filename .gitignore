@@ -43,3 +43,4 @@ admin/trash/
 # Post thumbnails fetched from Instagram/TikTok for campaign reports — client data.
 admin/post_thumbs/
 admin/analysis_media/
+admin/_vendor/
