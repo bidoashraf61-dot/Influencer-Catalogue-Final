@@ -100,6 +100,67 @@
   }
   function arDir(t) { return /[؀-ۿ]/.test(t) && !/[A-Za-z]{3}/.test(t) ? ' dir="rtl"' : ""; }
 
+  /* an "i" beside every part, saying what it is and where the number comes from */
+  var TIPS = {
+    "h2|Popular posts": "The creator's best-performing recent posts, ranked by engagement. Tap one to play it from Instagram.",
+    "h2|Followers": "How big the audience is and how much of it is real.",
+    "h2|Content": "How the creator's posts perform on average, split by content type.",
+    "h2|Creator brand affinity & interests": "What the creator posts about and which brands appear in their content.",
+    "h2|Audience data": "Who the audience is. Followers: everyone who follows the account. Likers: only the people who like the posts — the more engaged part of the audience.",
+    "h2|Popular hashtags & mentions": "The hashtags and accounts the creator uses most in recent posts.",
+    "Followers": "Total followers on the account on the date of the report. The small % is the recent change Modash reports.",
+    "Avg. likes": "Average likes per post over the creator's recent posts. \u201cHidden\u201d means the creator hides like counts on Instagram.",
+    "Engagement rate": "Average likes plus comments per post, divided by followers. The note compares it with creators of a similar size.",
+    "Fake followers": "Share of followers Modash flags as bots, inactive or suspicious accounts. The rest are real people.",
+    "Fake likers": "Share of the people liking posts that Modash flags as bots or suspicious accounts.",
+    "Audience reachability": "How many accounts the followers themselves follow. People who follow fewer than 1,000 accounts are more likely to see this creator's posts in their feed.",
+    "Fake followers distribution": "Where this creator sits among creators of a similar size by share of fake followers. The coloured bar is this creator; the darker grey bar is the median.",
+    "Followers growth": "Followers at the end of each month, read from the Modash growth chart.",
+    "Likes growth": "Average likes per post in each month, read from the Modash chart.",
+    "Estimated impressions": "Modash's estimate of how many times a typical post is seen. An estimate from followers and engagement — only the creator's own insights give exact figures.",
+    "Estimated reach": "Modash's estimate of how many different accounts see a typical post. An estimate — only the creator's own insights give exact figures.",
+    "Stories|Estimated reach": "Modash's estimate of how many different accounts see a typical story. An estimate — only the creator's own insights give exact figures.",
+    "Stories|Estimated impressions": "Modash's estimate of how many times a typical story is seen. An estimate — only the creator's own insights give exact figures.",
+    "Average views": "Average views per video post.",
+    "Average likes": "Average likes per post of this type.",
+    "Average comments": "Average comments per post of this type.",
+    "Average reel plays": "Average number of times a reel is played.",
+    "Average shares": "Average number of times a reel is shared.",
+    "Collaborations": "How the creator's sponsored posts perform compared with their normal posts.",
+    "Paid engagement": "Engagement on sponsored posts as a share of engagement on normal posts. 100% means sponsored posts do as well as normal ones; below 100%, they do less well.",
+    "Paid views": "Views on sponsored posts as a share of views on normal posts. 100% means sponsored posts get as many views as normal ones.",
+    "Engagement rate distribution": "Where this creator's engagement rate sits among creators of a similar size. The coloured bar is this creator; the darker grey bar is the median.",
+    "Creator brand affinity": "Brands the creator mentions or tags in their own posts — not necessarily paid partnerships.",
+    "Creator interests": "The topics the creator posts about, as Modash classifies them.",
+    "Gender": "Split of the audience by gender.",
+    "Age": "Split of the audience by age group.",
+    "Age by gender": "Each age group split into women and men, as a share of the whole audience.",
+    "Location by country": "Where the audience lives, by country.",
+    "Location by city": "Where the audience lives, by city.",
+    "Languages": "Languages the audience uses on Instagram.",
+    "Audience interests": "Topics the audience is interested in, based on the accounts they follow.",
+    "Audience brand affinity": "Brands the audience follows or engages with — useful to check fit with a client's brand. Small lists come from a sample of the audience, so treat close values as equal.",
+    "Popular hashtags": "Share of the creator's recent posts that use each hashtag.",
+    "Popular mentions": "Share of the creator's recent posts that tag or mention each account.",
+    "Sponsored posts": "Recent posts Modash identified as paid partnerships."
+  };
+  function addTips(root) {
+    [].forEach.call((root || document).querySelectorAll(".pp-h2, .pp-h3, .pp-key dt, .pp-tiles > div > span, .pp-row > span, .pp-er__label"), function (el) {
+      if (el.querySelector(".pp-tip")) return;
+      var text = el.textContent.trim(), pane = el.closest(".pp-pane"), ctx = pane ? pane.getAttribute("data-tab") : "";
+      var tip = TIPS[ctx + "|" + text] || (el.classList.contains("pp-h2") ? TIPS["h2|" + text] : null) || TIPS[text];
+      if (!tip) return;
+      el.insertAdjacentHTML("beforeend", ' <i class="pp-tip" tabindex="0" role="note" aria-label="' + esc(tip) + '" data-tip="' + esc(tip) + '">i</i>');
+    });
+  }
+  // A tip near the right edge opens leftwards, so it never runs off the screen.
+  function placeTip(e) {
+    var t = e.target.closest && e.target.closest(".pp-tip"); if (!t) return;
+    t.classList.toggle("pp-tip--end", t.getBoundingClientRect().left > window.innerWidth - 280);
+  }
+  document.addEventListener("mouseover", placeTip);
+  document.addEventListener("focusin", placeTip);
+
   function render() {
     var c = D.creator, a = D.analysis;
     document.title = c.name + " — Creator analysis — HelloVoice";
@@ -115,6 +176,7 @@
     renderAudience(a);
     renderTags(a);
     $("pp-source").textContent = "Source: " + (a.source || "Modash") + (a.updated ? " · data from " + day(a.updated) : "");
+    addTips();
   }
 
   /* identity: as the top of the Modash report — who, the three numbers, bio */
@@ -176,6 +238,7 @@
       $(box).innerHTML = list.length > 1 ? list.map(function (t, i) { return '<button type="button" role="tab" aria-selected="' + (i === on) + '" data-i="' + i + '">' + esc(t.label) + "</button>"; }).join("") : "";
       $(pane).innerHTML = list.map(function (t, i) { return '<div class="pp-pane" data-tab="' + esc(t.label) + '"' + (i === on ? "" : " hidden") + ">" + draw(t) + "</div>"; }).join("");
       if (pane === "pp-perf") collab();
+      addTips($(pane));
     }
     paint();
     $(box).onclick = function (e) { var b = e.target.closest("button[data-i]"); if (!b) return; on = +b.getAttribute("data-i"); paint(); };

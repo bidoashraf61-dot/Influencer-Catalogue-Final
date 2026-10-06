@@ -133,7 +133,13 @@
 .pp-row__bar b { display: block; height: 100%; border-radius: var(--r-pill); background: var(--ink); }
 .pp-row strong { font-family: var(--heading); font-weight: 400; font-size: 24px; text-align: right; }
 .pp-tip { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1.3px solid var(--gray); font: italic 700 11px/1 Georgia, serif; color: var(--gray); cursor: help; position: relative; }
-.pp-tip:hover::after, .pp-tip:focus::after { content: attr(data-tip); position: absolute; z-index: 5; left: 0; top: 24px; width: 240px; padding: 10px 12px; background: var(--ink); color: var(--white); font: 400 13px/1.5 var(--body); border-radius: 12px; }
+.pp-tip:hover::after, .pp-tip:focus::after { content: attr(data-tip); position: absolute; z-index: 20; left: 0; top: 24px; width: min(260px, 80vw); padding: 10px 12px; background: var(--ink); color: var(--white); font: 400 13px/1.5 var(--body); letter-spacing: normal; text-transform: none; text-align: left; white-space: normal; border-radius: 12px; box-shadow: 0 8px 24px rgba(18,18,18,.2); }
+.pp-tip--end:hover::after, .pp-tip--end:focus::after { left: auto; right: 0; }
+.pp-tip:focus-visible { outline: 2px solid var(--vivid-red); outline-offset: 2px; }
+.pp-h2 .pp-tip, .pp-h3 .pp-tip { vertical-align: .25em; margin-left: 4px; }
+.pp-h2 .pp-tip { width: 22px; height: 22px; font-size: 13px; }
+.pp-key dt .pp-tip, .pp-tiles span .pp-tip, .pp-er__label .pp-tip { width: 16px; height: 16px; font-size: 10px; vertical-align: middle; margin-left: 2px; }
+.pp-pdf .pp-tip { display: none !important; }
 .pp-collab { margin-top: 28px; }
 .pp-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
 .pp-tiles > div { padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--r-sm); }
