@@ -499,6 +499,8 @@ class Handler(BaseHTTPRequestHandler):
                              "application/json; charset=utf-8")
         if path == "/planner":
             return self.planner_get(query)
+        if path == "/calculator":
+            return self.send(200, views.calculator_page(plans.library()))
         if path == "/campaigns/thumb":
             f = thumbs.path_of("file:" + Path(query.get("n") or "").name)
             if f is None:
