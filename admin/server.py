@@ -1734,6 +1734,12 @@ class Handler(BaseHTTPRequestHandler):
             bm["er"][b] = pair("bm_er_" + b, bm["er"][b])
         for key in ("video_er", "view_rate", "story_rate", "ctr"):
             bm[key] = pair("bm_" + key, bm[key])
+        for key in ("fake_followers", "fake_likers"):
+            try:   # lower is better: the "good" ceiling sits under the "moderate" one
+                g, o = float(f.get("bm_" + key + "_good") or bm[key][0]), float(f.get("bm_" + key + "_ok") or bm[key][1])
+                bm[key] = [g, o] if 0 <= g <= o <= 100 else bm[key]
+            except ValueError:
+                pass
         db.set_setting("benchmarks", bm)
         return self.redirect("/settings?ok=" + urllib.parse.quote("Settings saved."))
 

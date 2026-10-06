@@ -3001,10 +3001,17 @@ def benchmarks_card(bm):
                     for key, label in [("video_er", "Video ER % (engagement ÷ views)"),
                                        ("view_rate", "Video views ÷ followers %"),
                                        ("story_rate", "Story reach ÷ followers %"), ("ctr", "Link click-through %")])
+    fake = "".join(line(label, "bm_" + key, bm[key])
+                   for key, label in [("fake_followers", "Fake followers % of audience"),
+                                      ("fake_likers", "Fake likers % of likes")])
     return ("<h2>Benchmarks</h2><div class='card'><p class='sub'>What the report calls good (green), moderate (amber) "
             "or low (red). These are industry guides; campaigns add their own targets on the Setup tab.</p>"
             "<table><thead><tr><th>Engagement rate % by tier</th><th>Good from</th><th>Moderate from</th></tr></thead><tbody>"
-            + er_rows + other + "</tbody></table></div>")
+            + er_rows + other + "</tbody></table>"
+            + "<p class='sub' style='margin-top:18px'>Fake shares work the other way round — lower is better. "
+              "Good up to the first figure, moderate up to the second, above that high.</p>"
+              "<table><thead><tr><th>Fake share</th><th>Good up to</th><th>Moderate up to</th></tr></thead><tbody>"
+            + fake + "</tbody></table></div>")
 
 
 def custom_link_form(k, rows, names):

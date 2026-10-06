@@ -93,6 +93,26 @@
   var I_COMMENT = ico('<path d="M4 5h16v11H9l-5 4z"/>');
   var I_PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>';
   var I_DOWN = ico('<path d="M12 4v11M7 10l5 5 5-5M5 20h14"/>');
+  /* verdict tags: the number against HelloVoice's own benchmarks (Admin → Settings) */
+  var BAND_NAME = { nano: "Nano", micro: "Micro", mid: "Mid-tier", macro: "Macro", mega: "Mega" };
+  function bandOf(f) { return f < 1e4 ? "nano" : f < 5e4 ? "micro" : f < 5e5 ? "mid" : f < 1e6 ? "macro" : "mega"; }
+  function bench(key, band) { var b = (D.benchmarks || {})[key]; return band ? (b || {})[band] : b; }
+  function verdict(v, pair, lower) {
+    if (v == null || !pair) return null;
+    return lower ? (v <= pair[0] ? "good" : v <= pair[1] ? "moderate" : "low") : (v >= pair[0] ? "good" : v >= pair[1] ? "moderate" : "low");
+  }
+  var VWORD = { good: "Strong", moderate: "Fair", low: "Low" }, VWORD_LOW = { good: "Healthy", moderate: "Watch", low: "High" };
+  function tagFor(g, why, lower) {
+    return g ? ' <span class="pp-sig pp-sig--' + g + '" title="' + esc(why) + '">' + (lower ? VWORD_LOW : VWORD)[g] + "</span>" : "";
+  }
+  function erTag(v, f) {
+    var band = bandOf(f || 0), pair = bench("er", band);
+    return pair ? tagFor(verdict(v, pair), "Strong from " + pair[0] + "%, fair from " + pair[1] + "% for " + BAND_NAME[band] + " creators — HelloVoice benchmark") : "";
+  }
+  function fakeTag(v, key) {
+    var pair = bench(key); if (!pair) return "";
+    return tagFor(verdict(v, pair, true), "Healthy up to " + pair[0] + "%, watch up to " + pair[1] + "%, high above that — HelloVoice benchmark", true);
+  }
   function pct2(v) { return v == null ? "—" : (+v).toFixed(2) + "%"; }
   function delta(v) {
     if (v == null) return "";
@@ -232,7 +252,7 @@
     var key = a ? [
       ["Followers", num(a.followers || c.followers), delta(a.followers_change_pct)],
       ["Avg. likes", a.likes_hidden ? "Hidden" : num(a.avg_likes), delta(a.avg_likes_change_pct)],
-      ["Engagement rate", pct2(a.er), ""]
+      ["Engagement rate", pct2(a.er), erTag(a.er, a.followers || c.followers)]
     ] : [["Followers", num(c.followers), ""], ["Tier", c.tier || BANDS[c.band] || "—", ""], ["Based in", c.city || "—", ""]];
     // The photo at its own size: never stretched past its pixels, never cropped.
     var src = (a && a.photo_url) || c.photo_url;
@@ -304,7 +324,7 @@
     return '<div class="pp-rows">' + items.map(function (r) {
       if (!r.ref || r.v == null || r.text === "Hidden") return '<div class="pp-row"><span>' + r.label + '</span><i class="pp-row__bar"></i><strong>' + r.text + "</strong></div>";
       var strong = r.ref[0], typ = r.ref[1], w = Math.min(100, r.v / strong * 100), g = r.v >= strong ? "good" : r.v >= typ ? "ok" : "low";
-      return '<div class="pp-row"><span>' + r.label + '</span><i class="pp-row__bar pp-row__bar--ref" title="Compared with a strong result for creators this size: typical ' + num(typ) + ", strong " + num(strong) + '"><b class="' + g + '" style="width:' + Math.max(2, w).toFixed(1) + "%" + (colour ? ";background:" + colour : "") + '"></b><u style="left:' + (typ / strong * 100).toFixed(1) + '%"></u></i><strong>' + r.text + "</strong></div>";
+      return '<div class="pp-row"><span>' + r.label + '</span><i class="pp-row__bar pp-row__bar--ref" title="Compared with a strong result for creators this size: typical ' + num(typ) + ", strong " + num(strong) + '"><b class="' + g + '" style="width:' + Math.max(2, w).toFixed(1) + "%" + (colour ? ";background:" + colour : "") + '"></b><u style="left:' + (typ / strong * 100).toFixed(1) + '%"></u></i><strong>' + r.text + tagFor(g === "ok" ? "moderate" : g, "Compared with a strong result for creators this size — HelloVoice benchmark") + "</strong></div>";
     }).join("") + '<p class="pp-rows__key">Each bar is compared with a strong result for creators this size · the tick is typical</p></div>';
   }
   function rows(items, colour) {
@@ -354,9 +374,9 @@
   function renderReal(a) {
     var out = "", tiles = [];
     if (a.followers != null) tiles.push(["Followers", num(a.followers)]);
-    if (a.fake_followers_pct != null) tiles.push(["Fake followers", pct2(a.fake_followers_pct)]);
-    if (a.fake_likers_pct != null) tiles.push(["Fake likers", pct2(a.fake_likers_pct)]);
-    if (tiles.length) out += '<div class="pp-tiles pp-tiles--big">' + tiles.map(function (t) { return '<div class="pp-tile"><span>' + t[0] + "</span><b>" + t[1] + "</b></div>"; }).join("") + "</div>";
+    if (a.fake_followers_pct != null) tiles.push(["Fake followers", pct2(a.fake_followers_pct), fakeTag(a.fake_followers_pct, "fake_followers")]);
+    if (a.fake_likers_pct != null) tiles.push(["Fake likers", pct2(a.fake_likers_pct), fakeTag(a.fake_likers_pct, "fake_likers")]);
+    if (tiles.length) out += '<div class="pp-tiles pp-tiles--big">' + tiles.map(function (t) { return '<div class="pp-tile"><span>' + t[0] + "</span><b>" + t[1] + "</b>" + (t[2] || "") + "</div>"; }).join("") + "</div>";
     var au = a.audience || {}, cards = [];
     if (au.reachability && au.reachability.length) {
       var RL = { "<500": "<500 accounts", "500-1000": "500-1k accounts", "1000-1500": "1k-1.5k accounts", ">1500": ">1.5k accounts" };
@@ -413,7 +433,7 @@
   function renderPerf(a) {
     var list = [];
     function erBlock(v, note, label) {
-      return '<div class="pp-er"><span class="pp-er__label">' + label + "</span><b>" + pct2(v) + "</b>" + (note ? "<p>" + esc(note) + "</p>" : "") + "</div>";
+      return '<div class="pp-er"><span class="pp-er__label">' + label + "</span><b>" + pct2(v) + "</b>" + erTag(v, a.followers || (D.creator && D.creator.followers)) + (note ? "<p>" + esc(note) + "</p>" : "") + "</div>";
     }
     var all = [];
     if (a.est_impressions != null) all.push({ label: "Estimated impressions", v: a.est_impressions, text: num(a.est_impressions) });

@@ -66,6 +66,10 @@ DEFAULT_BENCHMARKS = {
     "story_rate": [8.0, 4.0],
     # clicks ÷ (impressions + views), %
     "ctr": [1.0, 0.3],
+    # share of followers / likers that are fake, % — LOWER is better:
+    # at or under the first is "good", at or under the second "moderate"
+    "fake_followers": [15.0, 30.0],
+    "fake_likers": [15.0, 30.0],
 }
 
 
