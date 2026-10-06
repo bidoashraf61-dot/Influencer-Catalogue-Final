@@ -175,3 +175,7 @@
   body, .cat-app { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .pp-page { break-inside: avoid; }
 }
+
+/* inside the roster's side panel */
+.pp-embed .pp-top { display: none; }
+.pp-embed .pp { padding-top: 8px; }

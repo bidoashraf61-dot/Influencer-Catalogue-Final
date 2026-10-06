@@ -7,6 +7,18 @@
   "use strict";
 
   var API = (window.CREATOR_CONFIG || {}).api || "/admin";
+  // Opened inside the roster's side panel: no page chrome, and links leave
+  // the panel for the full window.
+  if (/[?&]embed=1\b/.test(location.search)) {
+    document.documentElement.classList.add("pp-embed");
+    var base = document.createElement("base"); base.target = "_top"; document.head.appendChild(base);
+    // Keep the roster's frost-on-leave working while focus is in here.
+    try {
+      var host = window.parent.document.body;
+      window.addEventListener("blur", function () { setTimeout(function () { if (!window.parent.document.hasFocus()) host.classList.add("cat-away"); }, 0); });
+      window.addEventListener("focus", function () { host.classList.remove("cat-away"); });
+    } catch (e) {}
+  }
   var ICONS = (window.HV_ICONS || {}).icons || {};
   var ICON_LINK = (window.HV_ICONS || {}).link || "";
   var D = null;

@@ -451,9 +451,10 @@
       // — the static build has no passport to open.
       (CFG.api ? '<a class="cat-card__analysis' + (c.analysis ? " is-ready" : "") + '" href="' +
         (document.body.getAttribute("data-page") === "selection" ? "../" : "") + "creator/#c=" +
-        encodeURIComponent(c.code) + '" data-noselect>' + (c.analysis ? "Full analysis" : "Analysis — request") +
+        encodeURIComponent(c.code) + '" data-noselect data-analysis="' + esc(c.code) + '" data-name="' + esc(c.name) + '">' +
+        (c.analysis ? "Profile analysis" : "Analysis — request") +
         ' <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
-        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>' : "") +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14 4.5v15"/></svg></a>' : "") +
       "</div></article>";
   }
 
@@ -1802,7 +1803,15 @@
 
   // Frost the page when the window loses focus — makes over-the-shoulder
   // screen capture from a second app noticeably harder to do cleanly.
-  window.addEventListener("blur", function () { document.body.classList.add("cat-away"); });
+  // Focus moving into the profile-analysis panel is not leaving the page;
+  // the panel frosts this page itself when the window really loses focus.
+  window.addEventListener("blur", function () {
+    setTimeout(function () {
+      var f = document.activeElement;
+      if (f && f.classList && f.classList.contains("cat-pp__frame")) return;
+      document.body.classList.add("cat-away");
+    }, 0);
+  });
   window.addEventListener("focus", function () { document.body.classList.remove("cat-away"); });
 
   // Last thing in the file, deliberately — see the note by `wasUnlocked`.
@@ -1829,4 +1838,51 @@
   } else if (wasUnlocked) {
     unlock();
   }
+
+  /* ------------------------------------------- profile analysis side panel */
+
+  // The card's analysis button opens the creator's page in a panel over the
+  // roster, so the client keeps their place and their picks. Ctrl/cmd-click
+  // or a middle click still opens it as a page of its own.
+  (function () {
+    var panel = null, frame = null, title = null, full = null, lastFocus = null;
+    function build() {
+      var wrap = document.createElement("div");
+      wrap.innerHTML = '<div class="cat-pp-scrim" hidden></div>' +
+        '<aside class="cat-pp" role="dialog" aria-modal="true" aria-labelledby="cat-pp-title" hidden>' +
+        '<header class="cat-pp__head"><p class="cat-pp__eyebrow">Profile analysis</p><h2 id="cat-pp-title"></h2>' +
+        '<a class="cat-pp__full" target="_blank" rel="noopener">Open as page <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>' +
+        '<button type="button" class="cat-pp__close" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button></header>' +
+        '<iframe class="cat-pp__frame" title="Creator profile analysis"></iframe></aside>';
+      while (wrap.firstChild) document.body.appendChild(wrap.firstChild);
+      panel = document.querySelector(".cat-pp"); frame = panel.querySelector("iframe");
+      title = $("cat-pp-title"); full = panel.querySelector(".cat-pp__full");
+      panel.querySelector(".cat-pp__close").addEventListener("click", close);
+      document.querySelector(".cat-pp-scrim").addEventListener("click", close);
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !panel.hidden) close(); });
+    }
+    function open(a) {
+      if (!panel) build();
+      lastFocus = a;
+      var href = a.getAttribute("href"), url = href.replace("creator/#", "creator/?embed=1#");
+      title.textContent = a.getAttribute("data-name") || "";
+      full.href = href;
+      frame.src = url;
+      document.querySelector(".cat-pp-scrim").hidden = false; panel.hidden = false;
+      document.documentElement.classList.add("cat-pp-open");
+      panel.querySelector(".cat-pp__close").focus();
+    }
+    function close() {
+      panel.hidden = true; document.querySelector(".cat-pp-scrim").hidden = true;
+      document.documentElement.classList.remove("cat-pp-open");
+      frame.src = "about:blank";
+      if (lastFocus) lastFocus.focus();
+    }
+    document.addEventListener("click", function (e) {
+      var a = e.target.closest && e.target.closest("a[data-analysis]");
+      if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+      e.preventDefault(); e.stopPropagation();
+      open(a);
+    }, true);
+  })();
 })();
