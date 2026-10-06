@@ -9,12 +9,12 @@ Build locally in this repo → push to `origin` → pull on the live server.
 
 ## 1. Objective
 
-A campaign tracker with the **same capabilities as Modash's campaign tracking**,
+A campaign tracker with the **full capabilities of a dedicated campaign-tracking tool**,
 living as its own page in the catalogue, in the catalogue's theme.
 
 - **We** (admin) create, run and edit every campaign.
 - **Clients** only view their own campaign reports — they never create or edit.
-- No Modash subscription needed for tracking; post data is captured by Claude.
+- No third-party subscription needed for tracking; post data is captured by Claude.
 
 ## 2. Decisions locked
 
@@ -31,14 +31,14 @@ living as its own page in the catalogue, in the catalogue's theme.
 | Campaign origin | "Start campaign" from a selection, or blank |
 | Sales / ROAS / CAC / AOV | Out — clients are not on Shopify; UTMs hand this to the client's own analytics |
 
-## 3. Modash parity map
+## 3. Capability map
 
-| Modash capability | Ours | Where |
+| Capability | Ours | Where |
 |---|---|---|
 | Campaign: name, client, dates, creators | ✅ | Admin |
 | Detection rules: hashtags, @mentions, keywords | ✅ matched on caption by capture job | Admin + capture |
 | "Campaign" vs "All content" tabs | ✅ matched vs unmatched posts in window | Admin + client page |
-| Auto-capture posts, Reels, Stories, TikTok, YouTube | ✅ via Claude in Chrome (Snapchat too — Modash can't) | Capture job |
+| Auto-capture posts, Reels, Stories, TikTok, YouTube | ✅ via Claude in Chrome (Snapchat too) | Capture job |
 | Manual "Import content" by link | ✅ | Admin |
 | Refresh metrics over time | ✅ one capture run every 24 hours for every live campaign (posts, Reels, Stories, videos) | Capture job |
 | Per-creator tracking links: clicks, unique, app, device, country | ✅ | `/go/` + admin |

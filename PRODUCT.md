@@ -15,11 +15,11 @@ web
 
 ## Product Purpose
 
-HelloVoice's influencer catalogue: a passcode-protected roster of vetted creators that clients shortlist from, plus — new in Oct 2026 — campaign tracking (a Modash-equivalent tracker run by HelloVoice) and per-creator full analysis pages. Success means a client can pick creators with confidence, see at a glance how their campaign is performing, and trust HelloVoice enough to book the next one.
+HelloVoice's influencer catalogue: a passcode-protected roster of vetted creators that clients shortlist from, plus — new in Oct 2026 — campaign tracking (a full campaign tracker run by HelloVoice) and per-creator full analysis pages. Success means a client can pick creators with confidence, see at a glance how their campaign is performing, and trust HelloVoice enough to book the next one.
 
 ## Positioning
 
-The creators, the campaign data and the analysis are HelloVoice's own: run end to end by the agency that produced the content, covering Instagram, TikTok, Snapchat and YouTube (Snapchat is something Modash does not cover), with real numbers from creators' own insights replacing estimates once approved.
+The creators, the campaign data and the analysis are HelloVoice's own: run end to end by the agency that produced the content, covering Instagram, TikTok, Snapchat and YouTube, with real numbers from creators' own insights replacing estimates once approved.
 
 ## Operating Context
 
