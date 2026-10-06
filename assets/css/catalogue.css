@@ -1119,13 +1119,18 @@ body[data-page="selection"] .cat-card__check { display: none; }
 }
 .cat-track:hover { background: var(--lime); color: var(--ink); border-color: var(--lime); }
 .cat-track:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 3px; }
+/* A filled button in both states (analysis ready, or ask for one): lime with
+   ink text, turning ink with lime text on hover. An outline alone read as a
+   label, not something to press. */
 .cat-card__analysis {
   display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; min-height: 40px; padding: 0 16px;
-  border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.2); color: var(--ink); text-decoration: none;
+  border-radius: var(--r-pill); border: 1px solid var(--lime); text-decoration: none;
+  background: var(--lime); color: var(--ink); cursor: pointer;
   font-size: 14px; font-weight: 600; position: relative; z-index: 2;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
 }
-.cat-card__analysis.is-ready { background: var(--lime); border-color: var(--lime); }
 .cat-card__analysis:hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .cat-card__analysis { transition: none; } }
 .cat-card__analysis:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
 @media (max-width: 640px) { .cat-track { font-size: 16px; padding: 10px 16px; } }
 
