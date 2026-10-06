@@ -336,7 +336,7 @@
     var rows = ranked(list).slice(0, 5);
     $("w-top").innerHTML = head(IC.top, "Creators leaderboard", filtered() ? "Ranked by views in this view." : scoreTip(), "creators")
       + '<div class="db-card__body">' + (filtered() ? "" : '<div class="db-top__how">' + scoreBar(true) + "</div>") + (filtered() ? '<div class="db-top__cols"><span>Creator</span><b>Reached</b></div>' : "") + (rows.map(function (r, i) {
-                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " post · " : " posts · ") + num(r.c.seen != null ? r.c.seen : r.c.views) + " views" + '</small>' + (filtered() ? "" : splitBar(r.c)) + '</span><span class="db-rank__score" title="' + (filtered() ? "People reached in this view" : "Score out of 100") + '">' + r.label + "</span></div>";
+                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " post · " : " posts · ") + num(r.c.seen != null ? r.c.seen : r.c.views) + " views" + '</small></span><span class="db-rank__score" title="' + (filtered() ? "People reached in this view" : "Score out of 100") + '">' + r.label + "</span></div>";
       }).join("") || '<p class="db-note">No creators in this view.</p>') + "</div>";
   }
 
@@ -450,13 +450,6 @@
     return '<div class="db-scorebar' + (small ? " db-scorebar--s" : "") + '">' + parts.map(function (x) {
       return '<i style="flex:' + x[1] + ";background:" + x[2] + '"><b>' + Math.round(x[1] * 100) + "</b></i>"; }).join("") + '</div><div class="db-scorekey' + (small ? " db-scorekey--s" : "") + '">'
       + parts.map(function (x) { return '<div><i style="background:' + x[2] + '"></i><b>' + x[0] + "</b>" + (small ? "" : "<small>" + x[3] + "</small>") + "</div>"; }).join("") + "</div>";
-  }
-  // One creator's points, split by where they came from, as wide as their score.
-  function splitBar(c) {
-    var q = c.parts; if (!q || c.score == null) return "";
-    var vals = [q.exposure, q.engagement, q.er, q.clicks], cols = [SCORECOL.exposure, SCORECOL.engagement, SCORECOL.er, SCORECOL.clicks];
-    return '<span class="db-split" style="width:' + Math.max(8, Math.min(100, c.score)) + '%" title="Points from ' + scoreParts().map(function (x) { return x[0].toLowerCase(); }).join(", ") + '">'
-      + vals.map(function (v, i) { return v > 0 ? '<i style="flex:' + v + ";background:" + cols[i] + '"></i>' : ""; }).join("") + "</span>";
   }
   // The campaign's objective as shares: how much of a creator's score is
   // awareness, engagement and clicks.

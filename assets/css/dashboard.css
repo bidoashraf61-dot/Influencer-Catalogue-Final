@@ -66,7 +66,7 @@
 .db-grid {
   flex: 1; display: grid; gap: var(--gap); min-height: 0;
   grid-template-columns: repeat(12, 1fr);
-  grid-template-rows: auto auto minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1.45fr) minmax(0, 1fr);
   grid-template-areas:
     "obj obj obj obj obj obj obj obj obj obj obj obj"
     "kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi kpi"
@@ -476,8 +476,6 @@
 .db-scorekey--s div { display: flex; align-items: center; gap: 5px; }
 .db-scorekey--s b { font-size: 11px; font-weight: 600; color: var(--gray); }
 .db-top__how { padding-bottom: 8px; margin-bottom: 4px; border-bottom: 1px solid #f0ede7; }
-.db-split { display: flex; height: 4px; border-radius: 2px; overflow: hidden; gap: 1px; margin-top: 3px; background: transparent; }
-.db-split i { display: block; }
 .db-obj { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .db-obj__t { position: relative; background: #f6f4f0; border-radius: 14px; padding: 12px 14px 12px 18px; display: grid; gap: 1px; overflow: hidden; }
 .db-obj__t > i { position: absolute; left: 0; top: 0; bottom: 0; width: 5px; }
@@ -488,8 +486,3 @@
 
 .db-top .db-rank { min-height: 32px; }
 .db-top__how { margin-bottom: 2px; }
-/* each creator's points as an underline along the row: as wide as their score, coloured by where the points came from */
-.db-top .db-rank { position: relative; }
-.db-top .db-rank .db-split { position: absolute; left: 0; bottom: 0; height: 3px; margin: 0; border-radius: 0 2px 2px 0; }
-.db-top .db-rank { padding-bottom: 6px; }
-.db-top .db-rank .db-split { height: 3px; bottom: 1px; }
