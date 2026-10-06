@@ -1838,7 +1838,10 @@ def ensure_link(cid, code, conn):
         conn.execute("UPDATE links SET active = 1 WHERE campaign_id = ? AND code = ?", (cid, code))
         return row["slug"]
     k = conn.execute("SELECT id, name FROM campaigns WHERE id = ?", (cid,)).fetchone()
-    base = (campaign_slug(k) + "-" + slugify(code, 20)).strip("-")
+    # Short on purpose, it is typed into bios and stories: "penduline-mc-003".
+    # Links already issued keep the slug they have.
+    short = re.sub(r"^hv-", "", slugify(code, 20))
+    base = ((slugify(k["name"], 10) or "c%d" % cid) + "-" + short).strip("-")
     slug, n = base, 2
     while conn.execute("SELECT 1 FROM links WHERE slug = ?", (slug,)).fetchone():
         slug, n = "%s-%d" % (base, n), n + 1

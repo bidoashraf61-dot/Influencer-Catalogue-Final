@@ -1951,13 +1951,10 @@ def _money(lo, hi):
 
 
 def selection_link(sel, origin):
-    """What the client is sent. The page reads the creators and prices from
-    the server by token; the name and codes ride along so the link still reads
-    as a selection before anything has loaded."""
-    from urllib.parse import quote
-    codes = json.loads(sel["codes"] or "[]")
-    return (origin + "/selection/#n=" + quote(sel["name"]) + "&c=" + ",".join(codes)
-            + "&s=" + sel["token"])
+    """What the client is sent: just the token, about 40 characters. The page
+    reads the name, creators and prices from the server by it. Older long links
+    (#n=…&c=…&s=…) keep working."""
+    return origin + "/selection/#s=" + sel["token"]
 
 
 def selections_page(sels, error=None, message=None, origin="", archived=False, n_archived=0, page_no=1, total=0,
