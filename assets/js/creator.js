@@ -249,6 +249,28 @@
   }
 
   /* one metric row: label, a bar against the largest in its group, the value */
+  // Each bar is measured against what a strong creator of this size gets for
+  // THAT measure — likes against strong likes, comments against strong
+  // comments — not against impressions, which are always far bigger. The
+  // tick is the typical level. Guides by size: engagement = likes + comments
+  // per 100 followers (strong / typical), comments ≈ 3% of reactions,
+  // reach ≈ share of followers who see a post.
+  var SIZE_ER = [[10000, 4, 2], [50000, 3, 1.5], [500000, 2, 1], [1000000, 1.5, 0.8], [Infinity, 1, 0.5]];
+  function refs(f) {
+    if (!f) return null;
+    var er = SIZE_ER.filter(function (x) { return f < x[0]; })[0];
+    var reach = [f * 0.30, f * 0.10];
+    return { likes: [f * er[1] / 100 * 0.97, f * er[2] / 100 * 0.97], comments: [f * er[1] / 100 * 0.03, f * er[2] / 100 * 0.03],
+             reach: reach, impressions: [reach[0] * 1.5, reach[1] * 1.5], views: reach, shares: [f * er[1] / 100 * 0.05, f * er[2] / 100 * 0.05],
+             story: [f * 0.08, f * 0.04] };
+  }
+  function scaled(items, colour) {
+    return '<div class="pp-rows">' + items.map(function (r) {
+      if (!r.ref || r.v == null || r.text === "Hidden") return '<div class="pp-row"><span>' + r.label + '</span><i class="pp-row__bar"></i><strong>' + r.text + "</strong></div>";
+      var strong = r.ref[0], typ = r.ref[1], w = Math.min(100, r.v / strong * 100), g = r.v >= strong ? "good" : r.v >= typ ? "ok" : "low";
+      return '<div class="pp-row"><span>' + r.label + '</span><i class="pp-row__bar pp-row__bar--ref" title="Compared with a strong result for creators this size: typical ' + num(typ) + ", strong " + num(strong) + '"><b class="' + g + '" style="width:' + Math.max(2, w).toFixed(1) + "%" + (colour ? ";background:" + colour : "") + '"></b><u style="left:' + (typ / strong * 100).toFixed(1) + '%"></u></i><strong>' + r.text + "</strong></div>";
+    }).join("") + '<p class="pp-rows__key">Each bar is compared with a strong result for creators this size · the tick is typical</p></div>';
+  }
   function rows(items, colour) {
     var peak = Math.max.apply(null, items.map(function (r) { return r.v || 0; }).concat([1]));
     return '<div class="pp-rows">' + items.map(function (r) {
@@ -337,12 +359,18 @@
     });
     return s + "</svg>";
   }
+  // The source report paints the median bar grey only when the creator is
+  // somewhere else; when the creator sits in the median bar it carries the
+  // creator's colour and no grey bar is drawn. So no median given = the
+  // creator is the median, and the chart says so.
   function dist(d, colour) {
-    var b = d.buckets || [];
+    var b = d.buckets || [], atMedian = d.creator != null && (d.median == null || d.median === d.creator);
     return '<div class="pp-dist" role="img" aria-label="Distribution among similar creators">' + b.map(function (x, i) {
       var who = i === d.creator ? " is-creator" : (i === d.median ? " is-median" : "");
-      return '<div class="pp-dist__col' + who + '"><i style="height:' + Math.max(3, x.h) + "%" + (who === " is-creator" && colour ? ";background:" + colour : "") + '"></i><span>' + esc(x.label) + "</span></div>";
-    }).join("") + '</div><p class="pp-dist__key"><span class="k-creator"' + (colour ? ' style="background:' + colour + '"' : "") + '></span>Creator<span class="k-median"></span>Median<span class="k-other"></span>Other creators</p>';
+      return '<div class="pp-dist__col' + who + (i === d.creator && atMedian ? " is-both" : "") + '">' + (i === d.creator && atMedian ? '<em class="pp-dist__tag">Median</em>' : "")
+        + '<i style="height:' + Math.max(3, x.h) + "%" + (who === " is-creator" && colour ? ";background:" + colour : "") + '"></i><span>' + esc(x.label) + "</span></div>";
+    }).join("") + '</div><p class="pp-dist__key"><span class="k-creator"' + (colour ? ' style="background:' + colour + '"' : "") + '></span>Creator'
+      + (atMedian ? '<b class="pp-dist__same">· sits exactly at the median (typical for this size)</b>' : '<span class="k-median"></span>Median') + '<span class="k-other"></span>Other creators</p>';
   }
 
   /* content: all content / reels / stories, collaborations, ER distribution */
@@ -358,25 +386,39 @@
     if (a.avg_likes != null) all.push({ label: "Average likes", v: a.avg_likes, text: num(a.avg_likes) });
     else if (a.likes_hidden) all.push({ label: "Average likes", v: 0, text: "Hidden" });
     if (a.avg_comments != null) all.push({ label: "Average comments", v: a.avg_comments, text: num(a.avg_comments) });
-    list.push({ label: "All content", html: erBlock(a.er, a.er_note, "Engagement rate") + rows(all, "#5b4bd6") });
+    var R = refs(a.followers || (D.creator && D.creator.followers));
+    function tag(list, map) { if (R) list.forEach(function (x) { x.ref = R[map[x.label]]; }); return list; }
+    var M = { "Estimated impressions": "impressions", "Estimated reach": "reach", "Average views": "views", "Average likes": "likes",
+              "Average comments": "comments", "Average reel plays": "views", "Average shares": "shares" };
+    list.push({ label: "All content", html: erBlock(a.er, a.er_note, "Engagement rate") + (R ? scaled(tag(all, M), "#5b4bd6") : rows(all, "#5b4bd6")) });
     var reels = [];
     if (a.avg_reel_plays != null) reels.push({ label: "Average reel plays", v: a.avg_reel_plays, text: num(a.avg_reel_plays) });
     if (a.avg_reel_likes != null) reels.push({ label: "Average likes", v: a.avg_reel_likes, text: num(a.avg_reel_likes) });
     if (a.avg_reel_comments != null) reels.push({ label: "Average comments", v: a.avg_reel_comments, text: num(a.avg_reel_comments) });
     if (a.avg_reel_shares != null) reels.push({ label: "Average shares", v: a.avg_reel_shares, text: num(a.avg_reel_shares) });
-    if (reels.length || a.reels_er != null) list.push({ label: "Reels", html: (a.reels_er != null ? erBlock(a.reels_er, a.reels_er_note, "Engagement rate") : "") + rows(reels, "#ff691e") });
+    if (reels.length || a.reels_er != null) list.push({ label: "Reels", html: (a.reels_er != null ? erBlock(a.reels_er, a.reels_er_note, "Engagement rate") : "") + (R ? scaled(tag(reels, M), "#ff691e") : rows(reels, "#ff691e")) });
     var st = [];
     if (a.story_reach != null) st.push({ label: "Estimated reach", v: a.story_reach, text: num(a.story_reach) });
     if (a.story_impressions != null) st.push({ label: "Estimated impressions", v: a.story_impressions, text: num(a.story_impressions) });
-    if (st.length) list.push({ label: "Stories", html: rows(st, "#14884a") });
+    if (st.length) list.push({ label: "Stories", html: R ? scaled(st.map(function (x) { x.ref = x.label === "Estimated reach" ? R.story : [R.story[0] * 1.2, R.story[1] * 1.2]; return x; }), "#14884a") : rows(st, "#14884a") });
     tabs("pp-perf-tabs", "pp-perf", list, function (t) { return '<div class="pp-perf">' + t.html + "</div>"; });
   }
   function collab() {
     var a = D.analysis, co = [], out = "";
-    if (a.paid_post_performance != null) co.push(["Paid engagement", pct2(a.paid_post_performance)]);
-    if (a.paid_views_pct != null) co.push(["Paid views", pct2(a.paid_views_pct)]);
+    // A plain-words line under each figure: 100% = sponsored posts do as
+    // well as the creator's normal posts.
+    function said(v, what) {
+      if (v >= 110) return ["good", "Ads do better than normal posts"];
+      if (v >= 85) return ["good", "Ads do about as well as normal posts"];
+      if (v >= 50) return ["ok", "Ads get less " + what + " than normal posts"];
+      if (v >= 5) return ["low", "Ads get much less " + what + " than normal posts"];
+      return ["low", "Ads get almost no " + what + " compared with normal posts"];
+    }
+    if (a.paid_post_performance != null) co.push(["Paid engagement", pct2(a.paid_post_performance), said(a.paid_post_performance, "likes and comments")]);
+    if (a.paid_views_pct != null) co.push(["Paid views", pct2(a.paid_views_pct), said(a.paid_views_pct, "views")]);
     if (co.length) out += '<div class="pp-collab"><h3 class="pp-h3">Collaborations</h3><div class="pp-tiles">'
-      + co.map(function (x) { return "<div><span>" + x[0] + "</span><b>" + x[1] + "</b></div>"; }).join("") + "</div></div>";
+      + co.map(function (x) { return "<div><span>" + x[0] + "</span><b>" + x[1] + '</b><small class="pp-said pp-said--' + x[2][0] + '">' + esc(x[2][1]) + "</small></div>"; }).join("") + "</div>"
+      + '<p class="pp-rows__key">100% means sponsored posts do as well as the creator\'s normal posts</p></div>';
     if (a.er_dist) out += '<div class="pp-collab pp-card"><h3 class="pp-h3">Engagement rate distribution</h3>' + dist(a.er_dist, "#14884a") + "</div>";
     if (out) $("pp-perf").insertAdjacentHTML("beforeend", out);
   }
