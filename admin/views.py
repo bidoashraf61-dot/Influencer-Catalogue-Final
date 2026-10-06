@@ -171,6 +171,9 @@ tr.flash td{animation:flash 2.4s ease-out}
 .stars .dim{color:#d8d2cc}
 .acct{font-size:12px;color:var(--gray)}
 .sel-table input{max-width:130px}
+.btn.lime{background:var(--lime);color:var(--ink);border-color:var(--lime)}
+.btn.lime:hover{background:var(--ink);color:var(--lime);border-color:var(--ink)}
+td.nowrap{white-space:nowrap}
 tr.linkrow.is-off td{background:#f6f4f1}
 tr.linkrow.is-off td:not(:last-child){opacity:.55}
 tr.linkrow:target td{box-shadow:inset 0 2px 0 var(--ink),inset 0 -2px 0 var(--ink)}
@@ -2089,6 +2092,23 @@ def campaign_start_card(sel, campaigns):
         + "</button></form></div>")
 
 
+def status_button(k):
+    """Go live / take offline, right on the campaigns list. Live is what puts
+    the report in front of the client, under their passcode."""
+    to, label, cls, ask = {
+        "draft": ("live", "Go live", "btn small lime",
+                  "Go live? The client sees this campaign's report on the catalogue under their passcode."),
+        "live": ("draft", "Take offline", "btn small ghost",
+                 "Take this campaign offline? The client stops seeing its report."),
+        "ended": ("live", "Reopen", "btn small ghost", "Reopen this campaign as live?"),
+    }.get(k["status"], ("live", "Go live", "btn small lime", "Go live?"))
+    return ("<form method='post' action='" + u("/campaigns/status") + "' class='inline' "
+            "onsubmit=\"return confirm('" + e(ask.replace("'", "’")) + "')\">"
+            "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
+            "<input type='hidden' name='status' value='" + to + "'>"
+            "<button class='" + cls + "'>" + label + "</button></form> ")
+
+
 def campaigns_page(camps, codes, error=None, message=None):
     note = ""
     if error:
@@ -2105,7 +2125,8 @@ def campaigns_page(camps, codes, error=None, message=None):
             + "<td>" + e(who) + "</td><td>" + status_pill(k["status"]) + "</td>"
             + "<td>" + _dates(k) + "</td><td>" + str(k["creators"]) + "</td>"
             + "<td class='muted'>" + ago(k["updated_at"]) + "</td>"
-            + "<td class='right'><a class='btn small' href='" + u("/campaigns/edit") + "?id="
+            + "<td class='right nowrap'>" + status_button(k)
+            + "<a class='btn small' href='" + u("/campaigns/edit") + "?id="
             + str(k["id"]) + "'>Open</a></td></tr>")
     table = "".join(rows) or ("<tr><td colspan='7' class='muted'>No campaigns yet. Start one from a "
                               "selection, or create a blank one above.</td></tr>")
@@ -2197,6 +2218,11 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
             + "<input type='hidden' name='code' value='" + e(code) + "'></td><td>" + accounts + "</td>"
             + "<td><input name='planned' value='" + ("" if c["planned"] is None else str(c["planned"]))
             + "' placeholder='e.g. 2' inputmode='numeric' style='width:80px'></td>"
+            + "<td><select name='pending_status' style='min-width:150px'>" + "".join(
+                "<option value='" + e(v) + "'" + (" selected" if (c["pending_status"] if "pending_status" in c.keys() else None) == v else "")
+                + ">" + e(v or "—") + "</option>" for v in [""] + __import__("db").PENDING_STATUSES) + "</select>"
+            + "<input type='date' name='pending_date' value='" + e((c["pending_date"] if "pending_date" in c.keys() else "") or "")
+            + "' title='When the next post is expected' style='margin-top:6px'></td>"
             + "<td><input name='cost' value='" + (format(cost, ",") if cost is not None else "")
             + "' placeholder='fee' inputmode='numeric'></td>"
             + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code) + "'> remove</label></td></tr>")
@@ -2277,7 +2303,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                "Untick steps this campaign does not include. Mark the one under way as In progress — the client sees it highlighted.")
         + step(3, "Creators &amp; posts planned",
                "<table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Accounts tracked</th>"
-               "<th>Posts planned</th><th>Fee to us (SAR)</th><th></th></tr></thead><tbody>" + table + "</tbody></table>"
+               "<th>Posts planned</th><th>Posts still to come</th><th>Fee to us (SAR)</th><th></th></tr></thead><tbody>" + table + "</tbody></table>"
                "<div class='row' style='margin-top:14px'><div style='flex:2'><label>Add creators by profile link or code</label>"
                "<textarea name='add' rows='3' placeholder='https://www.instagram.com/handle/\nhttps://www.tiktok.com/@handle\nHV-MC-005'></textarea>"
                "<div class='price-hint'>One per line, or separated by commas — Instagram, TikTok, Snapchat, "
@@ -2285,7 +2311,9 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                "roster has under another platform is added to that creator; one it does not have at all "
                "is added as a new creator, hidden from clients until you complete their details.</div></div>"
                "<div><label>Platform tracked</label><select name='platform'>" + plat_opts + "</select></div></div>",
-               "Posts planned is what each creator is booked for; the report counts delivered against it. Fees stay internal.")
+               "Posts planned is what each creator is booked for; the report counts delivered against it. "
+               "Each booked post not live yet shows on the client's report as a Pending card with the status "
+               "and expected date you set here. Fees stay internal.")
         + step(4, "What counts as a campaign post",
                "<label>Hashtags, @mentions and keywords</label>"
                "<textarea name='rules' placeholder='#svr #suncare @svr_ksa sunscreen'>" + e(_rules_text(rules)) + "</textarea>"

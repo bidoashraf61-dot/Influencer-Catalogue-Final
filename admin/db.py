@@ -466,6 +466,13 @@ def migrate(conn):
         # How many posts this creator is booked for — what "delivered" is
         # counted against on the status board.
         conn.execute("ALTER TABLE campaign_creators ADD COLUMN planned INTEGER")
+    cc_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaign_creators)")}
+    if "pending_status" not in cc_cols:
+        # Where a creator's posts still to come stand ("Shooting", "Scheduled"…)
+        # and when the next one is expected — shown on the client's report as a
+        # Pending card for each booked post not live yet.
+        conn.execute("ALTER TABLE campaign_creators ADD COLUMN pending_status TEXT")
+        conn.execute("ALTER TABLE campaign_creators ADD COLUMN pending_date TEXT")
 
     # Links were one per creator per campaign. Custom links (several per
     # creator, each with its own name and destination) need that rule gone;
@@ -1732,7 +1739,7 @@ def campaign_creators(cid):
     with connect() as conn:
         return conn.execute(
             "SELECT r.*, x.code cc_code, x.cost campaign_cost, x.sort cc_sort, x.added_at, "
-            "x.insights_token, x.planned "
+            "x.insights_token, x.planned, x.pending_status, x.pending_date "
             "FROM campaign_creators x LEFT JOIN creators r ON r.code = x.code "
             "WHERE x.campaign_id = ? ORDER BY x.sort, x.added_at, x.code", (cid,)).fetchall()
 
@@ -1983,6 +1990,18 @@ def campaign_logos(campaign):
     except ValueError:
         got = []
     return [x for x in got if isinstance(x, str)]
+
+
+PENDING_STATUSES = ["Coming soon", "Briefing", "Concept approval", "Waiting for product", "Shooting",
+                    "Editing", "Client review", "Scheduled", "Delayed"]
+
+
+def set_pending(cid, pending):
+    """{code: (status, YYYY-MM-DD or None)} for the posts still to come."""
+    with connect() as conn:
+        for code, (status, date) in pending.items():
+            conn.execute("UPDATE campaign_creators SET pending_status = ?, pending_date = ? "
+                         "WHERE campaign_id = ? AND code = ?", (status, date, cid, code))
 
 
 def set_planned(cid, planned):

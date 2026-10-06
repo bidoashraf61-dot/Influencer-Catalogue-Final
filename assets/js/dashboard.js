@@ -418,7 +418,7 @@
       var list = topPosts(posts());
       if (byKind === true) {
         var g = {}; list.forEach(function (p) { (g[p.kind] = g[p.kind] || []).push(p); });
-        return Object.keys(g).map(function (k) { return "<h3>" + esc(KIND[k] || k) + " · " + g[k].length + '</h3><div class="db-wall">' + g[k].map(post).join("") + "</div>"; }).join("");
+        return Object.keys(g).map(function (k) { return "<h3>" + esc(KIND[k] || k) + " · " + g[k].length + '</h3><div class="db-wall">' + g[k].map(post).join("") + "</div>"; }).join("") + pendingWall();
       }
       return '<div class="db-wall">' + list.map(post).join("") + "</div>";
     },
@@ -455,6 +455,22 @@
     if (p.view_rate != null && p.video) out.push(["View rate", pct(p.view_rate, 1)]);
     return out;
   }
+  // Booked posts not live yet, each a card with where it stands.
+  function pendingWall() {
+    var out = [];
+    (R.creators || []).forEach(function (c) {
+      for (var i = (c.delivered || 0); i < (c.planned || 0); i++) out.push({ c: c, n: i + 1 });
+    });
+    if (!out.length || filtered()) return "";
+    return "<h3>Pending · " + out.length + '</h3><div class="db-wall">' + out.map(function (x) {
+      var c = x.c, pic = c.photo_large || c.photo;
+      return '<div class="db-post db-post--pending"><div class="db-post__img">' + (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
+        + '<span class="db-kind db-kind--pending">Pending</span></div><div class="db-post__body"><b>' + esc(c.name) + "</b><span>"
+        + esc(c.pending_status || "Coming soon") + " · " + esc(c.pending_date ? day(c.pending_date) : "date to be confirmed")
+        + " · post " + x.n + " of " + c.planned + "</span></div></div>";
+    }).join("") + "</div>";
+  }
+
   function post(p) {
     return '<a class="db-post" href="' + esc(p.url) + '" target="_blank" rel="noopener"><div class="db-post__img">' + (p.thumb ? '<img src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
       + (p.kind ? '<span class="db-kind">' + esc(ONE[p.kind] || p.kind) + "</span>" : "")

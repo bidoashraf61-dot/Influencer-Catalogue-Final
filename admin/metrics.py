@@ -258,6 +258,8 @@ def report(campaign, internal=False):
         followers = m["followers"]
         row = {"code": code, "name": m["name"] or code, "photo": m["photo"],
                "followers": followers, "planned": m["planned"], "delivered": delivered,
+               "pending_status": (m["pending_status"] if "pending_status" in m.keys() else None),
+               "pending_date": (m["pending_date"] if "pending_date" in m.keys() else None),
                "profiles": db.split_profiles(m["profiles"]) if m["code"] else [],
                "band": band_of(followers), **t}
         row["er_grade"] = grade(t["er"], bm["er"][band_of(followers)]) if t["er"] is not None else None
@@ -523,7 +525,8 @@ def client_report(campaign, photo=None, photo_large=None):
     for c in r["creators"]:
         row = {k: c[k] for k in ("code", "name", "followers", "posts", "likes", "comments", "engagement",
                                  "views", "reach", "impressions", "shares", "saves", "er", "video_er",
-                                 "clicks", "planned", "delivered", "profiles", "band", "er_grade",
+                                 "clicks", "planned", "delivered", "pending_status", "pending_date",
+                                 "profiles", "band", "er_grade",
                                  "video_er_grade", "score", "rank", "badge")}
         row["photo"] = pics.get(c["code"])
         row["photo_large"] = photo_large(c["photo"]) if photo_large and c["photo"] else None

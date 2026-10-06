@@ -500,8 +500,9 @@
       return (!FILTER.section || p.section === FILTER.section) && (!FILTER.platform || p.platform === FILTER.platform)
         && (!FILTER.kind || p.kind === FILTER.kind);
     });
-    if (!list.length) { $("mx-wall").innerHTML = '<p class="mx-empty-note">No posts yet. They appear here within 24 hours of going live.</p>'; return; }
-    $("mx-wall").innerHTML = list.map(function (p) {
+    var owed = pendingCards();
+    if (!list.length && !owed.length) { $("mx-wall").innerHTML = '<p class="mx-empty-note">No posts yet. They appear here within 24 hours of going live.</p>'; return; }
+    $("mx-wall").innerHTML = owed.length && !list.length ? owed.map(pendingCard).join("") : list.map(function (p) {
       var est = function (real) { return real ? "" : '<span class="mx-est">est.</span>'; };
       var n = [];
       if (p.video) n.push(["Views", num(p.views)]);
@@ -520,7 +521,32 @@
         + n.slice(0, 6).map(function (x) { return "<div><dt>" + x[0] + "</dt><dd>" + x[1] + "</dd></div>"; }).join("")
         + '</dl><a class="mx-post__go" href="' + esc(p.url) + '" target="_blank" rel="noopener">View on ' + esc(p.platform)
         + ' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a></div></article>';
-    }).join("");
+    }).join("") + (list.length ? owed.map(pendingCard).join("") : "");
+  }
+
+  // A card for every booked post that is not live yet: the creator, where
+  // the post stands and when it is expected, so the client sees the whole
+  // plan and not only what has gone out.
+  function pendingCards() {
+    if (FILTER.section === "other" || FILTER.kind) return [];
+    var out = [];
+    (R.creators || []).forEach(function (c) {
+      if (FILTER.platform && !(c.profiles || []).some(function (p) { return p.platform === FILTER.platform; })) return;
+      var owed = (c.planned || 0) - (c.delivered || 0);
+      for (var i = 0; i < owed; i++) out.push({ c: c, n: (c.delivered || 0) + i + 1 });
+    });
+    return out;
+  }
+  function pendingCard(x) {
+    var c = x.c, when = c.pending_date ? "Expected " + day(c.pending_date) : "Date to be confirmed";
+    var pic = c.photo_large || c.photo;
+    return '<article class="mx-post mx-post--pending"><div class="mx-post__media"><div class="mx-post__plate"></div>'
+      + (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "")
+      + '<span class="mx-post__pending">Pending</span></div><div class="mx-post__body"><div class="mx-who">' + ava(c.photo)
+      + "<div><b>" + esc(c.name) + "</b><span>Post " + x.n + " of " + c.planned + '</span></div></div><dl class="mx-nums">'
+      + "<div><dt>Status</dt><dd>" + esc(c.pending_status || "Coming soon") + "</dd></div>"
+      + "<div><dt>When</dt><dd>" + esc(when) + "</dd></div></dl>"
+      + '<p class="mx-post__soon">Not live yet — its numbers appear here once it is posted.</p></div></article>';
   }
 
   /* -------------------------------------------------------- leaderboard */

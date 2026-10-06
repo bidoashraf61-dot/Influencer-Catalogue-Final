@@ -624,3 +624,13 @@
 .mx-none > * { min-width: 0; }
 .mx-none__brands { flex-wrap: wrap; min-width: 0; }
 @media (max-width: 860px) { .mx-none { grid-template-columns: minmax(0, 1fr); } .mx-none__ghost { padding: 18px; } .mx-none__brands b { font-size: 20px; } }
+
+/* A booked post not live yet: the creator's picture greyed under a Pending
+   label, with where it stands and when it is due. */
+.mx-post--pending .mx-post__media img { filter: grayscale(1) blur(2px); opacity: .45; }
+.mx-post__pending {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%) rotate(-4deg); z-index: 3;
+  font-family: var(--heading, Bebasneue, Arial, sans-serif); font-size: 26px; letter-spacing: .08em;
+  background: var(--ink, #121212); color: var(--lime, #e8ff76); padding: 8px 20px; border-radius: 999px;
+}
+.mx-post__soon { margin: 10px 0 0; font-size: 12px; color: var(--gray, #383838); }

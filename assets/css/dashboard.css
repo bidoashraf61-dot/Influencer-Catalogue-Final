@@ -318,3 +318,6 @@
   .db-wall { grid-template-columns: 1fr; }
   .db-post__img { aspect-ratio: 16 / 10; }
 }
+
+.db-post--pending .db-post__img img { filter: grayscale(1); opacity: .45; }
+.db-kind--pending { background: var(--ink, #121212) !important; color: var(--lime, #e8ff76) !important; }

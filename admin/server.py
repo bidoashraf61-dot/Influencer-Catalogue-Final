@@ -602,6 +602,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_campaign_new()
         if path == "/campaigns/save":
             return self.post_campaign_save()
+        if path == "/campaigns/status":
+            return self.post_campaign_status()
         if path == "/campaigns/delete":
             return self.post_campaign_delete()
         if path == "/campaigns/link":
@@ -685,6 +687,25 @@ class Handler(BaseHTTPRequestHandler):
             for args in held:
                 self.send(*args)
         return out
+
+    def post_campaign_status(self):
+        """Go live / take offline from the campaigns list."""
+        f = self.form_body()
+        cid, to = (f.get("id") or "").strip(), (f.get("status") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None or to not in db.CAMPAIGN_STATUSES:
+            return self.redirect("/campaigns")
+        if to == "live":
+            missing = [what for what, ok in (("first and last day", k["starts_at"] and k["ends_at"]),
+                                             ("the client's access code", k["code_id"]))
+                       if not ok]
+            if missing:
+                return self.redirect("/campaigns?e=" + urllib.parse.quote(
+                    "%s can't go live yet — set %s on its Setup tab." % (k["name"], " and ".join(missing))))
+        db.save_campaign(k["id"], status=to)
+        word = {"live": "is live — the client sees its report on the catalogue",
+                "draft": "is offline — the client no longer sees it", "ended": "has ended"}[to]
+        return self.redirect("/campaigns?ok=" + urllib.parse.quote("%s %s." % (k["name"], word)))
 
     def post_history_undo(self):
         f = self.form_body()
@@ -1381,7 +1402,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/campaigns/edit?id=%d" % cid)
 
     def post_campaign_save(self):
-        f = self.form_body(multi=("code", "cost", "drop", "planned", "logo", "logo_file"))
+        f = self.form_body(multi=("code", "cost", "drop", "planned", "logo", "logo_file",
+                                  "pending_status", "pending_date"))
         cid = (f.get("id") or "").strip()
         k = db.campaign(int(cid)) if cid.isdigit() else None
         if k is None:
@@ -1490,6 +1512,14 @@ class Handler(BaseHTTPRequestHandler):
             n = "".join(ch for ch in (n or "") if ch.isdigit())
             planned[code.strip().upper()] = int(n) if n else None
         db.set_planned(k["id"], planned)
+        statuses, dates = f.get("pending_status") or [], f.get("pending_date") or []
+        pending = {}
+        for i, code in enumerate(codes_in):
+            st = (statuses[i] if i < len(statuses) else "").strip()
+            dt = (dates[i] if i < len(dates) else "").strip()
+            pending[code.strip().upper()] = (st if st in db.PENDING_STATUSES else None,
+                                             dt if db.day_bounds(dt, None) is not None else None)
+        db.set_pending(k["id"], pending)
         db.save_campaign_creators(k["id"], costs, remove)
         if adds:
             db.add_campaign_creators(k["id"], adds)
@@ -2436,6 +2466,7 @@ TRACKED = {
     "/campaigns/new": ("campaign", None, "Created campaign"),
     "/campaigns/save": ("campaign", "id", "Saved campaign"),
     "/campaigns/delete": ("campaign", "id", "Deleted campaign"),
+    "/campaigns/status": ("campaign", "id", "Changed status of campaign"),
     "/campaigns/link": ("campaign", "id", "Changed a tracking link"),
     "/campaigns/link/custom": ("campaign", "id", "Added a tracking link"),
     "/campaigns/link/toggle": ("campaign", "id", "Switched a tracking link"),
