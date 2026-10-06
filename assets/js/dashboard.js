@@ -607,6 +607,22 @@
     $("db-panel-close").focus();
   }
   function closePanel() { $("db-scrim").hidden = true; $("db-panel").hidden = true; if (lastFocus) lastFocus.focus(); }
+  // Info tips: one floating box placed beside the "i", flipped and clamped
+  // so it never runs off the screen or under the next card.
+  var tipEl = null;
+  function showTip(t) {
+    hideTip();
+    tipEl = document.createElement("div"); tipEl.className = "db-tip"; tipEl.setAttribute("role", "tooltip");
+    tipEl.textContent = t.getAttribute("data-tip"); document.body.appendChild(tipEl);
+    var r = t.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight, vw = innerWidth, vh = innerHeight;
+    var x = Math.max(8, Math.min(r.left, vw - w - 8)), y = r.bottom + 8;
+    if (y + h > vh - 8) y = Math.max(8, r.top - h - 8);
+    tipEl.style.left = x + "px"; tipEl.style.top = y + "px";
+  }
+  function hideTip() { if (tipEl) { tipEl.remove(); tipEl = null; } }
+  ["mouseover", "focusin"].forEach(function (ev) { document.addEventListener(ev, function (e) { var t = e.target.closest && e.target.closest(".db-info"); if (t) showTip(t); }); });
+  ["mouseout", "focusout"].forEach(function (ev) { document.addEventListener(ev, function (e) { if (e.target.closest && e.target.closest(".db-info")) hideTip(); }); });
+  addEventListener("scroll", hideTip, true);
   document.addEventListener("click", function (e) { var b = e.target.closest("[data-area]"); if (b && b.closest("#cat-app")) openPanel(b.getAttribute("data-area")); });
   $("db-panel-close").addEventListener("click", closePanel);
   $("db-scrim").addEventListener("click", closePanel);
