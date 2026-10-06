@@ -123,6 +123,8 @@ def growth_line(page, ls, y_top, y_bot):
 
 
 def distribution(page, ls, y_top, y_bot):
+    if y_top is None or y_bot is None:
+        return None
     bars = sorted((d["rect"].x0, d["rect"].height, d.get("fill")) for d in page.get_drawings()
                   if y_top < d["rect"].y0 < y_bot and 55 < d["rect"].width < 70 and d["rect"].height > 3 and d.get("fill"))
     labels = sorted((x, t) for x, y, s, t in ls if y_top - 30 < y < y_bot and re.fullmatch(r"[<>]?\d+(\.\d+)?%", t))
