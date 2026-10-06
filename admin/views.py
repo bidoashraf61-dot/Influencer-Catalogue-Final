@@ -1632,7 +1632,6 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + "<p class='muted' style='font-size:13px;margin:0'>Both formats are "
           "read by the server itself — nothing to install, and .xlsx works "
           "wherever this is deployed.</p></form></div>"
-        + tiers_section(tiers, used)
         + "<h2>Attach photos in bulk</h2><div class='card'>"
         + "<p class='sub' style='margin-bottom:16px'>For creators who are "
           "already on the roster. Select a whole folder of images at once "
@@ -1663,6 +1662,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + "<p class='muted' style='font-size:13px;margin:0'>A photo already on "
           "file is replaced by the one you upload for that creator.</p>"
         + "</form></div>"
+        + tiers_section(tiers, used)
         + "<h2>Everyone</h2>"
         + "<form class='rsearch' method='get' action='" + u("/roster") + "'>"
           "<input name='q' value='" + e(q) + "' placeholder='Search name, code, "
