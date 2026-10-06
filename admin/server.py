@@ -500,7 +500,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/planner":
             return self.planner_get(query)
         if path == "/calculator":
-            return self.send(200, views.calculator_page(plans.library(), plans.sources()))
+            return self.send(200, views.calculator_page(
+                plans.library(), plans.sources(), initial=("c:" + query["id"]) if (query.get("id") or "").isdigit() else None,
+                ok=query.get("ok"), error=query.get("e")))
         if path == "/campaigns/thumb":
             f = thumbs.path_of("file:" + Path(query.get("n") or "").name)
             if f is None:
@@ -685,6 +687,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_settings_fx()
         if path == "/planner/apply":
             return self.post_planner_apply()
+        if path == "/calculator/save":
+            return self.post_calculator_save()
         if path == "/planner/library":
             return self.post_planner_library()
         if path == "/settings/save":
@@ -2210,6 +2214,39 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/planner?id=%d&ok=%s" % (k["id"], urllib.parse.quote(
             "Goals saved — the client's report now shows these targets and the benchmark.")))
 
+    def post_calculator_save(self):
+        """Save the figures worked out in the calculator as a campaign's goals:
+        the targets the client sees, its objective, and the benchmark ranges
+        behind them. The numbers are the ones typed on the page; the benchmark
+        and estimates are worked out here from the campaign's booked creators."""
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None:
+            return self.redirect("/calculator")
+        typ = f.get("type") if f.get("type") in ("awareness", "engagement", "conversion") else "awareness"
+        objective = {"awareness": "awareness", "engagement": "engagement", "conversion": "traffic"}[typ]
+        platform = f.get("platform") if f.get("platform") in plans.PLATFORMS else "Instagram"
+        category = f.get("category") if f.get("category") in plans.CATEGORIES else "other"
+        raw_budget = "".join(ch for ch in (f.get("budget") or "") if ch.isdigit() or ch == ".")
+        budget = float(raw_budget) if raw_budget else 0
+        targets = {}
+        for key in db.TARGET_KEYS:
+            raw = "".join(ch for ch in (f.get("target_" + key) or "") if ch.isdigit() or ch == ".")
+            if raw and raw.count(".") <= 1 and float(raw) > 0:
+                v = float(raw)
+                targets[key] = round(v, 2) if key == "er" else int(v)
+        p = plans.calculate({"platform": platform, "objective": objective, "category": category, "budget": budget,
+                             "tracked_links": typ == "conversion"}, plans.mix_from_campaign(k))
+        keep = {x: p.get(x) for x in ("platform", "objective", "category", "budget", "links", "posts",
+                                       "estimate", "floor", "target", "benchmark", "roi")}
+        keep["brief"] = {"type": typ, "platform": platform, "category": category, "budget": str(int(budget)) if budget else "", "source": "campaign"}
+        keep["agreed"] = targets
+        keep["saved_at"] = db.now()
+        db.save_campaign(k["id"], targets=targets, objective=objective, plan=keep)
+        return self.redirect("/calculator?id=%d&ok=%s" % (k["id"], urllib.parse.quote(
+            "Goals saved: the client's report now shows these targets and the benchmark.")))
+
     def post_planner_library(self):
         f = self.form_body()
         back = (f.get("back") or "").strip()
@@ -2669,6 +2706,7 @@ TRACKED = {
     "/settings/fx": ("settings", None, "Changed exchange rates"),
     "/planner/library": ("settings", None, "Changed the benchmark library"),
     "/planner/apply": ("campaign", "id", "Set goals from the ROI planner"),
+    "/calculator/save": ("campaign", "id", "Set goals from the calculator"),
     "/campaigns/link": ("campaign", "id", "Changed a tracking link"),
     "/campaigns/link/custom": ("campaign", "id", "Added a tracking link"),
     "/campaigns/link/toggle": ("campaign", "id", "Switched a tracking link"),

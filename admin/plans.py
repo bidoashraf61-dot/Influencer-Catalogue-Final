@@ -407,6 +407,12 @@ def sources():
                "creators": rows}
         sels.append(row); by_id[sel["id"]] = row
     camps = []
+    camp_of = {}
+    for k in db.list_campaigns():
+        if k["selection_id"] and k["selection_id"] not in camp_of:
+            camp_of[k["selection_id"]] = k["id"]
+    for row in sels:
+        row["campaign"] = camp_of.get(row["id"])
     for k in db.list_campaigns():
         members = []
         for m in db.campaign_creators(k["id"]):
@@ -423,5 +429,7 @@ def sources():
         if saved and saved >= 100:
             budget, from_ = [saved, saved], "the ROI planner"
         camps.append({"id": k["id"], "name": k["name"], "platform": k["platform"],
-                      "budget": budget, "budgetFrom": from_, "creators": members})
+                      "budget": budget, "budgetFrom": from_, "creators": members,
+                      "targets": db.campaign_targets(k), "objective": (k["objective"] if "objective" in k.keys() else None),
+                      "type": (((plan_of(k) or {}).get("brief") or {}).get("type")), "category": (plan_of(k) or {}).get("category")})
     return {"selections": sels, "campaigns": camps}

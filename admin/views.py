@@ -2433,10 +2433,10 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                "<div class='row'><div style='flex:3'><label>Campaign objective — decides how the leaderboard scores creators</label>"
                "<select name='objective'>" + obj_opts + "</select></div></div>"
                + "<div class='card' style='background:#f7f5f0;margin:14px 0 6px;display:flex;gap:14px;align-items:center;flex-wrap:wrap'>"
-                 "<div style='flex:1;min-width:240px'><strong>Set targets with the Goals &amp; ROI planner</strong>"
+                 "<div style='flex:1;min-width:240px'><strong>Set targets with the ROI calculator</strong>"
                  "<div class='price-hint'>Pick a template, enter the client's budget — it works out the minimum the budget must buy, "
                  "what the booked creators can safely deliver, and the benchmark the client sees.</div></div>"
-                 "<a class='btn small' href='" + u("/planner") + "?id=" + str(k["id"]) + "'>Open the planner</a></div>"
+                 "<a class='btn small' href='" + u("/calculator") + "?id=" + str(k["id"]) + "'>Open the calculator</a></div>"
                + "<label style='margin-top:16px'>Targets the client sees</label>"
                "<div class='row'>" + tgt("posts", "Posts", "e.g. 24") + tgt("views", "Views", "e.g. 500000")
                + tgt("reach", "Reach", "e.g. 300000") + tgt("engagement", "Engagement", "e.g. 20000")
@@ -2476,7 +2476,7 @@ def campaign_tabs(k, on):
     tabs = [("setup", "/campaigns/edit", "Setup"), ("content", "/campaigns/content", "Content"),
             ("insights", "/campaigns/insights", "Insights"),
             ("links", "/campaigns/links", "Tracking links &amp; clicks"),
-            ("plan", "/planner", "Goals &amp; ROI"),
+            ("plan", "/calculator", "Goals &amp; ROI"),
             ("report", "/campaigns/report", "Report")]
     return ("<nav class='tabs'>" + "".join(
         "<a href='" + u(href) + "?id=" + str(k["id"]) + "'" + (" class='on'" if key == on else "")
@@ -3363,6 +3363,10 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
     notes = "".join("<li>" + e(n) + "</li>" for n in plan["notes"])
     lib_json = json.dumps(lib, indent=1, ensure_ascii=False)
     body = ((_head(k, "plan", error, message) if k else "<h1>ROI planner</h1>" + _notes(error, message))
+            + "<div class='card' style='background:#fff8ec;border-color:#f3d9a8'><strong>The ROI calculator is the main tool now.</strong> "
+              "It does everything on this page and also measures real selections and campaigns. "
+              "<a href='" + u("/calculator") + ("?id=" + str(k["id"]) if k else "") + "'>Open the calculator</a>. "
+              "This older page stays for editing the <a href='#library'>benchmark library</a>.</div>"
             + "<p class='price-hint'>Brief in, numbers out. The target to agree is the <strong>minimum accepted</strong>: "
               "the lower of what the budget must buy to be fair value and what the creators can safely deliver — "
               "so we commit to it and beat it.</p>"
@@ -3385,7 +3389,7 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
               "engagement 15, engagement rate vs size 20, clicks 10 · engagement: 15 / 40 / 35 / 10 · traffic: 15 / 15 / 20 / 50 · "
               "balanced: 35 / 25 / 25 / 15. Exposure and engagement are against the best creator in the campaign; "
               "the rate against the strong benchmark for the creator's size.</p></div>"
-            + "<details style='margin-top:20px'><summary><strong>Benchmark library</strong> — edit the guide ranges</summary>"
+            + "<details id='library' style='margin-top:20px'><summary><strong>Benchmark library</strong> — edit the guide ranges</summary>"
               "<form method='post' action='" + u("/planner/library") + "' class='card' style='margin-top:10px'>"
               + ("<input type='hidden' name='back' value='" + str(k["id"]) + "'>" if k else "")
               + "<p class='price-hint'>Per platform: view_rate and eng_rate per tier as [safe, expected] %; ctr [safe, expected] %; "
@@ -3399,7 +3403,7 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
 
 # ------------------------------------------------------------- calculator --
 
-def calculator_page(lib, sources=None):
+def calculator_page(lib, sources=None, initial=None, ok=None, error=None):
     """The ROI calculator. Pick one or several campaign types and one or
     several platforms, type what the client pays (split between platforms),
     and read what result to accept. Everything is worked out in the browser
@@ -3407,13 +3411,14 @@ def calculator_page(lib, sources=None):
     never disagree with it."""
     import plans
     data = json.dumps({"lib": lib, "tiers": plans.TIERS, "tierLabel": plans.TIER_LABEL, "followers": plans.TIER_FOLLOWERS,
-                       "sources": sources or {"selections": [], "campaigns": []}},
+                       "sources": sources or {"selections": [], "campaigns": []}, "initial": initial or "", "base": BASE,
+                       "categories": {k: v[0] for k, v in plans.CATEGORIES.items()}},
                       ensure_ascii=False).replace("</", "<\\/")
     body = """
-<h1>ROI calculator</h1>
+""" + _notes(error, ok) + """<h1>ROI calculator</h1>
 <p class='sub'>Pick the campaign types and platforms (one or several), type what the client pays, and read what result to accept.
 Everything updates as you type. The numbers come from the benchmark library, which you can edit on the
-<a href='""" + u("/planner") + """'>ROI planner</a>.</p>
+<a href='""" + u("/planner") + """#library'>benchmark library</a>.</p>
 <style>
 .cal-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .cal-pills button{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 18px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
@@ -3467,6 +3472,9 @@ table.cal-t tr.tot td{border-top:2px solid #121212;font-weight:700}
 table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
 .cal-foc{max-width:380px;margin:0 0 12px}
 .cal-big{font-size:18px;line-height:1.5;margin:6px 0}
+.cal-goalrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:10px 0}
+.cal-goalrow label{font-size:12px}
+.cal-saved{background:#e7f6ec;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0}
 .cal-big b{font-size:26px}
 .cal-line{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;padding:8px 0;border-top:1px solid #eee}
 .cal-line:first-of-type{border-top:0}
@@ -3515,6 +3523,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
 <div id='cal-accept'></div>
 
 <div id='cal-check'></div>
+<div id='cal-goals'></div>
 
 <h2>Tools</h2>
 <div id='cal-focus-box' hidden class='card' style='margin-bottom:16px'>
@@ -3665,6 +3674,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     $('cal-focus-box').hidden = cs.length < 2;
     $('cal-focus').innerHTML = cs.map(function(x){ return '<option value="' + x.id + '"' + (x.id === S.focus ? ' selected' : '') + '>' + TYPES[x.t].name + ' · ' + x.p + '</option>'; }).join('');
     var fc = focus(), chk = check(fc, budget ? (split(budget)[fc.p] || budget) : null);
+    goals(fc, budget ? (split(budget)[fc.p] || budget) : null, chk);
     summary(budget, chk);
     tools(budget);
   }
@@ -3732,6 +3742,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     var box = $('cal-check'), sc = source();
     if (!sc) { box.innerHTML = ''; return null; }
     var o = sc.o, p = f.p, m = mainKind(f.t, f.p), c = ceil(p, m), rows = '', tot = [0, 0], priced = 0, problems = {bad: 0, warn: 0}, flagged = [];
+    var all = {views: [0, 0], reactions: [0, 0], clicks: [0, 0]}, postsN = 0;
     o.creators.forEach(function(cr){
       var n = S.posts[o.id + ':' + cr.code]; if (n == null) n = cr.posts || 1;
       var pp = perPost(cr, p, m), probs = [];
@@ -3740,7 +3751,8 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
         rows += '<tr><td><b>' + cr.name + '</b><br><small>' + cr.code + '</small></td><td colspan="6">' + probs.map(function(x){ return '<span class="cal-prob cal-prob--' + x[0] + '">' + x[1] + '</span>'; }).join('') + '</td></tr>';
         problems.bad++; flagged.push(cr.name); return;
       }
-      var us = pp.r[0] * n, ug = pp.r[1] * n; tot[0] += us; tot[1] += ug;
+      var us = pp.r[0] * n, ug = pp.r[1] * n; tot[0] += us; tot[1] += ug; postsN += n;
+      ['views', 'reactions', 'clicks'].forEach(function(kk){ var q = perPost(cr, p, kk); if (q.r) { all[kk][0] += q.r[0] * n; all[kk][1] += q.r[1] * n; } });
       var cost = (cr.price && us) ? cr.price / us : null, v = cost == null ? null : verdict(cost, c);
       if (cr.price) priced += cr.price;
       if (pp.fell) probs.push(['warn', 'No ' + p + ' account: using their main account']);
@@ -3771,8 +3783,33 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
       + '<p class="price-hint" style="margin:0">Measured on <b>' + label + '</b>. Change the posts per creator to see what happens.</p>' + banner + sumHtml
       + '<table class="cal-c"><thead><tr><th>Creator</th><th class="r">Posts</th><th class="r">Price (SAR)</th><th class="r">Usually gets</th><th class="r">Cost per result</th><th>Value</th><th>Problems</th></tr></thead><tbody>' + rows + '</tbody></table>'
       + priceNote + '</div>';
-    return {vd: vd, tot: tot, problems: problems, flagged: flagged, rs: rs, name: o.name, kind: sc.kind, label: label};
+    return {vd: vd, tot: tot, problems: problems, flagged: flagged, rs: rs, name: o.name, kind: sc.kind, label: label, all: all, posts: postsN, campaign: sc.kind === 'campaign' ? o.id : (o.campaign || null), o: o};
   }
+  // Goals: the minimum to agree for each KPI is the LOWER of what the budget
+  // must buy to be fair value and what these creators can safely deliver.
+  function rnd(v){ return v >= 100000 ? Math.round(v / 1000) * 1000 : v >= 1000 ? Math.round(v / 100) * 100 : Math.round(v); }
+  function goals(f, budget, chk){
+    var box = $('cal-goals');
+    if (!chk || !chk.campaign) { box.innerHTML = chk ? '<div class="card"><h2 style="margin-top:0">Campaign goals</h2><p class="price-hint">This selection is not linked to a campaign yet. Link it on the campaign\\'s setup page (Selection it came from) to save goals.</p></div>' : ''; return; }
+    var p = f.p, a = chk.all, camp = SRC.campaigns.filter(function(x){ return x.id === chk.campaign; })[0] || {};
+    var cat = S.cat || camp.category || 'other', links = f.t === 'conversion', vals = {};
+    if (budget) {
+      var vf = budget / ceil(p, 'views')[0], v = Math.min(vf, a.views[0] || vf);
+      vals.posts = chk.posts; vals.views = rnd(v); vals.reach = rnd(v * LIB[p].reach_per_view);
+      if (p !== 'Snapchat') { var ef = budget / ceil(p, 'reactions')[0], e = Math.min(ef, a.reactions[0] || ef); vals.engagement = rnd(e); vals.er = Math.round(e / v * 10000) / 100; }
+      if (links) { var cf = budget / ceil(p, 'clicks')[0]; vals.clicks = rnd(Math.min(cf, a.clicks[0] || cf)); }
+    }
+    var KEYS = [['posts', 'Posts'], ['views', 'Views'], ['reach', 'Reach'], ['engagement', 'Likes + comments'], ['er', 'Engagement rate %']].concat(links ? [['clicks', 'Clicks']] : []);
+    var ed = S.goalEdit || {};
+    var saved = camp.targets && Object.keys(camp.targets).length ? '<div class="cal-saved">Saved now: ' + Object.keys(camp.targets).map(function(k){ return k + ' ' + (k === 'er' ? camp.targets[k] + '%' : nice(camp.targets[k])); }).join(' · ') + '</div>' : '';
+    box.innerHTML = '<div class="card"><div class="cal-h"><span class="pill live">Goals</span><h2>Save as this campaign\\'s goals</h2></div>'
+      + '<p class="price-hint" style="margin:0">Filled with the <b>minimum to agree</b>: the lower of what the budget must buy and what these creators can safely deliver. Change any figure, then save. The client sees these on their dashboard.</p>' + saved
+      + '<form method="post" action="' + D.base + '/calculator/save"><input type="hidden" name="id" value="' + chk.campaign + '"><input type="hidden" name="type" value="' + f.t + '"><input type="hidden" name="platform" value="' + p + '"><input type="hidden" name="budget" value="' + (budget || '') + '">'
+      + '<div class="cal-goalrow">' + KEYS.map(function(k){ var v = ed[k[0]] != null ? ed[k[0]] : (vals[k[0]] != null ? vals[k[0]] : ''); return '<div><label for="cal-g-' + k[0] + '">' + k[1] + '</label><input id="cal-g-' + k[0] + '" name="target_' + k[0] + '" data-goal="' + k[0] + '" inputmode="decimal" value="' + v + '"></div>'; }).join('')
+      + '<div><label for="cal-g-cat">Product category</label><select id="cal-g-cat" name="category">' + Object.keys(D.categories).map(function(k){ return '<option value="' + k + '"' + (k === cat ? ' selected' : '') + '>' + D.categories[k] + '</option>'; }).join('') + '</select></div></div>'
+      + '<button class="btn">Save goals</button></form></div>';
+  }
+  function source0(v){ var parts = v.split(':'), list = parts[0] === 's' ? SRC.selections : SRC.campaigns; var o = list.filter(function(x){ return String(x.id) === parts[1]; })[0]; return o ? {kind: parts[0] === 's' ? 'selection' : 'campaign', o: o} : null; }
   function applySource(){
     var sc = source(); if (!sc) { $('cal-source-hint').textContent = 'Pick one and the calculator uses its real creators, their followers and prices.'; return; }
     var o = sc.o, plats = String(o.platform || '').split(/[,&+\/]/).map(function(x){ return x.trim(); }).filter(function(x){ return PLATS.indexOf(x) >= 0; }), plat = plats.join(' + ');
@@ -3815,7 +3852,8 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
   if (SRC.selections.length) opt += '<optgroup label="Selections">' + SRC.selections.map(function(x){ return '<option value="s:' + x.id + '">' + x.name + ' (' + x.creators.length + ')</option>'; }).join('') + '</optgroup>';
   if (SRC.campaigns.length) opt += '<optgroup label="Campaigns">' + SRC.campaigns.map(function(x){ return '<option value="c:' + x.id + '">' + x.name + ' (' + x.creators.length + ')</option>'; }).join('') + '</optgroup>';
   $('cal-source').innerHTML = opt;
-  $('cal-source').addEventListener('change', function(){ S.src = this.value; applySource(); render(); });
+  $('cal-source').addEventListener('change', function(){ S.src = this.value; S.goalEdit = {}; S.cat = null; applySource(); render(); });
+  if (D.initial && source0(D.initial)) { S.src = D.initial; $('cal-source').value = D.initial; var sc0 = source0(D.initial); var t0 = sc0.o.type; if (t0 && TYPES[t0]) S.types = [t0]; applySource(); }
   $('cal-go').addEventListener('click', function(){ $('cal-result').scrollIntoView({behavior: 'smooth', block: 'start'}); });
   $('cal-focus').addEventListener('change', function(){ S.focus = this.value; $('cal-got1').value = ''; $('cal-got2').value = ''; render(); });
   document.addEventListener('input', function(e){
@@ -3826,6 +3864,8 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
       document.querySelectorAll('#cal-split small').forEach(function(sm, i){ sm.textContent = budget ? 'SAR ' + num(amt[S.plats[i]]) : ''; });
       if (!budget) return;
       $('cal-accept').innerHTML = S.types.map(function(t){ return tableFor(t, budget); }).join(''); tools(budget); return; }
+    if (el.dataset && el.dataset.goal) { S.goalEdit = S.goalEdit || {}; S.goalEdit[el.dataset.goal] = el.value; return; }
+    if (el.id === 'cal-g-cat') { S.cat = el.value; return; }
     if (el.dataset && el.dataset.posts) { S.posts[el.dataset.posts] = Math.max(0, parseInt(el.value, 10) || 0); var id = el.dataset.posts, pos = el.selectionStart; render();
       var back = document.querySelector('[data-posts="' + id + '"]'); if (back) { back.focus(); try { back.setSelectionRange(pos, pos); } catch (x) {} } return; }
     if (el.tagName === 'INPUT') render();
