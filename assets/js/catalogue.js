@@ -1693,7 +1693,10 @@
       renderPlaces();
 
       // keep the URL in step so what they see is what they can re-share
-      var want = buildFragment(selectionName, selected);
+      // The short link only while the server holds exactly these creators.
+      var saved = CURATED && CURATED.codes &&
+        CURATED.codes.slice().sort().join() === selected.slice().sort().join();
+      var want = buildFragment(selectionName, selected, !saved);
       if (location.hash !== want) history.replaceState(null, "", want);
       // The link back into the catalogue carries the codes, not just the
       // token: it has to arrive with these creators already picked, and the
@@ -1722,6 +1725,33 @@
     // other. Only the range in the summary is shown, and a total typed in the
     // dashboard replaces it there.
 
+    // Removing a creator saves the shortlist on the server, so the short link
+    // (#s=<token>) opens exactly what is on screen — before this a copied
+    // link quietly reopened the original list. Until the save comes back, and
+    // if it fails, the link carries the creators itself (#n=…&c=…&s=…), which
+    // the page also reads, so no copy of the link is ever stale.
+    var saving = null;
+    function saveShortlist() {
+      history.replaceState(null, "", buildFragment(selectionName, selected, true));
+      clearTimeout(saving);
+      saving = setTimeout(function () {
+        var codes = selected.slice();
+        register(selectionName, codes, (CURATED && CURATED.token) || CARRIED_TOKEN)
+          .then(function (token) {
+            if (!token || codes.join() !== selected.join()) return;
+            if (!CURATED) CURATED = { prices: {}, platform: "" };
+            CURATED.token = token;
+            CURATED.name = selectionName;
+            // The server drops a total typed for the old list; so does the page.
+            if (CURATED.codes && CURATED.codes.slice().sort().join() !== codes.slice().sort().join()) {
+              CURATED.total = null;
+            }
+            CURATED.codes = codes;
+            history.replaceState(null, "", buildFragment(selectionName, selected));
+          });
+      }, 400);
+    }
+
     // A remove control per card, added here rather than in the markup so the
     // catalogue and the selection page can share one card template.
     cards.forEach(function (card) {
@@ -1734,7 +1764,7 @@
       btn.addEventListener("click", function (e) {
         e.stopPropagation();
         var i = selected.indexOf(card.dataset.code);
-        if (i !== -1) { selected.splice(i, 1); render(); }
+        if (i !== -1) { selected.splice(i, 1); render(); saveShortlist(); }
       });
       card.querySelector(".cat-card__media").appendChild(btn);
       // cards are not togglable here — the selection is the content
