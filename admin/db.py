@@ -1843,7 +1843,9 @@ def link(slug):
 
 
 def campaign_links(cid):
-    """Every link in a campaign, active ones first, with its counted clicks."""
+    """Every link in a campaign, in the campaign's creator order, with its
+    counted clicks. Not active-first: a link switched off used to jump to the
+    bottom, and the row left under the admin's cursor still said "Switch off"."""
     with connect() as conn:
         return conn.execute(
             "SELECT l.*, r.name creator_name, "
@@ -1853,7 +1855,7 @@ def campaign_links(cid):
             " (SELECT COUNT(*) FROM clicks c WHERE c.slug = l.slug) hits "
             "FROM links l LEFT JOIN creators r ON r.code = l.code "
             "LEFT JOIN campaign_creators x ON x.campaign_id = l.campaign_id AND x.code = l.code "
-            "WHERE l.campaign_id = ? ORDER BY l.active DESC, x.sort, l.code", (cid,)).fetchall()
+            "WHERE l.campaign_id = ? ORDER BY x.sort, l.code, l.is_default DESC, l.slug", (cid,)).fetchall()
 
 
 def save_link(slug, destination, new_slug=None):

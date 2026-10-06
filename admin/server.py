@@ -2008,8 +2008,10 @@ class Handler(BaseHTTPRequestHandler):
         if row is None or str(row["campaign_id"]) != (f.get("id") or ""):
             return self.redirect("/campaigns")
         db.set_link_active(row["slug"], not row["active"])
-        return self.redirect("/campaigns/links?id=%d&ok=%s" % (row["campaign_id"], urllib.parse.quote(
-            "Link switched " + ("off." if row["active"] else "on."))))
+        # Back to the same row, so the change is in front of the admin.
+        return self.redirect("/campaigns/links?id=%d&ok=%s#link-%s" % (row["campaign_id"], urllib.parse.quote(
+            "%s's link switched %s." % (row["code"], "off — taps now show 'This link is not active'"
+                                         if row["active"] else "back on")), row["slug"]))
 
     # --------------------------------------------------- creator analysis --
 

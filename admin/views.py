@@ -165,6 +165,9 @@ tr.flash td{animation:flash 2.4s ease-out}
 .stars .dim{color:#d8d2cc}
 .acct{font-size:12px;color:var(--gray)}
 .sel-table input{max-width:130px}
+tr.linkrow.is-off td{background:#f6f4f1}
+tr.linkrow.is-off td:not(:last-child){opacity:.55}
+tr.linkrow:target td{box-shadow:inset 0 2px 0 var(--ink),inset 0 -2px 0 var(--ink)}
 a.to-roster{color:inherit;text-decoration:none;border-bottom:1px solid rgba(18,18,18,.25);
   display:inline-flex;align-items:center;gap:5px}
 a.to-roster svg{opacity:.45}
@@ -2384,7 +2387,8 @@ def campaign_links_page(k, rows, st, origin, has_geo, error=None, message=None):
         dest = r["destination"] or ""
         locked = r["hits"] > 0
         items.append(
-            "<tr class='linkrow'><td><code>" + e(r["code"]) + "</code><br>" + e(names[r["code"]])
+            "<tr class='linkrow" + ("" if r["active"] else " is-off") + "' id='link-" + e(r["slug"])
+            + "'><td><code>" + e(r["code"]) + "</code><br>" + e(names[r["code"]])
             + ("" if r["is_default"] else "<br><span class='pill own'>custom: " + e(r["label"] or "link") + "</span>")
             + ("" if r["active"] else " <span class='pill dead'>off</span>") + "</td>"
             + "<td><div class='sel-link'><input value='" + e(url) + "' readonly>"
@@ -2402,8 +2406,8 @@ def campaign_links_page(k, rows, st, origin, has_geo, error=None, message=None):
             + "<td class='right'><strong>" + str(r["clicks"]) + "</strong></td>"
             + "<td class='right'>" + str(r["uniques"]) + "</td>"
             + "<td><form method='post' action='" + u("/campaigns/link/toggle") + "'><input type='hidden' name='id' value='"
-            + str(k["id"]) + "'><input type='hidden' name='slug' value='" + e(r["slug"]) + "'><button class='btn tiny ghost'>"
-            + ("Switch off" if r["active"] else "Switch on") + "</button></form></td></tr>")
+            + str(k["id"]) + "'><input type='hidden' name='slug' value='" + e(r["slug"]) + "'><button class='btn tiny"
+            + (" ghost'>Switch off" if r["active"] else "'>Switch on") + "</button></form></td></tr>")
     table = "".join(items) or ("<tr><td colspan='4' class='muted'>No creators in this campaign yet — "
                                "add them on the Setup tab and each gets a link here.</td></tr>")
     body = (
