@@ -218,7 +218,7 @@ def read_roster():
         # URL never changes — a cached image will happily render the old one and
         # send you hunting a data bug that is not there. Stamp them.
         photo = f"{code}.jpg?v={file_hash(pf)}" if pf.exists() else ""
-        lowres = bool(photo) and jpeg_width(pf) <= 150
+        lowres = bool(photo) and jpeg_width(pf) < 320
 
         people.append({
             "code": code,

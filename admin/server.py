@@ -2343,7 +2343,9 @@ class Handler(BaseHTTPRequestHandler):
             path = PHOTO_DIR / name
             self._widths[name] = uploads.jpeg_width(path) if path.exists() else 0
         w = self._widths[name]
-        return bool(w) and w <= 150
+        # 320 is the bar tools/photo_audit.py grades against: below it a
+        # ~330px card shows the source stretched, so it gets the soft circle.
+        return bool(w) and w < 320
 
     def api_request(self):
         code_id = self.viewer_code_id()

@@ -147,7 +147,7 @@ number for banding, and records both in the private key as `followers` and
 | Instagram | profile page `og:image`, **logged out** | 100×100 |
 | TikTok | logged-in browser, `__UNIVERSAL_DATA_FOR_REHYDRATION__` | **often 1000px+** |
 
-Sources at or below 150px get `.cat-card__photo--soft`: a circular portrait
+Sources under 320px wide get `.cat-card__photo--soft`: a circular portrait
 over a blurred bed of itself, rather than a 3× upscale that reads as broken.
 
 ### The eight that cannot be sourced
