@@ -298,7 +298,9 @@ def report(campaign, internal=False):
         creators.append(row)
 
     objective = objective_of(campaign)
-    scoreboard(creators, bm, OBJECTIVES[objective][1])
+    links_on = has_links(campaign)
+    w = weights_for(objective, links_on)
+    scoreboard(creators, bm, w)
     targets = db.campaign_targets(campaign)
     progress = target_progress(campaign, total, targets)
     planned = sum(c["planned"] or 0 for c in creators)
@@ -317,7 +319,7 @@ def report(campaign, internal=False):
            "emv_set": bool(rates), "visibility": vis, "factors": f,
            "benchmarks": bm, "targets": targets, "progress": progress, "verdict": verdict,
            "objective": {"key": objective, "label": OBJECTIVES[objective][0], "kpis": OBJECTIVE_KPIS[objective],
-                         "weights": dict(zip(("exposure", "engagement", "er", "clicks"), OBJECTIVES[objective][1]))},
+                         "weights": dict(zip(("exposure", "engagement", "er", "clicks"), w)), "links": links_on},
            "gaps": data_gaps(camp),
            "updated_at": max([p["metrics_at"] or 0 for p in posts] + [0]) or None}
     if internal:
@@ -432,6 +434,28 @@ def recommend_targets(campaign):
     out["objective"] = OBJECTIVES[key][0]
     out["primary"] = [k for k in OBJECTIVE_KPIS[key] if k in out["safe"]]
     return out
+
+
+def weights_for(objective, has_links):
+    """The objective's leaderboard weights. A campaign with no tracked links
+    has no clicks to score, so that part is dropped and the other three are
+    scaled up to still make 100 — nobody is marked on a metric that does not
+    exist in their campaign."""
+    w = list(OBJECTIVES[objective][1])
+    if not has_links:
+        rest = sum(w[:3])
+        w = [x / rest for x in w[:3]] + [0.0]
+    return tuple(w)
+
+
+def has_links(campaign, clicks=None):
+    """True when the campaign tracks link clicks: a destination is set or it
+    has active tracking links."""
+    if campaign["destination"]:
+        return True
+    with db.connect() as conn:
+        return bool(conn.execute("SELECT 1 FROM links WHERE campaign_id = ? AND active = 1 LIMIT 1",
+                                 (campaign["id"],)).fetchone())
 
 
 def objective_of(campaign):

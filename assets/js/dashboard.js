@@ -226,9 +226,11 @@
     ];
     // Sections the admin switched off are left out, not shown empty.
     var V = R.visibility || {};
-    cards = cards.filter(function (k) { return !(k[0] === "Reach" && V.reach === false) && !(k[0] === "Link clicks" && V.clicks === false); });
+    // No tracking links = no clicks anywhere: not a KPI, not a card, not scored.
+    var noClicks = V.clicks === false || !(R.objective || {}).links;
+    cards = cards.filter(function (k) { return !(k[0] === "Reach" && V.reach === false) && !(k[0] === "Link clicks" && noClicks); });
     $("w-kpis").style.setProperty("--kpis", cards.length);
-    $("db-grid").classList.toggle("no-clicks", V.clicks === false);
+    $("db-grid").classList.toggle("no-clicks", noClicks);
     $("w-kpis").innerHTML = cards.map(function (k) {
       return '<button type="button" class="db-kpi" data-area="' + k[5] + '"><span class="db-kpi__label">' + k[4] + esc(k[0]) + '</span><span class="db-kpi__value">' + k[1]
         + '</span><span class="db-kpi__foot">' + (k[2] || "<span></span>") + k[3] + "</span></button>";
@@ -417,7 +419,7 @@
   function scoreTip() {
     var w = weights(), o = (R.objective || {}).label || "Balanced";
     return "Score out of 100, weighted for the " + o + " objective: views & reach " + Math.round(w.exposure * 100) + ", engagement " + Math.round(w.engagement * 100)
-      + ", engagement rate against the strong mark for the creator's size " + Math.round(w.er * 100) + ", link clicks " + Math.round(w.clicks * 100)
+      + ", engagement rate against the strong mark for the creator's size " + Math.round(w.er * 100) + (w.clicks > 0 ? ", link clicks " + Math.round(w.clicks * 100) : "")
       + ". Views and engagement are measured against the best creator in the campaign.";
   }
   function renderPosts(list) {
@@ -453,28 +455,46 @@
           + '<td class="r muted">' + range(i.key) + "</td><td>" + sig(met ? "good" : i.grade) + "</td></tr>";
       }).join("");
       var out = head + (items.length ? '<h3>Targets agreed</h3><table class="db-table db-goals-t"><thead><tr><th>KPI</th><th class="r">Minimum agreed</th><th class="r">Now</th><th>Progress</th><th class="r">Benchmark range</th><th></th></tr></thead><tbody>' + rows + "</tbody></table>"
-        + '<p class="db-note" style="margin-top:8px">Targets are the minimum HelloVoice commits to for this budget — set low enough to beat. The benchmark range is what creators of this size usually deliver on ' + esc(plan.platform || "this platform") + ", from industry guides and our past campaigns. The black tick is where each number should be by today.</p>"
+        + '<div class="db-legend2"><span><i class="tick"></i>Where it should be today</span><span><i class="sw" style="background:#14884a"></i>Met / on track</span><span><i class="sw" style="background:#e2780f"></i>Close</span><span><i class="sw" style="background:#ee1515"></i>Behind</span><span class="db-legend2__txt">Minimum agreed = what we commit to · Benchmark = typical for these creators</span></div>'
         : '<p class="db-note">No targets set for this campaign yet.</p>');
-      if (pb.view_rate) out += '<h3>Benchmarks for these creators</h3><table class="db-table"><tbody>'
-        + "<tr><td>Views per video</td><td>" + pb.view_rate[0] + "–" + pb.view_rate[1] + "% of followers</td></tr>"
-        + "<tr><td>Engagement rate</td><td>" + pb.eng_rate[0] + "–" + pb.eng_rate[1] + "% of views</td><td>Now " + pct(t.video_er != null ? t.video_er : t.er) + " " + sig(t.video_er_grade || t.er_grade) + "</td></tr>"
-        + "<tr><td>Reach</td><td>≈ " + Math.round((pb.reach_per_view || 0.85) * 100) + "% of views are unique people</td></tr>"
-        + (R.visibility.clicks && R.clicks && R.clicks.has_destination && t.ctr != null ? "<tr><td>Click-through</td><td>" + pb.ctr[0] + "–" + pb.ctr[1] + "% of views</td><td>Now " + pct(t.ctr) + "</td></tr>" : "") + "</tbody></table>";
-      else out += '<h3>Benchmarks</h3><table class="db-table"><tbody><tr><td>Engagement rate</td><td>' + pct(t.er) + "</td><td>" + sig(t.er_grade) + "</td></tr>"
-        + (t.video_er != null ? "<tr><td>Video engagement</td><td>" + pct(t.video_er) + "</td><td>" + sig(t.video_er_grade) + "</td></tr>" : "") + "</tbody></table>"
-        + '<p class="db-note" style="margin-top:10px">Strong engagement rate by creator size: ' + Object.keys(bm.er).map(function (b) { return (bm.bands[b] || b).replace(/ \(.*/, "") + " " + bm.er[b][0] + "%+"; }).join(" · ") + ".</p>";
-      var w = weights();
-      out += '<h3>How creators are scored</h3><div class="db-weights">' + [["Views & reach", w.exposure, "against the creator with the most"], ["Engagement", w.engagement, "likes + comments, against the most"],
-        ["Engagement rate", w.er, "against the strong mark for their size"], ["Link clicks", w.clicks, "against the most"]].map(function (x) {
-        return '<div><b>' + Math.round(x[1] * 100) + "</b><span>" + x[0] + "</span><small>" + x[2] + "</small></div>"; }).join("") + "</div>"
-        + '<p class="db-note">Weights follow the ' + esc(o.label || "Balanced") + " objective; the score is out of 100.</p>";
+      // Benchmarks as gauges: the shaded band is the normal range for these
+      // creators, the dot is where the campaign is now.
+      function gauge(label, unit, band, now, grade) {
+        if (!band) return "";
+        var top = Math.max(band[1] * 1.35, (now || 0) * 1.1) || 1, l = band[0] / top * 100, w = (band[1] - band[0]) / top * 100;
+        var dot = now != null ? '<i class="db-gauge__dot ' + (grade || "") + '" style="left:' + Math.min(100, now / top * 100).toFixed(1) + '%"><span>' + now.toFixed(now < 10 ? 2 : 1) + "%</span></i>" : "";
+        return '<div class="db-gauge"><div class="db-gauge__lbl"><b>' + label + "</b><small>" + unit + '</small></div><div class="db-gauge__bar"><i class="db-gauge__band" style="left:' + l.toFixed(1) + "%;width:" + w.toFixed(1) + '%"></i>' + dot
+          + '<em style="left:' + l.toFixed(1) + '%">' + band[0] + '%</em><em style="left:' + (l + w).toFixed(1) + '%">' + band[1] + "%</em></div>"
+          + '<div class="db-gauge__sig">' + (now != null ? sig(grade) : '<span class="db-na">Typical</span>') + "</div></div>";
+      }
+      var vids = R.posts.filter(function (p) { return p.section === "campaign" && p.view_rate != null; });
+      var vrNow = vids.length ? vids.reduce(function (a, p) { return a + p.view_rate; }, 0) / vids.length : null;
+      var erNow = t.video_er != null ? t.video_er : t.er;
+      function gr(v, b) { return v == null ? null : v >= b[1] ? "good" : v >= b[0] ? "moderate" : "low"; }
+      var links = (R.objective || {}).links;
+      if (pb.view_rate) out += '<h3>Benchmarks for these creators</h3><div class="db-gauges">'
+        + gauge("Views per video", "% of followers", pb.view_rate, vrNow, gr(vrNow, pb.view_rate))
+        + gauge("Engagement rate", "% of views", pb.eng_rate, erNow, gr(erNow, pb.eng_rate))
+        + (links && pb.ctr ? gauge("Click-through", "% of views", pb.ctr, t.ctr, gr(t.ctr, pb.ctr)) : "")
+        + '<div class="db-gauge db-gauge--fact"><div class="db-gauge__lbl"><b>Reach</b><small>unique people</small></div><div class="db-fact"><b>' + Math.round((pb.reach_per_view || 0.85) * 100) + "%</b> of views are unique people</div><div></div></div>"
+        + '</div><div class="db-legend2"><span><i class="sw band"></i>Normal range for creators this size</span><span><i class="dot"></i>This campaign now</span></div>';
+      // Scoring as one bar: each part's share of the 100 points. Clicks only
+      // when the campaign tracks links.
+      var w = weights(), parts = [["Views & reach", w.exposure, "#14884a", "vs the top creator"], ["Engagement", w.engagement, "#ff691e", "likes + comments vs the top creator"],
+        ["Engagement rate", w.er, "#b9d400", "vs the strong mark for their size"]];
+      if (w.clicks > 0) parts.push(["Link clicks", w.clicks, "#121212", "vs the top creator"]);
+      out += '<h3>How creators are scored · out of 100</h3><div class="db-scorebar">' + parts.map(function (x) {
+        return '<i style="flex:' + x[1] + ";background:" + x[2] + '"><b>' + Math.round(x[1] * 100) + "</b></i>"; }).join("") + '</div><div class="db-scorekey">'
+        + parts.map(function (x) { return '<div><i style="background:' + x[2] + '"></i><b>' + x[0] + "</b><small>" + x[3] + "</small></div>"; }).join("") + "</div>";
       var G = R.gaps || {};
-      // Reach estimates and missing shares/saves are internal notes (admin
-      // Content tab), not the client's concern; hidden likes change the
-      // numbers they read, so they are said here.
-      if (G.likes_hidden) out += "<h3>About the data</h3><ul class=\"db-gaplist\">"
-        + (G.likes_hidden ? "<li><b>Likes hidden on " + G.likes_hidden + " posts</b> — the creator switched the like count off. Engagement for those posts counts comments only and they are left out of the engagement rate: " + (G.hidden || []).map(function (h) { return '<a href="' + esc(h.url) + '" target="_blank" rel="noopener">' + esc(h.creator) + "</a>"; }).join(", ") + ".</li>" : "")
-        + "</ul>";
+      // Hidden likes change the numbers the client reads, so they are shown;
+      // estimates and missing shares/saves are internal (admin Content tab).
+      if (G.likes_hidden) {
+        var by = {}; (G.hidden || []).forEach(function (h) { var x = by[h.creator] = by[h.creator] || { n: 0, url: h.url }; x.n++; });
+        out += '<h3>About the data</h3><div class="db-hidden"><div class="db-hidden__n"><b>' + G.likes_hidden + "</b><span>of " + G.posts + ' posts hide likes</span><i style="--w:' + (G.likes_hidden / G.posts * 100).toFixed(1) + '%"></i></div>'
+          + '<div class="db-hidden__body"><div class="db-hidden__chips">' + Object.keys(by).map(function (k) { return '<a href="' + esc(by[k].url) + '" target="_blank" rel="noopener">' + esc(k) + (by[k].n > 1 ? " <small>×" + by[k].n + "</small>" : "") + "</a>"; }).join("")
+          + '</div><p><b>Engagement</b> on these posts = comments only · <b>Engagement rate</b> leaves them out</p></div></div>';
+      }
       return out;
     },
     trend: function () {
@@ -487,14 +507,14 @@
     creators: function () {
       var list = posts(), by = {}; list.forEach(function (p) { var x = by[p.code] = by[p.code] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
       var rows = filtered() ? ranked(list).map(function (r) { return r.c; }) : R.creators;
-      return '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>ER</th>' + (R.visibility.clicks ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
+      return '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>ER</th>' + (R.visibility.clicks && R.objective.links ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
         + rows.map(function (c, i) { var x = filtered() ? (by[c.code] || {}) : { posts: c.delivered, views: c.views, reach: c.reach, eng: c.engagement };
           var n = filtered() ? i + 1 : c.rank;
           return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
-            + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
+            + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
         + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(scoreTip()) + "</p>"
-        + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views &amp; reach</th><th>Engagement</th><th>Eng. rate</th><th>Clicks</th><th>Score</th></tr></thead><tbody>'
-          + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td><td>" + q.er.toFixed(0) + "</td><td>" + q.clicks.toFixed(0) + "</td><td><b>" + c.score.toFixed(0) + "</b></td></tr>"; }).join("")
+        + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views &amp; reach</th><th>Engagement</th><th>Eng. rate</th>' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
+          + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td><td>" + q.er.toFixed(0) + "</td>" + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + c.score.toFixed(0) + "</b></td></tr>"; }).join("")
           + "</tbody></table>");
     },
     stage: function () {
