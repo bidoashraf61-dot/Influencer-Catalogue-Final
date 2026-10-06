@@ -618,3 +618,9 @@
 .mx-none__brands b { font-family: var(--heading); font-weight: 400; font-size: 28px; line-height: 1; letter-spacing: .02em; padding: 6px 14px; border: 2px dashed rgba(18,18,18,.3); border-radius: var(--r-sm); }
 .mx-none__brands .mx-camp__state { margin-left: auto; }
 .mx-none .mx-none__sub { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
+
+.mx-dash, .mx-dash:hover { text-decoration: none; }
+.mx-none { overflow: hidden; }
+.mx-none > * { min-width: 0; }
+.mx-none__brands { flex-wrap: wrap; min-width: 0; }
+@media (max-width: 860px) { .mx-none { grid-template-columns: minmax(0, 1fr); } .mx-none__ghost { padding: 18px; } .mx-none__brands b { font-size: 20px; } }

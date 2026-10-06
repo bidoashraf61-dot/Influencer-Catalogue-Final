@@ -1159,3 +1159,4 @@ body[data-page="selection"] .cat-card__check { display: none; }
   .cat-pp__pick { grid-column: 1 / -1; grid-row: 3; }
   .cat-pp__full { grid-column: 2; } .cat-pp__close { grid-column: 3; }
 }
+.cat-pp-open .cat-top { display: none; }

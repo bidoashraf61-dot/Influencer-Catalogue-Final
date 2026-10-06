@@ -105,6 +105,8 @@
     $("mx-list").hidden = which !== "list";
     $("mx-report").hidden = which !== "report";
     $("mx-empty").hidden = which !== "empty";
+    // "Back to dashboard" belongs to one campaign's report, not to the list.
+    if (which !== "report") $("mx-dash").hidden = true;
   }
   function empty(msg) { $("mx-empty").textContent = msg; show("empty"); }
 

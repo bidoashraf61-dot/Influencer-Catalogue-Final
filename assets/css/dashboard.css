@@ -303,3 +303,18 @@
 .db-name { color: inherit; text-decoration: none; background-image: linear-gradient(currentColor, currentColor); background-size: 0 1px; background-position: 0 100%; background-repeat: no-repeat; transition: background-size .2s ease; }
 .db-name:hover { background-size: 100% 1px; }
 .db-name:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; border-radius: 3px; }
+
+/* wide tables in the panel scroll sideways on a phone instead of being cut */
+@media (max-width: 640px) { .db-panel .db-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; } }
+
+@media (max-width: 640px) {
+  .db-head__row { flex-wrap: wrap; gap: 6px 10px; }
+  .db-head__row h1 { white-space: normal; }
+  .db-obj__track { flex: 1 1 100%; order: 3; }
+  .db-objective { row-gap: 10px; }
+  .db-grid > .db-mix, .db-grid > .db-geo, .db-grid > .db-plat, .db-grid > .db-clicks, .db-grid > .db-stage { min-height: 0; }
+}
+@media (max-width: 480px) {
+  .db-wall { grid-template-columns: 1fr; }
+  .db-post__img { aspect-ratio: 16 / 10; }
+}

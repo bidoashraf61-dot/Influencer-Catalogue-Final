@@ -241,3 +241,4 @@
 /* inside the roster's side panel */
 .pp-embed .pp-top { display: none; }
 .pp-embed .pp { padding-top: 8px; }
+@media (max-width: 820px) { .pp-key div:last-child:nth-child(odd) { grid-column: 1 / -1; } }
