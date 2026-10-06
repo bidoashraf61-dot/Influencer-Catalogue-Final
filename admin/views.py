@@ -70,7 +70,13 @@ text-decoration:none;color:#fff}
 .brand img{display:block;height:26px;width:auto}
 .brand span{opacity:.55;font-weight:400;font-size:14px;white-space:nowrap}
 .login img{filter:invert(1)}
-nav a{display:inline-block;padding:6px 0;margin-right:20px;color:#fff;
+/* Every page on one row: the header runs the full width, the links never
+   wrap, and on a screen too narrow for them all the row scrolls sideways. */
+header.top .wrap{max-width:none;padding:0 28px}
+nav{display:flex;align-items:center;gap:18px;flex-wrap:nowrap;white-space:nowrap;
+min-width:0;overflow-x:auto;scrollbar-width:none}
+nav::-webkit-scrollbar{display:none}
+nav a{display:inline-flex;align-items:center;padding:6px 0;margin:0;color:#fff;flex:none;
 text-decoration:none;opacity:.65;font-size:14px;border-bottom:2px solid transparent}
 nav a:hover{opacity:1}
 nav a.on{opacity:1;border-bottom-color:var(--lime)}
@@ -335,8 +341,8 @@ padding:5px 0;border-top:1px solid var(--line)}
 .pick dd{margin:0;font-weight:600}
 .pick .gone{padding:14px;color:var(--red);font-size:13px}
 @media(max-width:700px){
- header.top .wrap{flex-wrap:wrap;gap:10px}
- nav a{margin-right:14px}
+ header.top .wrap{gap:16px;padding:0 16px}
+ nav{gap:14px}
  table,thead,tbody,tr,td,th{display:block}
  thead{display:none}
  td{border:0;padding:4px 0}
@@ -422,7 +428,7 @@ def page(title, body, active=""):
         + '<link rel="stylesheet" href="' + u("/static/admin.css") + '"></head><body>'
         + '<header class="top"><div class="wrap">'
         + '<a class="brand" href="' + u("/") + '"><img src="' + u("/static/logo.webp") + '" alt="HelloVoice" '
-          'height="26"><span>' + e(NAME) + "</span></a>"
+          'height="26"></a>'
         + "<nav>" + nav + '<a href="' + u("/logout") + '">Sign out</a></nav>'
         + '</div></header><main class="wrap">' + body + "</main>" + SCROLL_JS
         + "<div class='toast' id='req-toast' role='status' hidden></div>"
