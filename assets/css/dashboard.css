@@ -452,6 +452,6 @@
   .db-top .db-rank b { font-size: 13px; }
 }
 /* Top creators: breathing room inside each row */
-.db-top .db-rank { padding: 4px 6px; column-gap: 12px; }
+.db-top .db-rank { padding: 2px 8px; column-gap: 12px; }
 .db-top .db-top__cols { padding: 0 6px 6px; }
-.db-top .db-card__body { gap: 2px; }
+.db-top .db-card__body { gap: 0; }
