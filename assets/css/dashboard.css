@@ -486,3 +486,7 @@
 
 .db-top .db-rank { min-height: 32px; }
 .db-top__how { margin-bottom: 2px; }
+
+/* Goals: the platform's icon beside its name */
+.db-goal-sum .db-goal-plat { display: flex; align-items: center; gap: 8px; }
+.db-goal-sum .db-goal-plat svg { width: 24px; height: 24px; flex: none; }

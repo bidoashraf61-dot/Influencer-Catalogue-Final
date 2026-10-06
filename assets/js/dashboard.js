@@ -491,7 +491,7 @@
       }
       var head = '<div class="db-goal-sum"><div><span>All targets</span><b>' + Math.round(P.all_met ? 100 : Math.min(99, P.overall || 0)) + '%</b><small>' + (P.all_met ? "Every target met" : "100% only when every target is met") + "</small></div>"
         + "<div><span>Objective</span><b>" + esc(o.label || "Balanced") + "</b><small>" + esc(lead.map(function (k) { return KEYN[k]; }).join(" & ")) + " lead</small></div>"
-        + (plan.platform ? "<div><span>Benchmarked for</span><b>" + esc(plan.platform) + "</b><small>" + esc(plan.category || plan.template || "") + "</small></div>" : "") + "</div>";
+        + (plan.platform ? "<div><span>Benchmarked for</span><b class=\"db-goal-plat\">" + (ICONS[plan.platform] || "") + esc(plan.platform) + "</b><small>" + esc(plan.category || plan.template || "") + "</small></div>" : "") + "</div>";
       var rows = items.map(function (i) {
         var isR = i.key === "er", col = { good: "#14884a", moderate: "#e2780f", low: "#ee1515" }[i.grade], met = i.actual >= i.goal;
         return "<tr" + (lead.indexOf(i.key) >= 0 ? ' class="is-lead"' : "") + "><td><b>" + KEYN[i.key] + "</b>" + (lead.indexOf(i.key) >= 0 ? ' <span class="db-lead">headline</span>' : "") + "</td>"
