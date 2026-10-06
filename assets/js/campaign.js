@@ -148,7 +148,7 @@
     list.forEach(function (c, i) {
       get("/api/campaign?t=" + encodeURIComponent(c.token)).then(function (b) {
         var R = b.report, t = R.total || {}, card = document.querySelector('.mx-camp[data-i="' + i + '"]');
-        agg.reach += (t.views || 0) + (t.reach || 0); agg.eng += t.engagement || 0; agg.posts += t.posts || 0; agg.clicks += t.clicks || 0;
+        agg.reach += t.seen != null ? t.seen : (t.views || 0); agg.eng += t.engagement || 0; agg.posts += t.posts || 0; agg.clicks += t.clicks || 0;
         card.querySelector(".mx-camp__prog").innerHTML = progress(R, c.status === "ended");
       }).catch(function () { var card = document.querySelector('.mx-camp[data-i="' + i + '"]'); card.querySelector(".mx-camp__prog").innerHTML = '<p class="mx-camp__wait">Progress is not available right now.</p>'; })
         .then(function () {
@@ -419,17 +419,18 @@
   var KLABEL = { posts: "Posts", views: "Views", reach: "Reach", engagement: "Engagement", er: "Avg ER", clicks: "Clicks" };
   function renderObjectiveBar() {
     var o = R.objective || { label: "Balanced", kpis: [] }, items = (R.progress && R.progress.items) || [];
-    var mine = items.filter(function (i) { return (o.kpis || []).indexOf(i.key) >= 0; });
-    if (!mine.length) mine = items;
+    // Every target counts: 100% only when all of them are met.
+    var mine = items, P = R.progress || {};
     var box = $("mx-delivery");
     if (!mine.length) {
       box.innerHTML = '<div class="mx-obj"><div class="mx-obj__label"><span>Campaign objective · <b>' + esc(o.label)
         + '</b></span><span class="mx-obj__pct">No targets set yet</span></div></div>';
       return;
     }
-    var done = mine.reduce(function (s, i) { return s + Math.min(100, i.pct); }, 0) / mine.length;
-    var due = mine.reduce(function (s, i) { return s + Math.min(100, i.expected / i.goal * 100); }, 0) / mine.length;
-    var ratio = due ? done / due : 1, g = ratio >= 1 ? "good" : (ratio >= 0.7 ? "moderate" : "low");
+    var done = P.overall != null ? P.overall : mine.reduce(function (s, i) { return s + Math.min(100, i.pct); }, 0) / mine.length;
+    var due = P.due != null ? P.due : mine.reduce(function (s, i) { return s + Math.min(100, i.expected / i.goal * 100); }, 0) / mine.length;
+    if (!P.all_met) done = Math.min(done, 99);
+    var ratio = due ? done / due : 1, g = P.all_met || ratio >= 1 ? "good" : (ratio >= 0.7 ? "moderate" : "low");
     box.innerHTML = '<div class="mx-obj"><div class="mx-obj__label"><span>Campaign objective · <b>' + esc(o.label) + "</b></span>"
       + '<span class="mx-obj__pct"><b>' + Math.round(done) + "%</b> achieved " + sig(g, "Where it should be by today: " + Math.round(due) + "%") + "</span></div>"
       + '<div class="mx-obj__track" role="img" aria-label="' + Math.round(done) + "% of the " + esc(o.label) + ' objective achieved; ' + Math.round(due) + '% expected by today">'
@@ -587,7 +588,7 @@
         + medalBody(c.badge, c.rank) + "</svg>"
         + (c.photo ? '<img class="mx-pod__photo" src="' + esc(c.photo) + '" alt="">' : '<span class="mx-pod__photo"></span>')
         + '<div class="mx-pod__name">' + creatorLink(c, "") + '</div><div class="mx-pod__score">' + c.score.toFixed(0)
-        + "<small>score out of 100</small></div><div class=\"mx-pod__line\">" + num((c.views || 0) + (c.reach || 0)) + " reached · "
+        + "<small>score out of 100</small></div><div class=\"mx-pod__line\">" + num(c.seen != null ? c.seen : (c.views || 0)) + " views · "
         + num(c.engagement) + " engagements" + (vis.clicks && c.clicks ? " · " + num(c.clicks) + " clicks" : "") + "</div></div>";
     }).join("");
     var head = ["#", "Creator", "Posts", "Views"].concat(vis.reach ? ["Reach"] : []).concat(["Engagement", "Eng. rate"])
@@ -684,7 +685,7 @@
     var posts = R.posts.filter(function (p) { return p.section === "campaign"; }), mix = [];
     var byPlat = {}, byKind = {};
     posts.forEach(function (p) {
-      var a = byPlat[p.platform] = byPlat[p.platform] || { n: 0, x: 0 }; a.n++; a.x += (p.views || 0) + (p.reach || 0);
+      var a = byPlat[p.platform] = byPlat[p.platform] || { n: 0, x: 0 }; a.n++; a.x += p.exposure != null ? p.exposure : (p.video ? (p.views || 0) : (p.reach || 0));
       byKind[p.kind] = (byKind[p.kind] || 0) + 1;
     });
     var plats = Object.keys(byPlat).map(function (k) { return { k: k, n: byPlat[k].x || byPlat[k].n, label: num(byPlat[k].x) }; })
@@ -718,7 +719,7 @@
     $("sec-clicks").hidden = !vis.clicks;
     if (!vis.clicks) return;
     if (!cl || !cl.links || !cl.has_destination) {
-      $("mx-clicks").innerHTML = '<p class="mx-empty-note">No affiliate links in this campaign.</p>';
+      $("mx-clicks").innerHTML = '<p class="mx-empty-note"><span class="mx-na">Not part of this campaign</span> No tracking links were set up, so there are no clicks to count.</p>';
       return;
     }
     var t = R.total;

@@ -55,6 +55,8 @@ import fx  # noqa: E402
 import analysis  # noqa: E402
 import links  # noqa: E402
 import metrics  # noqa: E402
+import plans  # noqa: E402
+import thumbs  # noqa: E402
 import track  # noqa: E402
 import uploads  # noqa: E402
 import views  # noqa: E402
@@ -280,6 +282,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_creator((query.get("c") or "").strip().upper())
         if path == "/api/campaign-logo":
             return self.api_campaign_logo(query.get("t") or "", query.get("n") or "")
+        if path == "/api/campaign-thumb":
+            return self.api_campaign_thumb(query.get("t") or "", query.get("n") or "")
         if path == "/api/campaign.csv":
             return self.api_campaign_csv(query.get("t") or "")
         if path.startswith("/api/capture/"):
@@ -491,6 +495,15 @@ class Handler(BaseHTTPRequestHandler):
             a = db.analysis(code)
             return self.send(200, json.dumps(a["data"] if a else {}, indent=2, ensure_ascii=False),
                              "application/json; charset=utf-8")
+        if path == "/planner":
+            return self.planner_get(query)
+        if path == "/campaigns/thumb":
+            f = thumbs.path_of("file:" + Path(query.get("n") or "").name)
+            if f is None:
+                return self.send(404, b"", "text/plain")
+            kind = uploads.image_kind(f.read_bytes()[:16]) or "jpg"
+            return self.send(200, f.read_bytes(), "image/" + ("jpeg" if kind == "jpg" else kind),
+                             [("Cache-Control", "private, max-age=604800")])
         if path == "/campaigns/logo":
             # The admin's own preview of an uploaded logo.
             name = Path(query.get("n") or "").name
@@ -666,6 +679,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.redirect("/analysis?ok=" + urllib.parse.quote("Marked as handled."))
         if path == "/settings/fx":
             return self.post_settings_fx()
+        if path == "/planner/apply":
+            return self.post_planner_apply()
+        if path == "/planner/library":
+            return self.post_planner_library()
         if path == "/settings/save":
             return self.post_settings()
         if path == "/settings/token":
@@ -1649,6 +1666,7 @@ class Handler(BaseHTTPRequestHandler):
                 "caption": (f.get("caption") or "").strip() or None,
                 "followers": db.platform_followers(code, platform), **self.counts_from(f)}
         _, created = db.add_content(k["id"], item, source="manual")
+        thumbs.fill_later(k["id"])
         return self.redirect(back + "&ok=" + urllib.parse.quote(
             "Post added." if created else "That post was already here — its numbers were updated."))
 
@@ -1754,6 +1772,8 @@ class Handler(BaseHTTPRequestHandler):
                "campaign:" + k["name"][:60])
         rep = metrics.client_report(k, photo=links.thumb, photo_large=links.photo)
         rep["campaign"]["logos"] = [self.logo_url(x, k["token"]) for x in rep["campaign"]["logos"]]
+        for p in rep["posts"]:
+            p["thumb"] = self.thumb_url(p.get("thumb"), k["token"])
         return self.send_json(200, {"ok": True, "report": rep},
                               self.cors() + [("Cache-Control", "no-store")])
 
@@ -1939,6 +1959,8 @@ class Handler(BaseHTTPRequestHandler):
                     item[m] = v if isinstance(v, int) and v >= 0 else None
                 _, new = db.add_content(k["id"], item, "capture")
                 done += 1; created += 1 if new else 0
+            if done:
+                thumbs.fill_later(k["id"])      # keep each post's picture before its CDN link expires
             return self.send_json(200, {"ok": True, "saved": done, "new": created, "refused": refused})
         if what == "insight":
             iid = body.get("id")
@@ -2121,6 +2143,110 @@ class Handler(BaseHTTPRequestHandler):
         if ref.startswith("clients/"):
             return "/assets/clients/" + Path(ref).name
         return BASE + "/api/campaign-logo?" + urllib.parse.urlencode({"t": token, "n": Path(ref).name})
+
+    # ------------------------------------------------------------ planner --
+
+    def planner_get(self, query):
+        cid = query.get("id", "")
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        saved = (plans.plan_of(k) or {}) if k else {}
+        brief = dict(saved.get("brief") or {})
+        if not brief and k:
+            brief = {"objective": metrics.objective_of(k), "platform": k["platform"] or "Instagram",
+                     "budget": "", "links": "1" if k["destination"] else "",
+                     "source": "campaign"}
+        for key in ("template", "objective", "platform", "category", "budget", "links", "source") + \
+                tuple("n_" + t for t in plans.TIERS):
+            if key in query:
+                brief[key] = query[key]
+        tpl = plans.TEMPLATES.get(brief.get("template") or "")
+        if tpl and query.get("apply_template") == "1":
+            brief.update({"objective": tpl["objective"], "platform": tpl["platform"], "category": tpl["category"]})
+            for t in plans.TIERS:
+                brief["n_" + t] = tpl["mix"].get(t, "")
+            if not k:
+                brief["source"] = "tiers"
+        budget = "".join(ch for ch in str(brief.get("budget") or "") if ch.isdigit() or ch == ".")
+        b = {"platform": brief.get("platform"), "objective": brief.get("objective"),
+             "category": brief.get("category"), "budget": float(budget) if budget else 0,
+             "tracked_links": brief.get("links") == "1"}
+        if k and brief.get("source") != "tiers":
+            mix = plans.mix_from_campaign(k)
+        else:
+            mix = plans.mix_from_counts({t: (str(brief.get("n_" + t) or "").strip() or "0")
+                                         for t in plans.TIERS if str(brief.get("n_" + t) or "0").strip().isdigit()})
+        plan = plans.calculate(b, mix)
+        plan["brief"] = brief
+        plan["template"] = brief.get("template") or None
+        return self.send(200, views.planner_page(k, brief, plan, plans.house_benchmarks(), plans.library(),
+                                                 query.get("e"), query.get("ok")))
+
+    def post_planner_apply(self):
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None:
+            return self.redirect("/campaigns")
+        try:
+            plan = json.loads(f.get("plan") or "{}")
+        except ValueError:
+            plan = {}
+        targets = {}
+        for key in db.TARGET_KEYS:
+            raw = "".join(ch for ch in (f.get("target_" + key) or "") if ch.isdigit() or ch == ".")
+            if raw and raw.count(".") <= 1 and float(raw) > 0:
+                v = float(raw)
+                targets[key] = round(v, 2) if key == "er" else int(v)
+        keep = {x: plan.get(x) for x in ("platform", "objective", "category", "budget", "links", "posts",
+                                          "estimate", "floor", "target", "benchmark", "roi", "brief", "template")}
+        keep["agreed"] = targets
+        keep["saved_at"] = db.now()
+        obj = f.get("objective") if f.get("objective") in metrics.OBJECTIVES else metrics.objective_of(k)
+        db.save_campaign(k["id"], targets=targets, objective=obj, plan=keep)
+        return self.redirect("/planner?id=%d&ok=%s" % (k["id"], urllib.parse.quote(
+            "Goals saved — the client's report now shows these targets and the benchmark.")))
+
+    def post_planner_library(self):
+        f = self.form_body()
+        back = (f.get("back") or "").strip()
+        dest = "/planner" + ("?id=" + back + "&" if back.isdigit() else "?")
+        if f.get("reset") == "1":
+            db.set_setting("benchmark_library", {})
+            return self.redirect(dest + "ok=" + urllib.parse.quote("Benchmark library reset to the defaults."))
+        try:
+            got = json.loads(f.get("library") or "")
+            assert isinstance(got, dict)
+        except (ValueError, AssertionError):
+            return self.redirect(dest + "e=" + urllib.parse.quote("That is not valid JSON — nothing was saved."))
+        db.set_setting("benchmark_library", got)
+        return self.redirect(dest + "ok=" + urllib.parse.quote("Benchmark library saved."))
+
+    def thumb_url(self, ref, token=None):
+        """A stored post picture as a link the viewer may open; a captured
+        CDN link is passed through (it may still work for a few days)."""
+        if not ref:
+            return None
+        if str(ref).startswith("file:"):
+            name = Path(str(ref)[5:]).name
+            if token is None:
+                return BASE + "/campaigns/thumb?n=" + urllib.parse.quote(name)
+            return BASE + "/api/campaign-thumb?" + urllib.parse.urlencode({"t": token, "n": name})
+        return ref
+
+    def api_campaign_thumb(self, token, name):
+        k, status = self.viewer_campaign(token)
+        name = Path(name).name
+        if k is None:
+            return self.send(404, b"", "text/plain")
+        with db.connect() as conn:
+            ok = conn.execute("SELECT 1 FROM content WHERE campaign_id = ? AND thumb = ?",
+                              (k["id"], "file:" + name)).fetchone()
+        f = thumbs.path_of("file:" + name) if ok else None
+        if f is None:
+            return self.send(404, b"", "text/plain")
+        kind = uploads.image_kind(f.read_bytes()[:16]) or "jpg"
+        return self.send(200, f.read_bytes(), "image/" + ("jpeg" if kind == "jpg" else kind),
+                         [("Cache-Control", "private, max-age=604800")])
 
     def api_campaign_logo(self, token, name):
         k, status = self.viewer_campaign(token)
@@ -2524,6 +2650,8 @@ TRACKED = {
     "/campaigns/delete": ("campaign", "id", "Deleted campaign"),
     "/campaigns/status": ("campaign", "id", "Changed status of campaign"),
     "/settings/fx": ("settings", None, "Changed exchange rates"),
+    "/planner/library": ("settings", None, "Changed the benchmark library"),
+    "/planner/apply": ("campaign", "id", "Set goals from the ROI planner"),
     "/campaigns/link": ("campaign", "id", "Changed a tracking link"),
     "/campaigns/link/custom": ("campaign", "id", "Added a tracking link"),
     "/campaigns/link/toggle": ("campaign", "id", "Switched a tracking link"),

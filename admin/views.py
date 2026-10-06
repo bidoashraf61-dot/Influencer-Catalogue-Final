@@ -14,6 +14,7 @@ import html
 import json
 import re
 import time
+import urllib.parse
 from datetime import datetime, timezone
 
 import links
@@ -446,6 +447,13 @@ def roster_link(code, label):
 
 def u(path):
     return (BASE + path) if path.startswith("/") else path
+
+
+def thumb_src(ref):
+    """A post picture kept on our server ("file:<name>"), or a captured link."""
+    if ref and str(ref).startswith("file:"):
+        return u("/campaigns/thumb?n=" + urllib.parse.quote(str(ref)[5:]))
+    return ref or ""
 
 
 def page(title, body, active=""):
@@ -2231,7 +2239,8 @@ def campaigns_page(camps, codes, error=None, message=None):
         "<h1>Campaigns</h1><p class='sub'>Creators booked for a client, the dates they post in and "
         "the rules that decide which posts count. Everything is set here; the client only views "
         "the report. Start one from a booked <a href='" + u("/selections") + "'>selection</a> "
-        "to copy its creators, passcode and costs, or create a blank one.</p>"
+        "to copy its creators, passcode and costs, or create a blank one. "
+        "<a href='" + u("/planner") + "'>ROI planner</a> — price a pitch from a budget before a campaign exists.</p>"
         + note
         + "<form method='post' action='" + u("/campaigns/new") + "' class='card'><div class='row'>"
         + "<div style='flex:2'><label>Campaign name</label><input name='name' required "
@@ -2423,7 +2432,11 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         + step(5, "Objective &amp; targets",
                "<div class='row'><div style='flex:3'><label>Campaign objective — decides how the leaderboard scores creators</label>"
                "<select name='objective'>" + obj_opts + "</select></div></div>"
-               + recommend_card(metrics.recommend_targets(k))
+               + "<div class='card' style='background:#f7f5f0;margin:14px 0 6px;display:flex;gap:14px;align-items:center;flex-wrap:wrap'>"
+                 "<div style='flex:1;min-width:240px'><strong>Set targets with the Goals &amp; ROI planner</strong>"
+                 "<div class='price-hint'>Pick a template, enter the client's budget — it works out the minimum the budget must buy, "
+                 "what the booked creators can safely deliver, and the benchmark the client sees.</div></div>"
+                 "<a class='btn small' href='" + u("/planner") + "?id=" + str(k["id"]) + "'>Open the planner</a></div>"
                + "<label style='margin-top:16px'>Targets the client sees</label>"
                "<div class='row'>" + tgt("posts", "Posts", "e.g. 24") + tgt("views", "Views", "e.g. 500000")
                + tgt("reach", "Reach", "e.g. 300000") + tgt("engagement", "Engagement", "e.g. 20000")
@@ -2463,6 +2476,7 @@ def campaign_tabs(k, on):
     tabs = [("setup", "/campaigns/edit", "Setup"), ("content", "/campaigns/content", "Content"),
             ("insights", "/campaigns/insights", "Insights"),
             ("links", "/campaigns/links", "Tracking links &amp; clicks"),
+            ("plan", "/planner", "Goals &amp; ROI"),
             ("report", "/campaigns/report", "Report")]
     return ("<nav class='tabs'>" + "".join(
         "<a href='" + u(href) + "?id=" + str(k["id"]) + "'" + (" class='on'" if key == on else "")
@@ -2650,7 +2664,7 @@ def campaign_content_page(k, members, posts, error=None, message=None):
     kinds = "".join("<option value='" + v + "'>" + l + "</option>" for v, l in KIND_LABEL.items())
     rows = []
     for p in posts:
-        thumb = ("<img class='post-thumb' src='" + e(p["thumb"]) + "' alt='' loading='lazy' "
+        thumb = ("<img class='post-thumb' src='" + e(thumb_src(p["thumb"])) + "' alt='' loading='lazy' "
                  "referrerpolicy='no-referrer' onerror=\"this.style.visibility='hidden'\">") if p["thumb"] else \
                 "<span class='post-thumb'></span>"
         est = lambda real: "<span class='real'>real</span>" if real else "<span class='est'>est.</span>"
@@ -2693,8 +2707,26 @@ def campaign_content_page(k, members, posts, error=None, message=None):
             + ago(p["metrics_at"]) + " · " + e(p["source"]) + "</span></td></tr>")
     table = "".join(rows) or ("<tr><td colspan='8' class='muted'>No posts yet. The capture job adds them "
                               "every 24 hours while the campaign is live, or add one below.</td></tr>")
+    # What the platform does not show publicly — to collect by hand.
+    live = [p for p in posts if not p["hidden"] and p["section"] == "campaign"]
+    hid = [p for p in live if p.get("likes_hidden")]
+    no_reach = sum(1 for p in live if "reach" in (p.get("gaps") or []))
+    no_ss = sum(1 for p in live if "shares" in (p.get("gaps") or []))
+    todo = ""
+    if live and (hid or no_reach or no_ss):
+        todo = ("<div class='card' style='background:#fff8ec;border-color:#f3d9a8'><strong>Collect by hand</strong>"
+                "<ul style='margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.6'>"
+                + (("<li><strong>Likes hidden on %d posts</strong> — ask for the like count or insights: " % len(hid))
+                   + ", ".join("<a href='" + e(p["url"]) + "' target='_blank' rel='noopener'>" + e(p.get("creator_name") or p["code"])
+                               + "</a>" for p in hid) + ". Until then engagement there is comments only and they are left out of ER.</li>" if hid else "")
+                + ("<li><strong>Real reach on %d posts</strong> — reels show plays, not unique people; reach is estimated "
+                   "until the creator's insights are approved.</li>" % no_reach if no_reach else "")
+                + ("<li><strong>Shares and saves on %d posts</strong> — not public; they come from insights.</li>" % no_ss if no_ss else "")
+                + "</ul><p class='price-hint'>Ask creators for 30-day insights screenshots on the "
+                  "<a href='" + u("/campaigns/insights") + "?id=" + str(k["id"]) + "'>Insights tab</a>, or type the numbers into a post with Edit.</p></div>")
     body = (
         _head(k, "content", error, message)
+        + todo
         + "<div class='card'><table><thead><tr><th></th><th>Post</th><th>Counts as</th><th class='right'>Likes</th>"
           "<th class='right'>Views</th><th class='right'>Reach / impressions</th><th class='right'>ER</th><th></th>"
           "</tr></thead><tbody>" + table + "</tbody></table>"
@@ -3198,3 +3230,168 @@ def history_page(rows, later, kind=None, q=None, message=None, error=None, page_
         + "<div class='card'><table><thead><tr><th>When</th><th>What</th><th>Item</th><th></th></tr></thead><tbody>"
         + table + "</tbody></table></div>" + pager(total, page_no, "/history", kind=kind or "", q=q or ""))
     return page("History", body, "/history")
+
+
+# ---------------------------------------------------------------- planner --
+
+PLAN_LABEL = {"posts": "Posts", "views": "Views", "reach": "Reach", "engagement": "Engagement",
+              "er": "Eng. rate % (of views)", "clicks": "Link clicks"}
+
+
+def _fmt(key, v):
+    if v is None:
+        return "—"
+    return ("%.2f%%" % v) if key == "er" else format(int(v), ",")
+
+
+def planner_page(k, brief, plan, house, lib, error=None, message=None):
+    """Goals & ROI: a brief in, the benchmark, the value floor for the budget,
+    the safe and expected estimates and the targets to agree out. Works for
+    a campaign (its booked creators) or on its own, for a pitch."""
+    import plans
+    q = (lambda key, d="": e(brief.get(key, d) if brief.get(key) is not None else d))
+    opt = lambda items, cur: "".join("<option value='" + e(v) + "'" + (" selected" if v == cur else "") + ">"
+                                     + e(l) + "</option>" for v, l in items)
+    tpl_opts = "<option value=''>— none —</option>" + opt([(key, t["label"]) for key, t in plans.TEMPLATES.items()],
+                                                          brief.get("template") or "")
+    obj_opts = opt([("awareness", "Awareness"), ("engagement", "Engagement"), ("traffic", "Traffic / sales"),
+                    ("balanced", "Balanced")], plan["objective"])
+    plat_opts = opt([(p, p) for p in plans.PLATFORMS], plan["platform"])
+    cat_opts = opt([(key, v[0]) for key, v in plans.CATEGORIES.items()], plan["category"])
+    use_campaign = bool(k) and brief.get("source") != "tiers"
+    tiers_in = "".join("<div><label>" + e(plans.TIER_LABEL[t]) + " — posts</label><input name='n_" + t
+                       + "' inputmode='numeric' value='" + q("n_" + t) + "'" + (" disabled" if use_campaign else "")
+                       + "></div>" for t in plans.TIERS)
+    src = ""
+    if k:
+        src = ("<div class='ticks' style='margin:6px 0 10px'>"
+               "<label class='tick'><input type='radio' name='source' value='campaign'" + (" checked" if use_campaign else "")
+               + " onchange='this.form.submit()'><span>Use this campaign's booked creators</span></label>"
+               "<label class='tick'><input type='radio' name='source' value='tiers'" + ("" if use_campaign else " checked")
+               + " onchange='this.form.submit()'><span>Plan by posts per tier</span></label></div>")
+    form = ("<form method='get' action='" + u("/planner") + "' class='card'>"
+            + ("<input type='hidden' name='id' value='" + str(k["id"]) + "'>" if k else "")
+            + "<div class='row'><div style='flex:2'><label>Start from a template</label><select name='template' "
+              "onchange=\"this.form.querySelector('[name=apply_template]').value='1';this.form.submit()\">" + tpl_opts + "</select>"
+              "<input type='hidden' name='apply_template' value=''></div>"
+              "<div><label>Objective</label><select name='objective'>" + obj_opts + "</select></div>"
+              "<div><label>Main platform</label><select name='platform'>" + plat_opts + "</select></div>"
+              "<div><label>Product category</label><select name='category'>" + cat_opts + "</select></div></div>"
+            + "<div class='row'><div><label>Client budget — what the client pays (SAR, before VAT)</label>"
+              "<input name='budget' inputmode='numeric' value='" + q("budget") + "' placeholder='e.g. 25000'></div>"
+              "<div><label>Tracked links</label><select name='links'>" + opt([("", "No affiliate links"), ("1", "Yes — each creator has a link")],
+                                                                              "1" if plan["links"] else "") + "</select></div></div>"
+            + src + "<div class='row'>" + tiers_in + "</div>"
+            + "<button class='btn'>Calculate</button></form>")
+
+    house_p = house.get(plan["platform"]) or {}
+    bm = plan.get("benchmark") or {}
+    def bench(key):
+        if key == "views" and bm.get("view_rate"):
+            return "%g–%g%% of followers per video" % tuple(bm["view_rate"])
+        if key == "reach":
+            return "≈ %d%% of views" % round((bm.get("reach_per_view") or 0.85) * 100)
+        if key in ("engagement", "er") and bm.get("eng_rate"):
+            return "%g–%g%% of views" % tuple(bm["eng_rate"])
+        if key == "clicks" and bm.get("ctr"):
+            return "%g–%g%% of views" % tuple(bm["ctr"])
+        return ""
+    def ours(key):
+        if not house_p.get("posts"):
+            return "<span class='muted'>no data yet</span>"
+        if key == "views" and house_p.get("view_rate") is not None:
+            return "%.1f%% of followers <span class='muted'>(%d videos)</span>" % (house_p["view_rate"], house_p["posts"])
+        if key in ("engagement", "er") and house_p.get("eng_rate") is not None:
+            return "%.2f%% of views" % house_p["eng_rate"]
+        return "<span class='muted'>—</span>"
+    est_s, est_x, fl, tgt = plan["estimate"]["safe"], plan["estimate"]["expected"], plan["floor"], plan["target"]
+    rows = ""
+    for key in ("posts", "views", "reach", "engagement", "er", "clicks"):
+        if key not in tgt and key not in est_s:
+            continue
+        lead = key in plan["primary"]
+        chk = next((c for c in plan["checks"] if c["key"] == key), None)
+        flag = ""
+        if chk:
+            flag = (" <span class='pill live'>clears value</span>" if chk["ok"]
+                    else " <span class='pill warn'>below value</span>")
+        rows += ("<tr" + (" class='rec-lead'" if lead else "") + "><td><strong>" + e(PLAN_LABEL[key]) + "</strong>"
+                 + (" <span class='pill own'>headline</span>" if lead else "") + "</td>"
+                 + "<td class='right'>" + _fmt(key, fl.get(key)) + "</td>"
+                 + "<td class='right'>" + _fmt(key, est_s.get(key)) + flag + "</td>"
+                 + "<td class='right muted'>" + _fmt(key, est_x.get(key)) + "</td>"
+                 + "<td class='right'><input form='apply' name='target_" + key + "' value='"
+                 + e(tgt.get(key) if tgt.get(key) is not None else "") + "' inputmode='decimal' style='width:120px;text-align:right'></td>"
+                 + "<td class='muted' style='font-size:12px'>" + bench(key) + "</td>"
+                 + "<td style='font-size:12px'>" + ours(key) + "</td></tr>")
+    roi = plan.get("roi") or {}
+    roi_html = ""
+    if roi:
+        c = roi["ceilings"]
+        def line(lbl, key):
+            if not c.get(key) or roi["safe"].get(key) is None:
+                return ""
+            v = roi["safe"][key]
+            gr = "live" if v <= c[key][1] else ("warn" if v <= c[key][0] else "dead")
+            word = {"live": "strong value", "warn": "fair value", "dead": "poor value"}[gr]
+            return ("<tr><td>" + lbl + "</td><td class='right'><strong>SAR %.2f</strong></td><td class='right muted'>SAR %.2f</td>"
+                    "<td class='right muted'>≤ %g good · ≤ %g acceptable</td><td><span class='pill %s'>%s</span></td></tr>"
+                    % (v, roi["expected"][key] or 0, c[key][1], c[key][0], gr, word))
+        roi_html = ("<h2>Return on the budget</h2><div class='card'><table><thead><tr><th>Cost per result</th>"
+                    "<th class='right'>At the safe estimate</th><th class='right'>At expected</th><th class='right'>Ceiling</th><th></th></tr></thead><tbody>"
+                    + line("Per 1,000 views (CPM)", "cpm") + line("Per engagement", "cpe") + line("Per link click", "cpc")
+                    + "</tbody></table><p class='price-hint'>The ceiling is the most a client should pay per result for the campaign "
+                      "to be fair value. The value floor in the table above is the budget divided by that ceiling.</p></div>")
+    tiers = plan.get("tiers") or {}
+    tier_rows = "".join("<tr><td>" + e(plans.TIER_LABEL[t]) + "</td><td class='right'>" + str(tiers[t]["posts"])
+                        + "</td><td class='right'>" + _fmt("views", tiers[t]["views"][0]) + "</td><td class='right muted'>"
+                        + _fmt("views", tiers[t]["views"][1]) + "</td><td class='right'>" + _fmt("engagement", tiers[t]["engagement"][0])
+                        + "</td></tr>" for t in plans.TIERS if t in tiers)
+    saved = json.dumps(plan)
+    apply = ""
+    if k:
+        apply = ("<form method='post' action='" + u("/planner/apply") + "' id='apply' class='savebar'>"
+                 "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
+                 "<input type='hidden' name='objective' value='" + e(plan["objective"]) + "'>"
+                 "<input type='hidden' name='template' value='" + e(brief.get("template") or "") + "'>"
+                 "<input type='hidden' name='plan' value='" + e(saved) + "'>"
+                 "<button class='btn'>Save as this campaign's goals</button>"
+                 "<span class='price-hint' style='margin-left:12px'>Saves the targets (edit any figure first), the objective "
+                 "and the benchmark the client sees on Goals. The budget and costs stay internal.</span></form>")
+    else:
+        apply = "<form id='apply'></form><p class='price-hint'>Open the planner from a campaign to save these as its goals.</p>"
+    notes = "".join("<li>" + e(n) + "</li>" for n in plan["notes"])
+    lib_json = json.dumps(lib, indent=1, ensure_ascii=False)
+    body = ((_head(k, "plan", error, message) if k else "<h1>ROI planner</h1>" + _notes(error, message))
+            + "<p class='price-hint'>Brief in, numbers out. The target to agree is the <strong>minimum accepted</strong>: "
+              "the lower of what the budget must buy to be fair value and what the creators can safely deliver — "
+              "so we commit to it and beat it.</p>"
+            + form
+            + "<h2>Targets</h2><div class='card'><table><thead><tr><th>KPI</th><th class='right'>Value floor<br><small>budget ÷ ceiling</small></th>"
+              "<th class='right'>Safe estimate</th><th class='right'>Expected</th><th class='right'>Target to agree</th>"
+              "<th>Industry guide</th><th>HelloVoice past campaigns</th></tr></thead><tbody>" + rows + "</tbody></table>"
+            + ("<ul class='price-hint' style='margin-top:10px'>" + notes + "</ul>" if notes else "") + "</div>"
+            + apply + roi_html
+            + ("<h2>By creator size</h2><div class='card'><table><thead><tr><th>Tier</th><th class='right'>Posts</th>"
+               "<th class='right'>Views, safe</th><th class='right'>Views, expected</th><th class='right'>Engagement, safe</th></tr></thead><tbody>"
+               + tier_rows + "</tbody></table></div>" if tier_rows else "")
+            + "<h2>How the numbers are worked out</h2><div class='card price-hint' style='font-size:13px;line-height:1.6'>"
+              "<p><strong>Views</strong> = each creator's followers × the view rate for their size (safe / expected) × posts. "
+              "<strong>Reach</strong> = views × unique-viewer share. <strong>Engagement</strong> = views × engagement rate, "
+              "adjusted for the product category. <strong>Clicks</strong> = views × click-through, only with tracked links.</p>"
+              "<p><strong>Value floor</strong> = budget ÷ the most a client should pay per 1,000 views, per engagement or per click. "
+              "<strong>Target</strong> = the lower of the floor and the safe estimate.</p>"
+              "<p><strong>Creator score</strong> on the report (0–100), weighted by the objective — awareness: exposure 55, "
+              "engagement 15, engagement rate vs size 20, clicks 10 · engagement: 15 / 40 / 35 / 10 · traffic: 15 / 15 / 20 / 50 · "
+              "balanced: 35 / 25 / 25 / 15. Exposure and engagement are against the best creator in the campaign; "
+              "the rate against the strong benchmark for the creator's size.</p></div>"
+            + "<details style='margin-top:20px'><summary><strong>Benchmark library</strong> — edit the guide ranges</summary>"
+              "<form method='post' action='" + u("/planner/library") + "' class='card' style='margin-top:10px'>"
+              + ("<input type='hidden' name='back' value='" + str(k["id"]) + "'>" if k else "")
+              + "<p class='price-hint'>Per platform: view_rate and eng_rate per tier as [safe, expected] %; ctr [safe, expected] %; "
+                "cpm, cpe, cpc as [acceptable, good] SAR ceilings; reach_per_view 0–1. Save with your own numbers once "
+                "campaigns give us better ones.</p>"
+              "<textarea name='library' rows='22' style='font-family:ui-monospace,monospace;font-size:12px'>" + e(lib_json) + "</textarea>"
+              "<div class='savebar'><button class='btn small'>Save library</button>"
+              "<button class='btn small ghost' name='reset' value='1'>Reset to defaults</button></div></form></details>")
+    return page(("%s — Goals & ROI" % k["name"]) if k else "ROI planner", body, "/campaigns")

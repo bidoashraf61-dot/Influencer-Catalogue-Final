@@ -39,3 +39,6 @@ deploy/catalogue/secret.conf
 # Undo bin: photographs of deleted creators, kept so a restore brings them
 # back. Creator data — never in this public repository.
 admin/trash/
+
+# Post thumbnails fetched from Instagram/TikTok for campaign reports — client data.
+admin/post_thumbs/

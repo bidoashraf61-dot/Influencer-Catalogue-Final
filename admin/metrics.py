@@ -5,6 +5,8 @@ Definitions (also in docs/CAMPAIGN-TRACKER-BRIEF.md §11):
 
   engagement          likes + comments
   est. reach, post    engagement × REACH_PER_ENGAGEMENT, capped at followers
+  est. reach, video   views × VIDEO_REACH_PER_VIEW — plays count replays and
+                      repeat viewers, so unique people are fewer than views
   est. reach, story   followers × STORY_VIEW_RATE
   est. impressions    post: est. reach × 1.5 · story: = est. reach
   video               views are counted as views, not as impressions
@@ -12,7 +14,11 @@ Definitions (also in docs/CAMPAIGN-TRACKER-BRIEF.md §11):
                       replace the estimates for that post
   ER%                 engagement ÷ followers, averaged over posts whose likes
                       are visible (stories excluded)
-  Video ER%           engagement ÷ views, over videos
+  Video ER%           engagement ÷ views, over videos whose likes are visible
+  hidden likes        the creator switched the like count off: engagement for
+                      that post is comments only, it is left out of every
+                      rate, and the report lists it so the real number can be
+                      taken from the creator's insights
   Impressions ER%     engagement ÷ impressions, over non-video posts
   EMV                 Σ count × SAR multiplier, per action and platform
   CPM (internal)      cost ÷ (impressions + views) × 1,000
@@ -25,9 +31,10 @@ settings, not constants, so they can be tuned without a deploy.
 import json
 
 import db
+import plans
 
 DEFAULT_FACTORS = {"reach_per_engagement": 10.0, "story_view_rate": 0.05,
-                   "impressions_per_reach": 1.5}
+                   "impressions_per_reach": 1.5, "video_reach_per_view": 0.85}
 EMV_ACTIONS = ["impressions", "views", "likes", "comments", "shares", "saves", "clicks"]
 
 
@@ -144,9 +151,10 @@ def post_numbers(c, f):
            "video": video, "story": story, "real": bool(ins)}
 
     if video:
-        out["reach"] = ins.get("reach") or (views or 0)
+        out["reach"] = int(ins["reach"]) if ins.get("reach") else \
+            int(round((views or 0) * f.get("video_reach_per_view", 0.85)))
         out["impressions"] = 0           # video exposure is counted as views
-        out["reach_real"] = "reach" in ins
+        out["reach_real"] = bool(ins.get("reach"))
     else:
         if story:
             est = followers * f["story_view_rate"]
@@ -166,7 +174,22 @@ def post_numbers(c, f):
     out["impressions_real"] = "impressions" in ins
     out["er"] = (eng / float(followers) * 100) if (followers and likes is not None
                                                    and not story) else None
-    out["video_er"] = (eng / float(views) * 100) if (video and views) else None
+    out["video_er"] = (eng / float(views) * 100) if (video and views and likes is not None) else None
+    out["likes_hidden"] = likes is None and not story
+    # What this post does not show publicly, so it can be asked for.
+    gaps = []
+    if out["likes_hidden"]:
+        gaps.append("likes")
+    if out["shares"] is None:
+        gaps.append("shares")
+    if out["saves"] is None:
+        gaps.append("saves")
+    if not out["reach_real"]:
+        gaps.append("reach")
+    out["gaps"] = gaps
+    # People who saw it: views for a video, reach for a post or story.
+    # Adding the two counts the same viewers twice.
+    out["exposure"] = (views or 0) if video else out["reach"]
     out["imp_er"] = (eng / float(out["impressions"]) * 100) if (
         not video and not story and out["impressions"]) else None
     out["view_rate"] = (views / float(followers) * 100) if (video and views and followers) else None
@@ -225,6 +248,8 @@ def report(campaign, internal=False):
         t = {k: sum((p.get(k) or 0) for p in items)
              for k in ("likes", "comments", "engagement", "views", "reach", "impressions",
                        "shares", "saves", "emv")}
+        t["seen"] = sum(p["exposure"] for p in items)
+        t["hidden_likes"] = sum(1 for p in items if p["likes_hidden"])
         t["posts"] = len(items)
         t["clicks"] = extra_clicks
         t["er"] = _avg(p["er"] for p in items)
@@ -293,6 +318,7 @@ def report(campaign, internal=False):
            "benchmarks": bm, "targets": targets, "progress": progress, "verdict": verdict,
            "objective": {"key": objective, "label": OBJECTIVES[objective][0], "kpis": OBJECTIVE_KPIS[objective],
                          "weights": dict(zip(("exposure", "engagement", "er", "clicks"), OBJECTIVES[objective][1]))},
+           "gaps": data_gaps(camp),
            "updated_at": max([p["metrics_at"] or 0 for p in posts] + [0]) or None}
     if internal:
         exposure = total["exposure"]
@@ -303,6 +329,19 @@ def report(campaign, internal=False):
             "cpc": (cost_total / float(clicks["clicks"])) if cost_total and clicks["clicks"] else None,
         }
     return out
+
+
+def data_gaps(posts):
+    """What the public numbers leave out, so the team can ask the creators
+    for insights: counts per kind, and the posts with hidden likes."""
+    if not posts:
+        return {"posts": 0}
+    hidden = [{"id": p["id"], "code": p["code"], "url": p["url"], "creator": p.get("creator_name") or p["code"]}
+              for p in posts if p.get("likes_hidden")]
+    return {"posts": len(posts), "likes_hidden": len(hidden), "hidden": hidden,
+            "no_shares": sum(1 for p in posts if "shares" in p["gaps"]),
+            "no_saves": sum(1 for p in posts if "saves" in p["gaps"]),
+            "reach_estimated": sum(1 for p in posts if "reach" in p["gaps"])}
 
 
 def _avg_grade(grades):
@@ -405,7 +444,7 @@ def scoreboard(creators, bm, weights=None):
     than audience size alone. Four parts, weighted by the campaign's
     objective (OBJECTIVES; balanced = 35/25/25/15):
 
-      exposure (views + reach) against the best in the campaign
+      exposure (views for videos, reach for posts) against the best in the campaign
       engagement against the best in the campaign
       engagement rate against the creator's own tier benchmark
            (meeting the "good" mark = full points, capped)
@@ -415,7 +454,7 @@ def scoreboard(creators, bm, weights=None):
     w = weights or OBJECTIVES["balanced"][1]
     def peak(key):
         return max([c[key] or 0 for c in creators] + [0]) or 1
-    pe = max([(c["views"] or 0) + (c["reach"] or 0) for c in creators] + [0]) or 1
+    pe = max([c.get("seen") or 0 for c in creators] + [0]) or 1
     pg, pc = peak("engagement"), peak("clicks")
     for c in creators:
         if not c["posts"]:
@@ -424,7 +463,11 @@ def scoreboard(creators, bm, weights=None):
         rate = c["er"] if c["er"] is not None else c["video_er"]
         target = bm["er"][c["band"]][0] if c["er"] is not None else bm["video_er"][0]
         quality = min(1.0, (rate or 0) / target) if target else 0
-        c["score"] = round(100 * (w[0] * ((c["views"] or 0) + (c["reach"] or 0)) / pe
+        c["parts"] = {"exposure": round(100 * w[0] * (c.get("seen") or 0) / pe, 1),
+                      "engagement": round(100 * w[1] * (c["engagement"] or 0) / pg, 1),
+                      "er": round(100 * w[2] * quality, 1),
+                      "clicks": round(100 * w[3] * (c["clicks"] or 0) / pc, 1)}
+        c["score"] = round(100 * (w[0] * (c.get("seen") or 0) / pe
                                   + w[1] * (c["engagement"] or 0) / pg
                                   + w[2] * quality
                                   + w[3] * (c["clicks"] or 0) / pc), 1)
@@ -444,8 +487,11 @@ def target_progress(campaign, total, targets):
         elapsed = max(0.0, min(1.0, (now - start) / float(end - start)))
     else:
         elapsed = 1.0
+    # ER on a video campaign is engagement ÷ views (what the planner targets);
+    # on photo posts it is engagement ÷ followers.
+    er = total["video_er"] if total.get("video_er") is not None else total["er"]
     actual = {"posts": total["posts"], "views": total["views"], "reach": total["reach"],
-              "engagement": total["engagement"], "er": total["er"], "clicks": total["clicks"]}
+              "engagement": total["engagement"], "er": er, "clicks": total["clicks"]}
     out = []
     for key, goal in targets.items():
         got = actual.get(key) or 0
@@ -457,7 +503,13 @@ def target_progress(campaign, total, targets):
         out.append({"key": key, "goal": goal, "actual": got, "pct": got / float(goal) * 100 if goal else 0,
                     "expected": expected,
                     "grade": "good" if ratio >= 1 else ("moderate" if ratio >= 0.7 else "low")})
-    return {"elapsed": elapsed, "items": out}
+    # The whole campaign's progress: every target counts, each capped at its
+    # goal, so it reads 100% only when views, reach, engagement and rate
+    # are ALL met — beating one target cannot hide another that is short.
+    overall = (sum(min(100.0, i["pct"]) for i in out) / len(out)) if out else None
+    due = (sum(min(100.0, i["expected"] / i["goal"] * 100) for i in out) / len(out)) if out else None
+    return {"elapsed": elapsed, "items": out, "overall": overall, "due": due,
+            "all_met": bool(out) and all(i["actual"] >= i["goal"] for i in out)}
 
 
 def overall_verdict(progress, total):
@@ -510,7 +562,7 @@ def client_report(campaign, photo=None, photo_large=None):
     keep = ("id", "code", "platform", "kind", "url", "posted_at", "caption", "thumb",
             "section", "likes", "comments", "engagement", "views", "reach", "impressions",
             "shares", "saves", "er", "video_er", "imp_er", "view_rate", "story_rate", "real",
-            "reach_real", "impressions_real", "video", "story", "health")
+            "reach_real", "impressions_real", "video", "story", "health", "likes_hidden", "gaps", "exposure")
     posts = [{k: p.get(k) for k in keep} for p in r["posts"]
              if vis["all_content"] or p["section"] == "campaign"]
     names = {c["code"]: c["name"] for c in r["creators"]}
@@ -527,7 +579,8 @@ def client_report(campaign, photo=None, photo_large=None):
                                  "views", "reach", "impressions", "shares", "saves", "er", "video_er",
                                  "clicks", "planned", "delivered", "pending_status", "pending_date",
                                  "profiles", "band", "er_grade",
-                                 "video_er_grade", "score", "rank", "badge")}
+                                 "video_er_grade", "score", "rank", "badge", "seen", "parts", "hidden_likes")
+               if k in c}
         row["photo"] = pics.get(c["code"])
         row["photo_large"] = photo_large(c["photo"]) if photo_large and c["photo"] else None
         row["has_analysis"] = c["code"] in have
@@ -553,6 +606,7 @@ def client_report(campaign, photo=None, photo_large=None):
            "total": total, "creators": creators, "posts": posts, "history": r["history"],
            "visibility": {kk: v for kk, v in vis.items() if kk != "emv"},
            "updated_at": r["updated_at"], "verdict": r["verdict"], "objective": r["objective"],
+           "plan": plans.client_view(plans.plan_of(k)), "gaps": r["gaps"],
            "progress": r["progress"] if vis["reach"] else {"elapsed": r["progress"]["elapsed"],
                                                             "items": [i for i in r["progress"]["items"]
                                                                       if i["key"] not in ("reach",)]},
@@ -561,6 +615,10 @@ def client_report(campaign, photo=None, photo_large=None):
                           "ctr": r["benchmarks"]["ctr"], "bands": BAND_LABEL}}
     if not vis["clicks"]:
         out["progress"]["items"] = [i for i in out["progress"]["items"] if i["key"] != "clicks"]
+    its = out["progress"]["items"]
+    out["progress"]["overall"] = (sum(min(100.0, i["pct"]) for i in its) / len(its)) if its else None
+    out["progress"]["due"] = (sum(min(100.0, i["expected"] / i["goal"] * 100) for i in its) / len(its)) if its else None
+    out["progress"]["all_met"] = bool(its) and all(i["actual"] >= i["goal"] for i in its)
     reach_by = {c["code"]: (c.get("reach") or 0) + (c.get("views") or 0) for c in r["creators"]}
     out["audience"] = audience_mix(r["creators"], reach_by)
     if vis["clicks"]:

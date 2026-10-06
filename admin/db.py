@@ -464,7 +464,7 @@ def migrate(conn):
         conn.execute("ALTER TABLE campaigns ADD COLUMN emv TEXT")
         conn.execute("ALTER TABLE campaigns ADD COLUMN visibility TEXT")
     camp_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
-    for col in ("phase", "status_note", "targets", "logos", "steps", "objective"):
+    for col in ("phase", "status_note", "targets", "logos", "steps", "objective", "plan"):
         # phase: where the campaign is (see PHASES); status_note: one line the
         # client reads; targets: JSON goals; logos: JSON brand logo files.
         if col not in camp_cols:
@@ -1730,11 +1730,11 @@ def save_campaign(cid, **fields):
     form cannot write a column it was never meant to."""
     allowed = {"name", "client", "code_id", "platform", "starts_at", "ends_at", "status",
                "rules", "destination", "cost", "notes", "emv", "visibility", "phase",
-               "status_note", "targets", "logos", "selection_id", "steps", "objective"}
+               "status_note", "targets", "logos", "selection_id", "steps", "objective", "plan"}
     bad = set(fields) - allowed
     if bad:
         raise ValueError("not a campaign field: " + ", ".join(sorted(bad)))
-    for key in ("rules", "emv", "visibility", "targets", "logos", "steps"):
+    for key in ("rules", "emv", "visibility", "targets", "logos", "steps", "plan"):
         if key in fields and fields[key] is not None and not isinstance(fields[key], str):
             fields[key] = json.dumps(fields[key])
     if fields.get("status") is not None and fields["status"] not in CAMPAIGN_STATUSES:
@@ -2213,7 +2213,8 @@ def add_content(cid, item, source="capture", conn=None):
     else:
         content_id = row["id"]
         conn.execute(
-            "UPDATE content SET caption = COALESCE(?, caption), thumb = COALESCE(?, thumb), "
+            "UPDATE content SET caption = COALESCE(?, caption), "
+            "thumb = CASE WHEN thumb LIKE 'file:%' THEN thumb ELSE COALESCE(?, thumb) END, "
             "followers = COALESCE(?, followers), posted_at = COALESCE(posted_at, ?), "
             "disclosure_ok = ? WHERE id = ?",
             (item.get("caption"), item.get("thumb"), item.get("followers"),
