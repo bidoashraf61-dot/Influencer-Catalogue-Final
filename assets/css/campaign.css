@@ -636,3 +636,8 @@
 .mx-post__soon { margin: 10px 0 0; font-size: 12px; color: var(--gray, #383838); }
 
 .mx-na { display: inline-block; font-size: 12px; font-weight: 700; color: #6a6a6a; background: #efede8; border-radius: 999px; padding: 4px 10px; margin-right: 8px; }
+
+/* post pictures are never cropped: fitted whole, a blurred copy behind */
+.db-thumb img.hv-fill, .db-post__img img.hv-fill, .mx-post__media img.hv-fill { object-fit: cover; filter: blur(14px) brightness(.85); transform: scale(1.15); }
+.db-thumb img.hv-fit, .db-post__img img.hv-fit, .mx-post__media img.hv-fit { object-fit: contain; }
+.db-thumb, .db-post__img, .mx-post__media { overflow: hidden; }

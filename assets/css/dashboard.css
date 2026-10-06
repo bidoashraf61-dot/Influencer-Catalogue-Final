@@ -392,3 +392,8 @@
 .db-gaplist { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; display: grid; gap: 6px; }
 @media (max-width: 640px) { .db-weights { grid-template-columns: 1fr 1fr; } .db-goals span { display: none; } }
 @media (prefers-reduced-motion: reduce) { .db-live::before { animation: none; } }
+
+/* post pictures are never cropped: fitted whole, a blurred copy behind */
+.db-thumb img.hv-fill, .db-post__img img.hv-fill, .mx-post__media img.hv-fill { object-fit: cover; filter: blur(14px) brightness(.85); transform: scale(1.15); }
+.db-thumb img.hv-fit, .db-post__img img.hv-fit, .mx-post__media img.hv-fit { object-fit: contain; }
+.db-thumb, .db-post__img, .mx-post__media { overflow: hidden; }

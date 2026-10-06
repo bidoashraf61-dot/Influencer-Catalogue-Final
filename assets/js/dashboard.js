@@ -426,7 +426,7 @@
     var top = topPosts(list).slice(0, 3);
     $("w-posts").innerHTML = head(IC.img, "Top posts", "The three posts that reached the most people in this view.", "posts")
       + '<div class="db-card__body"><div class="db-thumbs">' + (top.map(function (p, i) {
-        return '<a class="db-thumb" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + (p.thumb ? '<img src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
+        return '<a class="db-thumb" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + fit(p.thumb)
           + '<svg class="db-thumb__n" viewBox="0 0 40 50" aria-hidden="true">' + medalBody(i + 1) + "</svg>"
           + "<span><em>" + esc(p.creator) + "</em><i>" + (ICONS[p.platform] || "") + num(p.video ? p.views : p.reach) + "<small style=\"font:600 10px var(--body);color:#fff;opacity:.7\">" + (p.video ? "views" : "reached") + "</small></i></span></a>";
       }).join("") || '<p class="db-note">No posts in this view.</p>') + "</div></div>";
@@ -441,7 +441,7 @@
       // The guide range for each KPI, worked out for this campaign's creators.
       function range(k) {
         var sf = plan.safe || {}, ex = plan.estimate || {};
-        if (sf[k] != null && ex[k] != null) return fv(k, sf[k]) + " – " + fv(k, ex[k]);
+        if (k !== "posts" && sf[k] != null && ex[k] != null) return fv(k, sf[k]) + " – " + fv(k, ex[k]);
         return "—";
       }
       var head = '<div class="db-goal-sum"><div><span>All targets</span><b>' + Math.round(P.all_met ? 100 : Math.min(99, P.overall || 0)) + '%</b><small>' + (P.all_met ? "Every target met" : "100% only when every target is met") + "</small></div>"
@@ -461,7 +461,7 @@
         + "<tr><td>Views per video</td><td>" + pb.view_rate[0] + "–" + pb.view_rate[1] + "% of followers</td></tr>"
         + "<tr><td>Engagement rate</td><td>" + pb.eng_rate[0] + "–" + pb.eng_rate[1] + "% of views</td><td>Now " + pct(t.video_er != null ? t.video_er : t.er) + " " + sig(t.video_er_grade || t.er_grade) + "</td></tr>"
         + "<tr><td>Reach</td><td>≈ " + Math.round((pb.reach_per_view || 0.85) * 100) + "% of views are unique people</td></tr>"
-        + (R.visibility.clicks && t.ctr != null ? "<tr><td>Click-through</td><td>" + pb.ctr[0] + "–" + pb.ctr[1] + "% of views</td><td>Now " + pct(t.ctr) + "</td></tr>" : "") + "</tbody></table>";
+        + (R.visibility.clicks && R.clicks && R.clicks.has_destination && t.ctr != null ? "<tr><td>Click-through</td><td>" + pb.ctr[0] + "–" + pb.ctr[1] + "% of views</td><td>Now " + pct(t.ctr) + "</td></tr>" : "") + "</tbody></table>";
       else out += '<h3>Benchmarks</h3><table class="db-table"><tbody><tr><td>Engagement rate</td><td>' + pct(t.er) + "</td><td>" + sig(t.er_grade) + "</td></tr>"
         + (t.video_er != null ? "<tr><td>Video engagement</td><td>" + pct(t.video_er) + "</td><td>" + sig(t.video_er_grade) + "</td></tr>" : "") + "</tbody></table>"
         + '<p class="db-note" style="margin-top:10px">Strong engagement rate by creator size: ' + Object.keys(bm.er).map(function (b) { return (bm.bands[b] || b).replace(/ \(.*/, "") + " " + bm.er[b][0] + "%+"; }).join(" · ") + ".</p>";
@@ -562,8 +562,15 @@
     }).join("") + "</div>";
   }
 
+  // A post's picture is never cropped: the whole frame is fitted in, and a
+  // blurred copy of the same picture fills the space a tall reel leaves.
+  function fit(src) {
+    if (!src) return "";
+    var u = esc(src);
+    return '<img class="hv-fill" src="' + u + '" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer"><img class="hv-fit" src="' + u + '" alt="" loading="lazy" referrerpolicy="no-referrer">';
+  }
   function post(p) {
-    return '<a class="db-post" href="' + esc(p.url) + '" target="_blank" rel="noopener"><div class="db-post__img">' + (p.thumb ? '<img src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
+    return '<a class="db-post" href="' + esc(p.url) + '" target="_blank" rel="noopener"><div class="db-post__img">' + fit(p.thumb)
       + (p.kind ? '<span class="db-kind">' + esc(ONE[p.kind] || p.kind) + "</span>" : "")
       + '</div><div class="db-post__body"><b>' + esc(p.creator) + "</b><span>" + (ICONS[p.platform] ? "" : "") + esc(p.platform) + " · " + esc(day(p.posted_at, true)) + "</span></div>"
       + (p.caption ? '<p class="db-post__cap">' + esc(p.caption) + "</p>" : "")

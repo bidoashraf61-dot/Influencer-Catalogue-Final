@@ -514,7 +514,9 @@
       if (p.saves) n.push(["Saves", num(p.saves)]);
       if (p.shares) n.push(["Shares", num(p.shares)]);
       var h = p.health || {};
-      var img = p.thumb ? '<img src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "";
+      // Never cropped: the whole frame fitted over a blurred copy of itself.
+      var img = p.thumb ? '<img class="hv-fill" src="' + esc(p.thumb) + '" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
+        + '<img class="hv-fit" src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "";
       return '<article class="mx-post"><div class="mx-post__media"><div class="mx-post__plate">' + icon(p.platform) + "</div>" + img
         + '<span class="mx-post__tag">' + icon(p.platform) + esc(KIND[p.kind] || p.kind) + '</span><span class="mx-post__sig">'
         + sig(h.grade, healthTitle(h)) + '</span></div><div class="mx-post__body"><div class="mx-who">' + ava(p.photo)
