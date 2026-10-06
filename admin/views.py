@@ -3524,6 +3524,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
 
 <div id='cal-check'></div>
 <div id='cal-goals'></div>
+<div id='cal-results'></div>
 
 <h2>Tools</h2>
 <div id='cal-focus-box' hidden class='card' style='margin-bottom:16px'>
@@ -3675,6 +3676,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     $('cal-focus').innerHTML = cs.map(function(x){ return '<option value="' + x.id + '"' + (x.id === S.focus ? ' selected' : '') + '>' + TYPES[x.t].name + ' · ' + x.p + '</option>'; }).join('');
     var fc = focus(), chk = check(fc, budget ? (split(budget)[fc.p] || budget) : null);
     goals(fc, budget ? (split(budget)[fc.p] || budget) : null, chk);
+    resultsCard(fc, budget ? (split(budget)[fc.p] || budget) : null, chk);
     summary(budget, chk);
     tools(budget);
   }
@@ -3810,6 +3812,41 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
       + '<button class="btn">Save goals</button></form></div>';
   }
   function source0(v){ var parts = v.split(':'), list = parts[0] === 's' ? SRC.selections : SRC.campaigns; var o = list.filter(function(x){ return String(x.id) === parts[1]; })[0]; return o ? {kind: parts[0] === 's' ? 'selection' : 'campaign', o: o} : null; }
+  // Results by hand: pick a template (built from the same benchmarks and
+  // creators as everything above, so they match) and change any number.
+  function resultsCard(f, budget, chk){
+    var box = $('cal-results');
+    if (!chk || !chk.campaign) { box.innerHTML = ''; return; }
+    var p = f.p, a = chk.all, camp = SRC.campaigns.filter(function(x){ return x.id === chk.campaign; })[0] || {};
+    var links = f.t === 'conversion', measured = camp.measured || {}, adj = camp.adjusted || {};
+    function setFrom(views, eng, clicks, posts){
+      var o = {posts: posts};
+      o.views = rnd(views); o.reach = rnd(views * LIB[p].reach_per_view);
+      if (p !== 'Snapchat') { o.engagement = rnd(eng); o.er = Math.round(eng / views * 10000) / 100; }
+      if (links) o.clicks = rnd(clicks);
+      return o;
+    }
+    var T = {};
+    if (budget) {
+      var vOk = budget / ceil(p, 'views')[0], vGr = budget / ceil(p, 'views')[1], eOk = budget / ceil(p, 'reactions')[0], eGr = budget / ceil(p, 'reactions')[1], cOk = budget / ceil(p, 'clicks')[0], cGr = budget / ceil(p, 'clicks')[1];
+      T.accepted = ['Accepted: the minimum to promise', setFrom(vOk, eOk, cOk, chk.posts)];
+      T.middle = ['Halfway: accepted to great', setFrom((vOk + vGr) / 2, (eOk + eGr) / 2, (cOk + cGr) / 2, chk.posts)];
+      T.great = ['Great', setFrom(vGr, eGr, cGr, chk.posts)];
+    }
+    T.usual = ['What these creators usually get', setFrom(a.views[0], a.reactions[0], a.clicks[0], chk.posts)];
+    T.good = ['What they get on a good day', setFrom(a.views[1], a.reactions[1], a.clicks[1], chk.posts)];
+    S.templates = T;
+    var KEYS = [['views', 'Views'], ['reach', 'Reach'], ['engagement', 'Likes + comments'], ['er', 'Engagement rate %']].concat(links ? [['clicks', 'Clicks']] : []);
+    var ed = S.resEdit || {}, basis = S.resBasis || adj._basis || '';
+    var now = Object.keys(adj).filter(function(k){ return k !== '_basis'; }).length ? '<div class="cal-saved">Shown to the client now (as estimates): ' + Object.keys(adj).filter(function(k){ return k !== '_basis'; }).map(function(k){ return k + ' ' + (k === 'er' ? adj[k] + '%' : nice(adj[k])); }).join(' · ') + (adj._basis ? ' · based on: ' + adj._basis : '') + '</div>' : '<p class="price-hint">No adjustments: the client sees the measured numbers.</p>';
+    box.innerHTML = '<div class="card"><div class="cal-h"><span class="pill live">Results</span><h2>Adjust this campaign\\'s results by hand</h2></div>'
+      + '<p class="price-hint" style="margin:0">Use when the platform hides a number or it has not arrived yet. Pick a template to fill the boxes, then change anything. The client sees these <b>marked as estimates</b>, never as measured.</p>' + now
+      + '<div class="cal-pills" id="cal-tpl" style="margin:10px 0">' + Object.keys(T).map(function(k){ return '<button type="button" data-tpl="' + k + '" aria-pressed="' + (S.resBasisKey === k ? 'true' : 'false') + '">' + T[k][0] + '</button>'; }).join('') + '</div>'
+      + '<form method="post" action="' + D.base + '/calculator/results"><input type="hidden" name="id" value="' + chk.campaign + '"><input type="hidden" name="basis" id="cal-r-basis" value="' + basis.replace(/"/g, '&quot;') + '">'
+      + '<div class="cal-goalrow">' + KEYS.map(function(k){ var v = ed[k[0]] != null ? ed[k[0]] : (adj[k[0]] != null ? adj[k[0]] : ''); var m = measured[k[0]];
+        return '<div><label for="cal-r-' + k[0] + '">' + k[1] + '</label><input id="cal-r-' + k[0] + '" name="r_' + k[0] + '" data-res="' + k[0] + '" inputmode="decimal" value="' + v + '"><small class="muted">measured now: ' + (m == null ? '—' : (k[0] === 'er' ? m + '%' : nice(m))) + '</small></div>'; }).join('') + '</div>'
+      + '<button class="btn">Save results</button> <button class="btn ghost" name="do" value="clear" onclick="return confirm(\\'Go back to the measured numbers?\\')">Back to measured</button></form></div>';
+  }
   function applySource(){
     var sc = source(); if (!sc) { $('cal-source-hint').textContent = 'Pick one and the calculator uses its real creators, their followers and prices.'; return; }
     var o = sc.o, plats = String(o.platform || '').split(/[,&+\/]/).map(function(x){ return x.trim(); }).filter(function(x){ return PLATS.indexOf(x) >= 0; }), plat = plats.join(' + ');
@@ -3854,6 +3891,13 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
   $('cal-source').innerHTML = opt;
   $('cal-source').addEventListener('change', function(){ S.src = this.value; S.goalEdit = {}; S.cat = null; applySource(); render(); });
   if (D.initial && source0(D.initial)) { S.src = D.initial; $('cal-source').value = D.initial; var sc0 = source0(D.initial); var t0 = sc0.o.type; if (t0 && TYPES[t0]) S.types = [t0]; applySource(); }
+  document.addEventListener('click', function(e){
+    var b = e.target.closest && e.target.closest('[data-tpl]'); if (!b || !S.templates) return;
+    var t = S.templates[b.dataset.tpl]; if (!t) return;
+    S.resEdit = {}; Object.keys(t[1]).forEach(function(k){ if (k !== 'posts') S.resEdit[k] = t[1][k]; });
+    S.resBasisKey = b.dataset.tpl; S.resBasis = t[0] + ' for ' + (focus() ? TYPES[focus().t].name + ' · ' + focus().p : '');
+    render();
+  });
   $('cal-go').addEventListener('click', function(){ $('cal-result').scrollIntoView({behavior: 'smooth', block: 'start'}); });
   $('cal-focus').addEventListener('change', function(){ S.focus = this.value; $('cal-got1').value = ''; $('cal-got2').value = ''; render(); });
   document.addEventListener('input', function(e){
@@ -3864,6 +3908,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
       document.querySelectorAll('#cal-split small').forEach(function(sm, i){ sm.textContent = budget ? 'SAR ' + num(amt[S.plats[i]]) : ''; });
       if (!budget) return;
       $('cal-accept').innerHTML = S.types.map(function(t){ return tableFor(t, budget); }).join(''); tools(budget); return; }
+    if (el.dataset && el.dataset.res) { S.resEdit = S.resEdit || {}; S.resEdit[el.dataset.res] = el.value; return; }
     if (el.dataset && el.dataset.goal) { S.goalEdit = S.goalEdit || {}; S.goalEdit[el.dataset.goal] = el.value; return; }
     if (el.id === 'cal-g-cat') { S.cat = el.value; return; }
     if (el.dataset && el.dataset.posts) { S.posts[el.dataset.posts] = Math.max(0, parseInt(el.value, 10) || 0); var id = el.dataset.posts, pos = el.selectionStart; render();

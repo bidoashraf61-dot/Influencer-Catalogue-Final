@@ -375,6 +375,18 @@ def _creator_row(c, price=None, posts=None):
                     "likes_hidden": bool(an.get("likes_hidden")) or (likes is None and bool(an))} if an else None}
 
 
+def _measured(k):
+    """What the platforms really showed so far, before any manual change."""
+    import metrics
+    try:
+        t = metrics.report(k, raw=True)["total"]
+    except Exception:
+        return {}
+    er = t.get("video_er") if t.get("video_er") is not None else t.get("er")
+    return {"posts": t.get("posts"), "views": t.get("views"), "reach": t.get("reach"), "engagement": t.get("engagement"),
+            "er": round(er, 2) if er is not None else None, "clicks": t.get("clicks")}
+
+
 def sources():
     """Selections and campaigns with their creators, for the calculator.
     A selection's budget is its total (typed, else the sum of its creators'
@@ -430,6 +442,7 @@ def sources():
             budget, from_ = [saved, saved], "the ROI planner"
         camps.append({"id": k["id"], "name": k["name"], "platform": k["platform"],
                       "budget": budget, "budgetFrom": from_, "creators": members,
-                      "targets": db.campaign_targets(k), "objective": (k["objective"] if "objective" in k.keys() else None),
+                      "targets": db.campaign_targets(k), "adjusted": db.campaign_overrides(k),
+                      "measured": _measured(k), "objective": (k["objective"] if "objective" in k.keys() else None),
                       "type": (((plan_of(k) or {}).get("brief") or {}).get("type")), "category": (plan_of(k) or {}).get("category")})
     return {"selections": sels, "campaigns": camps}

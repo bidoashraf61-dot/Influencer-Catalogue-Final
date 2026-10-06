@@ -464,7 +464,7 @@ def migrate(conn):
         conn.execute("ALTER TABLE campaigns ADD COLUMN emv TEXT")
         conn.execute("ALTER TABLE campaigns ADD COLUMN visibility TEXT")
     camp_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
-    for col in ("phase", "status_note", "targets", "logos", "steps", "objective", "plan"):
+    for col in ("phase", "status_note", "targets", "logos", "steps", "objective", "plan", "overrides"):
         # phase: where the campaign is (see PHASES); status_note: one line the
         # client reads; targets: JSON goals; logos: JSON brand logo files.
         if col not in camp_cols:
@@ -1730,11 +1730,11 @@ def save_campaign(cid, **fields):
     form cannot write a column it was never meant to."""
     allowed = {"name", "client", "code_id", "platform", "starts_at", "ends_at", "status",
                "rules", "destination", "cost", "notes", "emv", "visibility", "phase",
-               "status_note", "targets", "logos", "selection_id", "steps", "objective", "plan"}
+               "status_note", "targets", "logos", "selection_id", "steps", "objective", "plan", "overrides"}
     bad = set(fields) - allowed
     if bad:
         raise ValueError("not a campaign field: " + ", ".join(sorted(bad)))
-    for key in ("rules", "emv", "visibility", "targets", "logos", "steps", "plan"):
+    for key in ("rules", "emv", "visibility", "targets", "logos", "steps", "plan", "overrides"):
         if key in fields and fields[key] is not None and not isinstance(fields[key], str):
             fields[key] = json.dumps(fields[key])
     if fields.get("status") is not None and fields["status"] not in CAMPAIGN_STATUSES:
@@ -2005,6 +2005,24 @@ def campaign_targets(campaign):
     except ValueError:
         got = {}
     return {k: got[k] for k in TARGET_KEYS if isinstance(got.get(k), (int, float)) and got[k] > 0}
+
+
+OVERRIDE_KEYS = ["views", "reach", "engagement", "er", "clicks"]
+
+
+def campaign_overrides(campaign):
+    """Whole-campaign results typed or chosen by hand, {key: number} plus
+    "_basis" (what they were based on). Used when the platform hides the real
+    number or it has not arrived yet; always shown to the client as an
+    estimate, never as a measurement."""
+    try:
+        got = json.loads(campaign["overrides"] or "{}") if "overrides" in campaign.keys() else {}
+    except ValueError:
+        got = {}
+    out = {k: got[k] for k in OVERRIDE_KEYS if isinstance(got.get(k), (int, float)) and got[k] > 0}
+    if out and got.get("_basis"):
+        out["_basis"] = got["_basis"]
+    return out
 
 
 def campaign_logos(campaign):

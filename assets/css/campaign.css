@@ -641,3 +641,5 @@
 .db-thumb img.hv-fill, .db-post__img img.hv-fill, .mx-post__media img.hv-fill { object-fit: cover; filter: blur(14px) brightness(.85); transform: scale(1.15); }
 .db-thumb img.hv-fit, .db-post__img img.hv-fit, .mx-post__media img.hv-fit { object-fit: contain; }
 .db-thumb, .db-post__img, .mx-post__media { overflow: hidden; }
+
+.mx-est { font-size: 11px; font-weight: 600; color: #6a6a6a; letter-spacing: .04em; vertical-align: super; cursor: help; }

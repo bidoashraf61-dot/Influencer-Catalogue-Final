@@ -211,6 +211,16 @@
   function renderAll() {
     $("db-reset").hidden = !filtered();
     var list = posts(), t = sums(list), s = series(list), cl = clicksFor();
+    // Whole-campaign totals set by HelloVoice by hand replace the measured
+    // ones in the unfiltered view and are always marked as estimates.
+    var adj = (!filtered() && R.total && R.total.adjusted) || [];
+    function isAdj(k) { return adj.indexOf(k) >= 0; }
+    function est(k) { return isAdj(k) ? '<small class="db-est" title="Estimated by HelloVoice: the platform has not shown the exact number yet.">est.</small>' : ""; }
+    if (isAdj("views")) t.views = R.total.views;
+    if (isAdj("reach")) t.reach = R.total.reach;
+    if (isAdj("engagement")) t.engagement = R.total.engagement;
+    if (isAdj("er")) t.er = R.total.er;
+    if (isAdj("clicks") && cl) cl = Object.assign({}, cl, { clicks: R.total.clicks });
     var whole = !filtered() ? R.total : null;
     renderObjective();
     // KPI cards
@@ -218,11 +228,11 @@
     function goal(k) { return !filtered() && g[k] ? sig(g[k].grade, "Goal " + (k === "er" ? pct(g[k].goal, 1) : num(g[k].goal))) : ""; }
     var cards = [
       ["Posts live", full(t.posts) + (!filtered() && R.total.planned ? "<small>/" + R.total.planned + "</small>" : ""), goal("posts"), spark(s.map(function (x) { return x.posts; }), COL[4]), IC.posts, "kpi"],
-      ["Views", num(t.views), goal("views"), spark(s.map(function (x) { return x.views; }), COL[0]), IC.views, "trend"],
-      ["Reach", num(t.reach) + (reachEst() ? '<small class="db-est" title="Instagram does not show reach on reels publicly. Estimated at ' + Math.round(((R.plan && R.plan.benchmark && R.plan.benchmark.reach_per_view) || 0.85) * 100) + '% of views until the creators\' insights arrive.">est.</small>' : ""), goal("reach"), spark(s.map(function (x) { return x.reach; }), COL[3]), IC.reach, "trend"],
-      ["Engagement", num(t.engagement), goal("engagement"), spark(s.map(function (x) { return x.eng; }), COL[1]), IC.engagement, "trend"],
-      ["Avg eng. rate", pct(t.er), !filtered() ? (g.er ? goal("er") : sig(R.total.er_grade)) : "", "", IC.er, "kpi"],
-      ["Link clicks", cl ? num(cl.clicks) : '<span class="db-na">Not tracked</span>', cl && !filtered() ? (g.clicks ? goal("clicks") : sig(R.total.ctr_grade)) : '<span class="db-na__why">No tracking links in this campaign</span>', "", IC.clicks, "clicks"]
+      ["Views", num(t.views) + est("views"), goal("views"), spark(s.map(function (x) { return x.views; }), COL[0]), IC.views, "trend"],
+      ["Reach", num(t.reach) + (isAdj("reach") ? est("reach") : reachEst() ? '<small class="db-est" title="Instagram does not show reach on reels publicly. Estimated at ' + Math.round(((R.plan && R.plan.benchmark && R.plan.benchmark.reach_per_view) || 0.85) * 100) + '% of views until the creators\' insights arrive.">est.</small>' : ""), goal("reach"), spark(s.map(function (x) { return x.reach; }), COL[3]), IC.reach, "trend"],
+      ["Engagement", num(t.engagement) + est("engagement"), goal("engagement"), spark(s.map(function (x) { return x.eng; }), COL[1]), IC.engagement, "trend"],
+      ["Avg eng. rate", pct(t.er) + est("er"), !filtered() ? (g.er ? goal("er") : sig(R.total.er_grade)) : "", "", IC.er, "kpi"],
+      ["Link clicks", cl ? num(cl.clicks) + est("clicks") : '<span class="db-na">Not tracked</span>', cl && !filtered() ? (g.clicks ? goal("clicks") : sig(R.total.ctr_grade)) : '<span class="db-na__why">No tracking links in this campaign</span>', "", IC.clicks, "clicks"]
     ];
     // Sections the admin switched off are left out, not shown empty.
     var V = R.visibility || {};
@@ -251,6 +261,8 @@
     var G = R.gaps || {}, bits = [], el = $("db-gaps");
     if (!el) { el = document.createElement("p"); el.id = "db-gaps"; el.className = "db-gaps"; $("db-fresh").parentNode.appendChild(el); }
     if (G.likes_hidden) bits.push("Likes hidden by the creator on " + G.likes_hidden + " of " + G.posts + " posts — engagement there counts comments only");
+    var ad = (R.total && R.total.adjusted) || [];
+    if (ad.length) bits.push("figures marked est. are estimated by HelloVoice, not measured, until the exact numbers arrive");
     el.hidden = !bits.length;
     el.innerHTML = bits.length ? '<span class="db-gaps__i" aria-hidden="true">i</span>Data note: ' + esc(bits.join(" · ")) + '. <button type="button" class="db-gaps__more" data-area="kpi">Details</button>' : "";
   }

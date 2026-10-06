@@ -219,7 +219,7 @@ def _avg(values):
     return (sum(vals) / len(vals)) if vals else None
 
 
-def report(campaign, internal=False):
+def report(campaign, internal=False, raw=False):
     """The whole report for one campaign as plain data. `internal` adds cost,
     CPM and cost per click — never set for the client's page."""
     cid = campaign["id"]
@@ -266,6 +266,18 @@ def report(campaign, internal=False):
         total["emv"] += clicks["clicks"] * _rate(rates, "*", "clicks")
     else:
         total["emv"] = None
+
+    # Whole-campaign results set by hand replace the measured ones, and are
+    # listed in total["adjusted"] so every page marks them as estimates.
+    total["adjusted"] = []
+    if not raw:
+        for key, val in db.campaign_overrides(campaign).items():
+            if key == "_basis":
+                continue
+            total[key] = val
+            if key == "er":
+                total["video_er"] = val
+            total["adjusted"].append(key)
 
     cost_total = campaign["cost"]
     if cost_total is None:

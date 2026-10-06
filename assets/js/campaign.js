@@ -456,14 +456,16 @@
   function renderScoreline() {
     var t = R.total, vis = R.visibility, bm = R.benchmarks, cells = [];
     var g = {}; (R.progress.items || []).forEach(function (i) { g[i.key] = i; });
+    var adj = t.adjusted || [];
+    function est(k) { return adj.indexOf(k) >= 0 ? ' <small class="mx-est" title="Estimated by HelloVoice: the platform has not shown the exact number yet.">est.</small>' : ""; }
     function goal(key, val) { var i = g[key]; return i ? sig(i.grade, "Goal " + (key === "er" ? pct(i.goal, 1) : num(i.goal))) : ""; }
     cells.push(["Posts live", full(t.delivered) + (t.planned ? "<small>/" + t.planned + "</small>" : ""), goal("posts"), "posts"]);
-    cells.push(["Views", num(t.views), goal("views"), "views"]);
-    if (vis.reach && t.reach != null) cells.push(["Reach" + (t.real_share >= 0.999 ? "" : " (est.)"), num(t.reach), goal("reach"), "reach"]);
-    cells.push(["Engagement", num(t.engagement), goal("engagement"), "engagement"]);
-    cells.push(["Avg eng. rate", pct(t.er), g.er ? goal("er") : sig(t.er_grade, "Against each creator's tier benchmark"), "er"]);
+    cells.push(["Views", num(t.views) + est("views"), goal("views"), "views"]);
+    if (vis.reach && t.reach != null) cells.push(["Reach" + (t.real_share >= 0.999 || adj.indexOf("reach") >= 0 ? "" : " (est.)"), num(t.reach) + est("reach"), goal("reach"), "reach"]);
+    cells.push(["Engagement", num(t.engagement) + est("engagement"), goal("engagement"), "engagement"]);
+    cells.push(["Avg eng. rate", pct(t.er) + est("er"), g.er ? goal("er") : sig(t.er_grade, "Against each creator's tier benchmark"), "er"]);
     if (vis.clicks && R.clicks && R.clicks.links && R.clicks.has_destination)
-      cells.push(["Link clicks", num(t.clicks), g.clicks ? goal("clicks") : sig(t.ctr_grade, "Strong from " + bm.ctr[0] + "% click-through"), "clicks"]);
+      cells.push(["Link clicks", num(t.clicks) + est("clicks"), g.clicks ? goal("clicks") : sig(t.ctr_grade, "Strong from " + bm.ctr[0] + "% click-through"), "clicks"]);
     $("mx-scoreline").innerHTML = cells.map(function (c) {
       return "<div><dt>" + (c[3] ? IC[c[3]] : "") + esc(c[0]) + "</dt><dd>" + c[1] + "</dd>" + (c[2] ? "<div class=\"mx-score-line__sig\">" + c[2] + "</div>" : "") + "</div>";
     }).join("");

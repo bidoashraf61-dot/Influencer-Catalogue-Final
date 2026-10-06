@@ -689,6 +689,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_planner_apply()
         if path == "/calculator/save":
             return self.post_calculator_save()
+        if path == "/calculator/results":
+            return self.post_calculator_results()
         if path == "/planner/library":
             return self.post_planner_library()
         if path == "/settings/save":
@@ -2247,6 +2249,30 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/calculator?id=%d&ok=%s" % (k["id"], urllib.parse.quote(
             "Goals saved: the client's report now shows these targets and the benchmark.")))
 
+    def post_calculator_results(self):
+        """Whole-campaign results by hand: pick a template or type the numbers.
+        They show to the client as estimates. "Back to measured" clears them."""
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None:
+            return self.redirect("/calculator")
+        back = "/calculator?id=%d&ok=" % k["id"]
+        if f.get("do") == "clear":
+            db.save_campaign(k["id"], overrides={})
+            return self.redirect(back + urllib.parse.quote("Back to the measured numbers."))
+        out = {}
+        for key in db.OVERRIDE_KEYS:
+            raw = "".join(ch for ch in (f.get("r_" + key) or "") if ch.isdigit() or ch == ".")
+            if raw and raw.count(".") <= 1 and float(raw) > 0:
+                v = float(raw)
+                out[key] = round(v, 2) if key == "er" else int(v)
+        if not out:
+            return self.redirect(back + urllib.parse.quote("Nothing to save: type at least one number."))
+        out["_basis"] = (f.get("basis") or "set by hand").strip()[:120]
+        db.save_campaign(k["id"], overrides=out)
+        return self.redirect(back + urllib.parse.quote("Results saved. The client's report shows them marked as estimates."))
+
     def post_planner_library(self):
         f = self.form_body()
         back = (f.get("back") or "").strip()
@@ -2707,6 +2733,7 @@ TRACKED = {
     "/planner/library": ("settings", None, "Changed the benchmark library"),
     "/planner/apply": ("campaign", "id", "Set goals from the ROI planner"),
     "/calculator/save": ("campaign", "id", "Set goals from the calculator"),
+    "/calculator/results": ("campaign", "id", "Adjusted campaign results by hand"),
     "/campaigns/link": ("campaign", "id", "Changed a tracking link"),
     "/campaigns/link/custom": ("campaign", "id", "Added a tracking link"),
     "/campaigns/link/toggle": ("campaign", "id", "Switched a tracking link"),
