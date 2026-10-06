@@ -339,24 +339,11 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   background-repeat: no-repeat;
 }
 /* Instagram returns 100px for a third of these accounts. Upscaling that to a
-   330px card reads as a broken image, so the small source sits at close to its
-   native size as a circular portrait over a blurred bed of itself. Both layers
-   are positioned pseudo-elements painting in DOM order — a negative z-index
-   bed would paint *over* the parent's own background, not under it. */
-.cat-card__photo--soft { background-size: 0; }
-.cat-card__photo--soft::before {
-  content: ""; position: absolute; inset: -14%;
-  background-image: inherit;
-  background-size: cover; background-position: center top;
-  filter: blur(24px) saturate(.8) brightness(.55);
-}
-.cat-card__photo--soft::after {
-  content: ""; position: absolute;
-  left: 50%; top: 44%; transform: translate(-50%, -50%);
-  width: 124px; height: 124px; border-radius: 100%;
-  background-image: inherit;
-  background-size: cover; background-position: center;
-  box-shadow: 0 10px 30px rgba(0,0,0,.5), 0 0 0 3px rgba(255,255,255,.14);
+   330px card reads as a broken image, so a small source is shown whole at its
+   own pixel size — no crop, no zoom, no circle — centred on a light bed. */
+.cat-card__media:has(.cat-card__photo--soft) { background: var(--linen); }
+.cat-card__photo--soft {
+  background-size: auto; background-position: center;
 }
 
 .cat-card__photo--fallback {

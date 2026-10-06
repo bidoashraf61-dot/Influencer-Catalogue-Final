@@ -64,32 +64,45 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <section class="pp-id" id="pp-id" aria-label="Creator identity"></section>
     <!-- locked: no analysis on file -->
     <section class="pp-sealed" id="pp-sealed" hidden></section>
-    <!-- the analysis pages, in the order of a Modash profile report -->
+    <!-- the analysis pages, in the order of the Modash profile report -->
     <div id="pp-pages" hidden>
-      <section class="pp-page" aria-labelledby="pp-h-perf">
-        <header class="pp-head"><h2 class="pp-h2" id="pp-h-perf">Performance</h2><div class="pp-tabs" id="pp-perf-tabs" role="tablist" aria-label="Content type"></div></header>
-        <div id="pp-perf"></div>
-      </section>
-      <section class="pp-page" aria-labelledby="pp-h-net" id="pp-net-sec">
-        <header class="pp-head"><h2 class="pp-h2" id="pp-h-net">Brands &amp; network</h2></header>
-        <div id="pp-net"></div>
-      </section>
       <section class="pp-page" aria-labelledby="pp-h-posts" id="pp-posts-sec">
         <header class="pp-head"><h2 class="pp-h2" id="pp-h-posts">Popular posts</h2></header>
         <div id="pp-posts"></div>
       </section>
       <section class="pp-page" aria-labelledby="pp-h-real" id="pp-real-sec">
-        <header class="pp-head"><h2 class="pp-h2" id="pp-h-real">Audience quality</h2><p class="pp-head__note">Is the audience real, can it be reached, and is it growing?</p></header>
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-real">Followers</h2></header>
         <div id="pp-real"></div>
       </section>
+      <section class="pp-page" aria-labelledby="pp-h-perf">
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-perf">Content</h2><div class="pp-tabs" id="pp-perf-tabs" role="tablist" aria-label="Content type"></div></header>
+        <div id="pp-perf"></div>
+      </section>
+      <section class="pp-page" aria-labelledby="pp-h-net" id="pp-net-sec">
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-net">Creator brand affinity &amp; interests</h2></header>
+        <div id="pp-net"></div>
+      </section>
       <section class="pp-page" aria-labelledby="pp-h-aud" id="pp-aud-sec">
-        <header class="pp-head"><h2 class="pp-h2" id="pp-h-aud">Audience</h2><div class="pp-tabs" id="pp-aud-tabs" role="tablist" aria-label="Audience of"></div></header>
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-aud">Audience data</h2><div class="pp-tabs" id="pp-aud-tabs" role="tablist" aria-label="Audience of"></div></header>
         <div id="pp-aud"></div>
       </section>
+      <section class="pp-page" aria-labelledby="pp-h-tags" id="pp-tags-sec">
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-tags">Popular hashtags &amp; mentions</h2></header>
+        <div id="pp-tags"></div>
+      </section>
+      <p class="pp-source" id="pp-source"></p>
     </div>
   </div></div>
   <p class="pp-empty" id="pp-empty" hidden></p>
 </main>
+
+<div class="pp-modal" id="pp-modal" hidden role="dialog" aria-modal="true" aria-label="Post">
+  <div class="pp-modal__box">
+    <button type="button" class="pp-modal__close" id="pp-modal-close" aria-label="Close">&times;</button>
+    <div class="pp-modal__frame" id="pp-modal-frame"></div>
+    <a class="pp-btn pp-btn--ink pp-modal__open" id="pp-modal-open" href="#" target="_blank" rel="noopener">Open on Instagram</a>
+  </div>
+</div>
 
 <script>
   window.CREATOR_CONFIG = { api: "/admin" };

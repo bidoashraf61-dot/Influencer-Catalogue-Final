@@ -12,10 +12,18 @@ One workbook can carry many creators — every sheet is keyed by creator code �
 so a whole batch is one upload.
 """
 
+import copy
 import json
 import re
+import urllib.parse
+from pathlib import Path
 
 import xlsx
+
+# Pictures that belong to an analysis — the profile photo and post covers
+# taken from the Modash report, and brand logos (shared, in _brands/). Client
+# data: not in git, served only to a viewer with a code (/api/creator-media).
+MEDIA = Path(__file__).resolve().parent / "analysis_media"
 
 OVERVIEW = [
     ("code", "Creator code (HV-…)"), ("platform", "Platform"), ("handle", "Handle"),
@@ -176,12 +184,48 @@ def parse_workbook(data, known_codes):
     return docs, problems
 
 
+# Further fields read off a Modash report (tools/modash_import.py), kept when
+# an analysis is pasted back as JSON.
+MODASH_EXTRA = {"bio", "location", "followers_change_pct", "avg_likes_change_pct", "likes_hidden",
+                "er_note", "reels_er_note", "notable_followers_pct", "creator_interests",
+                "fake_followers_dist", "er_dist", "photo"}
+
+
+def media_path(code, name):
+    """The file behind a "media:<name>" reference, or None."""
+    code = re.sub(r"[^A-Z0-9-]", "", str(code or "").upper())
+    name = Path(str(name or "")).name
+    if not code or not name or name.startswith("."):
+        return None
+    f = MEDIA / ("_brands" if name.startswith("brand-") else code) / name
+    return f if f.is_file() else None
+
+
+def with_media_urls(data, code, base):
+    """A copy of the analysis with every "media:" reference turned into a link
+    the viewer's browser can load from this service."""
+    d = copy.deepcopy(data or {})
+
+    def url(ref):
+        if isinstance(ref, str) and ref.startswith("media:"):
+            return base + "/api/creator-media?" + urllib.parse.urlencode({"c": code, "n": ref[6:]})
+        return ref
+    if d.get("photo"):
+        d["photo_url"] = url(d.pop("photo"))
+    for key in ("top_posts", "sponsored_posts"):
+        for p in d.get(key) or []:
+            p["thumb"] = url(p.get("thumb"))
+    for b in d.get("brands") or []:
+        b["logo"] = url(b.get("logo"))
+    return d
+
+
 def clean_json(doc):
     """A pasted JSON analysis, kept to the known shape."""
     if not isinstance(doc, dict):
         raise ValueError("The analysis must be a JSON object.")
     allowed = {k for k, _ in OVERVIEW} | {"audience", "audience_likers", "growth", "top_posts",
-                                          "sponsored_posts", "brands", "hashtags"}
+                                          "sponsored_posts", "brands", "hashtags"} | MODASH_EXTRA
     out = {k: v for k, v in doc.items() if k in allowed and k != "code"}
     if not isinstance(out.get("audience", {}), dict):
         raise ValueError("'audience' must be an object.")

@@ -280,6 +280,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_campaign(query.get("t") or "")
         if path == "/api/creator":
             return self.api_creator((query.get("c") or "").strip().upper())
+        if path == "/api/creator-media":
+            return self.api_creator_media(query.get("c") or "", query.get("n") or "")
         if path == "/api/campaign-logo":
             return self.api_campaign_logo(query.get("t") or "", query.get("n") or "")
         if path == "/api/campaign-thumb":
@@ -2354,11 +2356,24 @@ class Handler(BaseHTTPRequestHandler):
                 "profiles": db.split_profiles(r["profiles"]),
                 "band": metrics.band_of(r["followers"])}
         return self.send_json(200, {"ok": True, "creator": card,
-                                    "analysis": a["data"] if a else None,
+                                    "analysis": analysis.with_media_urls(a["data"], r["code"], BASE) if a else None,
                                     "updated_at": a["updated_at"] if a else None,
                                     "requested": asked,
                                     "benchmarks": metrics.benchmarks()},
                               self.cors() + [("Cache-Control", "no-store")])
+
+    def api_creator_media(self, code, name):
+        """A picture from a creator's analysis — post cover, photo or brand
+        logo — for a viewer who has unlocked the catalogue."""
+        if self.viewer_code_id() is None:
+            return self.send(401, b"", "text/plain")
+        f = analysis.media_path(code, name)
+        if f is None:
+            return self.send(404, b"", "text/plain")
+        data = f.read_bytes()
+        kind = uploads.image_kind(data[:16]) or "jpg"
+        return self.send(200, data, "image/" + ("jpeg" if kind == "jpg" else kind),
+                         [("Cache-Control", "private, max-age=604800")])
 
     def api_creator_request(self):
         code_id = self.viewer_code_id()
