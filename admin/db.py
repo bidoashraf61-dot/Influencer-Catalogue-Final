@@ -436,6 +436,13 @@ def migrate(conn):
         conn.execute("ALTER TABLE selections ADD COLUMN margin REAL")
     if "costs" not in sel_cols:
         conn.execute("ALTER TABLE selections ADD COLUMN costs TEXT")
+    if "archived_at" not in sel_cols:
+        conn.execute("ALTER TABLE selections ADD COLUMN archived_at INTEGER")
+    code_cols2 = {r["name"] for r in conn.execute("PRAGMA table_info(codes)")}
+    if "archived_at" not in code_cols2:
+        # Archived = out of the Clients list, nothing else: the code still
+        # works until it is revoked.
+        conn.execute("ALTER TABLE codes ADD COLUMN archived_at INTEGER")
     if "currency" not in sel_cols:
         # The currency this selection is quoted in (prices are kept in SAR).
         conn.execute("ALTER TABLE selections ADD COLUMN currency TEXT")
@@ -1566,6 +1573,14 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
             conn.execute("UPDATE selections SET margin=?, costs=? WHERE id=?",
                          (margin, json.dumps(costs or {}), sid))
         return sid
+
+
+def set_archived(table, rid, on):
+    """Put a client (access code) or a selection into the archive, or take it
+    out. Nothing else about it changes."""
+    assert table in ("codes", "selections")
+    with connect() as conn:
+        conn.execute("UPDATE %s SET archived_at = ? WHERE id = ?" % table, (now() if on else None, rid))
 
 
 def set_selection_currency(sid, currency):

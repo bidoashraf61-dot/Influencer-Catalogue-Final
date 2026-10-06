@@ -171,6 +171,13 @@ tr.flash td{animation:flash 2.4s ease-out}
 .stars .dim{color:#d8d2cc}
 .acct{font-size:12px;color:var(--gray)}
 .sel-table input{max-width:130px}
+.pager{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 4px}
+.pager a,.pager .pgnow,.pager .pgoff{min-width:34px;height:34px;display:inline-grid;place-items:center;
+  padding:0 10px;border-radius:999px;font-size:14px;text-decoration:none}
+.pager a{border:1px solid var(--line);color:var(--ink)}
+.pager a:hover{border-color:var(--ink)}
+.pager .pgnow{background:var(--ink);color:#fff;font-weight:600}
+.pager .muted{margin-right:8px}
 .btn.lime{background:var(--lime);color:var(--ink);border-color:var(--lime)}
 .btn.lime:hover{background:var(--ink);color:var(--lime);border-color:var(--ink)}
 td.nowrap{white-space:nowrap}
@@ -380,6 +387,51 @@ def urlencode(**kw):
     not carry `edit=&q=` and read as if something is set."""
     import urllib.parse
     return urllib.parse.urlencode({k: v for k, v in kw.items() if v})
+
+
+PER_PAGE = 50
+
+
+def page_slice(total, asked, per=PER_PAGE):
+    """(page number, first index) for ?page=, kept inside the list."""
+    pages = max(1, -(-total // per))
+    n = int(asked) if str(asked or "").isdigit() and int(asked) > 0 else 1
+    n = min(n, pages)
+    return n, (n - 1) * per
+
+
+def pager(total, page_no, path, per=PER_PAGE, **params):
+    """1 2 3 … links under a long list; the other query parameters kept."""
+    pages = max(1, -(-total // per))
+    if pages <= 1:
+        return ""
+    window = sorted({1, pages} | {n for n in range(page_no - 2, page_no + 3) if 1 <= n <= pages})
+    out, last = [], 0
+    for n in window:
+        if n - last > 1:
+            out.append("<span class='pgoff'>…</span>")
+        if n == page_no:
+            out.append("<span class='pgnow'>" + str(n) + "</span>")
+        else:
+            out.append("<a href='" + u(path) + "?" + urlencode(page=(n if n > 1 else ""), **params) + "'>" + str(n) + "</a>")
+        last = n
+    first, end = (page_no - 1) * per + 1, min(page_no * per, total)
+    return ("<div class='pager'><span class='muted'>" + str(first) + "–" + str(end) + " of " + str(total)
+            + "</span>" + "".join(out) + "</div>")
+
+
+def archive_button(kind, rid, archived):
+    return ("<form method='post' action='" + u("/archive") + "' class='inline'>"
+            "<input type='hidden' name='kind' value='" + kind + "'><input type='hidden' name='id' value='" + str(rid) + "'>"
+            "<input type='hidden' name='on' value='" + ("0" if archived else "1") + "'>"
+            "<button class='btn small ghost'>" + ("Unarchive" if archived else "Archive") + "</button></form>")
+
+
+def archive_tabs(path, archived, n_archived, live_label):
+    return ("<div class='row' style='gap:8px;margin:0 0 12px'>"
+            "<a class='btn small" + (" ghost" if archived else "") + "' href='" + u(path) + "'>" + live_label + "</a>"
+            "<a class='btn small" + ("" if archived else " ghost") + "' href='" + u(path) + "?archived=1'>Archived ("
+            + str(n_archived) + ")</a></div>")
 
 
 def roster_link(code, label):
@@ -1461,8 +1513,29 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, ba
         + "<input type='checkbox' name='active' value='1' " + checked
         + " style='width:auto'> Show to clients</div></div></div>"
         + "<button class='btn'>" + action_label + "</button>" + delete_button
-        + "</form>" + delete_after
+        + "</form>" + delete_after + analysis_box(c)
     )
+
+
+def analysis_box(c):
+    """On a creator's edit form: their profile analysis — download a template
+    already carrying their code, fill it, upload it back."""
+    if c is None:
+        return ""
+    code = e(c["code"])
+    return ("<div class='card' style='margin-top:12px;background:#f7f5f2'><label>Profile analysis</label>"
+            "<p class='price-hint' style='margin:4px 0 10px'>The full analysis a client opens from this creator's "
+            "card. Download the template (it already has " + code + " in it), fill what you have, and upload it. "
+            "Every field is listed in Server Access/Catalogue Portal/CREATOR-ANALYSIS-PARAMETERS.md.</p>"
+            "<div class='row' style='align-items:end'>"
+            "<div><a class='btn small ghost' href='" + u("/analysis/template.xlsx") + "?code=" + code + "'>"
+            "Download template for " + code + "</a></div>"
+            "<form method='post' action='" + u("/analysis/upload") + "' enctype='multipart/form-data' "
+            "class='row' style='align-items:end;margin:0'>"
+            "<div><input type='file' name='file' accept='.xlsx' required></div>"
+            "<div><button class='btn small'>Upload analysis</button></div></form>"
+            "<div><a class='btn small ghost' href='" + u("/analysis") + "?q=" + code + "#edit'>Open the analysis</a></div>"
+            "</div></div>")
 
 
 def date_carry(dates):
@@ -1846,7 +1919,8 @@ def selection_link(sel, origin):
             + "&s=" + sel["token"])
 
 
-def selections_page(sels, error=None, message=None, origin=""):
+def selections_page(sels, error=None, message=None, origin="", archived=False, n_archived=0, page_no=1, total=0):
+    listed = total
     note = ""
     if error:
         note += "<div class='err'>" + e(error) + "</div>"
@@ -1868,8 +1942,12 @@ def selections_page(sels, error=None, message=None, origin=""):
             "<tr><td><strong><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>"
             + e(x["name"]) + "</a></strong><br><span class='muted'>from " + src + "</span>"
             + "</td><td>" + str(n) + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
-            + "</td><td class='right'><a class='btn small' href='" + u("/selections/edit") + "?id="
-            + str(x["id"]) + "'>Adjust prices</a></td></tr>")
+            + "</td><td class='right nowrap'><a class='btn small' href='" + u("/selections/edit") + "?id="
+            + str(x["id"]) + "'>Adjust prices</a> " + archive_button("selection", x["id"], archived)
+            + "<form method='post' action='" + u("/selections/delete") + "' class='inline' onsubmit=\"return confirm('Delete "
+            + e((x["name"] or "this selection").replace("'", "’")) + "? Its link stops working. You can restore it from History.')\">"
+            "<input type='hidden' name='id' value='" + str(x["id"]) + "'><button class='btn small danger'>Delete</button></form>"
+            "</td></tr>")
     table = "".join(rows) or ("<tr><td colspan='5' class='muted'>No selections yet. One appears "
                               "here as soon as a client names a shortlist on the catalogue.</td></tr>")
     body = (
@@ -1885,8 +1963,10 @@ def selections_page(sels, error=None, message=None, origin=""):
         + "<div style='align-self:end'><button class='btn'>Adjust prices</button></div>"
         + "</div><p class='price-hint'>For a selection sent as a quote request, use "
           "<a href='" + u("/requests") + "'>Price &amp; send</a> on the Requests page instead.</p></form>"
+        + archive_tabs("/selections", archived, n_archived, "Selections")
         + "<div class='card'><table><thead><tr><th>Selection</th><th>Creators</th><th>Total</th>"
         + "<th>Updated</th><th></th></tr></thead><tbody>" + table + "</tbody></table></div>"
+        + pager(listed, page_no, "/selections", archived=("1" if archived else ""))
     )
     return page("Selections", body, "/selections")
 
@@ -2917,7 +2997,7 @@ def custom_link_form(k, rows, names):
 PHASE_LABEL = dict(__import__("db").PHASES)
 
 
-def clients_page(overview, origin):
+def clients_page(overview, origin, archived=False, n_archived=0, page_no=1, total=0, ok=None):
     """One card per client: their passcode, then the chain from shortlist to
     campaign to report, each a link into the page that controls it."""
     cards = []
@@ -2946,18 +3026,23 @@ def clients_page(overview, origin):
             + ("<span class='pill live'>active</span>" if ok else "<span class='pill dead'>" + e(why) + "</span>")
             + "</span></div><div class='muted' style='font-size:13px'>"
             + (str(len(open_reqs)) + " open quote request(s) · " if open_reqs else "")
-            + (str(o["analysis_requests"]) + " analysis request(s)" if o["analysis_requests"] else "") + "</div></div>"
+            + (str(o["analysis_requests"]) + " analysis request(s)" if o["analysis_requests"] else "")
+            + " " + archive_button("client", c["id"], archived) + "</div></div>"
             + "<div class='grid2' style='margin-top:12px'><div><label>Selections → campaigns</label><ul class='chain-list'>"
             + (sels or "<li class='muted'>No selections yet.</li>") + "</ul></div>"
             + "<div><label>All campaigns</label><ul class='chain-list'>" + (camps or "<li class='muted'>None yet.</li>")
             + "</ul></div></div></div>")
     body = ("<h1>Clients</h1><p class='sub'>Each client is one passcode. Follow it from the shortlist they picked to the "
             "campaign it became and the report they see. Everything links to the page that controls it.</p>"
-            + ("".join(cards) or "<div class='card muted'>No clients yet — issue a passcode on Access codes.</div>"))
+            + ("<div class='ok'>" + e(ok) + "</div>" if ok else "")
+            + archive_tabs("/clients", archived, n_archived, "Clients")
+            + ("".join(cards) or ("<div class='card muted'>" + ("Nothing archived." if archived else
+               "No clients yet — issue a passcode on Access codes.") + "</div>"))
+            + pager(total, page_no, "/clients", 20, archived=("1" if archived else "")))
     return page("Clients", body, "/clients")
 
 
-def analysis_page(creators, have, requests, origin, q="", error=None, message=None):
+def analysis_page(creators, have, requests, origin, q="", error=None, message=None, page_no=1):
     open_reqs = [r for r in requests if not r["handled_at"]]
     req_rows = "".join(
         "<tr><td><code>" + e(r["code"]) + "</code> " + e(r["creator_name"] or "") + "</td><td>" + e(r["code_label"] or "—")
@@ -2973,7 +3058,7 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
            else "<span class='pill'>locked</span>") + "</td><td>"
         + "<a class='btn tiny ghost' href='" + e(origin + "/creator/#c=" + c["code"]) + "' target='_blank' rel='noopener'>Preview</a> "
         + ("<a class='btn tiny ghost' href='" + u("/analysis") + "?q=" + e(c["code"]) + "#edit'>Edit</a>")
-        + "</td></tr>" for c in shown[:200])
+        + "</td></tr>" for c in shown[(page_no - 1) * PER_PAGE:page_no * PER_PAGE])
     editor = ""
     if term and len(shown) == 1:
         c = shown[0]
@@ -3007,7 +3092,7 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
           "<div><button class='btn small'>Search</button></div></div></form>"
         + "<div class='card'><table><thead><tr><th>Code</th><th>Name</th><th>Analysis</th><th></th></tr></thead><tbody>"
         + (rows or "<tr><td colspan='4' class='muted'>No creators match.</td></tr>") + "</tbody></table>"
-        + ("<p class='muted'>Showing the first 200 — search to narrow.</p>" if len(shown) > 200 else "") + "</div>")
+        + pager(len(shown), page_no, "/analysis", q=q) + "</div>")
     return page("Creator analysis", body, "/analysis")
 
 
@@ -3068,7 +3153,7 @@ HISTORY_KINDS = [("", "Everything"), ("trash", "Trash (deleted)"), ("creator", "
                  ("tiers", "Tiers"), ("roster", "Roster imports")]
 
 
-def history_page(rows, later, kind=None, q=None, message=None, error=None):
+def history_page(rows, later, kind=None, q=None, message=None, error=None, page_no=1):
     note = ""
     if error:
         note += "<div class='err'>" + e(error) + "</div>"
@@ -3079,7 +3164,8 @@ def history_page(rows, later, kind=None, q=None, message=None, error=None):
         + ("?" + urlencode(kind=v) if v else "") + "'>" + e(l) + "</a>" for v, l in HISTORY_KINDS)
     verbs = {"created": "Created", "edited": "Edited", "deleted": "Deleted", "undo": "Undo"}
     out = []
-    for r in rows:
+    total = len(rows)
+    for r in rows[(page_no - 1) * PER_PAGE:page_no * PER_PAGE]:
         done = r["undone_at"] is not None
         state = ("<span class='pill dead'>undone " + ago(r["undone_at"]) + "</span>") if done else ""
         n = later.get(r["id"], 0)
@@ -3110,5 +3196,5 @@ def history_page(rows, later, kind=None, q=None, message=None, error=None):
         + "<input name='q' value='" + e(q or "") + "' placeholder='Search by name or code' autocomplete='off'>"
         "<button class='btn small'>Search</button></form>"
         + "<div class='card'><table><thead><tr><th>When</th><th>What</th><th>Item</th><th></th></tr></thead><tbody>"
-        + table + "</tbody></table></div>")
+        + table + "</tbody></table></div>" + pager(total, page_no, "/history", kind=kind or "", q=q or ""))
     return page("History", body, "/history")

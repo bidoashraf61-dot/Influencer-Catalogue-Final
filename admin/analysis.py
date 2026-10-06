@@ -62,10 +62,13 @@ EXAMPLE = {
 }
 
 
-def template_xlsx():
+def template_xlsx(code=None):
+    """The blank template; with a creator code, the example rows already
+    carry that code, so the file only needs the numbers."""
     sheets = []
     for name, header in SHEETS.items():
-        rows = [header, EXAMPLE[name]]
+        example = [code if (code and v == "HV-XX-000") else v for v in EXAMPLE[name]]
+        rows = [header, example]
         sheets.append((name, rows, {i: 22 for i in range(len(header))}, None))
     return xlsx.write_book(sheets)
 

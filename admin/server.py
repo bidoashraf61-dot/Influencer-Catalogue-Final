@@ -337,10 +337,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/history":
             kind = (query.get("kind") or "").strip() or None
             q = (query.get("q") or "").strip() or None
-            rows = history.listing(kind, q)
-            later = {r["id"]: len(history.later_changes(r)) for r in rows
+            rows = history.listing(kind, q, limit=5000)
+            pg, start = views.page_slice(len(rows), query.get("page"))
+            later = {r["id"]: len(history.later_changes(r)) for r in rows[start:start + views.PER_PAGE]
                      if not r["undone_at"] and r["action"] != "undo"}
-            return self.send(200, views.history_page(rows, later, kind, q, query.get("ok"), query.get("e")))
+            return self.send(200, views.history_page(rows, later, kind, q, query.get("ok"), query.get("e"), pg))
         if path == "/codes":
             return self.send(200, views.codes_page(db.list_codes(), query.get("new"), query.get("e"),
                                                    db.code_devices(), query.get("ok")))
@@ -418,8 +419,14 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/pulse":
             return self.send_json(200, db.request_pulse(), [("Cache-Control", "no-store")])
         if path == "/selections":
+            arch = query.get("archived") == "1"
+            every = db.list_selections()
+            n_arch = sum(1 for x in every if x["archived_at"])
+            shown = [x for x in every if bool(x["archived_at"]) == arch]
+            pg, start = views.page_slice(len(shown), query.get("page"))
             return self.send(200, views.selections_page(
-                db.list_selections(), query.get("e"), query.get("ok"), self.site_origin()))
+                shown[start:start + views.PER_PAGE], query.get("e"), query.get("ok"), self.site_origin(),
+                archived=arch, n_archived=n_arch, page_no=pg, total=len(shown)))
         if path == "/selections/edit":
             sid = query.get("id", "")
             sel = db.selection(int(sid)) if sid.isdigit() else None
@@ -460,15 +467,25 @@ class Handler(BaseHTTPRequestHandler):
                              [("Content-Disposition", 'attachment; filename="report-%s.xlsx"'
                                % db.campaign_slug(k))])
         if path == "/clients":
-            return self.send(200, views.clients_page(db.client_overview(), self.site_origin()))
+            arch = query.get("archived") == "1"
+            every = db.client_overview()
+            n_arch = sum(1 for o in every if o["code"]["archived_at"])
+            shown = [o for o in every if bool(o["code"]["archived_at"]) == arch]
+            pg, start = views.page_slice(len(shown), query.get("page"), 20)
+            return self.send(200, views.clients_page(shown[start:start + 20], self.site_origin(),
+                                                     archived=arch, n_archived=n_arch, page_no=pg,
+                                                     total=len(shown), ok=query.get("ok")))
         if path == "/analysis":
             return self.send(200, views.analysis_page(
                 db.list_creators(), db.analysis_codes(), db.analysis_requests(), self.site_origin(),
-                query.get("q", ""), query.get("e"), query.get("ok")))
+                query.get("q", ""), query.get("e"), query.get("ok"),
+                page_no=int(query["page"]) if (query.get("page") or "").isdigit() and int(query["page"]) > 0 else 1))
         if path == "/analysis/template.xlsx":
-            return self.send(200, analysis.template_xlsx(),
+            code = re.sub(r"[^A-Z0-9-]", "", (query.get("code") or "").upper())[:20] or None
+            return self.send(200, analysis.template_xlsx(code),
                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             [("Content-Disposition", 'attachment; filename="creator-analysis-template.xlsx"')])
+                             [("Content-Disposition", 'attachment; filename="creator-analysis-%s.xlsx"'
+                               % (code or "template"))])
         if path == "/analysis/json":
             code = (query.get("c") or "").upper()
             a = db.analysis(code)
@@ -577,6 +594,19 @@ class Handler(BaseHTTPRequestHandler):
         history.set_actor(who["email"] if "email" in who.keys() else "admin")
         if path == "/history/undo":
             return self.post_history_undo()
+        if path == "/archive":
+            f = self.form_body()
+            kind = f.get("kind")
+            spec = {"client": ("code", "codes", "/clients"), "selection": ("selection", "selections", "/selections")}.get(kind)
+            rid = (f.get("id") or "").strip()
+            if not spec or not rid.isdigit():
+                return self.redirect("/")
+            on = f.get("on") == "1"
+            entity, table, back = spec
+            with history.tracked(entity, rid, ("Archived " if on else "Unarchived ") + describe(entity, rid, kind)):
+                db.set_archived(table, int(rid), on)
+            return self.redirect(back + ("?archived=1&" if not on else "?") + "ok=" + urllib.parse.quote(
+                ("Moved to the archive." if on else "Back from the archive.")))
         spec = TRACKED.get(path)
         if spec:
             return self.tracked_post(path, spec)
@@ -1374,7 +1404,8 @@ class Handler(BaseHTTPRequestHandler):
         sid = (self.form_body().get("id") or "").strip()
         if sid.isdigit():
             db.delete_selection(int(sid))
-        return self.redirect("/selections?ok=" + urllib.parse.quote("Selection deleted."))
+        return self.redirect("/selections?ok=" + urllib.parse.quote(
+            "Selection deleted. Changed your mind? Restore it from History → Trash."))
 
     # ---------------------------------------------------------- campaigns --
 
