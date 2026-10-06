@@ -500,7 +500,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/planner":
             return self.planner_get(query)
         if path == "/calculator":
-            return self.send(200, views.calculator_page(plans.library()))
+            return self.send(200, views.calculator_page(plans.library(), plans.sources()))
         if path == "/campaigns/thumb":
             f = thumbs.path_of("file:" + Path(query.get("n") or "").name)
             if f is None:

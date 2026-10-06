@@ -3399,14 +3399,15 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
 
 # ------------------------------------------------------------- calculator --
 
-def calculator_page(lib):
+def calculator_page(lib, sources=None):
     """The ROI calculator. Pick one or several campaign types and one or
     several platforms, type what the client pays (split between platforms),
     and read what result to accept. Everything is worked out in the browser
     from the benchmark library (editable on the ROI planner), so it can
     never disagree with it."""
     import plans
-    data = json.dumps({"lib": lib, "tiers": plans.TIERS, "tierLabel": plans.TIER_LABEL, "followers": plans.TIER_FOLLOWERS},
+    data = json.dumps({"lib": lib, "tiers": plans.TIERS, "tierLabel": plans.TIER_LABEL, "followers": plans.TIER_FOLLOWERS,
+                       "sources": sources or {"selections": [], "campaigns": []}},
                       ensure_ascii=False).replace("</", "<\\/")
     body = """
 <h1>ROI calculator</h1>
@@ -3465,6 +3466,22 @@ table.cal-t .ok{background:#fff8ec}table.cal-t .gr{background:#eef8f1}
 table.cal-t tr.tot td{border-top:2px solid #121212;font-weight:700}
 table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
 .cal-foc{max-width:380px;margin:0 0 12px}
+.cal-big{font-size:18px;line-height:1.5;margin:6px 0}
+.cal-big b{font-size:26px}
+.cal-line{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;padding:8px 0;border-top:1px solid #eee}
+.cal-line:first-of-type{border-top:0}
+.cal-line em{font-style:normal;font-weight:700;min-width:130px}
+table.cal-c{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
+table.cal-c th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#666;padding:6px 8px;font-weight:700}
+table.cal-c td{padding:8px;border-top:1px solid #eee;vertical-align:top}
+table.cal-c td.r,table.cal-c th.r{text-align:right}
+table.cal-c input{width:58px;padding:5px 6px;text-align:center}
+.cal-prob{display:inline-block;font-size:12px;border-radius:8px;padding:2px 8px;margin:0 4px 4px 0}
+.cal-prob--bad{background:#fdeeee;color:#9b1c1f}.cal-prob--warn{background:#fff4e3;color:#8a4f06}.cal-prob--info{background:#eef2f7;color:#445}
+.cal-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:10px 0}
+.cal-sum>div{background:#f6f4f0;border-radius:12px;padding:10px 12px}
+.cal-sum span{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#666;font-weight:700}
+.cal-sum b{font-size:22px;display:block;line-height:1.2}
 </style>
 
 <div class='card'>
@@ -3477,16 +3494,27 @@ table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
     <div class='cal-money'><input id='cal-budget' inputmode='numeric' value='35000' autocomplete='off'><span>SAR</span></div>
     <div class='price-hint'>Before VAT. Try another number: the results change at once.</div></div>
   </div>
+  <div class='row' style='margin-top:12px;max-width:560px'>
+    <div><label for='cal-source'>4 · Measure a selection or a campaign <span class='muted' style='font-weight:400'>optional, while you prepare it</span></label>
+    <select id='cal-source'><option value=''>— none: just type the numbers —</option></select>
+    <div class='price-hint' id='cal-source-hint'>Pick one and the calculator uses its real creators, their followers and prices.</div></div>
+  </div>
   <div id='cal-split-box' hidden>
     <label style='margin-top:6px'>How is the budget split between platforms?</label>
     <div class='cal-split' id='cal-split'></div>
     <div class='price-hint' id='cal-split-hint'></div>
   </div>
   <div id='cal-warn'></div>
+  <div style='margin-top:14px'><button type='button' class='btn' id='cal-go'>Show my results ↓</button>
+  <span class='price-hint' style='margin-left:10px'>Results also update by themselves as you type.</span></div>
 </div>
+
+<div id='cal-result' class='card' style='border:2px solid #121212;scroll-margin-top:16px'></div>
 
 <h2>What to accept</h2>
 <div id='cal-accept'></div>
+
+<div id='cal-check'></div>
 
 <h2>Tools</h2>
 <div id='cal-focus-box' hidden class='card' style='margin-bottom:16px'>
@@ -3534,7 +3562,8 @@ table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
   var NAME = {views: 'Views', reactions: 'Likes + comments', clicks: 'Clicks'};
   var SIGN = {2: ['Estimated', 'Our judgement, kept below published averages, and checked on one Saudi campaign so far.'],
               1: ['Rough hint', 'Very little data behind it: a starting point only, not a promise.']};
-  var S = {types: ['awareness'], plats: ['Instagram'], share: {}, focus: ''};
+  var S = {types: ['awareness'], plats: ['Instagram'], share: {}, focus: '', src: '', posts: {}};
+  var SRC = D.sources || {selections: [], campaigns: []};
   function $(i){return document.getElementById(i);}
   function num(v){return Math.round(v).toLocaleString('en-US');}
   function nice(v){return v>=1e6?(v/1e6).toFixed(1).replace(/\\.0$/,'')+'M':v>=1e4?Math.round(v/1e3)+'K':v>=1000?(v/1e3).toFixed(1).replace(/\\.0$/,'')+'K':num(v);}
@@ -3635,6 +3664,8 @@ table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
     var cs = combos(); if (!cs.some(function(x){ return x.id === S.focus; })) S.focus = cs[0].id;
     $('cal-focus-box').hidden = cs.length < 2;
     $('cal-focus').innerHTML = cs.map(function(x){ return '<option value="' + x.id + '"' + (x.id === S.focus ? ' selected' : '') + '>' + TYPES[x.t].name + ' · ' + x.p + '</option>'; }).join('');
+    var fc = focus(), chk = check(fc, budget ? (split(budget)[fc.p] || budget) : null);
+    summary(budget, chk);
     tools(budget);
   }
   function tools(totalBudget){
@@ -3675,6 +3706,101 @@ table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
     }
     $('cal-creators-out').innerHTML = line;
   }
+  // ---- a selection or campaign, measured while it is being prepared ----
+  function source(){
+    if (!S.src) return null;
+    var parts = S.src.split(':'), list = parts[0] === 's' ? SRC.selections : SRC.campaigns;
+    var o = list.filter(function(x){ return String(x.id) === parts[1]; })[0];
+    return o ? {kind: parts[0] === 's' ? 'selection' : 'campaign', o: o} : null;
+  }
+  function tierOf(f){ return f < 10000 ? 'nano' : f < 100000 ? 'micro' : f < 500000 ? 'mid' : f < 1000000 ? 'macro' : 'mega'; }
+  // what one creator usually gets from one post, [usual, good], for this result
+  function perPost(c, p, kind){
+    var P = LIB[p], f = c.followers[p], fell = false;
+    if (!f) { f = c.followers[c.platform]; fell = !!f; }
+    if (!f) return {none: true};
+    var t = tierOf(f), own = (p === 'Instagram' || c.platform === p) ? c.own : null, v, how = 'benchmark';
+    if (own && own.views) { v = [own.views * 0.8, own.views]; how = 'own average'; }
+    else v = [f * P.view_rate[t][0] / 100, f * P.view_rate[t][1] / 100];
+    var r;
+    if (kind === 'views') r = v;
+    else if (kind === 'reactions') r = (own && own.eng != null) ? [own.eng * 0.8, own.eng] : [v[0] * P.eng_rate[t][0] / 100, v[1] * P.eng_rate[t][1] / 100];
+    else r = [v[0] * P.ctr[0] / 100, v[1] * P.ctr[1] / 100];
+    return {r: r, f: f, tier: t, fell: fell, how: (kind === 'views' || (own && own.eng != null)) ? how : 'benchmark', own: own};
+  }
+  function check(f, budget){
+    var box = $('cal-check'), sc = source();
+    if (!sc) { box.innerHTML = ''; return null; }
+    var o = sc.o, p = f.p, m = mainKind(f.t, f.p), c = ceil(p, m), rows = '', tot = [0, 0], priced = 0, problems = {bad: 0, warn: 0}, flagged = [];
+    o.creators.forEach(function(cr){
+      var n = S.posts[o.id + ':' + cr.code]; if (n == null) n = cr.posts || 1;
+      var pp = perPost(cr, p, m), probs = [];
+      if (pp.none) {
+        probs.push(['bad', 'No follower number on file, so it cannot be estimated']);
+        rows += '<tr><td><b>' + cr.name + '</b><br><small>' + cr.code + '</small></td><td colspan="6">' + probs.map(function(x){ return '<span class="cal-prob cal-prob--' + x[0] + '">' + x[1] + '</span>'; }).join('') + '</td></tr>';
+        problems.bad++; flagged.push(cr.name); return;
+      }
+      var us = pp.r[0] * n, ug = pp.r[1] * n; tot[0] += us; tot[1] += ug;
+      var cost = (cr.price && us) ? cr.price / us : null, v = cost == null ? null : verdict(cost, c);
+      if (cr.price) priced += cr.price;
+      if (pp.fell) probs.push(['warn', 'No ' + p + ' account: using their main account']);
+      if (v && v[1] === 'r') probs.push(['bad', 'Costs more per result than we should accept']);
+      if (cr.own && cr.own.fake != null && cr.own.fake > 25) probs.push(['warn', 'Fake followers ' + Math.round(cr.own.fake) + '%']);
+      if (cr.own && cr.own.likes_hidden && m === 'reactions') probs.push(['warn', 'Hides likes: engagement is understated']);
+      if (!cr.price) probs.push(['info', 'No price on file']);
+      if (!cr.own) probs.push(['info', 'No analysis uploaded: estimated from creators this size']);
+      probs.forEach(function(x){ if (x[0] === 'bad') problems.bad++; else if (x[0] === 'warn') problems.warn++; });
+      if (probs.some(function(x){ return x[0] !== 'info'; })) flagged.push(cr.name);
+      var unit = m === 'views' ? 'SAR ' + money(cost * 1000) + ' / 1,000' : 'SAR ' + money(cost);
+      rows += '<tr><td><b>' + cr.name + '</b><br><small>' + cr.code + ' · ' + nice(pp.f) + ' · ' + D.tierLabel[pp.tier].replace(/ \(.*/, '') + '</small></td>'
+        + '<td class="r"><input type="number" min="0" step="1" data-posts="' + o.id + ':' + cr.code + '" value="' + n + '" aria-label="Posts"></td>'
+        + '<td class="r">' + (cr.price ? num(cr.price) : '—') + '</td><td class="r">' + nice(pp.r[0] * n) + ' – ' + nice(pp.r[1] * n) + '<br><small>' + pp.how + '</small></td>'
+        + '<td class="r">' + (cost == null ? '—' : unit) + '</td><td>' + (v ? '<span class="cal-v cal-v--' + v[1] + '">' + (v[0] === 'Not OK' ? 'Poor value' : v[0] === 'Accepted' ? 'Fair value' : 'Great value') + '</span>' : '') + '</td>'
+        + '<td>' + probs.map(function(x){ return '<span class="cal-prob cal-prob--' + x[0] + '">' + x[1] + '</span>'; }).join('') + '</td></tr>';
+    });
+    var rs = budget ? results(p, m, budget) : null, vd = null;
+    if (rs) vd = tot[0] >= rs.great ? ['Great', 'g', 'The creators comfortably deliver more than a great result.'] : tot[0] >= rs.ok ? ['Accepted', 'a', 'The creators can deliver the accepted result, even on an ordinary day.']
+      : tot[1] >= rs.ok ? ['Borderline', 'a', 'Only a good day reaches the accepted result. Add creators or lower the price.'] : ['Short', 'r', 'These creators are unlikely to reach the accepted result for this price.'];
+    var name = NAME[m].toLowerCase(), label = TYPES[f.t].name + ' · ' + p;
+    var sumHtml = '<div class="cal-sum"><div><span>These creators usually get</span><b>' + nice(tot[0]) + '</b><small>' + name + ' (good day: ' + nice(tot[1]) + ')</small></div>'
+      + (rs ? '<div><span>Accept at least</span><b>' + nice(rs.ok) + '</b><small>for SAR ' + num(budget) + '</small></div><div><span>Great is</span><b>' + nice(rs.great) + '+</b><small>' + name + '</small></div>' : '')
+      + '<div><span>Problems found</span><b>' + (problems.bad + problems.warn) + '</b><small>' + problems.bad + ' serious · ' + problems.warn + ' to check</small></div></div>';
+    var banner = vd ? '<div class="cal-big"><span class="cal-v cal-v--' + vd[1] + '" style="font-size:16px">' + vd[0] + '</span> ' + vd[2] + '</div>' : '<p class="price-hint">Type the client budget to compare.</p>';
+    var priceNote = priced ? '<p class="price-hint">Prices: ' + (sc.kind === 'selection' ? 'what the client is quoted for each creator (middle of the range)' : 'our fee to each creator') + '. Total ' + num(priced) + ' SAR.</p>' : '';
+    box.innerHTML = '<div class="card"><div class="cal-h"><span class="pill live">' + (sc.kind === 'selection' ? 'Selection' : 'Campaign') + '</span><h2>' + o.name + '</h2></div>'
+      + '<p class="price-hint" style="margin:0">Measured on <b>' + label + '</b>. Change the posts per creator to see what happens.</p>' + banner + sumHtml
+      + '<table class="cal-c"><thead><tr><th>Creator</th><th class="r">Posts</th><th class="r">Price (SAR)</th><th class="r">Usually gets</th><th class="r">Cost per result</th><th>Value</th><th>Problems</th></tr></thead><tbody>' + rows + '</tbody></table>'
+      + priceNote + '</div>';
+    return {vd: vd, tot: tot, problems: problems, flagged: flagged, rs: rs, name: o.name, kind: sc.kind, label: label};
+  }
+  function applySource(){
+    var sc = source(); if (!sc) { $('cal-source-hint').textContent = 'Pick one and the calculator uses its real creators, their followers and prices.'; return; }
+    var o = sc.o, plat = o.platform;
+    if (!plat) { var cnt = {}; o.creators.forEach(function(c){ if (c.platform) cnt[c.platform] = (cnt[c.platform] || 0) + 1; }); plat = Object.keys(cnt).sort(function(a, b){ return cnt[b] - cnt[a]; })[0]; }
+    if (plat && PLATS.indexOf(plat) >= 0) { S.plats = [plat]; S.share = {}; }
+    var hint = o.creators.length + ' creators';
+    if (o.budget) { var mid = Math.round((o.budget[0] + o.budget[1]) / 2 / 100) * 100; $('cal-budget').value = mid;
+      hint += ' · budget ' + (o.budget[0] === o.budget[1] ? num(o.budget[0]) : num(o.budget[0]) + ' – ' + num(o.budget[1])) + ' SAR' + (o.budgetFrom ? ' (from ' + o.budgetFrom + ')' : '') + ' put in the box above, change it if the client pays something else'; }
+    else hint += ' · no budget on file: type what the client pays';
+    $('cal-source-hint').textContent = hint + (plat ? ' · platform ' + plat : '');
+  }
+  function summary(budget, chk){
+    var box = $('cal-result');
+    if (!budget) { box.innerHTML = '<h2 style="margin-top:0">Your result</h2><p class="price-hint">Type what the client pays, and your result appears here.</p>'; return; }
+    var lines = '';
+    S.types.forEach(function(t){
+      var T = TYPES[t], mk = T.main, ok = 0, gr = 0, n = 0, snap = false;
+      var amt = split(budget);
+      S.plats.forEach(function(p){ if (mainKind(t, p) !== mk) { snap = true; return; } var r = results(p, mk, amt[p]); ok += r.ok; gr += r.great; n++; });
+      lines += '<div class="cal-line"><em>' + T.name + '</em><span>accept at least <b>' + nice(ok) + '</b> ' + NAME[mk].toLowerCase() + '</span><span>great is <b>' + nice(gr) + '+</b></span>'
+        + '<span class="muted">' + S.plats.join(' + ') + (snap ? ' (Snapchat judged on views)' : '') + '</span></div>';
+    });
+    var extra = '';
+    if (chk && chk.vd) extra = '<div class="cal-line"><em>' + chk.kind.charAt(0).toUpperCase() + chk.kind.slice(1) + ': ' + chk.name + '</em><span><span class="cal-v cal-v--' + chk.vd[1] + '">' + chk.vd[0] + '</span> ' + chk.vd[2] + '</span></div>'
+      + '<div class="cal-line"><em>Creators to check</em><span>' + (chk.flagged.length ? chk.flagged.join(', ') : 'none: no problems found') + '</span></div>';
+    box.innerHTML = '<h2 style="margin-top:0">Your result · SAR ' + num(budget) + '</h2>' + lines + extra
+      + '<p class="price-hint" style="margin:8px 0 0">Details by platform are below under <b>What to accept</b>' + (chk ? ', and creator by creator under <b>' + chk.name + '</b>' : '') + '.</p>';
+  }
   function toggle(list, k){
     var i = list.indexOf(k);
     if (i >= 0) { if (list.length > 1) list.splice(i, 1); } else list.push(k);   // always at least one
@@ -3685,6 +3811,12 @@ table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
   $('cal-tiers').innerHTML = TIERS.map(function(t){ return '<div><label for="cal-t-' + t + '">' + D.tierLabel[t] + '</label><input id="cal-t-' + t + '" inputmode="numeric" value="" placeholder="0"></div>'; }).join('');
   $('cal-type').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b) { toggle(S.types, b.dataset.k); $('cal-got1').value = ''; $('cal-got2').value = ''; render(); } });
   $('cal-plat').addEventListener('click', function(e){ var b = e.target.closest('button'); if (b) { toggle(S.plats, b.dataset.k); S.share = {}; render(); } });
+  var opt = '<option value="">— none: just type the numbers —</option>';
+  if (SRC.selections.length) opt += '<optgroup label="Selections">' + SRC.selections.map(function(x){ return '<option value="s:' + x.id + '">' + x.name + ' (' + x.creators.length + ')</option>'; }).join('') + '</optgroup>';
+  if (SRC.campaigns.length) opt += '<optgroup label="Campaigns">' + SRC.campaigns.map(function(x){ return '<option value="c:' + x.id + '">' + x.name + ' (' + x.creators.length + ')</option>'; }).join('') + '</optgroup>';
+  $('cal-source').innerHTML = opt;
+  $('cal-source').addEventListener('change', function(){ S.src = this.value; applySource(); render(); });
+  $('cal-go').addEventListener('click', function(){ $('cal-result').scrollIntoView({behavior: 'smooth', block: 'start'}); });
   $('cal-focus').addEventListener('change', function(){ S.focus = this.value; $('cal-got1').value = ''; $('cal-got2').value = ''; render(); });
   document.addEventListener('input', function(e){
     var el = e.target;
@@ -3694,6 +3826,8 @@ table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
       document.querySelectorAll('#cal-split small').forEach(function(sm, i){ sm.textContent = budget ? 'SAR ' + num(amt[S.plats[i]]) : ''; });
       if (!budget) return;
       $('cal-accept').innerHTML = S.types.map(function(t){ return tableFor(t, budget); }).join(''); tools(budget); return; }
+    if (el.dataset && el.dataset.posts) { S.posts[el.dataset.posts] = Math.max(0, parseInt(el.value, 10) || 0); var id = el.dataset.posts, pos = el.selectionStart; render();
+      var back = document.querySelector('[data-posts="' + id + '"]'); if (back) { back.focus(); try { back.setSelectionRange(pos, pos); } catch (x) {} } return; }
     if (el.tagName === 'INPUT') render();
   });
   render();

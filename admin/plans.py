@@ -351,3 +351,77 @@ def client_view(plan):
             "benchmark": plan.get("benchmark") or {},
             "estimate": (plan.get("estimate") or {}).get("expected") or {},
             "safe": (plan.get("estimate") or {}).get("safe") or {}}
+
+
+# ----------------------------------------------- selections and campaigns --
+
+def _creator_row(c, price=None, posts=None):
+    """One creator as the calculator needs them: followers per platform, what
+    they are priced at, and — when their analysis is on file — their own
+    averages, which beat any benchmark."""
+    foll = {}
+    for a in db.split_profiles(c["profiles"] or ""):
+        if a.get("followers"):
+            foll[a["platform"]] = int(a["followers"])
+    if c["followers"] and c["platform"] and c["platform"] not in foll:
+        foll[c["platform"]] = int(c["followers"])
+    an = (db.analysis(c["code"]) or {}).get("data") or {}
+    views = an.get("avg_reel_plays") or an.get("avg_views")
+    likes, comments = an.get("avg_likes"), an.get("avg_comments")
+    eng = ((likes or 0) + (comments or 0)) if (likes is not None or comments is not None) else None
+    return {"code": c["code"], "name": c["name"], "platform": c["platform"], "followers": foll,
+            "price": price, "posts": posts or 1,
+            "own": {"views": views, "eng": eng, "fake": an.get("fake_followers_pct"),
+                    "likes_hidden": bool(an.get("likes_hidden")) or (likes is None and bool(an))} if an else None}
+
+
+def sources():
+    """Selections and campaigns with their creators, for the calculator.
+    A selection's budget is its total (typed, else the sum of its creators'
+    client prices); a campaign's is its linked selection's."""
+    bands = db.tier_prices()
+    sels, by_id = [], {}
+    for sel in db.list_selections():
+        if "archived_at" in sel.keys() and sel["archived_at"]:
+            continue
+        try:
+            codes = json.loads(sel["codes"] or "[]")
+            own = json.loads(sel["prices"] or "{}")
+        except ValueError:
+            continue
+        rows, lo, hi = [], 0, 0
+        for code in codes:
+            c = db.creator(code)
+            if c is None:
+                continue
+            eff = own.get(code) or db.price_of(c, bands) or (None, None)
+            mid = (eff[0] + eff[1]) / 2.0 if eff and eff[0] is not None else None
+            if eff and eff[0] is not None:
+                lo += eff[0]; hi += eff[1]
+            rows.append(_creator_row(c, price=mid))
+        # A typed total counts; a placeholder like "1" does not.
+        typed = [v for v in (sel["total_from"], sel["total_to"]) if v and v >= 100]
+        if typed:
+            lo, hi = min(typed), max(typed)
+        row = {"id": sel["id"], "name": sel["name"], "platform": sel["platform"], "budget": [lo, hi] if hi else None,
+               "creators": rows}
+        sels.append(row); by_id[sel["id"]] = row
+    camps = []
+    for k in db.list_campaigns():
+        members = []
+        for m in db.campaign_creators(k["id"]):
+            if m["code"] is None:
+                continue
+            members.append(_creator_row(m, price=m["campaign_cost"], posts=m["planned"]))
+        link = by_id.get(k["selection_id"]) if k["selection_id"] else None
+        budget, from_ = (link["budget"], 'selection "%s"' % link["name"]) if link else (None, None)
+        saved = ((plan_of(k) or {}).get("brief") or {}).get("budget")      # what the planner was last given
+        try:
+            saved = float(str(saved).replace(",", "")) if saved else None
+        except ValueError:
+            saved = None
+        if saved and saved >= 100:
+            budget, from_ = [saved, saved], "the ROI planner"
+        camps.append({"id": k["id"], "name": k["name"], "platform": k["platform"],
+                      "budget": budget, "budgetFrom": from_, "creators": members})
+    return {"selections": sels, "campaigns": camps}
