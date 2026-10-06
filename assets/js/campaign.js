@@ -175,6 +175,13 @@
       + '<div class="mx-tl__foot"><span></span><span>7 of 9 steps done</span><span></span></div></div><p class="mx-none__tag">Example</p></div></section>';
     show("list");
   }
+  // Where an audience number came from: the creators' own analyses, the average
+  // of every analysed profile, or a mix of the two.
+  function audNote(a) {
+    if (a.basis === "average") return "Average audience of " + a.profiles + " creator profiles";
+    if (a.basis === "mixed") return "Weighted by reach · " + a.coverage.toFixed(0) + "% from this campaign's creators, the rest the average of " + a.profiles + " profiles";
+    return "Weighted by reach" + (a.coverage < 99 ? " · " + a.coverage.toFixed(0) + "% of reach covered" : "");
+  }
   function tile(label, value, tone) { return '<div class="mx-sum__tile' + (tone ? " mx-sum__tile--" + tone : "") + '"><b>' + value + "</b><span>" + label + "</span></div>"; }
   // The campaign's timeline: one segment per scope-of-work step, in order,
   // coloured done / in progress / to come, with the current stage and the
@@ -713,7 +720,7 @@
       mix.push('<div class="mx-panel"><h3>Who was reached</h3>' + bars(R.audience.countries.map(function (c) {
         return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" };
       }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
-        + '<p class="mx-panel__note">Weighted by reach' + (R.audience.coverage < 99 ? " · " + R.audience.coverage.toFixed(0) + "% of reach covered" : "") + "</p></div>");
+        + '<p class="mx-panel__note">' + audNote(R.audience) + "</p></div>");
     }
     $("mx-mix").innerHTML = mix.join("");
     decorateH3("mx-mix");

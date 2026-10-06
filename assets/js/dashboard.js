@@ -376,11 +376,16 @@
     var peak = Math.max.apply(null, rows.map(function (r) { return r.n; }).concat([1]));
     return rows.map(function (r, i) { return '<div class="db-bar"><span>' + keyHtml(r) + '</span><i style="--w:' + (r.n / peak * 100).toFixed(1) + "%;--c:" + (colourOf ? colourOf(i) : COL[i % 4]) + '"></i><b>' + r.label + "</b></div>"; }).join("");
   }
+  function audNote(a) {
+    if (a.basis === "average") return "Average audience of " + a.profiles + " creator profiles";
+    if (a.basis === "mixed") return "Weighted by reach · " + a.coverage.toFixed(0) + "% from this campaign's creators, the rest the average of " + a.profiles + " profiles";
+    return a.coverage < 99 ? a.coverage.toFixed(0) + "% of reach covered" : "Weighted by reach";
+  }
   function renderGeo() {
     var a = R.audience;
-    $("w-geo").innerHTML = head(IC.geo, "Audience countries", "Where the campaign's audience is, from the creators' profile analyses, weighted by reach. Shows the whole campaign.", "geo")
+    $("w-geo").innerHTML = head(IC.geo, "Audience countries", "Where the campaign's audience is: the creators' own profile analyses where there are any, otherwise the average audience of all analysed profiles. Shows the whole campaign.", "geo")
       + '<div class="db-card__body">' + (a && a.countries.length ? bars(a.countries.slice(0, 5).map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" }; }),
-        function (r) { return flag(r.k) + esc(countryName(r.k)); }) + '<p class="db-note">' + (a.coverage < 99 ? a.coverage.toFixed(0) + "% of reach covered" : "Weighted by reach") + "</p>"
+        function (r) { return flag(r.k) + esc(countryName(r.k)); }) + '<p class="db-note">' + audNote(a) + "</p>"
         : '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>') + "</div>";
   }
 
@@ -547,7 +552,7 @@
     geo: function () {
       var a = R.audience; if (!a) return '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>';
       return bars(a.countries.map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(1) + "%" }; }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
-        + '<p class="db-note" style="margin-top:10px">From the creators\' profile analyses, weighted by the reach each delivered; covers ' + a.coverage.toFixed(0) + "% of reach.</p>";
+        + '<p class="db-note" style="margin-top:10px">' + audNote(a) + ".</p>";
     },
     plat: function () {
       var by = {}; posts().forEach(function (p) { var x = by[p.platform] = by[p.platform] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
