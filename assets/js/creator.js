@@ -182,10 +182,10 @@
   }
 
   /* one metric row: label, a bar against the largest in its group, the value */
-  function rows(items) {
+  function rows(items, colour) {
     var peak = Math.max.apply(null, items.map(function (r) { return r.v || 0; }).concat([1]));
     return '<div class="pp-rows">' + items.map(function (r) {
-      return '<div class="pp-row"><span>' + r.label + '</span><i class="pp-row__bar"><b style="width:' + Math.max(2, (r.v || 0) / peak * 100).toFixed(1) + '%"></b></i><strong>' + r.text + "</strong></div>";
+      return '<div class="pp-row"><span>' + r.label + '</span><i class="pp-row__bar"><b style="width:' + Math.max(2, (r.v || 0) / peak * 100).toFixed(1) + "%" + (colour ? ";background:" + colour : "") + '"></b></i><strong>' + r.text + "</strong></div>";
     }).join("") + "</div>";
   }
 
@@ -236,19 +236,19 @@
     if (au.reachability && au.reachability.length) {
       var RL = { "<500": "<500 accounts", "500-1000": "500-1k accounts", "1000-1500": "1k-1.5k accounts", ">1500": ">1.5k accounts" };
       cards.push('<div class="pp-card"><h3 class="pp-h3">Audience reachability</h3>'
-        + rows(au.reachability.map(function (r) { return { label: esc(RL[r.name] || r.name), v: r.pct, text: pct2(r.pct) }; })) + "</div>");
+        + rows(au.reachability.map(function (r) { return { label: esc(RL[r.name] || r.name), v: r.pct, text: pct2(r.pct) }; }), "#5b4bd6") + "</div>");
     }
-    if (a.fake_followers_dist) cards.push('<div class="pp-card"><h3 class="pp-h3">Fake followers distribution</h3>' + dist(a.fake_followers_dist) + "</div>");
+    if (a.fake_followers_dist) cards.push('<div class="pp-card"><h3 class="pp-h3">Fake followers distribution</h3>' + dist(a.fake_followers_dist, "#ff691e") + "</div>");
     var gr = (a.growth || []).filter(function (x) { return x.followers; });
-    if (gr.length >= 2) cards.push('<div class="pp-card"><h3 class="pp-h3">Followers growth</h3>' + chart(gr, "followers") + "</div>");
+    if (gr.length >= 2) cards.push('<div class="pp-card"><h3 class="pp-h3">Followers growth</h3>' + chart(gr, "followers", "#14884a", "#e7f7ed") + "</div>");
     var gl = (a.growth || []).filter(function (x) { return x.avg_likes != null; });
-    if (gl.length >= 2) cards.push('<div class="pp-card"><h3 class="pp-h3">Likes growth</h3>' + chart(gl, "avg_likes") + "</div>");
+    if (gl.length >= 2) cards.push('<div class="pp-card"><h3 class="pp-h3">Likes growth</h3>' + chart(gl, "avg_likes", "#ff691e", "#fff1e8") + "</div>");
     if (cards.length) out += '<div class="pp-two">' + cards.join("") + "</div>";
     $("pp-real-sec").hidden = !out;
     $("pp-real").innerHTML = out;
   }
   function month(m) { var d = new Date(m + "-01T00:00:00Z"); return isNaN(d) ? m : d.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" }); }
-  function chart(gr, key) {
+  function chart(gr, key, colour, fill) {
     var vals = gr.map(function (x) { return x[key]; });
     var W = 560, H = 220, L = 12, Rr = 12, T = 30, B = 44, pw = W - L - Rr, ph = H - T - B;
     var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), pad = (hi - lo) * 0.25 || hi * 0.05 || 1, y0 = Math.max(0, lo - pad), y1 = hi + pad;
@@ -256,25 +256,26 @@
     function py(v) { return T + ph - (v - y0) / (y1 - y0) * ph; }
     var line = gr.map(function (d, i) { return px(i).toFixed(1) + "," + py(d[key]).toFixed(1); }).join(" ");
     var s = '<svg class="pp-chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(gr.map(function (d) { return month(d.month) + " " + num(d[key]); }).join(", ")) + '">'
-      + '<polyline fill="none" stroke="#121212" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="' + line + '"/>';
+      + '<polygon points="' + px(0).toFixed(1) + "," + (T + ph) + " " + line + " " + px(gr.length - 1).toFixed(1) + "," + (T + ph) + '" fill="' + fill + '"/>'
+      + '<polyline fill="none" stroke="' + colour + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" points="' + line + '"/>';
     function fmt(v) { return v >= 1e4 ? (v / 1e3).toFixed(1).replace(/\.0$/, "") + "K" : num(v); }
     gr.forEach(function (d, i) {
       var x = px(i).toFixed(1), y = py(d[key]), anchor = i === 0 ? "start" : i === gr.length - 1 ? "end" : "middle";
       // a dip carries its label underneath, so it never sits on the line
       var prev = i > 0 ? gr[i - 1][key] : null, next = i < gr.length - 1 ? gr[i + 1][key] : null;
       var dip = (prev == null || d[key] < prev) && (next == null || d[key] < next) && (prev != null || next != null) && i > 0 && i < gr.length - 1;
-      s += '<circle cx="' + x + '" cy="' + y.toFixed(1) + '" r="4" fill="#e8ff76" stroke="#121212" stroke-width="2"/>'
+      s += '<circle cx="' + x + '" cy="' + y.toFixed(1) + '" r="4" fill="#fff" stroke="' + colour + '" stroke-width="2.5"/>'
         + '<text x="' + x + '" y="' + (dip ? y + 20 : y - 10).toFixed(1) + '" text-anchor="' + anchor + '" font-size="12" font-weight="700" fill="#121212">' + fmt(d[key]) + "</text>"
         + '<text x="' + x + '" y="' + (H - 6) + '" text-anchor="' + anchor + '" font-size="12" fill="#5a5a5a">' + esc(month(d.month)) + "</text>";
     });
     return s + "</svg>";
   }
-  function dist(d) {
+  function dist(d, colour) {
     var b = d.buckets || [];
     return '<div class="pp-dist" role="img" aria-label="Distribution among similar creators">' + b.map(function (x, i) {
       var who = i === d.creator ? " is-creator" : (i === d.median ? " is-median" : "");
-      return '<div class="pp-dist__col' + who + '"><i style="height:' + Math.max(3, x.h) + '%"></i><span>' + esc(x.label) + "</span></div>";
-    }).join("") + '</div><p class="pp-dist__key"><span class="k-creator"></span>Creator<span class="k-median"></span>Median<span class="k-other"></span>Other creators</p>';
+      return '<div class="pp-dist__col' + who + '"><i style="height:' + Math.max(3, x.h) + "%" + (who === " is-creator" && colour ? ";background:" + colour : "") + '"></i><span>' + esc(x.label) + "</span></div>";
+    }).join("") + '</div><p class="pp-dist__key"><span class="k-creator"' + (colour ? ' style="background:' + colour + '"' : "") + '></span>Creator<span class="k-median"></span>Median<span class="k-other"></span>Other creators</p>';
   }
 
   /* content: all content / reels / stories, collaborations, ER distribution */
@@ -309,7 +310,7 @@
     if (a.paid_views_pct != null) co.push(["Paid views", pct2(a.paid_views_pct)]);
     if (co.length) out += '<div class="pp-collab"><h3 class="pp-h3">Collaborations</h3><div class="pp-tiles">'
       + co.map(function (x) { return "<div><span>" + x[0] + "</span><b>" + x[1] + "</b></div>"; }).join("") + "</div></div>";
-    if (a.er_dist) out += '<div class="pp-collab pp-card"><h3 class="pp-h3">Engagement rate distribution</h3>' + dist(a.er_dist) + "</div>";
+    if (a.er_dist) out += '<div class="pp-collab pp-card"><h3 class="pp-h3">Engagement rate distribution</h3>' + dist(a.er_dist, "#14884a") + "</div>";
     if (out) $("pp-perf").insertAdjacentHTML("beforeend", out);
   }
 
