@@ -358,6 +358,7 @@ details.card summary::-webkit-details-marker{display:none}
 @media(max-width:760px){.two{grid-template-columns:1fr}}
 .inline-add{display:flex;gap:8px;align-items:center}.inline-add input{min-width:220px;flex:1}
 .card.flat{border:0;box-shadow:none;padding:0;background:transparent}
+.refbox summary{cursor:pointer}.refgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px 24px}.refbox h3{font-size:14px;margin:14px 0 6px}.refbox ul.refs,.refbox ol.src{margin:0;padding-left:18px;font-size:13px;line-height:1.55}
 .stat-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
 /* ---- small screens ---- */
 .scrim{display:none}

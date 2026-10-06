@@ -26,6 +26,37 @@ import json
 
 import db
 
+
+# Where the guide numbers come from. Shown beside the calculator and the
+# library so nobody has to take a rate on trust. The planning ranges are
+# HelloVoice's own, set at the low end of these reports for the Saudi market.
+REFERENCES = {
+    "Instagram": ["Nano creators reach top-quartile engagement of 3.4%+ (Favikon, 2025)",
+                  "Good engagement: 3–6% for micro, 1–3% for larger accounts (Qoruz, 2025)",
+                  "Reels draw about 2.3× the engagement of single images (Metricool × HypeAuditor, 2025)"],
+    "TikTok": ["Engagement by followers: <100K 7.5% · 100–500K 5.1% · 500K–1M 4.5% · 1–5M 3.8% · 10M+ 2.9% (Emplicit, 2025)",
+               "38.6M TikTok users in Saudi Arabia (Kolsquare, 2026)"],
+    "Snapchat": ["Snapchat reaches 9 in 10 Saudis aged 13–34 (AGBI, 2024)", "Stories average a 65% completion rate (ElectroIQ, 2025)",
+                 "No public likes or views: numbers come from creators' screenshots"],
+    "YouTube": ["Engagement by subscribers: 0–10K 5–10% · 10–100K 3–6% · 100K–1M 2–4% · 1–10M 1–2% (Upgrowth, 2025)",
+                "Shorts engage at 5–8%, long videos at 2–4%"],
+    "Saudi market": ["38.6M TikTok users in Saudi Arabia (Kolsquare, 2026)", "40% of GCC influencer spend is in Saudi Arabia (Kolsquare, 2026)",
+                     "+35–50% engagement for Arabic-first content (Kolsquare, 2026)"],
+}
+SOURCES = [
+    ("Favikon — social media engagement benchmarks", "https://www.favikon.com/blog/what-is-a-good-engagement-rate-on-social-media"),
+    ("Qoruz — engagement rate benchmarks 2025", "https://qoruz.com/blog/engagement-rate-benchmarks-to-aim-for-in-2025/"),
+    ("Metricool × HypeAuditor — Instagram Content Playbook 2025", "https://metricool.com/press-release-instagram-content-playbook/"),
+    ("Emplicit — TikTok engagement rate benchmarks 2025", "https://emplicit.co/tiktok-engagement-rate-benchmarks-2025/"),
+    ("Upgrowth — YouTube engagement rate benchmarks", "https://upgrowth.in/social-media-tools/youtube-engagement-rate-calculator/"),
+    ("Kolsquare — influencer marketing in the Middle East 2026", "https://www.kolsquare.com/en/blog/influencer-marketing-in-the-middle-east-in-2026-high-stakes-high-spend-and-the-arabic-first-imperative"),
+    ("Kolsquare — influencer marketing cost 2025", "https://www.kolsquare.com/en/blog/how-much-does-influencer-marketing-cost-in-2025"),
+    ("IQFluence — CPM in influencer marketing", "https://iqfluence.io/public/blog/cpm-influencer-marketing"),
+    ("Influencer Marketing Hub — Saudi Arabia guide 2026", "https://influencermarketinghub.com/influencer-marketing-in-saudi-arabia-guide/"),
+    ("AGBI — Snap opens Saudi creator hub", "https://agbi.com/analysis/media/2024/12/snap-snapchat-saudi-arabia-office-creator-hub-mena-social-media"),
+    ("ElectroIQ — Snapchat Stories statistics 2025", "https://electroiq.com/?p=23117"),
+]
+
 TIERS = ["nano", "micro", "mid", "macro", "mega"]
 TIER_LABEL = {"nano": "Nano (<10K)", "micro": "Micro (10–100K)", "mid": "Mid (100–500K)",
               "macro": "Macro (500K–1M)", "mega": "Mega (1M+)"}

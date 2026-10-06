@@ -3643,6 +3643,7 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
               "<p><strong>Creator score</strong> on the report (0–100) rewards the results each creator delivered, as a share of the best creator's result: "
               "awareness: views &amp; reach 70, engagement 20, clicks 10 · engagement: 20 / 70 / 10 · traffic: 20 / 20 / 60 · balanced: 45 / 35 / 20. "
               "With no tracking links the clicks part is dropped and the others scale up to 100. Nothing is compared with followers or outside benchmarks.</p></div>"
+            + benchmark_refs()
             + "<details id='library' style='margin-top:20px'><summary><strong>Benchmark library</strong> — edit the guide ranges</summary>"
               "<form method='post' action='" + u("/planner/library") + "' class='card' style='margin-top:10px'>"
               + ("<input type='hidden' name='back' value='" + str(k["id"]) + "'>" if k else "")
@@ -3657,6 +3658,20 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
 
 # ------------------------------------------------------------- calculator --
 
+def benchmark_refs(open_=False):
+    """'Where these numbers come from': published references per platform and
+    the source links. Same list as the Benchmarks Pack's Sources page."""
+    import plans
+    cols = "".join("<div><h3>" + e(p) + "</h3><ul class='refs'>" + "".join("<li>" + e(r) + "</li>" for r in rs) + "</ul></div>"
+                   for p, rs in plans.REFERENCES.items())
+    srcs = "".join("<li><a href='" + e(url) + "' target='_blank' rel='noopener'>" + e(t) + "</a></li>" for t, url in plans.SOURCES)
+    return ("<details class='card refbox'" + (" open" if open_ else "") + "><summary><strong>Where these numbers come from</strong>"
+            " <span class='muted'>published references behind the guide ranges</span></summary>"
+            "<p class='sec-desc'>The planning ranges are HelloVoice's own, set at the low end of these published reports for the Saudi market, "
+            "and updated as our tracked campaigns add data. Every rate is a guide, not a promise.</p>"
+            "<div class='refgrid'>" + cols + "</div><h3>Sources</h3><ol class='src'>" + srcs + "</ol></details>")
+
+
 def calculator_page(lib, sources=None, initial=None, ok=None, error=None):
     """The ROI calculator. Pick one or several campaign types and one or
     several platforms, type what the client pays (split between platforms),
@@ -3669,7 +3684,7 @@ def calculator_page(lib, sources=None, initial=None, ok=None, error=None):
                        "categories": {k: v[0] for k, v in plans.CATEGORIES.items()}},
                       ensure_ascii=False).replace("</", "<\\/")
     body = """
-""" + _notes(error, ok) + ui.header("ROI calculator", "Pick campaign types and platforms, type what the client pays, and read the result to accept. Numbers come from the benchmark library.", crumbs=[("Insights", None), ("ROI calculator", None)], actions="<a class='btn ghost' href='" + u("/planner") + "#library'>Benchmark library</a>") + """
+""" + _notes(error, ok) + ui.header("ROI calculator", "Pick campaign types and platforms, type what the client pays, and read the result to accept. Numbers come from the benchmark library.", crumbs=[("Insights", None), ("ROI calculator", None)], actions="<a class='btn ghost' href='" + u("/planner") + "#library'>Benchmark library</a>") + benchmark_refs() + """
 <style>
 .cal-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .cal-pills button{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 18px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
