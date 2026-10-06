@@ -425,8 +425,9 @@
       var who = i === d.creator ? " is-creator" : (i === d.median ? " is-median" : "");
       return '<div class="pp-dist__col' + who + (i === d.creator && atMedian ? " is-both" : "") + '">' + (i === d.creator && atMedian ? '<em class="pp-dist__tag">Median</em>' : "")
         + '<i style="height:' + Math.max(3, x.h) + "%" + (who === " is-creator" && colour ? ";background:" + colour : "") + '"></i><span>' + esc(x.label) + "</span></div>";
-    }).join("") + '</div><p class="pp-dist__key"><span class="k-creator"' + (colour ? ' style="background:' + colour + '"' : "") + '></span>Creator'
-      + (atMedian ? '<b class="pp-dist__same">· sits exactly at the median (typical for this size)</b>' : '<span class="k-median"></span>Median') + '<span class="k-other"></span>Other creators</p>';
+    }).join("") + '</div><p class="pp-dist__key"><span class="pp-dist__k"><i class="k-creator"' + (colour ? ' style="background:' + colour + '"' : "") + '></i>Creator</span>'
+      + (atMedian ? "" : '<span class="pp-dist__k"><i class="k-median"></i>Median</span>') + '<span class="pp-dist__k"><i class="k-other"></i>Other creators</span></p>'
+      + (atMedian ? '<p class="pp-dist__same">This creator sits exactly at the median — typical for this size.</p>' : "");
   }
 
   /* content: all content / reels / stories, collaborations, ER distribution */

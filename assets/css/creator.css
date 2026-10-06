@@ -199,16 +199,16 @@
 .pp-chart { width: 100%; height: auto; display: block; overflow: visible; }
 #pp-real > .pp-two .pp-card { margin: 0; }
 .pp-two { align-items: start; }
-.pp-dist { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; height: 170px; align-items: end; }
+.pp-dist { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 6px; height: 170px; margin-top: 34px; align-items: end; }
 .pp-dist__col { display: grid; grid-template-rows: 1fr auto; height: 100%; gap: 6px; }
 .pp-dist__col i { align-self: end; display: block; border-radius: 6px 6px 2px 2px; background: #e4e1da; }
 .pp-dist__col.is-median i { background: #a9a49a; }
 .pp-dist__col.is-creator i { background: var(--ink); }
 .pp-dist__col span { font-size: 11px; color: var(--gray); text-align: center; white-space: nowrap; }
 .pp-dist__col.is-creator span { color: var(--ink); font-weight: 700; }
-.pp-dist__key { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 14px 0 0; font-size: 13px; color: var(--gray); }
-.pp-dist__key span { width: 10px; height: 10px; border-radius: 3px; margin-left: 8px; }
-.pp-dist__key span:first-child { margin-left: 0; }
+.pp-dist__key { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin: 14px 0 0; font-size: 13px; color: var(--gray); }
+.pp-dist__k { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.pp-dist__k i { width: 11px; height: 11px; border-radius: 3px; flex: none; }
 .k-creator { background: var(--ink); } .k-median { background: #a9a49a; } .k-other { background: #e4e1da; }
 
 /* audience */
@@ -314,7 +314,7 @@ body.pp-modal-on { overflow: hidden; }
 /* distribution: the creator's bar is also the median */
 .pp-dist__col { position: relative; }
 .pp-dist__tag { position: absolute; top: -20px; left: 50%; transform: translateX(-50%); font-style: normal; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; background: #a9a49a; color: #fff; padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
-.pp-dist__same { font-weight: 600; color: var(--ink); }
+.pp-dist__same { margin: 8px 0 0; font-size: 13px; font-weight: 600; color: var(--ink); }
 
 .pp-said { display: block; margin-top: 6px; font-size: 13px; font-weight: 600; }
 .pp-said--good { color: #14884a; } .pp-said--ok { color: #a85507; } .pp-said--low { color: #c01010; }
