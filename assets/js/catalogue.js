@@ -454,7 +454,7 @@
         encodeURIComponent(c.code) + '" data-noselect data-analysis="' + esc(c.code) + '" data-name="' + esc(c.name) + '">' +
         (c.analysis ? "Profile analysis" : "Analysis — request") +
         ' <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
-        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><path d="M14 4.5v15"/></svg></a>' : "") +
+        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-4M11 16V9M15 16v-6M19 16V6"/><path d="M5 9l5-4 4 3 6-5"/></svg></a>' : "") +
       "</div></article>";
   }
 
@@ -1851,6 +1851,7 @@
       wrap.innerHTML = '<div class="cat-pp-scrim" hidden></div>' +
         '<aside class="cat-pp" role="dialog" aria-modal="true" aria-labelledby="cat-pp-title" hidden>' +
         '<header class="cat-pp__head"><p class="cat-pp__eyebrow">Profile analysis</p><h2 id="cat-pp-title"></h2>' +
+        '<button type="button" class="cat-pp__pick" aria-pressed="false"></button>' +
         '<a class="cat-pp__full" target="_blank" rel="noopener">Open as page <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>' +
         '<button type="button" class="cat-pp__close" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button></header>' +
         '<iframe class="cat-pp__frame" title="Creator profile analysis"></iframe></aside>';
@@ -1858,12 +1859,28 @@
       panel = document.querySelector(".cat-pp"); frame = panel.querySelector("iframe");
       title = $("cat-pp-title"); full = panel.querySelector(".cat-pp__full");
       panel.querySelector(".cat-pp__close").addEventListener("click", close);
+      // Add to / remove from the selection without leaving the panel: it
+      // presses the creator's own card, so the tray stays the one source.
+      panel.querySelector(".cat-pp__pick").addEventListener("click", function () {
+        var card = document.querySelector('.cat-card[data-code="' + panel.getAttribute("data-code") + '"]');
+        if (card) { card.click(); pick(); }
+      });
       document.querySelector(".cat-pp-scrim").addEventListener("click", close);
       document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !panel.hidden) close(); });
+    }
+    function pick() {
+      var b = panel.querySelector(".cat-pp__pick");
+      var card = document.querySelector('.cat-card[data-code="' + panel.getAttribute("data-code") + '"]');
+      b.hidden = !card;
+      var on = !!card && card.getAttribute("aria-pressed") === "true";
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.textContent = on ? "✓ In your selection" : "+ Add to selection";
     }
     function open(a) {
       if (!panel) build();
       lastFocus = a;
+      panel.setAttribute("data-code", a.getAttribute("data-analysis"));
+      pick();
       var href = a.getAttribute("href"), url = href.replace("creator/#", "creator/?embed=1#");
       title.textContent = a.getAttribute("data-name") || "";
       full.href = href;

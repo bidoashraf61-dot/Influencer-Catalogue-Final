@@ -9,8 +9,8 @@
 <link rel="icon" href="../assets/icons/icon-32.png" type="image/png"/>
 <link rel="apple-touch-icon" href="../assets/icons/icon-180.png"/>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/flag-icons/7.2.3/css/flag-icons.min.css"/>
-<link rel="stylesheet" href="../assets/css/catalogue.css?v=3edca4ae"/>
-<link rel="stylesheet" href="../assets/css/creator.css?v=fb1a5f04"/>
+<link rel="stylesheet" href="../assets/css/catalogue.css?v=1e87d5be"/>
+<link rel="stylesheet" href="../assets/css/creator.css?v=e77a80bc"/>
 </head>
 <body class="cat-locked" data-page="creator">
 <!--
@@ -64,36 +64,28 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     <section class="pp-id" id="pp-id" aria-label="Creator identity"></section>
     <!-- locked: no analysis on file -->
     <section class="pp-sealed" id="pp-sealed" hidden></section>
-    <!-- the analysis pages -->
+    <!-- the analysis pages, in the order of a Modash profile report -->
     <div id="pp-pages" hidden>
       <section class="pp-page" aria-labelledby="pp-h-perf">
-        <h2 class="pp-h2" id="pp-h-perf">Performance</h2>
-        <dl class="pp-stats" id="pp-stats"></dl>
-      </section>
-      <section class="pp-page" aria-labelledby="pp-h-aud">
-        <h2 class="pp-h2" id="pp-h-aud">Audience</h2>
-        <div class="pp-stamps" id="pp-stamps"></div>
-        <div class="pp-grid" id="pp-aud"></div>
-      </section>
-      <section class="pp-page pp-page--split" aria-labelledby="pp-h-real">
-        <div>
-          <h2 class="pp-h2" id="pp-h-real">Is it real?</h2>
-          <div id="pp-cred"></div>
-        </div>
-        <div>
-          <h2 class="pp-h2">Growth</h2>
-          <div id="pp-growth"></div>
-        </div>
-      </section>
-      <section class="pp-page" aria-labelledby="pp-h-content" id="pp-content-sec">
-        <h2 class="pp-h2" id="pp-h-content">Content</h2>
-        <div id="pp-content"></div>
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-perf">Performance</h2><div class="pp-tabs" id="pp-perf-tabs" role="tablist" aria-label="Content type"></div></header>
+        <div id="pp-perf"></div>
       </section>
       <section class="pp-page" aria-labelledby="pp-h-net" id="pp-net-sec">
-        <h2 class="pp-h2" id="pp-h-net">Brands &amp; network</h2>
-        <div class="pp-grid" id="pp-net"></div>
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-net">Brands &amp; network</h2></header>
+        <div id="pp-net"></div>
       </section>
-      <p class="pp-source" id="pp-source"></p>
+      <section class="pp-page" aria-labelledby="pp-h-posts" id="pp-posts-sec">
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-posts">Popular posts</h2></header>
+        <div id="pp-posts"></div>
+      </section>
+      <section class="pp-page" aria-labelledby="pp-h-real" id="pp-real-sec">
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-real">Audience quality</h2><p class="pp-head__note">Is the audience real, can it be reached, and is it growing?</p></header>
+        <div id="pp-real"></div>
+      </section>
+      <section class="pp-page" aria-labelledby="pp-h-aud" id="pp-aud-sec">
+        <header class="pp-head"><h2 class="pp-h2" id="pp-h-aud">Audience</h2><div class="pp-tabs" id="pp-aud-tabs" role="tablist" aria-label="Audience of"></div></header>
+        <div id="pp-aud"></div>
+      </section>
     </div>
   </div></div>
   <p class="pp-empty" id="pp-empty" hidden></p>
@@ -103,6 +95,6 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
   window.CREATOR_CONFIG = { api: "/admin" };
 </script>
 <script src="../assets/js/hv-icons.js?v=f1325cf5"></script>
-<script src="../assets/js/creator.js?v=fca5cdba"></script>
+<script src="../assets/js/creator.js?v=b446c817"></script>
 </body>
 </html>
