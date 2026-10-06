@@ -445,6 +445,6 @@ def sources():
         camps.append({"id": k["id"], "name": k["name"], "platform": k["platform"],
                       "budget": budget, "budgetFrom": from_, "creators": members,
                       "targets": db.campaign_targets(k), "adjusted": db.campaign_overrides(k),
-                      "measured": _measured(k), "objective": (k["objective"] if "objective" in k.keys() else None),
+                      "measured": _measured(k), "starts": k["starts_at"], "ends": k["ends_at"], "objective": (k["objective"] if "objective" in k.keys() else None),
                       "type": (((plan_of(k) or {}).get("brief") or {}).get("type")), "category": (plan_of(k) or {}).get("category")})
     return {"selections": sels, "campaigns": camps}

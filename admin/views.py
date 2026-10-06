@@ -3483,6 +3483,36 @@ table.cal-t tr.tot td{border-top:2px solid #121212;font-weight:700}
 table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
 .cal-foc{max-width:380px;margin:0 0 12px}
 .cal-big{font-size:18px;line-height:1.5;margin:6px 0}
+.cal-in .cal-inrow{display:flex;flex-wrap:wrap;gap:14px 32px;align-items:flex-start;margin-bottom:12px}
+.cal-in label{margin-bottom:4px}
+.cal-tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid #121212;margin:20px 0 16px}
+.cal-tabs button{font:inherit;font-weight:700;border:0;background:transparent;padding:10px 16px;border-radius:12px 12px 0 0;cursor:pointer;color:#555}
+.cal-tabs button:hover{background:#efede8;color:#121212}
+.cal-tabs button[aria-selected=true]{background:#121212;color:#e8ff76}
+.cal-ov{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:stretch}
+@media(max-width:1000px){.cal-ov{grid-template-columns:1fr}}
+.cal-ov>.card{display:flex;flex-direction:column;margin:0}
+.cal-ovh{display:flex;gap:12px;align-items:center;margin-bottom:12px}
+.cal-ovh h2{margin:0;font-size:19px}.cal-ovh small{color:#666;font-size:12px}
+.cal-num{width:34px;height:34px;border-radius:50%;background:#121212;color:#e8ff76;display:grid;place-items:center;font-weight:700;flex:none}
+.cal-more{margin-top:auto;align-self:flex-start;border:0;background:#efede8;font:inherit;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px;cursor:pointer}
+.cal-more:hover{background:#e8ff76}
+.cal-ov .cal-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-top:1px solid #eee;font-size:14px}
+.cal-ov .cal-row:first-child{border-top:0}
+.cal-ov .cal-row b{font-size:19px}
+.cal-ov .cal-row small{display:block;color:#666;font-size:11.5px}
+.cal-bigchip{display:inline-block;font-size:22px;font-weight:800;border-radius:999px;padding:8px 20px;margin-bottom:8px}
+.cal-st{display:inline-block;font-weight:700;border-radius:999px;padding:3px 11px;font-size:12.5px;white-space:nowrap}
+.cal-st--g{background:#e7f6ec;color:#136b39}.cal-st--a{background:#fff4e3;color:#8a4f06}.cal-st--r{background:#fdeeee;color:#9b1c1f}.cal-st--n{background:#eef2f7;color:#445}
+.cal-bigchip.cal-st--g{background:#1f9d55;color:#fff}.cal-bigchip.cal-st--a{background:#e2780f;color:#fff}.cal-bigchip.cal-st--r{background:#e0241f;color:#fff}
+.cal-stgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:12px}
+.cal-stc{border:1px solid #eee;border-radius:14px;padding:12px 14px;background:#fff;display:grid;gap:6px}
+.cal-stc h3{margin:0;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#666}
+.cal-stc .nums{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.cal-stc .nums b{font-size:24px}.cal-stc .nums small{color:#666}
+.cal-stc .bar{height:8px;border-radius:999px;background:#efece6;overflow:hidden}
+.cal-stc .bar i{display:block;height:100%;border-radius:999px}
+.cal-stc p{margin:0;font-size:12.5px;color:#666}
 .cal-goalrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:10px 0}
 .cal-goalrow label{font-size:12px}
 .cal-saved{background:#e7f6ec;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0}
@@ -3503,41 +3533,55 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
 .cal-sum b{font-size:22px;display:block;line-height:1.2}
 </style>
 
-<div class='card'>
-  <label>1 · What does the client want? <span class='muted' style='font-weight:400'>pick one or several</span></label>
-  <div class='cal-pills cal-types' id='cal-type'></div>
-  <label style='margin-top:16px'>2 · Which platforms? <span class='muted' style='font-weight:400'>pick one or several</span></label>
-  <div class='cal-pills' id='cal-plat'></div>
-  <div class='row' style='margin-top:16px;max-width:380px'>
-    <div><label for='cal-budget'>3 · What does the client pay in total?</label>
-    <div class='cal-money'><input id='cal-budget' inputmode='numeric' value='35000' autocomplete='off'><span>SAR</span></div>
-    <div class='price-hint'>Before VAT. Try another number: the results change at once.</div></div>
+<div class='card cal-in'>
+  <div class='cal-inrow'>
+    <div><label>What does the client want?</label><div class='cal-pills cal-types' id='cal-type'></div></div>
+    <div><label>Platforms</label><div class='cal-pills' id='cal-plat'></div></div>
   </div>
-  <div class='row' style='margin-top:12px;max-width:560px'>
-    <div><label for='cal-source'>4 · Measure a selection or a campaign <span class='muted' style='font-weight:400'>optional, while you prepare it</span></label>
-    <select id='cal-source'><option value=''>— none: just type the numbers —</option></select>
-    <div class='price-hint' id='cal-source-hint'>Pick one and the calculator uses its real creators, their followers and prices.</div></div>
+  <div class='cal-inrow'>
+    <div><label for='cal-budget'>Client pays (SAR, before VAT)</label>
+    <div class='cal-money' style='width:230px'><input id='cal-budget' inputmode='numeric' value='35000' autocomplete='off'><span>SAR</span></div></div>
+    <div style='flex:1;min-width:280px;max-width:560px'><label for='cal-source'>Selection or campaign <span class='muted' style='font-weight:400'>(optional: uses its real creators)</span></label>
+    <select id='cal-source'><option value=''>none: just type the numbers</option></select>
+    <div class='price-hint' id='cal-source-hint'></div></div>
   </div>
   <div id='cal-split-box' hidden>
-    <label style='margin-top:6px'>How is the budget split between platforms?</label>
+    <label>How is the budget split between platforms?</label>
     <div class='cal-split' id='cal-split'></div>
     <div class='price-hint' id='cal-split-hint'></div>
   </div>
   <div id='cal-warn'></div>
-  <div style='margin-top:14px'><button type='button' class='btn' id='cal-go'>Show my results ↓</button>
-  <span class='price-hint' style='margin-left:10px'>Results also update by themselves as you type.</span></div>
 </div>
 
-<div id='cal-result' class='card' style='border:2px solid #121212;scroll-margin-top:16px'></div>
+<div class='cal-tabs' id='cal-tabs' role='tablist'>
+  <button type='button' role='tab' data-tab='overview' aria-selected='true'>Overview</button>
+  <button type='button' role='tab' data-tab='buy' aria-selected='false'>What the budget buys</button>
+  <button type='button' role='tab' data-tab='targets' aria-selected='false'>Targets</button>
+  <button type='button' role='tab' data-tab='actual' aria-selected='false'>Actual vs target</button>
+  <button type='button' role='tab' data-tab='creators' aria-selected='false'>Creators</button>
+  <button type='button' role='tab' data-tab='adjust' aria-selected='false'>Adjust results</button>
+  <button type='button' role='tab' data-tab='tools' aria-selected='false'>Tools</button>
+</div>
 
-<h2>What to accept</h2>
-<div id='cal-accept'></div>
-
-<div id='cal-check'></div>
-<div id='cal-goals'></div>
-<div id='cal-results'></div>
-
-<h2>Tools</h2>
+<div class='cal-panel' id='tab-overview'>
+  <div class='cal-ov'>
+    <div class='card'><div class='cal-ovh'><span class='cal-num'>1</span><div><h2>What the budget buys</h2><small>ROI: the results a fair deal should bring</small></div></div><div id='cal-ov-buy'></div><button type='button' class='cal-more' data-go='buy'>Details →</button></div>
+    <div class='card'><div class='cal-ovh'><span class='cal-num'>2</span><div><h2>What should be achieved</h2><small>The targets to agree with the client</small></div></div><div id='cal-ov-target'></div><button type='button' class='cal-more' data-go='targets'>Details →</button></div>
+    <div class='card'><div class='cal-ovh'><span class='cal-num'>3</span><div><h2>Where we are</h2><small>Actual results against those targets</small></div></div><div id='cal-ov-actual'></div><button type='button' class='cal-more' data-go='actual'>Details →</button></div>
+  </div>
+</div>
+<div class='cal-panel' id='tab-buy' hidden><div id='cal-accept'></div></div>
+<div class='cal-panel' id='tab-targets' hidden><div id='cal-goals'></div></div>
+<div class='cal-panel' id='tab-actual' hidden><div id='cal-actual'></div></div>
+<div class='cal-panel' id='tab-creators' hidden><div id='cal-check'></div>
+<details class='card' style='margin-top:16px'>
+  <summary><strong>Test a different mix</strong>: how many posts from each size of creator?</summary>
+  <p class='price-hint'>Works on the platform chosen under Tools.</p>
+  <div class='cal-tier' id='cal-tiers'></div>
+  <div class='cal-out' id='cal-creators-out'></div>
+</details></div>
+<div class='cal-panel' id='tab-adjust' hidden><div id='cal-results'></div></div>
+<div class='cal-panel' id='tab-tools' hidden>
 <div id='cal-focus-box' hidden class='card' style='margin-bottom:16px'>
   <label for='cal-focus'>The tools below work on one choice at a time. Which one?</label>
   <select id='cal-focus' class='cal-foc'></select>
@@ -3562,13 +3606,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     <div class='cal-out' id='cal-got-out'></div>
   </div>
 </div>
-
-<details class='card' style='margin-top:16px'>
-  <summary><strong>Check my creators</strong> — will the creators I booked deliver this?</summary>
-  <p class='price-hint'>How many posts from each size of creator, on the platform chosen above?</p>
-  <div class='cal-tier' id='cal-tiers'></div>
-  <div class='cal-out' id='cal-creators-out'></div>
-</details>
+</div>
 <script>
 (function(){
   var D = """ + data + """;
@@ -3688,7 +3726,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     var fc = focus(), chk = check(fc, budget ? (split(budget)[fc.p] || budget) : null);
     goals(fc, budget ? (split(budget)[fc.p] || budget) : null, chk);
     resultsCard(fc, budget ? (split(budget)[fc.p] || budget) : null, chk);
-    summary(budget, chk);
+    overview(budget, chk, fc);
     tools(budget);
   }
   function tools(totalBudget){
@@ -3802,7 +3840,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
   // must buy to be fair value and what these creators can safely deliver.
   function rnd(v){ return v >= 100000 ? Math.round(v / 1000) * 1000 : v >= 1000 ? Math.round(v / 100) * 100 : Math.round(v); }
   function goals(f, budget, chk){
-    var box = $('cal-goals');
+    var box = $('cal-goals'); S.vals = null;
     if (!chk || !chk.campaign) { box.innerHTML = chk ? '<div class="card"><h2 style="margin-top:0">Campaign goals</h2><p class="price-hint">This selection is not linked to a campaign yet. Link it on the campaign\\'s setup page (Selection it came from) to save goals.</p></div>' : ''; return; }
     var p = f.p, a = chk.all, camp = SRC.campaigns.filter(function(x){ return x.id === chk.campaign; })[0] || {};
     var cat = S.cat || camp.category || 'other', links = f.t === 'conversion', vals = {};
@@ -3812,6 +3850,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
       if (p !== 'Snapchat') { var ef = budget / ceil(p, 'reactions')[0], e = Math.min(ef, a.reactions[0] || ef); vals.engagement = rnd(e); vals.er = Math.round(e / v * 10000) / 100; }
       if (links) { var cf = budget / ceil(p, 'clicks')[0]; vals.clicks = rnd(Math.min(cf, a.clicks[0] || cf)); }
     }
+    S.vals = vals;
     var KEYS = [['posts', 'Posts'], ['views', 'Views'], ['reach', 'Reach'], ['engagement', 'Likes + comments'], ['er', 'Engagement rate %']].concat(links ? [['clicks', 'Clicks']] : []);
     var ed = S.goalEdit || {};
     var saved = camp.targets && Object.keys(camp.targets).length ? '<div class="cal-saved">Saved now: ' + Object.keys(camp.targets).map(function(k){ return k + ' ' + (k === 'er' ? camp.targets[k] + '%' : nice(camp.targets[k])); }).join(' · ') + '</div>' : '';
@@ -3869,22 +3908,80 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     else hint += ' · no budget on file: type what the client pays';
     $('cal-source-hint').textContent = hint + (plat ? ' · platform ' + plat : '');
   }
-  function summary(budget, chk){
-    var box = $('cal-result');
-    if (!budget) { box.innerHTML = '<h2 style="margin-top:0">Your result</h2><p class="price-hint">Type what the client pays, and your result appears here.</p>'; return; }
-    var lines = '';
-    S.types.forEach(function(t){
-      var T = TYPES[t], mk = T.main, ok = 0, gr = 0, n = 0, snap = false;
-      var amt = split(budget);
-      S.plats.forEach(function(p){ if (mainKind(t, p) !== mk) { snap = true; return; } var r = results(p, mk, amt[p]); ok += r.ok; gr += r.great; n++; });
-      lines += '<div class="cal-line"><em>' + T.name + '</em><span>accept at least <b>' + nice(ok) + '</b> ' + NAME[mk].toLowerCase() + '</span><span>great is <b>' + nice(gr) + '+</b></span>'
-        + '<span class="muted">' + S.plats.join(' + ') + (snap ? ' (Snapchat judged on views)' : '') + '</span></div>';
+  // ---- overview: your three questions, side by side ----
+  var SW = {g: ['On track', 'g'], a: ['Close', 'a'], r: ['Behind', 'r']};
+  function st(cls, text){ return '<span class="cal-st cal-st--' + cls + '">' + text + '</span>'; }
+  function perUnit(p, kind){ var c = ceil(p, kind); return kind === 'views' ? 'SAR ' + money(c[0] * 1000) + ' per 1,000 views' : 'SAR ' + money(c[0]) + ' per ' + (kind === 'clicks' ? 'click' : 'like or comment'); }
+  // Actual results against the targets, one status per aspect. Needs a campaign.
+  function statuses(f, budget, chk){
+    if (!chk || !chk.campaign) return null;
+    var camp = SRC.campaigns.filter(function(x){ return x.id === chk.campaign; })[0]; if (!camp) return null;
+    var m = camp.measured || {}, adj = camp.adjusted || {}, T = (camp.targets && Object.keys(camp.targets).length) ? camp.targets : (S.vals || {}), saved = !!(camp.targets && Object.keys(camp.targets).length);
+    var act = {}; ['posts', 'views', 'reach', 'engagement', 'er', 'clicks'].forEach(function(k){ act[k] = (k !== 'posts' && adj[k] != null) ? adj[k] : m[k]; });
+    var now = Date.now() / 1000, el = 1;
+    if (camp.starts && camp.ends && camp.ends > camp.starts) el = Math.max(0.15, Math.min(1, (now - camp.starts) / (camp.ends - camp.starts)));
+    var NAMES = {posts: 'Posts live', views: 'Views', reach: 'Reach', engagement: 'Likes + comments', er: 'Engagement rate', clicks: 'Clicks'};
+    var items = [];
+    ['posts', 'views', 'reach', 'engagement', 'er', 'clicks'].forEach(function(k){
+      var g = T[k]; if (!g || act[k] == null) return;
+      var pct = act[k] / g * 100, ratio = k === 'er' ? act[k] / g : act[k] / (g * el), s = act[k] >= g ? ['Goal reached', 'g'] : ratio >= 1 ? ['On track', 'g'] : ratio >= 0.7 ? ['Close', 'a'] : ['Behind', 'r'];
+      items.push({key: k, label: NAMES[k], goal: g, actual: act[k], pct: pct, status: s, kind: 'goal', est: adj[k] != null});
     });
-    var extra = '';
-    if (chk && chk.vd) extra = '<div class="cal-line"><em>' + chk.kind.charAt(0).toUpperCase() + chk.kind.slice(1) + ': ' + chk.name + '</em><span><span class="cal-v cal-v--' + chk.vd[1] + '">' + chk.vd[0] + '</span> ' + chk.vd[2] + '</span></div>'
-      + '<div class="cal-line"><em>Creators to check</em><span>' + (chk.flagged.length ? chk.flagged.join(', ') : 'none: no problems found') + '</span></div>';
-    box.innerHTML = '<h2 style="margin-top:0">Your result · SAR ' + num(budget) + '</h2>' + lines + extra
-      + '<p class="price-hint" style="margin:8px 0 0">Details by platform are below under <b>What to accept</b>' + (chk ? ', and creator by creator under <b>' + chk.name + '</b>' : '') + '.</p>';
+    // value for money: at the pace so far, what will each result cost?
+    var planned = chk.posts || 0, live = m.posts || 0, share = planned ? Math.min(1, live / planned) : 0, p = f.p;
+    if (budget && share > 0) [['views', 'views', 'per 1,000 views'], ['reactions', 'engagement', 'per like or comment']].forEach(function(x){
+      var got = act[x[1]]; if (!got) return; var proj = got / share, cost = budget / proj, c = ceil(p, x[0]), v = verdict(cost, c);
+      var word = v[1] === 'g' ? ['Great value', 'g'] : v[1] === 'a' ? ['Fair value', 'a'] : ['Poor value', 'r'];
+      items.push({key: 'val-' + x[0], label: 'Value: ' + (x[0] === 'views' ? 'views' : 'reactions'), kind: 'value', status: word,
+        text: (x[0] === 'views' ? 'SAR ' + money(cost * 1000) : 'SAR ' + money(cost)) + ' ' + x[2] + ' at the end', limit: 'limit ' + perUnit(p, x[0]).replace('SAR ', 'SAR ')});
+    });
+    var probs = chk.problems.bad + chk.problems.warn;
+    items.push({key: 'creators', label: 'Creators', kind: 'creators', status: probs === 0 ? ['No problems', 'g'] : probs <= 3 ? ['A few to check', 'a'] : ['Check them', 'r'], text: probs + ' problem' + (probs === 1 ? '' : 's') + ' found' + (chk.flagged.length ? ': ' + chk.flagged.slice(0, 3).join(', ') + (chk.flagged.length > 3 ? '…' : '') : '')});
+    var worst = items.some(function(i){ return i.status[1] === 'r'; }) ? 'r' : items.some(function(i){ return i.status[1] === 'a'; }) ? 'a' : 'g';
+    var overall = worst === 'g' ? ['On track', 'g'] : worst === 'a' ? ['Close to target', 'a'] : ['Needs attention', 'r'];
+    return {items: items, overall: overall, saved: saved, camp: camp, elapsed: el, share: share};
+  }
+  function actualTab(sv, f){
+    var box = $('cal-actual');
+    if (!sv) { box.innerHTML = '<div class="card"><h2 style="margin-top:0">Actual vs target</h2><p class="price-hint">Pick a <b>campaign</b> (or a selection linked to one) above, and its real results are compared with the targets here, with a status for every aspect.</p>'
+      + '<p class="price-hint">No campaign yet? Use <b>Tools → Did it pay off?</b> to type what a campaign got.</p></div>'; return; }
+    var cards = sv.items.map(function(i){
+      if (i.kind === 'goal') { var col = i.status[1] === 'g' ? '#1f9d55' : i.status[1] === 'a' ? '#e2780f' : '#e0241f';
+        return '<div class="cal-stc"><h3>' + i.label + '</h3><div class="nums"><b>' + (i.key === 'er' ? i.actual + '%' : nice(i.actual)) + (i.est ? ' <small>est.</small>' : '') + '</b><small>goal ' + (i.key === 'er' ? i.goal + '%' : nice(i.goal)) + '</small></div>'
+          + '<div class="bar"><i style="width:' + Math.min(100, i.pct) + '%;background:' + col + '"></i></div><div>' + st(i.status[1], i.status[0]) + ' <small class="muted">' + Math.round(i.pct) + '% of goal</small></div></div>'; }
+      return '<div class="cal-stc"><h3>' + i.label + '</h3><div class="nums"><b style="font-size:17px">' + i.text.split(' at the end')[0] + '</b></div><div>' + st(i.status[1], i.status[0]) + '</div>' + (i.limit ? '<p>' + i.limit + (i.text.indexOf('at the end') > 0 ? ' · projected to the end' : '') + '</p>' : '') + '</div>';
+    }).join('');
+    box.innerHTML = '<div class="card"><div class="cal-h"><span class="cal-bigchip cal-st--' + sv.overall[1] + '">' + sv.overall[0] + '</span></div>'
+      + '<p class="price-hint" style="margin:0">' + sv.camp.name + ' · goals: ' + (sv.saved ? 'the ones saved for this campaign' : 'suggested minimum (none saved yet)') + ' · ' + Math.round(sv.elapsed * 100) + '% of the time has passed · ' + (sv.camp.measured.posts || 0) + ' posts live'
+      + (Object.keys(sv.camp.adjusted || {}).filter(function(k){ return k !== '_basis'; }).length ? ' · figures marked est. were adjusted by hand' : '') + '</p><div class="cal-stgrid">' + cards + '</div></div>';
+  }
+  function overview(budget, chk, f){
+    var buy = '', tgt = '', act = '';
+    if (!budget) buy = '<p class="price-hint">Type what the client pays.</p>';
+    else {
+      var amt = split(budget);
+      S.types.forEach(function(t){
+        var T = TYPES[t], mk = T.main, ok = 0, gr = 0, snap = false;
+        S.plats.forEach(function(p){ if (mainKind(t, p) !== mk) { snap = true; return; } var r = results(p, mk, amt[p]); ok += r.ok; gr += r.great; });
+        buy += '<div class="cal-row"><span><b>' + T.name + '</b><small>' + NAME[mk].toLowerCase() + (snap ? ' (Snapchat on views)' : '') + ' · ' + perUnit(S.plats[0], mk) + ' at most</small></span><span style="text-align:right">accept <b>' + nice(ok) + '</b><small>great ' + nice(gr) + '+</small></span></div>';
+      });
+    }
+    var sv = statuses(f, budget, chk), camp = chk && chk.campaign ? SRC.campaigns.filter(function(x){ return x.id === chk.campaign; })[0] : null;
+    var T2 = camp && camp.targets && Object.keys(camp.targets).length ? camp.targets : (S.vals || null), TN = {posts: 'Posts', views: 'Views', reach: 'Reach', engagement: 'Likes + comments', er: 'Engagement rate', clicks: 'Clicks'};
+    if (T2) { var lbl = camp && camp.targets && Object.keys(camp.targets).length ? 'Agreed goals saved for this campaign' : 'Suggested minimum: the lower of the budget and what these creators can safely deliver';
+      tgt = '<p class="price-hint" style="margin:0 0 4px">' + lbl + '</p>' + Object.keys(TN).filter(function(k){ return T2[k] != null; }).map(function(k){ return '<div class="cal-row"><span>' + TN[k] + '</span><b>' + (k === 'er' ? T2[k] + '%' : nice(T2[k])) + '</b></div>'; }).join(''); }
+    else if (budget) { tgt = '<p class="price-hint" style="margin:0 0 4px">Minimum accepted for this budget. Pick a campaign to check what its creators can safely deliver.</p>' + buy; }
+    else tgt = '<p class="price-hint">Type what the client pays.</p>';
+    if (sv) act = '<div class="cal-bigchip cal-st--' + sv.overall[1] + '">' + sv.overall[0] + '</div>' + sv.items.slice(0, 7).map(function(i){ return '<div class="cal-row"><span>' + i.label + '</span>' + st(i.status[1], i.status[0]) + '</div>'; }).join('');
+    else act = '<p class="price-hint">Pick a campaign above to compare its real results with the targets, aspect by aspect.</p>';
+    $('cal-ov-buy').innerHTML = buy; $('cal-ov-target').innerHTML = tgt; $('cal-ov-actual').innerHTML = act;
+    actualTab(sv, f);
+  }
+  function setTab(name){
+    S.tab = name;
+    document.querySelectorAll('#cal-tabs button').forEach(function(b){ b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false'); });
+    document.querySelectorAll('.cal-panel').forEach(function(p){ p.hidden = p.id !== 'tab-' + name; });
+    try { sessionStorage.setItem('cal-tab', name); } catch (e) {}
   }
   function toggle(list, k){
     var i = list.indexOf(k);
@@ -3909,7 +4006,8 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     S.resBasisKey = b.dataset.tpl; S.resBasis = t[0] + ' for ' + (focus() ? TYPES[focus().t].name + ' · ' + focus().p : '');
     render();
   });
-  $('cal-go').addEventListener('click', function(){ $('cal-result').scrollIntoView({behavior: 'smooth', block: 'start'}); });
+  document.addEventListener('click', function(e){ var b = e.target.closest && e.target.closest('#cal-tabs button, [data-go]'); if (b) setTab(b.dataset.tab || b.dataset.go); });
+  try { var t0 = sessionStorage.getItem('cal-tab'); if (t0 && document.getElementById('tab-' + t0)) setTab(t0); } catch (e) {}
   $('cal-focus').addEventListener('change', function(){ S.focus = this.value; $('cal-got1').value = ''; $('cal-got2').value = ''; render(); });
   document.addEventListener('input', function(e){
     var el = e.target;
