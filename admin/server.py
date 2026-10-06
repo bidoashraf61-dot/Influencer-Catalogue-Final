@@ -1365,9 +1365,11 @@ class Handler(BaseHTTPRequestHandler):
         costs = {code.strip().upper(): money(fee)
                  for code, fee in zip(codes_in, fees + [""] * (len(codes_in) - len(fees)))}
         remove = {c.strip().upper() for c in (f.get("drop") or [])}
-        adds = [c.strip().upper() for c in re.split(r"[\s,;]+", f.get("add") or "") if c.strip()]
-        unknown = [c for c in adds if c not in known]
-        adds = [c for c in adds if c in known and c not in remove]
+        # Codes, profile links or @handles, any mix: each is matched to the
+        # roster, and a profile the roster does not have yet is added to it.
+        entries = [c for c in re.split(r"[\s,;]+", f.get("add") or "") if c.strip()]
+        adds, add_notes = db.resolve_creators(entries, k["name"]) if entries else ([], [])
+        adds = [c for c in adds if c not in remove]
 
         db.save_campaign(k["id"], name=(f.get("name") or "").strip() or k["name"],
                          client=(f.get("client") or "").strip() or None,
@@ -1420,8 +1422,11 @@ class Handler(BaseHTTPRequestHandler):
         db.save_campaign_creators(k["id"], costs, remove)
         if adds:
             db.add_campaign_creators(k["id"], adds)
-        if unknown:
-            return fail("Saved, but these codes are not in the roster: " + ", ".join(unknown))
+        if adds or add_notes:
+            msg = "Saved. Added %d creator%s." % (len(adds), "" if len(adds) == 1 else "s")
+            if add_notes:
+                msg += " " + " · ".join(add_notes)
+            return self.redirect(back + "&ok=" + urllib.parse.quote(msg[:1500]))
         return self.redirect(back + "&ok=" + urllib.parse.quote("Saved."))
 
     def post_campaign_link(self):

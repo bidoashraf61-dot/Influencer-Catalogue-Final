@@ -1077,6 +1077,112 @@ def handle_from_url(url):
     return text.rsplit("/", 1)[-1].lstrip("@")
 
 
+# Which platform a profile link belongs to, by its host.
+PLATFORM_HOSTS = [("instagram.com", "Instagram"), ("tiktok.com", "TikTok"),
+                  ("snapchat.com", "Snapchat"), ("youtube.com", "YouTube"), ("youtu.be", "YouTube"),
+                  ("x.com", "X"), ("twitter.com", "X"), ("facebook.com", "Facebook"),
+                  ("fb.com", "Facebook"), ("threads.net", "Threads"), ("threads.com", "Threads")]
+
+
+def platform_of(url):
+    host = re.sub(r"^https?://", "", (url or "").strip().lower()).split("/")[0]
+    host = host[4:] if host.startswith("www.") else host
+    host = host[2:] if host.startswith("m.") else host
+    for h, name in PLATFORM_HOSTS:
+        if host == h or host.endswith("." + h):
+            return name
+    return None
+
+
+def profile_handle(url):
+    """The username in a profile link, lower case — snapchat.com/add/x,
+    tiktok.com/@x, youtube.com/@x and instagram.com/x/?igsh=… all give "x"."""
+    text = (url or "").strip().split("?")[0].split("#")[0].rstrip("/")
+    parts = [p for p in re.sub(r"^https?://[^/]+", "", text).split("/") if p]
+    if parts and parts[0].lower() in ("add", "c", "user", "channel") and len(parts) > 1:
+        parts = parts[1:]
+    return parts[0].lstrip("@").lower() if parts else ""
+
+
+def resolve_creators(entries, campaign_name=""):
+    """Codes, profile links or @handles -> roster codes, for adding creators
+    to a campaign.
+
+    A link already on the roster is that creator. A link whose handle the
+    roster has on ANOTHER platform is taken to be the same person, and the
+    link is added to their profile. Anything else becomes a new creator,
+    hidden from clients until their details are filled in.
+    Returns (codes, notes) — notes says what happened, one line each.
+    """
+    codes, notes = [], []
+    with connect() as conn:
+        rows = conn.execute("SELECT * FROM creators").fetchall()
+        exact, by_handle = {}, {}
+        for r in rows:
+            for pr in split_profiles(r["profiles"]):
+                h = profile_handle(pr.get("url"))
+                if h:
+                    exact.setdefault((pr["platform"], h), r["code"])
+                    by_handle.setdefault(h, r["code"])
+            if r["handle"]:
+                by_handle.setdefault(r["handle"].lower().lstrip("@"), r["code"])
+        known = {r["code"] for r in rows}
+        for raw in entries:
+            item = raw.strip().strip(",;")
+            if not item:
+                continue
+            if item.upper() in known:
+                codes.append(item.upper()); continue
+            if re.match(r"^HV-[A-Z0-9]+-\d+$", item.upper()):
+                notes.append(item.upper() + " is not on the roster"); continue
+            url = item if re.match(r"^https?://", item, re.I) else (
+                "https://" + item if "." in item.split("/")[0] and "/" in item else "")
+            platform = platform_of(url) if url else None
+            handle = profile_handle(url) if url else item.lstrip("@").lower()
+            if not handle:
+                notes.append("Could not read a profile from: " + item); continue
+            code = exact.get((platform, handle)) if platform else by_handle.get(handle)
+            if code:
+                codes.append(code); continue
+            code = by_handle.get(handle)
+            if code and platform:
+                cur = creator(code, conn)
+                listed = split_profiles(cur["profiles"])
+                listed.append({"platform": platform, "url": url.split("?")[0], "followers": None})
+                row = {k: cur[k] for k in cur.keys()}
+                row["profiles"] = join_profiles(listed)
+                row["platform"] = join_cities([x["platform"] for x in split_profiles(row["profiles"])])
+                upsert_creator(row, conn)
+                exact[(platform, handle)] = code
+                codes.append(code)
+                notes.append("%s: added their %s link to %s" % (code, platform, cur["name"]))
+                continue
+            if not platform:
+                notes.append("@%s is not on the roster — paste their profile link to add them" % handle)
+                continue
+            code = next_code("Nano", conn=conn)
+            clean = url.split("?")[0]
+            upsert_creator({
+                "code": code, "name": handle, "handle": handle, "platform": platform,
+                "profiles": join_profiles([{"platform": platform, "url": clean, "followers": None}]),
+                "followers": None, "city": None, "nationality": None, "tier": "Nano",
+                "interest": None, "photo": None, "active": 0, "sort": 0,
+                "note": "Added from campaign %s on %s. Hidden from clients until the name, "
+                        "followers, tier and city are filled in." % (
+                            campaign_name or "setup", time.strftime("%Y-%m-%d")),
+            }, conn)
+            exact[(platform, handle)] = by_handle[handle] = code
+            known.add(code)
+            codes.append(code)
+            notes.append("%s: new on the roster (%s @%s) — hidden from clients until you "
+                         "complete their details" % (code, platform, handle))
+    seen, out = set(), []
+    for c in codes:
+        if c not in seen:
+            seen.add(c); out.append(c)
+    return out, notes
+
+
 def as_count(value):
     """A follower count from whatever the form or the sheet supplied."""
     if value is None or value == "":
@@ -1828,7 +1934,12 @@ PHASES = DEFAULT_STEPS + [("done", "Completed")]
 
 def campaign_steps(campaign):
     """[{key, label, on, start, end, state}] — the campaign's own steps, the
-    defaults filled in for any it has never saved."""
+    defaults filled in for any it has never saved, in DATE order.
+
+    The timeline is read as a calendar, so a step that starts earlier comes
+    first whatever its place in the default list. A step with no dates keeps
+    its place after the step before it, so leaving dates out does not throw
+    it to one end."""
     try:
         saved = json.loads(campaign["steps"] or "[]") if "steps" in campaign.keys() else []
     except ValueError:
@@ -1840,7 +1951,19 @@ def campaign_steps(campaign):
         out.append({"key": key, "label": x.get("label") or label, "on": x.get("on", True),
                     "start": x.get("start"), "end": x.get("end"),
                     "state": x.get("state") if x.get("state") in STEP_STATES else "pending"})
-    return out
+    return by_date(out)
+
+
+def by_date(steps):
+    keyed, last = [], ""
+    for i, x in enumerate(steps):
+        when = x.get("start") or x.get("end") or ""
+        if when:
+            last = when
+        # Undated: rides with the previous dated step, just after it.
+        keyed.append(((when or last), 0 if when else 1, i, x))
+    keyed.sort(key=lambda t: (t[0], t[1], t[2]))
+    return [t[3] for t in keyed]
 TARGET_KEYS = ["posts", "views", "reach", "engagement", "er", "clicks"]
 
 

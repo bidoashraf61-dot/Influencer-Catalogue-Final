@@ -2254,8 +2254,12 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         + step(3, "Creators &amp; posts planned",
                "<table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Accounts tracked</th>"
                "<th>Posts planned</th><th>Fee to us (SAR)</th><th></th></tr></thead><tbody>" + table + "</tbody></table>"
-               "<div class='row' style='margin-top:14px'><div style='flex:2'><label>Add creators by code</label>"
-               "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div>"
+               "<div class='row' style='margin-top:14px'><div style='flex:2'><label>Add creators by profile link or code</label>"
+               "<textarea name='add' rows='3' placeholder='https://www.instagram.com/handle/\nhttps://www.tiktok.com/@handle\nHV-MC-005'></textarea>"
+               "<div class='price-hint'>One per line, or separated by commas — Instagram, TikTok, Snapchat, "
+               "YouTube or X links, @handles, or roster codes. Each is matched to the roster. A profile the "
+               "roster has under another platform is added to that creator; one it does not have at all "
+               "is added as a new creator, hidden from clients until you complete their details.</div></div>"
                "<div><label>Platform tracked</label><select name='platform'>" + plat_opts + "</select></div></div>",
                "Posts planned is what each creator is booked for; the report counts delivered against it. Fees stay internal.")
         + step(4, "What counts as a campaign post",
