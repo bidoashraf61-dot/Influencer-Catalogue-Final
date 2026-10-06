@@ -376,12 +376,15 @@ def _avg_grade(grades):
 
 
 # What the leaderboard rewards, chosen per campaign: (reach+views, engagement,
-# engagement rate vs tier benchmark, affiliate clicks). Each row sums to 1.
+# engagement rate, affiliate clicks). Each row sums to 1. The rate weight is 0:
+# the score is the RESULTS a creator delivered for the campaign, each as a share
+# of the best creator's result, so a creator with a handful of views cannot rank
+# high on a ratio.
 OBJECTIVES = {
-    "balanced": ("Balanced", (0.35, 0.25, 0.25, 0.15)),
-    "awareness": ("Awareness", (0.55, 0.15, 0.20, 0.10)),
-    "engagement": ("Engagement", (0.15, 0.40, 0.35, 0.10)),
-    "traffic": ("Traffic / sales", (0.15, 0.15, 0.20, 0.50)),
+    "balanced": ("Balanced", (0.45, 0.35, 0.0, 0.20)),
+    "awareness": ("Awareness", (0.70, 0.20, 0.0, 0.10)),
+    "engagement": ("Engagement", (0.20, 0.70, 0.0, 0.10)),
+    "traffic": ("Traffic / sales", (0.20, 0.20, 0.0, 0.60)),
 }
 
 

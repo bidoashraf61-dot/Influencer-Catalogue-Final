@@ -3397,10 +3397,9 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
               "adjusted for the product category. <strong>Clicks</strong> = views × click-through, only with tracked links.</p>"
               "<p><strong>Value floor</strong> = budget ÷ the most a client should pay per 1,000 views, per engagement or per click. "
               "<strong>Target</strong> = the lower of the floor and the safe estimate.</p>"
-              "<p><strong>Creator score</strong> on the report (0–100), weighted by the objective — awareness: exposure 55, "
-              "engagement 15, engagement rate 20, clicks 10 · engagement: 15 / 40 / 35 / 10 · traffic: 15 / 15 / 20 / 50 · "
-              "balanced: 35 / 25 / 25 / 15. Exposure and engagement are against the best creator in the campaign; "
-              "the rate (reactions per view) the same way. Nothing is compared with followers or outside benchmarks.</p></div>"
+              "<p><strong>Creator score</strong> on the report (0–100) rewards the results each creator delivered, as a share of the best creator's result: "
+              "awareness: views &amp; reach 70, engagement 20, clicks 10 · engagement: 20 / 70 / 10 · traffic: 20 / 20 / 60 · balanced: 45 / 35 / 20. "
+              "With no tracking links the clicks part is dropped and the others scale up to 100. Nothing is compared with followers or outside benchmarks.</p></div>"
             + "<details id='library' style='margin-top:20px'><summary><strong>Benchmark library</strong> — edit the guide ranges</summary>"
               "<form method='post' action='" + u("/planner/library") + "' class='card' style='margin-top:10px'>"
               + ("<input type='hidden' name='back' value='" + str(k["id"]) + "'>" if k else "")

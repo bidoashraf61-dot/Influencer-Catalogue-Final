@@ -436,8 +436,8 @@
   function scoreTip() {
     var w = weights(), o = (R.objective || {}).label || "Balanced";
     return "Score out of 100, weighted for the " + o + " objective: views & reach " + Math.round(w.exposure * 100) + ", engagement " + Math.round(w.engagement * 100)
-      + ", engagement rate (reactions per view, against the best creator) " + Math.round(w.er * 100) + (w.clicks > 0 ? ", link clicks " + Math.round(w.clicks * 100) : "")
-      + ". Views and engagement are measured against the best creator in the campaign.";
+      + (w.er > 0 ? ", engagement rate " + Math.round(w.er * 100) : "") + (w.clicks > 0 ? ", link clicks " + Math.round(w.clicks * 100) : "")
+      + ". Each is the creator's result as a share of the best creator's: it rewards what they delivered for the campaign, not their follower count.";
   }
   function renderPosts(list) {
     var top = topPosts(list).slice(0, 3);
@@ -497,8 +497,8 @@
         + '</div><div class="db-legend2"><span><i class="sw band"></i>Normal range for creators this size</span><span><i class="dot"></i>This campaign now</span></div>';
       // Scoring as one bar: each part's share of the 100 points. Clicks only
       // when the campaign tracks links.
-      var w = weights(), parts = [["Views & reach", w.exposure, "#14884a", "vs the top creator"], ["Engagement", w.engagement, "#ff691e", "likes + comments vs the top creator"],
-        ["Engagement rate", w.er, "#b9d400", "reactions per view vs the best creator"]];
+      var w = weights(), parts = [["Views & reach", w.exposure, "#14884a", "what they delivered, vs the top creator"], ["Engagement", w.engagement, "#ff691e", "likes + comments delivered, vs the top creator"]];
+      if (w.er > 0) parts.push(["Engagement rate", w.er, "#b9d400", "reactions per view vs the best creator"]);
       if (w.clicks > 0) parts.push(["Link clicks", w.clicks, "#121212", "vs the top creator"]);
       out += '<h3>How creators are scored · out of 100</h3><div class="db-scorebar">' + parts.map(function (x) {
         return '<i style="flex:' + x[1] + ";background:" + x[2] + '"><b>' + Math.round(x[1] * 100) + "</b></i>"; }).join("") + '</div><div class="db-scorekey">'
@@ -530,8 +530,8 @@
           return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
             + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
         + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(scoreTip()) + "</p>"
-        + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views &amp; reach</th><th>Engagement</th><th>Eng. rate</th>' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
-          + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td><td>" + q.er.toFixed(0) + "</td>" + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + c.score.toFixed(0) + "</b></td></tr>"; }).join("")
+        + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views &amp; reach</th><th>Engagement</th>' + (weights().er > 0 ? "<th>Eng. rate</th>" : "") + '' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
+          + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td>" + (weights().er > 0 ? "<td>" + q.er.toFixed(0) + "</td>" : "") + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + c.score.toFixed(0) + "</b></td></tr>"; }).join("")
           + "</tbody></table>");
     },
     stage: function () {

@@ -592,8 +592,8 @@
     if (info) info.setAttribute("data-info", "Scored for this campaign's objective: " + o.label + ". Each creator gets a score out of 100 — "
       + Math.round(w.exposure * 100) + "% reach and views (compared with the best in the campaign), "
       + Math.round(w.engagement * 100) + "% engagement (compared with the best), "
-      + Math.round(w.er * 100) + "% engagement rate (reactions per view, compared with the best in the campaign), and "
-      + (w.clicks > 0 ? Math.round(w.clicks * 100) + "% affiliate clicks (compared with the best)" : "no clicks — this campaign has no tracking links") + ". The top three get gold, silver and bronze; creators who have not posted yet are listed last.");
+      + (w.er > 0 ? Math.round(w.er * 100) + "% engagement rate, " : "")
+      + (w.clicks > 0 ? "and " + Math.round(w.clicks * 100) + "% affiliate clicks (compared with the best)" : "and no clicks — this campaign has no tracking links") + ". It rewards the results each creator delivered for the campaign, not their follower count. The top three get gold, silver and bronze; creators who have not posted yet are listed last.");
     var tag = $("mx-objective");
     if (tag) tag.textContent = "Scored for " + o.label;
     var ranked = cs.filter(function (c) { return c.rank; });
