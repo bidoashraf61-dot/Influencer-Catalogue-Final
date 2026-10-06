@@ -206,6 +206,9 @@
       unlocked();
       var same = R && R.campaign && R._t === t;
       R = b.report; R._t = t;
+      // No tracking links = no clicks anywhere on the report: no tab, no
+      // column, no share of the score (the server already scored without it).
+      if (R.objective && R.objective.links === false) R.visibility.clicks = false;
       FILTER = { platform: "", kind: "", section: "campaign" };
       render(t);
       show("report");
@@ -581,7 +584,7 @@
       + Math.round(w.exposure * 100) + "% reach and views (compared with the best in the campaign), "
       + Math.round(w.engagement * 100) + "% engagement (compared with the best), "
       + Math.round(w.er * 100) + "% engagement rate against the benchmark for creators of their size, and "
-      + Math.round(w.clicks * 100) + "% affiliate clicks (compared with the best). The top three get gold, silver and bronze; creators who have not posted yet are listed last.");
+      + (w.clicks > 0 ? Math.round(w.clicks * 100) + "% affiliate clicks (compared with the best)" : "no clicks — this campaign has no tracking links") + ". The top three get gold, silver and bronze; creators who have not posted yet are listed last.");
     var tag = $("mx-objective");
     if (tag) tag.textContent = "Scored for " + o.label;
     var ranked = cs.filter(function (c) { return c.rank; });
