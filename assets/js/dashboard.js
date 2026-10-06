@@ -235,12 +235,13 @@
       ["Reach", num(t.reach) + (isAdj("reach") ? est("reach") : reachEst() ? '<small class="db-est" title="Instagram does not show reach on reels publicly. Placeholder at ' + Math.round(((R.reach_basis && R.reach_basis.per_view) || 0.9) * 100) + '% of views (a small margin below) until the creators\' insights arrive.">est.</small>' : ""), goal("reach"), spark(s.map(function (x) { return x.reach; }), COL[3]), IC.reach, "trend"],
       ["Engagement", num(t.engagement) + est("engagement"), goal("engagement"), spark(s.map(function (x) { return x.eng; }), COL[1]), IC.engagement, "trend"],
       ["Avg eng. rate", pct(t.er) + est("er"), !filtered() ? (g.er ? goal("er") : sig(R.total.er_grade)) : "", "", IC.er, "kpi"],
-      ["Link clicks", cl ? num(cl.clicks) + est("clicks") : '<span class="db-na">Not tracked</span>', cl && !filtered() ? (g.clicks ? goal("clicks") : sig(R.total.ctr_grade)) : '<span class="db-na__why">No tracking links in this campaign</span>', "", IC.clicks, "clicks"]
+      ["Link clicks", cl ? num(cl.clicks) + est("clicks") : '<span class="db-na">Not tracked</span>', cl && !filtered() ? (g.clicks ? goal("clicks") : sig(R.total.ctr_grade)) : '<span class="db-na__why">This campaign does not contain affiliate links</span>', "", IC.clicks, "clicks"]
     ];
     // Sections the admin switched off are left out, not shown empty.
     var V = R.visibility || {};
-    // No tracking links = no clicks anywhere: not a KPI, not a card, not scored.
-    var noClicks = V.clicks === false || !(R.objective || {}).links;
+    // The clicks slot stays where it is even for a campaign with no tracking
+    // links — it then says so. Only a section the admin switched off goes.
+    var noClicks = V.clicks === false;
     cards = cards.filter(function (k) { return !(k[0] === "Reach" && V.reach === false) && !(k[0] === "Link clicks" && noClicks); });
     $("w-kpis").style.setProperty("--kpis", cards.length);
     $("db-grid").classList.toggle("no-clicks", noClicks);
@@ -428,7 +429,7 @@
         + '<div style="margin-top:8px">' + bars((cl.by_app || []).slice(0, 3).map(function (r) { return { k: r.k, n: r.n, label: full(r.n) }; }), function (r) { return (ICONS[r.k] || "") + esc(r.k); }) + "</div>"
         + (cl.partial || F.platform ? '<p class="db-note">' + (F.platform ? "Clicks are per creator link, not per platform — showing all platforms." : "Apps show the whole campaign.") + "</p>" : "")
         : '<div class="db-na-card"><span class="db-na-card__icon">' + IC.clicks + '</span><span class="db-na">Not part of this campaign</span>'
-          + "<p>This campaign is about views and reach, so creators were not given tracking links. Ask us to add them for a sales or traffic campaign.</p></div>") + "</div>";
+          + "<p>This campaign does not contain affiliate links, so there are no clicks to show.</p></div>") + "</div>";
   }
 
   // People who saw a post: views for a video, reach for a photo or story.
@@ -582,7 +583,7 @@
         + Object.keys(by).map(function (k) { var x = by[k]; return "<tr><td>" + (ICONS[k] || "") + " " + esc(k) + "</td><td></td><td>" + x.posts + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng) + "</td></tr>"; }).join("") + "</tbody></table>";
     },
     clicks: function () {
-      var cl = clicksFor(); if (!cl) return '<div class="db-na-card"><span class="db-na-card__icon">' + IC.clicks + '</span><span class="db-na">Not part of this campaign</span><p>No tracking links were set up for this campaign, so there are no clicks to count.</p></div>';
+      var cl = clicksFor(); if (!cl) return '<div class="db-na-card"><span class="db-na-card__icon">' + IC.clicks + '</span><span class="db-na">Not part of this campaign</span><p>This campaign does not contain affiliate links, so there are no clicks to count.</p></div>';
       var L = function (rows) { return (rows || []).map(function (r) { return { k: r.k, n: r.n, label: full(r.n) }; }); };
       return '<div class="db-big">' + full(cl.clicks) + " <small>clicks" + (cl.uniques != null ? " · " + full(cl.uniques) + " unique people" : "") + "</small></div>"
         + "<h3>By creator</h3>" + bars(L(cl.by_creator), function (r) { return esc(r.k); })
