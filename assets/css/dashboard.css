@@ -488,3 +488,6 @@
 
 .db-top .db-rank { min-height: 32px; }
 .db-top__how { margin-bottom: 2px; }
+/* each creator's points as an underline along the row: as wide as their score, coloured by where the points came from */
+.db-top .db-rank { position: relative; }
+.db-top .db-rank .db-split { position: absolute; left: 0; bottom: 0; height: 3px; margin: 0; border-radius: 0 2px 2px 0; }
