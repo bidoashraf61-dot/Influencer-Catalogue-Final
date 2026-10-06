@@ -52,8 +52,9 @@ cp "$SRC/dist/index.html"           "$DST/index.html"
 cp "$SRC/dist/selection/index.html" "$DST/selection/index.html"
 # The campaign report is hand-written in the repo, not built.
 # The campaign report and the creator passport are hand-written, not built.
-mkdir -p "$DST/campaign" "$DST/creator"
+mkdir -p "$DST/campaign/dashboard" "$DST/creator"
 cp "$SRC/campaign/index.html"       "$DST/campaign/index.html"
+cp "$SRC/campaign/dashboard/index.html" "$DST/campaign/dashboard/index.html"
 cp "$SRC/creator/index.html"        "$DST/creator/index.html"
 
 # Stamp a ?v=<hash> onto the js/css URLs. The source templates carry one but
@@ -67,13 +68,15 @@ import hashlib, re, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
 names = ('js/catalogue.js', 'css/catalogue.css', 'js/campaign.js', 'css/campaign.css',
-         'js/creator.js', 'css/creator.css', 'js/hv-icons.js')
+         'js/creator.js', 'css/creator.css', 'js/hv-icons.js',
+         'js/dashboard.js', 'css/dashboard.css')
 stamp = {n: h('assets/' + n) for n in names}
-for page in ('index.html', 'selection/index.html', 'campaign/index.html', 'creator/index.html'):
+for page in ('index.html', 'selection/index.html', 'campaign/index.html',
+             'campaign/dashboard/index.html', 'creator/index.html'):
     f = root / page
     s = f.read_text()
     for n, v in stamp.items():
-        s = re.sub(r'((?:\.\./)?assets/' + re.escape(n) + r')(\?v=[0-9a-z]+)?', r'\1?v=' + v, s)
+        s = re.sub(r'((?:\.\./)*assets/' + re.escape(n) + r')(\?v=[0-9a-z]+)?', r'\1?v=' + v, s)
     f.write_text(s)
 print("stamped " + " ".join("%s=%s" % (n.split('/')[-1], v) for n, v in stamp.items()))
 PYSTAMP
