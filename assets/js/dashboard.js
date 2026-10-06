@@ -326,11 +326,14 @@
   }
 
   function renderStage() {
-    var c = R.campaign, steps = c.steps || [], now = steps.filter(function (s) { return s.state === "active"; })[0];
+    // Steps can overlap (shooting goes on while publishing): the latest one
+    // under way leads, the others are named under it.
+    var c = R.campaign, steps = c.steps || [], act = steps.filter(function (s) { return s.state === "active"; }), now = act[act.length - 1];
+    var also = act.slice(0, -1).map(function (s) { return s.label; });
     var done = steps.filter(function (s) { return s.state === "done"; }).length;
     $("w-stage").innerHTML = head(IC.stage, "Campaign stage", "Where the work is in the scope of work, updated by HelloVoice.", "stage")
       + '<div class="db-card__body"><div class="db-stage__now">' + esc(now ? now.label : (done === steps.length && steps.length ? "Completed" : "Not started")) + "</div>"
-      + '<div class="db-stage__dates">' + (now && now.start ? day(now.start) + " – " + day(now.end, true) : "") + "</div>"
+      + '<div class="db-stage__dates">' + (now && now.start ? day(now.start) + " – " + day(now.end, true) : "") + (also.length ? " · " + esc(also.join(", ")) + " also in progress" : "") + "</div>"
       + '<div class="db-steps">' + steps.map(function (s) { return '<i class="' + s.state + '" title="' + esc(s.label) + '"></i>'; }).join("") + "</div>"
       + (now && now.key === "publishing" && R.total.planned ? '<div class="db-stage__pub"><b>' + R.total.delivered + "</b> of " + R.total.planned + " videos published<i style=\"--w:" + Math.min(100, R.total.delivered / R.total.planned * 100).toFixed(1) + '%"></i></div>' : "")
       + '<div class="db-stage__meta"><span>' + done + " of " + steps.length + " steps done</span><span>" + (c.ends_at ? "Ends " + day(c.ends_at) : "") + "</span></div>"

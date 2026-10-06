@@ -351,7 +351,7 @@
 .db-pring__logo { position: absolute; inset: 0; display: grid; place-items: center; }
 .db-pring__logo svg { width: 38%; height: 38%; }
 .db-pring__key { flex: 1; display: grid; gap: 10px; }
-.db-pring__row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 8px; font-size: 13px; }
+.db-pring__row { display: grid; grid-template-columns: 1fr; gap: 2px; font-size: 13px; }
 .db-pring__name { display: flex; align-items: center; gap: 6px; font-weight: 600; }
 .db-pring__name i { width: 8px; height: 8px; border-radius: 50%; flex: none; }
 .db-pring__name svg { width: 14px; height: 14px; }
