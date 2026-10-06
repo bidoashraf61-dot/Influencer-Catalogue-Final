@@ -291,17 +291,17 @@
     if (a.avg_likes != null) all.push({ label: "Average likes", v: a.avg_likes, text: num(a.avg_likes) });
     else if (a.likes_hidden) all.push({ label: "Average likes", v: 0, text: "Hidden" });
     if (a.avg_comments != null) all.push({ label: "Average comments", v: a.avg_comments, text: num(a.avg_comments) });
-    list.push({ label: "All content", html: erBlock(a.er, a.er_note, "Engagement rate") + rows(all) });
+    list.push({ label: "All content", html: erBlock(a.er, a.er_note, "Engagement rate") + rows(all, "#5b4bd6") });
     var reels = [];
     if (a.avg_reel_plays != null) reels.push({ label: "Average reel plays", v: a.avg_reel_plays, text: num(a.avg_reel_plays) });
     if (a.avg_reel_likes != null) reels.push({ label: "Average likes", v: a.avg_reel_likes, text: num(a.avg_reel_likes) });
     if (a.avg_reel_comments != null) reels.push({ label: "Average comments", v: a.avg_reel_comments, text: num(a.avg_reel_comments) });
     if (a.avg_reel_shares != null) reels.push({ label: "Average shares", v: a.avg_reel_shares, text: num(a.avg_reel_shares) });
-    if (reels.length || a.reels_er != null) list.push({ label: "Reels", html: (a.reels_er != null ? erBlock(a.reels_er, a.reels_er_note, "Engagement rate") : "") + rows(reels) });
+    if (reels.length || a.reels_er != null) list.push({ label: "Reels", html: (a.reels_er != null ? erBlock(a.reels_er, a.reels_er_note, "Engagement rate") : "") + rows(reels, "#ff691e") });
     var st = [];
     if (a.story_reach != null) st.push({ label: "Estimated reach", v: a.story_reach, text: num(a.story_reach) });
     if (a.story_impressions != null) st.push({ label: "Estimated impressions", v: a.story_impressions, text: num(a.story_impressions) });
-    if (st.length) list.push({ label: "Stories", html: rows(st) });
+    if (st.length) list.push({ label: "Stories", html: rows(st, "#14884a") });
     tabs("pp-perf-tabs", "pp-perf", list, function (t) { return '<div class="pp-perf">' + t.html + "</div>"; });
   }
   function collab() {
