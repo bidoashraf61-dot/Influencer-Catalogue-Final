@@ -47,7 +47,7 @@ ISO = {"Egypt": "EG", "France": "FR", "Germany": "DE", "Indonesia": "ID", "Iran"
        "Jordan": "JO", "Oman": "OM", "Bahrain": "BH", "Morocco": "MA", "Algeria": "DZ", "Tunisia": "TN",
        "Libya": "LY", "Sudan": "SD", "Syria": "SY", "Palestine": "PS", "Brazil": "BR", "India": "IN",
        "Spain": "ES", "Portugal": "PT", "Mexico": "MX", "Argentina": "AR", "Canada": "CA",
-       "Russia": "RU", "Yemen": "YE", "Palestinian Territories": "PS", "Australia": "AU", "Ireland": "IE", "New Zealand": "NZ", "Dominican Republic": "DO", "Switzerland": "CH", "Pakistan": "PK", "Nigeria": "NG", "Colombia": "CO"}
+       "Russia": "RU", "Malaysia": "MY", "Singapore": "SG", "Philippines": "PH", "Bangladesh": "BD", "Afghanistan": "AF", "Somalia": "SO", "Ethiopia": "ET", "Kenya": "KE", "South Africa": "ZA", "Netherlands": "NL", "Belgium": "BE", "Sweden": "SE", "Norway": "NO", "Denmark": "DK", "Austria": "AT", "Poland": "PL", "Greece": "GR", "Japan": "JP", "South Korea": "KR", "China": "CN", "Thailand": "TH", "Vietnam": "VN", "Chile": "CL", "Peru": "PE", "Venezuela": "VE", "Ecuador": "EC", "Uruguay": "UY", "Paraguay": "PY", "Bolivia": "BO", "Ukraine": "UA", "Azerbaijan": "AZ", "Kazakhstan": "KZ", "Uzbekistan": "UZ", "Mauritania": "MR", "Senegal": "SN", "Ghana": "GH", "Cyprus": "CY", "Romania": "RO", "Hungary": "HU", "Czechia": "CZ", "Finland": "FI", "Puerto Rico": "PR", "Costa Rica": "CR", "Guatemala": "GT", "Panama": "PA", "Honduras": "HN", "El Salvador": "SV", "Nicaragua": "NI", "Cuba": "CU", "Haiti": "HT", "Jamaica": "JM", "Angola": "AO", "Cameroon": "CM", "Ivory Coast": "CI", "Côte d'Ivoire": "CI", "Sri Lanka": "LK", "Nepal": "NP", "Taiwan": "TW", "Hong Kong": "HK", "Yemen": "YE", "Palestinian Territories": "PS", "Australia": "AU", "Ireland": "IE", "New Zealand": "NZ", "Dominican Republic": "DO", "Switzerland": "CH", "Pakistan": "PK", "Nigeria": "NG", "Colombia": "CO"}
 REACH = {"<500 accounts": "<500", "500-1k accounts": "500-1000",
          "1k-1.5k accounts": "1000-1500", ">1.5k accounts": ">1500"}
 
@@ -219,7 +219,9 @@ def parse(path, handle):
                 if sec == "gender":
                     d.setdefault("gender", {})[lab.lower()] = p
                 elif sec == "countries":
-                    if lab not in ISO: raise SystemExit("unknown country " + lab)
+                    if lab not in ISO:
+                        print("  ! %s: country %r has no code here — left out; add it to ISO" % (handle, lab))
+                        continue
                     d.setdefault("countries", []).append({"code": ISO[lab], "pct": p})
                 else:
                     if sec == "interests": lab = lab[0].upper() + lab[1:]
