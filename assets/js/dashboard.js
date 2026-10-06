@@ -249,8 +249,6 @@
     var G = R.gaps || {}, bits = [], el = $("db-gaps");
     if (!el) { el = document.createElement("p"); el.id = "db-gaps"; el.className = "db-gaps"; $("db-fresh").parentNode.appendChild(el); }
     if (G.likes_hidden) bits.push("Likes hidden by the creator on " + G.likes_hidden + " of " + G.posts + " posts — engagement there counts comments only");
-    if (G.reach_estimated) bits.push("reach on " + (G.reach_estimated === G.posts ? "all" : G.reach_estimated) + " posts is estimated until insights arrive");
-    if (G.no_shares && G.no_shares === G.posts) bits.push("shares and saves are not public on Instagram");
     el.hidden = !bits.length;
     el.innerHTML = bits.length ? '<span class="db-gaps__i" aria-hidden="true">i</span>Data note: ' + esc(bits.join(" · ")) + '. <button type="button" class="db-gaps__more" data-area="kpi">Details</button>' : "";
   }
@@ -471,10 +469,12 @@
         return '<div><b>' + Math.round(x[1] * 100) + "</b><span>" + x[0] + "</span><small>" + x[2] + "</small></div>"; }).join("") + "</div>"
         + '<p class="db-note">Weights follow the ' + esc(o.label || "Balanced") + " objective; the score is out of 100.</p>";
       var G = R.gaps || {};
-      if (G.likes_hidden || G.reach_estimated) out += "<h3>About the data</h3><ul class=\"db-gaplist\">"
+      // Reach estimates and missing shares/saves are internal notes (admin
+      // Content tab), not the client's concern; hidden likes change the
+      // numbers they read, so they are said here.
+      if (G.likes_hidden) out += "<h3>About the data</h3><ul class=\"db-gaplist\">"
         + (G.likes_hidden ? "<li><b>Likes hidden on " + G.likes_hidden + " posts</b> — the creator switched the like count off. Engagement for those posts counts comments only and they are left out of the engagement rate: " + (G.hidden || []).map(function (h) { return '<a href="' + esc(h.url) + '" target="_blank" rel="noopener">' + esc(h.creator) + "</a>"; }).join(", ") + ".</li>" : "")
-        + (G.reach_estimated ? "<li><b>Reach is estimated on " + G.reach_estimated + " posts</b> — Instagram shows plays, not unique people, on reels. Real reach replaces the estimate when the creator's insights arrive.</li>" : "")
-        + (G.no_shares ? "<li><b>Shares and saves</b> are not public; they come from insights.</li>" : "") + "</ul>";
+        + "</ul>";
       return out;
     },
     trend: function () {
