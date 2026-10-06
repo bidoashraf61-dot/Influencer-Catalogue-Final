@@ -2035,6 +2035,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
             + "<div class='profit'></div></td>"
             + "<td><input name='p_from' value='" + val(0) + "' placeholder='from' inputmode='numeric'></td>"
             + "<td><input name='p_to' value='" + val(1) + "' placeholder='to' inputmode='numeric'></td>"
+            + "<td><label class='tick' title='Also save this price as the creator&#39;s price on the roster, so every later selection starts from it'>"
+              "<input type='checkbox' name='default' value='" + e(code) + "'> make default</label>"
+            + ("<div class='muted' style='font-size:12px'>roster now: " + money_c(c["price_from"], c["price_to"] or c["price_from"]) + "</div>"
+               if ("price_from" in c.keys() and c["price_from"]) else "<div class='muted' style='font-size:12px'>roster: tier price</div>") + "</td>"
             + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code) + "'> remove</label></td></tr>")
     table = "".join(rows) or "<tr><td colspan='8' class='muted'>No creators yet — add some below.</td></tr>"
     missing = [c for c in codes if c not in by]
@@ -2087,7 +2091,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
           "</div></div>"
         + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
-          "<th>Standard price</th><th>Cost to us (SAR)</th><th>Price for this client (" + cur + ")</th><th></th><th></th>"
+          "<th>Standard price</th><th>Cost to us (SAR)</th><th>Price for this client (" + cur + ")</th><th></th><th>Creator's default</th><th></th>"
           "</tr></thead><tbody>"
         + table + "</tbody></table>"
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
@@ -2095,7 +2099,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "margin above. With no cost, type the price yourself, or leave it empty to use the "
           "creator's standard price. One figure = a fixed price. The client never sees a price "
           "against a creator — these add up to the total they see, unless you type a total above. "
-          "A price set here becomes that creator's price on the roster as well, and a cost is "
+          "A price typed here stays in <b>this selection only</b>. Tick <b>make default</b> to also save it "
+          "as that creator's price on the roster, so every later selection starts from it. A cost is "
           "remembered for their next selection.</p>"
         + "<div class='row'><div style='flex:2'><label>Add creators (optional)</label>"
           "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div></div>"

@@ -1351,11 +1351,12 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/selections/edit?id=%d" % sid)
 
     def post_selection_save(self):
-        f = self.form_body(multi=("code", "p_from", "p_to", "cost", "drop"))
+        f = self.form_body(multi=("code", "p_from", "p_to", "cost", "drop", "default"))
         sid = (f.get("id") or "").strip()
         sel = db.selection(int(sid)) if sid.isdigit() else None
         if sel is None:
             return self.redirect("/selections")
+        make_default = {c.strip().upper() for c in (f.get("default") or [])}
 
         def num(v):
             v = "".join(ch for ch in (v or "") if ch.isdigit())
@@ -1411,21 +1412,28 @@ class Handler(BaseHTTPRequestHandler):
         db.set_selection_currency(sel["id"], cur)
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs)
-        # A price agreed here is that creator's rate, so it becomes their price
-        # on the roster too — one figure for the creator rather than a private
-        # one per selection that the roster then contradicts.
+        # A price typed here belongs to THIS selection. Only the ones ticked
+        # "make default" also become the creator's price on the roster, so a
+        # one-off deal does not silently change what every later selection
+        # starts from. Each roster change is its own entry in History.
         with db.connect() as conn:
             db.set_costs(costs, conn)
-            for code, band in prices.items():
-                cur = db.creator(code, conn)
-                if cur is None:
-                    continue
-                if (cur["price_from"], cur["price_to"]) == (band[0], band[1]):
-                    continue
-                row = {k: cur[k] for k in cur.keys()}
-                row["price_from"], row["price_to"] = band[0], band[1]
-                db.upsert_creator(row, conn)
-        return self.redirect("/selections/edit?id=%d&ok=%s" % (sel["id"], urllib.parse.quote("Saved.")))
+        saved_default = []
+        for code in sorted(make_default):
+            band = prices.get(code)
+            if not band:
+                continue
+            c0 = db.creator(code)
+            if c0 is None or (c0["price_from"], c0["price_to"]) == (band[0], band[1]):
+                continue
+            with history.tracked("creator", code, "Price set as default from selection: " + name):
+                with db.connect() as conn:
+                    row = {k: c0[k] for k in c0.keys()}
+                    row["price_from"], row["price_to"] = band[0], band[1]
+                    db.upsert_creator(row, conn)
+            saved_default.append(code)
+        msg = "Saved." + ((" Default price updated for " + ", ".join(saved_default) + ".") if saved_default else "")
+        return self.redirect("/selections/edit?id=%d&ok=%s" % (sel["id"], urllib.parse.quote(msg)))
 
     def post_selection_delete(self):
         sid = (self.form_body().get("id") or "").strip()
