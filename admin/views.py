@@ -2204,6 +2204,7 @@ MARGIN_JS = """<script>
         '<div><dt>Margin on cost</dt><dd class="gain">'+(same?(Math.round(ml*10)/10)+'%':(Math.round(ml*10)/10)+'% – '+(Math.round(mh*10)/10)+'%')+'</dd></div>':'')):
       '<div><dt>Profit</dt><dd class="muted" style="font-size:14px;font-weight:400">'+
       'Type a cost and a price against a creator to see it.</dd></div>';
+    rows.forEach(function(r){var a=r.querySelector('input[name=p_from]'), z=r.querySelector('input[name=p_to]'); a.dataset.prev=a.value; z.dataset.prev=z.value;});
     // The total the client sees follows the prices, unless typed by hand.
     if(tf&&tt&&counted){
       if(!totalsSet){                                  // first run: a stored total that differs from the sum was typed
@@ -2220,9 +2221,11 @@ MARGIN_JS = """<script>
     if(t===m||t===mx||t.name==='cost'){ if(t===m||t===mx) detectManual0(); run(); }
     else if(t.name==='p_from'||t.name==='p_to'){
       var r=t.closest('tr'), cost=n(r.querySelector('input[name=cost]').value), pl=r.querySelector('input[name=p_from]'), ph=r.querySelector('input[name=p_to]');
-      // One price typed = a fixed price: the other box was only auto-filled, so it follows.
-      if(t===pl&&ph.dataset.auto) ph.value=t.value;
-      if(t===ph&&pl.dataset.auto) pl.value=t.value;
+      // When the two boxes held ONE price, typing in one makes a fixed price (the other follows).
+      // When they held a range, typing in one box changes only that end.
+      var single=(pl.dataset.prev!==undefined&&pl.dataset.prev===ph.dataset.prev);
+      if(single&&t===pl&&ph.dataset.auto) ph.value=t.value;
+      if(single&&t===ph&&pl.dataset.auto) pl.value=t.value;
       delete pl.dataset.auto; delete ph.dataset.auto;
       if(t.value==='') delete r.dataset.manual; else if(cost!==null) r.dataset.manual='1';
       run();
