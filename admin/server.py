@@ -35,6 +35,7 @@ analytics are only meaningful because the check happens server-side.
 import argparse
 import html
 import json
+import math
 import re
 import sys
 import time
@@ -1386,18 +1387,23 @@ class Handler(BaseHTTPRequestHandler):
             # A cost sets the price to cost plus the margin — unless the admin
             # typed a different price for that creator, which is kept as their
             # own (the page then shows the profit and margin it leaves).
+            # Costs and prices are typed in the selection's currency, and the
+            # price is rounded in it too (10 SAR, 10 AED, 5 USD, 50 EGP);
+            # they are stored in SAR underneath.
             cost = num(cost)
             if cost is not None:
-                costs[code] = cost
-                auto = db.client_price(cost, margin)
-                tlo, thi = fx.to_sar(num(lo), cur), fx.to_sar(num(hi), cur)
-                typed = tlo if tlo is not None else thi
-                step_sar = {"USD": 5, "EGP": 50}.get(cur, 10) / float(fx.rates().get(cur, 1.0))
-                if typed is not None and abs(typed - auto) > max(10, step_sar):
-                    a, b = (tlo if tlo is not None else thi), (thi if thi is not None else tlo)
-                    prices[code] = sorted([a, b])
+                rate = float(fx.rates().get(cur, 1.0))
+                step_c = {"USD": 5, "EGP": 50}.get(cur, 10)
+                costs[code] = cost if cur == "SAR" else round(cost / rate, 2)
+                auto_c = int(math.ceil(cost * (1 + (margin or 0) / 100.0) / step_c) * step_c)
+                lo_c, hi_c = num(lo), num(hi)
+                typed = lo_c if lo_c is not None else hi_c
+                if typed is not None and abs(typed - auto_c) > step_c:
+                    a, b = (lo_c if lo_c is not None else hi_c), (hi_c if hi_c is not None else lo_c)
+                    prices[code] = sorted([fx.to_sar(a, cur), fx.to_sar(b, cur)])
                 else:
-                    prices[code] = [auto, auto]
+                    p = fx.to_sar(auto_c, cur)
+                    prices[code] = [p, p]
                 continue
             # Typed in the selection's currency, kept in SAR.
             lo, hi = fx.to_sar(num(lo), cur), fx.to_sar(num(hi), cur)
@@ -1425,7 +1431,7 @@ class Handler(BaseHTTPRequestHandler):
         # one-off deal does not silently change what every later selection
         # starts from. Each roster change is its own entry in History.
         with db.connect() as conn:
-            db.set_costs(costs, conn)
+            db.set_costs({k: int(round(v)) for k, v in costs.items()}, conn)
         saved_default = []
         for code in sorted(make_default):
             band = prices.get(code)

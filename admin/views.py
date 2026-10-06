@@ -1989,6 +1989,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     cur = (sel["currency"] if "currency" in keys else None) or "SAR"
     cur = cur if cur in usable else "SAR"
     conv = lambda v: fx.from_sar(v, cur)
+    rate_c = float(usable.get(cur, 1.0)) if cur != "SAR" else 1.0
+    step_c = {"USD": 5, "EGP": 50}.get(cur, 10)
     money_c = lambda lo, hi: "—" if lo is None else (
         (format(conv(lo), ",") if lo == hi else format(conv(lo), ",") + " – " + format(conv(hi), ",")) + " " + cur)
     costs = json.loads((sel["costs"] if "costs" in keys else None) or "{}")
@@ -2019,7 +2021,9 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         cost = costs.get(code)
         if cost is None and "cost" in c.keys():
             cost = c["cost"]
-        cost_txt = format(cost, ",") if cost is not None else ""
+        # Costs are kept in SAR but shown and typed in the selection's currency,
+        # so the whole page speaks one currency.
+        cost_txt = format(int(round(cost * rate_c)), ",") if cost is not None else ""
         rows.append(
             "<tr><td>" + shot + "</td><td><code>" + e(code) + "</code><br>" + roster_link(code, c["name"])
             + ("" if c["active"] else " <span class='pill dead'>hidden</span>")
@@ -2070,12 +2074,12 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "</select><div class='price-hint'>Pick one and each creator is tiered and priced on "
           "THAT account — a creator who is Mid-Tier on Instagram and Micro on TikTok is quoted "
           "as Micro for a TikTok campaign.</div></div>"
-        + "<div><label>Currency</label><select name='currency'>" + "".join(
+        + "<div><label>Currency</label><select name='currency' data-rates='" + e(json.dumps({k: v for k, v in usable.items()})) + "'>" + "".join(
             "<option value='" + c + "'" + (" selected" if c == cur else "") + ">" + c + " — " + fx.NAMES[c] + "</option>"
             for c in fx.CURRENCIES if c in usable) + "</select><div class='price-hint'>What this selection is "
           "quoted in. Prices below are typed in it; the client can switch to another enabled currency. "
           "Rates are set in <a href='" + u("/settings") + "#fx'>Settings</a>.</div></div>"
-        + "<div><label>Total the client sees (" + cur + ")</label><div style='display:flex;gap:6px'>"
+        + "<div><label>Total the client sees (<span class='cur-lbl'>" + cur + "</span>)</label><div style='display:flex;gap:6px'>"
           "<input name='total_from' value='" + tf + "' placeholder='from' inputmode='numeric'>"
           "<input name='total_to' value='" + tt + "' placeholder='to' inputmode='numeric'></div>"
           "<div class='price-hint'>Fills itself from the prices below as you type them (currently "
@@ -2087,12 +2091,12 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "' value='" + margin_txt + "' placeholder='e.g. 30' "
           "inputmode='decimal'></div>"
           "<div class='price-hint'>Added on top of each creator's cost. Client price = cost × "
-          "(1 + margin), rounded up to the next 10 SAR. Internal only — the client never sees "
+          "(1 + margin), rounded up to the next " + str(step_c) + " " + cur + ". Internal only — the client never sees "
           "the cost or the margin.</div></div>"
           "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
           "</div></div>"
         + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
-          "<th>Standard price</th><th>Cost to us (SAR)</th><th>Price for this client (" + cur + ")</th><th></th><th>Creator's default</th><th></th>"
+          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th></th>"
           "</tr></thead><tbody>"
         + table + "</tbody></table>"
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
@@ -2124,16 +2128,17 @@ MARGIN_JS = """<script>
 (function(){
   var m=document.getElementById('sel-margin'), sum=document.getElementById('sel-money');
   if(!m||!sum) return;
-  function n(v){v=String(v==null?'':v).replace(/[^0-9.]/g,'');return v===''?null:Number(v);}
-  function fmt(x){return Math.round(x).toLocaleString('en-US')+' SAR';}
-  function num(x){return Math.round(x).toLocaleString('en-US');}
-  function price(cost,mg){return Math.ceil(cost*(1+(mg||0)/100)/10)*10;}
-  // Costs and margin are in SAR; price and total boxes are in the selection's currency.
+  // Everything on this page is in the selection's currency: costs, prices,
+  // profit and totals. (Stored in SAR underneath; the catalogue shows the
+  // same numbers in whichever currency the client picks.)
   var rate=Number(m.getAttribute('data-rate'))||1, cur=m.getAttribute('data-cur')||'SAR';
-  var step=cur==='USD'?5:cur==='EGP'?50:10;
-  function toSar(v){return v===null?null:Math.round(v/rate);}
-  function shown(p){return rate===1?p:Math.round(p*rate/step)*step;}
-  var tol=Math.max(10,step/rate);
+  function stepOf(c){return c==='USD'?5:c==='EGP'?50:10;}
+  var step=stepOf(cur);
+  function n(v){v=String(v==null?'':v).replace(/[^0-9.]/g,'');return v===''?null:Number(v);}
+  function num(x){return Math.round(x).toLocaleString('en-US');}
+  function fmt(x){return num(x)+' '+cur;}
+  function price(cost,mg){return Math.ceil(cost*(1+(mg||0)/100)/step)*step;}
+  function sh(v){return rate===1?v:Math.round(v*rate/step)*step;}      // a SAR amount, shown in this currency
   var rows=[].slice.call(document.querySelectorAll('.sel-table tbody tr')).filter(function(r){
     return r.querySelector('input[name=cost]');});
   var tf=document.querySelector('input[name=total_from]'), tt=document.querySelector('input[name=total_to]');
@@ -2142,7 +2147,7 @@ MARGIN_JS = """<script>
     var mg=n(m.value);
     rows.forEach(function(r){
       var cost=n(r.querySelector('input[name=cost]').value), lo=n(r.querySelector('input[name=p_from]').value);
-      if(cost!==null&&lo!==null&&Math.abs(toSar(lo)-price(cost,mg))>tol) r.dataset.manual='1';
+      if(cost!==null&&lo!==null&&Math.abs(lo-price(cost,mg))>step) r.dataset.manual='1';
     });
   })();
   var totalsSet=false;
@@ -2150,17 +2155,17 @@ MARGIN_JS = """<script>
     var c=r.querySelector('input[name=cost]'), lo=r.querySelector('input[name=p_from]'), hi=r.querySelector('input[name=p_to]');
     var cost=n(c.value), loV=n(lo.value), hiV=n(hi.value), manual=r.dataset.manual==='1';
     if(cost!==null&&!manual){
-      var p=price(cost,mg), sh=shown(p);
-      lo.value=hi.value=num(sh); lo.dataset.auto=hi.dataset.auto='1';
+      var p=price(cost,mg);
+      lo.value=hi.value=num(p); lo.dataset.auto=hi.dataset.auto='1';
       return {cost:cost,lo:p,hi:p,auto:true};
     }
     if(lo.dataset.auto&&cost===null){lo.value='';hi.value='';delete lo.dataset.auto;delete hi.dataset.auto;loV=hiV=null;}
     if(loV!==null||hiV!==null){
-      var a=toSar(loV!==null?loV:hiV), b=toSar(hiV!==null?hiV:loV);
+      var a=loV!==null?loV:hiV, b=hiV!==null?hiV:loV;
       return {cost:cost,lo:Math.min(a,b),hi:Math.max(a,b),manual:true};
     }
-    var d=(lo.getAttribute('data-def')||'').split('|');          // standard price: counts toward the total
-    if(d.length===2) return {cost:cost,lo:Number(d[0]),hi:Number(d[1]),standard:true};
+    var d=(lo.getAttribute('data-def')||'').split('|');          // standard price (SAR): counts toward the total
+    if(d.length===2) return {cost:cost,lo:sh(Number(d[0])),hi:sh(Number(d[1])),standard:true};
     return {cost:cost,lo:null,hi:null};
   }
   function run(){
@@ -2193,10 +2198,10 @@ MARGIN_JS = """<script>
     if(tf&&tt&&counted){
       if(!totalsSet){                                  // first run: a stored total that differs from the sum was typed
         var a0=n(tf.value);
-        if(a0!==null&&Math.abs(toSar(a0)-tlo)>tol) tf.dataset.manual='1';
+        if(a0!==null&&Math.abs(a0-tlo)>step) tf.dataset.manual='1';
         totalsSet=true;
       }
-      if(tf.dataset.manual!=='1'){tf.value=num(shown(tlo));tt.value=num(shown(thi));}
+      if(tf.dataset.manual!=='1'){tf.value=num(tlo);tt.value=num(thi);}
     }
   }
   document.addEventListener('input',function(e){
@@ -2215,6 +2220,32 @@ MARGIN_JS = """<script>
       run();
     }
   });
+  // Changing the currency converts every figure on the page, so nothing is
+  // silently re-read in the new currency when you save.
+  var cs=document.querySelector('select[name=currency]');
+  if(cs){
+    var rates={}; try{rates=JSON.parse(cs.getAttribute('data-rates')||'{}');}catch(x){}
+    cs.addEventListener('change',function(){
+      var nc=cs.value, nr=Number(rates[nc]); if(!nr) return;
+      var ns=stepOf(nc);
+      [].slice.call(document.querySelectorAll('input[name=cost],input[name=p_from],input[name=p_to],input[name=total_from],input[name=total_to]')).forEach(function(i){
+        var v=n(i.value); if(v===null) return;
+        var sar=v/rate;
+        i.value=num(i.name==='cost'?sar*nr:Math.round(sar*nr/ns)*ns);
+      });
+      rate=nr; cur=nc; step=ns;
+      m.setAttribute('data-rate',String(nr)); m.setAttribute('data-cur',nc);
+      [].slice.call(document.querySelectorAll('.cur-lbl')).forEach(function(l){l.textContent=nc;});
+      rows.forEach(function(r){delete r.dataset.manual;});
+      var mg=n(m.value);
+      rows.forEach(function(r){   // a price that is not cost + margin stays as typed
+        var cost=n(r.querySelector('input[name=cost]').value), lo=n(r.querySelector('input[name=p_from]').value);
+        if(cost!==null&&lo!==null&&Math.abs(lo-price(cost,mg))>step) r.dataset.manual='1';
+      });
+      totalsSet=false; if(tf) delete tf.dataset.manual;
+      run();
+    });
+  }
   document.addEventListener('change',function(e){if(e.target.name==='drop') run();});
   run();
 })();
