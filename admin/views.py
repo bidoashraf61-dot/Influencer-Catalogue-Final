@@ -2244,7 +2244,7 @@ MARGIN_JS = """<script>
         var cost=n(r.querySelector('input[name=cost]').value), lo=n(r.querySelector('input[name=p_from]').value);
         if(cost!==null&&lo!==null&&Math.abs(lo-price(cost,mg))>step) r.dataset.manual='1';
       });
-      totalsSet=false; if(tf) delete tf.dataset.manual;
+      totalsSet=true;                    // a total that follows the prices stays that way; a typed one stays typed
       run();
     });
   }
