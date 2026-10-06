@@ -5,7 +5,7 @@ Definitions (also in docs/CAMPAIGN-TRACKER-BRIEF.md §11):
 
   engagement          likes + comments
   est. reach, post    engagement × REACH_PER_ENGAGEMENT, capped at followers
-  est. reach, video   views × VIDEO_REACH_PER_VIEW — plays count replays and
+  est. reach, video   views × VIDEO_REACH_PER_VIEW (40%) — plays count replays and
                       repeat viewers, so unique people are fewer than views
   est. reach, story   followers × STORY_VIEW_RATE
   est. impressions    post: est. reach × 1.5 · story: = est. reach
@@ -34,7 +34,11 @@ import db
 import plans
 
 DEFAULT_FACTORS = {"reach_per_engagement": 10.0, "story_view_rate": 0.05,
-                   "impressions_per_reach": 1.5, "video_reach_per_view": 0.85}
+                   "impressions_per_reach": 1.5, "video_reach_per_view": 0.40}
+# video_reach_per_view: unique people ÷ plays for an Instagram reel. Our first
+# 5 posts with real insights (Oct 2026) measured 20–22% on the big creators and
+# 59–79% on the small ones, 22% overall by views and 40% on a simple average;
+# 40% is the working estimate until more insights arrive. Editable in Settings.
 EMV_ACTIONS = ["impressions", "views", "likes", "comments", "shares", "saves", "clicks"]
 
 
@@ -152,7 +156,7 @@ def post_numbers(c, f):
 
     if video:
         out["reach"] = int(ins["reach"]) if ins.get("reach") else \
-            int(round((views or 0) * f.get("video_reach_per_view", 0.85)))
+            int(round((views or 0) * f.get("video_reach_per_view", DEFAULT_FACTORS["video_reach_per_view"])))
         out["impressions"] = 0           # video exposure is counted as views
         out["reach_real"] = bool(ins.get("reach"))
     else:
@@ -431,7 +435,7 @@ def recommend_targets(campaign):
         o = out[kind]
         o["posts"] = posts
         o["views"] = int(round(t["views"], -2))
-        o["reach"] = int(round(t["views"] * 0.85, -2))     # unique people, below total views
+        o["reach"] = int(round(t["views"] * factors()["video_reach_per_view"], -2))     # unique people, below total views
         o["engagement"] = int(round(t["engagement"], -1))
         o["er"] = round(t["engagement"] / t["followers"] * 100, 1) if t["followers"] else None
         if campaign["destination"]:

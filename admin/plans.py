@@ -62,7 +62,9 @@ LIBRARY = {
     "Instagram": {
         "view_rate": {"nano": [12, 25], "micro": [10, 22], "mid": [8, 18], "macro": [5, 12], "mega": [3, 8]},
         "eng_rate": {"nano": [3.0, 5.5], "micro": [2.5, 4.5], "mid": [2.0, 3.5], "macro": [1.5, 2.8], "mega": [1.0, 2.0]},
-        "reach_per_view": 0.85, "ctr": [0.3, 0.8],
+        # Unique people ÷ plays. Our first 5 reels with real insights: 22% overall by views
+        # (20-22% on the big creators, 59-79% on the small), 40% on a simple average.
+        "reach_per_view": 0.40, "ctr": [0.3, 0.8],
         "cpm": [70, 40], "cpe": [8.0, 4.0], "cpc": [15, 8],
         "note": "Reels. Feed photos reach about half a reel's audience; stories 4–8% of followers.",
     },
