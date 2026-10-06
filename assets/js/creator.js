@@ -148,7 +148,43 @@
     "Popular mentions": "Share of the creator's recent posts that tag or mention each account.",
     "Sponsored posts": "Recent posts identified as paid partnerships."
   };
+  /* How sure each number is, by what kind of number it is — so every
+     profile, and every one imported later, carries it without extra work.
+       3 bars  Measured   read from the public profile, or simple maths on it
+       2 bars  Estimated  worked out from a sample or a model; right in direction
+       1 bar   Rough hint few posts behind it; can swing a lot
+     A label not listed here (a new field) shows no sign rather than a guess. */
+  var TRUST_WORD = { 3: "Measured", 2: "Estimated", 1: "Rough hint" };
+  var TRUST_WHY = { 3: "Read from the public profile — reliable.", 2: "Worked out from a sample of the audience or a model — right in direction, not exact.",
+                    1: "Based on only a few posts — can swing a lot. Use as a hint only." };
+  var TRUST = {
+    "Followers": 3, "Avg. likes": 3, "Engagement rate": 3, "Followers growth": 3, "Likes growth": 3,
+    "Average views": 3, "Average likes": 3, "Average comments": 3, "Average reel plays": 3, "Average shares": 3,
+    "Popular hashtags": 3, "Popular mentions": 3, "Sponsored posts": 3, "Creator brand affinity": 3, "h2|Popular posts": 3,
+    "Estimated impressions": 2, "Estimated reach": 2, "Fake followers": 2, "Fake likers": 2, "Audience reachability": 2,
+    "Fake followers distribution": 2, "Engagement rate distribution": 2, "Gender": 2, "Age": 2, "Age by gender": 2,
+    "Location by country": 2, "Location by city": 2, "Languages": 2, "Audience interests": 2, "Creator interests": 2,
+    "Paid engagement": 1, "Paid views": 1, "Audience brand affinity": 1
+  };
+  function trustSign(n) {
+    var t = "How sure: " + TRUST_WORD[n] + " — " + TRUST_WHY[n];
+    return ' <i class="pp-trust pp-trust--' + n + '" tabindex="0" role="note" aria-label="' + esc(t) + '" data-tip="' + esc(t) + '"><b></b><b></b><b></b></i>';
+  }
+  function addTrust(root) {
+    [].forEach.call((root || document).querySelectorAll(".pp-h2, .pp-h3, .pp-key dt, .pp-tiles > div > span, .pp-row > span, .pp-er__label"), function (el) {
+      if (el.querySelector(".pp-trust")) return;
+      var tip = el.querySelector(".pp-tip"), text = (tip ? el.textContent.slice(0, -tip.textContent.length) : el.textContent).trim();
+      var n = el.classList.contains("pp-h2") ? TRUST["h2|" + text] : TRUST[text];
+      if (n) el.insertAdjacentHTML("beforeend", trustSign(n));
+    });
+    var leg = $("pp-trust-key");
+    if (!leg && $("pp-pages")) {
+      $("pp-pages").insertAdjacentHTML("afterbegin", '<p class="pp-trust-key" id="pp-trust-key"><span>How sure is each number?</span>'
+        + [3, 2, 1].map(function (n) { return '<span class="pp-trust-key__i"><i class="pp-trust pp-trust--' + n + '"><b></b><b></b><b></b></i><b>' + TRUST_WORD[n] + "</b>" + TRUST_WHY[n].split(" — ")[0].replace(/\.$/, "") + "</span>"; }).join("") + "</p>");
+    }
+  }
   function addTips(root) {
+    addTrust(root);
     [].forEach.call((root || document).querySelectorAll(".pp-h2, .pp-h3, .pp-key dt, .pp-tiles > div > span, .pp-row > span, .pp-er__label"), function (el) {
       if (el.querySelector(".pp-tip")) return;
       var text = el.textContent.trim(), pane = el.closest(".pp-pane"), ctx = pane ? pane.getAttribute("data-tab") : "";
