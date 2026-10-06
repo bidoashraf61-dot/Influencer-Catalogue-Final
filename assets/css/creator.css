@@ -333,3 +333,6 @@ body.pp-modal-on { overflow: hidden; }
 .pp-trust-key__i .pp-trust { margin: 0; cursor: default; }
 .pp-trust-key__i b { color: var(--ink); }
 @media print { .pp-trust:hover::after { display: none; } }
+
+/* in the PDF the key is its own block, full width, with room around it */
+.pp-pdf .pp-trust-key { margin: 0; font-size: 14px; }

@@ -556,7 +556,11 @@
     }).then(function () {
       var JsPDF = window.jspdf.jsPDF, doc = new JsPDF({ unit: "pt", format: "a4", compress: true });
       var PW = doc.internal.pageSize.getWidth(), PH = doc.internal.pageSize.getHeight(), M = 28, CW = PW - 2 * M;
-      var blocks = [$("pp-id")].concat([].slice.call(document.querySelectorAll("#pp-pages > .pp-page:not([hidden]), #pp-source")));
+      // The trust key goes right after the creator's identity: on paper there
+      // is no hover, so the key is what explains the bars beside each number.
+      addTrust();
+      var blocks = [$("pp-id"), $("pp-trust-key")].filter(Boolean)
+        .concat([].slice.call(document.querySelectorAll("#pp-pages > .pp-page:not([hidden]), #pp-source")));
       var y = M, first = true;
       return blocks.reduce(function (p, el) {
         return p.then(function () {
