@@ -338,13 +338,11 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   background-size: cover; background-position: center;
   background-repeat: no-repeat;
 }
-/* Instagram returns 100px for a third of these accounts. Upscaling that to a
-   330px card reads as a broken image, so a small source is shown whole at its
-   own pixel size — no crop, no zoom, no circle — centred on a light bed. */
-.cat-card__media:has(.cat-card__photo--soft) { background: var(--linen); }
-.cat-card__photo--soft {
-  background-size: auto; background-position: center;
-}
+/* Every photo fills the whole square, small sources included. Drawing a small
+   one at its own pixel size left most of the frame empty, which read worse
+   than a soft photo (client feedback 2026-10-06). The fix for a small source
+   is a bigger one from the creator's profile (tools/photo_audit.py), not a
+   different frame. */
 
 .cat-card__photo--fallback {
   display: grid; place-items: center;
