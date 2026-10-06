@@ -3937,8 +3937,12 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     });
     var probs = chk.problems.bad + chk.problems.warn;
     items.push({key: 'creators', label: 'Creators', kind: 'creators', status: probs === 0 ? ['No problems', 'g'] : probs <= 3 ? ['A few to check', 'a'] : ['Check them', 'r'], text: probs + ' problem' + (probs === 1 ? '' : 's') + ' found' + (chk.flagged.length ? ': ' + chk.flagged.slice(0, 3).join(', ') + (chk.flagged.length > 3 ? '…' : '') : '')});
-    var worst = items.some(function(i){ return i.status[1] === 'r'; }) ? 'r' : items.some(function(i){ return i.status[1] === 'a'; }) ? 'a' : 'g';
-    var overall = worst === 'g' ? ['On track', 'g'] : worst === 'a' ? ['Close to target', 'a'] : ['Needs attention', 'r'];
+    // The overall status judges the RESULTS against the goals, the same way the
+    // client dashboard does (on track / close / behind). Value and creator
+    // checks are shown beside it, so a creator problem cannot turn good
+    // results red.
+    var gi = items.filter(function(i){ return i.kind === 'goal'; }), pts = gi.reduce(function(a, i){ return a + (i.status[1] === 'g' ? 2 : i.status[1] === 'a' ? 1 : 0); }, 0) / (gi.length || 1);
+    var overall = !gi.length ? ['No goals yet', 'a'] : pts >= 1.5 ? ['On track', 'g'] : pts >= 0.75 ? ['Close to target', 'a'] : ['Behind target', 'r'];
     return {items: items, overall: overall, saved: saved, camp: camp, elapsed: el, share: share};
   }
   function actualTab(sv, f){
