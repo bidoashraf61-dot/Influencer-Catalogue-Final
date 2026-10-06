@@ -2203,8 +2203,11 @@ MARGIN_JS = """<script>
     var t=e.target;
     if(t===m||t.name==='cost') run();
     else if(t.name==='p_from'||t.name==='p_to'){
-      var r=t.closest('tr'), cost=n(r.querySelector('input[name=cost]').value);
-      delete r.querySelector('input[name=p_from]').dataset.auto; delete r.querySelector('input[name=p_to]').dataset.auto;
+      var r=t.closest('tr'), cost=n(r.querySelector('input[name=cost]').value), pl=r.querySelector('input[name=p_from]'), ph=r.querySelector('input[name=p_to]');
+      // One price typed = a fixed price: the other box was only auto-filled, so it follows.
+      if(t===pl&&ph.dataset.auto) ph.value=t.value;
+      if(t===ph&&pl.dataset.auto) pl.value=t.value;
+      delete pl.dataset.auto; delete ph.dataset.auto;
       if(t.value==='') delete r.dataset.manual; else if(cost!==null) r.dataset.manual='1';
       run();
     } else if(t===tf||t===tt){
