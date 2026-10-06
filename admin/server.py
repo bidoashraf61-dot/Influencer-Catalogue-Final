@@ -51,6 +51,7 @@ import auth  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
 import history  # noqa: E402
+import fx  # noqa: E402
 import analysis  # noqa: E402
 import links  # noqa: E402
 import metrics  # noqa: E402
@@ -485,7 +486,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.settings_page(
                 db.setting("emv_rates") or {}, metrics.factors(),
                 bool(db.setting("capture_token")), db.capture_runs(), track.GEO_DB.exists(),
-                None, query.get("e"), query.get("ok"), metrics.benchmarks()))
+                None, query.get("e"), query.get("ok"), metrics.benchmarks(), fx_rates=fx.rates()))
         if path == "/campaigns/links":
             cid = query.get("id", "")
             k = db.campaign(int(cid)) if cid.isdigit() else None
@@ -633,6 +634,8 @@ class Handler(BaseHTTPRequestHandler):
             if (f.get("id") or "").isdigit():
                 db.handle_analysis_request(int(f["id"]))
             return self.redirect("/analysis?ok=" + urllib.parse.quote("Marked as handled."))
+        if path == "/settings/fx":
+            return self.post_settings_fx()
         if path == "/settings/save":
             return self.post_settings()
         if path == "/settings/token":
@@ -661,7 +664,7 @@ class Handler(BaseHTTPRequestHandler):
         its key or None, verb)."""
         entity, field, verb = spec
         f = self.form_body()
-        key = (f.get(field) or "").strip() if field else ("*" if entity in ("roster", "tiers") else "")
+        key = (f.get(field) or "").strip() if field else ("*" if entity in ("roster", "tiers", "settings") else "")
         if entity == "creator" and key:
             key = key.upper()
         new_keys = None
@@ -1301,6 +1304,9 @@ class Handler(BaseHTTPRequestHandler):
             v = "".join(ch for ch in (v or "") if ch.isdigit())
             return int(v) if v else None
 
+        cur = (f.get("currency") or "SAR").strip().upper()
+        cur = cur if fx.usable(cur) else "SAR"
+
         # The margin is a percentage and may carry a decimal ("27.5").
         raw_margin = "".join(ch for ch in (f.get("margin") or "") if ch.isdigit() or ch == ".")
         try:
@@ -1327,7 +1333,8 @@ class Handler(BaseHTTPRequestHandler):
                 p = db.client_price(cost, margin)
                 prices[code] = [p, p]
                 continue
-            lo, hi = num(lo), num(hi)
+            # Typed in the selection's currency, kept in SAR.
+            lo, hi = fx.to_sar(num(lo), cur), fx.to_sar(num(hi), cur)
             if lo is None and hi is not None: lo = hi
             if hi is None and lo is not None: hi = lo
             if lo is not None:
@@ -1338,11 +1345,13 @@ class Handler(BaseHTTPRequestHandler):
         platform = (f.get("platform") or "").strip() or None
         # 0 is not a total: it would show the client "0 SAR". Treated as empty,
         # which means "add up the creators".
-        t_from, t_to = num(f.get("total_from")) or None, num(f.get("total_to")) or None
+        t_from = fx.to_sar(num(f.get("total_from")) or None, cur)
+        t_to = fx.to_sar(num(f.get("total_to")) or None, cur)
         if t_from is None and t_to is not None: t_from = t_to
         if t_to is None and t_from is not None: t_to = t_from
         if t_from is not None and t_to < t_from: t_from, t_to = t_to, t_from
         name = (f.get("name") or "").strip() or sel["name"]
+        db.set_selection_currency(sel["id"], cur)
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs)
         # A price agreed here is that creator's rate, so it becomes their price
@@ -1629,6 +1638,20 @@ class Handler(BaseHTTPRequestHandler):
         elif what == "metrics":
             db.add_snapshot(item["id"], self.counts_from(f), "manual")
         return self.redirect(back + "&ok=" + urllib.parse.quote("Saved."))
+
+    def post_settings_fx(self):
+        """Fixed exchange rates: 1 SAR = x of each currency. Empty switches a
+        currency off."""
+        f = self.form_body()
+        out = {}
+        for c in fx.CURRENCIES[1:]:
+            raw = "".join(ch for ch in (f.get("fx_" + c) or "") if ch.isdigit() or ch == ".")
+            try:
+                out[c] = float(raw) if raw and float(raw) > 0 else None
+            except ValueError:
+                out[c] = None
+        db.set_setting("fx_rates", out)
+        return self.redirect("/settings?ok=" + urllib.parse.quote("Exchange rates saved.") + "#fx")
 
     def post_settings(self):
         f = self.form_body()
@@ -2240,6 +2263,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json(200, {"ok": True, "name": sel["name"], "codes": codes,
                                     "prices": prices, "total": total,
                                     "platform": platform,
+                                    "currency": (sel["currency"] if "currency" in sel.keys() else None) or "SAR",
+                                    "fx": fx.rates(),
                                     "token": sel["token"]}, self.cors())
 
     def post_request_handled(self):
@@ -2297,7 +2322,7 @@ class Handler(BaseHTTPRequestHandler):
                       f"{policy}; Max-Age={DEVICE_TTL}")
         payload = {"ok": True, "label": row["label"]}
         if not lite:
-            payload.update(roster=self.roster_payload(), tiers=self.tier_payload())
+            payload.update(roster=self.roster_payload(), tiers=self.tier_payload(), fx=fx.rates())
         return self.send_json(200, payload,
                               self.cors() + [("Set-Cookie", cookie),
                                              ("Set-Cookie", dev_cookie)])
@@ -2307,7 +2332,7 @@ class Handler(BaseHTTPRequestHandler):
         if not code_id:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         return self.send_json(200, {"ok": True, "roster": self.roster_payload(),
-                                    "tiers": self.tier_payload()}, self.cors())
+                                    "tiers": self.tier_payload(), "fx": fx.rates()}, self.cors())
 
     def tier_payload(self):
         """Sent with the roster so the page totals a selection at today's
@@ -2467,6 +2492,7 @@ TRACKED = {
     "/campaigns/save": ("campaign", "id", "Saved campaign"),
     "/campaigns/delete": ("campaign", "id", "Deleted campaign"),
     "/campaigns/status": ("campaign", "id", "Changed status of campaign"),
+    "/settings/fx": ("settings", None, "Changed exchange rates"),
     "/campaigns/link": ("campaign", "id", "Changed a tracking link"),
     "/campaigns/link/custom": ("campaign", "id", "Added a tracking link"),
     "/campaigns/link/toggle": ("campaign", "id", "Switched a tracking link"),

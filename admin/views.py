@@ -1896,6 +1896,13 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     codes = json.loads(sel["codes"] or "[]")
     own = json.loads(sel["prices"] or "{}")
     keys = sel.keys()
+    import fx
+    usable = fx.rates()
+    cur = (sel["currency"] if "currency" in keys else None) or "SAR"
+    cur = cur if cur in usable else "SAR"
+    conv = lambda v: fx.from_sar(v, cur)
+    money_c = lambda lo, hi: "—" if lo is None else (
+        (format(conv(lo), ",") if lo == hi else format(conv(lo), ",") + " – " + format(conv(hi), ",")) + " " + cur)
     costs = json.loads((sel["costs"] if "costs" in keys else None) or "{}")
     margin = sel["margin"] if "margin" in keys else None
     margin_txt = "" if margin is None else ("%g" % margin)
@@ -1918,7 +1925,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
             lo_sum += eff[0]; hi_sum += eff[1]
         shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
                 if c["photo"] else "<span class='thumb sm none'>—</span>")
-        val = lambda i: format(set_[i], ",") if set_ else ""
+        val = lambda i: format(conv(set_[i]), ",") if set_ else ""
         # The cost this selection was priced from, else the creator's last
         # known cost — a starting point the admin can change.
         cost = costs.get(code)
@@ -1933,7 +1940,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
             + "".join("<div class='acct'>" + e(a["platform"] or "") + " " + num(a["followers"])
                       + " · " + e(a["tier"] or "—") + "</div>"
                       for a in db_account_tiers(c) if a["followers"]) + "</td>"
-            + "<td class='muted'>" + (_money(*default) if default[0] is not None else "—")
+            + "<td class='muted'>" + (money_c(*default) if default[0] is not None else "—")
         )
         rows[-1] += (
             "</td><td><input name='cost' value='" + cost_txt + "' placeholder='cost' inputmode='numeric'>"
@@ -1944,8 +1951,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     table = "".join(rows) or "<tr><td colspan='8' class='muted'>No creators yet — add some below.</td></tr>"
     missing = [c for c in codes if c not in by]
     link = selection_link(sel, origin)
-    tf = "" if sel["total_from"] is None else format(sel["total_from"], ",")
-    tt = "" if sel["total_to"] is None else format(sel["total_to"], ",")
+    tf = "" if sel["total_from"] is None else format(conv(sel["total_from"]), ",")
+    tt = "" if sel["total_to"] is None else format(conv(sel["total_to"]), ",")
     body = (
         "<p><a href='" + u("/selections") + "'>&larr; All selections</a></p>"
         + "<h1>" + e(sel["name"]) + "</h1>" + note
@@ -1970,15 +1977,21 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "</select><div class='price-hint'>Pick one and each creator is tiered and priced on "
           "THAT account — a creator who is Mid-Tier on Instagram and Micro on TikTok is quoted "
           "as Micro for a TikTok campaign.</div></div>"
-        + "<div><label>Total the client sees (SAR)</label><div style='display:flex;gap:6px'>"
+        + "<div><label>Currency</label><select name='currency'>" + "".join(
+            "<option value='" + c + "'" + (" selected" if c == cur else "") + ">" + c + " — " + fx.NAMES[c] + "</option>"
+            for c in fx.CURRENCIES if c in usable) + "</select><div class='price-hint'>What this selection is "
+          "quoted in. Prices below are typed in it; the client can switch to another enabled currency. "
+          "Rates are set in <a href='" + u("/settings") + "#fx'>Settings</a>.</div></div>"
+        + "<div><label>Total the client sees (" + cur + ")</label><div style='display:flex;gap:6px'>"
           "<input name='total_from' value='" + tf + "' placeholder='from' inputmode='numeric'>"
           "<input name='total_to' value='" + tt + "' placeholder='to' inputmode='numeric'></div>"
           "<div class='price-hint'>Empty = the sum of the creators below (currently "
-        + _money(lo_sum, hi_sum) + ").</div></div>"
+        + money_c(lo_sum, hi_sum) + ").</div></div>"
         + "</div></div>"
         + "<div class='card'><div class='row'>"
           "<div><label>Profit margin (%)</label><div class='margin-box'>"
-          "<input name='margin' id='sel-margin' value='" + margin_txt + "' placeholder='e.g. 30' "
+          "<input name='margin' id='sel-margin' data-cur='" + cur + "' data-rate='" + str(usable.get(cur, 1))
+        + "' value='" + margin_txt + "' placeholder='e.g. 30' "
           "inputmode='decimal'></div>"
           "<div class='price-hint'>Added on top of each creator's cost. Client price = cost × "
           "(1 + margin), rounded up to the next 10 SAR. Internal only — the client never sees "
@@ -1986,7 +1999,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
           "</div></div>"
         + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
-          "<th>Standard price</th><th>Cost to us</th><th>Price for this client</th><th></th><th></th>"
+          "<th>Standard price</th><th>Cost to us (SAR)</th><th>Price for this client (" + cur + ")</th><th></th><th></th>"
           "</tr></thead><tbody>"
         + table + "</tbody></table>"
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
@@ -2019,6 +2032,9 @@ MARGIN_JS = """<script>
   function n(v){v=String(v||'').replace(/[^0-9.]/g,'');return v===''?null:Number(v);}
   function fmt(x){return Math.round(x).toLocaleString('en-US')+' SAR';}
   function price(cost,mg){return Math.ceil(cost*(1+(mg||0)/100)/10)*10;}
+  // Costs and margin are in SAR; the price boxes are in the selection's currency.
+  var rate=Number(m.getAttribute('data-rate'))||1, cur=m.getAttribute('data-cur')||'SAR';
+  var step=cur==='USD'?5:cur==='EGP'?50:10;
   var rows=[].slice.call(document.querySelectorAll('.sel-table tbody tr')).filter(function(r){
     return r.querySelector('input[name=cost]');});
   function run(){
@@ -2032,7 +2048,8 @@ MARGIN_JS = """<script>
         lo.readOnly=hi.readOnly=false; out.textContent=''; return;
       }
       var p=price(cost,mg);
-      lo.value=hi.value=p.toLocaleString('en-US'); lo.readOnly=hi.readOnly=true;
+      var shown=rate===1?p:Math.round(p*rate/step)*step;
+      lo.value=hi.value=shown.toLocaleString('en-US'); lo.readOnly=hi.readOnly=true;
       out.textContent='+'+fmt(p-cost)+' profit';
       if(!gone){tc+=cost;tp+=p;priced++;}
     });
@@ -2669,7 +2686,7 @@ def campaign_report_page(k, r, origin):
 
 
 def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, error=None, message=None,
-                  bm=None):
+                  bm=None, fx_rates=None):
     own = (rates or {}).get("*", {})
     inputs = "".join(
         "<div><label>" + e(a) + " (SAR each)</label><input name='emv_" + a + "' inputmode='decimal' value='"
@@ -2712,8 +2729,28 @@ def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, erro
         + (run_rows or "<tr><td colspan='5' class='muted'>No capture runs yet.</td></tr>") + "</tbody></table></div>"
         + "<h2>Country lookup</h2><div class='card'><p>" + ("Installed." if has_geo else
           "Not installed — tracking-link countries read Unknown. See docs/ADMIN.md §5b.") + "</p></div>"
+        + fx_card(fx_rates or {})
     )
     return page("Settings", body, "/settings")
+
+
+def fx_card(rates):
+    """Fixed exchange rates for quoting selections in other currencies."""
+    import fx
+    saved = rates
+    boxes = "".join(
+        "<div><label>1 SAR = ? " + c + " <span class='muted'>(" + fx.NAMES[c] + ")</span></label>"
+        "<input name='fx_" + c + "' inputmode='decimal' value='" + (("%g" % saved[c]) if saved.get(c) else "")
+        + "' placeholder='" + (("%g" % fx.DEFAULTS[c]) if fx.DEFAULTS.get(c) else "not set — off") + "'></div>"
+        for c in fx.CURRENCIES[1:])
+    return ("<h2 id='fx'>Currencies</h2><form method='post' action='" + u("/settings/fx") + "' class='card'>"
+            "<p class='sub'>Prices are kept in SAR. A selection can be quoted in another currency, and the "
+            "client can switch between the ones set here, at these fixed rates. Leave a box empty to "
+            "switch that currency off. AED and USD start from their official pegs (1 USD = 3.75 SAR = "
+            "3.6725 AED); EGP floats, so it is off until you enter today's rate.</p>"
+            "<div class='row'>" + boxes + "</div>"
+            "<p class='price-hint'>Converted prices are rounded: SAR and AED to the nearest 10, USD to the "
+            "nearest 5, EGP to the nearest 50.</p><button class='btn'>Save rates</button></form>")
 
 
 def campaign_insights_page(k, items, members, content, origin, error=None, message=None):

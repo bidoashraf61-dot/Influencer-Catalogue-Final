@@ -119,6 +119,8 @@ def snapshot(entity, key, conn=None):
         return {"tiers": _rows(conn, "tiers", "1", ()), "creators": _rows(conn, "creators", "1", ())}
     if entity == "roster":
         return {"creators": _rows(conn, "creators", "1", ())}
+    if entity == "settings":
+        return {"settings": _rows(conn, "settings", "1", ())}
     raise ValueError("unknown entity " + entity)
 
 
@@ -138,6 +140,8 @@ def _clear(conn, entity, key):
         conn.execute("DELETE FROM creators")
     elif entity == "roster":
         conn.execute("DELETE FROM creators")
+    elif entity == "settings":
+        conn.execute("DELETE FROM settings")
 
 
 # Parents before children, so foreign keys are satisfied as rows go back.

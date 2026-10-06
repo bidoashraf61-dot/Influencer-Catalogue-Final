@@ -211,6 +211,7 @@
         }
         ROSTER = res.b.roster || [];
         adoptTiers(res.b.tiers);
+        adoptFx(res.b.fx);
         remember();
         unlock();
       })
@@ -1331,6 +1332,7 @@
         creators_selected: selected.length,
         tier_split: split || "—",
         indicative_total: lo ? priceText([lo, hi]) : "—",
+        currency: CURRENCY,
         price_note: "Indicative only, not a final price. Excludes taxes.",
         selection: lines.join("\n\n"),
         submitted_at: new Date().toISOString(),
@@ -1474,6 +1476,19 @@
 
   function money(n) { return n.toLocaleString("en-US"); }
 
+  // Currencies: prices arrive in SAR; FX is "1 SAR = x" for each currency
+  // the admin enabled in Settings. CURRENCY is what this page shows — the
+  // selection's own currency, or the one the client picked.
+  var FX = { SAR: 1 };
+  var CURRENCY = "SAR";
+  function adoptFx(rates) { if (rates && rates.SAR) FX = rates; }
+  function inCur(n) {
+    var r = FX[CURRENCY];
+    if (!r || CURRENCY === "SAR") return n;
+    var step = CURRENCY === "USD" ? 5 : CURRENCY === "EGP" ? 50 : 10;
+    return Math.round(n * r / step) * step || Math.ceil(n * r);
+  }
+
   // What one creator costs: the price a prepared selection set, else the
   // creator's own rate, else their tier's band.
   function priceOf(code, card) {
@@ -1487,7 +1502,8 @@
   }
   function priceText(p) {
     if (!p) return "—";
-    return (p[0] === p[1] ? money(p[0]) : money(p[0]) + " – " + money(p[1])) + " SAR";
+    var a = inCur(p[0]), b = inCur(p[1]);
+    return (a === b ? money(a) : money(a) + " – " + money(b)) + " " + CURRENCY;
   }
 
   // The admin's total applies only while the client is looking at exactly the
@@ -1518,6 +1534,8 @@
         .then(function (b) {
           if (b && b.ok) {
             token = b.token || token;
+            adoptFx(b.fx);
+            if (b.currency && FX[b.currency]) CURRENCY = b.currency;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
                         platform: b.platform || "" };
@@ -1561,6 +1579,33 @@
     // creators, and the cities under it. A creator serving two cities counts
     // in both cities but once in the country. Always the whole selection —
     // the filters narrow the cards, not this.
+    // The client can see the shortlist in any currency the admin enabled;
+    // their pick is kept for this selection in this browser.
+    var curKey = "hv-cur:" + ((CURATED && CURATED.token) || selectionName);
+    try { var mine = sessionStorage.getItem(curKey); if (mine && FX[mine]) CURRENCY = mine; } catch (e) {}
+    function renderCurrency() {
+      var have = Object.keys(FX);
+      var box = $("sel-currency");
+      if (have.length < 2) { if (box) box.hidden = true; return; }
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "sel-currency"; box.className = "cat-cur"; box.setAttribute("role", "group");
+        box.setAttribute("aria-label", "Currency");
+        $("sel-summary").insertAdjacentElement("beforebegin", box);
+        box.addEventListener("click", function (e) {
+          var b = e.target.closest("button[data-cur]"); if (!b) return;
+          CURRENCY = b.getAttribute("data-cur");
+          try { sessionStorage.setItem(curKey, CURRENCY); } catch (x) {}
+          render();
+        });
+      }
+      box.innerHTML = '<span class="cat-cur__label">Currency</span>' + ["SAR", "AED", "USD", "EGP"].filter(function (c) {
+        return FX[c];
+      }).map(function (c) {
+        return '<button type="button" data-cur="' + c + '" aria-pressed="' + (c === CURRENCY) + '">' + c + "</button>";
+      }).join("");
+    }
+
     function renderPlaces() {
       var box = $("sel-places");
       if (!box) {
@@ -1691,6 +1736,7 @@
         return "<div><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd></div>";
       }).join("");
       renderPlaces();
+      renderCurrency();
 
       // keep the URL in step so what they see is what they can re-share
       // The short link only while the server holds exactly these creators.
@@ -1861,7 +1907,7 @@
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (b) {
         settle();
-        if (b && b.ok) { ROSTER = b.roster || []; adoptTiers(b.tiers); remember(); unlock(); }
+        if (b && b.ok) { ROSTER = b.roster || []; adoptTiers(b.tiers); adoptFx(b.fx); remember(); unlock(); }
         else { forget(); }
       })
       .catch(settle);

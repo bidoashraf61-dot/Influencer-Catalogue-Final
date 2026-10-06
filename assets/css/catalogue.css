@@ -1165,3 +1165,13 @@ body[data-page="selection"] .cat-card__check { display: none; }
   .cat-pp__full { grid-column: 2; } .cat-pp__close { grid-column: 3; }
 }
 .cat-pp-open .cat-top { display: none; }
+
+/* Currency switcher on the selection page: small pills above the summary. */
+.cat-cur { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 22px; }
+.cat-cur__label { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--gray); margin-right: 6px; }
+.cat-cur button {
+  font: 600 14px var(--body); padding: 8px 16px; min-height: 40px; border-radius: var(--r-pill);
+  background: var(--white); color: var(--ink); border: 1px solid rgba(18,18,18,.2); cursor: pointer;
+}
+.cat-cur button:hover { border-color: var(--ink); }
+.cat-cur button[aria-pressed="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }

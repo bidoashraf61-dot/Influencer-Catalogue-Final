@@ -436,6 +436,9 @@ def migrate(conn):
         conn.execute("ALTER TABLE selections ADD COLUMN margin REAL")
     if "costs" not in sel_cols:
         conn.execute("ALTER TABLE selections ADD COLUMN costs TEXT")
+    if "currency" not in sel_cols:
+        # The currency this selection is quoted in (prices are kept in SAR).
+        conn.execute("ALTER TABLE selections ADD COLUMN currency TEXT")
     creator_cols = {r["name"] for r in conn.execute("PRAGMA table_info(creators)")}
     if "created_at" not in creator_cols:
         # When a creator was added, so the roster can be narrowed to a batch
@@ -1563,6 +1566,11 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
             conn.execute("UPDATE selections SET margin=?, costs=? WHERE id=?",
                          (margin, json.dumps(costs or {}), sid))
         return sid
+
+
+def set_selection_currency(sid, currency):
+    with connect() as conn:
+        conn.execute("UPDATE selections SET currency = ? WHERE id = ?", (currency, sid))
 
 
 def last_margin(conn=None):
