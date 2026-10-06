@@ -51,6 +51,9 @@ def tier_of(followers):
 #                   engagement and per click for the campaign to be fair value:
 #                   [acceptable, good]. Below "good" is strong value.
 #
+# Cost ceilings are calibrated to KSA creator rates and kept below published
+# 2025 averages (≈ USD 30 per 1,000 views and USD 2.65 per engagement on
+# Instagram reels — Kolsquare, IQFluence), so "fair value" is a real test.
 # Ranges are deliberately at the lower end of published 2025 reports
 # (HypeAuditor, Favikon, Emplicit, Influencer Marketing Hub, Kolsquare MENA)
 # and GCC rate cards, so a target built on them is one we can beat.
@@ -60,28 +63,28 @@ LIBRARY = {
         "view_rate": {"nano": [12, 25], "micro": [10, 22], "mid": [8, 18], "macro": [5, 12], "mega": [3, 8]},
         "eng_rate": {"nano": [3.0, 5.5], "micro": [2.5, 4.5], "mid": [2.0, 3.5], "macro": [1.5, 2.8], "mega": [1.0, 2.0]},
         "reach_per_view": 0.85, "ctr": [0.3, 0.8],
-        "cpm": [45, 25], "cpe": [3.0, 1.5], "cpc": [6, 3],
+        "cpm": [70, 40], "cpe": [8.0, 4.0], "cpc": [15, 8],
         "note": "Reels. Feed photos reach about half a reel's audience; stories 4–8% of followers.",
     },
     "TikTok": {
         "view_rate": {"nano": [20, 45], "micro": [15, 35], "mid": [10, 25], "macro": [7, 18], "mega": [5, 12]},
         "eng_rate": {"nano": [4.0, 7.5], "micro": [3.5, 6.0], "mid": [3.0, 5.0], "macro": [2.5, 4.5], "mega": [2.0, 3.5]},
         "reach_per_view": 0.8, "ctr": [0.2, 0.6],
-        "cpm": [30, 15], "cpe": [2.0, 1.0], "cpc": [5, 2.5],
+        "cpm": [50, 25], "cpe": [6.0, 3.0], "cpc": [12, 6],
         "note": "Views swing more than on Instagram — one post can travel far beyond followers.",
     },
     "Snapchat": {
         "view_rate": {"nano": [8, 15], "micro": [7, 13], "mid": [6, 11], "macro": [5, 9], "mega": [4, 7]},
         "eng_rate": {"nano": [0.5, 1.2], "micro": [0.5, 1.0], "mid": [0.4, 0.9], "macro": [0.3, 0.8], "mega": [0.3, 0.6]},
         "reach_per_view": 0.95, "ctr": [0.4, 1.0],
-        "cpm": [35, 20], "cpe": [8.0, 4.0], "cpc": [5, 2.5],
+        "cpm": [50, 30], "cpe": [12.0, 6.0], "cpc": [12, 6],
         "note": "Story views. Snapchat shows no public likes, so judge it on views and swipe-ups.",
     },
     "YouTube": {
         "view_rate": {"nano": [6, 15], "micro": [5, 12], "mid": [4, 10], "macro": [3, 8], "mega": [2, 6]},
         "eng_rate": {"nano": [2.0, 4.0], "micro": [1.8, 3.5], "mid": [1.5, 3.0], "macro": [1.2, 2.5], "mega": [1.0, 2.0]},
         "reach_per_view": 0.85, "ctr": [0.3, 0.9],
-        "cpm": [60, 35], "cpe": [4.0, 2.0], "cpc": [7, 3.5],
+        "cpm": [60, 35], "cpe": [8.0, 4.0], "cpc": [15, 8],
         "note": "Long videos and Shorts. Views keep coming for weeks; judge at 30 days.",
     },
 }
