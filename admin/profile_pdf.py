@@ -297,6 +297,19 @@ def parse(path, handle):
 
 
 
+def fix_er(a):
+    """The report's headline engagement rate is sometimes 0.00% for an account
+    that plainly has likes and comments. Showing 0% is wrong, so work it out
+    from the averages the same report gives, and say so. Returns True if it
+    changed anything."""
+    f, lk, cm = a.get("followers"), a.get("avg_likes"), a.get("avg_comments")
+    if not a.get("er") and f and ((lk or 0) + (cm or 0)) > 0:
+        a["er"] = round(((lk or 0) + (cm or 0)) / f * 100, 2)
+        a["er_note"] = "calculated from average likes and comments (the report showed 0.00%)"
+        return True
+    return False
+
+
 def available():
     try:
         import fitz  # noqa: F401
@@ -321,6 +334,7 @@ def import_pdf(data, code, handle=None, source=None):
         a, media = parse(path, handle)
     finally:
         os.unlink(path)
+    fix_er(a)
     a["updated"] = time.strftime("%Y-%m-%d", time.gmtime())
     a["source"] = source or "profile report PDF"
     d = analysis.MEDIA / code
