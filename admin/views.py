@@ -2033,7 +2033,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         rows[-1] += (
             "</td><td><input name='cost' value='" + cost_txt + "' placeholder='cost' inputmode='numeric'>"
             + "<div class='profit'></div></td>"
-            + "<td><input name='p_from' value='" + val(0) + "' placeholder='from' inputmode='numeric'></td>"
+            + "<td><input name='p_from' value='" + val(0) + "' placeholder='from' inputmode='numeric'"
+              + (" data-def='%d|%d'" % (default[0], default[1]) if default and default[0] is not None else "") + "></td>"
             + "<td><input name='p_to' value='" + val(1) + "' placeholder='to' inputmode='numeric'></td>"
             + "<td><label class='tick' title='Also save this price as the creator&#39;s price on the roster, so every later selection starts from it'>"
               "<input type='checkbox' name='default' value='" + e(code) + "'> make default</label>"
@@ -2077,8 +2078,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "<div><label>Total the client sees (" + cur + ")</label><div style='display:flex;gap:6px'>"
           "<input name='total_from' value='" + tf + "' placeholder='from' inputmode='numeric'>"
           "<input name='total_to' value='" + tt + "' placeholder='to' inputmode='numeric'></div>"
-          "<div class='price-hint'>Empty = the sum of the creators below (currently "
-        + money_c(lo_sum, hi_sum) + ").</div></div>"
+          "<div class='price-hint'>Fills itself from the prices below as you type them (currently "
+        + money_c(lo_sum, hi_sum) + "). Type your own figure to override it; clear it to follow the creators again.</div></div>"
         + "</div></div>"
         + "<div class='card'><div class='row'>"
           "<div><label>Profit margin (%)</label><div class='margin-box'>"
@@ -2099,7 +2100,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "margin above. With no cost, type the price yourself, or leave it empty to use the "
           "creator's standard price. One figure = a fixed price. The client never sees a price "
           "against a creator — these add up to the total they see, unless you type a total above. "
-          "A price typed here stays in <b>this selection only</b>. Tick <b>make default</b> to also save it "
+          "Type a creator's <b>cost</b> and their price follows the margin, or type the <b>price</b> yourself and the "
+          "profit and margin are worked out for you. The totals fill themselves. A price typed here stays in <b>this selection only</b>. Tick <b>make default</b> to also save it "
           "as that creator's price on the roster, so every later selection starts from it. A cost is "
           "remembered for their next selection.</p>"
         + "<div class='row'><div style='flex:2'><label>Add creators (optional)</label>"
@@ -2122,38 +2124,94 @@ MARGIN_JS = """<script>
 (function(){
   var m=document.getElementById('sel-margin'), sum=document.getElementById('sel-money');
   if(!m||!sum) return;
-  function n(v){v=String(v||'').replace(/[^0-9.]/g,'');return v===''?null:Number(v);}
+  function n(v){v=String(v==null?'':v).replace(/[^0-9.]/g,'');return v===''?null:Number(v);}
   function fmt(x){return Math.round(x).toLocaleString('en-US')+' SAR';}
+  function num(x){return Math.round(x).toLocaleString('en-US');}
   function price(cost,mg){return Math.ceil(cost*(1+(mg||0)/100)/10)*10;}
-  // Costs and margin are in SAR; the price boxes are in the selection's currency.
+  // Costs and margin are in SAR; price and total boxes are in the selection's currency.
   var rate=Number(m.getAttribute('data-rate'))||1, cur=m.getAttribute('data-cur')||'SAR';
   var step=cur==='USD'?5:cur==='EGP'?50:10;
+  function toSar(v){return v===null?null:Math.round(v/rate);}
+  function shown(p){return rate===1?p:Math.round(p*rate/step)*step;}
+  var tol=Math.max(10,step/rate);
   var rows=[].slice.call(document.querySelectorAll('.sel-table tbody tr')).filter(function(r){
     return r.querySelector('input[name=cost]');});
-  function run(){
-    var mg=n(m.value), tc=0, tp=0, priced=0;
+  var tf=document.querySelector('input[name=total_from]'), tt=document.querySelector('input[name=total_to]');
+  // On load: a price that differs from cost + margin was typed by hand; keep it.
+  (function(){
+    var mg=n(m.value);
     rows.forEach(function(r){
-      var c=r.querySelector('input[name=cost]'), lo=r.querySelector('input[name=p_from]'),
-          hi=r.querySelector('input[name=p_to]'), out=r.querySelector('.profit'),
-          gone=r.querySelector('input[name=drop]').checked, cost=n(c.value);
-      if(cost===null){
-        if(lo.readOnly){lo.value='';hi.value='';}
-        lo.readOnly=hi.readOnly=false; out.textContent=''; return;
-      }
-      var p=price(cost,mg);
-      var shown=rate===1?p:Math.round(p*rate/step)*step;
-      lo.value=hi.value=shown.toLocaleString('en-US'); lo.readOnly=hi.readOnly=true;
-      out.textContent='+'+fmt(p-cost)+' profit';
-      if(!gone){tc+=cost;tp+=p;priced++;}
+      var cost=n(r.querySelector('input[name=cost]').value), lo=n(r.querySelector('input[name=p_from]').value);
+      if(cost!==null&&lo!==null&&Math.abs(toSar(lo)-price(cost,mg))>tol) r.dataset.manual='1';
     });
-    sum.innerHTML=priced?('<div><dt>Cost ('+priced+')</dt><dd>'+fmt(tc)+'</dd></div>'+
-      '<div><dt>Client price</dt><dd>'+fmt(tp)+'</dd></div>'+
-      '<div><dt>Profit</dt><dd class="gain">'+fmt(tp-tc)+'</dd></div>'):
+  })();
+  var totalsSet=false;
+  function rowPrice(r,mg){
+    var c=r.querySelector('input[name=cost]'), lo=r.querySelector('input[name=p_from]'), hi=r.querySelector('input[name=p_to]');
+    var cost=n(c.value), loV=n(lo.value), hiV=n(hi.value), manual=r.dataset.manual==='1';
+    if(cost!==null&&!manual){
+      var p=price(cost,mg), sh=shown(p);
+      lo.value=hi.value=num(sh); lo.dataset.auto=hi.dataset.auto='1';
+      return {cost:cost,lo:p,hi:p,auto:true};
+    }
+    if(lo.dataset.auto&&cost===null){lo.value='';hi.value='';delete lo.dataset.auto;delete hi.dataset.auto;loV=hiV=null;}
+    if(loV!==null||hiV!==null){
+      var a=toSar(loV!==null?loV:hiV), b=toSar(hiV!==null?hiV:loV);
+      return {cost:cost,lo:Math.min(a,b),hi:Math.max(a,b),manual:true};
+    }
+    var d=(lo.getAttribute('data-def')||'').split('|');          // standard price: counts toward the total
+    if(d.length===2) return {cost:cost,lo:Number(d[0]),hi:Number(d[1]),standard:true};
+    return {cost:cost,lo:null,hi:null};
+  }
+  function run(){
+    var mg=n(m.value), tc=0, tpc=0, tlo=0, thi=0, costed=0, counted=0;
+    rows.forEach(function(r){
+      var out=r.querySelector('.profit'), gone=r.querySelector('input[name=drop]').checked, x=rowPrice(r,mg);
+      out.textContent='';
+      if(x.lo!==null){
+        var mid=(x.lo+x.hi)/2;
+        if(x.cost!==null){
+          var pr=mid-x.cost, pc=x.cost?pr/x.cost*100:0;
+          out.textContent=(pr>=0?'+':'')+fmt(pr)+' profit · '+(Math.round(pc*10)/10)+'% margin'+(x.manual?' (your price)':'');
+          out.style.color=pr<0?'#c01010':'';
+        } else if(x.standard) out.textContent='standard price';
+      }
+      if(gone) return;
+      if(x.lo!==null){tlo+=x.lo;thi+=x.hi;counted++;}
+      if(x.cost!==null&&x.lo!==null){tc+=x.cost;tpc+=(x.lo+x.hi)/2;costed++;}
+    });
+    var profit=tpc-tc, margin=tc?profit/tc*100:0;
+    var priceTxt=counted?(thi>tlo?fmt(tlo)+' – '+fmt(thi):fmt(tlo)):'—';
+    sum.innerHTML=(costed||counted)?(
+      (costed?'<div><dt>Cost ('+costed+')</dt><dd>'+fmt(tc)+'</dd></div>':'')+
+      '<div><dt>Client price ('+counted+')</dt><dd>'+priceTxt+'</dd></div>'+
+      (costed?'<div><dt>Profit</dt><dd class="gain">'+fmt(profit)+'</dd></div>'+
+        '<div><dt>Margin on cost</dt><dd class="gain">'+(Math.round(margin*10)/10)+'%</dd></div>':'')):
       '<div><dt>Profit</dt><dd class="muted" style="font-size:14px;font-weight:400">'+
-      'Type a cost against a creator to see it.</dd></div>';
+      'Type a cost and a price against a creator to see it.</dd></div>';
+    // The total the client sees follows the prices, unless typed by hand.
+    if(tf&&tt&&counted){
+      if(!totalsSet){                                  // first run: a stored total that differs from the sum was typed
+        var a0=n(tf.value);
+        if(a0!==null&&Math.abs(toSar(a0)-tlo)>tol) tf.dataset.manual='1';
+        totalsSet=true;
+      }
+      if(tf.dataset.manual!=='1'){tf.value=num(shown(tlo));tt.value=num(shown(thi));}
+    }
   }
   document.addEventListener('input',function(e){
-    if(e.target===m||e.target.name==='cost') run();});
+    var t=e.target;
+    if(t===m||t.name==='cost') run();
+    else if(t.name==='p_from'||t.name==='p_to'){
+      var r=t.closest('tr'), cost=n(r.querySelector('input[name=cost]').value);
+      delete r.querySelector('input[name=p_from]').dataset.auto; delete r.querySelector('input[name=p_to]').dataset.auto;
+      if(t.value==='') delete r.dataset.manual; else if(cost!==null) r.dataset.manual='1';
+      run();
+    } else if(t===tf||t===tt){
+      if(tf.value===''&&tt.value==='') delete tf.dataset.manual; else tf.dataset.manual='1';
+      run();
+    }
+  });
   document.addEventListener('change',function(e){if(e.target.name==='drop') run();});
   run();
 })();

@@ -1383,13 +1383,21 @@ class Handler(BaseHTTPRequestHandler):
             if not code or code in codes or code in remove or code not in known:
                 continue
             codes.append(code)
-            # A cost decides the price: cost plus the margin. The price boxes
-            # for that creator are only read when no cost is given.
+            # A cost sets the price to cost plus the margin — unless the admin
+            # typed a different price for that creator, which is kept as their
+            # own (the page then shows the profit and margin it leaves).
             cost = num(cost)
             if cost is not None:
                 costs[code] = cost
-                p = db.client_price(cost, margin)
-                prices[code] = [p, p]
+                auto = db.client_price(cost, margin)
+                tlo, thi = fx.to_sar(num(lo), cur), fx.to_sar(num(hi), cur)
+                typed = tlo if tlo is not None else thi
+                step_sar = {"USD": 5, "EGP": 50}.get(cur, 10) / float(fx.rates().get(cur, 1.0))
+                if typed is not None and abs(typed - auto) > max(10, step_sar):
+                    a, b = (tlo if tlo is not None else thi), (thi if thi is not None else tlo)
+                    prices[code] = sorted([a, b])
+                else:
+                    prices[code] = [auto, auto]
                 continue
             # Typed in the selection's currency, kept in SAR.
             lo, hi = fx.to_sar(num(lo), cur), fx.to_sar(num(hi), cur)
