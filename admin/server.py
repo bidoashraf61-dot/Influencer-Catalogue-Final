@@ -667,6 +667,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_code_new()
         if path == "/codes/revoke":
             return self.post_code_revoke()
+        if path == "/codes/passcode":
+            return self.post_code_passcode()
         if path == "/codes/limits":
             return self.post_code_limits()
         if path == "/codes/device/remove":
@@ -875,6 +877,31 @@ class Handler(BaseHTTPRequestHandler):
                        max_devices=int(max_devices) if max_devices.isdigit()
                        and int(max_devices) > 0 else None)
         return self.redirect("/codes?new=" + urllib.parse.quote(code))
+
+    def post_code_passcode(self):
+        """Change the passcode a client types. One code row, so the Access codes
+        page and the selection page always show the same one."""
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        row = db.get_code(int(cid)) if cid.isdigit() else None
+        back = (f.get("back") or "/codes").strip()
+        if not back.startswith("/") or back.startswith("//"):
+            back = "/codes"
+        sep = "&" if "?" in back.split("#")[0] else "?"
+        def go(kind, msg):
+            base, _, frag = back.partition("#")
+            return self.redirect(base + sep + kind + "=" + urllib.parse.quote(msg) + ("#" + frag if frag else ""))
+        if row is None:
+            return self.redirect("/codes")
+        code = (f.get("passcode") or "").strip()
+        problem = auth.custom_code_problem(code)
+        if problem:
+            return go("e", problem)
+        other = db.code_by_hash(auth.hash_code(code))
+        if other is not None and other["id"] != row["id"]:
+            return go("e", "That passcode is already in use. Choose another.")
+        db.set_code_passcode(row["id"], code, auth.hash_code(code), auth.code_hint(code))
+        return go("ok", "Passcode for " + row["label"] + " changed. Tell the client the new one.")
 
     def post_code_limits(self):
         """Change a code's device limit, use limit and expiry. Empty = none."""
@@ -3102,6 +3129,7 @@ TRACKED = {
     "/codes/new": ("code", None, "Created access code"),
     "/codes/revoke": ("code", "id", "Revoked access code"),
     "/codes/limits": ("code", "id", "Changed access code limits"),
+    "/codes/passcode": ("code", "id", "Changed a passcode"),
     "/codes/device/remove": ("code", "code", "Removed a device"),
 }
 

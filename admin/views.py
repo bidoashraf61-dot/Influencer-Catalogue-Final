@@ -723,12 +723,27 @@ def _day(value):
     return time.strftime("%Y-%m-%d", time.gmtime(value)) if value else ""
 
 
+def passcode_form(c, back):
+    """Show and change the passcode a client types. Same form on the Access
+    codes page and on a selection, both writing the one code row."""
+    cid = str(c["id"])
+    cur = (c["code_plain"] if "code_plain" in c.keys() else None) or ""
+    return ("<form method='post' action='" + u("/codes/passcode") + "' class='row limits'>"
+            "<input type='hidden' name='id' value='" + cid + "'><input type='hidden' name='back' value='" + e(back) + "'>"
+            "<div style='flex:2'><label>Passcode the client types</label><input name='passcode' value='" + e(cur)
+            + "' placeholder='at least 6 letters or numbers, with a number' autocomplete='off' required></div>"
+            "<div style='align-self:end'><button class='btn small'>Change passcode</button></div></form>"
+            "<p class='price-hint'>Changing it is instant. Selections and campaigns stay attached; "
+            "anyone already inside stays inside, new visitors need the new one.</p>")
+
+
 def code_manage(c, devices):
     """The panel under a code: its limits, and every device it opened on."""
     cid = str(c["id"])
     maxd = c["max_devices"] if "max_devices" in c.keys() else None
     form = (
-        "<form method='post' action='" + u("/codes/limits") + "' class='row limits'>"
+        passcode_form(c, "/codes#code-" + cid)
+        + "<form method='post' action='" + u("/codes/limits") + "' class='row limits'>"
         "<input type='hidden' name='id' value='" + cid + "'>"
         "<div><label>Max devices</label><input name='max_devices' type='number' min='1' "
         "value='" + (str(maxd) if maxd else "") + "' placeholder='no limit'></div>"
@@ -2107,6 +2122,14 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         "<option value=\"%s (%s)\">" % (e(c["name"]), e(c["code"])) for c in creators if c["active"]) + "</datalist>"
     client_pill = ("<span class='pill own'>" + e(sel["code_label"]) + "</span>" if ("code_label" in sel.keys() and sel["code_label"])
                    else "<span class='pill warn'>No client assigned</span>")
+    import db as _db
+    _code = _db.get_code(sel["code_id"]) if sel["code_id"] else None
+    pass_html = ("<div class='card'><div class='hd'><h2>Client passcode</h2></div>"
+                 "<p class='sec-desc'>What the client types to open the link. It is the same passcode as on the Access codes page, "
+                 "so changing it here changes it there.</p>"
+                 + (passcode_form(_code, "/selections/edit?id=" + str(sel["id"]) + "#st=share") if _code is not None else
+                    "<p class='muted'>No client is attached yet. Pick one under <a href='#st=details' data-go-tab='st:details'>Details</a>.</p>")
+                 + "</div>")
     link_html = (
         "<div class='card'><div class='hd'><h2>Share with the client</h2></div>"
         "<p class='sec-desc'>Send this link. The client opens it with their passcode and sees these prices, never your costs or margins. "
@@ -2180,7 +2203,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "</div></div>"
                 + "</div>"
         + "<div class='savebar'><button class='btn lime'>Save changes</button><span class='muted'>Prices, margins and details are saved together.</span></div></form>"
-        + ui.panel("share", link_html) + ui.panel("campaign", campaign_html)
+        + ui.panel("share", link_html + pass_html) + ui.panel("campaign", campaign_html)
         + "</div>"
         + "<details class='card' style='margin-top:24px'><summary class='muted'>Delete this selection</summary>"
         + "<form method='post' action='" + u("/selections/delete") + "' data-confirm='Delete this selection? Its link stops working. You can restore it from History.' style='margin-top:12px'>"

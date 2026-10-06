@@ -629,6 +629,15 @@ def list_codes():
         ).fetchall()
 
 
+def set_code_passcode(code_id, code, hash_, hint):
+    """Give an existing code a new passcode. Everything attached to it (its
+    selections, campaigns, devices, history) stays; only what the client types
+    changes. A client already unlocked stays unlocked until the pass lapses."""
+    with connect() as conn:
+        conn.execute("UPDATE codes SET code_hash = ?, hint = ?, code_plain = ? WHERE id = ?",
+                     (hash_, hint, code, code_id))
+
+
 def revoke_code(code_id):
     with connect() as conn:
         conn.execute("UPDATE codes SET revoked_at = ? WHERE id = ?", (now(), code_id))
