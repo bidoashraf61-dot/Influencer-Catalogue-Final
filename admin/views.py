@@ -165,6 +165,11 @@ tr.flash td{animation:flash 2.4s ease-out}
 .stars .dim{color:#d8d2cc}
 .acct{font-size:12px;color:var(--gray)}
 .sel-table input{max-width:130px}
+a.to-roster{color:inherit;text-decoration:none;border-bottom:1px solid rgba(18,18,18,.25);
+  display:inline-flex;align-items:center;gap:5px}
+a.to-roster svg{opacity:.45}
+a.to-roster:hover{border-bottom-color:var(--ink)}
+a.to-roster:hover svg{opacity:1}
 .rsearch .added{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--gray);
   margin:0;white-space:nowrap}
 .rsearch .added input{width:auto;padding:8px 10px}
@@ -363,6 +368,16 @@ def urlencode(**kw):
     not carry `edit=&q=` and read as if something is set."""
     import urllib.parse
     return urllib.parse.urlencode({k: v for k, v in kw.items() if v})
+
+
+def roster_link(code, label):
+    """A creator's name that opens their roster edit form, in a new tab so a
+    half-filled campaign or selection form is not lost."""
+    return ("<a class='to-roster' href='" + u("/roster") + "?" + urlencode(edit=code) + "#" + e(code)
+            + "' target='_blank' rel='noopener' title='Edit " + e(code) + " on the roster'>"
+            + e(label) + "<svg viewBox='0 0 24 24' width='13' height='13' fill='none' stroke='currentColor' "
+            "stroke-width='2' stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'>"
+            "<path d='M14 4l6 6M4 20l4-1 11-11-3-3L5 16z'/></svg></a>")
 
 
 def u(path):
@@ -1899,7 +1914,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
             cost = c["cost"]
         cost_txt = format(cost, ",") if cost is not None else ""
         rows.append(
-            "<tr><td>" + shot + "</td><td><code>" + e(code) + "</code><br>" + e(c["name"])
+            "<tr><td>" + shot + "</td><td><code>" + e(code) + "</code><br>" + roster_link(code, c["name"])
             + ("" if c["active"] else " <span class='pill dead'>hidden</span>")
             + "<input type='hidden' name='code' value='" + e(code) + "'></td>"
             + "<td>" + e(c["tier"]) + "<br><span class='muted'>" + num(c["followers"]) + "</span>"
@@ -2159,7 +2174,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
                 if not gone and c["photo"] else "<span class='thumb sm none'>—</span>")
         who = ("<span class='pill dead'>no longer in the roster</span>" if gone else
-               e(c["name"]) + ("" if c["active"] else " <span class='pill dead'>hidden</span>"))
+               roster_link(code, c["name"]) + ("" if c["active"] else " <span class='pill dead'>hidden</span>"))
         accounts = "" if gone else ("".join(
             "<div class='acct'><a href='" + e(a["url"]) + "' target='_blank' rel='noopener'>"
             + e(a["platform"] or "link") + "</a> " + num(a["followers"]) + "</div>"
