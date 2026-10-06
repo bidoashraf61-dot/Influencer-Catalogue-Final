@@ -10,15 +10,6 @@ from pathlib import Path
 _VENDOR = Path(__file__).resolve().parent / "_vendor"
 if _VENDOR.is_dir():
     sys.path.insert(0, str(_VENDOR))
-    # The slim container has no C++ runtime; PyMuPDF's wheel needs one. The two
-    # libraries are kept beside it so a rebuilt container still works.
-    try:
-        import ctypes
-        for _lib in ("libgcc_s.so.1", "libstdc++.so.6"):
-            if (_VENDOR / "lib" / _lib).is_file():
-                ctypes.CDLL(str(_VENDOR / "lib" / _lib), mode=ctypes.RTLD_GLOBAL)
-    except OSError:
-        pass
 
 
 

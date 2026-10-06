@@ -32,6 +32,16 @@ the JavaScript and the data sits in the page regardless. Expiry, revocation and
 analytics are only meaningful because the check happens server-side.
 """
 
+
+import os as _os, sys as _sys
+from pathlib import Path as _P
+_LIB = _P(__file__).resolve().parent / "_vendor" / "lib"
+if __name__ == "__main__" and _LIB.is_dir() and str(_LIB) not in _os.environ.get("LD_LIBRARY_PATH", ""):
+    # The slim container has no C++ runtime and the PDF reader needs one. The
+    # libraries live beside it; the loader only reads this variable at start-up.
+    _os.environ["LD_LIBRARY_PATH"] = str(_LIB) + (":" + _os.environ["LD_LIBRARY_PATH"] if _os.environ.get("LD_LIBRARY_PATH") else "")
+    _os.execv(_sys.executable, [_sys.executable] + _sys.argv)
+
 import argparse
 import html
 import json
