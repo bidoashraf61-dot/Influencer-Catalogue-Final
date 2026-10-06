@@ -50,6 +50,7 @@ sys.path.insert(0, str(HERE))
 import auth  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
+import history  # noqa: E402
 import analysis  # noqa: E402
 import links  # noqa: E402
 import metrics  # noqa: E402
@@ -81,6 +82,7 @@ PHOTO_DIR = HERE.parent / "site" / "assets" / "catalogue"
 # same size however far the roster grows.
 ROSTER_PAGE = 100
 links.PHOTO_DIR = PHOTO_DIR
+history.PHOTO_DIR = PHOTO_DIR
 LOGO = HERE.parent / "site" / "assets" / "helv" / "logo-knockout.webp"
 ADMIN_COOKIE = "hv_admin"
 VIEWER_COOKIE = "hv_view"
@@ -153,8 +155,12 @@ class Handler(BaseHTTPRequestHandler):
         return fwd.split(",")[-1].strip() if fwd else self.client_address[0]
 
     def body(self):
-        length = int(self.headers.get("Content-Length") or 0)
-        return self.rfile.read(length) if length else b""
+        # Read once and kept: the history wrapper reads the form to learn what
+        # is about to change, then the handler reads it again.
+        if not hasattr(self, "_body"):
+            length = int(self.headers.get("Content-Length") or 0)
+            self._body = self.rfile.read(length) if length else b""
+        return self._body
 
     def json_body(self):
         try:
@@ -169,6 +175,11 @@ class Handler(BaseHTTPRequestHandler):
         return {k: v[0] for k, v in urllib.parse.parse_qs(self.body().decode()).items()}
 
     def send(self, code, body=b"", ctype="text/html; charset=utf-8", headers=None):
+        # While a tracked action runs, its answer waits until the change is in
+        # the History — otherwise the redirected page could load first.
+        if getattr(self, "_held", None) is not None:
+            self._held.append((code, body, ctype, headers))
+            return
         if isinstance(body, str):
             body = body.encode()
         self.send_response(code)
@@ -322,6 +333,13 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/":
             return self.send(200, views.dashboard(db.stats(), db.recent_events(12), who))
+        if path == "/history":
+            kind = (query.get("kind") or "").strip() or None
+            q = (query.get("q") or "").strip() or None
+            rows = history.listing(kind, q)
+            later = {r["id"]: len(history.later_changes(r)) for r in rows
+                     if not r["undone_at"] and r["action"] != "undo"}
+            return self.send(200, views.history_page(rows, later, kind, q, query.get("ok"), query.get("e")))
         if path == "/codes":
             return self.send(200, views.codes_page(db.list_codes(), query.get("new"), query.get("e"),
                                                    db.code_devices(), query.get("ok")))
@@ -555,7 +573,15 @@ class Handler(BaseHTTPRequestHandler):
         who = self.require_admin()
         if not who:
             return
+        history.set_actor(who["email"] if "email" in who.keys() else "admin")
+        if path == "/history/undo":
+            return self.post_history_undo()
+        spec = TRACKED.get(path)
+        if spec:
+            return self.tracked_post(path, spec)
+        return self.admin_post(path)
 
+    def admin_post(self, path):
         if path == "/codes/new":
             return self.post_code_new()
         if path == "/codes/revoke":
@@ -624,6 +650,49 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/password":
             return self.post_password()
         return self.send(404, views.simple("Not found", "That action does not exist."))
+
+    # ---------------------------------------------------------- history --
+
+    def tracked_post(self, path, spec):
+        """Run an admin action with a snapshot before and after, so it can be
+        undone from the History page. `spec` is (entity, form field holding
+        its key or None, verb)."""
+        entity, field, verb = spec
+        f = self.form_body()
+        key = (f.get(field) or "").strip() if field else ("*" if entity in ("roster", "tiers") else "")
+        if entity == "creator" and key:
+            key = key.upper()
+        new_keys = None
+        if not key:                        # a create: learn its key afterwards
+            new_keys = KEYSETS[entity]()
+        creators_before = KEYSETS["creator"]() if path == "/campaigns/save" else None
+        self._held = []
+        named_before = describe(entity, key, verb) if key else None   # a delete loses the name
+        try:
+            with history.tracked(entity, key or None, "") as t:
+                out = self.admin_post(path)
+                if new_keys is not None:
+                    fresh = sorted(KEYSETS[entity]() - new_keys)
+                    t["key"] = fresh[0] if len(fresh) == 1 else None
+                after = describe(entity, t["key"], verb)
+                t["label"] = named_before if (named_before and len(named_before) > len(after)) else after
+            if creators_before is not None:   # creators a campaign save added to the roster
+                for code in sorted(KEYSETS["creator"]() - creators_before):
+                    history.record("created", "creator", code, describe("creator", code, "Added from a campaign"),
+                                   None, history.snapshot("creator", code))
+        finally:
+            held, self._held = self._held, None
+            for args in held:
+                self.send(*args)
+        return out
+
+    def post_history_undo(self):
+        f = self.form_body()
+        hid = (f.get("id") or "").strip()
+        ok, msg = history.undo(int(hid)) if hid.isdigit() else (False, "Nothing to undo.")
+        back = "/history" + ("?kind=" + urllib.parse.quote(f["kind"]) if f.get("kind") else "")
+        sep = "&" if "?" in back else "?"
+        return self.redirect(back + sep + ("ok=" if ok else "e=") + urllib.parse.quote(msg))
 
     # ------------------------------------------------------- admin actions --
 
@@ -1113,7 +1182,9 @@ class Handler(BaseHTTPRequestHandler):
                 stale = PHOTO_DIR / Path(str(existing["photo"]).split("?")[0]).name
                 try:
                     if stale.parent == PHOTO_DIR and stale.is_file():
-                        stale.unlink()
+                        # To the bin, not erased: Undo on the History page
+                        # brings the photograph back with the creator.
+                        history.trash_photo(stale.name)
                         Handler.forget_photo_widths()
                 except OSError:
                     # A photo we cannot remove is untidy, not a reason to leave
@@ -1134,7 +1205,7 @@ class Handler(BaseHTTPRequestHandler):
                 at = [c["code"] for c in db.list_creators(search=f.get("q"))].index(near)
                 f = dict(f, page=str(at // ROSTER_PAGE + 1))
             return self.roster_back(f, ("near-" + near) if near else None,
-                                    ok=code + " deleted.")
+                                    ok=code + " deleted. Changed your mind? Restore it from History → Trash.")
         return self.roster_back(f)
 
     # --------------------------------------------------------- selections --
@@ -2348,6 +2419,68 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json(200, {"ok": True}, self.cors())
 
 
+# Admin actions that are recorded for undo: path -> (what they change, the
+# form field naming which one, how the History page describes it). A field
+# of None, or an empty one, is a create — its key is found afterwards.
+TRACKED = {
+    "/roster/save": ("creator", "code", "Saved creator"),
+    "/roster/delete": ("creator", "code", "Deleted creator"),
+    "/roster/import": ("roster", None, "Imported a roster sheet"),
+    "/tiers/save": ("tiers", None, "Changed tiers"),
+    "/tiers/delete": ("tiers", None, "Deleted a tier"),
+    "/selections/new": ("selection", None, "Created selection"),
+    "/selections/save": ("selection", "id", "Saved selection"),
+    "/selections/delete": ("selection", "id", "Deleted selection"),
+    "/campaigns/new": ("campaign", None, "Created campaign"),
+    "/campaigns/save": ("campaign", "id", "Saved campaign"),
+    "/campaigns/delete": ("campaign", "id", "Deleted campaign"),
+    "/campaigns/link": ("campaign", "id", "Changed a tracking link"),
+    "/campaigns/link/custom": ("campaign", "id", "Added a tracking link"),
+    "/campaigns/link/toggle": ("campaign", "id", "Switched a tracking link"),
+    "/campaigns/content/add": ("campaign", "id", "Added a post"),
+    "/campaigns/content/update": ("campaign", "id", "Changed a post"),
+    "/campaigns/insights/decide": ("campaign", "id", "Reviewed insights"),
+    "/campaigns/insights/upload": ("campaign", "id", "Uploaded insights"),
+    "/campaigns/sync": ("campaign", "id", "Synced campaign creators"),
+    "/codes/new": ("code", None, "Created access code"),
+    "/codes/revoke": ("code", "id", "Revoked access code"),
+    "/codes/limits": ("code", "id", "Changed access code limits"),
+    "/codes/device/remove": ("code", "code", "Removed a device"),
+}
+
+
+def _keys(sql):
+    with db.connect() as conn:
+        return {str(r[0]) for r in conn.execute(sql)}
+
+
+KEYSETS = {
+    "creator": lambda: _keys("SELECT code FROM creators"),
+    "selection": lambda: _keys("SELECT id FROM selections"),
+    "campaign": lambda: _keys("SELECT id FROM campaigns"),
+    "code": lambda: _keys("SELECT id FROM codes"),
+}
+
+
+def describe(entity, key, verb):
+    """'Deleted creator HV-MI-212 · Bodor Mamdouh' — read from the before or
+    after state, whichever exists."""
+    name = ""
+    try:
+        with db.connect() as conn:
+            if entity == "creator" and key:
+                r = conn.execute("SELECT name FROM creators WHERE code = ?", (key,)).fetchone()
+                name = key + (" · " + r[0] if r else "")
+            elif entity in ("selection", "campaign", "code") and key and str(key).isdigit():
+                table, col = {"selection": ("selections", "name"), "campaign": ("campaigns", "name"),
+                              "code": ("codes", "label")}[entity]
+                r = conn.execute("SELECT %s FROM %s WHERE id = ?" % (col, table), (int(key),)).fetchone()
+                name = (r[0] if r else "#" + str(key))
+    except Exception:
+        pass
+    return verb + ((" " + name) if name else "")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8900)
@@ -2360,6 +2493,7 @@ def main():
     args = ap.parse_args()
 
     db.init()
+    history.init()
     db.purge_expired_sessions()
     ALLOWED_ORIGINS.update(args.origin)
     global BASE

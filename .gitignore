@@ -35,3 +35,7 @@ admin/geo.db.tmp
 # Insight screenshots creators upload for campaigns — client data.
 admin/insight_files/
 deploy/catalogue/secret.conf
+
+# Undo bin: photographs of deleted creators, kept so a restore brings them
+# back. Creator data — never in this public repository.
+admin/trash/

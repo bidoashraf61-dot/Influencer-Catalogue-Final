@@ -391,7 +391,7 @@ def page(title, body, active=""):
     items = [("/", "Overview"), ("/codes", "Access codes"), ("/analytics", "Analytics"),
              ("/clients", "Clients"), ("/roster", "Roster"), ("/analysis", "Creator analysis"),
              ("/selections", "Selections"), ("/campaigns", "Campaigns"),
-             ("/requests", "Requests"), ("/settings", "Settings")]
+             ("/requests", "Requests"), ("/history", "History"), ("/settings", "Settings")]
     # Requests nobody has handled yet, counted on every page so a new one is
     # seen from wherever the admin happens to be. The page script keeps it
     # live afterwards.
@@ -424,7 +424,7 @@ def page(title, body, active=""):
         + '<a class="brand" href="' + u("/") + '"><img src="' + u("/static/logo.webp") + '" alt="HelloVoice" '
           'height="26"><span>' + e(NAME) + "</span></a>"
         + "<nav>" + nav + '<a href="' + u("/logout") + '">Sign out</a></nav>'
-        + '</div></header><main class="wrap">' + body + "</main>"
+        + '</div></header><main class="wrap">' + body + "</main>" + SCROLL_JS
         + "<div class='toast' id='req-toast' role='status' hidden></div>"
         + "<script>window.HV_PULSE=" + json.dumps({"latest": pulse["latest"],
                                                     "company": pulse.get("company", ""),
@@ -2970,3 +2970,74 @@ def recommend_card(rec):
             "<script>function hvUseSafe(b){var d=JSON.parse(b.getAttribute('data-safe'));"
             "Object.keys(d).forEach(function(k){var i=document.querySelector('[name=target_'+k+']');if(i)i.value=d[k];});"
             "b.textContent='Filled — save to keep';}</script></div>")
+
+
+# Saving a form reloads the page; without this the admin lands at the top and
+# scrolls back down to where they were, after every save. The position is
+# kept for the same page only, for a minute, and a link to a #row wins.
+SCROLL_JS = """<script>
+(function(){
+  var key = 'hv-scroll:' + location.pathname;
+  document.addEventListener('submit', function(){
+    try { sessionStorage.setItem(key, JSON.stringify({y: window.scrollY, t: Date.now()})); } catch (e) {}
+  }, true);
+  var saved = null;
+  try { saved = JSON.parse(sessionStorage.getItem(key) || 'null'); sessionStorage.removeItem(key); } catch (e) {}
+  if (!saved || Date.now() - saved.t > 60000 || location.hash) return;
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+  var go = function(){ window.scrollTo(0, saved.y); };
+  if (document.readyState === 'complete') go(); else window.addEventListener('load', go);
+  document.addEventListener('DOMContentLoaded', go);
+})();
+</script>"""
+
+
+HISTORY_KINDS = [("", "Everything"), ("trash", "Trash (deleted)"), ("creator", "Creators"),
+                 ("campaign", "Campaigns"), ("selection", "Selections"), ("code", "Access codes"),
+                 ("tiers", "Tiers"), ("roster", "Roster imports")]
+
+
+def history_page(rows, later, kind=None, q=None, message=None, error=None):
+    note = ""
+    if error:
+        note += "<div class='err'>" + e(error) + "</div>"
+    if message:
+        note += "<div class='ok'>" + e(message) + "</div>"
+    tabs = "".join(
+        "<a class='btn small" + ("" if (kind or "") == v else " ghost") + "' href='" + u("/history")
+        + ("?" + urlencode(kind=v) if v else "") + "'>" + e(l) + "</a>" for v, l in HISTORY_KINDS)
+    verbs = {"created": "Created", "edited": "Edited", "deleted": "Deleted", "undo": "Undo"}
+    out = []
+    for r in rows:
+        done = r["undone_at"] is not None
+        state = ("<span class='pill dead'>undone " + ago(r["undone_at"]) + "</span>") if done else ""
+        n = later.get(r["id"], 0)
+        warn = (" It will also take back " + str(n) + " later change" + ("" if n == 1 else "s")
+                + " to the same item.") if n else ""
+        btn = "" if done else (
+            "<form method='post' action='" + u("/history/undo") + "' class='inline' onsubmit=\"return confirm('"
+            + e(("Undo: " + (r["label"] or "") + "?" + warn).replace("'", "’")) + "')\">"
+            "<input type='hidden' name='id' value='" + str(r["id"]) + "'>"
+            "<input type='hidden' name='kind' value='" + e(kind or "") + "'>"
+            "<button class='btn small" + ("" if r["action"] == "deleted" else " ghost") + "'>"
+            + ("Restore" if r["action"] == "deleted" else "Redo" if r["action"] == "undo" else "Undo")
+            + "</button></form>")
+        out.append("<tr" + (" class='muted'" if done else "") + "><td class='muted'>" + ago(r["at"]) + "<br>"
+                   + ts(r["at"]) + "</td><td><span class='pill " + ("dead" if r["action"] == "deleted" else "own")
+                   + "'>" + e(verbs.get(r["action"], r["action"])) + "</span></td><td><strong>"
+                   + e(r["label"] or r["entity"]) + "</strong> " + state + "<br><span class='muted'>"
+                   + e(r["who"] or "") + "</span></td><td class='right'>" + btn + "</td></tr>")
+    table = "".join(out) or "<tr><td colspan='4' class='muted'>Nothing here yet.</td></tr>"
+    body = (
+        "<h1>History</h1><p class='sub'>Every change made in the admin, newest first, kept for 90 days. "
+        "<strong>Undo</strong> puts that item back exactly as it was just before the change — a deleted "
+        "creator comes back with their photo, a campaign with its creators, links, posts and clicks. "
+        "An undo is listed too, so it can be taken back the same way (redo).</p>"
+        + note + "<div class='row' style='gap:8px;flex-wrap:wrap;margin:6px 0 14px'>" + tabs + "</div>"
+        + "<form class='rsearch' method='get' action='" + u("/history") + "'>"
+        + ("<input type='hidden' name='kind' value='" + e(kind) + "'>" if kind else "")
+        + "<input name='q' value='" + e(q or "") + "' placeholder='Search by name or code' autocomplete='off'>"
+        "<button class='btn small'>Search</button></form>"
+        + "<div class='card'><table><thead><tr><th>When</th><th>What</th><th>Item</th><th></th></tr></thead><tbody>"
+        + table + "</tbody></table></div>")
+    return page("History", body, "/history")
