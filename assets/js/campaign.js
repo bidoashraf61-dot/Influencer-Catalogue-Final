@@ -165,8 +165,9 @@
       + '<ol class="mx-none__steps"><li><b>1</b><span>Pick creators from the catalogue and send us your shortlist.</span></li>'
       + "<li><b>2</b><span>We agree the brief, the targets and the dates with you.</span></li>"
       + "<li><b>3</b><span>The campaign goes live and you follow it here, day by day.</span></li></ol>"
-      + '<div class="mx-none__actions"><a class="mx-camp__go" href="../">Browse the creators →</a><a class="mx-none__mail" href="mailto:info@hellovoice.co.uk">Talk to HelloVoice</a></div></div>'
-      + '<div class="mx-none__ghost" aria-hidden="true"><div class="mx-camp__head"><div class="mx-none__logo"></div><div><div class="mx-none__line mx-none__line--title"></div><div class="mx-none__line"></div></div><span class="mx-camp__state mx-camp__state--live">Live</span></div>'
+      + '<div class="mx-none__actions"><a class="mx-camp__go" href="../">Browse the creators →</a><a class="mx-none__mail" href="https://hellovoice.co.uk/service/influencer-campaigns/" target="_blank" rel="noopener">See our influencer work ↗</a></div></div>'
+      + '<div class="mx-none__ghost" aria-hidden="true"><div class="mx-none__brands"><img src="../assets/brand/logo.png" alt=""><span>×</span><b>Your brand</b><span class="mx-camp__state mx-camp__state--live">Live</span></div>'
+      + '<p class="mx-none__sub">Track your campaign performance, day by day.</p>'
       + '<div class="mx-camp__prog"><div class="mx-tl__head"><div><span class="mx-tl__label">Campaign timeline</span><b class="mx-tl__stage">Publishing</b></div><div class="mx-tl__count"><b>Day 6 of 20</b><em>14 days left</em></div></div>'
       + '<div class="mx-tl__track">' + "ddddddda.".split("").map(function (k) { return '<span class="mx-tl__seg mx-tl__seg--' + ({ d: "done", a: "active", ".": "pending" })[k] + '"></span>'; }).join("") + "</div>"
       + '<div class="mx-tl__foot"><span></span><span>7 of 9 steps done</span><span></span></div></div><p class="mx-none__tag">Example</p></div></section>';

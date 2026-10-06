@@ -383,6 +383,10 @@ def page(title, body, active=""):
         pulse = {"open": 0, "latest": 0}
 
     def badge(href):
+        if href == "/analysis":
+            n = pulse.get("a_open", 0)
+            return ("<span class='badge' id='an-badge'" + ("" if n else " hidden") + ">"
+                    + str(n) + "</span>")
         if href != "/requests":
             return ""
         n = pulse["open"]
@@ -407,7 +411,9 @@ def page(title, body, active=""):
                                                     "company": pulse.get("company", ""),
                                                     "count": pulse.get("count", 0),
                                                     "api": u("/api/pulse"),
-                                                    "requests": u("/requests")})
+                                                    "requests": u("/requests"),
+                                                    "a_latest": pulse.get("a_latest", 0),
+                                                    "analysis": u("/analysis")})
         + ";" + PULSE_JS + "</script></body></html>"
     )
 
@@ -418,9 +424,22 @@ def page(title, body, active=""):
 # per browser, so a request is announced once rather than on every page.
 PULSE_JS = """
 (function(){
-  var P=window.HV_PULSE, KEY='hv_seen_request';
+  var P=window.HV_PULSE, KEY='hv_seen_request', AKEY='hv_seen_analysis';
   var seen=+(localStorage.getItem(KEY)||0);
   if(!seen){ seen=P.latest; try{localStorage.setItem(KEY,seen);}catch(e){} }
+  var aseen=+(localStorage.getItem(AKEY)||0);
+  if(!aseen){ aseen=P.a_latest||0; try{localStorage.setItem(AKEY,aseen);}catch(e){} }
+  function announce(msg, href){
+    var t=document.getElementById('req-toast');
+    if(t){ t.innerHTML=''; var a=document.createElement('a'); a.href=href;
+           a.textContent=msg+' — open'; t.appendChild(a); t.hidden=false;
+           clearTimeout(t._h); t._h=setTimeout(function(){t.hidden=true;},15000); }
+    chime();
+    if(window.Notification && Notification.permission==='granted'){
+      try{ var n=new Notification('HelloVoice catalogue',{body:msg});
+           n.onclick=function(){window.focus();location.href=href;}; }catch(e){}
+    }
+  }
   var base=document.title.replace(/^\\(\\d+\\)\\s*/,'');
   function chime(){
     try{
@@ -439,7 +458,14 @@ PULSE_JS = """
   function show(d){
     var b=document.getElementById('req-badge');
     if(b){ b.textContent=d.open; b.hidden=!d.open; }
-    document.title=(d.open?'('+d.open+') ':'')+base;
+    var ab=document.getElementById('an-badge');
+    if(ab && d.a_open!=null){ ab.textContent=d.a_open; ab.hidden=!d.a_open; }
+    var total=(d.open||0)+(d.a_open||0);
+    document.title=(total?'('+total+') ':'')+base;
+    if(d.a_latest>aseen){
+      aseen=d.a_latest; try{localStorage.setItem(AKEY,aseen);}catch(e){}
+      announce('New analysis request'+(d.a_creator?' for '+d.a_creator:'')+(d.a_client?' from '+d.a_client:''), P.analysis);
+    }
     if(d.latest>seen){
       seen=d.latest; try{localStorage.setItem(KEY,seen);}catch(e){}
       var msg='New quote request'+(d.company?' from '+d.company:'')+
@@ -467,7 +493,8 @@ PULSE_JS = """
     }
   });
   show({open:+(document.getElementById('req-badge')||{}).textContent||0, latest:P.latest,
-        company:P.company, count:P.count});
+        company:P.company, count:P.count,
+        a_open:+(document.getElementById('an-badge')||{}).textContent||0, a_latest:P.a_latest||0});
   setInterval(poll,20000);
   document.addEventListener('visibilitychange',function(){ if(!document.hidden) poll(); });
 })();
@@ -2865,8 +2892,9 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
         "A creator without one shows a locked page with <em>Request full analysis</em>; requests land below.</p>"
         + _notes(error, message)
         + "<div class='grid2'><div class='card'><h3 style='margin-top:0'>1 · Download the template</h3>"
-          "<p class='muted'>One workbook, many creators: Overview, Audience, Growth, Posts, Brands, Hashtags, Notable "
-          "followers, Lookalikes — every row starts with the creator code.</p>"
+          "<p class='muted'>One workbook, many creators, laid out like a Modash profile report: Overview, Audience "
+          "(followers and likers), Growth, Posts, Brands (with logos), Hashtags &amp; mentions — every row starts with "
+          "the creator code.</p>"
           "<a class='btn small' href='" + u("/analysis/template.xlsx") + "'>Download template (.xlsx)</a></div>"
         + "<form class='card' method='post' action='" + u("/analysis/upload") + "' enctype='multipart/form-data'>"
           "<h3 style='margin-top:0'>2 · Upload it filled in</h3><input type='file' name='file' accept='.xlsx' required>"

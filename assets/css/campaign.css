@@ -612,3 +612,9 @@
 .mx-none__line--title { height: 22px; width: 180px; margin-top: 0; }
 .mx-none .mx-none__tag { position: absolute; top: -12px; right: 20px; margin: 0; padding: 3px 10px; border-radius: var(--r-pill); background: var(--ink); color: var(--white); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; }
 @media (max-width: 860px) { .mx-none { grid-template-columns: 1fr; padding: 24px; } .mx-none__ghost { transform: none; } }
+.mx-none__brands { display: flex; align-items: center; gap: 12px; }
+.mx-none__brands img { height: 28px; width: auto; }
+.mx-none__brands span:not(.mx-camp__state) { font-size: 20px; color: var(--gray); }
+.mx-none__brands b { font-family: var(--heading); font-weight: 400; font-size: 28px; line-height: 1; letter-spacing: .02em; padding: 6px 14px; border: 2px dashed rgba(18,18,18,.3); border-radius: var(--r-sm); }
+.mx-none__brands .mx-camp__state { margin-left: auto; }
+.mx-none .mx-none__sub { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }

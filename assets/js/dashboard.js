@@ -107,7 +107,7 @@
     if (c.client) bits.unshift(esc(c.client));
     $("db-sub").innerHTML = bits.join(" · ");
     var v = R.verdict || {};
-    $("db-verdict").innerHTML = '<span class="db-verdict' + (v.grade ? " db-verdict--" + v.grade : "") + '">' + esc(v.label || "") + "</span>";
+    $("db-verdict").innerHTML = v.label ? '<span class="db-verdict' + (v.grade ? " db-verdict--" + v.grade : "") + '" role="status" title="How the campaign is doing against its targets today">' + esc(v.label) + "</span>" : "";
     $("db-report").href = "../#t=" + TOKEN;
     $("db-pdf").href = "../#t=" + TOKEN;
     $("db-pdf").addEventListener("click", function () { try { sessionStorage.setItem("hv_print", "1"); } catch (e) {} });

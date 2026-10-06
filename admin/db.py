@@ -2262,6 +2262,18 @@ def request_pulse():
             "       (SELECT COALESCE(MAX(id), 0) FROM requests) latest").fetchone()
         last = conn.execute(
             "SELECT id, company, name, selection FROM requests ORDER BY id DESC LIMIT 1").fetchone()
+        # Creator-analysis requests from the catalogue, counted and announced
+        # the same way as quote requests.
+        an = conn.execute(
+            "SELECT (SELECT COUNT(*) FROM analysis_requests WHERE handled_at IS NULL) open, "
+            "       (SELECT COALESCE(MAX(id), 0) FROM analysis_requests) latest").fetchone()
+        alast = conn.execute(
+            "SELECT r.name creator, c.label client FROM analysis_requests a "
+            "LEFT JOIN creators r ON r.code = a.code LEFT JOIN codes c ON c.id = a.code_id "
+            "ORDER BY a.id DESC LIMIT 1").fetchone()
     return {"open": r["open"], "latest": r["latest"],
             "company": (last["company"] or last["name"] or "") if last else "",
-            "count": len(json.loads(last["selection"] or "[]")) if last else 0}
+            "count": len(json.loads(last["selection"] or "[]")) if last else 0,
+            "a_open": an["open"], "a_latest": an["latest"],
+            "a_creator": (alast["creator"] or "") if alast else "",
+            "a_client": (alast["client"] or "") if alast else ""}

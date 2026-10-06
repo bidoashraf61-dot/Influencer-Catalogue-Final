@@ -1,10 +1,12 @@
 """Creator full analysis: the template admins fill in, and the parser that
 turns it (or a pasted JSON document) into the stored analysis.
 
-The sections mirror a Modash profile report: overview numbers, audience
-(countries, cities, gender, ages, languages, interests, brand affinity,
-reachability, credibility), follower growth, top and sponsored posts, brands
-worked with, hashtags, notable followers and lookalike creators.
+The sections mirror a Modash profile report: overview numbers (all content,
+reels, stories, collaborations), audience quality (real people, mass and
+suspicious followers, fake followers and likers), audience by followers and
+by likers (countries, cities, gender, ages, languages, interests, brand
+affinity, reachability), follower and likes growth, popular and sponsored
+posts, brands worked with (with logos), hashtags and mentions.
 
 One workbook can carry many creators — every sheet is keyed by creator code —
 so a whole batch is one upload.
@@ -23,31 +25,40 @@ OVERVIEW = [
     ("paid_post_performance", "Paid post performance %"),
     ("fake_followers_pct", "Fake followers %"), ("credibility_pct", "Audience credibility %"),
     ("source", "Source (e.g. Modash Oct 2026)"), ("updated", "Data date (YYYY-MM-DD)"),
+    # Added to match the Modash report; every one is optional.
+    ("account_type", "Account type (Creator / Business)"),
+    ("est_impressions", "Estimated impressions"), ("est_reach", "Estimated reach"),
+    ("reels_er", "Reels engagement rate %"), ("avg_reel_likes", "Reels avg likes"),
+    ("avg_reel_comments", "Reels avg comments"), ("avg_reel_shares", "Reels avg shares"),
+    ("story_reach", "Stories estimated reach"), ("story_impressions", "Stories estimated impressions"),
+    ("paid_views_pct", "Paid views %"), ("fake_likers_pct", "Fake likers %"),
+    ("real_people_pct", "Real people %"), ("mass_followers_pct", "Real mass followers %"),
+    ("suspicious_mass_pct", "Suspicious mass %"), ("suspicious_pct", "Suspicious accounts %"),
 ]
+TEXT_KEYS = ("platform", "handle", "source", "updated", "account_type")
 AUDIENCE_SECTIONS = ["countries", "cities", "gender", "ages", "languages", "interests",
                      "brand_affinity", "reachability"]
 SHEETS = {
     "Overview": [label for _, label in OVERVIEW],
     "Audience": ["Creator code", "Section (" + " / ".join(AUDIENCE_SECTIONS) + ")",
-                 "Label (country code SA, city, female/male, 18-24, …)", "Percent"],
+                 "Label (country code SA, city, female/male, 18-24, …)", "Percent",
+                 "Audience of (followers / likers — empty means followers)"],
     "Growth": ["Creator code", "Month (YYYY-MM)", "Followers", "Avg likes (optional)"],
     "Posts": ["Creator code", "Kind (top / sponsored)", "Post link", "Image link (optional)",
               "Date (YYYY-MM-DD)", "Likes", "Comments", "Views", "Brand (sponsored)"],
-    "Brands": ["Creator code", "Brand", "Posts mentioning it"],
-    "Hashtags": ["Creator code", "Hashtag or @mention", "Times used"],
-    "Notable followers": ["Creator code", "Name", "Handle", "Followers"],
-    "Lookalikes": ["Creator code", "Name", "Handle", "Followers", "HV code if in roster"],
+    "Brands": ["Creator code", "Brand", "Posts mentioning it", "Logo link or website (optional)"],
+    "Hashtags": ["Creator code", "Hashtag or @mention", "Times used or %"],
 }
 EXAMPLE = {
     "Overview": ["HV-XX-000", "Instagram", "example_handle", "84000", "610", "512", "3.4", "2700",
-                 "160", "", "31000", "2.9", "6", "88", "Modash Oct 2026", "2026-10-01"],
-    "Audience": ["HV-XX-000", "countries", "SA", "71"],
+                 "160", "", "31000", "2.9", "6", "88", "Modash Oct 2026", "2026-10-01",
+                 "Creator", "120000", "80000", "2.1", "2300", "90", "60", "9000", "9500",
+                 "30", "5", "78", "6", "4", "12"],
+    "Audience": ["HV-XX-000", "countries", "SA", "71", ""],
     "Growth": ["HV-XX-000", "2026-09", "84000", ""],
     "Posts": ["HV-XX-000", "top", "https://www.instagram.com/p/…", "", "2026-09-12", "5400", "210", "", ""],
-    "Brands": ["HV-XX-000", "Example brand", "3"],
+    "Brands": ["HV-XX-000", "Example brand", "3", "examplebrand.com"],
     "Hashtags": ["HV-XX-000", "#skincare", "14"],
-    "Notable followers": ["HV-XX-000", "Example name", "example", "120000"],
-    "Lookalikes": ["HV-XX-000", "Example name", "example2", "90000", ""],
 }
 
 
@@ -104,7 +115,7 @@ def parse_workbook(data, known_codes):
             v = r[i].strip()
             if not v:
                 continue
-            if k in ("platform", "handle", "source", "updated"):
+            if k in TEXT_KEYS:
                 d[k] = v
             else:
                 d[k] = _num(v)
@@ -116,12 +127,14 @@ def parse_workbook(data, known_codes):
         if section not in AUDIENCE_SECTIONS or pct is None:
             problems.append("Audience row for %s skipped: section '%s'." % (r[0], r[1]))
             continue
+        who = (r[4].strip().lower() if len(r) > 4 else "")
+        aud = d.setdefault("audience_likers", {}) if who.startswith("lik") else d["audience"]
         if section == "gender":
-            d["audience"].setdefault("gender", {})[label.lower()] = pct
+            aud.setdefault("gender", {})[label.lower()] = pct
         elif section == "countries":
-            d["audience"].setdefault("countries", []).append({"code": label.upper()[:2], "pct": pct})
+            aud.setdefault("countries", []).append({"code": label.upper()[:2], "pct": pct})
         else:
-            d["audience"].setdefault(section, []).append({"name": label, "pct": pct})
+            aud.setdefault(section, []).append({"name": label, "pct": pct})
     for r in rows("Growth"):
         d = doc(r[0] if r else "")
         if d is None or len(r) < 3:
@@ -138,10 +151,8 @@ def parse_workbook(data, known_codes):
             "url": r[2].strip(), "thumb": r[3].strip() if r[3].startswith("https://") else None,
             "date": r[4].strip()[:10] or None, "likes": _intish(r[5]), "comments": _intish(r[6]),
             "views": _intish(r[7]), "brand": r[8].strip() or None})
-    for sheet, key, fields in (("Brands", "brands", ("name", "count")),
-                               ("Hashtags", "hashtags", ("tag", "count")),
-                               ("Notable followers", "notable_followers", ("name", "handle", "followers")),
-                               ("Lookalikes", "lookalikes", ("name", "handle", "followers", "code"))):
+    for sheet, key, fields in (("Brands", "brands", ("name", "count", "logo")),
+                               ("Hashtags", "hashtags", ("tag", "count"))):
         for r in rows(sheet):
             d = doc(r[0] if r else "")
             if d is None:
@@ -149,13 +160,14 @@ def parse_workbook(data, known_codes):
             vals = (r[1:] + [""] * len(fields))[:len(fields)]
             item = {}
             for f, v in zip(fields, vals):
-                item[f] = _intish(v) if f in ("count", "followers") else (v.strip() or None)
+                item[f] = _num(v) if f in ("count", "followers") else (v.strip() or None)
             if item.get(fields[0]):
                 d.setdefault(key, []).append(item)
     for d in docs.values():
-        for k in ("countries", "cities", "ages", "languages", "interests", "brand_affinity"):
-            if k in d["audience"]:
-                d["audience"][k].sort(key=lambda x: -(x.get("pct") or 0))
+        for aud in (d["audience"], d.get("audience_likers") or {}):
+            for k in ("countries", "cities", "ages", "languages", "interests", "brand_affinity"):
+                if k in aud:
+                    aud[k].sort(key=lambda x: -(x.get("pct") or 0))
         if "growth" in d:
             d["growth"].sort(key=lambda x: x["month"])
     return docs, problems
@@ -165,8 +177,8 @@ def clean_json(doc):
     """A pasted JSON analysis, kept to the known shape."""
     if not isinstance(doc, dict):
         raise ValueError("The analysis must be a JSON object.")
-    allowed = {k for k, _ in OVERVIEW} | {"audience", "growth", "top_posts", "sponsored_posts", "brands",
-                                          "hashtags", "notable_followers", "lookalikes"}
+    allowed = {k for k, _ in OVERVIEW} | {"audience", "audience_likers", "growth", "top_posts",
+                                          "sponsored_posts", "brands", "hashtags"}
     out = {k: v for k, v in doc.items() if k in allowed and k != "code"}
     if not isinstance(out.get("audience", {}), dict):
         raise ValueError("'audience' must be an object.")

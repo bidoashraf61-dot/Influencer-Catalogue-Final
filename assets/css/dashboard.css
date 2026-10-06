@@ -25,10 +25,15 @@
 .db-live { display: inline-flex; align-items: center; gap: 6px; color: var(--vivid-red); font-weight: 700; letter-spacing: .06em; font-size: 12px; }
 .db-live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--vivid-red); animation: db-pulse 1.8s ease-out infinite; }
 @keyframes db-pulse { 0% { box-shadow: 0 0 0 0 rgba(238,21,21,.55); } 100% { box-shadow: 0 0 0 10px rgba(238,21,21,0); } }
-.db-verdict { font-family: var(--heading); font-size: 20px; line-height: 1; padding: 9px 18px; border-radius: 999px; background: var(--lime); color: var(--ink); white-space: nowrap; transform: rotate(-2deg); }
-.db-verdict--good { background: var(--go); color: #fff; }
-.db-verdict--moderate { background: var(--amber); color: #fff; }
-.db-verdict--low { background: var(--vivid-red); color: #fff; }
+/* the verdict reads as a status beside the name, not as another button */
+.db-head__row { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.db-head__row h1 { min-width: 0; }
+.db-head__verdict { flex: none; }
+.db-verdict { display: inline-flex; align-items: center; gap: 6px; font-family: var(--body); font-size: 13px; font-weight: 600; line-height: 1; padding: 5px 11px 5px 9px; border-radius: 6px; background: #f2f0eb; color: var(--ink); white-space: nowrap; cursor: default; }
+.db-verdict::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.db-verdict--good { background: var(--go-soft); color: var(--go); }
+.db-verdict--moderate { background: var(--amber-soft); color: #a85507; }
+.db-verdict--low { background: var(--red-soft); color: #c01010; }
 .db-head__actions { display: flex; gap: 8px; }
 .db-btn { display: inline-flex; align-items: center; min-height: 38px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--ink);
   color: var(--ink); background: #fff; text-decoration: none; font-family: var(--heading); font-size: 18px; letter-spacing: .05em; white-space: nowrap; }
