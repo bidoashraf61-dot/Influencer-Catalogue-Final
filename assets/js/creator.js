@@ -86,7 +86,7 @@
 
   /* --------------------------------------------------------------- render */
 
-  // Only what the Modash report carries, in the order it carries it: no
+  // Only what the profile report carries, in the order it carries it: no
   // grades, benchmarks or derived numbers of our own.
   function ico(d) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + d + "</svg>"; }
   var I_LIKE = ico('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>');
@@ -108,23 +108,23 @@
     "h2|Creator brand affinity & interests": "What the creator posts about and which brands appear in their content.",
     "h2|Audience data": "Who the audience is. Followers: everyone who follows the account. Likers: only the people who like the posts — the more engaged part of the audience.",
     "h2|Popular hashtags & mentions": "The hashtags and accounts the creator uses most in recent posts.",
-    "Followers": "Total followers on the account on the date of the report. The small % is the recent change Modash reports.",
+    "Followers": "Total followers on the account on the date of the report. The small % is the recent change.",
     "Avg. likes": "Average likes per post over the creator's recent posts. \u201cHidden\u201d means the creator hides like counts on Instagram.",
     "Engagement rate": "Average likes plus comments per post, divided by followers. The note compares it with creators of a similar size.",
-    "Fake followers": "Share of followers Modash flags as bots, inactive or suspicious accounts. The rest are real people.",
-    "Fake likers": "Share of the people liking posts that Modash flags as bots or suspicious accounts.",
+    "Fake followers": "Share of followers flagged as bots, inactive or suspicious accounts. The rest are real people.",
+    "Fake likers": "Share of the people liking posts that are flagged as bots or suspicious accounts.",
     "Audience reachability": "How many accounts the followers themselves follow. People who follow fewer than 1,000 accounts are more likely to see this creator's posts in their feed.",
     "<500 accounts": "Followers who follow fewer than 500 accounts. Their feed is uncrowded, so they are the most likely to see this creator's posts.",
     "500-1k accounts": "Followers who follow 500 to 1,000 accounts. Still a manageable feed — they are likely to see a good share of the posts.",
     "1k-1.5k accounts": "Followers who follow 1,000 to 1,500 accounts. A busy feed, so they see fewer of this creator's posts.",
-    ">1.5k accounts": "Followers who follow more than 1,500 accounts. Their feed is so crowded that they rarely see any one creator's posts — Modash calls these mass followers.",
+    ">1.5k accounts": "Followers who follow more than 1,500 accounts. Their feed is so crowded that they rarely see any one creator's posts — these are called mass followers.",
     "Fake followers distribution": "Where this creator sits among creators of a similar size by share of fake followers. The coloured bar is this creator; the darker grey bar is the median.",
-    "Followers growth": "Followers at the end of each month, read from the Modash growth chart.",
-    "Likes growth": "Average likes per post in each month, read from the Modash chart.",
-    "Estimated impressions": "Modash's estimate of how many times a typical post is seen. An estimate from followers and engagement — only the creator's own insights give exact figures.",
-    "Estimated reach": "Modash's estimate of how many different accounts see a typical post. An estimate — only the creator's own insights give exact figures.",
-    "Stories|Estimated reach": "Modash's estimate of how many different accounts see a typical story. An estimate — only the creator's own insights give exact figures.",
-    "Stories|Estimated impressions": "Modash's estimate of how many times a typical story is seen. An estimate — only the creator's own insights give exact figures.",
+    "Followers growth": "Followers at the end of each month.",
+    "Likes growth": "Average likes per post in each month.",
+    "Estimated impressions": "An estimate of how many times a typical post is seen, based on followers and engagement — only the creator's own insights give exact figures.",
+    "Estimated reach": "An estimate of how many different accounts see a typical post — only the creator's own insights give exact figures.",
+    "Stories|Estimated reach": "An estimate of how many different accounts see a typical story — only the creator's own insights give exact figures.",
+    "Stories|Estimated impressions": "An estimate of how many times a typical story is seen — only the creator's own insights give exact figures.",
     "Average views": "Average views per video post.",
     "Average likes": "Average likes per post of this type.",
     "Average comments": "Average comments per post of this type.",
@@ -135,7 +135,7 @@
     "Paid views": "Views on sponsored posts as a share of views on normal posts. 100% means sponsored posts get as many views as normal ones.",
     "Engagement rate distribution": "Where this creator's engagement rate sits among creators of a similar size. The coloured bar is this creator; the darker grey bar is the median.",
     "Creator brand affinity": "Brands the creator mentions or tags in their own posts — not necessarily paid partnerships.",
-    "Creator interests": "The topics the creator posts about, as Modash classifies them.",
+    "Creator interests": "The topics the creator posts about.",
     "Gender": "Split of the audience by gender.",
     "Age": "Split of the audience by age group.",
     "Age by gender": "Each age group split into women and men, as a share of the whole audience.",
@@ -146,7 +146,7 @@
     "Audience brand affinity": "Brands the audience follows or engages with — useful to check fit with a client's brand. Small lists come from a sample of the audience, so treat close values as equal.",
     "Popular hashtags": "Share of the creator's recent posts that use each hashtag.",
     "Popular mentions": "Share of the creator's recent posts that tag or mention each account.",
-    "Sponsored posts": "Recent posts Modash identified as paid partnerships."
+    "Sponsored posts": "Recent posts identified as paid partnerships."
   };
   function addTips(root) {
     [].forEach.call((root || document).querySelectorAll(".pp-h2, .pp-h3, .pp-key dt, .pp-tiles > div > span, .pp-row > span, .pp-er__label"), function (el) {
@@ -179,11 +179,11 @@
     renderNetwork(a);
     renderAudience(a);
     renderTags(a);
-    $("pp-source").textContent = "Source: " + (a.source || "Modash") + (a.updated ? " · data from " + day(a.updated) : "");
+    $("pp-source").textContent = a.updated ? "Data as of " + day(a.updated) : "";
     addTips();
   }
 
-  /* identity: as the top of the Modash report — who, the three numbers, bio */
+  /* identity: who, the three numbers, bio */
   function renderId(c, a) {
     var handles = (c.profiles || []).filter(function (p) { return p.url; }).map(function (p) {
       var mine = a && a.followers && (!a.platform || a.platform === p.platform);

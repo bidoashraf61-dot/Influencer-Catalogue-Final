@@ -1,14 +1,14 @@
-"""Modash profile report (PDF) -> creator analysis, with its pictures.
+"""Profile report (PDF) -> creator analysis, with its pictures.
 
-Reads everything off the one-page PDF Modash exports: the numbers, the bio,
+Reads everything off the one-page profile report PDF: the numbers, the bio,
 the audience tables (followers and likers), the growth lines and the two
 distribution charts (drawn as vectors, read against their own axes), and the
 embedded profile photo and post covers.
 
-    python3 tools/modash_import.py OUT_DIR report-<handle>-<date>.pdf ...
+    python3 tools/profile_import.py OUT_DIR report-<handle>-<date>.pdf ...
         writes OUT_DIR/<handle>/analysis.json and the pictures beside it
 
-    python3 tools/modash_import.py --save ADMIN_DIR OUT_DIR HANDLE=HV-XX-000 ...
+    python3 tools/profile_import.py --save ADMIN_DIR OUT_DIR HANDLE=HV-XX-000 ...
         stores each one as that creator's analysis, pictures in
         ADMIN_DIR/analysis_media/<code>/ (brand logos: analysis_media/_brands/
         brand-<slug>.png, picked up by name when present)
@@ -53,7 +53,7 @@ REACH = {"<500 accounts": "<500", "500-1k accounts": "500-1000",
 
 
 def table(text, title, colname, end_markers):
-    """{'followers': [(label, pct)], 'likers': [...]} from a Modash split table."""
+    """{'followers': [(label, pct)], 'likers': [...]} from a split table of the report."""
     i = text.find(title + "\n" + colname + "\n")
     if i < 0:
         return {}
@@ -146,7 +146,7 @@ def parse(path, handle):
     doc = fitz.open(path); page = doc[0]
     ls, text = lines(page), page.get_text()
     by = lambda t: next((y for x, y, s, t2 in ls if t2 == t), None)
-    a = {"platform": "Instagram", "handle": handle, "source": "Modash Oct 2026",
+    a = {"platform": "Instagram", "handle": handle, "source": "report Oct 2026",
          "updated": "2026-10-0" + ("1" if "Oct-01" in path else "6")}
     acct = next((t for x, y, s, t in ls if " account" in t and y < 130), "")
     a["account_type"] = "Business" if acct.startswith("Business") else "Creator"

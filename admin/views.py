@@ -3107,7 +3107,7 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
         "A creator without one shows a locked page with <em>Request full analysis</em>; requests land below.</p>"
         + _notes(error, message)
         + "<div class='grid2'><div class='card'><h3 style='margin-top:0'>1 · Download the template</h3>"
-          "<p class='muted'>One workbook, many creators, laid out like a Modash profile report: Overview, Audience "
+          "<p class='muted'>One workbook, many creators, laid out like a profile report: Overview, Audience "
           "(followers and likers), Growth, Posts, Brands (with logos), Hashtags &amp; mentions — every row starts with "
           "the creator code.</p>"
           "<a class='btn small' href='" + u("/analysis/template.xlsx") + "'>Download template (.xlsx)</a></div>"

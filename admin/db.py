@@ -280,13 +280,13 @@ CREATE TABLE IF NOT EXISTS settings (
   value TEXT
 );
 
--- A creator's full profile analysis (Modash-style): overview, audience,
+-- A creator's full profile analysis (profile-report style): overview, audience,
 -- growth, posts, brands, lookalikes. Uploaded by an admin from a template or
 -- JSON; `data` is the whole document. One per creator.
 CREATE TABLE IF NOT EXISTS creator_analysis (
   code       TEXT PRIMARY KEY,
   data       TEXT NOT NULL,
-  source     TEXT,                       -- e.g. "Modash export 2026-10", "manual"
+  source     TEXT,                       -- internal only, e.g. "report 2026-10", "manual"
   updated_at INTEGER NOT NULL
 );
 

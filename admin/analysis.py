@@ -1,7 +1,7 @@
 """Creator full analysis: the template admins fill in, and the parser that
 turns it (or a pasted JSON document) into the stored analysis.
 
-The sections mirror a Modash profile report: overview numbers (all content,
+The sections mirror a standard profile report: overview numbers (all content,
 reels, stories, collaborations), audience quality (real people, mass and
 suspicious followers, fake followers and likers), audience by followers and
 by likers (countries, cities, gender, ages, languages, interests, brand
@@ -21,7 +21,7 @@ from pathlib import Path
 import xlsx
 
 # Pictures that belong to an analysis — the profile photo and post covers
-# taken from the Modash report, and brand logos (shared, in _brands/). Client
+# taken from the profile report, and brand logos (shared, in _brands/). Client
 # data: not in git, served only to a viewer with a code (/api/creator-media).
 MEDIA = Path(__file__).resolve().parent / "analysis_media"
 
@@ -32,8 +32,8 @@ OVERVIEW = [
     ("avg_views", "Avg views"), ("avg_reel_plays", "Avg reel plays"),
     ("paid_post_performance", "Paid post performance %"),
     ("fake_followers_pct", "Fake followers %"), ("credibility_pct", "Audience credibility %"),
-    ("source", "Source (e.g. Modash Oct 2026)"), ("updated", "Data date (YYYY-MM-DD)"),
-    # Added to match the Modash report; every one is optional.
+    ("source", "Source (internal, never shown to clients)"), ("updated", "Data date (YYYY-MM-DD)"),
+    # Added to match the profile report; every one is optional.
     ("account_type", "Account type (Creator / Business)"),
     ("est_impressions", "Estimated impressions"), ("est_reach", "Estimated reach"),
     ("reels_er", "Reels engagement rate %"), ("avg_reel_likes", "Reels avg likes"),
@@ -59,7 +59,7 @@ SHEETS = {
 }
 EXAMPLE = {
     "Overview": ["HV-XX-000", "Instagram", "example_handle", "84000", "610", "512", "3.4", "2700",
-                 "160", "", "31000", "2.9", "6", "88", "Modash Oct 2026", "2026-10-01",
+                 "160", "", "31000", "2.9", "6", "88", "Report Oct 2026", "2026-10-01",
                  "Creator", "120000", "80000", "2.1", "2300", "90", "60", "9000", "9500",
                  "30", "5", "78", "6", "4", "12"],
     "Audience": ["HV-XX-000", "countries", "SA", "71", ""],
@@ -184,9 +184,9 @@ def parse_workbook(data, known_codes):
     return docs, problems
 
 
-# Further fields read off a Modash report (tools/modash_import.py), kept when
+# Further fields read off a profile report (tools/profile_import.py), kept when
 # an analysis is pasted back as JSON.
-MODASH_EXTRA = {"bio", "location", "followers_change_pct", "avg_likes_change_pct", "likes_hidden",
+REPORT_EXTRA = {"bio", "location", "followers_change_pct", "avg_likes_change_pct", "likes_hidden",
                 "er_note", "reels_er_note", "notable_followers_pct", "creator_interests",
                 "fake_followers_dist", "er_dist", "photo"}
 
@@ -205,6 +205,8 @@ def with_media_urls(data, code, base):
     """A copy of the analysis with every "media:" reference turned into a link
     the viewer's browser can load from this service."""
     d = copy.deepcopy(data or {})
+    # Where the numbers came from is ours to know, not the client's.
+    d.pop("source", None)
 
     def url(ref):
         if isinstance(ref, str) and ref.startswith("media:"):
@@ -225,7 +227,7 @@ def clean_json(doc):
     if not isinstance(doc, dict):
         raise ValueError("The analysis must be a JSON object.")
     allowed = {k for k, _ in OVERVIEW} | {"audience", "audience_likers", "growth", "top_posts",
-                                          "sponsored_posts", "brands", "hashtags"} | MODASH_EXTRA
+                                          "sponsored_posts", "brands", "hashtags"} | REPORT_EXTRA
     out = {k: v for k, v in doc.items() if k in allowed and k != "code"}
     if not isinstance(out.get("audience", {}), dict):
         raise ValueError("'audience' must be an object.")
