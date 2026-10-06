@@ -3775,9 +3775,9 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
   }
   function applySource(){
     var sc = source(); if (!sc) { $('cal-source-hint').textContent = 'Pick one and the calculator uses its real creators, their followers and prices.'; return; }
-    var o = sc.o, plat = o.platform;
-    if (!plat) { var cnt = {}; o.creators.forEach(function(c){ if (c.platform) cnt[c.platform] = (cnt[c.platform] || 0) + 1; }); plat = Object.keys(cnt).sort(function(a, b){ return cnt[b] - cnt[a]; })[0]; }
-    if (plat && PLATS.indexOf(plat) >= 0) { S.plats = [plat]; S.share = {}; }
+    var o = sc.o, plats = String(o.platform || '').split(/[,&+\/]/).map(function(x){ return x.trim(); }).filter(function(x){ return PLATS.indexOf(x) >= 0; }), plat = plats.join(' + ');
+    if (!plats.length) { var cnt = {}; o.creators.forEach(function(c){ if (c.platform) cnt[c.platform] = (cnt[c.platform] || 0) + 1; }); var top = Object.keys(cnt).sort(function(a, b){ return cnt[b] - cnt[a]; })[0]; if (top && PLATS.indexOf(top) >= 0) { plats = [top]; plat = top; } }
+    if (plats.length) { S.plats = plats; S.share = {}; }
     var hint = o.creators.length + ' creators';
     if (o.budget) { var mid = Math.round((o.budget[0] + o.budget[1]) / 2 / 100) * 100; $('cal-budget').value = mid;
       hint += ' · budget ' + (o.budget[0] === o.budget[1] ? num(o.budget[0]) : num(o.budget[0]) + ' – ' + num(o.budget[1])) + ' SAR' + (o.budgetFrom ? ' (from ' + o.budgetFrom + ')' : '') + ' put in the box above, change it if the client pays something else'; }
