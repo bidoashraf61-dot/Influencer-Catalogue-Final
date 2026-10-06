@@ -3672,6 +3672,22 @@ def benchmark_refs(open_=False):
             "<div class='refgrid'>" + cols + "</div><h3>Sources</h3><ol class='src'>" + srcs + "</ol></details>")
 
 
+def objective_weights_card():
+    """Reference: how each campaign objective weights the creator score. Read
+    from metrics.OBJECTIVES so it can never drift from the real scoring."""
+    import metrics
+    rows = "".join("<tr><td><strong>" + e(lbl) + "</strong></td><td class='right'>%d%%</td><td class='right'>%d%%</td><td class='right'>%d%%</td></tr>"
+                   % (round(w[0] * 100), round(w[1] * 100), round(w[3] * 100)) for lbl, w in metrics.OBJECTIVES.values())
+    return ("<details class='card refbox'><summary><strong>How the campaign objective weights the score</strong>"
+            " <span class='muted'>no percentages to enter</span></summary>"
+            "<p class='sec-desc'>Pick one objective on the campaign's Setup page. It decides how much each result counts when creators are scored, "
+            "each as a share of the best creator's result. Mixed campaign? Choose Balanced.</p>"
+            "<table><thead><tr><th>Objective</th><th class='right'>Views &amp; reach</th><th class='right'>Engagement</th><th class='right'>Clicks</th></tr></thead><tbody>"
+            + rows + "</tbody></table>"
+            "<p class='price-hint'>No tracking links on the campaign? The clicks share is dropped and the other two scale up to 100%. "
+            "Nothing is compared with followers or outside benchmarks.</p></details>")
+
+
 def calculator_page(lib, sources=None, initial=None, ok=None, error=None):
     """The ROI calculator. Pick one or several campaign types and one or
     several platforms, type what the client pays (split between platforms),
@@ -3684,7 +3700,7 @@ def calculator_page(lib, sources=None, initial=None, ok=None, error=None):
                        "categories": {k: v[0] for k, v in plans.CATEGORIES.items()}},
                       ensure_ascii=False).replace("</", "<\\/")
     body = """
-""" + _notes(error, ok) + ui.header("ROI calculator", "Pick campaign types and platforms, type what the client pays, and read the result to accept. Numbers come from the benchmark library.", crumbs=[("Insights", None), ("ROI calculator", None)], actions="<a class='btn ghost' href='" + u("/planner") + "#library'>Benchmark library</a>") + benchmark_refs() + """
+""" + _notes(error, ok) + ui.header("ROI calculator", "Pick campaign types and platforms, type what the client pays, and read the result to accept. Numbers come from the benchmark library.", crumbs=[("Insights", None), ("ROI calculator", None)], actions="<a class='btn ghost' href='" + u("/planner") + "#library'>Benchmark library</a>") + objective_weights_card() + benchmark_refs() + """
 <style>
 .cal-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .cal-pills button{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 18px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
