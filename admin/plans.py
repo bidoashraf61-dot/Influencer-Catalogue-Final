@@ -157,7 +157,7 @@ TEMPLATES = {
     "launch-mixed": {"label": "Product launch — Instagram + TikTok", "objective": "balanced", "platform": "Instagram",
                      "category": "fmcg", "mix": {"micro": 10, "mid": 5, "macro": 1},
                      "why": "A burst in launch week: views first, then engagement."},
-    "traffic-affiliate": {"label": "Traffic / sales — tracked links", "objective": "traffic", "platform": "Instagram",
+    "traffic-affiliate": {"label": "Conversion — tracked links", "objective": "traffic", "platform": "Instagram",
                           "category": "retail", "mix": {"micro": 15, "mid": 3},
                           "why": "Every creator has their own link; judged on clicks and cost per click."},
     "snap-stories": {"label": "Awareness — Snapchat stories", "objective": "awareness", "platform": "Snapchat",

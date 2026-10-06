@@ -3509,7 +3509,7 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
                                      + e(l) + "</option>" for v, l in items)
     tpl_opts = "<option value=''>— none —</option>" + opt([(key, t["label"]) for key, t in plans.TEMPLATES.items()],
                                                           brief.get("template") or "")
-    obj_opts = opt([("awareness", "Awareness"), ("engagement", "Engagement"), ("traffic", "Traffic / sales"),
+    obj_opts = opt([("awareness", "Awareness"), ("engagement", "Engagement"), ("traffic", "Conversion (visits and sales)"),
                     ("balanced", "Balanced")], plan["objective"])
     plat_opts = opt([(p, p) for p in plans.PLATFORMS], plan["platform"])
     cat_opts = opt([(key, v[0]) for key, v in plans.CATEGORIES.items()], plan["category"])

@@ -389,7 +389,7 @@ OBJECTIVES = {
     "balanced": ("Balanced", (0.45, 0.35, 0.0, 0.20)),
     "awareness": ("Awareness", (0.70, 0.20, 0.0, 0.10)),
     "engagement": ("Engagement", (0.20, 0.70, 0.0, 0.10)),
-    "traffic": ("Traffic / sales", (0.20, 0.20, 0.0, 0.60)),
+    "traffic": ("Conversion", (0.20, 0.20, 0.0, 0.60)),
 }
 
 
