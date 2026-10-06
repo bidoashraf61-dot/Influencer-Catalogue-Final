@@ -2470,3 +2470,57 @@ def request_pulse():
             "a_open": an["open"], "a_latest": an["latest"],
             "a_creator": (alast["creator"] or "") if alast else "",
             "a_client": (alast["client"] or "") if alast else ""}
+
+
+# ------------------------------------------------------------- duplicates --
+
+def _profile_key(url):
+    """A profile link reduced to what identifies the account, so
+    "https://www.instagram.com/Noha.Magdi/?hl=en" and "instagram.com/noha.magdi"
+    are the same."""
+    u = (url or "").strip().lower()
+    if not u:
+        return None
+    u = re.sub(r"^https?://", "", u)
+    u = re.sub(r"^(www\.|m\.)", "", u)
+    u = u.split("?")[0].split("#")[0].rstrip("/")
+    return u or None
+
+
+def duplicate_groups():
+    """Creators that look like the same person: they share a profile link, or
+    the same handle on the same platform. [[creator rows], ...], biggest first.
+    Names alone are not enough (two Sarahs are not one person)."""
+    rows = list_creators()
+    parent = {r["code"]: r["code"] for r in rows}
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a, b):
+        parent[find(a)] = find(b)
+
+    seen = {}
+    for r in rows:
+        keys = set()
+        for p in split_profiles(r["profiles"] or ""):
+            k = _profile_key(p.get("url"))
+            if k:
+                keys.add(k)
+        h = (r["handle"] or "").strip().lower().lstrip("@")
+        if h:
+            keys.add("h:" + (r["platform"] or "").split(",")[0].strip().lower() + ":" + h)
+        for k in keys:
+            if k in seen:
+                union(r["code"], seen[k])
+            else:
+                seen[k] = r["code"]
+    groups = {}
+    for r in rows:
+        groups.setdefault(find(r["code"]), []).append(r)
+    out = [g for g in groups.values() if len(g) > 1]
+    out.sort(key=lambda g: (-len(g), g[0]["name"] or ""))
+    return out

@@ -88,6 +88,7 @@ ROSTER_PAGE = 100
 links.PHOTO_DIR = PHOTO_DIR
 history.PHOTO_DIR = PHOTO_DIR
 LOGO = HERE.parent / "site" / "assets" / "helv" / "logo-knockout.webp"
+STATIC = HERE / "static"
 ADMIN_COOKIE = "hv_admin"
 VIEWER_COOKIE = "hv_view"
 ADMIN_TTL = 12 * 3600
@@ -301,6 +302,14 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True})
         if path == "/static/admin.css":
             return self.send(200, views.CSS, "text/css; charset=utf-8")
+        if path.startswith("/static/fonts/") or path == "/static/logo-knockout.webp":
+            # Brand fonts and logo, kept with the admin so it does not depend on the built site.
+            name = Path(path).name
+            f = STATIC / ("fonts/" + name if path.startswith("/static/fonts/") else name)
+            if f.is_file() and f.suffix in (".ttf", ".webp"):
+                ctype = "font/ttf" if f.suffix == ".ttf" else "image/webp"
+                return self.send(200, f.read_bytes(), ctype, [("Cache-Control", "public, max-age=604800")])
+            return self.send(404, b"", "text/plain")
         if path == "/static/logo.webp":
             if LOGO.exists():
                 return self.send(200, LOGO.read_bytes(), "image/webp")
@@ -338,7 +347,10 @@ class Handler(BaseHTTPRequestHandler):
         who = self.require_admin()
         if not who:
             return
+        views.set_user(who["email"] if "email" in who.keys() else "")
 
+        if path == "/api/search":
+            return self.api_search((query.get("q") or "").strip())
         if path == "/":
             return self.send(200, views.dashboard(db.stats(), db.recent_events(12), who))
         if path == "/history":
@@ -399,6 +411,7 @@ class Handler(BaseHTTPRequestHandler):
                 editing=editing,
                 q=(query.get("q") or "").strip(),
                 bands=db.tier_bands(),
+                tab=query.get("tab"), dupes=db.duplicate_groups(),
                 page_no=page, pages=pages, total=total, per_page=ROSTER_PAGE,
                 dates=(d_from if t_from is not None else "", d_to if t_to is not None else "")))
         if path == "/roster/export":
@@ -431,9 +444,14 @@ class Handler(BaseHTTPRequestHandler):
             n_arch = sum(1 for x in every if x["archived_at"])
             shown = [x for x in every if bool(x["archived_at"]) == arch]
             pg, start = views.page_slice(len(shown), query.get("page"))
+            with db.connect() as conn:
+                counts = {r[0]: r[1] for r in conn.execute(
+                    "SELECT selection_id, COUNT(*) FROM campaigns WHERE selection_id IS NOT NULL GROUP BY selection_id")}
             return self.send(200, views.selections_page(
                 shown[start:start + views.PER_PAGE], query.get("e"), query.get("ok"), self.site_origin(),
-                archived=arch, n_archived=n_arch, page_no=pg, total=len(shown)))
+                archived=arch, n_archived=n_arch, page_no=pg, total=len(shown),
+                clients=[c for c in db.list_codes() if not (c["archived_at"] if "archived_at" in c.keys() else None)],
+                currencies=[c for c in fx.CURRENCIES if fx.usable(c)], camp_counts=counts))
         if path == "/selections/edit":
             sid = query.get("id", "")
             sel = db.selection(int(sid)) if sid.isdigit() else None
@@ -612,6 +630,7 @@ class Handler(BaseHTTPRequestHandler):
         if not who:
             return
         history.set_actor(who["email"] if "email" in who.keys() else "admin")
+        views.set_user(who["email"] if "email" in who.keys() else "")
         if path == "/history/undo":
             return self.post_history_undo()
         if path == "/archive":
@@ -700,6 +719,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_settings_token()
         if path == "/roster/delete":
             return self.post_roster_delete()
+        if path == "/roster/merge":
+            return self.post_roster_merge()
         if path == "/roster/import":
             return self.post_roster_import()
         if path == "/roster/photos":
@@ -1252,6 +1273,103 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/roster?ok=" + urllib.parse.quote(
             "Tier " + name + " removed."))
 
+    def post_roster_merge(self):
+        """Fold duplicate creators into the one to keep. Their selections,
+        campaigns, posts, insights and analysis move across; empty fields on the
+        kept creator are filled from the others; the duplicates are deleted.
+        Each change is its own entry in History, so each can be undone."""
+        f = self.form_body(multi=("drop",))
+        keep = (f.get("keep") or "").strip().upper()
+        drops = [d.strip().upper() for d in (f.get("drop") or []) if d.strip().upper() != keep]
+        if not keep or not drops or db.creator(keep) is None:
+            return self.redirect("/roster?tab=dupes&e=" + urllib.parse.quote("Pick the creator to keep."))
+        done = []
+        for d in drops:
+            if db.creator(d) is None:
+                continue
+            self.merge_one(keep, d)
+            done.append(d)
+        return self.redirect("/roster?tab=dupes&ok=" + urllib.parse.quote(
+            "Merged %s into %s. Undo from History if it was a mistake." % (", ".join(done) or "nothing", keep)))
+
+    def merge_one(self, keep, drop):
+        label = "Merged duplicate %s into %s" % (drop, keep)
+        # selections that list the duplicate
+        with db.connect() as conn:
+            sels = conn.execute("SELECT id, codes, prices, costs FROM selections").fetchall()
+        for sel in sels:
+            codes = json.loads(sel["codes"] or "[]")
+            if drop not in codes:
+                continue
+            with history.tracked("selection", sel["id"], label):
+                new = []
+                for c in codes:
+                    c = keep if c == drop else c
+                    if c not in new:
+                        new.append(c)
+                prices, costs = json.loads(sel["prices"] or "{}"), json.loads(sel["costs"] or "{}")
+                for dct in (prices, costs):
+                    if drop in dct:
+                        v = dct.pop(drop)
+                        dct.setdefault(keep, v)
+                with db.connect() as conn:
+                    conn.execute("UPDATE selections SET codes=?, prices=?, costs=?, updated_at=? WHERE id=?",
+                                 (json.dumps(new), json.dumps(prices), json.dumps(costs), db.now(), sel["id"]))
+        # campaigns that include the duplicate
+        with db.connect() as conn:
+            camps = [r[0] for r in conn.execute(
+                "SELECT campaign_id FROM campaign_creators WHERE code = ? UNION SELECT campaign_id FROM content WHERE code = ?",
+                (drop, drop))]
+        for cid in camps:
+            with history.tracked("campaign", cid, label):
+                with db.connect() as conn:
+                    has_keep = conn.execute("SELECT 1 FROM campaign_creators WHERE campaign_id = ? AND code = ?", (cid, keep)).fetchone()
+                    if has_keep:
+                        drow = conn.execute("SELECT planned, cost FROM campaign_creators WHERE campaign_id = ? AND code = ?", (cid, drop)).fetchone()
+                        if drow:
+                            conn.execute("UPDATE campaign_creators SET planned = MAX(COALESCE(planned,0), ?), "
+                                         "cost = COALESCE(cost, ?) WHERE campaign_id = ? AND code = ?",
+                                         (drow["planned"] or 0, drow["cost"], cid, keep))
+                            conn.execute("DELETE FROM campaign_creators WHERE campaign_id = ? AND code = ?", (cid, drop))
+                        conn.execute("DELETE FROM links WHERE campaign_id = ? AND code = ? AND is_default = 1", (cid, drop))
+                    else:
+                        conn.execute("UPDATE campaign_creators SET code = ? WHERE campaign_id = ? AND code = ?", (keep, cid, drop))
+                    for table in ("content", "insights", "links"):
+                        conn.execute("UPDATE %s SET code = ? WHERE campaign_id = ? AND code = ?" % table, (keep, cid, drop))
+        # analysis and its pictures
+        d_an, k_an = db.analysis(drop), db.analysis(keep)
+        if d_an and not k_an:
+            import analysis as analysis_mod, shutil
+            db.save_analysis(keep, d_an["data"], d_an["source"])
+            src, dst = analysis_mod.MEDIA / drop, analysis_mod.MEDIA / keep
+            if src.is_dir():
+                dst.mkdir(parents=True, exist_ok=True)
+                for fn in src.iterdir():
+                    shutil.copy(str(fn), str(dst / fn.name))
+        with db.connect() as conn:
+            conn.execute("UPDATE analysis_requests SET code = ? WHERE code = ?", (keep, drop))
+        # fill the kept creator's gaps from the duplicate
+        k, d = db.creator(keep), db.creator(drop)
+        row = {x: k[x] for x in k.keys()}
+        for field in ("photo", "city", "nationality", "interest", "note", "price_from", "price_to", "rating", "cost"):
+            if field in row and not row.get(field) and d[field]:
+                row[field] = d[field]
+        have = {(p["platform"], (p.get("url") or "").lower()) for p in db.split_profiles(k["profiles"] or "")}
+        profs = db.split_profiles(k["profiles"] or "")
+        for p in db.split_profiles(d["profiles"] or ""):
+            if (p["platform"], (p.get("url") or "").lower()) not in have:
+                profs.append(p)
+        row["profiles"] = json.dumps(profs)
+        adopted_photo = bool(row.get("photo")) and row.get("photo") == d["photo"] and k["photo"] != d["photo"]
+        with history.tracked("creator", keep, label):
+            with db.connect() as conn:
+                db.upsert_creator(row, conn)
+        # the duplicate goes (its photo to the bin unless the kept creator took it)
+        with history.tracked("creator", drop, label):
+            if d["photo"] and not adopted_photo:
+                history.trash_photo(Path(str(d["photo"]).split("?")[0]).name)
+            db.delete_creator(drop)
+
     def post_roster_delete(self):
         f = self.form_body()
         code = f.get("code")
@@ -1304,6 +1422,21 @@ class Handler(BaseHTTPRequestHandler):
         request, or one whose link was pasted in. Asking twice for the same
         request reopens the one already priced rather than starting another."""
         f = self.form_body()
+        if f.get("mode") == "scratch":
+            # A new, empty selection built here: a name, the client, the platform and the currency.
+            name = (f.get("name") or "").strip()[:120]
+            if not name:
+                return self.redirect("/selections?e=" + urllib.parse.quote("Give the selection a name."))
+            cid = (f.get("code_id") or "").strip()
+            cur = (f.get("currency") or "SAR").strip().upper()
+            plat = (f.get("platform") or "").strip() or None
+            with history.tracked("selection", None, "Created selection " + name) as t:
+                sid = db.save_selection(None, name, [], {}, None, None, code_id=int(cid) if cid.isdigit() else None,
+                                        platform=plat if plat in db.PLATFORMS else None)
+                db.set_selection_currency(sid, cur if fx.usable(cur) else "SAR")
+                t["key"] = sid
+            return self.redirect("/selections/edit?id=%d&ok=%s#st=creators" % (
+                sid, urllib.parse.quote("Created. Add the creators, then set their prices.")))
         rid = (f.get("request") or "").strip()
         known = {c["code"] for c in db.list_creators()}
         code_id = None
@@ -2692,6 +2825,31 @@ class Handler(BaseHTTPRequestHandler):
         )
         db.log("request", code_id, self.client_ip(), self.headers.get("User-Agent"), str(rid))
         return self.send_json(200, {"ok": True, "id": rid}, self.cors())
+
+    def api_search(self, q):
+        """Quick search for the command palette: creators, selections,
+        campaigns and clients matching what was typed."""
+        out = {"creators": [], "selections": [], "campaigns": [], "clients": []}
+        if len(q) >= 2:
+            ql = q.lower()
+            for c in db.list_creators(search=q)[:6]:
+                out["creators"].append({"label": c["name"], "hint": "%s · %s" % (c["code"], c["tier"]),
+                                        "href": views.u("/roster") + "?q=" + urllib.parse.quote(c["code"])})
+            for s in db.list_selections():
+                if ql in (s["name"] or "").lower() and not (s["archived_at"] if "archived_at" in s.keys() else None):
+                    out["selections"].append({"label": s["name"], "hint": "Selection",
+                                              "href": views.u("/selections/edit") + "?id=%d" % s["id"]})
+            for k in db.list_campaigns():
+                if ql in (k["name"] or "").lower() or ql in (k["client"] or "").lower():
+                    out["campaigns"].append({"label": k["name"], "hint": k["status"],
+                                             "href": views.u("/campaigns/edit") + "?id=%d" % k["id"]})
+            for c in db.list_codes():
+                if ql in (c["label"] or "").lower():
+                    out["clients"].append({"label": c["label"], "hint": "Client",
+                                           "href": views.u("/clients")})
+            for k in out:
+                out[k] = out[k][:6]
+        return self.send_json(200, out, [("Cache-Control", "no-store")])
 
     def api_selection_save(self):
         """A client naming a shortlist. It is recorded here so it appears in

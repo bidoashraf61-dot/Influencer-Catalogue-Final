@@ -56,7 +56,7 @@ def num(value):
     return format(value, ",") if value else "—"
 
 
-CSS = """
+LEGACY_CSS = """
 :root{--ink:#121212;--gray:#585858;--line:#e6e2de;--bg:#faf8f6;--white:#fff;
 --lime:#e8ff76;--red:#ee1515;--green:#1a7f37;--amber:#b76e00}
 *{box-sizing:border-box}
@@ -361,6 +361,9 @@ padding:5px 0;border-top:1px solid var(--line)}
 }
 """
 
+import ui
+CSS = ui.build_css(LEGACY_CSS)
+
 HEAD = (
     '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
     '<meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -456,11 +459,16 @@ def thumb_src(ref):
     return ref or ""
 
 
+import threading
+_user = threading.local()
+
+
+def set_user(email):
+    """Who is signed in, for the request being served (shown in the sidebar)."""
+    _user.email = email or ""
+
+
 def page(title, body, active=""):
-    items = [("/", "Overview"), ("/codes", "Access codes"), ("/analytics", "Analytics"),
-             ("/clients", "Clients"), ("/roster", "Roster"), ("/analysis", "Creator analysis"),
-             ("/selections", "Selections"), ("/campaigns", "Campaigns"), ("/calculator", "Calculator"),
-             ("/requests", "Requests"), ("/history", "History"), ("/settings", "Settings")]
     # Requests nobody has handled yet, counted on every page so a new one is
     # seen from wherever the admin happens to be. The page script keeps it
     # live afterwards.
@@ -469,43 +477,9 @@ def page(title, body, active=""):
         pulse = request_pulse()
     except Exception:
         pulse = {"open": 0, "latest": 0}
-
-    def badge(href):
-        if href == "/analysis":
-            n = pulse.get("a_open", 0)
-            return ("<span class='badge' id='an-badge'" + ("" if n else " hidden") + ">"
-                    + str(n) + "</span>")
-        if href != "/requests":
-            return ""
-        n = pulse["open"]
-        return ("<span class='badge' id='req-badge'" + ("" if n else " hidden") + ">"
-                + str(n) + "</span>")
-    nav = "".join(
-        '<a href="' + u(href) + '"' + (' class="on"' if active == href else "") + ">" + label
-        + badge(href) + "</a>"
-        for href, label in items
-    )
-    return (
-        HEAD
-        + "<title>" + e(title) + " — " + e(NAME) + "</title>"
-        + '<link rel="stylesheet" href="' + u("/static/admin.css") + '"></head><body>'
-        + '<header class="top"><div class="wrap">'
-        + '<a class="brand" href="' + u("/") + '"><img src="' + u("/static/logo.webp") + '" alt="HelloVoice" '
-          'height="26"></a>'
-        + "<nav>" + nav + '<a href="' + u("/logout") + '">Sign out</a></nav>'
-        + '</div></header><main class="wrap">' + body + "</main>" + SCROLL_JS
-        + "<div class='toast' id='req-toast' role='status' hidden></div>"
-        + "<script>window.HV_PULSE=" + json.dumps({"latest": pulse["latest"],
-                                                    "company": pulse.get("company", ""),
-                                                    "count": pulse.get("count", 0),
-                                                    "api": u("/api/pulse"),
-                                                    "requests": u("/requests"),
-                                                    "a_latest": pulse.get("a_latest", 0),
-                                                    "a_creator": pulse.get("a_creator", ""),
-                                                    "a_client": pulse.get("a_client", ""),
-                                                    "analysis": u("/analysis")})
-        + ";" + PULSE_JS + "</script></body></html>"
-    )
+    payload = dict(pulse, api=u("/api/pulse"), requests=u("/requests"), analysis=u("/analysis"))
+    return ui.shell(title, body + SCROLL_JS, active, u, NAME, pulse, payload, PULSE_JS,
+                    getattr(_user, "email", ""))
 
 
 # Watches for new quote requests while any dashboard page is open: a count on
@@ -621,36 +595,89 @@ def login_page(error=None, base=None):
 
 
 def dashboard(s, events, who, message=None, error=None):
-    rows = "".join(
-        "<tr><td>" + e(ev["kind"]) + "</td><td>" + e(ev["label"] or "—") + "</td>"
-        + "<td class='muted'>" + e(ev["detail"] or "") + "</td>"
-        + "<td class='right muted'>" + ago(ev["at"]) + "</td></tr>"
-        for ev in events
-    ) or "<tr><td colspan='4' class='muted'>Nothing yet.</td></tr>"
+    """Home: what needs a person today, where everything stands, how the live
+    campaigns are going, and how busy the catalogue has been."""
+    import overview
+    d = overview.home()
+    q, pl = d["queue"], d["pipeline"]
+    banner = ("<div class='ok'>" + e(message) + "</div>" if message else "") + ("<div class='err'>" + e(error) + "</div>" if error else "")
 
-    banner = ""
-    if message:
-        banner += "<div class='ok'>" + e(message) + "</div>"
-    if error:
-        banner += "<div class='err'>" + e(error) + "</div>"
+    # ---- needs you today
+    if q:
+        tone = {"alert": "var(--red)", "warn": "var(--amber)"}
+        rows = "".join(
+            "<li><span class='mark' style='background:%s;color:#fff'>%s</span><div class='what'><b>%s</b><span>%s</span></div>"
+            "<a class='btn small%s' href='%s'>%s</a></li>" % (
+                "var(--ink)" if t == "alert" else "#ece9e3", ui.icon(ic, 15), e(title), e(detail),
+                " lime" if t == "alert" else " ghost", u(href), e(label))
+            for ic, title, detail, href, label, t in q[:6])
+        needs = "<ul class='todo'>" + rows + "</ul>"
+    else:
+        needs = ui.empty("check", "All clear", "Nothing is waiting for you. A good moment to add creators or prepare the next selection.",
+                         "<a class='btn small' href='" + u("/selections") + "'>Prepare a selection</a>")
 
+    # ---- start something (the three journeys)
+    start = (
+        "<div class='journeys'>"
+        "<a class='jbtn primary' href='" + u("/selections") + "#new'><span>" + ui.icon("list", 20) + "</span><b>Quote a client</b><small>Build a selection, set prices, send the link</small></a>"
+        "<a class='jbtn' href='" + u("/campaigns") + "#new'><span>" + ui.icon("flag", 20) + "</span><b>Start a campaign</b><small>From a booked selection, with goals and dates</small></a>"
+        "<a class='jbtn' href='" + u("/roster") + "'><span>" + ui.icon("users", 20) + "</span><b>Add or fix creators</b><small>Profiles, photos, duplicates</small></a>"
+        "<a class='jbtn' href='" + u("/analysis") + "'><span>" + ui.icon("profile", 20) + "</span><b>Import an analysis</b><small>Attach a report PDF to a creator</small></a>"
+        "</div>")
+
+    # ---- pipeline
+    tot = max(1, pl["selections"] + pl["draft"] + pl["live"] + pl["ended"])
+    seg = [("Selections", pl["selections"], "#b9b3a8", "/selections"), ("Draft campaigns", pl["draft"], "#e2780f", "/campaigns"),
+           ("Live", pl["live"], "var(--green)", "/campaigns"), ("Ended", pl["ended"], "var(--ink)", "/campaigns")]
+    stack = "<div class='stack' role='img' aria-label='Pipeline'>" + "".join(
+        "<i style='width:%.1f%%;background:%s' title='%s: %d'></i>" % (n / float(tot) * 100, c, l, n) for l, n, c, _h in seg if n) + "</div>"
+    legend = "<div class='pipe'>" + "".join(
+        "<a href='%s'><i style='background:%s'></i><b>%d</b><span>%s</span></a>" % (u(h), c, n, l) for l, n, c, h in seg) + "</div>"
+
+    # ---- live campaigns
+    if d["live"]:
+        items = ""
+        for c in d["live"]:
+            pct_t = int(round((c["elapsed"] or 0) * 100))
+            pct_p = int(round(c["posts"] / float(c["planned"]) * 100)) if c["planned"] else 0
+            items += (
+                "<a class='lc' href='%s'><div><b>%s</b><span class='muted'>%s</span></div>"
+                "<div class='lc-bars'><span>Time</span><span class='track'><i style='width:%d%%;background:var(--ink)'></i></span><em>%d%%</em>"
+                "<span>Posts</span><span class='track'><i style='width:%d%%;background:var(--green)'></i></span><em>%d/%d</em></div></a>" % (
+                    u("/campaigns/report") + "?id=%d" % c["id"], e(c["name"]), e(c["client"] or ""), pct_t, pct_t, pct_p, c["posts"], c["planned"] or c["posts"]))
+        live = items
+    else:
+        live = ui.empty("flag", "No live campaigns", "When a campaign goes live it appears here with its progress.",
+                        "<a class='btn small ghost' href='" + u("/campaigns") + "'>See campaigns</a>")
+
+    # ---- activity
+    nice = {"unlock_ok": "opened the catalogue", "view": "viewed a page", "shortlist": "shortlisted creators", "unlock_fail": "entered a wrong code",
+            "request": "sent a quote request", "select": "shortlisted creators", "unlock": "opened the catalogue"}
+    feed = "".join("<li><span>%s <b>%s</b></span><em>%s</em></li>" % (e(ev["label"] or "Someone"), e(nice.get(ev["kind"], ev["kind"])), ago(ev["at"]))
+                   for ev in d["feed"]) or "<li class='muted'>Nothing yet.</li>"
+    chart = ui.column_chart(d["series"], d["labels"], 110)
+    tt = d["totals"]
     body = (
-        "<h1>Overview</h1><p class='sub'>Signed in as " + e(who["email"]) + ". Last 30 days.</p>"
-        + banner + "<div class='grid'>"
-        + "<div class='stat'><b>" + str(s["unlocks"]) + "</b><span>Catalogue opens</span></div>"
-        + "<div class='stat'><b>" + str(s["live_codes"]) + "</b><span>Live access codes</span></div>"
-        + "<div class='stat'><b>" + str(s["requests"]) + "</b><span>Quote requests</span></div>"
-        + "<div class='stat'><b>" + str(s["failures"]) + "</b><span>Rejected attempts</span></div>"
-        + "</div><h2>Recent activity</h2><div class='card'><table><thead><tr>"
-        + "<th>Event</th><th>Code</th><th>Detail</th><th class='right'>When</th>"
-        + "</tr></thead><tbody>" + rows + "</tbody></table></div>"
-        + "<h2>Change your password</h2>"
-        + "<form method='post' action='" + u("/password") + "' class='card'><div class='row'>"
-        + "<div><label>Current password</label><input name='current' type='password' required></div>"
-        + "<div><label>New password</label><input name='new' type='password' required></div>"
-        + "</div><button class='btn'>Update password</button></form>"
+        ui.header("Home", ("%d thing%s need%s you today." % (len(q), "" if len(q) == 1 else "s", "s" if len(q) == 1 else "")) if q
+                  else "All clear. Nothing is waiting for you.")
+        + banner
+        + "<div class='home-grid'><section class='card' aria-labelledby='h-needs'><div class='hd'><h2 id='h-needs'>Needs you today</h2>"
+          "<span class='muted'>Most urgent first</span></div>" + needs + "</section>"
+        + "<section class='card' aria-labelledby='h-start'><div class='hd'><h2 id='h-start'>Start something</h2></div>" + start + "</section></div>"
+        + "<section class='card' aria-labelledby='h-pipe'><div class='hd'><h2 id='h-pipe'>Where everything stands</h2>"
+          "<span class='muted'>" + str(tt["creators"]) + " active creators · " + str(tt["analysed"]) + " with a full analysis · " + str(tt["clients"]) + " live client codes</span></div>"
+        + stack + legend + "</section>"
+        + "<div class='home-grid even'><section class='card' aria-labelledby='h-live'><div class='hd'><h2 id='h-live'>Live campaigns</h2>"
+          "<a href='" + u("/campaigns") + "'>All campaigns</a></div>" + live + "</section>"
+        + "<section class='card' aria-labelledby='h-act'><div class='hd'><h2 id='h-act'>Catalogue activity</h2><span class='muted'>Last 14 days</span></div>"
+        + chart + "<ul class='feed'>" + feed + "</ul></section></div>"
+        + "<details class='card' id='account'><summary><b>Your account</b> <span class='muted'>· " + e(who["email"]) + " · change password</span></summary>"
+          "<form method='post' action='" + u("/password") + "' style='margin-top:14px'><div class='row'>"
+          "<div><label>Current password</label><input name='current' type='password' required></div>"
+          "<div><label>New password</label><input name='new' type='password' required></div>"
+          "</div><button class='btn'>Update password</button></form></details>"
     )
-    return page("Overview", body, "/")
+    return page("Home", body, "/")
 
 
 def copyable(text, extra=""):
@@ -733,6 +760,10 @@ def code_manage(c, devices):
     return form + listing
 
 
+def _client_tabs(current):
+    return [(u("/clients"), "Clients", None, current == "clients"), (u("/codes"), "Access codes", None, current == "codes")]
+
+
 def codes_page(codes, new_code=None, error=None, devices=(), message=None):
     by_code = {}
     for d in devices or ():
@@ -785,13 +816,18 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None):
             + "<td class='right'>" + revoke + "</td></tr>"
             + "<tr class='manage-row'><td colspan='7'>" + manage + "</td></tr>"
         )
-    body_rows = "".join(rows) or "<tr><td colspan='7' class='muted'>No codes yet.</td></tr>"
+    body_rows = "".join(rows) or ("<tr><td colspan='7'>" + ui.empty("key", "No access codes yet", "Create one above. A client needs a code to open the catalogue.") + "</td></tr>")
 
+    live_n = sum(1 for c in codes if code_state(c)[0])
     body = (
-        "<h1>Access codes</h1><p class='sub'>One code per client. Checked on the server, "
-        "so expiry and revocation take effect immediately — not whenever a browser feels "
-        "like it.</p>" + banner
-        + "<form method='post' action='" + u("/codes/new") + "' class='card'><div class='row'>"
+        ui.header("Access codes", "One passcode per client. It opens the catalogue and only that client's selections and campaigns. "
+                  "Expiry and revoking work immediately.", crumbs=None,
+                  actions="<a class='btn lime' href='#new-code'>" + ui.icon("plus", 16) + " New code</a>", tabs=_client_tabs("codes"))
+        + banner
+        + "<details class='card' id='new-code'" + ("" if codes else " open") + "><summary class='hd'><h2>Create a code</h2>"
+          "<span class='muted'>" + str(live_n) + " live of " + str(len(codes)) + "</span></summary>"
+          "<p class='sec-desc'>Give it to the client. They type it once on the catalogue and it remembers their device.</p>"
+        + "<form method='post' action='" + u("/codes/new") + "'><div class='row'>"
         + "<div><label>Issued to</label><input name='label' placeholder='Alpha Plus' required></div>"
         + "<div><label>Passcode (optional)</label><input name='custom' maxlength='40' "
           "placeholder='e.g. Alpha Plus122' autocomplete='off'>"
@@ -805,7 +841,7 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None):
           "<input name='max_devices' type='number' min='1' value='5' placeholder='no limit'>"
           "<div class='price-hint'>Phones or computers this code opens on. Passed to anyone "
           "else, it will not open. Empty = no limit.</div></div>"
-        + "</div><button class='btn'>Create code</button></form>"
+        + "</div><button class='btn lime'>Create code</button></form></details>"
         + "<div class='card'><table><thead><tr><th>Code</th><th>State</th><th>Devices</th><th>Uses</th>"
         + "<th>Expires</th><th>Last used</th><th></th></tr></thead><tbody>"
         + body_rows + "</tbody></table></div>"
@@ -1044,45 +1080,40 @@ def analytics_page(s, events):
         + (", by week" if s["bucket"] == "week" else "") + "</span>"
         "</form>")
 
+    panels = {
+        "overview": (
+            "<div class='grid'>" + cards + "</div>"
+            "<div class='card'><div class='hd'><h2>Activity</h2><span class='muted'>Opens, shortlists and quote requests per day</span></div>"
+            "<div class='legend'><span><i style='background:#121212'></i>Opens</span>"
+            "<span><i style='background:#b9d400'></i>Creators shortlisted</span>"
+            "<span><i style='background:#ff691e;border-radius:999px'></i>Quote request</span></div>"
+            + activity_chart(s["by_day"]) + "</div>"
+            "<div class='card'><div class='hd'><h2>How far each code got</h2><span class='muted'>From opening the catalogue to asking for a quote</span></div>"
+            + funnel(s) + "</div>"),
+        "clients": (
+            "<div class='card'><div class='hd'><h2>By client</h2><span class='muted'>Who is using their code, and how much</span></div>"
+            "<table><thead><tr><th>Code</th><th>State</th><th>Opens</th><th>Shortlisted</th><th>Asked for a quote</th>"
+            "<th class='right'>Last open</th></tr></thead><tbody>" + by_code + "</tbody></table></div>"),
+        "creators": (
+            "<div class='split'><div class='card'><div class='hd'><h2>What clients shortlist</h2></div>"
+            "<p class='sec-desc'>The tiers and platforms clients pick most.</p>"
+            "<p class='muted' style='font-size:13px;margin:0 0 6px'>By tier</p>" + rank(s["by_tier"])
+            + "<p class='muted' style='font-size:13px;margin:16px 0 6px'>By platform</p>" + rank(s["by_platform"], "#b9d400") + "</div>"
+            "<div class='card'><div class='hd'><h2>Most shortlisted creators</h2></div><table><thead><tr>"
+            "<th></th><th>Creator</th><th></th><th class='right'>Times</th></tr></thead><tbody>" + top + "</tbody></table></div></div>"),
+        "security": (
+            "<div class='card'><div class='hd'><h2>Why codes were refused</h2><span class='muted'>Wrong, expired or full codes</span></div>"
+            + rank(s["fail_reasons"], "#ee1515") + "</div>"
+            "<div class='card'><div class='hd'><h2>Event log</h2><span class='muted'>Everything recorded in this period</span></div>"
+            "<table><thead><tr><th>Event</th><th>Code</th><th>Detail</th><th>IP</th><th class='right'>When</th></tr></thead><tbody>"
+            + log + "</tbody></table></div>"),
+    }
     body = (
-        "<h1>Analytics</h1>"
-        "<p class='sub'>" + e(pretty_day(s["start"])) + " – "
-        + e(pretty_day(s["end"] - 86400)) + "</p>"
+        ui.header("Analytics", "How clients use the catalogue: who opens it, what they shortlist, and where they stop. "
+                  + e(pretty_day(s["start"])) + " – " + e(pretty_day(s["end"] - 86400)) + ".")
         + picker
-        + "<div class='grid'>" + cards + "</div>"
-
-        + "<h2>Activity</h2><div class='card'>"
-        + "<div class='legend'>"
-          "<span><i style='background:#121212'></i>Opens</span>"
-          "<span><i style='background:#b9d400'></i>Creators shortlisted</span>"
-          "<span><i style='background:#ff691e;border-radius:999px'></i>"
-          "Quote request</span></div>"
-        + activity_chart(s["by_day"]) + "</div>"
-
-        + "<h2>How far each code got</h2><div class='card'>" + funnel(s) + "</div>"
-
-        + "<div class='split'>"
-        + "<div><h2>What clients shortlist</h2><div class='card'>"
-        + "<p class='muted' style='font-size:13px;margin:0 0 6px'>By tier</p>"
-        + rank(s["by_tier"]) 
-        + "<p class='muted' style='font-size:13px;margin:16px 0 6px'>By platform</p>"
-        + rank(s["by_platform"], "#b9d400") + "</div></div>"
-        + "<div><h2>Why codes were refused</h2><div class='card'>"
-        + rank(s["fail_reasons"], "#ee1515") + "</div></div>"
-        + "</div>"
-
-        + "<h2>By client</h2><div class='card'><table><thead><tr><th>Code</th>"
-        + "<th>State</th><th>Opens</th><th>Shortlisted</th><th>Asked for a quote</th>"
-        + "<th class='right'>Last open</th></tr></thead><tbody>" + by_code
-        + "</tbody></table></div>"
-
-        + "<h2>Most shortlisted creators</h2><div class='card'><table><thead><tr>"
-        + "<th></th><th>Creator</th><th></th><th class='right'>Times</th></tr></thead>"
-        + "<tbody>" + top + "</tbody></table></div>"
-
-        + "<h2>Event log</h2><div class='card'><table><thead><tr>"
-        + "<th>Event</th><th>Code</th><th>Detail</th><th>IP</th>"
-        + "<th class='right'>When</th></tr></thead><tbody>" + log + "</tbody></table></div>"
+        + ui.tabset("an", [("overview", "Overview", None), ("clients", "Clients", None), ("creators", "Creators", None),
+                           ("security", "Refused & log", None)], panels)
     )
     return page("Analytics", body, "/analytics")
 
@@ -1556,10 +1587,28 @@ def date_carry(dates):
     return out
 
 
+def duplicate_group_card(group):
+    """One set of creators that look like the same person, with a Keep button
+    on each: choosing one merges the others into it."""
+    members = ""
+    for c in group:
+        others = [x["code"] for x in group if x["code"] != c["code"]]
+        members += (
+            "<div class='dup'><div class='dup-who'>"
+            + ("<img class='tface' src='" + e(links.thumb(c["photo"])) + "' alt=''>" if c["photo"] else "<span class='tface none'>—</span>")
+            + "<div><b>" + e(c["name"]) + "</b><br><code>" + e(c["code"]) + "</code> <span class='muted'>" + e(c["tier"] or "") + " · "
+            + num(c["followers"]) + " followers · " + e(c["platform"] or "") + "</span></div></div>"
+            "<form method='post' action='" + u("/roster/merge") + "' data-confirm='Keep " + e(c["name"]) + " and merge the others into it?'>"
+            "<input type='hidden' name='keep' value='" + e(c["code"]) + "'>"
+            + "".join("<input type='hidden' name='drop' value='" + e(o) + "'>" for o in others)
+            + "<button class='btn small lime'>" + ui.icon("merge", 15) + " Keep this one</button></form></div>")
+    return "<div class='card dups'>" + members + "</div>"
+
+
 def roster_page(creators, error=None, message=None, cities=None, tiers=None,
                 nationalities=None, interests=None, editing=None, q="",
                 bands=None, page_no=1, pages=1, total=None, per_page=100,
-                dates=("", "")):
+                dates=("", ""), tab=None, dupes=None):
     d_from, d_to = dates or ("", "")
     filtered = bool(q or d_from or d_to)
     tiers = tiers or []
@@ -1678,93 +1727,71 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
     suggestions = ("<datalist id='nationalities'>" + "".join(
         "<option value='" + e(x) + "'>" for x in (nationalities or [])) + "</datalist>")
 
+    all_panel = (
+        "<form class='rsearch' method='get' action='" + u("/roster") + "'>"
+        "<input name='q' value='" + e(q) + "' placeholder='Search name, code, handle or city' autocomplete='off' aria-label='Search creators'>"
+        "<label class='added'>Added from<input type='date' name='from' value='" + e(d_from) + "'></label>"
+        "<label class='added'>to<input type='date' name='to' value='" + e(d_to) + "'></label>"
+        "<button class='btn small'>Search</button>"
+        + ("<a class='btn small ghost' href='" + u("/roster") + "'>Clear</a>" if filtered else "")
+        + "<span class='muted' style='font-size:13px'>" + e(shown) + "</span>"
+        "<a class='btn small ghost' style='margin-left:auto' href='" + u("/roster/export") + "'>" + ui.icon("download", 15) + " Export .csv</a></form>"
+        + "<div class='card'><table><thead><tr><th></th><th>Code</th>"
+        + "<th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>City</th>"
+        + "<th></th></tr></thead><tbody>" + rows + "</tbody></table></div>" + pager)
+
+    add_panel = (
+        "<div class='card'><div class='hd'><h2>Add a creator</h2></div>"
+        "<p class='sec-desc'>Paste their profile links and the followers fill the tier. Hidden creators stay in the database but never reach a client.</p>"
+        + creator_form(None, cities, tier_names, interests, q, 1, price_bands, dates) + "</div>")
+
+    import_panel = (
+        "<div class='split'>"
+        "<div class='card'><div class='hd'><h2>Import a spreadsheet</h2></div>"
+        "<p class='sec-desc'>Add or update many creators at once.</p>"
+        "<ul class='tick-list'><li>Start from the template so the headings match.</li>"
+        "<li>A blank code is assigned for you; a code that already exists is updated, not duplicated.</li>"
+        "<li><b>Nothing is saved unless every row is valid.</b> Wrong rows are named so you can fix them.</li></ul>"
+        "<div style='display:flex;gap:8px;flex-wrap:wrap;margin:14px 0'>"
+        "<a class='btn ghost small' href='" + u("/roster/template.xlsx") + "'>" + ui.icon("download", 15) + " Template (.xlsx, takes photos)</a>"
+        "<a class='btn ghost small' href='" + u("/roster/template") + "'>CSV only</a></div>"
+        "<form method='post' action='" + u("/roster/import") + "' enctype='multipart/form-data'>"
+        "<label for='sheet'>Spreadsheet (.csv or .xlsx)</label><input id='sheet' type='file' name='sheet' accept='.csv,.xlsx,.xlsm,text/csv' required>"
+        "<button class='btn lime' style='margin-top:12px'>" + ui.icon("upload", 16) + " Import</button></form>"
+        "<details style='margin-top:14px'><summary class='muted'>Can photos travel with the sheet?</summary>"
+        "<p class='price-hint'>Only in an .xlsx: insert each picture on its row in the <code>photo</code> column. A CSV cannot carry images. "
+        "If the creators already exist, <b>Attach photos in bulk</b> is far quicker.</p></details></div>"
+        "<div class='card'><div class='hd'><h2>Attach photos in bulk</h2></div>"
+        "<p class='sec-desc'>Select a folder of images at once. Each file is matched to a creator by its filename.</p>"
+        "<ul class='tick-list'><li>The person's name: <code>Noha Magdy.jpg</code></li><li>Their handle: <code>noha.mgdi.jpg</code></li>"
+        "<li>Their code: <code>HV-MC-001.jpg</code></li></ul>"
+        "<p class='price-hint'>Spaces, dashes and underscores count the same, and a browser's <code>(1)</code> is ignored. Files that match nothing are listed back, "
+        "never dropped. A photo already on file is replaced.</p>"
+        "<form method='post' action='" + u("/roster/photos") + "' enctype='multipart/form-data'>"
+        "<label for='photos'>Images (select many)</label><input id='photos' type='file' name='photos' accept='image/*' multiple required>"
+        "<button class='btn lime' style='margin-top:12px'>" + ui.icon("image", 16) + " Attach photos</button></form></div></div>")
+
+    dupes = dupes or []
+    if dupes:
+        dgroups = "".join(duplicate_group_card(g) for g in dupes)
+        dup_panel = ("<p class='sec-desc'>These creators share a profile link or handle, so they are probably one person. "
+                     "Pick the one to keep: its selections, campaigns and analysis are kept, and the other is merged into it. "
+                     "Every merge can be undone from History.</p>" + dgroups)
+    else:
+        dup_panel = ui.empty("check", "No duplicates found", "Creators are checked by profile link and handle. Nothing looks doubled.")
+
+    panels = {"all": all_panel, "add": add_panel, "import": import_panel,
+              "tiers": tiers_section(tiers, used), "dupes": dup_panel}
+    first = tab if tab in panels else "all"
     body = (
         suggestions
         + reach_script(bands or [], [t["name"] for t in tiers if not t["auto"]])
-        + "<h1>Roster</h1><p class='sub'>" + str(len(creators))
-        + " creators. Hidden ones stay in the database but never reach a client.</p>" + err
-        + "<h2>Add a creator</h2><div class='card'>"
-        + creator_form(None, cities, tier_names, interests, q, 1, price_bands, dates) + "</div>"
-        + "<h2>Import a spreadsheet</h2><div class='card'>"
-        + "<p class='sub' style='margin-bottom:16px'>Add many creators at once. "
-          "Start from the template so the headings match — a code left blank is "
-          "assigned automatically, and a code that already exists is updated "
-          "rather than duplicated. Photos are never lost on re-import.</p>"
-        + "<p class='sub' style='margin-bottom:16px'><strong>Nothing is written "
-          "unless every row is valid.</strong> If a tier or platform is wrong the "
-          "whole file is rejected and the offending rows are named, so the roster "
-          "is never left half updated.</p>"
-        + "<p class='sub' style='margin-bottom:16px'><strong>Photos can travel "
-          "with the sheet, but only in an .xlsx.</strong> A cell holds text, so "
-          "a picture is not <em>in</em> one — Excel floats it over the sheet, and "
-          "the row its top-left corner sits on is the creator it belongs to. "
-          "Insert each picture on its row in the <code>photo</code> column. A CSV "
-          "cannot carry an image at all.</p>"
-        + "<p class='sub' style='margin-bottom:16px'>Worth it when you are "
-          "building a roster from scratch and have the photos to hand. If the "
-          "creators are already here and you just want to add or replace "
-          "pictures, <em>Attach photos in bulk</em> below is far quicker than "
-          "inserting them into Excel one at a time.</p>"
-        + "<a class='btn ghost' href='" + u("/roster/template.xlsx")
-        + "'>Download the template (.xlsx, takes photos)</a> "
-        + "<a class='btn ghost' href='" + u("/roster/template") + "'>CSV only</a>"
-        + "<form method='post' action='" + u("/roster/import") + "' enctype='multipart/form-data' "
-          "style='margin-top:18px'>"
-        + "<div class='row'><div><label>Spreadsheet (.csv or .xlsx)</label>"
-        + "<input type='file' name='sheet' accept='.csv,.xlsx,.xlsm,text/csv' required></div>"
-        + "<div style='align-self:end'><button class='btn'>Import</button></div></div>"
-        + "<p class='muted' style='font-size:13px;margin:0'>Both formats are "
-          "read by the server itself — nothing to install, and .xlsx works "
-          "wherever this is deployed.</p></form></div>"
-        + "<h2>Attach photos in bulk</h2><div class='card'>"
-        + "<p class='sub' style='margin-bottom:16px'>For creators who are "
-          "already on the roster. Select a whole folder of images at once "
-          "instead of opening each creator in turn — and unlike the "
-          "spreadsheet route, nothing has to be inserted into Excel first. "
-          "This is also how you replace a photo later without re-importing "
-          "anything.</p>"
-        + "<p class='sub' style='margin-bottom:10px'>Each file is matched to a "
-          "creator by its <strong>filename</strong>, any of three ways — so in "
-          "most cases you do not have to rename anything:</p>"
-        + "<ul class='sub' style='margin:0 0 16px 18px'>"
-          "<li>the person's name — <code>Noha Magdy.jpg</code>, "
-          "<code>noha_magdy.jpg</code>, <code>NOHA-MAGDY.jpg</code></li>"
-          "<li>their handle — <code>noha.mgdi.jpg</code></li>"
-          "<li>the code — <code>HV-MC-001.jpg</code></li></ul>"
-        + "<p class='sub' style='margin-bottom:16px'>Spaces, dashes and "
-          "underscores are all treated the same, and a <code>(1)</code> the "
-          "browser added to a second download is ignored. Anything matching "
-          "nothing is listed back by name rather than dropped, and a name that "
-          "fits two creators is skipped rather than guessed. The same 6MB and "
-          "real-image checks apply as on a single upload.</p>"
-        + "<form method='post' action='" + u("/roster/photos") + "' "
-          "enctype='multipart/form-data'>"
-        + "<div class='row'><div><label>Images (select many)</label>"
-        + "<input type='file' name='photos' accept='image/*' multiple required></div>"
-        + "<div style='align-self:end'><button class='btn'>Attach photos</button>"
-          "</div></div>"
-        + "<p class='muted' style='font-size:13px;margin:0'>A photo already on "
-          "file is replaced by the one you upload for that creator.</p>"
-        + "</form></div>"
-        + tiers_section(tiers, used)
-        + "<h2>Everyone</h2>"
-        + "<form class='rsearch' method='get' action='" + u("/roster") + "'>"
-          "<input name='q' value='" + e(q) + "' placeholder='Search name, code, "
-          "handle or city' autocomplete='off'>"
-          "<label class='added'>Added from<input type='date' name='from' value='" + e(d_from) + "'></label>"
-          "<label class='added'>to<input type='date' name='to' value='" + e(d_to) + "'></label>"
-          "<button class='btn small'>Search</button>"
-        + ("<a class='btn small ghost' href='" + u("/roster") + "'>Clear</a>" if filtered else "")
-        + "<span class='muted' style='font-size:13px'>" + e(shown) + "</span></form>"
-        + "<p class='sub' style='margin-bottom:12px'>Need the codes? "
-          "<a href='" + u("/roster/export") + "'>Export the roster (.csv)</a> — "
-          "every creator with their code, handle and whether a photo is on "
-          "file. It is also a valid import file, so you can edit a column and "
-          "upload it back.</p>"
-        + "<div class='card'><table><thead><tr><th></th><th>Code</th>"
-        + "<th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>City</th>"
-        + "<th></th></tr></thead><tbody>" + rows + "</tbody></table></div>"
-        + pager
+        + ui.header("Creators", "Everyone clients can pick from. Hidden creators stay in the database but never reach a client.",
+                    actions="<a class='btn lime' href='#rt=add' data-go-tab='rt:add'>" + ui.icon("plus", 16) + " Add a creator</a>")
+        + err
+        + ui.tabset("rt", [("all", "Everyone", len(creators) if not filtered else None), ("add", "Add a creator", None),
+                           ("import", "Import", None), ("tiers", "Tiers & pricing", None),
+                           ("dupes", "Duplicates", len(dupes) if dupes else None)], panels, first=first)
         + ROSTER_JS
     )
     return page("Roster", body, "/roster")
@@ -1901,12 +1928,17 @@ def requests_page(requests, creators, tiers=None):
     body_cards = "".join(card(r) for r in requests) or (
         "<div class='card muted'>No requests yet.</div>")
 
+    n_open = sum(1 for r in requests if not r["handled_at"])
     body = (
-        "<h1>Quote requests</h1><p class='sub'>" + str(len(requests))
-        + " requests. Each shows the client's details and every creator they chose, "
-          "exactly as they saw them.</p>" + body_cards
+        ui.header("Quote requests", "A client picked creators in the catalogue and asked for a price. Each request shows the client's details and "
+                  "every creator they chose, exactly as they saw them. Price it as a selection, then mark it handled.")
+        + ("<div class='card'>" + ui.empty("inbox", "No requests yet", "When a client sends a shortlist from the catalogue it lands here.") + "</div>"
+           if not requests else
+           "<div class='stat-row'><div class='stat'><b>" + str(n_open) + "</b><span>Waiting for you</span></div>"
+           "<div class='stat'><b>" + str(len(requests) - n_open) + "</b><span>Handled</span></div>"
+           "<div class='stat'><b>" + str(len(requests)) + "</b><span>Total</span></div></div>" + body_cards)
     )
-    return page("Requests", body, "/requests")
+    return page("Quote requests", body, "/requests")
 
 
 # ------------------------------------------------------------ selections --
@@ -1927,7 +1959,8 @@ def selection_link(sel, origin):
             + "&s=" + sel["token"])
 
 
-def selections_page(sels, error=None, message=None, origin="", archived=False, n_archived=0, page_no=1, total=0):
+def selections_page(sels, error=None, message=None, origin="", archived=False, n_archived=0, page_no=1, total=0,
+                    clients=None, currencies=None, camp_counts=None):
     listed = total
     note = ""
     if error:
@@ -1935,44 +1968,56 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
     if message:
         note += "<div class='ok'>" + e(message) + "</div>"
     rows = []
+    camp_counts = camp_counts or {}
     for x in sels:
         n = len(json.loads(x["codes"] or "[]"))
+        priced = bool(json.loads(x["prices"] or "{}")) or x["total_from"] is not None
+        in_camp = camp_counts.get(x["id"], 0)
         total = _money(x["total_from"], x["total_to"]) if x["total_from"] is not None else "sum of creators"
-        if x["request_id"]:
-            src = "quote request #" + str(x["request_id"])
-        elif ("code_label" in x.keys() and x["code_label"]):
-            src = "built by " + e(x["code_label"])
-        elif x["code_id"]:
-            src = "built by a client"
-        else:
-            src = "pasted link"
+        steps = [("Creators", n > 0), ("Prices", priced), ("Campaign", in_camp > 0)]
+        prog = "<div class='mini-steps'>" + "".join(
+            "<span class='%s' title='%s'>%s</span>" % ("on" if ok_ else "", lbl, ui.icon("check", 12) if ok_ else "") for lbl, ok_ in steps) + "</div>"
+        nxt = ("Add creators" if not n else "Set prices" if not priced else "Start a campaign" if not in_camp else "In a campaign")
+        client = ("<span class='pill own'>" + e(x["code_label"]) + "</span>" if ("code_label" in x.keys() and x["code_label"])
+                  else "<span class='pill warn'>No client</span>")
         rows.append(
             "<tr><td><strong><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>"
-            + e(x["name"]) + "</a></strong><br><span class='muted'>from " + src + "</span>"
-            + "</td><td>" + str(n) + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
+            + e(x["name"]) + "</a></strong>"
+            + "</td><td>" + client + "</td><td>" + prog + "<span class='muted' style='font-size:12.5px'>Next: " + nxt + "</span></td><td>" + str(n)
+            + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
             + "</td><td class='right nowrap'><a class='btn small' href='" + u("/selections/edit") + "?id="
-            + str(x["id"]) + "'>Adjust prices</a> " + archive_button("selection", x["id"], archived)
-            + "<form method='post' action='" + u("/selections/delete") + "' class='inline' onsubmit=\"return confirm('Delete "
-            + e((x["name"] or "this selection").replace("'", "’")) + "? Its link stops working. You can restore it from History.')\">"
+            + str(x["id"]) + "'>Open</a> " + archive_button("selection", x["id"], archived)
+            + "<form method='post' action='" + u("/selections/delete") + "' class='inline' data-confirm=\"Delete "
+            + e((x["name"] or "this selection").replace("'", "’")) + "? Its link stops working. You can restore it from History.\">"
             "<input type='hidden' name='id' value='" + str(x["id"]) + "'><button class='btn small danger'>Delete</button></form>"
             "</td></tr>")
-    table = "".join(rows) or ("<tr><td colspan='5' class='muted'>No selections yet. One appears "
-                              "here as soon as a client names a shortlist on the catalogue.</td></tr>")
+    table = "".join(rows) or ("<tr><td colspan='6'>" + ui.empty("list", "No selections yet", "A selection appears here when a client shortlists creators on the catalogue, "
+                              "or build one yourself.", "<a class='btn small lime' href='#new'>New selection</a>") + "</td></tr>")
+    code_opts = "<option value=''>No client yet</option>" + "".join(
+        "<option value='%d'>%s</option>" % (c["id"], e(c["label"])) for c in (clients or []))
+    plat_opts = "<option value=''>Every platform they are on</option>" + "".join("<option value='%s'>%s only</option>" % (p_, p_) for p_ in PLATFORMS)
+    cur_opts = "".join("<option>%s</option>" % c_ for c_ in (currencies or ["SAR"]))
+    create = (
+        "<details class='card' id='new'" + ("" if sels else " open") + "><summary class='hd'><h2>New selection</h2><span class='muted'>Build one, or open a client's</span></summary>"
+        "<p class='sec-desc'>A selection is a priced shortlist for one client. Name it, choose the client, then add creators and prices.</p>"
+        "<form method='post' action='" + u("/selections/new") + "'><input type='hidden' name='mode' value='scratch'><div class='row'>"
+        "<div style='flex:2'><label for='ns-name'>Selection name (the client sees this)</label><input id='ns-name' name='name' required placeholder='e.g. Penduline: Mothers, Instagram'></div>"
+        "<div><label for='ns-client'>Client</label><select id='ns-client' name='code_id'>" + code_opts + "</select></div>"
+        "<div><label for='ns-plat'>Quoted for</label><select id='ns-plat' name='platform'>" + plat_opts + "</select></div>"
+        "<div><label for='ns-cur'>Currency</label><select id='ns-cur' name='currency'>" + cur_opts + "</select></div></div>"
+        "<button class='btn lime'>" + ui.icon("arrow", 16) + " Create and add creators</button></form>"
+        "<details style='margin-top:16px'><summary class='muted'>Have a link a client sent? Open that selection instead</summary>"
+        "<form method='post' action='" + u("/selections/new") + "' style='margin-top:10px'><div class='row'>"
+        "<div style='flex:3'><label>Selection link</label><input name='link' required placeholder='https://influencer-catalogue.hellovoice.co.uk/selection/#n=…'></div>"
+        "<div style='align-self:end'><button class='btn small'>Open it</button></div></div>"
+        "<p class='price-hint'>A selection a client sent as a quote request is priced from <a href='" + u("/requests") + "'>Quote requests</a>.</p></form></details></details>")
     body = (
-        "<h1>Selections</h1><p class='sub'>Every shortlist a client names on the catalogue "
-        "appears here by itself, ready to be priced — there is no link to paste. Adjust the "
-        "prices and the client's own link shows them as soon as you save, and every later change "
-        "too. A client who goes back and adds a creator updates the same selection; the total you "
-        "typed is cleared then, because it was for a different shortlist.</p>"
-        + note
-        + "<form method='post' action='" + u("/selections/new") + "' class='card'><div class='row'>"
-        + "<div style='flex:3'><label>Or paste a selection link</label><input name='link' required "
-          "placeholder='https://influencer-catalogue.hellovoice.co.uk/selection/#n=…&amp;c=…'></div>"
-        + "<div style='align-self:end'><button class='btn'>Adjust prices</button></div>"
-        + "</div><p class='price-hint'>For a selection sent as a quote request, use "
-          "<a href='" + u("/requests") + "'>Price &amp; send</a> on the Requests page instead.</p></form>"
+        ui.header("Selections", "A selection is a priced shortlist of creators for one client. Clients create them on the catalogue and they appear here by themselves; "
+                  "you set the prices and the client's own link shows them at once.",
+                  actions="<a class='btn lime' href='#new'>" + ui.icon("plus", 16) + " New selection</a>")
+        + note + create
         + archive_tabs("/selections", archived, n_archived, "Selections")
-        + "<div class='card'><table><thead><tr><th>Selection</th><th>Creators</th><th>Total</th>"
+        + "<div class='card'><table><thead><tr><th>Selection</th><th>Client</th><th>Progress</th><th>Creators</th><th>Total</th>"
         + "<th>Updated</th><th></th></tr></thead><tbody>" + table + "</tbody></table></div>"
         + pager(listed, page_no, "/selections", archived=("1" if archived else ""))
     )
@@ -2052,22 +2097,70 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     link = selection_link(sel, origin)
     tf = "" if sel["total_from"] is None else format(conv(sel["total_from"]), ",")
     tt = "" if sel["total_to"] is None else format(conv(sel["total_to"]), ",")
+    n_cr = len([c for c in codes if c in by])
+    has_prices = bool(own) or sel["total_from"] is not None
+    st_done = [n_cr > 0, has_prices, bool(sel["code_id"]) and n_cr > 0 and has_prices, bool(campaigns)]
+    first_open = next((i for i, d_ in enumerate(st_done) if not d_), 3)
+    stepper_html = ui.stepper([("Add creators", "done" if st_done[0] else ("now" if first_open == 0 else "todo")),
+                               ("Set prices", "done" if st_done[1] else ("now" if first_open == 1 else "todo")),
+                               ("Share with the client", "done" if st_done[2] else ("now" if first_open == 2 else "todo")),
+                               ("Start a campaign", "done" if st_done[3] else ("now" if first_open == 3 else "todo"))])
+    roster_list = "<datalist id='roster-list'>" + "".join(
+        "<option value=\"%s (%s)\">" % (e(c["name"]), e(c["code"])) for c in creators if c["active"]) + "</datalist>"
+    client_pill = ("<span class='pill own'>" + e(sel["code_label"]) + "</span>" if ("code_label" in sel.keys() and sel["code_label"])
+                   else "<span class='pill warn'>No client assigned</span>")
+    link_html = (
+        "<div class='card'><div class='hd'><h2>Share with the client</h2></div>"
+        "<p class='sec-desc'>Send this link. The client opens it with their passcode and sees these prices, never your costs or margins. "
+        "A price change needs no new link; if you add or remove creators, send the link again.</p>"
+        "<div class='sel-link'><input id='sel-url' value='" + e(link) + "' readonly aria-label='Selection link'>"
+        "<button type='button' class='btn small lime' data-copy='#sel-url'>" + ui.icon("copy", 15) + " Copy link</button>"
+        "<a class='btn small ghost' href='" + e(link) + "' target='_blank' rel='noopener'>Preview as the client</a></div></div>")
+    campaign_html = campaign_start_card(sel, campaigns)
     body = (
-        "<p><a href='" + u("/selections") + "'>&larr; All selections</a></p>"
-        + "<h1>" + e(sel["name"]) + "</h1>" + note
-        + "<div class='card'><label>Link to send the client</label><div class='sel-link'>"
-        + "<input id='sel-url' value='" + e(link) + "' readonly>"
-        + "<button type='button' class='btn small' onclick=\"var i=document.getElementById('sel-url');"
-          "i.select();navigator.clipboard&&navigator.clipboard.writeText(i.value);"
-          "this.textContent='Copied'\">Copy link</button>"
-        + "<a class='btn small ghost' href='" + e(link) + "' target='_blank' rel='noopener'>Preview</a></div>"
-        + "<p class='price-hint'>The link the client already has shows these prices too, once saved, "
-          "as long as the creators are the same — so a price change needs no new link. If you add or "
-          "remove creators, send this link instead. The client opens it with their passcode.</p></div>"
+        roster_list
+        + ui.header(sel["name"], "A priced shortlist for one client: " + str(n_cr) + " creator" + ("" if n_cr == 1 else "s") + ". " + client_pill,
+                    crumbs=[("Selections", u("/selections")), (sel["name"], None)],
+                    actions="<button type='button' class='btn lime' data-go-tab='st:share'>" + ui.icon("send", 16) + " Share</button>")
+        + note + stepper_html
+        + "<div data-tabs='st'>" + ui.tab_nav("st", [("creators", "Creators & prices", n_cr), ("details", "Details", None),
+                                                    ("share", "Share", None), ("campaign", "Campaign", len(campaigns) or None)])
         + "<form method='post' action='" + u("/selections/save") + "' enctype='multipart/form-data'>"
         + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
-        + "<div class='card'><div class='row'>"
-        + "<div style='flex:2'><label>Selection name (the client sees this)</label>"
+        + "<div class='panel' data-panel='creators'>"
++ "<div class='card'><div class='row'>"
+          "<div style='display:flex;gap:10px'><div><label>Minimum margin (%)</label><div class='margin-box'>"
+          "<input name='margin' id='sel-margin' data-cur='" + cur + "' data-rate='" + str(usable.get(cur, 1))
+        + "' value='" + margin_txt + "' placeholder='e.g. 40' "
+          "inputmode='decimal'></div></div>"
+          "<div><label>Maximum margin (%)</label><div class='margin-box'>"
+          "<input name='margin_max' id='sel-margin-max' value='" + margin_max_txt + "' placeholder='e.g. 70' inputmode='decimal'></div></div></div>"
+          "<div class='price-hint'>Cost to us is what we pay the creator, with no profit in it. The client's price runs from "
+          "<b>cost + minimum margin</b> (the lowest price that still covers our profit) up to <b>cost + maximum margin</b>, "
+          "rounded up to the next " + str(step_c) + " " + cur + ". Leave the maximum empty for one price. "
+          "You can type any creator's range, or the total, yourself. Internal only — the client sees only the range.</div></div>"
+          "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
+          "</div>"
+        + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
+          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th></th>"
+          "</tr></thead><tbody>"
+        + table + "</tbody></table>"
+        + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
+        + "<p class='price-hint'>Type a creator's cost and their price is worked out from the "
+          "margin above. With no cost, type the price yourself, or leave it empty to use the "
+          "creator's standard price. One figure = a fixed price. The client never sees a price "
+          "against a creator — these add up to the total they see, unless you type a total above. "
+          "Type a creator's <b>cost</b> and their price follows the margin, or type the <b>price</b> yourself and the "
+          "profit and margin are worked out for you. The totals fill themselves. A price typed here stays in <b>this selection only</b>. Tick <b>make default</b> to also save it "
+          "as that creator's price on the roster, so every later selection starts from it. A cost is "
+          "remembered for their next selection.</p>"
+        + "<div class='row'><div style='flex:2'><label>Add creators (optional)</label>"
+          "<input name='add' list='roster-list' placeholder='Type a creator\'s name or code…' autocomplete='off'>"
+          "<div class='price-hint'>Pick from the list, or paste several codes separated by commas.</div></div></div>"
+                + "</div></div>"
+        + "<div class='panel' data-panel='details' hidden><div class='card'><div class='hd'><h2>Details</h2></div>"
+          "<p class='sec-desc'>What the client sees, which platform is priced, the currency and the total.</p>"
++ "<div class='row'><div style='flex:2'><label>Selection name (the client sees this)</label>"
           "<input name='name' value='" + e(sel["name"]) + "' required></div>"
         + "<div><label>Quoted for</label><select name='platform'>"
         + "".join("<option value='" + e(v) + "'" + (" selected" if (sel["platform"] or "") == v else "")
@@ -2087,40 +2180,14 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<div class='price-hint'>Fills itself from the prices below as you type them (currently "
         + money_c(lo_sum, hi_sum) + "). Type your own figure to override it; clear it to follow the creators again.</div></div>"
         + "</div></div>"
-        + "<div class='card'><div class='row'>"
-          "<div style='display:flex;gap:10px'><div><label>Minimum margin (%)</label><div class='margin-box'>"
-          "<input name='margin' id='sel-margin' data-cur='" + cur + "' data-rate='" + str(usable.get(cur, 1))
-        + "' value='" + margin_txt + "' placeholder='e.g. 40' "
-          "inputmode='decimal'></div></div>"
-          "<div><label>Maximum margin (%)</label><div class='margin-box'>"
-          "<input name='margin_max' id='sel-margin-max' value='" + margin_max_txt + "' placeholder='e.g. 70' inputmode='decimal'></div></div></div>"
-          "<div class='price-hint'>Cost to us is what we pay the creator, with no profit in it. The client's price runs from "
-          "<b>cost + minimum margin</b> (the lowest price that still covers our profit) up to <b>cost + maximum margin</b>, "
-          "rounded up to the next " + str(step_c) + " " + cur + ". Leave the maximum empty for one price. "
-          "You can type any creator's range, or the total, yourself. Internal only — the client sees only the range.</div></div>"
-          "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
-          "</div></div>"
-        + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
-          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th></th>"
-          "</tr></thead><tbody>"
-        + table + "</tbody></table>"
-        + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
-        + "<p class='price-hint'>Type a creator's cost and their price is worked out from the "
-          "margin above. With no cost, type the price yourself, or leave it empty to use the "
-          "creator's standard price. One figure = a fixed price. The client never sees a price "
-          "against a creator — these add up to the total they see, unless you type a total above. "
-          "Type a creator's <b>cost</b> and their price follows the margin, or type the <b>price</b> yourself and the "
-          "profit and margin are worked out for you. The totals fill themselves. A price typed here stays in <b>this selection only</b>. Tick <b>make default</b> to also save it "
-          "as that creator's price on the roster, so every later selection starts from it. A cost is "
-          "remembered for their next selection.</p>"
-        + "<div class='row'><div style='flex:2'><label>Add creators (optional)</label>"
-          "<input name='add' placeholder='HV-MC-005, HV-MD-012 …'></div></div>"
-        + "</div><button class='btn'>Save prices</button></form>"
-        + "<form method='post' action='" + u("/selections/delete") + "' style='margin-top:14px' "
-          "onsubmit=\"return confirm('Delete this selection? Its link stops working.')\">"
-          "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
-          "<button class='btn small danger'>Delete selection</button></form>"
-        + campaign_start_card(sel, campaigns)
+                + "</div>"
+        + "<div class='savebar'><button class='btn lime'>Save changes</button><span class='muted'>Prices, margins and details are saved together.</span></div></form>"
+        + ui.panel("share", link_html) + ui.panel("campaign", campaign_html)
+        + "</div>"
+        + "<details class='card' style='margin-top:24px'><summary class='muted'>Delete this selection</summary>"
+        + "<form method='post' action='" + u("/selections/delete") + "' data-confirm='Delete this selection? Its link stops working. You can restore it from History.' style='margin-top:12px'>"
+        + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
+        + "<button class='btn small danger'>Delete selection</button></form></details>"
         + MARGIN_JS
     )
     return page(sel["name"] + " — Selection", body, "/selections")
@@ -3180,8 +3247,10 @@ def clients_page(overview, origin, archived=False, n_archived=0, page_no=1, tota
             + (sels or "<li class='muted'>No selections yet.</li>") + "</ul></div>"
             + "<div><label>All campaigns</label><ul class='chain-list'>" + (camps or "<li class='muted'>None yet.</li>")
             + "</ul></div></div></div>")
-    body = ("<h1>Clients</h1><p class='sub'>Each client is one passcode. Follow it from the shortlist they picked to the "
-            "campaign it became and the report they see. Everything links to the page that controls it.</p>"
+    body = (ui.header("Clients", "Each client is one passcode. Follow it from the shortlist they picked to the campaign it became "
+                      "and the report they see. Every name links to the page that controls it.",
+                      actions="<a class='btn lime' href='" + u("/codes") + "#new-code'>" + ui.icon("plus", 16) + " New client</a>",
+                      tabs=_client_tabs("clients"))
             + ("<div class='ok'>" + e(ok) + "</div>" if ok else "")
             + archive_tabs("/clients", archived, n_archived, "Clients")
             + ("".join(cards) or ("<div class='card muted'>" + ("Nothing archived." if archived else
