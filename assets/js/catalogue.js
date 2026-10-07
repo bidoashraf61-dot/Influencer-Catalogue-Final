@@ -2292,7 +2292,7 @@
         } else {
           st.className = "cat-score cat-score--" + bandOf(item.score) + (item.basic ? " cat-score--basic" : "") + (multi ? " cat-score--multi" : "");
           st.innerHTML = "<b>" + item.score + "</b><small>" + (multi ? (PLAT_SHORT[item.platform] || item.platform) : (item.basic ? "Basic" : "Match")) + "</small>" +
-            (audienceEstimated(item) ? '<i class="cat-score__est">Audience est.</i>' : "");
+            "";
           st.setAttribute("aria-label", "Matching score " + item.score + " out of 100 on " + (item.platform || "the platform") + ", " + item.tag + ". Show why.");
           st.removeAttribute("title");
         }
@@ -2574,7 +2574,7 @@
     all(".cat-back, .cat-tray__edit, .cat-close__actions a[href='../'], .cat-close__actions a[href='/']")
       .forEach(function (a) {
         a.href = new URL("../", location.href).href + carry;
-        if (a.classList.contains("cat-btn")) a.textContent = "Add or remove creators";
+        if (a.classList.contains("cat-btn")) a.textContent = "Add more creators";
       });
 
     wireQuoteForm(function () { selected = []; render(); });
@@ -2759,4 +2759,36 @@
     ev.preventDefault();
     to.scrollIntoView({ behavior: still && still.matches ? 'auto' : 'smooth', block: 'start' });
   });
+})();
+
+/* Results bar: Group and Sort leave the filter row for a slim bar right above
+   the grid, with a live count on the left. Filters narrow the list; this bar
+   arranges what is left, so the two jobs read as two places. */
+(function () {
+  function count(grid, out) {
+    var n = 0, cards = grid.querySelectorAll(".cat-card");
+    for (var i = 0; i < cards.length; i++) if (!cards[i].hidden) n++;
+    out.textContent = "Showing " + n + " creator" + (n === 1 ? "" : "s");
+  }
+  function mount() {
+    var order = document.querySelector(".cat-bar__order") || document.querySelector(".cat-bar__row .cat-sort");
+    var grid = document.getElementById("cat-grid");
+    if (!order || !grid || document.querySelector(".cat-results")) return false;
+    var bar = document.createElement("div");
+    bar.className = "cat-results";
+    var n = document.createElement("p");
+    n.className = "cat-results__count";
+    n.setAttribute("aria-live", "polite");
+    bar.appendChild(n);
+    bar.appendChild(order);
+    grid.parentNode.insertBefore(bar, grid);
+    count(grid, n);
+    var t = null;
+    new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { count(grid, n); }, 60); })
+      .observe(grid, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
+    return true;
+  }
+  if (mount()) return;
+  var tries = 0, mo = new MutationObserver(function () { if (mount() || ++tries > 400) mo.disconnect(); });
+  mo.observe(document.body, { childList: true, subtree: true });
 })();

@@ -1024,7 +1024,7 @@ def build():
       <div class="cat-tray__count"><strong id="cat-tray-n">0</strong> in this selection</div>
       <div class="cat-tray__codes" id="cat-tray-codes"></div>
       <div class="cat-tray__actions">
-        <a class="cat-btn cat-btn--ghost cat-tray__edit" href="/catalogue/">Add or remove creators</a>
+        <a class="cat-btn cat-btn--ghost cat-tray__edit" href="/catalogue/">Add more creators</a>
         <button type="button" class="cat-btn cat-btn--lime" id="cat-request">Request a quote</button>
       </div>
     </div>
