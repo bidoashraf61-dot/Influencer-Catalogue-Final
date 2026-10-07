@@ -351,3 +351,12 @@ body.pp-modal-on { overflow: hidden; }
 .pp-plat button.is-off { border-style: dashed; border-color: rgba(18,18,18,.35); }
 .pp-plat button[aria-selected="true"] { background: var(--ink); color: var(--lime); border-style: solid; border-color: var(--ink); }
 .pp-plat button:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
+
+/* a basic record: sections not collected yet are held back, blurred */
+.pp-pending { position: relative; min-height: 150px; border: 1px solid var(--line); border-radius: var(--r-sm); overflow: hidden; }
+.pp-pending__ghost { filter: blur(7px); opacity: .5; padding: 22px; display: grid; gap: 14px; pointer-events: none; user-select: none; }
+.pp-pending__ghost i { display: block; height: 16px; border-radius: 8px; background: var(--line); }
+.pp-pending__tag { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 2px; }
+.pp-pending__tag b { font-size: 18px; font-weight: 600; }
+.pp-pending__tag small { color: var(--gray); font-size: 13px; }
+.pp-basicnote { color: var(--gray); font-size: 13px; margin: 12px 0 0; }

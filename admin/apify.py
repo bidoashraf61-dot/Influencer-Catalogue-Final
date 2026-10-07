@@ -108,6 +108,18 @@ CREATE TABLE IF NOT EXISTS api_audit (
   action TEXT NOT NULL,
   detail TEXT
 );
+CREATE TABLE IF NOT EXISTS profile_metrics (
+  id          INTEGER PRIMARY KEY,
+  code        TEXT NOT NULL,
+  platform    TEXT NOT NULL,
+  handle      TEXT,
+  at          INTEGER NOT NULL,
+  followers   INTEGER, following INTEGER, posts INTEGER,
+  avg_likes   REAL, avg_comments REAL, er_pct REAL,
+  posts_per_week REAL, last_post TEXT, sample_posts INTEGER,
+  verified    INTEGER, category TEXT, run_id INTEGER
+);
+CREATE INDEX IF NOT EXISTS profile_metrics_code ON profile_metrics(code, platform, at DESC);
 CREATE TABLE IF NOT EXISTS profile_raw (
   id      INTEGER PRIMARY KEY,
   run_id  INTEGER NOT NULL,
@@ -564,9 +576,60 @@ def _compact(item):
     return out
 
 
+def derive_instagram(it):
+    """Basic numbers worked out from an Instagram profile result: the profile's
+    own counts, and averages over the latest posts it carries."""
+    posts = [p for p in (it.get("latestPosts") or []) if isinstance(p, dict)]
+    likes = [p.get("likesCount") for p in posts if isinstance(p.get("likesCount"), (int, float)) and p["likesCount"] >= 0]
+    coms = [p.get("commentsCount") for p in posts if isinstance(p.get("commentsCount"), (int, float)) and p["commentsCount"] >= 0]
+    followers = _num(it.get("followersCount"))
+    out = {"followers": followers, "following": _num(it.get("followsCount")), "posts": _num(it.get("postsCount")),
+           "verified": 1 if it.get("verified") else 0, "category": it.get("businessCategoryName") or "",
+           "avg_likes": round(sum(likes) / len(likes), 1) if likes else None,
+           "avg_comments": round(sum(coms) / len(coms), 1) if coms else None,
+           "er_pct": None, "posts_per_week": None, "last_post": None, "sample_posts": len(posts)}
+    if followers and out["avg_likes"] is not None:
+        out["er_pct"] = round((out["avg_likes"] + (out["avg_comments"] or 0)) * 100.0 / followers, 3)
+    stamps = sorted(str(p.get("timestamp"))[:10] for p in posts if p.get("timestamp"))
+    if stamps:
+        out["last_post"] = stamps[-1]
+        try:
+            span = (time.mktime(time.strptime(stamps[-1], "%Y-%m-%d")) - time.mktime(time.strptime(stamps[0], "%Y-%m-%d"))) / 86400.0
+            if len(stamps) > 1 and span > 0:
+                out["posts_per_week"] = round((len(stamps) - 1) * 7.0 / span, 2)
+        except ValueError:
+            pass
+    return out
+
+
+def save_basic(conn, code, plat, handle, it, m, run_id):
+    """Keep the worked-out numbers and, for a creator with no analysis on this
+    platform, a basic profile record the creator page can show. A creator who
+    already has a real analysis is never touched."""
+    conn.execute("INSERT INTO profile_metrics (code,platform,handle,at,followers,following,posts,avg_likes,avg_comments,"
+                 "er_pct,posts_per_week,last_post,sample_posts,verified,category,run_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                 (code, plat, handle, db.now(), m["followers"], m["following"], m["posts"], m["avg_likes"], m["avg_comments"],
+                  m["er_pct"], m["posts_per_week"], m["last_post"], m["sample_posts"], m["verified"], m["category"], run_id))
+    cur = conn.execute("SELECT data FROM creator_analysis WHERE code = ? AND platform = ?", (code, plat)).fetchone()
+    if cur is not None:
+        try:
+            if not json.loads(cur["data"]).get("basic"):
+                return False
+        except ValueError:
+            return False
+    data = {"basic": True, "platform": plat, "handle": handle, "updated": time.strftime("%Y-%m-%d", time.gmtime()),
+            "followers": m["followers"], "following": m["following"], "posts_count": m["posts"],
+            "avg_likes": m["avg_likes"], "avg_comments": m["avg_comments"], "er": m["er_pct"],
+            "posts_per_week": m["posts_per_week"], "last_post": m["last_post"], "sample_posts": m["sample_posts"],
+            "verified": bool(m["verified"]), "account_type": m["category"] or None,
+            "bio": it.get("biography") or "", "external_url": it.get("externalUrl") or ""}
+    db.save_analysis(code, data, "Apify basic", conn, plat)
+    return True
+
+
 def ingest(run, job, items):
-    """Keep every result as the actor returned it, and, for profile jobs, the
-    follower number as a dated snapshot."""
+    """Keep every result as the actor returned it, the follower number as a
+    dated snapshot, and for Instagram profile runs the basic numbers."""
     hmap = json.loads(run["handle_map"] or "{}")
     plat = job["platform"] if job else ""
     saved = 0
@@ -592,11 +655,18 @@ def ingest(run, job, items):
                                  (code, plat, h, db.now(), f, _num(it.get("followsCount", it.get("following"))),
                                   _num(it.get("postsCount", it.get("posts"))), 1 if it.get("verified") else 0, run["id"]))
                     saved += 1
+                    if plat == "Instagram" and "followersCount" in it:
+                        save_basic(conn, code, plat, h, it, derive_instagram(it), run["id"])
     return saved
 
 
+_SLIM = "profilePicUrl,profilePicUrlHD,externalUrlShimmed,latestIgtvVideos,relatedProfiles"
+
+
 def refresh_run(run):
-    """Ask Apify how one run is going and finish it off when it is done."""
+    """Ask Apify how one run is going and finish it off when it is done. Results
+    are read a page at a time: a large run's results are far bigger than this
+    service's memory."""
     try:
         d = call("GET", "/actor-runs/" + run["apify_run"])["data"]
     except ApifyError as ex:
@@ -610,20 +680,29 @@ def refresh_run(run):
     if st != "SUCCEEDED":
         _finish(run, "FAILED", 0, 0, cost, failure_note(run, d, st))
         return
-    items, saved, note = [], 0, None
+    total, saved, note = 0, 0, None
+    job = get_job(run["job_id"]) if run["job_id"] else None
     try:
-        items = call("GET", "/datasets/%s/items" % run["dataset"],
-                     params={"format": "json", "clean": "1", "limit": "5000"}, timeout=60)
-        items = items if isinstance(items, list) else []
-        job = get_job(run["job_id"]) if run["job_id"] else None
-        saved = ingest(run, job, items)
-        if not items:
+        offset = 0
+        while True:
+            page = call("GET", "/datasets/%s/items" % run["dataset"],
+                        params={"format": "json", "clean": "1", "limit": "20", "offset": str(offset), "omit": _SLIM},
+                        timeout=90)
+            page = page if isinstance(page, list) else []
+            if not page:
+                break
+            total += len(page)
+            saved += ingest(run, job, page)
+            offset += len(page)
+            if len(page) < 20 or total >= 5000:
+                break
+        if not total:
             note = "The run finished but returned no results."
         elif job and job["kind"] == "profiles" and not saved:
             note = "Results kept, but no follower count was recognised in them."
     except ApifyError as ex:
         note = "Run finished but the results could not be read: " + str(ex)
-    _finish(run, "SUCCEEDED", len(items), saved, cost, note)
+    _finish(run, "SUCCEEDED", total, saved, cost, note)
 
 
 def _finish(run, status, results, saved, cost, message):

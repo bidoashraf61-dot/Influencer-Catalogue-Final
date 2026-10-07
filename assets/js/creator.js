@@ -244,6 +244,7 @@
     $("pp-sealed").hidden = !!a;
     $("pp-pages").hidden = !a;
     if (!a) return renderSealed(c);
+    if (a.basic) return renderBasic(a);
     renderPosts(a);
     renderReal(a);
     renderPerf(a);
@@ -252,6 +253,30 @@
     renderTags(a);
     $("pp-source").textContent = a.updated ? "Data as of " + day(a.updated) : "";
     addTips();
+  }
+
+  /* a basic record: the public numbers we have collected, and every other
+     section held back as pending (blurred, with nothing real behind it) */
+  function renderBasic(a) {
+    var T = [["Followers", a.followers != null ? num(a.followers) : "—"],
+             ["Following", a.following != null ? num(a.following) : "—"],
+             ["Posts", a.posts_count != null ? num(a.posts_count) : "—"],
+             ["Avg likes", a.avg_likes != null ? num(Math.round(a.avg_likes)) : "—"],
+             ["Avg comments", a.avg_comments != null ? num(Math.round(a.avg_comments)) : "—"],
+             ["Engagement rate", a.er != null ? pct2(a.er) : "—"],
+             ["Posts per week", a.posts_per_week != null ? (+a.posts_per_week).toFixed(1) : "—"],
+             ["Last post", a.last_post ? day(a.last_post) : "—"]];
+    $("pp-real").innerHTML = '<div class="pp-tiles pp-tiles--big">' + T.map(function (t) {
+      return '<div class="pp-tile"><span>' + t[0] + "</span><b>" + t[1] + "</b></div>"; }).join("") + "</div>"
+      + (a.sample_posts ? '<p class="pp-basicnote">Worked out from this creator\'s latest ' + a.sample_posts + " public posts.</p>" : "");
+    $("pp-h-real").textContent = "Basic numbers";
+    $("pp-real-sec").hidden = false;
+    var ghost = '<div class="pp-pending"><div class="pp-pending__ghost" aria-hidden="true"><i style="width:82%"></i><i style="width:64%"></i><i style="width:90%"></i><i style="width:48%"></i><i style="width:72%"></i></div>'
+      + '<span class="pp-pending__tag"><b>Pending</b><small>Not collected yet</small></span></div>';
+    ["pp-posts", "pp-perf", "pp-net", "pp-aud", "pp-tags"].forEach(function (id) { $(id).innerHTML = ghost; });
+    ["pp-perf-tabs", "pp-aud-tabs"].forEach(function (id) { $(id).innerHTML = ""; });
+    ["pp-posts-sec", "pp-net-sec", "pp-aud-sec", "pp-tags-sec"].forEach(function (id) { $(id).hidden = false; });
+    $("pp-source").textContent = "Basic public numbers" + (a.updated ? " as of " + day(a.updated) : "") + ". Audience, content and brand sections are pending.";
   }
 
   /* identity: who, the three numbers, bio */
