@@ -436,8 +436,6 @@ th.sortable button:focus-visible{outline:2px solid var(--ink);outline-offset:-2p
 th.sortable button::after{content:"↕";opacity:.35;font-size:var(--t-xs,12px)}
 th.sortable[aria-sort=ascending] button::after{content:"↑";opacity:1}
 th.sortable[aria-sort=descending] button::after{content:"↓";opacity:1}
-.ai-btn{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:var(--lime);font:inherit;font-weight:600;font-size:var(--t-sm,13px);cursor:pointer}
-.ai-btn:hover{background:#000}
 #ai-panel{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);background:var(--white);box-shadow:-20px 0 60px rgba(0,0,0,.25);z-index:60;display:flex;flex-direction:column;transform:translateX(105%);transition:transform .2s ease;visibility:hidden}
 #ai-panel.open{transform:none;visibility:visible}
 #ai-panel header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
@@ -445,7 +443,6 @@ th.sortable[aria-sort=descending] button::after{content:"↓";opacity:1}
 #ai-panel iframe{flex:1;border:0;width:100%}
 .kbd-help{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:var(--t-sm,13px);margin:8px 6px}
 .kbd-help kbd{font:600 var(--t-xs,12px) "DM Sans",sans-serif;background:var(--paper);border:1px solid var(--line-strong);border-radius:6px;padding:2px 7px}
-@media (max-width:1000px){.ai-btn span{display:none}.ai-btn{width:38px;padding:0;justify-content:center}}
 @media (max-width:700px){
   table.roster-t tr:not(.editrow){display:block;position:relative;padding:12px 56px 12px 58px;min-height:68px;border-bottom:1px solid var(--line)}
   table.roster-t tr:not(.editrow) td{display:inline;padding:0;border:0;font-size:var(--t-sm,13px)}
@@ -580,6 +577,41 @@ table.sel-table{width:100%;border-collapse:collapse}
   .sr-who b{max-width:22ch}
   .sel-drawer{top:auto;width:100vw;max-height:88vh;border-radius:18px 18px 0 0;transform:translateY(24px)}
 }
+
+/* ---- HELV Assistant: the catalogue's character opens the AI copilot (2026-10-08) ----
+   Same character, same motion as the client catalogue: a lime disc with the head rising
+   out of it, a breathing ring, a periodic hop and the waving loop. Under reduced motion it
+   is a still image. */
+.hv-voice{position:fixed;right:24px;bottom:24px;z-index:55;transition:bottom .25s cubic-bezier(.2,.8,.2,1),opacity .2s ease,transform .25s cubic-bezier(.2,.8,.2,1)}
+body:has(.savebar) .hv-voice{bottom:96px}
+body.ai-open .hv-voice{opacity:0;transform:scale(.6);pointer-events:none}
+body:has(#cp-log) .hv-voice{display:none}
+.hv-launch{position:relative;display:block;width:72px;height:72px;padding:0;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;animation:hv-hop 7s cubic-bezier(.2,.8,.2,1) 3s infinite}
+.hv-launch::after{content:"";position:absolute;inset:0;border-radius:50%;pointer-events:none;box-shadow:0 0 0 0 rgba(232,255,118,.85);animation:hv-ring 3.5s ease-out 1.5s infinite}
+.hv-launch:focus-visible{outline:none}
+.hv-launch:focus-visible .hv-launch__disc{box-shadow:0 0 0 2px var(--ink),0 0 0 5px var(--lime),0 0 0 7px var(--ink)}
+.hv-launch__disc{position:absolute;inset:0;border-radius:50%;background:var(--lime);box-shadow:0 0 0 2px var(--ink),0 14px 30px rgba(18,18,18,.22);transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+.hv-launch__face{position:absolute;left:0;bottom:0;width:72px;height:93px;object-fit:cover;object-position:50% 0;clip-path:inset(0 0 0 0 round 0 0 36px 36px);transform-origin:50% 100%;animation:hv-bob 3.6s ease-in-out infinite,hv-tilt 13s ease-in-out 6s infinite;transition:opacity .2s ease,transform .25s cubic-bezier(.2,.8,.2,1)}
+.hv-launch__vid{position:absolute;inset:0;width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:50% 30%;opacity:0;transform:scale(1.02);transition:opacity .3s ease,transform .3s cubic-bezier(.2,.8,.2,1);pointer-events:none}
+.hv-launch.has-video .hv-launch__vid{opacity:1}
+.hv-launch.has-video .hv-launch__face{opacity:0}
+.hv-launch:hover{animation:hv-wiggle .7s cubic-bezier(.2,.8,.2,1) 1}
+.hv-launch:hover .hv-launch__disc{transform:scale(1.1)}
+.hv-launch:hover::after{animation-duration:1.2s}
+.hv-launch:hover .hv-launch__vid{transform:scale(1.12)}
+.hv-launch:hover .hv-launch__face{animation-play-state:paused;transform:translateY(-5px)}
+.hv-tip{position:absolute;right:calc(100% + 12px);top:50%;transform:translate(6px,-50%);white-space:nowrap;padding:7px 12px;border-radius:999px;background:var(--ink);color:#fff;font-size:var(--t-sm,13px);font-weight:600;opacity:0;pointer-events:none;transition:opacity .15s ease,transform .15s ease}
+.hv-tip kbd{margin-left:6px;padding:1px 6px;border-radius:5px;background:rgba(255,255,255,.16);font:inherit;font-size:var(--t-xs,12px)}
+.hv-voice:hover .hv-tip,.hv-launch:focus-visible+.hv-tip{opacity:1;transform:translate(0,-50%)}
+@keyframes hv-ring{0%{box-shadow:0 0 0 0 rgba(232,255,118,.9)}70%,100%{box-shadow:0 0 0 22px rgba(232,255,118,0)}}
+@keyframes hv-hop{0%,84%,100%{transform:translateY(0)}88%{transform:translateY(-10px)}92%{transform:translateY(0)}95%{transform:translateY(-4px)}}
+@keyframes hv-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+@keyframes hv-tilt{0%,88%,100%{rotate:0deg}91%{rotate:-9deg}94%{rotate:6deg}97%{rotate:-3deg}}
+@keyframes hv-wiggle{0%{transform:rotate(0) scale(1)}25%{transform:rotate(-10deg) scale(1.08)}50%{transform:rotate(8deg) scale(1.08)}75%{transform:rotate(-4deg) scale(1.06)}100%{transform:rotate(0) scale(1.06)}}
+@media (prefers-reduced-motion:reduce){.hv-launch,.hv-launch::after,.hv-launch__face,.hv-launch:hover{animation:none}.hv-launch__vid{display:none}}
+@media (max-width:760px){.hv-voice{right:16px;bottom:16px}body:has(.savebar) .hv-voice{bottom:84px}.hv-launch{width:60px;height:60px}.hv-launch__face{width:60px;height:78px;clip-path:inset(0 0 0 0 round 0 0 30px 30px)}.hv-tip{display:none}
+  body:has(#undo-toast:not([hidden])) .hv-voice{opacity:0;pointer-events:none}}
+@media print{.hv-voice{display:none!important}}
 """
 
 
@@ -838,8 +870,6 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
         '<button class="iconbtn" id="side-toggle" type="button" aria-label="Toggle sidebar">' + icon("panel", 20) + '</button>'
         + crumb +
         '<span class="grow"></span>'
-        '<button class="ai-btn" type="button" id="ai-toggle" aria-controls="ai-panel" aria-expanded="false" title="AI copilot (press A)">'
-        + icon("star", 16) + '<span>Ask AI</span></button>'
         '<button class="search-btn" type="button" data-open-search aria-label="Search">' + icon("search", 17) + '<span>Search creators, selections…</span><kbd>⌘K</kbd></button>'
         '<a class="iconbtn" href="' + u("/requests") + '" aria-label="Inbox">' + icon("bell", 20)
         + ('<span class="badge">%d</span>' % bell_n if bell_n else "") + '</a>'
@@ -850,6 +880,7 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
         '<aside id="help" aria-label="Guides"><header><h2>How do I…?</h2><button class="iconbtn" id="help-close" type="button" aria-label="Close guides" style="border:0;background:transparent;cursor:pointer">'
         + icon("plus", 20, "x") + '</button></header><div class="body"><p class="muted" style="margin:8px 6px 4px">Step by step, for anything you do here. Every change can be undone from History.</p>'
         + _guides_html(u) + _SHORTCUTS_HTML + '</div></aside>'
+        + _VOICE_LAUNCHER +
         '<aside id="ai-panel" aria-label="AI copilot" data-src="' + u("/ai?embed=1") + '"><header><h2>AI copilot</h2>'
         '<span><a class="btn small ghost" href="' + u("/ai") + '">Full page</a> <button class="iconbtn" id="ai-close" type="button" aria-label="Close AI copilot">'
         + icon("plus", 20, "x") + '</button></span></header></aside>'
@@ -951,10 +982,11 @@ _JS_REVAMP = r"""
   var panel=$('#ai-panel'), tog=$('#ai-toggle'), frame=null;
   function setAI(o){ if(!panel) return;
     if(o && !frame){ frame=document.createElement('iframe'); frame.title='AI copilot'; frame.src=panel.getAttribute('data-src'); panel.appendChild(frame); }
-    panel.classList.toggle('open',o); if(tog) tog.setAttribute('aria-expanded',o?'true':'false');
+    panel.classList.toggle('open',o); document.body.classList.toggle('ai-open',o); if(tog) tog.setAttribute('aria-expanded',o?'true':'false');
+    if(!o&&tog&&panel.contains(document.activeElement)) tog.focus();
     if(o&&frame){ setTimeout(function(){ try{ var t=frame.contentDocument.getElementById('cp-text'); t&&t.focus(); }catch(e){} },300); } }
   if(tog) tog.addEventListener('click',function(){ setAI(!panel.classList.contains('open')); });
-  var ac=$('#ai-close'); if(ac) ac.addEventListener('click',function(){ setAI(false); });
+  var ac=$('#ai-close'); if(ac) ac.addEventListener('click',function(){ setAI(false); if(tog) tog.focus(); });
   // 4. Shortcuts: A = AI, ? = guides, G then a letter = go to a section.
   var go={h:'/',s:'/selections',c:'/campaigns',r:'/roster',q:'/requests',p:'/portal',a:'/analytics'}, base=(document.querySelector('.logo')||{}).getAttribute? document.querySelector('.logo').getAttribute('href').replace(/\/$/,''):'';
   var gArmed=0;
@@ -1119,3 +1151,28 @@ def add_shell_js(*scripts):
 
 
 add_shell_js(_RECENT_JS, _JS, _JS_REVAMP, _JS_R4)
+
+
+# The catalogue's HELV Assistant character, here as the way into the AI copilot.
+# Its images and waving loop are served by the catalogue site at the domain root.
+_V = "/assets/brand/voice/"
+_VOICE_LAUNCHER = (
+    '<div class="hv-voice"><button class="hv-launch" id="ai-toggle" type="button" aria-controls="ai-panel" aria-expanded="false" '
+    'aria-label="Open the AI copilot" aria-keyshortcuts="A"><span class="hv-launch__disc" aria-hidden="true"></span>'
+    '<img class="hv-launch__face" src="' + _V + 'voice-head-160.webp" srcset="' + _V + 'voice-head-320.webp 2x" alt="" width="72" height="93" decoding="async">'
+    '<video class="hv-launch__vid" muted loop playsinline preload="metadata" aria-hidden="true" poster="' + _V + 'voice-loop-poster.webp">'
+    '<source src="' + _V + 'voice-loop.webm" type="video/webm"><source src="' + _V + 'voice-loop.mp4" type="video/mp4"></video></button>'
+    '<span class="hv-tip" aria-hidden="true">Ask HELV Assistant<kbd>A</kbd></span></div>')
+
+_JS_VOICE = r"""
+(function(){
+  // The waving loop replaces the still once it plays; the still stays if it can't (or motion is reduced).
+  var b=document.getElementById('ai-toggle'); if(!b) return; var v=b.querySelector('.hv-launch__vid'); if(!v) return;
+  if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches){ v.remove(); return; }
+  function live(){ b.classList.add('has-video'); }
+  v.addEventListener('playing',live); v.addEventListener('pause',function(){ b.classList.remove('has-video'); });
+  v.addEventListener('error',function(){ v.remove(); },true);
+  var p=v.play&&v.play(); if(p&&p.catch) p.catch(function(){});
+})();
+"""
+add_shell_js(_JS_VOICE)
