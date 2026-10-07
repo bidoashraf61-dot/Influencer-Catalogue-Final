@@ -1252,3 +1252,19 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cst-bar b { display: block; height: 100%; background: #14884a; border-radius: 99px; }
 
 .cst-head small { display: block; }
+
+
+/* Fit, Role and Tags join the filter row as their own group, in orange. */
+.cat-bar__sep { width: 2px; align-self: stretch; min-height: 34px; margin: 0 6px; background: var(--vivid-orange); border-radius: 2px; opacity: .7; }
+.cat-bar__match { display: contents; }
+.cat-bar__match[hidden], .cat-bar__sep[hidden] { display: none; }
+.cat-dd--match .cat-dd__btn { background: var(--vivid-orange); border-color: var(--vivid-orange); color: var(--ink); }
+.cat-dd--match .cat-dd__btn:hover { background: #ff8444; border-color: #ff8444; }
+.cat-dd--match.has-value .cat-dd__btn { background: var(--ink); color: var(--vivid-orange); border-color: var(--vivid-orange); box-shadow: 0 0 0 2px var(--vivid-orange) inset; }
+.cat-dd--match .cat-dd__done { background: var(--vivid-orange); border-color: var(--vivid-orange); color: var(--ink); }
+.cat-dd--match .cat-opt input:checked + .cat-opt__box { background: var(--vivid-orange); border-color: var(--vivid-orange); }
+.cat-opt__n { margin-left: auto; font-size: 12px; font-weight: 700; opacity: .55; padding-left: 12px; }
+.cat-opt:has(.cat-opt__n) { display: flex; align-items: center; }
+.cat-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; flex: none; background: #14884a; }
+.cat-dot--good { background: #7d8f00; } .cat-dot--maybe { background: #d99a00; } .cat-dot--no { background: #d02424; }
+.cat-dot--strong { background: #14884a; }

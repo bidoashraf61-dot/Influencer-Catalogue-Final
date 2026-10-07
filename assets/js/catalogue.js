@@ -597,9 +597,13 @@
   // each a dropdown of checkboxes, plus a sort. OR within a dimension, AND
   // across them. Built from the cards themselves, so the selection page gets
   // options for exactly the creators in that selection.
-  function Controls(host, cards, onChange) {
+  function Controls(host, cards, onChange, extras) {
     // followers: [] for no limit, else [min, max] with either end null.
     var state = { tier: [], platform: [], place: [], interest: [], followers: [], sort: "", q: "" };
+    // `extras` (the selection page): more filters of the same kind, in their own colour (fit,
+    // role, tags), and the matching score to sort on.
+    var xdims = extras ? extras.dims : [];
+    xdims.forEach(function (d) { state[d] = []; });
 
     cards.forEach(function (card) {
       card._tier = card.dataset.tier ? [card.dataset.tier] : [];
@@ -624,8 +628,8 @@
         '<span class="cat-opt__label">' + esc(label) + "</span></label>";
     }
 
-    function dropdown(dim, title, body, wide) {
-      return '<div class="cat-dd' + (wide ? " cat-dd--wide" : "") + '" data-dim="' + dim + '">' +
+    function dropdown(dim, title, body, wide, cls) {
+      return '<div class="cat-dd' + (wide ? " cat-dd--wide" : "") + (cls ? " " + cls : "") + '" data-dim="' + dim + '">' +
         '<button type="button" class="cat-dd__btn" aria-expanded="false">' +
         '<span>' + title + '</span>' + CHEVRON + "</button>" +
         '<div class="cat-dd__panel" role="group" aria-label="' + title + '" hidden>' +
@@ -722,9 +726,10 @@
         intKeys.length > 8);
     }
 
+    var sortList = SORTS.concat(extras ? [["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]] : []);
     var sort = '<label class="cat-sort"><span class="cat-sort__label">Sort</span>' +
       '<select class="cat-sort__select" aria-label="Sort creators">' +
-      SORTS.map(function (s) { return '<option value="' + s[0] + '">' + s[1] + "</option>"; }).join("") +
+      sortList.map(function (s) { return '<option value="' + s[0] + '">' + s[1] + "</option>"; }).join("") +
       "</select>" + CHEVRON + "</label>";
 
     var bar = document.createElement("div");
@@ -737,12 +742,14 @@
       '<input type="search" class="cat-search__input" placeholder="Search creators by name" ' +
       'aria-label="Search creators by name" autocomplete="off" spellcheck="false"/></label>' +
       '<div class="cat-bar__row"><div class="cat-bar__filters">' +
-      '<span class="cat-bar__label">Filter</span>' + html + "</div>" + sort + "</div>" +
+      '<span class="cat-bar__label">Filter</span>' + html +
+      (extras ? '<span class="cat-bar__sep" aria-hidden="true"></span><div class="cat-bar__match" hidden></div>' : "") +
+      "</div>" + sort + "</div>" +
       '<div class="cat-active" hidden></div>';
     host.insertBefore(bar, host.firstChild);
 
     var active = bar.querySelector(".cat-active");
-    var dds = all(".cat-dd", bar);
+    function ddList() { return all(".cat-dd", bar); }
 
     function close(dd) {
       if (!dd) return;
@@ -751,7 +758,7 @@
       dd.querySelector(".cat-dd__panel").hidden = true;
       document.body.classList.remove("cat-sheet-open");
     }
-    function closeAll(except) { dds.forEach(function (d) { if (d !== except) close(d); }); }
+    function closeAll(except) { ddList().forEach(function (d) { if (d !== except) close(d); }); }
     function open(dd) {
       closeAll(dd);
       dd.classList.add("is-open");
@@ -792,12 +799,12 @@
         box.checked = on > 0 && on === cities.length;
         box.indeterminate = on > 0 && on < cities.length;
       });
-      dds.forEach(function (dd) {
+      ddList().forEach(function (dd) {
         var n = state[dd.dataset.dim].length;
         dd.classList.toggle("has-value", n > 0);
       });
       var pills = [];
-      ["tier", "platform", "place", "interest"].forEach(function (dim) {
+      ["tier", "platform", "place", "interest"].concat(xdims).forEach(function (dim) {
         // A whole country picked reads as the country, not ten cities.
         var shown = state[dim].slice();
         if (dim === "place") {
@@ -863,7 +870,7 @@
       }
       if (e.target.closest(".cat-active__clear")) {
         state.tier = []; state.platform = []; state.place = []; state.interest = [];
-        state.followers = [];
+        state.followers = []; xdims.forEach(function (d) { state[d] = []; });
         state.q = "";
         var sbox = bar.querySelector(".cat-search__input");
         if (sbox) sbox.value = "";
@@ -931,14 +938,48 @@
           if (state.followers[0] && f < state.followers[0]) return false;
           if (state.followers[1] && f > state.followers[1]) return false;
         }
-        return ["tier", "platform", "place", "interest"].every(function (dim) {
+        if (!["tier", "platform", "place", "interest"].every(function (dim) {
           if (!state[dim].length) return true;
           return card["_" + dim].some(function (v) { return state[dim].indexOf(v) !== -1; });
+        })) return false;
+        return xdims.every(function (dim) {
+          if (!state[dim].length) return true;
+          return extras.of(card, dim).some(function (v) { return state[dim].indexOf(v) !== -1; });
         });
       },
       filtering: function () {
         return !!(state.tier.length || state.platform.length || state.place.length ||
-                  state.interest.length || state.followers.length || !!state.q);
+                  state.interest.length || state.followers.length || !!state.q ||
+                  xdims.some(function (d) { return state[d].length; }));
+      },
+      // Rebuild the extra dropdowns from what the cards say now (scores load late, tags change).
+      refresh: function () {
+        if (!extras) return;
+        var holder = bar.querySelector(".cat-bar__match");
+        var any = false;
+        xdims.forEach(function (dim) {
+          var vals = extras.values(dim);
+          state[dim] = state[dim].filter(function (v) { return vals.some(function (x) { return x[0] === v; }); });
+          var body = vals.length ? '<div class="cat-dd__group">' + vals.map(function (x) {
+            return '<label class="cat-opt"><input type="checkbox" data-dim="' + dim + '" value="' + esc(x[0]) +
+              '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
+              (extras.dot && extras.dot(dim, x[0]) ? '<i class="cat-dot cat-dot--' + extras.dot(dim, x[0]) + '"></i>' : "") +
+              '<span class="cat-opt__label">' + esc(x[0]) + '</span><span class="cat-opt__n">' + x[1] + "</span></label>";
+          }).join("") + "</div>" : "";
+          var dd = holder.querySelector('.cat-dd[data-dim="' + dim + '"]');
+          if (!vals.length) { if (dd) dd.remove(); return; }
+          any = true;
+          if (!dd) {
+            holder.insertAdjacentHTML("beforeend", dropdown(dim, extras.titles[dim], body, vals.length > 8, "cat-dd--match"));
+          } else if (dd.dataset.sig !== body) {
+            // Only when the options really changed: rewriting them under a finger loses focus.
+            dd.querySelector(".cat-dd__body").innerHTML = body;
+          }
+          holder.querySelector('.cat-dd[data-dim="' + dim + '"]').dataset.sig = body;
+        });
+        holder.hidden = !any;
+        bar.querySelector(".cat-bar__sep").hidden = !any;
+        sync();
       },
       // Sorted copy of `list`; with no sort chosen, the list as given.
       order: function (list) {
@@ -952,6 +993,13 @@
           if (s === "tier-desc") return (tierRank(b.dataset.tier) - tierRank(a.dataset.tier)) || f(b) - f(a);
           if (s === "tier-asc") return (tierRank(a.dataset.tier) - tierRank(b.dataset.tier)) || f(b) - f(a);
           if (s === "name") return name(a).localeCompare(name(b));
+          if (extras && (s === "fit-desc" || s === "fit-asc")) {
+            var sa = extras.score(a), sb = extras.score(b);        // not scored sorts last either way
+            if (sa == null && sb == null) return 0;
+            if (sa == null) return 1;
+            if (sb == null) return -1;
+            return s === "fit-desc" ? sb - sa : sa - sb;
+          }
           return 0;
         });
       },
@@ -1572,7 +1620,30 @@
     // take anyone out of the selection or change its total.
     var host = document.querySelector(".cat-controls .cat-container");
     var controls = (host && selected.length > 1)
-      ? Controls(host, selected.map(function (c) { return byCode[c]; }), function () { render(); })
+      ? Controls(host, selected.map(function (c) { return byCode[c]; }), function () { render(); }, {
+          dims: ["fit", "role", "tag"],
+          titles: { fit: "Fit", role: "Role", tag: "Tags" },
+          of: function (card, dim) {
+            var code = card.dataset.code;
+            return dim === "fit" ? (fitOf(code) ? [fitOf(code)] : []) : dim === "role" ? rolesOf(code) : allTagsOf(code);
+          },
+          values: function (dim) {
+            var n = {}, order = [];
+            selected.forEach(function (code) {
+              (dim === "fit" ? (fitOf(code) ? [fitOf(code)] : []) : dim === "role" ? rolesOf(code) : allTagsOf(code)).forEach(function (v) {
+                if (!n[v]) { n[v] = 0; order.push(v); }
+                n[v]++;
+              });
+            });
+            var fixed = dim === "fit" ? ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
+              : dim === "role" ? ["Awareness", "Engagement", "Conversion", "UGC content"] : null;
+            var list = fixed ? fixed.filter(function (v) { return n[v]; })
+              : order.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
+            return list.map(function (v) { return [v, n[v]]; });
+          },
+          dot: function (dim, v) { return dim === "fit" ? (FIT_CLASS[v] || "maybe") : ""; },
+          score: function (card) { var s = scoreOf(card.dataset.code); return s && s.score != null ? s.score : null; }
+        })
       : null;
     if (!controls && host) host.closest(".cat-controls").hidden = true;
 
@@ -1694,7 +1765,6 @@
     // What the admin said about each creator of this selection: how well they
     // fit, the part they play, why, and any labels of their own. All of it
     // belongs to the selection, so it shows here and nowhere else.
-    var activeTag = null, activeFit = null, activeRole = null;
     var FIT_CLASS = { "Strong fit": "strong", "Good fit": "good", "Possible fit": "maybe", "Not recommended": "no" };
     function tagsOf(code) {
       var t = CURATED && CURATED.tags && CURATED.tags[code];
@@ -1744,20 +1814,6 @@
     function fitOf(code) {
       var v = verdictOf(code), s = scoreOf(code);
       return (v && v.fit) ? v.fit : (s && s.score != null ? s.tag : "");
-    }
-    function matchesLabels(code) {
-      return (!activeTag || allTagsOf(code).indexOf(activeTag) !== -1) &&
-             (!activeFit || fitOf(code) === activeFit) &&
-             (!activeRole || rolesOf(code).indexOf(activeRole) !== -1);
-    }
-    function barGroup(label, kind, names, counts, active, extra) {
-      if (!names.length) return "";
-      return '<div class="cat-tagbar__row"><span class="cat-tagbar__label">' + label + "</span>" +
-        '<button type="button" data-kind="' + kind + '" data-val="" aria-pressed="' + (!active) + '">All</button>' +
-        names.map(function (n) {
-          return '<button type="button" data-kind="' + kind + '" data-val="' + esc(n) + '" aria-pressed="' + (n === active) + '"' +
-            (extra && extra[n] ? ' class="' + extra[n] + '"' : "") + ">" + esc(n) + " <b>" + counts[n] + "</b></button>";
-        }).join("") + "</div>";
     }
     // The stamp on the photo: the score, coloured by band; hover or focus explains it.
     var tip = null;
@@ -1821,18 +1877,6 @@
     window.addEventListener("scroll", hideTip, { passive: true });
 
     function renderTags() {
-      var tagN = {}, tagOrder = [], fitN = {}, roleN = {};
-      selected.forEach(function (code) {
-        allTagsOf(code).forEach(function (t) {
-          if (!tagN[t]) { tagN[t] = 0; tagOrder.push(t); }
-          tagN[t]++;
-        });
-        var f = fitOf(code); if (f) fitN[f] = (fitN[f] || 0) + 1;
-        rolesOf(code).forEach(function (r) { roleN[r] = (roleN[r] || 0) + 1; });
-      });
-      if (activeTag && !tagN[activeTag]) activeTag = null;
-      if (activeFit && !fitN[activeFit]) activeFit = null;
-      if (activeRole && !roleN[activeRole]) activeRole = null;
       var back = (CURATED && CURATED.platform) ? "&p=" + encodeURIComponent(CURATED.platform) : "";
       cards.forEach(function (c) {
         var body = c.querySelector(".cat-card__body");
@@ -1876,30 +1920,7 @@
           }).join("") + (mt.length < 8 ? '<button type="button" class="cat-tag cat-tag--add" data-tag-add>+ Tag</button>' : "");
         }
       });
-      var bar = $("sel-tags");
-      var fits = ["Strong fit", "Good fit", "Possible fit", "Not recommended"].filter(function (f) { return fitN[f]; });
-      var roles = ["Awareness", "Engagement", "Conversion", "UGC content"].filter(function (r) { return roleN[r]; });
-      tagOrder.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
-      if (!fits.length && !roles.length && !tagOrder.length) { if (bar) bar.hidden = true; return; }
-      if (!bar) {
-        bar = document.createElement("div");
-        bar.id = "sel-tags"; bar.className = "cat-tagbar"; bar.setAttribute("role", "group");
-        bar.setAttribute("aria-label", "Filter by fit, role or tag");
-        $("cat-grid").insertAdjacentElement("beforebegin", bar);
-        bar.addEventListener("click", function (e) {
-          var b = e.target.closest("button[data-kind]"); if (!b) return;
-          var kind = b.getAttribute("data-kind"), val = b.getAttribute("data-val");
-          if (kind === "fit") activeFit = val === "" || activeFit === val ? null : val;
-          else if (kind === "role") activeRole = val === "" || activeRole === val ? null : val;
-          else activeTag = val === "" || activeTag === val ? null : val;
-          render();
-        });
-      }
-      bar.hidden = false;
-      var fitCls = {}; fits.forEach(function (f) { fitCls[f] = "fit-" + (FIT_CLASS[f] || "maybe"); });
-      bar.innerHTML = barGroup("Fit", "fit", fits, fitN, activeFit, fitCls) +
-        barGroup("Role", "role", roles, roleN, activeRole) +
-        barGroup("Tags", "tag", tagOrder, tagN, activeTag);
+      if (controls) controls.refresh();
     }
 
     $("cat-grid").addEventListener("click", function (e) {
@@ -1942,8 +1963,7 @@
       renderTags();
       var shown = 0;
       cards.forEach(function (c) {
-        var ok = selected.indexOf(c.dataset.code) !== -1 && (!controls || controls.matches(c)) &&
-          matchesLabels(c.dataset.code);
+        var ok = selected.indexOf(c.dataset.code) !== -1 && (!controls || controls.matches(c));
         c.hidden = !ok;
         if (ok) shown++;
       });
