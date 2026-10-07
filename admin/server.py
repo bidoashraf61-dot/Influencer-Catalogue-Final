@@ -3072,7 +3072,7 @@ class Handler(BaseHTTPRequestHandler):
                 done.append(code)
             except Exception as ex:
                 bad.append(name + " (" + str(ex)[:120] + ")")
-        msg = "Imported %d analysis%s: %s." % (len(done), "" if len(done) == 1 else "es", ", ".join(done)) if done else ""
+        msg = "Imported %d %s: %s." % (len(done), "analysis" if len(done) == 1 else "analyses", ", ".join(done)) if done else ""
         if bad:
             msg += (" " if msg else "") + "Could not import: " + "; ".join(bad)
         if held:
@@ -3085,6 +3085,12 @@ class Handler(BaseHTTPRequestHandler):
         part = f.get("file")
         if not isinstance(part, dict) or not part.get("data"):
             return self.redirect("/analysis?e=" + urllib.parse.quote("Choose the filled-in template (.xlsx)."))
+        head = part["data"][:8]
+        wrong = ("That is a PDF report — drop it in Option A (PDF reports) above instead." if head.startswith(b"%PDF") else
+                 "That is an old Excel (.xls) file. Open it and use Save As → Excel Workbook (.xlsx)." if head.startswith(b"\xd0\xcf\x11\xe0") else
+                 "That looks like a CSV or text file. Open it in Excel and use Save As → Excel Workbook (.xlsx)." if not head.startswith(b"PK") else None)
+        if wrong:
+            return self.redirect("/analysis?e=" + urllib.parse.quote(wrong) + "#prefilled")
         try:
             docs, problems, unresolved = analysis.parse_workbook(part["data"], self.analysis_resolver())
         except Exception as ex:
@@ -3164,6 +3170,9 @@ class Handler(BaseHTTPRequestHandler):
             if not docs:
                 return self.redirect("/analysis?e=" + urllib.parse.quote("Nothing to save. " + " ".join(problems[:5])))
             return self.save_analysis_docs(docs, problems)
+        if not any(picks.values()):
+            return self.redirect("/analysis/review?t=%s&e=%s" % (token, urllib.parse.quote(
+                "Nothing is chosen yet. For each file click the creator it belongs to (or type their name), then press Save.")))
         import profile_pdf
         done, failed = [], list(bad)
         for name, data in files:
@@ -3180,7 +3189,7 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as ex:
                 failed.append(name + " (" + str(ex)[:100] + ")")
         analysis.release(token)
-        msg = "Imported %d analysis%s: %s." % (len(done), "" if len(done) == 1 else "es", ", ".join(done)) if done else ""
+        msg = "Imported %d %s: %s." % (len(done), "analysis" if len(done) == 1 else "analyses", ", ".join(done)) if done else ""
         if failed:
             msg += (" " if msg else "") + "Not imported: " + "; ".join(failed)
         return self.redirect("/analysis?%s=%s" % ("ok" if done else "e", urllib.parse.quote(msg or "Nothing was imported.")))

@@ -3607,8 +3607,8 @@ def analysis_review_page(kind, token, items, matched, creators, res, error=None,
                  "<input name='pick_%d' list='rv-creators' value=\"%s\" placeholder='Type a name, handle or code — empty skips' "
                  "autocomplete='off' style='width:100%%'>%s</td></tr>") % (
             i, e(key), e(key), "" if kind == "xlsx" else "", i, e(pre),
-            ("<div class='muted' style='margin-top:4px'>Did you mean: " + " · ".join(
-                "<a href='#' onclick=\"this.closest('td').querySelector('input').value=this.dataset.v;return false\" "
+            ("<div style='margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center'><span class='muted'>Click the right one:</span>" + "".join(
+                "<a href='#' class='btn tiny ghost' onclick=\"this.closest('td').querySelector('input').value=this.dataset.v;return false\" "
                 "data-v=\"%s\">%s</a>" % (e(x), e(x)) for x in sug) + "</div>") if sug else
             "<div class='muted' style='margin-top:4px'>No close match in the roster.</div>")
     lead = ("%d creator%s matched and ready. " % (matched, "" if matched == 1 else "s") if kind == "xlsx" else "")
