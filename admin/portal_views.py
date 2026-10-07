@@ -4,6 +4,7 @@ Server-rendered like the rest of the dashboard: every value goes through ``e()``
 every change is a plain form posting to ``/portal/...``.
 """
 import json
+import time
 
 import db
 import gemini
@@ -12,7 +13,7 @@ import portal
 import ui
 from views import ago, e, page, ts, u
 
-TABS = [("accounts", "Client accounts"), ("briefs", "Briefs"), ("usage", "AI usage"), ("settings", "Settings & keys")]
+TABS = [("accounts", "Client accounts"), ("briefs", "Briefs"), ("usage", "Usage & cost"), ("settings", "Settings & keys")]
 
 
 def _banner(ok, err):
@@ -51,6 +52,7 @@ def _accounts_tab():
     stats = ("<div class='pstats'>" + _stat("Clients", len(users)) + _stat("Awaiting approval", len(pending))
              + _stat("Joined this week", sum(1 for x in users if x["created_at"] >= week))
              + _stat("Credits outstanding", outstanding) + "</div>")
+    spend = {r["code_id"]: r["usd"] for r in consumption(gemini.month_start())}
     rows = []
     for x in users:
         approve = ""
@@ -59,13 +61,13 @@ def _accounts_tab():
                        "<input type='hidden' name='status' value='active'><input type='hidden' name='back' value='/portal'>"
                        "<button class='btn small lime'>Approve</button></form> " % x["id"])
         rows.append(
-            "<tr><td><strong>%s</strong><br><span class='muted'>%s · %s</span></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td>"
+            "<tr><td><strong>%s</strong><br><span class='muted'>%s · %s</span></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td>"
             "<td class='right'>%s<a class='btn small ghost' href='%s'>Manage</a></td></tr>"
             % (e(x["name"] or "—"), e(x["company"] or "—"), e(x["email"]), _status_pill(x["status"]),
-               e(x["credits"] if x["credits"] is not None else 0), e(x["selections"]), e(x["briefs"]),
+               e(x["credits"] if x["credits"] is not None else 0), usd(spend.get(x["code_id"], 0)), e(x["selections"]), e(x["briefs"]),
                e(ago(x["last_login_at"]) if x["last_login_at"] else "never"), approve, u("/portal/user?id=%d" % x["id"])))
-    table = ("<table><thead><tr><th>Client</th><th>Status</th><th>Credits</th><th>Selections</th><th>Briefs</th><th>Last in</th><th></th></tr></thead><tbody>"
-             + ("".join(rows) or "<tr><td colspan='7'>" + ui.empty("users", "No sign-ups yet",
+    table = ("<table><thead><tr><th>Client</th><th>Status</th><th>Credits</th><th>AI cost (month)</th><th>Selections</th><th>Briefs</th><th>Last in</th><th></th></tr></thead><tbody>"
+             + ("".join(rows) or "<tr><td colspan='8'>" + ui.empty("users", "No sign-ups yet",
                 "Clients appear here when they sign in with a company email on the catalogue.") + "</td></tr>") + "</tbody></table>")
     return stats + "<div class='card'>" + table + "</div>"
 
@@ -84,36 +86,130 @@ def _briefs_tab():
             + "</tbody></table></div>")
 
 
-def _usage_tab():
-    used, cap = gemini.tokens_this_month(), gemini.monthly_cap()
-    since = gemini.month_start()
+def usd(v):
+    v = float(v or 0)
+    return "$%.2f" % v if v >= 0.995 or v == 0 else "$%.3f" % v if v >= 0.0095 else "$%.4f" % v
+
+
+def account_label(code_id, users_by_code, codes_by_id):
+    if code_id is None:
+        return "Platform (sign-in emails, admin copilot)", None
+    u = users_by_code.get(code_id)
+    if u:
+        return "%s · %s" % (u["company"] or "—", u["email"]), u["id"]
+    c = codes_by_id.get(code_id)
+    if c is not None and c["label"] == db.ADMIN_LABEL:
+        return "Admin preview", None
+    return "Access code: %s" % (c["label"] if c is not None else "#%s" % code_id), None
+
+
+def consumption(since=None, until=None):
+    """[(code_id, calls, failed, tokens, usd, credits)] per account, biggest spend first."""
+    q = ("SELECT code_id, COUNT(*) calls, SUM(1 - ok) failed, SUM(prompt_tokens + out_tokens) tok, SUM(cost_usd) usd, "
+         "SUM(credits) cr FROM ai_audit WHERE at >= ? AND at < ? GROUP BY code_id ORDER BY usd DESC")
     with db.connect() as conn:
-        by_kind = conn.execute("SELECT kind, COUNT(*) n, SUM(ok) good, SUM(prompt_tokens+out_tokens) tok, SUM(credits) cr "
-                               "FROM ai_audit WHERE at >= ? GROUP BY kind ORDER BY n DESC", (since,)).fetchall()
+        return conn.execute(q, (since or 0, until or db.now() + 86400)).fetchall()
+
+
+def _usage_tab():
+    import calendar
+    used, cap = gemini.tokens_this_month(), gemini.monthly_cap()
+    since, now = gemini.month_start(), db.now()
+    t = time.gmtime(now)
+    days_in = calendar.monthrange(t.tm_year, t.tm_mon)[1]
+    elapsed = max(1.0, (now - since) / 86400.0)
+    with db.connect() as conn:
+        one = lambda q, a=(): conn.execute(q, a).fetchone()[0] or 0
+        month_usd = one("SELECT SUM(cost_usd) FROM ai_audit WHERE at >= ?", (since,))
+        today_usd = one("SELECT SUM(cost_usd) FROM ai_audit WHERE at >= ?", (now - now % 86400,))
+        d30_usd = one("SELECT SUM(cost_usd) FROM ai_audit WHERE at >= ?", (now - 30 * 86400,))
+        all_usd = one("SELECT SUM(cost_usd) FROM ai_audit")
+        by_kind = conn.execute("SELECT kind, COUNT(*) n, SUM(ok) good, SUM(prompt_tokens+out_tokens) tok, SUM(cost_usd) usd "
+                               "FROM ai_audit WHERE at >= ? GROUP BY kind ORDER BY usd DESC", (since,)).fetchall()
+        by_model = conn.execute("SELECT model, COUNT(*) n, SUM(prompt_tokens) pin, SUM(out_tokens) pout, SUM(cost_usd) usd "
+                                "FROM ai_audit WHERE at >= ? GROUP BY model ORDER BY usd DESC", (since,)).fetchall()
+        daily = conn.execute("SELECT (at / 86400) d, SUM(cost_usd) usd FROM ai_audit WHERE at >= ? GROUP BY d ORDER BY d",
+                             (now - 29 * 86400,)).fetchall()
         recent = conn.execute("SELECT a.*, u.email FROM ai_audit a LEFT JOIN users u ON u.code_id = a.code_id "
                               "ORDER BY a.id DESC LIMIT 25").fetchall()
-        spent = conn.execute("SELECT COALESCE(-SUM(delta),0) FROM credit_ledger WHERE delta < 0 AND at >= ?", (since,)).fetchone()[0]
-        granted = conn.execute("SELECT COALESCE(SUM(delta),0) FROM credit_ledger WHERE delta > 0 AND at >= ?", (since,)).fetchone()[0]
-    pct = int(round(used * 100.0 / cap)) if cap else 0
-    stats = ("<div class='pstats'>" + _stat("Tokens this month", "{:,}".format(used), "of {:,} ({}%)".format(cap, pct))
-             + _stat("Calls", sum(r["n"] for r in by_kind)) + _stat("Failed", sum(r["n"] - (r["good"] or 0) for r in by_kind))
-             + _stat("Credits spent", spent, "granted %d" % granted) + "</div>")
-    kind_rows = "".join(
-        "<tr><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (e(r["kind"]), r["n"], r["good"] or 0, "{:,}".format(r["tok"] or 0))
-        for r in by_kind)
+        spent = one("SELECT -SUM(delta) FROM credit_ledger WHERE delta < 0 AND at >= ?", (since,))
+        granted = one("SELECT SUM(delta) FROM credit_ledger WHERE delta > 0 AND at >= ?", (since,))
+        codes = {r["id"]: r for r in conn.execute("SELECT id, label FROM codes").fetchall()}
+    users = {u["code_id"]: u for u in portal.list_users()}
+    ucap = gemini.monthly_usd_cap()
+    projected = month_usd / elapsed * days_in
+    stats = ("<div class='pstats'>"
+             + _stat("Spent this month", usd(month_usd), ("of %s budget · %d%%" % (usd(ucap), round(month_usd * 100 / ucap))) if ucap > 0 else "no budget set")
+             + _stat("Projected month end", usd(projected), "at the current pace")
+             + _stat("Today", usd(today_usd), "last 30 days %s" % usd(d30_usd))
+             + _stat("All time", usd(all_usd), "{:,} tokens this month".format(used))
+             + _stat("Cost per credit", usd(month_usd / spent) if spent else "—", "%d credits spent, %d granted" % (spent, granted))
+             + "</div>")
+    if ucap > 0 and projected > ucap:
+        stats += "<div class='note'>At this pace the month ends near %s, over the %s budget. AI stops for everyone when the budget is reached; raise it in Settings &amp; keys.</div>" % (usd(projected), usd(ucap))
+
+    days = {int(r["d"]): r["usd"] or 0 for r in daily}
+    first = (now - 29 * 86400) // 86400
+    # hbars scales against at least 1, so feed it hundredths of a cent: a $0.03 day still shows a bar
+    bars = ui.hbars([(time.strftime("%d %b", time.gmtime(d * 86400)), days.get(d, 0) * 10000, usd(days.get(d, 0)))
+                     for d in range(first, now // 86400 + 1)], "var(--ink)")
+
+    acct = consumption(since)
+    acct_all = {r["code_id"]: r for r in consumption()}
+    acct_rows = []
+    for r in acct:
+        label, uid = account_label(r["code_id"], users, codes)
+        name = ("<a href='%s'>%s</a>" % (u("/portal/user?id=%d" % uid), e(label))) if uid else e(label)
+        allr = acct_all.get(r["code_id"])
+        acct_rows.append("<tr><td>%s</td><td>%d</td><td>%s</td><td>%s</td><td><strong>%s</strong></td><td class='muted'>%s</td></tr>" % (
+            name, r["calls"], "{:,}".format(r["tok"] or 0), r["cr"] or 0, usd(r["usd"]), usd(allr["usd"] if allr else 0)))
+
+    kind_names = {"brief": "AI shortlist reasons", "parse": "Reading a brief", "chat": "Client chat", "copilot": "Admin copilot",
+                  "email": "Sign-in emails", "selftest": "Self test"}
+    kind_rows = "".join("<tr><td>%s</td><td>%d</td><td>%d</td><td>%s</td><td><strong>%s</strong></td></tr>" % (
+        e(kind_names.get(r["kind"], r["kind"])), r["n"], r["good"] or 0, "{:,}".format(r["tok"] or 0), usd(r["usd"])) for r in by_kind)
+    model_rows = "".join("<tr><td>%s</td><td>%d</td><td>%s</td><td>%s</td><td><strong>%s</strong></td></tr>" % (
+        e(r["model"] or "—"), r["n"], "{:,}".format(r["pin"] or 0), "{:,}".format(r["pout"] or 0), usd(r["usd"])) for r in by_model)
 
     def who(r):
-        return r["email"] or ("code #%s" % r["code_id"] if r["code_id"] else "admin")
+        return r["email"] or ("code #%s" % r["code_id"] if r["code_id"] else "platform")
     recent_rows = "".join(
-        "<tr><td class='muted'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td></tr>" % (
-            e(ago(r["at"])), e(r["kind"]), e(who(r)), "ok" if r["ok"] else "<span class='pill dead'>failed</span>",
-            "{:,}".format((r["prompt_tokens"] or 0) + (r["out_tokens"] or 0)),
+        "<tr><td class='muted'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td></tr>" % (
+            e(ago(r["at"])), e(kind_names.get(r["kind"], r["kind"])), e(who(r)), "ok" if r["ok"] else "<span class='pill dead'>failed</span>",
+            "{:,}".format((r["prompt_tokens"] or 0) + (r["out_tokens"] or 0)), usd(r["cost_usd"]),
             e(" · ".join(x for x in (("%s ms" % r["latency_ms"]) if r["latency_ms"] else "", r["model"] or "", r["detail"] or "") if x)))
         for r in recent)
-    return (stats + "<div class='card'><h2>This month by action</h2><table><thead><tr><th>Action</th><th>Calls</th><th>OK</th><th>Tokens</th></tr></thead><tbody>"
-            + (kind_rows or "<tr><td colspan='4' class='muted'>No AI calls yet.</td></tr>") + "</tbody></table></div>"
-            + "<div class='card'><h2>Latest calls</h2><table><thead><tr><th>When</th><th>Action</th><th>Who</th><th>Result</th><th>Tokens</th><th>ms / note</th></tr></thead><tbody>"
-            + (recent_rows or "<tr><td colspan='6' class='muted'>Nothing yet.</td></tr>") + "</tbody></table></div>")
+    empty = lambda n, t: "<tr><td colspan='%d' class='muted'>%s</td></tr>" % (n, t)
+    return (stats
+            + "<div class='card'><div class='hd' style='display:flex;justify-content:space-between;align-items:center'><h2>Consumption per account, this month</h2>"
+              "<a class='btn small ghost' href='%s'>Download CSV</a></div>" % u("/portal/usage.csv")
+            + "<table><thead><tr><th>Account</th><th>Calls</th><th>Tokens</th><th>Credits</th><th>Cost</th><th>All time</th></tr></thead><tbody>"
+            + ("".join(acct_rows) or empty(6, "No usage yet this month.")) + "</tbody></table></div>"
+            + "<div class='card'><h2>Last 30 days</h2>" + bars + "</div>"
+            + "<div class='fgrid'><div class='card'><h2>By action</h2><table><thead><tr><th>Action</th><th>Calls</th><th>OK</th><th>Tokens</th><th>Cost</th></tr></thead><tbody>"
+            + (kind_rows or empty(5, "Nothing yet.")) + "</tbody></table></div>"
+            + "<div class='card'><h2>By model</h2><table><thead><tr><th>Model</th><th>Calls</th><th>In</th><th>Out</th><th>Cost</th></tr></thead><tbody>"
+            + (model_rows or empty(5, "Nothing yet.")) + "</tbody></table></div></div>"
+            + "<div class='card'><h2>Latest calls</h2><table><thead><tr><th>When</th><th>Action</th><th>Who</th><th>Result</th><th>Tokens</th><th>Cost</th><th>ms / note</th></tr></thead><tbody>"
+            + (recent_rows or empty(7, "Nothing yet.")) + "</tbody></table></div>")
+
+
+def usage_csv():
+    """Every account's consumption, by month, for the finance side."""
+    import csv, io
+    with db.connect() as conn:
+        rows = conn.execute("SELECT strftime('%Y-%m', at, 'unixepoch') month, code_id, kind, COUNT(*) calls, "
+                            "SUM(prompt_tokens) pin, SUM(out_tokens) pout, SUM(credits) cr, SUM(cost_usd) usd "
+                            "FROM ai_audit GROUP BY month, code_id, kind ORDER BY month DESC, usd DESC").fetchall()
+        codes = {r["id"]: r for r in conn.execute("SELECT id, label FROM codes").fetchall()}
+    users = {x["code_id"]: x for x in portal.list_users()}
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["month", "account", "action", "calls", "input_tokens", "output_tokens", "credits", "cost_usd"])
+    for r in rows:
+        w.writerow([r["month"], account_label(r["code_id"], users, codes)[0], r["kind"], r["calls"], r["pin"] or 0,
+                    r["pout"] or 0, r["cr"] or 0, "%.6f" % (r["usd"] or 0)])
+    return buf.getvalue()
 
 
 def _settings_tab():
@@ -160,7 +256,18 @@ def _settings_tab():
           "<div><label>Gemini model</label><input name='gemini_model' value='%s'><div class='price-hint'>Default %s. If a model is retired the next one in line is tried automatically.</div></div>" % (e(gemini.model()), e(gemini.DEFAULT_MODEL))
         + "<div><label>Monthly token ceiling</label><input type='number' min='10000' name='ai_monthly_tokens' value='%d'>"
           "<div class='price-hint'>AI stops for everyone when this is reached.</div></div>" % gemini.monthly_cap()
+        + "<div><label>Monthly AI budget (USD)</label><input type='number' min='0' step='1' name='ai_monthly_usd' value='%g'>"
+          "<div class='price-hint'>AI stops for everyone when it is reached. 0 = no limit.</div></div>" % gemini.monthly_usd_cap()
+        + "<div><label>Copilot model</label><input name='copilot_model' value='%s' placeholder='same as above'>"
+          "<div class='price-hint'>A stronger model for your own analysis, e.g. gemini-3.1-pro-preview. Clients keep the main model.</div></div>"
+          % e(db.setting("copilot_model", "") or "")
+        + "<div><label>Cost per email (USD)</label><input type='number' min='0' step='0.0001' name='email_cost_usd' value='%g'></div>" % mailer.email_cost()
         + "<div><label>Send email from</label><input name='mail_from' value='%s'><div class='price-hint'>Its domain must be verified in Resend.</div></div></div>" % e(mailer.sender())
+        + "<label style='margin-top:14px'>Model prices, USD per 1M tokens (model, input, output — one per line)</label>"
+          "<textarea class='mono' name='ai_prices' rows='5'>%s</textarea>"
+          "<div class='price-hint'>From Google's price list on 7 Oct 2026. gemini-3.8-flash is a launch price until 31 Dec 2026: check it in January. "
+          "Each call stores its cost when it happens, so changing a price never rewrites past spend.</div>"
+          % e("\n".join("%s %g %g" % (m, p[0], p[1]) for m, p in sorted(gemini.prices().items())))
         + "<label style='margin-top:14px'>What the assistant knows about HelloVoice</label>"
           "<textarea class='mono' name='kb_text' rows='6'>%s</textarea></div>" % e(db.setting("kb_text", None) or __import__("assistant").DEFAULT_KB)
         + "<button class='btn lime'>Save settings</button></form>")
@@ -229,6 +336,8 @@ SUGGESTIONS = [
     "Who signed up this week and what did they ask for?",
     "Find 10 skincare creators in Riyadh on Instagram with 50k–300k followers",
     "How many credits has each client used this month?",
+    "Add a new creator: Reem Saleh, @reem.s on Instagram, 85k, Riyadh, skincare, Micro-tier",
+    "Make a draft campaign from the latest selection and set it to start next Sunday",
 ]
 
 COPILOT_JS = r"""

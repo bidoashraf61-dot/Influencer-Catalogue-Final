@@ -388,6 +388,191 @@ def a_create_selection(args, who):
     return {"ok": True, "selection_id": sid, "token": db.selection(sid)["token"]}
 
 
+# ---- adding creators, campaigns and tier prices -----------------------------
+
+def _clean(v, n=200):
+    return " ".join(str(v or "").split())[:n]
+
+
+def _day(v, end=False):
+    """'2026-11-03' -> UTC midnight (or the last second of that day)."""
+    import calendar
+    v = _clean(v, 10)
+    if not v:
+        return None
+    try:
+        t = time.strptime(v, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError("Dates must look like 2026-11-03.")
+    ts = calendar.timegm(t)
+    return ts + 86399 if end else ts
+
+
+def d_add_creator(args):
+    name, plat, tier = _clean(args.get("name"), 120), analysis.canon_platform(args.get("platform")), _clean(args.get("tier"), 40)
+    if len(name) < 2:
+        raise ValueError("A creator needs a name.")
+    if not plat:
+        raise ValueError("Platform must be one of Instagram, TikTok, Snapchat, YouTube, X, Facebook.")
+    if tier not in db.tier_names():
+        raise ValueError("Unknown tier. Tiers are: " + ", ".join(db.tier_names()))
+    handle = _clean(args.get("handle"), 80).lstrip("@").lower()
+    if handle:
+        for c in db.list_creators():
+            if str(c["handle"] or "").lstrip("@").lower() == handle and plat in analysis.creator_platforms(c):
+                raise ValueError("@%s on %s is already in the roster as %s." % (handle, plat, c["code"]))
+    f = int(args.get("followers") or 0)
+    return "Add creator %s (@%s, %s, %s followers, %s tier%s)" % (
+        name, handle or "no handle", plat, "{:,}".format(f), tier, (", " + _clean(args.get("city"), 60)) if args.get("city") else "")
+
+
+def a_add_creator(args, who):
+    import sqlite3
+    plat = analysis.canon_platform(args.get("platform"))
+    tier = _clean(args.get("tier"), 40)
+    handle = _clean(args.get("handle"), 80).lstrip("@")
+    url = _clean(args.get("profile_url"), 300)
+    f = int(args.get("followers") or 0) or None
+    profiles = [{"platform": plat, "url": url, "followers": f}] if url else []
+    for attempt in range(5):
+        code = db.next_code(tier)
+        try:
+            with history.tracked("creator", None, "Copilot added " + code) as t:
+                db.upsert_creator({"code": code, "name": _clean(args.get("name"), 120), "handle": handle, "platform": plat,
+                                   "followers": f, "city": _clean(args.get("city"), 120), "nationality": _clean(args.get("nationality"), 120),
+                                   "tier": tier, "interest": _clean(args.get("interest"), 300), "photo": None,
+                                   "profiles": json.dumps(profiles), "active": 1, "note": _clean(args.get("note"), 500), "sort": 0})
+                t["key"] = code
+            return {"ok": True, "code": code}
+        except sqlite3.IntegrityError:
+            continue
+    return {"ok": False, "error": "Could not allocate a creator code. Try again."}
+
+
+_CAMPAIGN_FIELDS = ("name", "client", "status", "platform", "notes", "starts", "ends", "add_creators", "remove_creators")
+
+
+def _campaign_changes(args):
+    c = db.campaign(int(args.get("id") or 0))
+    if c is None:
+        raise ValueError("No campaign with that id.")
+    ch = {}
+    for k in ("name", "client", "notes"):
+        if args.get(k):
+            ch[k] = _clean(args[k], 500 if k == "notes" else 160)
+    if args.get("status"):
+        if args["status"] not in db.CAMPAIGN_STATUSES:
+            raise ValueError("Status must be " + ", ".join(db.CAMPAIGN_STATUSES) + ".")
+        ch["status"] = args["status"]
+    if args.get("platform"):
+        pl = analysis.canon_platform(args["platform"])
+        if not pl:
+            raise ValueError("Unknown platform.")
+        ch["platform"] = pl
+    if args.get("starts"):
+        ch["starts_at"] = _day(args["starts"])
+    if args.get("ends"):
+        ch["ends_at"] = _day(args["ends"], end=True)
+    if ch.get("starts_at") and ch.get("ends_at") and ch["ends_at"] < ch["starts_at"]:
+        raise ValueError("The campaign cannot end before it starts.")
+    known = {r["code"] for r in db.list_creators(active_only=True)}
+    add = [str(x).strip().upper() for x in (args.get("add_creators") or [])]
+    bad = [x for x in add if x not in known]
+    if bad:
+        raise ValueError("Unknown creator codes: " + ", ".join(bad))
+    remove = [str(x).strip().upper() for x in (args.get("remove_creators") or [])]
+    if not ch and not add and not remove:
+        raise ValueError("Nothing to change.")
+    return c, ch, add, remove
+
+
+def d_update_campaign(args):
+    c, ch, add, remove = _campaign_changes(args)
+    bits = ["%s → %s" % (k.replace("_at", ""), time.strftime("%Y-%m-%d", time.gmtime(v)) if k.endswith("_at") else v) for k, v in ch.items()]
+    if add:
+        bits.append("add " + ", ".join(add))
+    if remove:
+        bits.append("remove " + ", ".join(remove))
+    return "Change campaign “%s” (#%d): %s" % (c["name"], c["id"], "; ".join(bits))
+
+
+def a_update_campaign(args, who):
+    c, ch, add, remove = _campaign_changes(args)
+    with history.tracked("campaign", c["id"], "Copilot changed campaign " + c["name"]):
+        if ch:
+            db.save_campaign(c["id"], **ch)
+        if add:
+            db.add_campaign_creators(c["id"], add)
+        if remove:
+            db.save_campaign_creators(c["id"], {}, remove)
+    return {"ok": True, "campaign": c["id"]}
+
+
+def d_create_campaign(args):
+    name = _clean(args.get("name"), 160)
+    if len(name) < 2:
+        raise ValueError("A campaign needs a name.")
+    sel = db.selection(int(args["selection_id"])) if args.get("selection_id") else None
+    if args.get("selection_id") and sel is None:
+        raise ValueError("No selection with that id.")
+    if args.get("client_email") and not portal.user_by_email(str(args["client_email"]).lower()):
+        raise ValueError("No client with that email.")
+    n = len(json.loads(sel["codes"] or "[]")) if sel else 0
+    return "Create draft campaign “%s”%s%s" % (name, (" from selection “%s” (%d creators)" % (sel["name"], n)) if sel else "",
+                                                (" for " + args["client_email"]) if args.get("client_email") else "")
+
+
+def a_create_campaign(args, who):
+    sel = db.selection(int(args["selection_id"])) if args.get("selection_id") else None
+    code_id = None
+    if args.get("client_email"):
+        code_id = portal.user_by_email(str(args["client_email"]).lower())["code_id"]
+    elif sel is not None:
+        code_id = sel["code_id"]
+    with history.tracked("campaign", None, "Copilot created campaign") as t:
+        cid = db.create_campaign(_clean(args["name"], 160), _clean(args.get("client"), 160) or None, code_id,
+                                 sel["id"] if sel else None, analysis.canon_platform(args.get("platform")),
+                                 json.loads(sel["codes"] or "[]") if sel else ())
+        t["key"] = cid
+    return {"ok": True, "campaign_id": cid, "status": "draft"}
+
+
+def d_set_tier_price(args):
+    t = next((x for x in db.list_tiers() if x["name"] == args.get("tier")), None)
+    if t is None:
+        raise ValueError("Unknown tier. Tiers are: " + ", ".join(db.tier_names()))
+    lo, hi = int(args.get("price_from") or 0), int(args.get("price_to") or 0)
+    if lo <= 0 or hi < lo or hi > 10000000:
+        raise ValueError("Prices must be positive SAR amounts with from ≤ to.")
+    return "Set the %s tier price from SAR %s–%s to SAR %s–%s (all creators on the tier band, and every unpriced selection)" % (
+        t["name"], "{:,}".format(t["price_from"] or 0), "{:,}".format(t["price_to"] or 0), "{:,}".format(lo), "{:,}".format(hi))
+
+
+def a_set_tier_price(args, who):
+    t = next(x for x in db.list_tiers() if x["name"] == args["tier"])
+    keys = t.keys()
+    with history.tracked("tiers", "all", "Copilot changed the %s tier price" % t["name"]):
+        db.save_tier(t["name"], t["code"], int(args["price_from"]), int(args["price_to"]), t["reach"], t["sort"],
+                     t["reach_from"] if "reach_from" in keys else None, t["reach_to"] if "reach_to" in keys else None,
+                     t["auto"] if "auto" in keys else 1)
+    return {"ok": True}
+
+
+def t_get_campaign(ctx, id):
+    c = db.campaign(int(id))
+    if c is None:
+        return {"error": "No campaign with that id."}
+    people = db.campaign_creators(c["id"])
+    return {"id": c["id"], "name": c["name"], "client": c["client"], "status": c["status"], "platform": c["platform"],
+            "starts": time.strftime("%Y-%m-%d", time.gmtime(c["starts_at"])) if c["starts_at"] else None,
+            "ends": time.strftime("%Y-%m-%d", time.gmtime(c["ends_at"])) if c["ends_at"] else None,
+            "creators": [r["cc_code"] if "cc_code" in r.keys() else r["code"] for r in people], "notes": c["notes"]}
+
+
+def t_list_tiers(ctx):
+    return [{"name": t["name"], "price_from": t["price_from"], "price_to": t["price_to"], "reach": t["reach"]} for t in db.list_tiers()]
+
+
 # --------------------------------------------------------------- registries --
 
 def _decl(name, description, props=None, required=None):
@@ -422,6 +607,8 @@ ADMIN_READ = {
     "demand_gap": (t_demand_gap, _decl("demand_gap", "What clients' briefs ask for versus how many creators the roster has in each category.")),
     "list_selections": (t_list_selections, _decl("list_selections", "Recent selections.", {"limit": I})),
     "list_campaigns": (t_list_campaigns, _decl("list_campaigns", "Recent campaigns.", {"limit": I})),
+    "get_campaign": (t_get_campaign, _decl("get_campaign", "One campaign: status, dates, platform, creators, notes.", {"id": I}, ["id"])),
+    "list_tiers": (t_list_tiers, _decl("list_tiers", "Tiers with their SAR price bands and reach.")),
     "sql_query": (t_sql_query, _decl("sql_query",
         "Read-only SQL (one SELECT) over: " + ", ".join(sorted(SQL_TABLES)) + ". Max 200 rows. Use for analysis that other tools do not cover.",
         {"sql": S}, ["sql"])),
@@ -440,6 +627,21 @@ ADMIN_WRITE = {
         "Add or remove a domain on the sign-up allow list (lets a domain through even if it looks personal) or block list. Needs confirmation.",
         {"list": {"type": "STRING", "enum": ["allow", "block"]}, "action": {"type": "STRING", "enum": ["add", "remove"]}, "domain": S},
         ["list", "action", "domain"])),
+    "add_creator": (d_add_creator, a_add_creator, _decl("add_creator",
+        "Add a new creator to the roster (a code is assigned from the tier). Needs confirmation.",
+        {"name": S, "handle": S, "platform": S, "followers": I, "tier": S, "city": S, "nationality": S, "interest": S,
+         "profile_url": S, "note": S}, ["name", "platform", "tier"])),
+    "update_campaign": (d_update_campaign, a_update_campaign, _decl("update_campaign",
+        "Edit a campaign: name, client, status (draft|live|ended), platform, start/end dates (YYYY-MM-DD), notes, "
+        "add or remove creators by code. Needs confirmation.",
+        {"id": I, "name": S, "client": S, "status": S, "platform": S, "starts": S, "ends": S, "notes": S,
+         "add_creators": SA, "remove_creators": SA}, ["id"])),
+    "create_campaign": (d_create_campaign, a_create_campaign, _decl("create_campaign",
+        "Create a draft campaign, optionally from a selection (its creators come along) and for a client by email. Needs confirmation.",
+        {"name": S, "client": S, "selection_id": I, "client_email": S, "platform": S}, ["name"])),
+    "set_tier_price": (d_set_tier_price, a_set_tier_price, _decl("set_tier_price",
+        "Change a tier's SAR price band. Affects every creator priced by that tier. Needs confirmation.",
+        {"tier": S, "price_from": I, "price_to": I}, ["tier", "price_from", "price_to"])),
     "create_selection": (d_create_selection, a_create_selection, _decl("create_selection",
         "Create a selection from creator codes, optionally assigned to a client by email. Needs confirmation.",
         {"name": S, "codes": SA, "client_email": S, "objective": S}, ["name", "codes"])),
@@ -552,7 +754,8 @@ def converse(scope, ctx, history_msgs, text, code_id=None, kind="chat", credits=
     cards = []
     for step in range(MAX_STEPS):
         out = gemini.generate(contents, system=system_prompt(scope, ctx), tools=tools, temperature=0.3,
-                              max_tokens=4096, kind=kind, code_id=code_id, credits=credits if step == 0 else 0)
+                              max_tokens=4096, kind=kind, code_id=code_id, credits=credits if step == 0 else 0,
+                              model_name=gemini.copilot_model() if scope == "admin" else None)
         if not out["calls"]:
             return {"reply": out["text"], "cards": cards, "queued": ctx.get("queued", [])}
         contents.append({"role": "model", "parts": out["parts"]})

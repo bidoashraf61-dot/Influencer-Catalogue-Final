@@ -442,7 +442,18 @@
   /* ------------------------------------------------------------------ chat */
 
   var chatThread = null;
-  var IDEAS = ["Suggest creators for a skincare launch in KSA", "Who are your best micro-creators in Riyadh?", "What does a campaign cost?", "What happens after I pick a selection?"];
+  var chatBrief = null;                // the answers gathered for free in this chat
+  var IDEAS = ["Plan a campaign with me", "Suggest creators for a skincare launch in KSA", "What does a campaign cost?", "What happens after I pick a selection?"];
+  // A message that asks for creators or a campaign gets the free questions first, so the one paid
+  // call that follows has everything it needs.
+  var REQUEST = /campaign|creator|influencer|shortlist|launch|recommend|suggest|find|looking for|need .*(people|creators)|ugc|حمل|مؤثر|إطلاق|اطلاق|ابحث|أبحث|اقترح/i;
+  var FLOW = ["goal", "platforms", "market", "category", "budget", "count"];
+  var SHORT = { goal: "Goal", platforms: "Platforms", market: "Audience", category: "Product space", budget: "Budget (SAR)", count: "Creators" };
+
+  function optionLabel(q, v) {
+    var o = (q.options || []).filter(function (x) { return x.value === v; })[0];
+    return o ? o.label : v;
+  }
 
   function openChat() {
     var log = h("div", { class: "pt-log", role: "log", "aria-live": "polite" });
@@ -454,46 +465,135 @@
     var ta = h("textarea", { rows: "1", placeholder: "Ask about creators, prices or your campaign…", "aria-label": "Your message", maxlength: "800" });
     var send = h("button", { class: "pt-btn pt-btn--lime", type: "button", style: "padding:12px 20px 10px" }, "Send");
     var foot = h("div", { class: "pt-foot" });
-    function refreshFoot() { foot.textContent = ME && ME.credits != null ? "1 credit per message · " + ME.credits + " left. The assistant can be wrong; final quotes come from our team." : "The assistant can be wrong; final quotes come from our team."; }
+    function refreshFoot() {
+      foot.textContent = (ME && ME.credits != null ? "Questions are free · 1 credit per AI answer · " + ME.credits + " left. " : "") +
+        "The assistant can be wrong; final quotes come from our team.";
+    }
     refreshFoot();
     drawer.appendChild(h("div", { class: "pt-compose" }, ta, send));
     drawer.appendChild(foot);
 
-    function bubble(kind, text) { var b = h("div", { class: "pt-msg-b pt-msg-b--" + kind }, text); log.appendChild(b); log.scrollTop = log.scrollHeight; return b; }
+    function scroll() { log.scrollTop = log.scrollHeight; }
+    function bubble(kind, text) { var b = h("div", { class: "pt-msg-b pt-msg-b--" + kind }, text); log.appendChild(b); scroll(); return b; }
     function cards(list) {
       if (!list || !list.length) return;
       var wrap = h("div", { class: "pt-cards" });
       list.forEach(function (c) {
         var ph = h("div", { class: "pt-photo" });
         bg(ph, c.photo_url);
-        var m = h("button", { class: "pt-mini", type: "button" }, ph, h("div", null, h("b", null, c.name), h("span", null, [followers(c.followers), c.city, price(c.price)].filter(Boolean).join(" · "))));
+        var m = h("button", { class: "pt-mini", type: "button" }, ph, h("div", null, h("b", null, c.name), h("span", null, [c.fit != null ? "Fit " + c.fit + "/100" : "", followers(c.followers), c.city, price(c.price)].filter(Boolean).join(" · "))));
         m.addEventListener("click", function () {
           var card = document.querySelector('.cat-card[data-code="' + c.code + '"]');
           if (card) { close(); card.scrollIntoView({ behavior: "smooth", block: "center" }); card.style.outline = "3px solid var(--lime)"; setTimeout(function () { card.style.outline = ""; }, 2400); }
         });
         wrap.appendChild(m);
       });
-      log.appendChild(wrap); log.scrollTop = log.scrollHeight;
+      log.appendChild(wrap); scroll();
     }
     var busyNow = false;
-    function ask(text) {
-      text = (text || "").trim();
-      if (!text || busyNow) return;
-      busyNow = true; send.disabled = true;
-      var ideas = log.querySelector(".pt-ideas"); if (ideas) ideas.remove();
-      bubble("me", text); ta.value = "";
+    function lock(on) { busyNow = on; send.disabled = on; ta.disabled = on; }
+
+    function askAI(text, brief) {
+      lock(true);
       var wait = bubble("ai", "Thinking…");
-      api("POST", "/api/chat", { message: text, thread: chatThread }).then(function (r) {
-        busyNow = false; send.disabled = false;
+      api("POST", "/api/chat", { message: text, thread: chatThread, brief: brief || undefined }).then(function (r) {
+        lock(false);
         if (r.b.ok) { chatThread = r.b.thread; wait.textContent = r.b.reply; setCredits(r.b.credits); refreshFoot(); cards(r.b.cards); }
         else { wait.className = "pt-msg-b pt-msg-b--err"; wait.textContent = r.s === 429 ? "You're sending messages too fast. Wait a moment." : (r.b.message || "That didn't work. You weren't charged."); }
         ta.focus();
       });
     }
+
+    function ask(text) {
+      text = (text || "").trim();
+      if (!text || busyNow) return;
+      var ideas = log.querySelector(".pt-ideas"); if (ideas) ideas.remove();
+      bubble("me", text); ta.value = "";
+      if (!chatBrief && REQUEST.test(text)) guided(text); else askAI(text);
+    }
+
+    /* The free questions, asked inside the chat. */
+    function guided(text) {
+      lock(true);
+      Promise.all([loadQuestions(), api("POST", "/api/brief/guess", { text: text })]).then(function (res) {
+        lock(false);
+        var qs = res[0], answers = (res[1].b && res[1].b.answers) || {};
+        var byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
+        var todo = FLOW.filter(function (id) { return byId[id] && !(answers[id] && answers[id].length); });
+        var known = FLOW.filter(function (id) { return answers[id] && answers[id].length; });
+        bubble("ai", (known.length ? "Got it. " : "") + "To find the right creators I need " + (todo.length ? todo.length + " quick detail" + (todo.length === 1 ? "" : "s") : "nothing more") +
+          ". Tap to answer — this part is free.");
+        var i = 0;
+        function next() {
+          if (i >= todo.length) return summary();
+          var q = byId[todo[i]], many = q.type === "many";
+          var card = h("div", { class: "pt-msg-b pt-msg-b--ai", style: "white-space:normal;max-width:100%" });
+          card.appendChild(h("p", { style: "margin:0 0 10px;font-weight:600" }, q.label));
+          var opts = h("div", { class: "pt-ideas" });
+          var picked = [];
+          q.options.forEach(function (o) {
+            var b = h("button", { class: "pt-idea", type: "button", "aria-pressed": "false" }, o.label);
+            b.addEventListener("click", function () {
+              if (!many) { answers[q.id] = o.value; done(o.label); return; }
+              var k = picked.indexOf(o.value);
+              if (o.value === "any") picked = k > -1 ? [] : ["any"];
+              else { picked = picked.filter(function (v) { return v !== "any"; }); if (k > -1) picked.splice(picked.indexOf(o.value), 1); else picked.push(o.value); }
+              Array.prototype.forEach.call(opts.children, function (x, xi) {
+                var on = picked.indexOf(q.options[xi].value) > -1;
+                x.setAttribute("aria-pressed", on ? "true" : "false");
+                x.style.background = on ? "var(--lime)" : ""; x.style.borderColor = on ? "var(--ink)" : "";
+              });
+            });
+            opts.appendChild(b);
+          });
+          card.appendChild(opts);
+          var row = h("div", { style: "margin-top:10px;display:flex;gap:8px" });
+          if (many) row.appendChild(h("button", { class: "pt-idea", type: "button", style: "background:var(--ink);color:var(--white)", onclick: function () {
+            if (!picked.length) return; answers[q.id] = picked.slice(); done(picked.map(function (v) { return optionLabel(q, v); }).join(", "));
+          } }, "Next"));
+          if (!q.required) row.appendChild(h("button", { class: "pt-idea", type: "button", onclick: function () { done("Skip"); } }, "Skip"));
+          if (row.children.length) card.appendChild(row);
+          log.appendChild(card); scroll();
+          function done(label) { card.remove(); bubble("me", label); i += 1; next(); }
+        }
+        function summary() {
+          chatBrief = answers;
+          var lines = FLOW.filter(function (id) { return byId[id] && answers[id] && answers[id].length; }).map(function (id) {
+            var v = answers[id]; return (SHORT[id] || byId[id].label.replace(/\?$/, "")) + ": " + (Array.isArray(v) ? v : [v]).map(function (x) { return optionLabel(byId[id], x); }).join(", ");
+          });
+          var card = h("div", { class: "pt-msg-b pt-msg-b--ai", style: "white-space:normal;max-width:100%" },
+            h("p", { style: "margin:0 0 8px;font-weight:600" }, "Your brief"), h("p", { style: "margin:0 0 12px;white-space:pre-line" }, lines.join("\n")));
+          var costs = (ME && ME.costs) || { brief: 5, chat: 1 };
+          var build = h("button", { class: "pt-idea", type: "button", style: "background:var(--lime);border-color:var(--ink);font-weight:600" }, "Build my shortlist · " + costs.brief + " credits");
+          var talk = h("button", { class: "pt-idea", type: "button" }, "Ask the assistant · " + costs.chat + " credit");
+          var redo = h("button", { class: "pt-idea", type: "button" }, "Change answers");
+          card.appendChild(h("div", { class: "pt-ideas" }, build, talk, redo));
+          log.appendChild(card); scroll();
+          build.addEventListener("click", function () {
+            card.remove(); bubble("me", "Build my shortlist");
+            lock(true);
+            var wait = bubble("ai", "Matching creators…");
+            api("POST", "/api/brief/run", { answers: answers, name: "Chat shortlist" }).then(function (r) {
+              lock(false);
+              if (!r.b.ok || r.b.empty) { wait.className = "pt-msg-b pt-msg-b--err"; wait.textContent = r.b.message || "That didn't work. You weren't charged."; return; }
+              setCredits(r.b.credits); refreshFoot();
+              wait.textContent = (r.b.summary || (r.b.picks.length + " creators match your brief, best fit first.")) + " Scores are out of 100.";
+              cards(r.b.picks.map(function (p) { var c = Object.assign({ code: p.code, name: p.code }, p.creator || {}); c.fit = p.score; return c; }));
+              var a = h("a", { class: "pt-idea", href: ROOT + "selection/#s=" + encodeURIComponent(r.b.token), style: "text-decoration:none;background:var(--ink);color:var(--white)" }, "Open as selection");
+              log.appendChild(h("div", { class: "pt-ideas" }, a)); scroll();
+            });
+          });
+          talk.addEventListener("click", function () { card.remove(); askAI(text, answers); });
+          redo.addEventListener("click", function () { card.remove(); chatBrief = null; answers = {}; guided(text); });
+        }
+        next();
+      });
+    }
+
     send.addEventListener("click", function () { ask(ta.value); });
     ta.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); ask(ta.value); } });
 
-    bubble("ai", "Hi" + (ME && ME.user ? " " + ME.user.name.split(" ")[0] : "") + ". I can search our creators, build a shortlist for your campaign and answer questions about how we work. What are you planning?");
+    bubble("ai", "Hi" + (ME && ME.user ? " " + ME.user.name.split(" ")[0] : "") + ". Tell me what you're planning and I'll ask a few quick questions (free), then build a scored shortlist or answer anything about how we work.");
     var ideas = h("div", { class: "pt-ideas" });
     IDEAS.forEach(function (i) { ideas.appendChild(h("button", { class: "pt-idea", type: "button", onclick: function () { ask(i); } }, i)); });
     log.appendChild(ideas);

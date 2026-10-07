@@ -198,6 +198,7 @@ class PortalMixin:
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,
             "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
             "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat,
+            "/api/brief/guess": self.api_brief_guess,
         }
         fn = routes.get(path)
         if not fn:
@@ -328,6 +329,16 @@ class PortalMixin:
                                     "cost": portal.costs().get(kind, 1),
                                     "message": "You're out of AI credits. Contact the HelloVoice team to top up."}, self.cors())
 
+    def api_brief_guess(self):
+        """Free: the answers a message already gives, so the chat only asks what is missing."""
+        who = self._need_viewer()
+        if not who:
+            return
+        if self._throttled("guess:%d" % who[0], 120, 600):
+            return
+        answers, missing = matcher.guess(str(self.json_body().get("text") or "")[:1500])
+        return self.send_json(200, {"ok": True, "answers": answers, "missing": missing}, self.cors())
+
     def api_brief_parse(self):
         who = self._need_viewer()
         if not who:
@@ -441,8 +452,15 @@ class PortalMixin:
         th = portal.thread(cid, "client", "", tid=tid)
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
+        brief, _ = matcher.clean_answers(b.get("brief")) if isinstance(b.get("brief"), dict) else ({}, [])
+        asked = text
+        if brief:
+            # The client answered the free questions first; hand the model the whole brief in this one call.
+            asked = text + "\n\n[Brief the client filled in: " + matcher.describe(brief) + \
+                ((". Notes: " + brief["notes"]) if brief.get("notes") else "") + \
+                ". Use suggest_shortlist with exactly these answers if they want creators.]"
         try:
-            res = assistant.converse("client", ctx, past, text, code_id=cid, kind="chat", credits=cost)
+            res = assistant.converse("client", ctx, past, asked, code_id=cid, kind="chat", credits=cost)
         except gemini.AIError as exc:
             portal.refund(cid, cost, "failed chat")
             return self._ai_fail(exc)
@@ -464,6 +482,9 @@ class PortalMixin:
             th = portal.find_thread(None, "admin", owner, int(query.get("t") or 0)) if (query.get("t") or "").isdigit() else None
             msgs = [{"role": m["role"], "text": m["content"]} for m in portal.messages(th["id"], 60)] if th else []
             return self.send_json(200, {"ok": True, "thread": th["id"] if th else None, "messages": msgs})
+        if path == "/portal/usage.csv":
+            return self.send(200, portal_views.usage_csv(), "text/csv; charset=utf-8",
+                             [("Content-Disposition", "attachment; filename=portal-usage.csv")])
         if path == "/portal":
             return self.send(200, portal_views.portal_page(query.get("tab") or "accounts", query.get("ok"), query.get("e"), query))
         if path == "/portal/user":
@@ -581,6 +602,25 @@ class PortalMixin:
             db.set_setting("domain_allow", lines("domain_allow"))
             db.set_setting("domain_block", lines("domain_block"))
             db.set_setting("ai_monthly_tokens", num("ai_monthly_tokens", 10000, 1000000000, gemini.DEFAULT_MONTHLY_TOKENS))
+            def money(key, default, hi):
+                try:
+                    return max(0.0, min(hi, float(f.get(key, default))))
+                except (TypeError, ValueError):
+                    return default
+            db.set_setting("ai_monthly_usd", money("ai_monthly_usd", gemini.DEFAULT_MONTHLY_USD, 100000))
+            db.set_setting("email_cost_usd", money("email_cost_usd", mailer.DEFAULT_EMAIL_USD, 1))
+            cm = (f.get("copilot_model") or "").strip()
+            db.set_setting("copilot_model", cm if cm and all(c.isalnum() or c in "-._" for c in cm) else None)
+            table = {}
+            for line in (f.get("ai_prices") or "").splitlines():
+                bits = line.split()
+                if len(bits) == 3 and all(c.isalnum() or c in "-._" for c in bits[0]):
+                    try:
+                        table[bits[0]] = [max(0.0, float(bits[1])), max(0.0, float(bits[2]))]
+                    except ValueError:
+                        pass
+            if table:
+                db.set_setting("ai_prices", table)
             model = (f.get("gemini_model") or "").strip()
             if model and all(c.isalnum() or c in "-._" for c in model):
                 db.set_setting("gemini_model", model)

@@ -129,6 +129,77 @@ def describe(answers):
     return (text[:1].upper() + text[1:]) if text else "No details given"
 
 
+# ------------------------------------------------------------ free pre-fill --
+# Reads the obvious answers out of what a client typed, with plain keyword matching: no model, no
+# credits. The chat uses it to skip the questions the client already answered.
+
+_GOAL_WORDS = {
+    "conversion": ["sale", "sales", "sell", "conversion", "convert", "traffic", "sign up", "signup", "download", "orders",
+                   "visit", "footfall", "leads", "مبيعات", "زيارات"],
+    "engagement": ["engagement", "engage", "interact", "community", "comments", "تفاعل"],
+    "awareness": ["awareness", "reach", "visibility", "launch", "known", "انتشار", "وعي", "اطلاق", "إطلاق"],
+}
+_PLATFORM_WORDS = {"Instagram": ["instagram", "insta", " ig ", "reels", "انستقرام", "انستغرام"], "TikTok": ["tiktok", "tik tok", "تيك توك"],
+                   "Snapchat": ["snapchat", "snap", "سناب"], "YouTube": ["youtube", "you tube", "يوتيوب"]}
+_EXTRA_CATEGORY = {
+    "health care": ["pharma", "medical", "doctor", "hospital", "clinic", "medicine", "drug", "patient", "healthcare", "صحة", "طبي", "دواء"],
+    "skincare": ["skincare", "skin care", "sunscreen", "sun screen", "derma", "cream", "serum", "moistur", "acne", "بشرة"],
+    "beauty": ["beauty", "makeup", "make-up", "cosmetic", "تجميل", "مكياج"],
+    "mother & baby": ["baby", "mother", "mom", "mum", "kids", "diaper", "أم", "أطفال", "طفل"],
+    "food": ["food", "restaurant", "snack", "drink", "coffee", "chocolate", "أكل", "مطعم"],
+    "automotive": ["car ", "cars", "auto", "vehicle", "motor", "سيارة", "سيارات"],
+    "technology": ["tech", "app ", "phone", "gadget", "software", "تقنية"],
+    "fashion": ["fashion", "clothing", "abaya", "shoes", "أزياء", "موضة"],
+    "fitness": ["fitness", "gym", "sport", "workout", "رياضة"],
+}
+
+
+def guess(text):
+    """Answers that the text states plainly. Returns ``(answers, missing_required)``."""
+    import re
+    t = " " + " ".join(str(text or "").lower().split()) + " "
+    raw = {}
+    for goal, words in _GOAL_WORDS.items():
+        if any(w in t for w in words):
+            raw["goal"] = goal
+            break
+    plats = [p for p, words in _PLATFORM_WORDS.items() if any(w in t for w in words)]
+    if plats:
+        raw["platforms"] = plats
+    for cc, words in fit.PLACE_WORDS.items():
+        if any(re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", t) for w in words):
+            if cc in {o[0] for o in _BY_ID["market"]["options"]}:
+                raw["market"] = cc
+                break
+    if "market" not in raw and any(w in t for w in ("السعودية", "الرياض", "جدة")):
+        raw["market"] = "SA"
+    cats = []
+    for value, _label in _BY_ID["category"]["options"]:
+        words = _EXTRA_CATEGORY.get(value, []) + [value]
+        if any(w in t for w in words):
+            cats.append(value)
+    if cats:
+        raw["category"] = cats[:3]
+    if any(w in t for w in (" women", " female", " mothers", " moms", " ladies", "نساء", "سيدات")):
+        raw["gender"] = "Women"
+    elif any(w in t for w in (" men ", " male", "رجال")):
+        raw["gender"] = "Men"
+    n = re.search(r"(\d{1,3})\s+(?:[^\s\d]+\s+){0,2}(creators|influencers|people|bloggers|ugc|مؤثر)", t)
+    if n:
+        k = int(n.group(1))
+        raw["count"] = "5" if k <= 5 else "8" if k <= 10 else "15" if k <= 20 else "25"
+    money = re.search(r"(\d[\d,\.]*)\s*(k|K|thousand|ألف)?\s*(sar|riyal|ريال|sr)\b", t) or re.search(r"(\d[\d,\.]*)\s*(k)\b", t)
+    if money:
+        try:
+            v = float(money.group(1).replace(",", ""))
+            if (money.group(2) or "").lower() in ("k", "thousand", "ألف"):
+                v *= 1000
+            raw["budget"] = "50" if v < 50000 else "150" if v <= 150000 else "400" if v <= 400000 else "400+"
+        except ValueError:
+            pass
+    return clean_answers(raw)
+
+
 # ----------------------------------------------------------------- scoring --
 
 def score_codes(codes, objective, target, wanted=None):

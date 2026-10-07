@@ -433,6 +433,99 @@ class Portal(unittest.TestCase):
             loc = r.headers.get("Location", "")
             self.assertTrue(loc.startswith("/portal") and "evil" not in loc and "\r" not in loc, (evil, loc))
 
+    def confirmed(self, tool, args):
+        import assistant
+        ctx = {"who": "boss@hellovoice.co.uk"}
+        r = assistant.run_tool("admin", tool, args, ctx)
+        self.assertEqual(r.get("status"), "queued_for_admin_confirmation", r)
+        return assistant.confirm(ctx["queued"][-1]["token"], "boss@hellovoice.co.uk")
+
+    def test_29_copilot_adds_a_creator(self):
+        import assistant
+        bad = assistant.run_tool("admin", "add_creator", {"name": "Dup", "handle": "@noha", "platform": "Instagram", "tier": "Micro"},
+                                 {"who": "boss@hellovoice.co.uk"})
+        self.assertIn("already in the roster", bad["error"])
+        r = self.confirmed("add_creator", {"name": "Reem Saleh", "handle": "@reem.s", "platform": "instagram", "followers": 85000,
+                                           "tier": "Micro", "city": "Riyadh", "interest": "Skincare"})
+        self.assertTrue(r["ok"], r)
+        self.addCleanup(db.delete_creator, r["code"])          # keep the 5-creator roster the other tests count on
+        c = db.creator(r["code"])
+        self.assertEqual((c["name"], c["tier"], c["city"]), ("Reem Saleh", "Micro", "Riyadh"))
+        self.assertTrue(r["code"].startswith("HV-MI-"))
+        self.assertTrue(any(h["entity"] == "creator" and h["key"] == r["code"] for h in history.listing(None, None, limit=10)))
+
+    def test_30_copilot_creates_and_edits_a_campaign(self):
+        sel_id = db.save_selection(None, "Camp src", ["HV-MI-001", "HV-MI-002"], {}, None, None, None, None)
+        r = self.confirmed("create_campaign", {"name": "Ramadan push", "client": "Pfizer", "selection_id": sel_id})
+        self.assertTrue(r["ok"], r)
+        cid = r["campaign_id"]
+        self.assertEqual(len(db.campaign_creators(cid)), 2)
+        r = self.confirmed("update_campaign", {"id": cid, "status": "live", "starts": "2026-11-01", "ends": "2026-11-30",
+                                               "add_creators": ["HV-MI-005"], "remove_creators": ["HV-MI-002"]})
+        self.assertTrue(r["ok"], r)
+        c = db.campaign(cid)
+        self.assertEqual(c["status"], "live")
+        codes = sorted((x["cc_code"]) for x in db.campaign_creators(cid))
+        self.assertEqual(codes, ["HV-MI-001", "HV-MI-005"])
+        import assistant
+        self.assertIn("error", assistant.run_tool("admin", "update_campaign", {"id": cid, "starts": "2026-12-01", "ends": "2026-11-01"},
+                                                  {"who": "boss@hellovoice.co.uk"}))
+
+    def test_31_copilot_changes_tier_price(self):
+        r = self.confirmed("set_tier_price", {"tier": "Micro", "price_from": 2000, "price_to": 4000})
+        self.assertTrue(r["ok"], r)
+        self.assertEqual(db.tier_prices()["Micro"], (2000, 4000))
+        rows = history.listing(None, None, limit=5)
+        hid = next(h["id"] for h in rows if "tier price" in (h["label"] or ""))
+        self.assertTrue(history.undo(hid)[0])
+        self.assertEqual(db.tier_prices()["Micro"], (1500, 3000))
+
+    def test_32_costs_are_tracked_per_call_and_per_account(self):
+        c, _ = self.signup("cost@pfizer.com")
+        cid = portal.user_by_email("cost@pfizer.com")["code_id"]
+        c.post("/api/chat", {"message": "hello"})
+        with db.connect() as conn:
+            row = conn.execute("SELECT * FROM ai_audit WHERE code_id = ? AND kind = 'chat' ORDER BY id DESC", (cid,)).fetchone()
+            mail = conn.execute("SELECT cost_usd FROM ai_audit WHERE kind = 'email' ORDER BY id DESC").fetchone()
+        self.assertAlmostEqual(row["cost_usd"], gemini.cost_usd(row["model"], row["prompt_tokens"], row["out_tokens"]))
+        self.assertGreater(row["cost_usd"], 0)
+        self.assertAlmostEqual(mail["cost_usd"], mailer.email_cost())
+        a = self.admin()
+        s, page, _ = a.get("/portal?tab=usage")
+        self.assertIn("cost@pfizer.com", page)
+        self.assertIn("Spent this month", page)
+        s, csvtext, _ = a.get("/portal/usage.csv")
+        self.assertIn("cost@pfizer.com", csvtext)
+
+    def test_33_dollar_budget_stops_ai(self):
+        c, _ = self.signup("budget@pfizer.com")
+        db.set_setting("ai_monthly_usd", 0.000001)
+        try:
+            s, r, _ = c.post("/api/chat", {"message": "hello"})
+            self.assertEqual((s, r["reason"]), (503, "budget"))
+            self.assertEqual(portal.balance(portal.user_by_email("budget@pfizer.com")["code_id"]), 50)   # refunded
+        finally:
+            db.set_setting("ai_monthly_usd", 50)
+
+    def test_34_guess_is_free_and_brief_reaches_the_model(self):
+        c, _ = self.signup("guess@pfizer.com")
+        cid = portal.user_by_email("guess@pfizer.com")["code_id"]
+        s, r, _ = c.post("/api/brief/guess", {"text": "8 micro creators on Instagram in Riyadh for a sunscreen launch, 120k SAR"})
+        self.assertEqual(r["answers"], {"goal": "awareness", "platforms": ["Instagram"], "market": "SA", "category": ["skincare"],
+                                        "budget": "150", "count": "8"})
+        self.assertEqual(r["missing"], [])
+        self.assertEqual(portal.balance(cid), 50)                        # nothing spent
+        seen = []
+        orig = gemini.STUB
+        gemini.STUB = lambda body: (seen.append(body), orig(body))[1]
+        try:
+            s, r, _ = c.post("/api/chat", {"message": "help me", "brief": r["answers"]})
+        finally:
+            gemini.STUB = orig
+        self.assertEqual(s, 200)
+        self.assertIn("Brief the client filled in", seen[0]["contents"][-1]["parts"][0]["text"])
+        self.assertEqual(portal.balance(cid), 49)                        # one paid call for the whole brief
+
     # ------------------------------------------------------------------- admin
     def admin(self):
         c = Client(self.base)
@@ -442,7 +535,7 @@ class Portal(unittest.TestCase):
 
     def test_20_admin_pages_render(self):
         a = self.admin()
-        for path in ("/portal", "/portal?tab=briefs", "/portal?tab=usage", "/portal?tab=settings", "/ai", "/codes", "/"):
+        for path in ("/portal", "/portal?tab=briefs", "/portal?tab=usage", "/portal?tab=settings", "/ai", "/codes", "/", "/portal/usage.csv"):
             s, body, _ = a.get(path)
             self.assertEqual(s, 200, path)
         self.signup("page@pfizer.com")

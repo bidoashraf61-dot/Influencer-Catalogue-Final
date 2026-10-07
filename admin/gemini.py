@@ -28,6 +28,22 @@ ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:gene
 DEFAULT_MODEL = "gemini-3.8-flash"
 FALLBACKS = ("gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest")
 DEFAULT_MONTHLY_TOKENS = 5_000_000
+DEFAULT_MONTHLY_USD = 50.0
+
+# USD per 1M tokens (input, output). Google's paid tier, read from ai.google.dev/gemini-api/docs/pricing
+# on 2026-10-07; output includes thinking tokens. gemini-3.8-flash is a launch price that Google says
+# rises on 1 Jan 2027. Editable in Client portal -> Settings, and stored per call, so a price change
+# never rewrites past spend.
+DEFAULT_PRICES = {
+    "gemini-3.8-flash": (0.75, 3.75),
+    "gemini-3.5-flash": (1.50, 9.00),
+    "gemini-3.5-flash-lite": (0.30, 2.50),
+    "gemini-3.1-flash-lite": (0.25, 1.50),
+    "gemini-3.1-pro-preview": (2.00, 12.00),
+    "gemini-2.5-flash": (0.30, 2.50),
+    "gemini-flash-latest": (1.50, 9.00),       # an alias with no list price: priced like 3.5-flash, on the safe side
+}
+UNKNOWN_PRICE = (2.00, 12.00)                   # a model not in the table is costed like a pro model
 MAX_CONCURRENT = 4
 OVERALL_SECONDS = 60
 
@@ -100,6 +116,40 @@ def model():
     return db.setting("gemini_model", DEFAULT_MODEL) or DEFAULT_MODEL
 
 
+# ------------------------------------------------------------------- prices --
+
+def prices():
+    out = dict(DEFAULT_PRICES)
+    for k, v in (db.setting("ai_prices", {}) or {}).items():
+        try:
+            out[str(k)] = (float(v[0]), float(v[1]))
+        except (TypeError, ValueError, IndexError):
+            pass
+    return out
+
+
+def cost_usd(model_name, prompt_tokens, out_tokens):
+    pin, pout = prices().get(model_name, UNKNOWN_PRICE)
+    return round((prompt_tokens or 0) * pin / 1e6 + (out_tokens or 0) * pout / 1e6, 6)
+
+
+def usd_this_month():
+    with db.connect() as conn:
+        r = conn.execute("SELECT COALESCE(SUM(cost_usd), 0) FROM ai_audit WHERE at >= ?", (month_start(),)).fetchone()
+    return float(r[0])
+
+
+def monthly_usd_cap():
+    try:
+        return float(db.setting("ai_monthly_usd", DEFAULT_MONTHLY_USD))
+    except (TypeError, ValueError):
+        return DEFAULT_MONTHLY_USD
+
+
+def copilot_model():
+    return db.setting("copilot_model", None) or model()
+
+
 # ------------------------------------------------------------------- budget --
 
 def month_start():
@@ -124,17 +174,23 @@ def monthly_cap():
 # --------------------------------------------------------------------- call --
 
 def _audit(kind, code_id, mdl, usage, credits, ok, started, detail=""):
+    pin = usage.get("promptTokenCount", 0) or 0
+    pout = (usage.get("candidatesTokenCount", 0) or 0) + (usage.get("thoughtsTokenCount", 0) or 0)
+    record(kind, code_id, mdl, pin, pout, credits, ok, int((time.time() - started) * 1000), detail, cost_usd(mdl, pin, pout))
+
+
+def record(kind, code_id, mdl, prompt_tokens, out_tokens, credits, ok, latency_ms, detail, usd):
+    """One line of usage. Also used for paid things that are not Gemini (sign-in emails)."""
     with db.connect() as conn:
         conn.execute(
-            "INSERT INTO ai_audit (at, code_id, kind, model, prompt_tokens, out_tokens, credits, ok, latency_ms, detail) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (db.now(), code_id, kind, mdl, usage.get("promptTokenCount", 0),
-             usage.get("candidatesTokenCount", 0) + usage.get("thoughtsTokenCount", 0),
-             credits, 1 if ok else 0, int((time.time() - started) * 1000), (detail or "")[:300]))
+            "INSERT INTO ai_audit (at, code_id, kind, model, prompt_tokens, out_tokens, credits, ok, latency_ms, detail, cost_usd) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (db.now(), code_id, kind, mdl, prompt_tokens, out_tokens, credits, 1 if ok else 0, latency_ms,
+             (detail or "")[:300], usd))
 
 
 def generate(contents, *, system=None, schema=None, tools=None, temperature=0.4, max_tokens=4096,
-             kind="chat", code_id=None, credits=0, timeout=45):
+             kind="chat", code_id=None, credits=0, timeout=45, model_name=None):
     """One model call. Returns ``{"text", "calls", "parts", "usage"}``.
 
     ``contents`` is a list of Gemini content dicts (``{"role", "parts"}``) or a
@@ -146,6 +202,9 @@ def generate(contents, *, system=None, schema=None, tools=None, temperature=0.4,
         raise NotConfigured("Gemini is not set up yet.")
     if tokens_this_month() >= monthly_cap():
         raise OverBudget("The monthly AI allowance has been used.")
+    cap = monthly_usd_cap()
+    if cap > 0 and usd_this_month() >= cap:
+        raise OverBudget("The monthly AI budget has been spent.")
     if isinstance(contents, str):
         contents = [{"role": "user", "parts": [{"text": contents}]}]
     body = {"contents": contents,
@@ -158,7 +217,8 @@ def generate(contents, *, system=None, schema=None, tools=None, temperature=0.4,
     if tools:
         body["tools"] = [{"functionDeclarations": tools}]
 
-    chain = [model()] + [m for m in FALLBACKS if m != model()]
+    first = model_name or model()
+    chain = [first] + [m for m in FALLBACKS if m != first]
     started = time.time()
     if not _slots.acquire(timeout=8):
         raise Busy("The assistant is busy. Try again in a moment.")

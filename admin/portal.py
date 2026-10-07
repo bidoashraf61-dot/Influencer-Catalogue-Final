@@ -82,6 +82,7 @@ CREATE TABLE IF NOT EXISTS ai_audit (
     prompt_tokens INTEGER NOT NULL DEFAULT 0,
     out_tokens INTEGER NOT NULL DEFAULT 0,
     credits INTEGER NOT NULL DEFAULT 0,
+    cost_usd REAL NOT NULL DEFAULT 0,
     ok INTEGER NOT NULL DEFAULT 1,
     latency_ms INTEGER,
     detail TEXT
@@ -119,6 +120,10 @@ DEFAULT_SIGNUP_CREDITS = 50
 def init():
     with db.connect() as conn:
         conn.executescript(SCHEMA)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(ai_audit)")}
+        if "cost_usd" not in cols:
+            conn.execute("ALTER TABLE ai_audit ADD COLUMN cost_usd REAL NOT NULL DEFAULT 0")
+        conn.execute("CREATE INDEX IF NOT EXISTS ai_audit_code ON ai_audit(code_id, at)")
 
 
 # ----------------------------------------------------------------- settings --

@@ -24,11 +24,52 @@ working, and the email sign-in only appears on the catalogue once mail is set up
   per-client page (profile, credits, ledger, selections, briefs, activity),
   all briefs, AI usage (tokens vs the monthly ceiling, per-action counts, latest
   calls) and **Settings & keys**.
-- **Insights → AI copilot** (`/ai`): ask about the data; ask for changes. A
+- **Insights → AI copilot** (`/ai`): ask about the data; ask for changes:
+  edit or add creators, create or edit campaigns (status, dates, creators),
+  change tier prices, create selections, adjust credits, approve or suspend
+  clients, change sign-up domains. A
   change is queued as a plain sentence and only runs when you press **Confirm**.
   It is recorded in **History & undo** like any other edit.
 - The selection page shows **Client brief** when the shortlist came from the AI.
 - Access codes can carry their own **AI credits** at creation.
+
+## Cost tracking (USD)
+
+**Client portal → Usage & cost** shows what the portal costs in dollars:
+this month, today, last 30 days, all time, the projected month end, the monthly
+budget, cost per credit, a 30-day chart, cost by action and by model, and
+**consumption per account** (each client, each access code, the admin preview
+and the platform itself). **Download CSV** exports month × account × action for
+finance. Each client's page and the accounts table also show their AI cost.
+
+Every Gemini call stores its own dollar cost when it happens (input and output
+tokens, thinking included, times the model's price), and every sign-in email
+stores its cost too. Changing a price later never rewrites past spend.
+Default prices are Google's list prices on 7 Oct 2026; `gemini-3.8-flash` is a
+launch price until 31 Dec 2026, so check it in January (Settings & keys).
+A **monthly budget in USD** (default $50) stops AI for everyone when reached.
+
+## Model
+
+`gemini-3.8-flash` for everything by default: 1,048,576-token input window,
+65,536 output, function calling and JSON output verified live, $0.75 / $3.75 per
+million tokens. If it is retired or overloaded, the call moves to
+`gemini-3.5-flash`, then `gemini-3.1-flash-lite`, then `gemini-flash-latest`.
+The copilot can use its own model (e.g. `gemini-3.1-pro-preview`) without
+changing what clients use.
+
+Production data (7 Oct 2026): the active roster is about 200k characters
+(~60–80k tokens) and fits the window easily; the 2,118 creator analyses are
+about 4M characters (~1–1.3M tokens) and do not. The assistants therefore
+fetch only what each question needs (typically 5–20k tokens, under 2 cents).
+
+## Free questions in the chat
+
+When a client asks the chat for creators or a campaign, it first reads what the
+message already says (keyword matching, free), then asks only the missing brief
+questions as tap-to-answer options — also free. Then the client chooses
+**Build my shortlist** (5 credits) or **Ask the assistant** (1 credit, with the
+whole brief attached), so one paid call has everything it needs.
 
 ## How it works
 
@@ -38,7 +79,7 @@ working, and the email sign-in only appears on the catalogue once mail is set up
 | Accounts, OTP, credits, briefs, chat store | `portal.py` | Tables created by `portal.init()` (additive) |
 | Gemini over HTTPS | `gemini.py` | Key in `.gemini-key`, audit table, monthly token ceiling |
 | Email over HTTPS | `mailer.py` | Resend; key in `.mail-key` |
-| Brief → ranked shortlist | `matcher.py` | Deterministic scoring with `fit.py`; Gemini only parses text and writes reasons |
+| Brief → ranked shortlist | `matcher.py` | Deterministic scoring with `fit.py`; free keyword pre-fill (`guess`); Gemini only parses text and writes reasons |
 | Assistants | `assistant.py` | Tool-using; client tools read-only; admin writes are queued |
 | Routes | `portal_api.py` | Mixin on `Handler` |
 | Admin pages | `portal_views.py` | |

@@ -67,10 +67,27 @@ def sender():
     return db.setting("mail_from", DEFAULT_FROM) or DEFAULT_FROM
 
 
+DEFAULT_EMAIL_USD = 0.0004       # Resend Pro: $20 for 50,000 emails a month; the free plan is $0
+
+
+def email_cost():
+    try:
+        return float(db.setting("email_cost_usd", DEFAULT_EMAIL_USD))
+    except (TypeError, ValueError):
+        return DEFAULT_EMAIL_USD
+
+
+def _count(kind="email"):
+    import gemini
+    gemini.record(kind, None, "resend", 0, 0, 0, True, 0, "", email_cost())
+
+
 def send(to, subject, text, html=None, reply_to=None):
-    """Send one message. Raises MailError when it cannot be sent."""
+    """Send one message. Raises MailError when it cannot be sent. Each sent email is
+    counted, with its cost, in the platform's usage."""
     if CAPTURE:
         OUTBOX.append({"to": to, "subject": subject, "text": text, "html": html})
+        _count()
         return True
     k = key()
     if not k:
@@ -86,6 +103,7 @@ def send(to, subject, text, html=None, reply_to=None):
     try:
         with urllib.request.urlopen(req, timeout=15) as r:
             r.read()
+        _count()
         return True
     except urllib.error.HTTPError as exc:
         raise MailError("Mail provider refused the message (%s)." % exc.code)

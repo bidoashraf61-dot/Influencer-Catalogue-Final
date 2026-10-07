@@ -380,7 +380,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return
         views.set_user(who["email"] if "email" in who.keys() else "")
 
-        if path in ("/ai", "/ai/history", "/portal", "/portal/user"):
+        if path in ("/ai", "/ai/history", "/portal", "/portal/user", "/portal/usage.csv"):
             return self.portal_admin_get(path, query, who)
         if path == "/api/search":
             return self.api_search((query.get("q") or "").strip())
