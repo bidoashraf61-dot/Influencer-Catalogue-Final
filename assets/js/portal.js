@@ -981,8 +981,18 @@
       if (kind === "ai") { var ava = h("span", { class: "hv-row__ava", "aria-hidden": "true" }); bg(ava, V_IMG + "voice-head-160.webp"); r.appendChild(ava); }
       r.appendChild(node); log.appendChild(r); scroll(); return r;
     }
+    // The AI writes light markdown: **bold** and "* " bullets. Rendered as text nodes, never as HTML.
+    function rich(text) {
+      var box = document.createDocumentFragment();
+      String(text).replace(/^\s*[*-]\s+/gm, "• ").split(/(\*\*[^*]+\*\*)/).forEach(function (part) {
+        var m = /^\*\*([^*]+)\*\*$/.exec(part);
+        box.appendChild(m ? h("b", null, m[1]) : document.createTextNode(part));
+      });
+      return box;
+    }
     function bubble(kind, text, keep) {
-      var b = h("div", { class: "hv-msg hv-msg--" + kind }, text);
+      var b = h("div", { class: "hv-msg hv-msg--" + kind });
+      b.appendChild(kind === "ai" ? rich(text) : document.createTextNode(text));
       row(kind, b);
       if (keep !== false) { msgs.push({ from: kind, text: text }); save(); }
       if (kind === "ai" && panel.hidden) launch.querySelector(".hv-launch__dot").hidden = false;
@@ -1006,7 +1016,7 @@
       queue = queue.then(function () {
         var wrap = h("div", { class: "hv-chips" + (opts.stack ? " hv-chips--stack" : "") });
         var many = list.some(function (c) { return c.toggle; });
-        wrap.appendChild(h("p", { class: "hv-chips__hint" }, many ? "Pick any, then confirm" : "Tap to choose"));
+        wrap.appendChild(h("p", { class: "hv-chips__hint" }, opts.hint || (many ? "Pick any, then confirm" : "Tap to choose")));
         list.forEach(function (c) {
           var b = h("button", { class: "hv-chip" + (c.primary ? " hv-chip--lime" : "") + (c.ghost ? " hv-chip--ghost" : ""), type: "button" }, c.label);
           if (c.pressed != null) b.setAttribute("aria-pressed", String(!!c.pressed));
@@ -1038,11 +1048,18 @@
                 { label: "Just browsing", ghost: true, go: function () { say("Sure. I'll be right here in the corner whenever you need me."); } });
       chips(list, { stack: true });
     }
+    // After every answer: the likely next requests as options, with the box below still open for typing.
+    function nextUp(lead) {
+      if (lead) say(lead);
+      var list = [{ label: "Find creators", go: flowFind }];
+      if (document.querySelector(".cat-bar")) list.push({ label: "Filter this page", go: flowShow });
+      list.push({ label: "My selection", go: flowSelection }, { label: "Get a quote", go: flowQuote },
+                { label: "Talk to a person", go: flowHuman });
+      chips(list, { hint: "Tap to choose · or type below" });
+    }
     function greet() {
-      var hour = new Date().getHours();
-      var part = hour >= 5 && hour < 12 ? "Good morning" : hour >= 12 && hour < 17 ? "Good afternoon" : hour >= 17 && hour < 23 ? "Good evening" : "Hi";
-      say(part + (first ? ", " + first : "") + " 👋 I'm HELV Assistant, from HelloVoice.");
-      menu("I can find creators for your campaign, filter this page, update your selection or get you a quote. What can I help you with today?");
+      say("Hi" + (first ? " " + first : "") + ", I'm here to help you 👋");
+      menu("How can I help you?");
     }
 
     /* -- 1. find creators: the brief questions, free, then one paid shortlist -- */
@@ -1127,18 +1144,19 @@
 
     /* -- 2. show creators on this page: a sentence becomes the page's filters -- */
     function flowShow() {
-      askFor("Describe who you'd like to see, e.g. “micro skincare creators in Jeddah on TikTok”.", "Who should I show?", function (text) {
+      askFor("Describe who you'd like to see, e.g. “micro skincare creators in Jeddah on TikTok”.", "Who should I show?", runShow);
+    }
+    function runShow(text) {
         api("POST", "/api/discover/parse", { text: text }).then(function (r) {
           var p = (r.b && r.b.filters) || {};
           var done = applyFilters(p);
           if (!done.length) { say("I couldn't pick out filters from that. Try naming a platform, city, size or topic."); chips([{ label: "Try again", go: flowShow }, { label: "Back to the menu", ghost: true, go: function () { menu("What would you like to do?"); } }]); return; }
           var shown = Array.prototype.filter.call(document.querySelectorAll(".cat-card"), function (c) { return !c.hidden && !c.classList.contains("cat-card--copy"); }).length;
           say("Done. The page now shows " + done.join(", ") + ". " + (shown ? shown + " creator" + (shown === 1 ? "" : "s") + " match." : "Nobody matches all of that yet, so try loosening one filter."));
-          chips([{ label: "Clear the filters", go: function () { clearFilters(); say("Filters cleared. You're seeing the whole roster again."); } },
+          chips([{ label: "Clear the filters", go: function () { clearFilters(); nextUp("Filters cleared. You're seeing the whole roster again."); } },
                  { label: "Build a scored shortlist instead", go: function () { flowFind(text); } },
                  { label: "Close chat", ghost: true, echo: false, go: function () { toggle(false); } }]);
         });
-      });
     }
     function fold(t) { return String(t || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").trim(); }
     function pick(sel) { var b = document.querySelector(sel); if (b && !b.checked) b.click(); return !!b; }
@@ -1210,7 +1228,7 @@
         say(msg);
         chips([{ label: "Open it", primary: true, echo: false, go: function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(s.token); } },
                { label: "More changes", go: function () { selActions(s); } },
-               { label: "Done", ghost: true, go: function () { say("Anytime."); } }]);
+               { label: "Done", ghost: true, go: function () { nextUp("Anything else?"); } }]);
       });
     }
     function selAdd(s) {
@@ -1295,11 +1313,11 @@
       missing.forEach(function (c) {
         list.push({ label: "Request " + c.name.split(" ")[0] + "'s analysis", go: function () {
           api("POST", "/api/creator/request", { code: c.code }).then(function (r) {
-            say(r.b.ok ? "Requested. The team will add " + c.name + "'s full analysis and you'll see it on their card." : "That request didn't go through. Please try again.");
+            nextUp(r.b.ok ? "Requested. The team will add " + c.name + "'s full analysis and you'll see it on their card." : "That request didn't go through. Please try again.");
           });
         } });
       });
-      list.push({ label: "Done", ghost: true, go: function () { say("Anytime."); } });
+      list.push({ label: "Done", ghost: true, go: function () { nextUp("Anything else?"); } });
       chips(list);
     }
 
@@ -1325,7 +1343,7 @@
         if (!r.b.ok) { say("That didn't go through. Please try again in a moment."); return; }
         say((topic === "quote" ? "Quote request sent" : "Sent") + (r.b.kam ? " to your account manager" : " to the HelloVoice team") +
             ". They usually reply within one working day, by email" + (ME && ME.user && ME.user.phone ? " or phone" : "") + ".");
-        chips([{ label: "Back to the menu", ghost: true, go: function () { menu("Anything else?"); } }]);
+        nextUp("Anything else?");
       });
     }
 
@@ -1340,6 +1358,9 @@
       Array.prototype.forEach.call(log.querySelectorAll(".hv-chips"), function (c) { c.remove(); });
       if (expecting) { var fn = expecting; expecting = null; ta.placeholder = "Type a message…"; fn(text); return; }
       if (/account manager|talk to (a )?(person|human|someone)|call me/i.test(text)) { handoff("handoff", text); return; }
+      if (/\bquot(e|ation)|عرض سعر|تسعير/i.test(text)) { flowQuote(); return; }
+      if (/my selection|my shortlist|\b(add|remove|rename|compare)\b|قائمتي/i.test(text)) { flowSelection(); return; }
+      if (document.querySelector(".cat-bar") && /^(show|filter|only|display|اعرض|أظهر)\b/i.test(text)) { runShow(text); return; }
       if (REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
       if (!(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
       busy = true; send.disabled = true;
@@ -1349,6 +1370,7 @@
         if (r.b.ok) {
           thread = r.b.thread; bubble("ai", r.b.reply); setCredits(r.b.credits); refreshFoot();
           if (r.b.cards && r.b.cards.length) creatorCards(r.b.cards);
+          nextUp();
         } else {
           say(r.s === 429 ? "One moment, that was quick. Try again in a few seconds." : (r.b.message || "That didn't work, and you weren't charged."));
         }
@@ -1371,7 +1393,7 @@
         hideNudge(true);
         if (!started) {
           started = true;
-          if (msgs.length) { msgs.forEach(function (m) { bubble(m.from, m.text, false); }); menu("Welcome back" + (first ? ", " + first : "") + ". What's next?"); }
+          if (msgs.length) { msgs.forEach(function (m) { bubble(m.from, m.text, false); }); menu("How can I help you?"); }
           else greet();
         }
         setTimeout(function () { ta.focus({ preventScroll: true }); }, 60);
