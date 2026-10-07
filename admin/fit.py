@@ -17,6 +17,8 @@ nothing. It weighs, for the campaign's objective:
 Nothing reaches a client until the admin saves, and every field stays editable.
 """
 
+import re
+
 FITS = ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
 ROLES = ["Awareness", "Engagement", "Conversion", "UGC content"]
 OBJECTIVES = ["Balanced", "Awareness", "Engagement", "Conversion"]
@@ -234,7 +236,7 @@ def _niche(category, doc, creator_interest):
 
 
 def score(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
-          record=None, creator_interest=None, min_parts=3):
+          record=None, creator_interest=None, min_parts=3, creator=None):
     """The matching score for one creator, or {"score": None, ...} when the
     analysis holds too little to judge. Returns {"score", "tag", "parts",
     "strengths", "watchouts", "conclusion", "objective", "platform"}."""
@@ -243,6 +245,8 @@ def score(doc, platform, followers=None, objective="Balanced", target=None, band
     if not doc:
         out["note"] = "No analysis on file."
         return out
+    if doc.get("basic"):
+        return score_basic(doc, platform, followers, objective, target, band, bench, creator)
     bench = bench or {}
     target = dict(DEFAULT_TARGET, **{k: v for k, v in (target or {}).items() if v})
     objective = objective if objective in WEIGHTS else "Balanced"
@@ -350,4 +354,123 @@ def score(doc, platform, followers=None, objective="Balanced", target=None, band
     out["conclusion"] = txt
     for p in out["parts"]:
         pass
+    return out
+
+
+# ------------------------------------------------- scoring on basic (public) data --
+#
+# Most creators have only the public numbers (followers, engagement, average
+# likes and comments, views on TikTok, bio, hashtags) and no audience report.
+# They are scored on what that record can show, and the stamp says so. Real
+# audience (fake followers) cannot be judged from it and is left out; audience
+# match is estimated from the roster (city, nationality, interest) and the bio
+# and hashtags instead of a measured audience split.
+
+WEIGHTS_BASIC = {
+    "Balanced":   {"engagement": 1.5, "reach": 1.5, "views": 1.5, "market": 1.5},
+    "Awareness":  {"engagement": 1.0, "reach": 3.0, "views": 3.0, "market": 1.0},
+    "Engagement": {"engagement": 3.0, "reach": 0.5, "views": 1.0, "market": 1.0},
+    "Conversion": {"engagement": 2.0, "reach": 0.5, "views": 2.0, "market": 3.0},
+}
+PLACE_WORDS = {
+    "SA": ["riyadh", "jeddah", "jedda", "dammam", "khobar", "al khobar", "dhahran", "taif", "makkah", "mecca", "madinah", "medina",
+           "abha", "tabuk", "jazan", "jizan", "hail", "qassim", "buraidah", "al ahsa", "hofuf", "jubail", "yanbu", "ksa",
+           "saudi", "saudi arabia", "saudia"],
+    "AE": ["dubai", "abu dhabi", "sharjah", "ajman", "al ain", "ras al khaimah", "fujairah", "uae", "emirates", "emirati"],
+    "EG": ["cairo", "giza", "alexandria", "mansora", "mansoura", "port said", "boursaeed", "tanta", "zagazig", "egypt", "egyptian",
+           "nasr city", "maadi", "heliopolis", "new cairo", "6th of october", "october", "sheikh zayed", "dokki", "mohandessin",
+           "zamalek", "ismailia", "suez", "aswan", "luxor", "hurghada", "sharm", "fayoum", "minya", "assiut", "sohag", "damietta"],
+    "KW": ["kuwait", "kuwaiti"], "QA": ["qatar", "doha", "qatari"], "BH": ["bahrain", "manama", "bahraini"],
+    "OM": ["oman", "muscat", "omani"], "JO": ["jordan", "amman", "jordanian"], "LB": ["lebanon", "beirut", "lebanese"],
+    "IQ": ["iraq", "baghdad", "erbil", "iraqi"], "MA": ["morocco", "casablanca", "rabat", "marrakech", "moroccan"],
+}
+
+
+def _place_mark(creator, target_cc):
+    """1.0 when the roster places the creator in the target country, 0.2 when it places them
+    elsewhere, 0.5 when it says nothing useful."""
+    def tokens(text):
+        t = str(text or "").lower()
+        return [x.strip() for x in re.split(r"[,/|;&+]|\band\b", t) if x.strip()]
+    hits = set()
+    for raw in tokens(creator["city"] if creator is not None else "") + tokens(creator["nationality"] if creator is not None else ""):
+        for cc, words in PLACE_WORDS.items():
+            if raw in words or any(w == raw or (len(w) > 4 and w in raw) for w in words):
+                hits.add(cc)
+    if not hits:
+        return 0.5, None
+    return (1.0 if target_cc in hits else 0.2), hits
+
+
+def score_basic(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
+                creator=None, min_parts=3):
+    """The matching score from a basic record. Same output as `score`, with "basic": True."""
+    out = {"score": None, "tag": "", "parts": [], "strengths": [], "watchouts": [], "conclusion": "",
+           "objective": objective, "platform": platform, "basic": True}
+    bench = bench or {}
+    target = dict(DEFAULT_TARGET, **{k: v for k, v in (target or {}).items() if v})
+    objective = objective if objective in WEIGHTS_BASIC else "Balanced"
+    w = WEIGHTS_BASIC[objective]
+    f = doc.get("followers") or followers
+    er = doc.get("er")
+    video = doc.get("er_basis") == "views"          # a rate per view (TikTok) or per follower (feed)
+    bars = bench.get("video_er") if video else (bench.get("er") or {}).get(band)
+    good, ok = bars if bars else ((6.0, 3.0) if video else (3.0, 1.5))
+    parts = []
+
+    def add(key, label, s, strength, watch):
+        parts.append((key, label, _clamp(s), strength, watch))
+
+    if er is not None:
+        s = 1.0 if er >= good else (0.6 + 0.4 * (er - ok) / (good - ok) if er >= ok and good > ok else 0.6 * er / ok if ok else 0.0)
+        add("engagement", "Engagement", s,
+            "Engagement %s%s, %s" % (_pct(er), " per view" if video else "",
+                                     ("above the %s benchmark" % _pct(good)) if er >= good else ("within the healthy range (%s and over)" % _pct(ok))),
+            "Engagement %s%s, below the %s benchmark" % (_pct(er), " per view" if video else "", _pct(ok)))
+    if f:
+        import math
+        add("reach", "Reach", (math.log10(max(f, 1)) - 3.7) / 2.0, "Reach of %s followers" % _k(f), "Small reach (%s followers)" % _k(f))
+    views = doc.get("avg_views")
+    if views and f:
+        v = float(views) / f * 100
+        vg, vo = (bench.get("view_rate") or (30.0, 10.0))
+        s = 1.0 if v >= vg else (0.6 + 0.4 * (v - vo) / (vg - vo) if v >= vo else 0.6 * v / vo)
+        add("views", "Views vs reach", s, "Average video views are %s of followers" % _pct(v),
+            "Average video views are only %s of followers" % _pct(v))
+    # audience match, estimated from the roster and the profile text
+    subs = []
+    pm, hits = _place_mark(creator, target["country"])
+    cname = dict(COUNTRIES).get(target["country"], target["country"])
+    if hits:
+        subs.append((pm, "Based in %s" % cname, "Based outside %s" % cname))
+    cats = [c for c in str(target["category"]).split("|") if c.strip() and c.strip().lower() != "any"]
+    if cats:
+        text = " ".join(filter(None, [str(creator["interest"] if creator is not None else ""), str(doc.get("bio") or ""),
+                                      " ".join(str((h.get("tag") if isinstance(h, dict) else h) or "") for h in (doc.get("hashtags") or []))]))
+        fake_doc = {"creator_interests": [text], "audience": {}}
+        nic = _niche("|".join(cats), fake_doc, creator["interest"] if creator is not None else "")
+        names = ", ".join(c.strip().lower() for c in cats)
+        subs.append((nic, "Works in the %s space" % names, "Little sign of %s content in their profile" % names))
+    if subs:
+        add("market", "Audience (estimated)", sum(x[0] for x in subs) / len(subs), "; ".join(x[1] for x in subs if x[0] >= 0.75) or None,
+            "; ".join(x[2] for x in subs if x[0] <= 0.45) or None)
+
+    out["parts"] = [{"key": k, "label": lab, "s": round(s, 2), "w": w.get(k, 1.0)} for k, lab, s, _, _ in parts]
+    if len(parts) < min_parts:
+        out["note"] = "Not enough public data to score."
+        return out
+    tw = sum(w.get(k, 1.0) for k, _, _, _, _ in parts)
+    val = int(round(100.0 * sum(w.get(k, 1.0) * s for k, _, s, _, _ in parts) / tw))
+    out["score"], out["tag"] = val, band_for(val)
+    order = sorted(parts, key=lambda p: -w.get(p[0], 1.0))
+    out["strengths"] = [st for _, _, s, st, _ in order if st and s >= 0.75][:4]
+    out["watchouts"] = [wo for _, _, s, _, wo in order if wo and s <= 0.45][:3]
+    lead = {"Balanced": "", "Awareness": " for awareness", "Engagement": " for engagement", "Conversion": " for conversion"}[objective]
+    txt = "%s%s (%d/100), from public numbers only." % (out["tag"], lead, val)
+    if out["strengths"]:
+        txt += " Strengths: " + "; ".join(out["strengths"][:2]) + "."
+    if out["watchouts"]:
+        txt += " Watch: " + "; ".join(out["watchouts"][:2]) + "."
+    out["conclusion"] = txt
+    out["objective"] = objective
     return out

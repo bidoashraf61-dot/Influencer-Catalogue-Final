@@ -1828,7 +1828,8 @@
         (sc.others && sc.others.length ? "<small>Also: " + sc.others.map(function (o) { return esc(o.platform) + " " + o.score; }).join(", ") + "</small>" : "") + "</div></div>" +
         (sc.strengths && sc.strengths.length ? '<p class="cst-h">Strengths</p><ul class="cst-g">' + sc.strengths.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
         (sc.watchouts && sc.watchouts.length ? '<p class="cst-h">Watch-outs</p><ul class="cst-w">' + sc.watchouts.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
-        '<p class="cst-h">How it adds up</p>' + bars;
+        '<p class="cst-h">How it adds up</p>' + bars +
+        (sc.basic ? '<p class="cst-basic">Based on public numbers only. Audience and fake-follower checks need the full analysis.</p>' : "");
       tip.hidden = false;
       var r = el.getBoundingClientRect(), tw = Math.min(320, window.innerWidth - 24);
       tip.style.width = tw + "px";
@@ -1868,8 +1869,8 @@
         st.setAttribute("aria-label", "Not scored yet: not enough analysis data");
         st.title = "Not scored yet — the full analysis is needed.";
       } else {
-        st.className = "cat-score cat-score--" + bandOf(sc.score);
-        st.innerHTML = "<b>" + sc.score + "</b><small>Match</small>";
+        st.className = "cat-score cat-score--" + bandOf(sc.score) + (sc.basic ? " cat-score--basic" : "");
+        st.innerHTML = "<b>" + sc.score + "</b><small>" + (sc.basic ? "Basic" : "Match") + "</small>";
         st.setAttribute("aria-label", "Matching score " + sc.score + " out of 100, " + sc.tag + ". Show why.");
         st.removeAttribute("title");
       }

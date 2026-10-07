@@ -2109,8 +2109,8 @@ def _live_score(live):
         return "<div class='vd-live off'><span class='vd-stamp none'>—</span><div><b>Not scored yet</b><div class='muted'>" + e(live.get("note") or "") + "</div></div></div>"
     band = "g" if live["score"] >= 80 else "l" if live["score"] >= 60 else "a" if live["score"] >= 40 else "r"
     li = lambda items, cls: "".join("<li class='" + cls + "'>" + e(x) + "</li>" for x in items)
-    return ("<div class='vd-live'><span class='vd-stamp " + band + "'>" + str(live["score"]) + "</span><div><b>" + e(live["tag"]) + "</b>"
-            "<span class='muted'> · live, for " + e(live["objective"].lower()) + (" on " + e(live["platform"]) if live.get("platform") else "") + "</span>"
+    return ("<div class='vd-live'><span class='vd-stamp " + band + ("' style='border:3px dashed #fff;box-shadow:0 0 0 1px #999'" if live.get("basic") else "'") + ">" + str(live["score"]) + "</span><div><b>" + e(live["tag"]) + "</b>"
+            "<span class='muted'> · " + ("BASIC (public numbers only), " if live.get("basic") else "") + "live, for " + e(live["objective"].lower()) + (" on " + e(live["platform"]) if live.get("platform") else "") + "</span>"
             "<ul class='vd-why'>" + li(live["strengths"], "g1") + li(live["watchouts"], "g-1") + "</ul></div></div>")
 
 

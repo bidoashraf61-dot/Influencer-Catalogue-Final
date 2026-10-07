@@ -1293,3 +1293,8 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-tag--add { background: transparent; border: 1px dashed rgba(18,18,18,.4); color: rgba(18,18,18,.65); padding: 0 12px; }
 .cat-tag--add:hover { background: var(--lime); border-style: solid; border-color: var(--ink); color: var(--ink); }
 .cat-tags__in { min-height: 28px; }
+
+/* A score built from public numbers only: dashed ring and a BASIC label. */
+.cat-score--basic { border-style: dashed; border-color: rgba(255,255,255,.9); }
+.cat-score--basic small { letter-spacing: .1em; }
+.cst-basic { margin: 12px 0 0; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.1); font-size: 12px; line-height: 1.4; opacity: .9; }
