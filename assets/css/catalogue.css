@@ -1349,3 +1349,10 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-score--multi { width: 52px; height: 52px; }
 .cat-score--multi b { font-size: 18px; }
 .cat-score[data-i="1"] { left: 72px; }
+
+/* The selection header is a banner: tag, client, name and a one-line brief. Numbers and buttons
+   live in the summary and the tray below. */
+.cat-selhead { grid-template-columns: 1fr; padding-bottom: 0; }
+.cat-selhead__title { margin-bottom: 10px; }
+p.cat-selhead__brief { display: block; margin: 0; font-size: 15px; font-weight: 600; color: var(--gray); letter-spacing: .01em; }
+[data-page="selection"] .cat-hero { padding-bottom: 32px; }

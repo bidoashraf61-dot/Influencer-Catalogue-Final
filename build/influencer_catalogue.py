@@ -900,16 +900,7 @@ def build():
         <div class="cat-selhead__main">
           <div class="cat-selhead__eyebrow"><span class="cat-selhead__tag">Selection</span><span class="cat-selhead__client" id="sel-client" hidden></span></div>
           <h1 class="cat-selhead__title" id="sel-title">Selection</h1>
-          <div class="cat-selhead__brief" id="sel-brief" hidden></div>
-          <p class="cat-selhead__hint">Remove anyone who does not fit, then request a quote.</p>
-        </div>
-        <div class="cat-selhead__side">
-          <dl class="cat-selhead__stats" id="sel-headstats"></dl>
-          <div class="cat-selhead__actions">
-            <button type="button" class="cat-btn cat-btn--lime" id="sel-head-quote">Request a quote</button>
-            <button type="button" class="cat-btn cat-btn--ghost" id="sel-head-copy">Copy link</button>
-            <a class="cat-btn cat-btn--ghost cat-tray__edit" href="/catalogue/">Add or remove creators</a>
-          </div>
+          <p class="cat-selhead__brief" id="sel-brief" hidden></p>
         </div>
       </div>
     </div></div>

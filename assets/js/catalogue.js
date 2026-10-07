@@ -1672,7 +1672,7 @@
           var cats = String(t.category || "").split("|").filter(function (x) { return x && x !== "Any"; });
           if (cats.length) chips.push(["Category", cats.join(", ")]);
           bx.hidden = false;
-          bx.innerHTML = chips.map(function (c) { return '<span class="cat-selhead__chip"><small>' + esc(c[0]) + "</small>" + esc(c[1]) + "</span>"; }).join("");
+          bx.textContent = chips.map(function (c) { return c[1]; }).join("  ·  ");
         }
       }
       var st = $("sel-headstats");
