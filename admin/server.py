@@ -2003,9 +2003,20 @@ class Handler(BaseHTTPRequestHandler):
                 (LOGO_DIR / name).write_bytes(part["data"])
                 logos.append("upload/" + name)
         sel_id = (f.get("selection_id") or "").strip()
+        # The objective is a template that fills four percentages the admin can
+        # then change. What is saved is the percentages: when they are one of
+        # the templates the campaign keeps that name, otherwise it is "Custom".
+        tpl = f.get("objective") if f.get("objective") in metrics.OBJECTIVES else "balanced"
+        typed = metrics.weights_from_percents([f.get("w_reach"), f.get("w_eng"), f.get("w_er"), f.get("w_clicks")]) \
+            if any((f.get(x) or "").strip() for x in ("w_reach", "w_eng", "w_er", "w_clicks")) else None
+        if typed is not None:
+            objective = metrics.objective_for(typed)
+            weights = [round(x, 4) for x in typed] if objective == "custom" else None
+        else:
+            objective, weights = (tpl if tpl != "custom" else "balanced"), None
         db.save_campaign(k["id"], visibility=vis, emv={"*": own_rates} if own_rates else None,
                          targets=targets, phase=phase, steps=steps,
-                         objective=f.get("objective") if f.get("objective") in metrics.OBJECTIVES else "balanced",
+                         objective=objective, weights=weights,
                          status_note=(f.get("status_note") or "").strip()[:240] or None, logos=logos,
                          selection_id=int(sel_id) if sel_id.isdigit() else None)
         planned = {}

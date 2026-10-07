@@ -2676,10 +2676,29 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         + u("/campaigns/logo") + "?n=" + e(x.split("/", 1)[1]) + "' alt=''><span>uploaded</span></label>"
         for x in chosen_logos if x.startswith("upload/"))
     obj_now = metrics.objective_of(k)
+    w_now = metrics.campaign_weights(k) if obj_now == "custom" else None
+    w_now = w_now or metrics.OBJECTIVES[obj_now][1]
     obj_opts = "".join(
-        "<option value='" + key + "'" + (" selected" if key == obj_now else "") + ">" + e(label) + " — reach "
-        + str(int(w[0] * 100)) + "% · engagement " + str(int(w[1] * 100)) + "% · eng. rate " + str(int(w[2] * 100))
-        + "% · clicks " + str(int(w[3] * 100)) + "%</option>" for key, (label, w) in metrics.OBJECTIVES.items())
+        "<option value='" + key + "'" + (" selected" if key == obj_now else "") + ">" + e(label)
+        + (" — " + e(metrics.TEMPLATE_NOTES.get(key, "")) if key != "custom" else " — set the four percentages yourself")
+        + "</option>" for key, (label, w) in metrics.OBJECTIVES.items())
+    obj_json = json.dumps({key: [round(x * 100, 1) for x in w] for key, (label, w) in metrics.OBJECTIVES.items() if key != "custom"})
+    pct_in = lambda name, label, val, hint: ("<div><label>" + label + "</label><div class='margin-box'><input name='" + name
+                                              + "' class='w-pct' inputmode='decimal' value='" + ("%g" % round(val * 100, 1)) + "'><span class='suffix'>%</span></div>"
+                                              "<div class='price-hint'>" + hint + "</div></div>")
+    weights_ui = ("<div class='row'>"
+                  + pct_in("w_reach", "Views &amp; reach", w_now[0], "How many people saw it")
+                  + pct_in("w_eng", "Engagement", w_now[1], "Likes and comments")
+                  + pct_in("w_er", "Engagement rate", w_now[2], "Reactions per view")
+                  + pct_in("w_clicks", "Link clicks", w_now[3], "Needs a tracked link")
+                  + "</div><div class='price-hint' id='w-sum'></div>"
+                  "<script>(function(){var T=" + obj_json + ",sel=document.querySelector('select[name=objective]'),"
+                  "in_=[].slice.call(document.querySelectorAll('.w-pct')),sum=document.getElementById('w-sum');"
+                  "function show(){var t=in_.reduce(function(a,i){return a+(parseFloat(i.value)||0)},0);"
+                  "sum.textContent='Total '+(Math.round(t*10)/10)+'%'+(Math.abs(t-100)>0.05?' — it is scaled to 100% when you save, so the proportions are what count.':'');"
+                  "sum.style.color=Math.abs(t-100)>0.05?'#b45309':''}"
+                  "sel.addEventListener('change',function(){var v=T[sel.value];if(!v)return;in_.forEach(function(i,n){i.value=v[n]});show()});"
+                  "in_.forEach(function(i){i.addEventListener('input',function(){sel.value='custom';show()})});show()})();</script>")
     tgt = lambda key, label, hint: ("<div><label>" + label + "</label><input name='target_" + key + "' inputmode='decimal' value='"
                                     + (("%g" % targets[key]) if key in targets else "") + "' placeholder='" + hint + "'></div>")
 
@@ -2689,9 +2708,10 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
 
     sync = ""
     if k["selection_id"]:
-        sync = ("<form method='post' action='" + u("/campaigns/sync") + "' class='inline'>"
-                "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
-                "<button class='btn small ghost'>Add creators added to the selection since</button></form>")
+        # A button inside the save form that submits a separate form (below the
+        # page's main form): <form> cannot nest, and a nested one used to close
+        # the save form early, leaving the Save button with nothing to save.
+        sync = "<button type='submit' form='camp-sync' class='btn small ghost'>Add creators added to the selection since</button>"
     body = (
         _head(k, "setup") + note + checklist
         + "<form method='post' action='" + u("/campaigns/save") + "' enctype='multipart/form-data' id='camp-form'>"
@@ -2742,7 +2762,10 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                "A post in the dates carrying any of these counts. Leave the destination empty if this campaign has no affiliate links.")
         + step(5, "Objective &amp; targets",
                "<div class='row'><div style='flex:3'><label>Campaign objective — decides how the leaderboard scores creators</label>"
-               "<select name='objective'>" + obj_opts + "</select></div></div>"
+               "<select name='objective'>" + obj_opts + "</select>"
+               "<div class='price-hint'>Pick a template and it fills the four percentages below. Change any of them and the objective becomes Custom — "
+               "the percentages are what scoring uses.</div></div></div>"
+               + weights_ui
                + "<div class='card' style='background:#f7f5f0;margin:14px 0 6px;display:flex;gap:14px;align-items:center;flex-wrap:wrap'>"
                  "<div style='flex:1;min-width:240px'><strong>Set targets with the ROI calculator</strong>"
                  "<div class='price-hint'>Pick a template, enter the client's budget — it works out the minimum the budget must buy, "
@@ -2776,6 +2799,8 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         + "</div></details></div>"
         + "<div class='savebar'><button class='btn'>Save campaign</button>"
           "<a class='btn ghost' href='" + u("/campaigns/report") + "?id=" + str(k["id"]) + "'>See the report</a></div></form>"
+        + ("<form id='camp-sync' method='post' action='" + u("/campaigns/sync") + "'><input type='hidden' name='id' value='" + str(k["id"]) + "'></form>"
+           if k["selection_id"] else "")
         + "<form method='post' action='" + u("/campaigns/delete") + "' style='margin-top:24px' "
           "onsubmit=\"return confirm('Delete this campaign? Its report and links stop working.')\">"
           "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
@@ -3952,11 +3977,11 @@ def objective_weights_card():
     from metrics.OBJECTIVES so it can never drift from the real scoring."""
     import metrics
     rows = "".join("<tr><td><strong>" + e(lbl) + "</strong></td><td class='right'>%d%%</td><td class='right'>%d%%</td><td class='right'>%d%%</td></tr>"
-                   % (round(w[0] * 100), round(w[1] * 100), round(w[3] * 100)) for lbl, w in metrics.OBJECTIVES.values())
+                   % (round(w[0] * 100), round(w[1] * 100), round(w[3] * 100)) for lbl, w in [v for _, v in metrics.TEMPLATES])
     return ("<details class='card refbox'><summary><strong>How the campaign objective weights the score</strong>"
-            " <span class='muted'>no percentages to enter</span></summary>"
-            "<p class='sec-desc'>Pick one objective on the campaign's Setup page. It decides how much each result counts when creators are scored, "
-            "each as a share of the best creator's result. Mixed campaign? Choose Balanced.</p>"
+            " <span class='muted'>templates — editable per campaign</span></summary>"
+            "<p class='sec-desc'>On the campaign's Setup page, pick an objective template and it fills in these percentages; change any of them to make it your own. "
+            "They decide how much each result counts when creators are scored, each as a share of the best creator's result. Mixed campaign? Choose Balanced.</p>"
             "<table><thead><tr><th>Objective</th><th class='right'>Views &amp; reach</th><th class='right'>Engagement</th><th class='right'>Clicks</th></tr></thead><tbody>"
             + rows + "</tbody></table>"
             "<p class='price-hint'>No tracking links on the campaign? The clicks share is dropped and the other two scale up to 100%. "

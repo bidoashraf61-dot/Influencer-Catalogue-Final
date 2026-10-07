@@ -324,7 +324,7 @@ def report(campaign, internal=False, raw=False):
 
     objective = objective_of(campaign)
     links_on = has_links(campaign)
-    w = weights_for(objective, links_on)
+    w = weights_for(objective, links_on, campaign_weights(campaign))
     scoreboard(creators, bm, w)
     targets = db.campaign_targets(campaign)
     progress = target_progress(campaign, total, targets)
@@ -390,12 +390,21 @@ OBJECTIVES = {
     "awareness": ("Awareness", (0.70, 0.20, 0.0, 0.10)),
     "engagement": ("Engagement", (0.20, 0.70, 0.0, 0.10)),
     "traffic": ("Conversion", (0.20, 0.20, 0.0, 0.60)),
+    # Not a template: weights the admin typed for this one campaign.
+    "custom": ("Custom", (0.45, 0.35, 0.0, 0.20)),
 }
+# The ready-made starting points offered in the campaign setup.
+TEMPLATES = [(k, v) for k, v in OBJECTIVES.items() if k != "custom"]
+TEMPLATE_NOTES = {"balanced": "Views, engagement and clicks all count",
+                  "awareness": "Reach and views matter most",
+                  "engagement": "Likes and comments matter most",
+                  "traffic": "Link clicks matter most"}
 
 
 # Which targets each objective puts in front of the client.
 OBJECTIVE_KPIS = {"balanced": ["views", "engagement", "er"], "awareness": ["views", "reach"],
-                  "engagement": ["engagement", "er"], "traffic": ["clicks", "views"]}
+                  "engagement": ["engagement", "er"], "traffic": ["clicks", "views"],
+                  "custom": ["views", "engagement", "er"]}
 SAFE_SHARE = 0.8      # of a creator's own averages, when their analysis is on file
 
 
@@ -464,12 +473,12 @@ def recommend_targets(campaign):
     return out
 
 
-def weights_for(objective, has_links):
+def weights_for(objective, has_links, custom=None):
     """The objective's leaderboard weights. A campaign with no tracked links
     has no clicks to score, so that part is dropped and the other three are
     scaled up to still make 100 — nobody is marked on a metric that does not
     exist in their campaign."""
-    w = list(OBJECTIVES[objective][1])
+    w = list(custom if (objective == "custom" and custom) else OBJECTIVES[objective][1])
     if not has_links:
         rest = sum(w[:3])
         w = [x / rest for x in w[:3]] + [0.0]
@@ -487,6 +496,41 @@ def has_links(campaign, clicks=None):
         return bool(conn.execute("SELECT 1 FROM links WHERE campaign_id = ? AND active = 1 "
                                  "AND destination IS NOT NULL AND destination != '' LIMIT 1",
                                  (campaign["id"],)).fetchone())
+
+
+def campaign_weights(campaign):
+    """The weights typed for this campaign — (reach & views, engagement,
+    engagement rate, clicks), summing to 1 — or None."""
+    raw = campaign["weights"] if "weights" in campaign.keys() else None
+    try:
+        w = json.loads(raw) if raw else None
+    except (ValueError, TypeError):
+        return None
+    if isinstance(w, list) and len(w) == 4 and all(isinstance(x, (int, float)) and x >= 0 for x in w) and sum(w) > 0:
+        t = float(sum(w))
+        return tuple(x / t for x in w)
+    return None
+
+
+def weights_from_percents(vals):
+    """Four typed percentages -> weights summing to 1, or None when nothing
+    usable was typed. They need not add up to exactly 100: they are scaled."""
+    out = []
+    for v in vals:
+        try:
+            out.append(max(0.0, float(str(v).replace("%", "").strip() or 0)))
+        except ValueError:
+            return None
+    t = sum(out)
+    return tuple(x / t for x in out) if t > 0 else None
+
+
+def objective_for(weights):
+    """The template these weights are (to the nearest half point), else "custom"."""
+    for key, (_, w) in TEMPLATES:
+        if all(abs(a - b) < 0.005 for a, b in zip(weights, w)):
+            return key
+    return "custom"
 
 
 def objective_of(campaign):
