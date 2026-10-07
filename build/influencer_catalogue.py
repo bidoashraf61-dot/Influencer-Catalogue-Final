@@ -891,10 +891,17 @@ def build():
 
 <main class="cat-app" id="cat-app" hidden>
 
-  <header class="cat-hero">
-    <div class="cat-pad"><div class="cat-container">
+  <header class="cat-hero cat-hero--cover cat-hero--short">
+    <video class="cat-cover__video" autoplay muted loop playsinline
+           preload="metadata" poster="/assets/video/hero-reel-poster.jpg"
+           aria-hidden="true" tabindex="-1">
+      <source src="/assets/video/hero-reel.mp4" type="video/mp4"/>
+    </video>
+    <div class="cat-cover__shade" aria-hidden="true"></div>
+
+    <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
-        <img class="cat-hero__logo" src="/assets/brand/logo.png" alt="HelloVoice"/>
+        <img class="cat-hero__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
         <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
           Campaign tracking
@@ -905,6 +912,9 @@ def build():
         </a>
       </div>
       </div>
+    </div></div></div>
+
+    <div class="cat-cover__body"><div class="cat-pad"><div class="cat-container">
       <a class="cat-back" href="/catalogue/">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
         Full catalogue
@@ -916,7 +926,7 @@ def build():
           <p class="cat-selhead__brief" id="sel-brief" hidden></p>
         </div>
       </div>
-    </div></div>
+    </div></div></div>
   </header>
 
   <section class="cat-summary" aria-label="Summary">

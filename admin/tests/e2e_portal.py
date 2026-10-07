@@ -228,6 +228,9 @@ class Portal(unittest.TestCase):
         self.assertNotEqual(s, 200)
 
     def test_6_credits_run_out_and_refund(self):
+        # With the plain shortlist priced (an admin can set it), running out blocks it.
+        db.set_setting("ai_costs", {"brief": 5, "parse": 1, "chat": 1, "search": 2})
+        self.addCleanup(db.set_setting, "ai_costs", None)
         c, b = self.signup("poor@roche.com")
         uid = portal.user_by_email("poor@roche.com")["code_id"]
         portal.grant(uid, -48, "test drain")                       # 2 left
@@ -384,10 +387,12 @@ class Portal(unittest.TestCase):
         ans = {"goal": "balanced", "platforms": ["any"], "market": "SA", "category": ["beauty"]}
         results = []
         def go():
-            results.append(c.post("/api/brief/run", {"answers": ans})[0])
+            r = c.post("/api/brief/run", {"answers": ans})
+            results.append((r[0], r[1].get("narrated")))
         ts = [threading.Thread(target=go) for _ in range(6)]
         [t.start() for t in ts]; [t.join() for t in ts]
-        self.assertEqual(sorted(results).count(200), 1, results)
+        self.assertTrue(all(code == 200 for code, _ in results), results)      # the plain shortlist is free
+        self.assertEqual(sum(1 for _, n in results if n), 1, results)           # only one could pay for AI reasons
         self.assertEqual(portal.balance(uid), 0)
 
     def test_24_bad_thread_id_is_not_charged(self):
@@ -555,6 +560,20 @@ class Portal(unittest.TestCase):
         self.assertIn("error", assistant.t_rank_by_metric({}, metric="bio"))
 
     # ------------------------------------------------------- round 3 features
+    def test_39_free_shortlist_for_access_code_clients(self):
+        code_id = db.create_code(auth.hash_code("Free Pass 9"), "ss 9", "Guest free", None, None, "Free Pass 9", 5)
+        c = Client(self.base)
+        c.post("/api/unlock", {"code": "Free Pass 9"})
+        portal.ensure_allowance(code_id)
+        portal.grant(code_id, -10, "drain")                                     # guest has spent all credits
+        ans = {"goal": "balanced", "platforms": ["any"], "market": "SA", "category": ["beauty"]}
+        for _ in range(3):
+            s, r, _ = c.post("/api/brief/run", {"answers": ans})
+            self.assertEqual(s, 200, r)
+            self.assertFalse(r["narrated"])
+        self.assertEqual(portal.balance(code_id), 0)
+        self.assertEqual(len([l for l in portal.ledger(code_id) if l["reason"].startswith("AI: search")]), 0)   # no zero rows
+
     def test_40_signup_is_open_by_default(self):
         db.set_setting("signup_mode", None)
         try:

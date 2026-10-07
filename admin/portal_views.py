@@ -319,7 +319,7 @@ def _settings_tab():
         ("open", "Open — any company email can sign up"), ("approval", "Approval — I approve each new client"),
         ("allowlist", "Invite only — only allow-listed domains"), ("closed", "Closed — no new sign-ups")))
     cost_inputs = "".join("<div><label>%s</label><input type='number' min='0' max='1000' name='cost_%s' value='%d'></div>"
-                          % (lbl, k, costs[k]) for k, lbl in (("brief", "AI shortlist with reasons"), ("search", "Shortlist without AI text"),
+                          % (lbl, k, costs[k]) for k, lbl in (("brief", "AI shortlist with reasons"), ("search", "Shortlist without AI text (0 = free)"),
                                                               ("parse", "Read a free-text brief"), ("chat", "Chat message")))
 
     def key_card(which, title, mod, help_):

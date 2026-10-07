@@ -123,7 +123,9 @@ OTP_MINUTES = 10
 OTP_MAX_ATTEMPTS = 5
 OTP_RESEND_SECONDS = 30
 
-DEFAULT_COSTS = {"brief": 5, "parse": 1, "chat": 1, "search": 2}
+# "search" is the scored shortlist without AI text: free, so every client (access code included)
+# can always get one. Written reasons, the brief reader and chat spend credits.
+DEFAULT_COSTS = {"brief": 5, "parse": 1, "chat": 1, "search": 0}
 DEFAULT_GUEST_CREDITS = 10
 DEFAULT_SIGNUP_CREDITS = 50
 
@@ -448,8 +450,8 @@ def charge(code_id, kind, ref=""):
     """Take the configured price of an AI action. The admin preview is free.
     Returns ``(ok, cost, balance)``."""
     cost = costs().get(kind, 1)
-    if code_id == db.admin_code_id():
-        return True, 0, balance(code_id)
+    if code_id == db.admin_code_id() or cost <= 0:
+        return True, 0, balance(code_id)            # free: nothing to record
     ensure_allowance(code_id)
     monthly_refill(code_id)
     ok, bal = spend(code_id, cost, "AI: " + kind, ref)

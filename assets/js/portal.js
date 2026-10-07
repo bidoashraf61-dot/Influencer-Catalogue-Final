@@ -451,7 +451,10 @@
       var missing = qs.filter(function (q) { return q.required && !(answers[q.id] && answers[q.id].length); });
       var cost = ME && ME.costs ? ME.costs.brief : 5;
       var run = h("button", { class: "pt-btn pt-btn--lime", type: "button" }, opts.attach ? "Score my selection" : "Show my creators");
-      body.appendChild(h("div", { class: "pt-actions" }, h("span", { class: "pt-note", style: "margin:0" }, opts.attach ? (LANG === "ar" ? "مجاناً" : "Free") : creditsLine(cost)),
+      var freeLine = (ME && ME.costs && !ME.costs.search && ME.credits != null)
+        ? (ME.credits >= cost ? creditsLine(cost) + " · free without written reasons" : "Free · written reasons need " + cost + " credits")
+        : creditsLine(cost);
+      body.appendChild(h("div", { class: "pt-actions" }, h("span", { class: "pt-note", style: "margin:0" }, opts.attach ? "Free" : freeLine),
         h("span", null, h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { go(0); }, style: "margin-right:8px" }, "Edit"), run)));
       if (missing.length) { run.disabled = true; fail("Still needed: " + missing.map(function (q) { return q.label.replace(/\?$/, ""); }).join("; ") + "."); }
       run.addEventListener("click", function () {
@@ -726,7 +729,9 @@
           var card = h("div", { class: "pt-msg-b pt-msg-b--ai", style: "white-space:normal;max-width:100%" },
             h("p", { style: "margin:0 0 8px;font-weight:600" }, "Your brief"), h("p", { style: "margin:0 0 12px;white-space:pre-line" }, lines.join("\n")));
           var costs = (ME && ME.costs) || { brief: 5, chat: 1 };
-          var build = h("button", { class: "pt-idea", type: "button", style: "background:var(--lime);border-color:var(--ink);font-weight:600" }, "Build my shortlist · " + costs.brief + " credits");
+          var label = (!costs.search && ME && ME.credits != null && ME.credits < costs.brief) ? "Build my shortlist · free"
+            : "Build my shortlist · " + costs.brief + " credits" + (!costs.search ? " (free without reasons)" : "");
+          var build = h("button", { class: "pt-idea", type: "button", style: "background:var(--lime);border-color:var(--ink);font-weight:600" }, label);
           var talk = h("button", { class: "pt-idea", type: "button" }, "Ask the assistant · " + costs.chat + " credit");
           var redo = h("button", { class: "pt-idea", type: "button" }, "Change answers");
           card.appendChild(h("div", { class: "pt-ideas" }, build, talk, redo));

@@ -1524,11 +1524,41 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 .cat-cover__cue:hover svg { transform: translateY(3px); }
 .cat-cover__cue:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; border-radius: 4px; }
 
+/* The selection page wears the same cover, cut shorter: the shortlist and its
+   prices are the point of this page, so they start above the fold. The title
+   keeps the selection's name at caption scale, with the client and brief under
+   it in the lead's light-on-dark tone. */
+[data-page="selection"] .cat-hero--cover { padding: 0; }
+.cat-hero--short { min-height: clamp(440px, 66vh, 700px); min-height: clamp(440px, 66svh, 700px); }
+.cat-hero--short .cat-cover__body { padding-bottom: clamp(28px, 5vh, 56px); }
+.cat-hero--cover .cat-back {
+  color: var(--white); background: rgba(18,18,18,.28);
+  border-color: rgba(255,255,255,.45); margin-bottom: 20px;
+  font-size: 17px; padding: 9px 20px;
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.cat-hero--cover .cat-back:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
+.cat-hero--cover .cat-back:focus-visible { outline-color: var(--lime); }
+.cat-hero--cover .cat-selhead { display: block; padding: 0; }
+.cat-hero--cover .cat-selhead__client { color: var(--white); opacity: .88; }
+.cat-hero--cover .cat-selhead__title {
+  color: var(--white); line-height: .92; letter-spacing: .01em; margin: 0;
+  font-size: clamp(2.75rem, 1.4rem + 4vw, 5.5rem); text-wrap: balance;
+  max-width: 18ch;
+}
+.cat-hero--cover .cat-selhead__brief {
+  display: block; margin: 18px 0 0; padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,.24);
+  color: rgba(255,255,255,.88); font-size: 16px; line-height: 1.6; letter-spacing: .005em;
+}
+.cat-hero--cover .cat-selhead__brief[hidden] { display: none; }
+
 @media screen and (max-width: 991px) {
   .cat-cover__nav { padding-top: 20px; }
 }
 @media screen and (max-width: 767px) {
   .cat-hero--cover { min-height: 88vh; min-height: 88svh; }
+  .cat-hero--short { min-height: clamp(500px, 70vh, 620px); min-height: clamp(500px, 70svh, 620px); }
   .cat-hero--cover .cat-topbar { flex-wrap: wrap; }
   .cat-cover__foot { flex-direction: column; align-items: flex-start; gap: 16px; }
   .cat-hero--cover .cat-hero__lead { font-size: 16px; line-height: 1.6; }
