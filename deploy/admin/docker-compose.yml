@@ -33,7 +33,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 128M
+          memory: 512M  # PDF imports parse large reports; 128M was OOM-killed on 2026-10-07
         reservations:
           memory: 32M
 
