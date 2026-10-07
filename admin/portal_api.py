@@ -13,6 +13,12 @@ Public (client) routes
     POST /api/auth/profile       name / company -> account created, signed in
     POST /api/auth/logout
     POST /api/me/update          edit profile
+    GET  /api/account            the client's own home: insights, campaigns, selections (account holders)
+    GET  /api/me/image?k=photo   their profile photo or company logo (k=logo), owner only
+    POST /api/me/image           {kind, data: data-URL} or {kind, remove: true}
+    POST /api/me/notify          which emails they want: {quote, live, report}
+    POST /api/me/signout-others  every other browser on their account loses access
+    POST /api/team/invite        ask HelloVoice to give a colleague access
     POST /api/brief/parse        free text -> MCQ answers   (credits)
     POST /api/brief/run          MCQ answers -> scored selection (credits)
     POST /api/chat               ask the assistant          (credits)
@@ -27,6 +33,7 @@ import sys
 import time
 import urllib.parse
 
+import account
 import assistant
 import db
 import fx
@@ -88,6 +95,7 @@ class PortalMixin:
                "costs": portal.costs(), "ai": gemini.configured()}
         if user:
             out["user"] = {k: user[k] for k in ("email", "name", "company", "job_title", "phone")}
+            out["user"]["photo"] = account.image_version(user, "photo")
             out["team"] = [{"name": t["name"], "job_title": t["job_title"]} for t in portal.teammates(cid)]
             out["monthly_credits"] = portal.monthly_allowance(user)
         return out
@@ -153,6 +161,18 @@ class PortalMixin:
             return None
         return cid, user, kind
 
+    def _need_account(self):
+        """(code_id, user) for a signed-in account holder; answers 401 or 403
+        and returns None for anyone else (access-code guests, admin preview)."""
+        who = self._need_viewer()
+        if not who:
+            return None
+        cid, user, kind = who
+        if kind != "user" or not user:
+            self.send_json(403, {"ok": False, "reason": "no_profile"}, self.cors())
+            return None
+        return cid, user
+
     # ----------------------------------------------------------- public GET --
 
     def portal_get(self, path, query):
@@ -167,6 +187,23 @@ class PortalMixin:
                                      "email_signin": mailer.configured()}, self.cors())
             else:
                 self.send_json(200, dict(self._me_payload(cid, user, kind), ok=True), self.cors())
+            return True
+        if path == "/api/account":
+            who = self._need_account()
+            if who:
+                cid, user = who
+                self.send_json(200, dict(account.summary(user, cid), ok=True), self.cors() + [("Cache-Control", "no-store")])
+            return True
+        if path == "/api/me/image":
+            who = self._need_account()
+            if who:
+                f = account.image_path(who[1], query.get("k") or "photo")
+                if f is None:
+                    self.send_json(404, {"ok": False}, self.cors())
+                else:
+                    ctype = {"jpg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(f.suffix[1:], "application/octet-stream")
+                    self.send(200, f.read_bytes(), ctype, self.cors() + [("Cache-Control", "private, no-store"),
+                                                                         ("X-Content-Type-Options", "nosniff")])
             return True
         if path == "/api/brief/questions":
             self.send_json(200, {"ok": True, "questions": matcher.public_questions(), "costs": portal.costs()}, self.cors())
@@ -270,6 +307,8 @@ class PortalMixin:
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
             "/api/credits/request": self.api_credits_request, "/api/me/delete": self.api_me_delete,
             "/api/voice/handoff": self.api_voice_handoff,
+            "/api/me/image": self.api_me_image, "/api/me/notify": self.api_me_notify,
+            "/api/me/signout-others": self.api_me_signout_others, "/api/team/invite": self.api_team_invite,
         }
         fn = routes.get(path)
         if not fn:
@@ -489,6 +528,76 @@ class PortalMixin:
                               "Contact: %s" % contact, "Selection: %s" % (sel or "—"), "Message: %s" % (note or "—"),
                               "", "Chat:", *lines], kam=user["kam"] if user else None)
         return self.send_json(200, {"ok": True, "kam": bool(user and user["kam"])}, self.cors())
+
+    # --------------------------------------------------------------- account --
+
+    def api_me_image(self):
+        """Set or clear the profile photo or company logo. The image arrives as
+        a data URL in JSON; anything over 3MB is refused before it is read."""
+        if int(self.headers.get("Content-Length") or 0) > 3 * 1024 * 1024:
+            return self.send_json(413, {"ok": False, "message": "That image is too large. Please use one under 2MB."}, self.cors())
+        who = self._need_account()
+        if not who:
+            return
+        cid, user = who
+        b = self.json_body()
+        kind = b.get("kind")
+        if kind not in account.KINDS:
+            return self.send_json(400, {"ok": False}, self.cors())
+        if b.get("remove"):
+            account.remove_image(user, kind)
+            return self.send_json(200, {"ok": True, "version": None}, self.cors())
+        import base64
+        data = str(b.get("data") or "")
+        try:
+            raw = base64.b64decode(data.split(",", 1)[1] if data.startswith("data:") else data, validate=False)
+        except Exception:
+            raw = b""
+        ok, why = account.save_image(user, kind, raw)
+        if not ok:
+            msg = {"too_big": "That image is too large. Please use one under 2MB.",
+                   "not_image": "Please choose a JPG, PNG or WebP image."}.get(why, "Couldn't save that image.")
+            return self.send_json(400, {"ok": False, "reason": why, "message": msg}, self.cors())
+        fresh = portal.user_by_id(user["id"])
+        return self.send_json(200, {"ok": True, "version": account.image_version(fresh, kind),
+                                    "completion": account.completion(fresh)}, self.cors())
+
+    def api_me_notify(self):
+        who = self._need_account()
+        if not who:
+            return
+        prefs = account.set_notify(who[1], self.json_body())
+        return self.send_json(200, {"ok": True, "notify": prefs}, self.cors())
+
+    def api_me_signout_others(self):
+        """Take every other browser off this account's code. This one keeps its
+        place, so the client stays signed in here."""
+        who = self._need_account()
+        if not who:
+            return
+        cid, user = who
+        srv = self._srv()
+        mine = db.device_hash(self.cookies().get(srv.DEVICE_COOKIE, ""))
+        with db.connect() as conn:
+            n = conn.execute("DELETE FROM code_devices WHERE code_id = ? AND device != ?", (cid, mine)).rowcount
+        return self.send_json(200, {"ok": True, "removed": n}, self.cors())
+
+    def api_team_invite(self):
+        """A colleague's access is HelloVoice's call: this only asks for it."""
+        who = self._need_account()
+        if not who:
+            return
+        cid, user = who
+        if self._throttled("invite:%d" % user["id"], 10, 86400):
+            return
+        b = self.json_body()
+        name = " ".join(str(b.get("name") or "").split())[:120]
+        email = " ".join(str(b.get("email") or "").split())[:160]
+        if "@" not in email:
+            return self.send_json(400, {"ok": False, "message": "Please add your colleague's work email."}, self.cors())
+        notify.send("signup", ["%s (%s, %s) asked for access for a colleague: %s <%s>." % (
+            user["name"], user["email"], user["company"] or "no company", name or "no name given", email)], kam=user["kam"])
+        return self.send_json(200, {"ok": True, "message": "Sent. Your account manager will set up access for %s." % (name or email)}, self.cors())
 
     def api_me_delete(self):
         who = self._need_viewer()

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
+<meta name="referrer" content="no-referrer"/>
+<title>My account — HelloVoice</title>
+<link rel="icon" href="../assets/icons/icon-32.png" type="image/png"/>
+<link rel="stylesheet" href="../assets/css/catalogue.css"/>
+<link rel="stylesheet" href="../assets/css/portal.css"/>
+<link rel="stylesheet" href="../assets/css/account.css"/>
+</head>
+<body data-page="account">
+<!--
+The client's own space, for signed-in account holders only. Same ink stage
+and menu bar as the catalogue; under it a white working area with four tabs:
+Home (status, what needs them, four verdict-first insights, their latest
+campaigns and selections, their contact), Selections, Campaigns and Settings.
+Everything is drawn by assets/js/account.js from /api/account.
+-->
+
+<header class="ac-head">
+  <div class="cat-pad"><div class="cat-container">
+    <div class="cat-topbar">
+      <a href="../" class="ac-head__logo"><img class="cat-hero__logo" src="../assets/brand/logo-knockout.webp" alt="HelloVoice — back to the catalogue"/></a>
+      <div class="cat-topbar__links">
+        <a class="cat-track" href="../">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          Catalogue
+        </a>
+        <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
+          Portfolio
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+        </a>
+      </div>
+    </div>
+
+    <div class="ac-who" id="ac-who" hidden>
+      <div class="ac-who__face" id="ac-face" aria-hidden="true"></div>
+      <div class="ac-who__text">
+        <h1 class="ac-who__name" id="ac-name"></h1>
+        <p class="ac-who__role" id="ac-role"></p>
+        <p class="ac-who__status" id="ac-status"></p>
+      </div>
+      <div class="ac-who__logo" id="ac-logo" hidden></div>
+    </div>
+
+    <nav class="ac-tabs" id="ac-tabs" aria-label="My account" hidden>
+      <a href="#home" data-tab="home">Home</a>
+      <a href="#selections" data-tab="selections">Selections</a>
+      <a href="#campaigns" data-tab="campaigns">Campaigns</a>
+      <a href="#settings" data-tab="settings">Settings</a>
+    </nav>
+  </div></div>
+</header>
+
+<main class="ac-main" id="ac-main">
+  <div class="cat-pad"><div class="cat-container">
+    <div class="ac-loading" id="ac-loading">Loading your account…</div>
+    <div class="ac-closed" id="ac-closed" hidden></div>
+    <section class="ac-panel" id="tab-home" data-panel="home" hidden></section>
+    <section class="ac-panel" id="tab-selections" data-panel="selections" hidden></section>
+    <section class="ac-panel" id="tab-campaigns" data-panel="campaigns" hidden></section>
+    <section class="ac-panel" id="tab-settings" data-panel="settings" hidden></section>
+  </div></div>
+</main>
+
+<footer class="cat-footer">
+  <div class="cat-pad"><div class="cat-container">
+    <div class="cat-footer__top">
+      <img class="cat-footer__logo" src="../assets/helv/logo-knockout.webp" srcset="../assets/helv/logo-knockout@2x.webp 2x" alt="HelloVoice" width="760" height="166"/>
+      <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
+        See the portfolio at hellovoice.co.uk
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+      </a>
+    </div>
+    <div class="cat-footer__base">
+      <p class="cat-footer__note">Confidential and not for redistribution.</p>
+    </div>
+  </div></div>
+</footer>
+
+<script>window.CATALOGUE_CONFIG = { api: "/admin" };</script>
+<script src="../assets/js/account.js"></script>
+<script src="../assets/js/portal.js"></script>
+</body>
+</html>

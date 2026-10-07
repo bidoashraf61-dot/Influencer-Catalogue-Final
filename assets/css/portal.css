@@ -479,6 +479,9 @@ body.pt-lock { overflow: hidden; }
 .pt-avatar[aria-expanded="true"] { box-shadow: 0 0 0 4px rgba(232,255,118,.35); }
 .pt-avatar:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
 .pt-avatar__ini { margin-top: 2px; }
+.pt-avatar { position: relative; overflow: hidden; padding: 0; }
+.pt-avatar__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.pt-avatar.has-photo .pt-avatar__ini { visibility: hidden; }
 .pt-menu {
   position: absolute; right: 0; top: calc(100% + 10px); z-index: 80;
   min-width: 248px; padding: 8px; border-radius: 20px;

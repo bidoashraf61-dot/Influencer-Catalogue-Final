@@ -52,3 +52,6 @@ admin/.gemini-key
 admin/.mail-key
 admin/.mail-smtp
 admin/.mail-graph
+
+# Client profile photos and company logos, uploaded from /account/.
+admin/profile_media/

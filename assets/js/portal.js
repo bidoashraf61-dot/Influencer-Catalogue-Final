@@ -22,6 +22,8 @@
   var CFGS = window.CATALOGUE_CONFIG || window.CAMPAIGN_CONFIG || {};
   var API = (CFGS.api != null ? CFGS.api : "/admin").replace(/\/$/, "");
   var ME = null;
+  // A few hooks other pages use (the account page): talk, setPhoto.
+  var HV = window.hvPortal = window.hvPortal || {};
 
   /* ------------------------------------------------------------- language */
   // English by default, Arabic for an Arabic browser or when chosen. Every static string goes
@@ -330,9 +332,17 @@
       : ME.kind === "admin" ? "HV" : "G";
     var btn = h("button", { class: "pt-avatar", type: "button", id: "pt-avatar", "aria-haspopup": "menu", "aria-expanded": "false", "aria-controls": "pt-menu", "aria-label": "Account menu" });
     btn.appendChild(h("span", { id: "pt-chip-name", class: "pt-avatar__ini" }, initials));
+    function setPhoto(v) {
+      var old = btn.querySelector("img");
+      if (old) old.remove();
+      btn.classList.toggle("has-photo", !!v);
+      if (v) btn.appendChild(h("img", { class: "pt-avatar__img", alt: "", src: API + "/api/me/image?k=photo&v=" + encodeURIComponent(v) }));
+    }
+    HV.setPhoto = setPhoto;
+    if (u && u.photo) setPhoto(u.photo);
     var menu = h("div", { class: "pt-menu", id: "pt-menu", role: "menu", "aria-labelledby": "pt-avatar", hidden: true });
     var head = h("div", { class: "pt-menu__head" }, h("b", { class: "pt-menu__name" }, name));
-    var sub = u ? [u.job_title, u.company].filter(Boolean).join(" · ") : ME.kind === "admin" ? "Administrator" : "Signed in with an access code";
+    var sub = u ? [u.job_title, u.company].filter(Boolean).join(" · ") || u.email : ME.kind === "admin" ? "Administrator" : "Signed in with an access code";
     if (sub) head.appendChild(h("span", { class: "pt-menu__sub" }, sub));
     menu.appendChild(head);
     function item(label, act, extra, cls) {
@@ -341,15 +351,34 @@
       el.appendChild(h("span", null, label));
       if (extra) el.appendChild(extra);
       if (act.go) el.addEventListener("click", function () { toggle(false); act.go(); });
+      else el.addEventListener("click", function () { toggle(false); });
       menu.appendChild(el);
       return el;
     }
-    item(u ? "My profile" : "My access", { go: openAccount });
-    item("My campaigns", { href: ROOT + "campaign/dashboard/" });
-    if (ME.credits != null) item("AI credits", { go: openAccount }, h("span", { class: "pt-menu__badge", id: "pt-chip-credits" }, ME.credits + " cr"));
-    menu.appendChild(h("div", { class: "pt-menu__rule", role: "separator" }));
-    if (ME.kind === "admin") item("Open admin", { href: API + "/" });
-    item("Sign out", { go: function () { api("POST", "/api/auth/logout", {}).then(function () { location.reload(); }); } }, null, "pt-menu__item--quiet");
+    function rule() { menu.appendChild(h("div", { class: "pt-menu__rule", role: "separator" })); }
+    var credits = ME.credits != null ? h("span", { class: "pt-menu__badge", id: "pt-chip-credits" }, ME.credits + " cr") : null;
+    var ACC = ROOT + "account/";
+    if (u) {
+      // Account holders: their own space, then help, then out.
+      item("My home", { href: ACC + "#home" });
+      item("My selections", { href: ACC + "#selections" });
+      item("My campaigns", { href: ACC + "#campaigns" });
+      if (credits) item("AI credits", { go: openAccount }, credits);
+      item("Settings", { href: ACC + "#settings" });
+      rule();
+      item("Help · contact my account manager", { go: function () { if (HV.talk) HV.talk(); else location.href = ACC + "#home"; } });
+    } else if (ME.kind === "admin") {
+      item("Preview as client", { go: openAccount });
+      item("My campaigns", { href: ROOT + "campaign/dashboard/" });
+      rule();
+      item("Open admin", { href: API + "/" });
+    } else {
+      // Access-code guests: no profile for now, just their campaigns and credits.
+      item("My campaigns", { href: ROOT + "campaign/dashboard/" });
+      if (credits) item("AI credits", { go: openAccount }, credits);
+      rule();
+    }
+    item("Sign out", { go: function () { api("POST", "/api/auth/logout", {}).then(function () { location.href = ROOT; }); } }, null, "pt-menu__item--quiet");
 
     function toggle(open) {
       menu.hidden = !open;
@@ -928,7 +957,7 @@
   // talk to a person). Typing goes to the AI assistant (credits, as in "Ask").
   // Every write is a button the client presses; the AI itself only answers.
 
-  var VOICE_PAGES = { catalogue: 1, selection: 1, creator: 1 };
+  var VOICE_PAGES = { catalogue: 1, selection: 1, creator: 1, account: 1 };
   var V_IMG = ROOT + "assets/brand/voice/";
   var V_ICON = {
     send: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>',
@@ -1445,6 +1474,8 @@
     }
     launch.addEventListener("click", function () { toggle(); });
     closeBtn.addEventListener("click", function () { toggle(false); });
+    // The account page's "Message your account manager" opens straight onto the hand-off.
+    HV.talk = function () { toggle(true); setTimeout(flowHuman, 400); };
     freshBtn.addEventListener("click", function () {
       msgs = []; save(); thread = null; expecting = null; log.innerHTML = ""; queue = Promise.resolve(); greet();
     });
