@@ -1824,12 +1824,12 @@
         return '<div class="cst-bar"><span>' + esc(p.label) + '</span><i><b class="' + bandOf(p.s * 100) + '" style="width:' + Math.round(p.s * 100) + '%"></b></i></div>';
       }).join("");
       tip.innerHTML = '<div class="cst-head"><b class="' + bandOf(sc.score) + '">' + sc.score + '</b><div><strong>' + esc(sc.tag) +
-        '</strong><small>Match for ' + esc((sc.objective || "").toLowerCase()) + (sc.platform ? " · on " + esc(sc.platform) : "") + "</small>" +
+        '</strong><small>' + (sc.basic ? "Screening score · " : "") + 'Match for ' + esc((sc.objective || "").toLowerCase()) + (sc.platform ? " · on " + esc(sc.platform) : "") + "</small>" +
         (sc.others && sc.others.length ? "<small>Also: " + sc.others.map(function (o) { return esc(o.platform) + " " + o.score; }).join(", ") + "</small>" : "") + "</div></div>" +
         (sc.strengths && sc.strengths.length ? '<p class="cst-h">Strengths</p><ul class="cst-g">' + sc.strengths.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
         (sc.watchouts && sc.watchouts.length ? '<p class="cst-h">Watch-outs</p><ul class="cst-w">' + sc.watchouts.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
         '<p class="cst-h">How it adds up</p>' + bars +
-        (sc.basic ? '<p class="cst-basic">Based on public numbers only. Audience and fake-follower checks need the full analysis.</p>' : "");
+        (sc.basic ? '<p class="cst-basic' + (sc.score >= 60 ? " cst-basic--warn" : "") + '"><b>Screening score, not proof.</b> It uses public numbers only, so fake followers and the real audience are not checked. Request the full analysis before booking.</p>' : "");
       tip.hidden = false;
       var r = el.getBoundingClientRect(), tw = Math.min(320, window.innerWidth - 24);
       tip.style.width = tw + "px";

@@ -2110,7 +2110,7 @@ def _live_score(live):
     band = "g" if live["score"] >= 80 else "l" if live["score"] >= 60 else "a" if live["score"] >= 40 else "r"
     li = lambda items, cls: "".join("<li class='" + cls + "'>" + e(x) + "</li>" for x in items)
     return ("<div class='vd-live'><span class='vd-stamp " + band + ("' style='border:3px dashed #fff;box-shadow:0 0 0 1px #999'" if live.get("basic") else "'") + ">" + str(live["score"]) + "</span><div><b>" + e(live["tag"]) + "</b>"
-            "<span class='muted'> · " + ("BASIC (public numbers only), " if live.get("basic") else "") + "live, for " + e(live["objective"].lower()) + (" on " + e(live["platform"]) if live.get("platform") else "") + "</span>"
+            "<span class='muted'> · " + ("BASIC: a screening score from public numbers only. Request the full analysis before booking. " if live.get("basic") else "") + "Live, for " + e(live["objective"].lower()) + (" on " + e(live["platform"]) if live.get("platform") else "") + "</span>"
             "<ul class='vd-why'>" + li(live["strengths"], "g1") + li(live["watchouts"], "g-1") + "</ul></div></div>")
 
 
