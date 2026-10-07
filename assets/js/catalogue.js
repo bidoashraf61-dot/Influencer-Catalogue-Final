@@ -2188,6 +2188,10 @@
     // The stamp on the photo: the score, coloured by band; hover or focus explains it.
     var tip = null;
     function bandOf(n) { return n >= 80 ? "g" : n >= 60 ? "l" : n >= 40 ? "a" : "r"; }
+    // No audience report: the audience part of the score is an assumption.
+    function audienceEstimated(sc) {
+      return !!(sc && (sc.parts || []).some(function (p) { return /assumed|estimated/i.test(p.label) && /audience/i.test(p.label); }));
+    }
     function showTip(el, sc) {
       if (!tip) { tip = document.createElement("div"); tip.className = "cat-score-tip"; tip.setAttribute("role", "tooltip"); document.body.appendChild(tip); }
       var bars = (sc.parts || []).map(function (p) {
@@ -2195,6 +2199,7 @@
       }).join("");
       tip.innerHTML = '<div class="cst-head"><b class="' + bandOf(sc.score) + '">' + sc.score + '</b><div><strong>' + esc(sc.tag) +
         '</strong><small>' + (sc.basic ? "Screening score · " : "") + 'Match for ' + esc((sc.objective || "").toLowerCase()) + (sc.platform ? " · on " + esc(sc.platform) : "") + "</small>" +
+        (audienceEstimated(sc) ? "<small>Audience estimated: no audience report yet, so it counts lightly</small>" : "") +
         (sc.others && sc.others.length ? "<small>Also: " + sc.others.map(function (o) { return esc(o.platform) + " " + o.score; }).join(", ") + "</small>" : "") + "</div></div>" +
         (sc.strengths && sc.strengths.length ? '<p class="cst-h">Strengths</p><ul class="cst-g">' + sc.strengths.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
         (sc.watchouts && sc.watchouts.length ? '<p class="cst-h">Watch-outs</p><ul class="cst-w">' + sc.watchouts.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
@@ -2248,7 +2253,8 @@
           st.title = "Not scored yet — the full analysis is needed.";
         } else {
           st.className = "cat-score cat-score--" + bandOf(item.score) + (item.basic ? " cat-score--basic" : "") + (multi ? " cat-score--multi" : "");
-          st.innerHTML = "<b>" + item.score + "</b><small>" + (multi ? (PLAT_SHORT[item.platform] || item.platform) : (item.basic ? "Basic" : "Match")) + "</small>";
+          st.innerHTML = "<b>" + item.score + "</b><small>" + (multi ? (PLAT_SHORT[item.platform] || item.platform) : (item.basic ? "Basic" : "Match")) + "</small>" +
+            (audienceEstimated(item) ? '<i class="cat-score__est">Audience est.</i>' : "");
           st.setAttribute("aria-label", "Matching score " + item.score + " out of 100 on " + (item.platform || "the platform") + ", " + item.tag + ". Show why.");
           st.removeAttribute("title");
         }

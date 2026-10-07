@@ -1427,3 +1427,10 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 }
 .cat-bar__order { display: flex; flex-wrap: wrap; gap: 10px; margin-left: auto; }
 @media screen and (max-width: 767px) { .cat-bar__order { width: 100%; } .cat-bar__order > * { flex: 1 1 100%; } }
+
+/* The audience behind this score is assumed, not measured: a small tag beside the stamp. */
+.cat-score__est { position: absolute; left: 100%; top: 50%; margin-left: 6px; transform: translateY(-50%) rotate(8deg); white-space: nowrap;
+  font-style: normal; font-size: 8px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  background: var(--white); color: var(--ink); padding: 3px 6px 2px; border-radius: var(--r-pill);
+  box-shadow: 0 1px 4px rgba(0,0,0,.25); }
+.cat-score--multi .cat-score__est { display: none; }   /* two stamps side by side: the tooltip says it */
