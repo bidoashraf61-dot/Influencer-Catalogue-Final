@@ -70,6 +70,8 @@ import plans  # noqa: E402
 import thumbs  # noqa: E402
 import track  # noqa: E402
 import uploads  # noqa: E402
+import apify
+import apis_view
 import views  # noqa: E402
 
 SECRET = auth.load_secret(HERE / ".secret")
@@ -557,6 +559,8 @@ class Handler(BaseHTTPRequestHandler):
                 db.setting("emv_rates") or {}, metrics.factors(),
                 bool(db.setting("capture_token")), db.capture_runs(), track.GEO_DB.exists(),
                 None, query.get("e"), query.get("ok"), metrics.benchmarks(), fx_rates=fx.rates()))
+        if path == "/apis":
+            return self.send(200, apis_view.apis_page(query.get("e"), query.get("ok")))
         if path == "/campaigns/links":
             cid = query.get("id", "")
             k = db.campaign(int(cid)) if cid.isdigit() else None
@@ -667,6 +671,8 @@ class Handler(BaseHTTPRequestHandler):
         return self.admin_post(path)
 
     def admin_post(self, path):
+        if path.startswith("/apis/"):
+            return self.post_apis(path)
         if path == "/codes/new":
             return self.post_code_new()
         if path == "/codes/revoke":
@@ -946,6 +952,53 @@ class Handler(BaseHTTPRequestHandler):
             db.remove_device(int(did))
         return self.redirect("/codes?ok=" + urllib.parse.quote("Device removed.")
                              + ("#code-" + cid if cid.isdigit() else ""))
+
+    def post_apis(self, path):
+        f = self.form_body()
+        jid = int(f["id"]) if (f.get("id") or "").isdigit() else None
+        q = urllib.parse.quote
+        try:
+            if path == "/apis/token":
+                apify.save_token(f.get("token"))
+                info = apify.test_connection()
+                return self.redirect("/apis?ok=" + q("Connected as %s." % (info.get("username") or "your account")))
+            if path == "/apis/token/clear":
+                apify.clear_token()
+                return self.redirect("/apis?ok=" + q("Token removed."))
+            if path == "/apis/test":
+                i = apify.test_connection()
+                bits = [i.get("username") or "connected", i.get("plan") or ""]
+                if i.get("used") is not None and i.get("cap") is not None:
+                    bits.append("$%.2f of $%.2f used this month" % (i["used"], i["cap"]))
+                return self.redirect("/apis?ok=" + q("Connected: " + ", ".join(b for b in bits if b)))
+            if path == "/apis/budget":
+                for key, field in (("apify_budget_usd", "budget"), ("apify_run_cap_usd", "run_cap")):
+                    try:
+                        v = float(f.get(field, ""))
+                    except ValueError:
+                        raise apify.ApifyError("Budget and per-run limit must be numbers.")
+                    if not 0 < v <= 1000:
+                        raise apify.ApifyError("Budget and per-run limit must be between 0 and 1000.")
+                    db.set_setting(key, v)
+                return self.redirect("/apis?ok=" + q("Limits saved."))
+            if path == "/apis/job/save":
+                apify.save_job(f)
+                return self.redirect("/apis?ok=" + q("Job saved."))
+            if path == "/apis/job/delete" and jid:
+                apify.delete_job(jid)
+                return self.redirect("/apis?ok=" + q("Job deleted."))
+            if path == "/apis/job/toggle" and jid:
+                apify.toggle_job(jid)
+                return self.redirect("/apis")
+            if path == "/apis/job/run" and jid:
+                ok, msg = apify.start_job(jid)
+                return self.redirect("/apis?" + ("ok=" if ok else "e=") + q(msg))
+            if path == "/apis/refresh":
+                n = apify.refresh_all()
+                return self.redirect("/apis?ok=" + q("Checked %d running job(s)." % n))
+        except apify.ApifyError as ex:
+            return self.redirect("/apis?e=" + q(str(ex)))
+        return self.redirect("/apis")
 
     def post_code_archive(self):
         cid = self.form_body().get("id")
@@ -3220,6 +3273,7 @@ def main():
 
     db.init()
     history.init()
+    apify.start_scheduler()
     db.purge_expired_sessions()
     ALLOWED_ORIGINS.update(args.origin)
     global BASE

@@ -80,6 +80,7 @@ NAV = [
     ("Insights", [("/calculator", "ROI calculator", "calc", None),
                   ("/analytics", "Analytics", "bars", None)]),
     ("System", [("/history", "History & undo", "clock", None),
+                ("/apis", "APIs", "gear", None),
                 ("/settings", "Settings", "gear", None)]),
 ]
 
