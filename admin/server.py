@@ -2980,14 +2980,49 @@ class Handler(BaseHTTPRequestHandler):
     def selection_scores(self, sel, objective=None, target=None):
         """{code: score} for every creator of a selection, worked out now from
         their analyses: one number against the selection's objective and target.
-        Creators without a full analysis come back with score None. The work is
-        in matcher.score_codes, which the AI shortlist builder shares."""
-        import matcher
+        Creators without a full analysis come back with score None."""
+        import fit as fit_mod
         codes = json.loads(sel["codes"] or "[]")
         objective = objective or self.selection_objective(sel)
         target = target or self.selection_target(sel)
         wanted = sel["platform"] if "platform" in sel.keys() else None
-        return matcher.score_codes(codes, objective, target, wanted)
+        rows = {c["code"]: c for c in db.list_creators() if c["code"] in set(codes)}
+        every = db.analyses_for(codes)
+        records, typical = metrics.track_records()
+        bench = metrics.benchmarks()
+        out = {}
+        for code in codes:
+            c = rows.get(code)
+            if c is None:
+                continue
+            mine = every.get(code) or {}
+            rec = dict(records[code], typical_er=typical) if code in records else None
+
+            def one(pl):
+                doc = mine[pl]["data"]
+                followers = doc.get("followers") or c["followers"]
+                return fit_mod.score(doc, pl, c["followers"], objective=objective, target=target,
+                                     band=metrics.band_of(followers), bench=bench, record=rec,
+                                     creator_interest=c["interest"], creator=c)
+            plat = analysis.canon_platform(wanted) if wanted and analysis.canon_platform(wanted) in mine else None
+            if plat:
+                out[code] = one(plat)
+            elif mine:
+                # "Every platform": judge the creator where they do best, and say where.
+                import profile_pdf as _pp
+                main = analysis.creator_platforms(c)
+                tried = {pl: one(pl) for pl in mine}
+                # Everyone is scored by the same formula, so the platform simply gives the best
+                # score; a verified (full) analysis wins a tie.
+                pool = [pl for pl in tried if tried[pl]["score"] is not None] or list(tried)
+                best = max(pool, key=lambda pl: (tried[pl]["score"] is not None, tried[pl]["score"] or 0,
+                                                 not mine[pl]["data"].get("basic"), _pp.completeness(mine[pl]["data"]), pl == main[0]))
+                out[code] = dict(tried[best])
+                out[code]["others"] = [{"platform": pl, "score": v["score"]} for pl, v in tried.items()
+                                       if pl != best and v["score"] is not None and pl in pool]
+            else:
+                out[code] = fit_mod.score(None, None, c["followers"], objective=objective, target=target)
+        return out
 
     def selection_suggest(self, query):
         """A suggested fit and role for one creator, from their analysis of a
