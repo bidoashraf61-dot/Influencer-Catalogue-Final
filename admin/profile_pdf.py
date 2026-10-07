@@ -42,7 +42,8 @@ ISO = {"Egypt": "EG", "France": "FR", "Germany": "DE", "Indonesia": "ID", "Iran"
        "Jordan": "JO", "Oman": "OM", "Bahrain": "BH", "Morocco": "MA", "Algeria": "DZ", "Tunisia": "TN",
        "Libya": "LY", "Sudan": "SD", "Syria": "SY", "Palestine": "PS", "Brazil": "BR", "India": "IN",
        "Spain": "ES", "Portugal": "PT", "Mexico": "MX", "Argentina": "AR", "Canada": "CA",
-       "Russia": "RU", "Malaysia": "MY", "Singapore": "SG", "Philippines": "PH", "Bangladesh": "BD", "Afghanistan": "AF", "Somalia": "SO", "Ethiopia": "ET", "Kenya": "KE", "South Africa": "ZA", "Netherlands": "NL", "The Netherlands": "NL", "Belgium": "BE", "Sweden": "SE", "Norway": "NO", "Denmark": "DK", "Austria": "AT", "Poland": "PL", "Greece": "GR", "Japan": "JP", "South Korea": "KR", "China": "CN", "Thailand": "TH", "Vietnam": "VN", "Chile": "CL", "Peru": "PE", "Venezuela": "VE", "Ecuador": "EC", "Uruguay": "UY", "Paraguay": "PY", "Bolivia": "BO", "Ukraine": "UA", "Azerbaijan": "AZ", "Kazakhstan": "KZ", "Uzbekistan": "UZ", "Mauritania": "MR", "Senegal": "SN", "Ghana": "GH", "Cyprus": "CY", "Romania": "RO", "Hungary": "HU", "Czechia": "CZ", "Finland": "FI", "Puerto Rico": "PR", "Costa Rica": "CR", "Guatemala": "GT", "Panama": "PA", "Honduras": "HN", "El Salvador": "SV", "Nicaragua": "NI", "Cuba": "CU", "Haiti": "HT", "Jamaica": "JM", "Angola": "AO", "Cameroon": "CM", "Ivory Coast": "CI", "Côte d'Ivoire": "CI", "Sri Lanka": "LK", "Nepal": "NP", "Taiwan": "TW", "Hong Kong": "HK", "Yemen": "YE", "Palestinian Territories": "PS", "Australia": "AU", "Ireland": "IE", "New Zealand": "NZ", "Dominican Republic": "DO", "Switzerland": "CH", "Pakistan": "PK", "Nigeria": "NG", "Colombia": "CO"}
+       "Russia": "RU", "Malaysia": "MY", "Singapore": "SG", "Philippines": "PH", "Bangladesh": "BD", "Afghanistan": "AF", "Somalia": "SO", "Ethiopia": "ET", "Kenya": "KE", "South Africa": "ZA", "Netherlands": "NL", "The Netherlands": "NL", "Belgium": "BE", "Sweden": "SE", "Norway": "NO", "Denmark": "DK", "Austria": "AT", "Poland": "PL", "Greece": "GR", "Japan": "JP", "South Korea": "KR", "China": "CN", "Thailand": "TH", "Vietnam": "VN", "Chile": "CL", "Peru": "PE", "Venezuela": "VE", "Ecuador": "EC", "Uruguay": "UY", "Paraguay": "PY", "Bolivia": "BO", "Ukraine": "UA", "Azerbaijan": "AZ", "Kazakhstan": "KZ", "Uzbekistan": "UZ", "Mauritania": "MR", "Senegal": "SN", "Ghana": "GH", "Cyprus": "CY", "Romania": "RO", "Hungary": "HU", "Czechia": "CZ", "Finland": "FI", "Puerto Rico": "PR", "Costa Rica": "CR", "Guatemala": "GT", "Panama": "PA", "Honduras": "HN", "El Salvador": "SV", "Nicaragua": "NI", "Cuba": "CU", "Haiti": "HT", "Jamaica": "JM", "Angola": "AO", "Cameroon": "CM", "Ivory Coast": "CI", "Côte d'Ivoire": "CI", "Sri Lanka": "LK", "Nepal": "NP", "Taiwan": "TW", "Hong Kong": "HK", "Yemen": "YE", "Palestinian Territories": "PS", "Australia": "AU", "Ireland": "IE", "New Zealand": "NZ", "Dominican Republic": "DO", "Switzerland": "CH", "Pakistan": "PK", "Nigeria": "NG", "Colombia": "CO",
+       "Bulgaria": "BG", "Serbia": "RS", "Croatia": "HR", "Slovakia": "SK", "Slovenia": "SI", "Lithuania": "LT", "Latvia": "LV", "Estonia": "EE", "Iceland": "IS", "Luxembourg": "LU", "Malta": "MT", "Albania": "AL", "Georgia": "GE", "Armenia": "AM", "Belarus": "BY", "Moldova": "MD", "North Macedonia": "MK", "Bosnia and Herzegovina": "BA", "Kosovo": "XK", "Montenegro": "ME", "Mongolia": "MN", "Myanmar": "MM", "Cambodia": "KH", "Laos": "LA", "Brunei": "BN", "Maldives": "MV", "Bhutan": "BT", "Kyrgyzstan": "KG", "Tajikistan": "TJ", "Turkmenistan": "TM", "Zimbabwe": "ZW", "Zambia": "ZM", "Uganda": "UG", "Tanzania": "TZ", "Rwanda": "RW", "Mozambique": "MZ", "Madagascar": "MG", "Mali": "ML", "Niger": "NE", "Chad": "TD", "Burkina Faso": "BF", "Guinea": "GN", "Benin": "BJ", "Togo": "TG", "Liberia": "LR", "Sierra Leone": "SL", "Gabon": "GA", "Congo": "CG", "Democratic Republic of the Congo": "CD", "Namibia": "NA", "Botswana": "BW", "Malawi": "MW", "Djibouti": "DJ", "Eritrea": "ER", "Comoros": "KM", "Mauritius": "MU", "Trinidad and Tobago": "TT", "Bahamas": "BS", "Barbados": "BB", "Belize": "BZ", "Guyana": "GY", "Suriname": "SR", "Czech Republic": "CZ", "Türkiye": "TR", "Macao": "MO", "Somaliland": "SO", "Gambia": "GM", "Lesotho": "LS", "Eswatini": "SZ", "Burundi": "BI", "South Sudan": "SS", "Central African Republic": "CF", "Cape Verde": "CV", "Seychelles": "SC", "Fiji": "FJ", "Papua New Guinea": "PG", "Jersey": "JE", "Gibraltar": "GI"}
 REACH = {"<500 accounts": "<500", "500-1k accounts": "500-1000",
          "1k-1.5k accounts": "1000-1500", ">1.5k accounts": ">1500"}
 
@@ -362,6 +363,15 @@ def detect_platform(data):
     return "TikTok" if tik and not ins else "Instagram" if ins and not tik else None
 
 
+def completeness(doc):
+    """How much a document holds: every non-empty value, nested, counted once."""
+    if isinstance(doc, dict):
+        return sum(completeness(v) for v in doc.values())
+    if isinstance(doc, list):
+        return sum(completeness(v) for v in doc)
+    return 0 if doc in (None, "", False) else 1
+
+
 def import_pdf(data, code, handle=None, source=None, platform=None):
     """Read one profile report PDF and store it as creator `code`'s analysis
     for one platform (given, else read off the report, else their main one),
@@ -411,5 +421,11 @@ def import_pdf(data, code, handle=None, source=None, platform=None):
         s = "brand-" + "".join(c for c in __import__("unicodedata").normalize("NFKD", b["name"].lower()).encode("ascii", "ignore").decode() if c.isalnum()) + ".png"
         if not b.get("logo") and (brands / s).is_file():
             b["logo"] = "media:" + s
+    # The same report uploaded twice in one go: keep the fuller copy, not just the later one.
+    cur = db.analysis(code, platform)
+    if cur and cur["source"] == a["source"] and db.now() - (cur["updated_at"] or 0) < 900 \
+            and completeness(cur["data"]) > completeness(a):
+        a["_kept_existing"] = True
+        return a
     db.save_analysis(code, a, a["source"], platform=platform)
     return a

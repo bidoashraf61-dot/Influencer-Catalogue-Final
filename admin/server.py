@@ -3053,7 +3053,7 @@ class Handler(BaseHTTPRequestHandler):
         res = self.analysis_resolver()
         picked = res.resolve((f.get("code") or "").strip())[0] if len(parts) == 1 else None
         want_plat = analysis.canon_platform(f.get("platform"))
-        done, bad, held = [], [], []
+        done, bad, held, kept = [], [], [], []
         for p in parts:
             name = p.get("filename") or "file.pdf"
             m = re.match(r"report-(.+?)-[A-Za-z]{3}-\d\d-\d{4}(?: ?\(\d+\))?\.pdf$", name)
@@ -3068,11 +3068,14 @@ class Handler(BaseHTTPRequestHandler):
                 held.append((name, p["data"]))
                 continue
             try:
-                profile_pdf.import_pdf(p["data"], code, handle, source="profile report PDF", platform=want_plat)
-                done.append(code)
+                got = profile_pdf.import_pdf(p["data"], code, handle, source="profile report PDF", platform=want_plat)
+                (kept if got.get("_kept_existing") else done).append(code if not got.get("_kept_existing") else name)
             except Exception as ex:
                 bad.append(name + " (" + str(ex)[:120] + ")")
         msg = "Imported %d %s: %s." % (len(done), "analysis" if len(done) == 1 else "analyses", ", ".join(done)) if done else ""
+        if kept:
+            msg += (" " if msg else "") + "%d repeat file%s skipped — a fuller copy of the same report was already saved (%s)." % (
+                len(kept), "" if len(kept) == 1 else "s", ", ".join(kept[:4]) + (" …" if len(kept) > 4 else ""))
         if bad:
             msg += (" " if msg else "") + "Could not import: " + "; ".join(bad)
         if held:

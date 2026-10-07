@@ -411,8 +411,10 @@
   }
   function renderPosts(a) {
     var top = a.top_posts || [], sp = a.sponsored_posts || [];
-    $("pp-posts-sec").hidden = !(top.length || sp.length);
-    $("pp-posts").innerHTML = (top.length ? postGrid(top, false) : "") + (sp.length ? '<h3 class="pp-h3">Sponsored posts</h3>' + postGrid(sp, true) : "");
+    $("pp-posts-sec").hidden = false;
+    $("pp-posts").innerHTML = (top.length || sp.length)
+      ? (top.length ? postGrid(top, false) : "") + (sp.length ? '<h3 class="pp-h3">Sponsored posts</h3>' + postGrid(sp, true) : "")
+      : '<p class="pp-missing">Not in this report.</p>';
     $("pp-posts").onclick = function (e) {
       var el = e.target.closest("[data-post]"); if (!el) return;
       var list = el.getAttribute("data-sp") ? sp : top, p = list[+el.getAttribute("data-post")], sc = p && shortcode(p.url);
@@ -437,6 +439,7 @@
     if (a.followers != null) tiles.push(["Followers", num(a.followers)]);
     if (a.fake_followers_pct != null) tiles.push(["Fake followers", pct2(a.fake_followers_pct), fakeTag(a.fake_followers_pct, "fake_followers")]);
     if (a.fake_likers_pct != null) tiles.push(["Fake likers", pct2(a.fake_likers_pct), fakeTag(a.fake_likers_pct, "fake_likers")]);
+    if (a.fake_followers_pct == null && a.fake_likers_pct == null) out += '<p class="pp-missing">Fake-follower data is not in this report.</p>';
     if (tiles.length) out += '<div class="pp-tiles pp-tiles--big">' + tiles.map(function (t) { return '<div class="pp-tile"><span>' + t[0] + "</span><b>" + t[1] + "</b>" + (t[2] || "") + "</div>"; }).join("") + "</div>";
     var au = a.audience || {}, cards = [];
     if (au.reachability && au.reachability.length) {

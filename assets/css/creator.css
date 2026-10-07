@@ -360,3 +360,5 @@ body.pp-modal-on { overflow: hidden; }
 .pp-pending__tag b { font-size: 18px; font-weight: 600; }
 .pp-pending__tag small { color: var(--gray); font-size: 13px; }
 .pp-basicnote { color: var(--gray); font-size: 13px; margin: 12px 0 0; }
+
+.pp-missing { margin: 0 0 14px; padding: 12px 16px; border-radius: 12px; background: #f2f0eb; color: #5b5b5b; font-size: 14px; }
