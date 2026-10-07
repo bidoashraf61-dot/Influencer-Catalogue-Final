@@ -120,8 +120,8 @@ class PortalMixin:
         cookie = f"{srv.VIEWER_COOKIE}={ticket}; Path=/; HttpOnly; {policy}; Max-Age={srv.VIEWER_TTL}"
         dev = f"{srv.DEVICE_COOKIE}={token}; Path=/; HttpOnly; {policy}; Max-Age={srv.DEVICE_TTL}"
         user = portal.user_for_code(row["id"])
-        payload = {"ok": True, "step": "done", "roster": self.roster_payload(), "tiers": self.tier_payload(),
-                   "fx": fx.rates(), "me": self._me_payload(row["id"], user, "user" if user else "guest")}
+        # No roster here: the page reloads after sign-in and fetches it once, the normal way.
+        payload = {"ok": True, "step": "done", "me": self._me_payload(row["id"], user, "user" if user else "guest")}
         payload.update(extra or {})
         return self.send_json(200, payload, self.cors() + [("Set-Cookie", cookie), ("Set-Cookie", dev)])
 

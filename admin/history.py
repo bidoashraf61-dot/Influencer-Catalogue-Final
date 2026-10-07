@@ -253,6 +253,7 @@ def undo(hid):
     gone = set(_photos(now_snap)) - set(_photos(before))
     for n in gone:
         trash_photo(n)
+    db.forget_tiers()                      # an undo may have rewritten the tiers table
     return True, "Undone: " + (row["label"] or row["action"]) + "."
 
 

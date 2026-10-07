@@ -1204,9 +1204,27 @@ def seed_tiers(conn=None):
         "reach_from,reach_to) VALUES (?,?,?,?,?,?,?,?)", SEED_TIERS)
 
 
+# Pricing one roster asks for the tier list about 3 times per creator (7,000+ times for 2,100
+# creators, each on its own connection): 9 s per page load. The list changes only when an admin
+# edits tiers, so it is held for 2 s and dropped by every write below.
+_tiers_cache = (0.0, None)
+
+
 def list_tiers():
+    global _tiers_cache
+    import time as _t
+    at, rows = _tiers_cache
+    if rows is not None and _t.monotonic() - at < 2.0:
+        return rows
     with connect() as conn:
-        return conn.execute("SELECT * FROM tiers ORDER BY sort, price_from").fetchall()
+        rows = conn.execute("SELECT * FROM tiers ORDER BY sort, price_from").fetchall()
+    _tiers_cache = (_t.monotonic(), rows)
+    return rows
+
+
+def forget_tiers():
+    global _tiers_cache
+    _tiers_cache = (0.0, None)
 
 
 # The platforms the dashboard offers. A creator can be stored on something
@@ -1446,6 +1464,7 @@ def tier_names():
 def save_tier(name, code, price_from, price_to, reach=None, sort=0,
               reach_from=None, reach_to=None, auto=1):
     with connect() as conn:
+        forget_tiers()
         conn.execute(
             "INSERT INTO tiers (name,code,price_from,price_to,reach,sort,"
             "reach_from,reach_to,auto) VALUES (?,?,?,?,?,?,?,?,?) "
@@ -1495,6 +1514,7 @@ def rename_tier(old, new):
     leave rows pointing at a tier that no longer exists, and those creators
     would price at nothing."""
     with connect() as conn:
+        forget_tiers()
         conn.execute("UPDATE tiers SET name = ? WHERE name = ?", (new, old))
         conn.execute("UPDATE creators SET tier = ? WHERE tier = ?", (new, old))
 
@@ -1507,6 +1527,7 @@ def delete_tier(name):
             "SELECT COUNT(*) c FROM creators WHERE tier = ?", (name,)).fetchone()["c"]
         if used:
             return used
+        forget_tiers()
         conn.execute("DELETE FROM tiers WHERE name = ?", (name,))
         return 0
 

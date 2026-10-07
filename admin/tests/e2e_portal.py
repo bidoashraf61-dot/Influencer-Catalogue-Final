@@ -164,7 +164,8 @@ class Portal(unittest.TestCase):
         c, b = self.signup("ali@pfizer.com")
         self.assertEqual(b["me"]["credits"], 50)
         self.assertEqual(b["me"]["kind"], "user")
-        self.assertEqual(len(b["roster"]), 5)
+        self.assertNotIn("roster", b)                                    # the page reloads and fetches it
+        self.assertEqual(len(c.get("/api/roster")[1]["roster"]), 5)
         s, me, _ = c.get("/api/me")
         self.assertEqual((me["signed_in"], me["user"]["company"]), (True, "Pfizer KSA"))
         # signing in again from a fresh browser: straight in, no profile step, same account
