@@ -906,7 +906,7 @@
 
     /* -- launcher -- */
     var root = h("div", { id: "hv-voice", class: "hv-voice" });
-    var launch = h("button", { class: "hv-launch", type: "button", "aria-label": "Chat with the HelloVoice assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
+    var launch = h("button", { class: "hv-launch", type: "button", "aria-label": "Chat with HELV Assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
     launch.innerHTML = '<span class="hv-launch__disc" aria-hidden="true"></span>' +
       '<img class="hv-launch__face" src="' + V_IMG + 'voice-head-160.webp" srcset="' + V_IMG + 'voice-head-320.webp 2x" alt="" width="84" height="84" decoding="async"/>' +
       (reduce ? "" : '<video class="hv-launch__vid" muted loop playsinline autoplay preload="auto" aria-hidden="true" poster="' + V_IMG + 'voice-loop-poster.webp">' +
@@ -936,7 +936,7 @@
     var panel = h("section", { id: "hv-panel", class: "hv-panel", role: "dialog", "aria-modal": "false", "aria-labelledby": "hv-name", hidden: "" });
     var head = h("header", { class: "hv-head" });
     head.innerHTML = '<img class="hv-head__fig" src="' + V_IMG + 'voice-figure-360.webp" srcset="' + V_IMG + 'voice-figure-720.webp 2x" alt="" width="120" height="192" decoding="async"/>' +
-      '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">HelloVoice Assistant</h2>' +
+      '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">HELV Assistant</h2>' +
       '<p class="hv-head__role"><span class="hv-head__on"><i aria-hidden="true"></i>Online</span><span class="hv-tag">Replies instantly</span></p></div>';
     var freshBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Start a new chat", title: "New chat" });
     freshBtn.innerHTML = V_ICON.fresh;
@@ -944,7 +944,7 @@
     closeBtn.innerHTML = V_ICON.close;
     head.appendChild(h("div", { class: "hv-head__tools" }, freshBtn, closeBtn));
     var log = h("div", { class: "hv-log", role: "log", "aria-live": "polite", "aria-relevant": "additions" });
-    var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message the HelloVoice assistant" });
+    var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message HELV Assistant" });
     var send = h("button", { class: "hv-send", type: "button", "aria-label": "Send" });
     send.innerHTML = V_ICON.send;
     var compose = h("div", { class: "hv-compose" }, ta, send);
@@ -1041,7 +1041,7 @@
     function greet() {
       var hour = new Date().getHours();
       var part = hour >= 5 && hour < 12 ? "Good morning" : hour >= 12 && hour < 17 ? "Good afternoon" : hour >= 17 && hour < 23 ? "Good evening" : "Hi";
-      say(part + (first ? ", " + first : "") + " 👋 I'm the HelloVoice assistant.");
+      say(part + (first ? ", " + first : "") + " 👋 I'm HELV Assistant, from HelloVoice.");
       menu("I can find creators for your campaign, filter this page, update your selection or get you a quote. What can I help you with today?");
     }
 
