@@ -356,6 +356,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return
         if path == "/api/roster":
             return self.api_roster()
+        if path == "/api/licences":
+            # Advertising licences for the cards: bio claims and verified ones only.
+            if not self.viewer_code_id():
+                return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+            import licence
+            return self.send_json(200, {"ok": True, "licences": licence.for_roster()}, self.cors())
         if path == "/api/discover/facets":
             return self.api_discover("facets")
         if path == "/api/selection":
@@ -563,6 +569,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send(200, importer.template_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition",
                                'attachment; filename="creator-import-template.csv"')])
+        if path == "/licences":
+            import licence
+            return self.send(200, licence.page_html(query))
         if path == "/requests":
             return self.send(200, views.requests_page(db.list_requests(),
                                                       db.list_creators(), db.tier_prices()))
@@ -969,6 +978,16 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_tier_delete()
         if path == "/requests/handled":
             return self.post_request_handled()
+        if path in ("/licences/save", "/licences/scan"):
+            import licence
+            if path.endswith("scan"):
+                res = licence.scan(db.setting("licence_confirmed_codes", None))
+                return self.redirect("/licences?ok=" + urllib.parse.quote("%d claims from %d creators." % (res["claims"], res["creators"])))
+            f = self.form_body()
+            who = self.admin()
+            licence.update((f.get("code") or "").strip(), f.get("country"), f.get("status"), f.get("number"),
+                           f.get("expires_on"), f.get("note"), (who["email"] if who and "email" in who.keys() else "admin"))
+            return self.redirect("/licences?status=claimed")
         if path == "/password":
             return self.post_password()
         return self.send(404, views.simple("Not found", "That action does not exist."))
@@ -4303,6 +4322,8 @@ def main():
     db.init()
     history.init()
     portal.init()
+    import licence
+    licence.init()
     account.init()
     team.init()
     apify.start_scheduler()

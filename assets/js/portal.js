@@ -1818,12 +1818,55 @@
     }
   }
 
+  /* ------------------------------------------------------- licence stamps */
+  // Advertising licences on the creator cards: Saudi Mawthooq, the UAE
+  // Advertiser Permit, Egypt's SCMR licence. "In bio" is the creator's own
+  // statement; "Verified" means HelloVoice checked it on the regulator's portal.
+  var LIC = null, licObserver = null;
+  var LIC_SHORT = { SA: "Mawthooq", AE: "UAE permit", EG: "Egypt licence" };
+  function paintLicences() {
+    if (!LIC) return;
+    Array.prototype.forEach.call(document.querySelectorAll(".cat-card[data-code]"), function (card) {
+      var list = LIC[card.getAttribute("data-code")];
+      var box = card.querySelector(".lic-stamps");
+      if (!list || !list.length) { if (box) box.remove(); return; }
+      var sig = JSON.stringify(list);
+      if (box && box.getAttribute("data-sig") === sig) return;
+      if (!box) { box = h("div", { class: "lic-stamps", "data-noselect": "" }); (card.querySelector(".cat-card__media") || card).appendChild(box); }
+      box.setAttribute("data-sig", sig);
+      box.innerHTML = "";
+      list.forEach(function (l) {
+        var ok = l.status === "verified";
+        var st = h("span", { class: "lic-stamp" + (ok ? " lic-stamp--ok" : ""), tabindex: "0",
+          title: (l.name + (l.number ? " no. " + l.number : "")) + (ok ? " · verified by HelloVoice" + (l.checked ? " on " + l.checked : "") : " · stated in the creator's bio, not yet verified by HelloVoice"),
+          "aria-label": LIC_SHORT[l.country] + (ok ? " licence, verified" : " licence, stated in bio") });
+        st.appendChild(h("b", null, LIC_SHORT[l.country] || l.name));
+        st.appendChild(h("small", null, ok ? "Verified ✓" : "In bio"));
+        box.appendChild(st);
+      });
+    });
+  }
+  function mountLicences() {
+    var page = document.body.getAttribute("data-page");
+    if (page !== "catalogue" && page !== "selection") return;
+    api("GET", "/api/licences").then(function (r) {
+      if (!r.b || !r.b.ok) return;
+      LIC = r.b.licences || {};
+      paintLicences();
+      if (!licObserver && "MutationObserver" in window) {
+        var t = null, app = document.getElementById("cat-grid") || document.body;
+        licObserver = new MutationObserver(function () { clearTimeout(t); t = setTimeout(paintLicences, 150); });
+        licObserver.observe(app, { childList: true, subtree: true });
+      }
+    });
+  }
+
   /* ------------------------------------------------------------------ boot */
 
   function boot() {
     api("GET", "/api/me").then(function (r) {
       if (r.b && r.b.signed_in) {
-        ME = r.b; mountDock(); mountVoice(); mountAiCard();
+        ME = r.b; mountDock(); mountVoice(); mountAiCard(); mountLicences();
         var m = /[#&]s=([^&]+)/.exec(location.hash || "");
         if (document.body.getAttribute("data-page") === "selection" && m) setTimeout(function () { offerBrief(decodeURIComponent(m[1])); }, 1200);
         // Arriving from the AI shortlist's "Request a quote": open the quote form straight away.

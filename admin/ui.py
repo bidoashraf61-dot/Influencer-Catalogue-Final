@@ -82,7 +82,7 @@ NAV = [
     ("System", [("/settings", "Settings", "gear", None)]),
 ]
 CHILDREN = {
-    "/roster": [("/analysis", "Creator analysis", "an")],
+    "/roster": [("/analysis", "Creator analysis", "an"), ("/licences", "Licences", None)],
     "/clients": [("/portal", "Client portal", None), ("/codes", "Access codes", None)],
     "/analytics": [("/calculator", "ROI calculator", None)],
     "/settings": [("/apis", "APIs & keys", None), ("/history", "History & undo", None), ("/team", "Team & security", None)],

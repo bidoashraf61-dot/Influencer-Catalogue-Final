@@ -742,3 +742,20 @@ body.pt-lock { overflow: hidden; }
   .ai-sl *, .ai-sl *::before, .ai-sl *::after, .ai-result { animation: none !important; transition: none !important; }
 }
 @media print { .ai-sl, .ai-result, .ai-badges { display: none !important; } }
+
+/* ------------------------------------------------------- licence stamps
+   A pressed stamp under the tier chip: white with an ink double rule when the
+   creator states the licence in their bio, lime when HelloVoice verified it. */
+.lic-stamps { position: absolute; left: 12px; top: 52px; z-index: 4; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.lic-stamp {
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 6px 11px 5px;
+  background: #fff; color: #121212; border: 2px solid #121212; border-radius: 8px;
+  box-shadow: inset 0 0 0 2px #fff, inset 0 0 0 3px #121212; transform: rotate(-3deg); cursor: help;
+}
+.lic-stamp:nth-child(2) { transform: rotate(2deg); }
+.lic-stamp b { font: 400 18px/1 Bebasneue, Arial, sans-serif; letter-spacing: .06em; text-transform: uppercase; }
+.lic-stamp small { font: 700 10px/1.1 "DM Sans", Arial, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: #383838; }
+.lic-stamp--ok { background: #e8ff76; box-shadow: inset 0 0 0 2px #e8ff76, inset 0 0 0 3px #121212; }
+.lic-stamp--ok small { color: #121212; }
+.lic-stamp:focus-visible { outline: 3px solid #ee1515; outline-offset: 2px; }
+@media print { .lic-stamps { display: none; } }
