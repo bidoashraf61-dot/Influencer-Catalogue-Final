@@ -39,7 +39,7 @@ def home():
             "SELECT campaign_id, COUNT(*) FROM content WHERE hidden = 0 AND section = 'campaign' GROUP BY campaign_id")}
         insights_wait = _count(conn, "SELECT COUNT(*) FROM insights WHERE status IN ('pending','extracted')")
         creators = _count(conn, "SELECT COUNT(*) FROM creators WHERE active = 1")
-        analysed = _count(conn, "SELECT COUNT(*) FROM creator_analysis")
+        analysed = _count(conn, "SELECT COUNT(DISTINCT code) FROM creator_analysis")
         days = 14
         start = now - (days - 1) * 86400
         per_day = {r[0]: r[1] for r in conn.execute(

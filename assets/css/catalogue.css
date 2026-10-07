@@ -1185,3 +1185,25 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-tagbar button b { font-weight: 700; opacity: .6; margin-left: 4px; }
 .cat-tagbar button[aria-pressed="true"] { background: var(--ink); color: var(--lime); }
 .cat-tagbar button:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
+
+
+/* Fit and role: the admin's call on each creator of a selection. */
+.cat-verdict { margin: 0 0 12px; }
+.cat-verdict__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-fit {
+  display: inline-block; padding: 4px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  letter-spacing: .03em; line-height: 1.4; background: var(--ink); color: var(--lime);
+}
+.cat-fit--good { background: var(--go); color: var(--white); }
+.cat-fit--maybe { background: #f5d77a; color: var(--ink); }
+.cat-fit--no { background: var(--vivid-red); color: var(--white); }
+.cat-role {
+  display: inline-block; padding: 3px 11px; border-radius: 999px; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--ink); color: var(--ink); line-height: 1.4;
+}
+.cat-verdict__why { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--gray); }
+.cat-tagbar { flex-direction: column; align-items: flex-start; gap: 10px; }
+.cat-tagbar__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cat-tagbar__label { min-width: 52px; }
+.cat-tagbar button.fit-no[aria-pressed="false"] { border-color: var(--vivid-red); color: var(--vivid-red); }
+.cat-tagbar button.fit-good[aria-pressed="false"] { border-color: var(--go); color: var(--go); }

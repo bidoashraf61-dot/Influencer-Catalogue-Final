@@ -341,14 +341,29 @@ def sniff_creator(data, resolver):
     return next(iter(found)) if len(found) == 1 else None
 
 
-def import_pdf(data, code, handle=None, source=None):
-    """Read one profile report PDF and store it as creator `code`'s analysis,
-    pictures included. Returns the stored document."""
+def detect_platform(data):
+    """Which platform a report PDF is about, from its first page, or None."""
+    import fitz
+    try:
+        text = fitz.open(stream=data, filetype="pdf")[0].get_text().lower()
+    except Exception:
+        return None
+    tik, ins = "tiktok" in text, "instagram" in text
+    return "TikTok" if tik and not ins else "Instagram" if ins and not tik else None
+
+
+def import_pdf(data, code, handle=None, source=None, platform=None):
+    """Read one profile report PDF and store it as creator `code`'s analysis
+    for one platform (given, else read off the report, else their main one),
+    pictures included. A TikTok report in the same layout is read the same
+    way; what the report does not carry is simply absent. Returns the stored
+    document."""
     import analysis, db
     if not available():
         raise RuntimeError("The PDF reader (PyMuPDF) is not installed on this server yet.")
     if db.creator(code) is None:
         raise ValueError("Unknown creator " + code)
+    platform = analysis.canon_platform(platform) or detect_platform(data) or db.platforms_of(code)[0]
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as t:
         t.write(data)
         path = t.name
@@ -358,12 +373,16 @@ def import_pdf(data, code, handle=None, source=None):
     finally:
         os.unlink(path)
     fix_er(a)
+    a["platform"] = platform
     a["updated"] = time.strftime("%Y-%m-%d", time.gmtime())
     a["source"] = source or "profile report PDF"
     d = analysis.MEDIA / code
     d.mkdir(parents=True, exist_ok=True)
+    # Instagram keeps the file names it always had; another platform's pictures
+    # get their own, so a TikTok import cannot overwrite the Instagram ones.
+    pre = "" if platform == "Instagram" else platform.lower() + "-"
     for k, im in media.items():
-        fn = "%s.%s" % (k, im["ext"])
+        fn = "%s%s.%s" % (pre, k, im["ext"])
         (d / fn).write_bytes(im["image"])
         if k == "photo":
             a["photo"] = "media:" + fn
@@ -375,5 +394,5 @@ def import_pdf(data, code, handle=None, source=None):
         s = "brand-" + "".join(c for c in __import__("unicodedata").normalize("NFKD", b["name"].lower()).encode("ascii", "ignore").decode() if c.isalnum()) + ".png"
         if not b.get("logo") and (brands / s).is_file():
             b["logo"] = "media:" + s
-    db.save_analysis(code, a, a["source"])
+    db.save_analysis(code, a, a["source"], platform=platform)
     return a

@@ -536,11 +536,13 @@ class Handler(BaseHTTPRequestHandler):
                                                      total=len(shown), ok=query.get("ok")))
         if path == "/analysis":
             return self.send(200, views.analysis_page(
-                db.list_creators(), db.analysis_codes(), db.analysis_requests(), self.site_origin(),
-                query.get("q", ""), query.get("e"), query.get("ok"),
+                db.list_creators(), db.analysis_platforms(), db.analysis_requests(), self.site_origin(),
+                query.get("q", ""), query.get("e"), query.get("ok"), platform=query.get("p", ""),
                 sources=([("selection:%d" % r["id"], "Selection · " + r["name"]) for r in db.list_selections()]
                          + [("campaign:%d" % r["id"], "Campaign · " + r["name"]) for r in db.list_campaigns()]),
                 page_no=int(query["page"]) if (query.get("page") or "").isdigit() and int(query["page"]) > 0 else 1))
+        if path == "/selections/suggest":
+            return self.selection_suggest(query)
         if path == "/analysis/review":
             return self.analysis_review_get(query)
         if path == "/analysis/find":
@@ -553,7 +555,7 @@ class Handler(BaseHTTPRequestHandler):
                                % (code or "template"))])
         if path == "/analysis/json":
             code = (query.get("c") or "").upper()
-            a = db.analysis(code)
+            a = db.analysis(code, analysis.canon_platform(query.get("p")))
             return self.send(200, json.dumps(a["data"] if a else {}, indent=2, ensure_ascii=False),
                              "application/json; charset=utf-8")
         if path == "/planner":
@@ -1559,10 +1561,12 @@ class Handler(BaseHTTPRequestHandler):
                     for table in ("content", "insights", "links"):
                         conn.execute("UPDATE %s SET code = ? WHERE campaign_id = ? AND code = ?" % table, (keep, cid, drop))
         # analysis and its pictures
-        d_an, k_an = db.analysis(drop), db.analysis(keep)
-        if d_an and not k_an:
+        d_all, k_all = db.analyses(drop), db.analyses(keep)
+        moved = {pl: a for pl, a in d_all.items() if pl not in k_all}
+        if moved:
             import analysis as analysis_mod, shutil
-            db.save_analysis(keep, d_an["data"], d_an["source"])
+            for pl, a in moved.items():
+                db.save_analysis(keep, a["data"], a["source"], platform=pl)
             src, dst = analysis_mod.MEDIA / drop, analysis_mod.MEDIA / keep
             if src.is_dir():
                 dst.mkdir(parents=True, exist_ok=True)
@@ -1723,7 +1727,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/selections/edit?id=%d" % sid)
 
     def post_selection_save(self):
-        f = self.form_body(multi=("code", "p_from", "p_to", "cost", "tags", "drop", "default"))
+        f = self.form_body(multi=("code", "p_from", "p_to", "cost", "tags", "fit", "roles", "reason", "drop", "default"))
         sid = (f.get("id") or "").strip()
         sel = db.selection(int(sid)) if sid.isdigit() else None
         if sel is None:
@@ -1767,6 +1771,18 @@ class Handler(BaseHTTPRequestHandler):
                     seen_t.add(t.lower()); mine.append(t)
             if mine:
                 tags[code_.strip().upper()] = mine
+        import fit as fit_mod
+        n_rows = len(f.get("code") or [])
+        lists = {}
+        for k in ("fit", "roles", "reason"):
+            v = f.get(k) or []
+            v = [v] if isinstance(v, str) else list(v)
+            lists[k] = v + [""] * (n_rows - len(v))
+        verdicts = {}
+        for i, code_ in enumerate(f.get("code") or []):
+            v = fit_mod.clean(lists["fit"][i].strip(), [x.strip() for x in lists["roles"][i].split(",")], lists["reason"][i])
+            if v:
+                verdicts[code_.strip().upper()] = v
         for code, lo, hi, cost in rows:
             code = code.strip().upper()
             if not code or code in codes or code in remove or code not in known:
@@ -1820,7 +1836,8 @@ class Handler(BaseHTTPRequestHandler):
         db.set_selection_currency(sel["id"], cur)
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs, margin_max=margin_max,
-                          tags={k: v for k, v in tags.items() if k in codes})
+                          tags={k: v for k, v in tags.items() if k in codes},
+                          verdicts={k: v for k, v in verdicts.items() if k in codes})
         # A price typed here belongs to THIS selection. Only the ones ticked
         # "make default" also become the creator's price on the roster, so a
         # one-off deal does not silently change what every later selection
@@ -2874,13 +2891,35 @@ class Handler(BaseHTTPRequestHandler):
     def analysis_resolver(self):
         return analysis.Resolver(db.list_creators(), db.creator_aliases())
 
+    def selection_suggest(self, query):
+        """A suggested fit and role for one creator, from their analysis of a
+        platform (the selection's, else the creator's own). The admin reads it,
+        edits it and saves it; nothing is stored here."""
+        import fit as fit_mod
+        code = (query.get("code") or "").strip().upper()
+        c = db.creator(code)
+        if c is None:
+            return self.send_json(404, {"note": "Unknown creator."})
+        plat = analysis.canon_platform(query.get("p"))
+        if plat:
+            a = db.analysis(code, plat)
+        else:
+            a = db.analysis(code)
+            plat = (a or {}).get("platform") or db.platforms_of(code)[0]
+        out = fit_mod.suggest(a["data"] if a else None, plat, c["followers"])
+        out["platform"] = plat
+        return self.send_json(200, out)
+
     def analysis_find(self, query, form=None):
         """The creator picker's data. GET: search the roster (q, platform,
         only those still without an analysis, or the creators of a selection
         or campaign). POST `list`: turn pasted handles, links or names into
         creators. Answers JSON: the first rows to show, and every match to add
         in one click."""
-        have = db.analysis_codes()
+        have = db.analysis_platforms()
+        ap = analysis.canon_platform((query or {}).get("ap"))
+        lacks = lambda c: (ap or analysis.creator_platforms(c)[0]) not in have.get(c["code"], {}) and \
+            (not ap or ap in analysis.creator_platforms(c))
         if form is not None:
             res = self.analysis_resolver()
             found, missing = [], []
@@ -2904,11 +2943,12 @@ class Handler(BaseHTTPRequestHandler):
             if query.get("platform"):
                 rows = [c for c in rows if (c["platform"] or "").lower() == query["platform"].lower()]
             if query.get("nohave") == "1":
-                rows = [c for c in rows if c["code"] not in have]
+                rows = [c for c in rows if lacks(c)]
             missing = []
         item = lambda c: {"code": c["code"], "name": c["name"], "handle": c["handle"] or "",
                           "platform": c["platform"] or "", "followers": c["followers"],
-                          "has": c["code"] in have}
+                          "has": sorted(have.get(c["code"], {})),
+                          "platforms": analysis.creator_platforms(c)}
         return self.send_json(200, {"total": len(rows), "items": [item(c) for c in rows[:150]],
                                     "all": [[c["code"], c["name"]] for c in rows[:3000]],
                                     "missing": missing})
@@ -2929,8 +2969,11 @@ class Handler(BaseHTTPRequestHandler):
         elif src == "codes":
             codes = [c for c in re.split(r"[\s,]+", f.get("codes") or "") if c]
         elif src == "missing":
-            have = db.analysis_codes()
-            codes = [c["code"] for c in everyone if c["code"] not in have][:500]
+            have = db.analysis_platforms()
+            ap = analysis.canon_platform(f.get("platform"))
+            codes = [c["code"] for c in everyone
+                     if (ap or analysis.creator_platforms(c)[0]) not in have.get(c["code"], {})
+                     and (not ap or ap in analysis.creator_platforms(c))][:500]
         else:
             res = self.analysis_resolver()
             for line in re.split(r"[\n,;]+", f.get("list") or ""):
@@ -2946,7 +2989,7 @@ class Handler(BaseHTTPRequestHandler):
         if not chosen:
             return self.redirect("/analysis?e=" + urllib.parse.quote(
                 "No creators found for that choice." + (" Not recognised: " + ", ".join(missing[:8]) if missing else "")) + "#prefilled")
-        return self.send(200, analysis.template_xlsx(chosen, missing=missing),
+        return self.send(200, analysis.template_xlsx(chosen, missing=missing, platform=f.get("platform")),
                          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                          [("Content-Disposition", 'attachment; filename="creator-analysis-%d-creators.xlsx"' % len(chosen))])
 
@@ -2965,6 +3008,7 @@ class Handler(BaseHTTPRequestHandler):
                 "The PDF reader is not installed on this server yet. Ask whoever deploys the admin to install it.") + "#pdf")
         res = self.analysis_resolver()
         picked = res.resolve((f.get("code") or "").strip())[0] if len(parts) == 1 else None
+        want_plat = analysis.canon_platform(f.get("platform"))
         done, bad, held = [], [], []
         for p in parts:
             name = p.get("filename") or "file.pdf"
@@ -2979,7 +3023,7 @@ class Handler(BaseHTTPRequestHandler):
                 held.append((name, p["data"]))
                 continue
             try:
-                profile_pdf.import_pdf(p["data"], code, handle, source="profile report PDF")
+                profile_pdf.import_pdf(p["data"], code, handle, source="profile report PDF", platform=want_plat)
                 done.append(code)
             except Exception as ex:
                 bad.append(name + " (" + str(ex)[:120] + ")")
@@ -3010,9 +3054,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def save_analysis_docs(self, docs, problems, prefix=""):
         with db.connect() as conn:
-            for code, d in docs.items():
-                db.save_analysis(code, d, d.get("source") or "template upload", conn)
-        msg = prefix + "Saved full analysis for %d creator(s)." % len(docs)
+            for (code, plat), d in docs.items():
+                db.save_analysis(code, d, d.get("source") or "template upload", conn, platform=plat)
+        msg = prefix + "Saved %d analys%s: %s." % (len(docs), "is" if len(docs) == 1 else "es",
+                                                    ", ".join("%s (%s)" % k for k in list(docs)[:12]) + (" …" if len(docs) > 12 else ""))
         if problems:
             msg += " Skipped: " + " ".join(problems[:6])
         return self.redirect("/analysis?ok=" + urllib.parse.quote(msg))
@@ -3083,7 +3128,7 @@ class Handler(BaseHTTPRequestHandler):
             m = re.match(r"report-(.+?)-[A-Za-z]{3}-\d\d-\d{4}", name)
             handle = m.group(1) if m else None
             try:
-                profile_pdf.import_pdf(data, code, handle, source="profile report PDF")
+                profile_pdf.import_pdf(data, code, handle, source="profile report PDF", platform=analysis.canon_platform(f.get("platform")))
                 done.append(code)
                 if remember and handle:
                     db.remember_alias(analysis.norm(handle), code)
@@ -3104,13 +3149,16 @@ class Handler(BaseHTTPRequestHandler):
             doc = analysis.clean_json(json.loads(f.get("json") or "{}"))
         except ValueError as ex:
             return self.redirect("/analysis?q=%s&e=%s" % (code, urllib.parse.quote(str(ex))))
-        db.save_analysis(code, doc, doc.get("source") or "pasted JSON")
-        return self.redirect("/analysis?q=%s&ok=%s" % (code, urllib.parse.quote("Analysis saved for " + code + ".")))
+        plat = analysis.canon_platform(f.get("platform")) or analysis.canon_platform(doc.get("platform")) or db.platforms_of(code)[0]
+        db.save_analysis(code, doc, doc.get("source") or "pasted JSON", platform=plat)
+        return self.redirect("/analysis?q=%s&p=%s&ok=%s" % (code, plat, urllib.parse.quote("%s analysis saved for %s." % (plat, code))))
 
     def post_analysis_delete(self):
-        code = (self.form_body().get("code") or "").strip().upper()
-        db.delete_analysis(code)
-        return self.redirect("/analysis?ok=" + urllib.parse.quote("Analysis removed for " + code + "."))
+        f = self.form_body()
+        code = (f.get("code") or "").strip().upper()
+        plat = analysis.canon_platform(f.get("platform"))
+        db.delete_analysis(code, plat)
+        return self.redirect("/analysis?ok=" + urllib.parse.quote("%sanalysis removed for %s." % ((plat + " ") if plat else "", code)))
 
     def api_creator(self, code):
         """One creator for the analysis page: the public card facts always,
@@ -3121,10 +3169,11 @@ class Handler(BaseHTTPRequestHandler):
         r = db.creator(code)
         if r is None or not r["active"]:
             return self.send_json(404, {"ok": False}, self.cors())
-        a = db.analysis(code)
-        with db.connect() as conn:
-            asked = conn.execute("SELECT 1 FROM analysis_requests WHERE code = ? AND code_id = ? "
-                                 "AND handled_at IS NULL", (code, code_id)).fetchone() is not None
+        every = db.analyses(code)
+        # The platforms this creator is on, plus any that has an analysis on file.
+        plats = list(db.platforms_of(code))
+        plats += [p for p in every if p not in plats]
+        asked = db.open_requests(code, code_id)
         db.log("view", code_id, self.client_ip(), self.headers.get("User-Agent"), "analysis:" + code)
         card = {"code": r["code"], "name": r["name"], "tier": r["tier"], "city": r["city"],
                 "nationality": r["nationality"], "interest": r["interest"], "followers": r["followers"],
@@ -3132,8 +3181,9 @@ class Handler(BaseHTTPRequestHandler):
                 "profiles": db.split_profiles(r["profiles"]),
                 "band": metrics.band_of(r["followers"])}
         return self.send_json(200, {"ok": True, "creator": card,
-                                    "analysis": analysis.with_media_urls(a["data"], r["code"], BASE) if a else None,
-                                    "updated_at": a["updated_at"] if a else None,
+                                    "platforms": plats,
+                                    "analyses": {p: analysis.with_media_urls(a["data"], r["code"], BASE)
+                                                 for p, a in every.items()},
                                     "requested": asked,
                                     "benchmarks": metrics.benchmarks()},
                               self.cors() + [("Cache-Control", "no-store")])
@@ -3158,8 +3208,9 @@ class Handler(BaseHTTPRequestHandler):
         code = (self.json_body().get("code") or "").strip().upper()
         if db.creator(code) is None:
             return self.send_json(404, {"ok": False}, self.cors())
-        db.request_analysis(code, code_id)
-        db.log("shortlist", code_id, self.client_ip(), self.headers.get("User-Agent"), "analysis request:" + code)
+        plat = analysis.canon_platform(self.json_body().get("platform")) or db.platforms_of(code)[0]
+        db.request_analysis(code, code_id, plat)
+        db.log("shortlist", code_id, self.client_ip(), self.headers.get("User-Agent"), "analysis request:%s:%s" % (code, plat))
         return self.send_json(200, {"ok": True}, self.cors())
 
     def post_campaign_delete(self):
@@ -3212,6 +3263,7 @@ class Handler(BaseHTTPRequestHandler):
                                     "prices": prices, "total": total,
                                     "platform": platform,
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
+                                    "verdicts": {k: v for k, v in json.loads((sel["verdicts"] if "verdicts" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "currency": (sel["currency"] if "currency" in sel.keys() else None) or "SAR",
                                     "fx": fx.rates(),
                                     "token": sel["token"]}, self.cors())

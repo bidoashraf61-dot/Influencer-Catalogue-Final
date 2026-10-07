@@ -46,16 +46,64 @@ OVERVIEW = [
 TEXT_KEYS = ("platform", "handle", "source", "updated", "account_type")
 AUDIENCE_SECTIONS = ["countries", "cities", "gender", "ages", "languages", "interests",
                      "brand_affinity", "reachability"]
+PLATFORM_COL = "Platform (Instagram / TikTok / … — empty means the Overview row's, else their main one)"
+# The platforms an analysis can be about, in the order they are offered.
+PLATFORMS = ["Instagram", "TikTok", "Snapchat", "YouTube", "X", "Facebook"]
+_PLAT_ALIASES = {"ig": "Instagram", "insta": "Instagram", "instagram": "Instagram", "tiktok": "TikTok", "tik tok": "TikTok",
+                 "tt": "TikTok", "snapchat": "Snapchat", "snap": "Snapchat", "sc": "Snapchat", "youtube": "YouTube",
+                 "yt": "YouTube", "x": "X", "twitter": "X", "facebook": "Facebook", "fb": "Facebook"}
+
+
+def canon_platform(v):
+    """"tiktok", "TikTok " or "tik tok" -> "TikTok"; None when it names none of ours."""
+    t = re.sub(r"\s+", " ", str(v or "").strip().lower())
+    return _PLAT_ALIASES.get(t)
+
+
+def creator_platforms(row):
+    """The platforms a creator is on, main one first: the roster's platform
+    field (it may hold several: "Instagram, Snapchat") and their profile links."""
+    out = []
+    try:
+        profiles = json.loads(row["profiles"] or "[]")
+    except (ValueError, TypeError, KeyError, IndexError):
+        profiles = []
+    try:
+        main = row["platform"] or ""
+    except (KeyError, IndexError):
+        main = ""
+    cands = re.split(r"[,&/+]|\band\b", main) + [p.get("platform") for p in profiles if isinstance(p, dict)]
+    for c in cands:
+        c = canon_platform(c)
+        if c and c not in out:
+            out.append(c)
+    return out or ["Instagram"]
+
+
+def handle_on(row, platform):
+    """The creator's handle on one platform, from the profile link for it."""
+    try:
+        profiles = json.loads(row["profiles"] or "[]")
+    except (ValueError, TypeError, KeyError, IndexError):
+        profiles = []
+    for p in profiles:
+        if isinstance(p, dict) and canon_platform(p.get("platform")) == platform and is_link(p.get("url")):
+            h = handle_from(p["url"])
+            if h:
+                return h
+    return (row["handle"] or "").lstrip("@") if platform == creator_platforms(row)[0] else ""
+
+
 SHEETS = {
     "Overview": [label for _, label in OVERVIEW],
     "Audience": ["Creator (code, @handle or name)", "Section (" + " / ".join(AUDIENCE_SECTIONS) + ")",
                  "Label (country code SA, city, female/male, 18-24, …)", "Percent",
-                 "Audience of (followers / likers — empty means followers)"],
-    "Growth": ["Creator (code, @handle or name)", "Month (YYYY-MM)", "Followers", "Avg likes (optional)"],
+                 "Audience of (followers / likers — empty means followers)", PLATFORM_COL],
+    "Growth": ["Creator (code, @handle or name)", "Month (YYYY-MM)", "Followers", "Avg likes (optional)", PLATFORM_COL],
     "Posts": ["Creator (code, @handle or name)", "Kind (top / sponsored)", "Post link", "Image link (optional)",
-              "Date (YYYY-MM-DD)", "Likes", "Comments", "Views", "Brand (sponsored)"],
-    "Brands": ["Creator (code, @handle or name)", "Brand", "Posts mentioning it", "Logo link or website (optional)"],
-    "Hashtags": ["Creator (code, @handle or name)", "Hashtag or @mention", "Times used or %"],
+              "Date (YYYY-MM-DD)", "Likes", "Comments", "Views", "Brand (sponsored)", PLATFORM_COL],
+    "Brands": ["Creator (code, @handle or name)", "Brand", "Posts mentioning it", "Logo link or website (optional)", PLATFORM_COL],
+    "Hashtags": ["Creator (code, @handle or name)", "Hashtag or @mention", "Times used or %", PLATFORM_COL],
 }
 EXAMPLE = {
     "Overview": ["HV-XX-000", "Instagram", "example_handle", "84000", "610", "512", "3.4", "2700",
@@ -194,30 +242,37 @@ AUDIENCE_SKELETON = [("gender", "female"), ("gender", "male"),
                      ("countries", "SA"), ("countries", "AE"), ("countries", "EG")]
 
 
-def template_xlsx(creators=None, code=None, missing=()):
+def template_xlsx(creators=None, code=None, missing=(), platform=None):
     """The template. With `creators` (roster rows) it comes prefilled: the
-    identity is on every row and the Audience sheet carries the usual
-    questions, so only numbers are typed. A single `code` is the old
-    one-creator download."""
+    identity and platform are on every row and the Audience sheet carries the
+    usual questions, so only numbers are typed. `platform` makes it the
+    template for that platform's analysis (each creator's handle there is
+    filled in); empty means each creator's main platform."""
     sheets = []
     if creators:
+        plat = canon_platform(platform)
         for name, header in SHEETS.items():
+            pcol = len(header) - 1 if name != "Overview" else 1
             rows = [header + ["Name (for reference, ignored)"]]
             for c in creators:
-                pad = lambda row: row + [""] * (len(header) - len(row)) + [c["name"]]
+                p = plat or creator_platforms(c)[0]
+
+                def pad(row, c=c, p=p):
+                    row = row + [""] * (len(header) - len(row))
+                    row[pcol] = p
+                    return row + [c["name"]]
                 if name == "Overview":
-                    row = [c["code"], c["platform"] or "", (c["handle"] or "").lstrip("@")]
-                    rows.append(pad(row))
+                    rows.append(pad([c["code"], p, handle_on(c, p)]))
                 elif name == "Audience":
                     for sec, label in AUDIENCE_SKELETON:
                         rows.append(pad([c["code"], sec, label]))
                 else:
                     rows.append(pad([c["code"]]))
             sheets.append((name, rows, {i: 22 for i in range(len(header) + 1)}, None))
-        ref = [["Code", "Name", "Handle", "Platform"]] + [
-            [c["code"], c["name"], c["handle"] or "", c["platform"] or ""] for c in creators] + [
+        ref = [["Code", "Name", "Handle", "Platforms"]] + [
+            [c["code"], c["name"], c["handle"] or "", ", ".join(creator_platforms(c))] for c in creators] + [
             ["NOT FOUND", m, "", ""] for m in missing]
-        sheets.append(("Creators (reference)", ref, {0: 16, 1: 28, 2: 24, 3: 14}, None))
+        sheets.append(("Creators (reference)", ref, {0: 16, 1: 28, 2: 24, 3: 24}, None))
         return xlsx.write_book(sheets)
     for name, header in SHEETS.items():
         example = [code if (code and v == "HV-XX-000") else v for v in EXAMPLE[name]]
@@ -242,17 +297,20 @@ def _intish(v):
 
 
 def parse_workbook(data, resolver, picks=None):
-    """(docs {code: analysis}, problems, unresolved {key: [suggested codes]}).
+    """(docs {(code, platform): analysis}, problems, unresolved {key: [codes]}).
 
     The first column of every row names the creator — code, @handle or name.
-    A name that fits more than one creator, or none, is listed in
-    `unresolved` so the admin can pick; `picks` {key: code or ""} carries
-    those answers on a second pass (an empty answer skips the rows). The
-    template's example rows and rows with nothing but the identity filled in
-    are ignored."""
+    The platform comes from the row's Platform column, else from that
+    creator's Overview row, else their main platform, so one workbook can hold
+    a creator's Instagram and TikTok side by side. A name that fits more than
+    one creator, or none, is listed in `unresolved` so the admin can pick;
+    `picks` {key: code or ""} carries those answers on a second pass (an empty
+    answer skips the rows). The example rows and rows with nothing but the
+    identity filled in are ignored."""
     book = xlsx.read_all(data)
     picks = {norm(k): v for k, v in (picks or {}).items()}
     docs, problems, unresolved = {}, [], {}
+    ov_plat = {}                                   # code -> platforms named on its Overview rows
 
     def rows(name):
         table = book.get(name) or []
@@ -261,10 +319,9 @@ def parse_workbook(data, resolver, picks=None):
     def cell(r, i):
         return r[i].strip() if len(r) > i else ""
 
-    def doc(key, platform=None, alt=()):
-        """The analysis being built for whoever `key` names; when the first
-        column is empty or unknown, the handle or profile link on the same
-        row (`alt`) is tried before asking."""
+    def who(key, platform=None, alt=()):
+        """The creator `key` names; when the first column is empty or unknown,
+        the handle or profile link on the same row (`alt`) is tried before asking."""
         key = (key or "").strip()
         if key.upper().startswith("HV-XX"):
             return None
@@ -281,13 +338,21 @@ def parse_workbook(data, resolver, picks=None):
         if code is None:
             pick = picks.get(norm(key))
             if pick:
-                code = pick
-            elif pick == "":
-                return None
-            else:
+                return pick
+            if pick is None:
                 unresolved.setdefault(key, suggestions)
-                return None
-        return docs.setdefault(code, {"audience": {}})
+            return None
+        return code
+
+    def doc(key, platform_cell="", alt=()):
+        code = who(key, canon_platform(platform_cell), alt)
+        if code is None:
+            return None
+        plat = canon_platform(platform_cell)
+        if not plat:
+            named = ov_plat.get(code) or []
+            plat = named[0] if len(named) == 1 else creator_platforms(resolver.label[code])[0]
+        return docs.setdefault((code, plat), {"audience": {}, "platform": plat})
 
     keys = [k for k, _ in OVERVIEW]
     for r in rows("Overview"):
@@ -300,22 +365,29 @@ def parse_workbook(data, resolver, picks=None):
         # Platform and handle come prefilled; they alone are not data.
         if not {k for k, v in vals.items() if v is not None} - {"platform", "handle"}:
             continue
-        d = doc(r[0], vals.get("platform"), [vals.get("handle")] + [c for c in r if is_link(c)])
-        if d is not None:
-            d.update({k: v for k, v in vals.items() if v is not None or k in TEXT_KEYS})
+        code = who(r[0], canon_platform(vals.get("platform")), [vals.get("handle")] + [c for c in r if is_link(c)])
+        if code is None:
+            continue
+        plat = canon_platform(vals.get("platform")) or creator_platforms(resolver.label[code])[0]
+        ov_plat.setdefault(code, [])
+        if plat not in ov_plat[code]:
+            ov_plat[code].append(plat)
+        d = docs.setdefault((code, plat), {"audience": {}, "platform": plat})
+        d.update({k: v for k, v in vals.items() if (v is not None or k in TEXT_KEYS) and k != "platform"})
+        d["platform"] = plat
     for r in rows("Audience"):
         pct = _num(cell(r, 3))
         if pct is None:
             continue
         section, label = cell(r, 1).lower().replace(" ", "_"), cell(r, 2)
-        d = doc(r[0])
+        d = doc(r[0], cell(r, 5))
         if d is None:
             continue
         if section not in AUDIENCE_SECTIONS or not label:
             problems.append("Audience row for %s skipped: section '%s'." % (r[0], r[1]))
             continue
-        who = cell(r, 4).lower()
-        aud = d.setdefault("audience_likers", {}) if who.startswith("lik") else d["audience"]
+        who_ = cell(r, 4).lower()
+        aud = d.setdefault("audience_likers", {}) if who_.startswith("lik") else d["audience"]
         if section == "gender":
             aud.setdefault("gender", {})[label.lower()] = pct
         elif section == "countries":
@@ -326,7 +398,7 @@ def parse_workbook(data, resolver, picks=None):
         followers = _intish(cell(r, 2))
         if followers is None:
             continue
-        d = doc(r[0])
+        d = doc(r[0], cell(r, 4))
         if d is None:
             continue
         d.setdefault("growth", []).append({"month": cell(r, 1)[:7], "followers": followers,
@@ -334,7 +406,7 @@ def parse_workbook(data, resolver, picks=None):
     for r in rows("Posts"):
         if not cell(r, 2).startswith("https://"):
             continue
-        d = doc(r[0])
+        d = doc(r[0], cell(r, 9))
         if d is None:
             continue
         r = r + [""] * (9 - len(r))
@@ -343,12 +415,12 @@ def parse_workbook(data, resolver, picks=None):
             "url": r[2].strip(), "thumb": r[3].strip() if r[3].startswith("https://") else None,
             "date": r[4].strip()[:10] or None, "likes": _intish(r[5]), "comments": _intish(r[6]),
             "views": _intish(r[7]), "brand": r[8].strip() or None})
-    for sheet, key, fields in (("Brands", "brands", ("name", "count", "logo")),
-                               ("Hashtags", "hashtags", ("tag", "count"))):
+    for sheet, key, fields, pidx in (("Brands", "brands", ("name", "count", "logo"), 4),
+                                     ("Hashtags", "hashtags", ("tag", "count"), 3)):
         for r in rows(sheet):
             if not cell(r, 1):
                 continue
-            d = doc(r[0])
+            d = doc(r[0], cell(r, pidx))
             if d is None:
                 continue
             vals = (r[1:] + [""] * len(fields))[:len(fields)]
@@ -359,7 +431,7 @@ def parse_workbook(data, resolver, picks=None):
                 d.setdefault(key, []).append(item)
     # A creator whose rows held nothing is not an analysis.
     docs = {c: d for c, d in docs.items()
-            if any(v for k, v in d.items() if k != "audience") or d["audience"]}
+            if any(v for k, v in d.items() if k not in ("audience", "platform")) or d["audience"]}
     for d in docs.values():
         for aud in (d["audience"], d.get("audience_likers") or {}):
             for k in ("countries", "cities", "ages", "languages", "interests", "brand_affinity"):

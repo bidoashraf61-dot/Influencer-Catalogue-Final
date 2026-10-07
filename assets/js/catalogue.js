@@ -1538,7 +1538,7 @@
             if (b.currency && FX[b.currency]) CURRENCY = b.currency;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
-                        tags: b.tags || {},
+                        tags: b.tags || {}, verdicts: b.verdicts || {},
                         platform: b.platform || "" };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
@@ -1691,59 +1691,104 @@
           "</p>" : "") + platHtml;
     }
 
-    // Labels the admin put on each creator of this selection (Hero, Beauty…).
-    // They belong to the selection, so they show here and nowhere else.
-    var activeTag = null;
+    // What the admin said about each creator of this selection: how well they
+    // fit, the part they play, why, and any labels of their own. All of it
+    // belongs to the selection, so it shows here and nowhere else.
+    var activeTag = null, activeFit = null, activeRole = null;
+    var FIT_CLASS = { "Strong fit": "strong", "Good fit": "good", "Possible fit": "maybe", "Not recommended": "no" };
     function tagsOf(code) {
       var t = CURATED && CURATED.tags && CURATED.tags[code];
       return t && t.length ? t : [];
     }
+    function verdictOf(code) {
+      var v = CURATED && CURATED.verdicts && CURATED.verdicts[code];
+      return v || null;
+    }
+    function rolesOf(code) { var v = verdictOf(code); return v && v.roles ? v.roles : []; }
+    function fitOf(code) { var v = verdictOf(code); return v && v.fit ? v.fit : ""; }
+    function matchesLabels(code) {
+      return (!activeTag || tagsOf(code).indexOf(activeTag) !== -1) &&
+             (!activeFit || fitOf(code) === activeFit) &&
+             (!activeRole || rolesOf(code).indexOf(activeRole) !== -1);
+    }
+    function barGroup(label, kind, names, counts, active, extra) {
+      if (!names.length) return "";
+      return '<div class="cat-tagbar__row"><span class="cat-tagbar__label">' + label + "</span>" +
+        '<button type="button" data-kind="' + kind + '" data-val="" aria-pressed="' + (!active) + '">All</button>' +
+        names.map(function (n) {
+          return '<button type="button" data-kind="' + kind + '" data-val="' + esc(n) + '" aria-pressed="' + (n === active) + '"' +
+            (extra && extra[n] ? ' class="' + extra[n] + '"' : "") + ">" + esc(n) + " <b>" + counts[n] + "</b></button>";
+        }).join("") + "</div>";
+    }
     function renderTags() {
-      var counts = {}, order = [];
+      var tagN = {}, tagOrder = [], fitN = {}, roleN = {};
       selected.forEach(function (code) {
         tagsOf(code).forEach(function (t) {
-          if (!counts[t]) { counts[t] = 0; order.push(t); }
-          counts[t]++;
+          if (!tagN[t]) { tagN[t] = 0; tagOrder.push(t); }
+          tagN[t]++;
         });
+        var f = fitOf(code); if (f) fitN[f] = (fitN[f] || 0) + 1;
+        rolesOf(code).forEach(function (r) { roleN[r] = (roleN[r] || 0) + 1; });
       });
-      if (activeTag && !counts[activeTag]) activeTag = null;
+      if (activeTag && !tagN[activeTag]) activeTag = null;
+      if (activeFit && !fitN[activeFit]) activeFit = null;
+      if (activeRole && !roleN[activeRole]) activeRole = null;
+      var back = (CURATED && CURATED.platform) ? "&p=" + encodeURIComponent(CURATED.platform) : "";
       cards.forEach(function (c) {
         var body = c.querySelector(".cat-card__body");
         if (!body) return;
-        var box = c.querySelector(".cat-tags");
-        var mine = tagsOf(c.dataset.code);
-        if (!mine.length) { if (box) box.remove(); return; }
-        if (!box) {
-          box = document.createElement("div");
-          box.className = "cat-tags";
-          body.insertBefore(box, body.firstChild);
+        var link = c.querySelector("a.cat-card__analysis");
+        if (link && back && link.href.indexOf("&p=") === -1) link.href = link.href + back;
+        var v = verdictOf(c.dataset.code), mine = tagsOf(c.dataset.code);
+        var box = c.querySelector(".cat-verdict");
+        if (!v || (!v.fit && !(v.roles || []).length && !v.reason)) { if (box) box.remove(); }
+        else {
+          if (!box) {
+            box = document.createElement("div");
+            box.className = "cat-verdict";
+            body.insertBefore(box, body.firstChild);
+          }
+          box.innerHTML = '<div class="cat-verdict__chips">' +
+            (v.fit ? '<span class="cat-fit cat-fit--' + (FIT_CLASS[v.fit] || "maybe") + '">' + esc(v.fit) + "</span>" : "") +
+            (v.roles || []).map(function (r) { return '<span class="cat-role">' + esc(r) + "</span>"; }).join("") + "</div>" +
+            (v.reason ? '<p class="cat-verdict__why">' + esc(v.reason) + "</p>" : "");
         }
-        box.innerHTML = mine.map(function (t) {
+        var tbox = c.querySelector(".cat-tags");
+        if (!mine.length) { if (tbox) tbox.remove(); return; }
+        if (!tbox) {
+          tbox = document.createElement("div");
+          tbox.className = "cat-tags";
+          var vb = c.querySelector(".cat-verdict");
+          if (vb) vb.insertAdjacentElement("afterend", tbox); else body.insertBefore(tbox, body.firstChild);
+        }
+        tbox.innerHTML = mine.map(function (t) {
           return '<span class="cat-tag">' + esc(t) + "</span>";
         }).join("");
       });
       var bar = $("sel-tags");
-      if (!order.length) { if (bar) bar.hidden = true; return; }
+      var fits = ["Strong fit", "Good fit", "Possible fit", "Not recommended"].filter(function (f) { return fitN[f]; });
+      var roles = ["Awareness", "Engagement", "Conversion", "UGC content"].filter(function (r) { return roleN[r]; });
+      tagOrder.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
+      if (!fits.length && !roles.length && !tagOrder.length) { if (bar) bar.hidden = true; return; }
       if (!bar) {
         bar = document.createElement("div");
         bar.id = "sel-tags"; bar.className = "cat-tagbar"; bar.setAttribute("role", "group");
-        bar.setAttribute("aria-label", "Filter by tag");
+        bar.setAttribute("aria-label", "Filter by fit, role or tag");
         $("cat-grid").insertAdjacentElement("beforebegin", bar);
         bar.addEventListener("click", function (e) {
-          var b = e.target.closest("button[data-tag]"); if (!b) return;
-          var t = b.getAttribute("data-tag");
-          activeTag = t === "" ? null : (activeTag === t ? null : t);
+          var b = e.target.closest("button[data-kind]"); if (!b) return;
+          var kind = b.getAttribute("data-kind"), val = b.getAttribute("data-val");
+          if (kind === "fit") activeFit = val === "" || activeFit === val ? null : val;
+          else if (kind === "role") activeRole = val === "" || activeRole === val ? null : val;
+          else activeTag = val === "" || activeTag === val ? null : val;
           render();
         });
       }
       bar.hidden = false;
-      order.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
-      bar.innerHTML = '<span class="cat-tagbar__label">Tags</span>' +
-        '<button type="button" data-tag="" aria-pressed="' + (!activeTag) + '">All <b>' + selected.length + "</b></button>" +
-        order.map(function (t) {
-          return '<button type="button" data-tag="' + esc(t) + '" aria-pressed="' + (t === activeTag) + '">' +
-            esc(t) + " <b>" + counts[t] + "</b></button>";
-        }).join("");
+      var fitCls = {}; fits.forEach(function (f) { fitCls[f] = "fit-" + (FIT_CLASS[f] || "maybe"); });
+      bar.innerHTML = barGroup("Fit", "fit", fits, fitN, activeFit, fitCls) +
+        barGroup("Role", "role", roles, roleN, activeRole) +
+        barGroup("Tags", "tag", tagOrder, tagN, activeTag);
     }
 
     function render() {
@@ -1751,7 +1796,7 @@
       var shown = 0;
       cards.forEach(function (c) {
         var ok = selected.indexOf(c.dataset.code) !== -1 && (!controls || controls.matches(c)) &&
-          (!activeTag || tagsOf(c.dataset.code).indexOf(activeTag) !== -1);
+          matchesLabels(c.dataset.code);
         c.hidden = !ok;
         if (ok) shown++;
       });

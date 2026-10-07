@@ -284,10 +284,12 @@ CREATE TABLE IF NOT EXISTS settings (
 -- growth, posts, brands, lookalikes. Uploaded by an admin from a template or
 -- JSON; `data` is the whole document. One per creator.
 CREATE TABLE IF NOT EXISTS creator_analysis (
-  code       TEXT PRIMARY KEY,
+  code       TEXT NOT NULL,
+  platform   TEXT NOT NULL DEFAULT 'Instagram',   -- one analysis per creator per platform
   data       TEXT NOT NULL,
   source     TEXT,                       -- internal only, e.g. "report 2026-10", "manual"
-  updated_at INTEGER NOT NULL
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (code, platform)
 );
 
 -- What the admin typed in an upload, mapped to the creator they said it meant,
@@ -303,7 +305,8 @@ CREATE TABLE IF NOT EXISTS analysis_requests (
   code       TEXT NOT NULL,              -- creators.code
   code_id    INTEGER REFERENCES codes(id) ON DELETE SET NULL,
   at         INTEGER NOT NULL,
-  handled_at INTEGER
+  handled_at INTEGER,
+  platform   TEXT                        -- which platform's analysis was asked for
 );
 
 CREATE TABLE IF NOT EXISTS capture_runs (
@@ -457,6 +460,28 @@ def migrate(conn):
         # Archived = out of the Clients list, nothing else: the code still
         # works until it is revoked.
         conn.execute("ALTER TABLE codes ADD COLUMN archived_at INTEGER")
+    if "verdicts" not in sel_cols:
+        # {code: {"fit": ..., "roles": [...], "reason": ...}}: the admin's fit and
+        # campaign-role call on each creator of THIS selection, shown to the client.
+        conn.execute("ALTER TABLE selections ADD COLUMN verdicts TEXT")
+    ca_cols = {r[1] for r in conn.execute("PRAGMA table_info(creator_analysis)")}
+    if "platform" not in ca_cols:
+        # One analysis per creator became one per creator per platform. What is
+        # on file belongs to the platform it names (Instagram when it names none).
+        import analysis as _an
+        conn.execute("ALTER TABLE creator_analysis RENAME TO creator_analysis_old")
+        conn.execute("CREATE TABLE creator_analysis (code TEXT NOT NULL, platform TEXT NOT NULL DEFAULT 'Instagram', "
+                     "data TEXT NOT NULL, source TEXT, updated_at INTEGER NOT NULL, PRIMARY KEY (code, platform))")
+        for r in conn.execute("SELECT * FROM creator_analysis_old").fetchall():
+            try:
+                plat = _an.canon_platform((json.loads(r["data"]) or {}).get("platform")) or "Instagram"
+            except ValueError:
+                plat = "Instagram"
+            conn.execute("INSERT OR REPLACE INTO creator_analysis (code, platform, data, source, updated_at) VALUES (?,?,?,?,?)",
+                         (r["code"], plat, r["data"], r["source"], r["updated_at"]))
+        conn.execute("DROP TABLE creator_analysis_old")
+    if "platform" not in {r[1] for r in conn.execute("PRAGMA table_info(analysis_requests)")}:
+        conn.execute("ALTER TABLE analysis_requests ADD COLUMN platform TEXT")
     if "tags" not in sel_cols:
         # {code: [tag, ...]}: labels the admin puts on each creator of THIS selection.
         conn.execute("ALTER TABLE selections ADD COLUMN tags TEXT")
@@ -1646,7 +1671,7 @@ def selection(sid=None, token=None):
 
 def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
                    code_id=None, platform=None, margin=None, costs=None, margin_max=False,
-                   tags=None):
+                   tags=None, verdicts=None):
     """Create (sid None) or update one priced selection. Returns its id.
 
     margin and costs are left as they are when not given, so a client
@@ -1677,6 +1702,8 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
             conn.execute("UPDATE selections SET margin_max=? WHERE id=?", (margin_max, sid))
         if tags is not None:               # not given = left as it is
             conn.execute("UPDATE selections SET tags=? WHERE id=?", (json.dumps(tags), sid))
+        if verdicts is not None:
+            conn.execute("UPDATE selections SET verdicts=? WHERE id=?", (json.dumps(verdicts), sid))
         return sid
 
 
@@ -2162,22 +2189,59 @@ def set_planned(cid, planned):
 
 # ------------------------------------------------------- creator analysis --
 
-def analysis(code):
+def platforms_of(code):
+    """The platforms a creator is on, main one first."""
+    import analysis as _an
     with connect() as conn:
-        row = conn.execute("SELECT * FROM creator_analysis WHERE code = ?", (code,)).fetchone()
-    if row is None:
-        return None
+        row = conn.execute("SELECT platform, profiles FROM creators WHERE code = ?", (code,)).fetchone()
+    return _an.creator_platforms(row) if row else ["Instagram"]
+
+
+def _analysis_row(row):
     try:
         data = json.loads(row["data"])
     except ValueError:
         data = {}
-    return {"data": data, "source": row["source"], "updated_at": row["updated_at"]}
+    return {"data": data, "source": row["source"], "updated_at": row["updated_at"], "platform": row["platform"]}
+
+
+def analysis(code, platform=None):
+    """One creator's analysis. With a platform, that platform's; without, the
+    one for their main platform when there is one, else the newest — so the
+    callers that only want "the" analysis keep working."""
+    with connect() as conn:
+        if platform:
+            row = conn.execute("SELECT * FROM creator_analysis WHERE code = ? AND platform = ?",
+                               (code, platform)).fetchone()
+        else:
+            rows = conn.execute("SELECT * FROM creator_analysis WHERE code = ? ORDER BY updated_at DESC",
+                                (code,)).fetchall()
+            main = platforms_of(code)[0] if rows else None
+            row = next((r for r in rows if r["platform"] == main), rows[0] if rows else None)
+    return _analysis_row(row) if row is not None else None
+
+
+def analyses(code):
+    """{platform: analysis} for everything on file for a creator."""
+    with connect() as conn:
+        rows = conn.execute("SELECT * FROM creator_analysis WHERE code = ?", (code,)).fetchall()
+    return {r["platform"]: _analysis_row(r) for r in rows}
 
 
 def analysis_codes():
+    """{code: when its newest analysis was saved}: who has any analysis."""
     with connect() as conn:
-        return {r["code"]: r["updated_at"] for r in conn.execute(
-            "SELECT code, updated_at FROM creator_analysis")}
+        return {r["code"]: r["t"] for r in conn.execute(
+            "SELECT code, MAX(updated_at) t FROM creator_analysis GROUP BY code")}
+
+
+def analysis_platforms():
+    """{code: {platform: when saved}}."""
+    out = {}
+    with connect() as conn:
+        for r in conn.execute("SELECT code, platform, updated_at FROM creator_analysis"):
+            out.setdefault(r["code"], {})[r["platform"]] = r["updated_at"]
+    return out
 
 
 def creator_aliases():
@@ -2194,32 +2258,54 @@ def remember_alias(alias, code, conn=None):
                      "ON CONFLICT(alias) DO UPDATE SET code = excluded.code", (alias, code))
 
 
-def save_analysis(code, data, source=None, conn=None):
+def save_analysis(code, data, source=None, conn=None, platform=None):
+    """Store one platform's analysis for a creator. The platform is the one
+    given, else the one the document names, else the creator's main one."""
+    import analysis as _an
     if conn is None:
         with connect() as own:
-            return save_analysis(code, data, source, own)
-    conn.execute("INSERT INTO creator_analysis (code, data, source, updated_at) VALUES (?,?,?,?) "
-                 "ON CONFLICT(code) DO UPDATE SET data = excluded.data, source = excluded.source, "
-                 "updated_at = excluded.updated_at", (code, json.dumps(data), source, now()))
-    # An uploaded analysis answers every open request for it.
-    conn.execute("UPDATE analysis_requests SET handled_at = ? WHERE code = ? AND handled_at IS NULL",
-                 (now(), code))
+            return save_analysis(code, data, source, own, platform)
+    platform = _an.canon_platform(platform) or _an.canon_platform((data or {}).get("platform"))
+    if not platform:
+        row = conn.execute("SELECT platform, profiles FROM creators WHERE code = ?", (code,)).fetchone()
+        platform = _an.creator_platforms(row)[0] if row else "Instagram"
+    data = dict(data or {}, platform=platform)
+    conn.execute("INSERT INTO creator_analysis (code, platform, data, source, updated_at) VALUES (?,?,?,?,?) "
+                 "ON CONFLICT(code, platform) DO UPDATE SET data = excluded.data, source = excluded.source, "
+                 "updated_at = excluded.updated_at", (code, platform, json.dumps(data), source, now()))
+    # An uploaded analysis answers the open requests for that platform (and the
+    # older ones that never said which).
+    conn.execute("UPDATE analysis_requests SET handled_at = ? WHERE code = ? AND handled_at IS NULL "
+                 "AND (platform IS NULL OR platform = ?)", (now(), code, platform))
 
 
-def delete_analysis(code):
+def delete_analysis(code, platform=None):
     with connect() as conn:
-        conn.execute("DELETE FROM creator_analysis WHERE code = ?", (code,))
+        if platform:
+            conn.execute("DELETE FROM creator_analysis WHERE code = ? AND platform = ?", (code, platform))
+        else:
+            conn.execute("DELETE FROM creator_analysis WHERE code = ?", (code,))
 
 
-def request_analysis(code, code_id):
-    """One open request per creator per client: asking twice is not news."""
+def request_analysis(code, code_id, platform=None):
+    """One open request per creator, platform and client: asking twice is not news."""
     with connect() as conn:
         if conn.execute("SELECT 1 FROM analysis_requests WHERE code = ? AND code_id IS ? "
-                        "AND handled_at IS NULL", (code, code_id)).fetchone():
+                        "AND platform IS ? AND handled_at IS NULL", (code, code_id, platform)).fetchone():
             return False
-        conn.execute("INSERT INTO analysis_requests (code, code_id, at) VALUES (?,?,?)",
-                     (code, code_id, now()))
+        conn.execute("INSERT INTO analysis_requests (code, code_id, at, platform) VALUES (?,?,?,?)",
+                     (code, code_id, now(), platform))
         return True
+
+
+def open_requests(code, code_id):
+    """The platforms this client has already asked for and not yet received.
+    An older request that named none counts for the creator's main platform."""
+    main = platforms_of(code)[0]
+    with connect() as conn:
+        rows = conn.execute("SELECT platform FROM analysis_requests WHERE code = ? AND code_id IS ? "
+                            "AND handled_at IS NULL", (code, code_id)).fetchall()
+    return sorted({r["platform"] or main for r in rows})
 
 
 def analysis_requests(open_only=False):

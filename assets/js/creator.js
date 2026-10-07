@@ -24,6 +24,7 @@
   // The analysis mark — bars and a trend line — shared with the roster's button.
   var ICON_ANALYSIS = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h16"/><path d="M7 16v-4M11 16V9M15 16v-6M19 16V6"/><path d="M5 9l5-4 4 3 6-5"/></svg>';
   var D = null;
+  var PLAT = "";           // the platform tab being read
   var BANDS = { nano: "Nano", micro: "Micro", mid: "Mid-tier", macro: "Macro", mega: "Mega" };
   var countryName = (function () {
     try { var d = new Intl.DisplayNames(["en"], { type: "region" }); return function (c) { return d.of(c) || c; }; }
@@ -46,6 +47,16 @@
   function pct(v, d) { return v == null ? "—" : (+v).toFixed(d == null ? 1 : d) + "%"; }
   function flag(cc) { return '<span class="fi fi-' + esc(String(cc).toLowerCase()) + '" aria-hidden="true"></span>'; }
   function icon(p) { return ICONS[p] || ICON_LINK; }
+  function wantPlat() { var m = /(?:^|[#&])p=([A-Za-z]+)/.exec(location.hash || ""); return m ? decodeURIComponent(m[1]) : ""; }
+  // The tab to open on: the one the link names, else the first platform that
+  // has an analysis, else the creator's main platform.
+  function choosePlat() {
+    var ps = D.platforms || [], w = wantPlat().toLowerCase();
+    var hit = ps.filter(function (p) { return p.toLowerCase() === w; })[0];
+    if (hit) return hit;
+    var an = D.analyses || {};
+    return ps.filter(function (p) { return an[p]; })[0] || ps[0] || "";
+  }
   function code() { var m = /(?:^|[#&])c=([A-Za-z0-9-]+)/.exec(location.hash || ""); return m ? decodeURIComponent(m[1]).toUpperCase() : ""; }
 
   /* gate */
@@ -222,10 +233,14 @@
   document.addEventListener("focusin", placeTip);
 
   function render() {
-    var c = D.creator, a = D.analysis;
+    var c = D.creator;
+    PLAT = choosePlat();
+    var a = (D.analyses || {})[PLAT] || null;
+    D.analysis = a;
     document.title = c.name + " — Creator analysis — HelloVoice";
     window.scrollTo(0, 0);
     renderId(c, a);
+    renderPlatforms(c);
     $("pp-sealed").hidden = !!a;
     $("pp-pages").hidden = !a;
     if (!a) return renderSealed(c);
@@ -274,20 +289,39 @@
   }
   function day(iso) { var d = new Date(String(iso).slice(0, 10) + "T00:00:00Z"); return isNaN(d) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }); }
 
+  /* one tab per platform the creator is on; a platform with no analysis is a locked tab */
+  function renderPlatforms(c) {
+    var box = $("pp-plat"), ps = D.platforms || [], an = D.analyses || {};
+    if (ps.length < 2) { box.hidden = true; box.innerHTML = ""; return; }
+    box.hidden = false;
+    box.innerHTML = '<span class="pp-plat__label">Analysis by platform</span>' + ps.map(function (p) {
+      var has = !!an[p], asked = (D.requested || []).indexOf(p) !== -1;
+      return '<button type="button" role="tab" data-p="' + esc(p) + '" aria-selected="' + (p === PLAT) + '" class="' + (has ? "is-on" : "is-off") + '">' + icon(p)
+        + "<span>" + esc(p) + "</span><small>" + (has ? "Analysed" : asked ? "Requested" : "Not analysed") + "</small></button>";
+    }).join("");
+    [].forEach.call(box.querySelectorAll("button"), function (b) {
+      b.addEventListener("click", function () {
+        var p = b.getAttribute("data-p");
+        history.replaceState(null, "", "#c=" + encodeURIComponent(c.code) + "&p=" + encodeURIComponent(p));
+        render();
+      });
+    });
+  }
+
   function renderSealed(c) {
-    var asked = D.requested;
+    var asked = (D.requested || []).indexOf(PLAT) !== -1;
     $("pp-sealed").innerHTML = '<div class="pp-sealed__icon" aria-hidden="true">' + ICON_ANALYSIS + "</div>"
-      + "<div><h2>Full analysis not on file yet</h2><p>The full analysis shows where " + esc(c.name) + "'s audience lives, their age and gender, how much of it is real, how it has grown, how posts perform and the brands they have worked with.</p>"
+      + "<div><h2>" + esc(PLAT || "Full") + " analysis not on file yet</h2><p>The " + esc(PLAT || "full") + " analysis shows where " + esc(c.name) + "'s audience lives, their age and gender, how much of it is real, how it has grown, how posts perform and the brands they have worked with.</p>"
       + '<ul class="pp-sealed__list"><li>Audience countries, cities, age &amp; gender</li><li>Real vs fake followers</li><li>Engagement and content performance</li><li>Brands &amp; interests</li></ul>'
-      + '<button type="button" class="pp-btn" id="pp-ask"' + (asked ? " disabled" : "") + ">" + (asked ? "Requested ✓" : "Request full analysis") + "</button>"
+      + '<button type="button" class="pp-btn" id="pp-ask"' + (asked ? " disabled" : "") + ">" + (asked ? "Requested ✓" : "Request " + (PLAT || "full") + " analysis") + "</button>"
       + '<p class="pp-sealed__done" id="pp-ask-done"' + (asked ? "" : " hidden") + ">Your request is with the HelloVoice team — we will add it and let you know.</p></div>";
     var btn = $("pp-ask");
     if (btn && !asked) btn.addEventListener("click", function () {
       btn.disabled = true; btn.textContent = "Sending…";
       fetch(API + "/api/creator/request", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: c.code }) })
-        .then(function (r) { if (!r.ok) throw 0; btn.textContent = "Requested ✓"; $("pp-ask-done").hidden = false; D.requested = true; })
-        .catch(function () { btn.disabled = false; btn.textContent = "Request full analysis"; var n = $("pp-ask-done"); n.textContent = "Could not send the request. Please try again."; n.hidden = false; });
+        body: JSON.stringify({ code: c.code, platform: PLAT }) })
+        .then(function (r) { if (!r.ok) throw 0; btn.textContent = "Requested ✓"; $("pp-ask-done").hidden = false; D.requested = (D.requested || []).concat([PLAT]); renderPlatforms(c); })
+        .catch(function () { btn.disabled = false; btn.textContent = "Request " + (PLAT || "full") + " analysis"; var n = $("pp-ask-done"); n.textContent = "Could not send the request. Please try again."; n.hidden = false; });
     });
   }
 
@@ -603,7 +637,7 @@
         });
       }, Promise.resolve()).then(function () {
         var c = D.creator;
-        doc.save((c.name || c.code).replace(/[^\w؀-ۿ -]+/g, "").trim().replace(/\s+/g, "-") + "-" + c.code + "-analysis.pdf");
+        doc.save((c.name || c.code).replace(/[^\w؀-ۿ -]+/g, "").trim().replace(/\s+/g, "-") + "-" + c.code + "-" + (PLAT || "").toLowerCase() + "-analysis.pdf");
       });
     }).catch(function () {
       alert("The PDF could not be made. Please try again.");

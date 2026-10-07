@@ -2086,6 +2086,40 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
     return page("Selections", body, "/selections")
 
 
+def _verdict_cell(v, fit_mod):
+    """One creator's fit and role in the selection editor: ready-made words,
+    plus a line of reasons the client reads."""
+    fits = "<option value=''>— no verdict —</option>" + "".join(
+        "<option" + (" selected" if v.get("fit") == f else "") + ">" + e(f) + "</option>" for f in fit_mod.FITS)
+    roles = v.get("roles") or []
+    ticks = "".join("<label class='tick vd-role'><input type='checkbox' value=\"" + e(r) + "\"" + (" checked" if r in roles else "")
+                    + "> <span>" + e(r) + "</span></label>" for r in fit_mod.ROLES)
+    return ("<select name='fit' class='vd-fit'>" + fits + "</select>"
+            "<div class='vd-roles'>" + ticks + "</div>"
+            "<input type='hidden' name='roles' class='vd-roles-in' value=\"" + e(",".join(roles)) + "\">"
+            "<input name='reason' class='vd-reason' value=\"" + e(v.get("reason") or "") + "\" maxlength='160' "
+            "placeholder='Why — the client reads this' autocomplete='off'>"
+            "<button type='button' class='btn tiny ghost vd-suggest'>Suggest</button> <span class='muted vd-note'></span>")
+
+
+VERDICT_JS = r'''<style>.vd{min-width:230px}.vd select,.vd input[name=reason]{width:100%;margin:2px 0}.vd-roles{display:flex;flex-wrap:wrap;gap:2px 8px}
+.vd-role{padding:2px 4px;min-height:0;font-size:12px}.vd-bar{margin:14px 0 4px}</style>
+<script>(function(){var base=%BASE%;
+function row(el){return el.closest('tr')}
+function syncRoles(tr){var v=[].slice.call(tr.querySelectorAll('.vd-role input:checked')).map(function(i){return i.value});tr.querySelector('.vd-roles-in').value=v.join(',')}
+document.addEventListener('change',function(e){var tr=e.target.closest&&e.target.closest('tr');if(tr&&e.target.closest('.vd-role'))syncRoles(tr)});
+function suggest(tr,done){var code=tr.querySelector('input[name=code]').value;var p=document.querySelector('select[name=platform]');p=p?p.value:'';
+ var note=tr.querySelector('.vd-note');note.textContent='…';
+ fetch(base+'/selections/suggest?code='+encodeURIComponent(code)+'&p='+encodeURIComponent(p),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+  if(d.fit!==undefined){var sel=tr.querySelector('.vd-fit');if(d.fit)sel.value=d.fit;
+   tr.querySelectorAll('.vd-role input').forEach(function(i){i.checked=(d.roles||[]).indexOf(i.value)>=0});syncRoles(tr);
+   if(d.reason)tr.querySelector('.vd-reason').value=d.reason}
+  note.textContent=d.note||('from '+d.platform+' analysis');if(done)done()}).catch(function(){note.textContent='could not suggest';if(done)done()})}
+document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.vd-suggest');if(b){suggest(row(b))}});
+var all=document.getElementById('vd-all');if(all)all.onclick=function(){var rows=[].slice.call(document.querySelectorAll('.sel-table tbody tr')).filter(function(t){return t.querySelector('.vd-fit')});
+ var i=0;(function next(){if(i>=rows.length)return;suggest(rows[i++],next)})()}})();</script>'''.replace('%BASE%', 'document.querySelector("form[action$=\'/selections/save\']").getAttribute("action").replace(/\\/selections\\/save$/,"")')
+
+
 TAG_JS = r'''<script>(function(){var pool=document.getElementById('tag-pool');if(!pool)return;var last=null;
 function esc(t){return String(t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function all(){var s={};document.querySelectorAll('.tag-in').forEach(function(i){i.value.split(/[,;]+/).forEach(function(t){t=t.trim();if(t)s[t.toLowerCase()]=t})});return Object.keys(s).map(function(k){return s[k]}).sort()}
@@ -2114,6 +2148,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         (format(conv(lo), ",") if lo == hi else format(conv(lo), ",") + " – " + format(conv(hi), ",")) + " " + cur)
     costs = json.loads((sel["costs"] if "costs" in keys else None) or "{}")
     tags_of = json.loads((sel["tags"] if "tags" in keys else None) or "{}")
+    verdicts_of = json.loads((sel["verdicts"] if "verdicts" in keys else None) or "{}")
+    import fit as _fit
     margin = sel["margin"] if "margin" in keys else None
     margin_txt = "" if margin is None else ("%g" % margin)
     mmax = sel["margin_max"] if "margin_max" in keys else None
@@ -2166,9 +2202,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
               "<input type='checkbox' name='default' value='" + e(code) + "'> make default</label>"
             + ("<div class='muted' style='font-size:12px'>roster now: " + money_c(c["price_from"], c["price_to"] or c["price_from"]) + "</div>"
                if ("price_from" in c.keys() and c["price_from"]) else "<div class='muted' style='font-size:12px'>roster: tier price</div>") + "</td>"
+            + "<td class='vd'>" + _verdict_cell(verdicts_of.get(code) or {}, _fit) + "</td>"
             + "<td><input name='tags' class='tag-in' value='" + e(", ".join(tags_of.get(code) or [])) + "' placeholder='e.g. Hero, Beauty' maxlength='200' autocomplete='off'></td>"
             + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code) + "'> remove</label></td></tr>")
-    table = "".join(rows) or "<tr><td colspan='9' class='muted'>No creators yet — add some below.</td></tr>"
+    table = "".join(rows) or "<tr><td colspan='10' class='muted'>No creators yet — add some below.</td></tr>"
     missing = [c for c in codes if c not in by]
     link = selection_link(sel, origin)
     tf = "" if sel["total_from"] is None else format(conv(sel["total_from"]), ",")
@@ -2226,10 +2263,13 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
           "</div>"
         + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
-          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th>Tags (client sees)</th><th></th>"
+          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th>Fit &amp; role (client sees)</th><th>Tags (client sees)</th><th></th>"
           "</tr></thead><tbody>"
         + table + "</tbody></table>"
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
+        + "<div class='vd-bar'><button type='button' class='btn small ghost' id='vd-all'>Suggest fit &amp; role for everyone</button> "
+          "<span class='muted'>Reads each creator's analysis (for the platform this selection is quoted for, else their own) and fills in a suggestion with the numbers behind it. "
+          "Nothing is shown to the client until you save, and you can change every word.</span></div>"
         + "<div class='price-hint' id='tag-pool' data-pool='" + e(json.dumps(sorted({t for v in tags_of.values() for t in v}, key=str.lower))) + "'></div>"
         + "<p class='price-hint'><b>Tags</b> are your own labels for this selection only (Hero, Beauty, Backup…). Separate them with commas. "
           "The client sees them on each card and can filter the selection by tag. Click a tag above to add it to the last box you were typing in.</p>"
@@ -2275,7 +2315,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "<form method='post' action='" + u("/selections/delete") + "' data-confirm='Delete this selection? Its link stops working. You can restore it from History.' style='margin-top:12px'>"
         + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
         + "<button class='btn small danger'>Delete selection</button></form></details>"
-        + MARGIN_JS + TAG_JS
+        + MARGIN_JS + TAG_JS + VERDICT_JS
     )
     return page(sel["name"] + " — Selection", body, "/selections")
 
@@ -3430,11 +3470,11 @@ _PICKER_JS = r"""(function(){
 var B='%BASE%',$=function(i){return document.getElementById(i)};
 var basket={},timer,last={all:[]};
 function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
-function params(){var p=new URLSearchParams();p.set('q',$('pk-q').value);p.set('platform',$('pk-pl').value);
+function params(){var p=new URLSearchParams();p.set('q',$('pk-q').value);p.set('platform',$('pk-pl').value);p.set('ap',$('pk-ap').value);
  if($('pk-no').checked)p.set('nohave','1');if($('pk-src').value)p.set('source',$('pk-src').value);return p}
 function search(){fetch(B+'/analysis/find?'+params()).then(function(r){return r.json()}).then(function(d){last=d;drawResults()})}
 function drawResults(){var rows=last.items.map(function(c){
- return '<label class="pk-row"><input type="checkbox" data-c="'+esc(c.code)+'" data-n="'+esc(c.name)+'"'+(basket[c.code]?' checked':'')+'> <strong>'+esc(c.name)+'</strong> <span class="muted">'+(c.handle?'@'+esc(c.handle)+' · ':'')+esc(c.platform)+(c.followers?' · '+c.followers.toLocaleString():'')+'</span>'+(c.has?' <span class="pill live">has analysis</span>':'')+'</label>'}).join('');
+ return '<label class="pk-row"><input type="checkbox" data-c="'+esc(c.code)+'" data-n="'+esc(c.name)+'"'+(basket[c.code]?' checked':'')+'> <strong>'+esc(c.name)+'</strong> <span class="muted">'+(c.handle?'@'+esc(c.handle)+' · ':'')+esc(c.platform)+(c.followers?' · '+c.followers.toLocaleString():'')+'</span>'+(c.has&&c.has.length?' <span class="pill live">analysed: '+esc(c.has.join(', '))+'</span>':'')+'</label>'}).join('');
  $('pk-list').innerHTML=rows||'<div class="muted" style="padding:10px">No creators match.</div>';
  $('pk-count').textContent=last.total+' match'+(last.total==1?'':'es')+(last.total>last.items.length?' (showing '+last.items.length+')':'');
  $('pk-all').disabled=!last.total;$('pk-all').textContent='Add all '+last.total}
@@ -3446,7 +3486,8 @@ $('pk-chips').addEventListener('click',function(e){var c=e.target.dataset.x;if(c
 $('pk-all').onclick=function(){last.all.forEach(function(r){basket[r[0]]=r[1]});drawBasket();drawResults()};
 $('pk-clear').onclick=function(){basket={};drawBasket();drawResults()};
 ['pk-q'].forEach(function(i){$(i).oninput=function(){clearTimeout(timer);timer=setTimeout(search,250)}});
-['pk-pl','pk-no','pk-src'].forEach(function(i){$(i).onchange=search});
+['pk-pl','pk-no','pk-src','pk-ap'].forEach(function(i){$(i).onchange=search});
+$('pk-ap').addEventListener('change',function(){$('pk-apf').value=$('pk-ap').value});
 $('pk-paste').onclick=function(){var b=new URLSearchParams();b.set('list',$('pk-list-in').value);
  fetch(B+'/analysis/find',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b}).then(function(r){return r.json()}).then(function(d){
   d.all.forEach(function(r){basket[r[0]]=r[1]});drawBasket();
@@ -3467,7 +3508,9 @@ def _creator_picker(sources, platforms):
             + "".join("<option>%s</option>" % e(p) for p in platforms) + "</select></div>"
             "<div><select id='pk-src'><option value=''>Whole roster</option>"
             + "".join("<option value='%s'>%s</option>" % (e(v), e(l)) for v, l in sources) + "</select></div></div>"
-            "<label style='display:block;margin:8px 0'><input type='checkbox' id='pk-no'> Only creators without an analysis yet</label>"
+            "<div class='row' style='margin-top:8px'><div><label>Analysis for</label><select id='pk-ap'><option value=''>Each creator's main platform</option>"
+            "<option>Instagram</option><option>TikTok</option><option>Snapchat</option></select></div>"
+            "<div style='align-self:flex-end'><label class='tick'><input type='checkbox' id='pk-no'> Only creators still without that analysis</label></div></div>"
             "<div class='muted' id='pk-count' style='margin:4px 0'></div><div class='pk-list' id='pk-list'></div>"
             "<div style='margin:8px 0'><button type='button' class='btn tiny ghost' id='pk-all'>Add all</button> "
             "<button type='button' class='btn tiny ghost' id='pk-clear'>Clear chosen</button></div>"
@@ -3475,7 +3518,7 @@ def _creator_picker(sources, platforms):
             "<textarea id='pk-list-in' placeholder='One per line — @handle, instagram.com/handle, or a name' style='min-height:90px;margin-top:8px'></textarea>"
             "<button type='button' class='btn tiny ghost' id='pk-paste'>Add these</button> <span class='muted' id='pk-pmsg'></span></details>"
             "<form method='post' action='" + u("/analysis/template") + "'>"
-            "<input type='hidden' name='source' value='codes'><input type='hidden' name='codes' id='pk-codes'>"
+            "<input type='hidden' name='source' value='codes'><input type='hidden' name='codes' id='pk-codes'><input type='hidden' name='platform' id='pk-apf'>"
             "<div style='margin:10px 0 4px'><strong id='pk-n'>0</strong> chosen <span id='pk-chips'></span></div>"
             "<button class='btn small' id='pk-dl' disabled>Download sheet for the chosen creators (.xlsx)</button> "
             "<a class='btn small ghost' href='" + u("/analysis/template.xlsx") + "'>Blank template</a></form>"
@@ -3504,7 +3547,8 @@ def analysis_review_page(kind, token, items, matched, creators, res, error=None,
             + _notes(error, message)
             + "<form method='post' action='" + u("/analysis/review") + "' class='card'>"
               "<input type='hidden' name='t' value='" + e(token) + "'>"
-              "<datalist id='rv-creators'>" + opts + "</datalist>"
+              + ("<div class='row'><div><label>Platform of these reports</label>" + _plat_select("platform", "Read it from each report") + "</div></div>" if kind == "pdf" else "")
+              + "<datalist id='rv-creators'>" + opts + "</datalist>"
               "<table><thead><tr><th>" + ("As written" if kind == "xlsx" else "File") + "</th><th>Creator</th></tr></thead><tbody>"
             + rows + "</tbody></table>"
               "<label style='display:block;margin:12px 0'><input type='checkbox' name='remember' value='1' checked> "
@@ -3514,69 +3558,104 @@ def analysis_review_page(kind, token, items, matched, creators, res, error=None,
     return page("Review upload", body, "/analysis")
 
 
-def analysis_page(creators, have, requests, origin, q="", error=None, message=None, page_no=1, sources=()):
+def _plat_select(name="platform", first="Each creator's main platform", cid=None, selected=""):
+    import analysis as _an
+    return ("<select name='" + name + "'" + (" id='" + cid + "'" if cid else "") + "><option value=''>" + e(first) + "</option>"
+            + "".join("<option" + (" selected" if p == selected else "") + ">" + p + "</option>" for p in _an.PLATFORMS[:3])
+            + "</select>")
+
+
+def analysis_page(creators, have, requests, origin, q="", error=None, message=None, page_no=1, sources=(), platform=""):
+    """`have` is {code: {platform: saved at}}: an analysis belongs to one platform."""
+    import analysis as _an
+    main = lambda code: next((_an.creator_platforms(c)[0] for c in creators if c["code"] == code), "Instagram")
     open_reqs = [r for r in requests if not r["handled_at"]]
     req_rows = "".join(
-        "<tr><td><code>" + e(r["code"]) + "</code> " + e(r["creator_name"] or "") + "</td><td>" + e(r["code_label"] or "—")
+        "<tr><td><code>" + e(r["code"]) + "</code> " + e(r["creator_name"] or "") + "</td><td><b>"
+        + e(r["platform"] or main(r["code"])) + "</b></td><td>" + e(r["code_label"] or "—")
         + "</td><td class='muted'>" + ago(r["at"]) + "</td><td>"
-        + ("<span class='pill live'>uploaded</span>" if r["code"] in have else "<span class='pill warn'>waiting</span>")
+        + ("<span class='pill live'>uploaded</span>" if (r["platform"] or main(r["code"])) in have.get(r["code"], {})
+           else "<span class='pill warn'>waiting</span>")
         + "</td><td><form method='post' action='" + u("/analysis/handled") + "'><input type='hidden' name='id' value='"
         + str(r["id"]) + "'><button class='btn tiny ghost'>Mark handled</button></form></td></tr>" for r in open_reqs)
     term = (q or "").strip().lower()
     shown = [c for c in creators if not term or term in (c["code"] + " " + c["name"]).lower()]
+
+    def plat_cells(c):
+        mine = have.get(c["code"], {})
+        plats = list(_an.creator_platforms(c)) + [p for p in mine if p not in _an.creator_platforms(c)]
+        out = ""
+        for p in plats:
+            if p in mine:
+                out += ("<span class='pill live'>" + e(p) + " · " + ago(mine[p]) + "</span> ")
+            else:
+                out += "<span class='pill'>" + e(p) + " · none</span> "
+        return out
+
+    def actions(c):
+        mine = have.get(c["code"], {})
+        plats = list(_an.creator_platforms(c)) + [p for p in mine if p not in _an.creator_platforms(c)]
+        first = next((p for p in plats if p in mine), plats[0])
+        return ("<a class='btn tiny ghost' href='" + e(origin + "/creator/#c=" + c["code"] + "&p=" + first) + "' target='_blank' rel='noopener'>Preview</a> "
+                + "".join("<a class='btn tiny ghost' href='" + u("/analysis") + "?q=" + e(c["code"]) + "&p=" + p + "#edit'>"
+                          + ("Edit " if p in mine else "Add ") + e(p) + "</a> " for p in plats))
     rows = "".join(
-        "<tr><td><code>" + e(c["code"]) + "</code></td><td>" + e(c["name"]) + "</td><td>"
-        + ("<span class='pill live'>full analysis · " + ago(have[c["code"]]) + "</span>" if c["code"] in have
-           else "<span class='pill'>locked</span>") + "</td><td>"
-        + "<a class='btn tiny ghost' href='" + e(origin + "/creator/#c=" + c["code"]) + "' target='_blank' rel='noopener'>Preview</a> "
-        + ("<a class='btn tiny ghost' href='" + u("/analysis") + "?q=" + e(c["code"]) + "#edit'>Edit</a>")
-        + "</td></tr>" for c in shown[(page_no - 1) * PER_PAGE:page_no * PER_PAGE])
+        "<tr><td><code>" + e(c["code"]) + "</code></td><td>" + e(c["name"]) + "</td><td>" + plat_cells(c) + "</td><td>"
+        + actions(c) + "</td></tr>" for c in shown[(page_no - 1) * PER_PAGE:page_no * PER_PAGE])
     editor = ""
     if term and len(shown) == 1:
         c = shown[0]
-        editor = ("<h2 id='edit'>Edit " + e(c["code"]) + " — " + e(c["name"]) + "</h2><form method='post' action='"
-                  + u("/analysis/save") + "' class='card'><input type='hidden' name='code' value='" + e(c["code"]) + "'>"
-                  "<label>Analysis as JSON</label><textarea name='json' id='an-json' style='min-height:260px;font-family:ui-monospace,monospace;font-size:12px'></textarea>"
-                  "<div class='savebar'><button class='btn small'>Save analysis</button></div></form>"
-                  "<script>fetch('" + u("/analysis/json") + "?c=" + e(c["code"]) + "').then(r=>r.text()).then(t=>{document.getElementById('an-json').value=t});</script>"
+        mine = have.get(c["code"], {})
+        plats = list(_an.creator_platforms(c)) + [p for p in mine if p not in _an.creator_platforms(c)]
+        cur = _an.canon_platform(platform) or next((p for p in plats if p in mine), plats[0])
+        tabs_ = "".join("<a class='btn tiny " + ("" if p == cur else "ghost") + "' href='" + u("/analysis") + "?q=" + e(c["code"]) + "&p=" + p + "#edit'>"
+                        + e(p) + ("" if p in mine else " (none)") + "</a> " for p in plats)
+        editor = ("<h2 id='edit'>Edit " + e(c["code"]) + " — " + e(c["name"]) + "</h2><div style='margin:0 0 10px'>" + tabs_ + "</div>"
+                  "<form method='post' action='" + u("/analysis/save") + "' class='card'><input type='hidden' name='code' value='" + e(c["code"]) + "'>"
+                  "<input type='hidden' name='platform' value='" + e(cur) + "'>"
+                  "<label>" + e(cur) + " analysis as JSON</label><textarea name='json' id='an-json' style='min-height:260px;font-family:ui-monospace,monospace;font-size:12px'></textarea>"
+                  "<div class='savebar'><button class='btn small'>Save " + e(cur) + " analysis</button></div></form>"
+                  "<script>fetch('" + u("/analysis/json") + "?c=" + e(c["code"]) + "&p=" + e(cur) + "').then(r=>r.text()).then(t=>{document.getElementById('an-json').value=t});</script>"
                   + ("<form method='post' action='" + u("/analysis/delete") + "' onsubmit=\"return confirm('Remove this analysis?')\">"
-                     "<input type='hidden' name='code' value='" + e(c["code"]) + "'><button class='btn small danger'>Remove analysis</button></form>"
-                     if c["code"] in have else ""))
+                     "<input type='hidden' name='code' value='" + e(c["code"]) + "'><input type='hidden' name='platform' value='" + e(cur) + "'>"
+                     "<button class='btn small danger'>Remove " + e(cur) + " analysis</button></form>" if cur in mine else ""))
     body = (
-        ui.header("Creator analysis", "Full profile analyses clients open from the catalogue and reports. A creator without one shows a locked page with Request full analysis; requests land below.", crumbs=[("Library", None), ("Creator analysis", None)])
+        ui.header("Creator analysis", "Full profile analyses clients open from the catalogue and reports — one per platform. A platform without one shows a locked tab with Request analysis; requests land below.", crumbs=[("Library", None), ("Creator analysis", None)])
         + _notes(error, message)
         + "<div class='card' id='pdf'><div class='hd'><h2>Option A · Drop profile report PDFs</h2></div>"
-          "<p class='sec-desc'>Drop one or many report PDFs. Each is read and saved as that creator's full analysis, "
-          "with their photo and post covers. The creator is found from the handle in the file name "
-          "(<code>report-handle-Oct-06-2026.pdf</code>) or printed on the report; anything that cannot be matched "
+          "<p class='sec-desc'>Drop one or many report PDFs. Each is read and saved as that creator's analysis for the platform the report is about "
+          "(read from the report, or set below), with their photo and post covers. The creator is found from the handle in the file name "
+          "(<code>report-handle-Oct-06-2026.pdf</code>), their profile links or a handle printed on the report; anything that cannot be matched "
           "comes up on a review screen where you pick the creator — nothing is refused.</p>"
           "<form method='post' action='" + u("/analysis/pdf") + "' enctype='multipart/form-data'>"
           + _dropzone("pdf-file", "file", "application/pdf,.pdf", True, "Drop PDF reports here or click to choose")
-          + "<div class='row'><div><label>Creator (only when uploading a single file)</label>"
+          + "<div class='row'><div><label>Platform of these reports</label>" + _plat_select("platform", "Read it from each report") + "</div>"
+            "<div><label>Creator (only when uploading a single file)</label>"
             "<input name='code' list='an-creators' placeholder='Type a name, handle or code' autocomplete='off'></div></div>"
           "<datalist id='an-creators'>" + "".join("<option value=\"%s\">%s</option>" % (e(c["code"]), e(c["name"])) for c in creators) + "</datalist>"
           "<button class='btn lime'>" + ui.icon("upload", 15) + " Import</button></form></div>"
         + "<div class='card' id='prefilled'><div class='hd'><h2>Option B · Numbers in a spreadsheet</h2></div>"
-          "<p class='sec-desc'>Step 1 — search and tick the creators you have numbers for (as many as you like), then download "
+          "<p class='sec-desc'>Step 1 — search and tick the creators you have numbers for (as many as you like), choose the platform, then download "
           "a sheet with them already filled in, so you never type a code. Step 2 — type the numbers and upload it. "
           "The creator is recognised from the code, <strong>@handle</strong>, profile link or name in the first column — "
-          "or from the handle/link in the Overview row — and anything unclear is asked about before saving.</p>"
+          "or from the handle/link in the Overview row — and anything unclear is asked about before saving. "
+          "A workbook can hold the same creator on several platforms: give each row its Platform.</p>"
           + _creator_picker(sources, sorted({c["platform"] for c in creators if c["platform"]}))
-          +           "<hr style='border:0;border-top:1px solid #e6e1d6;margin:16px 0'>"
+          + "<hr style='border:0;border-top:1px solid #e6e1d6;margin:16px 0'>"
           "<form method='post' action='" + u("/analysis/upload") + "' enctype='multipart/form-data'>"
           "<label>2 · Upload it filled in</label>"
           + _dropzone("xlsx-file", "file", ".xlsx", False, "Drop the filled-in workbook here or click to choose")
-          + "<p class='price-hint'>Rows with only the creator filled in are ignored. Uploading a creator again replaces "
-            "their analysis and closes their open requests.</p>"
+          + "<p class='price-hint'>Rows with only the creator filled in are ignored. Uploading a creator's platform again replaces "
+            "that platform's analysis and closes its open requests.</p>"
             "<button class='btn small'>Upload analyses</button></form></div>"
-        + "<h2>Requests from clients</h2><div class='card'><table><thead><tr><th>Creator</th><th>Client</th><th>Asked</th>"
-          "<th>Status</th><th></th></tr></thead><tbody>" + (req_rows or "<tr><td colspan='5' class='muted'>No open requests.</td></tr>")
+        + "<h2>Requests from clients</h2><div class='card'><table><thead><tr><th>Creator</th><th>Platform</th><th>Client</th><th>Asked</th>"
+          "<th>Status</th><th></th></tr></thead><tbody>" + (req_rows or "<tr><td colspan='6' class='muted'>No open requests.</td></tr>")
         + "</tbody></table></div>"
         + editor
         + "<h2>Creators</h2><form class='card' method='get' action='" + u("/analysis") + "'><div class='row'>"
           "<div style='flex:3'><input name='q' value='" + e(q) + "' placeholder='Search by code or name'></div>"
           "<div><button class='btn small'>Search</button></div></div></form>"
-        + "<div class='card'><table><thead><tr><th>Code</th><th>Name</th><th>Analysis</th><th></th></tr></thead><tbody>"
+        + "<div class='card'><table><thead><tr><th>Code</th><th>Name</th><th>Analysis by platform</th><th></th></tr></thead><tbody>"
         + (rows or "<tr><td colspan='4' class='muted'>No creators match.</td></tr>") + "</tbody></table>"
         + pager(len(shown), page_no, "/analysis", q=q) + "</div>")
     return page("Creator analysis", body, "/analysis")
