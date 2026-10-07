@@ -495,7 +495,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.selection_edit_page(
                 sel, db.list_creators(), db.tier_prices(), self.site_origin(),
                 query.get("e"), query.get("ok"), db.campaigns_for_selection(sel["id"]),
-                scores=self.selection_scores(sel), interests=db.known_interests()))
+                scores=self.selection_scores(sel), interests=db.known_interests(), codes=db.list_codes()))
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
                 db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok"),
@@ -1886,6 +1886,10 @@ class Handler(BaseHTTPRequestHandler):
         name = (f.get("name") or "").strip() or sel["name"]
         db.set_selection_currency(sel["id"], cur)
         import fit as _fit_mod
+        if "sel_client" in f:
+            raw = (f.get("sel_client") or "").strip()
+            cid = int(raw) if raw.isdigit() and db.get_code(int(raw)) is not None else None
+            db.set_selection_client(sel["id"], cid, (f.get("client_name") or "").strip()[:80])
         if (f.get("sel_objective") or "") in _fit_mod.OBJECTIVES:
             db.set_selection_objective(sel["id"], f["sel_objective"])
         if any(k in f for k in ("t_country", "t_gender", "t_age", "t_category")):
@@ -3450,7 +3454,8 @@ class Handler(BaseHTTPRequestHandler):
                                     "platform": platform,
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "brief": {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
-                                              "client": ((db.get_code(sel["code_id"]) or {"label": ""})["label"] if sel["code_id"] else "")},
+                                              "client": ((sel["client_name"] if "client_name" in sel.keys() else None)
+                                                         or ((db.get_code(sel["code_id"]) or {"label": ""})["label"] if sel["code_id"] else ""))},
                                     "scores": {k: {"score": v["score"], "tag": v["tag"], "strengths": v["strengths"],
                                                    "watchouts": v["watchouts"], "conclusion": v["conclusion"],
                                                    "parts": [{"label": p["label"], "s": p["s"]} for p in v["parts"]],

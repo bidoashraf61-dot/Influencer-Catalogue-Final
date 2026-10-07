@@ -2213,7 +2213,7 @@ if(cur.map(function(x){return x.toLowerCase()}).indexOf(t.toLowerCase())<0)cur.p
 draw()})();</script>'''
 
 
-def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=()):
+def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=(), codes=()):
     by = {c["code"]: c for c in creators}
     codes = json.loads(sel["codes"] or "[]")
     own = json.loads(sel["prices"] or "{}")
@@ -2313,7 +2313,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
                                ("Start a campaign", "done" if st_done[3] else ("now" if first_open == 3 else "todo"))])
     roster_list = "<datalist id='roster-list'>" + "".join(
         "<option value=\"%s (%s)\">" % (e(c["name"]), e(c["code"])) for c in creators if c["active"]) + "</datalist>"
-    client_pill = ("<span class='pill own'>" + e(sel["code_label"]) + "</span>" if ("code_label" in sel.keys() and sel["code_label"])
+    shown_client = (sel["client_name"] if "client_name" in sel.keys() else None) or ""
+    client_pill = ("<span class='pill own'>" + e(shown_client or sel["code_label"]) + "</span>" if ("code_label" in sel.keys() and sel["code_label"]) or shown_client
                    else "<span class='pill warn'>No client assigned</span>")
     import db as _db
     _code = _db.get_code(sel["code_id"]) if sel["code_id"] else None
@@ -2420,7 +2421,14 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<input name='total_to' value='" + tt + "' placeholder='to' inputmode='numeric'></div>"
           "<div class='price-hint'>Fills itself from the prices below as you type them (currently "
         + money_c(lo_sum, hi_sum) + "). Type your own figure to override it; clear it to follow the creators again.</div></div>"
-        + "</div></div>"
+        + "</div>"
+        + "<div class='row'><div><label>Client (access code)</label><select name='sel_client'><option value=''>No client</option>"
+        + "".join("<option value='%d'%s>%s</option>" % (c["id"], " selected" if c["id"] == sel["code_id"] else "", e(c["label"])) for c in codes)
+        + "</select><div class='price-hint'>Whose passcode opens this selection. Changing it moves the selection to that client.</div></div>"
+        + "<div style='flex:2'><label>Client name shown on the page</label><input name='client_name' maxlength='80' value='" + e(shown_client)
+        + "' placeholder='Leave empty to use the client&#39;s own name'><div class='price-hint'>Shown as &ldquo;for &hellip;&rdquo; in the selection banner. "
+          "Changes only this selection.</div></div></div>"
+        + "</div>"
                 + "</div>"
         + "<div class='savebar'><button class='btn lime'>Save changes</button><span class='muted'>Prices, margins and details are saved together.</span></div></form>"
         + ui.panel("share", link_html + pass_html) + ui.panel("campaign", campaign_html)

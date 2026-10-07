@@ -479,6 +479,9 @@ def migrate(conn):
     if "client_platforms" not in sel_cols:
         # The same, as the client chose it on their own page.
         conn.execute("ALTER TABLE selections ADD COLUMN client_platforms TEXT")
+    if "client_name" not in sel_cols:
+        # The client name shown on THIS selection's page; empty = the client's own label.
+        conn.execute("ALTER TABLE selections ADD COLUMN client_name TEXT")
     if "verdicts" not in sel_cols:
         # {code: {"fit": ..., "roles": [...], "reason": ...}}: the admin's fit and
         # campaign-role call on each creator of THIS selection, shown to the client.
@@ -1739,6 +1742,12 @@ def set_archived(table, rid, on):
 def set_selection_objective(sid, objective):
     with connect() as conn:
         conn.execute("UPDATE selections SET objective = ? WHERE id = ?", (objective, sid))
+
+
+def set_selection_client(sid, code_id, client_name):
+    """Move a selection to another client (access code) and/or rename the client it shows."""
+    with connect() as conn:
+        conn.execute("UPDATE selections SET code_id = ?, client_name = ? WHERE id = ?", (code_id, client_name or None, sid))
 
 
 def set_selection_target(sid, target):
