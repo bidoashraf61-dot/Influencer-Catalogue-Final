@@ -294,7 +294,7 @@ body.pt-lock { overflow: hidden; }
 
 /* panel */
 .hv-panel {
-  position: absolute; right: 0; bottom: 98px; width: 392px; height: min(640px, calc(100vh - 140px));
+  position: absolute; right: 0; bottom: 98px; width: 460px; height: min(780px, calc(100vh - 130px));
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--hv-white); border-radius: 28px;
   box-shadow: 0 24px 60px rgba(18,18,18,.24), 0 2px 8px rgba(18,18,18,.08);
@@ -339,6 +339,8 @@ body.pt-lock { overflow: hidden; }
   flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 18px 16px 10px;
   display: flex; flex-direction: column; gap: 10px; background: var(--hv-linen);
 }
+@media (min-width: 1440px) { .hv-panel { width: 500px; height: min(840px, calc(100vh - 130px)); } }
+@media (max-width: 760px) and (min-width: 561px) { .hv-panel { width: calc(100vw - 48px); } }
 .hv-row { display: flex; align-items: flex-end; gap: 8px; animation: hv-in .28s var(--hv-ease); }
 .hv-row--me { justify-content: flex-end; }
 .hv-row__ava {
