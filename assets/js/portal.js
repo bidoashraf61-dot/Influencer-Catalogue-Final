@@ -1502,14 +1502,334 @@
     }
   }
 
+  /* ---------------------------------------------------- AI shortlist card */
+  // "Build a shortlist with AI": a card beside the catalogue's filters. Six
+  // taps fill a brief (free), the server scores the whole roster, and the grid
+  // narrows to the picks, best first, each with one score per platform. The
+  // wait is staged: the character scouts with his camera while named steps
+  // tick off, so the client watches their campaign list being made.
+
+  var AI_STEPS = [
+    ["goal", "Goal", '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/>'],
+    ["platforms", "Platforms", '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/>'],
+    ["market", "Audience", '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17"/>'],
+    ["category", "Space", '<path d="M3.5 12.5l8-8h7v7l-8 8z"/><circle cx="15" cy="9" r="1.3"/>'],
+    ["budget", "Budget", '<rect x="3.5" y="6.5" width="17" height="12" rx="2.5"/><path d="M15.5 12.5h2.5M3.5 10h17"/>'],
+    ["count", "Creators", '<circle cx="9" cy="8.5" r="3"/><circle cx="16.5" cy="9.5" r="2.4"/><path d="M3.5 19c.5-3 2.7-4.6 5.5-4.6s5 1.6 5.5 4.6M15 14.6c2.6 0 4.6 1.4 5 4.4"/>']
+  ];
+  var AI_SHORT = { Instagram: "IG", TikTok: "TT", Snapchat: "SC", YouTube: "YT" };
+  var AI_MARKET = { SA: "KSA", AE: "UAE", EG: "Egypt", KW: "Kuwait", QA: "Qatar", BH: "Bahrain", OM: "Oman", JO: "Jordan" };
+  var AI_GOAL = { awareness: "Reach", engagement: "Engagement", conversion: "Sales", balanced: "Balanced" };
+  function aiSvg(path, size) {
+    return '<svg viewBox="0 0 24 24" width="' + (size || 20) + '" height="' + (size || 20) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + "</svg>";
+  }
+
+  function mountAiCard() {
+    if (document.body.getAttribute("data-page") !== "catalogue" || $("ai-sl")) return;
+    var tries = 0;
+    (function wait() {
+      var host = document.querySelector(".cat-controls .cat-container");
+      if (host && host.querySelector(".cat-bar")) return buildAiCard(host);
+      if (++tries < 60) setTimeout(wait, 250);
+    })();
+  }
+
+  function buildAiCard(host) {
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var V = ROOT + "assets/brand/voice/";
+    host.classList.add("ai-host");
+    var card = h("section", { id: "ai-sl", class: "ai-sl", "aria-labelledby": "ai-sl-title" });
+    var roster = document.querySelectorAll(".cat-card").length;
+    function loop(name) {
+      return reduce ? '<img src="' + V + 'voice-loop-poster.webp" alt="" width="120" height="120"/>'
+        : '<video muted loop playsinline autoplay preload="metadata" poster="' + V + 'voice-loop-poster.webp" aria-hidden="true">' +
+          '<source src="' + V + name + '.webm" type="video/webm"/><source src="' + V + name + '.mp4" type="video/mp4"/></video>';
+    }
+
+    // Collapsed: the invitation.
+    var intro = h("div", { class: "ai-sl__intro" });
+    intro.innerHTML = '<div class="ai-sl__face">' + loop("voice-loop") + "</div>" +
+      '<div class="ai-sl__copy"><h2 class="ai-sl__title" id="ai-sl-title">Build a shortlist with AI</h2>' +
+      "<p>Six quick taps. We score all " + (roster ? roster.toLocaleString("en-US") + " " : "") + "creators against your campaign and pick the best.</p></div>";
+    var start = h("button", { class: "ai-sl__start", type: "button" }, "Start");
+    start.insertAdjacentHTML("beforeend", aiSvg('<path d="M5 12h13M13 6l6 6-6 6"/>', 18));
+    intro.appendChild(start);
+
+    // Expanded: the journey.
+    var run = h("div", { class: "ai-sl__run", hidden: "" });
+    var head = h("div", { class: "ai-sl__head" });
+    var level = h("p", { class: "ai-sl__level", "aria-live": "polite" });
+    var quit = h("button", { class: "ai-sl__quit", type: "button", "aria-label": "Close the AI shortlist" });
+    quit.innerHTML = aiSvg('<path d="M6 6l12 12M18 6L6 18"/>', 18);
+    var track = h("ol", { class: "ai-sl__track", "aria-label": "Brief progress" });
+    AI_STEPS.forEach(function (s, i) {
+      var li = h("li", { class: "ai-sl__node", "data-i": String(i) });
+      li.innerHTML = '<span class="ai-sl__dot">' + aiSvg(s[2], 18) + '<i class="ai-sl__tick">' + aiSvg('<path d="M5 12.5l4.2 4.2L19 7"/>', 16) + "</i></span><span class=\"ai-sl__lbl\">" + s[1] + "</span>";
+      track.appendChild(li);
+    });
+    var fill = h("span", { class: "ai-sl__fill", "aria-hidden": "true" });
+    track.appendChild(fill);
+    head.appendChild(track); head.appendChild(level); head.appendChild(quit);
+    var stage = h("div", { class: "ai-sl__stage" });
+    run.appendChild(head); run.appendChild(stage);
+    card.appendChild(intro); card.appendChild(run);
+    host.appendChild(card);
+
+    var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null;
+
+    function setTrack(at, done) {
+      Array.prototype.forEach.call(track.querySelectorAll(".ai-sl__node"), function (n, i) {
+        n.classList.toggle("is-done", i < at || !!done);
+        n.classList.toggle("is-now", i === at && !done);
+      });
+      var pct = done ? 100 : Math.round(at / (AI_STEPS.length - 1) * 100);
+      fill.style.setProperty("--p", pct + "%");
+      level.innerHTML = done ? "<b>Brief</b> complete" : "<b>Brief " + Math.min(at + 1, AI_STEPS.length) + "</b> / " + AI_STEPS.length;
+    }
+    function open() {
+      card.classList.add("is-open"); intro.hidden = true; run.hidden = false;
+      loadQuestions().then(function (list) {
+        qs = list; byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
+        ask(0);
+      });
+    }
+    function close() {
+      card.classList.remove("is-open"); run.hidden = true; intro.hidden = false;
+    }
+    start.addEventListener("click", function () { answers = {}; open(); });
+    quit.addEventListener("click", close);
+
+    function swap(node) {
+      stage.innerHTML = "";
+      node.classList.add("ai-sl__panel");
+      stage.appendChild(node);
+      var f = node.querySelector("button, input");
+      if (f) f.focus({ preventScroll: true });
+    }
+    function ask(i) {
+      step = i; setTrack(i);
+      var id = AI_STEPS[i][0], q = byId[id];
+      if (!q) return i + 1 < AI_STEPS.length ? ask(i + 1) : review();
+      var many = q.type === "many";
+      var picked = Array.isArray(answers[id]) ? answers[id].slice() : [];
+      var p = h("div", { class: "ai-sl__q" });
+      p.appendChild(h("p", { class: "ai-sl__ask" }, q.label));
+      p.appendChild(h("p", { class: "ai-sl__hint" }, many ? "Pick any, then Next" : "Tap one"));
+      var opts = h("div", { class: "ai-sl__opts" + (q.options.length > 6 ? " ai-sl__opts--many" : "") });
+      q.options.forEach(function (o) {
+        var on = many ? picked.indexOf(o.value) > -1 : answers[id] === o.value;
+        var b = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(on) }, o.label);
+        b.addEventListener("click", function () {
+          if (!many) { answers[id] = o.value; b.setAttribute("aria-pressed", "true"); pop(b); setTimeout(function () { next(); }, reduce ? 0 : 260); return; }
+          var k = picked.indexOf(o.value);
+          if (o.value === "any") picked = k > -1 ? [] : ["any"];
+          else { picked = picked.filter(function (v) { return v !== "any"; }); if (k > -1) picked.splice(picked.indexOf(o.value), 1); else picked.push(o.value); }
+          Array.prototype.forEach.call(opts.children, function (x, xi) { x.setAttribute("aria-pressed", String(picked.indexOf(q.options[xi].value) > -1)); });
+          nextBtn.disabled = !picked.length;
+        });
+        opts.appendChild(b);
+      });
+      p.appendChild(opts);
+      var nav = h("div", { class: "ai-sl__nav" });
+      if (i > 0) nav.appendChild(h("button", { class: "ai-sl__back", type: "button", onclick: function () { ask(i - 1); } }, "Back"));
+      if (!q.required && !many) nav.appendChild(h("button", { class: "ai-sl__skip", type: "button", onclick: function () { delete answers[id]; next(); } }, "Skip"));
+      var nextBtn = h("button", { class: "ai-sl__next", type: "button", onclick: function () { answers[id] = picked.slice(); pop(nextBtn); next(); } }, "Next");
+      if (many) { nextBtn.disabled = !picked.length; nav.appendChild(nextBtn); }
+      p.appendChild(nav);
+      swap(p);
+      function next() { if (i + 1 < AI_STEPS.length) ask(i + 1); else review(); }
+    }
+    function pop(el) {
+      if (reduce) return;
+      var s = h("span", { class: "ai-sl__plus", "aria-hidden": "true" }, "+1");
+      el.appendChild(s); setTimeout(function () { s.remove(); }, 700);
+    }
+    function label(id) {
+      var v = answers[id], q = byId[id];
+      if (v == null || (Array.isArray(v) && !v.length)) return "Any";
+      return (Array.isArray(v) ? v : [v]).map(function (x) { return optionLabel(q, x); }).join(", ");
+    }
+    function nameFor() {
+      var cat = Array.isArray(answers.category) && answers.category[0] && answers.category[0] !== "any" ? optionLabel(byId.category, answers.category[0]).split(/ [&\/] /)[0] : "Creators";
+      return [cat, AI_MARKET[answers.market] || "", AI_GOAL[answers.goal] || ""].filter(Boolean).join(" · ");
+    }
+    function costLine() {
+      var c = (ME && ME.costs) || { brief: 5, search: 0 };
+      if (ME && ME.kind === "admin") return "Admin preview · free";
+      if (ME && ME.ai && c.brief && (ME.credits == null || ME.credits >= c.brief)) return c.brief + " credits · includes AI reasons";
+      return c.search ? c.search + " credits" : "Free";
+    }
+    function review() {
+      setTrack(AI_STEPS.length, true);
+      var p = h("div", { class: "ai-sl__review" });
+      var ticket = h("div", { class: "ai-sl__ticket" });
+      ticket.appendChild(h("p", { class: "ai-sl__tk-h" }, "Campaign brief"));
+      var nameIn = h("input", { class: "ai-sl__name", type: "text", maxlength: "80", value: nameFor(), "aria-label": "Name this shortlist" });
+      ticket.appendChild(nameIn);
+      var dl = h("dl", { class: "ai-sl__rows" });
+      AI_STEPS.forEach(function (s, i) {
+        var row = h("div", { class: "ai-sl__row" });
+        row.appendChild(h("dt", null, s[1]));
+        row.appendChild(h("dd", null, label(s[0])));
+        var edit = h("button", { class: "ai-sl__edit", type: "button", "aria-label": "Change " + s[1] }, "Change");
+        edit.addEventListener("click", function () { ask(i); });
+        row.appendChild(edit);
+        dl.appendChild(row);
+      });
+      ticket.appendChild(dl);
+      p.appendChild(ticket);
+      var side = h("div", { class: "ai-sl__go" });
+      side.appendChild(h("p", { class: "ai-sl__ask" }, "Ready when you are."));
+      side.appendChild(h("p", { class: "ai-sl__hint" }, "We score every creator on each platform, fit your budget and explain each pick."));
+      var build = h("button", { class: "ai-sl__build", type: "button" }, "Build my shortlist");
+      build.appendChild(h("small", null, costLine()));
+      build.addEventListener("click", function () { if (!busy) go(nameIn.value.trim() || nameFor()); });
+      side.appendChild(build);
+      p.appendChild(side);
+      swap(p);
+    }
+
+    /* -- the wait, staged -- */
+    var STAGES = ["Reading your brief", "Scoring every creator", "Fitting your budget", "Writing the reasons"];
+    function go(name) {
+      busy = true;
+      var p = h("div", { class: "ai-sl__wait", role: "status", "aria-live": "polite" });
+      var scene = h("div", { class: "ai-sl__scene", "aria-hidden": "true" });
+      scene.innerHTML = '<div class="ai-sl__orbit ai-sl__orbit--a"><i></i><i></i><i></i></div>' +
+        '<div class="ai-sl__orbit ai-sl__orbit--b"><i></i><i></i></div>' +
+        '<div class="ai-sl__orbit ai-sl__orbit--c">' + ["Instagram", "TikTok", "Snapchat"].map(function (pl) {
+          var ic = window.HV_ICONS && window.HV_ICONS.icons && window.HV_ICONS.icons[pl];
+          return '<b class="ai-sl__mark ai-sl__mark--' + pl.toLowerCase() + '">' + (ic || '<em>' + AI_SHORT[pl] + "</em>") + "</b>";
+        }).join("") + "</div>" +
+        '<div class="ai-sl__lens">' + loop("voice-scan") + "</div>" +
+        '<span class="ai-sl__spark ai-sl__spark--1"></span><span class="ai-sl__spark ai-sl__spark--2"></span><span class="ai-sl__spark ai-sl__spark--3"></span>';
+      p.appendChild(scene);
+      var side = h("div", { class: "ai-sl__steps" });
+      side.appendChild(h("p", { class: "ai-sl__ask" }, "Building “" + name + "”"));
+      var list = h("ol", { class: "ai-sl__list" });
+      var counter = h("b", { class: "ai-sl__count" }, "0");
+      STAGES.forEach(function (t, i) {
+        var li = h("li", { class: "ai-sl__st" }, h("span", { class: "ai-sl__st-dot", "aria-hidden": "true" }), h("span", null, t));
+        if (i === 1) li.appendChild(counter);
+        list.appendChild(li);
+      });
+      side.appendChild(list);
+      var bar = h("div", { class: "ai-sl__bar", "aria-hidden": "true" }, h("i"));
+      side.appendChild(bar);
+      p.appendChild(side);
+      swap(p);
+      var items = list.children, total = Math.max(roster, 1), t0 = Date.now(), done = false, at = 0;
+      function mark(i) {
+        Array.prototype.forEach.call(items, function (li, k) { li.classList.toggle("is-done", k < i); li.classList.toggle("is-now", k === i); });
+        at = i;
+      }
+      mark(0);
+      var timer = setInterval(function () {
+        var s = (Date.now() - t0) / 1000;
+        if (!done) {
+          if (s > 1.2 && at < 1) mark(1);
+          if (at === 1) counter.textContent = Math.min(total, Math.round(total * Math.min(1, (s - 1.2) / 4))).toLocaleString("en-US");
+          if (s > 5.4 && at < 2) mark(2);
+          if (s > 7.4 && at < 3) mark(3);
+          bar.firstChild.style.width = Math.min(92, 8 + s * 4) + "%";
+        }
+      }, 120);
+      api("POST", "/api/brief/run", { answers: answers, name: name }).then(function (r) {
+        done = true; clearInterval(timer); busy = false;
+        if (!r.b.ok || r.b.empty || !(r.b.picks || []).length) {
+          var err = h("div", { class: "ai-sl__q" }, h("p", { class: "ai-sl__ask" }, r.b.empty ? "No creators matched that brief." : "That didn't work."),
+            h("p", { class: "ai-sl__hint" }, (r.b.message || "Nothing was charged. Try again in a moment.")));
+          err.appendChild(h("div", { class: "ai-sl__nav" }, h("button", { class: "ai-sl__next", type: "button", onclick: review }, "Change the brief")));
+          swap(err); return;
+        }
+        counter.textContent = (r.b.pool || total).toLocaleString ? Number(r.b.pool || total).toLocaleString("en-US") : String(r.b.pool || total);
+        mark(STAGES.length); bar.firstChild.style.width = "100%";
+        setCredits(r.b.credits);
+        last = r.b;
+        setTimeout(function () { celebrate(r.b, name); }, reduce ? 0 : 500);
+      });
+    }
+    function celebrate(res, name) {
+      var p = h("div", { class: "ai-sl__done" });
+      var burst = h("div", { class: "ai-sl__burst", "aria-hidden": "true" });
+      for (var i = 0; i < 18; i++) { var c = h("i"); c.style.setProperty("--a", (i * 20) + "deg"); c.style.setProperty("--d", (60 + (i % 3) * 26) + "px"); burst.appendChild(c); }
+      p.appendChild(burst);
+      p.appendChild(h("p", { class: "ai-sl__big" }, h("b", null, String(res.picks.length)), " creators picked"));
+      p.appendChild(h("p", { class: "ai-sl__hint" }, "Best fit first, scored per platform. They're ticked in your tray: add or remove anyone, then save."));
+      swap(p);
+      showResult(res, name);
+      setTimeout(function () {
+        close();
+        var bar = $("ai-result");
+        if (bar) bar.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+      }, reduce ? 300 : 1900);
+    }
+
+    /* -- the grid, narrowed to the picks -- */
+    function bandOf(n) { return n >= 80 ? "g" : n >= 60 ? "l" : n >= 40 ? "a" : "r"; }
+    function clearResult() {
+      var grid = $("cat-grid");
+      if (grid) grid.classList.remove("ai-on");
+      Array.prototype.forEach.call(document.querySelectorAll(".cat-card.ai-pick, .cat-card.ai-out"), function (c) {
+        c.classList.remove("ai-pick", "ai-out"); c.style.order = "";
+        var x = c.querySelector(".ai-badges"); if (x) x.remove();
+      });
+      var bar = $("ai-result"); if (bar) bar.remove();
+      document.body.classList.remove("ai-mode");
+    }
+    function showResult(res, name) {
+      clearResult();
+      var grid = $("cat-grid");
+      if (!grid) return;
+      var rank = {}, why = {};
+      res.picks.forEach(function (p, i) { rank[p.code] = i + 1; why[p.code] = p.why || ""; });
+      grid.classList.add("ai-on");
+      document.body.classList.add("ai-mode");
+      Array.prototype.forEach.call(grid.querySelectorAll(".cat-card[data-code]"), function (c) {
+        var code = c.getAttribute("data-code"), n = rank[code];
+        if (!n) { c.classList.add("ai-out"); return; }
+        c.classList.add("ai-pick"); c.style.order = String(n);
+        var media = c.querySelector(".cat-card__media") || c;
+        var box = h("div", { class: "ai-badges", "data-noselect": "" });
+        box.appendChild(h("span", { class: "ai-rank", title: why[code] || "" }, "#" + n));
+        var ps = (res.platform_scores || {})[code] || {};
+        var plats = Object.keys(ps);
+        if (!plats.length) { var only = res.picks[n - 1]; if (only && only.score != null) { ps = { Match: only.score }; plats = ["Match"]; } }
+        plats.sort(function (a, b) { return ps[b] - ps[a]; }).forEach(function (pl) {
+          var s = h("span", { class: "ai-pscore ai-pscore--" + bandOf(ps[pl]), title: pl + " match " + ps[pl] + " / 100" });
+          s.appendChild(h("small", null, AI_SHORT[pl] || pl)); s.appendChild(h("b", null, String(ps[pl])));
+          box.appendChild(s);
+        });
+        media.appendChild(box);
+        if (c.getAttribute("aria-pressed") !== "true") c.click();
+      });
+      var bar = h("div", { id: "ai-result", class: "ai-result" });
+      var txt = h("div", { class: "ai-result__txt" });
+      txt.appendChild(h("p", { class: "ai-result__name" }, name));
+      txt.appendChild(h("p", { class: "ai-result__sum" }, res.summary || (res.picks.length + " creators match your brief, best fit first.")));
+      bar.appendChild(txt);
+      var acts = h("div", { class: "ai-result__acts" });
+      acts.appendChild(h("a", { class: "ai-result__btn ai-result__btn--lime", href: ROOT + "selection/#s=" + encodeURIComponent(res.token) }, "Open as selection"));
+      acts.appendChild(h("a", { class: "ai-result__btn", href: ROOT + "selection/#s=" + encodeURIComponent(res.token) + "&quote=1" }, "Request a quote"));
+      acts.appendChild(h("button", { class: "ai-result__btn ai-result__btn--ghost", type: "button", onclick: clearResult }, "Show all creators"));
+      acts.appendChild(h("button", { class: "ai-result__btn ai-result__btn--ghost", type: "button", onclick: function () { clearResult(); answers = {}; open(); card.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" }); } }, "New brief"));
+      bar.appendChild(acts);
+      grid.parentNode.insertBefore(bar, grid);
+    }
+  }
+
   /* ------------------------------------------------------------------ boot */
 
   function boot() {
     api("GET", "/api/me").then(function (r) {
       if (r.b && r.b.signed_in) {
-        ME = r.b; mountDock(); mountVoice();
+        ME = r.b; mountDock(); mountVoice(); mountAiCard();
         var m = /[#&]s=([^&]+)/.exec(location.hash || "");
         if (document.body.getAttribute("data-page") === "selection" && m) setTimeout(function () { offerBrief(decodeURIComponent(m[1])); }, 1200);
+        // Arriving from the AI shortlist's "Request a quote": open the quote form straight away.
+        if (document.body.getAttribute("data-page") === "selection" && /[#&]quote=1/.test(location.hash)) setTimeout(function () {
+          var q = document.getElementById("cat-request") || document.getElementById("cat-request-2"); if (q) q.click();
+        }, 1600);
         if (storedBrief()) applyFit();
         return;
       }

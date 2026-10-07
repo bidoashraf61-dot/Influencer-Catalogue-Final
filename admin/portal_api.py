@@ -707,12 +707,22 @@ class PortalMixin:
                               text, ("Notes: " + answers["notes"]) if answers.get("notes") else ""], kam=user["kam"] if user else None)
         token = db.selection(sid)["token"]
         shown = {r["code"]: r for r in self.roster_payload(only=set(codes) | {a["code"] for a in result["alternates"]})}
+        # One score per platform for each pick, scored by the same rules as the shortlist, so a card
+        # can say "IG 87 · TT 64" instead of one number that hides which account it is about.
+        plat_scores = {}
+        for plat in (brief["platforms"] or sorted(matcher.PLATFORMS)):
+            try:
+                for it in matcher.score_all(dict(brief, platforms=[plat]), only=set(codes)):
+                    plat_scores.setdefault(it["code"], {})[plat] = it["score"]
+            except Exception:
+                continue
         return self.send_json(200, {
             "ok": True, "token": token, "name": name, "summary": summary, "narrated": narrated, "brief": text, "brief_id": brief_id,
             "objective": brief["objective"], "totals": result["totals"], "pool": result["pool"],
             "picks": [dict(p, why=reasons.get(p["code"], ""), creator=shown.get(p["code"])) for p in result["picks"]],
             "alternates": [dict({k: a[k] for k in ("code", "score", "tag", "basis", "price")}, creator=shown.get(a["code"]))
                            for a in result["alternates"]],
+            "platform_scores": plat_scores,
             "spent": cost, "credits": bal if kind != "admin" else None}, self.cors())
 
     # ------------------------------------------------------------------ chat --
