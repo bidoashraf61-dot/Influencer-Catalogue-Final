@@ -797,12 +797,29 @@ class PortalMixin:
 
     def portal_keys(self, f, done):
         which, action = f.get("which"), f.get("action")
+        if which == "graph":
+            if action == "clear":
+                mailer.clear_graph()
+                return done("Microsoft 365 app disconnected.")
+            try:
+                mailer.save_graph(f.get("tenant"), f.get("client_id"), f.get("secret"), f.get("sender"))
+            except ValueError as exc:
+                return done(str(exc), False)
+            if f.get("test"):
+                try:
+                    mailer.send(f["test"].strip(), "HelloVoice portal: test email",
+                                "This is a test from the catalogue portal. Email sign-in can now send codes.")
+                except mailer.MailError as exc:
+                    return done("Saved, but the test failed: %s" % exc, False)
+                return done("Connected. A test email was sent to %s from %s." % (f["test"].strip(), f.get("sender")))
+            return done("Connected. The secret is never shown again.")
         if which == "smtp":
             if action == "clear":
                 mailer.clear_smtp()
                 return done("Mailbox removed.")
             try:
-                mailer.save_smtp(f.get("user"), f.get("password"), f.get("host") or "smtp.office365.com", f.get("port") or 587)
+                mailer.save_smtp(f.get("user"), f.get("password"), f.get("host") or "smtp.office365.com", f.get("port") or 587,
+                                 f.get("send_as") or "")
             except ValueError as exc:
                 return done(str(exc), False)
             if f.get("test"):

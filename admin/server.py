@@ -23,6 +23,10 @@ Routes
   /campaigns            booked creators, dates and detection rules per client
   /api/unlock           POST {code}   -> sets a viewer cookie, returns roster
   /api/roster           GET           -> roster, viewer cookie required
+  /api/discover/facets  GET           -> Audience/Performance filter options (names only)
+  /api/discover         POST          -> codes passing analysis filters (analyses stay here)
+  /api/discover/like    POST          -> codes most like one creator, best first
+  /api/discover/parse   POST          -> a typed brief read into sidebar filters (free)
   /api/request          POST          -> store a quote request
   /api/event            POST          -> record a shortlist action
 

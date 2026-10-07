@@ -78,6 +78,60 @@ class Mailbox(unittest.TestCase):
         with self.assertRaises(mailer.MailError):
             mailer.send("client@pfizer.com", "s", "t")
 
+    def test_smtp_send_as_shared_mailbox(self):
+        mailer.save_smtp("bido@hellovoice.co.uk", "right-pass", "127.0.0.1", self.port, send_as="info@hellovoice.co.uk")
+        mailer.send("client@pfizer.com", "s", "t")
+        self.assertEqual(GOT[-1]["user"], "bido@hellovoice.co.uk")
+        self.assertIn("From: HelloVoice <info@hellovoice.co.uk>", GOT[-1]["msg"])
+        mailer.clear_smtp()
+
+    def test_graph_sends_as_shared_mailbox(self):
+        calls = []
+        def fake(url, data, headers, timeout=15):
+            calls.append((url, data, headers))
+            if "oauth2" in url:
+                return 200, {"access_token": "tok-1", "expires_in": 3600}
+            return 202, {}
+        orig = mailer._graph_post
+        mailer._graph_post = fake
+        try:
+            mailer.save_graph("1234abcd-1234-1234-1234-1234567890ab", "abcd1234-1234-1234-1234-1234567890ab",
+                              "a-very-long-client-secret-value", "info@hellovoice.co.uk")
+            self.assertEqual(mailer.engine(), "graph")
+            subject, text, html = mailer.otp_message("654321")
+            mailer.send("client@pfizer.com", subject, text, html)
+            mailer.send("client2@pfizer.com", subject, text, html)
+            self.assertEqual(sum(1 for c in calls if "oauth2" in c[0]), 1)         # token reused
+            url, data, headers = calls[-1]
+            self.assertIn("/users/info%40hellovoice.co.uk/sendMail", url)
+            body = __import__("json").loads(data)
+            self.assertEqual(body["message"]["toRecipients"][0]["emailAddress"]["address"], "client2@pfizer.com")
+            self.assertIn("654321", body["message"]["body"]["content"])
+            self.assertEqual(headers["Authorization"], "Bearer tok-1")
+            self.assertEqual(oct(mailer.GRAPH_FILE.stat().st_mode)[-3:], "600")
+            with self.assertRaises(ValueError):
+                mailer.save_graph("not-a-tenant id", "x", "y", "z")
+        finally:
+            mailer._graph_post = orig
+            mailer.clear_graph()
+
+    def test_graph_permission_error_is_plain(self):
+        import io, urllib.error
+        def fake(url, data, headers, timeout=15):
+            if "oauth2" in url:
+                return 200, {"access_token": "tok", "expires_in": 3600}
+            raise urllib.error.HTTPError(url, 403, "Forbidden", {}, io.BytesIO(b'{"error":{"code":"ErrorAccessDenied"}}'))
+        orig = mailer._graph_post
+        mailer._graph_post = fake
+        try:
+            mailer.save_graph("hellovoice.co.uk", "abcd1234-1234-1234-1234-1234567890ab", "a-very-long-client-secret-value", "info@hellovoice.co.uk")
+            with self.assertRaises(mailer.MailError) as cm:
+                mailer.send("c@pfizer.com", "s", "t")
+            self.assertIn("Mail.Send", str(cm.exception))
+        finally:
+            mailer._graph_post = orig
+            mailer.clear_graph()
+
     def test_validation_and_clear(self):
         with self.assertRaises(ValueError):
             mailer.save_smtp("not-an-email", "x")

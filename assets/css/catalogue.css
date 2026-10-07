@@ -1459,6 +1459,7 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
   background: var(--white); color: var(--ink); border: 1px solid rgba(18,18,18,.14);
   cursor: pointer; transition: border-color .2s ease, background .2s ease;
 }
+.cat-mode { white-space: nowrap; flex: none; }
 .cat-mode svg { flex: none; margin-top: -2px; }
 .cat-mode:hover { border-color: var(--ink); }
 .cat-mode[aria-selected="true"] { background: var(--lime); border-color: var(--lime); }
@@ -1691,8 +1692,13 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 @media screen and (max-width: 560px) {
   .cat-mode { font-size: 18px; min-height: 42px; padding: 11px 14px 10px; }
   .cat-modes { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
-  .cat-discover .cat-bar__order { flex-wrap: wrap; }
-  .cat-discover .cat-sort { flex: 1 1 100%; }
+  .cat-modes { margin-inline: -5.3%; padding-inline: 5.3%; }
+  .cat-discover .cat-bar__order { flex: 1 1 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cat-discover .cat-sort { padding-left: 14px; gap: 6px; min-width: 0; }
+  .cat-discover .cat-sort__label { font-size: 17px; }
+  .cat-discover .cat-sort__select { min-width: 0; padding-right: 30px; font-size: 14px; text-overflow: ellipsis; }
+  .cat-discover .cat-sort svg { right: 12px; }
+  .cat-find__open { flex: 1 1 100%; justify-content: center; }
   .cat-discover .cat-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; }
 }
 @media (prefers-reduced-motion: reduce) {

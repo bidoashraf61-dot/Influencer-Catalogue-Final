@@ -157,7 +157,10 @@ country is multiplied by 0.6, so a large Dubai account does not win a KSA brief.
 
 ## Setting it up (once)
 
-1. **Email**: easiest is a **company mailbox** on Microsoft 365 (what hellovoice.co.uk already
+1. **Email (recommended)**: a Microsoft 365 **shared mailbox through Microsoft Graph** — Entra app
+   registration with Mail.Send (application, admin consent) + client secret, limited to the shared
+   mailbox; paste tenant ID, client ID, secret and the mailbox in Settings & keys. No password, no DNS.
+   Other options: a **company mailbox** on Microsoft 365 (what hellovoice.co.uk already
    uses, no DNS change): turn on *Authenticated SMTP* for the mailbox in Exchange admin, then
    Admin → Client portal → Settings & keys → *Email: company mailbox* (address + password or app
    password, optional test address). Alternative: Resend (needs DNS records at GoDaddy).

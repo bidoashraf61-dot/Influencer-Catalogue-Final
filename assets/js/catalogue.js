@@ -1179,7 +1179,7 @@
         cards.filter(function (c) { return fold(c.dataset.name).indexOf(t) === 0; })[0] || null;
     }
     function setSortOption() {
-      var sel = wrap.querySelector(".cat-sort__select");
+      var sel = wrap.querySelector('.cat-sort:not(.cat-group-by) .cat-sort__select');
       var opt = sel.querySelector('option[value="like"]');
       opt.hidden = opt.disabled = !like;
       if (like && !state.sort) { sel.value = "like"; state.sort = "like"; }
@@ -1366,7 +1366,7 @@
         srv.sponsored = box.checked; changedSrv();
       } else if (box.dataset.flag === "unmeasured") {
         unmeasured = box.checked; changed();
-      } else if (box.classList.contains("cat-sort__select")) {
+      } else if (box.classList.contains("cat-sort__select") && !box.closest(".cat-group-by")) {
         state.sort = box.value; onChange();
       }
     });

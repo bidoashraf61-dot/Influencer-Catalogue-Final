@@ -384,15 +384,36 @@ def _settings_tab():
           "<textarea class='mono' name='kb_text' rows='6'>%s</textarea></div>" % e(db.setting("kb_text", None) or __import__("assistant").DEFAULT_KB)
         + "<button class='btn lime'>Save settings</button></form>")
     keys = (key_card("gemini", "Gemini API key", gemini, "Powers the shortlist reasons, the chat and the copilot.")
-            + smtp_card() + key_card("mail", "Email (Resend) API key — alternative", mailer,
+            + graph_card() + smtp_card() + key_card("mail", "Email (Resend) API key — alternative", mailer,
                                      "Only needed if you do not use a company mailbox above."))
     return form + "<div style='margin-top:20px'>" + keys + "</div>"
+
+
+def graph_card():
+    hint = mailer.graph_hint()
+    back = "<input type='hidden' name='back' value='/portal?tab=settings'><input type='hidden' name='which' value='graph'>"
+    return ("<div class='card'><h2>Email: shared mailbox (Microsoft 365, recommended)</h2>"
+            "<p class='sec-desc'>Sends sign-in codes and team notifications as a Microsoft 365 <b>shared mailbox</b>, with no password, through an "
+            "app registration (Microsoft Graph). No DNS change. Set up once in Microsoft Entra: register an app, give it the <b>Mail.Send</b> "
+            "application permission with admin consent, create a client secret, and limit the app to the shared mailbox. "
+            "The secret stays on the server in a private file and is never shown again.</p>"
+            + ("<p>Connected: <code>%s</code></p>" % e(hint) if hint else "<p class='muted'>Not connected.</p>")
+            + "<form method='post' action='%s' autocomplete='off'>%s<div class='fgrid'>"
+              "<div><label>Shared mailbox to send from</label><input name='sender' type='email' placeholder='info@hellovoice.co.uk' required></div>"
+              "<div><label>Directory (tenant) ID</label><input name='tenant' placeholder='xxxxxxxx-xxxx-…' required></div>"
+              "<div><label>Application (client) ID</label><input name='client_id' placeholder='xxxxxxxx-xxxx-…' required></div>"
+              "<div><label>Client secret (Value)</label><input name='secret' type='password' autocomplete='new-password' required></div>"
+              "<div><label>Send a test to (optional)</label><input name='test' type='email' placeholder='you@hellovoice.co.uk'></div></div>"
+              "<button class='btn lime' name='action' value='save'>%s</button></form>" % (u("/portal/keys"), back, "Replace" if hint else "Connect")
+            + (("<form method='post' action='%s' class='inline' style='margin-top:10px'>%s<button class='btn small danger' name='action' value='clear' "
+                "onclick=\"return confirm('Disconnect?')\">Disconnect</button></form>") % (u("/portal/keys"), back) if hint else "")
+            + "</div>")
 
 
 def smtp_card():
     hint = mailer.smtp_hint()
     back = "<input type='hidden' name='back' value='/portal?tab=settings'><input type='hidden' name='which' value='smtp'>"
-    return ("<div class='card'><h2>Email: company mailbox (Microsoft 365)</h2>"
+    return ("<div class='card'><h2>Email: user mailbox with password (Microsoft 365 SMTP) — alternative</h2>"
             "<p class='sec-desc'>Sends the sign-in codes and team notifications from one of your own Outlook mailboxes, the same email "
             "hellovoice.co.uk already uses, so no DNS change is needed. In Microsoft 365 admin, turn on <b>Authenticated SMTP</b> for that "
             "mailbox (Exchange admin → Recipients → Mailboxes → the mailbox → Manage email apps). If the mailbox uses MFA, use an app password. "
@@ -402,6 +423,8 @@ def smtp_card():
               "<div><label>Mailbox address</label><input name='user' type='email' placeholder='portal@hellovoice.co.uk' required></div>"
               "<div><label>Password or app password</label><input name='password' type='password' autocomplete='new-password' required></div>"
               "<div><label>Send a test to (optional)</label><input name='test' type='email' placeholder='you@hellovoice.co.uk'></div>"
+              "<div><label>Send as (shared mailbox, optional)</label><input name='send_as' type='email' placeholder='info@hellovoice.co.uk'>"
+              "<div class='price-hint'>The user above needs Send As rights on it.</div></div>"
               "<div><label>Server</label><input name='host' value='smtp.office365.com'></div></div>"
               "<button class='btn lime' name='action' value='save'>%s</button></form>" % (u("/portal/keys"), back, "Replace mailbox" if hint else "Connect mailbox")
             + (("<form method='post' action='%s' class='inline' style='margin-top:10px'>%s<button class='btn small danger' name='action' value='clear' "
@@ -414,7 +437,7 @@ def portal_page(tab="accounts", ok=None, err=None, query=None):
     body = {"accounts": _accounts_tab, "briefs": _briefs_tab, "chats": _chats_tab, "usage": _usage_tab, "settings": _settings_tab}[tab]()
     status = ("<span class='pill %s'>Gemini %s</span> <span class='pill %s'>Email %s</span>" % (
         "live" if gemini.configured() else "warn", "ready" if gemini.configured() else "not set up",
-        "live" if mailer.configured() else "warn", ("ready (%s)" % ("company mailbox" if mailer.engine() == "smtp" else "Resend")) if mailer.configured() else "not set up"))
+        "live" if mailer.configured() else "warn", ("ready (%s)" % {"graph": "shared mailbox", "smtp": "mailbox", "resend": "Resend"}.get(mailer.engine(), "")) if mailer.configured() else "not set up"))
     return page("Client portal", STAT_CSS + ui.header("Client portal", "Company-email accounts, AI credits, briefs and AI settings. " + status,
                 tabs=_tabs(tab)) + _banner(ok, err) + body, "/portal")
 
