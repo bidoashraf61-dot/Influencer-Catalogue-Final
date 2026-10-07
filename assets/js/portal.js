@@ -949,7 +949,7 @@
     send.innerHTML = V_ICON.send;
     var compose = h("div", { class: "hv-compose" }, ta, send);
     var foot = h("p", { class: "hv-foot" });
-    panel.appendChild(head); panel.appendChild(log); panel.appendChild(compose); panel.appendChild(foot);
+    panel.appendChild(head); panel.appendChild(log); panel.appendChild(compose);
     root.appendChild(panel); root.appendChild(nudge); root.appendChild(launch);
     document.body.appendChild(root);
     document.body.classList.add("has-voice");
