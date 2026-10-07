@@ -1072,6 +1072,96 @@
     var host = document.querySelector(".cat-controls .cat-container");
     var controls = host ? Controls(host, cards, apply) : null;
 
+    /* -- group by: the roster split into sections by one parameter -- */
+    var G_DIMS = [["", "None"], ["tier", "Creator size"], ["platform", "Platform"], ["country", "Country"], ["interest", "Interest"]];
+    var G_NONE = { tier: "No tier", platform: "No platform", country: "Location not specified", interest: "No interest listed" };
+    var byCodeAll = {};
+    cards.forEach(function (c) { byCodeAll[c.dataset.code] = c; });
+    function gKeys(card, dim) {
+      var out = [];
+      if (dim === "tier") out = card.dataset.tier ? [card.dataset.tier] : [];
+      else if (dim === "platform") out = values(card.dataset.platform);
+      else if (dim === "interest") out = values(card.dataset.interest);
+      else if (dim === "country") values(card.dataset.city).forEach(function (v) {
+        if (/^unspecified$/i.test(v)) return;
+        var c = place(v).country;
+        if (out.indexOf(c) < 0) out.push(c);
+      });
+      return out.length ? out : [G_NONE[dim]];
+    }
+    var gStore = "hv-group:catalogue", gBy = "";
+    try { gBy = sessionStorage.getItem(gStore) || ""; } catch (e) {}
+    if (controls) {
+      var gRow = document.querySelector(".cat-bar__row");
+      var gSort = gRow && gRow.querySelector(".cat-sort");
+      if (gRow) {
+        var gLab = document.createElement("label");
+        gLab.className = "cat-sort cat-group-by";
+        gLab.innerHTML = '<span class="cat-sort__label">Group</span><select class="cat-sort__select" aria-label="Group creators by">' +
+          G_DIMS.map(function (d) { return '<option value="' + d[0] + '"' + (d[0] === gBy ? " selected" : "") + ">" + d[1] + "</option>"; }).join("") +
+          "</select>" + CHEVRON;
+        var gWrap = document.createElement("div");
+        gWrap.className = "cat-bar__order";
+        if (gSort) { gRow.insertBefore(gWrap, gSort); gWrap.appendChild(gLab); gWrap.appendChild(gSort); }
+        else { gWrap.appendChild(gLab); gRow.appendChild(gWrap); }
+        gLab.querySelector("select").addEventListener("change", function (e) {
+          gBy = e.target.value;
+          try { sessionStorage.setItem(gStore, gBy); } catch (x) {}
+          apply();
+        });
+      }
+    }
+    function gOrder(names, count) {
+      var fixed = gBy === "tier" ? Object.keys(TIER_PRICE) : gBy === "country" ? COUNTRY_ORDER : null;
+      return names.sort(function (a, b) {
+        var na = a === G_NONE[gBy], nb = b === G_NONE[gBy];
+        if (na !== nb) return na ? 1 : -1;
+        if (fixed) {
+          var ia = fixed.indexOf(a), ib = fixed.indexOf(b);
+          if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        }
+        return (count[b] - count[a]) || a.localeCompare(b);
+      });
+    }
+    // A creator in two groups shows in both; the copy passes its clicks to the
+    // real card, so picking from either one picks the creator.
+    function layoutGroups(list) {
+      all(".cat-group", grid).forEach(function (g) { g.remove(); });
+      grid.classList.toggle("is-grouped", !!gBy);
+      if (!gBy) return;
+      var members = {}, count = {};
+      list.forEach(function (card) {
+        if (card.hidden) return;
+        gKeys(card, gBy).forEach(function (k) { (members[k] = members[k] || []).push(card); count[k] = (count[k] || 0) + 1; });
+      });
+      var placed = {};
+      gOrder(Object.keys(members), count).forEach(function (k) {
+        var sec = document.createElement("section");
+        sec.className = "cat-group";
+        var flag = gBy === "country" && k !== G_NONE.country ? flagOf(k) : "";
+        var mark = gBy === "platform" && ICONS[k] ? '<span class="cat-places__mark ' + (BRAND[k] || "") + '">' + ICONS[k] + "</span>" : "";
+        sec.innerHTML = '<header class="cat-group__head">' + flag + mark + '<h2 class="cat-group__name">' + esc(k) + "</h2></header>";
+        var inner = document.createElement("div");
+        inner.className = "cat-grid cat-group__grid";
+        members[k].forEach(function (card) {
+          var code = card.dataset.code;
+          if (!placed[code]) { placed[code] = true; inner.appendChild(card); return; }
+          var cp = card.cloneNode(true);
+          cp.classList.add("cat-card--copy");
+          cp.addEventListener("click", function (e) {
+            if (e.target.closest && e.target.closest("[data-noselect]")) return;
+            toggle(byCodeAll[code]);
+          });
+          cp.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(byCodeAll[code]); }
+          });
+          inner.appendChild(cp);
+        });
+        sec.appendChild(inner);
+        grid.appendChild(sec);
+      });
+    }
+
     /* -- filtering and sorting -- */
 
     function apply() {
@@ -1085,6 +1175,7 @@
         var list = controls.sorted() ? controls.order(cards)
           : cards.slice().sort(function (a, b) { return a.dataset.idx - b.dataset.idx; });
         list.forEach(function (c) { grid.appendChild(c); });
+        layoutGroups(list);
       }
       // How many creators exist, and how many a filter leaves, is commercial
       // information: it belongs in the dashboard, not on the client page. Only
@@ -1119,6 +1210,7 @@
       var i = selected.indexOf(code);
       if (i === -1) selected.push(code); else selected.splice(i, 1);
       card.setAttribute("aria-pressed", i === -1 ? "true" : "false");
+      all('.cat-card--copy[data-code="' + code + '"]').forEach(function (cp) { cp.setAttribute("aria-pressed", i === -1 ? "true" : "false"); });
       renderTray();
 
       // Only additions are recorded, and only the code. It answers "which
@@ -1147,7 +1239,7 @@
 
     $("cat-clear").addEventListener("click", function () {
       selected = [];
-      cards.forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
+      cards.concat(all(".cat-card--copy")).forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
       renderTray();
     });
 
