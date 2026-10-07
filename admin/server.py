@@ -3040,8 +3040,9 @@ class Handler(BaseHTTPRequestHandler):
             m = re.match(r"report-(.+?)-[A-Za-z]{3}-\d\d-\d{4}(?: ?\(\d+\))?\.pdf$", name)
             handle = m.group(1) if m else re.sub(r"\.pdf$", "", name, flags=re.I)
             code = picked
+            seen_plat = want_plat or profile_pdf.detect_platform(p["data"])
             if not code:
-                code = res.resolve(handle)[0]
+                code = res.resolve(handle, seen_plat)[0]
             if not code:
                 code = profile_pdf.sniff_creator(p["data"], res)
             if not code:

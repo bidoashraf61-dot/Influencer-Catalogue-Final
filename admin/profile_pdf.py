@@ -150,8 +150,11 @@ def parse(path, handle):
     acct = next((t for x, y, s, t in ls if " account" in t and y < 130), "")
     a["account_type"] = "Business" if acct.startswith("Business") else "Creator"
     if "•" in acct: a["location"] = acct.split("•", 1)[1].strip()
+    # The numbers row sits under its "Followers" label, which moves up when the
+    # report has no location line — find it rather than assuming a height.
+    label_y = next((y for x, y, s, t in ls if t == "Followers" and y < 200), 139)
     for x, y, s, t in ls:
-        if 145 < y < 160:
+        if label_y + 6 < y < label_y + 21:
             parts = t.split()
             if x < 150:
                 a["followers"] = num(parts[0])
@@ -163,7 +166,7 @@ def parse(path, handle):
             else:
                 a["er"] = num(t)
     pp = by("Popular posts")
-    bio = [t for x, y, s, t in sorted(ls, key=lambda l: l[1]) if 165 < y < pp and x < 40]
+    bio = [t for x, y, s, t in sorted(ls, key=lambda l: l[1]) if label_y + 26 < y < pp and x < 40]
     for i, fixed in BIO_FIX.get(handle, {}).items():
         bio[i] = fixed
     if bio: a["bio"] = "\n".join(bio)
@@ -266,7 +269,7 @@ def parse(path, handle):
     ph = [i for i in infos if i["bbox"][1] < 40 and i["width"] >= 150]
     if ph:
         media["photo"] = doc.extract_image(ph[0]["xref"])
-    links = [l for l in page.get_links() if "instagram.com/" in (l.get("uri") or "")]
+    links = [l for l in page.get_links() if re.search(r"(instagram|tiktok)\.com/", l.get("uri") or "")]
     links.sort(key=lambda l: (round(l["from"].y0), l["from"].x0))
     # each number under a post sits right of its icon: a heart (likes) or a
     # speech bubble (comments); a post with hidden likes shows only the bubble
@@ -342,12 +345,19 @@ def sniff_creator(data, resolver):
 
 
 def detect_platform(data):
-    """Which platform a report PDF is about, from its first page, or None."""
+    """Which platform a report PDF is about, or None. The post links in it are
+    the surest sign (every popular post links to its own platform); the words on
+    the first page are the fallback."""
     import fitz
     try:
-        text = fitz.open(stream=data, filetype="pdf")[0].get_text().lower()
+        doc = fitz.open(stream=data, filetype="pdf")
+        uris = " ".join((l.get("uri") or "") for p in doc for l in p.get_links()).lower()
+        text = doc[0].get_text().lower()
     except Exception:
         return None
+    tik, ins = uris.count("tiktok.com"), uris.count("instagram.com")
+    if tik != ins:
+        return "TikTok" if tik > ins else "Instagram"
     tik, ins = "tiktok" in text, "instagram" in text
     return "TikTok" if tik and not ins else "Instagram" if ins and not tik else None
 

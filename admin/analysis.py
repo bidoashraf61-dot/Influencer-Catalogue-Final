@@ -151,6 +151,7 @@ class Resolver:
         self.by_handle, self.by_name = {}, {}
         self.aliases = {norm(k): v for k, v in (aliases or {}).items()}
         self.label = {}
+        self.raw = {}                      # code -> {platform or "": {handles exactly as written, lower case}}
         for c in creators:
             code = c["code"]
             self.by_code[code.upper()] = code
@@ -159,6 +160,10 @@ class Resolver:
                 n = norm(val)
                 if n and code not in table.get(n, []):
                     table.setdefault(n, []).append(code)
+            mine = self.raw.setdefault(code, {})
+            if c["handle"]:
+                mine.setdefault("", set()).add(str(c["handle"]).lstrip("@").lower())
+                mine.setdefault(creator_platforms(c)[0], set()).add(str(c["handle"]).lstrip("@").lower())
             # The same person's other accounts: their profile links name handles too.
             try:
                 profiles = json.loads(c["profiles"] or "[]")
@@ -169,6 +174,10 @@ class Resolver:
                 n = norm(handle_from(url)) if is_link(url) else ""
                 if n and code not in self.by_handle.get(n, []):
                     self.by_handle.setdefault(n, []).append(code)
+                if n:
+                    h_raw = handle_from(url).lstrip("@").lower()
+                    mine.setdefault("", set()).add(h_raw)
+                    mine.setdefault(canon_platform(item.get("platform")) or "", set()).add(h_raw)
         self._fuzzy_keys = None
 
     def resolve(self, key, platform=None):
@@ -188,6 +197,15 @@ class Resolver:
                 hits = table.get(probe) or []
                 if len(hits) == 1:
                     return hits[0], []
+                if len(hits) > 1:
+                    # "dr_neira_fahmy" and "dr_neirafahmy" read the same once punctuation
+                    # is dropped, but they are two accounts: an exact match settles it,
+                    # on the report's platform first.
+                    written = handle_from(raw).lstrip("@").lower()
+                    for plat in ([canon_platform(platform)] if canon_platform(platform) else []) + [""]:
+                        exact = [h for h in hits if written in self.raw.get(h, {}).get(plat, ())]
+                        if len(exact) == 1:
+                            return exact[0], []
                 if len(hits) > 1 and platform:
                     same = [h for h in hits if (self.label[h]["platform"] or "").lower() == platform.strip().lower()]
                     if len(same) == 1:
