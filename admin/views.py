@@ -2111,7 +2111,10 @@ def _live_score(live):
     li = lambda items, cls: "".join("<li class='" + cls + "'>" + e(x) + "</li>" for x in items)
     return ("<div class='vd-live'><span class='vd-stamp " + band + ("' style='border:3px dashed #fff;box-shadow:0 0 0 1px #999'" if live.get("basic") else "'") + ">" + str(live["score"]) + "</span><div><b>" + e(live["tag"]) + "</b>"
             "<span class='muted'> · " + ("BASIC: a screening score from public numbers only. Request the full analysis before booking. " if live.get("basic") else "") + "Live, for " + e(live["objective"].lower()) + (" on " + e(live["platform"]) if live.get("platform") else "") + "</span>"
-            "<ul class='vd-why'>" + li(live["strengths"], "g1") + li(live["watchouts"], "g-1") + "</ul></div></div>")
+            "<ul class='vd-why'>" + li(live["strengths"], "g1") + li(live["watchouts"], "g-1") + "</ul>"
+            + ("<div class='muted' style='margin-top:6px'><b>Verified by the full analysis:</b></div><ul class='vd-why'>"
+               + "".join("<li class='" + {"ok": "g1", "bad": "g-1"}.get(c_["level"], "") + "'>" + e(c_["text"]) + "</li>" for c_ in live["checks"]) + "</ul>"
+               if live.get("checks") else "") + "</div></div>")
 
 
 def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None):

@@ -1300,3 +1300,8 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cst-basic { margin: 12px 0 0; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.1); font-size: 12px; line-height: 1.4; opacity: .9; }
 .cst-basic b { display: block; margin-bottom: 2px; }
 .cst-basic--warn { background: rgba(255, 183, 77, .22); border-left: 3px solid #ffb74d; }
+.cst-c { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.cst-c li::before { font-weight: 800; margin-right: 6px; }
+.cst-c li.ok::before { content: "\2713"; color: var(--lime); }
+.cst-c li.warn::before { content: "!"; color: #ffb74d; }
+.cst-c li.bad::before { content: "\2715"; color: #ff6b6b; }

@@ -2980,50 +2980,14 @@ class Handler(BaseHTTPRequestHandler):
     def selection_scores(self, sel, objective=None, target=None):
         """{code: score} for every creator of a selection, worked out now from
         their analyses: one number against the selection's objective and target.
-        Creators without a full analysis come back with score None."""
-        import fit as fit_mod
+        Creators without a full analysis come back with score None. The work is
+        in matcher.score_codes, which the AI shortlist builder shares."""
+        import matcher
         codes = json.loads(sel["codes"] or "[]")
         objective = objective or self.selection_objective(sel)
         target = target or self.selection_target(sel)
         wanted = sel["platform"] if "platform" in sel.keys() else None
-        rows = {c["code"]: c for c in db.list_creators() if c["code"] in set(codes)}
-        every = db.analyses_for(codes)
-        records, typical = metrics.track_records()
-        bench = metrics.benchmarks()
-        out = {}
-        for code in codes:
-            c = rows.get(code)
-            if c is None:
-                continue
-            mine = every.get(code) or {}
-            rec = dict(records[code], typical_er=typical) if code in records else None
-
-            def one(pl):
-                doc = mine[pl]["data"]
-                followers = doc.get("followers") or c["followers"]
-                return fit_mod.score(doc, pl, c["followers"], objective=objective, target=target,
-                                     band=metrics.band_of(followers), bench=bench, record=rec,
-                                     creator_interest=c["interest"], creator=c)
-            plat = analysis.canon_platform(wanted) if wanted and analysis.canon_platform(wanted) in mine else None
-            if plat:
-                out[code] = one(plat)
-            elif mine:
-                # "Every platform": judge the creator where they do best, and say where.
-                import profile_pdf as _pp
-                main = analysis.creator_platforms(c)
-                tried = {pl: one(pl) for pl in mine}
-                # A full analysis, whenever there is one that can be scored; basic public
-                # numbers only as the fallback.
-                full = [pl for pl in tried if not mine[pl]["data"].get("basic") and tried[pl]["score"] is not None]
-                pool = full or list(tried)
-                best = max(pool, key=lambda pl: (tried[pl]["score"] is not None, tried[pl]["score"] or 0,
-                                                 _pp.completeness(mine[pl]["data"]), pl == main[0]))
-                out[code] = dict(tried[best])
-                out[code]["others"] = [{"platform": pl, "score": v["score"]} for pl, v in tried.items()
-                                       if pl != best and v["score"] is not None and pl in pool]
-            else:
-                out[code] = fit_mod.score(None, None, c["followers"], objective=objective, target=target)
-        return out
+        return matcher.score_codes(codes, objective, target, wanted)
 
     def selection_suggest(self, query):
         """A suggested fit and role for one creator, from their analysis of a
@@ -3431,7 +3395,8 @@ class Handler(BaseHTTPRequestHandler):
                                                    "watchouts": v["watchouts"], "conclusion": v["conclusion"],
                                                    "parts": [{"label": p["label"], "s": p["s"]} for p in v["parts"]],
                                                    "platform": v["platform"], "objective": v["objective"],
-                                                   "others": v.get("others") or [], "basic": bool(v.get("basic"))}
+                                                   "others": v.get("others") or [], "basic": bool(v.get("basic")),
+                                                   "checks": v.get("checks") or []}
                                                for k, v in self.selection_scores(sel).items()},
                                     "client_tags": {k: v for k, v in json.loads((sel["client_tags"] if "client_tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "verdicts": {k: v for k, v in json.loads((sel["verdicts"] if "verdicts" in sel.keys() else None) or "{}").items() if k in by and k in codes},
