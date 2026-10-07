@@ -282,7 +282,7 @@
     var close;
     var x = h("button", { class: "pt-x", type: "button", "aria-label": "Close", onclick: function () { close(); } }, "×");
     modal.appendChild(h("div", { class: "pt-head" }, title, x));
-    modal.appendChild(h("div", { class: "pt-progress" }, h("i", { style: "width:" + Math.round((step + 1) / total * 100) + "%" })));
+    modal.appendChild(h("div", { class: "pt-progress" }, h("i", { style: "transform:scaleX(" + ((step + 1) / total).toFixed(3) + ")" })));
     var body = h("div", { class: "pt-body" });
     modal.appendChild(body);
     var err = h("div", { class: "pt-err", hidden: true, role: "alert" });
