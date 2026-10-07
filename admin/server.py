@@ -339,6 +339,18 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True})
         if path == "/static/admin.css":
             return self.send(200, views.CSS, "text/css; charset=utf-8")
+        if path == "/manifest.webmanifest":
+            # Lets the admin be added to a phone's home screen and open full-screen, like an app.
+            return self.send(200, json.dumps({
+                "name": "HelloVoice Admin", "short_name": "HV Admin", "start_url": (BASE or "") + "/",
+                "scope": (BASE or "") + "/", "display": "standalone", "background_color": "#f5f3ef", "theme_color": "#121212",
+                "icons": [{"src": (BASE or "") + "/static/icon-180.png", "sizes": "180x180", "type": "image/png", "purpose": "any"}]}),
+                "application/manifest+json", [("Cache-Control", "public, max-age=86400")])
+        if path in ("/static/icon-180.png", "/static/icon-32.png"):
+            f = STATIC / Path(path).name
+            if f.is_file():
+                return self.send(200, f.read_bytes(), "image/png", [("Cache-Control", "public, max-age=604800")])
+            return self.send(404, b"", "text/plain")
         if path.startswith("/static/fonts/") or path == "/static/logo-knockout.webp":
             # Brand fonts and logo, kept with the admin so it does not depend on the built site.
             name = Path(path).name

@@ -739,20 +739,16 @@ def build():
       </div>
     </div></div></div>
 
-    <div class="cat-cover__body"><div class="cat-pad"><div class="cat-container">
-      <div class="cat-hero__head">
-        <div class="cat-pill">Creator Roster</div>
-        <h1 class="cat-hero__title">Catalogue</h1>
-      </div>
-      <div class="cat-cover__foot">
-        <p class="cat-hero__lead">
-          Creator campaigns run end to end — casting against the brief,
-          per-creator scripts that protect the claim set, compliance before
-          anything posts, and a post-by-post read afterwards.
-        </p>
-        <a class="cat-cover__cue" href="#cat-roster">
+    <div class="cat-cover__body cat-cover__body--center"><div class="cat-pad"><div class="cat-container">
+      <div class="cat-cover__center">
+        <h1 class="cat-cover__title">
+          <span class="cat-pill cat-cover__brand">HelloVoice</span>
+          <span class="cat-cover__line">Influencer Catalogue</span>
+        </h1>
+        <p class="cat-cover__sub">Vetted creators across Saudi Arabia, the UAE and Egypt. Shortlist the right voices for your brief and we run the campaign end to end.</p>
+        <a class="cat-cover__cta cat-cover__cue" href="#cat-roster">
           Browse creators
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
         </a>
       </div>
     </div></div></div>

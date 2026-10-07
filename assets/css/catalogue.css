@@ -1524,6 +1524,38 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 .cat-cover__cue:hover svg { transform: translateY(3px); }
 .cat-cover__cue:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; border-radius: 4px; }
 
+/* Catalogue cover, centred: the brand, what this is, one way in. The footage
+   carries burned-in captions, so the centre gets its own shade (a soft ink
+   pool behind the text) on top of the edge shade. */
+.cat-cover__body--center { margin: auto 0; padding: 40px 0 clamp(48px, 9vh, 96px); }
+.cat-hero--cover:has(.cat-cover__body--center) .cat-cover__shade {
+  background:
+    radial-gradient(62% 58% at 50% 52%, rgba(18,18,18,.72) 0%, rgba(18,18,18,.32) 62%, rgba(18,18,18,0) 100%),
+    linear-gradient(180deg, rgba(18,18,18,.7) 0%, rgba(18,18,18,.18) 24%, rgba(18,18,18,.18) 70%, rgba(18,18,18,.75) 100%);
+}
+.cat-cover__center { max-width: 920px; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; }
+.cat-cover__title { margin: 0; font-weight: 400; display: flex; flex-direction: column; align-items: center; }
+.cat-hero--cover .cat-cover__brand {
+  font-size: clamp(1rem, .75rem + .7vw, 1.45rem); padding: 8px 22px; letter-spacing: .08em;
+  margin: 0 0 -.55rem; transform: rotate(-5deg);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.cat-cover__line {
+  font-family: var(--heading); color: var(--white); line-height: .9; letter-spacing: .01em;
+  font-size: clamp(3.4rem, 1.2rem + 6.4vw, 6rem); text-wrap: balance;
+  text-shadow: 0 2px 24px rgba(0,0,0,.35);
+}
+.cat-cover__sub {
+  margin: 22px auto 0; max-width: 52ch; color: rgba(255,255,255,.9);
+  font-size: clamp(16px, .9rem + .3vw, 19px); line-height: 1.6; letter-spacing: .005em; text-wrap: pretty;
+}
+.cat-cover__cta.cat-cover__cue {
+  margin-top: 30px; padding: 14px 30px; border-radius: var(--r-pill);
+  background: var(--lime); color: var(--ink); font-size: 22px; letter-spacing: .07em;
+  min-height: 52px; transition: background .2s ease, color .2s ease;
+}
+.cat-cover__cta.cat-cover__cue:hover { background: var(--white); color: var(--ink); }
+
 /* The selection page: same ink stage and overlaid menu as the catalogue cover,
    but no footage. A drawn shortlist (three fanned creator cards, the front one
    ticked in lime) on a hairline desk grid says "your pick" instead of "our

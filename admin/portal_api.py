@@ -652,7 +652,8 @@ class PortalMixin:
 
     def portal_admin_get(self, path, query, who):
         if path == "/ai":
-            return self.send(200, portal_views.copilot_page(who["email"] if "email" in who.keys() else "", gemini.configured()))
+            return self.send(200, portal_views.copilot_page(who["email"] if "email" in who.keys() else "", gemini.configured(),
+                                                            embed=query.get("embed") == "1"))
         if path == "/ai/history":
             owner = who["email"]
             th = portal.find_thread(None, "admin", owner, int(query.get("t") or 0)) if (query.get("t") or "").isdigit() else None

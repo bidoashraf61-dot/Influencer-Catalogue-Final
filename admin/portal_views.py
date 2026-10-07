@@ -547,7 +547,7 @@ COPILOT_JS = r"""
 """
 
 
-def copilot_page(email, configured):
+def copilot_page(email, configured, embed=False):
     chips = "".join("<button type='button' class='cp-chip'>%s</button>" % e(s) for s in SUGGESTIONS)
     off = "" if configured else ("<div class='note'>The copilot needs a Gemini key. <a href='%s'>Add it in Client portal → Settings &amp; keys</a>.</div>"
                                  % u("/portal?tab=settings"))
@@ -565,4 +565,14 @@ def copilot_page(email, configured):
             + off + "<div class='cp'><div class='cp-chips'>" + chips + "</div><div id='cp-log'><div class='cp-m cp-bot'>Hi. What would you like to look at or change?</div></div>"
             "<form id='cp-form'><textarea id='cp-text' placeholder='Ask anything about creators, clients, briefs or credits…' rows='1'></textarea>"
             "<button class='btn lime'>Send</button></form></div><script>" + js + "</script>")
+    if embed:
+        # Inside the side panel that every admin page has: just the conversation.
+        slim = ("<style>body{margin:0;background:var(--white)}.cp{height:100vh;min-height:0;padding:12px;box-sizing:border-box}"
+                ".cp-chips{max-height:84px;overflow:auto}#cp-log{border:0;background:var(--paper)}</style>")
+        return ('<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                '<meta name="robots" content="noindex,nofollow"><title>AI copilot</title><link rel="stylesheet" href="%s"></head><body>%s%s%s'
+                '<div class="cp"><div class="cp-chips">%s</div><div id="cp-log"><div class="cp-m cp-bot">Hi. Ask about creators, clients, briefs or credits, '
+                'or ask for a change. Nothing changes until you press Confirm.</div></div><form id="cp-form"><textarea id="cp-text" '
+                'aria-label="Message the copilot" placeholder="Ask anything…" rows="1"></textarea><button class="btn lime">Send</button></form></div>'
+                '<script>%s</script></body></html>') % (u("/static/admin.css"), css, slim, off, chips, js)
     return page("AI copilot", body, "/ai")

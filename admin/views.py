@@ -585,10 +585,10 @@ def login_page(error=None, base=None):
         + "<p class='sub'>Selections, campaigns, creators and clients, in one place.</p>"
         + err
         + "<form method='post' action='" + u("/login") + "' class='card'>"
-        + "<div style='margin-bottom:14px'><label>Email</label>"
-        + "<input name='email' type='email' required autofocus autocomplete='username'></div>"
-        + "<div style='margin-bottom:18px'><label>Password</label>"
-        + "<input name='password' type='password' required autocomplete='current-password'></div>"
+        + "<div style='margin-bottom:14px'><label for='login-email'>Email</label>"
+        + "<input id='login-email' name='email' type='email' required autofocus autocomplete='username'></div>"
+        + "<div style='margin-bottom:18px'><label for='login-password'>Password</label>"
+        + "<input id='login-password' name='password' type='password' required autocomplete='current-password'></div>"
         + "<button class='btn' style='width:100%'>Sign in</button></form>"
         + "</main></body></html>"
     )
@@ -1836,7 +1836,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + ("<a class='btn small ghost' href='" + u("/roster") + "'>Clear</a>" if filtered else "")
         + "<span class='muted' style='font-size:13px'>" + e(shown) + "</span>"
         "<a class='btn small ghost' style='margin-left:auto' href='" + u("/roster/export") + "'>" + ui.icon("download", 15) + " Export .csv</a></form>"
-        + "<div class='card'><table><thead><tr><th></th><th>Code</th>"
+        + "<div class='card'><table class='roster-t'><thead><tr><th></th><th>Code</th>"
         + "<th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>City</th>"
         + "<th></th></tr></thead><tbody>" + rows + "</tbody></table></div>" + pager)
 

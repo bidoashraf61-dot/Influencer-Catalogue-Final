@@ -906,11 +906,26 @@
 
     /* -- launcher -- */
     var root = h("div", { id: "hv-voice", class: "hv-voice" });
-    var launch = h("button", { class: "hv-launch", type: "button", "aria-label": "Chat with Voice, the HelloVoice assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
+    var launch = h("button", { class: "hv-launch", type: "button", "aria-label": "Chat with the HelloVoice assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
     launch.innerHTML = '<span class="hv-launch__disc" aria-hidden="true"></span>' +
       '<img class="hv-launch__face" src="' + V_IMG + 'voice-head-160.webp" srcset="' + V_IMG + 'voice-head-320.webp 2x" alt="" width="84" height="84" decoding="async"/>' +
+      (reduce ? "" : '<video class="hv-launch__vid" muted loop playsinline autoplay preload="auto" aria-hidden="true" poster="' + V_IMG + 'voice-loop-poster.webp">' +
+        '<source src="' + V_IMG + 'voice-loop.webm" type="video/webm"/><source src="' + V_IMG + 'voice-loop.mp4" type="video/mp4"/></video>') +
       '<span class="hv-launch__x" aria-hidden="true">' + V_ICON.close + "</span>" +
       '<span class="hv-launch__dot" aria-hidden="true" hidden></span>';
+    // The waving loop (made with Higgsfield) replaces the still once it can play; the still stays if it can't.
+    var vid = launch.querySelector(".hv-launch__vid");
+    if (vid) {
+      // Autoplay can start before this listener exists, so check the clock too.
+      var live = function () { launch.classList.add("has-video"); };
+      vid.addEventListener("playing", live);
+      vid.addEventListener("timeupdate", live, { once: true });
+      // If the browser stops the loop (power saving, background tab), fall back to the still.
+      vid.addEventListener("pause", function () { launch.classList.remove("has-video"); });
+      if (!vid.paused && vid.readyState > 2) live();
+      vid.addEventListener("error", function () { vid.remove(); }, true);
+      var p = vid.play && vid.play(); if (p && p.catch) p.catch(function () { /* autoplay blocked: keep the still */ });
+    }
     var nudge = h("div", { class: "hv-nudge", role: "status", hidden: "" });
     nudge.innerHTML = "<span>Need a hand finding creators?</span>";
     var nudgeX = h("button", { class: "hv-nudge__x", type: "button", "aria-label": "Dismiss" });
@@ -921,15 +936,15 @@
     var panel = h("section", { id: "hv-panel", class: "hv-panel", role: "dialog", "aria-modal": "false", "aria-labelledby": "hv-name", hidden: "" });
     var head = h("header", { class: "hv-head" });
     head.innerHTML = '<img class="hv-head__fig" src="' + V_IMG + 'voice-figure-360.webp" srcset="' + V_IMG + 'voice-figure-720.webp 2x" alt="" width="120" height="192" decoding="async"/>' +
-      '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">Voice</h2>' +
-      '<p class="hv-head__role"><i aria-hidden="true"></i>HelloVoice assistant · replies instantly</p></div>';
+      '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">HelloVoice Assistant</h2>' +
+      '<p class="hv-head__role"><span class="hv-head__on"><i aria-hidden="true"></i>Online</span><span class="hv-tag">Replies instantly</span></p></div>';
     var freshBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Start a new chat", title: "New chat" });
     freshBtn.innerHTML = V_ICON.fresh;
     var closeBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Close chat", title: "Close" });
     closeBtn.innerHTML = V_ICON.close;
     head.appendChild(h("div", { class: "hv-head__tools" }, freshBtn, closeBtn));
     var log = h("div", { class: "hv-log", role: "log", "aria-live": "polite", "aria-relevant": "additions" });
-    var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message Voice" });
+    var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message the HelloVoice assistant" });
     var send = h("button", { class: "hv-send", type: "button", "aria-label": "Send" });
     send.innerHTML = V_ICON.send;
     var compose = h("div", { class: "hv-compose" }, ta, send);
@@ -950,7 +965,7 @@
     var tray = $("cat-tray");
     function lift() {
       var hgt = tray && !tray.hidden ? tray.getBoundingClientRect().height : 0;
-      root.style.setProperty("--hv-lift", Math.ceil(hgt) + "px");
+      document.body.style.setProperty("--hv-lift", Math.ceil(hgt) + "px");
     }
     if (tray && window.MutationObserver) new MutationObserver(lift).observe(tray, { attributes: true, childList: true, subtree: true });
     window.addEventListener("resize", lift);
@@ -963,7 +978,7 @@
     function scroll() { log.scrollTop = log.scrollHeight; }
     function row(kind, node) {
       var r = h("div", { class: "hv-row hv-row--" + kind });
-      if (kind === "ai") r.appendChild(h("img", { class: "hv-row__ava", src: V_IMG + "voice-head-160.webp", alt: "", width: "32", height: "32" }));
+      if (kind === "ai") { var ava = h("span", { class: "hv-row__ava", "aria-hidden": "true" }); bg(ava, V_IMG + "voice-head-160.webp"); r.appendChild(ava); }
       r.appendChild(node); log.appendChild(r); scroll(); return r;
     }
     function bubble(kind, text, keep) {
@@ -978,7 +993,7 @@
     function say(text, then) {
       queue = queue.then(function () {
         return new Promise(function (done) {
-          var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "Voice is typing" }, h("i"), h("i"), h("i")));
+          var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "The assistant is typing" }, h("i"), h("i"), h("i")));
           setTimeout(function () {
             dots.remove(); bubble("ai", text); if (then) then(); done();
           }, reduce ? 0 : Math.min(900, 280 + text.length * 9));
@@ -990,6 +1005,8 @@
       opts = opts || {};
       queue = queue.then(function () {
         var wrap = h("div", { class: "hv-chips" + (opts.stack ? " hv-chips--stack" : "") });
+        var many = list.some(function (c) { return c.toggle; });
+        wrap.appendChild(h("p", { class: "hv-chips__hint" }, many ? "Pick any, then confirm" : "Tap to choose"));
         list.forEach(function (c) {
           var b = h("button", { class: "hv-chip" + (c.primary ? " hv-chip--lime" : "") + (c.ghost ? " hv-chip--ghost" : ""), type: "button" }, c.label);
           if (c.pressed != null) b.setAttribute("aria-pressed", String(!!c.pressed));
@@ -1024,7 +1041,7 @@
     function greet() {
       var hour = new Date().getHours();
       var part = hour >= 5 && hour < 12 ? "Good morning" : hour >= 12 && hour < 17 ? "Good afternoon" : hour >= 17 && hour < 23 ? "Good evening" : "Hi";
-      say(part + (first ? ", " + first : "") + " 👋 I'm Voice, HelloVoice's assistant.");
+      say(part + (first ? ", " + first : "") + " 👋 I'm the HelloVoice assistant.");
       menu("I can find creators for your campaign, filter this page, update your selection or get you a quote. What can I help you with today?");
     }
 
@@ -1326,7 +1343,7 @@
       if (REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
       if (!(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
       busy = true; send.disabled = true;
-      var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "Voice is typing" }, h("i"), h("i"), h("i")));
+      var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "The assistant is typing" }, h("i"), h("i"), h("i")));
       api("POST", "/api/chat", { message: text, thread: thread }).then(function (r) {
         busy = false; send.disabled = false; dots.remove();
         if (r.b.ok) {

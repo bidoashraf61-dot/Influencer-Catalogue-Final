@@ -141,7 +141,7 @@ _NEW = r"""
 @font-face{font-family:"Bebas Neue";src:url(__FONTS__/bebas.ttf) format("truetype");font-weight:400;font-display:swap}
 :root{
   --ink:#121212;--ink-2:#1b1b1b;--ink-3:#2a2a2a;--paper:#f5f3ef;--bg:#f5f3ef;--white:#fff;--linen:#e9dcd2;--lime:#e8ff76;
-  --gray:#5a5a58;--muted:#8a8984;--line:rgba(18,18,18,.1);--line-strong:rgba(18,18,18,.2);
+  --gray:#5a5a58;--muted:#6e6d68;--line:rgba(18,18,18,.1);--line-strong:rgba(18,18,18,.2);
   --green:#14884a;--green-soft:#e7f6ec;--amber:#a85507;--amber-soft:#fff1e2;--red:#c01010;--red-soft:#fdeaea;--blue:#1d4ed8;--blue-soft:#eef2ff;
   --r-sm:8px;--r-md:12px;--r-lg:16px;--side:252px;--bar:60px;
 }
@@ -381,7 +381,42 @@ details.card summary::-webkit-details-marker{display:none}
   .ph h1{font-size:34px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
-@media print{.side,.bar,#help,.savebar{display:none!important}.app{display:block}.page{padding:0}}
+@media print{.side,.bar,#help,.savebar,#ai-panel{display:none!important}.app{display:block}.page{padding:0}}
+/* ---- 2026-10 revamp: reach, read, act ---- */
+input[type=checkbox],input[type=radio]{width:18px;height:18px;accent-color:var(--ink)}
+@media (pointer:coarse){
+  .btn.small,.btn.tiny{min-height:40px;padding:6px 14px}
+  input[type=checkbox],input[type=radio]{width:24px;height:24px}
+  td a:not(.btn),.crumbs a{display:inline-block;padding:6px 0}
+  .iconbtn{min-width:44px;min-height:44px}
+}
+th.sortable{padding:0}
+th.sortable button{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:6px;width:100%;padding:0 12px 10px;cursor:pointer;font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit}
+th.sortable button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;border-radius:4px}
+th.sortable button::after{content:"↕";opacity:.35;font-size:11px}
+th.sortable[aria-sort=ascending] button::after{content:"↑";opacity:1}
+th.sortable[aria-sort=descending] button::after{content:"↓";opacity:1}
+.ai-btn{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border-radius:999px;border:1px solid var(--ink);background:var(--ink);color:var(--lime);font:inherit;font-weight:600;font-size:13.5px;cursor:pointer}
+.ai-btn:hover{background:#000}
+#ai-panel{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);background:var(--white);box-shadow:-20px 0 60px rgba(0,0,0,.25);z-index:60;display:flex;flex-direction:column;transform:translateX(105%);transition:transform .2s ease;visibility:hidden}
+#ai-panel.open{transform:none;visibility:visible}
+#ai-panel header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line)}
+#ai-panel header h2{margin:0;font-size:16px}
+#ai-panel iframe{flex:1;border:0;width:100%}
+.kbd-help{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13.5px;margin:8px 6px}
+.kbd-help kbd{font:600 12px "DM Sans",sans-serif;background:var(--paper);border:1px solid var(--line-strong);border-radius:6px;padding:2px 7px}
+@media (max-width:1000px){.ai-btn span{display:none}.ai-btn{width:38px;padding:0;justify-content:center}}
+@media (max-width:700px){
+  table.roster-t tr:not(.editrow){display:block;position:relative;padding:12px 56px 12px 58px;min-height:68px;border-bottom:1px solid var(--line)}
+  table.roster-t tr:not(.editrow) td{display:inline;padding:0;border:0;font-size:13px}
+  table.roster-t tr:not(.editrow) td:nth-child(1){position:absolute;left:0;top:12px}
+  table.roster-t tr:not(.editrow) td:nth-child(1) img,table.roster-t tr:not(.editrow) td:nth-child(1) .shot{width:46px!important;height:46px!important;border-radius:10px;object-fit:cover}
+  table.roster-t tr:not(.editrow) td:nth-child(2){display:block}
+  table.roster-t tr:not(.editrow) td:nth-child(3){display:block;font-size:15px}
+  table.roster-t tr:not(.editrow) td:nth-child(n+4):nth-child(-n+6)::after{content:" · ";color:var(--muted)}
+  table.roster-t tr:not(.editrow) td:nth-child(4) br{display:none}
+  table.roster-t tr:not(.editrow) td:last-child{position:absolute;right:0;top:12px}
+}
 """
 
 
@@ -615,7 +650,11 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
                  (' <i>/</i> <b>%s</b>' % e(a_label) if a_label and a_href != "/" else ""))))
     return (
         '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
-        '<meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="robots" content="noindex,nofollow">'
+        '<meta name="theme-color" content="#121212"><meta name="apple-mobile-web-app-capable" content="yes">'
+        '<meta name="apple-mobile-web-app-title" content="HV Admin"><meta name="apple-mobile-web-app-status-bar-style" content="black">'
+        '<link rel="manifest" href="' + u("/manifest.webmanifest") + '"><link rel="apple-touch-icon" href="' + u("/static/icon-180.png") + '">'
+        '<link rel="icon" href="' + u("/static/icon-32.png") + '">'
         "<title>" + e(title) + " — " + e(name) + '</title><link rel="stylesheet" href="' + u("/static/admin.css") + '"></head><body>'
         '<a class="skip" href="#main">Skip to content</a>'
         '<div class="app"><aside class="side" aria-label="Main">'
@@ -628,19 +667,113 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
         '<button class="iconbtn" id="side-toggle" type="button" aria-label="Toggle sidebar">' + icon("panel", 20) + '</button>'
         + crumb +
         '<span class="grow"></span>'
+        '<button class="ai-btn" type="button" id="ai-toggle" aria-controls="ai-panel" aria-expanded="false" title="AI copilot (press A)">'
+        + icon("star", 16) + '<span>Ask AI</span></button>'
         '<button class="search-btn" type="button" data-open-search aria-label="Search">' + icon("search", 17) + '<span>Search creators, selections…</span><kbd>⌘K</kbd></button>'
         '<a class="iconbtn" href="' + u("/requests") + '" aria-label="Inbox">' + icon("bell", 20)
         + ('<span class="badge">%d</span>' % bell_n if bell_n else "") + '</a>'
         '<button class="iconbtn" id="help-toggle" type="button" aria-label="Guides" aria-expanded="false" aria-controls="help">' + icon("help", 20) + '</button>'
         '</header><main class="page" id="main">' + body + '</main></div></div>'
         '<dialog id="pal" aria-label="Search"><div class="pal-in">' + icon("search", 20) + '<input id="pal-q" type="search" placeholder="Search creators, selections, campaigns, clients, pages…" autocomplete="off"></div>'
-        '<ul class="pal-list" id="pal-list"></ul><div class="pal-foot">↑↓ to move · Enter to open · Esc to close · press <b>/</b> anywhere to search</div></dialog>'
+        '<ul class="pal-list" id="pal-list"></ul><div class="pal-foot">↑↓ to move · Enter to open · Esc to close · <b>/</b> search · <b>A</b> AI copilot · <b>?</b> shortcuts</div></dialog>'
         '<aside id="help" aria-label="Guides"><header><h2>How do I…?</h2><button class="iconbtn" id="help-close" type="button" aria-label="Close guides" style="border:0;background:transparent;cursor:pointer">'
         + icon("plus", 20, "x") + '</button></header><div class="body"><p class="muted" style="margin:8px 6px 4px">Step by step, for anything you do here. Every change can be undone from History.</p>'
-        + _guides_html(u) + '</div></aside>'
+        + _guides_html(u) + _SHORTCUTS_HTML + '</div></aside>'
+        '<aside id="ai-panel" aria-label="AI copilot" data-src="' + u("/ai?embed=1") + '"><header><h2>AI copilot</h2>'
+        '<span><a class="btn small ghost" href="' + u("/ai") + '">Full page</a> <button class="iconbtn" id="ai-close" type="button" aria-label="Close AI copilot">'
+        + icon("plus", 20, "x") + '</button></span></header></aside>'
         "<div class='toast' id='req-toast' role='status' hidden></div><div class='toast' id='hv-toast' role='status' hidden></div>"
-        '<style>aside#help .x{transform:rotate(45deg)}</style>'
+        '<style>aside#help .x,#ai-panel .x{transform:rotate(45deg)}</style>'
         "<script>window.HV_SEARCH=" + json.dumps(u("/api/search")) + ";window.HV_PAGES=" + pages_js
         + ";window.HV_PULSE=" + json.dumps(pulse_payload) + ";</script>"
-        "<script>" + _JS + "</script><script>" + pulse_js + "</script></body></html>"
+        "<script>" + _RECENT_JS + "</script><script>" + _JS + "</script><script>" + _JS_REVAMP + "</script><script>" + pulse_js + "</script></body></html>"
     )
+
+
+_SHORTCUTS_HTML = (
+    '<details style="margin:14px 6px 0"><summary><b>Keyboard shortcuts</b></summary><div class="kbd-help">'
+    '<kbd>/</kbd><span>Search anything</span><kbd>⌘K</kbd><span>Search anything</span><kbd>A</kbd><span>Open the AI copilot</span>'
+    '<kbd>G H</kbd><span>Home</span><kbd>G S</kbd><span>Selections</span><kbd>G C</kbd><span>Campaigns</span>'
+    '<kbd>G R</kbd><span>Creators</span><kbd>G Q</kbd><span>Quote requests</span><kbd>G P</kbd><span>Client portal</span>'
+    '<kbd>?</kbd><span>These guides</span><kbd>Esc</kbd><span>Close panels</span></div></details>')
+
+# Recently opened pages go to the top of the search palette (this browser only).
+_RECENT_JS = r"""
+(function(){ try{
+  var KEY='hv_recent', here={href:location.pathname+location.search,label:document.title.split(' — ')[0],hint:'Recent',kw:''};
+  var list=JSON.parse(localStorage.getItem(KEY)||'[]').filter(function(x){return x.href!==here.href;});
+  if(!/\/(login|logout)/.test(here.href)) { list.unshift(here); localStorage.setItem(KEY, JSON.stringify(list.slice(0,8))); }
+  window.HV_PAGES=list.slice(1,6).concat(window.HV_PAGES||[]);
+}catch(e){} })();
+"""
+
+_JS_REVAMP = r"""
+(function(){
+  var $=function(s,r){return (r||document).querySelector(s)}, $$=function(s,r){return [].slice.call((r||document).querySelectorAll(s))};
+  // 1. Every field has a name a screen reader can say: tie each bare <label> to the field after it,
+  //    and name fields that only have a placeholder.
+  var n=0;
+  $$('label:not([for])').forEach(function(l){
+    if(l.querySelector('input,select,textarea')) return;
+    var f=l.nextElementSibling;
+    while(f && !/^(INPUT|SELECT|TEXTAREA)$/.test(f.tagName)){ var inner=f.querySelector&&f.querySelector('input:not([type=hidden]),select,textarea'); if(inner&&!f.matches('label')){f=inner;break;} f=f.nextElementSibling===null?null:f.nextElementSibling; if(f&&f.tagName==='LABEL'){f=null;} }
+    if(!f || f.type==='hidden') return;
+    if(!f.id) f.id='fld-'+(++n);
+    l.setAttribute('for', f.id);
+  });
+  $$('input:not([type=hidden]),select,textarea').forEach(function(f){
+    if(f.labels&&f.labels.length) return;
+    if(f.getAttribute('aria-label')||f.getAttribute('aria-labelledby')) return;
+    var t=f.getAttribute('placeholder')||f.getAttribute('title')||f.getAttribute('name');
+    if(t) f.setAttribute('aria-label', t.replace(/[_-]/g,' '));
+  });
+  // 2. Sort any list table by a column header click (tables with expandable edit rows are left alone).
+  function key(td){ var t=(td.getAttribute('data-sort')||td.textContent||'').trim();
+    var m=t.replace(/,/g,'').match(/^(-?\d+(?:\.\d+)?)\s*([KkMm%])?/);
+    if(m){ var v=parseFloat(m[1]); if(/[Kk]/.test(m[2]||'')) v*=1e3; if(/[Mm]/.test(m[2]||'')) v*=1e6; return {n:v}; }
+    var d=Date.parse(t); if(!isNaN(d) && /\d{4}|\d{1,2} [A-Z][a-z]{2}/.test(t)) return {n:d};
+    return {s:t.toLowerCase()}; }
+  $$('main table').forEach(function(tb){
+    var head=tb.tHead, body=tb.tBodies[0]; if(!head||!body||tb.hasAttribute('data-nosort')) return;
+    var rows=[].slice.call(body.rows); if(rows.length<3) return;
+    if(rows.some(function(r){return r.querySelector('td[colspan]');})) return;
+    var ths=[].slice.call(head.rows[head.rows.length-1].cells);
+    ths.forEach(function(th,i){ var label=th.textContent.trim(); if(!label||th.querySelector('input,button,a')) return;
+      th.classList.add('sortable'); th.setAttribute('aria-sort','none');
+      var b=document.createElement('button'); b.type='button'; b.textContent=label; b.setAttribute('aria-label','Sort by '+label); th.textContent=''; th.appendChild(b);
+      b.addEventListener('click',function(){
+        var dir=th.getAttribute('aria-sort')==='ascending'?-1:1;
+        ths.forEach(function(o){ if(o.classList.contains('sortable')) o.setAttribute('aria-sort','none'); });
+        th.setAttribute('aria-sort', dir===1?'ascending':'descending');
+        var rs=[].slice.call(body.rows);
+        rs.sort(function(a,b2){ var x=key(a.cells[i]||a), y=key(b2.cells[i]||b2);
+          if(x.n!==undefined&&y.n!==undefined) return (x.n-y.n)*dir;
+          if(x.n!==undefined) return -1; if(y.n!==undefined) return 1;
+          return (x.s||'').localeCompare(y.s||'')*dir; });
+        rs.forEach(function(r){body.appendChild(r);});
+      });
+    });
+  });
+  // 3. The AI copilot opens beside any page.
+  var panel=$('#ai-panel'), tog=$('#ai-toggle'), frame=null;
+  function setAI(o){ if(!panel) return;
+    if(o && !frame){ frame=document.createElement('iframe'); frame.title='AI copilot'; frame.src=panel.getAttribute('data-src'); panel.appendChild(frame); }
+    panel.classList.toggle('open',o); if(tog) tog.setAttribute('aria-expanded',o?'true':'false');
+    if(o&&frame){ setTimeout(function(){ try{ var t=frame.contentDocument.getElementById('cp-text'); t&&t.focus(); }catch(e){} },300); } }
+  if(tog) tog.addEventListener('click',function(){ setAI(!panel.classList.contains('open')); });
+  var ac=$('#ai-close'); if(ac) ac.addEventListener('click',function(){ setAI(false); });
+  // 4. Shortcuts: A = AI, ? = guides, G then a letter = go to a section.
+  var go={h:'/',s:'/selections',c:'/campaigns',r:'/roster',q:'/requests',p:'/portal',a:'/analytics'}, base=(document.querySelector('.logo')||{}).getAttribute? document.querySelector('.logo').getAttribute('href').replace(/\/$/,''):'';
+  var gArmed=0;
+  document.addEventListener('keydown',function(ev){
+    var tag=(ev.target.tagName||'').toLowerCase(); if(tag==='input'||tag==='textarea'||tag==='select'||ev.target.isContentEditable||ev.metaKey||ev.ctrlKey||ev.altKey) return;
+    var k=ev.key.toLowerCase();
+    if(ev.key==='Escape'){ setAI(false); return; }
+    if(gArmed && go[k]){ ev.preventDefault(); location.href=base+(go[k]==='/'?'/':go[k]); return; }
+    gArmed=0;
+    if(k==='g'){ gArmed=1; setTimeout(function(){gArmed=0;},1200); return; }
+    if(k==='a'){ ev.preventDefault(); setAI(true); }
+    if(ev.key==='?'){ ev.preventDefault(); var hb=$('#help-toggle'); hb&&hb.click(); }
+  });
+})();
+"""
