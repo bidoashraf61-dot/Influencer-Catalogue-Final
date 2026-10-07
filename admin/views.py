@@ -2215,15 +2215,17 @@ def _brief_note(sel):
             row = conn.execute("SELECT * FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1", (sel["id"],)).fetchone()
     except Exception:
         return ""
+    quote = " <a class='btn small ghost' href='" + u("/portal/quote?sel=%d" % sel["id"]) + "'>Printable quotation</a>"
     if not row:
-        return ""
+        return "<p style='margin:0 0 14px'>" + quote + "</p>"
     try:
         notes = json.loads(row["answers"] or "{}").get("notes") or ""
     except ValueError:
         notes = ""
     return ("<div class='note'><strong>Client brief.</strong> " + e(row["summary"] or "")
             + ((" <span class='muted'>“" + e(notes) + "”</span>") if notes else "")
-            + " <span class='muted'>Built by the AI shortlist " + e(ago(row["created_at"])) + ". Scores on this page use that objective and audience.</span></div>")
+            + " <span class='muted'>" + ("Answered for this selection " if row["source"] == "selection" else "Built by the AI shortlist ")
+            + e(ago(row["created_at"])) + ". Scores on this page use that objective and audience.</span>" + quote + "</div>")
 
 
 def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=()):

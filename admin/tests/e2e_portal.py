@@ -8,6 +8,7 @@ scripted stub.
 """
 import http.cookiejar
 import json
+import time
 import shutil
 import sys
 import tempfile
@@ -551,6 +552,122 @@ class Portal(unittest.TestCase):
         low = assistant.t_rank_by_metric({}, metric="fake_followers_pct", order="asc", limit=1)
         self.assertEqual(low["creators"][0]["code"], "HV-MI-001")
         self.assertIn("error", assistant.t_rank_by_metric({}, metric="bio"))
+
+    # ------------------------------------------------------- round 3 features
+    def test_40_signup_is_open_by_default(self):
+        db.set_setting("signup_mode", None)
+        try:
+            c, b = self.signup("auto@roche.com")
+            self.assertEqual(b["me"]["credits"], 50)                    # straight in, no approval
+        finally:
+            db.set_setting("signup_mode", "open")
+
+    def test_41_brief_for_a_hand_built_selection_is_free(self):
+        c, _ = self.signup("hand@novartis.com")
+        cid = portal.user_by_email("hand@novartis.com")["code_id"]
+        s, r, _ = c.post("/api/selection", {"name": "My picks", "codes": ["HV-MI-001", "HV-MD-004", "HV-MI-005"]})
+        token = r["token"]
+        self.assertIsNone(c.get("/api/brief/for?s=" + token)[1]["brief"])
+        ans = {"goal": "awareness", "platforms": ["Instagram"], "market": "SA", "category": ["skincare"]}
+        s, r, _ = c.post("/api/brief/attach", {"token": token, "answers": ans})
+        self.assertEqual(s, 200, r)
+        self.assertEqual(sorted(p["code"] for p in r["picks"]), ["HV-MD-004", "HV-MI-001", "HV-MI-005"])
+        self.assertEqual(r["picks"][0]["code"], "HV-MI-001")
+        self.assertEqual(portal.balance(cid), 50)                        # free
+        self.assertIn("Reach as many", c.get("/api/brief/for?s=" + token)[1]["brief"]["summary"])
+        sel = db.selection(token=token)
+        self.assertEqual(sel["objective"], "Awareness")
+        scores = c.get("/api/brief/scores?b=%d" % r["brief_id"])[1]["scores"]
+        self.assertEqual(len(scores), 4)                                 # every Instagram creator, for the catalogue badges
+        other, _ = self.signup("x@gsk.com")
+        self.assertEqual(other.post("/api/brief/attach", {"token": token, "answers": ans})[0], 404)
+        self.assertEqual(other.get("/api/brief/scores?b=%d" % r["brief_id"])[0], 404)
+
+    def test_42_colleagues_share_selections_and_campaigns(self):
+        a, _ = self.signup("one@astrazeneca.com")
+        b, _ = self.signup("two@astrazeneca.com")
+        z, _ = self.signup("three@sanofi.com")
+        token = a.post("/api/selection", {"name": "Team list", "codes": ["HV-MI-001"]})[1]["token"]
+        self.assertEqual(b.get("/api/selection?s=" + token)[0], 200)
+        self.assertNotEqual(z.get("/api/selection?s=" + token)[0], 200)
+        team = b.get("/api/team")[1]
+        self.assertTrue(any(x["token"] == token for x in team["selections"]))
+        cid = db.create_campaign("Shared", "AZ", portal.user_by_email("one@astrazeneca.com")["code_id"])
+        db.save_campaign(cid, status="live")
+        self.assertTrue(any(k["name"] == "Shared" for k in b.get("/api/campaigns")[1]["campaigns"]))
+        self.assertFalse(any(k["name"] == "Shared" for k in z.get("/api/campaigns")[1]["campaigns"]))
+        db.set_setting("team_sharing", False)
+        try:
+            self.assertNotEqual(b.get("/api/selection?s=" + token)[0], 200)
+        finally:
+            db.set_setting("team_sharing", True)
+
+    def test_43_credit_request_and_grant(self):
+        c, _ = self.signup("more@bayer.com")
+        u = portal.user_by_email("more@bayer.com")
+        s, r, _ = c.post("/api/credits/request", {"amount": 200, "note": "Q4 launch"})
+        self.assertTrue(r["ok"])
+        a = self.admin()
+        rid = portal.open_credit_requests()[-1]["id"]
+        a.req("POST", "/portal/credit-request", form={"id": rid, "grant": "200", "action": "grant", "back": "/portal"})
+        self.assertEqual(portal.balance(u["code_id"]), 250)
+        self.assertFalse(any(x["id"] == rid for x in portal.open_credit_requests()))
+
+    def test_44_monthly_refill(self):
+        c, _ = self.signup("monthly@merck.com")
+        u = portal.user_by_email("monthly@merck.com")
+        portal.grant(u["code_id"], -45, "drain")
+        portal.update_profile(u["id"], monthly_credits="30")
+        c.get("/api/me")
+        self.assertEqual(portal.balance(u["code_id"]), 30)               # topped back up to 30
+        c.get("/api/me")
+        self.assertEqual(portal.balance(u["code_id"]), 30)               # once a month only
+
+    def test_45_export_and_delete(self):
+        c, _ = self.signup("bye@pfizer.com")
+        c.post("/api/chat", {"message": "hello"})
+        s, data, _ = c.get("/api/me/export")
+        self.assertEqual(data["profile"]["email"], "bye@pfizer.com")
+        self.assertTrue(data["chat"])
+        self.assertEqual(c.post("/api/me/delete", {"confirm": "nope"})[0], 400)
+        s, r, _ = c.post("/api/me/delete", {"confirm": "DELETE"})
+        self.assertEqual(s, 200)
+        self.assertIsNone(portal.user_by_email("bye@pfizer.com"))
+        self.assertEqual(c.get("/api/roster")[0], 401)
+        with db.connect() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM chat_messages m JOIN chat_threads t ON t.id = m.thread_id "
+                                          "JOIN users u ON u.code_id = t.code_id WHERE u.deleted_at IS NOT NULL").fetchone()[0], 0)
+
+    def test_46_notifications_go_to_kam_and_team(self):
+        db.set_setting("notify_emails", ["sales@hellovoice.co.uk"])
+        db.set_setting("kams", ["Marwa Mahmoud <marwa@hellovoice.co.uk>"])
+        try:
+            c, _ = self.signup("notify@pfizer.com")
+            u = portal.user_by_email("notify@pfizer.com")
+            portal.update_profile(u["id"], kam="marwa@hellovoice.co.uk")
+            mailer.OUTBOX.clear()
+            c.post("/api/request", {"selection": ["HV-MI-001"], "selection_name": "Quote me", "name": "N", "email": "notify@pfizer.com"})
+            time.sleep(0.5)
+            to = [m["to"] for m in mailer.OUTBOX]
+            self.assertEqual(to[:2], ["marwa@hellovoice.co.uk", "sales@hellovoice.co.uk"])
+            self.assertIn("Quote request", mailer.OUTBOX[0]["subject"])
+        finally:
+            db.set_setting("notify_emails", [])
+
+    def test_47_admin_chats_and_quotation(self):
+        c, _ = self.signup("talk@pfizer.com")
+        r = c.post("/api/chat", {"message": "hello there"})[1]
+        a = self.admin()
+        s, page, _ = a.get("/portal?tab=chats")
+        self.assertIn("hello there", page)
+        s, page, _ = a.get("/portal/chat?id=%d" % r["thread"])
+        self.assertEqual(s, 200)
+        self.assertIn("hello there", page)
+        sid = db.save_selection(None, "Quote sel", ["HV-MI-001", "HV-MD-003"], {}, None, None, None, None)
+        s, page, _ = a.get("/portal/quote?sel=%d" % sid)
+        self.assertEqual(s, 200)
+        self.assertIn("Total incl. 15% VAT", page)
+        self.assertIn("Noha Magdy", page)
 
     # ------------------------------------------------------------------- admin
     def admin(self):

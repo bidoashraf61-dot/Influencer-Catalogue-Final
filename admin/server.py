@@ -380,7 +380,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return
         views.set_user(who["email"] if "email" in who.keys() else "")
 
-        if path in ("/ai", "/ai/history", "/portal", "/portal/user", "/portal/usage.csv"):
+        if path in ("/ai", "/ai/history", "/portal", "/portal/user", "/portal/usage.csv", "/portal/chat", "/portal/quote"):
             return self.portal_admin_get(path, query, who)
         if path == "/api/search":
             return self.api_search((query.get("q") or "").strip())
@@ -2387,10 +2387,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         code_id = self.viewer_code_id()
         if code_id is None:
             return self.send_json(401, {"ok": False}, self.cors())
+        team = sorted(portal.team_codes(code_id))
         with db.connect() as conn:
             rows = conn.execute(
                 "SELECT token, name, client, status, phase, starts_at, ends_at, logos FROM campaigns "
-                "WHERE code_id = ? AND status != 'draft' ORDER BY starts_at DESC", (code_id,)).fetchall()
+                "WHERE code_id IN (%s) AND status != 'draft' ORDER BY starts_at DESC" % ",".join("?" * len(team)),
+                team).fetchall()
         out = []
         for r in rows:
             d = dict(r)
@@ -2405,7 +2407,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return None, 401
         k = db.campaign(token=token) if token else None
         # Not found and not yours look the same from outside.
-        if k is None or k["code_id"] != code_id or k["status"] == "draft":
+        if k is None or k["code_id"] not in portal.team_codes(code_id) or k["status"] == "draft":
             return None, 404
         return k, 200
 
@@ -3447,7 +3449,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # who is reading it.
             if sel is not None and sel["code_id"] is not None:
                 try:
-                    if int(viewer) != sel["code_id"] and int(viewer) != db.admin_code_id():
+                    if sel["code_id"] not in portal.team_codes(int(viewer)) and int(viewer) != db.admin_code_id():
                         sel = None
                 except (TypeError, ValueError):
                     sel = None
@@ -3643,6 +3645,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             b.get("selection_name"), [str(c)[:40] for c in selection[:200]],
         )
         db.log("request", code_id, self.client_ip(), self.headers.get("User-Agent"), str(rid))
+        # The browser still mails the quote through the form service; this is the server's own copy to
+        # the client's KAM and the team, which does not depend on that service accepting it.
+        import notify
+        u = portal.user_for_code(code_id)
+        notify.send("quote", ["%s requested a quote for “%s” (%d creators)." % (
+            (u["company"] or u["email"]) if u else (b.get("company") or "A client"), b.get("selection_name") or "a selection", len(selection)),
+            "Name: %s" % (b.get("name") or ""), "Email: %s" % (b.get("email") or ""), "Phone: %s" % (b.get("phone") or "")],
+            kam=u["kam"] if u else None, link=self.site_origin() + BASE + "/requests")
         return self.send_json(200, {"ok": True, "id": rid}, self.cors())
 
     def api_search(self, q):
@@ -3679,7 +3689,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         b = self.json_body()
         sel = db.selection(token=str(b.get("token") or ""))
-        if sel is None or (sel["code_id"] is not None and int(viewer) not in (sel["code_id"], db.admin_code_id())):
+        if sel is None or (sel["code_id"] is not None and int(viewer) != db.admin_code_id()
+                           and sel["code_id"] not in portal.team_codes(int(viewer))):
             return self.send_json(404, {"ok": False}, self.cors())
         code = str(b.get("code") or "").strip().upper()
         if code not in json.loads(sel["codes"] or "[]"):
@@ -3713,8 +3724,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
         token = (str(b.get("token") or "")).strip()
         sel = db.selection(token=token) if token else None
-        if sel is not None and sel["code_id"] is not None and sel["code_id"] != viewer:
-            sel = None                      # another client's selection: never touched
+        if sel is not None and sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(viewer):
+            sel = None                      # another client's selection: never touched (colleagues share)
         if sel is None:
             sel = db.selection_for_link(name, codes, viewer)
         if sel is None:

@@ -263,25 +263,20 @@ ESTIMATE_WEIGHT = 0.85
 MISMATCH_WEIGHT = 0.6
 
 
-def rank(brief, exclude=()):
-    """Score every active creator against the brief and cut a shortlist.
-
-    Returns ``{"picks", "alternates", "totals", "pool"}`` where each pick is
-    ``{code, score, rank_score, tag, basis, platform, price, strengths, watchouts}``.
-    ``basis`` is "analysis", "basic" (public numbers) or "roster" (an estimate).
-    """
+def score_all(brief, exclude=(), only=None):
+    """Every active creator scored against the brief, best first (no cut for count or budget)."""
     objective, target = brief["objective"], brief["target"]
     wanted = [p for p in brief.get("platforms", []) if p in PLATFORMS]
-    creators = [c for c in db.list_creators(active_only=True) if c["code"] not in set(exclude)]
+    creators = [c for c in db.list_creators(active_only=True) if c["code"] not in set(exclude)
+                and (only is None or c["code"] in only)]
     if wanted:
         creators = [c for c in creators if set(analysis.creator_platforms(c)) & set(wanted)]
     single = wanted[0] if len(wanted) == 1 else None
     scored = score_codes([c["code"] for c in creators], objective, target, single)
     bands = db.tier_prices()
-    by_code = {c["code"]: c for c in creators}
-
     items = []
-    for code, c in by_code.items():
+    for c in creators:
+        code = c["code"]
         s = scored.get(code) or {}
         basis, val = None, s.get("score")
         if val is not None:
@@ -293,22 +288,33 @@ def rank(brief, exclude=()):
         if val is None:
             continue
         rank_score = val * (ESTIMATE_WEIGHT if basis == "roster" else 1.0)
-        # Without a measured audience split, a creator the roster places in another country
-        # must not win on reach alone: a big Dubai account is the wrong buy for a KSA brief.
         if basis in ("roster", "basic"):
             _, hits = fit._place_mark(c, target["country"])
             if hits and target["country"] not in hits:
+                # The number shown carries the penalty too, so a card never reads higher than the order says.
                 rank_score *= MISMATCH_WEIGHT
-                s = dict(s, watchouts=["Based outside %s" % dict(fit.COUNTRIES).get(target["country"], target["country"])]
+                val = int(round(val * MISMATCH_WEIGHT))
+                s = dict(s, tag=fit.band_for(val),
+                         watchouts=["Based outside %s" % dict(fit.COUNTRIES).get(target["country"], target["country"])]
                          + [w for w in (s.get("watchouts") or []) if not w.startswith("Based outside")])
         price = db.price_for(c, bands, single or (wanted[0] if wanted else None))
         items.append({
             "code": code, "score": val, "rank_score": round(rank_score, 1), "tag": s.get("tag") or fit.band_for(val),
-            "basis": basis, "platform": s.get("platform") or single,
-            "price": list(price) if price else None,
+            "basis": basis, "platform": s.get("platform") or single, "price": list(price) if price else None,
             "strengths": (s.get("strengths") or [])[:3], "watchouts": (s.get("watchouts") or [])[:2],
         })
     items.sort(key=lambda i: (-i["rank_score"], i["code"]))
+    return items
+
+
+def rank(brief, exclude=()):
+    """Score every active creator against the brief and cut a shortlist.
+
+    Returns ``{"picks", "alternates", "totals", "pool"}`` where each pick is
+    ``{code, score, rank_score, tag, basis, platform, price, strengths, watchouts}``.
+    ``basis`` is "analysis", "basic" (public numbers) or "roster" (an estimate).
+    """
+    items = score_all(brief, exclude)
 
     count, cap = brief.get("count") or 8, brief.get("budget_max")
     picks, spent = [], 0

@@ -89,6 +89,17 @@ CREATE TABLE IF NOT EXISTS ai_audit (
 );
 CREATE INDEX IF NOT EXISTS ai_audit_at ON ai_audit(at);
 
+CREATE TABLE IF NOT EXISTS credit_requests (
+    id INTEGER PRIMARY KEY,
+    code_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    note TEXT,
+    at INTEGER NOT NULL,
+    handled_at INTEGER,
+    granted INTEGER,
+    handled_by TEXT
+);
+
 CREATE TABLE IF NOT EXISTS chat_threads (
     id INTEGER PRIMARY KEY,
     code_id INTEGER,
@@ -124,6 +135,10 @@ def init():
         if "cost_usd" not in cols:
             conn.execute("ALTER TABLE ai_audit ADD COLUMN cost_usd REAL NOT NULL DEFAULT 0")
         conn.execute("CREATE INDEX IF NOT EXISTS ai_audit_code ON ai_audit(code_id, at)")
+        ucols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
+        for col, ddl in (("kam", "TEXT"), ("monthly_credits", "INTEGER"), ("deleted_at", "INTEGER")):
+            if col not in ucols:
+                conn.execute("ALTER TABLE users ADD COLUMN %s %s" % (col, ddl))
 
 
 # ----------------------------------------------------------------- settings --
@@ -154,9 +169,9 @@ def signup_credits():
 
 
 def signup_mode():
-    # Default is approval: the roster is confidential, so a new company is let in by a person.
-    m = db.setting("signup_mode", "approval")
-    return m if m in ("open", "approval", "allowlist", "closed") else "approval"
+    # Default is open: any company-domain address is let in at once (Bido, 2026-10-07).
+    m = db.setting("signup_mode", "open")
+    return m if m in ("open", "approval", "allowlist", "closed") else "open"
 
 
 def _list_setting(key):
@@ -279,7 +294,7 @@ def list_users():
             " (SELECT COUNT(*) FROM selections s WHERE s.code_id = u.code_id) AS selections, "
             " (SELECT COUNT(*) FROM campaigns c WHERE c.code_id = u.code_id) AS campaigns, "
             " (SELECT COUNT(*) FROM briefs b WHERE b.code_id = u.code_id) AS briefs "
-            "FROM users u ORDER BY u.created_at DESC").fetchall()
+            "FROM users u WHERE u.deleted_at IS NULL ORDER BY u.created_at DESC").fetchall()
 
 
 def create_user(email, name, company, job_title="", phone="", ip=None):
@@ -334,12 +349,16 @@ def signups_from(ip, hours=24):
 
 
 def update_profile(uid, **fields):
-    allowed = {"name": 120, "company": 160, "job_title": 120, "phone": 40, "notes": 500}
+    allowed = {"name": 120, "company": 160, "job_title": 120, "phone": 40, "notes": 500, "kam": 160}
     sets, vals = [], []
     for k, n in allowed.items():
         if k in fields and fields[k] is not None:
             sets.append(k + " = ?")
             vals.append(" ".join(str(fields[k]).split())[:n])
+    if "monthly_credits" in fields:
+        v = fields["monthly_credits"]
+        sets.append("monthly_credits = ?")
+        vals.append(int(v) if str(v).strip().isdigit() else None)
     if sets:
         with db.connect() as conn:
             conn.execute("UPDATE users SET %s WHERE id = ?" % ", ".join(sets), vals + [uid])
@@ -432,6 +451,7 @@ def charge(code_id, kind, ref=""):
     if code_id == db.admin_code_id():
         return True, 0, balance(code_id)
     ensure_allowance(code_id)
+    monthly_refill(code_id)
     ok, bal = spend(code_id, cost, "AI: " + kind, ref)
     return ok, cost, bal
 
@@ -496,6 +516,20 @@ def find_thread(code_id, scope, owner, tid):
                             (tid, scope, code_id, owner)).fetchone()
 
 
+def find_thread_any(tid):
+    with db.connect() as conn:
+        return conn.execute("SELECT * FROM chat_threads WHERE id = ?", (tid,)).fetchone()
+
+
+def threads(code_id=None, scope="client", limit=100):
+    q = ("SELECT t.*, (SELECT COUNT(*) FROM chat_messages m WHERE m.thread_id = t.id) n, "
+         "(SELECT MAX(at) FROM chat_messages m WHERE m.thread_id = t.id) last, "
+         "(SELECT content FROM chat_messages m WHERE m.thread_id = t.id AND role = 'user' ORDER BY id LIMIT 1) first "
+         "FROM chat_threads t WHERE scope = ?" + (" AND code_id = ?" if code_id is not None else "") + " ORDER BY last DESC LIMIT ?")
+    with db.connect() as conn:
+        return conn.execute(q, ((scope, code_id, limit) if code_id is not None else (scope, limit))).fetchall()
+
+
 def add_message(tid, role, content, meta=None):
     with db.connect() as conn:
         conn.execute("INSERT INTO chat_messages (thread_id, role, content, meta, at) VALUES (?,?,?,?,?)",
@@ -525,3 +559,128 @@ def read_ticket(secret, ticket):
     _, rest = raw.split(":", 1)
     email, _, exp = rest.rpartition(":")
     return email if exp.isdigit() and int(exp) >= time.time() else None
+
+
+# -------------------------------------------------------------------- teams --
+
+def team_codes(code_id):
+    """The access-code ids whose selections and campaigns this viewer may see: their own, plus
+    colleagues on the same company domain when team sharing is on. Personal domains (only possible
+    through the allow list) never form a team."""
+    me = user_for_code(code_id)
+    if not me or not db.setting("team_sharing", True) or guard._matches(me["domain"] or "", guard.FREE_DOMAINS):
+        return {code_id}
+    with db.connect() as conn:
+        rows = conn.execute("SELECT code_id FROM users WHERE domain = ? AND status = 'active' AND deleted_at IS NULL",
+                            (me["domain"],)).fetchall()
+    return {r["code_id"] for r in rows} | {code_id}
+
+
+def teammates(code_id):
+    me = user_for_code(code_id)
+    if not me:
+        return []
+    ids = team_codes(code_id) - {code_id}
+    if not ids:
+        return []
+    with db.connect() as conn:
+        return conn.execute("SELECT id, name, job_title, email, code_id FROM users WHERE code_id IN (%s) ORDER BY name"
+                            % ",".join("?" * len(ids)), list(ids)).fetchall()
+
+
+# ---------------------------------------------------------- monthly credits --
+
+def monthly_allowance(user):
+    v = user["monthly_credits"] if user is not None and "monthly_credits" in user.keys() else None
+    if v is None:
+        v = db.setting("monthly_credits", 0)
+    try:
+        return max(0, int(v or 0))
+    except (TypeError, ValueError):
+        return 0
+
+
+def monthly_refill(code_id):
+    """Top a signed-up client back up to their monthly allowance, once per calendar month."""
+    u = user_for_code(code_id)
+    n = monthly_allowance(u)
+    if not u or not n or u["status"] != "active":
+        return
+    t = time.gmtime()
+    start = int(time.mktime((t.tm_year, t.tm_mon, 1, 0, 0, 0, 0, 0, 0))) - time.timezone
+    with db.connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if conn.execute("SELECT 1 FROM credit_ledger WHERE code_id = ? AND reason = 'Monthly credits' AND at >= ?",
+                        (code_id, start)).fetchone():
+            return
+        r = conn.execute("SELECT balance_after FROM credit_ledger WHERE code_id = ? ORDER BY id DESC LIMIT 1", (code_id,)).fetchone()
+        bal = r["balance_after"] if r else 0
+        _post(conn, code_id, max(0, n - bal), "Monthly credits", time.strftime("%Y-%m", t), "system")
+
+
+# ---------------------------------------------------------- credit requests --
+
+def request_credits(code_id, amount, note):
+    with db.connect() as conn:
+        cur = conn.execute("INSERT INTO credit_requests (code_id, amount, note, at) VALUES (?,?,?,?)",
+                           (code_id, amount, " ".join(str(note or "").split())[:300], db.now()))
+        return cur.lastrowid
+
+
+def open_credit_requests(code_id=None):
+    with db.connect() as conn:
+        if code_id is None:
+            return conn.execute("SELECT r.*, u.email, u.company, u.id user_id FROM credit_requests r "
+                                "LEFT JOIN users u ON u.code_id = r.code_id WHERE r.handled_at IS NULL ORDER BY r.id").fetchall()
+        return conn.execute("SELECT * FROM credit_requests WHERE code_id = ? ORDER BY id DESC LIMIT 20", (code_id,)).fetchall()
+
+
+def handle_credit_request(rid, grant_n, who):
+    with db.connect() as conn:
+        r = conn.execute("SELECT * FROM credit_requests WHERE id = ? AND handled_at IS NULL", (rid,)).fetchone()
+        if not r:
+            return None
+        conn.execute("UPDATE credit_requests SET handled_at = ?, granted = ?, handled_by = ? WHERE id = ?",
+                     (db.now(), grant_n, who, rid))
+    if grant_n:
+        grant(r["code_id"], grant_n, "Top-up on request", actor=who, ref="request %d" % rid)
+    return r
+
+
+# ------------------------------------------------------------- data rights --
+
+def export(code_id):
+    """Everything we hold that this client created or that is about them."""
+    u = user_for_code(code_id)
+    with db.connect() as conn:
+        sels = [dict(r) for r in conn.execute("SELECT name, token, codes, created_at, updated_at FROM selections WHERE code_id = ?", (code_id,))]
+        reqs = [dict(r) for r in conn.execute("SELECT at, name, company, email, phone, selection_name FROM requests WHERE code_id = ?", (code_id,))]
+        threads = conn.execute("SELECT id FROM chat_threads WHERE code_id = ? AND scope = 'client'", (code_id,)).fetchall()
+        chats = [{"role": m["role"], "text": m["content"], "at": m["at"]} for t in threads
+                 for m in conn.execute("SELECT * FROM chat_messages WHERE thread_id = ? ORDER BY id", (t["id"],))]
+    return {"exported_at": db.now(),
+            "profile": {k: u[k] for k in ("email", "name", "company", "job_title", "phone", "created_at", "last_login_at")} if u else None,
+            "credits": [dict(r) for r in ledger(code_id, 1000)],
+            "briefs": [{"summary": b["summary"], "answers": json.loads(b["answers"] or "{}"), "at": b["created_at"]} for b in briefs_for(code_id, 1000)],
+            "selections": sels, "quote_requests": reqs, "chat": chats}
+
+
+def delete_account(uid):
+    """Close the account and erase the personal data. Selections and quote requests stay as
+    business records, without the person's details; the credit ledger stays for accounting."""
+    u = user_by_id(uid)
+    if not u:
+        return False
+    with db.connect() as conn:
+        conn.execute("UPDATE codes SET revoked_at = COALESCE(revoked_at, ?), label = ? WHERE id = ?",
+                     (db.now(), "Deleted client #%d" % uid, u["code_id"]))
+        conn.execute("DELETE FROM code_devices WHERE code_id = ?", (u["code_id"],))
+        conn.execute("DELETE FROM chat_messages WHERE thread_id IN (SELECT id FROM chat_threads WHERE code_id = ?)", (u["code_id"],))
+        conn.execute("DELETE FROM chat_threads WHERE code_id = ?", (u["code_id"],))
+        conn.execute("DELETE FROM otp WHERE email = ?", (u["email"],))
+        conn.execute("UPDATE requests SET name = NULL, email = NULL, phone = NULL WHERE code_id = ?", (u["code_id"],))
+        conn.execute("UPDATE briefs SET answers = json_remove(answers, '$.notes') WHERE code_id = ?", (u["code_id"],))
+        conn.execute("UPDATE users SET email = ?, name = NULL, company = NULL, job_title = NULL, phone = NULL, notes = NULL, "
+                     "signup_ip = NULL, status = 'suspended', deleted_at = ? WHERE id = ?",
+                     ("deleted-%d@deleted.invalid" % uid, db.now(), uid))
+    return True

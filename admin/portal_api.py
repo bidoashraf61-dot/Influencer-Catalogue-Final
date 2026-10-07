@@ -24,6 +24,7 @@ Admin routes (signed-in admin only)
 """
 import json
 import sys
+import time
 import urllib.parse
 
 import assistant
@@ -33,8 +34,11 @@ import gemini
 import guard
 import mailer
 import matcher
+import notify
 import portal
 import portal_views
+
+_score_cache = {}          # brief id -> (time, scores) for the catalogue's fit badges
 
 REASON_TEXT = {
     "invalid": "Enter a valid work email address.",
@@ -78,10 +82,14 @@ class PortalMixin:
     def _me_payload(self, cid, user, kind):
         if kind == "guest":
             portal.ensure_allowance(cid)
+        if kind == "user":
+            portal.monthly_refill(cid)
         out = {"signed_in": True, "kind": kind, "credits": portal.balance(cid) if kind != "admin" else None,
                "costs": portal.costs(), "ai": gemini.configured()}
         if user:
             out["user"] = {k: user[k] for k in ("email", "name", "company", "job_title", "phone")}
+            out["team"] = [{"name": t["name"], "job_title": t["job_title"]} for t in portal.teammates(cid)]
+            out["monthly_credits"] = portal.monthly_allowance(user)
         return out
 
     def _issue_pass(self, row, extra=None):
@@ -179,6 +187,53 @@ class PortalMixin:
                      "selection": (db.selection(b["selection_id"])["token"] if b["selection_id"] and db.selection(b["selection_id"]) else None)}
                     for b in portal.briefs_for(who[0], 20)]}, self.cors())
             return True
+        if path == "/api/brief/for":
+            who = self._need_viewer()
+            if who:
+                sel = db.selection(token=query.get("s") or "") if query.get("s") else None
+                if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(who[0])
+                                   and who[0] != db.admin_code_id()):
+                    self.send_json(404, {"ok": False}, self.cors())
+                else:
+                    with db.connect() as conn:
+                        b = conn.execute("SELECT id, summary FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1",
+                                         (sel["id"],)).fetchone()
+                    self.send_json(200, {"ok": True, "brief": dict(b) if b else None}, self.cors())
+            return True
+        if path == "/api/brief/scores":
+            who = self._need_viewer()
+            if who:
+                b = portal.brief(self._int(query.get("b")))
+                if b is None or (b["code_id"] not in portal.team_codes(who[0]) and who[0] != db.admin_code_id()):
+                    self.send_json(404, {"ok": False}, self.cors())
+                else:
+                    self.send_json(200, {"ok": True, "brief": b["summary"], "scores": self._brief_scores(b)}, self.cors())
+            return True
+        if path == "/api/team":
+            who = self._need_viewer()
+            if who:
+                cid = who[0]
+                team = portal.team_codes(cid) - {cid}
+                sels = []
+                if team:
+                    with db.connect() as conn:
+                        sels = conn.execute(
+                            "SELECT s.name, s.token, s.codes, s.updated_at, u.name owner FROM selections s JOIN users u ON u.code_id = s.code_id "
+                            "WHERE s.code_id IN (%s) AND s.archived_at IS NULL ORDER BY s.updated_at DESC LIMIT 30" % ",".join("?" * len(team)),
+                            list(team)).fetchall()
+                self.send_json(200, {"ok": True, "members": [{"name": t["name"], "job_title": t["job_title"]} for t in portal.teammates(cid)],
+                                     "selections": [{"name": s["name"], "token": s["token"], "owner": s["owner"], "at": s["updated_at"],
+                                                     "creators": len(json.loads(s["codes"] or "[]"))} for s in sels]}, self.cors())
+            return True
+        if path == "/api/me/export":
+            who = self._need_viewer()
+            if who:
+                if who[2] != "user":
+                    self.send_json(400, {"ok": False, "reason": "no_profile"}, self.cors())
+                else:
+                    self.send(200, json.dumps(portal.export(who[0]), indent=2, ensure_ascii=False), "application/json; charset=utf-8",
+                              self.cors() + [("Content-Disposition", "attachment; filename=my-hellovoice-data.json")])
+            return True
         if path == "/api/chat/history":
             who = self._need_viewer()
             if who:
@@ -198,7 +253,8 @@ class PortalMixin:
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,
             "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
             "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat,
-            "/api/brief/guess": self.api_brief_guess,
+            "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
+            "/api/credits/request": self.api_credits_request, "/api/me/delete": self.api_me_delete,
         }
         fn = routes.get(path)
         if not fn:
@@ -298,6 +354,8 @@ class PortalMixin:
                                         "message": "Too many accounts were created from this network today. Please contact the HelloVoice team."}, self.cors())
         user = portal.create_user(email, name, company, b.get("job_title"), b.get("phone"), self.client_ip())
         db.log("signup", user["code_id"], self.client_ip(), self._ua(), email.rsplit("@", 1)[1])
+        notify.send("signup", ["%s (%s) from %s signed up." % (user["name"], user["email"], user["company"]),
+                               "Job title: %s" % (user["job_title"] or "—"), "Phone: %s" % (user["phone"] or "—")])
         return self._enter(user)
 
     def api_auth_logout(self):
@@ -328,6 +386,82 @@ class PortalMixin:
         return self.send_json(402, {"ok": False, "reason": "no_credits", "balance": portal.balance(cid),
                                     "cost": portal.costs().get(kind, 1),
                                     "message": "You're out of AI credits. Contact the HelloVoice team to top up."}, self.cors())
+
+    def _brief_scores(self, b):
+        """{code: [score, tag, basis]} for every creator against a stored brief. Free and cached a
+        while, so the catalogue can badge every card."""
+        hit = _score_cache.get(b["id"])
+        if hit and time.time() - hit[0] < 600:
+            return hit[1]
+        answers, _ = matcher.clean_answers(json.loads(b["answers"] or "{}"))
+        out = {i["code"]: [i["score"], i["tag"], i["basis"]] for i in matcher.score_all(matcher.to_brief(answers))}
+        if len(_score_cache) > 50:
+            _score_cache.clear()
+        _score_cache[b["id"]] = (time.time(), out)
+        return out
+
+    def api_brief_attach(self):
+        """A client built a selection by hand and answers the brief questions for it: free. The
+        selection takes the brief's objective and audience, so its page scores against them."""
+        who = self._need_viewer()
+        if not who:
+            return
+        cid, user, kind = who
+        b = self.json_body()
+        sel = db.selection(token=str(b.get("token") or "")) if b.get("token") else None
+        if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id()):
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        answers, missing = matcher.clean_answers(b.get("answers"))
+        if missing:
+            return self.send_json(400, {"ok": False, "reason": "missing", "missing": missing}, self.cors())
+        if self._throttled("attach:%d" % cid, 30, 3600):
+            return
+        brief = matcher.to_brief(answers)
+        db.set_selection_objective(sel["id"], brief["objective"])
+        db.set_selection_target(sel["id"], brief["target"])
+        codes = json.loads(sel["codes"] or "[]")
+        items = matcher.score_all(brief, only=set(codes))
+        text = matcher.describe(answers)
+        bid = portal.save_brief(cid, user["id"] if user else None, "selection", answers, text, brief["objective"], brief["target"],
+                                sel["id"], {"codes": codes})
+        db.log("brief", cid, self.client_ip(), self._ua(), ("selection: " + text)[:80])
+        notify.send("brief", ["%s described the campaign for their selection “%s” (%d creators)." % (
+            (user["company"] or user["email"]) if user else "A client", sel["name"], len(codes)), text],
+            kam=user["kam"] if user else None)
+        shown = {r["code"]: r for r in self.roster_payload(only=set(codes))}
+        return self.send_json(200, {"ok": True, "brief_id": bid, "brief": text, "token": sel["token"], "name": sel["name"],
+                                    "picks": [dict(i, why="", creator=shown.get(i["code"])) for i in items],
+                                    "totals": {"n": len(items)}, "narrated": False, "summary": "", "alternates": []}, self.cors())
+
+    def api_credits_request(self):
+        who = self._need_viewer()
+        if not who:
+            return
+        cid, user, kind = who
+        if kind == "admin":
+            return self.send_json(400, {"ok": False}, self.cors())
+        b = self.json_body()
+        amount = max(1, min(self._int(b.get("amount"), 50), 10000))
+        if self._throttled("creditreq:%d" % cid, 3, 86400):
+            return
+        rid = portal.request_credits(cid, amount, b.get("note"))
+        notify.send("credits", ["%s asked for %d more AI credits." % ((user["company"] or user["email"]) if user else "An access-code client", amount),
+                                "Note: %s" % (b.get("note") or "—")], kam=user["kam"] if user else None)
+        return self.send_json(200, {"ok": True, "id": rid,
+                                    "message": "Request sent. The HelloVoice team will top you up shortly."}, self.cors())
+
+    def api_me_delete(self):
+        who = self._need_viewer()
+        if not who:
+            return
+        cid, user, kind = who
+        if kind != "user":
+            return self.send_json(400, {"ok": False, "reason": "no_profile"}, self.cors())
+        if str(self.json_body().get("confirm") or "") != "DELETE":
+            return self.send_json(400, {"ok": False, "reason": "confirm", "message": "Type DELETE to confirm."}, self.cors())
+        portal.delete_account(user["id"])
+        db.log("account_deleted", cid, self.client_ip(), self._ua(), None)
+        return self.api_auth_logout()
 
     def api_brief_guess(self):
         """Free: the answers a message already gives, so the chat only asks what is missing."""
@@ -417,13 +551,15 @@ class PortalMixin:
         db.set_selection_objective(sid, brief["objective"])
         db.set_selection_target(sid, brief["target"])
         text = matcher.describe(answers)
-        portal.save_brief(cid, user["id"] if user else None, "mcq", answers, text, brief["objective"], brief["target"], sid,
-                          {"codes": codes, "summary": summary})
+        brief_id = portal.save_brief(cid, user["id"] if user else None, "mcq", answers, text, brief["objective"], brief["target"], sid,
+                                     {"codes": codes, "summary": summary})
         db.log("brief", cid, self.client_ip(), self._ua(), text[:80])
+        notify.send("brief", ["%s ran an AI shortlist (%d creators)." % ((user["company"] or user["email"]) if user else "A client", len(codes)),
+                              text, ("Notes: " + answers["notes"]) if answers.get("notes") else ""], kam=user["kam"] if user else None)
         token = db.selection(sid)["token"]
         shown = {r["code"]: r for r in self.roster_payload(only=set(codes) | {a["code"] for a in result["alternates"]})}
         return self.send_json(200, {
-            "ok": True, "token": token, "name": name, "summary": summary, "narrated": narrated, "brief": text,
+            "ok": True, "token": token, "name": name, "summary": summary, "narrated": narrated, "brief": text, "brief_id": brief_id,
             "objective": brief["objective"], "totals": result["totals"], "pool": result["pool"],
             "picks": [dict(p, why=reasons.get(p["code"], ""), creator=shown.get(p["code"])) for p in result["picks"]],
             "alternates": [dict({k: a[k] for k in ("code", "score", "tag", "basis", "price")}, creator=shown.get(a["code"]))
@@ -482,6 +618,16 @@ class PortalMixin:
             th = portal.find_thread(None, "admin", owner, int(query.get("t") or 0)) if (query.get("t") or "").isdigit() else None
             msgs = [{"role": m["role"], "text": m["content"]} for m in portal.messages(th["id"], 60)] if th else []
             return self.send_json(200, {"ok": True, "thread": th["id"] if th else None, "messages": msgs})
+        if path == "/portal/chat":
+            th = portal.find_thread_any(self._int(query.get("id")))
+            if not th:
+                return self.redirect("/portal?tab=chats&e=" + urllib.parse.quote("No such conversation."))
+            return self.send(200, portal_views.chat_page(th))
+        if path == "/portal/quote":
+            sel = db.selection(self._int(query.get("sel")))
+            if sel is None:
+                return self.redirect("/selections?e=" + urllib.parse.quote("That selection no longer exists."))
+            return self.send(200, portal_views.quote_page(sel, self.site_origin()))
         if path == "/portal/usage.csv":
             return self.send(200, portal_views.usage_csv(), "text/csv; charset=utf-8",
                              [("Content-Disposition", "attachment; filename=portal-usage.csv")])
@@ -562,8 +708,22 @@ class PortalMixin:
             if not u:
                 return done("Unknown client.", False)
             portal.update_profile(u["id"], name=f.get("name"), company=f.get("company"), job_title=f.get("job_title"),
-                                  phone=f.get("phone"), notes=f.get("notes"))
+                                  phone=f.get("phone"), notes=f.get("notes"), kam=f.get("kam") or "",
+                                  monthly_credits=f.get("monthly_credits", ""))
             return done("Saved.")
+        if path == "/portal/user/delete":
+            u = user_of(f)
+            if not u or f.get("confirm") != "DELETE":
+                return done("Type DELETE to confirm.", False)
+            portal.delete_account(u["id"])
+            return self.redirect("/portal?ok=" + urllib.parse.quote("Account deleted and personal data erased."))
+        if path == "/portal/credit-request":
+            rid = self._int(f.get("id"))
+            grant_n = self._int(f.get("grant")) if f.get("action") == "grant" else 0
+            r = portal.handle_credit_request(rid, max(0, min(grant_n, 100000)), email)
+            if not r:
+                return done("That request was already handled.", False)
+            return done("Granted %d credits." % grant_n if grant_n else "Request declined.")
         if path == "/portal/code/credits":
             try:
                 cid, n = int(f.get("code_id") or 0), int(f.get("amount") or 0)
@@ -627,6 +787,10 @@ class PortalMixin:
             sender = (f.get("mail_from") or "").strip()
             if sender and "@" in sender and "\n" not in sender:
                 db.set_setting("mail_from", sender[:120])
+            db.set_setting("monthly_credits", num("monthly_credits", 0, 100000, 0))
+            db.set_setting("team_sharing", f.get("team_sharing") == "on")
+            db.set_setting("notify_emails", sorted({x.strip().lower() for x in (f.get("notify_emails") or "").replace(",", " ").split() if "@" in x}))
+            db.set_setting("kams", [l.strip() for l in (f.get("kams") or "").splitlines() if "@" in l][:50])
             kb = (f.get("kb_text") or "").strip()
             db.set_setting("kb_text", kb[:4000] if kb else None)
         return done("Settings saved.")

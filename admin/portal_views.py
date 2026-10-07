@@ -9,11 +9,12 @@ import time
 import db
 import gemini
 import mailer
+import notify
 import portal
 import ui
 from views import ago, e, page, ts, u
 
-TABS = [("accounts", "Client accounts"), ("briefs", "Briefs"), ("usage", "Usage & cost"), ("settings", "Settings & keys")]
+TABS = [("accounts", "Client accounts"), ("briefs", "Briefs"), ("chats", "Chats"), ("usage", "Usage & cost"), ("settings", "Settings & keys")]
 
 
 def _banner(ok, err):
@@ -49,7 +50,33 @@ def _accounts_tab():
     week = db.now() - 7 * 86400
     pending = [x for x in users if x["status"] == "pending"]
     outstanding = sum((x["credits"] or 0) for x in users)
-    stats = ("<div class='pstats'>" + _stat("Clients", len(users)) + _stat("Awaiting approval", len(pending))
+    month = db.now() - 30 * 86400
+    with db.connect() as conn:
+        one = lambda q, a=(): conn.execute(q, a).fetchone()[0] or 0
+        f_signups = one("SELECT COUNT(*) FROM users WHERE created_at >= ? AND deleted_at IS NULL", (month,))
+        f_active = one("SELECT COUNT(*) FROM users WHERE last_login_at >= ? AND deleted_at IS NULL", (month,))
+        f_briefs = one("SELECT COUNT(DISTINCT code_id) FROM briefs WHERE created_at >= ?", (month,))
+        f_sel = one("SELECT COUNT(DISTINCT s.code_id) FROM selections s JOIN users u ON u.code_id = s.code_id WHERE s.created_at >= ?", (month,))
+        f_quote = one("SELECT COUNT(DISTINCT r.code_id) FROM requests r JOIN users u ON u.code_id = r.code_id WHERE r.at >= ?", (month,))
+    def step(label, n, base):
+        return ("<div class='stat'><span class='k'>%s</span><b class='v'>%d</b><span class='muted'>%s</span></div>"
+                % (e(label), n, ("%d%% of sign-ins" % round(n * 100 / base)) if base else "&nbsp;"))
+    funnel = ("<div class='card'><h2>Last 30 days</h2><p class='sec-desc'>Clients at each step. A client counts once per step.</p>"
+              "<div class='pstats' style='margin:0'>" + step("Signed up", f_signups, 0) + step("Signed in", f_active, 0)
+              + step("Wrote a brief", f_briefs, f_active) + step("Saved a selection", f_sel, f_active)
+              + step("Asked for a quote", f_quote, f_active) + "</div></div>")
+    reqs = portal.open_credit_requests()
+    req_html = ""
+    if reqs:
+        req_html = ("<div class='card'><h2>Credit requests</h2><table><tbody>" + "".join(
+            "<tr><td><strong>%s</strong><br><span class='muted'>%s · %s</span></td><td>%d credits</td><td>%s</td><td class='right'>"
+            "<form method='post' action='%s' class='inline'><input type='hidden' name='id' value='%d'><input type='hidden' name='back' value='/portal'>"
+            "<input type='number' name='grant' value='%d' min='1' style='width:90px'> <button class='btn small lime' name='action' value='grant'>Grant</button> "
+            "<button class='btn small ghost' name='action' value='decline'>Decline</button></form></td></tr>"
+            % (e(r["company"] or r["email"] or "Access code #%d" % r["code_id"]), e(r["email"] or ""), e(ago(r["at"])), r["amount"],
+               e(r["note"] or ""), u("/portal/credit-request"), r["id"], r["amount"]) for r in reqs) + "</tbody></table></div>")
+    stats = ("<div class='pstats'>" + _stat("Clients", len(users))
+             + (_stat("Awaiting approval", len(pending)) if portal.signup_mode() == "approval" or pending else "")
              + _stat("Joined this week", sum(1 for x in users if x["created_at"] >= week))
              + _stat("Credits outstanding", outstanding) + "</div>")
     spend = {r["code_id"]: r["usd"] for r in consumption(gemini.month_start())}
@@ -61,15 +88,15 @@ def _accounts_tab():
                        "<input type='hidden' name='status' value='active'><input type='hidden' name='back' value='/portal'>"
                        "<button class='btn small lime'>Approve</button></form> " % x["id"])
         rows.append(
-            "<tr><td><strong>%s</strong><br><span class='muted'>%s · %s</span></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td>"
+            "<tr><td><strong>%s</strong><br><span class='muted'>%s · %s</span></td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td>"
             "<td class='right'>%s<a class='btn small ghost' href='%s'>Manage</a></td></tr>"
-            % (e(x["name"] or "—"), e(x["company"] or "—"), e(x["email"]), _status_pill(x["status"]),
+            % (e(x["name"] or "—"), e(x["company"] or "—"), e(x["email"]), e(x["kam"] or "—"), _status_pill(x["status"]),
                e(x["credits"] if x["credits"] is not None else 0), usd(spend.get(x["code_id"], 0)), e(x["selections"]), e(x["briefs"]),
                e(ago(x["last_login_at"]) if x["last_login_at"] else "never"), approve, u("/portal/user?id=%d" % x["id"])))
-    table = ("<table><thead><tr><th>Client</th><th>Status</th><th>Credits</th><th>AI cost (month)</th><th>Selections</th><th>Briefs</th><th>Last in</th><th></th></tr></thead><tbody>"
-             + ("".join(rows) or "<tr><td colspan='8'>" + ui.empty("users", "No sign-ups yet",
+    table = ("<table><thead><tr><th>Client</th><th>KAM</th><th>Status</th><th>Credits</th><th>AI cost (month)</th><th>Selections</th><th>Briefs</th><th>Last in</th><th></th></tr></thead><tbody>"
+             + ("".join(rows) or "<tr><td colspan='9'>" + ui.empty("users", "No sign-ups yet",
                 "Clients appear here when they sign in with a company email on the catalogue.") + "</td></tr>") + "</tbody></table>")
-    return stats + "<div class='card'>" + table + "</div>"
+    return stats + req_html + funnel + "<div class='card'>" + table + "</div>"
 
 
 def _briefs_tab():
@@ -84,6 +111,78 @@ def _briefs_tab():
             "already scored against the brief.</p><table><thead><tr><th>Client</th><th>Brief</th><th>Objective</th><th>Result</th><th>When</th></tr></thead><tbody>"
             + ("".join(rows) or "<tr><td colspan='5'>" + ui.empty("list", "No briefs yet", "They appear when a client uses Find creators.") + "</td></tr>")
             + "</tbody></table></div>")
+
+
+def _chats_tab():
+    users = {x["code_id"]: x for x in portal.list_users()}
+    rows = []
+    for t in portal.threads(None, "client", 200):
+        if not t["n"]:
+            continue
+        x = users.get(t["code_id"])
+        who = ("%s · %s" % (x["company"] or "—", x["email"])) if x else "Access code #%s" % t["code_id"]
+        rows.append("<tr><td>%s</td><td>%s</td><td>%d</td><td class='muted'>%s</td><td class='right'><a class='btn small ghost' href='%s'>Read</a></td></tr>"
+                    % (e(who), e((t["first"] or "")[:90]), t["n"], e(ago(t["last"])), u("/portal/chat?id=%d" % t["id"])))
+    return ("<div class='card'><p class='sec-desc'>What clients ask the assistant. Useful for spotting demand, gaps in the roster, "
+            "and questions to answer on the website.</p><table><thead><tr><th>Client</th><th>Opened with</th><th>Messages</th><th>Last</th><th></th></tr></thead><tbody>"
+            + ("".join(rows) or "<tr><td colspan='5'>" + ui.empty("list", "No conversations yet", "They appear when clients use Ask.") + "</td></tr>")
+            + "</tbody></table></div>")
+
+
+def chat_page(th):
+    x = portal.user_for_code(th["code_id"]) if th["code_id"] else None
+    who = ("%s · %s" % (x["company"] or "—", x["email"])) if x else ("Admin copilot · %s" % th["owner"] if th["scope"] == "admin" else "Access code #%s" % th["code_id"])
+    msgs = "".join("<div style='margin:0 0 12px;max-width:80%%;%s'><div class='muted' style='font-size:12px'>%s · %s</div>"
+                   "<div style='white-space:pre-wrap;background:%s;color:%s;padding:10px 14px;border-radius:14px'>%s</div></div>"
+                   % ("margin-left:auto" if m["role"] == "user" else "", "Client" if m["role"] == "user" else "Assistant", e(ago(m["at"])),
+                      "var(--ink)" if m["role"] == "user" else "#f3f1ec", "#fff" if m["role"] == "user" else "inherit", e(m["content"]))
+                   for m in portal.messages(th["id"], 500))
+    return page("Conversation", ui.header("Conversation", e(who), crumbs=[("Client portal", u("/portal?tab=chats")), ("Conversation", None)])
+                + "<div class='card' style='display:flex;flex-direction:column'>" + (msgs or "<p class='muted'>Empty.</p>") + "</div>", "/portal")
+
+
+def quote_page(sel, origin):
+    """A printable quotation from a selection and its brief (the browser's Print → Save as PDF)."""
+    import fx
+    codes = json.loads(sel["codes"] or "[]")
+    own = json.loads(sel["prices"] or "{}")
+    bands = db.tier_prices()
+    rows = {c["code"]: c for c in db.list_creators() if c["code"] in set(codes)}
+    with db.connect() as conn:
+        b = conn.execute("SELECT * FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1", (sel["id"],)).fetchone()
+    owner = portal.user_for_code(sel["code_id"]) if sel["code_id"] else None
+    lines, lo_t, hi_t = [], 0, 0
+    for i, code in enumerate(codes, 1):
+        c = rows.get(code)
+        if c is None:
+            continue
+        p = own.get(code)
+        lo, hi = (p, p) if isinstance(p, (int, float)) else (tuple(p) if isinstance(p, list) and len(p) == 2 else (db.price_for(c, bands, sel["platform"]) or (0, 0)))
+        lo_t += lo or 0; hi_t += hi or 0
+        lines.append("<tr><td>%d</td><td><strong>%s</strong><br><span class='muted'>%s</span></td><td>%s</td><td>%s</td><td>%s</td><td class='right'>%s</td></tr>" % (
+            i, e(c["name"]), e(code), e(c["platform"]), "{:,}".format(c["followers"] or 0), e(c["tier"]),
+            ("SAR {:,}".format(int(lo)) + (" – {:,}".format(int(hi)) if hi and hi != lo else "")) if lo else "On request"))
+    total_from = sel["total_from"] or lo_t
+    total_to = sel["total_to"] or hi_t
+    rng = lambda a, z: "SAR {:,}".format(int(a)) + (" – {:,}".format(int(z)) if z and z != a else "")
+    vat = lambda a, z: rng(a * 1.15, z * 1.15)
+    css = ("<style>@media print{.sidebar,.topbar,.no-print,nav,header.app-top{display:none!important}main,.main{margin:0!important;padding:0!important}"
+           ".card{border:0!important;box-shadow:none!important}} .q-h{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}"
+           ".q-h h1{font-family:'Bebas Neue',sans-serif;font-size:44px;margin:0;letter-spacing:.02em} .q-tot td{font-weight:600}</style>")
+    body = (css + "<div class='no-print' style='margin-bottom:14px'><button class='btn lime' onclick='window.print()'>Print / save as PDF</button></div>"
+            "<div class='card'><div class='q-h'><div><h1>Quotation</h1><p class='muted'>%s · Ref Q-%d-%s</p></div>"
+            "<div style='text-align:right'><strong>HelloVoice</strong><br><span class='muted'>Al-Olaya, Riyadh<br>info@hellovoice.co.uk · +966 11 463 4518</span></div></div>"
+            % (e(time.strftime("%d %b %Y")), sel["id"], time.strftime("%y%m"))
+            + "<p><strong>Prepared for:</strong> %s</p>" % e((owner["company"] + " · " + (owner["name"] or "")) if owner else (sel["name"]))
+            + ("<p><strong>Brief:</strong> %s</p>" % e(b["summary"]) if b else "")
+            + "<p><strong>Selection:</strong> %s (%d creators)</p>" % (e(sel["name"]), len(lines))
+            + "<table><thead><tr><th>#</th><th>Creator</th><th>Platform</th><th>Followers</th><th>Tier</th><th class='right'>Fee (per video)</th></tr></thead><tbody>"
+            + "".join(lines)
+            + "<tr class='q-tot'><td colspan='5'>Total before VAT</td><td class='right'>%s</td></tr>" % rng(total_from, total_to)
+            + "<tr class='q-tot'><td colspan='5'>Total incl. 15%% VAT</td><td class='right'>%s</td></tr></tbody></table>" % vat(total_from, total_to)
+            + "<p class='muted' style='margin-top:18px'>Prices in SAR, valid 30 days, subject to creator availability on booking. "
+              "Includes casting, briefing, compliance review and post-campaign reporting. Usage rights beyond 30 days are quoted separately.</p></div>")
+    return page("Quotation — " + sel["name"], body, "/selections")
 
 
 def usd(v):
@@ -250,8 +349,21 @@ def _settings_tab():
         + "<div class='fgrid' style='margin-top:14px'><div><label>Allow-listed domains</label><textarea class='mono' name='domain_allow' placeholder='one per line'>%s</textarea></div>"
           % e("\n".join(allow))
         + "<div><label>Blocked domains</label><textarea class='mono' name='domain_block' placeholder='one per line'>%s</textarea></div></div></div>" % e("\n".join(block))
+        + "<div class='card'><h2>Team &amp; notifications</h2><div class='fgrid'>"
+          "<div><label>Email the team about</label><p class='muted' style='margin:4px 0 8px'>New clients, briefs, quote requests and credit requests. "
+          "The client's KAM is emailed first when one is set.</p><textarea class='mono' name='notify_emails' rows='3' placeholder='sales@hellovoice.co.uk'>%s</textarea></div>"
+          % e("\n".join(notify.recipients()))
+        + "<div><label>Key account managers</label><p class='muted' style='margin:4px 0 8px'>One per line: Name &lt;email&gt;. Assign them on each client's page.</p>"
+          "<textarea class='mono' name='kams' rows='3' placeholder='Marwa Mahmoud &lt;marwa@hellovoice.co.uk&gt;'>%s</textarea></div>"
+          % e("\n".join("%s <%s>" % k for k in notify.kams()))
+        + "<div><label>Colleagues share selections</label><label style='display:flex;gap:8px;align-items:center;font-weight:400'>"
+          "<input type='checkbox' name='team_sharing'%s> People on the same company domain see each other's selections and campaigns</label></div></div></div>"
+          % (" checked" if db.setting("team_sharing", True) else "")
         + "<div class='card'><h2>AI credits</h2><p class='sec-desc'>What each action costs a client. A failed AI call is refunded automatically. The admin is never charged.</p>"
-          "<div class='fgrid'>" + cost_inputs + "</div></div>"
+          "<div class='fgrid'>" + cost_inputs
+        + "<div><label>Monthly credits per client</label><input type='number' min='0' name='monthly_credits' value='%s'>"
+          "<div class='price-hint'>Each month a client is topped back up to this. 0 = off. A client's own page can override it.</div></div>"
+          % e(db.setting("monthly_credits", 0) or 0) + "</div></div>"
         + "<div class='card'><h2>AI &amp; email</h2><div class='fgrid'>"
           "<div><label>Gemini model</label><input name='gemini_model' value='%s'><div class='price-hint'>Default %s. If a model is retired the next one in line is tried automatically.</div></div>" % (e(gemini.model()), e(gemini.DEFAULT_MODEL))
         + "<div><label>Monthly token ceiling</label><input type='number' min='10000' name='ai_monthly_tokens' value='%d'>"
@@ -278,7 +390,7 @@ def _settings_tab():
 
 def portal_page(tab="accounts", ok=None, err=None, query=None):
     tab = tab if tab in dict(TABS) else "accounts"
-    body = {"accounts": _accounts_tab, "briefs": _briefs_tab, "usage": _usage_tab, "settings": _settings_tab}[tab]()
+    body = {"accounts": _accounts_tab, "briefs": _briefs_tab, "chats": _chats_tab, "usage": _usage_tab, "settings": _settings_tab}[tab]()
     status = ("<span class='pill %s'>Gemini %s</span> <span class='pill %s'>Email %s</span>" % (
         "live" if gemini.configured() else "warn", "ready" if gemini.configured() else "not set up",
         "live" if mailer.configured() else "warn", "ready" if mailer.configured() else "not set up"))
@@ -305,17 +417,26 @@ def user_page(usr, ok=None, err=None):
     profile = (
         "<div class='card'><h2>Profile</h2><form method='post' action='%s'>%s%s<div class='fgrid'>"
         "<div><label>Name</label><input name='name' value='%s'></div><div><label>Company</label><input name='company' value='%s'></div>"
-        "<div><label>Job title</label><input name='job_title' value='%s'></div><div><label>Phone</label><input name='phone' value='%s'></div></div>"
+        "<div><label>Job title</label><input name='job_title' value='%s'></div><div><label>Phone</label><input name='phone' value='%s'></div>"
+        "<div><label>KAM</label><select name='kam'>%s</select></div>"
+        "<div><label>Monthly credits</label><input type='number' min='0' name='monthly_credits' value='%s' placeholder='default'></div></div>"
         "<label style='margin-top:12px'>Internal notes</label><textarea name='notes' rows='3'>%s</textarea>"
         "<p class='muted'>%s · joined %s · domain %s</p><button class='btn lime'>Save</button></form></div>"
         % (u("/portal/user/save"), hid("id", usr["id"]), back, e(usr["name"]), e(usr["company"]), e(usr["job_title"]), e(usr["phone"]),
+           "<option value=''>—</option>" + "".join("<option value='%s'%s>%s</option>" % (e(m), " selected" if usr["kam"] == m else "", e(n))
+                                                    for n, m in notify.kams()),
+           e(usr["monthly_credits"] if usr["monthly_credits"] is not None else ""),
            e(usr["notes"]), e(usr["email"]), e(ts(usr["created_at"])), e(usr["domain"])))
     credits = (
         "<div class='card'><h2>AI credits: %d</h2><form method='post' action='%s' class='row'>%s%s"
         "<div><label>Add or remove</label><input type='number' name='amount' placeholder='e.g. 50 or -10' required></div>"
         "<div><label>Reason</label><input name='reason' placeholder='Top-up for Q4 campaign'></div><div><button class='btn lime'>Apply</button></div></form>"
+        "<div style='margin:4px 0 14px'>%s</div>"
         "<table><thead><tr><th>When</th><th>Change</th><th>Balance</th><th>Reason</th></tr></thead><tbody>%s</tbody></table></div>"
         % (bal, u("/portal/user/credits"), hid("id", usr["id"]), back,
+           " ".join("<form method='post' action='%s' class='inline'>%s%s%s%s<button class='btn small ghost'>+%d</button></form>"
+                    % (u("/portal/user/credits"), hid("id", usr["id"]), back, hid("amount", n), hid("reason", "Credit pack +%d" % n), n)
+                    for n in (50, 200, 500)),
            "".join("<tr><td class='muted'>%s</td><td>%+d</td><td>%d</td><td>%s</td></tr>" % (e(ago(r["at"])), r["delta"], r["balance_after"], e(r["reason"]))
                    for r in ledger) or "<tr><td colspan='4' class='muted'>No movements.</td></tr>"))
     work = (
@@ -323,9 +444,25 @@ def user_page(usr, ok=None, err=None):
         % ("".join("<li>%s <span class='muted'>%s</span></li>" % (e(s["name"]), e(ago(s["updated_at"]))) for s in sels) or "<li class='muted'>none</li>",
            "".join("<li>%s <span class='muted'>%s</span></li>" % (e(b["summary"]), e(ago(b["created_at"]))) for b in portal.briefs_for(cid, 10)) or "<li class='muted'>none</li>",
            "".join("<li>%s × %d <span class='muted'>last %s</span></li>" % (e(r["kind"]), r["n"], e(ago(r["last"]))) for r in ev) or "<li class='muted'>none</li>"))
+    reqs = [r for r in portal.open_credit_requests(cid) if not r["handled_at"]]
+    req_html = "".join(
+        "<div class='note'><strong>Asked for %d credits</strong> %s · %s <form method='post' action='%s' class='inline'>%s%s"
+        "<input type='hidden' name='grant' value='%d'><button class='btn small lime' name='action' value='grant'>Grant</button> "
+        "<button class='btn small ghost' name='action' value='decline'>Decline</button></form></div>"
+        % (r["amount"], e(r["note"] or ""), e(ago(r["at"])), u("/portal/credit-request"), hid("id", r["id"]), back, r["amount"]) for r in reqs)
+    chats = "".join("<li><a href='%s'>%s</a> <span class='muted'>%d messages · %s</span></li>"
+                    % (u("/portal/chat?id=%d" % t["id"]), e((t["first"] or "Conversation")[:80]), t["n"], e(ago(t["last"])))
+                    for t in portal.threads(cid, "client", 30) if t["n"])
+    quotes = "".join("<li>%s <a class='muted' href='%s'>quotation</a></li>" % (e(s["name"]), u("/portal/quote?sel=%d" % s["id"])) for s in sels)
+    extra = ("<div class='card'><h2>Conversations</h2><ul>%s</ul><h2 style='margin-top:18px'>Quotations</h2><ul>%s</ul></div>"
+             % (chats or "<li class='muted'>none</li>", quotes or "<li class='muted'>none</li>"))
+    danger = ("<details class='card'><summary class='hd'><h2>Delete account</h2></summary><p class='sec-desc'>Revokes access and erases the person's "
+              "details, chats and sign-in codes. Selections and quote requests stay as business records without their details.</p>"
+              "<form method='post' action='%s'>%s%s<input name='confirm' placeholder='Type DELETE' required> "
+              "<button class='btn small danger'>Delete account</button></form></details>" % (u("/portal/user/delete"), hid("id", usr["id"]), back))
     return page(usr["email"], STAT_CSS + ui.header(usr["name"] or usr["email"], "%s · %s" % (usr["company"] or "no company", usr["email"]),
                 crumbs=[("Client portal", u("/portal")), (usr["email"], None)], actions=status_btns + _status_pill(usr["status"]))
-                + _banner(ok, err) + profile + credits + work, "/portal")
+                + _banner(ok, err) + req_html + profile + credits + work + extra + danger, "/portal")
 
 
 # ----------------------------------------------------------------- copilot --

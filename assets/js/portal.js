@@ -21,6 +21,80 @@
   var CFGS = window.CATALOGUE_CONFIG || window.CAMPAIGN_CONFIG || {};
   var API = (CFGS.api != null ? CFGS.api : "/admin").replace(/\/$/, "");
   var ME = null;
+
+  /* ------------------------------------------------------------- language */
+  // English by default, Arabic for an Arabic browser or when chosen. Every static string goes
+  // through T() inside h(), so a missing translation simply stays English.
+  var LANG = (function () {
+    try { var v = localStorage.getItem("hv_lang"); if (v) return v; } catch (e) { /* blocked */ }
+    return /^ar/i.test(navigator.language || "") ? "ar" : "en";
+  })();
+  var AR = {
+    "Sign in with your work email. We'll send a one-time code. No password needed.": "سجّل الدخول ببريد العمل. سنرسل لك رمزاً لمرة واحدة، بدون كلمة مرور.",
+    "Email me a code": "أرسل لي الرمز", "Work email": "بريد العمل", "Verify and continue": "تحقق وتابع",
+    "Send a new code": "أرسل رمزاً جديداً", "Use a different email": "استخدم بريداً آخر", "Your name": "الاسم",
+    "Company": "الشركة", "Job title (optional)": "المسمى الوظيفي (اختياري)", "Phone (optional)": "الجوال (اختياري)",
+    "Create my account": "أنشئ حسابي", "I have an access code instead": "لديّ رمز دخول بدلاً من ذلك",
+    "Sign in with email instead": "الدخول بالبريد بدلاً من ذلك", "Enter a valid work email address.": "أدخل بريد عمل صحيحاً.",
+    "Email confirmed. Tell us who you are.": "تم تأكيد البريد. عرّفنا بنفسك.", "Welcome. Opening the catalogue…": "أهلاً بك. جارٍ فتح الكتالوج…",
+    "Please wait…": "يرجى الانتظار…", "Enter the 6-digit code.": "أدخل الرمز المكوّن من 6 أرقام.",
+    "Too many requests. Please wait a few minutes.": "طلبات كثيرة. انتظر بضع دقائق.", "Too many attempts. Please wait a few minutes.": "محاولات كثيرة. انتظر بضع دقائق.",
+    "Find creators": "ابحث عن مؤثرين", "Ask": "اسأل", "Account": "الحساب", "Admin": "المسؤول", "My account": "حسابي",
+    "Review your brief": "راجع الملخص", "Describe your campaign in a sentence and our AI will fill the questions. Or answer them yourself below.":
+      "صف حملتك في جملة وسيملأ الذكاء الاصطناعي الأسئلة، أو أجب عنها بنفسك بالأسفل.",
+    "Fill it in for me": "املأها عني", "Reading your brief…": "جارٍ قراءة طلبك…", "or answer a few questions": "أو أجب عن بعض الأسئلة",
+    "Back": "رجوع", "Next": "التالي", "Next / skip": "التالي / تخطَّ", "Review": "مراجعة", "Show my creators": "اعرض المؤثرين",
+    "Matching creators…": "جارٍ مطابقة المؤثرين…", "Edit": "تعديل", "change": "تغيير", "Please choose an answer to continue.": "اختر إجابة للمتابعة.",
+    "This is what we'll match creators against.": "هذا ما سنطابق المؤثرين عليه.", "We read your brief. Check it and change anything that's off.":
+      "قرأنا طلبك. راجعه وعدّل ما يلزم.", "Not answered": "لم تتم الإجابة", "Describe the campaign in a sentence or two.": "صف الحملة في جملة أو جملتين.",
+    "Close": "إغلاق", "Your shortlist": "قائمتك المختصرة", "Open as selection": "افتحها كقائمة", "Refine brief": "عدّل الطلب",
+    "Measured": "مُقاس", "Public data": "بيانات عامة", "Estimated": "تقديري", "Price on request": "السعر عند الطلب",
+    "Scores come from our data. Written reasons weren't generated this time.": "الدرجات من بياناتنا. لم تُكتب الأسباب هذه المرة.",
+    "Ask HelloVoice AI": "اسأل مساعد هلا فويس", "Send": "إرسال", "Ask about creators, prices or your campaign…": "اسأل عن المؤثرين أو الأسعار أو حملتك…",
+    "Thinking…": "جارٍ التفكير…", "Build my shortlist": "ابنِ قائمتي", "Ask the assistant": "اسأل المساعد", "Change answers": "غيّر الإجابات",
+    "Your brief": "ملخص طلبك", "Skip": "تخطَّ", "Plan a campaign with me": "خطط حملة معي",
+    "Suggest creators for a skincare launch in KSA": "اقترح مؤثرين لإطلاق منتج عناية بالبشرة في السعودية",
+    "What does a campaign cost?": "كم تكلفة الحملة؟", "What happens after I pick a selection?": "ماذا يحدث بعد اختيار القائمة؟",
+    "AI credits": "رصيد الذكاء الاصطناعي", "credits left": "رصيد متبقٍ", "My briefs": "طلباتي", "My campaigns": "حملاتي",
+    "Open campaign tracking": "افتح متابعة الحملات", "My details": "بياناتي", "Name": "الاسم", "Job title": "المسمى الوظيفي", "Phone": "الجوال",
+    "Save": "حفظ", "Saved": "تم الحفظ", "Sign out": "تسجيل الخروج", "My team": "فريقي", "Team selections": "قوائم الفريق",
+    "Request more credits": "اطلب رصيداً إضافياً", "Download my data": "حمّل بياناتي", "Delete my account": "احذف حسابي", "Open": "فتح",
+    "Score this selection": "قيّم هذه القائمة", "Answer a few quick questions about the campaign and we'll score every creator in it. Free.":
+      "أجب عن أسئلة سريعة عن الحملة وسنقيّم كل مؤثر في القائمة. مجاناً.", "Not now": "ليس الآن", "Answer questions": "أجب عن الأسئلة",
+    "Score my selection": "قيّم قائمتي", "Fit scores shown": "درجات الملاءمة ظاهرة", "Hide scores": "إخفاء الدرجات",
+    "Request sent. The HelloVoice team will top you up shortly.": "تم إرسال الطلب. سيضيف فريق هلا فويس الرصيد قريباً.",
+    "You're out of AI credits. Contact the HelloVoice team to top up.": "نفد رصيدك. تواصل مع فريق هلا فويس لإعادة الشحن.",
+    "That code isn't right.": "الرمز غير صحيح.", "That code has expired. Request a new one.": "انتهت صلاحية الرمز. اطلب رمزاً جديداً.",
+    "Too many wrong tries. Request a new code.": "محاولات خاطئة كثيرة. اطلب رمزاً جديداً.",
+    "Please use your company email address. Personal addresses such as Gmail or Outlook can't be used.": "استخدم بريد شركتك. لا يمكن استخدام البريد الشخصي مثل Gmail أو Outlook.",
+    "Please enter your name and company.": "أدخل اسمك واسم الشركة.", "Colleagues": "الزملاء", "Language": "اللغة"
+  };
+  function T(s) { return LANG === "ar" && AR[s] ? AR[s] : s; }
+  // Question and option labels from the server, by id and value.
+  var QAR = {
+    goal: ["ما الهدف الرئيسي من الحملة؟", { awareness: "الوصول لأكبر عدد من الناس", engagement: "زيادة التفاعل", conversion: "زيادة المبيعات أو الزيارات أو التسجيلات", balanced: "مزيج متوازن" }],
+    platforms: ["أين سيُنشر المحتوى؟", { any: "لا تفضيل" }],
+    market: ["في أي دولة الجمهور؟", { SA: "السعودية", AE: "الإمارات", EG: "مصر", KW: "الكويت", QA: "قطر", BH: "البحرين", OM: "عُمان", JO: "الأردن" }],
+    gender: ["من الجمهور؟", { Any: "الجميع", Women: "غالباً نساء", Men: "غالباً رجال" }],
+    age: ["الفئة العمرية الرئيسية", { Any: "كل الأعمار", "45-54": "45+" }],
+    category: ["في أي مجال المنتج؟", { "health care": "الرعاية الصحية / الأدوية", skincare: "العناية بالبشرة والجلدية", beauty: "التجميل", "hair care": "العناية بالشعر",
+      fragrance: "العطور", "mother & baby": "الأم والطفل", food: "الأغذية والمشروبات", fitness: "اللياقة والصحة", fashion: "الأزياء", lifestyle: "أسلوب الحياة",
+      technology: "التقنية", automotive: "السيارات", travel: "السفر", finance: "المال", gaming: "الألعاب" }],
+    budget: ["ميزانية المؤثرين (ريال، قبل الضريبة)", { "50": "أقل من 50,000", "150": "50,000 – 150,000", "400": "150,000 – 400,000", "400+": "أكثر من 400,000", open: "لم تُحدد بعد" }],
+    count: ["كم عدد المؤثرين؟", { "25": "20 أو أكثر" }],
+    deliverable: ["ما المطلوب منهم؟", { reels: "ريلز / فيديوهات قصيرة", ugc: "محتوى UGC لقنواتنا", stories: "ستوري", event: "حضور فعالية أو متجر", review: "مراجعة منتج" }],
+    timing: ["متى تبدأ؟", { asap: "خلال أسبوعين", month: "خلال 6 أسابيع", quarter: "الربع القادم", later: "نستكشف فقط" }],
+    notes: ["هل هناك ما يجب أن نعرفه؟", {}]
+  };
+  function localise(qs) {
+    if (LANG !== "ar") return qs;
+    return qs.map(function (q) {
+      var t = QAR[q.id];
+      if (!t) return q;
+      return Object.assign({}, q, { label: t[0], options: (q.options || []).map(function (o) { return Object.assign({}, o, { label: t[1][o.value] || o.label }); }) });
+    });
+  }
+  function setLang(l) { try { localStorage.setItem("hv_lang", l); } catch (e) { /* blocked */ } location.reload(); }
   var ICON = {
     spark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',
     chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',
@@ -36,15 +110,15 @@
       var v = props[k];
       if (v == null || v === false) return;
       if (k === "class") node.className = v;
-      else if (k === "text") node.textContent = v;
+      else if (k === "text") node.textContent = T(v);
       else if (k === "html") node.innerHTML = v;            // only ever our own static strings
       else if (k.slice(0, 2) === "on") node.addEventListener(k.slice(2), v);
-      else node.setAttribute(k, v === true ? "" : v);
+      else node.setAttribute(k, v === true ? "" : (k === "placeholder" || k === "aria-label" || k === "title") ? T(v) : v);
     });
     for (var i = 2; i < arguments.length; i++) {
       var c = arguments[i];
       if (c == null || c === false) continue;
-      node.appendChild(typeof c === "string" ? document.createTextNode(c) : c);
+      node.appendChild(typeof c === "string" ? document.createTextNode(T(c)) : c);
     }
     return node;
   }
@@ -75,6 +149,7 @@
 
   var openLayers = [];
   function layer(node, drawer) {
+    if (LANG === "ar") { node.setAttribute("dir", "rtl"); node.setAttribute("lang", "ar"); }
     var scrim = drawer ? node : h("div", { class: "pt-scrim", role: "presentation" }, node);
     var prev = document.activeElement;
     function close() {
@@ -97,6 +172,7 @@
 
   function creditsLine(cost) {
     if (!ME || ME.credits == null) return "";
+    if (LANG === "ar") return cost + " رصيد · متبقٍ " + ME.credits;
     return cost + " credit" + (cost === 1 ? "" : "s") + " · " + ME.credits + " left";
   }
 
@@ -113,7 +189,7 @@
     var oldErr = inner.querySelector(".cat-gate__error");
 
     var msg = h("p", { class: "pt-msg", role: "status", "aria-live": "polite" });
-    function say(text, kind) { msg.textContent = text || ""; msg.className = "pt-msg" + (kind ? " is-" + kind : ""); }
+    function say(text, kind) { msg.textContent = T(text || ""); msg.className = "pt-msg" + (kind ? " is-" + kind : ""); }
 
     var email = h("input", { class: "pt-input", type: "email", name: "email", placeholder: "you@yourcompany.com", autocomplete: "email",
       "aria-label": "Work email", required: true, inputmode: "email", spellcheck: "false" });
@@ -137,7 +213,9 @@
     var toCodeLink = h("button", { class: "pt-link", type: "button" }, "I have an access code instead");
     var panel = h("div", { class: "pt-gate" },
       h("p", { class: "pt-gate__lead" }, "Sign in with your work email. We'll send a one-time code. No password needed."),
-      formEmail, formCode, formProfile, msg, h("div", { class: "pt-gate__alt" }, toCodeLink));
+      formEmail, formCode, formProfile, msg, h("div", { class: "pt-gate__alt" }, toCodeLink, " · ",
+        h("button", { class: "pt-link", type: "button", onclick: function () { setLang(LANG === "ar" ? "en" : "ar"); } }, LANG === "ar" ? "English" : "العربية")));
+    if (LANG === "ar") { panel.setAttribute("dir", "rtl"); panel.setAttribute("lang", "ar"); }
 
     inner.insertBefore(panel, note || oldForm);
     if (note) note.hidden = true;
@@ -151,7 +229,7 @@
       if (oldErr) oldErr.style.display = "";
       [formEmail, formCode, formProfile].forEach(function (f) { if (showingCode) f.hidden = true; });
       if (!showingCode) { formEmail.hidden = false; say(""); }
-      toCodeLink.textContent = showingCode ? "Sign in with email instead" : "I have an access code instead";
+      toCodeLink.textContent = T(showingCode ? "Sign in with email instead" : "I have an access code instead");
       var first = (showingCode ? oldForm : email);
       var inp = first && first.querySelector ? (first.querySelector("input") || first) : first;
       if (inp && inp.focus) inp.focus();
@@ -160,7 +238,7 @@
     var state = { email: "", ticket: "", timer: null };
     function busy(btn, on, label) {
       btn.disabled = on;
-      btn.textContent = on ? "Please wait…" : label;
+      btn.textContent = T(on ? "Please wait…" : label);
     }
     function countdown(secs) {
       clearInterval(state.timer);
@@ -182,7 +260,9 @@
         if (r.b.reason === "mail_not_configured") { say(r.b.message, "err"); toCodeLink.click(); return; }
         if (!r.b.ok) { say(r.b.message || "Couldn't send the code.", "err"); return; }
         formEmail.hidden = true; formCode.hidden = false; formProfile.hidden = true;
-        say(r.b.sent === false ? "A code was sent a moment ago. Check your inbox." : "We sent a 6-digit code to " + state.email + ". It lasts " + (r.b.minutes || 10) + " minutes.", "ok");
+        say(r.b.sent === false ? (LANG === "ar" ? "أُرسل رمز قبل لحظات. تحقق من بريدك." : "A code was sent a moment ago. Check your inbox.")
+          : (LANG === "ar" ? "أرسلنا رمزاً من 6 أرقام إلى " + state.email + ". صالح لمدة " + (r.b.minutes || 10) + " دقائق."
+             : "We sent a 6-digit code to " + state.email + ". It lasts " + (r.b.minutes || 10) + " minutes."), "ok");
         countdown(r.b.resend_in || r.b.wait || 30);
         code.value = ""; code.focus();
       });
@@ -242,14 +322,16 @@
     var cat = document.querySelector(".cat-topbar__links");
     var dock = h("div", { id: "pt-dock", class: "pt-dock" + (cat ? "" : " pt-dock--fixed") });
     if (ME.kind !== "guest" || ME.ai) {
-      dock.appendChild(h("button", { class: "pt-chip pt-chip--lime", type: "button", html: ICON.spark + "<span>Find creators</span>", onclick: openWizard }));
+      dock.appendChild(h("button", { class: "pt-chip pt-chip--lime", type: "button", html: ICON.spark + "<span>" + T("Find creators") + "</span>", onclick: openWizard }));
     }
-    if (ME.ai) dock.appendChild(h("button", { class: "pt-chip", type: "button", html: ICON.chat + "<span>Ask</span>", onclick: openChat }));
+    if (ME.ai) dock.appendChild(h("button", { class: "pt-chip", type: "button", html: ICON.chat + "<span>" + T("Ask") + "</span>", onclick: openChat }));
     var chip = h("button", { class: "pt-chip", type: "button", "aria-label": "My account", onclick: openAccount });
     chip.innerHTML = ICON.user;
     chip.appendChild(h("span", { id: "pt-chip-name" }, ME.user ? ME.user.name.split(" ")[0] : ME.kind === "admin" ? "Admin" : "Account"));
     if (ME.credits != null) chip.appendChild(h("span", { class: "pt-credits", id: "pt-chip-credits" }, ME.credits + " cr"));
     dock.appendChild(chip);
+    dock.appendChild(h("button", { class: "pt-chip", type: "button", "aria-label": "Language", title: "Language",
+      onclick: function () { setLang(LANG === "ar" ? "en" : "ar"); } }, LANG === "ar" ? "EN" : "ع"));
     if (cat) cat.insertBefore(dock, cat.firstChild); else document.body.appendChild(dock);
   }
 
@@ -265,7 +347,7 @@
   var QUESTIONS = null;
   function loadQuestions() {
     if (QUESTIONS) return Promise.resolve(QUESTIONS);
-    return api("GET", "/api/brief/questions").then(function (r) { QUESTIONS = r.b.questions || []; return QUESTIONS; });
+    return api("GET", "/api/brief/questions").then(function (r) { QUESTIONS = localise(r.b.questions || []); return QUESTIONS; });
   }
 
   function openWizard() {
@@ -273,11 +355,12 @@
   }
 
   var currentClose = null;
-  function wizard(qs, answers, step, prefillNote) {
+  function wizard(qs, answers, step, prefillNote, opts) {
+    opts = opts || {};
     if (currentClose) currentClose();
     var total = qs.length + 1;                        // questions + review
     var onReview = step >= qs.length;
-    var title = h("h2", { class: "pt-title", id: "pt-wiz-title" }, onReview ? "Review your brief" : "Find creators");
+    var title = h("h2", { class: "pt-title", id: "pt-wiz-title" }, onReview ? "Review your brief" : opts.attach ? "Score this selection" : "Find creators");
     var modal = h("div", { class: "pt-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "pt-wiz-title" });
     var close;
     var x = h("button", { class: "pt-x", type: "button", "aria-label": "Close", onclick: function () { close(); } }, "×");
@@ -287,12 +370,12 @@
     modal.appendChild(body);
     var err = h("div", { class: "pt-err", hidden: true, role: "alert" });
 
-    function fail(text) { err.textContent = text; err.hidden = !text; }
-    function go(n) { wizard(qs, answers, Math.max(0, Math.min(n, qs.length)), prefillNote); }
+    function fail(text) { err.textContent = T(text || ""); err.hidden = !text; }
+    function go(n) { wizard(qs, answers, Math.max(0, Math.min(n, qs.length)), prefillNote, opts); }
 
     if (!onReview) {
       var q = qs[step];
-      if (step === 0) {
+      if (step === 0 && !opts.attach) {
         // The one-sentence shortcut lives on the first screen only.
         var free = h("textarea", { class: "pt-text", placeholder: "e.g. We're launching a sunscreen in Riyadh and want 8 micro-creators on Instagram, budget around 100k SAR.", maxlength: "1500", "aria-label": "Describe your campaign" });
         var fillBtn = h("button", { class: "pt-btn pt-btn--ghost", type: "button" }, "Fill it in for me");
@@ -312,7 +395,8 @@
           });
         }
       }
-      body.appendChild(h("p", { class: "pt-note", style: "margin-top:0" }, "Question " + (step + 1) + " of " + qs.length + (q.required ? "" : " · optional")));
+      body.appendChild(h("p", { class: "pt-note", style: "margin-top:0" }, LANG === "ar" ? "سؤال " + (step + 1) + " من " + qs.length + (q.required ? "" : " · اختياري")
+        : "Question " + (step + 1) + " of " + qs.length + (q.required ? "" : " · optional")));
       body.appendChild(h("h3", { class: "pt-q" }, q.label));
       if (q.type === "text") {
         var ta = h("textarea", { class: "pt-text", maxlength: String(q.max || 500), "aria-label": q.label, placeholder: "A city, a product name, a tone, anything that helps." }, answers[q.id] || "");
@@ -368,15 +452,21 @@
       body.appendChild(err);
       var missing = qs.filter(function (q) { return q.required && !(answers[q.id] && answers[q.id].length); });
       var cost = ME && ME.costs ? ME.costs.brief : 5;
-      var run = h("button", { class: "pt-btn pt-btn--lime", type: "button" }, "Show my creators");
-      body.appendChild(h("div", { class: "pt-actions" }, h("span", { class: "pt-note", style: "margin:0" }, creditsLine(cost)),
+      var run = h("button", { class: "pt-btn pt-btn--lime", type: "button" }, opts.attach ? "Score my selection" : "Show my creators");
+      body.appendChild(h("div", { class: "pt-actions" }, h("span", { class: "pt-note", style: "margin:0" }, opts.attach ? (LANG === "ar" ? "مجاناً" : "Free") : creditsLine(cost)),
         h("span", null, h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { go(0); }, style: "margin-right:8px" }, "Edit"), run)));
       if (missing.length) { run.disabled = true; fail("Still needed: " + missing.map(function (q) { return q.label.replace(/\?$/, ""); }).join("; ") + "."); }
       run.addEventListener("click", function () {
-        run.disabled = true; run.textContent = "Matching creators…"; fail("");
-        api("POST", "/api/brief/run", { answers: answers }).then(function (r) {
-          if (r.b.ok && !r.b.empty) { setCredits(r.b.credits); close(); results(r.b, qs, answers); return; }
-          run.disabled = false; run.textContent = "Show my creators";
+        run.disabled = true; run.textContent = T("Matching creators…"); fail("");
+        var call = opts.attach ? api("POST", "/api/brief/attach", { token: opts.attach, answers: answers })
+                               : api("POST", "/api/brief/run", { answers: answers });
+        call.then(function (r) {
+          if (r.b.ok && !r.b.empty) {
+            if (r.b.credits != null) setCredits(r.b.credits);
+            rememberBrief(r.b.brief_id);
+            close(); results(r.b, qs, answers, opts); return;
+          }
+          run.disabled = false; run.textContent = T(opts.attach ? "Score my selection" : "Show my creators");
           fail(r.b.empty ? r.b.message : r.s === 429 ? "Too many requests. Please wait a few minutes." : (r.b.message || "Something went wrong. You weren't charged."));
         });
       });
@@ -408,13 +498,16 @@
       h("div", { class: "pt-score pt-score--" + scoreClass(p.tag) }, h("b", null, String(p.score)), h("span", null, p.tag)));
   }
 
-  function results(res, qs, answers) {
+  function results(res, qs, answers, opts) {
+    opts = opts || {};
     var modal = h("div", { class: "pt-modal pt-modal--wide", role: "dialog", "aria-modal": "true", "aria-labelledby": "pt-res-title" });
     var close;
     modal.appendChild(h("div", { class: "pt-head" }, h("h2", { class: "pt-title", id: "pt-res-title" }, "Your shortlist"),
       h("button", { class: "pt-x", type: "button", "aria-label": "Close", onclick: function () { close(); } }, "×")));
     var body = h("div", { class: "pt-body" });
-    var sum = h("div", { class: "pt-summary" }, res.summary || (res.picks.length + " creators matched your brief, ranked by fit."),
+    var sum = h("div", { class: "pt-summary" }, res.summary || (opts.attach
+        ? (LANG === "ar" ? "قيّمنا " + res.picks.length + " مؤثرين في قائمتك مقابل هذا الطلب، الأفضل أولاً." : "We scored the " + res.picks.length + " creators in your selection against this brief, best fit first.")
+        : (LANG === "ar" ? res.picks.length + " مؤثرين يطابقون طلبك، مرتبين حسب الملاءمة." : res.picks.length + " creators matched your brief, ranked by fit.")),
       h("small", null, res.brief));
     body.appendChild(sum);
     var list = h("div", { class: "pt-list" });
@@ -434,9 +527,80 @@
     var total = h("div", { class: "pt-total" }, t.from ? "Estimated creator fees " : "", t.from ? h("b", null, "SAR " + money(t.from) + (t.to && t.to !== t.from ? " – " + money(t.to) : "")) : "",
       t.unpriced ? " (+" + t.unpriced + " on request)" : "", t.from ? " · 15% VAT extra" : "");
     var open = h("a", { class: "pt-btn pt-btn--lime", href: ROOT + "selection/#s=" + encodeURIComponent(res.token), style: "text-decoration:none;display:inline-block" }, "Open as selection");
-    var refine = h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { close(); wizard(qs, answers, 0); } }, "Refine brief");
+    var refine = h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { close(); wizard(qs, answers, 0, null, opts); } }, "Refine brief");
+    if (opts.attach && /selection/.test(location.pathname) && location.hash.indexOf(encodeURIComponent(res.token)) > -1) {
+      open.addEventListener("click", function (e) { e.preventDefault(); location.reload(); });
+    }
     modal.appendChild(h("div", { class: "pt-bar" }, total, h("span", null, refine, " ", open)));
     close = layer(modal);
+  }
+
+  /* ------------------------------------------ brief for a hand-built selection */
+
+  var offered = {};
+  function offerBrief(token) {
+    if (!ME || !ME.signed_in || !token || offered[token]) return;
+    offered[token] = 1;
+    api("GET", "/api/brief/for?s=" + encodeURIComponent(token)).then(function (r) {
+      if (!r.b.ok || r.b.brief) return;
+      var box = h("div", { class: "pt-toast", role: "dialog", "aria-label": "Score this selection" },
+        h("p", { class: "pt-toast__t" }, "Score this selection"),
+        h("p", { class: "pt-toast__b" }, "Answer a few quick questions about the campaign and we'll score every creator in it. Free."));
+      if (LANG === "ar") box.setAttribute("dir", "rtl");
+      var later = h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { box.remove(); } }, "Not now");
+      var go = h("button", { class: "pt-btn pt-btn--lime", type: "button", onclick: function () {
+        // Scoring needs only who the audience is and what the product is: six questions, not eleven.
+        box.remove(); loadQuestions().then(function (qs) {
+          wizard(qs.filter(function (q) { return q.required || q.id === "gender" || q.id === "age"; }), {}, 0, null, { attach: token });
+        });
+      } }, "Answer questions");
+      box.appendChild(h("div", { class: "pt-actions", style: "margin-top:12px" }, later, go));
+      document.body.appendChild(box);
+    });
+  }
+  window.addEventListener("hv:selection-saved", function (e) { offerBrief(e.detail && e.detail.token); });
+
+  function rememberBrief(id) { if (id) { try { sessionStorage.setItem("hv_brief", String(id)); } catch (e) { /* blocked */ } applyFit(); } }
+  function storedBrief() { try { return sessionStorage.getItem("hv_brief"); } catch (e) { return null; } }
+
+  // Fit badges on the catalogue cards for the last brief, so the whole roster reads against it.
+  var FIT = null, fitObserver = null;
+  function applyFit() {
+    var id = storedBrief();
+    if (!id || !document.querySelector(".cat-card")) { if (id && !fitObserver) watchCards(); return; }
+    var paint = function () {
+      if (!FIT) return;
+      Array.prototype.forEach.call(document.querySelectorAll(".cat-card[data-code]"), function (card) {
+        var v = FIT.scores[card.getAttribute("data-code")];
+        var b = card.querySelector(".pt-fit");
+        if (!v) { if (b) b.remove(); return; }
+        if (!b) { b = h("span", { class: "pt-fit" }); card.classList.add("pt-has-fit"); card.appendChild(b); }
+        b.className = "pt-fit pt-fit--" + scoreClass(v[1]);
+        b.textContent = (LANG === "ar" ? "ملاءمة " : "Fit ") + v[0];
+        b.title = v[1] + (v[2] === "roster" ? " · " + T("Estimated") : "");
+      });
+    };
+    if (FIT && FIT.id === id) { paint(); return; }
+    api("GET", "/api/brief/scores?b=" + encodeURIComponent(id)).then(function (r) {
+      if (!r.b.ok) return;
+      FIT = { id: id, scores: r.b.scores };
+      paint(); watchCards(paint); fitChip();
+    });
+  }
+  function watchCards(paint) {
+    if (fitObserver || !("MutationObserver" in window)) return;
+    var app = document.getElementById("cat-app") || document.body, t = null;
+    fitObserver = new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { if (FIT) (paint || applyFit)(); else applyFit(); }, 150); });
+    fitObserver.observe(app, { childList: true, subtree: true });
+  }
+  function fitChip() {
+    var dock = $("pt-dock");
+    if (!dock || $("pt-fitchip")) return;
+    dock.insertBefore(h("button", { id: "pt-fitchip", class: "pt-chip", type: "button", title: "Hide scores", onclick: function () {
+      try { sessionStorage.removeItem("hv_brief"); } catch (e) { /* blocked */ }
+      FIT = null; Array.prototype.forEach.call(document.querySelectorAll(".pt-fit"), function (b) { b.remove(); });
+      var c = $("pt-fitchip"); if (c) c.remove();
+    } }, "Fit scores shown", " ×"), dock.firstChild ? dock.firstChild.nextSibling : null);
   }
 
   /* ------------------------------------------------------------------ chat */
@@ -576,7 +740,7 @@
             api("POST", "/api/brief/run", { answers: answers, name: "Chat shortlist" }).then(function (r) {
               lock(false);
               if (!r.b.ok || r.b.empty) { wait.className = "pt-msg-b pt-msg-b--err"; wait.textContent = r.b.message || "That didn't work. You weren't charged."; return; }
-              setCredits(r.b.credits); refreshFoot();
+              setCredits(r.b.credits); refreshFoot(); rememberBrief(r.b.brief_id);
               wait.textContent = (r.b.summary || (r.b.picks.length + " creators match your brief, best fit first.")) + " Scores are out of 100.";
               cards(r.b.picks.map(function (p) { var c = Object.assign({ code: p.code, name: p.code }, p.creator || {}); c.fit = p.score; return c; }));
               var a = h("a", { class: "pt-idea", href: ROOT + "selection/#s=" + encodeURIComponent(r.b.token), style: "text-decoration:none;background:var(--ink);color:var(--white)" }, "Open as selection");
@@ -622,8 +786,22 @@
     if (ME.credits != null) {
       var bal = h("div", { class: "pt-sec" }, h("h3", null, "AI credits"),
         h("div", { class: "pt-balance" }, h("b", { id: "pt-bal" }, String(ME.credits)), h("span", { class: "pt-sub", style: "margin:0" }, "credits left")),
-        h("p", { class: "pt-sub" }, "A shortlist with written reasons costs " + ME.costs.brief + ", a chat message " + ME.costs.chat + ". Need more? ",
-          h("a", { href: "mailto:info@hellovoice.co.uk?subject=" + encodeURIComponent("AI credits top-up") }, "Ask the team.")));
+        h("p", { class: "pt-sub" }, LANG === "ar" ? "القائمة مع الأسباب تكلف " + ME.costs.brief + "، والرسالة " + ME.costs.chat + ". أسئلة الملخص مجانية."
+          : "A shortlist with written reasons costs " + ME.costs.brief + ", a chat message " + ME.costs.chat + ". Brief questions are free."));
+      var ask = h("div", { class: "pt-actions", style: "margin-top:10px;justify-content:flex-start" });
+      var amt = h("select", { class: "pt-field", style: "width:auto", "aria-label": "Credits" });
+      [50, 200, 500].forEach(function (n) { amt.appendChild(h("option", { value: String(n) }, "+" + n)); });
+      var note = h("input", { class: "pt-field", style: "flex:1;min-width:160px", placeholder: LANG === "ar" ? "ملاحظة (اختياري)" : "Note (optional)" });
+      var reqBtn = h("button", { class: "pt-btn pt-btn--ghost", type: "button" }, "Request more credits");
+      var reqMsg = h("span", { class: "pt-note", style: "margin:0" });
+      reqBtn.addEventListener("click", function () {
+        reqBtn.disabled = true;
+        api("POST", "/api/credits/request", { amount: +amt.value, note: note.value }).then(function (r) {
+          reqMsg.textContent = r.s === 429 ? (LANG === "ar" ? "أرسلت طلبات كافية اليوم." : "You've sent enough requests today.") : T(r.b.message || "");
+        });
+      });
+      ask.appendChild(amt); ask.appendChild(note); ask.appendChild(reqBtn);
+      bal.appendChild(ask); bal.appendChild(reqMsg);
       var led = h("table", { class: "pt-ledger" });
       bal.appendChild(led);
       body.appendChild(bal);
@@ -644,6 +822,21 @@
         bl.appendChild(h("li", null, h("span", null, b.summary + " · " + ago(b.at)), b.selection ? h("a", { href: ROOT + "selection/#s=" + encodeURIComponent(b.selection) }, "Open") : null));
       });
     });
+
+    if (u) {
+      var team = h("div", { class: "pt-sec" }, h("h3", null, "My team"));
+      var tl = h("ul", { class: "pt-brieflist" });
+      team.appendChild(tl); body.appendChild(team);
+      api("GET", "/api/team").then(function (r) {
+        var members = r.b.members || [], sels = r.b.selections || [];
+        if (!members.length) { tl.appendChild(h("li", null, h("span", { class: "pt-sub", style: "margin:0" },
+          LANG === "ar" ? "عندما ينضم زملاء من شركتك سترى قوائمهم هنا." : "When colleagues from your company join, their selections appear here."))); return; }
+        tl.appendChild(h("li", null, h("span", null, members.map(function (m) { return m.name + (m.job_title ? " (" + m.job_title + ")" : ""); }).join(", "))));
+        sels.slice(0, 8).forEach(function (x) {
+          tl.appendChild(h("li", null, h("span", null, x.name + " · " + x.owner + " · " + ago(x.at)), h("a", { href: ROOT + "selection/#s=" + encodeURIComponent(x.token) }, "Open")));
+        });
+      });
+    }
 
     body.appendChild(h("div", { class: "pt-sec" }, h("h3", null, "My campaigns"),
       h("p", { class: "pt-sub", style: "margin:0" }, h("a", { href: ROOT + "campaign/dashboard/" }, "Open campaign tracking"), " to see results for the campaigns we run for you.")));
@@ -666,7 +859,21 @@
       body.appendChild(form);
     }
 
-    body.appendChild(h("div", { class: "pt-actions" }, h("span"), h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () {
+    var extra = h("span");
+    if (u) {
+      extra.appendChild(h("button", { class: "pt-link", type: "button", style: "color:var(--ink)", onclick: function () {
+        fetch(API + "/api/me/export", { credentials: "include" }).then(function (r) { return r.blob(); }).then(function (b) {
+          var a = h("a", { href: URL.createObjectURL(b), download: "my-hellovoice-data.json" }); document.body.appendChild(a); a.click(); a.remove();
+        });
+      } }, "Download my data"));
+      extra.appendChild(document.createTextNode(" · "));
+      extra.appendChild(h("button", { class: "pt-link", type: "button", style: "color:var(--red-text)", onclick: function () {
+        var typed = window.prompt(LANG === "ar" ? "سيُحذف حسابك وبياناتك الشخصية نهائياً. اكتب DELETE للتأكيد." : "Your account and personal data will be erased. Type DELETE to confirm.");
+        if (typed !== "DELETE") return;
+        api("POST", "/api/me/delete", { confirm: "DELETE" }).then(function () { location.reload(); });
+      } }, "Delete my account"));
+    }
+    body.appendChild(h("div", { class: "pt-actions" }, extra, h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () {
       api("POST", "/api/auth/logout", {}).then(function () { location.reload(); });
     } }, "Sign out")));
     close = layer(modal);
@@ -676,7 +883,13 @@
 
   function boot() {
     api("GET", "/api/me").then(function (r) {
-      if (r.b && r.b.signed_in) { ME = r.b; mountDock(); return; }
+      if (r.b && r.b.signed_in) {
+        ME = r.b; mountDock();
+        var m = /[#&]s=([^&]+)/.exec(location.hash || "");
+        if (document.body.getAttribute("data-page") === "selection" && m) setTimeout(function () { offerBrief(decodeURIComponent(m[1])); }, 1200);
+        if (storedBrief()) applyFit();
+        return;
+      }
       // Only replace the access-code gate once the server can actually send the email.
       if (r.b && r.b.email_signin) enhanceGate();
     });

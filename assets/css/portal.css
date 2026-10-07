@@ -169,3 +169,19 @@
 body.pt-lock { overflow: hidden; }
 .pt-modal a:not(.pt-btn), .pt-drawer a { color: var(--ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--pt-rule); }
 .pt-modal a:not(.pt-btn):hover { text-decoration-color: var(--ink); }
+
+/* --------------------------------------------------------- toast + fit badge */
+.pt-toast { position: fixed; left: 16px; bottom: 96px; z-index: 190; width: min(380px, calc(100vw - 32px)); background: var(--white); color: var(--ink);
+  border-radius: var(--r-md); box-shadow: 0 18px 50px rgba(0,0,0,.28); padding: 18px 20px; font-family: var(--body); animation: pt-rise .22s ease; }
+.pt-toast__t { font-family: var(--heading); font-size: 28px; line-height: 1; text-transform: uppercase; margin: 0 0 8px; }
+.pt-toast__b { font-size: 15px; line-height: 1.5; margin: 0; color: var(--pt-mute); }
+.pt-toast .pt-btn { font-size: 17px; padding: 11px 20px 9px; }
+.cat-card.pt-has-fit { position: relative; }
+.pt-fit { position: absolute; top: 58px; left: 14px; z-index: 3; font-family: var(--heading); font-size: 20px; line-height: 1; letter-spacing: .04em;
+  padding: 8px 12px 6px; border-radius: var(--r-pill); background: var(--white); color: var(--ink); box-shadow: 0 4px 14px rgba(0,0,0,.18); }
+.pt-fit--strong { background: var(--lime); }
+.pt-fit--good { background: var(--white); }
+.pt-fit--possible { background: var(--amber-soft); color: var(--amber-text); }
+.pt-fit--no { background: var(--red-soft); color: var(--red-text); }
+[dir="rtl"] .pt-review b { text-align: left; }
+[dir="rtl"] .pt-opt { text-align: right; }

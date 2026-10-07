@@ -65,7 +65,12 @@
       body: JSON.stringify({ name: name, codes: codes, token: token || "" })
     })
       .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (b) { return (b && b.ok && b.token) || ""; })
+      .then(function (b) {
+        var t = (b && b.ok && b.token) || "";
+        // Tell the portal layer (portal.js) a shortlist was saved, so it can offer the brief questions.
+        if (t) { try { window.dispatchEvent(new CustomEvent("hv:selection-saved", { detail: { token: t, name: name, codes: codes } })); } catch (e) { /* old browser */ } }
+        return t;
+      })
       .catch(function () { return ""; });
   }
 
