@@ -267,8 +267,15 @@ def score(doc, platform, followers=None, objective="Balanced", target=None, band
     if er is not None:
         s = 1.0 if er >= good else (0.6 + 0.4 * (er - ok) / (good - ok) if er >= ok and good > ok else 0.6 * er / ok if ok else 0.0)
         s = _clamp(s)
-        add("engagement", "Engagement", [(s, "Engagement %s, above the %s benchmark" % (_pct(er), _pct(good)),
-                                         "Engagement %s, below the %s benchmark" % (_pct(er), _pct(ok)))])
+        # A rate the importer worked out from average likes (the report showed 0%) is a guess:
+        # it counts, but never as a full-marks strength.
+        est = bool(doc.get("er_note"))
+        if est:
+            s = min(s, 0.7)
+        word = ("Engagement about %s (estimated from average likes)" if est else "Engagement %s") % _pct(er)
+        add("engagement", "Engagement", [(s,
+            word + (", above the %s benchmark" % _pct(good) if er >= good else ", within the healthy range (%s and over)" % _pct(ok)),
+            word + ", below the %s benchmark" % _pct(ok))])
     if fake is not None:
         s = 1.0 if fake <= fk_good else 0.0 if fake >= fk_bad else 1 - (fake - fk_good) / (fk_bad - fk_good)
         add("credibility", "Real audience", [(s, "Only %s fake followers" % _pct(fake), "%s fake followers" % _pct(fake))])
