@@ -1987,9 +1987,9 @@
           " <b>" + sum + "</b></p><ul>" + list.map(function (t) {
             var label = t.replace(/^\s*hcp\s*[-–—:]?\s*/i, "");
             var pct = Math.round(100 * tiers[t] / total);
-            return '<li><span class="cat-tiers__name">' + esc(label) + '</span><span class="cat-tiers__track"><i style="width:' +
-              Math.max(4, Math.round(100 * tiers[t] / max)) + '%"></i></span><span class="cat-tiers__n">' + tiers[t] +
-              "</span><small>" + pct + "%</small></li>";
+            return '<li class="cat-tier"><span class="cat-tier__name">' + esc(label) + '</span><b class="cat-tier__n">' + tiers[t] +
+              '</b><span class="cat-tier__pct">' + pct + '% of selection</span><i class="cat-tier__meter" aria-hidden="true"><i style="width:' +
+              Math.max(3, Math.round(100 * tiers[t] / max)) + '%"></i></i></li>';
           }).join("") + "</ul></div>";
       };
       var hcpList = names.filter(function (t) { return /hcp/i.test(t); });
