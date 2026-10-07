@@ -359,8 +359,9 @@ body.pt-lock { overflow: hidden; }
   display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin: 2px 0 4px 40px;
   animation: hv-in .28s var(--hv-ease);
 }
-.hv-chips--stack { flex-direction: column; align-items: flex-end; }
-.hv-chips > .hv-chip { max-width: 100%; }
+.hv-chips--stack { display: grid; justify-items: end; }
+.hv-chips > .hv-chip { max-width: 100%; min-width: 0; }
+.hv-chips { min-width: 0; }
 .hv-log { overflow-x: hidden; }
 .hv-chips__hint {
   flex-basis: 100%; margin: 0 2px -2px; text-align: right;
