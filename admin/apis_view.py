@@ -119,7 +119,51 @@ def creator_page(code):
     return V.page("APIs", body, "/apis")
 
 
-def apify_tab():
+def health_card():
+    h, t = apify.health(), apify.last_test()
+    spent, bud = apify.spent_this_month(), apify.budget()
+    pct = int(min(100, round(spent * 100.0 / bud))) if bud else 0
+    colour = "#c0392b" if pct >= 100 else ("#e67e22" if pct >= 80 else "var(--ink)")
+    alert = ""
+    if pct >= 80:
+        alert = ("<div class='err'><strong>%d%% of the monthly budget is used</strong> ($%.2f of $%.2f)."
+                 " New runs are refused once it is reached.</div>" % (pct, spent, bud))
+    paused = apify.paused()
+    return (
+        alert
+        + ("<div class='err'><strong>Apify is paused.</strong> No run will start, scheduled or manual.</div>" if paused else "")
+        + "<section class='card'><div class='hd'><h2>Status</h2>"
+          "<form method='post' action='" + u("/apis/pause") + "' class='inline'><button class='btn small " + ("lime" if paused else "danger") + "'>"
+        + ("Resume everything" if paused else "Pause everything") + "</button></form></div>"
+        "<div class='row'>"
+        "<div><label>Connection</label>" + (
+            ("<span class='pill " + ("live" if t["ok"] else "dead") + "'>" + ("ok" if t["ok"] else "failed") + "</span> <span class='muted'>tested "
+             + V.ago(t["at"]) + "</span>") if t else "<span class='muted'>not tested yet</span>") + "</div>"
+        "<div><label>Last successful run</label>" + V.ago(h["last_ok"]) + "</div>"
+        "<div><label>Running / queued</label>%d / %d</div>" % (h["running"], h["queued"])
+        + "<div><label>Failed in the last 24 h</label>%d</div></div>" % h["failed_24h"]
+        + "<label style='margin-top:10px'>Budget this month: $%.2f of $%.2f (%d%%)</label>" % (spent, bud, pct)
+        + "<div style='height:10px;border-radius:6px;background:var(--line,#e5e5e0);overflow:hidden'><div style='height:100%%;width:%d%%;background:%s'></div></div>"
+          % (pct, colour) + "</section>")
+
+
+def usage_card():
+    rows = "".join("<tr><td>%s</td><td>%d</td><td>%d</td><td>$%.2f</td></tr>" % (e(r["job_name"] or "—"), r["runs"], r["ok"], r["cost"])
+                   for r in apify.spend_by_job())
+    return ("<section class='card'><div class='hd'><h2>Spend by job, this month</h2></div><table><thead><tr><th>Job</th>"
+            "<th>Runs</th><th>Succeeded</th><th>Cost</th></tr></thead><tbody>"
+            + (rows or "<tr><td colspan='4' class='muted'>No runs this month.</td></tr>") + "</tbody></table></section>")
+
+
+def activity_card():
+    rows = "".join("<tr><td class='muted'>%s</td><td>%s</td><td><strong>%s</strong> <span class='muted'>%s</span></td></tr>"
+                   % (V.ts(r["at"]), e(r["who"] or ""), e(r["action"]), e(r["detail"] or "")) for r in apify.list_audit())
+    return ("<section class='card'><div class='hd'><h2>Activity</h2><span class='muted'>who changed what on this page</span></div>"
+            "<table><tbody>" + (rows or "<tr><td class='muted'>Nothing yet.</td></tr>") + "</tbody></table></section>")
+
+
+def apify_tab(query=None):
+    query = query or {}
     hint = apify.token_hint()
     spent, bud, cap = apify.spent_this_month(), apify.budget(), apify.run_cap()
     n_snap, n_creators, last = apify.snapshot_summary()
@@ -162,6 +206,8 @@ def apify_tab():
             "<td>" + e(when) + "</td><td class='muted'>" + V.ago(j["last_started"]) + "</td>"
             "<td><span class='pill " + ("live" if j["enabled"] else "dead") + "'>" + ("on" if j["enabled"] else "paused") + "</span></td>"
             "<td class='right'>" + post("/apis/job/run", "Run now", "small lime")
+            + post("/apis/job/estimate", "Estimate cost", "small ghost")
+            + post("/apis/job/clone", "Copy", "small ghost")
             + post("/apis/job/toggle", "Pause" if j["enabled"] else "Resume", "small ghost")
             + post("/apis/job/delete", "Delete", "small danger ghost", "Delete this job? Its past runs stay in the list.")
             + "</td></tr><tr><td colspan='5'><details><summary class='btn small ghost'>Edit</summary>"
@@ -185,23 +231,40 @@ def apify_tab():
         + _job_form(None).replace("<form ", "<form id='newjob' ", 1) + "</div></section>" + preset_js)
 
     runs = []
-    for r in apify.list_runs():
+    flt_status, flt_job = query.get("status", ""), query.get("job", "")
+    for r in apify.list_runs(50, flt_status, flt_job):
         cls = {"SUCCEEDED": "live", "RUNNING": "warn", "QUEUED": "warn"}.get(r["status"], "dead")
+        ctl = ""
+        if r["status"] in ("RUNNING", "QUEUED"):
+            ctl = (" <form method='post' action='" + u("/apis/run/abort") + "' class='inline'><input type='hidden' name='id' value='%d'>"
+                   "<button class='btn small ghost'>Stop</button></form>" % r["id"])
+        elif r["status"] in ("FAILED", "REFUSED") and r["handle_map"]:
+            ctl = (" <form method='post' action='" + u("/apis/run/retry") + "' class='inline'><input type='hidden' name='id' value='%d'>"
+                   "<button class='btn small'>Retry</button></form>" % r["id"])
         view = (" <a href='" + u("/apis/run?id=%d" % r["id"]) + "'>" + ("View" if r["results"] else "Details") + "</a>") if (r["results"] or r["apify_run"]) else ""
         runs.append(
             "<tr><td>" + e(r["job_name"] or "—") + "<br><span class='muted' style='font-size:12px'>" + e(r["trigger"]) + "</span></td>"
             "<td><span class='pill " + cls + "'>" + e(r["status"].lower()) + "</span></td>"
             "<td>" + str(r["handles"]) + "</td><td>" + str(r["results"]) + "</td><td>" + str(r["saved"]) + "</td>"
             "<td>$%.2f</td><td class='muted'>" % r["cost"] + V.ts(r["started_at"]) + "</td>"
-            "<td class='muted' style='font-size:12px'>" + e((r["message"] or "")[:200]) + view + "</td></tr>")
+            "<td class='muted' style='font-size:12px'>" + e((r["message"] or "")[:200]) + view + ctl + "</td></tr>")
     runs_body = "".join(runs) or "<tr><td colspan='8' class='muted'>No runs yet.</td></tr>"
+    names = sorted({j["name"] for j in apify.list_jobs()} | {r["job_name"] for r in apify.list_runs(200) if r["job_name"]})
+    filt = ("<form method='get' action='" + u("/apis") + "' class='row' style='margin-bottom:10px'><input type='hidden' name='tab' value='apify'>"
+            "<div><label>Status</label><select name='status'><option value=''>All</option>"
+            + "".join("<option value='%s'%s>%s</option>" % (s, " selected" if flt_status.upper() == s else "", s.lower())
+                      for s in ("SUCCEEDED", "RUNNING", "QUEUED", "FAILED", "REFUSED")) + "</select></div>"
+            "<div><label>Job</label><select name='job'><option value=''>All</option>"
+            + "".join("<option value='%s'%s>%s</option>" % (e(n), " selected" if flt_job == n else "", e(n)) for n in names)
+            + "</select></div><div style='align-self:end'><button class='btn small'>Filter</button> "
+            "<a class='btn small ghost' href='" + u("/apis/runs.csv") + "'>Export CSV</a></div></form>")
     runs_card = (
         "<section class='card'><div class='hd'><h2>Runs</h2><span class='muted'>"
         + (str(n_snap) + " snapshots for " + str(n_creators) + " creators, last " + V.ago(last) if n_snap else "No snapshots saved yet")
-        + "</span></div><table><thead><tr><th>Job</th><th>Status</th><th>Sent</th><th>Results</th><th>Saved</th>"
+        + "</span></div>" + filt + "<table><thead><tr><th>Job</th><th>Status</th><th>Sent</th><th>Results</th><th>Saved</th>"
         "<th>Cost</th><th>Started</th><th></th></tr></thead><tbody>" + runs_body + "</tbody></table></section>")
 
-    return conn_card + limits + pack_card() + jobs + runs_card
+    return health_card() + conn_card + limits + pack_card() + jobs + usage_card() + runs_card + activity_card()
 
 
 # One entry per integration. A new service adds a tab here (label, one-line
@@ -226,13 +289,13 @@ def overview_tab():
             "<p class='muted'>More services can be added here as tabs, each with its own connection and settings.</p>")
 
 
-def apis_page(error=None, message=None, tab="overview", q=""):
+def apis_page(error=None, message=None, tab="overview", q="", query=None):
     keys = {i["key"]: i for i in INTEGRATIONS}
     tab = tab if (tab in keys or tab == "data") else "overview"
     tabs = [(u("/apis?tab=overview"), "Overview", None, tab == "overview")]
     tabs += [(u("/apis?tab=" + i["key"]), i["label"], None, tab == i["key"]) for i in INTEGRATIONS]
     tabs.append((u("/apis?tab=data"), "Collected data", None, tab == "data"))
-    inner = keys[tab]["body"]() if tab in keys else (data_tab(q) if tab == "data" else overview_tab())
+    inner = (apify_tab(query) if tab == "apify" else keys[tab]["body"]()) if tab in keys else (data_tab(q) if tab == "data" else overview_tab())
     body = (ui.header("APIs", "Connect outside services and run them from here.",
                       crumbs=[("System", None), ("APIs", None)], tabs=tabs)
             + V._notes(error, message) + inner)

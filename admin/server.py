@@ -559,6 +559,9 @@ class Handler(BaseHTTPRequestHandler):
                 db.setting("emv_rates") or {}, metrics.factors(),
                 bool(db.setting("capture_token")), db.capture_runs(), track.GEO_DB.exists(),
                 None, query.get("e"), query.get("ok"), metrics.benchmarks(), fx_rates=fx.rates()))
+        if path == "/apis/runs.csv":
+            return self.send(200, apify.runs_csv().encode(), "text/csv; charset=utf-8",
+                             [("Content-Disposition", "attachment; filename=apify-runs.csv")])
         if path == "/apis/creator" and query.get("code"):
             return self.send(200, apis_view.creator_page(query["code"].upper()))
         if path == "/apis/run" and query.get("id", "").isdigit():
@@ -570,7 +573,7 @@ class Handler(BaseHTTPRequestHandler):
                              "application/json; charset=utf-8",
                              [("Content-Disposition", "attachment; filename=run-%s.json" % query["id"])])
         if path == "/apis":
-            return self.send(200, apis_view.apis_page(query.get("e"), query.get("ok"), query.get("tab", "overview"), query.get("q", "")))
+            return self.send(200, apis_view.apis_page(query.get("e"), query.get("ok"), query.get("tab", "overview"), query.get("q", ""), query))
         if path == "/campaigns/links":
             cid = query.get("id", "")
             k = db.campaign(int(cid)) if cid.isdigit() else None
@@ -965,21 +968,49 @@ class Handler(BaseHTTPRequestHandler):
 
     def post_apis(self, path):
         f = self.form_body()
+        who_row = self.admin()
+        who = who_row["email"] if who_row is not None and "email" in who_row.keys() else "admin"
         jid = int(f["id"]) if (f.get("id") or "").isdigit() else None
         q = urllib.parse.quote
         try:
+            if path == "/apis/pause":
+                apify.set_paused(not apify.paused())
+                apify.audit(who, "Paused Apify" if apify.paused() else "Resumed Apify")
+                return self.redirect("/apis?tab=apify&ok=" + q("Apify is paused." if apify.paused() else "Apify resumed."))
+            if path == "/apis/run/abort" and jid:
+                ok, msg = apify.abort_run(jid)
+                apify.audit(who, "Stopped run %d" % jid, msg)
+                return self.redirect("/apis?tab=apify&" + ("ok=" if ok else "e=") + q(msg))
+            if path == "/apis/run/retry" and jid:
+                ok, msg = apify.retry_run(jid)
+                apify.audit(who, "Retried run %d" % jid, msg)
+                return self.redirect("/apis?tab=apify&" + ("ok=" if ok else "e=") + q(msg))
+            if path == "/apis/job/clone" and jid:
+                new = apify.clone_job(jid)
+                apify.audit(who, "Copied job %d" % jid, "new job %s" % new)
+                return self.redirect("/apis?tab=apify&ok=" + q("Job copied. The copy is set to run manually."))
+            if path == "/apis/job/estimate" and jid:
+                n, est = apify.estimate_job(jid)
+                return self.redirect("/apis?tab=apify&ok=" + q("%d creators, about $%.2f if run now." % (n, est)))
             if path == "/apis/token":
                 apify.save_token(f.get("token"))
+                apify.audit(who, "Saved Apify token")
                 info = apify.test_connection()
                 return self.redirect("/apis?tab=apify&ok=" + q("Connected as %s." % (info.get("username") or "your account")))
             if path == "/apis/token/clear":
                 apify.clear_token()
+                apify.audit(who, "Removed Apify token")
                 return self.redirect("/apis?tab=apify&ok=" + q("Token removed."))
             if path == "/apis/test":
-                i = apify.test_connection()
+                try:
+                    i = apify.test_connection()
+                except apify.ApifyError as ex:
+                    apify.record_test(False, str(ex))
+                    raise
                 bits = [i.get("username") or "connected", i.get("plan") or ""]
                 if i.get("used") is not None and i.get("cap") is not None:
                     bits.append("$%.2f of $%.2f used this month" % (i["used"], i["cap"]))
+                apify.record_test(True, ", ".join(b for b in bits if b))
                 return self.redirect("/apis?tab=apify&ok=" + q("Connected: " + ", ".join(b for b in bits if b)))
             if path == "/apis/budget":
                 for key, field in (("apify_budget_usd", "budget"), ("apify_run_cap_usd", "run_cap")):
@@ -990,6 +1021,7 @@ class Handler(BaseHTTPRequestHandler):
                     if not 0 < v <= 1000:
                         raise apify.ApifyError("Budget and per-run limit must be between 0 and 1000.")
                     db.set_setting(key, v)
+                apify.audit(who, "Changed spend limits", "budget %s, per run %s" % (f.get("budget"), f.get("run_cap")))
                 return self.redirect("/apis?tab=apify&ok=" + q("Limits saved."))
             if path == "/apis/pack":
                 plats = [p for p in ("Instagram", "TikTok") if f.get("plat_" + p.lower())]
@@ -1001,18 +1033,23 @@ class Handler(BaseHTTPRequestHandler):
                                          bool(f.get("audience")), bool(f.get("audit")),
                                          f.get("schedule") if f.get("schedule") in ("manual", "daily", "weekly") else "manual",
                                          f.get("at_time") or "03:00", int(f["weekday"]) if (f.get("weekday") or "").isdigit() else 0)
+                apify.audit(who, "Collect everything", msg[:200])
                 return self.redirect("/apis?tab=apify&" + ("ok=" if ok else "e=") + q(msg))
             if path == "/apis/job/save":
                 apify.save_job(f)
+                apify.audit(who, "Saved job", f.get("name") or "")
                 return self.redirect("/apis?tab=apify&ok=" + q("Job saved."))
             if path == "/apis/job/delete" and jid:
                 apify.delete_job(jid)
+                apify.audit(who, "Deleted job %d" % jid)
                 return self.redirect("/apis?tab=apify&ok=" + q("Job deleted."))
             if path == "/apis/job/toggle" and jid:
                 apify.toggle_job(jid)
+                apify.audit(who, "Paused or resumed job %d" % jid)
                 return self.redirect("/apis?tab=apify")
             if path == "/apis/job/run" and jid:
                 ok, msg = apify.start_job(jid)
+                apify.audit(who, "Ran job %d" % jid, msg)
                 return self.redirect("/apis?tab=apify&" + ("ok=" if ok else "e=") + q(msg))
             if path == "/apis/refresh":
                 n = apify.refresh_all()

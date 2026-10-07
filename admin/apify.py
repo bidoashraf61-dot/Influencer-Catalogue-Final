@@ -101,6 +101,13 @@ CREATE TABLE IF NOT EXISTS profile_snapshots (
   verified  INTEGER,
   run_id    INTEGER
 );
+CREATE TABLE IF NOT EXISTS api_audit (
+  id     INTEGER PRIMARY KEY,
+  at     INTEGER NOT NULL,
+  who    TEXT,
+  action TEXT NOT NULL,
+  detail TEXT
+);
 CREATE TABLE IF NOT EXISTS profile_raw (
   id      INTEGER PRIMARY KEY,
   run_id  INTEGER NOT NULL,
@@ -406,9 +413,19 @@ def toggle_job(jid):
 
 # --------------------------------------------------------------------- runs --
 
-def list_runs(limit=25):
+def list_runs(limit=25, status="", job=""):
+    q, args = "SELECT * FROM api_runs", []
+    where = []
+    if status:
+        where.append("status = ?")
+        args.append(status.upper())
+    if job:
+        where.append("job_name = ?")
+        args.append(job)
+    if where:
+        q += " WHERE " + " AND ".join(where)
     with db.connect() as conn:
-        return conn.execute("SELECT * FROM api_runs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return conn.execute(q + " ORDER BY id DESC LIMIT ?", args + [limit]).fetchall()
 
 
 def _refuse(job, trigger, why):
@@ -437,6 +454,8 @@ def start_job(jid, trigger="manual"):
         return False, "That job no longer exists."
     if not get_token():
         return False, "Save an Apify token first."
+    if paused():
+        return False, "Apify is paused. Resume it on this page first."
     with db.connect() as conn:
         busy = conn.execute("SELECT 1 FROM api_runs WHERE job_id = ? AND status IN ('RUNNING','QUEUED')",
                             (jid,)).fetchone()
@@ -480,6 +499,8 @@ def _launch(job, handles):
 
 def pump():
     """Start queued per-creator runs, up to MAX_PARALLEL in flight."""
+    if paused():
+        return
     with db.connect() as conn:
         running = conn.execute("SELECT COUNT(*) c FROM api_runs WHERE status = 'RUNNING'").fetchone()["c"]
         queued = conn.execute("SELECT * FROM api_runs WHERE status = 'QUEUED' ORDER BY id").fetchall()
@@ -722,6 +743,115 @@ def creator_data(code):
             "GROUP BY actor, platform) ORDER BY platform, actor", (code, code)).fetchall()
 
 
+# ----------------------------------------------------------- portal helpers --
+
+def audit(who, action, detail=""):
+    """A line in the activity log: who changed what on this page, and when."""
+    with db.connect() as conn:
+        conn.execute("INSERT INTO api_audit (at, who, action, detail) VALUES (?,?,?,?)",
+                     (db.now(), who or "", action, (detail or "")[:300]))
+
+
+def list_audit(limit=15):
+    with db.connect() as conn:
+        return conn.execute("SELECT * FROM api_audit ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+
+
+def paused():
+    return bool(db.setting("apify_paused", False))
+
+
+def set_paused(flag):
+    db.set_setting("apify_paused", bool(flag))
+
+
+def record_test(ok, text):
+    db.set_setting("apify_last_test", {"at": db.now(), "ok": bool(ok), "text": text})
+
+
+def last_test():
+    return db.setting("apify_last_test") or None
+
+
+def health():
+    with db.connect() as conn:
+        ok = conn.execute("SELECT MAX(finished_at) t FROM api_runs WHERE status = 'SUCCEEDED'").fetchone()["t"]
+        live = conn.execute("SELECT COUNT(*) c FROM api_runs WHERE status = 'RUNNING'").fetchone()["c"]
+        queued = conn.execute("SELECT COUNT(*) c FROM api_runs WHERE status = 'QUEUED'").fetchone()["c"]
+        failed = conn.execute("SELECT COUNT(*) c FROM api_runs WHERE status IN ('FAILED','REFUSED') AND started_at >= ?",
+                              (db.now() - 86400,)).fetchone()["c"]
+    return {"last_ok": ok, "running": live, "queued": queued, "failed_24h": failed}
+
+
+def spend_by_job():
+    with db.connect() as conn:
+        return conn.execute(
+            "SELECT job_name, COUNT(*) runs, SUM(CASE WHEN status='SUCCEEDED' THEN 1 ELSE 0 END) ok, "
+            "COALESCE(SUM(cost),0) cost FROM api_runs WHERE started_at >= ? GROUP BY job_name "
+            "ORDER BY cost DESC", (month_start(),)).fetchall()
+
+
+def estimate_job(jid):
+    job = get_job(jid)
+    n = len(build_handles(job)) if job else 0
+    return n, n * float(job["est_each"] or 0) if job else 0.0
+
+
+def clone_job(jid):
+    j = get_job(jid)
+    if j is None:
+        return None
+    with db.connect() as conn:
+        cur = conn.execute(
+            "INSERT INTO api_jobs (name,actor,kind,platform,source,input,max_handles,schedule,at_time,weekday,"
+            "enabled,est_each,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            (j["name"] + " (copy)", j["actor"], j["kind"], j["platform"], j["source"], j["input"], j["max_handles"],
+             "manual", j["at_time"], j["weekday"], 1, j["est_each"], db.now()))
+        return cur.lastrowid
+
+
+def abort_run(rid):
+    run = get_run(rid)
+    if run is None or run["status"] not in ("RUNNING", "QUEUED"):
+        return False, "That run is not active."
+    if run["status"] == "RUNNING" and run["apify_run"]:
+        try:
+            call("POST", "/actor-runs/%s/abort" % run["apify_run"])
+        except ApifyError as ex:
+            return False, str(ex)
+    _finish(run, "FAILED", 0, 0, run["cost"] or 0.0, "Stopped by you.")
+    return True, "Run stopped."
+
+
+def retry_run(rid):
+    """Queue the same creators again for a run that failed or was refused."""
+    run = get_run(rid)
+    if run is None or run["status"] not in ("FAILED", "REFUSED") or not run["handle_map"]:
+        return False, "Only a failed run that had creators can be retried."
+    if paused():
+        return False, "Apify is paused. Resume it first."
+    with db.connect() as conn:
+        conn.execute("INSERT INTO api_runs (job_id, job_name, trigger, status, handles, handle_map, started_at) "
+                     "VALUES (?,?,?,?,?,?,?)", (run["job_id"], run["job_name"], "retry", "QUEUED", run["handles"],
+                                               run["handle_map"], db.now()))
+    pump()
+    return True, "Queued again."
+
+
+def runs_csv():
+    import csv, io
+    buf = io.StringIO()
+    w = csv.writer(buf)
+    w.writerow(["id", "job", "trigger", "status", "creators", "results", "saved", "cost_usd", "started", "finished", "message"])
+    with db.connect() as conn:
+        for r in conn.execute("SELECT * FROM api_runs ORDER BY id DESC"):
+            w.writerow([r["id"], r["job_name"], r["trigger"], r["status"], r["handles"], r["results"], r["saved"],
+                        "%.4f" % r["cost"], time.strftime("%Y-%m-%d %H:%M", time.gmtime(r["started_at"])),
+                        time.strftime("%Y-%m-%d %H:%M", time.gmtime(r["finished_at"])) if r["finished_at"] else "",
+                        (r["message"] or "").replace("\n", " ")])
+    return buf.getvalue()
+
+
 # ---------------------------------------------------------------- scheduler --
 
 def _due(job, t):
@@ -740,6 +870,8 @@ def tick(t=None):
     if not get_token():
         return
     refresh_all()
+    if paused():
+        return
     for job in list_jobs():
         if _due(job, t):
             start_job(job["id"], "schedule")
