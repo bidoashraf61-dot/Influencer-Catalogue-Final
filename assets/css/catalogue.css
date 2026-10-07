@@ -1529,9 +1529,13 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
    pool behind the text) on top of the edge shade. */
 .cat-cover__body--center { margin: auto 0; padding: 40px 0 clamp(48px, 9vh, 96px); }
 .cat-hero--cover:has(.cat-cover__body--center) .cat-cover__shade {
+  /* Three layers: an even ink veil over the whole film so it reads as a
+     backdrop, a darker pool behind the centred text, and the top and bottom
+     edges deepened for the menu and the journey strip. */
   background:
-    radial-gradient(62% 58% at 50% 52%, rgba(18,18,18,.72) 0%, rgba(18,18,18,.32) 62%, rgba(18,18,18,0) 100%),
-    linear-gradient(180deg, rgba(18,18,18,.7) 0%, rgba(18,18,18,.18) 24%, rgba(18,18,18,.18) 70%, rgba(18,18,18,.75) 100%);
+    radial-gradient(58% 52% at 50% 50%, rgba(18,18,18,.62) 0%, rgba(18,18,18,.28) 60%, rgba(18,18,18,0) 100%),
+    linear-gradient(180deg, rgba(18,18,18,.55) 0%, rgba(18,18,18,0) 22%, rgba(18,18,18,0) 72%, rgba(18,18,18,.7) 100%),
+    rgba(18,18,18,.42);
 }
 .cat-cover__center { max-width: 920px; margin: 0 auto; text-align: center; display: flex; flex-direction: column; align-items: center; }
 .cat-cover__title { margin: 0; font-weight: 400; display: flex; flex-direction: column; align-items: center; }
