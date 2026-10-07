@@ -115,6 +115,8 @@ class Portal(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         seed()
+        db.set_setting("signup_mode", "open")          # the shipped default is approval; most flows below need open
+        db.set_setting("signups_per_ip_day", 1000)     # every test signs up from 127.0.0.1
         mailer.CAPTURE = True
         gemini.STUB = stub
         views.set_base("")
@@ -335,6 +337,101 @@ class Portal(unittest.TestCase):
         c = Client(self.base)
         s, b, _ = c.req("POST", "/api/auth/start", body={"email": "a@bayer.com"}, headers={"Origin": "https://evil.example"})
         self.assertEqual(s, 403)
+
+    # ---------------------------------------------------------- review fixes
+    def test_16_plus_tags_are_one_mailbox(self):
+        c, _ = self.signup("dup@pfizer.com")
+        c2 = Client(self.base)
+        s, b, _ = c2.post("/api/auth/start", {"email": "Dup+free1@Pfizer.com"})
+        self.assertTrue(b["sent"] or b.get("wait"))
+        self.assertEqual(mailer.OUTBOX[-1]["to"], "dup@pfizer.com")
+        self.assertEqual(db.setting("x", 1), 1)
+
+    def test_17_resend_does_not_kill_a_live_code(self):
+        c = Client(self.base)
+        c.post("/api/auth/start", {"email": "keep@sanofi.com"})
+        first = mailer.OUTBOX[-1]["text"].split("code is ")[1][:6]
+        self.skip_cooldown()
+        c.post("/api/auth/start", {"email": "keep@sanofi.com"})        # an attacker (or the user) asks again
+        s, b, _ = c.post("/api/auth/verify", {"email": "keep@sanofi.com", "otp": first})
+        self.assertEqual(b.get("step"), "profile", b)
+
+    def test_18_account_cap_per_ip(self):
+        with db.connect() as conn:
+            conn.execute("UPDATE users SET signup_ip = 'earlier'")
+        db.set_setting("signups_per_ip_day", 3)
+        self.addCleanup(db.set_setting, "signups_per_ip_day", 1000)
+        made = 0
+        for i in range(5):
+            c = Client(self.base)
+            em = "cap%d@merck.com" % i
+            c.post("/api/auth/start", {"email": em})
+            code = mailer.OUTBOX[-1]["text"].split("code is ")[1][:6]
+            s, b, _ = c.post("/api/auth/verify", {"email": em, "otp": code})
+            s, r, _ = c.post("/api/auth/profile", {"ticket": b["ticket"], "name": "Cap Test", "company": "Merck"})
+            if s == 200:
+                made += 1
+            else:
+                self.assertEqual((s, r["reason"]), (429, "too_many_accounts"))
+        self.assertEqual(made, 3)
+
+    def test_19_parallel_briefs_charge_every_run(self):
+        c, _ = self.signup("race@abbvie.com")
+        uid = portal.user_by_email("race@abbvie.com")["code_id"]
+        portal.grant(uid, -45, "drain")                                  # 5 left: exactly one AI shortlist
+        ans = {"goal": "balanced", "platforms": ["any"], "market": "SA", "category": ["beauty"]}
+        results = []
+        def go():
+            results.append(c.post("/api/brief/run", {"answers": ans})[0])
+        ts = [threading.Thread(target=go) for _ in range(6)]
+        [t.start() for t in ts]; [t.join() for t in ts]
+        self.assertEqual(sorted(results).count(200), 1, results)
+        self.assertEqual(portal.balance(uid), 0)
+
+    def test_24_bad_thread_id_is_not_charged(self):
+        c, _ = self.signup("thr@gsk.com")
+        uid = portal.user_by_email("thr@gsk.com")["code_id"]
+        s, r, _ = c.post("/api/chat", {"message": "hello", "thread": "abc"})
+        self.assertEqual(s, 200, r)
+        self.assertEqual(portal.balance(uid), 49)
+
+    def test_25_pending_revokes_and_activate_respects_admin_revocation(self):
+        c, _ = self.signup("hold@bayer.com")
+        u = portal.user_by_email("hold@bayer.com")
+        portal.set_status(u["id"], "pending")
+        self.assertEqual(c.get("/api/roster")[0], 401)                  # on hold really means out
+        portal.set_status(u["id"], "active")
+        self.assertEqual(c.get("/api/roster")[0], 200)
+        with db.connect() as conn:                                      # admin revokes the code from the Codes page
+            conn.execute("UPDATE codes SET revoked_at = ? WHERE id = ?", (db.now(), u["code_id"]))
+        portal.set_status(u["id"], "active")                            # already active: must not lift it
+        self.assertEqual(c.get("/api/roster")[0], 401)
+
+    def test_26_copilot_blocks_writes_after_reading_client_text(self):
+        import assistant
+        ctx = {"who": "boss@hellovoice.co.uk"}
+        assistant.run_tool("admin", "list_clients", {}, ctx)
+        r = assistant.run_tool("admin", "update_creator", {"code": "HV-MI-001", "city": "X"}, ctx)
+        self.assertIn("error", r)
+        self.assertEqual(db.creator("HV-MI-001")["city"], "Riyadh")
+        clean = {"who": "boss@hellovoice.co.uk"}
+        self.assertEqual(assistant.run_tool("admin", "update_creator", {"code": "HV-MI-001", "city": "X"}, clean)["status"],
+                         "queued_for_admin_confirmation")
+
+    def test_27_sql_cannot_build_giant_values(self):
+        for bad in ("select zeroblob(1000000000)", "select printf('%.*c', 1000000000, 'a')", "select randomblob(1000000000)"):
+            self.assertIn("error", assistant_sql(bad), bad)
+        out = assistant_sql("with recursive n(i) as (select 1 union all select i+1 from n where i<5) select sum(i) from n")
+        self.assertEqual(out["rows"][0][0], 15)
+
+    def test_28_back_redirect_is_pinned_to_admin_pages(self):
+        self.signup("redir@bayer.com")
+        a = self.admin()
+        u = portal.user_by_email("redir@bayer.com")
+        for evil in ("/\\evil.com", "//evil.com", "https://evil.com", "/portal\r\nSet-Cookie: x=1"):
+            s, _, r = a.req("POST", "/portal/user/credits", form={"id": u["id"], "amount": "1", "back": evil})
+            loc = r.headers.get("Location", "")
+            self.assertTrue(loc.startswith("/portal") and "evil" not in loc and "\r" not in loc, (evil, loc))
 
     # ------------------------------------------------------------------- admin
     def admin(self):

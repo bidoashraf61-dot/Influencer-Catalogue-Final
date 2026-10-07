@@ -149,8 +149,9 @@ def signup_credits():
 
 
 def signup_mode():
-    m = db.setting("signup_mode", "open")
-    return m if m in ("open", "approval", "allowlist", "closed") else "open"
+    # Default is approval: the roster is confidential, so a new company is let in by a person.
+    m = db.setting("signup_mode", "approval")
+    return m if m in ("open", "approval", "allowlist", "closed") else "approval"
 
 
 def _list_setting(key):
@@ -207,7 +208,10 @@ def new_otp(email, ip=None):
                             (email,)).fetchone()
         if last and now - last["created_at"] < OTP_RESEND_SECONDS:
             return None, "wait"
-        conn.execute("UPDATE otp SET used_at = ? WHERE email = ? AND used_at IS NULL", (now, email))
+        # Earlier unexpired codes stay valid (the last 3): asking for a new one must not be a way
+        # to knock a client's live code out. Older ones are retired.
+        conn.execute("UPDATE otp SET used_at = ? WHERE email = ? AND used_at IS NULL AND id NOT IN "
+                     "(SELECT id FROM otp WHERE email = ? AND used_at IS NULL ORDER BY id DESC LIMIT 2)", (now, email, email))
         code = "%06d" % secrets.randbelow(1000000)
         conn.execute("INSERT INTO otp (email, code_hash, created_at, expires_at, ip) VALUES (?,?,?,?,?)",
                      (email, _otp_hash(email, code), now, now + OTP_MINUTES * 60, ip))
@@ -224,18 +228,24 @@ def check_otp(email, code):
     _salt()
     with db.connect() as conn:
         conn.execute("BEGIN IMMEDIATE")
-        row = conn.execute("SELECT * FROM otp WHERE email = ? AND used_at IS NULL ORDER BY id DESC LIMIT 1",
-                           (email,)).fetchone()
-        if not row:
+        rows = conn.execute("SELECT * FROM otp WHERE email = ? AND used_at IS NULL ORDER BY id DESC LIMIT 3",
+                            (email,)).fetchall()
+        if not rows:
             return False, "invalid"
-        if row["expires_at"] < now:
+        live = [r for r in rows if r["expires_at"] >= now]
+        if not live:
             return False, "expired"
-        if row["attempts"] >= OTP_MAX_ATTEMPTS:
+        open_ = [r for r in live if r["attempts"] < OTP_MAX_ATTEMPTS]
+        if not open_:
             return False, "locked"
-        conn.execute("UPDATE otp SET attempts = attempts + 1 WHERE id = ?", (row["id"],))
-        if len(code) != 6 or not hmac.compare_digest(row["code_hash"], _otp_hash(email, code)):
+        match = None
+        for r in open_:
+            conn.execute("UPDATE otp SET attempts = attempts + 1 WHERE id = ?", (r["id"],))
+            if len(code) == 6 and hmac.compare_digest(r["code_hash"], _otp_hash(email, code)):
+                match = r
+        if not match:
             return False, "invalid"
-        conn.execute("UPDATE otp SET used_at = ? WHERE id = ?", (now, row["id"]))
+        conn.execute("UPDATE otp SET used_at = ? WHERE email = ? AND used_at IS NULL", (now, email))
     return True, None
 
 
@@ -269,25 +279,53 @@ def list_users():
 
 def create_user(email, name, company, job_title="", phone="", ip=None):
     """Make the account, its personal access-code row and its starting credits.
-    Returns the user row. The pending state (approval mode) has no live code."""
+    Returns the user row. A pending account (approval mode) gets a revoked code and no
+    credits until an admin activates it. Safe against a double submit: the second call
+    returns the account the first one made."""
+    import sqlite3
     email = email.lower()
+    existing = user_by_email(email)
+    if existing:
+        return existing
     clean = lambda v, n: " ".join(str(v or "").split())[:n]
     status = "pending" if signup_mode() == "approval" else "active"
     token = secrets.token_hex(32)
     max_dev = db.setting("user_max_devices", 5)
-    code_id = db.create_code(hashlib.sha256(("hv-user:" + token).encode()).hexdigest(), "····",
-                             "Client: " + email, None, None, None,
-                             max_dev if isinstance(max_dev, int) and max_dev > 0 else 5)
-    with db.connect() as conn:
-        cur = conn.execute(
-            "INSERT INTO users (email, name, company, job_title, phone, domain, code_id, status, created_at, signup_ip) "
-            "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (email, clean(name, 120), clean(company, 160), clean(job_title, 120), clean(phone, 40),
-             email.rsplit("@", 1)[1], code_id, status, db.now(), ip))
-        uid = cur.lastrowid
+    try:
+        with db.connect() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            if conn.execute("SELECT 1 FROM users WHERE email = ?", (email,)).fetchone():
+                return user_by_email(email)
+            cur = conn.execute(
+                "INSERT INTO codes (code_hash, hint, label, created_at, max_devices, revoked_at) VALUES (?,?,?,?,?,?)",
+                (hashlib.sha256(("hv-user:" + token).encode()).hexdigest(), "····", "Client: " + email, db.now(),
+                 max_dev if isinstance(max_dev, int) and max_dev > 0 else 5, db.now() if status == "pending" else None))
+            code_id = cur.lastrowid
+            cur = conn.execute(
+                "INSERT INTO users (email, name, company, job_title, phone, domain, code_id, status, created_at, signup_ip) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (email, clean(name, 120), clean(company, 160), clean(job_title, 120), clean(phone, 40),
+                 email.rsplit("@", 1)[1], code_id, status, db.now(), ip))
+            uid = cur.lastrowid
+    except sqlite3.IntegrityError:
+        return user_by_email(email)
     if status == "active":
         grant(code_id, signup_credits(), "Welcome credits", actor="system")
     return user_by_id(uid)
+
+
+def signups_per_ip():
+    """New accounts one network may create per day (stops welcome-credit farming)."""
+    try:
+        return max(1, int(db.setting("signups_per_ip_day", 3)))
+    except (TypeError, ValueError):
+        return 3
+
+
+def signups_from(ip, hours=24):
+    with db.connect() as conn:
+        return conn.execute("SELECT COUNT(*) FROM users WHERE signup_ip = ? AND created_at >= ?",
+                            (ip, db.now() - hours * 3600)).fetchone()[0]
 
 
 def update_profile(uid, **fields):
@@ -304,17 +342,20 @@ def update_profile(uid, **fields):
 
 
 def set_status(uid, status):
-    """active / suspended / pending. Suspending revokes the personal code, so the
-    client is out on their next request; activating a pending user grants the
-    welcome credits once."""
+    """active / suspended / pending. Anything but active revokes the personal code, so the
+    client is out on their next request. Activating lifts only that revocation (a code an
+    admin revoked from the Codes page while the account was active stays revoked), and grants
+    the welcome credits once."""
     assert status in ("active", "suspended", "pending")
     u = user_by_id(uid)
     if not u:
         return None
     with db.connect() as conn:
         conn.execute("UPDATE users SET status = ? WHERE id = ?", (status, uid))
-        conn.execute("UPDATE codes SET revoked_at = ? WHERE id = ?",
-                     (db.now() if status == "suspended" else None, u["code_id"]))
+        if status != "active":
+            conn.execute("UPDATE codes SET revoked_at = COALESCE(revoked_at, ?) WHERE id = ?", (db.now(), u["code_id"]))
+        elif u["status"] != "active":
+            conn.execute("UPDATE codes SET revoked_at = NULL WHERE id = ?", (u["code_id"],))
         had = conn.execute("SELECT 1 FROM credit_ledger WHERE code_id = ? LIMIT 1", (u["code_id"],)).fetchone()
     if status == "active" and not had:
         grant(u["code_id"], signup_credits(), "Welcome credits", actor="system")

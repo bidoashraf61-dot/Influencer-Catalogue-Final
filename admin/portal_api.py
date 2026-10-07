@@ -121,11 +121,22 @@ class PortalMixin:
         with db.connect() as conn:
             return conn.execute("SELECT * FROM codes WHERE id = ?", (code_id,)).fetchone()
 
-    def _throttled(self, key, limit, window):
+    def _throttled(self, key, limit, window, hit=True):
+        """True (and a 429 sent) when ``key`` is over its limit. Records the attempt unless
+        ``hit`` is False (the sign-in code counts only mails actually sent)."""
         if not guard.limiter.allow(key, limit, window):
             self.too_many(guard.limiter.retry_after(key, limit, window))
             return True
+        if hit:
+            guard.limiter.hit(key)
         return False
+
+    @staticmethod
+    def _int(v, default=0):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return default
 
     def _need_viewer(self):
         cid, user, kind = self._identity()
@@ -172,7 +183,7 @@ class PortalMixin:
             who = self._need_viewer()
             if who:
                 cid, user, kind = who
-                t = portal.find_thread(cid, "client", "", int(query.get("t") or 0)) if (query.get("t") or "").isdigit() else None
+                t = portal.find_thread(cid, "client", "", self._int(query.get("t"))) if (query.get("t") or "").isdigit() else None
                 msgs = [{"role": m["role"], "text": m["content"]} for m in portal.messages(t["id"], 40)] if t else []
                 self.send_json(200, {"ok": True, "thread": t["id"] if t else None, "messages": msgs}, self.cors())
             return True
@@ -203,8 +214,10 @@ class PortalMixin:
             return self.send_json(400, {"ok": False, "reason": why, "message": REASON_TEXT.get(why, "Can't use that email.")}, self.cors())
         ip = self.client_ip()
         # Per address, per email, and a global ceiling that protects the sender's reputation.
-        if (self._throttled("otp:ip:" + ip, 12, 3600) or self._throttled("otp:em:" + email, 6, 3600)
-                or self._throttled("otp:all", 300, 3600)):
+        domain = email.rsplit("@", 1)[1]
+        if (self._throttled("otp:ip:" + ip, 12, 3600, hit=False) or self._throttled("otp:em:" + email, 6, 3600, hit=False)
+                or self._throttled("otp:dom:" + domain, 40, 3600, hit=False)
+                or self._throttled("otp:all", 400, 3600, hit=False)):
             return
         if not mailer.configured():
             return self.send_json(503, {"ok": False, "reason": "mail_not_configured",
@@ -212,9 +225,8 @@ class PortalMixin:
         code, wait = portal.new_otp(email, ip)
         if wait:
             return self.send_json(200, {"ok": True, "sent": False, "wait": portal.OTP_RESEND_SECONDS}, self.cors())
-        guard.limiter.hit("otp:ip:" + ip)
-        guard.limiter.hit("otp:em:" + email)
-        guard.limiter.hit("otp:all")
+        for k in ("otp:ip:" + ip, "otp:em:" + email, "otp:dom:" + domain, "otp:all"):
+            guard.limiter.hit(k)
         try:
             subject, text, html = mailer.otp_message(code, portal.OTP_MINUTES)
             mailer.send(email, subject, text, html)
@@ -280,6 +292,9 @@ class PortalMixin:
         _, why = portal.check_email(email)
         if why:
             return self.send_json(400, {"ok": False, "reason": why, "message": REASON_TEXT.get(why)}, self.cors())
+        if portal.signups_from(self.client_ip()) >= portal.signups_per_ip():
+            return self.send_json(429, {"ok": False, "reason": "too_many_accounts",
+                                        "message": "Too many accounts were created from this network today. Please contact the HelloVoice team."}, self.cors())
         user = portal.create_user(email, name, company, b.get("job_title"), b.get("phone"), self.client_ip())
         db.log("signup", user["code_id"], self.client_ip(), self._ua(), email.rsplit("@", 1)[1])
         return self._enter(user)
@@ -350,25 +365,39 @@ class PortalMixin:
         costs = portal.costs()
         if kind == "guest":
             portal.ensure_allowance(cid)
-        if kind != "admin" and portal.balance(cid) < costs["search"]:
-            return self._no_credits(cid, "search")
-
-        brief = matcher.to_brief(answers)
-        result = matcher.rank(brief)
-        if not result["picks"]:
-            return self.send_json(200, {"ok": True, "empty": True, "message":
-                                        "No creators matched. Try fewer filters or another platform.",
-                                        "credits": portal.balance(cid)}, self.cors())
-        summary, reasons, narrated = "", {}, False
-        if gemini.configured() and (kind == "admin" or portal.balance(cid) >= costs["brief"]):
-            try:
-                nar = matcher.narrate(matcher.describe(answers) + ((". " + answers["notes"]) if answers.get("notes") else ""), result, cid)
-                summary, reasons, narrated = nar["summary"], nar["reasons"], True
-            except gemini.AIError:
-                pass
-        ok, cost, bal = portal.charge(cid, "brief" if narrated else "search", "AI shortlist")
+        # Reserve the credits BEFORE any model tokens are spent, so parallel requests cannot all
+        # pass a balance check and then be charged once. Asked for the full price; if the balance
+        # only covers the plain shortlist, that is what runs.
+        want_ai = gemini.configured()
+        kind_paid = "brief" if want_ai else "search"
+        ok, cost, bal = portal.charge(cid, kind_paid, "AI shortlist")
+        if not ok and want_ai:
+            kind_paid = "search"
+            ok, cost, bal = portal.charge(cid, kind_paid, "AI shortlist")
         if not ok:
-            return self._no_credits(cid, "brief" if narrated else "search")
+            return self._no_credits(cid, "search")
+        try:
+            brief = matcher.to_brief(answers)
+            result = matcher.rank(brief)
+            if not result["picks"]:
+                portal.refund(cid, cost, "no creators matched")
+                return self.send_json(200, {"ok": True, "empty": True, "message":
+                                            "No creators matched. Try fewer filters or another platform.",
+                                            "credits": portal.balance(cid)}, self.cors())
+            summary, reasons, narrated = "", {}, False
+            if kind_paid == "brief":
+                try:
+                    nar = matcher.narrate(matcher.describe(answers) + ((". " + answers["notes"]) if answers.get("notes") else ""), result, cid)
+                    summary, reasons, narrated = nar["summary"], nar["reasons"], True
+                except gemini.AIError:
+                    diff = cost - costs["search"]
+                    if diff > 0:
+                        portal.refund(cid, diff, "shortlist without AI text")
+                        cost -= diff
+        except Exception:
+            portal.refund(cid, cost, "failed shortlist")
+            raise
+        bal = portal.balance(cid)
 
         codes = [p["code"] for p in result["picks"]]
         name = (str(b.get("name") or "").strip() or "AI shortlist") [:100]
@@ -405,10 +434,11 @@ class PortalMixin:
             return self.send_json(503, {"ok": False, "reason": "not_configured", "message": AI_FAIL["not_configured"][1]}, self.cors())
         if self._throttled("chat:%d" % cid, 40, 600):
             return
+        tid = self._int(b.get("thread")) or None
         ok, cost, bal = portal.charge(cid, "chat", "chat message")
         if not ok:
             return self._no_credits(cid, "chat")
-        th = portal.thread(cid, "client", "", tid=int(b.get("thread") or 0) or None)
+        th = portal.thread(cid, "client", "", tid=tid)
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
         try:
@@ -465,7 +495,7 @@ class PortalMixin:
             return self.send_json(503, {"ok": False, "error": "Add a Gemini key on the AI settings tab first."})
         if self._throttled("aichat:" + email, 60, 600):
             return
-        th = portal.thread(None, "admin", email, tid=int(b.get("thread") or 0) or None)
+        th = portal.thread(None, "admin", email, tid=self._int(b.get("thread")) or None)
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 16)]
         ctx = {"who": email, "code_id": db.admin_code_id()}
         try:
@@ -479,7 +509,8 @@ class PortalMixin:
     def portal_form(self, path, email):
         f = self.form_body()
         back = f.get("back") or "/portal"
-        if not back.startswith("/") or back.startswith("//"):
+        # Only our own pages; no backslashes or control characters (a browser reads /\\x as //x).
+        if (not back.startswith(("/portal", "/codes")) or "\\" in back or any(ord(c) < 32 or c == "\x7f" for c in back)):
             back = "/portal"
         sep = "&" if "?" in back else "?"
 
@@ -545,6 +576,7 @@ class PortalMixin:
             db.set_setting("signup_credits", num("signup_credits", 0, 100000, portal.DEFAULT_SIGNUP_CREDITS))
             db.set_setting("guest_credits", num("guest_credits", 0, 100000, portal.DEFAULT_GUEST_CREDITS))
             db.set_setting("user_max_devices", num("user_max_devices", 1, 50, 5))
+            db.set_setting("signups_per_ip_day", num("signups_per_ip_day", 1, 1000, 3))
             db.set_setting("ai_costs", costs)
             db.set_setting("domain_allow", lines("domain_allow"))
             db.set_setting("domain_block", lines("domain_block"))

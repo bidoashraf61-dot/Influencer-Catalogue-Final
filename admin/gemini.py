@@ -29,6 +29,7 @@ DEFAULT_MODEL = "gemini-3.8-flash"
 FALLBACKS = ("gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest")
 DEFAULT_MONTHLY_TOKENS = 5_000_000
 MAX_CONCURRENT = 4
+OVERALL_SECONDS = 60
 
 STUB = None            # callable(body: dict) -> response dict, set by tests
 _slots = threading.BoundedSemaphore(MAX_CONCURRENT)
@@ -162,13 +163,15 @@ def generate(contents, *, system=None, schema=None, tools=None, temperature=0.4,
     if not _slots.acquire(timeout=8):
         raise Busy("The assistant is busy. Try again in a moment.")
     data, mdl = None, chain[0]
+    deadline = started + OVERALL_SECONDS            # one budget for the whole chain, so slow calls cannot hold every slot
     try:
         for i, mdl in enumerate(chain):
             try:
-                data = _post(mdl, body, timeout)
+                data = _post(mdl, body, max(5, min(timeout, deadline - time.time())))
                 break
             except Upstream as exc:
-                if i < len(chain) - 1 and exc.status in (None, 404, 429, 500, 502, 503, 504):
+                if (i < len(chain) - 1 and time.time() < deadline
+                        and exc.status in (None, 404, 429, 500, 502, 503, 504)):
                     continue                  # that model is gone or overloaded: try the next
                 raise
     except AIError as exc:

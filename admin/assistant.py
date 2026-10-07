@@ -246,15 +246,19 @@ def t_sql_query(ctx, sql):
     conn.row_factory = sqlite3.Row
 
     def auth(action, a1, a2, dbname, src):
-        if action == sqlite3.SQLITE_SELECT:
+        if action in (sqlite3.SQLITE_SELECT, getattr(sqlite3, "SQLITE_RECURSIVE", 33)):
             return sqlite3.SQLITE_OK
         if action == sqlite3.SQLITE_READ:
             return sqlite3.SQLITE_OK if a1 in SQL_TABLES else sqlite3.SQLITE_DENY
         if action == sqlite3.SQLITE_FUNCTION:
-            return sqlite3.SQLITE_OK if (a2 or "").lower() not in ("load_extension",) else sqlite3.SQLITE_DENY
+            # Functions that can build gigabyte values in one call (the 4 s timer cannot interrupt them).
+            return sqlite3.SQLITE_DENY if (a2 or "").lower() in ("load_extension", "zeroblob", "randomblob", "printf", "format") else sqlite3.SQLITE_OK
         return sqlite3.SQLITE_DENY
 
     deadline = time.time() + 4
+    if hasattr(conn, "setlimit"):                              # Python 3.11+, which production runs
+        conn.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, 1000000)    # a zeroblob(1e9) cannot exhaust memory
+        conn.setlimit(sqlite3.SQLITE_LIMIT_SQL_LENGTH, 5000)
     conn.set_authorizer(auth)
     conn.set_progress_handler(lambda: 1 if time.time() > deadline else 0, 20000)
     try:
@@ -449,9 +453,20 @@ def declarations(scope):
     return d
 
 
+# Tools whose results carry text a client or an anonymous visitor typed (names, companies, brief
+# notes, quote requests). Such text could try to steer the model, so once one has run in a turn no
+# write may be queued in that same turn: the admin asks again in a fresh message.
+UNTRUSTED_READS = {"client_overview", "list_clients", "sql_query", "list_selections"}
+
+
 def run_tool(scope, name, args, ctx):
     """Execute one tool call. Writes are queued, not run."""
     args = args if isinstance(args, dict) else {}
+    if name in UNTRUSTED_READS:
+        ctx["tainted"] = True
+    if name in ADMIN_WRITE and ctx.get("tainted"):
+        return {"error": "Not queued: this answer used client-written text, so changes are blocked in the same turn. "
+                         "Tell the admin which change you suggest and ask them to request it in a new message."}
     if name in CLIENT_TOOLS:
         fn = CLIENT_TOOLS[name][0]
     elif scope == "admin" and name in ADMIN_READ:
@@ -468,7 +483,7 @@ def run_tool(scope, name, args, ctx):
             for k in [k for k, v in _pending.items() if now - v["at"] > PENDING_TTL]:
                 del _pending[k]
             _pending[token] = {"tool": name, "args": args, "owner": ctx.get("who"), "at": now, "text": text}
-        ctx.setdefault("queued", []).append({"token": token, "text": text})
+        ctx.setdefault("queued", []).append({"token": token, "text": text, "tool": name, "args": json.dumps(args)[:600]})
         return {"status": "queued_for_admin_confirmation", "will_do": text,
                 "instruction": "Tell the admin what you queued and that they must press Confirm. Do not say it is done."}
     else:

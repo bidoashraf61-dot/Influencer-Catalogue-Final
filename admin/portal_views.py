@@ -98,12 +98,17 @@ def _usage_tab():
     stats = ("<div class='pstats'>" + _stat("Tokens this month", "{:,}".format(used), "of {:,} ({}%)".format(cap, pct))
              + _stat("Calls", sum(r["n"] for r in by_kind)) + _stat("Failed", sum(r["n"] - (r["good"] or 0) for r in by_kind))
              + _stat("Credits spent", spent, "granted %d" % granted) + "</div>")
-    kind_rows = "".join("<tr><td>%s</td><td>%d</td><td>%d</td><td>{:,}</td></tr>".format(r["tok"] or 0) % (e(r["kind"]), r["n"], r["good"] or 0)
-                        for r in by_kind)
+    kind_rows = "".join(
+        "<tr><td>%s</td><td>%d</td><td>%d</td><td>%s</td></tr>" % (e(r["kind"]), r["n"], r["good"] or 0, "{:,}".format(r["tok"] or 0))
+        for r in by_kind)
+
+    def who(r):
+        return r["email"] or ("code #%s" % r["code_id"] if r["code_id"] else "admin")
     recent_rows = "".join(
-        "<tr><td class='muted'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>{:,}</td><td>%s</td></tr>".format((r["prompt_tokens"] or 0) + (r["out_tokens"] or 0))
-        % (e(ago(r["at"])), e(r["kind"]), e(r["email"] or ("code #%s" % r["code_id"] if r["code_id"] else "admin")),
-           "ok" if r["ok"] else "<span class='pill dead'>failed</span>", e(r["latency_ms"] or ""), e(r["detail"] or ""))
+        "<tr><td class='muted'>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td></tr>" % (
+            e(ago(r["at"])), e(r["kind"]), e(who(r)), "ok" if r["ok"] else "<span class='pill dead'>failed</span>",
+            "{:,}".format((r["prompt_tokens"] or 0) + (r["out_tokens"] or 0)),
+            e(" · ".join(x for x in (("%s ms" % r["latency_ms"]) if r["latency_ms"] else "", r["model"] or "", r["detail"] or "") if x)))
         for r in recent)
     return (stats + "<div class='card'><h2>This month by action</h2><table><thead><tr><th>Action</th><th>Calls</th><th>OK</th><th>Tokens</th></tr></thead><tbody>"
             + (kind_rows or "<tr><td colspan='4' class='muted'>No AI calls yet.</td></tr>") + "</tbody></table></div>"
@@ -142,6 +147,8 @@ def _settings_tab():
           "<div><label>Welcome credits</label><input type='number' min='0' name='signup_credits' value='%d'></div>" % portal.signup_credits()
         + "<div><label>Guest passcode allowance</label><input type='number' min='0' name='guest_credits' value='%d'>"
           "<div class='price-hint'>One-off credits for clients still using an access code.</div></div>" % portal.guest_credits()
+        + "<div><label>New accounts per network per day</label><input type='number' min='1' max='1000' name='signups_per_ip_day' value='%d'>"
+          "<div class='price-hint'>Stops one person farming welcome credits.</div></div>" % portal.signups_per_ip()
         + "<div><label>Devices per account</label><input type='number' min='1' max='50' name='user_max_devices' value='%s'></div></div>"
           % e(db.setting("user_max_devices", 5))
         + "<div class='fgrid' style='margin-top:14px'><div><label>Allow-listed domains</label><textarea class='mono' name='domain_allow' placeholder='one per line'>%s</textarea></div>"

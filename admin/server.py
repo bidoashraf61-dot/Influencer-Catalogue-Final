@@ -923,7 +923,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def post_login(self):
         form = self.form_body()
         email = (form.get("email") or "").strip().lower()
-        ip_key, em_key = f"login:ip:{self.client_ip()}", f"login:em:{email[:80]}"
+        # The account key includes the source address: otherwise anyone could lock the real admin out
+        # by typing five wrong passwords from anywhere.
+        ip_key, em_key = f"login:ip:{self.client_ip()}", f"login:em:{self.client_ip()}:{email[:80]}"
         # 8 failures per address and 5 per account in 15 minutes, then a lockout.
         # Counted on failure only, so a real admin who types it right is never slowed.
         for key, limit in ((ip_key, 8), (em_key, 5)):

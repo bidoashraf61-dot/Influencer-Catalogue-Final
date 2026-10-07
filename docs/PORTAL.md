@@ -66,14 +66,23 @@ country is multiplied by 0.6, so a large Dubai account does not win a KSA brief.
 ## Security model
 
 - OTP: 6 digits, hashed with a server salt, 10-minute life, 5 attempts, 30 s
-  resend cooldown, limits per address, per email and a global hourly ceiling.
+  resend cooldown; asking for a new code does not cancel the last two, so nobody
+  can lock a client out by requesting codes. Limits per network, per email, per
+  domain and a global hourly ceiling count only emails actually sent.
+- `name+tag@company.com` is the same mailbox as `name@company.com` (no free
+  accounts per tag); 3 new accounts per network per day by default; welcome
+  credits only once an account is active.
+- Credits are reserved before any model call, so parallel requests cannot spend
+  more than the balance. Admin lockout is keyed on network + account.
 - Sign-in, access-code and admin-login throttling; CSRF origin check on every
   POST; `Secure` cookie flag over https.
 - Client chat tools return only the creator fields the catalogue already shows.
   Cost, rating and internal notes are never sent to a model for a client.
 - Copilot SQL is one read-only `SELECT` through an authorizer that allows a fixed
   table list. `codes`, `admins`, `sessions`, `otp`, `settings` and `history` are
-  refused. Copilot writes never run directly (queued, confirm, history).
+  refused, as are functions that can build huge values. Copilot writes never run
+  directly (queued, confirm, history), and no write can be queued in a turn that
+  read client-written text (names, companies, brief notes, quote requests).
 - All model output that selects data is validated against the allowed options.
   Free text from clients and tool results are treated as data, not instructions.
 - Keys are written to mode-600 files on the server, never shown after saving,
@@ -87,8 +96,11 @@ country is multiplied by 0.6, so a large Dubai account does not win a KSA brief.
 2. **Gemini**: create a key in Google AI Studio (restrict it to the Generative
    Language API). Paste it under *Gemini API key*. Never paste it in chat or
    commit it. Set the monthly token ceiling.
-3. Choose **Who can sign up** (Open / Approval / Invite only / Closed), the
-   welcome credits and the allow/block domain lists.
+3. Choose **Who can sign up**. The default is **Approval**: a new company signs
+   in, lands on "waiting for approval", and you activate it under Client accounts
+   (the roster is confidential, so a person lets each new company in). Open,
+   Invite only and Closed are the other modes. Set welcome credits, the
+   accounts-per-network cap and the allow/block domain lists.
 
 ## Release
 

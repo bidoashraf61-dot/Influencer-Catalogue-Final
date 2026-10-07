@@ -130,6 +130,8 @@ def normalise_email(raw):
     s = (raw or "").strip().lower()
     if len(s) > 254 or s.count("@") != 1 or ".." in s:
         return ""
+    local, _, dom = s.partition("@")
+    s = local.split("+", 1)[0] + "@" + dom        # one mailbox, however many +tags: no free accounts per tag
     m = _EMAIL_RE.match(s)
     if not m:
         return ""

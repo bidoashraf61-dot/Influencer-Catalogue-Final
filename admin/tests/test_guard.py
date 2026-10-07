@@ -21,6 +21,10 @@ class Email(unittest.TestCase):
         for e in ("", "x", "a@b", "a@@b.com", "a b@c.com", "a@b..com", "a@-b.com", "a@b.c1", "a@1.2.3.4"):
             self.assertEqual(self.why(e), "invalid", e)
 
+    def test_plus_tags_collapse(self):
+        self.assertEqual(self.ok("Jane+promo1@Pfizer.com"), "jane@pfizer.com")
+        self.assertEqual(self.ok("jane+a+b@pfizer.com"), "jane@pfizer.com")
+
     def test_lookalike_not_blocked(self):
         self.assertEqual(self.ok("a@notgmail.com"), "a@notgmail.com")
         self.assertEqual(self.ok("a@gmail.com.evil.io"), "a@gmail.com.evil.io")
