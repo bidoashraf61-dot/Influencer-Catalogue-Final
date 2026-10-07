@@ -484,7 +484,8 @@ class Handler(BaseHTTPRequestHandler):
                 shown[start:start + views.PER_PAGE], query.get("e"), query.get("ok"), self.site_origin(),
                 archived=arch, n_archived=n_arch, page_no=pg, total=len(shown),
                 clients=[c for c in db.list_codes() if not (c["archived_at"] if "archived_at" in c.keys() else None)],
-                currencies=[c for c in fx.CURRENCIES if fx.usable(c)], camp_counts=counts))
+                currencies=[c for c in fx.CURRENCIES if fx.usable(c)], camp_counts=counts,
+                interests=db.known_interests()))
         if path == "/selections/edit":
             sid = query.get("id", "")
             sel = db.selection(int(sid)) if sid.isdigit() else None
@@ -1686,6 +1687,14 @@ class Handler(BaseHTTPRequestHandler):
                 sid = db.save_selection(None, name, [], {}, None, None, code_id=int(cid) if cid.isdigit() else None,
                                         platform=plat if plat in db.PLATFORMS else None)
                 db.set_selection_currency(sid, cur if fx.usable(cur) else "SAR")
+                import fit as _fit_new
+                if (f.get("sel_objective") or "") in _fit_new.OBJECTIVES:
+                    db.set_selection_objective(sid, f["sel_objective"])
+                db.set_selection_target(sid, {
+                    "country": f.get("t_country") if f.get("t_country") in dict(_fit_new.COUNTRIES) else "SA",
+                    "gender": f.get("t_gender") if f.get("t_gender") in _fit_new.GENDERS else "Any",
+                    "age": f.get("t_age") if f.get("t_age") in _fit_new.AGE_BANDS else "Any",
+                    "category": (f.get("t_category") or "Any")[:40]})
                 t["key"] = sid
             return self.redirect("/selections/edit?id=%d&ok=%s#st=creators" % (
                 sid, urllib.parse.quote("Created. Add the creators, then set their prices.")))

@@ -2023,7 +2023,7 @@ def selection_link(sel, origin):
 
 
 def selections_page(sels, error=None, message=None, origin="", archived=False, n_archived=0, page_no=1, total=0,
-                    clients=None, currencies=None, camp_counts=None):
+                    clients=None, currencies=None, camp_counts=None, interests=()):
     listed = total
     note = ""
     if error:
@@ -2058,6 +2058,7 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
                               "or build one yourself.", "<a class='btn small lime' href='#new'>New selection</a>") + "</td></tr>")
     code_opts = "<option value=''>No client yet</option>" + "".join(
         "<option value='%d'>%s</option>" % (c["id"], e(c["label"])) for c in (clients or []))
+    import fit as _fit_ns
     plat_opts = "<option value=''>Every platform they are on</option>" + "".join("<option value='%s'>%s only</option>" % (p_, p_) for p_ in PLATFORMS)
     cur_opts = "".join("<option>%s</option>" % c_ for c_ in (currencies or ["SAR"]))
     create = (
@@ -2068,6 +2069,18 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
         "<div><label for='ns-client'>Client</label><select id='ns-client' name='code_id'>" + code_opts + "</select></div>"
         "<div><label for='ns-plat'>Quoted for</label><select id='ns-plat' name='platform'>" + plat_opts + "</select></div>"
         "<div><label for='ns-cur'>Currency</label><select id='ns-cur' name='currency'>" + cur_opts + "</select></div></div>"
+        "<div class='card' style='background:#f7f5f0;margin:14px 0'><strong>Who is this selection for?</strong>"
+        "<div class='price-hint' style='margin:4px 0 8px'>Every creator gets a matching score against this, worked out from their analysis. You can change it any time on the selection's <b>Fit &amp; tags</b> tab.</div>"
+        "<div class='row'><div><label for='ns-obj'>Campaign objective</label><select id='ns-obj' name='sel_objective'>" + "".join(
+            "<option" + (" selected" if o_ == "Balanced" else "") + ">" + o_ + "</option>" for o_ in _fit_ns.OBJECTIVES) + "</select></div>"
+        "<div><label for='ns-country'>Target country</label><select id='ns-country' name='t_country'>" + "".join(
+            "<option value='" + k_ + "'>" + e(n_) + "</option>" for k_, n_ in _fit_ns.COUNTRIES) + "</select></div>"
+        "<div><label for='ns-gender'>Audience gender</label><select id='ns-gender' name='t_gender'>" + "".join(
+            "<option>" + g_ + "</option>" for g_ in _fit_ns.GENDERS) + "</select></div>"
+        "<div><label for='ns-age'>Audience age</label><select id='ns-age' name='t_age'><option>Any</option>" + "".join(
+            "<option>" + a_ + "</option>" for a_ in _fit_ns.AGE_BANDS) + "</select></div>"
+        "<div><label for='ns-cat'>Product category</label><select id='ns-cat' name='t_category'><option>Any</option>" + "".join(
+            "<option>" + e(i_) + "</option>" for i_ in interests) + "</select></div></div></div>"
         "<button class='btn lime'>" + ui.icon("arrow", 16) + " Create and add creators</button></form>"
         "<details style='margin-top:16px'><summary class='muted'>Have a link a client sent? Open that selection instead</summary>"
         "<form method='post' action='" + u("/selections/new") + "' style='margin-top:10px'><div class='row'>"
