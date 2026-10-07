@@ -476,6 +476,51 @@
   // the field. Filters group the cities under their country so Riyadh and
   // Jeddah sit under Saudi Arabia rather than between Dubai and Cairo.
   // Matching still uses the raw value on the card; this is only how it reads.
+
+  /* Small drawn flags for the "Where they are" panel. Simplified on purpose:
+     at 30x20 the colour bands are what people recognise. */
+  function serrated(color, n) {
+    var pts = ["0,0", "8,0"], step = 20 / (2 * n);
+    for (var i = 1; i < 2 * n; i++) pts.push((i % 2 ? 11 : 8) + "," + (i * step).toFixed(2));
+    pts.push("8,20", "0,20");
+    return '<rect width="30" height="20" fill="' + color + '"/><polygon fill="#fff" points="' + pts.join(" ") + '"/>';
+  }
+  function bands(a, b, c) {
+    return '<rect width="30" height="6.7" fill="' + a + '"/><rect y="6.6" width="30" height="6.8" fill="' + b +
+      '"/><rect y="13.3" width="30" height="6.7" fill="' + c + '"/>';
+  }
+  var FLAGS = {
+    "Egypt": bands("#ce1126", "#fff", "#111") + '<circle cx="15" cy="10" r="2" fill="#c09300"/>',
+    "Saudi Arabia": '<rect width="30" height="20" fill="#006c35"/><rect x="8" y="6.5" width="14" height="1.7" rx=".8" fill="#fff"/>' +
+      '<rect x="9" y="12" width="12" height="1" fill="#fff"/><rect x="20" y="11.2" width="1.2" height="2.6" fill="#fff"/>',
+    "UAE": bands("#00732f", "#fff", "#111") + '<rect width="8" height="20" fill="#ff0000"/>',
+    "Kuwait": bands("#007a3d", "#fff", "#ce1126") + '<polygon points="0,0 8,6.7 8,13.3 0,20" fill="#111"/>',
+    "Qatar": serrated("#8a1538", 9),
+    "Bahrain": serrated("#ce1126", 5),
+    "Oman": '<rect width="30" height="20" fill="#db161b"/><rect x="8" width="22" height="6.7" fill="#fff"/><rect x="8" y="13.3" width="22" height="6.7" fill="#008000"/>',
+    "Jordan": bands("#111", "#fff", "#007a3d") + '<polygon points="0,0 14,10 0,20" fill="#ce1126"/><circle cx="4.6" cy="10" r="1.3" fill="#fff"/>',
+    "Lebanon": '<rect width="30" height="20" fill="#ed1c24"/><rect y="5" width="30" height="10" fill="#fff"/><polygon points="15,6 19.5,13.5 10.5,13.5" fill="#00a651"/>',
+    "Iraq": bands("#ce1126", "#fff", "#111") + '<rect x="10" y="9.2" width="10" height="1.6" rx=".8" fill="#007a3d"/>',
+    "Morocco": '<rect width="30" height="20" fill="#c1272d"/><polygon points="15,5.5 16.3,9.3 20.3,9.3 17.1,11.7 18.3,15.5 15,13.2 11.7,15.5 12.9,11.7 9.7,9.3 13.7,9.3" fill="none" stroke="#006233" stroke-width="1"/>'
+  };
+  var ICON_GLOBE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5S9.6 5.9 12 3.5z"/></svg>';
+  function flagOf(country) {
+    var f = FLAGS[country];
+    return f ? '<svg class="cat-flag" viewBox="0 0 30 20" aria-hidden="true">' + f + "</svg>"
+             : '<span class="cat-flag cat-flag--none">' + ICON_GLOBE + "</span>";
+  }
+  var STAT_ICONS = {
+    "Creators": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.8" cy="9.5" r="2.5"/><path d="M15.6 14.2c2.4-.3 4.3 1.2 4.9 4"/></svg>',
+    "Indicative range": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8a1.5 1.5 0 0 1 0 2.1l-6.9 6.9a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.5"/></svg>',
+    "Quoted for": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M10.5 18h3"/></svg>',
+    "Not in this roster": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.4v.1"/></svg>'
+  };
+
+  function shareBar(n, total) {
+    var pct = total ? Math.round(100 * n / total) : 0;
+    return '<span class="cat-meter" role="img" aria-label="' + pct + '% of the selection"><i style="width:' + pct + '%"></i></span>' +
+      '<span class="cat-meter__pct">' + pct + "%</span>";
+  }
   var COUNTRY_ORDER = ["Saudi Arabia", "UAE", "Egypt", "Kuwait", "Qatar", "Bahrain",
                        "Oman", "Jordan", "Lebanon"];
   var PLACES = {
@@ -1021,6 +1066,96 @@
     var host = document.querySelector(".cat-controls .cat-container");
     var controls = host ? Controls(host, cards, apply) : null;
 
+    /* -- group by: the roster split into sections by one parameter -- */
+    var G_DIMS = [["", "None"], ["tier", "Creator size"], ["platform", "Platform"], ["country", "Country"], ["interest", "Interest"]];
+    var G_NONE = { tier: "No tier", platform: "No platform", country: "Location not specified", interest: "No interest listed" };
+    var byCodeAll = {};
+    cards.forEach(function (c) { byCodeAll[c.dataset.code] = c; });
+    function gKeys(card, dim) {
+      var out = [];
+      if (dim === "tier") out = card.dataset.tier ? [card.dataset.tier] : [];
+      else if (dim === "platform") out = values(card.dataset.platform);
+      else if (dim === "interest") out = values(card.dataset.interest);
+      else if (dim === "country") values(card.dataset.city).forEach(function (v) {
+        if (/^unspecified$/i.test(v)) return;
+        var c = place(v).country;
+        if (out.indexOf(c) < 0) out.push(c);
+      });
+      return out.length ? out : [G_NONE[dim]];
+    }
+    var gStore = "hv-group:catalogue", gBy = "";
+    try { gBy = sessionStorage.getItem(gStore) || ""; } catch (e) {}
+    if (controls) {
+      var gRow = document.querySelector(".cat-bar__row");
+      var gSort = gRow && gRow.querySelector(".cat-sort");
+      if (gRow) {
+        var gLab = document.createElement("label");
+        gLab.className = "cat-sort cat-group-by";
+        gLab.innerHTML = '<span class="cat-sort__label">Group</span><select class="cat-sort__select" aria-label="Group creators by">' +
+          G_DIMS.map(function (d) { return '<option value="' + d[0] + '"' + (d[0] === gBy ? " selected" : "") + ">" + d[1] + "</option>"; }).join("") +
+          "</select>" + CHEVRON;
+        var gWrap = document.createElement("div");
+        gWrap.className = "cat-bar__order";
+        if (gSort) { gRow.insertBefore(gWrap, gSort); gWrap.appendChild(gLab); gWrap.appendChild(gSort); }
+        else { gWrap.appendChild(gLab); gRow.appendChild(gWrap); }
+        gLab.querySelector("select").addEventListener("change", function (e) {
+          gBy = e.target.value;
+          try { sessionStorage.setItem(gStore, gBy); } catch (x) {}
+          apply();
+        });
+      }
+    }
+    function gOrder(names, count) {
+      var fixed = gBy === "tier" ? Object.keys(TIER_PRICE) : gBy === "country" ? COUNTRY_ORDER : null;
+      return names.sort(function (a, b) {
+        var na = a === G_NONE[gBy], nb = b === G_NONE[gBy];
+        if (na !== nb) return na ? 1 : -1;
+        if (fixed) {
+          var ia = fixed.indexOf(a), ib = fixed.indexOf(b);
+          if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        }
+        return (count[b] - count[a]) || a.localeCompare(b);
+      });
+    }
+    // A creator in two groups shows in both; the copy passes its clicks to the
+    // real card, so picking from either one picks the creator.
+    function layoutGroups(list) {
+      all(".cat-group", grid).forEach(function (g) { g.remove(); });
+      grid.classList.toggle("is-grouped", !!gBy);
+      if (!gBy) return;
+      var members = {}, count = {};
+      list.forEach(function (card) {
+        if (card.hidden) return;
+        gKeys(card, gBy).forEach(function (k) { (members[k] = members[k] || []).push(card); count[k] = (count[k] || 0) + 1; });
+      });
+      var placed = {};
+      gOrder(Object.keys(members), count).forEach(function (k) {
+        var sec = document.createElement("section");
+        sec.className = "cat-group";
+        var flag = gBy === "country" && k !== G_NONE.country ? flagOf(k) : "";
+        var mark = gBy === "platform" && ICONS[k] ? '<span class="cat-places__mark ' + (BRAND[k] || "") + '">' + ICONS[k] + "</span>" : "";
+        sec.innerHTML = '<header class="cat-group__head">' + flag + mark + '<h2 class="cat-group__name">' + esc(k) + "</h2></header>";
+        var inner = document.createElement("div");
+        inner.className = "cat-grid cat-group__grid";
+        members[k].forEach(function (card) {
+          var code = card.dataset.code;
+          if (!placed[code]) { placed[code] = true; inner.appendChild(card); return; }
+          var cp = card.cloneNode(true);
+          cp.classList.add("cat-card--copy");
+          cp.addEventListener("click", function (e) {
+            if (e.target.closest && e.target.closest("[data-noselect]")) return;
+            toggle(byCodeAll[code]);
+          });
+          cp.addEventListener("keydown", function (e) {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(byCodeAll[code]); }
+          });
+          inner.appendChild(cp);
+        });
+        sec.appendChild(inner);
+        grid.appendChild(sec);
+      });
+    }
+
     /* -- filtering and sorting -- */
 
     function apply() {
@@ -1034,6 +1169,7 @@
         var list = controls.sorted() ? controls.order(cards)
           : cards.slice().sort(function (a, b) { return a.dataset.idx - b.dataset.idx; });
         list.forEach(function (c) { grid.appendChild(c); });
+        layoutGroups(list);
       }
       // How many creators exist, and how many a filter leaves, is commercial
       // information: it belongs in the dashboard, not on the client page. Only
@@ -1068,6 +1204,7 @@
       var i = selected.indexOf(code);
       if (i === -1) selected.push(code); else selected.splice(i, 1);
       card.setAttribute("aria-pressed", i === -1 ? "true" : "false");
+      all('.cat-card--copy[data-code="' + code + '"]').forEach(function (cp) { cp.setAttribute("aria-pressed", i === -1 ? "true" : "false"); });
       renderTray();
 
       // Only additions are recorded, and only the code. It answers "which
@@ -1096,7 +1233,7 @@
 
     $("cat-clear").addEventListener("click", function () {
       selected = [];
-      cards.forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
+      cards.concat(all(".cat-card--copy")).forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
       renderTray();
     });
 
@@ -1591,7 +1728,8 @@
             if (b.currency && FX[b.currency]) CURRENCY = b.currency;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
-                        tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {},
+                        tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null, clientPlatforms: b.client_platforms || {},
+                        segments: b.segments || {}, groupBy: b.group_by || "",
                         platform: b.platform || "" };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
@@ -1652,6 +1790,113 @@
       : null;
     if (!controls && host) host.closest(".cat-controls").hidden = true;
 
+    // Group by: the same creators split into sections by one parameter. The
+    // admin picks how the page opens; the client can switch or turn it off.
+    var GROUP_DIMS = [["", "None"], ["segment", "Segment"], ["tier", "Creator size"], ["platform", "Platform"],
+                      ["country", "Country"], ["interest", "Interest"], ["fit", "Fit"], ["role", "Role"], ["tag", "Tags"]];
+    var NONE_LABEL = { segment: "No segment", country: "Location not specified", interest: "No interest listed",
+                       fit: "Not rated", role: "No role set", tag: "Untagged", platform: "No platform", tier: "No tier" };
+    function groupKeys(code, dim) {
+      var card = byCode[code], out = [];
+      if (!card) return out;
+      if (dim === "segment") out = (CURATED && CURATED.segments && CURATED.segments[code]) || [];
+      else if (dim === "tier") out = card.dataset.tier ? [card.dataset.tier] : [];
+      else if (dim === "platform") out = values(card.dataset.platform);
+      else if (dim === "interest") out = values(card.dataset.interest);
+      else if (dim === "fit") out = fitOf(code) ? [fitOf(code)] : [];
+      else if (dim === "role") out = rolesOf(code);
+      else if (dim === "tag") out = allTagsOf(code);
+      else if (dim === "country") {
+        values(card.dataset.city).forEach(function (v) {
+          if (/^unspecified$/i.test(v)) return;
+          var c = place(v).country;
+          if (out.indexOf(c) < 0) out.push(c);
+        });
+      }
+      return out.length ? out : [NONE_LABEL[dim]];
+    }
+    function groupHas(dim) {
+      if (!dim) return true;
+      return selected.some(function (code) { return groupKeys(code, dim)[0] !== NONE_LABEL[dim]; });
+    }
+    var groupKey = "hv-group:" + ((CURATED && CURATED.token) || selectionName);
+    var groupBy = (CURATED && CURATED.groupBy) || "";
+    try { var gb = sessionStorage.getItem(groupKey); if (gb !== null) groupBy = gb; } catch (e) {}
+    if (!groupHas(groupBy)) groupBy = "";
+    var groupSel = null;
+    if (controls) {
+      var row = document.querySelector(".cat-bar__row");
+      var sortEl = row && row.querySelector(".cat-sort");
+      var opts = GROUP_DIMS.filter(function (d) { return !d[0] || groupHas(d[0]); });
+      if (row && opts.length > 1) {
+        var lab = document.createElement("label");
+        lab.className = "cat-sort cat-group-by";
+        lab.innerHTML = '<span class="cat-sort__label">Group</span><select class="cat-sort__select" aria-label="Group creators by">' +
+          opts.map(function (d) { return '<option value="' + d[0] + '"' + (d[0] === groupBy ? " selected" : "") + ">" + d[1] + "</option>"; }).join("") +
+          "</select>" + CHEVRON + "";
+        var order = document.createElement("div");
+        order.className = "cat-bar__order";
+        if (sortEl) { row.insertBefore(order, sortEl); order.appendChild(lab); order.appendChild(sortEl); }
+        else { order.appendChild(lab); row.appendChild(order); }
+        groupSel = lab.querySelector("select");
+        groupSel.addEventListener("change", function () {
+          groupBy = groupSel.value;
+          try { sessionStorage.setItem(groupKey, groupBy); } catch (e) {}
+          render();
+        });
+      }
+    }
+    function groupOrder(dim, names, count) {
+      var fixed = dim === "tier" ? Object.keys(TIER_PRICE)
+        : dim === "fit" ? ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
+        : dim === "country" ? COUNTRY_ORDER : null;
+      return names.sort(function (a, b) {
+        var na = a === NONE_LABEL[dim], nb = b === NONE_LABEL[dim];
+        if (na !== nb) return na ? 1 : -1;
+        if (fixed) {
+          var ia = fixed.indexOf(a), ib = fixed.indexOf(b);
+          if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        }
+        return (count[b] - count[a]) || a.localeCompare(b);
+      });
+    }
+    // Lay the visible cards out in sections. A creator in two groups shows in
+    // both (the second is a copy); clicks are handled on the grid, so copies work.
+    function layoutGroups(grid, ordered) {
+      all(".cat-group", grid).forEach(function (g) { g.remove(); });
+      grid.classList.toggle("is-grouped", !!groupBy);
+      if (!groupBy) return;
+      var members = {}, count = {};
+      ordered.forEach(function (card) {
+        if (card.hidden) return;
+        groupKeys(card.dataset.code, groupBy).forEach(function (k) {
+          (members[k] = members[k] || []).push(card);
+          count[k] = (count[k] || 0) + 1;
+        });
+      });
+      var placed = {};
+      var total = selected.length;
+      groupOrder(groupBy, Object.keys(members), count).forEach(function (k) {
+        var sec = document.createElement("section");
+        sec.className = "cat-group";
+        var pct = total ? Math.round(100 * count[k] / total) : 0;
+        var flag = groupBy === "country" && k !== NONE_LABEL.country ? flagOf(k) : "";
+        var mark = groupBy === "platform" && ICONS[k] ? '<span class="cat-places__mark ' + (BRAND[k] || "") + '">' + ICONS[k] + "</span>" : "";
+        sec.innerHTML = '<header class="cat-group__head">' + flag + mark + '<h2 class="cat-group__name">' + esc(k) + "</h2>" +
+          '<span class="cat-group__n">' + count[k] + (count[k] === 1 ? " creator" : " creators") + "</span>" +
+          '<span class="cat-group__pct">' + pct + "% of the selection</span></header>";
+        var inner = document.createElement("div");
+        inner.className = "cat-grid cat-group__grid";
+        members[k].forEach(function (card) {
+          var code = card.dataset.code;
+          if (!placed[code]) { placed[code] = true; inner.appendChild(card); }
+          else { var cp = card.cloneNode(true); cp.classList.add("cat-card--copy"); cp.removeAttribute("id"); inner.appendChild(cp); }
+        });
+        sec.appendChild(inner);
+        grid.appendChild(sec);
+      });
+    }
+
     // Where the creators in this selection are: each country with how many
     // creators, and the cities under it. A creator serving two cities counts
     // in both cities but once in the country. Always the whole selection —
@@ -1660,6 +1905,40 @@
     // their pick is kept for this selection in this browser.
     var curKey = "hv-cur:" + ((CURATED && CURATED.token) || selectionName);
     try { var mine = sessionStorage.getItem(curKey); if (mine && FX[mine]) CURRENCY = mine; } catch (e) {}
+    // The header: who it is for, what the brief is, and the numbers at a glance.
+    var COUNTRY_NAME = { SA: "Saudi Arabia", AE: "UAE", EG: "Egypt", KW: "Kuwait", QA: "Qatar", BH: "Bahrain", OM: "Oman", JO: "Jordan", LB: "Lebanon", IQ: "Iraq", MA: "Morocco" };
+    function renderHead(lo, hi) {
+      var br = CURATED && CURATED.brief;
+      var cl = $("sel-client");
+      if (cl) { cl.hidden = !(br && br.client); cl.textContent = br && br.client ? "for " + br.client : ""; }
+      var bx = $("sel-brief");
+      if (bx) {
+        if (!br) { bx.hidden = true; }
+        else {
+          var t = br.target || {}, chips = [["Objective", br.objective]];
+          if (t.country) chips.push(["Market", COUNTRY_NAME[t.country] || t.country]);
+          if (t.gender && t.gender !== "Any") chips.push(["Audience", t.gender]);
+          if (t.age && t.age !== "Any") chips.push(["Age", t.age]);
+          var cats = String(t.category || "").split("|").filter(function (x) { return x && x !== "Any"; });
+          if (cats.length) chips.push(["Category", cats.join(", ")]);
+          bx.hidden = false;
+          bx.textContent = chips.map(function (c) { return c[1]; }).join("  ·  ");
+        }
+      }
+      var st = $("sel-headstats");
+      if (!st) return;
+      var n = {}, any = false;
+      selected.forEach(function (code) { var f = fitOf(code); if (f) { n[f] = (n[f] || 0) + 1; any = true; } });
+      var cell = function (label, val, cls) { return '<div class="' + (cls || "") + '"><dt>' + label + "</dt><dd>" + val + "</dd></div>"; };
+      var html = cell("Creators", selected.length);
+      if (any) {
+        html += cell("Strong fit", n["Strong fit"] || 0, "is-strong") + cell("Good fit", n["Good fit"] || 0, "is-good");
+        var rest = (n["Possible fit"] || 0) + (n["Not recommended"] || 0);
+        if (rest) html += cell("Lower fit", rest, "is-low");
+      }
+      if (selected.length) html += cell("Indicative range", priceText([lo, hi]), "is-range");
+      st.innerHTML = html;
+    }
     function renderCurrency() {
       var have = Object.keys(FX);
       var box = $("sel-currency");
@@ -1683,13 +1962,54 @@
       }).join("");
     }
 
+    // The tier mix as one bar: how the shortlist splits by size, at a glance.
+    function renderTiers(tiers) {
+      var box = $("sel-tiers");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "sel-tiers";
+        box.className = "cat-tiers";
+        $("sel-summary").insertAdjacentElement("afterend", box);
+      }
+      var names = Object.keys(tiers).filter(function (t) { return tiers[t] && t && t !== "undefined"; });
+      var total = names.reduce(function (s, t) { return s + tiers[t]; }, 0);
+      box.hidden = !total;
+      if (!total) { box.innerHTML = ""; return; }
+      // One labelled row per tier, creators and HCPs side by side; bars share
+      // one scale so a longer bar is always more creators.
+      var SIZES = ["nano", "micro", "mid", "macro", "mega"];
+      var rank = function (t) {
+        var x = t.toLowerCase();
+        for (var i = 0; i < SIZES.length; i++) if (x.indexOf(SIZES[i]) > -1) return i;
+        return 9;
+      };
+      var max = Math.max.apply(null, names.map(function (t) { return tiers[t]; }));
+      var panel = function (title, list, hcp) {
+        if (!list.length) return "";
+        var sum = list.reduce(function (s, t) { return s + tiers[t]; }, 0);
+        list.sort(function (a, b) { return rank(a) - rank(b); });
+        return '<div class="cat-tiers__panel' + (hcp ? " is-hcp" : "") + '"><p class="cat-tiers__title">' + title +
+          " <b>" + sum + "</b></p><ul>" + list.map(function (t) {
+            var label = t.replace(/^\s*hcp\s*[-–—:]?\s*/i, "");
+            var pct = Math.round(100 * tiers[t] / total);
+            return '<li class="cat-tier"><span class="cat-tier__name">' + esc(label) + '</span><b class="cat-tier__n">' + tiers[t] +
+              '</b><span class="cat-tier__pct">' + pct + '% of selection</span><i class="cat-tier__meter" aria-hidden="true"><i style="width:' +
+              Math.max(3, Math.round(100 * tiers[t] / max)) + '%"></i></i></li>';
+          }).join("") + "</ul></div>";
+      };
+      var hcpList = names.filter(function (t) { return /hcp/i.test(t); });
+      var plainList = names.filter(function (t) { return !/hcp/i.test(t); });
+      box.innerHTML = '<p class="cat-places__label">Creator size</p><div class="cat-tiers__panels">' +
+        panel("Influencers", plainList, false) + panel("HCPs", hcpList, true) + "</div>";
+    }
+
     function renderPlaces() {
       var box = $("sel-places");
       if (!box) {
         box = document.createElement("div");
         box.id = "sel-places";
         box.className = "cat-places";
-        $("sel-summary").insertAdjacentElement("afterend", box);
+        ($("sel-tiers") || $("sel-summary")).insertAdjacentElement("afterend", box);
       }
       var countries = {}, several = 0, multiCity = 0;
       selected.forEach(function (code) {
@@ -1737,7 +2057,8 @@
           platNames.map(function (pl) {
             return '<li><p class="cat-places__country"><span class="cat-places__mark ' +
               (BRAND[pl] || "") + '">' + (ICONS[pl] || ICON_LINK) + "</span><span>" + esc(pl) +
-              "</span><b>" + plats[pl] + "</b></p></li>";
+              "</span><b>" + plats[pl] + "</b></p>" +
+              '<div class="cat-places__bar">' + shareBar(plats[pl], selected.length) + "</div></li>";
           }).join("") + "</ul>" +
           (multiPlat ? '<p class="cat-places__note">' + multiPlat +
             (multiPlat === 1 ? " creator is" : " creators are") +
@@ -1752,11 +2073,12 @@
             var na = a === "City not specified", nb = b === "City not specified";
             return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
           });
-          return '<li><p class="cat-places__country"><span>' +
+          return '<li><p class="cat-places__country">' + flagOf(name) + "<span>" +
             esc(name === "Other" ? "Other locations" : name) + "</span><b>" + c.n + "</b></p>" +
-            (cities.length ? '<p class="cat-places__cities">' + cities.map(function (city) {
-              return esc(city) + " <b>" + c.cities[city] + "</b>";
-            }).join('<i aria-hidden="true">·</i>') + "</p>" : "") + "</li>";
+            '<div class="cat-places__bar">' + shareBar(c.n, selected.length) + "</div>" +
+            (cities.length ? '<ul class="cat-places__cities">' + cities.map(function (city) {
+              return "<li>" + esc(city) + " <b>" + c.cities[city] + "</b></li>";
+            }).join("") + "</ul>" : "") + "</li>";
         }).join("") + "</ul>" +
         // Say why the counts add up to more than the selection, when they do.
         ((several || multiCity) ? '<p class="cat-places__note">' +
@@ -1777,6 +2099,9 @@
     }
     // Labels the client puts on creators themselves. Kept on the server with the
     // selection when it has a link of its own; otherwise only in this browser.
+    var PLAT_KEY = "hv-myplat:" + ((CURATED && CURATED.token) || selectionName);
+    var LOCAL_PLAT = {};
+    try { LOCAL_PLAT = JSON.parse(localStorage.getItem(PLAT_KEY) || "{}") || {}; } catch (e) { LOCAL_PLAT = {}; }
     var MINE_KEY = "hv-mytags:" + ((CURATED && CURATED.token) || selectionName);
     var LOCAL_MINE = {};
     try { LOCAL_MINE = JSON.parse(localStorage.getItem(MINE_KEY) || "{}") || {}; } catch (e) { LOCAL_MINE = {}; }
@@ -1815,7 +2140,52 @@
     function rolesOf(code) { var v = verdictOf(code); return v && v.roles ? v.roles : []; }
     // The matching score is worked out by the server from the creator's analysis; a fit
     // tag the admin chose by hand wins over the one the score implies.
-    function scoreOf(code) { var s = CURATED && CURATED.scores && CURATED.scores[code]; return s || null; }
+    function rawScore(code) { return (CURATED && CURATED.scores && CURATED.scores[code]) || null; }
+    // The platform to read a creator's score from: the client's own pick, else the admin's
+    // assignment, else (none) the best one the server chose.
+    function pickOf(code) {
+      var mine = CURATED && CURATED.token ? (CURATED.clientPlatforms || {})[code] : LOCAL_PLAT[code];
+      if (mine) return mine;
+      var s = rawScore(code);
+      return s && s.assigned && s.assigned !== "Auto" ? s.assigned : "";
+    }
+    function withBase(base, x) {
+      var o = {}; for (var k in x) o[k] = x[k];
+      o.assigned = base.assigned; o.available = base.available; o.platforms = base.platforms;
+      return o;
+    }
+    // "Both": two scores side by side, no combined number.
+    function bothOf(code) {
+      var base = rawScore(code);
+      if (!base || pickOf(code) !== "Both" || !base.platforms) return null;
+      var list = Object.keys(base.platforms).sort().map(function (pl) { return withBase(base, base.platforms[pl]); });
+      return list.length > 1 ? list : null;
+    }
+    function scoreOf(code) {
+      var base = rawScore(code);
+      if (!base) return null;
+      var pick = pickOf(code);
+      if (pick && pick !== "Both" && base.platforms && base.platforms[pick]) return withBase(base, base.platforms[pick]);
+      var both = bothOf(code);
+      if (both) return both.reduce(function (a, b) { return (b.score < a.score ? b : a); });   // ranked by the weaker
+      return base;
+    }
+    function savePlatform(code, pl) {
+      if (CURATED && CURATED.token) {
+        CURATED.clientPlatforms = CURATED.clientPlatforms || {};
+        CURATED.clientPlatforms[code] = pl;
+        fetch(CFG.api + "/api/selection/platform", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: CURATED.token, code: code, platform: pl }) })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (b) { if (b && b.ok) CURATED.clientPlatforms = b.client_platforms || CURATED.clientPlatforms; })
+          .catch(function () { /* stays on screen */ });
+      } else {
+        LOCAL_PLAT[code] = pl;
+        try { localStorage.setItem(PLAT_KEY, JSON.stringify(LOCAL_PLAT)); } catch (e) { /* private mode */ }
+      }
+      render();
+    }
+    var PLAT_SHORT = { Instagram: "IG", TikTok: "TT", Snapchat: "SC", YouTube: "YT" };
     function fitOf(code) {
       var v = verdictOf(code), s = scoreOf(code);
       return (v && v.fit) ? v.fit : (s && s.score != null ? s.tag : "");
@@ -1823,6 +2193,10 @@
     // The stamp on the photo: the score, coloured by band; hover or focus explains it.
     var tip = null;
     function bandOf(n) { return n >= 80 ? "g" : n >= 60 ? "l" : n >= 40 ? "a" : "r"; }
+    // No audience report: the audience part of the score is an assumption.
+    function audienceEstimated(sc) {
+      return !!(sc && (sc.parts || []).some(function (p) { return /assumed|estimated/i.test(p.label) && /audience/i.test(p.label); }));
+    }
     function showTip(el, sc) {
       if (!tip) { tip = document.createElement("div"); tip.className = "cat-score-tip"; tip.setAttribute("role", "tooltip"); document.body.appendChild(tip); }
       var bars = (sc.parts || []).map(function (p) {
@@ -1830,10 +2204,13 @@
       }).join("");
       tip.innerHTML = '<div class="cst-head"><b class="' + bandOf(sc.score) + '">' + sc.score + '</b><div><strong>' + esc(sc.tag) +
         '</strong><small>' + (sc.basic ? "Screening score · " : "") + 'Match for ' + esc((sc.objective || "").toLowerCase()) + (sc.platform ? " · on " + esc(sc.platform) : "") + "</small>" +
+        (audienceEstimated(sc) ? "<small>Audience estimated: no audience report yet, so it counts lightly</small>" : "") +
         (sc.others && sc.others.length ? "<small>Also: " + sc.others.map(function (o) { return esc(o.platform) + " " + o.score; }).join(", ") + "</small>" : "") + "</div></div>" +
         (sc.strengths && sc.strengths.length ? '<p class="cst-h">Strengths</p><ul class="cst-g">' + sc.strengths.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
         (sc.watchouts && sc.watchouts.length ? '<p class="cst-h">Watch-outs</p><ul class="cst-w">' + sc.watchouts.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
         '<p class="cst-h">How it adds up</p>' + bars +
+        (sc.checks && sc.checks.length ? '<p class="cst-h">Verified by the full analysis</p><ul class="cst-c">' + sc.checks.map(function (c) {
+          return '<li class="' + esc(c.level) + '">' + esc(c.text) + "</li>"; }).join("") + "</ul>" : "") +
         (sc.basic ? '<p class="cst-basic' + (sc.score >= 60 ? " cst-basic--warn" : "") + '"><b>Screening score, not proof.</b> It uses public numbers only, so fake followers and the real audience are not checked. Request the full analysis before booking.</p>' : "");
       tip.hidden = false;
       var r = el.getBoundingClientRect(), tw = Math.min(320, window.innerWidth - 24);
@@ -1849,36 +2226,61 @@
       tip.style.bottom = "auto";
     }
     function hideTip() { if (tip) tip.hidden = true; }
+    function stampItem(code, i) { var both = bothOf(code); return both ? both[i] : scoreOf(code); }
     function renderStamp(card, sc) {
       var media = card.querySelector(".cat-card__media");
       if (!media) return;
-      var st = media.querySelector(".cat-score");
-      if (!sc) { if (st) st.remove(); return; }
-      if (!st) {
-        st = document.createElement("button");
-        st.type = "button"; st.className = "cat-score"; st.setAttribute("data-noselect", "");
-        media.appendChild(st);
-        st.addEventListener("mouseenter", function () { var s = scoreOf(card.dataset.code); if (s && s.score != null) showTip(st, s); });
-        st.addEventListener("focus", function () { var s = scoreOf(card.dataset.code); if (s && s.score != null) showTip(st, s); });
-        st.addEventListener("mouseleave", hideTip);
-        st.addEventListener("blur", hideTip);
-        st.addEventListener("click", function (e) {
-          e.preventDefault(); e.stopPropagation();
-          var s = scoreOf(card.dataset.code);
-          if (s && s.score != null) { if (tip && !tip.hidden) hideTip(); else showTip(st, s); }
-        });
+      var code = card.dataset.code;
+      var list = bothOf(code) || (sc ? [sc] : []);
+      var have = [].slice.call(media.querySelectorAll(".cat-score"));
+      for (var k = list.length; k < have.length; k++) have[k].remove();
+      list.forEach(function (item, i) {
+        var st = have[i];
+        if (!st) {
+          st = document.createElement("button");
+          st.type = "button"; st.className = "cat-score"; st.setAttribute("data-noselect", ""); st.setAttribute("data-i", i);
+          media.appendChild(st);
+          st.addEventListener("mouseenter", function () { var s = stampItem(code, i); if (s && s.score != null) showTip(st, s); });
+          st.addEventListener("focus", function () { var s = stampItem(code, i); if (s && s.score != null) showTip(st, s); });
+          st.addEventListener("mouseleave", hideTip);
+          st.addEventListener("blur", hideTip);
+          st.addEventListener("click", function (e) {
+            e.preventDefault(); e.stopPropagation();
+            var s = stampItem(code, i);
+            if (s && s.score != null) { if (tip && !tip.hidden) hideTip(); else showTip(st, s); }
+          });
+        }
+        var multi = list.length > 1;
+        if (item.score == null) {
+          st.className = "cat-score cat-score--none";
+          st.innerHTML = "<b>—</b><small>Not scored</small>";
+          st.setAttribute("aria-label", "Not scored yet: not enough analysis data");
+          st.title = "Not scored yet — the full analysis is needed.";
+        } else {
+          st.className = "cat-score cat-score--" + bandOf(item.score) + (item.basic ? " cat-score--basic" : "") + (multi ? " cat-score--multi" : "");
+          st.innerHTML = "<b>" + item.score + "</b><small>" + (multi ? (PLAT_SHORT[item.platform] || item.platform) : (item.basic ? "Basic" : "Match")) + "</small>" +
+            (audienceEstimated(item) ? '<i class="cat-score__est">Audience est.</i>' : "");
+          st.setAttribute("aria-label", "Matching score " + item.score + " out of 100 on " + (item.platform || "the platform") + ", " + item.tag + ". Show why.");
+          st.removeAttribute("title");
+        }
+      });
+    }
+    // The platform switch on a card: which platform to read this creator's match from.
+    function renderPlat(card) {
+      var base = rawScore(card.dataset.code), body = card.querySelector(".cat-card__body");
+      var box = card.querySelector(".cat-plat");
+      var have = base && base.platforms ? Object.keys(base.platforms).sort() : [];
+      if (!body || have.length < 2) { if (box) box.remove(); return; }
+      var shown = pickOf(card.dataset.code) || scoreOf(card.dataset.code).platform;
+      if (!box) {
+        box = document.createElement("div");
+        box.className = "cat-plat"; box.setAttribute("data-noselect", ""); box.setAttribute("role", "group");
+        box.setAttribute("aria-label", "Platform this creator is scored on");
+        body.insertBefore(box, body.firstChild);
       }
-      if (sc.score == null) {
-        st.className = "cat-score cat-score--none";
-        st.innerHTML = "<b>—</b><small>Not scored</small>";
-        st.setAttribute("aria-label", "Not scored yet: not enough analysis data");
-        st.title = "Not scored yet — the full analysis is needed.";
-      } else {
-        st.className = "cat-score cat-score--" + bandOf(sc.score) + (sc.basic ? " cat-score--basic" : "");
-        st.innerHTML = "<b>" + sc.score + "</b><small>" + (sc.basic ? "Basic" : "Match") + "</small>";
-        st.setAttribute("aria-label", "Matching score " + sc.score + " out of 100, " + sc.tag + ". Show why.");
-        st.removeAttribute("title");
-      }
+      box.innerHTML = '<span class="cat-plat__label">Score on</span>' + have.concat(["Both"]).map(function (pl) {
+        return '<button type="button" data-plat="' + esc(pl) + '" aria-pressed="' + (pl === shown) + '">' + esc(pl) + "</button>";
+      }).join("");
     }
     window.addEventListener("scroll", hideTip, { passive: true });
 
@@ -1899,6 +2301,7 @@
         var sc = scoreOf(c.dataset.code), fitNow = fitOf(c.dataset.code);
         var why = (v && v.reason) || "";     // the generated conclusion is in the hover on the stamp
         renderStamp(c, sc);
+        renderPlat(c);
         var box = c.querySelector(".cat-verdict");
         if (!fitNow && !(v && (v.roles || []).length) && !why) { if (box) box.remove(); }
         else {
@@ -1936,6 +2339,12 @@
     }
 
     $("cat-grid").addEventListener("click", function (e) {
+      var pb = e.target.closest && e.target.closest("[data-plat]");
+      if (pb) {
+        e.preventDefault(); e.stopPropagation();
+        savePlatform(pb.closest(".cat-card").dataset.code, pb.getAttribute("data-plat"));
+        return;
+      }
       var card = e.target.closest && e.target.closest(".cat-card");
       if (!card) return;
       var code = card.dataset.code;
@@ -1953,12 +2362,36 @@
         var inp = document.createElement("input");
         inp.type = "text"; inp.className = "cat-tags__in"; inp.maxLength = 24;
         inp.placeholder = "Type a tag, press Enter"; inp.setAttribute("aria-label", "New tag");
-        box.appendChild(inp); inp.focus();
+        box.appendChild(inp);
+        // Tags already used anywhere in this selection, one click to reuse.
+        var have = allTagsOf(code).map(function (t) { return t.toLowerCase(); });
+        var pool = {};
+        selected.forEach(function (c2) { allTagsOf(c2).forEach(function (t) { if (have.indexOf(t.toLowerCase()) < 0) pool[t.toLowerCase()] = pool[t.toLowerCase()] || t; }); });
+        var picks = Object.keys(pool).map(function (k) { return pool[k]; }).sort(function (x, y) { return x.localeCompare(y); }).slice(0, 14);
+        var pickBox = null;
+        if (picks.length) {
+          pickBox = document.createElement("div");
+          pickBox.className = "cat-tags__picks";
+          pickBox.innerHTML = '<span>Reuse:</span>' + picks.map(function (t) {
+            return '<button type="button" class="cat-tag cat-tag--t' + tone(t) + '" data-tag-pick="' + esc(t) + '"><i></i>' + esc(t) + "</button>";
+          }).join("");
+          pickBox.addEventListener("mousedown", function (ev) {
+            var b = ev.target.closest("[data-tag-pick]");
+            if (!b) return;
+            ev.preventDefault(); ev.stopPropagation();
+            inp.value = b.getAttribute("data-tag-pick");
+            commit(true);
+          });
+          pickBox.addEventListener("click", function (ev) { ev.stopPropagation(); });
+          box.appendChild(pickBox);
+        }
+        inp.focus();
         var done = false;
         function commit(keep) {
           if (done) return; done = true;
           var v = inp.value.replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
           inp.remove();
+          if (pickBox) pickBox.remove();
           if (keep && v && !allTagsOf(code).some(function (t) { return t.toLowerCase() === v.toLowerCase(); })) {
             saveMine(code, mineOf(code).concat([v]));
           } else render();
@@ -1984,9 +2417,10 @@
       // the client picked.
       var grid = $("cat-grid");
       var inOrder = selected.map(function (code) { return byCode[code]; }).filter(Boolean);
-      (controls ? controls.order(inOrder) : inOrder).forEach(function (card) {
-        grid.appendChild(card);
-      });
+      var ordered = controls ? controls.order(inOrder) : inOrder;
+      cards.forEach(function (card) { grid.appendChild(card); });   // back out of any sections first
+      ordered.forEach(function (card) { grid.appendChild(card); });
+      layoutGroups(grid, ordered);
 
       $("sel-title").textContent = selectionName;
       document.title = selectionName + " — HelloVoice";
@@ -2010,15 +2444,15 @@
         ["Indicative range", selected.length ? priceText([lo, hi]) : "—"]
       ];
       if (CURATED && CURATED.platform) rows.splice(1, 0, ["Quoted for", CURATED.platform]);
-      Object.keys(TIER_PRICE).forEach(function (t) {
-        if (tiers[t]) rows.push([t, String(tiers[t])]);
-      });
       if (dropped) rows.push(["Not in this roster", String(dropped)]);
       $("sel-summary").innerHTML = rows.map(function (r) {
-        return "<div><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd></div>";
+        return '<div class="cat-stat' + (r[0] === "Indicative range" ? " cat-stat--range" : "") + '"><dt>' +
+          '<span class="cat-stat__icon">' + (STAT_ICONS[r[0]] || "") + "</span>" + r[0] + "</dt><dd>" + r[1] + "</dd></div>";
       }).join("");
+      renderTiers(tiers);
       renderPlaces();
       renderCurrency();
+      renderHead(lo, hi);
 
       // keep the URL in step so what they see is what they can re-share
       // The short link only while the server holds exactly these creators.
@@ -2113,6 +2547,12 @@
     wireQuoteForm(function () { selected = []; render(); });
     var second = $("cat-request-2");
     if (second) second.addEventListener("click", function () { $("cat-request").click(); });
+    var hq = $("sel-head-quote"); if (hq) hq.addEventListener("click", function () { $("cat-request").click(); });
+    var hc = $("sel-head-copy");
+    if (hc) hc.addEventListener("click", function () {
+      copyText(location.href, function () { hc.textContent = "Link copied"; setTimeout(function () { hc.textContent = "Copy link"; }, 2200); },
+        function () { hc.textContent = "Copy failed"; setTimeout(function () { hc.textContent = "Copy link"; }, 2200); });
+    });
 
     var copyBtn = $("cat-copy-link");
     if (copyBtn) copyBtn.addEventListener("click", function () {

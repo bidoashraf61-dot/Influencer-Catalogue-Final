@@ -2112,6 +2112,17 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
     return page("Selections", body, "/selections")
 
 
+def _plat_options(live, assigned):
+    """Auto, each platform the creator has an analysis on, and Both when there are two."""
+    have = list((live or {}).get("available") or [])
+    opts = "<option value=''" + (" selected" if not assigned else "") + ">Auto: the platform with the best score</option>"
+    for pl in have:
+        opts += "<option value=\"" + e(pl) + "\"" + (" selected" if assigned == pl else "") + ">" + e(pl) + "</option>"
+    if len(have) >= 2:
+        opts += "<option value='Both'" + (" selected" if assigned == "Both" else "") + ">Both (two scores, no combined number)</option>"
+    return opts
+
+
 def _live_score(live):
     """The matching score as the client sees it, with the reasons behind it."""
     if not live:
@@ -2122,10 +2133,13 @@ def _live_score(live):
     li = lambda items, cls: "".join("<li class='" + cls + "'>" + e(x) + "</li>" for x in items)
     return ("<div class='vd-live'><span class='vd-stamp " + band + ("' style='border:3px dashed #fff;box-shadow:0 0 0 1px #999'" if live.get("basic") else "'") + ">" + str(live["score"]) + "</span><div><b>" + e(live["tag"]) + "</b>"
             "<span class='muted'> · " + ("BASIC: a screening score from public numbers only. Request the full analysis before booking. " if live.get("basic") else "") + "Live, for " + e(live["objective"].lower()) + (" on " + e(live["platform"]) if live.get("platform") else "") + "</span>"
-            "<ul class='vd-why'>" + li(live["strengths"], "g1") + li(live["watchouts"], "g-1") + "</ul></div></div>")
+            "<ul class='vd-why'>" + li(live["strengths"], "g1") + li(live["watchouts"], "g-1") + "</ul>"
+            + ("<div class='muted' style='margin-top:6px'><b>Verified by the full analysis:</b></div><ul class='vd-why'>"
+               + "".join("<li class='" + {"ok": "g1", "bad": "g-1"}.get(c_["level"], "") + "'>" + e(c_["text"]) + "</li>" for c_ in live["checks"]) + "</ul>"
+               if live.get("checks") else "") + "</div></div>")
 
 
-def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None):
+def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None, assigned="", client_pick="", segs=()):
     """One creator on the Fit & tags tab: who they are on the left, then the
     fit, the roles, the reason the client reads, and their tags, with room to type."""
     fits = "<option value=''>— no verdict —</option>" + "".join(
@@ -2140,12 +2154,17 @@ def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None):
             "<div class='vd-main'>"
             "<div class='vd-line'><div><label>Fit</label><select name='fit' class='vd-fit'>" + fits + "</select></div>"
             "<div><label>Role in the campaign</label><div class='vd-roles'>" + ticks + "</div></div></div>"
-            "<input type='hidden' name='roles' class='vd-roles-in' value=\"" + e(",".join(roles)) + "\">"
+            "<label>Platform this creator will deliver on (the score is read from it)</label>"
+            "<select name='plat_assign' class='vd-plat'>" + _plat_options(live, assigned) + "</select>"
+            + ("<div class='muted' style='margin-top:4px'>The client chose: <b>" + e(client_pick) + "</b></div>" if client_pick else "")
+            + "<input type='hidden' name='roles' class='vd-roles-in' value=\"" + e(",".join(roles)) + "\">"
             "<label>Why — the client reads this</label>"
             "<input name='reason' class='vd-reason' value=\"" + e(v.get("reason") or "") + "\" maxlength='160' "
             "placeholder='e.g. Strong engagement and a mostly Saudi audience' autocomplete='off'>"
             "<label>Tags</label>"
             "<input name='tags' class='tag-in' value=\"" + e(", ".join(tags)) + "\" placeholder='e.g. Hero, Beauty — separate with commas' maxlength='200' autocomplete='off'>"
+            "<label>Segments</label>"
+            "<input name='segs' list='seg-list' value=\"" + e(", ".join(segs)) + "\" placeholder='e.g. Sunscreen, Wave 1 — the client page can group by these' maxlength='240' autocomplete='off'>"
             + ("<div class='muted' style='margin-top:8px'>Added by the client: "
                + " ".join("<span class='pill'>" + e(t) + "</span>" for t in client_tags) + "</div>" if client_tags else "")
             + "</div></div>")
@@ -2228,7 +2247,7 @@ def _brief_note(sel):
             + e(ago(row["created_at"])) + ". Scores on this page use that objective and audience.</span>" + quote + "</div>")
 
 
-def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=()):
+def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=(), access_codes=()):
     by = {c["code"]: c for c in creators}
     codes = json.loads(sel["codes"] or "[]")
     own = json.loads(sel["prices"] or "{}")
@@ -2246,6 +2265,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     tags_of = json.loads((sel["tags"] if "tags" in keys else None) or "{}")
     verdicts_of = json.loads((sel["verdicts"] if "verdicts" in keys else None) or "{}")
     client_tags_of = json.loads((sel["client_tags"] if "client_tags" in keys else None) or "{}")
+    segs_of = json.loads((sel["segments"] if "segments" in keys else None) or "{}")
+    seg_names = sorted({s_ for v_ in segs_of.values() for s_ in v_}, key=str.lower)
+    plat_assign_of = json.loads((sel["platforms"] if "platforms" in keys else None) or "{}")
+    client_plat_of = json.loads((sel["client_platforms"] if "client_platforms" in keys else None) or "{}")
     import fit as _fit
     try:
         target_now = dict(_fit.DEFAULT_TARGET, **{k: v for k, v in json.loads((sel["target"] if "target" in keys else None) or "{}").items() if v})
@@ -2277,7 +2300,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
             lo_sum += eff[0]; hi_sum += eff[1]
         shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
                 if c["photo"] else "<span class='thumb sm none'>—</span>")
-        fit_cards_l.append(_fit_card(code, c, shot, verdicts_of.get(code) or {}, tags_of.get(code) or [], _fit, client_tags_of.get(code) or [], (scores or {}).get(code)))
+        fit_cards_l.append(_fit_card(code, c, shot, verdicts_of.get(code) or {}, tags_of.get(code) or [], _fit, client_tags_of.get(code) or [], (scores or {}).get(code),
+                                     assigned=plat_assign_of.get(code, ""), client_pick=client_plat_of.get(code, ""), segs=segs_of.get(code) or []))
         val = lambda i: format(conv(set_[i]), ",") if set_ else ""
         # The cost this selection was priced from, else the creator's last
         # known cost — a starting point the admin can change.
@@ -2323,9 +2347,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
                                ("Set prices", "done" if st_done[1] else ("now" if first_open == 1 else "todo")),
                                ("Share with the client", "done" if st_done[2] else ("now" if first_open == 2 else "todo")),
                                ("Start a campaign", "done" if st_done[3] else ("now" if first_open == 3 else "todo"))])
-    roster_list = "<datalist id='roster-list'>" + "".join(
+    roster_list = "<datalist id='seg-list'>" + "".join("<option value=\"%s\">" % e(n_) for n_ in seg_names) + "</datalist>" + "<datalist id='roster-list'>" + "".join(
         "<option value=\"%s (%s)\">" % (e(c["name"]), e(c["code"])) for c in creators if c["active"]) + "</datalist>"
-    client_pill = ("<span class='pill own'>" + e(sel["code_label"]) + "</span>" if ("code_label" in sel.keys() and sel["code_label"])
+    shown_client = (sel["client_name"] if "client_name" in sel.keys() else None) or ""
+    client_pill = ("<span class='pill own'>" + e(shown_client or sel["code_label"]) + "</span>" if ("code_label" in sel.keys() and sel["code_label"]) or shown_client
                    else "<span class='pill warn'>No client assigned</span>")
     import db as _db
     _code = _db.get_code(sel["code_id"]) if sel["code_id"] else None
@@ -2432,7 +2457,18 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<input name='total_to' value='" + tt + "' placeholder='to' inputmode='numeric'></div>"
           "<div class='price-hint'>Fills itself from the prices below as you type them (currently "
         + money_c(lo_sum, hi_sum) + "). Type your own figure to override it; clear it to follow the creators again.</div></div>"
-        + "</div></div>"
+        + "</div>"
+        + "<div class='row'><div><label>Client (access code)</label><select name='sel_client'><option value=''>No client</option>"
+        + "".join("<option value='%d'%s>%s</option>" % (c["id"], " selected" if c["id"] == sel["code_id"] else "", e(c["label"])) for c in access_codes)
+        + "</select><div class='price-hint'>Whose passcode opens this selection. Changing it moves the selection to that client.</div></div>"
+        + "<div><label>Client page opens grouped by</label><select name='sel_group'>"
+        + "".join("<option value='%s'%s>%s</option>" % (k_, " selected" if ((sel["group_by"] if "group_by" in keys else None) or "") == k_ else "", l_)
+                  for k_, l_ in _db.GROUPS)
+        + "</select><div class='price-hint'>The client can switch it or turn it off. Segments are set per creator on the Fit &amp; tags tab.</div></div>"
+        + "<div style='flex:2'><label>Client name shown on the page</label><input name='client_name' maxlength='80' value='" + e(shown_client)
+        + "' placeholder='Leave empty to use the client&#39;s own name'><div class='price-hint'>Shown as &ldquo;for &hellip;&rdquo; in the selection banner. "
+          "Changes only this selection.</div></div></div>"
+        + "</div>"
                 + "</div>"
         + "<div class='savebar'><button class='btn lime'>Save changes</button><span class='muted'>Prices, margins and details are saved together.</span></div></form>"
         + ui.panel("share", link_html + pass_html) + ui.panel("campaign", campaign_html)

@@ -472,6 +472,23 @@ def migrate(conn):
         # selection from its page. Kept apart from `tags` so an admin saving the
         # selection never overwrites them.
         conn.execute("ALTER TABLE selections ADD COLUMN client_tags TEXT")
+    if "platforms" not in sel_cols:
+        # {code: "Instagram" | "TikTok" | "Both"}: the platform each creator will deliver on in
+        # THIS selection, which the matching score is read from. Empty = best score.
+        conn.execute("ALTER TABLE selections ADD COLUMN platforms TEXT")
+    if "client_platforms" not in sel_cols:
+        # The same, as the client chose it on their own page.
+        conn.execute("ALTER TABLE selections ADD COLUMN client_platforms TEXT")
+    if "segments" not in sel_cols:
+        # {code: [segment, ...]}: the admin's own groups for THIS selection (a product,
+        # a wave, an objective); the client page can show the creators split by them.
+        conn.execute("ALTER TABLE selections ADD COLUMN segments TEXT")
+    if "group_by" not in sel_cols:
+        # How the client page opens: "" (one grid) or a grouping such as "segment" or "tier".
+        conn.execute("ALTER TABLE selections ADD COLUMN group_by TEXT")
+    if "client_name" not in sel_cols:
+        # The client name shown on THIS selection's page; empty = the client's own label.
+        conn.execute("ALTER TABLE selections ADD COLUMN client_name TEXT")
     if "verdicts" not in sel_cols:
         # {code: {"fit": ..., "roles": [...], "reason": ...}}: the admin's fit and
         # campaign-role call on each creator of THIS selection, shown to the client.
@@ -1683,7 +1700,7 @@ def selection(sid=None, token=None):
 
 def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
                    code_id=None, platform=None, margin=None, costs=None, margin_max=False,
-                   tags=None, verdicts=None):
+                   tags=None, verdicts=None, platforms=None, segments=None):
     """Create (sid None) or update one priced selection. Returns its id.
 
     margin and costs are left as they are when not given, so a client
@@ -1716,6 +1733,10 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
             conn.execute("UPDATE selections SET tags=? WHERE id=?", (json.dumps(tags), sid))
         if verdicts is not None:
             conn.execute("UPDATE selections SET verdicts=? WHERE id=?", (json.dumps(verdicts), sid))
+        if platforms is not None:
+            conn.execute("UPDATE selections SET platforms=? WHERE id=?", (json.dumps(platforms), sid))
+        if segments is not None:
+            conn.execute("UPDATE selections SET segments=? WHERE id=?", (json.dumps(segments), sid))
         return sid
 
 
@@ -1730,6 +1751,20 @@ def set_archived(table, rid, on):
 def set_selection_objective(sid, objective):
     with connect() as conn:
         conn.execute("UPDATE selections SET objective = ? WHERE id = ?", (objective, sid))
+
+
+GROUPS = [("", "Not grouped"), ("segment", "Segment"), ("tier", "Creator size"), ("platform", "Platform"), ("country", "Country"), ("interest", "Interest"), ("fit", "Fit"), ("role", "Role"), ("tag", "Tags")]
+
+
+def set_selection_group(sid, group_by):
+    with connect() as conn:
+        conn.execute("UPDATE selections SET group_by = ? WHERE id = ?", (group_by or None, sid))
+
+
+def set_selection_client(sid, code_id, client_name):
+    """Move a selection to another client (access code) and/or rename the client it shows."""
+    with connect() as conn:
+        conn.execute("UPDATE selections SET code_id = ?, client_name = ? WHERE id = ?", (code_id, client_name or None, sid))
 
 
 def set_selection_target(sid, target):
@@ -1757,6 +1792,22 @@ def selection_campaign_objective(sid):
         r = conn.execute("SELECT objective FROM campaigns WHERE selection_id = ? AND objective IS NOT NULL "
                          "ORDER BY updated_at DESC LIMIT 1", (sid,)).fetchone()
     return r["objective"] if r else None
+
+
+def set_client_platform(sid, code, platform):
+    """Record which platform the client wants to see a creator on ("" clears it)."""
+    with connect() as conn:
+        row = conn.execute("SELECT client_platforms FROM selections WHERE id = ?", (sid,)).fetchone()
+        try:
+            cur = json.loads(row["client_platforms"] or "{}") if row else {}
+        except ValueError:
+            cur = {}
+        if platform:
+            cur[code] = platform
+        else:
+            cur.pop(code, None)
+        conn.execute("UPDATE selections SET client_platforms = ? WHERE id = ?", (json.dumps(cur), sid))
+        return cur
 
 
 def set_client_tags(sid, code, tags):

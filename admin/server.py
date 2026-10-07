@@ -506,7 +506,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send(200, views.selection_edit_page(
                 sel, db.list_creators(), db.tier_prices(), self.site_origin(),
                 query.get("e"), query.get("ok"), db.campaigns_for_selection(sel["id"]),
-                scores=self.selection_scores(sel), interests=db.known_interests()))
+                scores=self.selection_scores(sel), interests=db.known_interests(), access_codes=db.list_codes()))
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
                 db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok"),
@@ -710,6 +710,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_event()
         if path == "/api/selection/tags":
             return self.api_selection_tags()
+        if path == "/api/selection/platform":
+            return self.api_selection_platform()
         if path == "/api/selection":
             return self.api_selection_save()
         if path == "/api/creator/request":
@@ -1813,7 +1815,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return self.redirect("/selections/edit?id=%d" % sid)
 
     def post_selection_save(self):
-        f = self.form_body(multi=("code", "vcode", "p_from", "p_to", "cost", "tags", "fit", "roles", "reason", "drop", "default", "t_category"))
+        f = self.form_body(multi=("code", "vcode", "p_from", "p_to", "cost", "tags", "segs", "fit", "roles", "reason", "drop", "default", "t_category", "plat_assign"))
         sid = (f.get("id") or "").strip()
         sel = db.selection(int(sid)) if sid.isdigit() else None
         if sel is None:
@@ -1861,6 +1863,18 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                     seen_t.add(t.lower()); mine.append(t)
             if mine:
                 tags[code_.strip().upper()] = mine
+        seg_in = f.get("segs") or []
+        seg_in = [seg_in] if isinstance(seg_in, str) else list(seg_in)
+        seg_in = seg_in + [""] * (len(vc) - len(seg_in))
+        segments = {}
+        for code_, raw in zip(vc, seg_in):
+            seen_s, mine = set(), []
+            for t in re.split(r"[,;\n]+", raw or ""):
+                t = re.sub(r"\s+", " ", t).strip()[:40]
+                if t and t.lower() not in seen_s and len(mine) < 6:
+                    seen_s.add(t.lower()); mine.append(t)
+            if mine:
+                segments[code_.strip().upper()] = mine
         import fit as fit_mod
         n_rows = len(vc)
         lists = {}
@@ -1868,6 +1882,15 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             v = f.get(k) or []
             v = [v] if isinstance(v, str) else list(v)
             lists[k] = v + [""] * (n_rows - len(v))
+        pa = f.get("plat_assign") or []
+        pa = [pa] if isinstance(pa, str) else list(pa)
+        pa = pa + [""] * (len(vc) - len(pa))
+        platforms_map = {}
+        for code_, raw in zip(vc, pa):
+            raw = (raw or "").strip()
+            val = "Both" if raw == "Both" else (analysis.canon_platform(raw) or "")
+            if val:
+                platforms_map[code_.strip().upper()] = val
         verdicts = {}
         for i, code_ in enumerate(vc):
             v = fit_mod.clean(lists["fit"][i].strip(), [x.strip() for x in lists["roles"][i].split(",")], lists["reason"][i])
@@ -1925,6 +1948,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         name = (f.get("name") or "").strip() or sel["name"]
         db.set_selection_currency(sel["id"], cur)
         import fit as _fit_mod
+        if "sel_client" in f:
+            raw = (f.get("sel_client") or "").strip()
+            cid = int(raw) if raw.isdigit() and db.get_code(int(raw)) is not None else None
+            db.set_selection_client(sel["id"], cid, (f.get("client_name") or "").strip()[:80])
         if (f.get("sel_objective") or "") in _fit_mod.OBJECTIVES:
             db.set_selection_objective(sel["id"], f["sel_objective"])
         if any(k in f for k in ("t_country", "t_gender", "t_age", "t_category")):
@@ -1936,7 +1963,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs, margin_max=margin_max,
                           tags={k: v for k, v in tags.items() if k in codes},
-                          verdicts={k: v for k, v in verdicts.items() if k in codes})
+                          verdicts={k: v for k, v in verdicts.items() if k in codes},
+                          platforms={k: v for k, v in platforms_map.items() if k in codes},
+                          segments=({k: v for k, v in segments.items() if k in codes} if "segs" in f else None))
+        if "sel_group" in f and (f.get("sel_group") or "") in dict(db.GROUPS):
+            db.set_selection_group(sel["id"], f.get("sel_group") or "")
         # A price typed here belongs to THIS selection. Only the ones ticked
         # "make default" also become the creator's price on the roster, so a
         # one-off deal does not silently change what every later selection
@@ -3038,6 +3069,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         objective = objective or self.selection_objective(sel)
         target = target or self.selection_target(sel)
         wanted = sel["platform"] if "platform" in sel.keys() else None
+        try:
+            assign = json.loads((sel["platforms"] if "platforms" in sel.keys() else None) or "{}")
+        except ValueError:
+            assign = {}
         rows = {c["code"]: c for c in db.list_creators() if c["code"] in set(codes)}
         every = db.analyses_for(codes)
         records, typical = metrics.track_records()
@@ -3056,25 +3091,31 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return fit_mod.score(doc, pl, c["followers"], objective=objective, target=target,
                                      band=metrics.band_of(followers), bench=bench, record=rec,
                                      creator_interest=c["interest"], creator=c)
-            plat = analysis.canon_platform(wanted) if wanted and analysis.canon_platform(wanted) in mine else None
-            if plat:
-                out[code] = one(plat)
-            elif mine:
-                # "Every platform": judge the creator where they do best, and say where.
-                import profile_pdf as _pp
-                main = analysis.creator_platforms(c)
-                tried = {pl: one(pl) for pl in mine}
-                # A full analysis, whenever there is one that can be scored; basic public
-                # numbers only as the fallback.
-                full = [pl for pl in tried if not mine[pl]["data"].get("basic") and tried[pl]["score"] is not None]
-                pool = full or list(tried)
-                best = max(pool, key=lambda pl: (tried[pl]["score"] is not None, tried[pl]["score"] or 0,
-                                                 _pp.completeness(mine[pl]["data"]), pl == main[0]))
-                out[code] = dict(tried[best])
-                out[code]["others"] = [{"platform": pl, "score": v["score"]} for pl, v in tried.items()
-                                       if pl != best and v["score"] is not None and pl in pool]
-            else:
+            if not mine:
                 out[code] = fit_mod.score(None, None, c["followers"], objective=objective, target=target)
+                out[code]["assigned"] = "Auto"
+                continue
+            import profile_pdf as _pp
+            main = analysis.creator_platforms(c)
+            tried = {pl: one(pl) for pl in mine}
+            scored = [pl for pl in tried if tried[pl]["score"] is not None]
+            # Which platform the creator is scored on: the one assigned for this selection; "Both"
+            # shows both and ranks by the weaker; else the selection's platform; else the best.
+            assigned = (assign.get(code) or "").strip()
+            sel_plat = analysis.canon_platform(wanted) if wanted else None
+            if assigned == "Both" and len(scored) >= 2:
+                shown = min(scored, key=lambda pl: tried[pl]["score"])
+            elif assigned in tried:
+                shown = assigned
+            elif sel_plat in tried:
+                shown = sel_plat
+            else:
+                shown = max(scored or list(tried), key=lambda pl: (tried[pl]["score"] is not None, tried[pl]["score"] or 0,
+                                                                  not mine[pl]["data"].get("basic"), _pp.completeness(mine[pl]["data"]), pl == main[0]))
+            out[code] = dict(tried[shown])
+            out[code]["assigned"] = assigned if (assigned in tried or (assigned == "Both" and len(scored) >= 2)) else "Auto"
+            out[code]["platforms"] = {pl: tried[pl] for pl in tried if tried[pl]["score"] is not None}
+            out[code]["available"] = sorted(tried)
         return out
 
     def selection_suggest(self, query):
@@ -3479,13 +3520,26 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                     "prices": prices, "total": total,
                                     "platform": platform,
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
+                                    "segments": {k: v for k, v in json.loads((sel["segments"] if "segments" in sel.keys() else None) or "{}").items() if k in by and k in codes},
+                                    "group_by": (sel["group_by"] if "group_by" in sel.keys() else None) or "",
+                                    "brief": {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
+                                              "client": ((sel["client_name"] if "client_name" in sel.keys() else None)
+                                                         or ((db.get_code(sel["code_id"]) or {"label": ""})["label"] if sel["code_id"] else ""))},
                                     "scores": {k: {"score": v["score"], "tag": v["tag"], "strengths": v["strengths"],
                                                    "watchouts": v["watchouts"], "conclusion": v["conclusion"],
                                                    "parts": [{"label": p["label"], "s": p["s"]} for p in v["parts"]],
                                                    "platform": v["platform"], "objective": v["objective"],
-                                                   "others": v.get("others") or [], "basic": bool(v.get("basic"))}
+                                                   "basic": bool(v.get("basic")), "checks": v.get("checks") or [],
+                                                   "assigned": v.get("assigned") or "Auto", "available": v.get("available") or [],
+                                                   "platforms": {pl: {"score": x["score"], "tag": x["tag"], "strengths": x["strengths"],
+                                                                      "watchouts": x["watchouts"], "conclusion": x["conclusion"],
+                                                                      "parts": [{"label": p["label"], "s": p["s"]} for p in x["parts"]],
+                                                                      "platform": x["platform"], "objective": x["objective"],
+                                                                      "basic": bool(x.get("basic")), "checks": x.get("checks") or []}
+                                                                 for pl, x in (v.get("platforms") or {}).items()}}
                                                for k, v in self.selection_scores(sel).items()},
                                     "client_tags": {k: v for k, v in json.loads((sel["client_tags"] if "client_tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
+                                    "client_platforms": {k: v for k, v in json.loads((sel["client_platforms"] if "client_platforms" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "verdicts": {k: v for k, v in json.loads((sel["verdicts"] if "verdicts" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "currency": (sel["currency"] if "currency" in sel.keys() else None) or "SAR",
                                     "fx": fx.rates(),
@@ -3679,6 +3733,25 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             for k in out:
                 out[k] = out[k][:6]
         return self.send_json(200, out, [("Cache-Control", "no-store")])
+
+    def api_selection_platform(self):
+        """A client choosing which platform to see a creator's match on (and so, which one they
+        want booked). Same rules as their tags: their own passcode, or the admin."""
+        viewer = self.viewer_code_id()
+        if not viewer:
+            return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+        b = self.json_body()
+        sel = db.selection(token=str(b.get("token") or ""))
+        if sel is None or (sel["code_id"] is not None and int(viewer) not in (sel["code_id"], db.admin_code_id())):
+            return self.send_json(404, {"ok": False}, self.cors())
+        code = str(b.get("code") or "").strip().upper()
+        if code not in json.loads(sel["codes"] or "[]"):
+            return self.send_json(404, {"ok": False}, self.cors())
+        raw = str(b.get("platform") or "").strip()
+        plat = "Both" if raw == "Both" else (analysis.canon_platform(raw) or "")
+        if plat and plat != "Both" and plat not in db.analyses(code):
+            return self.send_json(400, {"ok": False, "reason": "no analysis on that platform"}, self.cors())
+        return self.send_json(200, {"ok": True, "client_platforms": db.set_client_platform(sel["id"], code, plat)}, self.cors())
 
     def api_selection_tags(self):
         """A client labelling a creator on their own selection page (Shortlist,

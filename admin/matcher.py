@@ -250,9 +250,9 @@ def _roster_estimate(c, objective, target, platform):
     holds: reach, where they are and what they post about."""
     bench = metrics.benchmarks()
     followers = c["followers"] or 0
-    res = fit.score_basic({"followers": followers}, platform, followers, objective=objective, target=target,
-                          band=metrics.band_of(followers), bench=bench, creator=c, min_parts=2)
-    return res
+    # The same formula every creator is scored with (fit.score_core), fed only what the roster holds.
+    return fit.score_core({"followers": followers, "basic": True}, platform, followers, objective, target,
+                          metrics.band_of(followers), bench, c, None, 2)
 
 
 # ---------------------------------------------------------------- shortlist --
