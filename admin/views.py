@@ -661,7 +661,7 @@ def dashboard(s, events, who, message=None, error=None):
         ui.header("Home", ("%d thing%s need%s you today." % (len(q), "" if len(q) == 1 else "s", "s" if len(q) == 1 else "")) if q
                   else "All clear. Nothing is waiting for you.",
                   actions="<a class='btn lime' href='" + u("/open-catalogue") + "' target='_blank' rel='noopener'>"
-                          + ui.icon("open", 16) + " Open catalogue as admin</a>")
+                          + "Open catalogue as admin " + ui.icon("arrow", 16) + "</a>")
         + banner
         + "<div class='home-grid'><section class='card' aria-labelledby='h-needs'><div class='hd'><h2 id='h-needs'>Needs you today</h2>"
           "<span class='muted'>Most urgent first</span></div>" + needs + "</section>"
