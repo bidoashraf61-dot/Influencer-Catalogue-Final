@@ -868,6 +868,10 @@
       ddList().forEach(function (dd) {
         var n = state[dd.dataset.dim].length;
         dd.classList.toggle("has-value", n > 0);
+        // How many options are picked, inside the button: "Tier 2".
+        var btn = dd.querySelector(".cat-dd__btn"), badge = btn && btn.querySelector(".cat-dd__n");
+        if (btn && !badge) { badge = document.createElement("b"); badge.className = "cat-dd__n"; btn.insertBefore(badge, btn.lastElementChild); }
+        if (badge) { badge.textContent = n ? String(n) : ""; badge.hidden = !n; }
       });
       var pills = [];
       ["tier", "platform", "place", "interest"].concat(xdims).forEach(function (dim) {
@@ -2761,31 +2765,41 @@
   });
 })();
 
-/* Results bar: Group and Sort leave the filter row for a slim bar right above
-   the grid, with a live count on the left. Filters narrow the list; this bar
-   arranges what is left, so the two jobs read as two places. */
+/* The roster count and Group / Sort sit at the end of the filter row: one
+   compact toolbar. The count is the headline number ("2,137 creators", or
+   "128 of 2,137" while filtered); Group and Sort read as plain text menus. */
 (function () {
-  function count(grid, out) {
-    var n = 0, cards = grid.querySelectorAll(".cat-card");
-    for (var i = 0; i < cards.length; i++) if (!cards[i].hidden) n++;
-    out.textContent = "Showing " + n + " creator" + (n === 1 ? "" : "s");
+  function fmt(n) { return Number(n).toLocaleString("en-US"); }
+  function count(grid, num, of, lab) {
+    // What is actually on screen: the catalogue's own filters hide cards with
+    // [hidden], the licence filter and the AI shortlist with classes.
+    var cards = grid.querySelectorAll(".cat-card"), n = 0;
+    for (var i = 0; i < cards.length; i++) if (!cards[i].hidden && getComputedStyle(cards[i]).display !== "none") n++;
+    num.textContent = fmt(n);
+    of.textContent = n < cards.length ? "of " + fmt(cards.length) : "";
+    of.hidden = n >= cards.length;
+    lab.textContent = n === 1 && n >= cards.length ? "creator" : "creators";
   }
   function mount() {
-    var order = document.querySelector(".cat-bar__order") || document.querySelector(".cat-bar__row .cat-sort");
+    var row = document.querySelector(".cat-bar__row");
     var grid = document.getElementById("cat-grid");
-    if (!order || !grid || document.querySelector(".cat-results")) return false;
-    var bar = document.createElement("div");
-    bar.className = "cat-results";
-    var n = document.createElement("p");
-    n.className = "cat-results__count";
-    n.setAttribute("aria-live", "polite");
-    bar.appendChild(n);
-    bar.appendChild(order);
-    grid.parentNode.insertBefore(bar, grid);
-    count(grid, n);
+    var order = document.querySelector(".cat-bar__order") || (row && row.querySelector(".cat-sort"));
+    if (!row || !grid || !order || document.querySelector(".cat-tally")) return false;
+    var side = document.createElement("div");
+    side.className = "cat-bar__side";
+    var tally = document.createElement("p");
+    tally.className = "cat-tally";
+    tally.setAttribute("aria-live", "polite");
+    var num = document.createElement("b"), of = document.createElement("span"), lab = document.createElement("small");
+    of.className = "cat-tally__of";
+    tally.appendChild(num); tally.appendChild(of); tally.appendChild(lab);
+    side.appendChild(tally);
+    side.appendChild(order);
+    row.appendChild(side);
+    count(grid, num, of, lab);
     var t = null;
-    new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { count(grid, n); }, 60); })
-      .observe(grid, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden"] });
+    new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { count(grid, num, of, lab); }, 60); })
+      .observe(grid, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden", "class"] });
     return true;
   }
   if (mount()) return;

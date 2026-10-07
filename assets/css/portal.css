@@ -836,3 +836,51 @@ body.pt-lock { overflow: hidden; }
 .lic-chip:focus-visible { outline: 3px solid #ee1515; outline-offset: 2px; }
 .lic-filter__note { font-size: 13px; color: #383838; margin-left: 4px; }
 .cat-grid .cat-card.lic-out { display: none !important; }
+
+/* ======================================================= compact toolbar */
+/* The setup panel as one compact toolbar (Bido, 2026-10-08):
+     row 1  search ........................ [ (face) Build a shortlist with AI  Start → ]
+     row 2  Filter chips ............... 2,137 CREATORS | Group ▾ Sort ▾
+     row 3  Licence chips
+   .cat-bar becomes display:contents so its search and filter row join the
+   host grid beside the AI card. Starting the AI flow opens it full width
+   underneath; the Results header only shows once an AI shortlist is on. */
+.cat-controls.is-setup { padding-top: 28px; padding-bottom: 28px; }
+.cat-controls.is-setup > .cat-pad > .cat-container { padding: 18px 20px 16px; }
+.cat-controls .setup-head { display: none; }
+.results-head { display: none; }
+.cat-grid-section:has(#cat-grid.ai-on) .results-head, .results-head:has(+ #ai-result) { display: flex; }
+
+.ai-host {
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "search ai" "row row" "active active" "lic lic" "open open";
+  gap: 12px 20px; align-items: center;
+}
+.ai-host > .cat-bar { display: contents; }
+.ai-host > .cat-bar > * { grid-column: 1 / -1; }
+.ai-host .cat-search { grid-area: search; max-width: none; margin: 0; }
+.ai-host .cat-bar__row { grid-area: row; }
+.ai-host .cat-active { grid-area: active; }
+.ai-host > #lic-filter { grid-area: lic; margin: 0; }
+.ai-host > .ai-sl { grid-area: ai; grid-column: auto; grid-row: auto; }
+.ai-host > .ai-sl.is-open { grid-area: open; }
+
+/* The closed AI card is one slim pill: face, title, Start. */
+.ai-sl:not(.is-open) { border-radius: 999px; }
+.ai-sl:not(.is-open) .ai-sl__intro {
+  grid-template-columns: 40px auto auto; gap: 12px; padding: 5px 5px 5px 6px; align-items: center;
+}
+.ai-sl:not(.is-open) .ai-sl__face { width: 40px; height: 40px; box-shadow: none; }
+.ai-sl:not(.is-open) .ai-sl__title { font-size: 21px; white-space: nowrap; }
+.ai-sl:not(.is-open) .ai-sl__copy p { display: none; }
+.ai-sl:not(.is-open) .ai-sl__start { grid-column: auto; min-height: 44px; padding: 0 20px; font-size: 19px; }
+
+/* Licence chips: same quiet outline as the filter chips, one tight row. */
+.lic-filter__label { font-size: 18px; }
+.lic-chip { min-height: 36px; padding: 6px 14px; font-size: 13px; border-width: 1px; }
+
+@media (max-width: 900px) {
+  .ai-host { grid-template-columns: minmax(0, 1fr); grid-template-areas: "search" "ai" "row" "active" "lic" "open"; }
+  .ai-sl:not(.is-open) .ai-sl__intro { grid-template-columns: 40px 1fr auto; }
+  .ai-sl:not(.is-open) .ai-sl__title { font-size: 19px; white-space: normal; }
+}

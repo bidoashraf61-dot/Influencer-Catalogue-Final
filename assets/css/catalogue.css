@@ -1724,24 +1724,49 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
    roster's paint-on-scroll optimisation left them blank in some browsers. */
 [data-page="selection"] .cat-card { content-visibility: visible; contain-intrinsic-size: none; }
 
-/* ------------------------------------------------------------ results bar */
-.cat-results {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap;
-  padding: 0 0 14px; margin: 0 0 22px; border-bottom: 1px solid rgba(18,18,18,.12);
+/* ------------------------------------------------- the compact toolbar */
+/* Filter chips: quiet outlines on linen, so the creators stay the loudest
+   thing on the page. A chip with something picked turns ink with lime text
+   and carries the count. */
+.cat-controls .cat-dd__btn {
+  background: var(--white); color: var(--ink); border: 1px solid rgba(18,18,18,.18);
+  font-size: 14px; padding: 8px 14px 8px 18px; min-height: 44px; gap: 8px;
 }
-.cat-results__count { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); }
-.cat-results .cat-bar__order { display: flex; align-items: center; gap: 4px 20px; flex-wrap: wrap; margin: 0; }
-.cat-results .cat-sort {
-  background: transparent; border: 0; box-shadow: none; padding: 0 26px 0 0; min-height: 44px; width: auto;
+.cat-controls .cat-dd__btn:hover { background: var(--white); border-color: var(--ink); }
+.cat-controls .cat-dd.is-open .cat-dd__btn { border-color: var(--ink); box-shadow: 0 0 0 1px var(--ink) inset; }
+.cat-controls .cat-dd.has-value .cat-dd__btn { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.cat-dd__n {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 20px; height: 20px; padding: 0 6px;
+  border-radius: 999px; background: var(--lime); color: var(--ink); font-size: 12px; font-weight: 800;
 }
-.cat-results .cat-sort:focus-within { box-shadow: none; outline: 3px solid var(--vivid-red); outline-offset: 2px; border-radius: 8px; }
-.cat-results .cat-sort__label { font-family: var(--body, "DM Sans", Arial, sans-serif); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); margin-right: 6px; }
-.cat-results .cat-sort__select { font-weight: 700; font-size: 15px; color: var(--ink); background: transparent; padding: 0; max-width: 200px; }
-.cat-results .cat-sort svg { right: 4px; }
+.cat-dd__n[hidden] { display: none; }
+.cat-controls .cat-bar__label { font-size: 20px; }
+
+/* Count + Group/Sort at the end of the filter row. */
+.cat-bar__side { display: flex; align-items: center; gap: 6px 22px; flex-wrap: wrap; margin-left: auto; }
+.cat-tally { display: inline-flex; align-items: baseline; gap: 6px; margin: 0; white-space: nowrap; }
+.cat-tally b { font-family: var(--heading); font-weight: 400; font-size: 30px; line-height: 1; letter-spacing: .01em; color: var(--ink); }
+.cat-tally__of { font-size: 14px; font-weight: 600; color: var(--gray); }
+.cat-tally__of[hidden] { display: none; }
+.cat-tally small { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); }
+.cat-bar__side .cat-bar__order { display: flex; align-items: center; gap: 4px 18px; flex-wrap: wrap; margin: 0; padding-left: 20px; border-left: 1px solid rgba(18,18,18,.15); }
+.cat-bar__side .cat-sort { background: transparent; border: 0; box-shadow: none; padding: 0 22px 0 0; min-height: 44px; width: auto; }
+/* Mouse clicks leave no ring; keyboard focus still gets one. */
+.cat-bar__side .cat-sort:focus-within { box-shadow: none; border: 0; outline: none; }
+.cat-bar__side .cat-sort:has(:focus-visible) { outline: 3px solid var(--vivid-red); outline-offset: 2px; border-radius: 8px; }
+.cat-bar__side .cat-sort__label { font-family: var(--body, "DM Sans", Arial, sans-serif); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); margin-right: 4px; }
+.cat-bar__side .cat-sort__select {
+  font-weight: 700; font-size: 14px; color: var(--ink); background: transparent; padding: 0; width: auto; max-width: 180px;
+  field-sizing: content; text-decoration: underline; text-decoration-color: var(--lime); text-decoration-thickness: 3px; text-underline-offset: 6px;
+}
+.cat-bar__side .cat-sort svg { right: 2px; }
 @media screen and (max-width: 767px) {
   .cat-cover__sub { white-space: normal; max-width: 26ch; text-wrap: balance; }
-  .cat-results { padding-bottom: 8px; }
-  .cat-results .cat-sort { width: auto; }
+  .cat-bar__side { margin-left: 0; width: 100%; justify-content: flex-start; gap: 4px 18px; }
+  .cat-bar__side .cat-bar__order { padding-left: 0; border-left: 0; width: auto; flex-wrap: nowrap; gap: 16px; }
+  .cat-bar__side .cat-sort { width: auto !important; flex: 0 1 auto; }
+  .cat-bar__side .cat-sort__select { max-width: 140px; }
+  .cat-controls .cat-dd__btn { padding: 6px 12px 6px 14px; font-size: 13px; }
 }
 
 
