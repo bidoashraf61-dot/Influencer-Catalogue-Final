@@ -60,6 +60,8 @@ sys.path.insert(0, str(HERE))
 
 import auth  # noqa: E402
 import guard  # noqa: E402
+import portal  # noqa: E402
+import portal_api  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
 import history  # noqa: E402
@@ -149,7 +151,7 @@ def ts(value):
     return datetime.fromtimestamp(value, timezone.utc).strftime("%d %b %Y, %H:%M")
 
 
-class Handler(BaseHTTPRequestHandler):
+class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     server_version = "hv-catalogue"
 
     # ----------------------------------------------------------- plumbing --
@@ -319,6 +321,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_campaign_csv(query.get("t") or "")
         if path.startswith("/api/capture/"):
             return self.capture_get(path[len("/api/capture/"):], query)
+        if path.startswith("/api/") and self.portal_get(path, query):
+            return
         if path == "/api/roster":
             return self.api_roster()
         if path == "/api/selection":
@@ -376,6 +380,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         views.set_user(who["email"] if "email" in who.keys() else "")
 
+        if path in ("/ai", "/ai/history", "/portal", "/portal/user"):
+            return self.portal_admin_get(path, query, who)
         if path == "/api/search":
             return self.api_search((query.get("q") or "").strip())
         if path == "/":
@@ -694,6 +700,8 @@ class Handler(BaseHTTPRequestHandler):
         if path.startswith("/api/"):
             guard.limiter.hit(f"api:{self.client_ip()}")
 
+        if path.startswith("/api/") and self.portal_post(path):
+            return
         if path == "/api/unlock":
             return self.api_unlock()
         if path == "/api/request":
@@ -718,6 +726,8 @@ class Handler(BaseHTTPRequestHandler):
             return
         history.set_actor(who["email"] if "email" in who.keys() else "admin")
         views.set_user(who["email"] if "email" in who.keys() else "")
+        if path in ("/ai/chat", "/ai/confirm", "/ai/dismiss") or path.startswith("/portal/"):
+            return self.portal_admin_post(path, who)
         if path == "/history/undo":
             return self.post_history_undo()
         if path == "/archive":
@@ -972,11 +982,15 @@ class Handler(BaseHTTPRequestHandler):
                     "That passcode is already in use. Choose another."))
         else:
             code = auth.generate_code()
-        db.create_code(auth.hash_code(code), auth.code_hint(code), label, expires,
-                       int(max_uses) if max_uses.isdigit() and int(max_uses) > 0 else None,
-                       code_plain=code,
-                       max_devices=int(max_devices) if max_devices.isdigit()
-                       and int(max_devices) > 0 else None)
+        new_id = db.create_code(auth.hash_code(code), auth.code_hint(code), label, expires,
+                                int(max_uses) if max_uses.isdigit() and int(max_uses) > 0 else None,
+                                code_plain=code,
+                                max_devices=int(max_devices) if max_devices.isdigit()
+                                and int(max_devices) > 0 else None)
+        # The AI allowance for this link. Left empty it falls back to the guest default.
+        credits = form.get("credits", "").strip()
+        if credits.isdigit():
+            portal.grant(new_id, int(credits), "Allowance at creation", actor="admin")
         return self.redirect("/codes?new=" + urllib.parse.quote(code))
 
     def post_code_passcode(self):
@@ -3822,6 +3836,7 @@ def main():
 
     db.init()
     history.init()
+    portal.init()
     apify.start_scheduler()
     profile_thumbs.start()
     db.purge_expired_sessions()

@@ -778,7 +778,8 @@ def code_manage(c, devices):
 
 
 def _client_tabs(current):
-    return [(u("/clients"), "Clients", None, current == "clients"), (u("/codes"), "Access codes", None, current == "codes")]
+    return [(u("/clients"), "Clients", None, current == "clients"), (u("/codes"), "Access codes", None, current == "codes"),
+            (u("/portal"), "Client portal", None, current == "portal")]
 
 
 def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists=None):
@@ -891,6 +892,10 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
           "<input name='days' type='number' min='1' max='3650' placeholder='empty = never'></div>"
         + "<div><label>Max uses</label>"
           "<input name='max_uses' type='number' min='1' placeholder='unlimited'></div>"
+        + "<div><label>AI credits</label>"
+          "<input name='credits' type='number' min='0' placeholder='guest default'>"
+          "<div class='price-hint'>What this link may spend on the AI shortlist and chat. "
+          "Empty uses the guest default from Client portal settings.</div></div>"
         + "<div><label>Max devices</label>"
           "<input name='max_devices' type='number' min='1' value='5' placeholder='no limit'>"
           "<div class='price-hint'>Phones or computers this code opens on. Passed to anyone "
