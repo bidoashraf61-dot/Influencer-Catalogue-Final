@@ -2701,3 +2701,29 @@
     }, true);
   })();
 })();
+
+/* Cover header: honour reduced motion by holding the showreel on its poster,
+   and glide to the roster from the "Browse creators" cue. */
+(function () {
+  var v = document.querySelector('.cat-cover__video');
+  var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  if (v && still && still.matches) { v.removeAttribute('autoplay'); v.pause(); }
+  else if (v) {
+    // The roster sits hidden behind the passcode gate, and a browser will not
+    // start autoplay on a hidden video — so start it when the app is shown.
+    var go = function () { var p = v.play(); if (p && p.catch) p.catch(function () {}); };
+    var app = document.getElementById('cat-app');
+    if (app && window.MutationObserver) {
+      new MutationObserver(function () { if (!app.hidden) go(); })
+        .observe(app, { attributes: true, attributeFilter: ['hidden'] });
+    }
+    if (v.readyState >= 2) go(); else v.addEventListener('loadeddata', go, { once: true });
+  }
+  var cue = document.querySelector('.cat-cover__cue');
+  if (cue) cue.addEventListener('click', function (ev) {
+    var to = document.getElementById('cat-roster');
+    if (!to) return;
+    ev.preventDefault();
+    to.scrollIntoView({ behavior: still && still.matches ? 'auto' : 'smooth', block: 'start' });
+  });
+})();

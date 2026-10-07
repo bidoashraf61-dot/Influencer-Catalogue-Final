@@ -1442,3 +1442,71 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
   background: var(--white); color: var(--ink); padding: 3px 6px 2px; border-radius: var(--r-pill);
   box-shadow: 0 1px 4px rgba(0,0,0,.25); }
 .cat-score--multi .cat-score__est { display: none; }   /* two stamps side by side: the tooltip says it */
+
+/* ------------------------------------------------------------ cover header */
+/* The catalogue opens like hellovoice.co.uk: the showreel fills the first
+   screen, the menu sits over its top edge, and the title and lead sit over its
+   lower third. The shade is heaviest top and bottom, where the text is, so the
+   footage stays clear through the middle. */
+.cat-hero--cover {
+  position: relative; isolation: isolate; overflow: hidden;
+  display: flex; flex-direction: column;
+  min-height: 100vh; min-height: 100svh; padding: 0;
+  background: var(--ink); color: var(--white);
+}
+.cat-cover__video {
+  position: absolute; inset: 0; z-index: -2;
+  width: 100%; height: 100%; object-fit: cover; display: block;
+}
+.cat-cover__shade {
+  position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(18,18,18,.72) 0%, rgba(18,18,18,0) 26%),
+    linear-gradient(0deg, rgba(18,18,18,.88) 0%, rgba(18,18,18,.45) 38%, rgba(18,18,18,0) 68%);
+}
+.cat-cover__nav { padding-top: 28px; }
+.cat-hero--cover .cat-topbar { margin-bottom: 0; }
+.cat-hero--cover .cat-track {
+  color: var(--white); background: rgba(18,18,18,.28);
+  border-color: rgba(255,255,255,.55);
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.cat-hero--cover .cat-track:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
+.cat-hero--cover .cat-portfolio:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
+.cat-hero--cover .cat-track:focus-visible,
+.cat-hero--cover .cat-portfolio:focus-visible { outline-color: var(--lime); }
+
+.cat-cover__body { margin-top: auto; padding-bottom: clamp(36px, 6vh, 72px); }
+.cat-hero--cover .cat-hero__title {
+  color: var(--white); line-height: .86;
+  font-size: clamp(4.5rem, 1rem + 15vw, 17rem);
+}
+.cat-cover__foot {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 32px; margin-top: 28px;
+  padding-top: 24px; border-top: 1px solid rgba(255,255,255,.28);
+}
+.cat-hero--cover .cat-hero__lead { color: rgba(255,255,255,.86); margin: 0; max-width: 58ch; }
+.cat-cover__cue {
+  display: inline-flex; align-items: center; gap: 10px; flex: none;
+  font-family: var(--heading); font-size: 20px; letter-spacing: .08em;
+  text-transform: uppercase; text-decoration: none; color: var(--white);
+  min-height: 44px;
+}
+.cat-cover__cue svg { transition: transform .25s ease; }
+.cat-cover__cue:hover { color: var(--lime); }
+.cat-cover__cue:hover svg { transform: translateY(3px); }
+.cat-cover__cue:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; border-radius: 4px; }
+
+@media screen and (max-width: 991px) {
+  .cat-cover__nav { padding-top: 20px; }
+}
+@media screen and (max-width: 767px) {
+  .cat-hero--cover { min-height: 88vh; min-height: 88svh; }
+  .cat-hero--cover .cat-topbar { flex-wrap: wrap; }
+  .cat-cover__foot { flex-direction: column; align-items: flex-start; gap: 16px; }
+  .cat-hero--cover .cat-hero__lead { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cat-cover__cue svg { transition: none; }
+}

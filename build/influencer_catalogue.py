@@ -716,10 +716,17 @@ def build():
 
 <main class="cat-app" id="cat-app" hidden>
 
-  <header class="cat-hero">
-    <div class="cat-pad"><div class="cat-container">
+  <header class="cat-hero cat-hero--cover">
+    <video class="cat-cover__video" autoplay muted loop playsinline
+           preload="metadata" poster="/assets/video/hero-reel-poster.jpg"
+           aria-hidden="true" tabindex="-1">
+      <source src="/assets/video/hero-reel.mp4" type="video/mp4"/>
+    </video>
+    <div class="cat-cover__shade" aria-hidden="true"></div>
+
+    <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
-        <img class="cat-hero__logo" src="/assets/brand/logo.png" alt="HelloVoice"/>
+        <img class="cat-hero__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
         <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
           Campaign tracking
@@ -730,32 +737,32 @@ def build():
         </a>
       </div>
       </div>
+    </div></div></div>
+
+    <div class="cat-cover__body"><div class="cat-pad"><div class="cat-container">
       <div class="cat-hero__head">
         <div class="cat-pill">Creator Roster</div>
         <h1 class="cat-hero__title">Catalogue</h1>
       </div>
-      <p class="cat-hero__lead">
-        Creator campaigns run end to end — casting against the brief,
-        per-creator scripts that protect the claim set, compliance before
-        anything posts, and a post-by-post read afterwards.
-      </p>
-
-      <div class="cat-showreel">
-        <video class="cat-showreel__video" autoplay muted loop playsinline
-               preload="none" poster="/assets/video/hero-reel-poster.jpg"
-               aria-label="Influencer campaign showreel">
-          <source src="/assets/video/hero-reel.mp4" type="video/mp4"/>
-        </video>
-        <span class="cat-showreel__label">Showreel</span>
+      <div class="cat-cover__foot">
+        <p class="cat-hero__lead">
+          Creator campaigns run end to end — casting against the brief,
+          per-creator scripts that protect the claim set, compliance before
+          anything posts, and a post-by-post read afterwards.
+        </p>
+        <a class="cat-cover__cue" href="#cat-roster">
+          Browse creators
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+        </a>
       </div>
-    </div></div>
+    </div></div></div>
   </header>
 
   <div class="cat-ticker" aria-hidden="true">
     <div class="cat-ticker__track">{ticker_track}</div>
   </div>
 
-  <section class="cat-controls" aria-label="Filters">
+  <section class="cat-controls" id="cat-roster" aria-label="Filters">
     <div class="cat-pad"><div class="cat-container">
       {filters}
       <p class="cat-note">Pick the creators you want, then review the selection. Costs are quoted for the shortlist as a whole.</p>
