@@ -1876,6 +1876,12 @@
     }
     window.addEventListener("scroll", hideTip, { passive: true });
 
+    // A tag keeps the same colour wherever it appears: one of six, chosen from its letters.
+    function tone(t) {
+      var h = 0; t = String(t).toLowerCase();
+      for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % 6;
+      return h;
+    }
     function renderTags() {
       var back = (CURATED && CURATED.platform) ? "&p=" + encodeURIComponent(CURATED.platform) : "";
       cards.forEach(function (c) {
@@ -1885,7 +1891,7 @@
         if (link && back && link.href.indexOf("&p=") === -1) link.href = link.href + back;
         var v = verdictOf(c.dataset.code), mine = tagsOf(c.dataset.code);
         var sc = scoreOf(c.dataset.code), fitNow = fitOf(c.dataset.code);
-        var why = (v && v.reason) || (sc && sc.score != null ? sc.conclusion : "");
+        var why = (v && v.reason) || "";     // the generated conclusion is in the hover on the stamp
         renderStamp(c, sc);
         var box = c.querySelector(".cat-verdict");
         if (!fitNow && !(v && (v.roles || []).length) && !why) { if (box) box.remove(); }
@@ -1908,14 +1914,14 @@
           tbox = document.createElement("div");
           tbox.className = "cat-tags";
           tbox.setAttribute("data-noselect", "");
-          var vb = c.querySelector(".cat-verdict");
-          if (vb) vb.insertAdjacentElement("afterend", tbox); else body.insertBefore(tbox, body.firstChild);
+          var lk = c.querySelector("a.cat-card__analysis");
+          if (lk) lk.insertAdjacentElement("beforebegin", tbox); else body.appendChild(tbox);
         }
         if (!typing) {
-          tbox.innerHTML = mine.map(function (t) {
-            return '<span class="cat-tag">' + esc(t) + "</span>";
+          tbox.innerHTML = '<span class="cat-tags__label">Tags</span>' + mine.map(function (t) {
+            return '<span class="cat-tag cat-tag--t' + tone(t) + '"><i></i>' + esc(t) + "</span>";
           }).join("") + mt.map(function (t) {
-            return '<span class="cat-tag cat-tag--mine">' + esc(t) + '<button type="button" data-tag-x="' + esc(t) +
+            return '<span class="cat-tag cat-tag--mine cat-tag--t' + tone(t) + '"><i></i>' + esc(t) + '<button type="button" data-tag-x="' + esc(t) +
               '" aria-label="Remove tag ' + esc(t) + '">&times;</button></span>';
           }).join("") + (mt.length < 8 ? '<button type="button" class="cat-tag cat-tag--add" data-tag-add>+ Tag</button>' : "");
         }

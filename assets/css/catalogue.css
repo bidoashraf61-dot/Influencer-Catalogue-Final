@@ -1268,3 +1268,28 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; flex: none; background: #14884a; }
 .cat-dot--good { background: #7d8f00; } .cat-dot--maybe { background: #d99a00; } .cat-dot--no { background: #d02424; }
 .cat-dot--strong { background: #14884a; }
+
+
+/* Tags on a selection card: sit between the creator's details and the analysis button; each
+   tag has its own soft colour, the client's own tags are outlined and removable. */
+.cat-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 6px; margin: 14px 0 12px; padding: 12px 0 0; border-top: 1px solid rgba(18,18,18,.1); }
+.cat-tags__label { flex-basis: 100%; font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(18,18,18,.5); margin-bottom: 2px; }
+.cat-tag {
+  --tg-bg: #e3f6ea; --tg-fg: #0c5a2d; --tg-dot: #1b9b52;
+  display: inline-flex; align-items: center; gap: 7px; min-height: 28px; padding: 0 12px; border-radius: 999px;
+  font-size: 12.5px; font-weight: 600; line-height: 1.1; letter-spacing: .005em; color: var(--tg-fg); background: var(--tg-bg);
+  border: 1px solid transparent; text-transform: none;
+}
+.cat-tag > i { width: 8px; height: 8px; border-radius: 50%; background: var(--tg-dot); flex: none; }
+.cat-tag--t0 { --tg-bg: #e3f6ea; --tg-fg: #0c5a2d; --tg-dot: #1b9b52; }
+.cat-tag--t1 { --tg-bg: #e0ecff; --tg-fg: #163f91; --tg-dot: #2f6fe0; }
+.cat-tag--t2 { --tg-bg: #ffe8d6; --tg-fg: #8a3a05; --tg-dot: #f0731d; }
+.cat-tag--t3 { --tg-bg: #efe6ff; --tg-fg: #53219c; --tg-dot: #8b4ae0; }
+.cat-tag--t4 { --tg-bg: #fff3c4; --tg-fg: #6b5200; --tg-dot: #d6a400; }
+.cat-tag--t5 { --tg-bg: #ffe1e6; --tg-fg: #96153a; --tg-dot: #e0365c; }
+.cat-tag--mine { background: var(--white); border-color: var(--tg-dot); padding-right: 4px; }
+.cat-tag--mine button { color: var(--tg-fg); }
+.cat-tag--mine button:hover { background: var(--tg-dot); color: var(--white); }
+.cat-tag--add { background: transparent; border: 1px dashed rgba(18,18,18,.4); color: rgba(18,18,18,.65); padding: 0 12px; }
+.cat-tag--add:hover { background: var(--lime); border-style: solid; border-color: var(--ink); color: var(--ink); }
+.cat-tags__in { min-height: 28px; }
