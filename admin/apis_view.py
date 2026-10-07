@@ -62,6 +62,62 @@ def _job_form(job, presets_js=False):
         + "<button class='btn lime'>Save job</button></form>")
 
 
+def pack_card():
+    chk = lambda n, label, on=True: ("<label style='display:inline-flex;gap:6px;margin-right:16px'><input type='checkbox' name='%s'%s> %s</label>"
+                                     % (n, " checked" if on else "", label))
+    return (
+        "<section class='card'><div class='hd'><h2>Collect everything</h2></div>"
+        "<p class='sec-desc'>One press runs the full set of actors for the platforms you tick: profile numbers, "
+        "fake-follower or engagement score, and audience demographics. Each step is a normal job below, so it can be "
+        "edited or scheduled on its own. If the whole collection would pass the monthly budget, nothing starts.</p>"
+        "<form method='post' action='" + u("/apis/pack") + "' onsubmit=\"return confirm('This starts several runs and spends money. Continue?')\">"
+        "<div style='margin:6px 0 12px'>" + chk("plat_instagram", "Instagram") + chk("plat_tiktok", "TikTok") + "</div>"
+        "<div class='row'><div><label>Which creators</label><select name='source'>" + _sources("sample20") + "</select></div>"
+        "<div><label>Max creators</label><input name='max_handles' type='number' min='1' max='1000' value='20'></div>"
+        "<div><label>Repeat</label><select name='schedule'><option value='manual'>Only now</option>"
+        "<option value='weekly'>Every week</option><option value='daily'>Every day</option></select></div>"
+        "<div><label>At (Riyadh time)</label><input name='at_time' type='time' value='03:00'></div></div>"
+        "<div style='margin:10px 0'>" + chk("audience", "Audience demographics (about $0.15 per creator per platform)")
+        + chk("audit", "Instagram follower audit (about $1 per creator)", False) + "</div>"
+        "<button class='btn lime'>Collect everything</button></form></section>")
+
+
+def data_tab(query_q=""):
+    cov = []
+    for plat in ("Instagram", "TikTok"):
+        cov.append("<tr><td colspan='3'><strong>" + plat + "</strong></td></tr>"
+                   + "".join("<tr><td>" + e(l) + "</td><td class='muted' style='font-size:12px'>" + e(a) + "</td><td>"
+                             + str(n) + " creators</td></tr>" for l, a, n in apify.coverage(plat)))
+    rows = "".join(
+        "<tr><td><a href='" + u("/apis/creator?code=" + r["code"]) + "'><strong>" + e(r["name"]) + "</strong></a> "
+        "<span class='muted'>" + e(r["code"]) + "</span></td><td>" + str(r["actors"]) + " sources</td>"
+        "<td class='muted'>" + V.ago(r["last"]) + "</td></tr>" for r in apify.creators_with_data(query_q))
+    return ("<section class='card'><div class='hd'><h2>Coverage</h2></div><table><tbody>" + "".join(cov) + "</tbody></table></section>"
+            "<section class='card'><div class='hd'><h2>Creators with collected data</h2></div>"
+            "<form method='get' action='" + u("/apis") + "'><input type='hidden' name='tab' value='data'>"
+            "<input name='q' value='" + e(query_q) + "' placeholder='Search by creator name or code' style='width:100%;margin-bottom:12px'></form>"
+            "<table><tbody>" + (rows or "<tr><td class='muted'>Nothing collected yet. Run a collection first.</td></tr>")
+            + "</tbody></table></section>")
+
+
+def creator_page(code):
+    with db.connect() as conn:
+        c = conn.execute("SELECT * FROM creators WHERE code = ?", (code,)).fetchone()
+    cards = []
+    for r in apify.creator_data(code):
+        try:
+            pretty = json.dumps(json.loads(r["data"]), indent=2, ensure_ascii=False)
+        except ValueError:
+            pretty = r["data"]
+        cards.append("<details class='card' open><summary class='hd'><h2>" + e(r["platform"] or "") + " · " + e(r["actor"] or "")
+                     + "</h2><span class='muted'>" + V.ts(r["at"]) + "</span></summary><pre style='white-space:pre-wrap;font-size:12px;"
+                     "max-height:520px;overflow:auto'>" + e(pretty) + "</pre></details>")
+    body = (ui.header(c["name"] if c else code, "Everything collected for this creator, latest result from each source.",
+                      crumbs=[("APIs", u("/apis?tab=data")), (code, None)])
+            + ("".join(cards) or "<p class='muted'>Nothing collected for this creator yet.</p>"))
+    return V.page("APIs", body, "/apis")
+
+
 def apify_tab():
     hint = apify.token_hint()
     spent, bud, cap = apify.spent_this_month(), apify.budget(), apify.run_cap()
@@ -144,7 +200,7 @@ def apify_tab():
         + "</span></div><table><thead><tr><th>Job</th><th>Status</th><th>Sent</th><th>Results</th><th>Saved</th>"
         "<th>Cost</th><th>Started</th><th></th></tr></thead><tbody>" + runs_body + "</tbody></table></section>")
 
-    return conn_card + limits + jobs + runs_card
+    return conn_card + limits + pack_card() + jobs + runs_card
 
 
 # One entry per integration. A new service adds a tab here (label, one-line
@@ -169,12 +225,13 @@ def overview_tab():
             "<p class='muted'>More services can be added here as tabs, each with its own connection and settings.</p>")
 
 
-def apis_page(error=None, message=None, tab="overview"):
+def apis_page(error=None, message=None, tab="overview", q=""):
     keys = {i["key"]: i for i in INTEGRATIONS}
-    tab = tab if tab in keys else "overview"
+    tab = tab if (tab in keys or tab == "data") else "overview"
     tabs = [(u("/apis?tab=overview"), "Overview", None, tab == "overview")]
     tabs += [(u("/apis?tab=" + i["key"]), i["label"], None, tab == i["key"]) for i in INTEGRATIONS]
-    inner = keys[tab]["body"]() if tab in keys else overview_tab()
+    tabs.append((u("/apis?tab=data"), "Collected data", None, tab == "data"))
+    inner = keys[tab]["body"]() if tab in keys else (data_tab(q) if tab == "data" else overview_tab())
     body = (ui.header("APIs", "Connect outside services and run them from here.",
                       crumbs=[("System", None), ("APIs", None)], tabs=tabs)
             + V._notes(error, message) + inner)

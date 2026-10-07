@@ -559,6 +559,8 @@ class Handler(BaseHTTPRequestHandler):
                 db.setting("emv_rates") or {}, metrics.factors(),
                 bool(db.setting("capture_token")), db.capture_runs(), track.GEO_DB.exists(),
                 None, query.get("e"), query.get("ok"), metrics.benchmarks(), fx_rates=fx.rates()))
+        if path == "/apis/creator" and query.get("code"):
+            return self.send(200, apis_view.creator_page(query["code"].upper()))
         if path == "/apis/run" and query.get("id", "").isdigit():
             return self.send(200, apis_view.run_page(int(query["id"])))
         if path == "/apis/run.json" and query.get("id", "").isdigit():
@@ -568,7 +570,7 @@ class Handler(BaseHTTPRequestHandler):
                              "application/json; charset=utf-8",
                              [("Content-Disposition", "attachment; filename=run-%s.json" % query["id"])])
         if path == "/apis":
-            return self.send(200, apis_view.apis_page(query.get("e"), query.get("ok"), query.get("tab", "overview")))
+            return self.send(200, apis_view.apis_page(query.get("e"), query.get("ok"), query.get("tab", "overview"), query.get("q", "")))
         if path == "/campaigns/links":
             cid = query.get("id", "")
             k = db.campaign(int(cid)) if cid.isdigit() else None
@@ -989,6 +991,14 @@ class Handler(BaseHTTPRequestHandler):
                         raise apify.ApifyError("Budget and per-run limit must be between 0 and 1000.")
                     db.set_setting(key, v)
                 return self.redirect("/apis?tab=apify&ok=" + q("Limits saved."))
+            if path == "/apis/pack":
+                plats = [p for p in ("Instagram", "TikTok") if f.get("plat_" + p.lower())]
+                mh = int(f["max_handles"]) if (f.get("max_handles") or "").isdigit() else 20
+                ok, msg = apify.run_pack(plats, f.get("source") or "sample20", max(1, min(mh, apify.HARD_MAX_HANDLES)),
+                                         bool(f.get("audience")), bool(f.get("audit")),
+                                         f.get("schedule") if f.get("schedule") in ("manual", "daily", "weekly") else "manual",
+                                         f.get("at_time") or "03:00", int(f["weekday"]) if (f.get("weekday") or "").isdigit() else 0)
+                return self.redirect("/apis?tab=apify&" + ("ok=" if ok else "e=") + q(msg))
             if path == "/apis/job/save":
                 apify.save_job(f)
                 return self.redirect("/apis?tab=apify&ok=" + q("Job saved."))

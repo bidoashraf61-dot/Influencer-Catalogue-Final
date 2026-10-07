@@ -227,9 +227,15 @@ def month_start(t=None):
 
 
 def spent_this_month():
+    """What this month has cost, counting runs still in flight at their estimate
+    so a batch started all at once cannot each pass the budget check alone."""
     with db.connect() as conn:
-        return conn.execute("SELECT COALESCE(SUM(cost),0) c FROM api_runs WHERE started_at >= ?",
-                            (month_start(),)).fetchone()["c"]
+        done = conn.execute("SELECT COALESCE(SUM(cost),0) c FROM api_runs WHERE started_at >= ? "
+                            "AND status NOT IN ('QUEUED','RUNNING')", (month_start(),)).fetchone()["c"]
+        pending = conn.execute("SELECT COALESCE(SUM(r.handles * COALESCE(j.est_each, 0.01)),0) c FROM api_runs r "
+                               "LEFT JOIN api_jobs j ON j.id = r.job_id WHERE r.status IN ('QUEUED','RUNNING')"
+                               ).fetchone()["c"]
+    return done + pending
 
 
 # ------------------------------------------------------------------ handles --
@@ -584,6 +590,97 @@ def run_results(rid):
     with db.connect() as conn:
         return conn.execute("SELECT r.*, c.name FROM profile_raw r LEFT JOIN creators c ON c.code = r.code "
                             "WHERE r.run_id = ? ORDER BY r.id", (rid,)).fetchall()
+
+
+# ------------------------------------------------------------ full collection --
+# The perfect set per platform: every step is an ordinary job, so each can still
+# be edited, paused or scheduled on its own. Steps marked expensive stay off
+# unless asked for.
+PACKS = {
+    "Instagram": [("ig_profiles", "profile numbers", False), ("ig_fakes", "fake-follower score", False),
+                  ("ig_audience", "audience demographics", False), ("ig_audit", "follower audit", True)],
+    "TikTok": [("tt_profiles", "profile numbers", False), ("tt_analytics", "engagement analytics", False),
+               ("tt_audience", "audience demographics", False)],
+}
+
+
+def pack_job(preset, source, max_handles, schedule, at_time, weekday):
+    """The job for one step of the collection: reused when it exists, so a
+    repeat run does not pile up duplicates."""
+    p = PRESETS[preset]
+    name = "Full · " + p["label"]
+    with db.connect() as conn:
+        row = conn.execute("SELECT id FROM api_jobs WHERE name = ?", (name,)).fetchone()
+    return save_job({"id": str(row["id"]) if row else "", "name": name, "actor": p["actor"], "kind": p["kind"],
+                     "platform": p["platform"], "source": source, "input": p["input"],
+                     "max_handles": str(max_handles), "est_each": str(p["est"]), "schedule": schedule,
+                     "at_time": at_time, "weekday": str(weekday)})
+
+
+def run_pack(platforms, source, max_handles, with_audience, with_audit, schedule="manual",
+             at_time="03:00", weekday=0):
+    """Start every step for each platform. Checked as a whole first: if the
+    whole collection would pass the monthly budget, nothing starts."""
+    if not get_token():
+        return False, "Save an Apify token first."
+    steps = []
+    for plat in platforms:
+        for key, label, expensive in PACKS.get(plat, []):
+            if "audience" in label and not with_audience:
+                continue
+            if expensive and not with_audit:
+                continue
+            steps.append(key)
+    if not steps:
+        return False, "Pick at least one platform."
+    plan, total = [], 0.0
+    for key in steps:
+        jid = pack_job(key, source, max_handles, schedule, at_time, weekday)
+        job = get_job(jid)
+        n = len(build_handles(job))
+        plan.append((jid, job["name"], n))
+        total += n * float(job["est_each"] or 0)
+    if not any(n for _j, _n, n in plan):
+        return False, "No creator has a handle for that platform and source."
+    if spent_this_month() + total > budget():
+        return False, ("The whole collection is about $%.2f; this month has $%.2f left of the $%.2f budget. "
+                       "Raise the budget or choose fewer steps or creators."
+                       % (total, max(0.0, budget() - spent_this_month()), budget()))
+    started = []
+    for jid, name, n in plan:
+        if n:
+            ok, msg = start_job(jid, "manual")
+            started.append("%s: %s" % (name.replace("Full · ", ""), msg if ok else "not started (%s)" % msg))
+    return True, "Started %d steps, about $%.2f in all. " % (len(started), total) + " ".join(started)
+
+
+def coverage(platform):
+    """Per step: how many creators have a result from it."""
+    out = []
+    with db.connect() as conn:
+        for key, label, _x in PACKS.get(platform, []):
+            actor = PRESETS[key]["actor"]
+            n = conn.execute("SELECT COUNT(DISTINCT code) c FROM profile_raw WHERE code != '' AND actor = ? "
+                             "AND platform = ?", (actor, platform)).fetchone()["c"]
+            out.append((label, actor, n))
+    return out
+
+
+def creators_with_data(q="", limit=60):
+    like = "%" + q.strip().lower() + "%"
+    with db.connect() as conn:
+        return conn.execute(
+            "SELECT c.code, c.name, MAX(r.at) last, COUNT(DISTINCT r.actor) actors FROM profile_raw r "
+            "JOIN creators c ON c.code = r.code WHERE r.code != '' AND (lower(c.name) LIKE ? OR lower(c.code) LIKE ?) "
+            "GROUP BY c.code ORDER BY last DESC LIMIT ?", (like, like, limit)).fetchall()
+
+
+def creator_data(code):
+    """The latest result from each actor for one creator."""
+    with db.connect() as conn:
+        return conn.execute(
+            "SELECT * FROM profile_raw WHERE code = ? AND id IN (SELECT MAX(id) FROM profile_raw WHERE code = ? "
+            "GROUP BY actor, platform) ORDER BY platform, actor", (code, code)).fetchall()
 
 
 # ---------------------------------------------------------------- scheduler --
