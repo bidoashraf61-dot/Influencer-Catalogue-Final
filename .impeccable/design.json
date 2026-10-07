@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-05T15:48:52.602721+03:00",
+  "generatedAt": "2026-10-08T02:12:46+03:00",
   "title": "Design System: HelloVoice Influencer Catalogue",
   "extensions": {
     "colorMeta": {
@@ -392,6 +392,50 @@
       "action": {
         "displayName": "Action",
         "purpose": "Buttons and View on <platform> links."
+      },
+      "dash-micro": {
+        "displayName": "Dash Micro",
+        "purpose": "Smallest dashboard text: axis ticks and tiny captions on the one-screen campaign board. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-caption": {
+        "displayName": "Dash Caption",
+        "purpose": "Captions and secondary labels under dashboard figures. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-small": {
+        "displayName": "Dash Small",
+        "purpose": "Small supporting text in dashboard panels and legends. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-body": {
+        "displayName": "Dash Body",
+        "purpose": "Default running text on the campaign dashboard. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-strong": {
+        "displayName": "Dash Strong",
+        "purpose": "Emphasised dashboard labels: panel titles and creator names. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-figure-sm": {
+        "displayName": "Dash Figure S",
+        "purpose": "Small Bebas figures in dense dashboard rows. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-figure": {
+        "displayName": "Dash Figure",
+        "purpose": "Standard Bebas figure for dashboard metrics. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-figure-md": {
+        "displayName": "Dash Figure M",
+        "purpose": "Mid-size Bebas figures for panel headline numbers. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-figure-lg": {
+        "displayName": "Dash Figure L",
+        "purpose": "Large Bebas figures for the most important panel numbers. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-kpi": {
+        "displayName": "Dash KPI",
+        "purpose": "The headline KPI numbers across the top of the dashboard. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
+      },
+      "dash-title": {
+        "displayName": "Dash Title",
+        "purpose": "The dashboard's campaign title. Part of the compact fixed ramp used only on campaign/dashboard/, which does not use the fluid page scale."
       }
     },
     "shadows": [
@@ -499,6 +543,13 @@
         "shares": "#8a7a68"
       },
       "note": "Client decision: colour variation instead of uniform ink bars. Green is both the Strong verdict hue and data colour 1."
+    },
+    "radiusMeta": {
+      "tick": {
+        "displayName": "Tick",
+        "value": "3px",
+        "purpose": "Dashboard step ticks and bar tracks; the tightest radius in the system."
+      }
     }
   },
   "components": [
