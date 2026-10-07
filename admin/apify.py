@@ -249,6 +249,13 @@ def build_handles(job):
         if src.startswith("selection:") and src[10:].isdigit():
             r = conn.execute("SELECT codes FROM selections WHERE id = ?", (int(src[10:]),)).fetchone()
             allowed = set(json.loads(r["codes"] or "[]")) if r else set()
+        elif src == "noanalysis":
+            have = {r["code"] for r in conn.execute("SELECT code FROM creator_analysis")}
+            allowed = {c["code"] for c in rows} - have
+        elif src == "nosnap":
+            have = {r["code"] for r in conn.execute(
+                "SELECT DISTINCT code FROM profile_snapshots WHERE platform = ?", (plat,))}
+            allowed = {c["code"] for c in rows} - have
         elif src.startswith("campaign:") and src[9:].isdigit():
             allowed = {r["code"] for r in conn.execute(
                 "SELECT code FROM campaign_creators WHERE campaign_id = ?", (int(src[9:]),))}

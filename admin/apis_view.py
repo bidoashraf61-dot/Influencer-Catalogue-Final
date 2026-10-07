@@ -13,7 +13,9 @@ DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 
 
 def _sources(current):
-    opts = [("all", "All active creators")]
+    opts = [("all", "All active creators"),
+            ("noanalysis", "Only creators with no analysis uploaded yet"),
+            ("nosnap", "Only creators not scraped yet on this platform")]
     for s in db.list_selections():
         opts.append(("selection:%d" % s["id"], "Selection: " + (s["name"] or "Untitled")))
     for c in db.list_campaigns():
@@ -111,12 +113,13 @@ def apify_tab():
         "<section class='card'><div class='hd'><h2>Jobs</h2>"
         "<form method='post' action='" + u("/apis/refresh") + "' class='inline'><button class='btn small ghost'>Check running jobs</button></form></div>"
         "<p class='sec-desc'>A job is a saved recipe: which actor, which creators, and when. "
+        "<a href='#new-job'>Create a new job below</a>. "
         "Times are Riyadh time. The scheduler checks every minute.</p>"
         "<table><thead><tr><th>Job</th><th>Runs</th><th>Last started</th><th>State</th><th></th></tr></thead><tbody>"
         + jobs_body + "</tbody></table>"
-        "<details class='card' style='margin-top:14px'><summary class='hd'><h2>New job</h2></summary>"
+        "<div class='card' id='new-job' style='margin-top:14px'><div class='hd'><h2>+ New job</h2></div>"
         "<label>Start from</label><select id='preset' form='newjob'>" + presets + "</select>"
-        + _job_form(None).replace("<form ", "<form id='newjob' ", 1) + "</details></section>" + preset_js)
+        + _job_form(None).replace("<form ", "<form id='newjob' ", 1) + "</div></section>" + preset_js)
 
     runs = []
     for r in apify.list_runs():
