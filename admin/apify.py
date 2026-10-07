@@ -34,14 +34,11 @@ PRESETS = {
     "ig_profiles": {"label": "Instagram · profile numbers", "platform": "Instagram", "kind": "profiles",
                     "actor": "apify/instagram-profile-scraper", "est": 0.003,
                     "input": '{"usernames": "{{handles}}", "includeAboutSection": false}'},
-    "ig_fakes": {"label": "Instagram · fake-follower score (cheap)", "platform": "Instagram", "kind": "analysis",
-                 "actor": "charlestechy/instagram-influencer-deep-analyzer", "est": 0.001,
-                 "input": '{"usernames": "{{handles}}"}'},
     "ig_audience": {"label": "Instagram · audience demographics (one run per creator)", "platform": "Instagram",
-                    "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 0.15,
+                    "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 1.70,
                     "input": '{"influencerHandle": "{{handle}}", "platform": "instagram"}'},
-    "ig_audit": {"label": "Instagram · follower audit (about $1 per creator)", "platform": "Instagram",
-                 "kind": "analysis", "actor": "seemuapps/instagram-fake-follower-auditor", "est": 0.99,
+    "ig_audit": {"label": "Instagram · follower audit (about $2 per creator)", "platform": "Instagram",
+                 "kind": "analysis", "actor": "seemuapps/instagram-fake-follower-auditor", "est": 2.00,
                  "input": '{"username": "{{handle}}", "sampleSize": 200}'},
     "tt_profiles": {"label": "TikTok · profile numbers", "platform": "TikTok", "kind": "profiles",
                     "actor": "khadinakbar/tiktok-profile-scraper", "est": 0.002,
@@ -50,7 +47,7 @@ PRESETS = {
                      "actor": "maximedupre/tiktok-creator-analytics", "est": 0.001,
                      "input": '{"target": "handles", "creatorHandles": "{{handles}}", "postSampleSize": 20}'},
     "tt_audience": {"label": "TikTok · audience demographics (one run per creator)", "platform": "TikTok",
-                    "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 0.15,
+                    "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 1.70,
                     "input": '{"influencerHandle": "{{handle}}", "platform": "tiktok"}'},
     "custom": {"label": "Another actor", "platform": "", "kind": "other", "actor": "", "est": 0.01,
                "input": '{"profiles": "{{handles}}"}'},
@@ -476,7 +473,7 @@ def start_job(jid, trigger="manual"):
 
 def _launch(job, handles):
     return call("POST", "/acts/" + job["actor"].replace("/", "~") + "/runs", render_input(job["input"], handles),
-                params={"maxTotalChargeUsd": "%.2f" % run_cap()})["data"]
+                params={"maxTotalChargeUsd": "%.2f" % max(run_cap(), float(job["est_each"] or 0) * 1.3 * max(1, len(handles)))})["data"]
 
 
 def pump():
@@ -637,7 +634,7 @@ def run_results(rid):
 # be edited, paused or scheduled on its own. Steps marked expensive stay off
 # unless asked for.
 PACKS = {
-    "Instagram": [("ig_profiles", "profile numbers", False), ("ig_fakes", "fake-follower score", False),
+    "Instagram": [("ig_profiles", "profile numbers", False),
                   ("ig_audience", "audience demographics", False), ("ig_audit", "follower audit", True)],
     "TikTok": [("tt_profiles", "profile numbers", False), ("tt_analytics", "engagement analytics", False),
                ("tt_audience", "audience demographics", False)],

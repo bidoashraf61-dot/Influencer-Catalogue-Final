@@ -68,7 +68,7 @@ def pack_card():
     return (
         "<section class='card'><div class='hd'><h2>Collect everything</h2></div>"
         "<p class='sec-desc'>One press runs the full set of actors for the platforms you tick: profile numbers, "
-        "fake-follower or engagement score, and audience demographics. Each step is a normal job below, so it can be "
+        "engagement analytics, and audience demographics. Each step is a normal job below, so it can be "
         "edited or scheduled on its own. If the whole collection would pass the monthly budget, nothing starts.</p>"
         "<form method='post' action='" + u("/apis/pack") + "' onsubmit=\"return confirm('This starts several runs and spends money. Continue?')\">"
         "<div style='margin:6px 0 12px'>" + chk("plat_instagram", "Instagram") + chk("plat_tiktok", "TikTok") + "</div>"
@@ -77,8 +77,8 @@ def pack_card():
         "<div><label>Repeat</label><select name='schedule'><option value='manual'>Only now</option>"
         "<option value='weekly'>Every week</option><option value='daily'>Every day</option></select></div>"
         "<div><label>At (Riyadh time)</label><input name='at_time' type='time' value='03:00'></div></div>"
-        "<div style='margin:10px 0'>" + chk("audience", "Audience demographics (about $0.15 per creator per platform)")
-        + chk("audit", "Instagram follower audit (about $1 per creator)", False) + "</div>"
+        "<div style='margin:10px 0'>" + chk("audience", "Audience demographics (about $1.70 per creator per platform)")
+        + chk("audit", "Instagram follower audit (about $2 per creator)", False) + "</div>"
         "<button class='btn lime'>Collect everything</button></form></section>")
 
 
