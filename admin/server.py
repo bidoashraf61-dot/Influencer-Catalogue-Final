@@ -59,6 +59,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import auth  # noqa: E402
+import guard  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
 import history  # noqa: E402
@@ -219,6 +220,10 @@ class Handler(BaseHTTPRequestHandler):
             to = BASE + to
         h = [("Location", to)] + list(headers or [])
         self.send(303, b"", "text/plain", h)
+
+    def secure_flag(self):
+        """'; Secure' when we are served over https (an https --origin is set)."""
+        return "; Secure" if any(o.startswith("https://") for o in ALLOWED_ORIGINS) else ""
 
     def cors(self):
         """Only for /api/*. The dashboard is same-origin and needs none."""
@@ -666,8 +671,28 @@ class Handler(BaseHTTPRequestHandler):
                          [("Location", to), ("Cache-Control", "no-store"),
                           ("Referrer-Policy", "no-referrer"), ("X-Robots-Tag", "noindex")])
 
+    def too_many(self, retry, body=None):
+        """429 in the shape the caller expects: JSON for /api/*, text otherwise."""
+        h = [("Retry-After", str(max(1, retry)))]
+        if self.path.split("?")[0].startswith(BASE + "/api/") or self.path.startswith("/api/"):
+            return self.send_json(429, body or {"ok": False, "reason": "slow_down",
+                                                "retry_after": max(1, retry)}, self.cors() + h)
+        return self.send(429, "Too many attempts. Wait a few minutes and try again.",
+                         "text/plain; charset=utf-8", h)
+
     def do_POST(self):
         path = self.route(urllib.parse.urlparse(self.path).path)
+
+        # CSRF: a cross-site form post cannot forge Origin / Sec-Fetch-Site.
+        if not guard.origin_ok(self.headers, ALLOWED_ORIGINS):
+            db.log("csrf_block", ip=self.client_ip(), user_agent=self.headers.get("User-Agent"),
+                   detail=f"{self.headers.get('Origin', '')[:80]} {path[:60]}")
+            return self.send(403, "Cross-site request blocked.", "text/plain; charset=utf-8")
+        # A blanket ceiling on the public API, so no single address can hammer it.
+        if path.startswith("/api/") and not guard.limiter.allow(f"api:{self.client_ip()}", 240, 60):
+            return self.too_many(guard.limiter.retry_after(f"api:{self.client_ip()}", 240, 60))
+        if path.startswith("/api/"):
+            guard.limiter.hit(f"api:{self.client_ip()}")
 
         if path == "/api/unlock":
             return self.api_unlock()
@@ -888,18 +913,27 @@ class Handler(BaseHTTPRequestHandler):
     def post_login(self):
         form = self.form_body()
         email = (form.get("email") or "").strip().lower()
+        ip_key, em_key = f"login:ip:{self.client_ip()}", f"login:em:{email[:80]}"
+        # 8 failures per address and 5 per account in 15 minutes, then a lockout.
+        # Counted on failure only, so a real admin who types it right is never slowed.
+        for key, limit in ((ip_key, 8), (em_key, 5)):
+            if not guard.limiter.allow(key, limit, 900):
+                return self.too_many(guard.limiter.retry_after(key, limit, 900))
         row = db.admin_by_email(email)
         ok = row and auth.verify_password(form.get("password") or "", row["password_hash"])
         # Same delay either way: a fast "no" tells an attacker the email is wrong.
         time.sleep(0.4)
         if not ok:
+            guard.limiter.hit(ip_key)
+            guard.limiter.hit(em_key)
             db.log("admin_fail", ip=self.client_ip(), user_agent=self.headers.get("User-Agent"),
                    detail=email[:80])
             return self.redirect("/login?e=1")
+        guard.limiter.reset(em_key)
         db.touch_admin_login(row["id"])
         token = db.create_session(row["id"], ADMIN_TTL)
         cookie = (f"{ADMIN_COOKIE}={auth.sign(token, SECRET)}; Path=/; HttpOnly; "
-                  f"SameSite=Lax; Max-Age={ADMIN_TTL}")
+                  f"SameSite=Lax; Max-Age={ADMIN_TTL}{self.secure_flag()}")
         return self.redirect("/", [("Set-Cookie", cookie)])
 
     def post_password(self):
@@ -3450,6 +3484,10 @@ class Handler(BaseHTTPRequestHandler):
     def api_unlock(self):
         body = self.json_body()
         code = (body.get("code") or "").strip()
+        # Guessing codes: 10 wrong tries per address per 10 minutes.
+        gk = f"unlock:{self.client_ip()}"
+        if not guard.limiter.allow(gk, 10, 600):
+            return self.too_many(guard.limiter.retry_after(gk, 10, 600))
         # The campaign report only needs the pass, not the whole roster.
         lite = bool(body.get("lite"))
         row = None
@@ -3459,6 +3497,7 @@ class Handler(BaseHTTPRequestHandler):
         ok, reason = db.code_state(row)
         ua = self.headers.get("User-Agent")
         if not ok:
+            guard.limiter.hit(gk)
             db.log("unlock_fail", row["id"] if row else None, self.client_ip(), ua, reason)
             # The reason is deliberately returned: "expired" is far more useful
             # to an honest client than a flat "wrong code", and tells an
