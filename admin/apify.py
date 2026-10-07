@@ -343,6 +343,9 @@ def build_handles(job):
             ranked = sorted(rows, key=lambda c: (c["code"] not in have, c["code"]))
             usable = [c["code"] for c in ranked if creator_handles(c).get(plat)]
             allowed = set(usable[:20])
+        elif src == "noplat":
+            have = {r["code"] for r in conn.execute("SELECT code FROM creator_analysis WHERE platform = ?", (plat,))}
+            allowed = {c["code"] for c in rows} - have
         elif src == "noanalysis":
             have = {r["code"] for r in conn.execute("SELECT code FROM creator_analysis")}
             allowed = {c["code"] for c in rows} - have
@@ -553,6 +556,9 @@ def _match(item, hmap):
         v = item.get(k)
         if isinstance(v, str) and v.lstrip("@").lower() in hmap:
             return v.lstrip("@").lower()
+    cr = item.get("creator")
+    if isinstance(cr, dict) and str(cr.get("handle", "")).lstrip("@").lower() in hmap:
+        return str(cr["handle"]).lstrip("@").lower()
     am = item.get("authorMeta")
     if isinstance(am, dict) and str(am.get("name", "")).lower() in hmap:
         return str(am["name"]).lower()
@@ -602,6 +608,33 @@ def derive_instagram(it):
     return out
 
 
+def derive_tiktok_analytics(it):
+    """Basic numbers from the TikTok creator analytics result: the profile's own
+    counts and averages over the latest posts (engagement here is measured
+    against views, as that actor defines it)."""
+    cr, au = it.get("creator") or {}, it.get("audience") or {}
+    rp = it.get("recentPosts") or {}
+    av, eng = rp.get("averages") or {}, rp.get("engagement") or {}
+    posts = [p for p in (rp.get("posts") or []) if isinstance(p, dict)]
+    stamps = sorted(str(p.get("publishedAt"))[:10] for p in posts if p.get("publishedAt"))
+    out = {"followers": _num(au.get("followers")), "following": _num(au.get("following")),
+           "posts": _num(au.get("videoCount")), "verified": 1 if cr.get("isVerified") else 0, "category": "",
+           "avg_likes": round(av["likes"], 1) if isinstance(av.get("likes"), (int, float)) else None,
+           "avg_comments": round(av["comments"], 1) if isinstance(av.get("comments"), (int, float)) else None,
+           "avg_views": round(av["views"]) if isinstance(av.get("views"), (int, float)) else None,
+           "er_pct": round(eng["ratePercent"], 3) if isinstance(eng.get("ratePercent"), (int, float)) else None,
+           "er_basis": "views", "posts_per_week": None, "last_post": stamps[-1] if stamps else None,
+           "sample_posts": _num(rp.get("usedCount")) or len(posts), "bio": cr.get("bio") or ""}
+    if len(stamps) > 1:
+        try:
+            span = (time.mktime(time.strptime(stamps[-1], "%Y-%m-%d")) - time.mktime(time.strptime(stamps[0], "%Y-%m-%d"))) / 86400.0
+            if span > 0:
+                out["posts_per_week"] = round((len(stamps) - 1) * 7.0 / span, 2)
+        except ValueError:
+            pass
+    return out
+
+
 def save_basic(conn, code, plat, handle, it, m, run_id):
     """Keep the worked-out numbers and, for a creator with no analysis on this
     platform, a basic profile record the creator page can show. A creator who
@@ -622,7 +655,11 @@ def save_basic(conn, code, plat, handle, it, m, run_id):
             "avg_likes": m["avg_likes"], "avg_comments": m["avg_comments"], "er": m["er_pct"],
             "posts_per_week": m["posts_per_week"], "last_post": m["last_post"], "sample_posts": m["sample_posts"],
             "verified": bool(m["verified"]), "account_type": m["category"] or None,
-            "bio": it.get("biography") or "", "external_url": it.get("externalUrl") or ""}
+            "bio": it.get("biography") or m.get("bio") or "", "external_url": it.get("externalUrl") or ""}
+    if m.get("avg_views") is not None:
+        data["avg_views"] = m["avg_views"]
+    if m.get("er_basis"):
+        data["er_basis"] = m["er_basis"]
     db.save_analysis(code, data, "Apify basic", conn, plat)
     return True
 
@@ -643,6 +680,15 @@ def ingest(run, job, items):
             conn.execute("INSERT INTO profile_raw (run_id, code, platform, actor, at, data) VALUES (?,?,?,?,?,?)",
                          (run["id"], code or "", plat, job["actor"] if job else "", db.now(),
                           json.dumps(small, default=str)))
+            if job and job["kind"] == "profiles" and code and isinstance(it.get("audience"), dict) and isinstance(it.get("creator"), dict):
+                m = derive_tiktok_analytics(it)
+                if m["followers"] is not None:
+                    conn.execute("INSERT INTO profile_snapshots (code,platform,handle,at,followers,following,posts,verified,run_id) "
+                                 "VALUES (?,?,?,?,?,?,?,?,?)", (code, plat, h, db.now(), m["followers"], m["following"],
+                                                               m["posts"], m["verified"], run["id"]))
+                    saved += 1
+                    save_basic(conn, code, plat, h, it, m, run["id"])
+                continue
             if job and job["kind"] == "profiles" and code:
                 f = next((x for x in (_num(it.get(k)) for k in (
                     "followersCount", "followers", "followerCount", "subscriberCount",

@@ -264,11 +264,13 @@
              ["Avg likes", a.avg_likes != null ? num(Math.round(a.avg_likes)) : "—"],
              ["Avg comments", a.avg_comments != null ? num(Math.round(a.avg_comments)) : "—"],
              ["Engagement rate", a.er != null ? pct2(a.er) : "—"],
+             ["Avg views", a.avg_views != null ? num(Math.round(a.avg_views)) : null],
              ["Posts per week", a.posts_per_week != null ? (+a.posts_per_week).toFixed(1) : "—"],
              ["Last post", a.last_post ? day(a.last_post) : "—"]];
+    T = T.filter(function (t) { return t[1] !== null; });
     $("pp-real").innerHTML = '<div class="pp-tiles pp-tiles--big">' + T.map(function (t) {
       return '<div class="pp-tile"><span>' + t[0] + "</span><b>" + t[1] + "</b></div>"; }).join("") + "</div>"
-      + (a.sample_posts ? '<p class="pp-basicnote">Worked out from this creator\'s latest ' + a.sample_posts + " public posts.</p>" : "");
+      + (a.sample_posts ? '<p class="pp-basicnote">Worked out from this creator\'s latest ' + a.sample_posts + " public posts." + (a.er_basis === "views" ? " Engagement is measured against views." : "") + "</p>" : "");
     $("pp-h-real").textContent = "Basic numbers";
     $("pp-real-sec").hidden = false;
     var ghost = '<div class="pp-pending"><div class="pp-pending__ghost" aria-hidden="true"><i style="width:82%"></i><i style="width:64%"></i><i style="width:90%"></i><i style="width:48%"></i><i style="width:72%"></i></div>'
