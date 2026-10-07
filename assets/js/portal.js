@@ -6,6 +6,7 @@
  *    cookie and unlocks itself, so every page that has a gate works unchanged.
  *  - Dock: "Find creators" (AI brief), "Ask" (chat) and the account chip, shown
  *    once signed in.
+ *  - Voice: the character in the corner; a chat that greets, then gets tasks done.
  *  - Brief wizard: a few multiple-choice questions (or one sentence the AI turns
  *    into answers), then a scored shortlist saved as a real selection.
  *
@@ -876,12 +877,523 @@
     close = layer(modal);
   }
 
+  /* ----------------------------------------------------------------- voice */
+  // "Voice": the HelloVoice character in the bottom-right corner. Opens a chat
+  // that greets the client, then routes them through tap-to-answer flows that
+  // get things done (find creators, filter the page, edit a selection, quote,
+  // talk to a person). Typing goes to the AI assistant (credits, as in "Ask").
+  // Every write is a button the client presses; the AI itself only answers.
+
+  var VOICE_PAGES = { catalogue: 1, selection: 1, creator: 1 };
+  var V_IMG = ROOT + "assets/brand/voice/";
+  var V_ICON = {
+    send: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>',
+    close: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    fresh: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>'
+  };
+
+  function mountVoice() {
+    var page = document.body.getAttribute("data-page");
+    if (!VOICE_PAGES[page] || $("hv-voice")) return;
+    var first = ME && ME.user ? ME.user.name.split(" ")[0] : "";
+    var STORE = "hv-voice:" + (ME && ME.user ? ME.user.email : ME && ME.kind) + ":" + page;
+    var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    /* -- launcher -- */
+    var root = h("div", { id: "hv-voice", class: "hv-voice" });
+    var launch = h("button", { class: "hv-launch", type: "button", "aria-label": "Chat with Voice, the HelloVoice assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
+    launch.innerHTML = '<span class="hv-launch__disc" aria-hidden="true"></span>' +
+      '<img class="hv-launch__face" src="' + V_IMG + 'voice-head-160.webp" srcset="' + V_IMG + 'voice-head-320.webp 2x" alt="" width="84" height="84" decoding="async"/>' +
+      '<span class="hv-launch__x" aria-hidden="true">' + V_ICON.close + "</span>" +
+      '<span class="hv-launch__dot" aria-hidden="true" hidden></span>';
+    var nudge = h("div", { class: "hv-nudge", role: "status", hidden: "" });
+    nudge.innerHTML = "<span>Need a hand finding creators?</span>";
+    var nudgeX = h("button", { class: "hv-nudge__x", type: "button", "aria-label": "Dismiss" });
+    nudgeX.innerHTML = V_ICON.close;
+    nudge.appendChild(nudgeX);
+
+    /* -- panel -- */
+    var panel = h("section", { id: "hv-panel", class: "hv-panel", role: "dialog", "aria-modal": "false", "aria-labelledby": "hv-name", hidden: "" });
+    var head = h("header", { class: "hv-head" });
+    head.innerHTML = '<img class="hv-head__fig" src="' + V_IMG + 'voice-figure-360.webp" srcset="' + V_IMG + 'voice-figure-720.webp 2x" alt="" width="120" height="192" decoding="async"/>' +
+      '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">Voice</h2>' +
+      '<p class="hv-head__role"><i aria-hidden="true"></i>HelloVoice assistant · replies instantly</p></div>';
+    var freshBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Start a new chat", title: "New chat" });
+    freshBtn.innerHTML = V_ICON.fresh;
+    var closeBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Close chat", title: "Close" });
+    closeBtn.innerHTML = V_ICON.close;
+    head.appendChild(h("div", { class: "hv-head__tools" }, freshBtn, closeBtn));
+    var log = h("div", { class: "hv-log", role: "log", "aria-live": "polite", "aria-relevant": "additions" });
+    var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message Voice" });
+    var send = h("button", { class: "hv-send", type: "button", "aria-label": "Send" });
+    send.innerHTML = V_ICON.send;
+    var compose = h("div", { class: "hv-compose" }, ta, send);
+    var foot = h("p", { class: "hv-foot" });
+    panel.appendChild(head); panel.appendChild(log); panel.appendChild(compose); panel.appendChild(foot);
+    root.appendChild(panel); root.appendChild(nudge); root.appendChild(launch);
+    document.body.appendChild(root);
+    document.body.classList.add("has-voice");
+
+    function refreshFoot() {
+      foot.textContent = ME && ME.ai
+        ? "Tapping options is free · typed questions use 1 credit" + (ME.credits != null ? " · " + ME.credits + " left" : "")
+        : "Tap an option, or ask for your account manager.";
+    }
+    refreshFoot();
+
+    // Keep clear of the selection tray when it is open.
+    var tray = $("cat-tray");
+    function lift() {
+      var hgt = tray && !tray.hidden ? tray.getBoundingClientRect().height : 0;
+      root.style.setProperty("--hv-lift", Math.ceil(hgt) + "px");
+    }
+    if (tray && window.MutationObserver) new MutationObserver(lift).observe(tray, { attributes: true, childList: true, subtree: true });
+    window.addEventListener("resize", lift);
+    lift();
+
+    /* -- transcript -- */
+    var msgs = [];
+    try { msgs = JSON.parse(sessionStorage.getItem(STORE) || "[]") || []; } catch (e) { msgs = []; }
+    function save() { try { sessionStorage.setItem(STORE, JSON.stringify(msgs.slice(-60))); } catch (e) { /* private */ } }
+    function scroll() { log.scrollTop = log.scrollHeight; }
+    function row(kind, node) {
+      var r = h("div", { class: "hv-row hv-row--" + kind });
+      if (kind === "ai") r.appendChild(h("img", { class: "hv-row__ava", src: V_IMG + "voice-head-160.webp", alt: "", width: "32", height: "32" }));
+      r.appendChild(node); log.appendChild(r); scroll(); return r;
+    }
+    function bubble(kind, text, keep) {
+      var b = h("div", { class: "hv-msg hv-msg--" + kind }, text);
+      row(kind, b);
+      if (keep !== false) { msgs.push({ from: kind, text: text }); save(); }
+      if (kind === "ai" && panel.hidden) launch.querySelector(".hv-launch__dot").hidden = false;
+      return b;
+    }
+    // Voice "types" for a moment before each message: short, so it reads as a reply, not a wait.
+    var queue = Promise.resolve();
+    function say(text, then) {
+      queue = queue.then(function () {
+        return new Promise(function (done) {
+          var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "Voice is typing" }, h("i"), h("i"), h("i")));
+          setTimeout(function () {
+            dots.remove(); bubble("ai", text); if (then) then(); done();
+          }, reduce ? 0 : Math.min(900, 280 + text.length * 9));
+        });
+      });
+      return queue;
+    }
+    function chips(list, opts) {
+      opts = opts || {};
+      queue = queue.then(function () {
+        var wrap = h("div", { class: "hv-chips" + (opts.stack ? " hv-chips--stack" : "") });
+        list.forEach(function (c) {
+          var b = h("button", { class: "hv-chip" + (c.primary ? " hv-chip--lime" : "") + (c.ghost ? " hv-chip--ghost" : ""), type: "button" }, c.label);
+          if (c.pressed != null) b.setAttribute("aria-pressed", String(!!c.pressed));
+          b.addEventListener("click", function () {
+            if (c.toggle) { c.toggle(b); return; }
+            if (!opts.keep) wrap.remove();
+            if (c.echo !== false) bubble("me", c.label);
+            c.go();
+          });
+          wrap.appendChild(b);
+        });
+        log.appendChild(wrap); scroll();
+      });
+      return queue;
+    }
+    var expecting = null;               // a function waiting for the next typed message
+    function askFor(text, placeholder, fn) {
+      say(text, function () { ta.placeholder = placeholder || "Type here…"; expecting = fn; ta.focus(); });
+    }
+
+    /* -- the menu -- */
+    function menu(lead) {
+      if (lead) say(lead);
+      var list = [{ label: "Find creators for a campaign", go: flowFind }];
+      if (document.querySelector(".cat-bar")) list.push({ label: "Show creators on this page", go: flowShow });
+      list.push({ label: "Work on my selection", go: flowSelection },
+                { label: "Get a quote", go: flowQuote },
+                { label: "Talk to my account manager", go: flowHuman },
+                { label: "Just browsing", ghost: true, go: function () { say("Sure. I'll be right here in the corner whenever you need me."); } });
+      chips(list, { stack: true });
+    }
+    function greet() {
+      var hour = new Date().getHours();
+      var part = hour >= 5 && hour < 12 ? "Good morning" : hour >= 12 && hour < 17 ? "Good afternoon" : hour >= 17 && hour < 23 ? "Good evening" : "Hi";
+      say(part + (first ? ", " + first : "") + " 👋 I'm Voice, HelloVoice's assistant.");
+      menu("I can find creators for your campaign, filter this page, update your selection or get you a quote. What can I help you with today?");
+    }
+
+    /* -- 1. find creators: the brief questions, free, then one paid shortlist -- */
+    var FLOW_IDS = ["goal", "platforms", "market", "category", "budget", "count"];
+    function flowFind(seed) {
+      var text = typeof seed === "string" ? seed : "";
+      say(text ? "Got it. A few quick taps and I'll match the roster. This part is free." : "Let's find the right creators. A few quick taps, all free.");
+      Promise.all([loadQuestions(), text ? api("POST", "/api/brief/guess", { text: text }) : Promise.resolve({ b: {} })]).then(function (res) {
+        var qs = res[0], answers = (res[1].b && res[1].b.answers) || {};
+        var byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
+        var todo = FLOW_IDS.filter(function (id) { return byId[id] && !(answers[id] && answers[id].length); });
+        var i = 0;
+        function next() {
+          if (i >= todo.length) return review();
+          var q = byId[todo[i]], many = q.type === "many", picked = [];
+          say(q.label);
+          var list = q.options.map(function (o) {
+            return many ? { label: o.label, pressed: false, toggle: function (b) {
+              var k = picked.indexOf(o.value);
+              if (k > -1) picked.splice(k, 1); else picked.push(o.value);
+              b.setAttribute("aria-pressed", String(k === -1));
+            } } : { label: o.label, go: function () { answers[q.id] = o.value; i++; next(); } };
+          });
+          if (many) list.push({ label: "Next", primary: true, echo: false, go: function () {
+            answers[q.id] = picked.length ? picked.slice() : ["any"];
+            bubble("me", picked.length ? picked.map(function (v) { return optionLabel(q, v); }).join(", ") : "Any");
+            i++; next();
+          } });
+          if (!q.required) list.push({ label: "Skip", ghost: true, go: function () { i++; next(); } });
+          chips(list, { keep: many });
+          if (many) queue = queue.then(function () {
+            // The "Next" press removes the whole option set.
+            var sets = log.querySelectorAll(".hv-chips"); var last = sets[sets.length - 1];
+            last.addEventListener("click", function (e) { if (e.target.closest(".hv-chip--lime")) last.remove(); });
+          });
+        }
+        function review() {
+          var costs = (ME && ME.costs) || { brief: 5 };
+          var lines = FLOW_IDS.filter(function (id) { return byId[id] && answers[id] && answers[id].length; }).map(function (id) {
+            var v = answers[id]; return (byId[id].label.replace(/\?$/, "")) + ": " + (Array.isArray(v) ? v : [v]).map(function (x) { return optionLabel(byId[id], x); }).join(", ");
+          });
+          say("Here's your brief:\n" + lines.join("\n"));
+          var list = [];
+          if (ME && ME.ai) list.push({ label: "Build my shortlist · " + costs.brief + " credits", primary: true, go: function () { build(answers); } });
+          list.push({ label: "Change answers", ghost: true, go: function () { flowFind(text); } });
+          if (!(ME && ME.ai)) list.push({ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", "Brief from Voice:\n" + lines.join("\n")); } });
+          chips(list);
+        }
+        next();
+      });
+    }
+    function build(answers) {
+      say("Matching the roster to your brief…");
+      api("POST", "/api/brief/run", { answers: answers, name: "Voice shortlist" }).then(function (r) {
+        if (!r.b.ok || r.b.empty) { say(r.b.message || "That didn't work and you weren't charged. Want to try again?"); menu(); return; }
+        setCredits(r.b.credits); refreshFoot();
+        if (typeof rememberBrief === "function") rememberBrief(r.b.brief_id);
+        say((r.b.summary || (r.b.picks.length + " creators match your brief.")) + " Best fit first, scored out of 100.");
+        queue = queue.then(function () { creatorCards(r.b.picks.slice(0, 6).map(function (p) { var c = Object.assign({ code: p.code, name: p.code }, p.creator || {}); c.fit = p.score; return c; })); });
+        say("I've saved them as a selection for you.");
+        chips([{ label: "Open the selection", primary: true, echo: false, go: function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(r.b.token); } },
+               { label: "Get a quote for it", go: function () { quoteFor({ name: "Voice shortlist", token: r.b.token }); } },
+               { label: "Something else", ghost: true, go: function () { menu("What next?"); } }]);
+      });
+    }
+    function creatorCards(list) {
+      if (!list || !list.length) return;
+      var wrap = h("div", { class: "hv-cards" });
+      list.forEach(function (c) {
+        var ph = h("span", { class: "hv-card__photo" }); bg(ph, c.photo_url);
+        var b = h("button", { class: "hv-card", type: "button" }, ph,
+          h("span", { class: "hv-card__txt" }, h("b", null, c.name),
+            h("span", null, [c.fit != null ? "Fit " + c.fit : "", c.followers ? followers(c.followers) : "", c.city].filter(Boolean).join(" · "))));
+        b.addEventListener("click", function () {
+          var card = document.querySelector('.cat-card[data-code="' + c.code + '"]');
+          if (card) { card.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" }); card.classList.add("hv-flash"); setTimeout(function () { card.classList.remove("hv-flash"); }, 2400); }
+        });
+        wrap.appendChild(b);
+      });
+      log.appendChild(wrap); scroll();
+    }
+
+    /* -- 2. show creators on this page: a sentence becomes the page's filters -- */
+    function flowShow() {
+      askFor("Describe who you'd like to see, e.g. “micro skincare creators in Jeddah on TikTok”.", "Who should I show?", function (text) {
+        api("POST", "/api/discover/parse", { text: text }).then(function (r) {
+          var p = (r.b && r.b.filters) || {};
+          var done = applyFilters(p);
+          if (!done.length) { say("I couldn't pick out filters from that. Try naming a platform, city, size or topic."); chips([{ label: "Try again", go: flowShow }, { label: "Back to the menu", ghost: true, go: function () { menu("What would you like to do?"); } }]); return; }
+          var shown = Array.prototype.filter.call(document.querySelectorAll(".cat-card"), function (c) { return !c.hidden && !c.classList.contains("cat-card--copy"); }).length;
+          say("Done. The page now shows " + done.join(", ") + ". " + (shown ? shown + " creator" + (shown === 1 ? "" : "s") + " match." : "Nobody matches all of that yet, so try loosening one filter."));
+          chips([{ label: "Clear the filters", go: function () { clearFilters(); say("Filters cleared. You're seeing the whole roster again."); } },
+                 { label: "Build a scored shortlist instead", go: function () { flowFind(text); } },
+                 { label: "Close chat", ghost: true, echo: false, go: function () { toggle(false); } }]);
+        });
+      });
+    }
+    function fold(t) { return String(t || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").trim(); }
+    function pick(sel) { var b = document.querySelector(sel); if (b && !b.checked) b.click(); return !!b; }
+    function clearFilters() { var c = document.querySelector(".cat-active__clear"); if (c) c.click(); }
+    function applyFilters(p) {
+      clearFilters();
+      var bar = document.querySelector(".cat-bar"); if (!bar) return [];
+      var out = [];
+      function each(dim, test, label) {
+        var hit = false;
+        Array.prototype.forEach.call(bar.querySelectorAll('input[data-dim="' + dim + '"]'), function (box) {
+          if (test(box.value) && !box.checked) { box.click(); hit = true; }
+        });
+        if (hit) out.push(label);
+      }
+      (p.platform || []).forEach(function (pl) { each("platform", function (v) { return v === pl; }, pl); });
+      var sizes = (p.tier || []).map(function (t) { return fold(t).replace("-tier", ""); });
+      if (sizes.length || p.hcp) each("tier", function (v) {
+        var hcp = /^hcp/i.test(v), base = fold(v.replace(/^hcp\s*-\s*/i, "")).replace("-tier", "");
+        return (p.hcp ? hcp : !hcp) && (!sizes.length || sizes.some(function (s) { return base.indexOf(s) === 0; }));
+      }, p.hcp ? "healthcare professionals" + (sizes.length ? " (" + p.tier.join(", ") + ")" : "") : p.tier.join(", ") + " creators");
+      if ((p.city || []).length) {
+        (p.city || []).forEach(function (city) { each("place", function (v) { return fold(v.split("|")[1]).indexOf(fold(city)) === 0; }, city); });
+      } else if ((p.country || []).length) {
+        p.country.forEach(function (c) { if (pick('input[data-country="' + c + '"]')) out.push(c); });
+      }
+      if ((p.interest_words || []).length) {
+        var words = p.interest_words.map(fold).filter(Boolean);
+        each("interest", function (v) { var f = " " + fold(v) + " "; return words.some(function (w) { return f.indexOf(w) !== -1; }); }, "the topics you named");
+      }
+      return out;
+    }
+
+    /* -- 3. work on my selection -- */
+    var ROSTER = null;
+    function roster() {
+      if (ROSTER) return Promise.resolve(ROSTER);
+      return api("GET", "/api/roster").then(function (r) { ROSTER = (r.b && r.b.roster) || []; return ROSTER; });
+    }
+    function byCode(list, code) { return list.filter(function (c) { return c.code === code; })[0]; }
+    function flowSelection() {
+      say("Let me pull up your selections…");
+      api("GET", "/api/voice/selections").then(function (r) {
+        var sels = (r.b && r.b.selections) || [];
+        if (!sels.length) {
+          say("You don't have a saved selection yet. Pick creators on the catalogue and press Save, or let me build one for you.");
+          chips([{ label: "Find creators for a campaign", primary: true, go: flowFind }, { label: "Back to the menu", ghost: true, go: function () { menu("What else can I do?"); } }]);
+          return;
+        }
+        say("Which one?");
+        chips(sels.slice(0, 8).map(function (s) {
+          return { label: s.name + " · " + s.codes.length + (s.mine ? "" : " (team)"), go: function () { selActions(s); } };
+        }), { stack: true });
+      });
+    }
+    function selActions(s) {
+      say("“" + s.name + "” has " + s.codes.length + " creator" + (s.codes.length === 1 ? "" : "s") + ". What should I do?");
+      chips([{ label: "Open it", echo: false, go: function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(s.token); } },
+             { label: "Add creators", go: function () { selAdd(s); } },
+             { label: "Remove creators", go: function () { selRemove(s); } },
+             { label: "Rename it", go: function () { selRename(s); } },
+             { label: "Compare two creators", go: function () { selCompare(s); } },
+             { label: "Get a quote for it", go: function () { quoteFor(s); } }]);
+    }
+    function saveSel(s, codes, name, msg) {
+      return api("POST", "/api/selection", { token: s.token, name: name || s.name, codes: codes }).then(function (r) {
+        if (!r.b.ok) { say(r.b.reason === "empty" ? "A selection needs at least one creator, so I left it as it was." : "I couldn't save that just now. Please try again."); return; }
+        s.codes = codes; s.name = name || s.name; s.token = r.b.token || s.token;
+        say(msg);
+        chips([{ label: "Open it", primary: true, echo: false, go: function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(s.token); } },
+               { label: "More changes", go: function () { selActions(s); } },
+               { label: "Done", ghost: true, go: function () { say("Anytime."); } }]);
+      });
+    }
+    function selAdd(s) {
+      askFor("Type the creators' names or codes, separated by commas.", "e.g. Sara A., HV-MI-014", function (text) {
+        roster().then(function (list) {
+          var want = text.split(/[,،\n]+/).map(fold).filter(Boolean), found = [], miss = [];
+          want.forEach(function (w) {
+            var c = list.filter(function (x) { return fold(x.code) === w || fold(x.name) === w; })[0] ||
+                    list.filter(function (x) { return fold(x.name).indexOf(w) === 0; })[0];
+            if (c && s.codes.indexOf(c.code) === -1 && found.indexOf(c) === -1) found.push(c); else if (!c) miss.push(w);
+          });
+          if (!found.length) { say("I couldn't find " + (miss.length ? "“" + miss.join("”, “") + "”" : "anyone new") + " on the roster. Check the spelling, or use the code on the card."); chips([{ label: "Try again", go: function () { selAdd(s); } }, { label: "Back", ghost: true, go: function () { selActions(s); } }]); return; }
+          say("Add " + found.map(function (c) { return c.name; }).join(", ") + " to “" + s.name + "”?" + (miss.length ? " (I couldn't find: " + miss.join(", ") + ")" : ""));
+          chips([{ label: "Yes, add " + (found.length === 1 ? "them" : "all " + found.length), primary: true, go: function () {
+            saveSel(s, s.codes.concat(found.map(function (c) { return c.code; })), null, "Added. “" + s.name + "” now has " + (s.codes.length + found.length) + " creators.");
+          } }, { label: "Cancel", ghost: true, go: function () { selActions(s); } }]);
+        });
+      });
+    }
+    function selRemove(s) {
+      roster().then(function (list) {
+        var drop = [];
+        say("Tap the creators to remove, then confirm.");
+        chips(s.codes.map(function (code) {
+          var c = byCode(list, code) || { name: code };
+          return { label: c.name, pressed: false, toggle: function (b) {
+            var k = drop.indexOf(code); if (k > -1) drop.splice(k, 1); else drop.push(code);
+            b.setAttribute("aria-pressed", String(k === -1));
+          } };
+        }).concat([{ label: "Remove selected", primary: true, echo: false, go: function () {
+          if (!drop.length) { say("Nothing picked, so nothing changed."); return; }
+          bubble("me", "Remove " + drop.length);
+          saveSel(s, s.codes.filter(function (c) { return drop.indexOf(c) === -1; }), null, "Removed " + drop.length + ". “" + s.name + "” now has " + (s.codes.length - drop.length) + " creators.");
+        } }]), { keep: true });
+        queue = queue.then(function () {
+          var sets = log.querySelectorAll(".hv-chips"); var last = sets[sets.length - 1];
+          last.addEventListener("click", function (e) { if (e.target.closest(".hv-chip--lime")) last.remove(); });
+        });
+      });
+    }
+    function selRename(s) {
+      askFor("What should “" + s.name + "” be called?", "New name", function (text) {
+        var name = text.trim().slice(0, 120);
+        if (!name) return;
+        saveSel(s, s.codes.slice(), name, "Renamed to “" + name + "”.");
+      });
+    }
+    function selCompare(s) {
+      roster().then(function (list) {
+        var two = [];
+        say("Tap two creators to compare.");
+        chips(s.codes.map(function (code) {
+          var c = byCode(list, code) || { name: code, code: code };
+          return { label: c.name, pressed: false, toggle: function (b) {
+            if (two.indexOf(c) > -1) return;
+            two.push(c); b.setAttribute("aria-pressed", "true");
+            if (two.length === 2) { b.closest(".hv-chips").remove(); bubble("me", two[0].name + " vs " + two[1].name); compare(two); }
+          } };
+        }), { keep: true });
+      });
+    }
+    function compare(two) {
+      queue = queue.then(function () {
+        var rows = [["Size", function (c) { return c.tier || "—"; }], ["Followers", function (c) { return c.followers ? followers(c.followers) : "—"; }],
+                    ["Platform", function (c) { return c.platform || "—"; }], ["City", function (c) { return c.city || "—"; }],
+                    ["Niche", function (c) { return c.interest || "—"; }], ["Full analysis", function (c) { return c.analysis ? "On file" : "Not yet"; }]];
+        var t = h("table", { class: "hv-compare" });
+        var hr = h("tr", null, h("th", null, ""));
+        two.forEach(function (c) { hr.appendChild(h("th", { scope: "col" }, c.name)); });
+        t.appendChild(hr);
+        rows.forEach(function (r) {
+          var tr = h("tr", null, h("th", { scope: "row" }, r[0]));
+          two.forEach(function (c) { tr.appendChild(h("td", null, r[1](c))); });
+          t.appendChild(tr);
+        });
+        row("ai", h("div", { class: "hv-msg hv-msg--ai hv-msg--wide" }, t));
+      });
+      var missing = two.filter(function (c) { return !c.analysis; });
+      var list = two.filter(function (c) { return c.analysis; }).map(function (c) {
+        return { label: "Open " + c.name.split(" ")[0] + "'s analysis", echo: false, go: function () { location.href = ROOT + "creator/#c=" + encodeURIComponent(c.code); } };
+      });
+      missing.forEach(function (c) {
+        list.push({ label: "Request " + c.name.split(" ")[0] + "'s analysis", go: function () {
+          api("POST", "/api/creator/request", { code: c.code }).then(function (r) {
+            say(r.b.ok ? "Requested. The team will add " + c.name + "'s full analysis and you'll see it on their card." : "That request didn't go through. Please try again.");
+          });
+        } });
+      });
+      list.push({ label: "Done", ghost: true, go: function () { say("Anytime."); } });
+      chips(list);
+    }
+
+    /* -- 4 & 5. quote and a person -- */
+    function flowQuote() {
+      api("GET", "/api/voice/selections").then(function (r) {
+        var sels = (r.b && r.b.selections) || [];
+        if (!sels.length) { handoffAsk("quote", null, "Tell me what you'd like quoted (creators, deliverables, dates) and I'll send it to your account manager."); return; }
+        say("Which selection should we quote?");
+        chips(sels.slice(0, 6).map(function (s) { return { label: s.name + " · " + s.codes.length, go: function () { quoteFor(s); } }; })
+          .concat([{ label: "Something else", ghost: true, go: function () { handoffAsk("quote", null, "Tell me what you'd like quoted and I'll pass it on."); } }]), { stack: true });
+      });
+    }
+    function quoteFor(s) { handoffAsk("quote", s, "Anything to add for the quote, like deliverables, dates or budget? Or tap Send as is."); }
+    function handoffAsk(topic, sel, prompt) {
+      askFor(prompt, "Add a note…", function (text) { handoff(topic, text, sel); });
+      if (sel) chips([{ label: "Send as is", primary: true, go: function () { expecting = null; ta.placeholder = "Type a message…"; handoff(topic, "", sel); } }]);
+    }
+    function flowHuman() { handoffAsk("handoff", null, "What would you like to discuss? I'll send it to your account manager with our chat."); }
+    function handoff(topic, note, sel) {
+      api("POST", "/api/voice/handoff", { topic: topic, message: note, selection: sel ? sel.name + " (" + sel.token + ")" : "", transcript: msgs.slice(-30) }).then(function (r) {
+        if (r.s === 429) { say("You've sent a few requests already today. The team has them and will be in touch."); return; }
+        if (!r.b.ok) { say("That didn't go through. Please try again in a moment."); return; }
+        say((topic === "quote" ? "Quote request sent" : "Sent") + (r.b.kam ? " to your account manager" : " to the HelloVoice team") +
+            ". They usually reply within one working day, by email" + (ME && ME.user && ME.user.phone ? " or phone" : "") + ".");
+        chips([{ label: "Back to the menu", ghost: true, go: function () { menu("Anything else?"); } }]);
+      });
+    }
+
+    /* -- typing: answers a pending question, or goes to the AI -- */
+    var REQ = /campaign|creator|influencer|shortlist|launch|recommend|suggest|find|looking for|ugc|حمل|مؤثر|إطلاق|اطلاق|ابحث|أبحث|اقترح/i;
+    var thread = null, busy = false;
+    function submit() {
+      var text = ta.value.trim();
+      if (!text || busy) return;
+      ta.value = ""; grow();
+      bubble("me", text);
+      Array.prototype.forEach.call(log.querySelectorAll(".hv-chips"), function (c) { c.remove(); });
+      if (expecting) { var fn = expecting; expecting = null; ta.placeholder = "Type a message…"; fn(text); return; }
+      if (/account manager|talk to (a )?(person|human|someone)|call me/i.test(text)) { handoff("handoff", text); return; }
+      if (REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
+      if (!(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
+      busy = true; send.disabled = true;
+      var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "Voice is typing" }, h("i"), h("i"), h("i")));
+      api("POST", "/api/chat", { message: text, thread: thread }).then(function (r) {
+        busy = false; send.disabled = false; dots.remove();
+        if (r.b.ok) {
+          thread = r.b.thread; bubble("ai", r.b.reply); setCredits(r.b.credits); refreshFoot();
+          if (r.b.cards && r.b.cards.length) creatorCards(r.b.cards);
+        } else {
+          say(r.s === 429 ? "One moment, that was quick. Try again in a few seconds." : (r.b.message || "That didn't work, and you weren't charged."));
+        }
+      });
+    }
+    function grow() { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 120) + "px"; }
+    ta.addEventListener("input", grow);
+    ta.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } });
+    send.addEventListener("click", submit);
+
+    /* -- open and close -- */
+    var started = false;
+    function toggle(on) {
+      if (on === undefined) on = panel.hidden;
+      if (on) {
+        panel.hidden = false;
+        requestAnimationFrame(function () { root.classList.add("is-open"); });
+        launch.setAttribute("aria-expanded", "true");
+        launch.querySelector(".hv-launch__dot").hidden = true;
+        hideNudge(true);
+        if (!started) {
+          started = true;
+          if (msgs.length) { msgs.forEach(function (m) { bubble(m.from, m.text, false); }); menu("Welcome back" + (first ? ", " + first : "") + ". What's next?"); }
+          else greet();
+        }
+        setTimeout(function () { ta.focus({ preventScroll: true }); }, 60);
+      } else {
+        root.classList.remove("is-open");
+        launch.setAttribute("aria-expanded", "false");
+        setTimeout(function () { if (!root.classList.contains("is-open")) panel.hidden = true; }, reduce ? 0 : 220);
+        launch.focus({ preventScroll: true });
+      }
+    }
+    launch.addEventListener("click", function () { toggle(); });
+    closeBtn.addEventListener("click", function () { toggle(false); });
+    freshBtn.addEventListener("click", function () {
+      msgs = []; save(); thread = null; expecting = null; log.innerHTML = ""; queue = Promise.resolve(); greet();
+    });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && root.classList.contains("is-open")) toggle(false); });
+
+    /* -- the nudge: once per visit, after the client has had a look around -- */
+    var NUDGE = "hv-voice-nudged";
+    function hideNudge(forever) {
+      nudge.classList.remove("is-in");
+      setTimeout(function () { nudge.hidden = true; }, 200);
+      if (forever) { try { sessionStorage.setItem(NUDGE, "1"); } catch (e) { /* private */ } }
+    }
+    nudge.addEventListener("click", function (e) { if (e.target.closest(".hv-nudge__x")) { hideNudge(true); return; } toggle(true); });
+    var nudged = false;
+    try { nudged = sessionStorage.getItem(NUDGE) === "1"; } catch (e) { /* private */ }
+    if (!nudged) {
+      setTimeout(function () {
+        if (root.classList.contains("is-open")) return;
+        nudge.hidden = false;
+        requestAnimationFrame(function () { nudge.classList.add("is-in"); launch.classList.add("is-waving"); });
+        setTimeout(function () { launch.classList.remove("is-waving"); }, 1600);
+        setTimeout(function () { if (!root.classList.contains("is-open")) hideNudge(true); }, 9000);
+      }, 4500);
+    }
+  }
+
   /* ------------------------------------------------------------------ boot */
 
   function boot() {
     api("GET", "/api/me").then(function (r) {
       if (r.b && r.b.signed_in) {
-        ME = r.b; mountDock();
+        ME = r.b; mountDock(); mountVoice();
         var m = /[#&]s=([^&]+)/.exec(location.hash || "");
         if (document.body.getAttribute("data-page") === "selection" && m) setTimeout(function () { offerBrief(decodeURIComponent(m[1])); }, 1200);
         if (storedBrief()) applyFit();

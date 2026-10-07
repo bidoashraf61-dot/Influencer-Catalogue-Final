@@ -209,6 +209,20 @@ class PortalMixin:
                 else:
                     self.send_json(200, {"ok": True, "brief": b["summary"], "scores": self._brief_scores(b)}, self.cors())
             return True
+        if path == "/api/voice/selections":
+            # Voice ("Work on my selection"): the viewer's own shortlists, then their colleagues'.
+            who = self._need_viewer()
+            if who:
+                team = portal.team_codes(who[0]) | {who[0]}
+                with db.connect() as conn:
+                    rows = conn.execute(
+                        "SELECT name, token, codes, updated_at, code_id FROM selections WHERE code_id IN (%s) AND archived_at IS NULL "
+                        "ORDER BY (code_id = ?) DESC, updated_at DESC LIMIT 20" % ",".join("?" * len(team)),
+                        list(team) + [who[0]]).fetchall()
+                self.send_json(200, {"ok": True, "selections": [
+                    {"name": r["name"], "token": r["token"], "codes": json.loads(r["codes"] or "[]"), "at": r["updated_at"],
+                     "mine": r["code_id"] == who[0]} for r in rows]}, self.cors())
+            return True
         if path == "/api/team":
             who = self._need_viewer()
             if who:
@@ -255,6 +269,7 @@ class PortalMixin:
             "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat,
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
             "/api/credits/request": self.api_credits_request, "/api/me/delete": self.api_me_delete,
+            "/api/voice/handoff": self.api_voice_handoff,
         }
         fn = routes.get(path)
         if not fn:
@@ -449,6 +464,31 @@ class PortalMixin:
                                 "Note: %s" % (b.get("note") or "—")], kam=user["kam"] if user else None)
         return self.send_json(200, {"ok": True, "id": rid,
                                     "message": "Request sent. The HelloVoice team will top you up shortly."}, self.cors())
+
+    def api_voice_handoff(self):
+        """Voice: "talk to my account manager" or "get a quote". The client's message and the
+        chat so far go to their KAM and the team list; the reply comes from a person."""
+        who = self._need_viewer()
+        if not who:
+            return
+        cid, user, kind = who
+        b = self.json_body()
+        topic = "quote" if b.get("topic") == "quote" else "handoff"
+        if self._throttled("handoff:%d" % cid, 6, 86400):
+            return
+        note = str(b.get("message") or "").strip()[:1200]
+        sel = str(b.get("selection") or "").strip()[:80]
+        lines = []
+        for m in (b.get("transcript") or [])[-30:]:
+            if isinstance(m, dict) and m.get("text"):
+                lines.append("%s: %s" % ("Client" if m.get("from") == "me" else "Voice", str(m["text"])[:400]))
+        who_txt = ((user["name"] + ", " + (user["company"] or "")) if user else "An access-code client")
+        contact = (user["email"] + (" · " + user["phone"] if user["phone"] else "")) if user else "—"
+        db.log("request", cid, self.client_ip(), self.headers.get("User-Agent"), "voice %s" % topic)
+        notify.send("quote", ["%s %s via Voice." % (who_txt, "asked for a quote" if topic == "quote" else "asked to talk to their account manager"),
+                              "Contact: %s" % contact, "Selection: %s" % (sel or "—"), "Message: %s" % (note or "—"),
+                              "", "Chat:", *lines], kam=user["kam"] if user else None)
+        return self.send_json(200, {"ok": True, "kam": bool(user and user["kam"])}, self.cors())
 
     def api_me_delete(self):
         who = self._need_viewer()
