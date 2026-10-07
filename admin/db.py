@@ -643,6 +643,21 @@ def revoke_code(code_id):
         conn.execute("UPDATE codes SET revoked_at = ? WHERE id = ?", (now(), code_id))
 
 
+def delete_code(code_id):
+    """Permanently remove a code. Its devices go with it; events, requests and
+    campaigns keep their rows with the code cleared. Selections have no foreign
+    key, so they are detached by hand and keep working by their own link."""
+    with connect() as conn:
+        conn.execute("UPDATE selections SET code_id = NULL WHERE code_id = ?", (code_id,))
+        conn.execute("DELETE FROM codes WHERE id = ?", (code_id,))
+
+
+def restore_code(code_id):
+    """Bring a revoked code back live. Expiry and use limits still apply."""
+    with connect() as conn:
+        conn.execute("UPDATE codes SET revoked_at = NULL WHERE id = ?", (code_id,))
+
+
 # ----------------------------------------------------------- devices --
 
 def device_hash(token):

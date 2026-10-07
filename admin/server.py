@@ -372,8 +372,12 @@ class Handler(BaseHTTPRequestHandler):
                      if not r["undone_at"] and r["action"] != "undo"}
             return self.send(200, views.history_page(rows, later, kind, q, query.get("ok"), query.get("e"), pg))
         if path == "/codes":
+            lists = {}
+            for sel in db.list_selections():
+                if sel["code_id"]:
+                    lists.setdefault(sel["code_id"], []).append(sel["name"])
             return self.send(200, views.codes_page(db.list_codes(), query.get("new"), query.get("e"),
-                                                   db.code_devices(), query.get("ok")))
+                                                   db.code_devices(), query.get("ok"), lists))
         if path == "/analytics":
             # Two dates off a calendar, not a fixed window. int(query["days"])
             # used to sit here and raised ValueError on anything non-numeric in
@@ -667,6 +671,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_code_new()
         if path == "/codes/revoke":
             return self.post_code_revoke()
+        if path == "/codes/restore":
+            return self.post_code_restore()
+        if path == "/codes/delete":
+            return self.post_code_delete()
         if path == "/codes/passcode":
             return self.post_code_passcode()
         if path == "/codes/limits":
@@ -934,6 +942,21 @@ class Handler(BaseHTTPRequestHandler):
             db.remove_device(int(did))
         return self.redirect("/codes?ok=" + urllib.parse.quote("Device removed.")
                              + ("#code-" + cid if cid.isdigit() else ""))
+
+    def post_code_delete(self):
+        cid = self.form_body().get("id")
+        row = db.get_code(int(cid)) if cid and cid.isdigit() else None
+        # Only a code that is already off can be deleted: revoke first, so a
+        # live client is never cut off by a single stray click.
+        if row is not None and not db.code_state(row)[0]:
+            db.delete_code(row["id"])
+        return self.redirect("/codes")
+
+    def post_code_restore(self):
+        cid = self.form_body().get("id")
+        if cid and cid.isdigit():
+            db.restore_code(int(cid))
+        return self.redirect("/codes")
 
     def post_code_revoke(self):
         cid = self.form_body().get("id")
@@ -3128,6 +3151,8 @@ TRACKED = {
     "/campaigns/sync": ("campaign", "id", "Synced campaign creators"),
     "/codes/new": ("code", None, "Created access code"),
     "/codes/revoke": ("code", "id", "Revoked access code"),
+    "/codes/restore": ("code", "id", "Restored access code"),
+    "/codes/delete": ("code", "id", "Deleted access code"),
     "/codes/limits": ("code", "id", "Changed access code limits"),
     "/codes/passcode": ("code", "id", "Changed a passcode"),
     "/codes/device/remove": ("code", "code", "Removed a device"),

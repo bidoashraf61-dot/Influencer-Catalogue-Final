@@ -779,7 +779,8 @@ def _client_tabs(current):
     return [(u("/clients"), "Clients", None, current == "clients"), (u("/codes"), "Access codes", None, current == "codes")]
 
 
-def codes_page(codes, new_code=None, error=None, devices=(), message=None):
+def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists=None):
+    lists = lists or {}
     by_code = {}
     for d in devices or ():
         by_code.setdefault(d["code_id"], []).append(d)
@@ -808,6 +809,21 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None):
                 + confirm + "\"><input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small danger'>Revoke</button></form>"
             )
+        elif reason == "revoked":
+            revoke = (
+                "<form method='post' action='" + u("/codes/restore") + "' class='inline' onsubmit=\""
+                + "return confirm('Restore this code? It works again at once.')\">"
+                + "<input type='hidden' name='id' value='" + str(c["id"])
+                + "'><button class='btn small'>Restore</button></form>"
+            )
+        if not ok:
+            revoke += (
+                " <form method='post' action='" + u("/codes/delete") + "' class='inline' onsubmit=\""
+                + "return confirm('Delete this code for good? It cannot be restored. "
+                + "Selections keep working by their own link.')\">"
+                + "<input type='hidden' name='id' value='" + str(c["id"])
+                + "'><button class='btn small danger'>Delete</button></form>"
+            )
         # Codes issued before code_plain existed are hashed and gone; the last
         # four characters are all that was ever kept of them.
         plain = c["code_plain"] if "code_plain" in c.keys() else None
@@ -822,14 +838,18 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None):
         manage = ("<details id='code-" + str(c["id"]) + "' class='manage'><summary class='btn small ghost'>"
                   "Manage</summary><div class='manage-body'>"
                   + code_manage(c, by_code.get(c["id"], [])) + "</div></details>")
+        names = lists.get(c["id"], [])
+        hay = " ".join([c["label"] or "", plain or "", c["hint"] or ""] + names).lower()
+        listed = ("<br><span class='muted' style='font-size:12px'>" + e(", ".join(names[:3]))
+                  + ("…" if len(names) > 3 else "") + "</span>") if names else ""
         rows.append(
-            "<tr><td><strong>" + e(c["label"]) + "</strong><br>" + shown
+            "<tr class='code-row' data-q='" + e(hay) + "'><td><strong>" + e(c["label"]) + "</strong><br>" + shown + listed
             + "</td><td><span class='pill " + cls + "'>" + e(reason) + "</span></td>"
             + "<td>" + devs + "</td>"
             + "<td>" + used + "</td><td class='muted'>" + ts(c["expires_at"]) + "</td>"
             + "<td class='muted'>" + ago(c["last_used"]) + "</td>"
             + "<td class='right'>" + revoke + "</td></tr>"
-            + "<tr class='manage-row'><td colspan='7'>" + manage + "</td></tr>"
+            + "<tr class='manage-row' data-for='" + e(hay) + "'><td colspan='7'>" + manage + "</td></tr>"
         )
     body_rows = "".join(rows) or ("<tr><td colspan='7'>" + ui.empty("key", "No access codes yet", "Create one above. A client needs a code to open the catalogue.") + "</td></tr>")
 
@@ -857,9 +877,19 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None):
           "<div class='price-hint'>Phones or computers this code opens on. Passed to anyone "
           "else, it will not open. Empty = no limit.</div></div>"
         + "</div><button class='btn lime'>Create code</button></form></details>"
-        + "<div class='card'><table><thead><tr><th>Code</th><th>State</th><th>Devices</th><th>Uses</th>"
+        + "<div class='card'><input id='code-search' type='search' autocomplete='off' "
+          "placeholder='Search by company, list name or passcode' style='width:100%;margin-bottom:12px'>"
+          "<p id='code-none' class='muted' style='display:none'>No code matches.</p>"
+          "<table><thead><tr><th>Code</th><th>State</th><th>Devices</th><th>Uses</th>"
         + "<th>Expires</th><th>Last used</th><th></th></tr></thead><tbody>"
         + body_rows + "</tbody></table></div>"
+        + "<script>(function(){var i=document.getElementById('code-search');if(!i)return;"
+          "i.addEventListener('input',function(){var q=i.value.trim().toLowerCase(),n=0;"
+          "document.querySelectorAll('tr.code-row,tr.manage-row').forEach(function(r){"
+          "var h=r.getAttribute('data-q')||r.getAttribute('data-for')||'';"
+          "var on=!q||h.indexOf(q)>-1;r.style.display=on?'':'none';"
+          "if(on&&r.classList.contains('code-row'))n++;});"
+          "document.getElementById('code-none').style.display=(q&&!n)?'':'none';});})();</script>"
     )
     return page("Access codes", body, "/codes")
 
