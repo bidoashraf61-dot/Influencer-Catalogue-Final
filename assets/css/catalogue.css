@@ -1254,15 +1254,10 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cst-head small { display: block; }
 
 
-/* Fit, Role and Tags join the filter row as their own group, in orange. */
-.cat-bar__sep { width: 2px; align-self: stretch; min-height: 34px; margin: 0 6px; background: var(--vivid-orange); border-radius: 2px; opacity: .7; }
+/* Fit, Role and Tags join the filter row as their own group, in lime. */
+.cat-bar__sep { width: 2px; align-self: stretch; min-height: 34px; margin: 0 6px; background: var(--ink); border-radius: 2px; opacity: .25; }
 .cat-bar__match { display: contents; }
 .cat-bar__match[hidden], .cat-bar__sep[hidden] { display: none; }
-.cat-dd--match .cat-dd__btn { background: var(--vivid-orange); border-color: var(--vivid-orange); color: var(--ink); }
-.cat-dd--match .cat-dd__btn:hover { background: #ff8444; border-color: #ff8444; }
-.cat-dd--match.has-value .cat-dd__btn { background: var(--ink); color: var(--vivid-orange); border-color: var(--vivid-orange); box-shadow: 0 0 0 2px var(--vivid-orange) inset; }
-.cat-dd--match .cat-dd__done { background: var(--vivid-orange); border-color: var(--vivid-orange); color: var(--ink); }
-.cat-dd--match .cat-opt input:checked + .cat-opt__box { background: var(--vivid-orange); border-color: var(--vivid-orange); }
 .cat-opt__n { margin-left: auto; font-size: 12px; font-weight: 700; opacity: .55; padding-left: 12px; }
 .cat-opt:has(.cat-opt__n) { display: flex; align-items: center; }
 .cat-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 8px; flex: none; background: #14884a; }
@@ -1356,3 +1351,46 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-selhead__title { margin-bottom: 10px; }
 p.cat-selhead__brief { display: block; margin: 0; font-size: 15px; font-weight: 600; color: var(--gray); letter-spacing: .01em; }
 [data-page="selection"] .cat-hero { padding-bottom: 32px; }
+
+/* ------------------------------------------- summary: stats, tier mix, places
+   Icons beside each label, the tier split as one bar, each country with its
+   flag and its share of the selection. */
+.cat-stat dt { display: flex; align-items: center; gap: 10px; }
+.cat-stat__icon { display: inline-flex; width: 30px; height: 30px; border-radius: 100%;
+  background: var(--ink); color: var(--lime); align-items: center; justify-content: center; flex: none; }
+.cat-stat__icon:empty { display: none; }
+.cat-stat__icon svg { width: 17px; height: 17px; }
+.cat-stat dd { padding-left: 40px; }
+.cat-stat--range dd { color: var(--ink); }
+@media screen and (max-width: 767px) { .cat-stat dd { padding-left: 0; } }
+
+.cat-tiers { margin: -4px 0 32px; padding: 0 0 32px; border-bottom: 1px solid rgba(18,18,18,.12); }
+.cat-tiers__bar { display: flex; height: 44px; border-radius: var(--r-pill); overflow: hidden; gap: 3px; background: transparent; }
+.cat-tiers__bar span { min-width: 30px; display: flex; align-items: center; justify-content: center;
+  font-family: var(--heading); font-size: 20px; letter-spacing: .04em; color: var(--white); }
+.cat-tiers__legend { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 26px; }
+.cat-tiers__legend li { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--gray); }
+.cat-tiers__legend i { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+.cat-tiers__legend b { color: var(--ink); font-weight: 700; }
+.cat-tiers__legend small { font-size: 12px; opacity: .7; }
+
+.cat-flag { width: 30px; height: 20px; border-radius: 4px; flex: none; align-self: center;
+  box-shadow: 0 0 0 1px rgba(18,18,18,.14); }
+.cat-flag--none { display: inline-flex; align-items: center; justify-content: center; box-shadow: none;
+  width: 30px; height: 30px; border-radius: 100%; background: var(--ink); color: var(--white); }
+.cat-flag--none svg { width: 18px; height: 18px; }
+.cat-places__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 26px 48px; }
+.cat-places__country { align-items: center; }
+.cat-places__bar { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; }
+.cat-meter { flex: 1; height: 8px; border-radius: var(--r-pill); background: rgba(18,18,18,.1); overflow: hidden; }
+.cat-meter i { display: block; height: 100%; background: var(--ink); border-radius: inherit; }
+.cat-meter__pct { font-size: 13px; font-weight: 600; color: var(--ink); min-width: 38px; text-align: right; }
+ul.cat-places__cities { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var(--r-pill); padding: 4px 11px; font-size: 13px; }
+
+/* Fit and tag filters: lime, the brand's own accent. */
+.cat-dd--match .cat-dd__btn { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.cat-dd--match .cat-dd__btn:hover { background: #dcf55c; border-color: #dcf55c; }
+.cat-dd--match.has-value .cat-dd__btn { background: var(--ink); color: var(--lime); border-color: var(--lime); box-shadow: 0 0 0 2px var(--lime) inset; }
+.cat-dd--match .cat-dd__done { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.cat-dd--match .cat-opt input:checked + .cat-opt__box { background: var(--lime); border-color: var(--ink); }

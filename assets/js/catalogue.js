@@ -471,6 +471,52 @@
   // the field. Filters group the cities under their country so Riyadh and
   // Jeddah sit under Saudi Arabia rather than between Dubai and Cairo.
   // Matching still uses the raw value on the card; this is only how it reads.
+
+  /* Small drawn flags for the "Where they are" panel. Simplified on purpose:
+     at 30x20 the colour bands are what people recognise. */
+  function serrated(color, n) {
+    var pts = ["0,0", "8,0"], step = 20 / (2 * n);
+    for (var i = 1; i < 2 * n; i++) pts.push((i % 2 ? 11 : 8) + "," + (i * step).toFixed(2));
+    pts.push("8,20", "0,20");
+    return '<rect width="30" height="20" fill="' + color + '"/><polygon fill="#fff" points="' + pts.join(" ") + '"/>';
+  }
+  function bands(a, b, c) {
+    return '<rect width="30" height="6.7" fill="' + a + '"/><rect y="6.6" width="30" height="6.8" fill="' + b +
+      '"/><rect y="13.3" width="30" height="6.7" fill="' + c + '"/>';
+  }
+  var FLAGS = {
+    "Egypt": bands("#ce1126", "#fff", "#111") + '<circle cx="15" cy="10" r="2" fill="#c09300"/>',
+    "Saudi Arabia": '<rect width="30" height="20" fill="#006c35"/><rect x="8" y="6.5" width="14" height="1.7" rx=".8" fill="#fff"/>' +
+      '<rect x="9" y="12" width="12" height="1" fill="#fff"/><rect x="20" y="11.2" width="1.2" height="2.6" fill="#fff"/>',
+    "UAE": bands("#00732f", "#fff", "#111") + '<rect width="8" height="20" fill="#ff0000"/>',
+    "Kuwait": bands("#007a3d", "#fff", "#ce1126") + '<polygon points="0,0 8,6.7 8,13.3 0,20" fill="#111"/>',
+    "Qatar": serrated("#8a1538", 9),
+    "Bahrain": serrated("#ce1126", 5),
+    "Oman": '<rect width="30" height="20" fill="#db161b"/><rect x="8" width="22" height="6.7" fill="#fff"/><rect x="8" y="13.3" width="22" height="6.7" fill="#008000"/>',
+    "Jordan": bands("#111", "#fff", "#007a3d") + '<polygon points="0,0 14,10 0,20" fill="#ce1126"/><circle cx="4.6" cy="10" r="1.3" fill="#fff"/>',
+    "Lebanon": '<rect width="30" height="20" fill="#ed1c24"/><rect y="5" width="30" height="10" fill="#fff"/><polygon points="15,6 19.5,13.5 10.5,13.5" fill="#00a651"/>',
+    "Iraq": bands("#ce1126", "#fff", "#111") + '<rect x="10" y="9.2" width="10" height="1.6" rx=".8" fill="#007a3d"/>',
+    "Morocco": '<rect width="30" height="20" fill="#c1272d"/><polygon points="15,5.5 16.3,9.3 20.3,9.3 17.1,11.7 18.3,15.5 15,13.2 11.7,15.5 12.9,11.7 9.7,9.3 13.7,9.3" fill="none" stroke="#006233" stroke-width="1"/>'
+  };
+  var ICON_GLOBE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5S9.6 5.9 12 3.5z"/></svg>';
+  function flagOf(country) {
+    var f = FLAGS[country];
+    return f ? '<svg class="cat-flag" viewBox="0 0 30 20" aria-hidden="true">' + f + "</svg>"
+             : '<span class="cat-flag cat-flag--none">' + ICON_GLOBE + "</span>";
+  }
+  var STAT_ICONS = {
+    "Creators": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.8" cy="9.5" r="2.5"/><path d="M15.6 14.2c2.4-.3 4.3 1.2 4.9 4"/></svg>',
+    "Indicative range": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8a1.5 1.5 0 0 1 0 2.1l-6.9 6.9a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.5"/></svg>',
+    "Quoted for": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M10.5 18h3"/></svg>',
+    "Not in this roster": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.4v.1"/></svg>'
+  };
+  var TIER_TONES = ["#121212", "#4a4a4a", "#7c7c7c", "#a9a9a9", "#cfcfcf"];
+  var HCP_TONES = ["#0c5a2d", "#14884a", "#43ad72", "#8fd3aa", "#c4ebd2"];
+  function shareBar(n, total) {
+    var pct = total ? Math.round(100 * n / total) : 0;
+    return '<span class="cat-meter" role="img" aria-label="' + pct + '% of the selection"><i style="width:' + pct + '%"></i></span>' +
+      '<span class="cat-meter__pct">' + pct + "%</span>";
+  }
   var COUNTRY_ORDER = ["Saudi Arabia", "UAE", "Egypt", "Kuwait", "Qatar", "Bahrain",
                        "Oman", "Jordan", "Lebanon"];
   var PLACES = {
@@ -1712,13 +1758,46 @@
       }).join("");
     }
 
+    // The tier mix as one bar: how the shortlist splits by size, at a glance.
+    function renderTiers(tiers) {
+      var box = $("sel-tiers");
+      if (!box) {
+        box = document.createElement("div");
+        box.id = "sel-tiers";
+        box.className = "cat-tiers";
+        $("sel-summary").insertAdjacentElement("afterend", box);
+      }
+      var names = Object.keys(TIER_PRICE).filter(function (t) { return tiers[t]; });
+      Object.keys(tiers).forEach(function (t) { if (tiers[t] && names.indexOf(t) < 0 && t && t !== "undefined") names.push(t); });
+      var total = names.reduce(function (s, t) { return s + tiers[t]; }, 0);
+      box.hidden = !total;
+      if (!total) { box.innerHTML = ""; return; }
+      var plain = 0, hcp = 0;
+      var tone = {};
+      names.forEach(function (t) {
+        tone[t] = /hcp/i.test(t) ? HCP_TONES[Math.min(hcp++, HCP_TONES.length - 1)]
+                                 : TIER_TONES[Math.min(plain++, TIER_TONES.length - 1)];
+      });
+      var light = function (c) { return TIER_TONES.indexOf(c) >= 2 || HCP_TONES.indexOf(c) >= 3; };
+      box.innerHTML = '<p class="cat-places__label">Creator size</p>' +
+        '<div class="cat-tiers__bar" role="img" aria-label="' + esc(names.map(function (t) { return tiers[t] + " " + t; }).join(", ")) + '">' +
+        names.map(function (t) {
+          return '<span style="flex:' + tiers[t] + ";background:" + tone[t] + (light(tone[t]) ? ";color:var(--ink)" : "") +
+            '" title="' + esc(t) + ": " + tiers[t] + '">' + tiers[t] + "</span>";
+        }).join("") + "</div>" +
+        '<ul class="cat-tiers__legend">' + names.map(function (t) {
+          return '<li><i style="background:' + tone[t] + '"></i>' + esc(t) + " <b>" + tiers[t] + "</b><small>" +
+            Math.round(100 * tiers[t] / total) + "%</small></li>";
+        }).join("") + "</ul>";
+    }
+
     function renderPlaces() {
       var box = $("sel-places");
       if (!box) {
         box = document.createElement("div");
         box.id = "sel-places";
         box.className = "cat-places";
-        $("sel-summary").insertAdjacentElement("afterend", box);
+        ($("sel-tiers") || $("sel-summary")).insertAdjacentElement("afterend", box);
       }
       var countries = {}, several = 0, multiCity = 0;
       selected.forEach(function (code) {
@@ -1766,7 +1845,8 @@
           platNames.map(function (pl) {
             return '<li><p class="cat-places__country"><span class="cat-places__mark ' +
               (BRAND[pl] || "") + '">' + (ICONS[pl] || ICON_LINK) + "</span><span>" + esc(pl) +
-              "</span><b>" + plats[pl] + "</b></p></li>";
+              "</span><b>" + plats[pl] + "</b></p>" +
+              '<div class="cat-places__bar">' + shareBar(plats[pl], selected.length) + "</div></li>";
           }).join("") + "</ul>" +
           (multiPlat ? '<p class="cat-places__note">' + multiPlat +
             (multiPlat === 1 ? " creator is" : " creators are") +
@@ -1781,11 +1861,12 @@
             var na = a === "City not specified", nb = b === "City not specified";
             return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
           });
-          return '<li><p class="cat-places__country"><span>' +
+          return '<li><p class="cat-places__country">' + flagOf(name) + "<span>" +
             esc(name === "Other" ? "Other locations" : name) + "</span><b>" + c.n + "</b></p>" +
-            (cities.length ? '<p class="cat-places__cities">' + cities.map(function (city) {
-              return esc(city) + " <b>" + c.cities[city] + "</b>";
-            }).join('<i aria-hidden="true">·</i>') + "</p>" : "") + "</li>";
+            '<div class="cat-places__bar">' + shareBar(c.n, selected.length) + "</div>" +
+            (cities.length ? '<ul class="cat-places__cities">' + cities.map(function (city) {
+              return "<li>" + esc(city) + " <b>" + c.cities[city] + "</b></li>";
+            }).join("") + "</ul>" : "") + "</li>";
         }).join("") + "</ul>" +
         // Say why the counts add up to more than the selection, when they do.
         ((several || multiCity) ? '<p class="cat-places__note">' +
@@ -2120,13 +2201,12 @@
         ["Indicative range", selected.length ? priceText([lo, hi]) : "—"]
       ];
       if (CURATED && CURATED.platform) rows.splice(1, 0, ["Quoted for", CURATED.platform]);
-      Object.keys(TIER_PRICE).forEach(function (t) {
-        if (tiers[t]) rows.push([t, String(tiers[t])]);
-      });
       if (dropped) rows.push(["Not in this roster", String(dropped)]);
       $("sel-summary").innerHTML = rows.map(function (r) {
-        return "<div><dt>" + r[0] + "</dt><dd>" + r[1] + "</dd></div>";
+        return '<div class="cat-stat' + (r[0] === "Indicative range" ? " cat-stat--range" : "") + '"><dt>' +
+          '<span class="cat-stat__icon">' + (STAT_ICONS[r[0]] || "") + "</span>" + r[0] + "</dt><dd>" + r[1] + "</dd></div>";
       }).join("");
+      renderTiers(tiers);
       renderPlaces();
       renderCurrency();
       renderHead(lo, hi);
