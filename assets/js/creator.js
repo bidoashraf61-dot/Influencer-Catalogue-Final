@@ -278,6 +278,19 @@
     ["pp-posts", "pp-perf", "pp-net", "pp-aud", "pp-tags"].forEach(function (id) { $(id).innerHTML = ghost; });
     ["pp-perf-tabs", "pp-aud-tabs"].forEach(function (id) { $(id).innerHTML = ""; });
     ["pp-posts-sec", "pp-net-sec", "pp-aud-sec", "pp-tags-sec"].forEach(function (id) { $(id).hidden = false; });
+    var c = D.creator, asked = (D.requested || []).indexOf(PLAT) !== -1;
+    $("pp-real").insertAdjacentHTML("beforeend", '<div class="pp-request"><div><b>Want the full ' + esc(PLAT || "") + ' analysis?</b>'
+      + '<p>Audience countries, age and gender, real versus fake followers, content performance and brand affinity are pending for ' + esc(c.name) + ".</p></div>"
+      + '<button type="button" class="pp-btn" id="pp-ask"' + (asked ? " disabled" : "") + ">" + (asked ? "Requested ✓" : "Request full analysis") + "</button>"
+      + '<p class="pp-sealed__done" id="pp-ask-done"' + (asked ? "" : " hidden") + ">Your request is with the HelloVoice team — we will add it and let you know.</p></div>");
+    var ask = $("pp-ask");
+    if (ask && !asked) ask.addEventListener("click", function () {
+      ask.disabled = true; ask.textContent = "Sending…";
+      fetch(API + "/api/creator/request", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: c.code, platform: PLAT }) })
+        .then(function (r) { if (!r.ok) throw 0; ask.textContent = "Requested ✓"; $("pp-ask-done").hidden = false; D.requested = (D.requested || []).concat([PLAT]); renderPlatforms(c); })
+        .catch(function () { ask.disabled = false; ask.textContent = "Request full analysis"; var n = $("pp-ask-done"); n.textContent = "Could not send the request. Please try again."; n.hidden = false; });
+    });
     $("pp-source").textContent = "Basic public numbers" + (a.updated ? " as of " + day(a.updated) : "") + ". Audience, content and brand sections are pending.";
   }
 
