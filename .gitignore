@@ -48,3 +48,5 @@ admin/_vendor/
 
 # Apify API token. Entered on the APIs page, kept on the server only.
 admin/.apify-token
+admin/.gemini-key
+admin/.mail-key
