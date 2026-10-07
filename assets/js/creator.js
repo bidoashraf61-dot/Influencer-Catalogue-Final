@@ -245,6 +245,8 @@
     $("pp-pages").hidden = !a;
     if (!a) return renderSealed(c);
     if (a.basic) return renderBasic(a);
+    $("pp-posts-sec").after($("pp-real-sec"));
+    $("pp-h-real").textContent = "Followers";
     renderPosts(a);
     renderReal(a);
     renderPerf(a);
@@ -272,6 +274,7 @@
       return '<div class="pp-tile"><span>' + t[0] + "</span><b>" + t[1] + "</b></div>"; }).join("") + "</div>"
       + (a.sample_posts ? '<p class="pp-basicnote">Worked out from this creator\'s latest ' + a.sample_posts + " public posts." + (a.er_basis === "views" ? " Engagement is measured against views." : "") + "</p>" : "");
     $("pp-h-real").textContent = "Basic numbers";
+    $("pp-posts-sec").before($("pp-real-sec"));
     $("pp-real-sec").hidden = false;
     var ghost = '<div class="pp-pending"><div class="pp-pending__ghost" aria-hidden="true"><i style="width:82%"></i><i style="width:64%"></i><i style="width:90%"></i><i style="width:48%"></i><i style="width:72%"></i></div>'
       + '<span class="pp-pending__tag"><b>Pending</b><small>Not collected yet</small></span></div>';
@@ -316,14 +319,14 @@
       : '<span class="pp-photo__none">' + esc(c.code.split("-").pop()) + "</span>") + "</div>"
       + '<div class="pp-fields">'
       + (a ? '<p class="pp-badge pp-badge--ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.4 1.8 3 .1.9 2.9 2.4 1.8-.9 2.9.9 2.9-2.4 1.8-.9 2.9-3 .1L12 21.5l-2.4-1.8-3-.1-.9-2.9-2.4-1.8.9-2.9-.9-2.9 2.4-1.8.9-2.9 3-.1z" fill="currentColor"/><path d="M8.2 12.3l2.6 2.6 5-5.2" fill="none" stroke="#e8ff76" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
-           + "<span><b>Verified analysis</b>" + (a.updated ? "<small>Data from " + esc(day(a.updated)) + "</small>" : "") + "</span></p>"
+           + "<span><b>" + (a.basic ? "Basic data" : "Verified analysis") + "</b>" + (a.updated ? "<small>Data from " + esc(day(a.updated)) + "</small>" : "") + "</span></p>"
          : '<p class="pp-badge pp-badge--locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg><span><b>Not analysed yet</b><small>Basics only</small></span></p>')
       + '<h1 class="pp-name">' + esc(c.name) + "</h1>"
       + '<p class="pp-line"><span class="pp-code">' + esc(c.code) + "</span>" + line.map(esc).join(" · ") + (c.tier || c.band ? " · " + esc(c.tier || BANDS[c.band]) + " tier" : "") + "</p>"
       + '<div class="pp-handles">' + handles + "</div>"
       + '<dl class="pp-key">' + key.map(function (k) { return "<div><dt>" + k[0] + "</dt><dd>" + esc(k[1]) + (k[2] ? " " + k[2] : "") + "</dd></div>"; }).join("") + "</dl>"
       + bio
-      + (a ? '<div class="pp-actions"><button type="button" class="pp-btn pp-btn--ink" id="pp-print">' + I_DOWN + "Download PDF</button></div>" : "")
+      + (a && !a.basic ? '<div class="pp-actions"><button type="button" class="pp-btn pp-btn--ink" id="pp-print">' + I_DOWN + "Download PDF</button></div>" : "")
       + "</div>";
     var pb = $("pp-print"); if (pb) pb.addEventListener("click", function () { downloadPdf(pb); });
   }
@@ -337,7 +340,7 @@
     box.innerHTML = '<span class="pp-plat__label">Analysis by platform</span>' + ps.map(function (p) {
       var has = !!an[p], asked = (D.requested || []).indexOf(p) !== -1;
       return '<button type="button" role="tab" data-p="' + esc(p) + '" aria-selected="' + (p === PLAT) + '" class="' + (has ? "is-on" : "is-off") + '">' + icon(p)
-        + "<span>" + esc(p) + "</span><small>" + (has ? "Analysed" : asked ? "Requested" : "Not analysed") + "</small></button>";
+        + "<span>" + esc(p) + "</span><small>" + (has ? (an[p].basic ? "Basic" : "Analysed") : asked ? "Requested" : "Not analysed") + "</small></button>";
     }).join("");
     [].forEach.call(box.querySelectorAll("button"), function (b) {
       b.addEventListener("click", function () {
