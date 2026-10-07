@@ -594,6 +594,27 @@ def login_page(error=None, base=None):
     )
 
 
+def _kpi_strip(kpis):
+    """This month vs the same days of last month; each tile opens the list behind it."""
+    if not kpis:
+        return ""
+    def fmt(v):
+        return ("%.2f" % v) if isinstance(v, float) and v != int(v) else "{:,}".format(int(v))
+    tiles = ""
+    for k in kpis:
+        n, b = k["now"], k["before"]
+        if b:
+            ch = (n - b) / float(b) * 100
+            delta = "%s%d%% vs last month" % ("+" if ch >= 0 else "−", abs(round(ch)))
+            tone = "up" if ch > 0 else "down" if ch < 0 else ""
+        else:
+            delta, tone = ("new this month" if n else "none yet"), ("up" if n else "")
+        tiles += ("<a class='kpi' href='%s'><span>%s</span><b>%s</b><em class='%s'>%s</em></a>"
+                  % (u(k["href"]), e(k["label"]), fmt(n), tone, e(delta)))
+    return ("<section class='card' aria-labelledby='h-kpi'><div class='hd'><h2 id='h-kpi'>This month so far</h2>"
+            "<span class='muted'>Compared with the same days of last month</span></div><div class='kpi-row'>" + tiles + "</div></section>")
+
+
 def dashboard(s, events, who, message=None, error=None):
     """Home: what needs a person today, where everything stands, how the live
     campaigns are going, and how busy the catalogue has been."""
@@ -666,6 +687,7 @@ def dashboard(s, events, who, message=None, error=None):
         + "<div class='home-grid'><section class='card' aria-labelledby='h-needs'><div class='hd'><h2 id='h-needs'>Needs you today</h2>"
           "<span class='muted'>Most urgent first</span></div>" + needs + "</section>"
         + "<section class='card' aria-labelledby='h-start'><div class='hd'><h2 id='h-start'>Start something</h2></div>" + start + "</section></div>"
+        + _kpi_strip(d.get("kpis") or [])
         + "<section class='card' aria-labelledby='h-pipe'><div class='hd'><h2 id='h-pipe'>Where everything stands</h2>"
           "<span class='muted'>" + str(tt["creators"]) + " active creators · " + str(tt["analysed"]) + " with a full analysis · " + str(tt["clients"]) + " live client codes</span></div>"
         + stack + legend + "</section>"
@@ -1704,6 +1726,32 @@ def duplicate_group_card(group):
     return "<div class='card dups'>" + members + "</div>"
 
 
+def _bulk_bar(q=""):
+    """The bar that appears when creators are ticked: one action for all of them."""
+    import db as _db
+    tiers = "".join("<option value='%s'>%s</option>" % (e(t), e(t)) for t in _db.tier_names())
+    sels = "".join("<option value='%d'>%s</option>" % (x["id"], e(x["name"])) for x in _db.list_selections()[:40]
+                   if not (x["archived_at"] if "archived_at" in x.keys() else None))
+    return ("<form id='bulk' class='bulkbar' method='post' action='" + u("/roster/bulk") + "' hidden>"
+            "<input type='hidden' name='back' value='" + e("/roster" + ("?q=" + q if q else "")) + "'>"
+            "<b id='bulk-n'>0 selected</b>"
+            "<select name='action' id='bulk-act' aria-label='Action for the ticked creators'>"
+            "<option value=''>Choose an action…</option><option value='select'>Add to a selection</option>"
+            "<option value='tier'>Move to a tier</option><option value='hide'>Hide from clients</option>"
+            "<option value='show'>Show to clients</option><option value='export'>Export as CSV</option></select>"
+            "<select name='value' id='bulk-tier' aria-label='Tier' hidden disabled><option value=''>Tier…</option>" + tiers + "</select>"
+            "<select name='value' id='bulk-sel' aria-label='Selection' hidden disabled><option value=''>New selection</option>" + sels + "</select>"
+            "<button class='btn small lime'>Apply</button><button class='btn small ghost' type='button' id='bulk-clear'>Clear</button></form>"
+            "<script>(function(){var f=document.getElementById('bulk');if(!f)return;var boxes=function(){return [].slice.call(document.querySelectorAll(\"input[form=bulk][name=codes]\"));};"
+            "function upd(){var n=boxes().filter(function(b){return b.checked;}).length;f.hidden=!n;document.getElementById('bulk-n').textContent=n+' selected';}"
+            "document.addEventListener('change',function(ev){if(ev.target.matches('input[form=bulk][name=codes]'))upd();});"
+            "var all=document.getElementById('rpick-all');if(all)all.addEventListener('change',function(){boxes().forEach(function(b){b.checked=all.checked;});upd();});"
+            "var act=document.getElementById('bulk-act'),t=document.getElementById('bulk-tier'),s=document.getElementById('bulk-sel');"
+            "act.addEventListener('change',function(){t.hidden=t.disabled=act.value!=='tier';s.hidden=s.disabled=act.value!=='select';});"
+            "document.getElementById('bulk-clear').addEventListener('click',function(){boxes().forEach(function(b){b.checked=false;});if(all)all.checked=false;upd();});"
+            "f.addEventListener('submit',function(ev){if(act.value==='hide'&&!confirm('Hide the ticked creators from every client? You can show them again or undo from History.'))ev.preventDefault();});})();</script>")
+
+
 def roster_page(creators, error=None, message=None, cities=None, tiers=None,
                 nationalities=None, interests=None, editing=None, q="",
                 bands=None, page_no=1, pages=1, total=None, per_page=100,
@@ -1751,7 +1799,8 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
                   + ("Close" if open_now else "Edit") + "</a>")
 
         out = (
-            "<tr id='" + e(c["code"]) + "'><td>" + shot + "</td><td><code>"
+            "<tr id='" + e(c["code"]) + "'><td><label class='rpick'><input type='checkbox' form='bulk' name='codes' value='" + e(c["code"])
+            + "' aria-label='Select " + e(c["name"]) + "'></label>" + shot + "</td><td><code>"
             + e(c["code"]) + "</code></td>"
             + "<td><strong>" + e(c["name"]) + "</strong>" + hidden
             + (("<br>" + stars(c["rating"])) if ("rating" in c.keys() and c["rating"]) else "")
@@ -1836,7 +1885,8 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         + ("<a class='btn small ghost' href='" + u("/roster") + "'>Clear</a>" if filtered else "")
         + "<span class='muted' style='font-size:13px'>" + e(shown) + "</span>"
         "<a class='btn small ghost' style='margin-left:auto' href='" + u("/roster/export") + "'>" + ui.icon("download", 15) + " Export .csv</a></form>"
-        + "<div class='card'><table class='roster-t'><thead><tr><th></th><th>Code</th>"
+        + _bulk_bar(q)
+        + "<div class='card'><table class='roster-t'><thead><tr><th><input type='checkbox' id='rpick-all' aria-label='Select all on this page'></th><th>Code</th>"
         + "<th>Name</th><th>Platform</th><th>Followers</th><th>Tier</th><th>City</th>"
         + "<th></th></tr></thead><tbody>" + rows + "</tbody></table></div>" + pager)
 
@@ -2259,6 +2309,14 @@ def _brief_note(sel):
     except Exception:
         return ""
     quote = " <a class='btn small ghost' href='" + u("/portal/quote?sel=%d" % sel["id"]) + "'>Printable quotation</a>"
+    try:
+        import portal as _portal
+        owner = _portal.user_for_code(sel["code_id"]) if sel["code_id"] else None
+    except Exception:
+        owner = None
+    if owner and not owner["deleted_at"]:
+        quote += (" <a class='btn small ghost' href='" + u("/portal/user?id=%d" % owner["id"]) + "'>Client: "
+                  + e(owner["company"] or owner["email"]) + " →</a>")
     if not row:
         return "<p style='margin:0 0 14px'>" + quote + "</p>"
     try:

@@ -478,7 +478,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 page_no=page, pages=pages, total=total, per_page=ROSTER_PAGE,
                 dates=(d_from if t_from is not None else "", d_to if t_to is not None else "")))
         if path == "/roster/export":
-            return self.send(200, self.roster_csv(), "text/csv; charset=utf-8",
+            only = {c.strip().upper() for c in (query.get("codes") or "").split(",") if c.strip()} or None
+            return self.send(200, self.roster_csv(only), "text/csv; charset=utf-8",
                              [("Content-Disposition",
                                'attachment; filename="roster.csv"')])
         if path == "/roster/template.xlsx":
@@ -864,6 +865,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_settings_token()
         if path == "/roster/delete":
             return self.post_roster_delete()
+        if path == "/roster/bulk":
+            return self.post_roster_bulk()
         if path == "/roster/merge":
             return self.post_roster_merge()
         if path == "/roster/import":
@@ -1525,7 +1528,54 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         key = "ok" if saved else "e"
         return self.redirect("/roster?" + key + "=" + urllib.parse.quote(msg))
 
-    def roster_csv(self):
+    def post_roster_bulk(self):
+        """Hide, show, re-tier or add to a selection many creators at once. Each creator's change is
+        its own History entry, so any one of them can be undone."""
+        raw = urllib.parse.parse_qs(self.body().decode())
+        codes = list(dict.fromkeys(c.strip().upper() for c in raw.get("codes", []) if c.strip()))[:500]
+        action, value = (raw.get("action") or [""])[0], (raw.get("value") or [""])[0].strip()
+        back = (raw.get("back") or ["/roster"])[0]
+        back = back if back.startswith("/roster") and "\\" not in back else "/roster"
+        sep = "&" if "?" in back else "?"
+        if not codes:
+            return self.redirect(back + sep + "e=" + urllib.parse.quote("Tick at least one creator first."))
+        known = {c["code"]: c for c in db.list_creators() if c["code"] in set(codes)}
+        if action in ("hide", "show", "tier"):
+            if action == "tier" and value not in db.tier_names():
+                return self.redirect(back + sep + "e=" + urllib.parse.quote("Choose a tier."))
+            n = 0
+            for code, c in known.items():
+                row = dict(c)
+                if action == "tier":
+                    row["tier"] = value
+                else:
+                    row["active"] = 0 if action == "hide" else 1
+                if row == dict(c):
+                    continue
+                with history.tracked("creator", code, "%s %s" % ({"hide": "Hid", "show": "Showed", "tier": "Moved to " + value}[action], code)):
+                    db.upsert_creator(row)
+                n += 1
+            word = {"hide": "hidden", "show": "shown to clients", "tier": "moved to " + value}[action]
+            return self.redirect(back + sep + "ok=" + urllib.parse.quote("%d creator%s %s. Undo any of them from History." % (n, "" if n == 1 else "s", word)))
+        if action == "select":
+            if value.isdigit() and db.selection(int(value)):
+                sel = db.selection(int(value))
+                have = json.loads(sel["codes"] or "[]")
+                new = have + [c for c in known if c not in have]
+                with history.tracked("selection", sel["id"], "Added %d creators to %s" % (len(new) - len(have), sel["name"])):
+                    db.save_selection(sel["id"], sel["name"], new, json.loads(sel["prices"] or "{}"), sel["total_from"], sel["total_to"],
+                                      platform=sel["platform"])
+                return self.redirect("/selections/edit?id=%d&ok=" % sel["id"] + urllib.parse.quote("%d creators added." % (len(new) - len(have))))
+            name = value or "New selection"
+            with history.tracked("selection", None, "Created selection " + name) as t:
+                sid = db.save_selection(None, name[:120], list(known), {}, None, None)
+                t["key"] = sid
+            return self.redirect("/selections/edit?id=%d&ok=" % sid + urllib.parse.quote("Selection created with %d creators." % len(known)))
+        if action == "export":
+            return self.redirect("/roster/export?codes=" + urllib.parse.quote(",".join(known)))
+        return self.redirect(back + sep + "e=" + urllib.parse.quote("Choose what to do with the ticked creators."))
+
+    def roster_csv(self, only=None):
         """The roster as the import template, already filled in.
 
         Two jobs at once: it is the list of codes — which nobody memorises and
@@ -1539,6 +1589,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         w = csv.writer(buf)
         w.writerow(importer.COLUMNS)
         for c in db.list_creators():
+            if only is not None and c["code"] not in only:
+                continue
             # Grouped, not keyed: a creator can have two accounts on one
             # platform, and keying by platform would export only the last of
             # them — a round trip that silently loses an account is worse than

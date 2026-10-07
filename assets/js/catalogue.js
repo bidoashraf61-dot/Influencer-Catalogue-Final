@@ -128,6 +128,21 @@
     if (CFG.api && ROSTER) renderRoster(ROSTER);
     initApp();
     backToTop();
+    welcome();
+  }
+
+  /* The cover tag greets a signed-in client by first name; access-code
+     guests and anyone the service does not know keep the plain "Welcome". */
+  function welcome() {
+    var tag = $("cat-welcome");
+    if (!tag || !CFG.api) return;
+    fetch(CFG.api + "/api/me", { credentials: "include" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (me) {
+        var name = me && me.user && me.user.name ? String(me.user.name).trim().split(/\s+/)[0] : "";
+        if (name) tag.textContent = "Welcome, " + name;
+      })
+      .catch(function () {});
   }
 
   /* --------------------------------------------------------- back to top */

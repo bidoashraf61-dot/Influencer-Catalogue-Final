@@ -68,23 +68,26 @@ def icon(name, size=18, cls=""):
 
 # ---------------------------------------------------------------- navigation --
 # Grouped by job, not by database table. (href, label, icon, badge, keywords)
+# Nine top-level destinations, grouped by job (2026-10 revamp). Related pages sit one level down and
+# open under their parent when you are in that section; every old URL still works.
 NAV = [
     ("", [("/", "Home", "home", None)]),
-    ("Work", [("/selections", "Selections", "list", None),
-              ("/campaigns", "Campaigns", "flag", None),
-              ("/requests", "Quote requests", "inbox", "req")]),
-    ("Library", [("/roster", "Creators", "users", None),
-                 ("/analysis", "Creator analysis", "profile", "an")]),
-    ("Clients", [("/clients", "Clients", "building", None),
-                 ("/portal", "Client portal", "users", None),
-                 ("/codes", "Access codes", "key", None)]),
-    ("Insights", [("/ai", "AI copilot", "star", None),
-                  ("/calculator", "ROI calculator", "calc", None),
-                  ("/analytics", "Analytics", "bars", None)]),
-    ("System", [("/history", "History & undo", "clock", None),
-                ("/apis", "APIs", "gear", None),
-                ("/settings", "Settings", "gear", None)]),
+    ("Work", [("/requests", "Quote requests", "inbox", "req"),
+              ("/selections", "Selections", "list", None),
+              ("/campaigns", "Campaigns", "flag", None)]),
+    ("Library", [("/roster", "Creators", "users", None)]),
+    ("Clients", [("/clients", "Clients", "building", None)]),
+    ("Insights", [("/analytics", "Analytics", "bars", None),
+                  ("/ai", "AI copilot", "star", None)]),
+    ("System", [("/settings", "Settings", "gear", None)]),
 ]
+CHILDREN = {
+    "/roster": [("/analysis", "Creator analysis", "an")],
+    "/clients": [("/portal", "Client portal", None), ("/codes", "Access codes", None)],
+    "/analytics": [("/calculator", "ROI calculator", None)],
+    "/settings": [("/apis", "APIs & keys", None), ("/history", "History & undo", None)],
+}
+PARENT = {c[0]: p for p, kids in CHILDREN.items() for c in kids}
 
 # Which sidebar item a page belongs under, so sub-pages keep it highlighted.
 SECTION_OF = {"/planner": "/calculator", "/clients": "/clients"}
@@ -92,9 +95,13 @@ SECTION_OF = {"/planner": "/calculator", "/clients": "/clients"}
 
 def _active_item(active):
     active = SECTION_OF.get(active, active)
+    top = PARENT.get(active, active)
     for group, items in NAV:
         for href, label, ic, badge in items:
-            if href == active:
+            if href == top:
+                if top != active:
+                    child = next(c for c in CHILDREN[top] if c[0] == active)
+                    return group, active, child[1]
                 return group, href, label
     return "", active, ""
 
@@ -166,6 +173,24 @@ a{color:inherit}
 .nav-item[aria-current=page] .ic{color:var(--lime)}
 .nav-item .ic{flex:none}
 .nav-item .badge{margin-left:auto}
+.views{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-6px 0 14px}
+.views .pill{text-decoration:none}.views .vx{border:0;background:transparent;cursor:pointer;color:var(--gray);font-size:16px;line-height:1;padding:0 6px 0 0;min-width:24px;min-height:24px}
+.bulkbar{position:sticky;top:calc(var(--bar) + 8px);z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 14px;margin:0 0 12px;background:var(--ink);color:#fff;border-radius:var(--r-md);box-shadow:0 10px 30px rgba(0,0,0,.2)}
+.bulkbar select{min-height:36px;width:auto;max-width:260px}
+.bulkbar .btn.ghost{color:#fff;border-color:rgba(255,255,255,.4)}
+.rpick{display:inline-flex;margin:0 8px 0 0;vertical-align:middle}
+@media (min-width:1001px){main table thead th{position:sticky;top:var(--bar);background:var(--white);z-index:2}}
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.kpi{display:flex;flex-direction:column;gap:2px;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-md);text-decoration:none;color:var(--ink);background:var(--white)}
+.kpi:hover{border-color:var(--ink)}
+.kpi span{font-size:13px;color:var(--gray)}
+.kpi b{font-family:"Bebas Neue",sans-serif;font-weight:400;font-size:32px;line-height:1.05;font-variant-numeric:tabular-nums}
+.kpi em{font-style:normal;font-size:12.5px;color:var(--gray)}
+.kpi em.up{color:var(--green)}.kpi em.down{color:var(--amber)}
+.nav-item.nav-sub{padding:7px 10px 7px 41px;font-size:13.5px}
+.nav-item.nav-sub[aria-current=page]{background:transparent;color:#fff;box-shadow:inset 2px 0 0 var(--lime)}
+.nav-item[aria-current=true]{color:#fff}
+.app.is-collapsed .nav-item.nav-sub{display:none}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,.12);display:grid;gap:4px}
 .side-me{display:flex;align-items:center;gap:10px;padding:8px 10px;color:rgba(255,255,255,.74);font-size:13px;min-width:0}
 .side-me i{flex:none;width:30px;height:30px;border-radius:50%;background:var(--lime);color:var(--ink);font-style:normal;font-weight:700;display:grid;place-items:center}
@@ -631,15 +656,24 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
         return ""
 
     nav = ""
+    open_parent = PARENT.get(a_href, a_href)
     for gname, items in NAV:
-        links = "".join(
-            '<a class="nav-item" href="%s"%s title="%s">%s<span class="t">%s</span>%s</a>' % (
-                u(href), ' aria-current="page"' if href == a_href else "", e(label), icon(ic, 19), e(label), badge(bk))
-            for href, label, ic, bk in items)
+        links = ""
+        for href, label, ic, bk in items:
+            kids = CHILDREN.get(href, [])
+            in_family = open_parent == href
+            links += '<a class="nav-item" href="%s"%s title="%s">%s<span class="t">%s</span>%s</a>' % (
+                u(href), ' aria-current="page"' if href == a_href else (' aria-current="true"' if in_family and kids else ""),
+                e(label), icon(ic, 19), e(label), badge(bk) if not (kids and not in_family) else
+                "".join(badge(k[2]) for k in kids if k[2]) + badge(bk))
+            if kids and in_family:
+                links += "".join('<a class="nav-item nav-sub" href="%s"%s>%s<span class="t">%s</span>%s</a>' % (
+                    u(ch), ' aria-current="page"' if ch == a_href else "", "", e(cl), badge(cb)) for ch, cl, cb in kids)
         nav += '<div class="nav-group">%s%s</div>' % ('<div class="nav-title">%s</div>' % e(gname) if gname else "", links)
 
     bell_n = pulse.get("open", 0) + pulse.get("a_open", 0)
     pages_js = json.dumps([{"href": u(h), "label": l, "hint": g or "Home", "kw": ""} for g, its in NAV for h, l, _i, _b in its]
+                          + [{"href": u(c[0]), "label": c[1], "hint": "Go to", "kw": ""} for kids in CHILDREN.values() for c in kids]
                           + [{"href": u("/selections"), "label": "New selection", "hint": "Create", "kw": "quote create add"},
                              {"href": u("/campaigns"), "label": "New campaign", "hint": "Create", "kw": "start create add"},
                              {"href": u("/roster"), "label": "Add a creator", "hint": "Create", "kw": "new influencer"},
@@ -754,6 +788,22 @@ _JS_REVAMP = r"""
       });
     });
   });
+  // 2b. My views: save the filters in the address bar under a name, per page, in this browser.
+  (function(){ var ph=$('main .ph'); if(!ph) return; var KEY='hv_views', path=location.pathname, all={};
+    try{ all=JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(e){}
+    var mine=all[path]||[], q=location.search.replace(/[?&](ok|e)=[^&]*/g,'').replace(/^&/,'?');
+    if(!mine.length && (!q||q==='?')) return;
+    var bar=document.createElement('div'); bar.className='views'; bar.setAttribute('aria-label','My views');
+    function save(){ try{ all[path]=mine; localStorage.setItem(KEY, JSON.stringify(all)); }catch(e){} }
+    function draw(){ bar.innerHTML='';
+      if(mine.length){ var t=document.createElement('span'); t.className='muted'; t.textContent='My views:'; bar.appendChild(t); }
+      mine.forEach(function(v,i){ var a=document.createElement('a'); a.className='pill'; a.href=path+v.q; a.textContent=v.name; bar.appendChild(a);
+        var x=document.createElement('button'); x.type='button'; x.className='vx'; x.setAttribute('aria-label','Remove view '+v.name); x.textContent='×';
+        x.onclick=function(){ mine.splice(i,1); save(); draw(); }; bar.appendChild(x); });
+      if(q && q!=='?' && !mine.some(function(v){return v.q===q;})){ var b=document.createElement('button'); b.type='button'; b.className='btn tiny ghost'; b.textContent='Save this view';
+        b.onclick=function(){ var n=prompt('Name this view'); if(!n) return; mine.push({name:n.slice(0,40),q:q}); save(); draw(); }; bar.appendChild(b); } }
+    draw(); ph.insertAdjacentElement('afterend', bar);
+  })();
   // 3. The AI copilot opens beside any page.
   var panel=$('#ai-panel'), tog=$('#ai-toggle'), frame=null;
   function setAI(o){ if(!panel) return;

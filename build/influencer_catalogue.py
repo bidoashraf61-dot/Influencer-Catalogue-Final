@@ -742,10 +742,11 @@ def build():
     <div class="cat-cover__body cat-cover__body--center"><div class="cat-pad"><div class="cat-container">
       <div class="cat-cover__center">
         <h1 class="cat-cover__title">
-          <span class="cat-pill cat-cover__brand">HelloVoice</span>
+          <span class="cat-pill cat-cover__brand" id="cat-welcome">Welcome</span>
           <span class="cat-cover__line">Influencer Catalogue</span>
         </h1>
-        <p class="cat-cover__sub">Vetted creators across Saudi Arabia, the UAE and Egypt. Shortlist the right voices for your brief and we run the campaign end to end.</p>
+        <p class="cat-cover__sub">Your next influencer campaign, <span class="cat-cover__hi">all in one place.</span></p>
+        <p class="cat-cover__sign">We talk to reach.</p>
         <a class="cat-cover__cta cat-cover__cue" href="#cat-roster">
           Browse creators
           <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>

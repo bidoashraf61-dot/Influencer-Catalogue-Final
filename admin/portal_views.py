@@ -450,7 +450,9 @@ def user_page(usr, ok=None, err=None):
     bal = portal.balance(cid)
     ledger = portal.ledger(cid, 25)
     with db.connect() as conn:
-        sels = conn.execute("SELECT id, name, updated_at FROM selections WHERE code_id = ? ORDER BY updated_at DESC LIMIT 20", (cid,)).fetchall()
+        sels = conn.execute("SELECT id, name, updated_at, codes FROM selections WHERE code_id = ? ORDER BY updated_at DESC LIMIT 20", (cid,)).fetchall()
+        camps = conn.execute("SELECT id, name, status, starts_at FROM campaigns WHERE code_id = ? ORDER BY id DESC LIMIT 20", (cid,)).fetchall()
+        quotes = conn.execute("SELECT id, at, selection_name, handled_at FROM requests WHERE code_id = ? ORDER BY id DESC LIMIT 20", (cid,)).fetchall()
         ev = conn.execute("SELECT kind, COUNT(*) n, MAX(at) last FROM events WHERE code_id = ? GROUP BY kind ORDER BY n DESC", (cid,)).fetchall()
     hid = lambda name, val: "<input type='hidden' name='%s' value='%s'>" % (name, e(val))
     back = hid("back", "/portal/user?id=%d" % usr["id"])
@@ -484,9 +486,18 @@ def user_page(usr, ok=None, err=None):
                     for n in (50, 200, 500)),
            "".join("<tr><td class='muted'>%s</td><td>%+d</td><td>%d</td><td>%s</td></tr>" % (e(ago(r["at"])), r["delta"], r["balance_after"], e(r["reason"]))
                    for r in ledger) or "<tr><td colspan='4' class='muted'>No movements.</td></tr>"))
+    status_pill = lambda st: "<span class='pill %s'>%s</span>" % ({"live": "live", "draft": "warn"}.get(st, ""), e(st))
     work = (
-        "<div class='card'><h2>Work</h2><p><strong>Selections</strong></p><ul>%s</ul><p><strong>Briefs</strong></p><ul>%s</ul><p><strong>Activity</strong></p><ul>%s</ul></div>"
-        % ("".join("<li>%s <span class='muted'>%s</span></li>" % (e(s["name"]), e(ago(s["updated_at"]))) for s in sels) or "<li class='muted'>none</li>",
+        "<div class='card'><h2>Work</h2>"
+        "<p><strong>Campaigns</strong></p><ul>%s</ul>"
+        "<p><strong>Quote requests</strong></p><ul>%s</ul>"
+        % ("".join("<li><a href='%s'>%s</a> %s</li>" % (u("/campaigns/edit?id=%d" % k["id"]), e(k["name"]), status_pill(k["status"])) for k in camps)
+           or "<li class='muted'>none</li>",
+           "".join("<li><a href='%s'>%s</a> <span class='muted'>%s · %s</span></li>" % (u("/requests") + "#r%d" % r["id"], e(r["selection_name"] or "Quote"),
+                   e(ago(r["at"])), "answered" if r["handled_at"] else "<b>waiting</b>") for r in quotes) or "<li class='muted'>none</li>")
+        + "<p><strong>Selections</strong></p><ul>%s</ul><p><strong>Briefs</strong></p><ul>%s</ul><p><strong>Activity</strong></p><ul>%s</ul></div>"
+        % ("".join("<li><a href='%s'>%s</a> <span class='muted'>%d creators · %s</span></li>" % (u("/selections/edit?id=%d" % s["id"]), e(s["name"]),
+                   len(json.loads(s["codes"] or "[]")), e(ago(s["updated_at"]))) for s in sels) or "<li class='muted'>none</li>",
            "".join("<li>%s <span class='muted'>%s</span></li>" % (e(b["summary"]), e(ago(b["created_at"]))) for b in portal.briefs_for(cid, 10)) or "<li class='muted'>none</li>",
            "".join("<li>%s × %d <span class='muted'>last %s</span></li>" % (e(r["kind"]), r["n"], e(ago(r["last"]))) for r in ev) or "<li class='muted'>none</li>"))
     reqs = [r for r in portal.open_credit_requests(cid) if not r["handled_at"]]

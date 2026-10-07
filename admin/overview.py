@@ -61,6 +61,7 @@ def home():
     out["pipeline"] = {"selections": sel_total, "draft": by_status["draft"], "live": by_status["live"], "ended": by_status["ended"]}
     out["totals"] = {"creators": creators, "analysed": analysed, "clients": _live_clients()}
     out["feed"] = db.recent_events(8)
+    out["kpis"] = _kpis(now)
 
     q = out["queue"]
     if pulse["open"]:
@@ -83,7 +84,48 @@ def home():
         if k["status"] == "draft":
             q.append(("flag", "%s is still a draft" % k["name"], "Finish the setup, then press Go live so the client can see it.",
                       "/campaigns/edit?id=%d" % k["id"], "Finish setup", "warn"))
+    # Client portal: credit requests to answer, and active clients who have run out.
+    try:
+        import portal
+        reqs = portal.open_credit_requests()
+        if reqs:
+            q.insert(1 if pulse["open"] else 0, ("star", "%d credit request%s" % (len(reqs), "" if len(reqs) == 1 else "s"),
+                      "Clients asked for more AI credits. Grant or decline in one click.", "/portal", "Answer", "alert"))
+        brief = portal.costs().get("brief", 5)
+        with db.connect() as conn:
+            dry = conn.execute(
+                "SELECT COUNT(*) FROM users u WHERE u.status = 'active' AND u.deleted_at IS NULL AND u.last_login_at >= ? AND "
+                "COALESCE((SELECT balance_after FROM credit_ledger l WHERE l.code_id = u.code_id ORDER BY l.id DESC LIMIT 1), 0) < ?",
+                (now - 30 * 86400, brief)).fetchone()[0]
+        if dry:
+            q.append(("users", "%d active client%s out of AI credits" % (dry, "" if dry == 1 else "s"),
+                      "They can still get free shortlists, but not written reasons or chat. Top them up if they are live deals.",
+                      "/portal", "See clients", "warn"))
+    except Exception:
+        pass
     if sel_free:
         q.append(("list", "%d selection%s without a client" % (sel_free, "" if sel_free == 1 else "s"),
                   "A selection needs a client passcode before the client can open it.", "/selections", "Assign", "warn"))
+    return out
+
+
+def _kpis(now):
+    """This month so far against the same days of last month, each linking to the rows behind it."""
+    t = time.gmtime(now)
+    m0 = int(time.mktime((t.tm_year, t.tm_mon, 1, 0, 0, 0, 0, 0, 0))) - time.timezone
+    py, pm = (t.tm_year, t.tm_mon - 1) if t.tm_mon > 1 else (t.tm_year - 1, 12)
+    p0 = int(time.mktime((py, pm, 1, 0, 0, 0, 0, 0, 0))) - time.timezone
+    p1 = p0 + (now - m0)                      # same number of days into last month
+    rows = [
+        ("Quote requests", "SELECT COUNT(*) FROM requests WHERE at >= ? AND at < ?", "/requests"),
+        ("Selections made", "SELECT COUNT(*) FROM selections WHERE created_at >= ? AND created_at < ?", "/selections"),
+        ("Client briefs", "SELECT COUNT(*) FROM briefs WHERE created_at >= ? AND created_at < ?", "/portal?tab=briefs"),
+        ("New client accounts", "SELECT COUNT(*) FROM users WHERE created_at >= ? AND created_at < ?", "/portal"),
+        ("Catalogue visits", "SELECT COUNT(*) FROM events WHERE kind = 'unlock_ok' AND at >= ? AND at < ?", "/analytics"),
+        ("AI cost (USD)", "SELECT ROUND(COALESCE(SUM(cost_usd), 0), 2) FROM ai_audit WHERE at >= ? AND at < ?", "/portal?tab=usage"),
+    ]
+    out = []
+    with db.connect() as conn:
+        for label, sql, href in rows:
+            out.append({"label": label, "now": _count(conn, sql, (m0, now + 1)), "before": _count(conn, sql, (p0, p1)), "href": href})
     return out

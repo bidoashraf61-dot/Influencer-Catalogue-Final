@@ -689,6 +689,35 @@ class Portal(unittest.TestCase):
         self.assertIn("Total incl. 15% VAT", page)
         self.assertIn("Noha Magdy", page)
 
+    def test_48_roster_bulk_actions(self):
+        a = self.admin()
+        body = "codes=HV-MI-001&codes=HV-MI-002&action=hide&value=&back=/roster"
+        r = a.req("POST", "/roster/bulk", headers={"Content-Type": "application/x-www-form-urlencoded"}, body=None) if False else None
+        import urllib.request
+        def post(form):
+            data = form.encode()
+            req = urllib.request.Request(self.base + "/roster/bulk", data=data, method="POST",
+                                         headers={"Origin": self.base, "Content-Type": "application/x-www-form-urlencoded"})
+            try:
+                return a.op.open(req)
+            except urllib.error.HTTPError as exc:
+                return exc
+        post(body)
+        self.assertEqual((db.creator("HV-MI-001")["active"], db.creator("HV-MI-002")["active"]), (0, 0))
+        hid = [h for h in history.listing(None, None, limit=10) if (h["label"] or "").startswith("Hid ")]
+        self.assertEqual(len(hid), 2)
+        post("codes=HV-MI-001&codes=HV-MI-002&action=show&value=&back=/roster")
+        self.assertEqual(db.creator("HV-MI-001")["active"], 1)
+        r = post("codes=HV-MI-001&codes=HV-MD-004&action=select&value=Bulk+pick&back=/roster")
+        sid = max(x["id"] for x in db.list_selections())
+        self.assertEqual(sorted(json.loads(db.selection(sid)["codes"])), ["HV-MD-004", "HV-MI-001"])
+        s, csv_text, _ = a.get("/roster/export?codes=HV-MI-001")
+        self.assertIn("HV-MI-001", csv_text)
+        self.assertNotIn("HV-MD-004", csv_text)
+        s, home, _ = a.get("/")
+        self.assertIn("This month so far", home)
+        self.assertIn("nav-sub", a.get("/codes")[1])                       # sub-pages open under their parent
+
     # ------------------------------------------------------------------- admin
     def admin(self):
         c = Client(self.base)
