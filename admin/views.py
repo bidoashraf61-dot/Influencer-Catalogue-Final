@@ -2213,7 +2213,7 @@ if(cur.map(function(x){return x.toLowerCase()}).indexOf(t.toLowerCase())<0)cur.p
 draw()})();</script>'''
 
 
-def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=(), codes=()):
+def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=(), access_codes=()):
     by = {c["code"]: c for c in creators}
     codes = json.loads(sel["codes"] or "[]")
     own = json.loads(sel["prices"] or "{}")
@@ -2423,7 +2423,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + money_c(lo_sum, hi_sum) + "). Type your own figure to override it; clear it to follow the creators again.</div></div>"
         + "</div>"
         + "<div class='row'><div><label>Client (access code)</label><select name='sel_client'><option value=''>No client</option>"
-        + "".join("<option value='%d'%s>%s</option>" % (c["id"], " selected" if c["id"] == sel["code_id"] else "", e(c["label"])) for c in codes)
+        + "".join("<option value='%d'%s>%s</option>" % (c["id"], " selected" if c["id"] == sel["code_id"] else "", e(c["label"])) for c in access_codes)
         + "</select><div class='price-hint'>Whose passcode opens this selection. Changing it moves the selection to that client.</div></div>"
         + "<div style='flex:2'><label>Client name shown on the page</label><input name='client_name' maxlength='80' value='" + e(shown_client)
         + "' placeholder='Leave empty to use the client&#39;s own name'><div class='price-hint'>Shown as &ldquo;for &hellip;&rdquo; in the selection banner. "

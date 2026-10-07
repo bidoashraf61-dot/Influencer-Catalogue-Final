@@ -495,7 +495,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.selection_edit_page(
                 sel, db.list_creators(), db.tier_prices(), self.site_origin(),
                 query.get("e"), query.get("ok"), db.campaigns_for_selection(sel["id"]),
-                scores=self.selection_scores(sel), interests=db.known_interests(), codes=db.list_codes()))
+                scores=self.selection_scores(sel), interests=db.known_interests(), access_codes=db.list_codes()))
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
                 db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok"),
