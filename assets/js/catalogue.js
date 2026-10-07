@@ -513,9 +513,9 @@
   // One brand colour per size, small to large.
   var SIZE_TONES = [["nano", "#e8ff76", "#121212"], ["micro", "#ffffff", "#121212"], ["mid", "#ffc29f", "#121212"],
                     ["macro", "#ff691e", "#121212"], ["mega", "#121212", "#e8ff76"]];
-  // HCP tiers get their own teal family, light to dark by size.
-  var HCP_SIZE_TONES = [["nano", "#c9f1ee", "#121212"], ["micro", "#7fd8d1", "#121212"], ["mid", "#2fb3a9", "#121212"],
-                        ["macro", "#12817a", "#ffffff"], ["mega", "#0b4f4b", "#ffffff"]];
+  // HCP tiers get their own blue family, light sky to deep navy by size.
+  var HCP_SIZE_TONES = [["nano", "#dbe7fb", "#121212"], ["micro", "#a6c3f2", "#121212"], ["mid", "#6b95e3", "#121212"],
+                        ["macro", "#2f5fc4", "#ffffff"], ["mega", "#15306e", "#ffffff"]];
   function toneOf(tier) {
     var t = String(tier).toLowerCase();
     var set = /hcp/.test(t) ? HCP_SIZE_TONES : SIZE_TONES;
