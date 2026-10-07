@@ -254,7 +254,10 @@ def score(doc, platform, followers=None, objective="Balanced", target=None, band
 # match is estimated from the roster (city, nationality, interest) and the bio
 # and hashtags instead of a measured audience split.
 
-ASSUMED_AUDIENCE = 0.8           # no measured audience: assume a good match (80%) at full weight
+ASSUMED_AUDIENCE = 0.8           # no measured audience: assume a good match (80%)...
+# ...but every part's weight is scaled by how far its data can be trusted, so a guess
+# can only nudge the score: measured 1.0, worked out from other numbers 0.5, assumed 0.2.
+TRUST = {"measured": 1.0, "estimated": 0.5, "assumed": 0.2}
 WEIGHTS_BASIC = {
     "Balanced":   {"engagement": 1.5, "reach": 1.5, "views": 1.5, "market": 1.5},
     "Awareness":  {"engagement": 1.0, "reach": 3.0, "views": 3.0, "market": 1.0},
@@ -341,6 +344,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     bars = bench.get("video_er") if video else (bench.get("er") or {}).get(band)
     good, ok = bars if bars else ((6.0, 3.0) if video else (3.0, 1.5))
     parts = []
+    wmul = {}
 
     def add(key, label, s, strength, watch):
         parts.append((key, label, _clamp(s), strength, watch))
@@ -350,6 +354,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         est = bool(doc.get("er_note"))           # a rate the importer worked out: counts, but never as full marks
         if est:
             s = min(s, 0.7)
+            wmul["engagement"] = TRUST["estimated"]
         lab = "Engagement about %s (estimated from average likes)" if est else "Engagement %s"
         add("engagement", "Engagement", s,
             (lab % _pct(er)) + (" per view" if video else "") + ", " + (("above the %s benchmark" % _pct(good)) if er >= good else ("within the healthy range (%s and over)" % _pct(ok))),
@@ -362,6 +367,8 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         import math
         s = (math.log10(max(typ, 1)) - 3.0) / 2.0               # 1K -> 0, 10K -> 0.5, 100K -> 1
         tag = " (estimated)" if how == "estimated" else ""
+        if how == "estimated":
+            wmul["views"] = TRUST["estimated"]
         add("views", "Typical views", s, "A typical video gets about %s views%s" % (_k(typ), tag),
             "A typical video gets only about %s views%s" % (_k(typ), tag))
     # audience match, estimated from the roster and the profile text
@@ -378,7 +385,6 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         nic = _niche("|".join(cats), fake_doc, creator["interest"] if creator is not None else "")
         names = ", ".join(c.strip().lower() for c in cats)
         subs.append((nic, "Works in the %s space" % names, "Little sign of %s content in their profile" % names))
-    wmul = {}
     au = doc.get("audience") or {}
     measured = []
     if verified and (au.get("countries") or au.get("gender") or au.get("ages")):
@@ -404,6 +410,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
             "; ".join(x[1] for x in measured if _clamp(x[0]) >= 0.75) or None, "; ".join(x[2] for x in measured if _clamp(x[0]) <= 0.45) or None)
     else:
         # no audience report: assume a good match rather than guess from the roster
+        wmul["market"] = TRUST["assumed"]
         add("market", "Audience (assumed 80%)", ASSUMED_AUDIENCE, None, None)
 
     def wt(k):
