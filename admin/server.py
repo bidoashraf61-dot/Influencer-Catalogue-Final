@@ -2763,6 +2763,20 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     # -------------------------------------------------------- client API --
 
+    def selection_client(self, sel):
+        """Who a selection is for, as the client reads it: the name set on the
+        selection, else the account holder's company (their code's label is an
+        internal 'Client: email'), else the passcode's client label."""
+        named = sel["client_name"] if "client_name" in sel.keys() else None
+        if named:
+            return named
+        if not sel["code_id"]:
+            return ""
+        u = portal.user_for_code(sel["code_id"])
+        if u is not None:
+            return u["company"] or u["name"] or ""
+        return (db.get_code(sel["code_id"]) or {"label": ""})["label"]
+
     def api_campaigns(self):
         """The campaigns this passcode may see. Drafts are never listed."""
         code_id = self.viewer_code_id()
@@ -3873,8 +3887,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                     "segments": {k: v for k, v in json.loads((sel["segments"] if "segments" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "group_by": (sel["group_by"] if "group_by" in sel.keys() else None) or "",
                                     "brief": {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
-                                              "client": ((sel["client_name"] if "client_name" in sel.keys() else None)
-                                                         or ((db.get_code(sel["code_id"]) or {"label": ""})["label"] if sel["code_id"] else ""))},
+                                              "client": self.selection_client(sel)},
                                     "scores": {k: {"score": v["score"], "tag": v["tag"], "strengths": v["strengths"],
                                                    "watchouts": v["watchouts"], "conclusion": v["conclusion"],
                                                    "parts": [{"label": p["label"], "s": p["s"]} for p in v["parts"]],

@@ -103,19 +103,17 @@
     else el.appendChild(h("span", null, initials(u.name)));
   }
 
+  // The header names the page and holds the tabs; who the client is lives on Home.
   function renderHead() {
-    var u = DATA.user, ins = DATA.insights;
-    face($("ac-face"), u);
-    $("ac-name").textContent = u.name || u.email;
-    $("ac-role").textContent = [u.job_title, u.company].filter(Boolean).join(" · ") || u.email;
+    var ins = DATA.insights;
+    $("ac-face").hidden = true;
+    $("ac-logo").hidden = true;
+    $("ac-name").textContent = "My account";
+    $("ac-role").textContent = DATA.user.name || DATA.user.email;
     var bits = [];
     bits.push(ins.live_campaigns ? ins.live_campaigns + " campaign" + (ins.live_campaigns === 1 ? "" : "s") + " live" : "No live campaigns");
     bits.push(DATA.selections.length + " selection" + (DATA.selections.length === 1 ? "" : "s"));
     $("ac-status").textContent = bits.join(" · ");
-    var lg = $("ac-logo");
-    lg.textContent = "";
-    if (u.logo) { lg.appendChild(h("img", { src: imgUrl("logo", u.logo), alt: u.company || "Company logo" })); lg.hidden = false; }
-    else lg.hidden = true;
     $("ac-who").hidden = false;
     $("ac-tabs").hidden = false;
   }
@@ -247,27 +245,41 @@
       h("button", { class: "cat-btn cat-btn--lime", type: "button", onclick: talk }, "Message " + (DATA.kam ? DATA.kam.split(" ")[0] : "the team")));
   }
 
+  // Home is the client's own profile, nothing else: who they are, how to
+  // reach them, their contact at HelloVoice, their credits and team.
   function renderHome() {
     var p = $("tab-home");
     p.textContent = "";
-    var live = DATA.campaigns.filter(function (c) { return c.status === "live"; });
-    if (live.length) {
-      add(p, scorebug(live[0], live.length > 1 ? "+" + (live.length - 1) + " more live →" : null));
-      add(p, explainer());
-    }
+    var u = DATA.user;
     add(p, completionStrip());
-    add(p, attentionCard());
-    var others = DATA.campaigns.filter(function (c) { return !live.length || c !== live[0]; });
-    if (!live.length || others.length) {
-      add(p, section(live.length ? "Other campaigns" : "Campaigns", others.length > 3 ? h("a", { class: "ac-more", href: "#campaigns" }, "All campaigns →") : null,
-        others.slice(0, 3).map(campaignCard),
-        empty("No campaigns yet", "When we run a campaign for you, its live results show here first.", "Ask for a proposal", null, talk)));
+    var facts = [["Email", u.email], ["Phone", u.phone], ["Job title", u.job_title], ["Company", u.company],
+                 ["Member since", u.created_at ? day(u.created_at) : null],
+                 ["Account manager", DATA.kam || "Your HelloVoice team"],
+                 ["AI credits", DATA.credits != null ? DATA.credits + " left" + (DATA.monthly_credits ? " · " + DATA.monthly_credits + " added monthly" : "") : null]];
+    var dl = h("dl", { class: "ac-facts" });
+    facts.forEach(function (f) {
+      dl.appendChild(h("div", null, h("dt", null, f[0]), h("dd", { class: f[1] ? null : "is-empty" }, f[1] || "Not added yet")));
+    });
+    var faceEl = h("div", { class: "ac-profile__face", "aria-hidden": "true" });
+    face(faceEl, u);
+    add(p, h("section", { class: "ac-profile", "aria-labelledby": "ac-profile-name" },
+      h("div", { class: "ac-profile__who" }, faceEl,
+        h("div", null, h("h2", { class: "ac-profile__name", id: "ac-profile-name" }, u.name || u.email),
+          h("p", { class: "ac-muted" }, [u.job_title, u.company].filter(Boolean).join(" · ") || u.email)),
+        u.logo ? h("div", { class: "ac-profile__logo" }, h("img", { src: imgUrl("logo", u.logo), alt: u.company || "Company logo" })) : null),
+      dl,
+      h("div", { class: "ac-row" },
+        h("a", { class: "cat-btn cat-btn--lime", href: "#settings/profile" }, "Edit profile"),
+        h("button", { class: "ac-btn-line", type: "button", onclick: talk }, "Message " + (DATA.kam ? DATA.kam.split(" ")[0] : "the team")))));
+    if (DATA.team.length) {
+      var list = h("ul", { class: "ac-people" });
+      DATA.team.forEach(function (t) {
+        list.appendChild(h("li", null, h("span", { class: "ac-people__ini", "aria-hidden": "true" }, initials(t.name)),
+          h("div", null, h("b", null, t.name), t.job_title ? h("span", { class: "ac-muted" }, t.job_title) : null)));
+      });
+      add(p, h("div", { class: "ac-sec" }, h("div", { class: "ac-sec__hd" }, h("h2", { class: "ac-h2" }, "Your team"),
+        h("a", { class: "ac-more", href: "#settings/team" }, "Invite a colleague →")), list));
     }
-    add(p, section("Selections", DATA.selections.length > 3 ? h("a", { class: "ac-more", href: "#selections" }, "All selections →") : null,
-      DATA.selections.slice(0, 3).map(selectionCard),
-      empty("No selections yet", "Pick creators in the catalogue and review them as a selection. Your shortlists appear here.", "Browse creators", ROOT + "#cat-roster"),
-      shortlistLine()));
-    add(p, contactCard());
   }
 
   function renderSelections() {
@@ -279,11 +291,19 @@
       shortlistLine()));
   }
 
+  // Campaigns: each live campaign as the report's scorebug, then the rest.
   function renderCampaigns() {
     var p = $("tab-campaigns");
     p.textContent = "";
-    add(p, section("My campaigns", null, DATA.campaigns.map(campaignCard),
-      empty("No campaigns yet", "When we run a campaign for you, its live results and report appear here.", "Ask for a proposal", null, talk)));
+    var live = DATA.campaigns.filter(function (c) { return c.status === "live"; });
+    var rest = DATA.campaigns.filter(function (c) { return c.status !== "live"; });
+    live.forEach(function (c) { add(p, scorebug(c, null)); });
+    if (live.length) add(p, explainer());
+    add(p, attentionCard());
+    if (!live.length || rest.length) {
+      add(p, section(live.length ? "Earlier campaigns" : "My campaigns", null, rest.map(campaignCard),
+        empty("No campaigns yet", "When we run a campaign for you, its live results and report appear here.", "Ask for a proposal", null, talk)));
+    }
   }
 
   /* -------------------------------------------------------------- settings */

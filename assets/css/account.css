@@ -12,6 +12,7 @@
 .ac-head__logo:focus-visible, .ac-head .cat-topbar a:focus-visible { outline: 3px solid var(--lime); outline-offset: 3px; }
 .ac-who { display: flex; align-items: center; gap: 22px; padding-bottom: 28px; }
 .ac-who[hidden] { display: none; }
+.ac-who__face[hidden] { display: none; }
 .ac-who__face {
   width: 84px; height: 84px; flex: none; border-radius: 50%; overflow: hidden;
   background: var(--lime); color: var(--ink); border: 3px solid var(--lime);
@@ -138,6 +139,25 @@ p.ac-muted { margin: 6px 0 0; max-width: 64ch; }
 .ac-explain dl { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 8px 18px; margin: 6px 0 0; max-width: 820px; font-size: 14px; line-height: 1.5; }
 .ac-explain dt { font-weight: 700; }
 .ac-explain dd { margin: 0; color: var(--gray); }
+
+/* ---------------------------------------------------- home: the profile */
+.ac-profile { border: 1px solid rgba(18,18,18,.12); border-radius: 24px; padding: 28px; }
+.ac-profile__who { display: flex; align-items: center; gap: 20px; }
+.ac-profile__who > div:nth-child(2) { flex: 1; min-width: 0; }
+.ac-profile__face {
+  width: 88px; height: 88px; flex: none; border-radius: 50%; overflow: hidden; background: var(--lime); color: var(--ink);
+  display: flex; align-items: center; justify-content: center; font-family: var(--heading); font-size: 36px;
+}
+.ac-profile__face img { width: 100%; height: 100%; object-fit: cover; }
+.ac-profile__name { font-family: var(--heading); font-weight: 400; font-size: 38px; line-height: 1; margin: 0; overflow-wrap: anywhere; }
+.ac-profile__logo { flex: none; height: 60px; max-width: 160px; padding: 8px 12px; border-radius: 14px; border: 1px solid rgba(18,18,18,.12); display: flex; align-items: center; }
+.ac-profile__logo img { max-height: 100%; max-width: 100%; object-fit: contain; }
+.ac-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 24px 0; border-top: 1px solid rgba(18,18,18,.1); }
+.ac-facts > div { display: flex; flex-direction: column; gap: 4px; padding: 16px 16px 16px 0; border-bottom: 1px solid rgba(18,18,18,.1); min-width: 0; }
+.ac-facts > div:nth-child(even) { padding-left: 16px; border-left: 1px solid rgba(18,18,18,.1); }
+.ac-facts dt { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); }
+.ac-facts dd { margin: 0; font-size: 16px; color: var(--ink); overflow-wrap: anywhere; }
+.ac-facts dd.is-empty { color: var(--gray); font-style: italic; }
 
 /* -------------------------------------------- profile strip and attention */
 .ac-strip {
@@ -313,6 +333,12 @@ p.ac-muted { margin: 6px 0 0; max-width: 64ch; }
   .ac-explain dd { margin-bottom: 10px; }
   .ac-strip a { margin-left: 0; }
   .ac-grid, .ac-people { grid-template-columns: 1fr; }
+  .ac-profile { padding: 20px; }
+  .ac-profile__face { width: 64px; height: 64px; font-size: 26px; }
+  .ac-profile__name { font-size: 30px; }
+  .ac-profile__logo { display: none; }
+  .ac-facts { grid-template-columns: 1fr; }
+  .ac-facts > div:nth-child(even) { padding-left: 0; border-left: 0; }
   .ac-form { grid-template-columns: 1fr; }
   .ac-action { flex-direction: column; align-items: flex-start; }
   .ac-sec__hd { flex-wrap: wrap; align-items: flex-start; }
