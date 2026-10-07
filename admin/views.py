@@ -2125,6 +2125,9 @@ VERDICT_JS = r'''<style>
 .vd-role:has(input:checked){background:var(--ink,#121212);color:#e8ff76;border-color:var(--ink,#121212)}
 .vd-role input{margin:0}
 .vd-note{font-size:12px;margin-top:6px}
+.vd-why{list-style:none;margin:8px 0 0;padding:0;font-size:12px;display:grid;gap:3px}
+.vd-why li{padding:3px 8px;border-radius:8px;background:#f3f1eb}
+.vd-why li.g1{background:#e7f7ed}.vd-why li.g-1{background:#fdeaea}
 @media (max-width:1200px){.vd-line{grid-template-columns:1fr}}
 @media (max-width:900px){.vd-item{grid-template-columns:1fr}}
 </style>
@@ -2132,13 +2135,18 @@ VERDICT_JS = r'''<style>
 function row(el){return el.closest('.vd-item')}
 function syncRoles(tr){var v=[].slice.call(tr.querySelectorAll('.vd-role input:checked')).map(function(i){return i.value});tr.querySelector('.vd-roles-in').value=v.join(',')}
 document.addEventListener('change',function(e){var tr=e.target.closest&&e.target.closest('.vd-item');if(tr&&e.target.closest('.vd-role'))syncRoles(tr)});
-function suggest(tr,done){var code=tr.querySelector('input[name=vcode]').value;var p=document.querySelector('select[name=platform]');p=p?p.value:'';
+function suggest(tr,done){var code=tr.querySelector('input[name=vcode]').value;var p=document.querySelector('select[name=platform]');p=p?p.value:'';var o=document.getElementById('vd-obj');o=o?o.value:'';
  var note=tr.querySelector('.vd-note');note.textContent='Reading the analysis…';
- fetch(base+'/selections/suggest?code='+encodeURIComponent(code)+'&p='+encodeURIComponent(p),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+ fetch(base+'/selections/suggest?code='+encodeURIComponent(code)+'&p='+encodeURIComponent(p)+'&o='+encodeURIComponent(o),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
   if(d.fit!==undefined){var sel=tr.querySelector('.vd-fit');if(d.fit)sel.value=d.fit;
    tr.querySelectorAll('.vd-role input').forEach(function(i){i.checked=(d.roles||[]).indexOf(i.value)>=0});syncRoles(tr);
    if(d.reason)tr.querySelector('.vd-reason').value=d.reason}
-  note.textContent=d.note||('Suggested from the '+d.platform+' analysis — check it, then Save changes.');if(done)done()}).catch(function(){note.textContent='Could not suggest.';if(done)done()})}
+  note.textContent=d.note||('Suggested for '+d.objective+' from the '+d.platform+' analysis — check it, then Save changes.');
+  var old=tr.querySelector('.vd-why');if(old)old.remove();
+  if(d.checks&&d.checks.length){var ul=document.createElement('ul');ul.className='vd-why';
+   d.checks.forEach(function(c){var li=document.createElement('li');li.className='g'+c.grade;li.textContent=c.label+': '+c.value+'  ('+c.bench+')';ul.appendChild(li)});
+   tr.querySelector('.vd-who > div').appendChild(ul)}
+  if(done)done()}).catch(function(){note.textContent='Could not suggest.';if(done)done()})}
 document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.vd-suggest');if(b){suggest(row(b))}});
 var all=document.getElementById('vd-all');if(all)all.onclick=function(){var rows=[].slice.call(document.querySelectorAll('.vd-item'));
  var i=0;(function next(){if(i>=rows.length)return;suggest(rows[i++],next)})()}})();</script>'''.replace("%BASE%", """document.querySelector("form[action$='/selections/save']").getAttribute("action").replace(/\/selections\/save$/,"")""")
@@ -2175,6 +2183,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     verdicts_of = json.loads((sel["verdicts"] if "verdicts" in keys else None) or "{}")
     client_tags_of = json.loads((sel["client_tags"] if "client_tags" in keys else None) or "{}")
     import fit as _fit
+    import db as _db2
+    obj_now = (sel["objective"] if "objective" in keys else None) or _fit.FROM_CAMPAIGN.get(_db2.selection_campaign_objective(sel["id"]) or "", "Balanced")
     margin = sel["margin"] if "margin" in keys else None
     margin_txt = "" if margin is None else ("%g" % margin)
     mmax = sel["margin_max"] if "margin_max" in keys else None
@@ -2310,9 +2320,13 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<p class='sec-desc'>Tell the client whether each creator suits this campaign, and what part they play. "
           "The client sees the fit, the roles, your reason and the tags on each creator's card, and can filter the selection by them. "
           "Everything here belongs to this selection only.</p>"
-          "<div class='vd-bar'><button type='button' class='btn small' id='vd-all'>Suggest fit &amp; role for everyone</button> "
-          "<span class='muted'>Reads each creator's analysis (for the platform this selection is quoted for, else their own) and fills in a suggestion with the numbers behind it. "
-          "Nothing is shown to the client until you save, and you can change every word.</span></div>"
+          "<div class='vd-bar'><div><label style='display:block;font-weight:600;font-size:13px;margin-bottom:4px'>Judge fit for this objective</label>"
+          "<select name='sel_objective' id='vd-obj'>" + "".join(
+              "<option" + (" selected" if o_ == obj_now else "") + ">" + o_ + "</option>" for o_ in _fit.OBJECTIVES) + "</select></div>"
+          "<button type='button' class='btn small' id='vd-all'>Suggest fit &amp; role for everyone</button> "
+          "<span class='muted' style='flex:1;min-width:260px'>Suggestions weigh each creator's analysis against the benchmark ranges in Settings, "
+          "their audience in KSA, their reach and our own past campaigns with them, for the objective chosen. "
+          "Or ignore them and fill everything in by hand — nothing is shown to the client until you save.</span></div>"
           "<div class='price-hint' id='tag-pool' data-pool='" + e(json.dumps(sorted({t for v in tags_of.values() for t in v}, key=str.lower))) + "'></div>"
           "<div class='vd-list'>" + fit_cards + "</div>"
           "<p class='price-hint'>Tags are your own labels (Hero, Beauty, Backup…), separated by commas. Click a tag in <i>Tags in use</i> to add it to the box you last typed in. "

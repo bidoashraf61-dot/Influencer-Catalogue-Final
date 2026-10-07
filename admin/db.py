@@ -460,6 +460,9 @@ def migrate(conn):
         # Archived = out of the Clients list, nothing else: the code still
         # works until it is revoked.
         conn.execute("ALTER TABLE codes ADD COLUMN archived_at INTEGER")
+    if "objective" not in sel_cols:
+        # Which campaign objective the admin judges this selection's creators against.
+        conn.execute("ALTER TABLE selections ADD COLUMN objective TEXT")
     if "client_tags" not in sel_cols:
         # {code: [tag, ...]}: labels the client themselves put on creators of THIS
         # selection from its page. Kept apart from `tags` so an admin saving the
@@ -1718,6 +1721,19 @@ def set_archived(table, rid, on):
     assert table in ("codes", "selections")
     with connect() as conn:
         conn.execute("UPDATE %s SET archived_at = ? WHERE id = ?" % table, (now() if on else None, rid))
+
+
+def set_selection_objective(sid, objective):
+    with connect() as conn:
+        conn.execute("UPDATE selections SET objective = ? WHERE id = ?", (objective, sid))
+
+
+def selection_campaign_objective(sid):
+    """The objective of the newest campaign built from this selection, if any."""
+    with connect() as conn:
+        r = conn.execute("SELECT objective FROM campaigns WHERE selection_id = ? AND objective IS NOT NULL "
+                         "ORDER BY updated_at DESC LIMIT 1", (sid,)).fetchone()
+    return r["objective"] if r else None
 
 
 def set_client_tags(sid, code, tags):

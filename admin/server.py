@@ -1840,6 +1840,9 @@ class Handler(BaseHTTPRequestHandler):
         if t_from is not None and t_to < t_from: t_from, t_to = t_to, t_from
         name = (f.get("name") or "").strip() or sel["name"]
         db.set_selection_currency(sel["id"], cur)
+        import fit as _fit_mod
+        if (f.get("sel_objective") or "") in _fit_mod.OBJECTIVES:
+            db.set_selection_objective(sel["id"], f["sel_objective"])
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs, margin_max=margin_max,
                           tags={k: v for k, v in tags.items() if k in codes},
@@ -2923,7 +2926,12 @@ class Handler(BaseHTTPRequestHandler):
         else:
             a = db.analysis(code)
             plat = (a or {}).get("platform") or db.platforms_of(code)[0]
-        out = fit_mod.suggest(a["data"] if a else None, plat, c["followers"])
+        obj = query.get("o") if query.get("o") in fit_mod.OBJECTIVES else "Balanced"
+        followers = ((a["data"] if a else {}).get("followers")) or c["followers"]
+        records, typical = metrics.track_records()
+        rec = dict(records.get(code) or {}, typical_er=typical) if code in records else None
+        out = fit_mod.suggest(a["data"] if a else None, plat, c["followers"], objective=obj,
+                              band=metrics.band_of(followers), bench=metrics.benchmarks(), record=rec)
         out["platform"] = plat
         return self.send_json(200, out)
 

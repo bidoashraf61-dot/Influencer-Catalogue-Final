@@ -632,6 +632,31 @@ def overall_verdict(progress, total):
             "grade": g}
 
 
+def track_records():
+    """Our own record with each creator, from the campaigns we have run:
+    ({code: {"campaigns", "posts", "er"}}, typical_er). `er` is reactions per
+    view over their counted video posts, in %; `typical_er` the median across
+    creators with a record (None until there are three), so a creator can be
+    judged against what our own creators usually deliver."""
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT c.code, c.campaign_id, s.likes, s.comments, s.views FROM content c "
+            "JOIN snapshots s ON s.id = (SELECT id FROM snapshots WHERE content_id = c.id ORDER BY at DESC, id DESC LIMIT 1) "
+            "WHERE c.hidden = 0 AND c.section = 'campaign'").fetchall()
+    per = {}
+    for r in rows:
+        if not r["views"]:
+            continue
+        d = per.setdefault(r["code"], {"camps": set(), "posts": 0, "react": 0, "views": 0})
+        d["camps"].add(r["campaign_id"]); d["posts"] += 1
+        d["react"] += (r["likes"] or 0) + (r["comments"] or 0); d["views"] += r["views"]
+    out = {c: {"campaigns": len(d["camps"]), "posts": d["posts"], "er": 100.0 * d["react"] / d["views"]}
+           for c, d in per.items() if d["views"]}
+    ers = sorted(v["er"] for v in out.values())
+    typical = (ers[len(ers) // 2] if len(ers) % 2 else (ers[len(ers) // 2 - 1] + ers[len(ers) // 2]) / 2) if len(ers) >= 3 else None
+    return out, typical
+
+
 def catalogue_audience():
     """The average audience of every creator profile that has an uploaded
     analysis: for each country, its mean share across those profiles (a profile

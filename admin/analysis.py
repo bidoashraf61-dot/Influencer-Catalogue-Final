@@ -242,6 +242,50 @@ AUDIENCE_SKELETON = [("gender", "female"), ("gender", "male"),
                      ("countries", "SA"), ("countries", "AE"), ("countries", "EG")]
 
 
+# Cells with a fixed set of answers are dropdowns in the workbook, so they are
+# picked, never typed. They are offered, not enforced: a city or an interest
+# the list does not know can still be typed.
+COUNTRY_CODES = ["SA", "AE", "EG", "KW", "QA", "BH", "OM", "JO", "LB", "IQ", "MA", "TN", "DZ", "SD", "SY", "YE", "US", "GB"]
+LABELS = ["female", "male", "13-17", "18-24", "25-34", "35-44", "45-54", "55-64", "65+"] + COUNTRY_CODES
+OPTION_LISTS = [("Platform", PLATFORMS), ("Section", AUDIENCE_SECTIONS), ("Audience of", ["followers", "likers"]),
+                ("Post kind", ["top", "sponsored"]), ("Label (gender, age, country)", LABELS),
+                ("Account type", ["Creator", "Business"])]
+
+
+def _letter(i):
+    out = ""
+    i += 1
+    while i:
+        i, r = divmod(i - 1, 26)
+        out = chr(65 + r) + out
+    return out
+
+
+def options_sheet():
+    """The Options sheet the dropdowns read from: one column per list."""
+    longest = max(len(v) for _, v in OPTION_LISTS)
+    rows = [[name for name, _ in OPTION_LISTS]] + [
+        [(vals[i] if i < len(vals) else "") for _, vals in OPTION_LISTS] for i in range(longest)]
+    return ("Options", rows, {i: 24 for i in range(len(OPTION_LISTS))}, None)
+
+
+def dropdowns(order):
+    """Validations for the analysis sheets. `order` is the workbook's sheet
+    names in order; the Options sheet must be among them."""
+    idx = {n: i for i, n in enumerate(order, start=1)}
+    ref = lambda col, n: "Options!$%s$2:$%s$%d" % (_letter(col), _letter(col), n + 1)
+    plat, sect, aud, kind, label, acct = (ref(i, len(v)) for i, (_, v) in enumerate(OPTION_LISTS))
+    keys = [k for k, _ in OVERVIEW]
+    rules = [(idx["Overview"], "B2:B3000", plat),
+             (idx["Overview"], "%s2:%s3000" % ((_letter(keys.index("account_type")),) * 2), acct),
+             (idx["Audience"], "B2:B6000", sect), (idx["Audience"], "C2:C6000", label),
+             (idx["Audience"], "E2:E6000", aud), (idx["Audience"], "F2:F6000", plat),
+             (idx["Growth"], "E2:E6000", plat),
+             (idx["Posts"], "B2:B6000", kind), (idx["Posts"], "J2:J6000", plat),
+             (idx["Brands"], "E2:E6000", plat), (idx["Hashtags"], "D2:D6000", plat)]
+    return rules
+
+
 def template_xlsx(creators=None, code=None, missing=(), platform=None):
     """The template. With `creators` (roster rows) it comes prefilled: the
     identity and platform are on every row and the Audience sheet carries the
@@ -273,11 +317,13 @@ def template_xlsx(creators=None, code=None, missing=(), platform=None):
             [c["code"], c["name"], c["handle"] or "", ", ".join(creator_platforms(c))] for c in creators] + [
             ["NOT FOUND", m, "", ""] for m in missing]
         sheets.append(("Creators (reference)", ref, {0: 16, 1: 28, 2: 24, 3: 24}, None))
-        return xlsx.write_book(sheets)
+        sheets.append(options_sheet())
+        return xlsx.write_book(sheets, dropdowns([s_[0] for s_ in sheets]))
     for name, header in SHEETS.items():
         example = [code if (code and v == "HV-XX-000") else v for v in EXAMPLE[name]]
         sheets.append((name, [header, example], {i: 22 for i in range(len(header))}, None))
-    return xlsx.write_book(sheets)
+    sheets.append(options_sheet())
+    return xlsx.write_book(sheets, dropdowns([s_[0] for s_ in sheets]))
 
 
 def _num(v):
