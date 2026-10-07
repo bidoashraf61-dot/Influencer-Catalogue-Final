@@ -1567,6 +1567,49 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 }
 .cat-cover__cta.cat-cover__cue:hover { background: var(--white); color: var(--ink); }
 
+/* The journey along the foot of the cover: five steps from browsing to
+   tracking, joined by one hairline. The first is lit in lime as where the
+   client is now. On a phone the strip scrolls sideways inside itself. */
+.cat-journey { position: relative; padding: 0 0 26px; }
+.cat-hero--cover:has(.cat-journey) .cat-cover__body--center { padding-bottom: clamp(28px, 5vh, 56px); }
+.cat-journey__list {
+  list-style: none; margin: 0; padding: 22px 0 0;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0 16px;
+  border-top: 1px solid rgba(255,255,255,.22);
+  counter-reset: step;
+}
+.cat-journey__step { position: relative; display: grid; grid-template-columns: auto 1fr; column-gap: 12px; align-items: baseline; counter-increment: step; }
+.cat-journey__dot {
+  grid-row: span 2; align-self: start; margin-top: 2px;
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,.55); color: rgba(255,255,255,.85);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-family: var(--heading); font-size: 15px; line-height: 1;
+  background: rgba(18,18,18,.35);
+}
+.cat-journey__dot::before { content: counter(step); }
+.cat-journey__name {
+  font-family: var(--heading); font-size: 22px; letter-spacing: .06em; line-height: 1.05;
+  text-transform: uppercase; color: var(--white);
+}
+.cat-journey__hint { grid-column: 2; font-size: 13px; line-height: 1.35; color: rgba(255,255,255,.72); margin-top: 3px; }
+.cat-journey__step.is-here .cat-journey__dot { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.cat-journey__step.is-here .cat-journey__name { color: var(--lime); }
+/* the lime tick on the rule above the current step */
+.cat-journey__step.is-here::before {
+  content: ""; position: absolute; left: 0; right: 16px; top: -23px; height: 2px;
+  background: var(--lime); border-radius: 2px;
+}
+@media screen and (max-width: 991px) {
+  .cat-journey__list {
+    display: flex; overflow-x: auto; gap: 0 26px; scroll-snap-type: x proximity;
+    scrollbar-width: none; padding-bottom: 4px;
+  }
+  .cat-journey__list::-webkit-scrollbar { display: none; }
+  .cat-journey__step { flex: 0 0 auto; min-width: 170px; scroll-snap-align: start; }
+  .cat-journey__step.is-here::before { top: -23px; }
+}
+
 /* The selection page: same ink stage and overlaid menu as the catalogue cover,
    but no footage. A drawn shortlist (three fanned creator cards, the front one
    ticked in lime) on a hairline desk grid says "your pick" instead of "our

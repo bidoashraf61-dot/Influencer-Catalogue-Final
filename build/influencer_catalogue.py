@@ -753,7 +753,18 @@ def build():
         </a>
       </div>
     </div></div></div>
+    <nav class="cat-journey" aria-label="How it works"><div class="cat-pad"><div class="cat-container">
+        <ol class="cat-journey__list">
+          <li class="cat-journey__step is-here"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Browse</span><span class="cat-journey__hint">Explore vetted creators</span></li>
+          <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Shortlist</span><span class="cat-journey__hint">Pick the voices you like</span></li>
+          <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Score</span><span class="cat-journey__hint">Match them to your brief</span></li>
+          <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Quote</span><span class="cat-journey__hint">We confirm the price</span></li>
+          <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Track</span><span class="cat-journey__hint">Follow every post</span></li>
+        </ol>
+    </div></div></nav>
   </header>
+
+  {clients_block}
 
   <div class="cat-ticker" aria-hidden="true">
     <div class="cat-ticker__track">{ticker_track}</div>
@@ -762,11 +773,8 @@ def build():
   <section class="cat-controls" id="cat-roster" aria-label="Filters">
     <div class="cat-pad"><div class="cat-container">
       {filters}
-      <p class="cat-note">Pick the creators you want, then review the selection. Costs are quoted for the shortlist as a whole.</p>
     </div></div>
   </section>
-
-  {clients_block}
 
   <section class="cat-grid-section">
     <div class="cat-pad"><div class="cat-container">
