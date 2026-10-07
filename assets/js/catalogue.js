@@ -510,8 +510,15 @@
     "Quoted for": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M10.5 18h3"/></svg>',
     "Not in this roster": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.4v.1"/></svg>'
   };
-  var TIER_TONES = ["#121212", "#4a4a4a", "#7c7c7c", "#a9a9a9", "#cfcfcf"];
-  var HCP_TONES = ["#0c5a2d", "#14884a", "#43ad72", "#8fd3aa", "#c4ebd2"];
+  // One brand colour per size, small to large; HCP tiers keep their size's
+  // colour and add a stripe, so size and HCP read as two separate things.
+  var SIZE_TONES = [["nano", "#e8ff76", "#121212"], ["micro", "#ffffff", "#121212"], ["mid", "#ffc29f", "#121212"],
+                    ["macro", "#ff691e", "#121212"], ["mega", "#121212", "#e8ff76"]];
+  function toneOf(tier) {
+    var t = String(tier).toLowerCase();
+    for (var i = 0; i < SIZE_TONES.length; i++) if (t.indexOf(SIZE_TONES[i][0]) > -1) return SIZE_TONES[i];
+    return ["x", "#8a8178", "#ffffff"];
+  }
   function shareBar(n, total) {
     var pct = total ? Math.round(100 * n / total) : 0;
     return '<span class="cat-meter" role="img" aria-label="' + pct + '% of the selection"><i style="width:' + pct + '%"></i></span>' +
@@ -1772,21 +1779,19 @@
       var total = names.reduce(function (s, t) { return s + tiers[t]; }, 0);
       box.hidden = !total;
       if (!total) { box.innerHTML = ""; return; }
-      var plain = 0, hcp = 0;
-      var tone = {};
-      names.forEach(function (t) {
-        tone[t] = /hcp/i.test(t) ? HCP_TONES[Math.min(hcp++, HCP_TONES.length - 1)]
-                                 : TIER_TONES[Math.min(plain++, TIER_TONES.length - 1)];
-      });
-      var light = function (c) { return TIER_TONES.indexOf(c) >= 2 || HCP_TONES.indexOf(c) >= 3; };
+      var paint = function (t) {
+        var c = toneOf(t);
+        return "background-color:" + c[1] + ";color:" + c[2];
+      };
+      var cls = function (t) { return /hcp/i.test(t) ? ' class="is-hcp"' : ""; };
       box.innerHTML = '<p class="cat-places__label">Creator size</p>' +
         '<div class="cat-tiers__bar" role="img" aria-label="' + esc(names.map(function (t) { return tiers[t] + " " + t; }).join(", ")) + '">' +
         names.map(function (t) {
-          return '<span style="flex:' + tiers[t] + ";background:" + tone[t] + (light(tone[t]) ? ";color:var(--ink)" : "") +
+          return "<span" + cls(t) + ' style="flex:' + tiers[t] + ";" + paint(t) +
             '" title="' + esc(t) + ": " + tiers[t] + '">' + tiers[t] + "</span>";
         }).join("") + "</div>" +
         '<ul class="cat-tiers__legend">' + names.map(function (t) {
-          return '<li><i style="background:' + tone[t] + '"></i>' + esc(t) + " <b>" + tiers[t] + "</b><small>" +
+          return "<li><i" + cls(t) + ' style="' + paint(t) + '"></i>' + esc(t) + " <b>" + tiers[t] + "</b><small>" +
             Math.round(100 * tiers[t] / total) + "%</small></li>";
         }).join("") + "</ul>";
     }

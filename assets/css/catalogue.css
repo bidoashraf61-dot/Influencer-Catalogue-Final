@@ -1365,12 +1365,15 @@ p.cat-selhead__brief { display: block; margin: 0; font-size: 15px; font-weight: 
 @media screen and (max-width: 767px) { .cat-stat dd { padding-left: 0; } }
 
 .cat-tiers { margin: -4px 0 32px; padding: 0 0 32px; border-bottom: 1px solid rgba(18,18,18,.12); }
-.cat-tiers__bar { display: flex; height: 44px; border-radius: var(--r-pill); overflow: hidden; gap: 3px; background: transparent; }
+.cat-tiers__bar { display: flex; height: 44px; border-radius: var(--r-pill); overflow: hidden; gap: 3px;
+  box-shadow: 0 0 0 1px rgba(18,18,18,.12); background: rgba(18,18,18,.12); }
+.cat-tiers__bar .is-hcp, .cat-tiers__legend i.is-hcp {
+  background-image: repeating-linear-gradient(135deg, rgba(18,18,18,.16) 0 3px, transparent 3px 8px); }
 .cat-tiers__bar span { min-width: 30px; display: flex; align-items: center; justify-content: center;
   font-family: var(--heading); font-size: 20px; letter-spacing: .04em; color: var(--white); }
 .cat-tiers__legend { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 26px; }
 .cat-tiers__legend li { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--gray); }
-.cat-tiers__legend i { width: 12px; height: 12px; border-radius: 4px; flex: none; }
+.cat-tiers__legend i { width: 14px; height: 14px; border-radius: 4px; flex: none; box-shadow: 0 0 0 1px rgba(18,18,18,.18); }
 .cat-tiers__legend b { color: var(--ink); font-weight: 700; }
 .cat-tiers__legend small { font-size: 12px; opacity: .7; }
 
@@ -1382,8 +1385,9 @@ p.cat-selhead__brief { display: block; margin: 0; font-size: 15px; font-weight: 
 .cat-places__list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 26px 48px; }
 .cat-places__country { align-items: center; }
 .cat-places__bar { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; }
-.cat-meter { flex: 1; height: 8px; border-radius: var(--r-pill); background: rgba(18,18,18,.1); overflow: hidden; }
-.cat-meter i { display: block; height: 100%; background: var(--ink); border-radius: inherit; }
+.cat-meter { flex: 1; height: 10px; border-radius: var(--r-pill); background: rgba(255,255,255,.7); overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(18,18,18,.08); }
+.cat-meter i { display: block; height: 100%; background: var(--vivid-orange); border-radius: inherit; }
 .cat-meter__pct { font-size: 13px; font-weight: 600; color: var(--ink); min-width: 38px; text-align: right; }
 ul.cat-places__cities { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
 ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var(--r-pill); padding: 4px 11px; font-size: 13px; }
