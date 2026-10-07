@@ -44,7 +44,7 @@ PRESETS = {
                     "actor": "khadinakbar/tiktok-profile-scraper", "est": 0.002,
                     "input": '{"profiles": "{{handles}}", "maxResults": "{{count}}"}'},
     "tt_analytics": {"label": "TikTok · engagement analytics", "platform": "TikTok", "kind": "analysis",
-                     "actor": "maximedupre/tiktok-creator-analytics", "est": 0.001,
+                     "actor": "maximedupre/tiktok-creator-analytics", "est": 0.0001,
                      "input": '{"target": "handles", "creatorHandles": "{{handles}}", "postSampleSize": 20}'},
     "tt_audience": {"label": "TikTok · audience demographics (one run per creator)", "platform": "TikTok",
                     "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 1.70,
@@ -54,6 +54,8 @@ PRESETS = {
 }
 
 MAX_PARALLEL = 5                       # per-creator runs in flight at once
+# Actors that run out of memory on a long list are sent a few creators at a time.
+CHUNK = {"maximedupre/tiktok-creator-analytics": 25}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS api_jobs (
@@ -493,6 +495,17 @@ def start_job(jid, trigger="manual"):
             conn.execute("UPDATE api_jobs SET last_started = ? WHERE id = ?", (db.now(), jid))
         pump()
         return True, "Queued %d runs, about $%.2f." % (len(pairs), est)
+    chunk = CHUNK.get(job["actor"])
+    if chunk and len(pairs) > chunk:
+        with db.connect() as conn:
+            for i in range(0, len(pairs), chunk):
+                part = pairs[i:i + chunk]
+                conn.execute("INSERT INTO api_runs (job_id, job_name, trigger, status, handles, handle_map, started_at) "
+                             "VALUES (?,?,?,?,?,?,?)", (jid, job["name"], trigger, "QUEUED", len(part),
+                                                       json.dumps({h.lower(): c for c, h in part}), db.now()))
+            conn.execute("UPDATE api_jobs SET last_started = ? WHERE id = ?", (db.now(), jid))
+        pump()
+        return True, "Queued %d runs of up to %d creators, about $%.2f." % (-(-len(pairs) // chunk), chunk, est)
     handles = [h for _c, h in pairs]
     try:
         res = _launch(job, handles)
