@@ -756,12 +756,9 @@ def build():
     <nav class="cat-journey" aria-label="How it works"><div class="cat-pad"><div class="cat-container">
         <ol class="cat-journey__list">
           <li class="cat-journey__step is-here"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Browse</span><span class="cat-journey__hint">Explore vetted creators</span></li>
-          <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Analyse</span><span class="cat-journey__hint">Read each creator's full profile</span></li>
           <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Shortlist</span><span class="cat-journey__hint">Pick the voices you like</span></li>
           <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Score</span><span class="cat-journey__hint">Match them to your brief</span></li>
           <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Quote</span><span class="cat-journey__hint">We confirm the price</span></li>
-          <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Logistics</span><span class="cat-journey__hint">Products to creators, handled</span></li>
-          <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Content</span><span class="cat-journey__hint">Scripts, filming and approvals</span></li>
           <li class="cat-journey__step"><span class="cat-journey__dot" aria-hidden="true"></span><span class="cat-journey__name">Track</span><span class="cat-journey__hint">Follow every post</span></li>
         </ol>
     </div></div></nav>
