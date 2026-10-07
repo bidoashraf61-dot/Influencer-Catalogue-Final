@@ -254,7 +254,7 @@ def score(doc, platform, followers=None, objective="Balanced", target=None, band
 # match is estimated from the roster (city, nationality, interest) and the bio
 # and hashtags instead of a measured audience split.
 
-EST_AUDIENCE_WEIGHT = 0.2        # an audience guessed from the roster counts a fifth as much as a measured one
+ASSUMED_AUDIENCE = 0.8           # no measured audience: assume a good match (80%) at full weight
 WEIGHTS_BASIC = {
     "Balanced":   {"engagement": 1.5, "reach": 1.5, "views": 1.5, "market": 1.5},
     "Awareness":  {"engagement": 1.0, "reach": 3.0, "views": 3.0, "market": 1.0},
@@ -402,11 +402,9 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     if measured:
         add("market", "Audience (measured)", sum(_clamp(x[0]) for x in measured) / len(measured),
             "; ".join(x[1] for x in measured if _clamp(x[0]) >= 0.75) or None, "; ".join(x[2] for x in measured if _clamp(x[0]) <= 0.45) or None)
-    elif subs:
-        # only a guess from the roster and the bio: it may nudge the score, never carry it
-        wmul["market"] = EST_AUDIENCE_WEIGHT
-        add("market", "Audience (estimated)", sum(x[0] for x in subs) / len(subs), "; ".join(x[1] for x in subs if x[0] >= 0.75) or None,
-            "; ".join(x[2] for x in subs if x[0] <= 0.45) or None)
+    else:
+        # no audience report: assume a good match rather than guess from the roster
+        add("market", "Audience (assumed 80%)", ASSUMED_AUDIENCE, None, None)
 
     def wt(k):
         return w.get(k, 1.0) * wmul.get(k, 1.0)
@@ -419,16 +417,6 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     val = int(round(100.0 * sum(wt(k) * s for k, _, s, _, _ in parts) / tw))
     extra_watch = []
     if verified:
-        fk_good, fk_bad = bench.get("fake_followers") or (15.0, 30.0)
-        fake = doc.get("fake_followers_pct")
-        if fake is None and doc.get("credibility_pct") is not None:
-            fake = round(100 - doc["credibility_pct"], 1)
-        if fake is not None:
-            lv = "ok" if fake <= fk_good else "bad" if fake >= fk_bad else "warn"
-            out["checks"].append({"label": "Fake followers", "text": "%s fake followers" % _pct(fake), "level": lv})
-            if lv == "bad":
-                val = min(val, 39)
-                extra_watch.append("%s fake followers: the score is capped" % _pct(fake))
         au = doc.get("audience") or {}
         countries = au.get("countries") or []
         if countries:
