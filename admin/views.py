@@ -2101,6 +2101,17 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
     return page("Selections", body, "/selections")
 
 
+def _plat_options(live, assigned):
+    """Auto, each platform the creator has an analysis on, and Both when there are two."""
+    have = list((live or {}).get("available") or [])
+    opts = "<option value=''" + (" selected" if not assigned else "") + ">Auto: the platform with the best score</option>"
+    for pl in have:
+        opts += "<option value=\"" + e(pl) + "\"" + (" selected" if assigned == pl else "") + ">" + e(pl) + "</option>"
+    if len(have) >= 2:
+        opts += "<option value='Both'" + (" selected" if assigned == "Both" else "") + ">Both (two scores, no combined number)</option>"
+    return opts
+
+
 def _live_score(live):
     """The matching score as the client sees it, with the reasons behind it."""
     if not live:
@@ -2117,7 +2128,7 @@ def _live_score(live):
                if live.get("checks") else "") + "</div></div>")
 
 
-def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None):
+def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None, assigned="", client_pick=""):
     """One creator on the Fit & tags tab: who they are on the left, then the
     fit, the roles, the reason the client reads, and their tags, with room to type."""
     fits = "<option value=''>— no verdict —</option>" + "".join(
@@ -2132,7 +2143,10 @@ def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None):
             "<div class='vd-main'>"
             "<div class='vd-line'><div><label>Fit</label><select name='fit' class='vd-fit'>" + fits + "</select></div>"
             "<div><label>Role in the campaign</label><div class='vd-roles'>" + ticks + "</div></div></div>"
-            "<input type='hidden' name='roles' class='vd-roles-in' value=\"" + e(",".join(roles)) + "\">"
+            "<label>Platform this creator will deliver on (the score is read from it)</label>"
+            "<select name='plat_assign' class='vd-plat'>" + _plat_options(live, assigned) + "</select>"
+            + ("<div class='muted' style='margin-top:4px'>The client chose: <b>" + e(client_pick) + "</b></div>" if client_pick else "")
+            + "<input type='hidden' name='roles' class='vd-roles-in' value=\"" + e(",".join(roles)) + "\">"
             "<label>Why — the client reads this</label>"
             "<input name='reason' class='vd-reason' value=\"" + e(v.get("reason") or "") + "\" maxlength='160' "
             "placeholder='e.g. Strong engagement and a mostly Saudi audience' autocomplete='off'>"
@@ -2217,6 +2231,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     tags_of = json.loads((sel["tags"] if "tags" in keys else None) or "{}")
     verdicts_of = json.loads((sel["verdicts"] if "verdicts" in keys else None) or "{}")
     client_tags_of = json.loads((sel["client_tags"] if "client_tags" in keys else None) or "{}")
+    plat_assign_of = json.loads((sel["platforms"] if "platforms" in keys else None) or "{}")
+    client_plat_of = json.loads((sel["client_platforms"] if "client_platforms" in keys else None) or "{}")
     import fit as _fit
     try:
         target_now = dict(_fit.DEFAULT_TARGET, **{k: v for k, v in json.loads((sel["target"] if "target" in keys else None) or "{}").items() if v})
@@ -2248,7 +2264,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
             lo_sum += eff[0]; hi_sum += eff[1]
         shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
                 if c["photo"] else "<span class='thumb sm none'>—</span>")
-        fit_cards_l.append(_fit_card(code, c, shot, verdicts_of.get(code) or {}, tags_of.get(code) or [], _fit, client_tags_of.get(code) or [], (scores or {}).get(code)))
+        fit_cards_l.append(_fit_card(code, c, shot, verdicts_of.get(code) or {}, tags_of.get(code) or [], _fit, client_tags_of.get(code) or [], (scores or {}).get(code),
+                                     assigned=plat_assign_of.get(code, ""), client_pick=client_plat_of.get(code, "")))
         val = lambda i: format(conv(set_[i]), ",") if set_ else ""
         # The cost this selection was priced from, else the creator's last
         # known cost — a starting point the admin can change.

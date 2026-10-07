@@ -1337,3 +1337,15 @@ body[data-page="selection"] .cat-card__check { display: none; }
 [data-page="selection"] .cat-hero { padding: 28px 0 44px; }
 [data-page="selection"] .cat-topbar { margin-bottom: 26px; }
 [data-page="selection"] .cat-back { margin-bottom: 22px; }
+
+
+/* "Score on": which platform a creator's match is read from; and the second stamp for "Both". */
+.cat-plat { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 12px; }
+.cat-plat__label { font-size: 10px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(18,18,18,.5); margin-right: 2px; }
+.cat-plat button { font: inherit; font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 999px; border: 1.5px solid rgba(18,18,18,.25); background: transparent; color: var(--ink); cursor: pointer; }
+.cat-plat button:hover { border-color: var(--ink); }
+.cat-plat button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--lime); }
+.cat-plat button:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
+.cat-score--multi { width: 52px; height: 52px; }
+.cat-score--multi b { font-size: 18px; }
+.cat-score[data-i="1"] { left: 72px; }

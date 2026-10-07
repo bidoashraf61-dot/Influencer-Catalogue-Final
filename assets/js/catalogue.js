@@ -1586,7 +1586,7 @@
             if (b.currency && FX[b.currency]) CURRENCY = b.currency;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
-                        tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null,
+                        tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null, clientPlatforms: b.client_platforms || {},
                         platform: b.platform || "" };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
@@ -1806,6 +1806,9 @@
     }
     // Labels the client puts on creators themselves. Kept on the server with the
     // selection when it has a link of its own; otherwise only in this browser.
+    var PLAT_KEY = "hv-myplat:" + ((CURATED && CURATED.token) || selectionName);
+    var LOCAL_PLAT = {};
+    try { LOCAL_PLAT = JSON.parse(localStorage.getItem(PLAT_KEY) || "{}") || {}; } catch (e) { LOCAL_PLAT = {}; }
     var MINE_KEY = "hv-mytags:" + ((CURATED && CURATED.token) || selectionName);
     var LOCAL_MINE = {};
     try { LOCAL_MINE = JSON.parse(localStorage.getItem(MINE_KEY) || "{}") || {}; } catch (e) { LOCAL_MINE = {}; }
@@ -1844,7 +1847,52 @@
     function rolesOf(code) { var v = verdictOf(code); return v && v.roles ? v.roles : []; }
     // The matching score is worked out by the server from the creator's analysis; a fit
     // tag the admin chose by hand wins over the one the score implies.
-    function scoreOf(code) { var s = CURATED && CURATED.scores && CURATED.scores[code]; return s || null; }
+    function rawScore(code) { return (CURATED && CURATED.scores && CURATED.scores[code]) || null; }
+    // The platform to read a creator's score from: the client's own pick, else the admin's
+    // assignment, else (none) the best one the server chose.
+    function pickOf(code) {
+      var mine = CURATED && CURATED.token ? (CURATED.clientPlatforms || {})[code] : LOCAL_PLAT[code];
+      if (mine) return mine;
+      var s = rawScore(code);
+      return s && s.assigned && s.assigned !== "Auto" ? s.assigned : "";
+    }
+    function withBase(base, x) {
+      var o = {}; for (var k in x) o[k] = x[k];
+      o.assigned = base.assigned; o.available = base.available; o.platforms = base.platforms;
+      return o;
+    }
+    // "Both": two scores side by side, no combined number.
+    function bothOf(code) {
+      var base = rawScore(code);
+      if (!base || pickOf(code) !== "Both" || !base.platforms) return null;
+      var list = Object.keys(base.platforms).sort().map(function (pl) { return withBase(base, base.platforms[pl]); });
+      return list.length > 1 ? list : null;
+    }
+    function scoreOf(code) {
+      var base = rawScore(code);
+      if (!base) return null;
+      var pick = pickOf(code);
+      if (pick && pick !== "Both" && base.platforms && base.platforms[pick]) return withBase(base, base.platforms[pick]);
+      var both = bothOf(code);
+      if (both) return both.reduce(function (a, b) { return (b.score < a.score ? b : a); });   // ranked by the weaker
+      return base;
+    }
+    function savePlatform(code, pl) {
+      if (CURATED && CURATED.token) {
+        CURATED.clientPlatforms = CURATED.clientPlatforms || {};
+        CURATED.clientPlatforms[code] = pl;
+        fetch(CFG.api + "/api/selection/platform", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: CURATED.token, code: code, platform: pl }) })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (b) { if (b && b.ok) CURATED.clientPlatforms = b.client_platforms || CURATED.clientPlatforms; })
+          .catch(function () { /* stays on screen */ });
+      } else {
+        LOCAL_PLAT[code] = pl;
+        try { localStorage.setItem(PLAT_KEY, JSON.stringify(LOCAL_PLAT)); } catch (e) { /* private mode */ }
+      }
+      render();
+    }
+    var PLAT_SHORT = { Instagram: "IG", TikTok: "TT", Snapchat: "SC", YouTube: "YT" };
     function fitOf(code) {
       var v = verdictOf(code), s = scoreOf(code);
       return (v && v.fit) ? v.fit : (s && s.score != null ? s.tag : "");
@@ -1880,36 +1928,60 @@
       tip.style.bottom = "auto";
     }
     function hideTip() { if (tip) tip.hidden = true; }
+    function stampItem(code, i) { var both = bothOf(code); return both ? both[i] : scoreOf(code); }
     function renderStamp(card, sc) {
       var media = card.querySelector(".cat-card__media");
       if (!media) return;
-      var st = media.querySelector(".cat-score");
-      if (!sc) { if (st) st.remove(); return; }
-      if (!st) {
-        st = document.createElement("button");
-        st.type = "button"; st.className = "cat-score"; st.setAttribute("data-noselect", "");
-        media.appendChild(st);
-        st.addEventListener("mouseenter", function () { var s = scoreOf(card.dataset.code); if (s && s.score != null) showTip(st, s); });
-        st.addEventListener("focus", function () { var s = scoreOf(card.dataset.code); if (s && s.score != null) showTip(st, s); });
-        st.addEventListener("mouseleave", hideTip);
-        st.addEventListener("blur", hideTip);
-        st.addEventListener("click", function (e) {
-          e.preventDefault(); e.stopPropagation();
-          var s = scoreOf(card.dataset.code);
-          if (s && s.score != null) { if (tip && !tip.hidden) hideTip(); else showTip(st, s); }
-        });
+      var code = card.dataset.code;
+      var list = bothOf(code) || (sc ? [sc] : []);
+      var have = [].slice.call(media.querySelectorAll(".cat-score"));
+      for (var k = list.length; k < have.length; k++) have[k].remove();
+      list.forEach(function (item, i) {
+        var st = have[i];
+        if (!st) {
+          st = document.createElement("button");
+          st.type = "button"; st.className = "cat-score"; st.setAttribute("data-noselect", ""); st.setAttribute("data-i", i);
+          media.appendChild(st);
+          st.addEventListener("mouseenter", function () { var s = stampItem(code, i); if (s && s.score != null) showTip(st, s); });
+          st.addEventListener("focus", function () { var s = stampItem(code, i); if (s && s.score != null) showTip(st, s); });
+          st.addEventListener("mouseleave", hideTip);
+          st.addEventListener("blur", hideTip);
+          st.addEventListener("click", function (e) {
+            e.preventDefault(); e.stopPropagation();
+            var s = stampItem(code, i);
+            if (s && s.score != null) { if (tip && !tip.hidden) hideTip(); else showTip(st, s); }
+          });
+        }
+        var multi = list.length > 1;
+        if (item.score == null) {
+          st.className = "cat-score cat-score--none";
+          st.innerHTML = "<b>—</b><small>Not scored</small>";
+          st.setAttribute("aria-label", "Not scored yet: not enough analysis data");
+          st.title = "Not scored yet — the full analysis is needed.";
+        } else {
+          st.className = "cat-score cat-score--" + bandOf(item.score) + (item.basic ? " cat-score--basic" : "") + (multi ? " cat-score--multi" : "");
+          st.innerHTML = "<b>" + item.score + "</b><small>" + (multi ? (PLAT_SHORT[item.platform] || item.platform) : (item.basic ? "Basic" : "Match")) + "</small>";
+          st.setAttribute("aria-label", "Matching score " + item.score + " out of 100 on " + (item.platform || "the platform") + ", " + item.tag + ". Show why.");
+          st.removeAttribute("title");
+        }
+      });
+    }
+    // The platform switch on a card: which platform to read this creator's match from.
+    function renderPlat(card) {
+      var base = rawScore(card.dataset.code), body = card.querySelector(".cat-card__body");
+      var box = card.querySelector(".cat-plat");
+      var have = base && base.platforms ? Object.keys(base.platforms).sort() : [];
+      if (!body || have.length < 2) { if (box) box.remove(); return; }
+      var shown = pickOf(card.dataset.code) || scoreOf(card.dataset.code).platform;
+      if (!box) {
+        box = document.createElement("div");
+        box.className = "cat-plat"; box.setAttribute("data-noselect", ""); box.setAttribute("role", "group");
+        box.setAttribute("aria-label", "Platform this creator is scored on");
+        body.insertBefore(box, body.firstChild);
       }
-      if (sc.score == null) {
-        st.className = "cat-score cat-score--none";
-        st.innerHTML = "<b>—</b><small>Not scored</small>";
-        st.setAttribute("aria-label", "Not scored yet: not enough analysis data");
-        st.title = "Not scored yet — the full analysis is needed.";
-      } else {
-        st.className = "cat-score cat-score--" + bandOf(sc.score) + (sc.basic ? " cat-score--basic" : "");
-        st.innerHTML = "<b>" + sc.score + "</b><small>" + (sc.basic ? "Basic" : "Match") + "</small>";
-        st.setAttribute("aria-label", "Matching score " + sc.score + " out of 100, " + sc.tag + ". Show why.");
-        st.removeAttribute("title");
-      }
+      box.innerHTML = '<span class="cat-plat__label">Score on</span>' + have.concat(["Both"]).map(function (pl) {
+        return '<button type="button" data-plat="' + esc(pl) + '" aria-pressed="' + (pl === shown) + '">' + esc(pl) + "</button>";
+      }).join("");
     }
     window.addEventListener("scroll", hideTip, { passive: true });
 
@@ -1930,6 +2002,7 @@
         var sc = scoreOf(c.dataset.code), fitNow = fitOf(c.dataset.code);
         var why = (v && v.reason) || "";     // the generated conclusion is in the hover on the stamp
         renderStamp(c, sc);
+        renderPlat(c);
         var box = c.querySelector(".cat-verdict");
         if (!fitNow && !(v && (v.roles || []).length) && !why) { if (box) box.remove(); }
         else {
@@ -1967,6 +2040,12 @@
     }
 
     $("cat-grid").addEventListener("click", function (e) {
+      var pb = e.target.closest && e.target.closest("[data-plat]");
+      if (pb) {
+        e.preventDefault(); e.stopPropagation();
+        savePlatform(pb.closest(".cat-card").dataset.code, pb.getAttribute("data-plat"));
+        return;
+      }
       var card = e.target.closest && e.target.closest(".cat-card");
       if (!card) return;
       var code = card.dataset.code;
