@@ -18,6 +18,9 @@ from pathlib import Path
 import db
 
 KEY_FILE = Path(__file__).resolve().parent / ".mail-key"
+# A mailbox on the company's own email (Microsoft 365 by default): {"host", "port", "user", "password"}.
+# Uses what hellovoice.co.uk already sends from, so no DNS change is needed. Takes priority over Resend.
+SMTP_FILE = Path(__file__).resolve().parent / ".mail-smtp"
 API = "https://api.resend.com/emails"
 DEFAULT_FROM = "HelloVoice <portal@hellovoice.co.uk>"
 
@@ -59,11 +62,53 @@ def clear_key():
         pass
 
 
+def smtp_conf():
+    try:
+        c = json.loads(SMTP_FILE.read_text())
+        return c if c.get("user") and c.get("password") else None
+    except (OSError, ValueError):
+        return None
+
+
+def save_smtp(user, password, host="smtp.office365.com", port=587):
+    user, host = (user or "").strip().lower(), (host or "smtp.office365.com").strip()
+    if "@" not in user or not password or len(password) < 6:
+        raise ValueError("Enter the mailbox address and its password (or app password).")
+    if any(c.isspace() for c in host) or not host:
+        raise ValueError("That is not a mail server name.")
+    SMTP_FILE.write_text(json.dumps({"host": host, "port": int(port or 587), "user": user, "password": password}))
+    os.chmod(SMTP_FILE, 0o600)
+
+
+def clear_smtp():
+    try:
+        SMTP_FILE.unlink()
+    except OSError:
+        pass
+
+
+def engine():
+    """'smtp', 'resend' or '' — what send() will use."""
+    if smtp_conf():
+        return "smtp"
+    return "resend" if key() else ""
+
+
+def smtp_hint():
+    c = smtp_conf()
+    return ("%s via %s" % (c["user"], c["host"])) if c else ""
+
+
 def configured():
-    return CAPTURE or bool(key())
+    return CAPTURE or bool(engine())
 
 
 def sender():
+    c = smtp_conf()
+    if c:
+        # Microsoft 365 only sends as the signed-in mailbox: keep the display name, force the address.
+        name = (db.setting("mail_from", DEFAULT_FROM) or DEFAULT_FROM).split("<")[0].strip() or "HelloVoice"
+        return "%s <%s>" % (name, c["user"])
     return db.setting("mail_from", DEFAULT_FROM) or DEFAULT_FROM
 
 
@@ -89,6 +134,11 @@ def send(to, subject, text, html=None, reply_to=None):
         OUTBOX.append({"to": to, "subject": subject, "text": text, "html": html})
         _count()
         return True
+    c = smtp_conf()
+    if c:
+        _send_smtp(c, to, subject, text, html, reply_to)
+        _count()
+        return True
     k = key()
     if not k:
         raise MailError("Email is not set up yet.")
@@ -109,6 +159,38 @@ def send(to, subject, text, html=None, reply_to=None):
         raise MailError("Mail provider refused the message (%s)." % exc.code)
     except (urllib.error.URLError, TimeoutError, OSError):
         raise MailError("Could not reach the mail provider.")
+
+
+def _send_smtp(c, to, subject, text, html=None, reply_to=None):
+    import smtplib
+    import ssl
+    from email.message import EmailMessage
+    from email.utils import make_msgid
+    msg = EmailMessage()
+    msg["From"], msg["To"], msg["Subject"] = sender(), to, subject
+    msg["Message-ID"] = make_msgid(domain=c["user"].rsplit("@", 1)[1])
+    if reply_to:
+        msg["Reply-To"] = reply_to
+    msg.set_content(text)
+    if html:
+        msg.add_alternative(html, subtype="html")
+    local = c["host"] in ("127.0.0.1", "localhost")
+    try:
+        with smtplib.SMTP(c["host"], int(c.get("port") or 587), timeout=20) as s:
+            s.ehlo()
+            if s.has_extn("starttls"):
+                s.starttls(context=ssl.create_default_context())
+                s.ehlo()
+            elif not local:
+                raise MailError("The mail server does not offer encryption; not sending the password in clear.")
+            s.login(c["user"], c["password"])
+            s.send_message(msg)
+    except smtplib.SMTPAuthenticationError:
+        raise MailError("The mailbox refused the sign-in. Check the password, and that SMTP sending is allowed for it.")
+    except MailError:
+        raise
+    except (smtplib.SMTPException, OSError) as exc:
+        raise MailError("Could not send through the mailbox (%s)." % type(exc).__name__)
 
 
 def otp_message(code, minutes=10):

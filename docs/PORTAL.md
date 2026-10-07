@@ -157,9 +157,10 @@ country is multiplied by 0.6, so a large Dubai account does not win a KSA brief.
 
 ## Setting it up (once)
 
-1. **Resend**: create an account, verify the `hellovoice.co.uk` sending domain
-   (DNS records), create an API key. Admin → Client portal → Settings & keys →
-   *Email (Resend)* key, and check "Send email from".
+1. **Email**: easiest is a **company mailbox** on Microsoft 365 (what hellovoice.co.uk already
+   uses, no DNS change): turn on *Authenticated SMTP* for the mailbox in Exchange admin, then
+   Admin → Client portal → Settings & keys → *Email: company mailbox* (address + password or app
+   password, optional test address). Alternative: Resend (needs DNS records at GoDaddy).
 2. **Gemini**: create a key in Google AI Studio (restrict it to the Generative
    Language API). Paste it under *Gemini API key*. Never paste it in chat or
    commit it. Set the monthly token ceiling.

@@ -303,8 +303,11 @@ def like(code, limit=48):
         t, hcp = _tier(r["tier"])
         if my_tier is not None and t is not None:
             s += max(0, 2 - abs(my_tier - t))
+        # A doctor is looked-alike by doctors first: that is what a healthcare brief is buying.
         if hcp == my_hcp:
-            s += 1.5 if hcp else 0.3
+            s += 3 if hcp else 0.3
+        elif my_hcp:
+            s -= 1
         city = str(r["city"] or "").lower()
         if my_city and city:
             if city == my_city:

@@ -384,8 +384,29 @@ def _settings_tab():
           "<textarea class='mono' name='kb_text' rows='6'>%s</textarea></div>" % e(db.setting("kb_text", None) or __import__("assistant").DEFAULT_KB)
         + "<button class='btn lime'>Save settings</button></form>")
     keys = (key_card("gemini", "Gemini API key", gemini, "Powers the shortlist reasons, the chat and the copilot.")
-            + key_card("mail", "Email (Resend) API key", mailer, "Sends the sign-in codes."))
+            + smtp_card() + key_card("mail", "Email (Resend) API key — alternative", mailer,
+                                     "Only needed if you do not use a company mailbox above."))
     return form + "<div style='margin-top:20px'>" + keys + "</div>"
+
+
+def smtp_card():
+    hint = mailer.smtp_hint()
+    back = "<input type='hidden' name='back' value='/portal?tab=settings'><input type='hidden' name='which' value='smtp'>"
+    return ("<div class='card'><h2>Email: company mailbox (Microsoft 365)</h2>"
+            "<p class='sec-desc'>Sends the sign-in codes and team notifications from one of your own Outlook mailboxes, the same email "
+            "hellovoice.co.uk already uses, so no DNS change is needed. In Microsoft 365 admin, turn on <b>Authenticated SMTP</b> for that "
+            "mailbox (Exchange admin → Recipients → Mailboxes → the mailbox → Manage email apps). If the mailbox uses MFA, use an app password. "
+            "The password stays on the server in a private file and is never shown again.</p>"
+            + ("<p>Connected: <code>%s</code></p>" % e(hint) if hint else "<p class='muted'>No mailbox connected.</p>")
+            + "<form method='post' action='%s' autocomplete='off'>%s<div class='fgrid'>"
+              "<div><label>Mailbox address</label><input name='user' type='email' placeholder='portal@hellovoice.co.uk' required></div>"
+              "<div><label>Password or app password</label><input name='password' type='password' autocomplete='new-password' required></div>"
+              "<div><label>Send a test to (optional)</label><input name='test' type='email' placeholder='you@hellovoice.co.uk'></div>"
+              "<div><label>Server</label><input name='host' value='smtp.office365.com'></div></div>"
+              "<button class='btn lime' name='action' value='save'>%s</button></form>" % (u("/portal/keys"), back, "Replace mailbox" if hint else "Connect mailbox")
+            + (("<form method='post' action='%s' class='inline' style='margin-top:10px'>%s<button class='btn small danger' name='action' value='clear' "
+                "onclick=\"return confirm('Disconnect the mailbox?')\">Disconnect</button></form>") % (u("/portal/keys"), back) if hint else "")
+            + "</div>")
 
 
 def portal_page(tab="accounts", ok=None, err=None, query=None):
@@ -393,7 +414,7 @@ def portal_page(tab="accounts", ok=None, err=None, query=None):
     body = {"accounts": _accounts_tab, "briefs": _briefs_tab, "chats": _chats_tab, "usage": _usage_tab, "settings": _settings_tab}[tab]()
     status = ("<span class='pill %s'>Gemini %s</span> <span class='pill %s'>Email %s</span>" % (
         "live" if gemini.configured() else "warn", "ready" if gemini.configured() else "not set up",
-        "live" if mailer.configured() else "warn", "ready" if mailer.configured() else "not set up"))
+        "live" if mailer.configured() else "warn", ("ready (%s)" % ("company mailbox" if mailer.engine() == "smtp" else "Resend")) if mailer.configured() else "not set up"))
     return page("Client portal", STAT_CSS + ui.header("Client portal", "Company-email accounts, AI credits, briefs and AI settings. " + status,
                 tabs=_tabs(tab)) + _banner(ok, err) + body, "/portal")
 

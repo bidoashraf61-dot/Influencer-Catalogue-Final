@@ -50,3 +50,4 @@ admin/_vendor/
 admin/.apify-token
 admin/.gemini-key
 admin/.mail-key
+admin/.mail-smtp

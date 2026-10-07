@@ -797,6 +797,21 @@ class PortalMixin:
 
     def portal_keys(self, f, done):
         which, action = f.get("which"), f.get("action")
+        if which == "smtp":
+            if action == "clear":
+                mailer.clear_smtp()
+                return done("Mailbox removed.")
+            try:
+                mailer.save_smtp(f.get("user"), f.get("password"), f.get("host") or "smtp.office365.com", f.get("port") or 587)
+            except ValueError as exc:
+                return done(str(exc), False)
+            if f.get("test"):
+                try:
+                    mailer.send(f["test"].strip(), "HelloVoice portal: test email", "This is a test from the catalogue portal. Email sign-in can now send codes.")
+                except mailer.MailError as exc:
+                    return done("Saved, but the test failed: %s" % exc, False)
+                return done("Mailbox saved and a test email was sent to %s." % f["test"].strip())
+            return done("Mailbox saved. The password is never shown again.")
         mod = {"gemini": gemini, "mail": mailer}.get(which)
         if not mod:
             return done("Unknown key.", False)
