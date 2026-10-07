@@ -1538,7 +1538,7 @@
             if (b.currency && FX[b.currency]) CURRENCY = b.currency;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
-                        tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {},
+                        tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {},
                         platform: b.platform || "" };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
@@ -1738,7 +1738,13 @@
       return v || null;
     }
     function rolesOf(code) { var v = verdictOf(code); return v && v.roles ? v.roles : []; }
-    function fitOf(code) { var v = verdictOf(code); return v && v.fit ? v.fit : ""; }
+    // The matching score is worked out by the server from the creator's analysis; a fit
+    // tag the admin chose by hand wins over the one the score implies.
+    function scoreOf(code) { var s = CURATED && CURATED.scores && CURATED.scores[code]; return s || null; }
+    function fitOf(code) {
+      var v = verdictOf(code), s = scoreOf(code);
+      return (v && v.fit) ? v.fit : (s && s.score != null ? s.tag : "");
+    }
     function matchesLabels(code) {
       return (!activeTag || allTagsOf(code).indexOf(activeTag) !== -1) &&
              (!activeFit || fitOf(code) === activeFit) &&
@@ -1753,6 +1759,66 @@
             (extra && extra[n] ? ' class="' + extra[n] + '"' : "") + ">" + esc(n) + " <b>" + counts[n] + "</b></button>";
         }).join("") + "</div>";
     }
+    // The stamp on the photo: the score, coloured by band; hover or focus explains it.
+    var tip = null;
+    function bandOf(n) { return n >= 80 ? "g" : n >= 60 ? "l" : n >= 40 ? "a" : "r"; }
+    function showTip(el, sc) {
+      if (!tip) { tip = document.createElement("div"); tip.className = "cat-score-tip"; tip.setAttribute("role", "tooltip"); document.body.appendChild(tip); }
+      var bars = (sc.parts || []).map(function (p) {
+        return '<div class="cst-bar"><span>' + esc(p.label) + '</span><i><b class="' + bandOf(p.s * 100) + '" style="width:' + Math.round(p.s * 100) + '%"></b></i></div>';
+      }).join("");
+      tip.innerHTML = '<div class="cst-head"><b class="' + bandOf(sc.score) + '">' + sc.score + '</b><div><strong>' + esc(sc.tag) +
+        '</strong><small>Match for ' + esc((sc.objective || "").toLowerCase()) + (sc.platform ? " · " + esc(sc.platform) : "") + "</small></div></div>" +
+        (sc.strengths && sc.strengths.length ? '<p class="cst-h">Strengths</p><ul class="cst-g">' + sc.strengths.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
+        (sc.watchouts && sc.watchouts.length ? '<p class="cst-h">Watch-outs</p><ul class="cst-w">' + sc.watchouts.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
+        '<p class="cst-h">How it adds up</p>' + bars;
+      tip.hidden = false;
+      var r = el.getBoundingClientRect(), tw = Math.min(320, window.innerWidth - 24);
+      tip.style.width = tw + "px";
+      var left = Math.max(12, Math.min(r.left, window.innerWidth - tw - 12));
+      tip.style.left = left + "px";
+      // Below the stamp when it fits, else above it, else pinned inside the window.
+      var th = tip.offsetHeight, room = window.innerHeight - 12;
+      var top = r.bottom + 10;
+      if (top + th > room) top = r.top - th - 10;
+      if (top < 8) top = Math.max(8, room - th);
+      tip.style.top = top + "px";
+      tip.style.bottom = "auto";
+    }
+    function hideTip() { if (tip) tip.hidden = true; }
+    function renderStamp(card, sc) {
+      var media = card.querySelector(".cat-card__media");
+      if (!media) return;
+      var st = media.querySelector(".cat-score");
+      if (!sc) { if (st) st.remove(); return; }
+      if (!st) {
+        st = document.createElement("button");
+        st.type = "button"; st.className = "cat-score"; st.setAttribute("data-noselect", "");
+        media.appendChild(st);
+        st.addEventListener("mouseenter", function () { var s = scoreOf(card.dataset.code); if (s && s.score != null) showTip(st, s); });
+        st.addEventListener("focus", function () { var s = scoreOf(card.dataset.code); if (s && s.score != null) showTip(st, s); });
+        st.addEventListener("mouseleave", hideTip);
+        st.addEventListener("blur", hideTip);
+        st.addEventListener("click", function (e) {
+          e.preventDefault(); e.stopPropagation();
+          var s = scoreOf(card.dataset.code);
+          if (s && s.score != null) { if (tip && !tip.hidden) hideTip(); else showTip(st, s); }
+        });
+      }
+      if (sc.score == null) {
+        st.className = "cat-score cat-score--none";
+        st.innerHTML = "<b>—</b><small>Not scored</small>";
+        st.setAttribute("aria-label", "Not scored yet: not enough analysis data");
+        st.title = "Not scored yet — the full analysis is needed.";
+      } else {
+        st.className = "cat-score cat-score--" + bandOf(sc.score);
+        st.innerHTML = "<b>" + sc.score + "</b><small>Match</small>";
+        st.setAttribute("aria-label", "Matching score " + sc.score + " out of 100, " + sc.tag + ". Show why.");
+        st.removeAttribute("title");
+      }
+    }
+    window.addEventListener("scroll", hideTip, { passive: true });
+
     function renderTags() {
       var tagN = {}, tagOrder = [], fitN = {}, roleN = {};
       selected.forEach(function (code) {
@@ -1773,8 +1839,11 @@
         var link = c.querySelector("a.cat-card__analysis");
         if (link && back && link.href.indexOf("&p=") === -1) link.href = link.href + back;
         var v = verdictOf(c.dataset.code), mine = tagsOf(c.dataset.code);
+        var sc = scoreOf(c.dataset.code), fitNow = fitOf(c.dataset.code);
+        var why = (v && v.reason) || (sc && sc.score != null ? sc.conclusion : "");
+        renderStamp(c, sc);
         var box = c.querySelector(".cat-verdict");
-        if (!v || (!v.fit && !(v.roles || []).length && !v.reason)) { if (box) box.remove(); }
+        if (!fitNow && !(v && (v.roles || []).length) && !why) { if (box) box.remove(); }
         else {
           if (!box) {
             box = document.createElement("div");
@@ -1782,9 +1851,9 @@
             body.insertBefore(box, body.firstChild);
           }
           box.innerHTML = '<div class="cat-verdict__chips">' +
-            (v.fit ? '<span class="cat-fit cat-fit--' + (FIT_CLASS[v.fit] || "maybe") + '">' + esc(v.fit) + "</span>" : "") +
-            (v.roles || []).map(function (r) { return '<span class="cat-role">' + esc(r) + "</span>"; }).join("") + "</div>" +
-            (v.reason ? '<p class="cat-verdict__why">' + esc(v.reason) + "</p>" : "");
+            (fitNow ? '<span class="cat-fit cat-fit--' + (FIT_CLASS[fitNow] || "maybe") + '">' + esc(fitNow) + "</span>" : "") +
+            ((v && v.roles) || []).map(function (r) { return '<span class="cat-role">' + esc(r) + "</span>"; }).join("") + "</div>" +
+            (why ? '<p class="cat-verdict__why">' + esc(why) + "</p>" : "");
         }
         var tbox = c.querySelector(".cat-tags");
         var mt = mineOf(c.dataset.code);
