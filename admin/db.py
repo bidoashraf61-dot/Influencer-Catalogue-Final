@@ -460,6 +460,10 @@ def migrate(conn):
         # Archived = out of the Clients list, nothing else: the code still
         # works until it is revoked.
         conn.execute("ALTER TABLE codes ADD COLUMN archived_at INTEGER")
+    if "target" not in sel_cols:
+        # {country, gender, age, category}: who this selection is for; the matching
+        # score is measured against it (see fit.score).
+        conn.execute("ALTER TABLE selections ADD COLUMN target TEXT")
     if "objective" not in sel_cols:
         # Which campaign objective the admin judges this selection's creators against.
         conn.execute("ALTER TABLE selections ADD COLUMN objective TEXT")
@@ -1726,6 +1730,25 @@ def set_archived(table, rid, on):
 def set_selection_objective(sid, objective):
     with connect() as conn:
         conn.execute("UPDATE selections SET objective = ? WHERE id = ?", (objective, sid))
+
+
+def set_selection_target(sid, target):
+    with connect() as conn:
+        conn.execute("UPDATE selections SET target = ? WHERE id = ?", (json.dumps(target), sid))
+
+
+def analyses_for(codes):
+    """{code: {platform: {"data", "source", "updated_at"}}} for many creators in one query."""
+    out = {}
+    codes = list(codes)
+    if not codes:
+        return out
+    with connect() as conn:
+        for i in range(0, len(codes), 400):
+            part = codes[i:i + 400]
+            for r in conn.execute("SELECT * FROM creator_analysis WHERE code IN (%s)" % ",".join("?" * len(part)), part):
+                out.setdefault(r["code"], {})[r["platform"]] = _analysis_row(r)
+    return out
 
 
 def selection_campaign_objective(sid):

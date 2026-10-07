@@ -492,7 +492,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.redirect("/selections?e=" + urllib.parse.quote("That selection no longer exists."))
             return self.send(200, views.selection_edit_page(
                 sel, db.list_creators(), db.tier_prices(), self.site_origin(),
-                query.get("e"), query.get("ok"), db.campaigns_for_selection(sel["id"])))
+                query.get("e"), query.get("ok"), db.campaigns_for_selection(sel["id"]),
+                scores=self.selection_scores(sel), interests=db.known_interests()))
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
                 db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok"),
@@ -1866,6 +1867,12 @@ class Handler(BaseHTTPRequestHandler):
         import fit as _fit_mod
         if (f.get("sel_objective") or "") in _fit_mod.OBJECTIVES:
             db.set_selection_objective(sel["id"], f["sel_objective"])
+        if any(k in f for k in ("t_country", "t_gender", "t_age", "t_category")):
+            db.set_selection_target(sel["id"], {
+                "country": f.get("t_country") if f.get("t_country") in dict(_fit_mod.COUNTRIES) else "SA",
+                "gender": f.get("t_gender") if f.get("t_gender") in _fit_mod.GENDERS else "Any",
+                "age": f.get("t_age") if f.get("t_age") in _fit_mod.AGE_BANDS else "Any",
+                "category": (f.get("t_category") or "Any")[:40]})
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs, margin_max=margin_max,
                           tags={k: v for k, v in tags.items() if k in codes},
@@ -2934,6 +2941,53 @@ class Handler(BaseHTTPRequestHandler):
     def analysis_resolver(self):
         return analysis.Resolver(db.list_creators(), db.creator_aliases())
 
+    def selection_objective(self, sel):
+        import fit as fit_mod
+        keys = sel.keys()
+        got = (sel["objective"] if "objective" in keys else None) or fit_mod.FROM_CAMPAIGN.get(db.selection_campaign_objective(sel["id"]) or "", "Balanced")
+        return got if got in fit_mod.OBJECTIVES else "Balanced"
+
+    def selection_target(self, sel):
+        import fit as fit_mod
+        try:
+            t = json.loads((sel["target"] if "target" in sel.keys() else None) or "{}")
+        except ValueError:
+            t = {}
+        return dict(fit_mod.DEFAULT_TARGET, **{k: v for k, v in t.items() if v})
+
+    def selection_scores(self, sel, objective=None, target=None):
+        """{code: score} for every creator of a selection, worked out now from
+        their analyses: one number against the selection's objective and target.
+        Creators without a full analysis come back with score None."""
+        import fit as fit_mod
+        codes = json.loads(sel["codes"] or "[]")
+        objective = objective or self.selection_objective(sel)
+        target = target or self.selection_target(sel)
+        wanted = sel["platform"] if "platform" in sel.keys() else None
+        rows = {c["code"]: c for c in db.list_creators() if c["code"] in set(codes)}
+        every = db.analyses_for(codes)
+        records, typical = metrics.track_records()
+        bench = metrics.benchmarks()
+        out = {}
+        for code in codes:
+            c = rows.get(code)
+            if c is None:
+                continue
+            mine = every.get(code) or {}
+            plat = analysis.canon_platform(wanted) if wanted and analysis.canon_platform(wanted) in mine else None
+            if not plat and mine:
+                # the creator's fullest analysis (their main platform on a tie)
+                import profile_pdf as _pp
+                main = analysis.creator_platforms(c)
+                plat = max(mine, key=lambda p: (_pp.completeness(mine[p]["data"]), p == main[0]))
+            doc = mine[plat]["data"] if plat else None
+            followers = (doc or {}).get("followers") or c["followers"]
+            rec = dict(records[code], typical_er=typical) if code in records else None
+            out[code] = fit_mod.score(doc, plat, c["followers"], objective=objective, target=target,
+                                      band=metrics.band_of(followers), bench=bench, record=rec,
+                                      creator_interest=c["interest"])
+        return out
+
     def selection_suggest(self, query):
         """A suggested fit and role for one creator, from their analysis of a
         platform (the selection's, else the creator's own). The admin reads it,
@@ -2956,6 +3010,18 @@ class Handler(BaseHTTPRequestHandler):
         out = fit_mod.suggest(a["data"] if a else None, plat, c["followers"], objective=obj,
                               band=metrics.band_of(followers), bench=metrics.benchmarks(), record=rec)
         out["platform"] = plat
+        sel = {"codes": json.dumps([code]), "platform": None, "id": 0}
+        tgt = {"country": query.get("tc"), "gender": query.get("tg"), "age": query.get("ta"), "category": query.get("tk")}
+        sc = fit_mod.score(a["data"] if a else None, plat, c["followers"], objective=obj,
+                           target=dict(fit_mod.DEFAULT_TARGET, **{k: v for k, v in tgt.items() if v}),
+                           band=metrics.band_of(followers), bench=metrics.benchmarks(), record=rec,
+                           creator_interest=c["interest"])
+        out["score"] = sc
+        if sc["score"] is not None:
+            out["fit"] = sc["tag"]
+            out["reason"] = sc["conclusion"][:160]
+            out["checks"] = [{"label": p["label"], "value": "%d%%" % round(p["s"] * 100), "bench": "weight %g" % p["w"],
+                              "grade": 1 if p["s"] >= 0.75 else -1 if p["s"] <= 0.45 else 0} for p in sc["parts"]]
         return self.send_json(200, out)
 
     def analysis_find(self, query, form=None):
@@ -3324,6 +3390,11 @@ class Handler(BaseHTTPRequestHandler):
                                     "prices": prices, "total": total,
                                     "platform": platform,
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
+                                    "scores": {k: {"score": v["score"], "tag": v["tag"], "strengths": v["strengths"],
+                                                   "watchouts": v["watchouts"], "conclusion": v["conclusion"],
+                                                   "parts": [{"label": p["label"], "s": p["s"]} for p in v["parts"]],
+                                                   "platform": v["platform"], "objective": v["objective"]}
+                                               for k, v in self.selection_scores(sel).items()},
                                     "client_tags": {k: v for k, v in json.loads((sel["client_tags"] if "client_tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "verdicts": {k: v for k, v in json.loads((sel["verdicts"] if "verdicts" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "currency": (sel["currency"] if "currency" in sel.keys() else None) or "SAR",

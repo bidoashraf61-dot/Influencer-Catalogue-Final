@@ -149,3 +149,187 @@ def _belongs(sentence, key):
     s = sentence.lower()
     return {"engagement": s.startswith("engagement"), "credibility": "fake" in s,
             "market": "audience is in" in s, "reach": s.startswith("reach"), "record": s.startswith("our record")}[key]
+
+
+# ------------------------------------------------------------ matching score --
+#
+# One number per creator for one selection: how well they fit what the
+# selection is for (its objective and its target audience). It is worked out
+# live from the creator's analysis and never stored, so it cannot go stale;
+# whatever the admin types by hand (fit tag, reason) sits on top of it.
+
+SCORE_BANDS = [(80, "Strong fit"), (60, "Good fit"), (40, "Possible fit"), (0, "Not recommended")]
+COUNTRIES = [("SA", "Saudi Arabia"), ("AE", "UAE"), ("EG", "Egypt"), ("KW", "Kuwait"), ("QA", "Qatar"), ("BH", "Bahrain"),
+             ("OM", "Oman"), ("JO", "Jordan"), ("LB", "Lebanon"), ("IQ", "Iraq"), ("MA", "Morocco")]
+AGE_BANDS = ["13-17", "18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
+GENDERS = ["Any", "Women", "Men"]
+DEFAULT_TARGET = {"country": "SA", "gender": "Any", "age": "Any", "category": "Any"}
+# What a category looks for in a creator's interests and audience interests.
+CATEGORY_WORDS = {
+    "beauty": ["beauty", "cosmetic", "skin", "makeup", "hair", "fragrance", "personal care"],
+    "health": ["health", "medical", "wellness", "fitness", "nutrition", "pharma", "doctor", "diet"],
+    "mother & baby": ["baby", "mother", "child", "kids", "family", "parent", "toys"],
+    "food": ["food", "restaurant", "cooking", "recipe", "drink", "coffee", "cafe"],
+    "lifestyle": ["lifestyle", "fashion", "shopping", "travel", "home", "friends"],
+    "fashion": ["fashion", "clothes", "shoes", "accessor", "style", "shopping"],
+    "technology": ["tech", "gadget", "electronic", "gaming", "software", "phone"],
+    "automotive": ["car", "auto", "vehicle", "motor"],
+    "travel": ["travel", "tourism", "hotel", "holiday"],
+    "fitness": ["fitness", "sport", "gym", "health", "wellness"],
+    "skincare": ["skin", "beauty", "cosmetic", "derma", "care"],
+    "hair care": ["hair", "beauty", "salon", "care"],
+    "make-up": ["makeup", "make-up", "beauty", "cosmetic"],
+    "fragrance": ["fragrance", "perfume", "beauty"],
+    "health care": ["health", "medical", "doctor", "pharma", "wellness", "nutrition"],
+    "motherhood": ["baby", "mother", "child", "kids", "family", "parent", "toys"],
+    "sports": ["sport", "fitness", "gym", "football"],
+    "gaming": ["gaming", "game", "esport"],
+    "finance": ["finance", "bank", "invest", "money", "business"],
+    "tv podcasting": ["podcast", "tv", "show", "entertain", "media"],
+}
+
+
+def band_for(score):
+    return next(name for lo, name in SCORE_BANDS if score >= lo)
+
+
+def _clamp(x):
+    return max(0.0, min(1.0, x))
+
+
+def _age_share(ages, wanted):
+    """Share of the audience in an age band, adding up the report's bands that overlap it."""
+    def span(name):
+        n = str(name).replace("+", "-99")
+        lo, _, hi = n.partition("-")
+        try:
+            return int(lo), int(hi or lo)
+        except ValueError:
+            return None
+    w = span(wanted)
+    if not w:
+        return None
+    total = 0.0
+    for a in ages or []:
+        s = span(a.get("name", ""))
+        if s and s[0] <= w[1] and s[1] >= w[0]:
+            total += a.get("pct") or 0
+    return total
+
+
+def _niche(category, doc, creator_interest):
+    """1.0 when the creator's own category or their audience's interests name the category, else 0.25."""
+    cat = (category or "").strip().lower()
+    if not cat or cat == "any":
+        return None
+    words = CATEGORY_WORDS.get(cat) or [w for w in cat.replace("&", " ").split() if len(w) >= 4] or [cat]
+    pool = [str(creator_interest or "").lower()]
+    pool += [str(x).lower() for x in (doc.get("creator_interests") or [])]
+    pool += [str(i.get("name", "")).lower() for i in (doc.get("audience") or {}).get("interests") or []]
+    pool += [str(i.get("name", "")).lower() for i in (doc.get("audience") or {}).get("brand_affinity") or []]
+    if cat in str(creator_interest or "").lower():
+        return 1.0
+    return 1.0 if any(w in p for p in pool for w in words) else 0.25
+
+
+def score(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
+          record=None, creator_interest=None, min_parts=3):
+    """The matching score for one creator, or {"score": None, ...} when the
+    analysis holds too little to judge. Returns {"score", "tag", "parts",
+    "strengths", "watchouts", "conclusion", "objective", "platform"}."""
+    out = {"score": None, "tag": "", "parts": [], "strengths": [], "watchouts": [], "conclusion": "",
+           "objective": objective, "platform": platform}
+    if not doc:
+        out["note"] = "No analysis on file."
+        return out
+    bench = bench or {}
+    target = dict(DEFAULT_TARGET, **{k: v for k, v in (target or {}).items() if v})
+    objective = objective if objective in WEIGHTS else "Balanced"
+    w = WEIGHTS[objective]
+    f = doc.get("followers") or followers
+    er = doc.get("er")
+    fake = doc.get("fake_followers_pct")
+    if fake is None and doc.get("credibility_pct") is not None:
+        fake = round(100 - doc["credibility_pct"], 1)
+    au = doc.get("audience") or {}
+    feed = platform in (None, "Instagram", "Facebook", "X")
+    bars = (bench.get("er") or {}).get(band) if feed else bench.get("video_er")
+    good, ok = bars if bars else ((3.0, 1.5) if feed else (6.0, 3.0))
+    fk_good, fk_bad = bench.get("fake_followers") or (15.0, 30.0)
+
+    parts = []          # (key, label, s 0..1, [(s, strength, watchout)])
+
+    def add(key, label, subs):
+        subs = [x for x in subs if x is not None]
+        if subs:
+            parts.append((key, label, sum(x[0] for x in subs) / len(subs), subs))
+
+    if er is not None:
+        s = 1.0 if er >= good else (0.6 + 0.4 * (er - ok) / (good - ok) if er >= ok and good > ok else 0.6 * er / ok if ok else 0.0)
+        s = _clamp(s)
+        add("engagement", "Engagement", [(s, "Engagement %s, above the %s benchmark" % (_pct(er), _pct(good)),
+                                         "Engagement %s, below the %s benchmark" % (_pct(er), _pct(ok)))])
+    if fake is not None:
+        s = 1.0 if fake <= fk_good else 0.0 if fake >= fk_bad else 1 - (fake - fk_good) / (fk_bad - fk_good)
+        add("credibility", "Real audience", [(s, "Only %s fake followers" % _pct(fake), "%s fake followers" % _pct(fake))])
+
+    subs = []
+    tc = target["country"]
+    cname = dict(COUNTRIES).get(tc, tc)
+    countries = au.get("countries") or []
+    if countries:
+        home = next((c.get("pct") for c in countries if str(c.get("code", "")).upper() == tc), 0) or 0
+        subs.append((_clamp(home / 60.0), "%s of the audience is in %s" % (_pct(home), cname),
+                     "Only %s of the audience is in %s" % (_pct(home), cname)))
+    g = target["gender"]
+    if g in ("Women", "Men") and au.get("gender"):
+        share = (au["gender"].get("female" if g == "Women" else "male")) or 0
+        subs.append((_clamp(share / 60.0), "%s of the audience are %s" % (_pct(share), g.lower()),
+                     "Only %s of the audience are %s" % (_pct(share), g.lower())))
+    if target["age"] != "Any" and au.get("ages"):
+        share = _age_share(au["ages"], target["age"])
+        if share is not None:
+            subs.append((_clamp(share / 40.0), "%s of the audience is aged %s" % (_pct(share), target["age"]),
+                         "Only %s of the audience is aged %s" % (_pct(share), target["age"])))
+    nic = _niche(target["category"], doc, creator_interest)
+    if nic is not None:
+        subs.append((nic, "Works in the %s space" % target["category"].lower(),
+                     "Little sign of %s content or audience interest" % target["category"].lower()))
+    add("market", "Audience match", subs)
+
+    if f:
+        import math
+        s = _clamp((math.log10(max(f, 1)) - 3.7) / (5.7 - 3.7))        # 5K -> 0, 500K -> 1
+        add("reach", "Reach", [(s, "Reach of %s followers" % _k(f), "Small reach (%s followers)" % _k(f))])
+    if record and record.get("posts", 0) >= 2 and record.get("er") is not None and record.get("typical_er"):
+        r = record["er"] / record["typical_er"]
+        s = _clamp(0.7 * r if r < 1 else 0.7 + 0.3 * min(1.0, (r - 1) / 0.5))
+        add("record", "Our record", [(s, "Delivered %s engagement per view in our %d campaign%s (typical %s)" % (
+            _pct(record["er"]), record["campaigns"], "" if record["campaigns"] == 1 else "s", _pct(record["typical_er"])),
+            "Below our typical engagement in our past campaigns (%s vs %s)" % (_pct(record["er"]), _pct(record["typical_er"])))])
+
+    out["parts"] = [{"key": k, "label": lab, "s": round(s, 2), "w": w.get(k, 1.0)} for k, lab, s, _ in parts]
+    if len(parts) < min_parts:
+        out["note"] = "Not enough analysis data to score."
+        return out
+    tw = sum(w.get(k, 1.0) for k, _, _, _ in parts)
+    val = 100.0 * sum(w.get(k, 1.0) * s for k, _, s, _ in parts) / tw
+    if fake is not None and fake >= fk_bad:
+        val = min(val, 39.0)                          # a mostly bought audience is never a fit
+    val = int(round(val))
+    out["score"], out["tag"] = val, band_for(val)
+    ranked = sorted(parts, key=lambda p: -w.get(p[0], 1.0))
+    subs_all = [(w.get(k, 1.0), s_, st, wo) for k, _, _, subs in ranked for (s_, st, wo) in subs]
+    subs_all.sort(key=lambda x: -x[0])
+    out["strengths"] = [st for _, s_, st, _ in subs_all if s_ >= 0.75][:4]
+    out["watchouts"] = [wo for _, s_, _, wo in subs_all if s_ <= 0.45][:3]
+    lead = {"Balanced": "overall", "Awareness": "awareness", "Engagement": "engagement", "Conversion": "conversion"}[objective]
+    txt = ("%s (%d/100)." % (out["tag"], val)) if objective == "Balanced" else ("%s for %s (%d/100)." % (out["tag"], lead, val))
+    if out["strengths"]:
+        txt += " Strengths: " + "; ".join(out["strengths"][:2]) + "."
+    if out["watchouts"]:
+        txt += " Watch: " + "; ".join(out["watchouts"][:2]) + "."
+    out["conclusion"] = txt
+    for p in out["parts"]:
+        pass
+    return out

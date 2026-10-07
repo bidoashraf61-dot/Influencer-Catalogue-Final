@@ -345,6 +345,16 @@ def build_handles(job):
             ranked = sorted(rows, key=lambda c: (c["code"] not in have, c["code"]))
             usable = [c["code"] for c in ranked if creator_handles(c).get(plat)]
             allowed = set(usable[:20])
+        elif src == "noposts":
+            have = set()
+            for r in conn.execute("SELECT code, data FROM creator_analysis WHERE platform = ?", (plat,)):
+                try:
+                    d = json.loads(r["data"])
+                except ValueError:
+                    d = {}
+                if not d.get("basic") or d.get("top_posts") or d.get("posts_stored"):
+                    have.add(r["code"])
+            allowed = {c["code"] for c in rows} - have
         elif src == "noplat":
             have = {r["code"] for r in conn.execute("SELECT code FROM creator_analysis WHERE platform = ?", (plat,))}
             allowed = {c["code"] for c in rows} - have
@@ -595,6 +605,29 @@ def _compact(item):
     return out
 
 
+
+_TAG = re.compile(r"#([^\s#@!?.,;:()\[\]{}\"'<>]{2,60})", re.U)
+_MEN = re.compile(r"@([A-Za-z0-9._]{2,30})")
+
+
+def tag_shares(pairs, total, top=10):
+    """[{"tag", "count"}] where count is the share of posts (percent) that used it."""
+    from collections import Counter
+    c = Counter()
+    for tags in pairs:
+        for t in set(tags):
+            c[t] += 1
+    return [{"tag": t, "count": round(n * 100.0 / total, 1)} for t, n in c.most_common(top) if total]
+
+
+def tags_from_posts(rows):
+    """Hashtags and @mentions across posts: rows are (hashtags, mentions) lists."""
+    total = len(rows)
+    tags = tag_shares([["#" + str(t).lstrip("#") for t in r[0]] for r in rows], total)
+    ments = tag_shares([["@" + str(m).lstrip("@") for m in r[1]] for r in rows], total)
+    return tags + ments
+
+
 def derive_instagram(it):
     """Basic numbers worked out from an Instagram profile result: the profile's
     own counts, and averages over the latest posts it carries."""
@@ -609,6 +642,19 @@ def derive_instagram(it):
            "er_pct": None, "posts_per_week": None, "last_post": None, "sample_posts": len(posts)}
     if followers and out["avg_likes"] is not None:
         out["er_pct"] = round((out["avg_likes"] + (out["avg_comments"] or 0)) * 100.0 / followers, 3)
+    scored = sorted((p for p in posts if p.get("url")), key=lambda p: (p.get("likesCount") or 0) + (p.get("commentsCount") or 0), reverse=True)
+    out["top_posts"] = [{"url": p["url"], "likes": p.get("likesCount"), "comments": p.get("commentsCount"),
+                         "date": str(p.get("timestamp") or "")[:10] or None} for p in scored[:6]]
+    out["hashtags"] = tags_from_posts([(p.get("hashtags") or [], p.get("mentions") or []) for p in posts]) if posts else []
+    vids = [p for p in posts if str(p.get("type")).lower() == "video"]
+    if vids and followers:
+        vl = [p.get("likesCount") for p in vids if isinstance(p.get("likesCount"), (int, float)) and p["likesCount"] >= 0]
+        vc = [p.get("commentsCount") for p in vids if isinstance(p.get("commentsCount"), (int, float)) and p["commentsCount"] >= 0]
+        if vl:
+            out["avg_reel_likes"] = round(sum(vl) / len(vl), 1)
+            out["avg_reel_comments"] = round(sum(vc) / len(vc), 1) if vc else None
+            out["reels_er"] = round((out["avg_reel_likes"] + (out["avg_reel_comments"] or 0)) * 100.0 / followers, 3)
+            out["reel_posts"] = len(vids)
     stamps = sorted(str(p.get("timestamp"))[:10] for p in posts if p.get("timestamp"))
     if stamps:
         out["last_post"] = stamps[-1]
@@ -638,6 +684,10 @@ def derive_tiktok_analytics(it):
            "er_pct": round(eng["ratePercent"], 3) if isinstance(eng.get("ratePercent"), (int, float)) else None,
            "er_basis": "views", "posts_per_week": None, "last_post": stamps[-1] if stamps else None,
            "sample_posts": _num(rp.get("usedCount")) or len(posts), "bio": cr.get("bio") or ""}
+    top = sorted((p for p in posts if p.get("url")), key=lambda p: p.get("views") or 0, reverse=True)
+    out["top_posts"] = [{"url": p["url"], "likes": p.get("likes"), "comments": p.get("comments"), "views": p.get("views"),
+                         "date": str(p.get("publishedAt") or "")[:10] or None} for p in top[:6]]
+    out["hashtags"] = tags_from_posts([(_TAG.findall(p.get("text") or ""), _MEN.findall(p.get("text") or "")) for p in posts]) if posts else []
     if len(stamps) > 1:
         try:
             span = (time.mktime(time.strptime(stamps[-1], "%Y-%m-%d")) - time.mktime(time.strptime(stamps[0], "%Y-%m-%d"))) / 86400.0
@@ -669,6 +719,10 @@ def save_basic(conn, code, plat, handle, it, m, run_id):
             "posts_per_week": m["posts_per_week"], "last_post": m["last_post"], "sample_posts": m["sample_posts"],
             "verified": bool(m["verified"]), "account_type": m["category"] or None,
             "bio": it.get("biography") or m.get("bio") or "", "external_url": it.get("externalUrl") or ""}
+    data["posts_stored"] = True
+    for k in ("top_posts", "hashtags", "avg_reel_likes", "avg_reel_comments", "reels_er", "reel_posts"):
+        if m.get(k) not in (None, [], ""):
+            data[k] = m[k]
     if m.get("avg_views") is not None:
         data["avg_views"] = m["avg_views"]
     if m.get("er_basis"):

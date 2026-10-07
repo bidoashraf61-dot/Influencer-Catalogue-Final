@@ -257,6 +257,20 @@
     addTips();
   }
 
+  function renderBasicPerf(a) {
+    var all = [];
+    if (a.avg_views != null) all.push({ label: "Average views", v: a.avg_views, text: num(a.avg_views) });
+    if (a.avg_likes != null) all.push({ label: "Average likes", v: a.avg_likes, text: num(a.avg_likes) });
+    if (a.avg_comments != null) all.push({ label: "Average comments", v: a.avg_comments, text: num(a.avg_comments) });
+    var er = function (v, note) { return v == null ? "" : '<div class="pp-er"><span class="pp-er__label">Engagement rate</span><b>' + pct2(v) + "</b><p>" + note + "</p></div>"; };
+    var list = [{ label: "All content", html: er(a.er, a.er_basis === "views" ? "Likes, comments and shares as a share of views." : "Likes and comments as a share of followers.") + rows(all, "#5b4bd6") }];
+    var reels = [];
+    if (a.avg_reel_likes != null) reels.push({ label: "Average likes", v: a.avg_reel_likes, text: num(a.avg_reel_likes) });
+    if (a.avg_reel_comments != null) reels.push({ label: "Average comments", v: a.avg_reel_comments, text: num(a.avg_reel_comments) });
+    if (reels.length) list.push({ label: "Reels", html: er(a.reels_er, "Likes and comments on video posts, as a share of followers.") + rows(reels, "#ff691e") });
+    tabs("pp-perf-tabs", "pp-perf", list, function (t) { return '<div class="pp-perf">' + t.html + "</div>"; });
+  }
+
   /* a basic record: the public numbers we have collected, and every other
      section held back as pending (blurred, with nothing real behind it) */
   function renderBasic(a) {
@@ -281,9 +295,13 @@
     ["pp-posts", "pp-perf", "pp-net", "pp-aud", "pp-tags"].forEach(function (id) { $(id).innerHTML = ghost; });
     ["pp-perf-tabs", "pp-aud-tabs"].forEach(function (id) { $(id).innerHTML = ""; });
     ["pp-posts-sec", "pp-net-sec", "pp-aud-sec", "pp-tags-sec"].forEach(function (id) { $(id).hidden = false; });
+    var pend = ["Audience countries, age and gender", "real versus fake followers", "brand affinity"];
+    if (a.top_posts && a.top_posts.length) renderPosts(a);
+    if (a.hashtags && a.hashtags.length) renderTags(a);
+    if (a.avg_likes != null || a.avg_views != null) renderBasicPerf(a);
     var c = D.creator, asked = (D.requested || []).indexOf(PLAT) !== -1;
     $("pp-real").insertAdjacentHTML("beforeend", '<div class="pp-request"><div><b>Want the full ' + esc(PLAT || "") + ' analysis?</b>'
-      + '<p>Audience countries, age and gender, real versus fake followers, content performance and brand affinity are pending for ' + esc(c.name) + ".</p></div>"
+      + '<p>Audience countries, age and gender, real versus fake followers and brand affinity are pending for ' + esc(c.name) + ".</p></div>"
       + '<button type="button" class="pp-btn" id="pp-ask"' + (asked ? " disabled" : "") + ">" + (asked ? "Requested ✓" : "Request full analysis") + "</button>"
       + '<p class="pp-sealed__done" id="pp-ask-done"' + (asked ? "" : " hidden") + ">Your request is with the HelloVoice team — we will add it and let you know.</p></div>");
     var ask = $("pp-ask");
@@ -294,7 +312,7 @@
         .then(function (r) { if (!r.ok) throw 0; ask.textContent = "Requested ✓"; $("pp-ask-done").hidden = false; D.requested = (D.requested || []).concat([PLAT]); renderPlatforms(c); })
         .catch(function () { ask.disabled = false; ask.textContent = "Request full analysis"; var n = $("pp-ask-done"); n.textContent = "Could not send the request. Please try again."; n.hidden = false; });
     });
-    $("pp-source").textContent = "Basic public numbers" + (a.updated ? " as of " + day(a.updated) : "") + ". Audience, content and brand sections are pending.";
+    $("pp-source").textContent = "Basic public numbers" + (a.updated ? " as of " + day(a.updated) : "") + ". Audience and brand sections are pending.";
   }
 
   /* identity: who, the three numbers, bio */
