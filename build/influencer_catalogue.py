@@ -896,14 +896,22 @@ def build():
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
         Full catalogue
       </a>
-      <div class="cat-hero__head">
-        <div class="cat-pill">Selection</div>
-        <h1 class="cat-hero__title" id="sel-title">Selection</h1>
+      <div class="cat-selhead">
+        <div class="cat-selhead__main">
+          <div class="cat-selhead__eyebrow"><span class="cat-selhead__tag">Selection</span><span class="cat-selhead__client" id="sel-client" hidden></span></div>
+          <h1 class="cat-selhead__title" id="sel-title">Selection</h1>
+          <div class="cat-selhead__brief" id="sel-brief" hidden></div>
+          <p class="cat-selhead__hint">Remove anyone who does not fit, then request a quote.</p>
+        </div>
+        <div class="cat-selhead__side">
+          <dl class="cat-selhead__stats" id="sel-headstats"></dl>
+          <div class="cat-selhead__actions">
+            <button type="button" class="cat-btn cat-btn--lime" id="sel-head-quote">Request a quote</button>
+            <button type="button" class="cat-btn cat-btn--ghost" id="sel-head-copy">Copy link</button>
+            <a class="cat-btn cat-btn--ghost cat-tray__edit" href="/catalogue/">Add or remove creators</a>
+          </div>
+        </div>
       </div>
-      <p class="cat-hero__lead">
-        The creators shortlisted for this campaign. Remove anyone who does not
-        fit, then send it back for a full quote.
-      </p>
     </div></div>
   </header>
 

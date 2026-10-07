@@ -3426,6 +3426,8 @@ class Handler(BaseHTTPRequestHandler):
                                     "prices": prices, "total": total,
                                     "platform": platform,
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
+                                    "brief": {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
+                                              "client": ((db.get_code(sel["code_id"]) or {"label": ""})["label"] if sel["code_id"] else "")},
                                     "scores": {k: {"score": v["score"], "tag": v["tag"], "strengths": v["strengths"],
                                                    "watchouts": v["watchouts"], "conclusion": v["conclusion"],
                                                    "parts": [{"label": p["label"], "s": p["s"]} for p in v["parts"]],

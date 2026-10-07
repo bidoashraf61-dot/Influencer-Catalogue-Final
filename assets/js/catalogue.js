@@ -1586,7 +1586,7 @@
             if (b.currency && FX[b.currency]) CURRENCY = b.currency;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
-                        tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {},
+                        tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null,
                         platform: b.platform || "" };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
@@ -1655,6 +1655,40 @@
     // their pick is kept for this selection in this browser.
     var curKey = "hv-cur:" + ((CURATED && CURATED.token) || selectionName);
     try { var mine = sessionStorage.getItem(curKey); if (mine && FX[mine]) CURRENCY = mine; } catch (e) {}
+    // The header: who it is for, what the brief is, and the numbers at a glance.
+    var COUNTRY_NAME = { SA: "Saudi Arabia", AE: "UAE", EG: "Egypt", KW: "Kuwait", QA: "Qatar", BH: "Bahrain", OM: "Oman", JO: "Jordan", LB: "Lebanon", IQ: "Iraq", MA: "Morocco" };
+    function renderHead(lo, hi) {
+      var br = CURATED && CURATED.brief;
+      var cl = $("sel-client");
+      if (cl) { cl.hidden = !(br && br.client); cl.textContent = br && br.client ? "for " + br.client : ""; }
+      var bx = $("sel-brief");
+      if (bx) {
+        if (!br) { bx.hidden = true; }
+        else {
+          var t = br.target || {}, chips = [["Objective", br.objective]];
+          if (t.country) chips.push(["Market", COUNTRY_NAME[t.country] || t.country]);
+          if (t.gender && t.gender !== "Any") chips.push(["Audience", t.gender]);
+          if (t.age && t.age !== "Any") chips.push(["Age", t.age]);
+          var cats = String(t.category || "").split("|").filter(function (x) { return x && x !== "Any"; });
+          if (cats.length) chips.push(["Category", cats.join(", ")]);
+          bx.hidden = false;
+          bx.innerHTML = chips.map(function (c) { return '<span class="cat-selhead__chip"><small>' + esc(c[0]) + "</small>" + esc(c[1]) + "</span>"; }).join("");
+        }
+      }
+      var st = $("sel-headstats");
+      if (!st) return;
+      var n = {}, any = false;
+      selected.forEach(function (code) { var f = fitOf(code); if (f) { n[f] = (n[f] || 0) + 1; any = true; } });
+      var cell = function (label, val, cls) { return '<div class="' + (cls || "") + '"><dt>' + label + "</dt><dd>" + val + "</dd></div>"; };
+      var html = cell("Creators", selected.length);
+      if (any) {
+        html += cell("Strong fit", n["Strong fit"] || 0, "is-strong") + cell("Good fit", n["Good fit"] || 0, "is-good");
+        var rest = (n["Possible fit"] || 0) + (n["Not recommended"] || 0);
+        if (rest) html += cell("Lower fit", rest, "is-low");
+      }
+      if (selected.length) html += cell("Indicative range", priceText([lo, hi]), "is-range");
+      st.innerHTML = html;
+    }
     function renderCurrency() {
       var have = Object.keys(FX);
       var box = $("sel-currency");
@@ -2016,6 +2050,7 @@
       }).join("");
       renderPlaces();
       renderCurrency();
+      renderHead(lo, hi);
 
       // keep the URL in step so what they see is what they can re-share
       // The short link only while the server holds exactly these creators.
@@ -2110,6 +2145,12 @@
     wireQuoteForm(function () { selected = []; render(); });
     var second = $("cat-request-2");
     if (second) second.addEventListener("click", function () { $("cat-request").click(); });
+    var hq = $("sel-head-quote"); if (hq) hq.addEventListener("click", function () { $("cat-request").click(); });
+    var hc = $("sel-head-copy");
+    if (hc) hc.addEventListener("click", function () {
+      copyText(location.href, function () { hc.textContent = "Link copied"; setTimeout(function () { hc.textContent = "Copy link"; }, 2200); },
+        function () { hc.textContent = "Copy failed"; setTimeout(function () { hc.textContent = "Copy link"; }, 2200); });
+    });
 
     var copyBtn = $("cat-copy-link");
     if (copyBtn) copyBtn.addEventListener("click", function () {
