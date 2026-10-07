@@ -261,6 +261,8 @@ def _roster_estimate(c, objective, target, platform):
 # The guess is discounted so a measured 70 outranks a guessed 75.
 ESTIMATE_WEIGHT = 0.85
 MISMATCH_WEIGHT = 0.6
+CATEGORY_MISS_WEIGHT = 0.6
+HCP_BOOST = 1.15
 
 
 def score_all(brief, exclude=(), only=None):
@@ -297,14 +299,39 @@ def score_all(brief, exclude=(), only=None):
                 s = dict(s, tag=fit.band_for(val),
                          watchouts=["Based outside %s" % dict(fit.COUNTRIES).get(target["country"], target["country"])]
                          + [w for w in (s.get("watchouts") or []) if not w.startswith("Based outside")])
+        # The product space is a requirement, not one factor among five: a beauty creator with great
+        # engagement is still the wrong buy for a food brief. Judged on the creator's own tagged
+        # interests; one who is not tagged for any asked-for space is marked down and says so.
+        cats = [x for x in str(target.get("category") or "").split("|") if x and x.lower() != "any"]
+        if cats and not _tagged(c, cats):
+            val = int(round(val * CATEGORY_MISS_WEIGHT))
+            rank_score *= CATEGORY_MISS_WEIGHT
+            s = dict(s, tag=fit.band_for(val), watchouts=["Not tagged for %s" % ", ".join(cats)] + list(s.get("watchouts") or []))
+        # Healthcare professionals first for a healthcare brief: that is what a pharma client is buying.
+        if any(x in ("health care", "health") for x in cats) and str(c["tier"] or "").upper().startswith("HCP"):
+            rank_score *= HCP_BOOST
+            s = dict(s, strengths=["Healthcare professional"] + list(s.get("strengths") or []))
         price = db.price_for(c, bands, single or (wanted[0] if wanted else None))
         items.append({
             "code": code, "score": val, "rank_score": round(rank_score, 1), "tag": s.get("tag") or fit.band_for(val),
             "basis": basis, "platform": s.get("platform") or single, "price": list(price) if price else None,
             "strengths": (s.get("strengths") or [])[:3], "watchouts": (s.get("watchouts") or [])[:2],
+            "followers": c["followers"] or 0,
         })
-    items.sort(key=lambda i: (-i["rank_score"], i["code"]))
+    # Equal scores are common on public data; break the tie the way the goal would: reach for
+    # awareness, the smaller (cheaper, closer) account otherwise.
+    big_first = objective == "Awareness"
+    items.sort(key=lambda i: (-i["rank_score"], -i["followers"] if big_first else i["followers"], i["code"]))
     return items
+
+
+def _tagged(c, cats):
+    interest = str(c["interest"] or "").lower()
+    for cat in cats:
+        words = fit.CATEGORY_WORDS.get(cat.lower()) or [cat.lower()]
+        if cat.lower() in interest or any(fit.has_word(interest, w) for w in words):
+            return True
+    return False
 
 
 def rank(brief, exclude=()):
@@ -321,11 +348,16 @@ def rank(brief, exclude=()):
     for it in items:
         if len(picks) >= count:
             break
-        low = it["price"][0] if it["price"] else 0
-        if cap and picks and spent + low > cap:
-            continue                       # this one would break the budget; try a cheaper one
+        # Budget is checked on the middle of each fee range: the low end alone let five mega
+        # creators through an "under 50,000" brief.
+        mid = (it["price"][0] + it["price"][1]) / 2.0 if it["price"] else 0
+        if cap:
+            left, slots = cap - spent, count - len(picks)
+            # Over budget, or so dear it would leave too little for the remaining slots: try a cheaper one.
+            if spent + mid > cap or mid > left / slots * 1.5:
+                continue
         picks.append(it)
-        spent += low
+        spent += mid
     chosen = {p["code"] for p in picks}
     alternates = [i for i in items if i["code"] not in chosen][:10]
     lows = [p["price"][0] for p in picks if p["price"]]

@@ -33,6 +33,32 @@ working, and the email sign-in only appears on the catalogue once mail is set up
 - The selection page shows **Client brief** when the shortlist came from the AI.
 - Access codes can carry their own **AI credits** at creation.
 
+## Also included (round 3)
+
+- **Sign-up is automatic** for any company domain (no approval step; Approval mode is still available).
+- **Hand-built selections get a brief too.** When a client saves a selection, a free 6-question card
+  offers to score it; the answers become the selection's objective and audience.
+- **Fit badges on the catalogue** for the client's latest brief, with a chip to hide them.
+- **Colleagues share** selections and campaigns (same company domain; switch in Settings).
+- **Credits:** clients request more from their account panel; you grant from Client accounts or their
+  page (+50 / +200 / +500 packs); optional monthly top-up per client or for everyone.
+- **KAMs and emails:** assign a KAM per client; new clients, briefs, quote requests and credit requests
+  are emailed to the KAM and the team list (Settings & keys).
+- **Chats tab:** read every client conversation.
+- **Funnel:** sign-ups → sign-ins → briefs → selections → quote requests, last 30 days.
+- **Printable quotation** from any selection (Print → Save as PDF), linked from the selection page.
+- **Data rights:** clients download their data and can delete their account; admins can too.
+- **Arabic:** sign-in, questions, results, chat and account switch to Arabic, right-to-left.
+
+## Matching quality (tested on the production roster, 7 Oct 2026)
+
+Fixed after testing against the live 2,152-creator roster:
+the product space is enforced (a creator not tagged for it is marked down ×0.6 and says so),
+healthcare briefs put HCP-tier creators first, "car" no longer matches "skincare" (this also fixes the
+existing selection scores), budgets are checked on the middle of each fee and spread across all slots,
+and equal scores break by reach for awareness, by smaller accounts otherwise. When the roster has no
+creators for a space (e.g. automotive today) the shortlist says "Possible fit" instead of pretending.
+
 ## Cost tracking (USD)
 
 **Client portal → Usage & cost** shows what the portal costs in dollars:

@@ -219,6 +219,16 @@ def _age_share(ages, wanted):
     return total
 
 
+def has_word(text, word):
+    """``word`` appears in ``text`` as a word or a word's start. Short words must be whole words
+    (plural allowed): "car" is in "cars" and "car care", not in "skincare"; "cosmetic" still
+    finds "cosmetics"."""
+    word = word.lower()
+    if len(word) <= 4:
+        return re.search(r"(?<![a-z])" + re.escape(word) + r"s?(?![a-z])", text) is not None
+    return re.search(r"(?<![a-z])" + re.escape(word), text) is not None
+
+
 def _niche(category, doc, creator_interest):
     """1.0 when the creator's own category or their audience's interests name the category, else 0.25."""
     cats = [c.strip().lower() for c in str(category or "").split("|") if c.strip() and c.strip().lower() != "any"]
@@ -230,7 +240,7 @@ def _niche(category, doc, creator_interest):
     pool += [str(i.get("name", "")).lower() for i in (doc.get("audience") or {}).get("brand_affinity") or []]
     for cat in cats:
         words = CATEGORY_WORDS.get(cat) or [w for w in cat.replace("&", " ").split() if len(w) >= 4] or [cat]
-        if cat in str(creator_interest or "").lower() or any(w in p for p in pool for w in words):
+        if cat in str(creator_interest or "").lower() or any(has_word(p, w) for p in pool for w in words):
             return 1.0
     return 0.25
 
