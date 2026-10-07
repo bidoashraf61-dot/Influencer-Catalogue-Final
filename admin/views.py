@@ -2079,8 +2079,9 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
             "<option>" + g_ + "</option>" for g_ in _fit_ns.GENDERS) + "</select></div>"
         "<div><label for='ns-age'>Audience age</label><select id='ns-age' name='t_age'><option>Any</option>" + "".join(
             "<option>" + a_ + "</option>" for a_ in _fit_ns.AGE_BANDS) + "</select></div>"
-        "<div><label for='ns-cat'>Product category</label><select id='ns-cat' name='t_category'><option>Any</option>" + "".join(
-            "<option>" + e(i_) + "</option>" for i_ in interests) + "</select></div></div></div>"
+        "<div style='flex:3'><label>Product categories (tick all that apply)</label><div class='vd-roles'>" + "".join(
+            "<label class='tick'><input type='checkbox' name='t_category' value=\"" + e(i_) + "\"> <span>" + e(i_) + "</span></label>"
+            for i_ in interests) + "</div></div></div></div>"
         "<button class='btn lime'>" + ui.icon("arrow", 16) + " Create and add creators</button></form>"
         "<details style='margin-top:16px'><summary class='muted'>Have a link a client sent? Open that selection instead</summary>"
         "<form method='post' action='" + u("/selections/new") + "' style='margin-top:10px'><div class='row'>"
@@ -2168,7 +2169,7 @@ function syncRoles(tr){var v=[].slice.call(tr.querySelectorAll('.vd-role input:c
 document.addEventListener('change',function(e){var tr=e.target.closest&&e.target.closest('.vd-item');if(tr&&e.target.closest('.vd-role'))syncRoles(tr)});
 function suggest(tr,done){var code=tr.querySelector('input[name=vcode]').value;var p=document.querySelector('select[name=platform]');p=p?p.value:'';var o=document.getElementById('vd-obj');o=o?o.value:'';function tv(i){var x=document.getElementById(i);return x?x.value:''}
  var note=tr.querySelector('.vd-note');note.textContent='Reading the analysis…';
- fetch(base+'/selections/suggest?code='+encodeURIComponent(code)+'&p='+encodeURIComponent(p)+'&o='+encodeURIComponent(o)+'&tc='+encodeURIComponent(tv('t-country'))+'&tg='+encodeURIComponent(tv('t-gender'))+'&ta='+encodeURIComponent(tv('t-age'))+'&tk='+encodeURIComponent(tv('t-category')),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
+ fetch(base+'/selections/suggest?code='+encodeURIComponent(code)+'&p='+encodeURIComponent(p)+'&o='+encodeURIComponent(o)+'&tc='+encodeURIComponent(tv('t-country'))+'&tg='+encodeURIComponent(tv('t-gender'))+'&ta='+encodeURIComponent(tv('t-age'))+'&tk='+encodeURIComponent([].slice.call(document.querySelectorAll('input[name=t_category]:checked')).map(function(i){return i.value}).join('|')),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
   if(d.fit!==undefined){var sel=tr.querySelector('.vd-fit');if(d.fit)sel.value=d.fit;
    tr.querySelectorAll('.vd-role input').forEach(function(i){i.checked=(d.roles||[]).indexOf(i.value)>=0});syncRoles(tr);
    if(d.reason)tr.querySelector('.vd-reason').value=d.reason}
@@ -2370,8 +2371,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
               "<option" + (" selected" if g_ == target_now["gender"] else "") + ">" + g_ + "</option>" for g_ in _fit.GENDERS) + "</select></div>"
           "<div><label>Audience age</label><select name='t_age' id='t-age'><option>Any</option>" + "".join(
               "<option" + (" selected" if a_ == target_now["age"] else "") + ">" + a_ + "</option>" for a_ in _fit.AGE_BANDS) + "</select></div>"
-          "<div><label>Product category</label><select name='t_category' id='t-category'><option>Any</option>" + "".join(
-              "<option" + (" selected" if i_ == target_now["category"] else "") + ">" + e(i_) + "</option>" for i_ in interests) + "</select></div></div></div>"
+          "<div style='flex:3'><label>Product categories (tick all that apply)</label><div class='vd-roles' id='t-category'>" + "".join(
+              "<label class='vd-role'><input type='checkbox' name='t_category' value=\"" + e(i_) + "\""
+              + (" checked" if i_.lower() in [c_.lower() for c_ in str(target_now["category"]).split("|")] else "") + "> <span>" + e(i_) + "</span></label>"
+              for i_ in interests) + "</div></div></div></div>"
           "<div class='price-hint' id='tag-pool' data-pool='" + e(json.dumps(sorted({t for v in tags_of.values() for t in v}, key=str.lower))) + "'></div>"
           "<div class='vd-list'>" + fit_cards + "</div>"
           "<p class='price-hint'>Tags are your own labels (Hero, Beauty, Backup…), separated by commas. Click a tag in <i>Tags in use</i> to add it to the box you last typed in. "

@@ -166,8 +166,8 @@ GENDERS = ["Any", "Women", "Men"]
 DEFAULT_TARGET = {"country": "SA", "gender": "Any", "age": "Any", "category": "Any"}
 # What a category looks for in a creator's interests and audience interests.
 CATEGORY_WORDS = {
-    "beauty": ["beauty", "cosmetic", "skin", "makeup", "hair", "fragrance", "personal care"],
-    "health": ["health", "medical", "wellness", "fitness", "nutrition", "pharma", "doctor", "diet"],
+    "beauty": ["beauty", "cosmetic", "skin", "makeup", "hair", "fragrance", "personal care", "nail"],
+    "health": ["health", "medical", "wellness", "fitness", "nutrition", "pharma", "doctor", "diet", "vitamin", "supplement"],
     "mother & baby": ["baby", "mother", "child", "kids", "family", "parent", "toys"],
     "food": ["food", "restaurant", "cooking", "recipe", "drink", "coffee", "cafe"],
     "lifestyle": ["lifestyle", "fashion", "shopping", "travel", "home", "friends"],
@@ -180,7 +180,7 @@ CATEGORY_WORDS = {
     "hair care": ["hair", "beauty", "salon", "care"],
     "make-up": ["makeup", "make-up", "beauty", "cosmetic"],
     "fragrance": ["fragrance", "perfume", "beauty"],
-    "health care": ["health", "medical", "doctor", "pharma", "wellness", "nutrition"],
+    "health care": ["health", "medical", "doctor", "pharma", "wellness", "nutrition", "vitamin", "supplement"],
     "motherhood": ["baby", "mother", "child", "kids", "family", "parent", "toys"],
     "sports": ["sport", "fitness", "gym", "football"],
     "gaming": ["gaming", "game", "esport"],
@@ -219,17 +219,18 @@ def _age_share(ages, wanted):
 
 def _niche(category, doc, creator_interest):
     """1.0 when the creator's own category or their audience's interests name the category, else 0.25."""
-    cat = (category or "").strip().lower()
-    if not cat or cat == "any":
+    cats = [c.strip().lower() for c in str(category or "").split("|") if c.strip() and c.strip().lower() != "any"]
+    if not cats:
         return None
-    words = CATEGORY_WORDS.get(cat) or [w for w in cat.replace("&", " ").split() if len(w) >= 4] or [cat]
     pool = [str(creator_interest or "").lower()]
     pool += [str(x).lower() for x in (doc.get("creator_interests") or [])]
     pool += [str(i.get("name", "")).lower() for i in (doc.get("audience") or {}).get("interests") or []]
     pool += [str(i.get("name", "")).lower() for i in (doc.get("audience") or {}).get("brand_affinity") or []]
-    if cat in str(creator_interest or "").lower():
-        return 1.0
-    return 1.0 if any(w in p for p in pool for w in words) else 0.25
+    for cat in cats:
+        words = CATEGORY_WORDS.get(cat) or [w for w in cat.replace("&", " ").split() if len(w) >= 4] or [cat]
+        if cat in str(creator_interest or "").lower() or any(w in p for p in pool for w in words):
+            return 1.0
+    return 0.25
 
 
 def score(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
@@ -300,8 +301,9 @@ def score(doc, platform, followers=None, objective="Balanced", target=None, band
                          "Only %s of the audience is aged %s" % (_pct(share), target["age"])))
     nic = _niche(target["category"], doc, creator_interest)
     if nic is not None:
-        subs.append((nic, "Works in the %s space" % target["category"].lower(),
-                     "Little sign of %s content or audience interest" % target["category"].lower()))
+        names = ", ".join(c.strip().lower() for c in str(target["category"]).split("|") if c.strip())
+        subs.append((nic, "Works in the %s space" % names,
+                     "Little sign of %s content or audience interest" % names))
     add("market", "Audience match", subs)
 
     if f:

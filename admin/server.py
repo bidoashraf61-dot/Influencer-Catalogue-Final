@@ -1674,7 +1674,7 @@ class Handler(BaseHTTPRequestHandler):
         """Re-price a selection a client already has: one they sent as a quote
         request, or one whose link was pasted in. Asking twice for the same
         request reopens the one already priced rather than starting another."""
-        f = self.form_body()
+        f = self.form_body(multi=("t_category",))
         if f.get("mode") == "scratch":
             # A new, empty selection built here: a name, the client, the platform and the currency.
             name = (f.get("name") or "").strip()[:120]
@@ -1694,7 +1694,7 @@ class Handler(BaseHTTPRequestHandler):
                     "country": f.get("t_country") if f.get("t_country") in dict(_fit_new.COUNTRIES) else "SA",
                     "gender": f.get("t_gender") if f.get("t_gender") in _fit_new.GENDERS else "Any",
                     "age": f.get("t_age") if f.get("t_age") in _fit_new.AGE_BANDS else "Any",
-                    "category": (f.get("t_category") or "Any")[:40]})
+                    "category": self.clean_categories(f.get("t_category"))})
                 t["key"] = sid
             return self.redirect("/selections/edit?id=%d&ok=%s#st=creators" % (
                 sid, urllib.parse.quote("Created. Add the creators, then set their prices.")))
@@ -1762,7 +1762,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/selections/edit?id=%d" % sid)
 
     def post_selection_save(self):
-        f = self.form_body(multi=("code", "vcode", "p_from", "p_to", "cost", "tags", "fit", "roles", "reason", "drop", "default"))
+        f = self.form_body(multi=("code", "vcode", "p_from", "p_to", "cost", "tags", "fit", "roles", "reason", "drop", "default", "t_category"))
         sid = (f.get("id") or "").strip()
         sel = db.selection(int(sid)) if sid.isdigit() else None
         if sel is None:
@@ -1881,7 +1881,7 @@ class Handler(BaseHTTPRequestHandler):
                 "country": f.get("t_country") if f.get("t_country") in dict(_fit_mod.COUNTRIES) else "SA",
                 "gender": f.get("t_gender") if f.get("t_gender") in _fit_mod.GENDERS else "Any",
                 "age": f.get("t_age") if f.get("t_age") in _fit_mod.AGE_BANDS else "Any",
-                "category": (f.get("t_category") or "Any")[:40]})
+                "category": self.clean_categories(f.get("t_category"))})
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs, margin_max=margin_max,
                           tags={k: v for k, v in tags.items() if k in codes},
@@ -2949,6 +2949,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def analysis_resolver(self):
         return analysis.Resolver(db.list_creators(), db.creator_aliases())
+
+    def clean_categories(self, raw):
+        """The ticked product categories, kept to ones the roster knows, as "A|B|C" (or "Any")."""
+        items = [raw] if isinstance(raw, str) else list(raw or [])
+        known = {k.lower(): k for k in db.known_interests()}
+        out = []
+        for i in items:
+            i = re.sub(r"\s+", " ", str(i or "")).strip()[:40]
+            i = known.get(i.lower(), i)
+            if i and i.lower() != "any" and i not in out and "|" not in i:
+                out.append(i)
+        return "|".join(out[:8]) or "Any"
 
     def selection_objective(self, sel):
         import fit as fit_mod
