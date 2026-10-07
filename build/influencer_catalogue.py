@@ -782,18 +782,21 @@ def build():
 
   <footer class="cat-footer">
     <div class="cat-pad"><div class="cat-container">
-      <img class="cat-footer__logo" src="/assets/helv/logo-knockout.webp"
-           srcset="/assets/helv/logo-knockout@2x.webp 2x"
-           alt="HelloVoice" width="760" height="166"/>
-      <p class="cat-footer__note">
-        Confidential and not for redistribution.
-        Creator identities are released on agreement.
-      </p>
-      <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
-        See the portfolio at hellovoice.co.uk
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
-      </a>
-      {admin_link}
+      <div class="cat-footer__top">
+        <img class="cat-footer__logo" src="/assets/helv/logo-knockout.webp"
+             srcset="/assets/helv/logo-knockout@2x.webp 2x"
+             alt="HelloVoice" width="760" height="166"/>
+        <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
+          See the portfolio at hellovoice.co.uk
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+        </a>
+      </div>
+      <div class="cat-footer__base">
+        <p class="cat-footer__note">
+          Confidential and not for redistribution.
+          Creator identities are released on agreement.
+        </p>{admin_link}
+      </div>
     </div></div>
   </footer>
 
@@ -964,18 +967,21 @@ def build():
 
   <footer class="cat-footer">
     <div class="cat-pad"><div class="cat-container">
-      <img class="cat-footer__logo" src="/assets/helv/logo-knockout.webp"
-           srcset="/assets/helv/logo-knockout@2x.webp 2x"
-           alt="HelloVoice" width="760" height="166"/>
-      <p class="cat-footer__note">
-        Confidential and not for redistribution.
-        Creator identities are released on agreement.
-      </p>
-      <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
-        See the portfolio at hellovoice.co.uk
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
-      </a>
-      {admin_link}
+      <div class="cat-footer__top">
+        <img class="cat-footer__logo" src="/assets/helv/logo-knockout.webp"
+             srcset="/assets/helv/logo-knockout@2x.webp 2x"
+             alt="HelloVoice" width="760" height="166"/>
+        <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
+          See the portfolio at hellovoice.co.uk
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+        </a>
+      </div>
+      <div class="cat-footer__base">
+        <p class="cat-footer__note">
+          Confidential and not for redistribution.
+          Creator identities are released on agreement.
+        </p>{admin_link}
+      </div>
     </div></div>
   </footer>
 
