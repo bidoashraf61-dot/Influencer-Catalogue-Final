@@ -186,7 +186,7 @@ def apify_tab():
     runs = []
     for r in apify.list_runs():
         cls = {"SUCCEEDED": "live", "RUNNING": "warn", "QUEUED": "warn"}.get(r["status"], "dead")
-        view = (" <a href='" + u("/apis/run?id=%d" % r["id"]) + "'>View</a>") if r["results"] else ""
+        view = (" <a href='" + u("/apis/run?id=%d" % r["id"]) + "'>" + ("View" if r["results"] else "Details") + "</a>") if (r["results"] or r["apify_run"]) else ""
         runs.append(
             "<tr><td>" + e(r["job_name"] or "—") + "<br><span class='muted' style='font-size:12px'>" + e(r["trigger"]) + "</span></td>"
             "<td><span class='pill " + cls + "'>" + e(r["status"].lower()) + "</span></td>"
@@ -256,5 +256,8 @@ def run_page(rid):
     body = (ui.header("Run results", e(run["job_name"] or "") + " · " + V.ts(run["started_at"]) + " · $%.2f" % run["cost"],
                       crumbs=[("APIs", u("/apis?tab=apify")), ("Run %d" % rid, None)],
                       actions="<a class='btn small' href='" + u("/apis/run.json?id=%d" % rid) + "'>Download JSON</a>")
+            + ("<div class='" + ("err" if run["status"] in ("FAILED", "REFUSED") else "note") + "'><strong>" + e(run["status"].lower())
+               + "</strong> " + e(run["message"] or "") + (" <a href='https://console.apify.com/actors/runs/" + e(run["apify_run"])
+               + "' target='_blank' rel='noopener'>Open in Apify</a>" if run["apify_run"] else "") + "</div>" if (run["message"] or run["apify_run"]) else "")
             + ("".join(rows) or "<p class='muted'>No results were kept for this run.</p>"))
     return V.page("APIs", body, "/apis")

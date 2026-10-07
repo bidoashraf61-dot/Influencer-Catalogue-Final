@@ -192,6 +192,46 @@ def call(method, path, body=None, params=None, timeout=30):
     return json.loads(raw.decode()) if raw else {}
 
 
+def call_text(path, timeout=30):
+    """A plain-text answer from Apify, such as a run's log."""
+    token = get_token()
+    if not token:
+        return ""
+    req = urllib.request.Request(API + path, headers={"Authorization": "Bearer " + token})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read().decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError):
+        return ""
+
+
+def run_cost(d):
+    """What a run cost. Pay-per-result actors charge through events, which the
+    run's usage total does not always include, so both are counted and the
+    larger is kept."""
+    usage = float(d.get("usageTotalUsd") or 0)
+    events = 0.0
+    try:
+        prices = ((d.get("pricingInfo") or {}).get("pricingPerEvent") or {}).get("actorChargeEvents") or {}
+        for name, n in (d.get("chargedEventCounts") or {}).items():
+            events += float(n or 0) * float((prices.get(name) or {}).get("eventPriceUsd") or 0)
+    except (TypeError, ValueError):
+        pass
+    return max(usage, events)
+
+
+def failure_note(run, d, status):
+    """Why a run did not finish: Apify's own status line and the tail of its log."""
+    bits = ["Apify ended the run as %s." % status]
+    if d.get("statusMessage"):
+        bits.append(str(d["statusMessage"])[:300])
+    log = call_text("/actor-runs/%s/log" % run["apify_run"])
+    lines = [ln.strip() for ln in log.splitlines() if ln.strip()][-6:]
+    if lines:
+        bits.append("Log: " + " | ".join(l[:200] for l in lines))
+    return " ".join(bits)
+
+
 def test_connection():
     me = call("GET", "/users/me").get("data", {})
     out = {"username": me.get("username"), "plan": (me.get("plan") or {}).get("id") or "",
@@ -544,11 +584,11 @@ def refresh_run(run):
             _finish(run, "FAILED", 0, 0, 0.0, "Lost track of this run: " + str(ex))
         return
     st = d.get("status")
-    cost = float(d.get("usageTotalUsd") or 0)
-    if st in ("READY", "RUNNING"):
+    cost = run_cost(d)
+    if st in ("READY", "RUNNING", "ABORTING", "TIMING-OUT"):
         return
     if st != "SUCCEEDED":
-        _finish(run, "FAILED", 0, 0, cost, "Apify ended the run as " + str(st) + ".")
+        _finish(run, "FAILED", 0, 0, cost, failure_note(run, d, st))
         return
     items, saved, note = [], 0, None
     try:
