@@ -510,13 +510,16 @@
     "Quoted for": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M10.5 18h3"/></svg>',
     "Not in this roster": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.4v.1"/></svg>'
   };
-  // One brand colour per size, small to large; HCP tiers keep their size's
-  // colour and add a stripe, so size and HCP read as two separate things.
+  // One brand colour per size, small to large.
   var SIZE_TONES = [["nano", "#e8ff76", "#121212"], ["micro", "#ffffff", "#121212"], ["mid", "#ffc29f", "#121212"],
                     ["macro", "#ff691e", "#121212"], ["mega", "#121212", "#e8ff76"]];
+  // HCP tiers get their own teal family, light to dark by size.
+  var HCP_SIZE_TONES = [["nano", "#c9f1ee", "#121212"], ["micro", "#7fd8d1", "#121212"], ["mid", "#2fb3a9", "#121212"],
+                        ["macro", "#12817a", "#ffffff"], ["mega", "#0b4f4b", "#ffffff"]];
   function toneOf(tier) {
     var t = String(tier).toLowerCase();
-    for (var i = 0; i < SIZE_TONES.length; i++) if (t.indexOf(SIZE_TONES[i][0]) > -1) return SIZE_TONES[i];
+    var set = /hcp/.test(t) ? HCP_SIZE_TONES : SIZE_TONES;
+    for (var i = 0; i < set.length; i++) if (t.indexOf(set[i][0]) > -1) return set[i];
     return ["x", "#8a8178", "#ffffff"];
   }
   function shareBar(n, total) {
@@ -1640,6 +1643,7 @@
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
                         tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null, clientPlatforms: b.client_platforms || {},
+                        segments: b.segments || {}, groupBy: b.group_by || "",
                         platform: b.platform || "" };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
@@ -1699,6 +1703,113 @@
         })
       : null;
     if (!controls && host) host.closest(".cat-controls").hidden = true;
+
+    // Group by: the same creators split into sections by one parameter. The
+    // admin picks how the page opens; the client can switch or turn it off.
+    var GROUP_DIMS = [["", "None"], ["segment", "Segment"], ["tier", "Creator size"], ["platform", "Platform"],
+                      ["country", "Country"], ["interest", "Interest"], ["fit", "Fit"], ["role", "Role"], ["tag", "Tags"]];
+    var NONE_LABEL = { segment: "No segment", country: "Location not specified", interest: "No interest listed",
+                       fit: "Not rated", role: "No role set", tag: "Untagged", platform: "No platform", tier: "No tier" };
+    function groupKeys(code, dim) {
+      var card = byCode[code], out = [];
+      if (!card) return out;
+      if (dim === "segment") out = (CURATED && CURATED.segments && CURATED.segments[code]) || [];
+      else if (dim === "tier") out = card.dataset.tier ? [card.dataset.tier] : [];
+      else if (dim === "platform") out = values(card.dataset.platform);
+      else if (dim === "interest") out = values(card.dataset.interest);
+      else if (dim === "fit") out = fitOf(code) ? [fitOf(code)] : [];
+      else if (dim === "role") out = rolesOf(code);
+      else if (dim === "tag") out = allTagsOf(code);
+      else if (dim === "country") {
+        values(card.dataset.city).forEach(function (v) {
+          if (/^unspecified$/i.test(v)) return;
+          var c = place(v).country;
+          if (out.indexOf(c) < 0) out.push(c);
+        });
+      }
+      return out.length ? out : [NONE_LABEL[dim]];
+    }
+    function groupHas(dim) {
+      if (!dim) return true;
+      return selected.some(function (code) { return groupKeys(code, dim)[0] !== NONE_LABEL[dim]; });
+    }
+    var groupKey = "hv-group:" + ((CURATED && CURATED.token) || selectionName);
+    var groupBy = (CURATED && CURATED.groupBy) || "";
+    try { var gb = sessionStorage.getItem(groupKey); if (gb !== null) groupBy = gb; } catch (e) {}
+    if (!groupHas(groupBy)) groupBy = "";
+    var groupSel = null;
+    if (controls) {
+      var row = document.querySelector(".cat-bar__row");
+      var sortEl = row && row.querySelector(".cat-sort");
+      var opts = GROUP_DIMS.filter(function (d) { return !d[0] || groupHas(d[0]); });
+      if (row && opts.length > 1) {
+        var lab = document.createElement("label");
+        lab.className = "cat-sort cat-group-by";
+        lab.innerHTML = '<span class="cat-sort__label">Group</span><select class="cat-sort__select" aria-label="Group creators by">' +
+          opts.map(function (d) { return '<option value="' + d[0] + '"' + (d[0] === groupBy ? " selected" : "") + ">" + d[1] + "</option>"; }).join("") +
+          "</select>" + CHEVRON + "";
+        var order = document.createElement("div");
+        order.className = "cat-bar__order";
+        if (sortEl) { row.insertBefore(order, sortEl); order.appendChild(lab); order.appendChild(sortEl); }
+        else { order.appendChild(lab); row.appendChild(order); }
+        groupSel = lab.querySelector("select");
+        groupSel.addEventListener("change", function () {
+          groupBy = groupSel.value;
+          try { sessionStorage.setItem(groupKey, groupBy); } catch (e) {}
+          render();
+        });
+      }
+    }
+    function groupOrder(dim, names, count) {
+      var fixed = dim === "tier" ? Object.keys(TIER_PRICE)
+        : dim === "fit" ? ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
+        : dim === "country" ? COUNTRY_ORDER : null;
+      return names.sort(function (a, b) {
+        var na = a === NONE_LABEL[dim], nb = b === NONE_LABEL[dim];
+        if (na !== nb) return na ? 1 : -1;
+        if (fixed) {
+          var ia = fixed.indexOf(a), ib = fixed.indexOf(b);
+          if (ia !== ib) return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        }
+        return (count[b] - count[a]) || a.localeCompare(b);
+      });
+    }
+    // Lay the visible cards out in sections. A creator in two groups shows in
+    // both (the second is a copy); clicks are handled on the grid, so copies work.
+    function layoutGroups(grid, ordered) {
+      all(".cat-group", grid).forEach(function (g) { g.remove(); });
+      grid.classList.toggle("is-grouped", !!groupBy);
+      if (!groupBy) return;
+      var members = {}, count = {};
+      ordered.forEach(function (card) {
+        if (card.hidden) return;
+        groupKeys(card.dataset.code, groupBy).forEach(function (k) {
+          (members[k] = members[k] || []).push(card);
+          count[k] = (count[k] || 0) + 1;
+        });
+      });
+      var placed = {};
+      var total = selected.length;
+      groupOrder(groupBy, Object.keys(members), count).forEach(function (k) {
+        var sec = document.createElement("section");
+        sec.className = "cat-group";
+        var pct = total ? Math.round(100 * count[k] / total) : 0;
+        var flag = groupBy === "country" && k !== NONE_LABEL.country ? flagOf(k) : "";
+        var mark = groupBy === "platform" && ICONS[k] ? '<span class="cat-places__mark ' + (BRAND[k] || "") + '">' + ICONS[k] + "</span>" : "";
+        sec.innerHTML = '<header class="cat-group__head">' + flag + mark + '<h2 class="cat-group__name">' + esc(k) + "</h2>" +
+          '<span class="cat-group__n">' + count[k] + (count[k] === 1 ? " creator" : " creators") + "</span>" +
+          '<span class="cat-group__pct">' + pct + "% of the selection</span></header>";
+        var inner = document.createElement("div");
+        inner.className = "cat-grid cat-group__grid";
+        members[k].forEach(function (card) {
+          var code = card.dataset.code;
+          if (!placed[code]) { placed[code] = true; inner.appendChild(card); }
+          else { var cp = card.cloneNode(true); cp.classList.add("cat-card--copy"); cp.removeAttribute("id"); inner.appendChild(cp); }
+        });
+        sec.appendChild(inner);
+        grid.appendChild(sec);
+      });
+    }
 
     // Where the creators in this selection are: each country with how many
     // creators, and the cities under it. A creator serving two cities counts
@@ -2149,12 +2260,36 @@
         var inp = document.createElement("input");
         inp.type = "text"; inp.className = "cat-tags__in"; inp.maxLength = 24;
         inp.placeholder = "Type a tag, press Enter"; inp.setAttribute("aria-label", "New tag");
-        box.appendChild(inp); inp.focus();
+        box.appendChild(inp);
+        // Tags already used anywhere in this selection, one click to reuse.
+        var have = allTagsOf(code).map(function (t) { return t.toLowerCase(); });
+        var pool = {};
+        selected.forEach(function (c2) { allTagsOf(c2).forEach(function (t) { if (have.indexOf(t.toLowerCase()) < 0) pool[t.toLowerCase()] = pool[t.toLowerCase()] || t; }); });
+        var picks = Object.keys(pool).map(function (k) { return pool[k]; }).sort(function (x, y) { return x.localeCompare(y); }).slice(0, 14);
+        var pickBox = null;
+        if (picks.length) {
+          pickBox = document.createElement("div");
+          pickBox.className = "cat-tags__picks";
+          pickBox.innerHTML = '<span>Reuse:</span>' + picks.map(function (t) {
+            return '<button type="button" class="cat-tag cat-tag--t' + tone(t) + '" data-tag-pick="' + esc(t) + '"><i></i>' + esc(t) + "</button>";
+          }).join("");
+          pickBox.addEventListener("mousedown", function (ev) {
+            var b = ev.target.closest("[data-tag-pick]");
+            if (!b) return;
+            ev.preventDefault(); ev.stopPropagation();
+            inp.value = b.getAttribute("data-tag-pick");
+            commit(true);
+          });
+          pickBox.addEventListener("click", function (ev) { ev.stopPropagation(); });
+          box.appendChild(pickBox);
+        }
+        inp.focus();
         var done = false;
         function commit(keep) {
           if (done) return; done = true;
           var v = inp.value.replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
           inp.remove();
+          if (pickBox) pickBox.remove();
           if (keep && v && !allTagsOf(code).some(function (t) { return t.toLowerCase() === v.toLowerCase(); })) {
             saveMine(code, mineOf(code).concat([v]));
           } else render();
@@ -2180,9 +2315,10 @@
       // the client picked.
       var grid = $("cat-grid");
       var inOrder = selected.map(function (code) { return byCode[code]; }).filter(Boolean);
-      (controls ? controls.order(inOrder) : inOrder).forEach(function (card) {
-        grid.appendChild(card);
-      });
+      var ordered = controls ? controls.order(inOrder) : inOrder;
+      cards.forEach(function (card) { grid.appendChild(card); });   // back out of any sections first
+      ordered.forEach(function (card) { grid.appendChild(card); });
+      layoutGroups(grid, ordered);
 
       $("sel-title").textContent = selectionName;
       document.title = selectionName + " — HelloVoice";

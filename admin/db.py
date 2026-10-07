@@ -479,6 +479,13 @@ def migrate(conn):
     if "client_platforms" not in sel_cols:
         # The same, as the client chose it on their own page.
         conn.execute("ALTER TABLE selections ADD COLUMN client_platforms TEXT")
+    if "segments" not in sel_cols:
+        # {code: [segment, ...]}: the admin's own groups for THIS selection (a product,
+        # a wave, an objective); the client page can show the creators split by them.
+        conn.execute("ALTER TABLE selections ADD COLUMN segments TEXT")
+    if "group_by" not in sel_cols:
+        # How the client page opens: "" (one grid) or a grouping such as "segment" or "tier".
+        conn.execute("ALTER TABLE selections ADD COLUMN group_by TEXT")
     if "client_name" not in sel_cols:
         # The client name shown on THIS selection's page; empty = the client's own label.
         conn.execute("ALTER TABLE selections ADD COLUMN client_name TEXT")
@@ -1693,7 +1700,7 @@ def selection(sid=None, token=None):
 
 def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
                    code_id=None, platform=None, margin=None, costs=None, margin_max=False,
-                   tags=None, verdicts=None, platforms=None):
+                   tags=None, verdicts=None, platforms=None, segments=None):
     """Create (sid None) or update one priced selection. Returns its id.
 
     margin and costs are left as they are when not given, so a client
@@ -1728,6 +1735,8 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
             conn.execute("UPDATE selections SET verdicts=? WHERE id=?", (json.dumps(verdicts), sid))
         if platforms is not None:
             conn.execute("UPDATE selections SET platforms=? WHERE id=?", (json.dumps(platforms), sid))
+        if segments is not None:
+            conn.execute("UPDATE selections SET segments=? WHERE id=?", (json.dumps(segments), sid))
         return sid
 
 
@@ -1742,6 +1751,14 @@ def set_archived(table, rid, on):
 def set_selection_objective(sid, objective):
     with connect() as conn:
         conn.execute("UPDATE selections SET objective = ? WHERE id = ?", (objective, sid))
+
+
+GROUPS = [("", "Not grouped"), ("segment", "Segment"), ("tier", "Creator size"), ("platform", "Platform"), ("country", "Country"), ("interest", "Interest"), ("fit", "Fit"), ("role", "Role"), ("tag", "Tags")]
+
+
+def set_selection_group(sid, group_by):
+    with connect() as conn:
+        conn.execute("UPDATE selections SET group_by = ? WHERE id = ?", (group_by or None, sid))
 
 
 def set_selection_client(sid, code_id, client_name):

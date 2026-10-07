@@ -1765,7 +1765,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/selections/edit?id=%d" % sid)
 
     def post_selection_save(self):
-        f = self.form_body(multi=("code", "vcode", "p_from", "p_to", "cost", "tags", "fit", "roles", "reason", "drop", "default", "t_category", "plat_assign"))
+        f = self.form_body(multi=("code", "vcode", "p_from", "p_to", "cost", "tags", "segs", "fit", "roles", "reason", "drop", "default", "t_category", "plat_assign"))
         sid = (f.get("id") or "").strip()
         sel = db.selection(int(sid)) if sid.isdigit() else None
         if sel is None:
@@ -1813,6 +1813,18 @@ class Handler(BaseHTTPRequestHandler):
                     seen_t.add(t.lower()); mine.append(t)
             if mine:
                 tags[code_.strip().upper()] = mine
+        seg_in = f.get("segs") or []
+        seg_in = [seg_in] if isinstance(seg_in, str) else list(seg_in)
+        seg_in = seg_in + [""] * (len(vc) - len(seg_in))
+        segments = {}
+        for code_, raw in zip(vc, seg_in):
+            seen_s, mine = set(), []
+            for t in re.split(r"[,;\n]+", raw or ""):
+                t = re.sub(r"\s+", " ", t).strip()[:40]
+                if t and t.lower() not in seen_s and len(mine) < 6:
+                    seen_s.add(t.lower()); mine.append(t)
+            if mine:
+                segments[code_.strip().upper()] = mine
         import fit as fit_mod
         n_rows = len(vc)
         lists = {}
@@ -1902,7 +1914,10 @@ class Handler(BaseHTTPRequestHandler):
                           margin=margin, costs=costs, margin_max=margin_max,
                           tags={k: v for k, v in tags.items() if k in codes},
                           verdicts={k: v for k, v in verdicts.items() if k in codes},
-                          platforms={k: v for k, v in platforms_map.items() if k in codes})
+                          platforms={k: v for k, v in platforms_map.items() if k in codes},
+                          segments=({k: v for k, v in segments.items() if k in codes} if "segs" in f else None))
+        if "sel_group" in f and (f.get("sel_group") or "") in dict(db.GROUPS):
+            db.set_selection_group(sel["id"], f.get("sel_group") or "")
         # A price typed here belongs to THIS selection. Only the ones ticked
         # "make default" also become the creator's price on the roster, so a
         # one-off deal does not silently change what every later selection
@@ -3453,6 +3468,8 @@ class Handler(BaseHTTPRequestHandler):
                                     "prices": prices, "total": total,
                                     "platform": platform,
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
+                                    "segments": {k: v for k, v in json.loads((sel["segments"] if "segments" in sel.keys() else None) or "{}").items() if k in by and k in codes},
+                                    "group_by": (sel["group_by"] if "group_by" in sel.keys() else None) or "",
                                     "brief": {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
                                               "client": ((sel["client_name"] if "client_name" in sel.keys() else None)
                                                          or ((db.get_code(sel["code_id"]) or {"label": ""})["label"] if sel["code_id"] else ""))},

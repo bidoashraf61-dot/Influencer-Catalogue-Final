@@ -2128,7 +2128,7 @@ def _live_score(live):
                if live.get("checks") else "") + "</div></div>")
 
 
-def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None, assigned="", client_pick=""):
+def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None, assigned="", client_pick="", segs=()):
     """One creator on the Fit & tags tab: who they are on the left, then the
     fit, the roles, the reason the client reads, and their tags, with room to type."""
     fits = "<option value=''>— no verdict —</option>" + "".join(
@@ -2152,6 +2152,8 @@ def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=(), live=None, assign
             "placeholder='e.g. Strong engagement and a mostly Saudi audience' autocomplete='off'>"
             "<label>Tags</label>"
             "<input name='tags' class='tag-in' value=\"" + e(", ".join(tags)) + "\" placeholder='e.g. Hero, Beauty — separate with commas' maxlength='200' autocomplete='off'>"
+            "<label>Segments</label>"
+            "<input name='segs' list='seg-list' value=\"" + e(", ".join(segs)) + "\" placeholder='e.g. Sunscreen, Wave 1 — the client page can group by these' maxlength='240' autocomplete='off'>"
             + ("<div class='muted' style='margin-top:8px'>Added by the client: "
                + " ".join("<span class='pill'>" + e(t) + "</span>" for t in client_tags) + "</div>" if client_tags else "")
             + "</div></div>")
@@ -2231,6 +2233,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     tags_of = json.loads((sel["tags"] if "tags" in keys else None) or "{}")
     verdicts_of = json.loads((sel["verdicts"] if "verdicts" in keys else None) or "{}")
     client_tags_of = json.loads((sel["client_tags"] if "client_tags" in keys else None) or "{}")
+    segs_of = json.loads((sel["segments"] if "segments" in keys else None) or "{}")
+    seg_names = sorted({s_ for v_ in segs_of.values() for s_ in v_}, key=str.lower)
     plat_assign_of = json.loads((sel["platforms"] if "platforms" in keys else None) or "{}")
     client_plat_of = json.loads((sel["client_platforms"] if "client_platforms" in keys else None) or "{}")
     import fit as _fit
@@ -2265,7 +2269,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
                 if c["photo"] else "<span class='thumb sm none'>—</span>")
         fit_cards_l.append(_fit_card(code, c, shot, verdicts_of.get(code) or {}, tags_of.get(code) or [], _fit, client_tags_of.get(code) or [], (scores or {}).get(code),
-                                     assigned=plat_assign_of.get(code, ""), client_pick=client_plat_of.get(code, "")))
+                                     assigned=plat_assign_of.get(code, ""), client_pick=client_plat_of.get(code, ""), segs=segs_of.get(code) or []))
         val = lambda i: format(conv(set_[i]), ",") if set_ else ""
         # The cost this selection was priced from, else the creator's last
         # known cost — a starting point the admin can change.
@@ -2311,7 +2315,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
                                ("Set prices", "done" if st_done[1] else ("now" if first_open == 1 else "todo")),
                                ("Share with the client", "done" if st_done[2] else ("now" if first_open == 2 else "todo")),
                                ("Start a campaign", "done" if st_done[3] else ("now" if first_open == 3 else "todo"))])
-    roster_list = "<datalist id='roster-list'>" + "".join(
+    roster_list = "<datalist id='seg-list'>" + "".join("<option value=\"%s\">" % e(n_) for n_ in seg_names) + "</datalist>" + "<datalist id='roster-list'>" + "".join(
         "<option value=\"%s (%s)\">" % (e(c["name"]), e(c["code"])) for c in creators if c["active"]) + "</datalist>"
     shown_client = (sel["client_name"] if "client_name" in sel.keys() else None) or ""
     client_pill = ("<span class='pill own'>" + e(shown_client or sel["code_label"]) + "</span>" if ("code_label" in sel.keys() and sel["code_label"]) or shown_client
@@ -2425,6 +2429,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "<div class='row'><div><label>Client (access code)</label><select name='sel_client'><option value=''>No client</option>"
         + "".join("<option value='%d'%s>%s</option>" % (c["id"], " selected" if c["id"] == sel["code_id"] else "", e(c["label"])) for c in access_codes)
         + "</select><div class='price-hint'>Whose passcode opens this selection. Changing it moves the selection to that client.</div></div>"
+        + "<div><label>Client page opens grouped by</label><select name='sel_group'>"
+        + "".join("<option value='%s'%s>%s</option>" % (k_, " selected" if ((sel["group_by"] if "group_by" in keys else None) or "") == k_ else "", l_)
+                  for k_, l_ in _db.GROUPS)
+        + "</select><div class='price-hint'>The client can switch it or turn it off. Segments are set per creator on the Fit &amp; tags tab.</div></div>"
         + "<div style='flex:2'><label>Client name shown on the page</label><input name='client_name' maxlength='80' value='" + e(shown_client)
         + "' placeholder='Leave empty to use the client&#39;s own name'><div class='price-hint'>Shown as &ldquo;for &hellip;&rdquo; in the selection banner. "
           "Changes only this selection.</div></div></div>"
