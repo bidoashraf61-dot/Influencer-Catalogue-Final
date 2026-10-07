@@ -2086,44 +2086,68 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
     return page("Selections", body, "/selections")
 
 
-def _verdict_cell(v, fit_mod):
-    """One creator's fit and role in the selection editor: ready-made words,
-    plus a line of reasons the client reads."""
+def _fit_card(code, c, shot, v, tags, fit_mod, client_tags=()):
+    """One creator on the Fit & tags tab: who they are on the left, then the
+    fit, the roles, the reason the client reads, and their tags, with room to type."""
     fits = "<option value=''>— no verdict —</option>" + "".join(
         "<option" + (" selected" if v.get("fit") == f else "") + ">" + e(f) + "</option>" for f in fit_mod.FITS)
     roles = v.get("roles") or []
-    ticks = "".join("<label class='tick vd-role'><input type='checkbox' value=\"" + e(r) + "\"" + (" checked" if r in roles else "")
+    ticks = "".join("<label class='vd-role'><input type='checkbox' value=\"" + e(r) + "\"" + (" checked" if r in roles else "")
                     + "> <span>" + e(r) + "</span></label>" for r in fit_mod.ROLES)
-    return ("<select name='fit' class='vd-fit'>" + fits + "</select>"
-            "<div class='vd-roles'>" + ticks + "</div>"
+    return ("<div class='vd-item'><input type='hidden' name='vcode' value=\"" + e(code) + "\">"
+            "<div class='vd-who'>" + shot + "<div><b>" + e(c["name"]) + "</b><div class='muted'><code>" + e(code) + "</code> · " + e(c["tier"] or "") + "</div>"
+            "<button type='button' class='btn tiny ghost vd-suggest'>Suggest from analysis</button><div class='muted vd-note'></div></div></div>"
+            "<div class='vd-main'>"
+            "<div class='vd-line'><div><label>Fit</label><select name='fit' class='vd-fit'>" + fits + "</select></div>"
+            "<div><label>Role in the campaign</label><div class='vd-roles'>" + ticks + "</div></div></div>"
             "<input type='hidden' name='roles' class='vd-roles-in' value=\"" + e(",".join(roles)) + "\">"
+            "<label>Why — the client reads this</label>"
             "<input name='reason' class='vd-reason' value=\"" + e(v.get("reason") or "") + "\" maxlength='160' "
-            "placeholder='Why — the client reads this' autocomplete='off'>"
-            "<button type='button' class='btn tiny ghost vd-suggest'>Suggest</button> <span class='muted vd-note'></span>")
+            "placeholder='e.g. Strong engagement and a mostly Saudi audience' autocomplete='off'>"
+            "<label>Tags</label>"
+            "<input name='tags' class='tag-in' value=\"" + e(", ".join(tags)) + "\" placeholder='e.g. Hero, Beauty — separate with commas' maxlength='200' autocomplete='off'>"
+            + ("<div class='muted' style='margin-top:8px'>Added by the client: "
+               + " ".join("<span class='pill'>" + e(t) + "</span>" for t in client_tags) + "</div>" if client_tags else "")
+            + "</div></div>")
 
 
-VERDICT_JS = r'''<style>.vd{min-width:230px}.vd select,.vd input[name=reason]{width:100%;margin:2px 0}.vd-roles{display:flex;flex-wrap:wrap;gap:2px 8px}
-.vd-role{padding:2px 4px;min-height:0;font-size:12px}.vd-bar{margin:14px 0 4px}</style>
+VERDICT_JS = r'''<style>
+.vd-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:6px 0 10px}
+.vd-list{display:grid;gap:14px;margin-top:12px}
+.vd-item{display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:20px;padding:16px;border:1px solid var(--line,#e6e1d6);border-radius:14px;background:#fff}
+.vd-who{display:flex;gap:12px;align-items:flex-start}.vd-who .btn{margin-top:8px}
+.vd-main label{display:block;margin:10px 0 4px;font-size:13px;font-weight:600}
+.vd-main select,.vd-main input[type=text],.vd-main input:not([type]){width:100%}
+.vd-line{display:grid;grid-template-columns:minmax(180px,240px) 1fr;gap:16px;align-items:start}
+.vd-line label{margin-top:0}
+.vd-roles{display:flex;flex-wrap:wrap;gap:8px}
+.vd-role{display:inline-flex!important;align-items:center;gap:6px;margin:0!important;padding:7px 14px;border:1px solid var(--line-strong,#cfc8b8);border-radius:999px;cursor:pointer;font-size:13px!important;font-weight:600}
+.vd-role:has(input:checked){background:var(--ink,#121212);color:#e8ff76;border-color:var(--ink,#121212)}
+.vd-role input{margin:0}
+.vd-note{font-size:12px;margin-top:6px}
+@media (max-width:1200px){.vd-line{grid-template-columns:1fr}}
+@media (max-width:900px){.vd-item{grid-template-columns:1fr}}
+</style>
 <script>(function(){var base=%BASE%;
-function row(el){return el.closest('tr')}
+function row(el){return el.closest('.vd-item')}
 function syncRoles(tr){var v=[].slice.call(tr.querySelectorAll('.vd-role input:checked')).map(function(i){return i.value});tr.querySelector('.vd-roles-in').value=v.join(',')}
-document.addEventListener('change',function(e){var tr=e.target.closest&&e.target.closest('tr');if(tr&&e.target.closest('.vd-role'))syncRoles(tr)});
-function suggest(tr,done){var code=tr.querySelector('input[name=code]').value;var p=document.querySelector('select[name=platform]');p=p?p.value:'';
- var note=tr.querySelector('.vd-note');note.textContent='…';
+document.addEventListener('change',function(e){var tr=e.target.closest&&e.target.closest('.vd-item');if(tr&&e.target.closest('.vd-role'))syncRoles(tr)});
+function suggest(tr,done){var code=tr.querySelector('input[name=vcode]').value;var p=document.querySelector('select[name=platform]');p=p?p.value:'';
+ var note=tr.querySelector('.vd-note');note.textContent='Reading the analysis…';
  fetch(base+'/selections/suggest?code='+encodeURIComponent(code)+'&p='+encodeURIComponent(p),{credentials:'same-origin'}).then(function(r){return r.json()}).then(function(d){
   if(d.fit!==undefined){var sel=tr.querySelector('.vd-fit');if(d.fit)sel.value=d.fit;
    tr.querySelectorAll('.vd-role input').forEach(function(i){i.checked=(d.roles||[]).indexOf(i.value)>=0});syncRoles(tr);
    if(d.reason)tr.querySelector('.vd-reason').value=d.reason}
-  note.textContent=d.note||('from '+d.platform+' analysis');if(done)done()}).catch(function(){note.textContent='could not suggest';if(done)done()})}
+  note.textContent=d.note||('Suggested from the '+d.platform+' analysis — check it, then Save changes.');if(done)done()}).catch(function(){note.textContent='Could not suggest.';if(done)done()})}
 document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.vd-suggest');if(b){suggest(row(b))}});
-var all=document.getElementById('vd-all');if(all)all.onclick=function(){var rows=[].slice.call(document.querySelectorAll('.sel-table tbody tr')).filter(function(t){return t.querySelector('.vd-fit')});
- var i=0;(function next(){if(i>=rows.length)return;suggest(rows[i++],next)})()}})();</script>'''.replace('%BASE%', 'document.querySelector("form[action$=\'/selections/save\']").getAttribute("action").replace(/\\/selections\\/save$/,"")')
+var all=document.getElementById('vd-all');if(all)all.onclick=function(){var rows=[].slice.call(document.querySelectorAll('.vd-item'));
+ var i=0;(function next(){if(i>=rows.length)return;suggest(rows[i++],next)})()}})();</script>'''.replace("%BASE%", """document.querySelector("form[action$='/selections/save']").getAttribute("action").replace(/\/selections\/save$/,"")""")
 
 
 TAG_JS = r'''<script>(function(){var pool=document.getElementById('tag-pool');if(!pool)return;var last=null;
 function esc(t){return String(t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
 function all(){var s={};document.querySelectorAll('.tag-in').forEach(function(i){i.value.split(/[,;]+/).forEach(function(t){t=t.trim();if(t)s[t.toLowerCase()]=t})});return Object.keys(s).map(function(k){return s[k]}).sort()}
-function draw(){var t=all();pool.innerHTML=t.length?'Tags in use: '+t.map(function(x){return '<a href="#" class="pill" data-t="'+esc(x)+'">'+esc(x)+'</a>'}).join(' '):'No tags yet — type some in the Tags column.'}
+function draw(){var t=all();pool.innerHTML=t.length?'Tags in use: '+t.map(function(x){return '<a href="#" class="pill" data-t="'+esc(x)+'">'+esc(x)+'</a>'}).join(' '):'No tags yet — type some in a Tags box.'}
 document.addEventListener('focusin',function(e){if(e.target.classList&&e.target.classList.contains('tag-in'))last=e.target});
 document.addEventListener('input',function(e){if(e.target.classList&&e.target.classList.contains('tag-in'))draw()});
 pool.addEventListener('click',function(e){var a=e.target.closest('a[data-t]');if(!a)return;e.preventDefault();if(!last)return;
@@ -2149,6 +2173,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     costs = json.loads((sel["costs"] if "costs" in keys else None) or "{}")
     tags_of = json.loads((sel["tags"] if "tags" in keys else None) or "{}")
     verdicts_of = json.loads((sel["verdicts"] if "verdicts" in keys else None) or "{}")
+    client_tags_of = json.loads((sel["client_tags"] if "client_tags" in keys else None) or "{}")
     import fit as _fit
     margin = sel["margin"] if "margin" in keys else None
     margin_txt = "" if margin is None else ("%g" % margin)
@@ -2162,6 +2187,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
 
     lo_sum = hi_sum = 0
     rows = []
+    fit_cards_l = []
     for code in codes:
         c = by.get(code)
         if c is None:
@@ -2173,6 +2199,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
             lo_sum += eff[0]; hi_sum += eff[1]
         shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
                 if c["photo"] else "<span class='thumb sm none'>—</span>")
+        fit_cards_l.append(_fit_card(code, c, shot, verdicts_of.get(code) or {}, tags_of.get(code) or [], _fit, client_tags_of.get(code) or []))
         val = lambda i: format(conv(set_[i]), ",") if set_ else ""
         # The cost this selection was priced from, else the creator's last
         # known cost — a starting point the admin can change.
@@ -2202,10 +2229,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
               "<input type='checkbox' name='default' value='" + e(code) + "'> make default</label>"
             + ("<div class='muted' style='font-size:12px'>roster now: " + money_c(c["price_from"], c["price_to"] or c["price_from"]) + "</div>"
                if ("price_from" in c.keys() and c["price_from"]) else "<div class='muted' style='font-size:12px'>roster: tier price</div>") + "</td>"
-            + "<td class='vd'>" + _verdict_cell(verdicts_of.get(code) or {}, _fit) + "</td>"
-            + "<td><input name='tags' class='tag-in' value='" + e(", ".join(tags_of.get(code) or [])) + "' placeholder='e.g. Hero, Beauty' maxlength='200' autocomplete='off'></td>"
+            + ""
             + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code) + "'> remove</label></td></tr>")
-    table = "".join(rows) or "<tr><td colspan='10' class='muted'>No creators yet — add some below.</td></tr>"
+    table = "".join(rows) or "<tr><td colspan='8' class='muted'>No creators yet — add some below.</td></tr>"
+    fit_cards = "".join(fit_cards_l) or "<p class='muted'>No creators yet — add some on the Creators &amp; prices tab.</p>"
     missing = [c for c in codes if c not in by]
     link = selection_link(sel, origin)
     tf = "" if sel["total_from"] is None else format(conv(sel["total_from"]), ",")
@@ -2244,7 +2271,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
                     crumbs=[("Selections", u("/selections")), (sel["name"], None)],
                     actions="<button type='button' class='btn lime' data-go-tab='st:share'>" + ui.icon("send", 16) + " Share</button>")
         + note + stepper_html
-        + "<div data-tabs='st'>" + ui.tab_nav("st", [("creators", "Creators & prices", n_cr), ("details", "Details", None),
+        + "<div data-tabs='st'>" + ui.tab_nav("st", [("creators", "Creators & prices", n_cr), ("fit", "Fit & tags", (sum(1 for v in verdicts_of.values() if v) or None)), ("details", "Details", None),
                                                     ("share", "Share", None), ("campaign", "Campaign", len(campaigns) or None)])
         + "<form method='post' action='" + u("/selections/save") + "' enctype='multipart/form-data'>"
         + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
@@ -2263,16 +2290,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
           "</div>"
         + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
-          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th>Fit &amp; role (client sees)</th><th>Tags (client sees)</th><th></th>"
+          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th></th>"
           "</tr></thead><tbody>"
         + table + "</tbody></table>"
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
-        + "<div class='vd-bar'><button type='button' class='btn small ghost' id='vd-all'>Suggest fit &amp; role for everyone</button> "
-          "<span class='muted'>Reads each creator's analysis (for the platform this selection is quoted for, else their own) and fills in a suggestion with the numbers behind it. "
-          "Nothing is shown to the client until you save, and you can change every word.</span></div>"
-        + "<div class='price-hint' id='tag-pool' data-pool='" + e(json.dumps(sorted({t for v in tags_of.values() for t in v}, key=str.lower))) + "'></div>"
-        + "<p class='price-hint'><b>Tags</b> are your own labels for this selection only (Hero, Beauty, Backup…). Separate them with commas. "
-          "The client sees them on each card and can filter the selection by tag. Click a tag above to add it to the last box you were typing in.</p>"
         + "<p class='price-hint'>Type a creator's cost and their price is worked out from the "
           "margin above. With no cost, type the price yourself, or leave it empty to use the "
           "creator's standard price. One figure = a fixed price. The client never sees a price "
@@ -2285,6 +2306,17 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<input name='add' list='roster-list' placeholder='Type a creator\'s name or code…' autocomplete='off'>"
           "<div class='price-hint'>Pick from the list, or paste several codes separated by commas.</div></div></div>"
                 + "</div></div>"
+        + "<div class='panel' data-panel='fit' hidden><div class='card'><div class='hd'><h2>Fit &amp; tags</h2></div>"
+          "<p class='sec-desc'>Tell the client whether each creator suits this campaign, and what part they play. "
+          "The client sees the fit, the roles, your reason and the tags on each creator's card, and can filter the selection by them. "
+          "Everything here belongs to this selection only.</p>"
+          "<div class='vd-bar'><button type='button' class='btn small' id='vd-all'>Suggest fit &amp; role for everyone</button> "
+          "<span class='muted'>Reads each creator's analysis (for the platform this selection is quoted for, else their own) and fills in a suggestion with the numbers behind it. "
+          "Nothing is shown to the client until you save, and you can change every word.</span></div>"
+          "<div class='price-hint' id='tag-pool' data-pool='" + e(json.dumps(sorted({t for v in tags_of.values() for t in v}, key=str.lower))) + "'></div>"
+          "<div class='vd-list'>" + fit_cards + "</div>"
+          "<p class='price-hint'>Tags are your own labels (Hero, Beauty, Backup…), separated by commas. Click a tag in <i>Tags in use</i> to add it to the box you last typed in. "
+          "Remember to press <b>Save changes</b> below.</p></div></div>"
         + "<div class='panel' data-panel='details' hidden><div class='card'><div class='hd'><h2>Details</h2></div>"
           "<p class='sec-desc'>What the client sees, which platform is priced, the currency and the total.</p>"
 + "<div class='row'><div style='flex:2'><label>Selection name (the client sees this)</label>"

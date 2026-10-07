@@ -1207,3 +1207,12 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-tagbar__label { min-width: 52px; }
 .cat-tagbar button.fit-no[aria-pressed="false"] { border-color: var(--vivid-red); color: var(--vivid-red); }
 .cat-tagbar button.fit-good[aria-pressed="false"] { border-color: var(--go); color: var(--go); }
+
+
+/* The client's own tags on a selection card: removable, with an add button. */
+.cat-tag--mine { background: transparent; border: 1px solid var(--ink); display: inline-flex; align-items: center; gap: 4px; padding-right: 4px; }
+.cat-tag--mine button { border: 0; background: transparent; color: inherit; font-size: 15px; line-height: 1; cursor: pointer; padding: 0 4px; border-radius: 50%; }
+.cat-tag--mine button:hover { background: var(--ink); color: var(--lime); }
+.cat-tag--add { border: 1px dashed var(--ink); background: transparent; cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; }
+.cat-tag--add:hover { background: var(--lime); }
+.cat-tags__in { font: inherit; font-size: 13px; padding: 4px 12px; border: 1px solid var(--ink); border-radius: 999px; min-width: 150px; outline-offset: 2px; }

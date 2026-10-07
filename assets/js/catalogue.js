@@ -1538,7 +1538,7 @@
             if (b.currency && FX[b.currency]) CURRENCY = b.currency;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
-                        tags: b.tags || {}, verdicts: b.verdicts || {},
+                        tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {},
                         platform: b.platform || "" };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
@@ -1700,6 +1700,39 @@
       var t = CURATED && CURATED.tags && CURATED.tags[code];
       return t && t.length ? t : [];
     }
+    // Labels the client puts on creators themselves. Kept on the server with the
+    // selection when it has a link of its own; otherwise only in this browser.
+    var MINE_KEY = "hv-mytags:" + ((CURATED && CURATED.token) || selectionName);
+    var LOCAL_MINE = {};
+    try { LOCAL_MINE = JSON.parse(localStorage.getItem(MINE_KEY) || "{}") || {}; } catch (e) { LOCAL_MINE = {}; }
+    function mineOf(code) {
+      var t = CURATED && CURATED.token ? (CURATED.clientTags || {})[code] : LOCAL_MINE[code];
+      return t && t.length ? t : [];
+    }
+    function allTagsOf(code) {
+      var out = tagsOf(code).slice();
+      mineOf(code).forEach(function (t) {
+        if (!out.some(function (x) { return x.toLowerCase() === t.toLowerCase(); })) out.push(t);
+      });
+      return out;
+    }
+    function saveMine(code, tags) {
+      tags = tags.slice(0, 8);
+      if (CURATED && CURATED.token) {
+        CURATED.clientTags = CURATED.clientTags || {};
+        if (tags.length) CURATED.clientTags[code] = tags; else delete CURATED.clientTags[code];
+        fetch(CFG.api + "/api/selection/tags", { method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: CURATED.token, code: code, tags: tags }) })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (b) { if (b && b.ok) { CURATED.clientTags = b.client_tags || CURATED.clientTags; render(); } })
+          .catch(function () { /* the tags stay on screen; they are saved next time */ });
+      } else {
+        if (tags.length) LOCAL_MINE[code] = tags; else delete LOCAL_MINE[code];
+        try { localStorage.setItem(MINE_KEY, JSON.stringify(LOCAL_MINE)); } catch (e) { /* private mode */ }
+      }
+      render();
+    }
     function verdictOf(code) {
       var v = CURATED && CURATED.verdicts && CURATED.verdicts[code];
       return v || null;
@@ -1707,7 +1740,7 @@
     function rolesOf(code) { var v = verdictOf(code); return v && v.roles ? v.roles : []; }
     function fitOf(code) { var v = verdictOf(code); return v && v.fit ? v.fit : ""; }
     function matchesLabels(code) {
-      return (!activeTag || tagsOf(code).indexOf(activeTag) !== -1) &&
+      return (!activeTag || allTagsOf(code).indexOf(activeTag) !== -1) &&
              (!activeFit || fitOf(code) === activeFit) &&
              (!activeRole || rolesOf(code).indexOf(activeRole) !== -1);
     }
@@ -1723,7 +1756,7 @@
     function renderTags() {
       var tagN = {}, tagOrder = [], fitN = {}, roleN = {};
       selected.forEach(function (code) {
-        tagsOf(code).forEach(function (t) {
+        allTagsOf(code).forEach(function (t) {
           if (!tagN[t]) { tagN[t] = 0; tagOrder.push(t); }
           tagN[t]++;
         });
@@ -1754,16 +1787,24 @@
             (v.reason ? '<p class="cat-verdict__why">' + esc(v.reason) + "</p>" : "");
         }
         var tbox = c.querySelector(".cat-tags");
-        if (!mine.length) { if (tbox) tbox.remove(); return; }
+        var mt = mineOf(c.dataset.code);
+        var typing = c.querySelector(".cat-tags__in");
+        // One strip: the admin's labels, then the client's own (removable), then the add button.
         if (!tbox) {
           tbox = document.createElement("div");
           tbox.className = "cat-tags";
+          tbox.setAttribute("data-noselect", "");
           var vb = c.querySelector(".cat-verdict");
           if (vb) vb.insertAdjacentElement("afterend", tbox); else body.insertBefore(tbox, body.firstChild);
         }
-        tbox.innerHTML = mine.map(function (t) {
-          return '<span class="cat-tag">' + esc(t) + "</span>";
-        }).join("");
+        if (!typing) {
+          tbox.innerHTML = mine.map(function (t) {
+            return '<span class="cat-tag">' + esc(t) + "</span>";
+          }).join("") + mt.map(function (t) {
+            return '<span class="cat-tag cat-tag--mine">' + esc(t) + '<button type="button" data-tag-x="' + esc(t) +
+              '" aria-label="Remove tag ' + esc(t) + '">&times;</button></span>';
+          }).join("") + (mt.length < 8 ? '<button type="button" class="cat-tag cat-tag--add" data-tag-add>+ Tag</button>' : "");
+        }
       });
       var bar = $("sel-tags");
       var fits = ["Strong fit", "Good fit", "Possible fit", "Not recommended"].filter(function (f) { return fitN[f]; });
@@ -1790,6 +1831,42 @@
         barGroup("Role", "role", roles, roleN, activeRole) +
         barGroup("Tags", "tag", tagOrder, tagN, activeTag);
     }
+
+    $("cat-grid").addEventListener("click", function (e) {
+      var card = e.target.closest && e.target.closest(".cat-card");
+      if (!card) return;
+      var code = card.dataset.code;
+      var x = e.target.closest("[data-tag-x]");
+      if (x) {
+        e.preventDefault(); e.stopPropagation();
+        var gone = x.getAttribute("data-tag-x");
+        saveMine(code, mineOf(code).filter(function (t) { return t !== gone; }));
+        return;
+      }
+      if (e.target.closest("[data-tag-add]")) {
+        e.preventDefault(); e.stopPropagation();
+        var box = card.querySelector(".cat-tags");
+        box.querySelector("[data-tag-add]").remove();
+        var inp = document.createElement("input");
+        inp.type = "text"; inp.className = "cat-tags__in"; inp.maxLength = 24;
+        inp.placeholder = "Type a tag, press Enter"; inp.setAttribute("aria-label", "New tag");
+        box.appendChild(inp); inp.focus();
+        var done = false;
+        function commit(keep) {
+          if (done) return; done = true;
+          var v = inp.value.replace(/[<>]/g, "").replace(/\s+/g, " ").trim();
+          inp.remove();
+          if (keep && v && !allTagsOf(code).some(function (t) { return t.toLowerCase() === v.toLowerCase(); })) {
+            saveMine(code, mineOf(code).concat([v]));
+          } else render();
+        }
+        inp.addEventListener("keydown", function (ev) {
+          if (ev.key === "Enter") { ev.preventDefault(); commit(true); }
+          else if (ev.key === "Escape") { commit(false); }
+        });
+        inp.addEventListener("blur", function () { commit(true); });
+      }
+    }, true);
 
     function render() {
       renderTags();

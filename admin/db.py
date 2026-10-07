@@ -460,6 +460,11 @@ def migrate(conn):
         # Archived = out of the Clients list, nothing else: the code still
         # works until it is revoked.
         conn.execute("ALTER TABLE codes ADD COLUMN archived_at INTEGER")
+    if "client_tags" not in sel_cols:
+        # {code: [tag, ...]}: labels the client themselves put on creators of THIS
+        # selection from its page. Kept apart from `tags` so an admin saving the
+        # selection never overwrites them.
+        conn.execute("ALTER TABLE selections ADD COLUMN client_tags TEXT")
     if "verdicts" not in sel_cols:
         # {code: {"fit": ..., "roles": [...], "reason": ...}}: the admin's fit and
         # campaign-role call on each creator of THIS selection, shown to the client.
@@ -1713,6 +1718,22 @@ def set_archived(table, rid, on):
     assert table in ("codes", "selections")
     with connect() as conn:
         conn.execute("UPDATE %s SET archived_at = ? WHERE id = ?" % table, (now() if on else None, rid))
+
+
+def set_client_tags(sid, code, tags):
+    """Replace the tags the client put on one creator of a selection."""
+    with connect() as conn:
+        row = conn.execute("SELECT client_tags FROM selections WHERE id = ?", (sid,)).fetchone()
+        try:
+            cur = json.loads(row["client_tags"] or "{}") if row else {}
+        except ValueError:
+            cur = {}
+        if tags:
+            cur[code] = tags
+        else:
+            cur.pop(code, None)
+        conn.execute("UPDATE selections SET client_tags = ? WHERE id = ?", (json.dumps(cur), sid))
+        return cur
 
 
 def set_selection_currency(sid, currency):

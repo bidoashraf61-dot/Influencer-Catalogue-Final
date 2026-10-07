@@ -672,6 +672,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.api_request()
         if path == "/api/event":
             return self.api_event()
+        if path == "/api/selection/tags":
+            return self.api_selection_tags()
         if path == "/api/selection":
             return self.api_selection_save()
         if path == "/api/creator/request":
@@ -1727,7 +1729,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/selections/edit?id=%d" % sid)
 
     def post_selection_save(self):
-        f = self.form_body(multi=("code", "p_from", "p_to", "cost", "tags", "fit", "roles", "reason", "drop", "default"))
+        f = self.form_body(multi=("code", "vcode", "p_from", "p_to", "cost", "tags", "fit", "roles", "reason", "drop", "default"))
         sid = (f.get("id") or "").strip()
         sel = db.selection(int(sid)) if sid.isdigit() else None
         if sel is None:
@@ -1759,11 +1761,15 @@ class Handler(BaseHTTPRequestHandler):
         rows = zip(f.get("code") or [], f.get("p_from") or [], f.get("p_to") or [],
                    cost_in + [""] * (len(f.get("code") or []) - len(cost_in)))
         remove = set(f.get("drop") or [])
+        # The Fit & tags tab has its own row per creator (vcode), so its lists
+        # line up with each other whatever the pricing table holds.
+        vc = f.get("vcode") or f.get("code") or []
+        vc = [vc] if isinstance(vc, str) else list(vc)
         tag_in = f.get("tags") or []
         tag_in = [tag_in] if isinstance(tag_in, str) else list(tag_in)
-        tag_in = tag_in + [""] * (len(f.get("code") or []) - len(tag_in))
+        tag_in = tag_in + [""] * (len(vc) - len(tag_in))
         tags = {}
-        for code_, raw in zip(f.get("code") or [], tag_in):
+        for code_, raw in zip(vc, tag_in):
             seen_t, mine = set(), []
             for t in re.split(r"[,;\n]+", raw or ""):
                 t = re.sub(r"\s+", " ", t).strip()[:24]
@@ -1772,14 +1778,14 @@ class Handler(BaseHTTPRequestHandler):
             if mine:
                 tags[code_.strip().upper()] = mine
         import fit as fit_mod
-        n_rows = len(f.get("code") or [])
+        n_rows = len(vc)
         lists = {}
         for k in ("fit", "roles", "reason"):
             v = f.get(k) or []
             v = [v] if isinstance(v, str) else list(v)
             lists[k] = v + [""] * (n_rows - len(v))
         verdicts = {}
-        for i, code_ in enumerate(f.get("code") or []):
+        for i, code_ in enumerate(vc):
             v = fit_mod.clean(lists["fit"][i].strip(), [x.strip() for x in lists["roles"][i].split(",")], lists["reason"][i])
             if v:
                 verdicts[code_.strip().upper()] = v
@@ -3274,6 +3280,7 @@ class Handler(BaseHTTPRequestHandler):
                                     "prices": prices, "total": total,
                                     "platform": platform,
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
+                                    "client_tags": {k: v for k, v in json.loads((sel["client_tags"] if "client_tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "verdicts": {k: v for k, v in json.loads((sel["verdicts"] if "verdicts" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "currency": (sel["currency"] if "currency" in sel.keys() else None) or "SAR",
                                     "fx": fx.rates(),
@@ -3453,6 +3460,28 @@ class Handler(BaseHTTPRequestHandler):
             for k in out:
                 out[k] = out[k][:6]
         return self.send_json(200, out, [("Cache-Control", "no-store")])
+
+    def api_selection_tags(self):
+        """A client labelling a creator on their own selection page (Shortlist,
+        Backup, Phase 2…). Allowed for the passcode the selection belongs to,
+        and for the admin; the labels are kept apart from the admin's own."""
+        viewer = self.viewer_code_id()
+        if not viewer:
+            return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+        b = self.json_body()
+        sel = db.selection(token=str(b.get("token") or ""))
+        if sel is None or (sel["code_id"] is not None and int(viewer) not in (sel["code_id"], db.admin_code_id())):
+            return self.send_json(404, {"ok": False}, self.cors())
+        code = str(b.get("code") or "").strip().upper()
+        if code not in json.loads(sel["codes"] or "[]"):
+            return self.send_json(404, {"ok": False}, self.cors())
+        seen, mine = set(), []
+        for t in (b.get("tags") or [])[:20]:
+            t = re.sub(r"[<>]", "", re.sub(r"\s+", " ", str(t))).strip()[:24]
+            if t and t.lower() not in seen and len(mine) < 8:
+                seen.add(t.lower()); mine.append(t)
+        everyone = db.set_client_tags(sel["id"], code, mine)
+        return self.send_json(200, {"ok": True, "tags": mine, "client_tags": everyone}, self.cors())
 
     def api_selection_save(self):
         """A client naming a shortlist. It is recorded here so it appears in
