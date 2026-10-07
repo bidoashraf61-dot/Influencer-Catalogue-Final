@@ -510,18 +510,7 @@
     "Quoted for": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M10.5 18h3"/></svg>',
     "Not in this roster": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.4v.1"/></svg>'
   };
-  // One brand colour per size, small to large.
-  var SIZE_TONES = [["nano", "#e8ff76", "#121212"], ["micro", "#ffffff", "#121212"], ["mid", "#ffc29f", "#121212"],
-                    ["macro", "#ff691e", "#121212"], ["mega", "#121212", "#e8ff76"]];
-  // HCP tiers get their own blue family, light sky to deep navy by size.
-  var HCP_SIZE_TONES = [["nano", "#dbe7fb", "#121212"], ["micro", "#a6c3f2", "#121212"], ["mid", "#6b95e3", "#121212"],
-                        ["macro", "#2f5fc4", "#ffffff"], ["mega", "#15306e", "#ffffff"]];
-  function toneOf(tier) {
-    var t = String(tier).toLowerCase();
-    var set = /hcp/.test(t) ? HCP_SIZE_TONES : SIZE_TONES;
-    for (var i = 0; i < set.length; i++) if (t.indexOf(set[i][0]) > -1) return set[i];
-    return ["x", "#8a8178", "#ffffff"];
-  }
+
   function shareBar(n, total) {
     var pct = total ? Math.round(100 * n / total) : 0;
     return '<span class="cat-meter" role="img" aria-label="' + pct + '% of the selection"><i style="width:' + pct + '%"></i></span>' +
@@ -1977,26 +1966,36 @@
         box.className = "cat-tiers";
         $("sel-summary").insertAdjacentElement("afterend", box);
       }
-      var names = Object.keys(TIER_PRICE).filter(function (t) { return tiers[t]; });
-      Object.keys(tiers).forEach(function (t) { if (tiers[t] && names.indexOf(t) < 0 && t && t !== "undefined") names.push(t); });
+      var names = Object.keys(tiers).filter(function (t) { return tiers[t] && t && t !== "undefined"; });
       var total = names.reduce(function (s, t) { return s + tiers[t]; }, 0);
       box.hidden = !total;
       if (!total) { box.innerHTML = ""; return; }
-      var paint = function (t) {
-        var c = toneOf(t);
-        return "background-color:" + c[1] + ";color:" + c[2];
+      // One labelled row per tier, creators and HCPs side by side; bars share
+      // one scale so a longer bar is always more creators.
+      var SIZES = ["nano", "micro", "mid", "macro", "mega"];
+      var rank = function (t) {
+        var x = t.toLowerCase();
+        for (var i = 0; i < SIZES.length; i++) if (x.indexOf(SIZES[i]) > -1) return i;
+        return 9;
       };
-      var cls = function (t) { return /hcp/i.test(t) ? ' class="is-hcp"' : ""; };
-      box.innerHTML = '<p class="cat-places__label">Creator size</p>' +
-        '<div class="cat-tiers__bar" role="img" aria-label="' + esc(names.map(function (t) { return tiers[t] + " " + t; }).join(", ")) + '">' +
-        names.map(function (t) {
-          return "<span" + cls(t) + ' style="flex:' + tiers[t] + ";" + paint(t) +
-            '" title="' + esc(t) + ": " + tiers[t] + '">' + tiers[t] + "</span>";
-        }).join("") + "</div>" +
-        '<ul class="cat-tiers__legend">' + names.map(function (t) {
-          return "<li><i" + cls(t) + ' style="' + paint(t) + '"></i>' + esc(t) + " <b>" + tiers[t] + "</b><small>" +
-            Math.round(100 * tiers[t] / total) + "%</small></li>";
-        }).join("") + "</ul>";
+      var max = Math.max.apply(null, names.map(function (t) { return tiers[t]; }));
+      var panel = function (title, list, hcp) {
+        if (!list.length) return "";
+        var sum = list.reduce(function (s, t) { return s + tiers[t]; }, 0);
+        list.sort(function (a, b) { return rank(a) - rank(b); });
+        return '<div class="cat-tiers__panel' + (hcp ? " is-hcp" : "") + '"><p class="cat-tiers__title">' + title +
+          " <b>" + sum + "</b></p><ul>" + list.map(function (t) {
+            var label = t.replace(/^\s*hcp\s*[-–—:]?\s*/i, "");
+            var pct = Math.round(100 * tiers[t] / total);
+            return '<li><span class="cat-tiers__name">' + esc(label) + '</span><span class="cat-tiers__track"><i style="width:' +
+              Math.max(4, Math.round(100 * tiers[t] / max)) + '%"></i></span><span class="cat-tiers__n">' + tiers[t] +
+              "</span><small>" + pct + "%</small></li>";
+          }).join("") + "</ul></div>";
+      };
+      var hcpList = names.filter(function (t) { return /hcp/i.test(t); });
+      var plainList = names.filter(function (t) { return !/hcp/i.test(t); });
+      box.innerHTML = '<p class="cat-places__label">Creator size</p><div class="cat-tiers__panels">' +
+        panel("Influencers", plainList, false) + panel("HCPs", hcpList, true) + "</div>";
     }
 
     function renderPlaces() {

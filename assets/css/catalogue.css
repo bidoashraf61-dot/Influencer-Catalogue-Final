@@ -1365,15 +1365,20 @@ p.cat-selhead__brief { display: block; margin: 0; font-size: 15px; font-weight: 
 @media screen and (max-width: 767px) { .cat-stat dd { padding-left: 0; } }
 
 .cat-tiers { margin: -4px 0 32px; padding: 0 0 32px; border-bottom: 1px solid rgba(18,18,18,.12); }
-.cat-tiers__bar { display: flex; height: 44px; border-radius: var(--r-pill); overflow: hidden; gap: 3px;
-  box-shadow: 0 0 0 1px rgba(18,18,18,.12); background: rgba(18,18,18,.12); }
-.cat-tiers__bar span { min-width: 30px; display: flex; align-items: center; justify-content: center;
-  font-family: var(--heading); font-size: 20px; letter-spacing: .04em; color: var(--white); }
-.cat-tiers__legend { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 10px 26px; }
-.cat-tiers__legend li { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--gray); }
-.cat-tiers__legend i { width: 14px; height: 14px; border-radius: 4px; flex: none; box-shadow: 0 0 0 1px rgba(18,18,18,.18); }
-.cat-tiers__legend b { color: var(--ink); font-weight: 700; }
-.cat-tiers__legend small { font-size: 12px; opacity: .7; }
+.cat-tiers__panels { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px 56px; }
+.cat-tiers__title { font-family: var(--heading); font-size: 24px; letter-spacing: .03em; margin: 0 0 10px;
+  display: flex; align-items: center; gap: 10px; }
+.cat-tiers__title b { font-weight: 400; font-size: 16px; background: var(--ink); color: var(--lime); padding: 3px 10px 2px; border-radius: var(--r-pill); }
+.cat-tiers__panel.is-hcp .cat-tiers__title b { background: #2f5fc4; color: var(--white); }
+.cat-tiers__panel ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cat-tiers__panel li { display: grid; grid-template-columns: 76px 1fr 34px 40px; align-items: center; gap: 12px; }
+.cat-tiers__name { font-size: 15px; font-weight: 600; color: var(--ink); }
+.cat-tiers__track { height: 14px; border-radius: var(--r-pill); background: rgba(255,255,255,.7); overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(18,18,18,.08); }
+.cat-tiers__track i { display: block; height: 100%; border-radius: inherit; background: var(--ink); }
+.cat-tiers__panel.is-hcp .cat-tiers__track i { background: #2f5fc4; }
+.cat-tiers__n { font-family: var(--heading); font-size: 22px; line-height: 1; text-align: right; }
+.cat-tiers__panel small { font-size: 12px; color: var(--gray); }
 
 .cat-flag { width: 30px; height: 20px; border-radius: 4px; flex: none; align-self: center;
   box-shadow: 0 0 0 1px rgba(18,18,18,.14); }
