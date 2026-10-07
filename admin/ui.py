@@ -863,7 +863,7 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
         '<style>aside#help .x,#ai-panel .x{transform:rotate(45deg)}</style>'
         "<script>window.HV_SEARCH=" + json.dumps(u("/api/search")) + ";window.HV_PAGES=" + pages_js
         + ";window.HV_PULSE=" + json.dumps(pulse_payload) + ";</script>"
-        "<script src='" + u("/shell.js") + "?v=" + SHELL_VER + "'></script><script>" + pulse_js + "</script></body></html>"
+        "<script src='" + u("/shell.js") + "?v=" + SHELL_VER + "'></script>" + ("<script>" + pulse_js + "</script>" if pulse_js else "") + "</body></html>"
     )
 
 
@@ -1055,6 +1055,7 @@ _JS_R4 = r"""
   (function(){ var q=new URLSearchParams(location.search), name=q.get('f'), msg=q.get('e'); if(!name||!msg) return;
     var f=document.querySelector('main [name="'+name.replace(/"/g,'')+'"]'); if(!f) return;
     $$('main .err').forEach(function(b){ if(b.textContent.trim()===msg.trim()) b.hidden=true; });
+    var dt=f.closest('details'); if(dt) dt.open=true;
     fieldErr(f,msg); f.focus(); })();
   // ---- 5. Unsaved changes: editors warn before you leave them.
   var dirty=null;
@@ -1106,6 +1107,15 @@ def pct1(v):
 
 # The page scripts every admin page shares, served once as a cached file
 # instead of inline on every page (round 4: about 30 KB less per page).
-SHELL_JS = "\n".join((_RECENT_JS, _JS, _JS_REVAMP, _JS_R4))
 import hashlib as _hashlib
-SHELL_VER = _hashlib.sha256(SHELL_JS.encode()).hexdigest()[:10]
+SHELL_JS = SHELL_VER = ""
+
+
+def add_shell_js(*scripts):
+    """Add page-independent scripts to the cached /shell.js (views adds its own)."""
+    global SHELL_JS, SHELL_VER
+    SHELL_JS = "\n;".join([SHELL_JS] + [s_.strip() for s_ in scripts if s_.strip()]) if SHELL_JS else "\n;".join(scripts)
+    SHELL_VER = _hashlib.sha256(SHELL_JS.encode()).hexdigest()[:10]
+
+
+add_shell_js(_RECENT_JS, _JS, _JS_REVAMP, _JS_R4)

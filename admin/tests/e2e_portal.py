@@ -882,6 +882,31 @@ class Portal(unittest.TestCase):
         kinds = {x["kind"] for x in team.recent_log()}
         self.assertTrue({"login", "invite"} <= kinds, kinds)
 
+    def test_76_password_errors_point_at_the_field(self):
+        a = self.admin()
+        s, _, r = a.req("POST", "/password", form={"current": "wrong", "new": "x"})
+        self.assertIn("f=current", r.headers["Location"])
+        s, home, _ = a.get(r.headers["Location"].split("#")[0])
+        self.assertIn("That is not your current password.", home)          # Home now shows it
+        s, _, r = a.req("POST", "/password", form={"current": "correct-horse-battery", "new": "x"})
+        self.assertIn("f=new", r.headers["Location"])
+
+    def test_77_selection_rows_are_light_and_drop_works(self):
+        a = self.admin()
+        c1, c2 = [c["code"] for c in db.list_creators()][:2]                # whatever earlier tests left
+        sid = db.save_selection(None, "Light", [c1, c2], {}, None, None)
+        sid = sid if isinstance(sid, int) else db.list_selections()[0]["id"]
+        s, page, _ = a.get("/selections/edit?id=%d" % sid)
+        self.assertEqual(s, 200)
+        self.assertIn("class=sr", page)
+        self.assertNotIn("roster-list", page)                               # no 2,000-option datalist
+        self.assertIn("/editor.js?v=", page)
+        s, frag, _ = a.get("/selections/fit?id=%d" % sid)
+        self.assertIn("fit_loaded", frag)
+        resp = a.req("POST", "/selections/save", form=[("id", str(sid))] + [(k, v) for c in (c1, c2)
+                                                               for k, v in (("code", c), ("cost", ""), ("p_from", ""), ("p_to", ""))] + [("drop", c2)])
+        self.assertEqual(json.loads(db.selection(sid)["codes"]), [c1], (resp[0], resp[2].headers.get("Location"), sid, db.selection(sid)["codes"]))
+
 def assistant_sql(sql):
     import assistant
     return assistant.t_sql_query({}, sql)

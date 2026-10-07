@@ -478,7 +478,7 @@ def page(title, body, active=""):
     except Exception:
         pulse = {"open": 0, "latest": 0}
     payload = dict(pulse, api=u("/api/pulse"), requests=u("/requests"), analysis=u("/analysis"))
-    return ui.shell(title, body + SCROLL_JS, active, u, NAME, pulse, payload, PULSE_JS,
+    return ui.shell(title, body, active, u, NAME, pulse, payload, "",      # pulse + scroll live in /shell.js
                     getattr(_user, "email", ""))
 
 
@@ -2403,7 +2403,8 @@ SEL_JS = r"""<script>
   var base=$("form[action$='/selections/save']").getAttribute('action').replace(/\/selections\/save$/,'');
   function cur(){ return m.getAttribute('data-cur')||'SAR'; }
   function inp(r,n){ return r.querySelector('input[name='+n+']'); }
-  function dropped(r){ return !inp(r,'drop').disabled; }
+  function dropped(r){ return r.dataset.drop==='1'; }
+  function flag(r,n,on){ var x=inp(r,n); r.dataset[n]=on?'1':''; if(on&&!x){ x=document.createElement('input'); x.type='hidden'; x.name=n; x.value=r.dataset.code; r.querySelector('.sr-act').appendChild(x); } else if(!on&&x){ x.remove(); } }
   function money(v){ return v ? cur()+' '+v : ''; }
   function paint(r){
     var c=inp(r,'cost').value, a=inp(r,'p_from').value, b=inp(r,'p_to').value;
@@ -2416,14 +2417,14 @@ SEL_JS = r"""<script>
     [['sd-cost','cost'],['sd-from','p_from'],['sd-to','p_to']].forEach(function(x){ var f=$('#'+x[0]); if(document.activeElement!==f) f.value=inp(r,x[1]).value; });
     $('#sd-gain').textContent=r.querySelector('.profit').textContent||'';
     $('#sd-gain').classList.toggle('neg',/^-|\s-/.test($('#sd-gain').textContent));
-    $('#sd-default').checked=!inp(r,'default').disabled;
+    $('#sd-default').checked=r.dataset.default==='1';
     $('#sd-drop').textContent=dropped(r)?'Keep in selection':'Remove';
   }
   function visible(){ return rows.filter(function(r){return !r.hidden;}); }
   function open(r,focus){ if(cur_r) cur_r.removeAttribute('aria-current'); cur_r=r; r.setAttribute('aria-current','true');
     var img=r.querySelector('.thumb'); $('#sd-face').innerHTML=img?img.outerHTML:'';
     $('#sd-name').textContent=r.querySelector('.sr-who b').textContent; $('#sd-meta').textContent=r.querySelector('.sr-who small').textContent;
-    $('#sd-std').textContent=r.dataset.std||'—'; $('#sd-roster').textContent=r.dataset.roster||'—';
+    $('#sd-std').textContent=r.dataset.std||'—'; $('#sd-roster').textContent=r.dataset.roster||'Tier price';
     $('#sd-acct').textContent=r.dataset.acct||''; $('#sd-acct').hidden=!r.dataset.acct;
     $('#sd-open').href=base+'/roster?edit='+encodeURIComponent(r.dataset.code)+'#'+r.dataset.code;
     var v=visible(), i=v.indexOf(r); $('#sd-prev').disabled=i<=0; $('#sd-next').disabled=i<0||i>=v.length-1;
@@ -2439,8 +2440,8 @@ SEL_JS = r"""<script>
   $('#sd-cost').addEventListener('input',function(){push('sd-cost','cost');});
   $('#sd-from').addEventListener('input',function(){push('sd-from','p_from');});
   $('#sd-to').addEventListener('input',function(){push('sd-to','p_to');});
-  $('#sd-default').addEventListener('change',function(){ if(cur_r) inp(cur_r,'default').disabled=!this.checked; });
-  $('#sd-drop').addEventListener('click',function(){ if(!cur_r) return; var d=inp(cur_r,'drop'); d.disabled=!d.disabled;
+  $('#sd-default').addEventListener('change',function(){ if(cur_r) flag(cur_r,'default',this.checked); });
+  $('#sd-drop').addEventListener('click',function(){ if(!cur_r) return; flag(cur_r,'drop',!dropped(cur_r));
     if(window.hvSelRun) window.hvSelRun(); paint(cur_r); fill(); });
   $('#sd-prev').addEventListener('click',function(){ var v=visible(), i=v.indexOf(cur_r); if(i>0) open(v[i-1]); });
   $('#sd-next').addEventListener('click',function(){ var v=visible(), i=v.indexOf(cur_r); if(i<v.length-1) open(v[i+1]); });
@@ -2580,21 +2581,20 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
                       if ("price_from" in c.keys() and c["price_from"]) else "Tier price")
         # One compact, read-only row per creator; the fields live in hidden
         # inputs and are edited in the side drawer (round 4).
+        hid = lambda n, v: "<input type=hidden name=%s%s>" % (n, " value='" + v + "'" if v else "")
         rows.append(
-            "<tr class='sr' tabindex='0' data-code='" + e(code) + "' data-acct=\"" + e(accts)
-            + "\" data-std=\"" + e(money_c(*default) if default[0] is not None else "—") + "\" data-roster=\"" + e(roster_now) + "\">"
-            "<td class='sr-who'>" + shot + "<span><b>" + e(c["name"]) + "</b>"
+            "<tr class=sr tabindex=0 data-code='" + e(code) + "' data-acct=\"" + e(accts)
+            + "\" data-std=\"" + e(money_c(*default) if default[0] is not None else "—") + "\""
+            + ("" if roster_now == "Tier price" else " data-roster=\"" + e(roster_now) + "\"") + ">"
+            "<td class=sr-who>" + shot + "<span><b>" + e(c["name"]) + "</b>"
             + ("" if c["active"] else " <span class='pill dead'>hidden</span>")
             + "<small>" + e(code) + " · " + e(c["tier"] or "—") + " · " + ui.compact(c["followers"]) + "</small></span></td>"
-            "<td class='num sr-cost'></td><td class='num sr-price'></td><td class='sr-gain'><div class='profit'></div></td>"
-            "<td class='sr-act'><button type='button' class='btn tiny ghost sr-edit' aria-label='Edit prices'>Edit</button>"
-            "<input type='hidden' name='code' value='" + e(code) + "'>"
-            "<input type='hidden' name='cost' value='" + cost_txt + "'>"
-            "<input type='hidden' name='p_from' value='" + val(0) + "'"
+            "<td class='num sr-cost'></td><td class='num sr-price'></td><td class=sr-gain><div class=profit></div></td>"
+            "<td class=sr-act><button type=button class='btn tiny ghost sr-edit'>Edit</button>"
+            + hid("code", e(code)) + hid("cost", cost_txt)
+            + "<input type=hidden name=p_from" + (" value='" + val(0) + "'" if val(0) else "")
             + (" data-def='%d|%d'" % (default[0], default[1]) if default and default[0] is not None else "") + ">"
-            "<input type='hidden' name='p_to' value='" + val(1) + "'>"
-            "<input type='hidden' name='default' value='" + e(code) + "' disabled>"
-            "<input type='hidden' name='drop' value='" + e(code) + "' disabled></td></tr>")
+            + hid("p_to", val(1)) + "</td></tr>")
     table = "".join(rows) or "<tr><td colspan='5'>" + ui.empty("users", "No creators yet", "Add creators below, by name or code.") + "</td></tr>"
     missing = [c for c in codes if c not in by]
     link = selection_link(sel, origin)
@@ -2765,7 +2765,7 @@ MARGIN_JS = """<script>
   function run(){
     var mg=n(m.value), tc=0, tpl=0, tph=0, tlo=0, thi=0, costed=0, counted=0;
     rows.forEach(function(r){
-      var out=r.querySelector('.profit'), gone=!r.querySelector('input[name=drop]').disabled, x=rowPrice(r,mg);
+      var out=r.querySelector('.profit'), gone=r.dataset.drop==='1', x=rowPrice(r,mg);
       out.textContent='';
       if(x.lo!==null){
         if(x.cost!==null){
@@ -5009,3 +5009,7 @@ def _split_assets(*blocks):
 
 EDITOR_STYLE, EDITOR_JS = _split_assets(MARGIN_JS, VERDICT_JS, SEL_JS)
 EDITOR_VER = __import__("hashlib").sha256(EDITOR_JS.encode()).hexdigest()[:10]
+
+
+# Page-independent scripts join the cached /shell.js (round 4 follow-up).
+ui.add_shell_js(PULSE_JS, SCROLL_JS.replace("<script>", "").replace("</script>", ""))

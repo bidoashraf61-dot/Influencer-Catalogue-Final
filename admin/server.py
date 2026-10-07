@@ -79,6 +79,7 @@ import plans  # noqa: E402
 import thumbs  # noqa: E402
 import track  # noqa: E402
 import uploads  # noqa: E402
+import account  # noqa: E402
 import apify
 import profile_thumbs
 import apis_view
@@ -200,7 +201,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         ctype = self.headers.get("Content-Type", "")
         if ctype.startswith("multipart/form-data"):
             return uploads.parse_multipart(self.body(), ctype, multi=multi)
-        return {k: v[0] for k, v in urllib.parse.parse_qs(self.body().decode()).items()}
+        return {k: (v if k in multi else v[0])
+                for k, v in urllib.parse.parse_qs(self.body().decode(), keep_blank_values=bool(multi)).items()}
 
     def send(self, code, body=b"", ctype="text/html; charset=utf-8", headers=None):
         # While a tracked action runs, its answer waits until the change is in
@@ -466,7 +468,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/api/search":
             return self.api_search((query.get("q") or "").strip())
         if path == "/":
-            return self.send(200, views.dashboard(db.stats(), db.recent_events(12), who))
+            return self.send(200, views.dashboard(db.stats(), db.recent_events(12), who,
+                                                  message=query.get("ok"), error=query.get("e")))
         if path == "/history":
             kind = (query.get("kind") or "").strip() or None
             q = (query.get("q") or "").strip() or None
@@ -1208,12 +1211,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         new = form.get("new") or ""
         row = db.admin_by_email(who["email"])
         if not auth.verify_password(form.get("current") or "", row["password_hash"]):
-            return self.redirect("/?e=badpass")
+            return self.redirect("/?f=current&e=" + urllib.parse.quote("That is not your current password.") + "#account")
         problems = auth.password_problems(new)
         if problems:
-            return self.redirect("/?e=" + urllib.parse.quote(" ".join(problems)))
+            return self.redirect("/?f=new&e=" + urllib.parse.quote(" ".join(problems)) + "#account")
         db.set_admin_password(row["id"], auth.hash_password(new))
-        return self.redirect("/?ok=password")
+        team.log("password", who["email"], "", self.client_ip())
+        return self.redirect("/?ok=" + urllib.parse.quote("Your password is changed."))
 
     def post_code_new(self):
         form = self.form_body()
@@ -4286,6 +4290,7 @@ def main():
     db.init()
     history.init()
     portal.init()
+    account.init()
     team.init()
     apify.start_scheduler()
     profile_thumbs.start()
