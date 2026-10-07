@@ -69,7 +69,7 @@ header.top .wrap{display:flex;align-items:center;gap:28px}
 .brand{display:flex;align-items:center;gap:10px;margin-right:auto;
 text-decoration:none;color:#fff}
 .brand img{display:block;height:26px;width:auto}
-.brand span{opacity:.55;font-weight:400;font-size:14px;white-space:nowrap}
+.brand span{opacity:.55;font-weight:400;font-size:var(--t-md,14.5px);white-space:nowrap}
 .login img{filter:invert(1)}
 /* Every page on one row: the header runs the full width, the links never
    wrap, and on a screen too narrow for them all the row scrolls sideways. */
@@ -78,34 +78,34 @@ nav{display:flex;align-items:center;gap:18px;flex-wrap:nowrap;white-space:nowrap
 min-width:0;overflow-x:auto;scrollbar-width:none}
 nav::-webkit-scrollbar{display:none}
 nav a{display:inline-flex;align-items:center;padding:6px 0;margin:0;color:#fff;flex:none;
-text-decoration:none;opacity:.65;font-size:14px;border-bottom:2px solid transparent}
+text-decoration:none;opacity:.65;font-size:var(--t-md,14.5px);border-bottom:2px solid transparent}
 nav a:hover{opacity:1}
 nav a.on{opacity:1;border-bottom-color:var(--lime)}
-h1{font-size:26px;margin:32px 0 4px}
-h2{font-size:17px;margin:32px 0 12px}
+h1{font-size:var(--t-xl,28px);margin:32px 0 4px}
+h2{font-size:var(--t-lg,17px);margin:32px 0 12px}
 .sub{color:var(--gray);margin:0 0 24px}
 /* the 7/30/90 range tabs; nav a.on is the top nav and does not reach here */
 .sub a.on{color:var(--ink);font-weight:600;text-decoration:none;
 background:var(--lime);padding:2px 9px;border-radius:999px}
 .grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));margin:24px 0}
 .stat{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:18px}
-.stat b{display:block;font-size:30px;line-height:1.1;margin-bottom:2px}
-.stat span{color:var(--gray);font-size:13px}
+.stat b{display:block;font-size:var(--t-xl,28px);line-height:1.1;margin-bottom:2px}
+.stat span{color:var(--gray);font-size:var(--t-sm,13px)}
 .card{background:var(--white);border:1px solid var(--line);border-radius:12px;
 padding:22px;margin-bottom:20px}
-table{width:100%;border-collapse:collapse;font-size:14px}
-th{text-align:left;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+table{width:100%;border-collapse:collapse;font-size:var(--t-md,14.5px)}
+th{text-align:left;font-size:var(--t-xs,12px);letter-spacing:.06em;text-transform:uppercase;
 color:var(--gray);font-weight:600;padding:0 10px 8px;border-bottom:1px solid var(--line)}
 td{padding:11px 10px;border-bottom:1px solid var(--line);vertical-align:top}
 tr:last-child td{border-bottom:0}
 code{font:13px ui-monospace,SFMono-Regular,Menlo,monospace;background:#f1efec;
 padding:2px 6px;border-radius:5px}
-.pill{display:inline-block;font-size:12px;padding:3px 10px;border-radius:999px;
+.pill{display:inline-block;font-size:var(--t-xs,12px);padding:3px 10px;border-radius:999px;
 background:#f1efec;color:var(--gray)}
 .pill.live{background:#e7f6ec;color:var(--green)}
 .pill.dead{background:#fdeaea;color:var(--red)}
 .pill.warn{background:#fdf3e3;color:var(--amber)}
-label{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;
+label{display:block;font-size:var(--t-xs,12px);letter-spacing:.06em;text-transform:uppercase;
 color:var(--gray);margin:0 0 6px}
 input,select,textarea{width:100%;font:inherit;padding:10px 12px;border:1px solid var(--line);
 border-radius:8px;background:var(--white);color:var(--ink)}
@@ -117,37 +117,37 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--ink);outline-off
 .tabs a.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:600}
 .kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));margin-bottom:18px}
 .kpis div{background:var(--white);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
-.kpis b{display:block;font-size:26px;line-height:1.1}
-.kpis span{font-size:12px;color:var(--gray);text-transform:uppercase;letter-spacing:.06em}
+.kpis b{display:block;font-size:var(--t-xl,28px);line-height:1.1}
+.kpis span{font-size:var(--t-xs,12px);color:var(--gray);text-transform:uppercase;letter-spacing:.06em}
 .split{display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
 .linkrow input[readonly]{background:#f6f5f2}
 .linkrow form{display:grid;gap:8px;grid-template-columns:1fr 1fr auto;align-items:end}
 .post-thumb{width:56px;height:56px;border-radius:8px;object-fit:cover;background:#eee;display:block}
-.est{font-size:11px;color:var(--gray);text-transform:uppercase;letter-spacing:.04em}
-.real{font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:.04em}
+.est{font-size:var(--t-xs,12px);color:var(--gray);text-transform:uppercase;letter-spacing:.04em}
+.real{font-size:var(--t-xs,12px);color:var(--green);text-transform:uppercase;letter-spacing:.04em}
 .inline{display:inline}
-.mini input{padding:5px 7px;font-size:13px;width:80px}
+.mini input{padding:5px 7px;font-size:var(--t-sm,13px);width:80px}
 .shot{max-width:100%;max-height:420px;border:1px solid var(--line);border-radius:8px}
 .grid2{display:grid;gap:18px;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .guide{border-color:var(--ink)}
 .guide-head{margin-bottom:10px}
 .guide-steps{display:flex;flex-wrap:wrap;gap:8px;list-style:none;padding:0;margin:0;counter-reset:g}
-.guide-steps li{counter-increment:g;font-size:13px;padding:6px 12px;border-radius:999px;background:#f3f1ec;color:var(--gray)}
+.guide-steps li{counter-increment:g;font-size:var(--t-sm,13px);padding:6px 12px;border-radius:999px;background:#f3f1ec;color:var(--gray)}
 .guide-steps li::before{content:counter(g) "  ";font-weight:700}
 .guide-steps li.ok{background:#e7f6ec;color:var(--green)}
 .guide-steps li.ok::before{content:"\\2713  "}
 .step h2{display:flex;align-items:center;gap:10px}
-.step-n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;font-size:14px}
+.step-n{display:inline-grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:#fff;font-size:var(--t-md,14.5px)}
 .logo-grid{display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));max-height:280px;overflow:auto;padding:4px}
-.logo-pick{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:11px;color:var(--gray);margin:0}
+.logo-pick{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px;border:1px solid var(--line);border-radius:10px;cursor:pointer;text-transform:none;letter-spacing:0;font-size:var(--t-xs,12px);color:var(--gray);margin:0}
 .logo-pick img{width:56px;height:56px;object-fit:contain}
 .logo-pick:has(input:checked){border-color:var(--ink);box-shadow:0 0 0 2px var(--ink) inset;color:var(--ink)}
 .logo-pick input{margin:0;width:auto}
 .savebar{position:sticky;bottom:0;background:rgba(247,245,240,.95);padding:14px 0;display:flex;gap:10px;border-top:1px solid var(--line);margin-top:20px}
-.steps-table input,.steps-table select{padding:7px 9px;font-size:14px}
+.steps-table input,.steps-table select{padding:7px 9px;font-size:var(--t-md,14.5px)}
 .steps-table td{padding:6px 8px}
 .rec-lead td{font-weight:600}
-.chain{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:13px}
+.chain{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:var(--t-sm,13px)}
 .chain .arrow{color:var(--gray)}
 @media (max-width:820px){.grid2{grid-template-columns:1fr}}
 .row{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px}
@@ -155,26 +155,26 @@ input:focus,select:focus,textarea:focus{outline:2px solid var(--ink);outline-off
 border:1px solid var(--ink);background:var(--ink);color:#fff;cursor:pointer;text-decoration:none}
 .btn:hover{opacity:.88}
 .btn.ghost{background:transparent;color:var(--ink)}
-.btn.small{padding:6px 14px;font-size:13px}
+.btn.small{padding:6px 14px;font-size:var(--t-sm,13px)}
 .badge{display:inline-block;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:9px;
 .badge[hidden]{display:none}
-  background:var(--red);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;
+  background:var(--red);color:#fff;font-size:var(--t-xs,12px);font-weight:700;line-height:18px;text-align:center;
   vertical-align:1px}
 .toast{position:fixed;right:18px;bottom:18px;z-index:50;max-width:360px;padding:14px 18px;border-radius:12px;
-  background:var(--ink);color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:14px}
+  background:var(--ink);color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.25);font-size:var(--t-md,14.5px)}
 .toast a{color:var(--lime);font-weight:600;text-decoration:none}
 tr[id]{scroll-margin-top:90px}
 tr.flash td{animation:flash 2.4s ease-out}
 @keyframes flash{0%,35%{background:#fff7c2}100%{background:transparent}}
-.price-hint{font-size:12px;color:var(--gray);margin-top:4px}
+.price-hint{font-size:var(--t-xs,12px);color:var(--gray);margin-top:4px}
 .pill.own{background:#eef6ff;color:#1d4ed8}
-.stars{font-size:13px;color:#e0a500;letter-spacing:1px}
+.stars{font-size:var(--t-sm,13px);color:#e0a500;letter-spacing:1px}
 .stars .dim{color:#d8d2cc}
-.acct{font-size:12px;color:var(--gray)}
+.acct{font-size:var(--t-xs,12px);color:var(--gray)}
 .sel-table input{max-width:130px}
 .pager{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:14px 0 4px}
 .pager a,.pager .pgnow,.pager .pgoff{min-width:34px;height:34px;display:inline-grid;place-items:center;
-  padding:0 10px;border-radius:999px;font-size:14px;text-decoration:none}
+  padding:0 10px;border-radius:999px;font-size:var(--t-md,14.5px);text-decoration:none}
 .pager a{border:1px solid var(--line);color:var(--ink)}
 .pager a:hover{border-color:var(--ink)}
 .pager .pgnow{background:var(--ink);color:#fff;font-weight:600}
@@ -190,7 +190,7 @@ a.to-roster{color:inherit;text-decoration:none;border-bottom:1px solid rgba(18,1
 a.to-roster svg{opacity:.45}
 a.to-roster:hover{border-bottom-color:var(--ink)}
 a.to-roster:hover svg{opacity:1}
-.rsearch .added{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--gray);
+.rsearch .added{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-sm,13px);color:var(--gray);
   margin:0;white-space:nowrap}
 .rsearch .added input{width:auto;padding:8px 10px}
 tr.manage-row td{padding-top:0;border-top:0}
@@ -199,20 +199,20 @@ details.manage summary::-webkit-details-marker{display:none}
 details.manage[open] summary{margin-bottom:12px}
 .manage-body{background:#f7f5f2;border-radius:12px;padding:16px 18px}
 .limits input{max-width:170px}
-table.devices{margin-top:10px;font-size:14px}
+table.devices{margin-top:10px;font-size:var(--t-md,14.5px)}
 .sel-table input[readonly]{background:#f3f1ee;color:var(--gray)}
-.sel-table .profit{font-size:12px;color:#14884a;white-space:nowrap}
+.sel-table .profit{font-size:var(--t-xs,12px);color:#14884a;white-space:nowrap}
 .margin-box{display:flex;align-items:center;gap:8px}
 .margin-box input{max-width:110px}
 .money-sum{display:flex;flex-wrap:wrap;gap:28px;margin:4px 0 0}
 .money-sum div{min-width:120px}
-.money-sum dt{font-size:12px;color:var(--gray);text-transform:uppercase;letter-spacing:.06em}
-.money-sum dd{margin:2px 0 0;font-size:20px;font-weight:700}
+.money-sum dt{font-size:var(--t-xs,12px);color:var(--gray);text-transform:uppercase;letter-spacing:.06em}
+.money-sum dd{margin:2px 0 0;font-size:var(--t-lg,17px);font-weight:700}
 .money-sum .gain{color:#14884a}
 .sel-link{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.sel-link input{flex:1;min-width:260px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+.sel-link input{flex:1;min-width:260px;font-family:ui-monospace,Menlo,monospace;font-size:var(--t-xs,12px)}
 .pager{display:flex;align-items:center;justify-content:center;gap:6px;flex-wrap:wrap;
-  margin:18px 0 4px;font-size:14px}
+  margin:18px 0 4px;font-size:var(--t-md,14.5px)}
 .pager a,.pager .pgnow,.pager .pgoff{padding:7px 12px;border-radius:8px;line-height:1;
   text-decoration:none}
 .pager a{color:var(--ink);border:1px solid var(--line)}
@@ -232,18 +232,18 @@ background:var(--ink);color:var(--lime);padding:14px 18px;border-radius:10px;dis
 .code-full{font:14px ui-monospace,SFMono-Regular,Menlo,monospace;letter-spacing:.04em;
 background:#f0f0ee;border:1px solid rgba(18,18,18,.12);border-radius:7px;
 padding:4px 9px;user-select:all;white-space:nowrap}
-.code-full.reveal{font-size:20px;letter-spacing:.08em;padding:14px 18px;border-radius:10px;
+.code-full.reveal{font-size:var(--t-lg,17px);letter-spacing:.08em;padding:14px 18px;border-radius:10px;
 background:var(--ink);color:var(--lime);border-color:var(--ink)}
-.btn.tiny{padding:4px 12px;font-size:12px}
+.btn.tiny{padding:4px 12px;font-size:var(--t-xs,12px)}
 /* --- analytics ------------------------------------------------------ */
-.stat.hero b{font-size:38px}
-.stat .ctx{display:block;color:var(--gray);font-size:12px;margin-top:6px}
+.stat.hero b{font-size:var(--t-2xl,38px)}
+.stat .ctx{display:block;color:var(--gray);font-size:var(--t-xs,12px);margin-top:6px}
 .chart{width:100%;height:auto;display:block;overflow:visible}
-.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--gray);
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:var(--t-sm,13px);color:var(--gray);
 margin:0 0 14px}
 .range{display:flex;gap:14px;align-items:end;flex-wrap:wrap;background:var(--white);
 border:1px solid var(--line);border-radius:12px;padding:16px 18px;margin:0 0 24px}
-.range input[type=date]{font:inherit;font-size:15px;padding:9px 12px;
+.range input[type=date]{font:inherit;font-size:var(--t-md,14.5px);padding:9px 12px;
 border:1px solid var(--line);border-radius:9px;background:var(--white);
 color:var(--ink);min-height:42px}
 .range input[type=date]:focus{outline:none;border-color:var(--ink)}
@@ -252,14 +252,14 @@ tr.editrow > td{background:#f6f5f3;border-bottom:2px solid var(--ink);
 padding:18px 20px 24px;text-align:left}
 tr.editrow form{max-width:1100px}
 .rsearch{display:flex;gap:10px;align-items:center;margin:0 0 14px;flex-wrap:wrap}
-.rsearch input{font:inherit;font-size:15px;padding:9px 13px;min-width:260px;
+.rsearch input{font:inherit;font-size:var(--t-md,14.5px);padding:9px 13px;min-width:260px;
 border:1px solid var(--line);border-radius:9px;background:var(--white)}
 .rsearch input:focus{outline:none;border-color:var(--ink)}
 .tier-row{display:grid;gap:12px;align-items:end;padding:12px 0;
 border-bottom:1px solid var(--line);
 grid-template-columns:minmax(110px,1.1fr) 70px 96px 96px minmax(96px,1fr) 100px 100px 58px auto}
 .tier-row:last-of-type{border-bottom:0}
-.tier-row input{font:inherit;font-size:15px;padding:9px 11px;width:100%;
+.tier-row input{font:inherit;font-size:var(--t-md,14.5px);padding:9px 11px;width:100%;
 border:1px solid var(--line);border-radius:9px;background:var(--white);
 color:var(--ink);min-height:40px;box-sizing:border-box}
 .tier-row input:focus{outline:none;border-color:var(--ink)}
@@ -269,7 +269,7 @@ color:var(--ink);min-height:40px;box-sizing:border-box}
 .profiles{grid-column:1/-1}
 .prow{display:grid;grid-template-columns:150px 1fr 130px;gap:10px;margin-bottom:8px}
 .profiles>button{margin-top:2px}
-.prow select,.prow input{font:inherit;font-size:15px;padding:9px 11px;width:100%;
+.prow select,.prow input{font:inherit;font-size:var(--t-md,14.5px);padding:9px 11px;width:100%;
 border:1px solid var(--line);border-radius:9px;background:var(--white);
 color:var(--ink);min-height:40px;box-sizing:border-box}
 .prow select:focus,.prow input:focus{outline:none;border-color:var(--ink)}
@@ -281,7 +281,7 @@ color:var(--ink);min-height:40px;box-sizing:border-box}
 .ticks{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
 .tick{display:inline-flex;align-items:center;gap:7px;margin:0;padding:7px 13px;
 border:1px solid var(--line);border-radius:999px;background:var(--white);
-cursor:pointer;text-transform:none;letter-spacing:normal;font-size:14px;
+cursor:pointer;text-transform:none;letter-spacing:normal;font-size:var(--t-md,14.5px);
 min-height:38px}
 .tick:hover{border-color:var(--ink)}
 .tick input{margin:0;width:15px;height:15px;accent-color:var(--ink)}
@@ -291,7 +291,7 @@ min-height:38px}
 .legend span{display:inline-flex;align-items:center;gap:7px}
 .legend i{width:11px;height:11px;border-radius:3px;display:inline-block}
 .hb{display:grid;grid-template-columns:minmax(90px,auto) 1fr auto;gap:12px;
-align-items:center;padding:7px 0;font-size:14px}
+align-items:center;padding:7px 0;font-size:var(--t-md,14.5px)}
 .hb .track{background:#f1efec;border-radius:999px;height:9px;overflow:hidden}
 .hb .fill{display:block;height:100%;border-radius:999px;background:var(--ink)}
 .hb .n{font-variant-numeric:tabular-nums;color:var(--gray);min-width:56px;
@@ -300,15 +300,15 @@ text-align:right}
 .fstep{display:grid;grid-template-columns:minmax(120px,auto) 1fr;gap:14px;
 align-items:center;padding:6px 0}
 .fstep .bar{height:34px;border-radius:8px;background:var(--ink);color:#fff;
-display:flex;align-items:center;padding:0 12px;font-size:14px;font-weight:600;
+display:flex;align-items:center;padding:0 12px;font-size:var(--t-md,14.5px);font-weight:600;
 min-width:46px;white-space:nowrap}
-.fstep .drop{color:rgba(255,255,255,.62);font-size:12px;margin-left:10px;
+.fstep .drop{color:rgba(255,255,255,.62);font-size:var(--t-xs,12px);margin-left:10px;
 font-weight:400}
 .tface{width:38px;height:38px;border-radius:9px;object-fit:cover;display:block;
 background:#f1efec}
-.tface.none{display:grid;place-items:center;color:var(--gray);font-size:11px}
+.tface.none{display:grid;place-items:center;color:var(--gray);font-size:var(--t-xs,12px)}
 .split{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
-.empty{color:var(--gray);font-size:14px;padding:10px 0}
+.empty{color:var(--gray);font-size:var(--t-md,14.5px);padding:10px 0}
 .bars{display:flex;align-items:flex-end;gap:3px;height:90px;margin:8px 0 4px}
 .bars div{flex:1;background:var(--ink);border-radius:3px 3px 0 0;min-height:2px}
 .muted{color:var(--gray)}
@@ -319,9 +319,9 @@ summary{list-style:none;cursor:pointer}
 .thumb{display:block;width:74px;height:74px;object-fit:cover;border-radius:10px;
 background:#eee;border:1px solid var(--line)}
 .thumb.sm{width:44px;height:44px;border-radius:8px}
-.thumb.none{display:grid;place-items:center;color:#bbb;font-size:13px}
+.thumb.none{display:grid;place-items:center;color:#bbb;font-size:var(--t-sm,13px)}
 .photo-pick{display:flex;align-items:center;gap:12px}
-.photo-pick input[type=file]{font-size:13px;padding:7px}
+.photo-pick input[type=file]{font-size:var(--t-sm,13px);padding:7px}
 
 /* request cards */
 .req{background:var(--white);border:1px solid var(--line);border-radius:14px;
@@ -329,28 +329,28 @@ padding:22px;margin-bottom:18px}
 .req.done{opacity:.62}
 .req-head{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start;
 padding-bottom:16px;border-bottom:1px solid var(--line);margin-bottom:18px}
-.req-who h3{margin:0 0 4px;font-size:19px}
+.req-who h3{margin:0 0 4px;font-size:var(--t-lg,17px)}
 .req-who a{color:var(--gray);text-decoration:none}
 .req-who a:hover{color:var(--ink)}
-.req-meta{margin-left:auto;text-align:right;font-size:13px;color:var(--gray)}
-.req-sum{display:flex;flex-wrap:wrap;gap:22px;margin:0 0 18px;font-size:13px}
-.req-sum b{display:block;font-size:18px;color:var(--ink)}
+.req-meta{margin-left:auto;text-align:right;font-size:var(--t-sm,13px);color:var(--gray)}
+.req-sum{display:flex;flex-wrap:wrap;gap:22px;margin:0 0 18px;font-size:var(--t-sm,13px)}
+.req-sum b{display:block;font-size:var(--t-lg,17px);color:var(--ink)}
 .req-sum span{color:var(--gray)}
 .picks{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(232px,1fr))}
 .pick{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--white)}
 .pick-top{display:flex;gap:12px;padding:12px}
 .pick-top .thumb{width:62px;height:62px;flex:none}
 .pick-id{min-width:0}
-.pick-id code{font-size:11px;padding:1px 5px}
-.pick-id strong{display:block;font-size:15px;margin:4px 0 2px;
+.pick-id code{font-size:var(--t-xs,12px);padding:1px 5px}
+.pick-id strong{display:block;font-size:var(--t-md,14.5px);margin:4px 0 2px;
 overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pick-id a{font-size:12px;color:var(--gray)}
-.pick dl{margin:0;padding:0 12px 12px;font-size:12.5px}
+.pick-id a{font-size:var(--t-xs,12px);color:var(--gray)}
+.pick dl{margin:0;padding:0 12px 12px;font-size:var(--t-xs,12px)}
 .pick dl div{display:flex;justify-content:space-between;gap:10px;
 padding:5px 0;border-top:1px solid var(--line)}
 .pick dt{color:var(--gray);margin:0}
 .pick dd{margin:0;font-weight:600}
-.pick .gone{padding:14px;color:var(--red);font-size:13px}
+.pick .gone{padding:14px;color:var(--red);font-size:var(--t-sm,13px)}
 @media(max-width:700px){
  header.top .wrap{gap:16px;padding:0 16px}
  nav{gap:14px}
@@ -841,8 +841,8 @@ def code_manage(c, devices):
             "<td class='muted'>" + ago(d["first_at"]) + "</td>"
             "<td class='muted'>" + ago(d["last_at"]) + "</td>"
             "<td class='right'><form method='post' action='" + u("/codes/device/remove") + "' "
-            "class='inline' onsubmit=\"return confirm('Remove this device? It loses access at "
-            "once and its slot is freed.')\"><input type='hidden' name='id' value='" + str(d["id"])
+            "class='inline' data-confirm-title='Remove this device?' data-confirm='It loses access at "
+            "once and its slot is freed.' data-confirm-ok='Remove device'><input type='hidden' name='id' value='" + str(d["id"])
             + "'><input type='hidden' name='code' value='" + cid + "'>"
             "<button class='btn small ghost'>Remove</button></form></td></tr>"
             for d in devices)
@@ -884,21 +884,20 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
         try:
             import portal as _portal
             _cr = _portal.balance(c["id"])
-            used += "<br><span class='muted' style='font-size:12px'>" + str(_cr) + " AI credit" + ("" if _cr == 1 else "s") + "</span>"
+            used += "<br><span class='muted' style='font-size:var(--t-xs,12px)'>" + str(_cr) + " AI credit" + ("" if _cr == 1 else "s") + "</span>"
         except Exception:
             pass
         revoke = ""
         if ok:
-            confirm = "return confirm('Revoke this code? Anyone using it loses access at once.')"
             revoke = (
-                "<form method='post' action='" + u("/codes/revoke") + "' class='inline' onsubmit=\""
-                + confirm + "\"><input type='hidden' name='id' value='" + str(c["id"])
+                "<form method='post' action='" + u("/codes/revoke") + "' class='inline' data-confirm-title='Revoke this access code?' "
+                "data-confirm-what='" + e(c["label"] or "") + "' data-confirm='Anyone using it loses access at once. You can restore it later.' "
+                "data-confirm-ok='Revoke'><input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small danger'>Revoke</button></form>"
             )
         elif reason == "revoked":
             revoke = (
-                "<form method='post' action='" + u("/codes/restore") + "' class='inline' onsubmit=\""
-                + "return confirm('Restore this code? It works again at once.')\">"
+                "<form method='post' action='" + u("/codes/restore") + "' class='inline'>"
                 + "<input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small'>Restore</button></form>"
             )
@@ -907,16 +906,14 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
                 "<form method='post' action='" + u("/codes/unarchive") + "' class='inline'>"
                 + "<input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small'>Unarchive</button></form> "
-                + "<form method='post' action='" + u("/codes/delete") + "' class='inline' onsubmit=\""
-                + "return confirm('Delete this archived code for good? It cannot be restored.')\">"
+                + "<form method='post' action='" + u("/codes/delete") + "' class='inline' data-confirm-title='Delete this code for good?' "
+                + "data-confirm-what='" + e(c["label"] or "") + "' data-confirm='It cannot be restored.' data-confirm-ok='Delete'>"
                 + "<input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small danger'>Delete</button></form>"
             )
         elif not ok:
             revoke += (
-                " <form method='post' action='" + u("/codes/archive") + "' class='inline' onsubmit=\""
-                + "return confirm('Archive this code? It moves to the Archived list and stays off. "
-                + "Selections and campaigns tied to it are not changed.')\">"
+                " <form method='post' action='" + u("/codes/archive") + "' class='inline'>"
                 + "<input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small ghost'>Archive</button></form>"
             )
@@ -936,7 +933,7 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
                   + code_manage(c, by_code.get(c["id"], [])) + "</div></details>")
         names = lists.get(c["id"], [])
         hay = " ".join([c["label"] or "", plain or "", c["hint"] or ""] + names).lower()
-        listed = ("<br><span class='muted' style='font-size:12px'>" + e(", ".join(names[:3]))
+        listed = ("<br><span class='muted' style='font-size:var(--t-xs,12px)'>" + e(", ".join(names[:3]))
                   + ("…" if len(names) > 3 else "") + "</span>") if names else ""
         (arch_rows if reason == "archived" else rows).append(
             "<tr class='code-row' data-q='" + e(hay) + "'><td><strong>" + e(c["label"]) + "</strong><br>" + shown + listed
@@ -1015,7 +1012,7 @@ def hbar(label, n, peak, colour=None, sub=None):
     is the thing you actually want to see."""
     width = str(pct(n, peak) if peak else 0)
     style = ("background:" + colour + ";") if colour else ""
-    left = e(label) + ("<br><span class='muted' style='font-size:12px'>"
+    left = e(label) + ("<br><span class='muted' style='font-size:var(--t-xs,12px)'>"
                        + e(sub) + "</span>" if sub else "")
     return ("<div class='hb'><div>" + left + "</div>"
             "<div class='track'><i class='fill' style='width:" + width + "%;"
@@ -1119,7 +1116,7 @@ def funnel(s):
             drop = ("<span class='drop'>" + str(pct(n, prev)) + "% of previous</span>"
                     if prev else "<span class='drop'>—</span>")
         out.append("<div class='fstep'><div>" + e(label)
-                   + "<br><span class='muted' style='font-size:12px'>" + e(why)
+                   + "<br><span class='muted' style='font-size:var(--t-xs,12px)'>" + e(why)
                    + "</span></div>"
                    "<div><div class='bar' style='width:" + str(w) + "%'>"
                    + str(n) + "</div></div></div>")
@@ -1164,7 +1161,7 @@ def analytics_page(s, events):
                else "<span class='muted'>—</span>")
         rows.append(
             "<tr><td><strong>" + e(c["label"]) + "</strong><br>"
-            "<code class='muted' style='font-size:12px'>••••-" + e(c["hint"])
+            "<code class='muted' style='font-size:var(--t-xs,12px)'>••••-" + e(c["hint"])
             + "</code></td>"
             "<td><span class='pill " + cls + "'>" + e(reason) + "</span></td>"
             "<td>" + str(c["opens"]) + "</td><td>" + str(c["shortlists"]) + "</td>"
@@ -1186,7 +1183,7 @@ def analytics_page(s, events):
         faces.append(
             "<tr><td style='width:46px'>" + shot + "</td>"
             "<td><strong>" + who + "</strong><br>"
-            "<span class='muted' style='font-size:12px'><code>" + e(r["code"])
+            "<span class='muted' style='font-size:var(--t-xs,12px)'><code>" + e(r["code"])
             + "</code>" + (" · " + e(meta) if meta else "") + "</span></td>"
             "<td style='width:45%'><div class='track' style='background:#f1efec;"
             "border-radius:999px;height:9px;overflow:hidden'>"
@@ -1227,7 +1224,7 @@ def analytics_page(s, events):
         "<input type='date' id='to' name='to' value='" + e(d_to)
         + "' max='" + today + "'></div>"
         "<button class='btn'>Apply</button>"
-        "<span class='muted' style='font-size:13px'>" + str(span)
+        "<span class='muted' style='font-size:var(--t-sm,13px)'>" + str(span)
         + (" day" if span == 1 else " days")
         + (", by week" if s["bucket"] == "week" else "") + "</span>"
         "</form>")
@@ -1249,8 +1246,8 @@ def analytics_page(s, events):
         "creators": (
             "<div class='split'><div class='card'><div class='hd'><h2>What clients shortlist</h2></div>"
             "<p class='sec-desc'>The tiers and platforms clients pick most.</p>"
-            "<p class='muted' style='font-size:13px;margin:0 0 6px'>By tier</p>" + rank(s["by_tier"])
-            + "<p class='muted' style='font-size:13px;margin:16px 0 6px'>By platform</p>" + rank(s["by_platform"], "#b9d400") + "</div>"
+            "<p class='muted' style='font-size:var(--t-sm,13px);margin:0 0 6px'>By tier</p>" + rank(s["by_tier"])
+            + "<p class='muted' style='font-size:var(--t-sm,13px);margin:16px 0 6px'>By platform</p>" + rank(s["by_platform"], "#b9d400") + "</div>"
             "<div class='card'><div class='hd'><h2>Most shortlisted creators</h2></div><table><thead><tr>"
             "<th></th><th>Creator</th><th></th><th class='right'>Times</th></tr></thead><tbody>" + top + "</tbody></table></div></div>"),
         "security": (
@@ -1279,13 +1276,12 @@ def tier_row(t, count):
         else "no creators yet"
     delete = ""
     if not count:
-        confirm = "return confirm('Remove the " + name + " tier?')"
         delete = ("<form method='post' action='" + u("/tiers/delete")
-                  + "' class='inline' onsubmit=\"" + confirm + "\">"
+                  + "' class='inline' data-confirm-title='Remove the " + name + " tier?' data-confirm='No creator uses it. You can undo this from History.' data-confirm-ok='Remove tier'>"
                   "<input type='hidden' name='name' value='" + name + "'>"
                   "<button class='btn small ghost'>Remove</button></form>")
     else:
-        delete = ("<span class='muted' style='font-size:12px'>in use</span>")
+        delete = ("<span class='muted' style='font-size:var(--t-xs,12px)'>in use</span>")
 
     return (
         "<form method='post' action='" + u("/tiers/save") + "' class='tier-row'>"
@@ -1322,7 +1318,7 @@ def tier_row(t, count):
         + " style='width:auto' title='On: creators are placed in this tier from their followers. "
           "Off: a category (like HCPs) you assign by hand, and nobody is moved out of it.'></div></div>"
         "<div class='tier-act'><button class='btn small'>Save</button>" + delete
-        + "<span class='muted' style='font-size:12px;margin-left:8px'>" + people
+        + "<span class='muted' style='font-size:var(--t-xs,12px);margin-left:8px'>" + people
         + "</span></div></form>")
 
 
@@ -1349,7 +1345,7 @@ def tiers_section(tiers, used):
         "tier so it has no ceiling. <strong>Order</strong> sets the order tiers "
         "appear in, smallest first.</p>"
         + rows
-        + "<h3 style='margin:22px 0 10px;font-size:15px'>Add a tier</h3>"
+        + "<h3 style='margin:22px 0 10px;font-size:var(--t-md,14.5px)'>Add a tier</h3>"
         "<form method='post' action='" + u("/tiers/save") + "' class='tier-row'>"
         "<div><label>Tier</label><input name='name' placeholder='Mega' required></div>"
         "<div><label>Code</label><input name='code' placeholder='MG' size='4' "
@@ -1415,7 +1411,7 @@ def profile_field(c):
 
     return ("<div class='row'><div class='profiles'>"
             "<label>Profiles</label>"
-            "<div class='muted' style='margin:0 0 10px;font-size:13px'>Pick the "
+            "<div class='muted' style='margin:0 0 10px;font-size:var(--t-sm,13px)'>Pick the "
             "platform, paste the full link, and put the followers on that "
             "profile. Add a row for each one — the same platform twice is fine "
             "if a creator runs two accounts. Clearing a row removes it. The "
@@ -1424,7 +1420,7 @@ def profile_field(c):
             + "".join(out)
             + "<button type='button' class='btn small ghost' onclick=\"" + add
             + "\">+ Add another profile</button>"
-            "<div class='muted reach-note' style='margin-top:8px;font-size:13px'></div>"
+            "<div class='muted reach-note' style='margin-top:8px;font-size:var(--t-sm,13px)'></div>"
             "</div></div>")
 
 
@@ -1445,7 +1441,7 @@ def interest_field(c, interests):
     boxes = "".join(
         "<label class='tick'><input type='checkbox' name='interest' value='" + e(o) + "'"
         + (" checked" if o.lower() in lower else "") + "><span>" + e(o) + "</span></label>"
-        for o in options) or "<span class='muted' style='font-size:13px'>None yet.</span>"
+        for o in options) or "<span class='muted' style='font-size:var(--t-sm,13px)'>None yet.</span>"
 
     return ("<div class='cities'><label>Interests</label>"
             "<div class='ticks'>" + boxes + "</div>"
@@ -1471,7 +1467,7 @@ def city_field(c, cities):
     boxes = "".join(
         "<label class='tick'><input type='checkbox' name='city' value='" + e(o) + "'"
         + (" checked" if o.lower() in lower else "") + "><span>" + e(o) + "</span></label>"
-        for o in options) or "<span class='muted' style='font-size:13px'>None yet.</span>"
+        for o in options) or "<span class='muted' style='font-size:var(--t-sm,13px)'>None yet.</span>"
 
     return ("<div class='cities'><label>City</label>"
             "<div class='ticks'>" + boxes + "</div>"
@@ -1585,7 +1581,7 @@ def price_field(c, bands=None):
     band = ""
     if c is not None and bands and bands.get(c["tier"]):
         lo, hi = bands[c["tier"]]
-        band = "Empty = tier price (" + format(lo, ",") + " – " + format(hi, ",") + " SAR)"
+        band = "Empty = tier price (" + ui.sar_range(lo, hi) + ")"
     else:
         band = "Empty = the tier's price range"
     return (
@@ -1652,12 +1648,12 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, ba
     delete_button = delete_after = ""
     if c is not None:
         ident = "del-" + re.sub(r"[^A-Za-z0-9]", "", c["code"])
-        confirm = "return confirm('Delete " + e(c["code"]) + " permanently?')"
         delete_button = ("<button form='" + ident + "' class='btn small danger' "
                          "style='margin-left:8px'>Delete</button>")
         delete_after = (
             "<form id='" + ident + "' method='post' action='" + u("/roster/delete")
-            + "' onsubmit=\"" + confirm + "\"><input type='hidden' name='code' value='"
+            + "' data-confirm-title='Delete this creator?' data-confirm-what='" + e(c["code"] + " · " + (c["name"] or "")) + "' "
+            "data-confirm='They leave the roster and every selection. You can bring them back from History.' data-confirm-ok='Delete creator'><input type='hidden' name='code' value='"
             + e(c["code"]) + "'><input type='hidden' name='q' value='" + e(q or "")
             + "'><input type='hidden' name='page' value='" + e(str(page_no or 1)) + "'>"
             + date_carry(dates) + "</form>")
@@ -1749,7 +1745,7 @@ def duplicate_group_card(group):
             "<div class='dup'><div class='dup-who'>"
             + ("<img class='tface' src='" + e(links.thumb(c["photo"])) + "' alt=''>" if c["photo"] else "<span class='tface none'>—</span>")
             + "<div><b>" + e(c["name"]) + "</b><br><code>" + e(c["code"]) + "</code> <span class='muted'>" + e(c["tier"] or "") + " · "
-            + num(c["followers"]) + " followers · " + e(c["platform"] or "") + "</span></div></div>"
+            + ui.compact(c["followers"]) + " followers · " + e(c["platform"] or "") + "</span></div></div>"
             "<form method='post' action='" + u("/roster/merge") + "' data-confirm='Combine the records into " + e(c["code"]) + "? Both are kept as one creator, nothing is lost.'>"
             "<input type='hidden' name='keep' value='" + e(c["code"]) + "'>"
             + "".join("<input type='hidden' name='drop' value='" + e(o) + "'>" for o in others)
@@ -1780,7 +1776,7 @@ def _bulk_bar(q=""):
             "var act=document.getElementById('bulk-act'),t=document.getElementById('bulk-tier'),s=document.getElementById('bulk-sel');"
             "act.addEventListener('change',function(){t.hidden=t.disabled=act.value!=='tier';s.hidden=s.disabled=act.value!=='select';});"
             "document.getElementById('bulk-clear').addEventListener('click',function(){boxes().forEach(function(b){b.checked=false;});if(all)all.checked=false;upd();});"
-            "f.addEventListener('submit',function(ev){if(act.value==='hide'&&!confirm('Hide the ticked creators from every client? You can show them again or undo from History.'))ev.preventDefault();});})();</script>")
+            "})();</script>")
 
 
 def roster_page(creators, error=None, message=None, cities=None, tiers=None,
@@ -1807,7 +1803,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
             return ""
         lo, hi = lo or hi, hi or lo
         txt = format(lo, ",") if lo == hi else format(lo, ",") + "–" + format(hi, ",")
-        return "<br><span class='pill own' title='Own price per video'>" + txt + " SAR</span>"
+        return "<br><span class='pill own' title='Own price per video'>SAR " + txt + "</span>"
 
     def row(c):
         hidden = "" if c["active"] else " <span class='pill dead'>hidden</span>"
@@ -1837,7 +1833,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
             + (("<br>" + stars(c["rating"])) if ("rating" in c.keys() and c["rating"]) else "")
             + "</td><td>" + e(c["platform"])
             + "<br><span class='muted'>" + e(handle) + "</span></td><td>"
-            + num(c["followers"]) + "</td><td>" + e(c["tier"]) + own_price(c) + "</td><td>"
+            + ui.compact(c["followers"]) + "</td><td>" + e(c["tier"]) + own_price(c) + "</td><td>"
             + e(", ".join(split_cities(c["city"])) or "—") + "</td>"
             + "<td class='right'>" + button + "</td></tr>")
 
@@ -1914,7 +1910,7 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         "<label class='added'>to<input type='date' name='to' value='" + e(d_to) + "'></label>"
         "<button class='btn small'>Search</button>"
         + ("<a class='btn small ghost' href='" + u("/roster") + "'>Clear</a>" if filtered else "")
-        + "<span class='muted' style='font-size:13px'>" + e(shown) + "</span>"
+        + "<span class='muted' style='font-size:var(--t-sm,13px)'>" + e(shown) + "</span>"
         "<a class='btn small ghost' style='margin-left:auto' href='" + u("/roster/export") + "'>" + ui.icon("download", 15) + " Export .csv</a></form>"
         + _bulk_bar(q)
         + "<div class='card'><table class='roster-t'><thead><tr><th><input type='checkbox' id='rpick-all' aria-label='Select all on this page'></th><th>Code</th>"
@@ -2032,10 +2028,9 @@ def requests_page(requests, creators, tiers=None):
         price = "—"
         t = price_of(c, tiers)
         if t:
-            price = (format(t[0], ",") if t[0] == t[1]
-                     else format(t[0], ",") + " – " + format(t[1], ",")) + " SAR"
+            price = ui.sar_range(t[0], t[1])
 
-        rows = [("Followers", num(c["followers"])), ("Platform", e(c["platform"])),
+        rows = [("Followers", ui.compact(c["followers"])), ("Platform", e(c["platform"])),
                 ("City", e(c["city"] or "—")), ("Tier", e(c["tier"])), ("Price", price)]
         if c["interest"]:
             rows.insert(3, ("Interest", e(c["interest"])))
@@ -2066,7 +2061,7 @@ def requests_page(requests, creators, tiers=None):
             if t:
                 lo += t[0]
                 hi += t[1]
-        total = (format(lo, ",") + " – " + format(hi, ",") + " SAR") if lo else "—"
+        total = ui.sar_range(lo, hi) if lo else "—"
         split_txt = ", ".join(k + " " + str(v) for k, v in sorted(split.items())) or "—"
 
         handled = bool(r["handled_at"])
@@ -2128,7 +2123,7 @@ def requests_page(requests, creators, tiers=None):
 def _money(lo, hi):
     if lo is None:
         return "—"
-    return (format(lo, ",") if lo == hi else format(lo, ",") + " – " + format(hi, ",")) + " SAR"
+    return ui.sar_range(lo, hi)
 
 
 def selection_link(sel, origin):
@@ -2162,7 +2157,7 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
         rows.append(
             "<tr><td><strong><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>"
             + e(x["name"]) + "</a></strong>"
-            + "</td><td>" + client + "</td><td>" + prog + "<span class='muted' style='font-size:12.5px'>Next: " + nxt + "</span></td><td>" + str(n)
+            + "</td><td>" + client + "</td><td>" + prog + "<span class='muted' style='font-size:var(--t-xs,12px)'>Next: " + nxt + "</span></td><td>" + str(n)
             + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
             + "</td><td class='right nowrap'><a class='btn small' href='" + u("/selections/edit") + "?id="
             + str(x["id"]) + "'>Open</a> " + archive_button("selection", x["id"], archived)
@@ -2280,20 +2275,20 @@ VERDICT_JS = r'''<style>
 .vd-list{display:grid;gap:14px;margin-top:12px}
 .vd-item{display:grid;grid-template-columns:minmax(200px,260px) 1fr;gap:20px;padding:16px;border:1px solid var(--line,#e6e1d6);border-radius:14px;background:#fff}
 .vd-who{display:flex;gap:12px;align-items:flex-start}.vd-who .btn{margin-top:8px}
-.vd-main label{display:block;margin:10px 0 4px;font-size:13px;font-weight:600}
+.vd-main label{display:block;margin:10px 0 4px;font-size:var(--t-sm,13px);font-weight:600}
 .vd-main select,.vd-main input[type=text],.vd-main input:not([type]){width:100%}
 .vd-line{display:grid;grid-template-columns:minmax(180px,240px) 1fr;gap:16px;align-items:start}
 .vd-line label{margin-top:0}
 .vd-roles{display:flex;flex-wrap:wrap;gap:8px}
-.vd-role{display:inline-flex!important;align-items:center;gap:6px;margin:0!important;padding:7px 14px;border:1px solid var(--line-strong,#cfc8b8);border-radius:999px;cursor:pointer;font-size:13px!important;font-weight:600}
+.vd-role{display:inline-flex!important;align-items:center;gap:6px;margin:0!important;padding:7px 14px;border:1px solid var(--line-strong,#cfc8b8);border-radius:999px;cursor:pointer;font-size:var(--t-sm,13px)!important;font-weight:600}
 .vd-role:has(input:checked){background:var(--ink,#121212);color:#e8ff76;border-color:var(--ink,#121212)}
 .vd-role input{margin:0}
-.vd-note{font-size:12px;margin-top:6px}
-.vd-why{list-style:none;margin:8px 0 0;padding:0;font-size:12px;display:grid;gap:3px}
+.vd-note{font-size:var(--t-xs,12px);margin-top:6px}
+.vd-why{list-style:none;margin:8px 0 0;padding:0;font-size:var(--t-xs,12px);display:grid;gap:3px}
 .vd-why li{padding:3px 8px;border-radius:8px;background:#f3f1eb}
 .vd-why li.g1{background:#e7f7ed}.vd-why li.g-1{background:#fdeaea}
 .vd-live{display:flex;gap:10px;align-items:flex-start;margin-top:10px;padding:10px;border-radius:12px;background:#f7f5f0}
-.vd-stamp{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:16px;color:#fff;background:#14884a}
+.vd-stamp{flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:var(--t-lg,17px);color:#fff;background:#14884a}
 .vd-stamp.l{background:#8a9a00;color:#fff}.vd-stamp.a{background:#d99a00}.vd-stamp.r{background:#d02424}.vd-stamp.none{background:#cfc8b8}
 @media (max-width:1200px){.vd-line{grid-template-columns:1fr}}
 @media (max-width:900px){.vd-item{grid-template-columns:1fr}}
@@ -2315,8 +2310,8 @@ function suggest(tr,done){var code=tr.querySelector('input[name=vcode]').value;v
    tr.querySelector('.vd-who > div').appendChild(ul)}
   if(done)done()}).catch(function(){note.textContent='Could not suggest.';if(done)done()})}
 document.addEventListener('click',function(e){var b=e.target.closest&&e.target.closest('.vd-suggest');if(b){suggest(row(b))}});
-var all=document.getElementById('vd-all');if(all)all.onclick=function(){var rows=[].slice.call(document.querySelectorAll('.vd-item'));
- var i=0;(function next(){if(i>=rows.length)return;suggest(rows[i++],next)})()}})();</script>'''.replace("%BASE%", """document.querySelector("form[action$='/selections/save']").getAttribute("action").replace(/\/selections\/save$/,"")""")
+document.addEventListener('click',function(e){if(!(e.target.closest&&e.target.closest('#vd-all')))return;var rows=[].slice.call(document.querySelectorAll('.vd-item'));
+ var i=0;(function next(){if(i>=rows.length)return;suggest(rows[i++],next)})()})})();</script>'''.replace("%BASE%", """document.querySelector("form[action$='/selections/save']").getAttribute("action").replace(/\/selections\/save$/,"")""")
 
 
 TAG_JS = r'''<script>(function(){var pool=document.getElementById('tag-pool');if(!pool)return;var last=null;
@@ -2329,6 +2324,164 @@ pool.addEventListener('click',function(e){var a=e.target.closest('a[data-t]');if
 var cur=last.value.split(/[,;]+/).map(function(x){return x.trim()}).filter(Boolean);var t=a.dataset.t;
 if(cur.map(function(x){return x.toLowerCase()}).indexOf(t.toLowerCase())<0)cur.push(t);last.value=cur.join(', ');draw()});
 draw()})();</script>'''
+
+
+def selection_fit_panel(sel, creators, scores=None, interests=()):
+    """The Fit & tags tab, fetched when it is opened (round 4): on a large
+    selection it is most of the page, and most visits never open it."""
+    import fit as _fit
+    import db as _db2
+    by = {c["code"]: c for c in creators}
+    codes = [c for c in json.loads(sel["codes"] or "[]") if c in by]
+    keys = sel.keys()
+    load = lambda k: json.loads((sel[k] if k in keys else None) or "{}")
+    tags_of, verdicts_of, client_tags_of = load("tags"), load("verdicts"), load("client_tags")
+    segs_of, plat_assign_of, client_plat_of = load("segments"), load("platforms"), load("client_platforms")
+    try:
+        target_now = dict(_fit.DEFAULT_TARGET, **{k: v for k, v in load("target").items() if v})
+    except (ValueError, AttributeError):
+        target_now = dict(_fit.DEFAULT_TARGET)
+    obj_now = (sel["objective"] if "objective" in keys else None) or _fit.FROM_CAMPAIGN.get(_db2.selection_campaign_objective(sel["id"]) or "", "Balanced")
+    cards = "".join(_fit_card(
+        code, by[code], ("<img class='thumb sm' src='" + e(links.thumb(by[code]["photo"])) + "' alt='' width='44' height='44' loading='lazy'>"
+                         if by[code]["photo"] else "<span class='thumb sm none'>—</span>"),
+        verdicts_of.get(code) or {}, tags_of.get(code) or [], _fit, client_tags_of.get(code) or [], (scores or {}).get(code),
+        assigned=plat_assign_of.get(code, ""), client_pick=client_plat_of.get(code, ""), segs=segs_of.get(code) or [])
+        for code in codes) or ui.empty("users", "No creators yet", "Add creators on the Creators & prices tab first.")
+    return ("<div class='card'><div class='hd'><h2>Fit &amp; tags</h2></div>"
+            "<p class='sec-desc'>Tell the client whether each creator suits this campaign, and what part they play. "
+            "The client sees the fit, the roles, your reason and the tags on each creator's card, and can filter the selection by them. "
+            "Everything here belongs to this selection only.</p>"
+            "<div class='vd-bar'><div><label for='vd-obj' style='display:block;font-weight:600;font-size:var(--t-sm,13px);margin-bottom:4px'>Judge fit for this objective</label>"
+            "<select name='sel_objective' id='vd-obj'>" + "".join(
+                "<option" + (" selected" if o_ == obj_now else "") + ">" + o_ + "</option>" for o_ in _fit.OBJECTIVES) + "</select></div>"
+            "<button type='button' class='btn small' id='vd-all'>Suggest fit &amp; role for everyone</button> "
+            "<span class='muted' style='flex:1;min-width:260px'>Suggestions weigh each creator's analysis against the benchmark ranges in Settings, "
+            "their audience in KSA, their reach and our own past campaigns with them, for the objective chosen. "
+            "Nothing is shown to the client until you save.</span></div>"
+            "<div class='card' style='background:#f7f5f0;margin:0 0 14px'><strong>Who this selection is for</strong>"
+            "<div class='price-hint' style='margin:4px 0 8px'>The matching score on every card is measured against this and the objective above.</div>"
+            "<div class='row'><div><label>Target country</label><select name='t_country' id='t-country'>" + "".join(
+                "<option value='" + k_ + "'" + (" selected" if k_ == target_now["country"] else "") + ">" + e(n_) + "</option>" for k_, n_ in _fit.COUNTRIES) + "</select></div>"
+            "<div><label>Audience gender</label><select name='t_gender' id='t-gender'>" + "".join(
+                "<option" + (" selected" if g_ == target_now["gender"] else "") + ">" + g_ + "</option>" for g_ in _fit.GENDERS) + "</select></div>"
+            "<div><label>Audience age</label><select name='t_age' id='t-age'><option>Any</option>" + "".join(
+                "<option" + (" selected" if a_ == target_now["age"] else "") + ">" + a_ + "</option>" for a_ in _fit.AGE_BANDS) + "</select></div>"
+            "<div style='flex:3'><label>Product categories (tick all that apply)</label><div class='vd-roles' id='t-category'>" + "".join(
+                "<label class='vd-role'><input type='checkbox' name='t_category' value=\"" + e(i_) + "\""
+                + (" checked" if i_.lower() in [c_.lower() for c_ in str(target_now["category"]).split("|")] else "") + "> <span>" + e(i_) + "</span></label>"
+                for i_ in interests) + "</div></div></div></div>"
+            "<div class='price-hint' id='tag-pool' data-pool='" + e(json.dumps(sorted({t for v in tags_of.values() for t in v}, key=str.lower))) + "'></div>"
+            "<div class='vd-list'>" + cards + "</div>"
+            "<p class='price-hint'>Tags are your own labels (Hero, Beauty, Backup…), separated by commas. Click a tag in <i>Tags in use</i> to add it to the box you last typed in. "
+            "Press <b>Save changes</b> below when done.</p><input type='hidden' name='fit_loaded' value='1'></div>" + TAG_JS)
+
+
+_SEL_DRAWER = (
+    "<div class='sd-scrim' id='sd-scrim' hidden></div>"
+    "<aside class='sel-drawer' id='sel-drawer' role='dialog' aria-labelledby='sd-name' hidden>"
+    "<header><div class='sd-face' id='sd-face'></div><div class='sd-id'><h2 id='sd-name'></h2><p id='sd-meta'></p></div>"
+    "<button type='button' class='sd-x' id='sd-x' aria-label='Close'>×</button></header>"
+    "<div class='sd-body'><dl class='sd-facts'><div><dt>Standard price</dt><dd id='sd-std'></dd></div><div><dt>Roster price</dt><dd id='sd-roster'></dd></div></dl>"
+    "<p class='sd-acct' id='sd-acct'></p>"
+    "<label for='sd-cost'>Cost to us (<span class='cur-lbl'></span>)</label><input id='sd-cost' inputmode='numeric' autocomplete='off'>"
+    "<div class='sd-pair'><div><label for='sd-from'>Client price from</label><input id='sd-from' inputmode='numeric' autocomplete='off'></div>"
+    "<div><label for='sd-to'>to</label><input id='sd-to' inputmode='numeric' autocomplete='off'></div></div>"
+    "<p class='sd-gain' id='sd-gain' aria-live='polite'></p>"
+    "<label class='tick sd-def'><input type='checkbox' id='sd-default'> Also make it their roster price, so later selections start from it</label>"
+    "<p><a id='sd-open' target='_blank' rel='noopener'>Open on the roster ↗</a></p></div>"
+    "<footer><button type='button' class='btn small ghost' id='sd-prev'>← Previous</button><button type='button' class='btn small ghost' id='sd-next'>Next →</button>"
+    "<span class='sd-gap'></span><button type='button' class='btn small danger' id='sd-drop'>Remove</button>"
+    "<button type='button' class='btn small' id='sd-done'>Done</button></footer></aside>")
+
+
+SEL_JS = r"""<script>
+(function(){
+  var $=function(q,r){return (r||document).querySelector(q)}, $$=function(q,r){return [].slice.call((r||document).querySelectorAll(q))};
+  var m=$('#sel-margin'); if(!m) return;
+  var body=$('.sel-table tbody'), rows=$$('tr.sr',body), dr=$('#sel-drawer'), scrim=$('#sd-scrim'), cur_r=null, opener=null;
+  var base=$("form[action$='/selections/save']").getAttribute('action').replace(/\/selections\/save$/,'');
+  function cur(){ return m.getAttribute('data-cur')||'SAR'; }
+  function inp(r,n){ return r.querySelector('input[name='+n+']'); }
+  function dropped(r){ return !inp(r,'drop').disabled; }
+  function money(v){ return v ? cur()+' '+v : ''; }
+  function paint(r){
+    var c=inp(r,'cost').value, a=inp(r,'p_from').value, b=inp(r,'p_to').value;
+    r.querySelector('.sr-cost').innerHTML=c?money(c):'<span class="muted">—</span>';
+    r.querySelector('.sr-price').innerHTML=a?(b&&b!==a?cur()+' '+a+'–'+b:money(a)):'<span class="muted" title="No price typed: the standard price counts">Standard</span>';
+    r.classList.toggle('is-dropped',dropped(r));
+  }
+  function paintAll(){ rows.forEach(paint); $$('.cur-lbl').forEach(function(l){l.textContent=cur();}); }
+  function fill(){ if(!cur_r) return; var r=cur_r;
+    [['sd-cost','cost'],['sd-from','p_from'],['sd-to','p_to']].forEach(function(x){ var f=$('#'+x[0]); if(document.activeElement!==f) f.value=inp(r,x[1]).value; });
+    $('#sd-gain').textContent=r.querySelector('.profit').textContent||'';
+    $('#sd-gain').classList.toggle('neg',/^-|\s-/.test($('#sd-gain').textContent));
+    $('#sd-default').checked=!inp(r,'default').disabled;
+    $('#sd-drop').textContent=dropped(r)?'Keep in selection':'Remove';
+  }
+  function visible(){ return rows.filter(function(r){return !r.hidden;}); }
+  function open(r,focus){ if(cur_r) cur_r.removeAttribute('aria-current'); cur_r=r; r.setAttribute('aria-current','true');
+    var img=r.querySelector('.thumb'); $('#sd-face').innerHTML=img?img.outerHTML:'';
+    $('#sd-name').textContent=r.querySelector('.sr-who b').textContent; $('#sd-meta').textContent=r.querySelector('.sr-who small').textContent;
+    $('#sd-std').textContent=r.dataset.std||'—'; $('#sd-roster').textContent=r.dataset.roster||'—';
+    $('#sd-acct').textContent=r.dataset.acct||''; $('#sd-acct').hidden=!r.dataset.acct;
+    $('#sd-open').href=base+'/roster?edit='+encodeURIComponent(r.dataset.code)+'#'+r.dataset.code;
+    var v=visible(), i=v.indexOf(r); $('#sd-prev').disabled=i<=0; $('#sd-next').disabled=i<0||i>=v.length-1;
+    fill(); dr.hidden=false; scrim.hidden=false; document.body.classList.add('sd-open');
+    requestAnimationFrame(function(){ dr.classList.add('in'); });
+    if(focus!==false) $('#sd-cost').focus();
+  }
+  function close(){ if(!cur_r) return; dr.classList.remove('in'); document.body.classList.remove('sd-open');
+    var r=cur_r; cur_r=null; r.removeAttribute('aria-current'); dr.hidden=true; scrim.hidden=true;
+    var b=r.querySelector('.sr-edit'); b&&b.focus(); }
+  function push(field,name){ if(!cur_r) return; var h=inp(cur_r,name); h.value=$('#'+field).value;
+    h.dispatchEvent(new Event('input',{bubbles:true})); paint(cur_r); fill(); }
+  $('#sd-cost').addEventListener('input',function(){push('sd-cost','cost');});
+  $('#sd-from').addEventListener('input',function(){push('sd-from','p_from');});
+  $('#sd-to').addEventListener('input',function(){push('sd-to','p_to');});
+  $('#sd-default').addEventListener('change',function(){ if(cur_r) inp(cur_r,'default').disabled=!this.checked; });
+  $('#sd-drop').addEventListener('click',function(){ if(!cur_r) return; var d=inp(cur_r,'drop'); d.disabled=!d.disabled;
+    if(window.hvSelRun) window.hvSelRun(); paint(cur_r); fill(); });
+  $('#sd-prev').addEventListener('click',function(){ var v=visible(), i=v.indexOf(cur_r); if(i>0) open(v[i-1]); });
+  $('#sd-next').addEventListener('click',function(){ var v=visible(), i=v.indexOf(cur_r); if(i<v.length-1) open(v[i+1]); });
+  $('#sd-done').addEventListener('click',close); $('#sd-x').addEventListener('click',close); scrim.addEventListener('click',close);
+  dr.addEventListener('keydown',function(ev){ if(ev.key==='Escape'){ ev.preventDefault(); ev.stopPropagation(); close(); }
+    if(ev.key==='Enter'&&ev.target.tagName==='INPUT'&&ev.target.type!=='checkbox'){ ev.preventDefault(); $('#sd-next').disabled?close():$('#sd-next').click(); } });
+  body.addEventListener('click',function(ev){ var r=ev.target.closest('tr.sr'); if(!r||ev.target.closest('a')) return; open(r); });
+  body.addEventListener('keydown',function(ev){ var r=ev.target.closest('tr.sr'); if(r&&ev.target===r&&(ev.key==='Enter'||ev.key===' ')){ ev.preventDefault(); open(r); } });
+  document.addEventListener('input',function(ev){ var t=ev.target; if(t===m||t.id==='sel-margin-max'||t.name==='total_from'){ paintAll(); fill(); } });
+  var cs=$('select[name=currency]'); if(cs) cs.addEventListener('change',function(){ setTimeout(function(){ paintAll(); fill(); },0); });
+  // find within the selection
+  var fd=$('#sel-find'), cnt=$('#sel-count');
+  if(fd) fd.addEventListener('input',function(){ var q=fd.value.trim().toLowerCase(), n=0;
+    rows.forEach(function(r){ var ok=!q||(r.querySelector('.sr-who b').textContent+' '+r.dataset.code).toLowerCase().indexOf(q)>=0; r.hidden=!ok; if(ok) n++; });
+    cnt.textContent=q?(n+' of '+rows.length+' shown'):(rows.length+' creator'+(rows.length===1?'':'s')); });
+  paintAll();
+  // add creators: type-ahead over the whole roster, asked for as you type
+  var add=$('#sel-add'), list=$('#sel-add-list'), t=null, act=-1;
+  function pick(li){ var parts=add.value.split(','); parts[parts.length-1]=' '+li.dataset.v; add.value=parts.join(',').replace(/^\s+/,'')+', '; list.hidden=true; add.setAttribute('aria-expanded','false'); add.focus(); }
+  if(add){ add.addEventListener('input',function(){ var q=add.value.split(',').pop().trim(); clearTimeout(t); act=-1;
+      if(q.length<2){ list.hidden=true; add.setAttribute('aria-expanded','false'); return; }
+      t=setTimeout(function(){ fetch((window.HV_SEARCH||'')+'?q='+encodeURIComponent(q),{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(d){
+        var cs=(d.creators||[]); list.innerHTML=cs.map(function(c,i){ var code=(c.hint||'').split(' · ')[0];
+          return '<li role="option" id="ta-'+i+'" data-v="'+(c.label+' ('+code+')').replace(/"/g,'&quot;')+'"><b></b><small></small></li>'; }).join('');
+        $$('li',list).forEach(function(li,i){ li.querySelector('b').textContent=cs[i].label; li.querySelector('small').textContent=cs[i].hint||''; });
+        list.hidden=!cs.length; add.setAttribute('aria-expanded',cs.length?'true':'false'); }).catch(function(){}); },180); });
+    add.addEventListener('keydown',function(ev){ var li=$$('li',list); if(list.hidden||!li.length) return;
+      if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ ev.preventDefault(); act=(act+(ev.key==='ArrowDown'?1:-1)+li.length)%li.length;
+        li.forEach(function(x,i){x.setAttribute('aria-selected',i===act?'true':'false');}); add.setAttribute('aria-activedescendant','ta-'+act); }
+      else if(ev.key==='Enter'&&act>=0){ ev.preventDefault(); pick(li[act]); } else if(ev.key==='Escape'){ list.hidden=true; } });
+    list.addEventListener('mousedown',function(ev){ var li=ev.target.closest('li'); if(li){ ev.preventDefault(); pick(li); } });
+    add.addEventListener('blur',function(){ setTimeout(function(){ list.hidden=true; add.setAttribute('aria-expanded','false'); },120); }); }
+  // the Fit & tags tab is fetched the first time it is opened
+  var lazy=$('[data-panel=fit][data-lazy]');
+  function load(){ if(!lazy||lazy._done||lazy.hidden) return; lazy._done=true;
+    fetch(lazy.getAttribute('data-lazy'),{credentials:'same-origin'}).then(function(r){ if(!r.ok) throw 0; return r.text(); }).then(function(h){
+      lazy.innerHTML=h; $$('script',lazy).forEach(function(o){ var n=document.createElement('script'); n.textContent=o.textContent; o.replaceWith(n); });
+      lazy.removeAttribute('aria-busy'); }).catch(function(){ lazy._done=false; lazy.innerHTML='<div class="card"><p class="err">Could not load this tab. <a href="">Reload the page</a>.</p></div>'; }); }
+  if(lazy){ new MutationObserver(load).observe(lazy,{attributes:true,attributeFilter:['hidden']}); load(); }
+})();
+</script>"""
 
 
 def _brief_note(sel):
@@ -2373,7 +2526,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     rate_c = float(usable.get(cur, 1.0)) if cur != "SAR" else 1.0
     step_c = {"USD": 5, "EGP": 50}.get(cur, 10)
     money_c = lambda lo, hi: "—" if lo is None else (
-        (format(conv(lo), ",") if lo == hi else format(conv(lo), ",") + " – " + format(conv(hi), ",")) + " " + cur)
+        cur + " " + (format(conv(lo), ",") if lo == hi else format(conv(lo), ",") + "–" + format(conv(hi), ",")))
     costs = json.loads((sel["costs"] if "costs" in keys else None) or "{}")
     tags_of = json.loads((sel["tags"] if "tags" in keys else None) or "{}")
     verdicts_of = json.loads((sel["verdicts"] if "verdicts" in keys else None) or "{}")
@@ -2401,7 +2554,6 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
 
     lo_sum = hi_sum = 0
     rows = []
-    fit_cards_l = []
     for code in codes:
         c = by.get(code)
         if c is None:
@@ -2411,10 +2563,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         eff = set_ or default
         if eff and eff[0] is not None:
             lo_sum += eff[0]; hi_sum += eff[1]
-        shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='44' height='44'>"
+        shot = ("<img class='thumb sm' src='" + e(links.thumb(c["photo"])) + "' alt='' width='40' height='40' loading='lazy'>"
                 if c["photo"] else "<span class='thumb sm none'>—</span>")
-        fit_cards_l.append(_fit_card(code, c, shot, verdicts_of.get(code) or {}, tags_of.get(code) or [], _fit, client_tags_of.get(code) or [], (scores or {}).get(code),
-                                     assigned=plat_assign_of.get(code, ""), client_pick=client_plat_of.get(code, ""), segs=segs_of.get(code) or []))
         val = lambda i: format(conv(set_[i]), ",") if set_ else ""
         # The cost this selection was priced from, else the creator's last
         # known cost — a starting point the admin can change.
@@ -2424,30 +2574,28 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         # Costs are kept in SAR but shown and typed in the selection's currency,
         # so the whole page speaks one currency.
         cost_txt = format(int(round(cost * rate_c)), ",") if cost is not None else ""
+        accts = " · ".join("%s %s %s" % (a["platform"] or "", ui.compact(a["followers"]), a["tier"] or "")
+                           for a in db_account_tiers(c) if a["followers"])
+        roster_now = (money_c(c["price_from"], c["price_to"] or c["price_from"])
+                      if ("price_from" in c.keys() and c["price_from"]) else "Tier price")
+        # One compact, read-only row per creator; the fields live in hidden
+        # inputs and are edited in the side drawer (round 4).
         rows.append(
-            "<tr><td>" + shot + "</td><td><code>" + e(code) + "</code><br>" + roster_link(code, c["name"])
+            "<tr class='sr' tabindex='0' data-code='" + e(code) + "' data-acct=\"" + e(accts)
+            + "\" data-std=\"" + e(money_c(*default) if default[0] is not None else "—") + "\" data-roster=\"" + e(roster_now) + "\">"
+            "<td class='sr-who'>" + shot + "<span><b>" + e(c["name"]) + "</b>"
             + ("" if c["active"] else " <span class='pill dead'>hidden</span>")
-            + "<input type='hidden' name='code' value='" + e(code) + "'></td>"
-            + "<td>" + e(c["tier"]) + "<br><span class='muted'>" + num(c["followers"]) + "</span>"
-            + "".join("<div class='acct'>" + e(a["platform"] or "") + " " + num(a["followers"])
-                      + " · " + e(a["tier"] or "—") + "</div>"
-                      for a in db_account_tiers(c) if a["followers"]) + "</td>"
-            + "<td class='muted'>" + (money_c(*default) if default[0] is not None else "—")
-        )
-        rows[-1] += (
-            "</td><td><input name='cost' value='" + cost_txt + "' placeholder='cost' inputmode='numeric'>"
-            + "<div class='profit'></div></td>"
-            + "<td><input name='p_from' value='" + val(0) + "' placeholder='from' inputmode='numeric'"
-              + (" data-def='%d|%d'" % (default[0], default[1]) if default and default[0] is not None else "") + "></td>"
-            + "<td><input name='p_to' value='" + val(1) + "' placeholder='to' inputmode='numeric'></td>"
-            + "<td><label class='tick' title='Also save this price as the creator&#39;s price on the roster, so every later selection starts from it'>"
-              "<input type='checkbox' name='default' value='" + e(code) + "'> make default</label>"
-            + ("<div class='muted' style='font-size:12px'>roster now: " + money_c(c["price_from"], c["price_to"] or c["price_from"]) + "</div>"
-               if ("price_from" in c.keys() and c["price_from"]) else "<div class='muted' style='font-size:12px'>roster: tier price</div>") + "</td>"
-            + ""
-            + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code) + "'> remove</label></td></tr>")
-    table = "".join(rows) or "<tr><td colspan='8' class='muted'>No creators yet — add some below.</td></tr>"
-    fit_cards = "".join(fit_cards_l) or "<p class='muted'>No creators yet — add some on the Creators &amp; prices tab.</p>"
+            + "<small>" + e(code) + " · " + e(c["tier"] or "—") + " · " + ui.compact(c["followers"]) + "</small></span></td>"
+            "<td class='num sr-cost'></td><td class='num sr-price'></td><td class='sr-gain'><div class='profit'></div></td>"
+            "<td class='sr-act'><button type='button' class='btn tiny ghost sr-edit' aria-label='Edit prices'>Edit</button>"
+            "<input type='hidden' name='code' value='" + e(code) + "'>"
+            "<input type='hidden' name='cost' value='" + cost_txt + "'>"
+            "<input type='hidden' name='p_from' value='" + val(0) + "'"
+            + (" data-def='%d|%d'" % (default[0], default[1]) if default and default[0] is not None else "") + ">"
+            "<input type='hidden' name='p_to' value='" + val(1) + "'>"
+            "<input type='hidden' name='default' value='" + e(code) + "' disabled>"
+            "<input type='hidden' name='drop' value='" + e(code) + "' disabled></td></tr>")
+    table = "".join(rows) or "<tr><td colspan='5'>" + ui.empty("users", "No creators yet", "Add creators below, by name or code.") + "</td></tr>"
     missing = [c for c in codes if c not in by]
     link = selection_link(sel, origin)
     tf = "" if sel["total_from"] is None else format(conv(sel["total_from"]), ",")
@@ -2460,8 +2608,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
                                ("Set prices", "done" if st_done[1] else ("now" if first_open == 1 else "todo")),
                                ("Share with the client", "done" if st_done[2] else ("now" if first_open == 2 else "todo")),
                                ("Start a campaign", "done" if st_done[3] else ("now" if first_open == 3 else "todo"))])
-    roster_list = "<datalist id='seg-list'>" + "".join("<option value=\"%s\">" % e(n_) for n_ in seg_names) + "</datalist>" + "<datalist id='roster-list'>" + "".join(
-        "<option value=\"%s (%s)\">" % (e(c["name"]), e(c["code"])) for c in creators if c["active"]) + "</datalist>"
+    roster_list = "<datalist id='seg-list'>" + "".join("<option value=\"%s\">" % e(n_) for n_ in seg_names) + "</datalist>"
     shown_client = (sel["client_name"] if "client_name" in sel.keys() else None) or ""
     client_pill = ("<span class='pill own'>" + e(shown_client or sel["code_label"]) + "</span>" if ("code_label" in sel.keys() and sel["code_label"]) or shown_client
                    else "<span class='pill warn'>No client assigned</span>")
@@ -2492,63 +2639,31 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "<form method='post' action='" + u("/selections/save") + "' enctype='multipart/form-data'>"
         + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
         + "<div class='panel' data-panel='creators'>"
-+ "<div class='card'><div class='row'>"
-          "<div style='display:flex;gap:10px'><div><label>Minimum margin (%)</label><div class='margin-box'>"
+        + "<div class='card sel-bar'><div class='sel-margins'>"
+          "<div><label for='sel-margin'>Minimum margin %</label>"
           "<input name='margin' id='sel-margin' data-cur='" + cur + "' data-rate='" + str(usable.get(cur, 1))
-        + "' value='" + margin_txt + "' placeholder='e.g. 40' "
-          "inputmode='decimal'></div></div>"
-          "<div><label>Maximum margin (%)</label><div class='margin-box'>"
-          "<input name='margin_max' id='sel-margin-max' value='" + margin_max_txt + "' placeholder='e.g. 70' inputmode='decimal'></div></div></div>"
-          "<div class='price-hint'>Cost to us is what we pay the creator, with no profit in it. The client's price runs from "
-          "<b>cost + minimum margin</b> (the lowest price that still covers our profit) up to <b>cost + maximum margin</b>, "
-          "rounded up to the next " + str(step_c) + " " + cur + ". Leave the maximum empty for one price. "
-          "You can type any creator's range, or the total, yourself. Internal only — the client sees only the range.</div></div>"
-          "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
-          "</div>"
-        + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
-          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th></th>"
-          "</tr></thead><tbody>"
+        + "' value='" + margin_txt + "' placeholder='e.g. 40' inputmode='decimal'></div>"
+          "<div><label for='sel-margin-max'>Maximum margin %</label>"
+          "<input name='margin_max' id='sel-margin-max' value='" + margin_max_txt + "' placeholder='e.g. 70' inputmode='decimal'></div></div>"
+          "<dl class='money-sum' id='sel-money'></dl>"
+          "<details class='sel-how'><summary>How pricing works</summary><p class='price-hint'>Cost is what we pay the creator. The client's price runs from "
+          "<b>cost + minimum margin</b> to <b>cost + maximum margin</b>, rounded up to the next " + str(step_c) + " " + cur + "; leave the maximum empty for one price. "
+          "Type a price yourself to override it — the profit and margin are worked out for you. With no cost and no price, the creator's standard price counts. "
+          "A price stays in this selection unless you tick <b>make it their roster price</b>. The client sees only the total, never costs or margins.</p></details></div>"
+        + "<div class='card sel-list'><div class='sel-tools'><div class='sel-find'><label class='vh' for='sel-find'>Find a creator in this selection</label>"
+          "<input id='sel-find' type='search' placeholder='Find in this selection…' autocomplete='off'></div>"
+          "<span class='muted' id='sel-count'>" + str(n_cr) + " creator" + ("" if n_cr == 1 else "s") + "</span></div>"
+          "<table class='sel-table' data-nosort data-nocols><thead><tr><th>Creator</th><th class='num'>Cost to us</th><th class='num'>Client price</th><th>Profit</th>"
+          "<th><span class='vh'>Edit</span></th></tr></thead><tbody>"
         + table + "</tbody></table>"
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
-        + "<p class='price-hint'>Type a creator's cost and their price is worked out from the "
-          "margin above. With no cost, type the price yourself, or leave it empty to use the "
-          "creator's standard price. One figure = a fixed price. The client never sees a price "
-          "against a creator — these add up to the total they see, unless you type a total above. "
-          "Type a creator's <b>cost</b> and their price follows the margin, or type the <b>price</b> yourself and the "
-          "profit and margin are worked out for you. The totals fill themselves. A price typed here stays in <b>this selection only</b>. Tick <b>make default</b> to also save it "
-          "as that creator's price on the roster, so every later selection starts from it. A cost is "
-          "remembered for their next selection.</p>"
-        + "<div class='row'><div style='flex:2'><label>Add creators (optional)</label>"
-          "<input name='add' list='roster-list' placeholder='Type a creator\'s name or code…' autocomplete='off'>"
-          "<div class='price-hint'>Pick from the list, or paste several codes separated by commas.</div></div></div>"
-                + "</div></div>"
-        + "<div class='panel' data-panel='fit' hidden><div class='card'><div class='hd'><h2>Fit &amp; tags</h2></div>"
-          "<p class='sec-desc'>Tell the client whether each creator suits this campaign, and what part they play. "
-          "The client sees the fit, the roles, your reason and the tags on each creator's card, and can filter the selection by them. "
-          "Everything here belongs to this selection only.</p>"
-          "<div class='vd-bar'><div><label style='display:block;font-weight:600;font-size:13px;margin-bottom:4px'>Judge fit for this objective</label>"
-          "<select name='sel_objective' id='vd-obj'>" + "".join(
-              "<option" + (" selected" if o_ == obj_now else "") + ">" + o_ + "</option>" for o_ in _fit.OBJECTIVES) + "</select></div>"
-          "<button type='button' class='btn small' id='vd-all'>Suggest fit &amp; role for everyone</button> "
-          "<span class='muted' style='flex:1;min-width:260px'>Suggestions weigh each creator's analysis against the benchmark ranges in Settings, "
-          "their audience in KSA, their reach and our own past campaigns with them, for the objective chosen. "
-          "Or ignore them and fill everything in by hand — nothing is shown to the client until you save.</span></div>"
-          "<div class='card' style='background:#f7f5f0;margin:0 0 14px'><strong>Who this selection is for</strong>"
-          "<div class='price-hint' style='margin:4px 0 8px'>The matching score on every card is measured against this and the objective above. It updates itself — no button to press.</div>"
-          "<div class='row'><div><label>Target country</label><select name='t_country' id='t-country'>" + "".join(
-              "<option value='" + k_ + "'" + (" selected" if k_ == target_now["country"] else "") + ">" + e(n_) + "</option>" for k_, n_ in _fit.COUNTRIES) + "</select></div>"
-          "<div><label>Audience gender</label><select name='t_gender' id='t-gender'>" + "".join(
-              "<option" + (" selected" if g_ == target_now["gender"] else "") + ">" + g_ + "</option>" for g_ in _fit.GENDERS) + "</select></div>"
-          "<div><label>Audience age</label><select name='t_age' id='t-age'><option>Any</option>" + "".join(
-              "<option" + (" selected" if a_ == target_now["age"] else "") + ">" + a_ + "</option>" for a_ in _fit.AGE_BANDS) + "</select></div>"
-          "<div style='flex:3'><label>Product categories (tick all that apply)</label><div class='vd-roles' id='t-category'>" + "".join(
-              "<label class='vd-role'><input type='checkbox' name='t_category' value=\"" + e(i_) + "\""
-              + (" checked" if i_.lower() in [c_.lower() for c_ in str(target_now["category"]).split("|")] else "") + "> <span>" + e(i_) + "</span></label>"
-              for i_ in interests) + "</div></div></div></div>"
-          "<div class='price-hint' id='tag-pool' data-pool='" + e(json.dumps(sorted({t for v in tags_of.values() for t in v}, key=str.lower))) + "'></div>"
-          "<div class='vd-list'>" + fit_cards + "</div>"
-          "<p class='price-hint'>Tags are your own labels (Hero, Beauty, Backup…), separated by commas. Click a tag in <i>Tags in use</i> to add it to the box you last typed in. "
-          "Remember to press <b>Save changes</b> below.</p></div></div>"
+        + "<div class='sel-add'><label for='sel-add'>Add creators</label><div class='ta'>"
+          "<input name='add' id='sel-add' placeholder='Type a name or code; paste several codes with commas' autocomplete='off' role='combobox' aria-expanded='false' aria-controls='sel-add-list' aria-autocomplete='list'>"
+          "<ul class='ta-list' id='sel-add-list' role='listbox' hidden></ul></div>"
+          "<div class='price-hint'>They join when you save.</div></div>"
+        + "</div>" + _SEL_DRAWER + "</div>"
+        + "<div class='panel' data-panel='fit' hidden data-lazy='" + u("/selections/fit") + "?id=" + str(sel["id"]) + "'>"
+          "<div class='card lazy-wait' aria-busy='true'><div class='sk'></div><div class='sk'></div><div class='sk short'></div></div></div>"
         + "<div class='panel' data-panel='details' hidden><div class='card'><div class='hd'><h2>Details</h2></div>"
           "<p class='sec-desc'>What the client sees, which platform is priced, the currency and the total.</p>"
 + "<div class='row'><div style='flex:2'><label>Selection name (the client sees this)</label>"
@@ -2590,7 +2705,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "<form method='post' action='" + u("/selections/delete") + "' data-confirm='Delete this selection? Its link stops working. You can restore it from History.' style='margin-top:12px'>"
         + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
         + "<button class='btn small danger'>Delete selection</button></form></details>"
-        + MARGIN_JS + TAG_JS + VERDICT_JS
+        + EDITOR_STYLE + "<script src='" + u("/editor.js") + "?v=" + EDITOR_VER + "'></script>"
     )
     return page(sel["name"] + " — Selection", body, "/selections")
 
@@ -2610,7 +2725,7 @@ MARGIN_JS = """<script>
   var step=stepOf(cur);
   function n(v){v=String(v==null?'':v).replace(/[^0-9.]/g,'');return v===''?null:Number(v);}
   function num(x){return Math.round(x).toLocaleString('en-US');}
-  function fmt(x){return num(x)+' '+cur;}
+  function fmt(x){return cur+' '+num(x);}
   function price(cost,mg){return Math.ceil(cost*(1+(mg||0)/100)/step)*step;}
   function sh(v){return rate===1?v:Math.round(v*rate/step)*step;}      // a SAR amount, shown in this currency
   var rows=[].slice.call(document.querySelectorAll('.sel-table tbody tr')).filter(function(r){
@@ -2650,15 +2765,15 @@ MARGIN_JS = """<script>
   function run(){
     var mg=n(m.value), tc=0, tpl=0, tph=0, tlo=0, thi=0, costed=0, counted=0;
     rows.forEach(function(r){
-      var out=r.querySelector('.profit'), gone=r.querySelector('input[name=drop]').checked, x=rowPrice(r,mg);
+      var out=r.querySelector('.profit'), gone=!r.querySelector('input[name=drop]').disabled, x=rowPrice(r,mg);
       out.textContent='';
       if(x.lo!==null){
         if(x.cost!==null){
           var p1=x.lo-x.cost, p2=x.hi-x.cost, m1=x.cost?p1/x.cost*100:0, m2=x.cost?p2/x.cost*100:0;
           function sg(v){return (v>=0?'+':'')+num(v);}
-          out.textContent=(p1===p2?sg(p1):sg(p1)+' to '+sg(p2))+' '+cur+' profit · '+(p1===p2?(Math.round(m1*10)/10):(Math.round(m1*10)/10)+'–'+(Math.round(m2*10)/10))+'% margin'+(x.manual?' (your price)':'');
+          out.textContent=cur+' '+(p1===p2?sg(p1):sg(p1)+' to '+sg(p2))+' · '+(p1===p2?(Math.round(m1*10)/10).toFixed(1):(Math.round(m1*10)/10).toFixed(1)+'–'+(Math.round(m2*10)/10).toFixed(1))+'% margin'+(x.manual?' · your price':'');
           out.style.color=p1<0?'#c01010':'';
-        } else if(x.standard) out.textContent='standard price';
+        } else if(x.standard) out.textContent='';
       }
       if(gone) return;
       if(x.lo!==null){tlo+=x.lo;thi+=x.hi;counted++;}
@@ -2671,7 +2786,7 @@ MARGIN_JS = """<script>
       '<div><dt>Client price ('+counted+')</dt><dd>'+priceTxt+'</dd></div>'+
       (costed?'<div><dt>Profit'+(same?'':' (min – max)')+'</dt><dd class="gain">'+(same?fmt(pl):fmt(pl)+' – '+fmt(ph))+'</dd></div>'+
         '<div><dt>Margin on cost</dt><dd class="gain">'+(same?(Math.round(ml*10)/10)+'%':(Math.round(ml*10)/10)+'% – '+(Math.round(mh*10)/10)+'%')+'</dd></div>':'')):
-      '<div><dt>Profit</dt><dd class="muted" style="font-size:14px;font-weight:400">'+
+      '<div><dt>Profit</dt><dd class="muted" style="font-size:var(--t-md,14.5px);font-weight:400">'+
       'Type a cost and a price against a creator to see it.</dd></div>';
     rows.forEach(function(r){var a=r.querySelector('input[name=p_from]'), z=r.querySelector('input[name=p_to]'); a.dataset.prev=a.value; z.dataset.prev=z.value;});
     // The total the client sees follows the prices, unless typed by hand.
@@ -2727,7 +2842,7 @@ MARGIN_JS = """<script>
       run();
     });
   }
-  document.addEventListener('change',function(e){if(e.target.name==='drop') run();});
+  window.hvSelRun=run;
   run();
 })();
 </script>"""
@@ -2786,7 +2901,7 @@ def status_button(k):
         "ended": ("live", "Reopen", "btn small ghost", "Reopen this campaign as live?"),
     }.get(k["status"], ("live", "Go live", "btn small lime", "Go live?"))
     return ("<form method='post' action='" + u("/campaigns/status") + "' class='inline' "
-            "onsubmit=\"return confirm('" + e(ask.replace("'", "’")) + "')\">"
+            ">"
             "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
             "<input type='hidden' name='status' value='" + to + "'>"
             "<button class='" + cls + "'>" + label + "</button></form> ")
@@ -2899,7 +3014,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                roster_link(code, c["name"]) + ("" if c["active"] else " <span class='pill dead'>hidden</span>"))
         accounts = "" if gone else ("".join(
             "<div class='acct'><a href='" + e(a["url"]) + "' target='_blank' rel='noopener'>"
-            + e(a["platform"] or "link") + "</a> " + num(a["followers"]) + "</div>"
+            + e(a["platform"] or "link") + "</a> " + ui.compact(a["followers"]) + "</div>"
             for a in split_profiles(c["profiles"])
             if a.get("url") and (not k["platform"] or a["platform"] == k["platform"]))
             or "<span class='muted'>no " + e(k["platform"] or "") + " profile on file</span>")
@@ -3065,7 +3180,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         + "<h2>Internal</h2><div class='card'><div class='row'>"
         + "<div><label>Total cost to us (SAR)</label><input name='total_cost' value='"
         + (format(k["cost"], ",") if k["cost"] is not None else "") + "' inputmode='numeric'>"
-          "<div class='price-hint'>Empty = the sum of the fees (" + format(total_cost, ",") + " SAR).</div></div>"
+          "<div class='price-hint'>Empty = the sum of the fees (" + ui.sar(total_cost) + ").</div></div>"
         + "<div style='flex:2'><label>Internal notes</label><textarea name='notes'>" + e(k["notes"] or "") + "</textarea></div>"
         + "</div><details><summary>EMV rates for this campaign (internal)</summary><div class='row' style='margin-top:10px'>"
         + "".join("<div><label>" + a_ + "</label><input name='emv_" + a_ + "' inputmode='decimal' value='"
@@ -3077,7 +3192,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         + ("<form id='camp-sync' method='post' action='" + u("/campaigns/sync") + "'><input type='hidden' name='id' value='" + str(k["id"]) + "'></form>"
            if k["selection_id"] else "")
         + "<form method='post' action='" + u("/campaigns/delete") + "' style='margin-top:24px' "
-          "onsubmit=\"return confirm('Delete this campaign? Its report and links stop working.')\">"
+          "data-confirm-title='Delete this campaign?' data-confirm-what='" + e(k["name"]) + "' data-confirm='Its report and tracking links stop working at once.' data-confirm-ok='Delete campaign'>"
           "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
           "<button class='btn small danger'>Delete campaign</button></form>"
     )
@@ -3100,7 +3215,7 @@ def link_gone():
     chrome and nothing about the campaign."""
     return (HEAD + "<title>Link not active</title><style>body{font-family:system-ui,sans-serif;"
             "background:#f7f5f0;color:#121212;display:grid;place-items:center;min-height:100vh;margin:0}"
-            "main{max-width:420px;padding:24px;text-align:center}h1{font-size:22px}"
+            "main{max-width:420px;padding:24px;text-align:center}h1{font-size:var(--t-xl,28px)}"
             "p{color:#6b6b6b}</style></head><body><main><h1>This link is not active</h1>"
             "<p>The page it pointed to is no longer available through this link.</p>"
             "</main></body></html>")
@@ -3122,7 +3237,7 @@ def clicks_chart(by_day):
                            for d in by_day]).replace(
         "Opens and shortlists per day", "Clicks and unique visitors per day").replace(
         " opens</title>", " clicks</title>").replace(" shortlists</title>", " unique</title>") + (
-        "<p class='muted' style='font-size:13px'><span style='color:#121212'>&#9632;</span> clicks &nbsp; "
+        "<p class='muted' style='font-size:var(--t-sm,13px)'><span style='color:#121212'>&#9632;</span> clicks &nbsp; "
         "<span style='color:#b9d400'>&#9632;</span> unique visitors</p>")
 
 
@@ -3173,7 +3288,7 @@ def campaign_links_page(k, rows, st, origin, has_geo, error=None, message=None):
         + "<div><span>Clicks</span><b>" + format(st["clicks"], ",") + "</b></div>"
         + "<div><span>Unique visitors</span><b>" + format(st["uniques"], ",") + "</b></div>"
         + "<div><span>Creators with clicks</span><b>" + str(len(st["by_creator"])) + "</b></div>"
-        + "<div><span>Last click</span><b style='font-size:16px'>" + (ago(st["last"]) if st["last"] else "—") + "</b></div>"
+        + "<div><span>Last click</span><b style='font-size:var(--t-lg,17px)'>" + (ago(st["last"]) if st["last"] else "—") + "</b></div>"
         + "</div>"
         + "<h2>Links</h2><div class='card'><p class='price-hint'>Each creator puts their own link in "
           "their bio, story link sticker or video description. A tap is counted, then the visitor is "
@@ -3210,11 +3325,11 @@ def fmt(v, digits=0):
 
 
 def fpct(v):
-    return "—" if v is None else ("%.2f%%" % v)
+    return ui.pct1(v)
 
 
 def fsar(v):
-    return "—" if v is None else fmt(v) + " SAR"
+    return ui.sar(v)
 
 
 def _when(t):
@@ -3300,7 +3415,7 @@ def campaign_content_page(k, members, posts, error=None, message=None):
         actions = (act("other" if p["section"] == "campaign" else "campaign",
                        "Move to all content" if p["section"] == "campaign" else "Count it")
                    + act("unhide" if p["hidden"] else "hide", "Unhide" if p["hidden"] else "Hide")
-                   + act("delete", "Delete", " onclick=\"return confirm('Delete this post and its history?')\""))
+                   + act("delete", "Delete", " data-confirm-title='Delete this post?' data-confirm='Its numbers and their history are removed from the report.' data-confirm-ok='Delete post'"))
         edit = ("<details><summary class='muted'>Enter numbers</summary>"
                 "<form method='post' action='" + u("/campaigns/content/update") + "' class='mini'>"
                 "<input type='hidden' name='id' value='" + cid + "'><input type='hidden' name='content' value='" + pid + "'>"
@@ -3312,14 +3427,14 @@ def campaign_content_page(k, members, posts, error=None, message=None):
             "<tr><td>" + thumb + "</td><td><strong>" + e(p.get("creator_name") or p["code"]) + "</strong><br>"
             + "<span class='muted'>" + e(p["platform"]) + " · " + KIND_LABEL.get(p["kind"], p["kind"]) + " · "
             + _when(p["posted_at"]) + "</span><br><a href='" + e(p["url"]) + "' target='_blank' rel='noopener'>open post</a>"
-            + "<div class='muted' style='max-width:340px;font-size:12px'>" + e((p["caption"] or "")[:160]) + "</div></td>"
+            + "<div class='muted' style='max-width:340px;font-size:var(--t-xs,12px)'>" + e((p["caption"] or "")[:160]) + "</div></td>"
             + "<td>" + sec + flag + "</td>"
             + "<td class='right'>" + fmt(p["likes"]) + "<br><span class='muted'>" + fmt(p["comments"]) + " comments</span></td>"
             + "<td class='right'>" + (fmt(p["views"]) if p["video"] else "—") + "</td>"
             + "<td class='right'>" + fmt(p["reach"]) + " " + est(p["reach_real"]) + "<br>"
             + ("" if p["video"] else fmt(p["impressions"]) + " imp. " + est(p["impressions_real"])) + "</td>"
             + "<td class='right'>" + fpct(p["er"] if not p["video"] else p["video_er"]) + "</td>"
-            + "<td>" + actions + edit + "<span class='muted' style='font-size:12px'>numbers "
+            + "<td>" + actions + edit + "<span class='muted' style='font-size:var(--t-xs,12px)'>numbers "
             + ago(p["metrics_at"]) + " · " + e(p["source"]) + "</span></td></tr>")
     table = "".join(rows) or ("<tr><td colspan='8' class='muted'>No posts yet. The capture job adds them "
                               "every 24 hours while the campaign is live, or add one below.</td></tr>")
@@ -3331,7 +3446,7 @@ def campaign_content_page(k, members, posts, error=None, message=None):
     todo = ""
     if live and (hid or no_reach or no_ss):
         todo = ("<div class='card' style='background:#fff8ec;border-color:#f3d9a8'><strong>Collect by hand</strong>"
-                "<ul style='margin:8px 0 0;padding-left:18px;font-size:13px;line-height:1.6'>"
+                "<ul style='margin:8px 0 0;padding-left:18px;font-size:var(--t-sm,13px);line-height:1.6'>"
                 + (("<li><strong>Likes hidden on %d posts</strong> — ask for the like count or insights: " % len(hid))
                    + ", ".join("<a href='" + e(p["url"]) + "' target='_blank' rel='noopener'>" + e(p.get("creator_name") or p["code"])
                                + "</a>" for p in hid) + ". Until then engagement there is comments only and they are left out of ER.</li>" if hid else "")
@@ -3449,8 +3564,8 @@ def campaign_report_page(k, r, origin):
         + kp("Clicks", fmt(t["clicks"])) + kp("CTR", fpct(t["ctr"]))
         + kp("EMV", fsar(t["emv"]) if r["emv_set"] else "not set", "" if r["emv_set"] else "set rates in Settings")
         + "</div><h2>Internal</h2><div class='kpis'>"
-        + kp("Cost", fsar(inn["cost"])) + kp("CPM", fsar(inn["cpm"])) + kp("Cost / engagement", fsar(inn["cpe"]) if inn["cpe"] is None else fmt(inn["cpe"], 2) + " SAR")
-        + kp("Cost / click", fsar(inn["cpc"]) if inn["cpc"] is None else fmt(inn["cpc"], 2) + " SAR")
+        + kp("Cost", fsar(inn["cost"])) + kp("CPM", fsar(inn["cpm"])) + kp("Cost / engagement", ui.sar(inn["cpe"], 2))
+        + kp("Cost / click", ui.sar(inn["cpc"], 2))
         + "</div><h2>By creator</h2><div class='card'><table><thead><tr><th>Creator</th><th class='right'>Posts</th>"
           "<th class='right'>Views</th><th class='right'>Reach</th><th class='right'>Engagement</th><th class='right'>ER</th>"
           "<th class='right'>Clicks</th><th class='right'>EMV</th><th class='right'>Fee</th><th class='right'>CPM</th>"
@@ -3474,7 +3589,7 @@ def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, erro
     run_rows = "".join(
         "<tr><td>" + ts(r["at"]) + "</td><td>" + ("<span class='pill live'>ok</span>" if r["ok"] else "<span class='pill dead'>failed</span>")
         + "</td><td class='right'>" + fmt(r["posts"]) + "</td><td class='right'>" + fmt(r["insights"])
-        + "</td><td class='muted' style='font-size:12px'>" + e((r["errors"] or "")[:300]) + "</td></tr>" for r in runs)
+        + "</td><td class='muted' style='font-size:var(--t-xs,12px)'>" + e((r["errors"] or "")[:300]) + "</td></tr>" for r in runs)
     token_box = ""
     if new_token:
         token_box = ("<div class='ok'>New capture token — copy it now, it is not shown again:"
@@ -3501,7 +3616,7 @@ def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, erro
         + "<p>The scheduled Claude job on the team Mac signs in with this token. "
         + ("A token is set." if token_set else "<strong>No token yet — the capture job cannot connect.</strong>")
         + " See docs/CAPTURE-AGENT.md.</p>"
-        + "<form method='post' action='" + u("/settings/token") + "' onsubmit=\"return confirm('Make a new token? The old one stops working at once.')\">"
+        + "<form method='post' action='" + u("/settings/token") + "' data-confirm-title='Make a new capture token?' data-confirm='The old one stops working at once; the capture job needs the new one.' data-confirm-ok='Make token'>"
         + "<button class='btn small'>" + ("Replace token" if token_set else "Create token") + "</button></form>"
         + "<table style='margin-top:14px'><thead><tr><th>Run</th><th></th><th class='right'>Posts</th>"
           "<th class='right'>Insights read</th><th>Errors</th></tr></thead><tbody>"
@@ -3626,16 +3741,16 @@ def insights_upload_page(row, posts, sent, ok=None, error=None):
         "body{margin:0;background:#121212;color:#fff;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}"
         "main{max-width:520px;margin:0 auto;padding:32px 18px 60px}"
         ".eyebrow{display:inline-block;background:#e8ff76;color:#121212;font-weight:700;letter-spacing:.12em;"
-        "font-size:12px;padding:5px 14px;border-radius:999px;transform:rotate(-3deg)}"
-        "h1{font-size:28px;margin:18px 0 6px}p{color:rgba(255,255,255,.72);line-height:1.6}"
-        "label{display:block;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin:18px 0 6px}"
+        "font-size:var(--t-xs,12px);padding:5px 14px;border-radius:999px;transform:rotate(-3deg)}"
+        "h1{font-size:var(--t-xl,28px);margin:18px 0 6px}p{color:rgba(255,255,255,.72);line-height:1.6}"
+        "label{display:block;font-size:var(--t-xs,12px);letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);margin:18px 0 6px}"
         "select,input,textarea{width:100%;box-sizing:border-box;font:inherit;padding:12px 14px;border-radius:12px;"
         "border:1px solid rgba(255,255,255,.25);background:#1d1d1d;color:#fff}"
         "button{margin-top:22px;width:100%;font:inherit;font-weight:700;padding:15px;border:0;border-radius:999px;"
         "background:#e8ff76;color:#121212;cursor:pointer}"
         ".ok{background:#14884a;color:#fff;padding:12px 14px;border-radius:12px}"
         ".err{background:#ee1515;color:#fff;padding:12px 14px;border-radius:12px}"
-        ".ar{direction:rtl;text-align:right;color:rgba(255,255,255,.6);font-size:14px}"
+        ".ar{direction:rtl;text-align:right;color:rgba(255,255,255,.6);font-size:var(--t-md,14.5px)}"
         "ul{color:rgba(255,255,255,.72);line-height:1.7;padding-left:18px}</style></head><body><main>"
         + "<span class='eyebrow'>HELLOVOICE</span><h1>Hi " + e(row["creator_name"] or "") + "</h1>"
         + "<p>Upload screenshots of your insights for <strong>" + e(row["campaign_name"]) + "</strong>.</p>"
@@ -3650,7 +3765,7 @@ def insights_upload_page(row, posts, sent, ok=None, error=None):
         + "<label>Screenshots (up to 6) · لقطات الشاشة</label><input type='file' name='shots' accept='image/*' multiple required>"
         + "<label>Note (optional) · ملاحظة</label><textarea name='note' rows='2'></textarea>"
         + "<button>Send · إرسال</button></form>"
-        + ("<p style='margin-top:24px;font-size:13px'>Uploaded so far: " + str(sent) + "</p>" if sent else "")
+        + ("<p style='margin-top:24px;font-size:var(--t-sm,13px)'>Uploaded so far: " + str(sent) + "</p>" if sent else "")
         + "</main></body></html>")
 
 
@@ -3730,7 +3845,7 @@ def clients_page(overview, origin, archived=False, n_archived=0, page_no=1, tota
             "<div class='card'><div style='display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap'>"
             "<div><h3 style='margin:0'>" + e(c["label"]) + "</h3><span class='muted'>passcode · "
             + ("<span class='pill live'>active</span>" if ok else "<span class='pill dead'>" + e(why) + "</span>")
-            + "</span></div><div class='muted' style='font-size:13px'>"
+            + "</span></div><div class='muted' style='font-size:var(--t-sm,13px)'>"
             + (str(len(open_reqs)) + " open quote request(s) · " if open_reqs else "")
             + (str(o["analysis_requests"]) + " analysis request(s)" if o["analysis_requests"] else "")
             + " " + archive_button("client", c["id"], archived) + "</div></div>"
@@ -3800,7 +3915,7 @@ def _creator_picker(sources, platforms):
     handles / profile links / names), and download a sheet for exactly them."""
     return ("<style>.pk-list{max-height:280px;overflow:auto;border:1px solid #e6e1d6;border-radius:8px;background:#fff}"
             ".pk-row{display:block;padding:7px 10px;border-bottom:1px solid #f0ece2;cursor:pointer}"
-            ".pk-chip{display:inline-block;background:#eef6d8;border-radius:12px;padding:2px 9px;margin:2px;font-size:12px}"
+            ".pk-chip{display:inline-block;background:#eef6d8;border-radius:12px;padding:2px 9px;margin:2px;font-size:var(--t-xs,12px)}"
             ".pk-chip a{text-decoration:none;margin-left:4px}</style>"
             "<label>1 · Find the creators</label>"
             "<div class='row'><div style='flex:3'><input id='pk-q' placeholder='Search by name, @handle, code or city' autocomplete='off'></div>"
@@ -3913,10 +4028,10 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
         editor = ("<h2 id='edit'>Edit " + e(c["code"]) + " — " + e(c["name"]) + "</h2><div style='margin:0 0 10px'>" + tabs_ + "</div>"
                   "<form method='post' action='" + u("/analysis/save") + "' class='card'><input type='hidden' name='code' value='" + e(c["code"]) + "'>"
                   "<input type='hidden' name='platform' value='" + e(cur) + "'>"
-                  "<label>" + e(cur) + " analysis as JSON</label><textarea name='json' id='an-json' style='min-height:260px;font-family:ui-monospace,monospace;font-size:12px'></textarea>"
+                  "<label>" + e(cur) + " analysis as JSON</label><textarea name='json' id='an-json' style='min-height:260px;font-family:ui-monospace,monospace;font-size:var(--t-xs,12px)'></textarea>"
                   "<div class='savebar'><button class='btn small'>Save " + e(cur) + " analysis</button></div></form>"
                   "<script>fetch('" + u("/analysis/json") + "?c=" + e(c["code"]) + "&p=" + e(cur) + "').then(r=>r.text()).then(t=>{document.getElementById('an-json').value=t});</script>"
-                  + ("<form method='post' action='" + u("/analysis/delete") + "' onsubmit=\"return confirm('Remove this analysis?')\">"
+                  + ("<form method='post' action='" + u("/analysis/delete") + "' data-confirm-title='Remove this analysis?' data-confirm-what='" + e(c["code"] + " · " + cur) + "' data-confirm='The creator page goes back to “Request full analysis”.' data-confirm-ok='Remove analysis'>"
                      "<input type='hidden' name='code' value='" + e(c["code"]) + "'><input type='hidden' name='platform' value='" + e(cur) + "'>"
                      "<button class='btn small danger'>Remove " + e(cur) + " analysis</button></form>" if cur in mine else ""))
     body = (
@@ -4037,8 +4152,9 @@ def history_page(rows, later, kind=None, q=None, message=None, error=None, page_
         warn = (" It will also take back " + str(n) + " later change" + ("" if n == 1 else "s")
                 + " to the same item.") if n else ""
         btn = "" if done else (
-            "<form method='post' action='" + u("/history/undo") + "' class='inline' onsubmit=\"return confirm('"
-            + e(("Undo: " + (r["label"] or "") + "?" + warn).replace("'", "’")) + "')\">"
+            "<form method='post' action='" + u("/history/undo") + "' class='inline'"
+            + ((" data-confirm-title='Undo this and later changes?' data-confirm-what='" + e(r["label"] or "") + "' data-confirm='" + e(warn.strip())
+                + "' data-confirm-ok='Undo' data-confirm-tone='plain'") if warn else "") + ">"
             "<input type='hidden' name='id' value='" + str(r["id"]) + "'>"
             "<input type='hidden' name='kind' value='" + e(kind or "") + "'>"
             "<button class='btn small" + ("" if r["action"] == "deleted" else " ghost") + "'>"
@@ -4152,8 +4268,8 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
                  + "<td class='right muted'>" + _fmt(key, est_x.get(key)) + "</td>"
                  + "<td class='right'><input form='apply' name='target_" + key + "' value='"
                  + e(tgt.get(key) if tgt.get(key) is not None else "") + "' inputmode='decimal' style='width:120px;text-align:right'></td>"
-                 + "<td class='muted' style='font-size:12px'>" + bench(key) + "</td>"
-                 + "<td style='font-size:12px'>" + ours(key) + "</td></tr>")
+                 + "<td class='muted' style='font-size:var(--t-xs,12px)'>" + bench(key) + "</td>"
+                 + "<td style='font-size:var(--t-xs,12px)'>" + ours(key) + "</td></tr>")
     roi = plan.get("roi") or {}
     roi_html = ""
     if roi:
@@ -4209,7 +4325,7 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
             + ("<h2>By creator size</h2><div class='card'><table><thead><tr><th>Tier</th><th class='right'>Posts</th>"
                "<th class='right'>Views, safe</th><th class='right'>Views, expected</th><th class='right'>Engagement, safe</th></tr></thead><tbody>"
                + tier_rows + "</tbody></table></div>" if tier_rows else "")
-            + "<h2>How the numbers are worked out</h2><div class='card price-hint' style='font-size:13px;line-height:1.6'>"
+            + "<h2>How the numbers are worked out</h2><div class='card price-hint' style='font-size:var(--t-sm,13px);line-height:1.6'>"
               "<p><strong>Views</strong> = each creator's followers × the view rate for their size (safe / expected) × posts. "
               "<strong>Reach</strong> = views × unique-viewer share. <strong>Engagement</strong> = views × engagement rate, "
               "adjusted for the product category. <strong>Clicks</strong> = views × click-through, only with tracked links.</p>"
@@ -4225,7 +4341,7 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
               + "<p class='price-hint'>Per platform: view_rate and eng_rate per tier as [safe, expected] %; ctr [safe, expected] %; "
                 "cpm, cpe, cpc as [acceptable, good] SAR ceilings; reach_per_view 0–1. Save with your own numbers once "
                 "campaigns give us better ones.</p>"
-              "<textarea name='library' rows='22' style='font-family:ui-monospace,monospace;font-size:12px'>" + e(lib_json) + "</textarea>"
+              "<textarea name='library' rows='22' style='font-family:ui-monospace,monospace;font-size:var(--t-xs,12px)'>" + e(lib_json) + "</textarea>"
               "<div class='savebar'><button class='btn small'>Save library</button>"
               "<button class='btn small ghost' name='reset' value='1'>Reset to defaults</button></div></form></details>")
     return page(("%s — Goals & ROI" % k["name"]) if k else "ROI planner", body, "/campaigns")
@@ -4283,20 +4399,20 @@ def calculator_page(lib, sources=None, initial=None, ok=None, error=None):
 .cal-pills button[aria-pressed=true]{background:var(--ink,#121212);color:#e8ff76;border-color:var(--ink,#121212)}
 .cal-pills button[aria-pressed=true]::before{background:#e8ff76 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.6 2.6L11 4.5' fill='none' stroke='%23121212' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/100% no-repeat;border-color:#e8ff76}
 .cal-types button{padding:12px 22px;text-align:left;border-radius:16px}
-.cal-types button span small{display:block;font-weight:400;font-size:12px;opacity:.75;margin-top:2px}
+.cal-types button span small{display:block;font-weight:400;font-size:var(--t-xs,12px);opacity:.75;margin-top:2px}
 .cal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
 @media(max-width:900px){.cal-grid{grid-template-columns:1fr}}
 .cal-h{display:flex;align-items:center;gap:10px;margin:0 0 4px;flex-wrap:wrap}
 .cal-h h2{margin:0}
-.cal-q{font-size:14px;margin:4px 0 12px}
+.cal-q{font-size:var(--t-md,14.5px);margin:4px 0 12px}
 .cal-meter{display:flex;height:16px;border-radius:999px;overflow:hidden;margin:2px 0 6px}
 .cal-meter i{display:block}
 .cal-r{background:#e5484d}.cal-a{background:#f2a33a}.cal-g{background:#1f9d55}
 .cal-keys{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
 .cal-key{border-left:4px solid;border-radius:10px;padding:8px 10px}
-.cal-key span{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700}
-.cal-key b{font-size:22px;line-height:1.1;display:block;color:#121212}
-.cal-key small{font-size:11px;color:#666}
+.cal-key span{display:block;font-size:var(--t-xs,12px);letter-spacing:.08em;text-transform:uppercase;font-weight:700}
+.cal-key b{font-size:var(--t-xl,28px);line-height:1.1;display:block;color:#121212}
+.cal-key small{font-size:var(--t-xs,12px);color:#666}
 .cal-key--r{background:#fdeeee;border-color:#e5484d;color:#9b1c1f}
 .cal-key--a{background:#fff4e3;border-color:#f2a33a;color:#8a4f06}
 .cal-key--g{background:#e7f6ec;border-color:#1f9d55;color:#136b39}
@@ -4304,31 +4420,31 @@ def calculator_page(lib, sources=None, initial=None, ok=None, error=None):
 .cal-sign i{display:block;width:4px;border-radius:1px;background:#d9d5cc}
 .cal-sign i:nth-child(1){height:5px}.cal-sign i:nth-child(2){height:9px}.cal-sign i:nth-child(3){height:13px}
 .cal-sign--2 i:nth-child(-n+2){background:#e2780f}.cal-sign--1 i:nth-child(1){background:#ee1515}
-.cal-sign em{font-style:normal;font-size:11px;font-weight:700;margin-left:6px;color:#666;line-height:13px}
-.cal-why{font-size:12px;color:#666;margin:8px 0 0}
-.cal-note{background:#fff8ec;border:1px solid #f3d9a8;border-radius:12px;padding:10px 12px;font-size:13px;margin-top:10px}
-.cal-out{font-size:15px;line-height:1.5;margin-top:10px}
-.cal-out b{font-size:22px}
-.cal-v{display:inline-block;font-weight:700;border-radius:999px;padding:4px 12px;font-size:13px}
+.cal-sign em{font-style:normal;font-size:var(--t-xs,12px);font-weight:700;margin-left:6px;color:#666;line-height:13px}
+.cal-why{font-size:var(--t-xs,12px);color:#666;margin:8px 0 0}
+.cal-note{background:#fff8ec;border:1px solid #f3d9a8;border-radius:12px;padding:10px 12px;font-size:var(--t-sm,13px);margin-top:10px}
+.cal-out{font-size:var(--t-md,14.5px);line-height:1.5;margin-top:10px}
+.cal-out b{font-size:var(--t-xl,28px)}
+.cal-v{display:inline-block;font-weight:700;border-radius:999px;padding:4px 12px;font-size:var(--t-sm,13px)}
 .cal-v--g{background:#e7f6ec;color:#136b39}.cal-v--a{background:#fff4e3;color:#8a4f06}.cal-v--r{background:#fdeeee;color:#9b1c1f}
 .cal-tier{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
 @media(max-width:700px){.cal-tier{grid-template-columns:repeat(2,1fr)}}
-.cal-money{position:relative}.cal-money input{padding-right:52px}.cal-money span{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#777;font-size:13px}
+.cal-money{position:relative}.cal-money input{padding-right:52px}.cal-money span{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:#777;font-size:var(--t-sm,13px)}
 .cal-split{display:flex;flex-wrap:wrap;gap:12px;margin-top:6px}
 .cal-split>div{background:#f6f4f0;border-radius:12px;padding:10px 12px;min-width:150px}
-.cal-split label{margin:0 0 4px;font-size:12px}
+.cal-split label{margin:0 0 4px;font-size:var(--t-xs,12px)}
 .cal-split .cal-money input{padding:8px 34px 8px 10px}
-.cal-split small{display:block;margin-top:4px;color:#666;font-size:12px}
-table.cal-t{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px}
-table.cal-t th{text-align:right;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#666;font-weight:700;padding:6px 10px}
+.cal-split small{display:block;margin-top:4px;color:#666;font-size:var(--t-xs,12px)}
+table.cal-t{width:100%;border-collapse:collapse;font-size:var(--t-md,14.5px);margin-top:6px}
+table.cal-t th{text-align:right;font-size:var(--t-xs,12px);letter-spacing:.06em;text-transform:uppercase;color:#666;font-weight:700;padding:6px 10px}
 table.cal-t th:first-child,table.cal-t td:first-child{text-align:left}
 table.cal-t td{padding:9px 10px;border-top:1px solid #eee;text-align:right}
-table.cal-t td b{font-size:17px}
+table.cal-t td b{font-size:var(--t-lg,17px)}
 table.cal-t .ok{background:#fff8ec}table.cal-t .gr{background:#eef8f1}
 table.cal-t tr.tot td{border-top:2px solid #121212;font-weight:700}
 table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
 .cal-foc{max-width:380px;margin:0 0 12px}
-.cal-big{font-size:18px;line-height:1.5;margin:6px 0}
+.cal-big{font-size:var(--t-lg,17px);line-height:1.5;margin:6px 0}
 .cal-in .cal-inrow{display:flex;flex-wrap:wrap;gap:14px 32px;align-items:flex-start;margin-bottom:12px}
 .cal-in label{margin-bottom:4px}
 .cal-tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:2px solid #121212;margin:20px 0 16px}
@@ -4339,44 +4455,44 @@ table.cal-t .grp th{text-align:center;border-bottom:1px solid #ddd}
 @media(max-width:1000px){.cal-ov{grid-template-columns:1fr}}
 .cal-ov>.card{display:flex;flex-direction:column;margin:0}
 .cal-ovh{display:flex;gap:12px;align-items:center;margin-bottom:12px}
-.cal-ovh h2{margin:0;font-size:19px}.cal-ovh small{color:#666;font-size:12px}
+.cal-ovh h2{margin:0;font-size:var(--t-lg,17px)}.cal-ovh small{color:#666;font-size:var(--t-xs,12px)}
 .cal-num{width:34px;height:34px;border-radius:50%;background:#121212;color:#e8ff76;display:grid;place-items:center;font-weight:700;flex:none}
-.cal-more{margin-top:auto;align-self:flex-start;border:0;background:#efede8;font:inherit;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px;cursor:pointer}
+.cal-more{margin-top:auto;align-self:flex-start;border:0;background:#efede8;font:inherit;font-weight:700;font-size:var(--t-sm,13px);padding:7px 14px;border-radius:999px;cursor:pointer}
 .cal-more:hover{background:#e8ff76}
-.cal-ov .cal-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-top:1px solid #eee;font-size:14px}
+.cal-ov .cal-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;border-top:1px solid #eee;font-size:var(--t-md,14.5px)}
 .cal-ov .cal-row:first-child{border-top:0}
-.cal-ov .cal-row b{font-size:19px}
-.cal-ov .cal-row small{display:block;color:#666;font-size:11.5px}
-.cal-bigchip{display:inline-block;font-size:22px;font-weight:800;border-radius:999px;padding:8px 20px;margin-bottom:8px}
-.cal-st{display:inline-block;font-weight:700;border-radius:999px;padding:3px 11px;font-size:12.5px;white-space:nowrap}
+.cal-ov .cal-row b{font-size:var(--t-lg,17px)}
+.cal-ov .cal-row small{display:block;color:#666;font-size:var(--t-xs,12px)}
+.cal-bigchip{display:inline-block;font-size:var(--t-xl,28px);font-weight:800;border-radius:999px;padding:8px 20px;margin-bottom:8px}
+.cal-st{display:inline-block;font-weight:700;border-radius:999px;padding:3px 11px;font-size:var(--t-xs,12px);white-space:nowrap}
 .cal-st--g{background:#e7f6ec;color:#136b39}.cal-st--a{background:#fff4e3;color:#8a4f06}.cal-st--r{background:#fdeeee;color:#9b1c1f}.cal-st--n{background:#eef2f7;color:#445}
 .cal-bigchip.cal-st--g{background:#1f9d55;color:#fff}.cal-bigchip.cal-st--a{background:#e2780f;color:#fff}.cal-bigchip.cal-st--r{background:#e0241f;color:#fff}
 .cal-stgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:12px}
 .cal-stc{border:1px solid #eee;border-radius:14px;padding:12px 14px;background:#fff;display:grid;gap:6px}
-.cal-stc h3{margin:0;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:#666}
+.cal-stc h3{margin:0;font-size:var(--t-sm,13px);letter-spacing:.06em;text-transform:uppercase;color:#666}
 .cal-stc .nums{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
-.cal-stc .nums b{font-size:24px}.cal-stc .nums small{color:#666}
+.cal-stc .nums b{font-size:var(--t-xl,28px)}.cal-stc .nums small{color:#666}
 .cal-stc .bar{height:8px;border-radius:999px;background:#efece6;overflow:hidden}
 .cal-stc .bar i{display:block;height:100%;border-radius:999px}
-.cal-stc p{margin:0;font-size:12.5px;color:#666}
+.cal-stc p{margin:0;font-size:var(--t-xs,12px);color:#666}
 .cal-goalrow{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:10px 0}
-.cal-goalrow label{font-size:12px}
-.cal-saved{background:#e7f6ec;border-radius:10px;padding:8px 12px;font-size:13px;margin:8px 0}
-.cal-big b{font-size:26px}
+.cal-goalrow label{font-size:var(--t-xs,12px)}
+.cal-saved{background:#e7f6ec;border-radius:10px;padding:8px 12px;font-size:var(--t-sm,13px);margin:8px 0}
+.cal-big b{font-size:var(--t-xl,28px)}
 .cal-line{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:baseline;padding:8px 0;border-top:1px solid #eee}
 .cal-line:first-of-type{border-top:0}
 .cal-line em{font-style:normal;font-weight:700;min-width:130px}
-table.cal-c{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}
-table.cal-c th{text-align:left;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#666;padding:6px 8px;font-weight:700}
+table.cal-c{width:100%;border-collapse:collapse;font-size:var(--t-sm,13px);margin-top:8px}
+table.cal-c th{text-align:left;font-size:var(--t-xs,12px);letter-spacing:.06em;text-transform:uppercase;color:#666;padding:6px 8px;font-weight:700}
 table.cal-c td{padding:8px;border-top:1px solid #eee;vertical-align:top}
 table.cal-c td.r,table.cal-c th.r{text-align:right}
 table.cal-c input{width:58px;padding:5px 6px;text-align:center}
-.cal-prob{display:inline-block;font-size:12px;border-radius:8px;padding:2px 8px;margin:0 4px 4px 0}
+.cal-prob{display:inline-block;font-size:var(--t-xs,12px);border-radius:8px;padding:2px 8px;margin:0 4px 4px 0}
 .cal-prob--bad{background:#fdeeee;color:#9b1c1f}.cal-prob--warn{background:#fff4e3;color:#8a4f06}.cal-prob--info{background:#eef2f7;color:#445}
 .cal-sum{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin:10px 0}
 .cal-sum>div{background:#f6f4f0;border-radius:12px;padding:10px 12px}
-.cal-sum span{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#666;font-weight:700}
-.cal-sum b{font-size:22px;display:block;line-height:1.2}
+.cal-sum span{display:block;font-size:var(--t-xs,12px);letter-spacing:.08em;text-transform:uppercase;color:#666;font-weight:700}
+.cal-sum b{font-size:var(--t-xl,28px);display:block;line-height:1.2}
 </style>
 
 <div class='card cal-in'>
@@ -4674,7 +4790,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     var sumHtml = '<div class="cal-sum"><div><span>These creators usually get</span><b>' + nice(tot[0]) + '</b><small>' + name + ' (good day: ' + nice(tot[1]) + ')</small></div>'
       + (rs ? '<div><span>Accept at least</span><b>' + nice(rs.ok) + '</b><small>for SAR ' + num(budget) + '</small></div><div><span>Great is</span><b>' + nice(rs.great) + '+</b><small>' + name + '</small></div>' : '')
       + '<div><span>Problems found</span><b>' + (problems.bad + problems.warn) + '</b><small>' + problems.bad + ' serious · ' + problems.warn + ' to check</small></div></div>';
-    var banner = vd ? '<div class="cal-big"><span class="cal-v cal-v--' + vd[1] + '" style="font-size:16px">' + vd[0] + '</span> ' + vd[2] + '</div>' : '<p class="price-hint">Type the client budget to compare.</p>';
+    var banner = vd ? '<div class="cal-big"><span class="cal-v cal-v--' + vd[1] + '" style="font-size:var(--t-lg,17px)">' + vd[0] + '</span> ' + vd[2] + '</div>' : '<p class="price-hint">Type the client budget to compare.</p>';
     var priceNote = priced ? '<p class="price-hint">Prices: ' + (sc.kind === 'selection' ? 'what the client is quoted for each creator (middle of the range)' : 'our fee to each creator') + '. Total ' + num(priced) + ' SAR.</p>' : '';
     box.innerHTML = '<div class="card"><div class="cal-h"><span class="pill live">' + (sc.kind === 'selection' ? 'Selection' : 'Campaign') + '</span><h2>' + o.name + '</h2></div>'
       + '<p class="price-hint" style="margin:0">Measured on <b>' + label + '</b>. Change the posts per creator to see what happens.</p>' + banner + sumHtml
@@ -4741,7 +4857,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
       + '<form method="post" action="' + D.base + '/calculator/results"><input type="hidden" name="id" value="' + chk.campaign + '"><input type="hidden" name="basis" id="cal-r-basis" value="' + basis.replace(/"/g, '&quot;') + '">'
       + '<div class="cal-goalrow">' + KEYS.map(function(k){ var v = ed[k[0]] != null ? ed[k[0]] : (adj[k[0]] != null ? adj[k[0]] : ''); var m = measured[k[0]];
         return '<div><label for="cal-r-' + k[0] + '">' + k[1] + '</label><input id="cal-r-' + k[0] + '" name="r_' + k[0] + '" data-res="' + k[0] + '" inputmode="decimal" value="' + v + '"><small class="muted">measured now: ' + (m == null ? '—' : (k[0] === 'er' ? m + '%' : nice(m))) + '</small></div>'; }).join('') + '</div>'
-      + '<button class="btn">Save results</button> <button class="btn ghost" name="do" value="clear" onclick="return confirm(\\'Go back to the measured numbers?\\')">Back to measured</button></form></div>';
+      + '<button class="btn">Save results</button> <button class="btn ghost" name="do" value="clear" data-confirm-title="Go back to the measured numbers?" data-confirm="The numbers you typed are cleared." data-confirm-ok="Clear my numbers">Back to measured</button></form></div>';
   }
   function applySource(){
     var sc = source(); if (!sc) { $('cal-source-hint').textContent = 'Pick one and the calculator uses its real creators, their followers and prices.'; return; }
@@ -4799,7 +4915,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
       if (i.kind === 'goal') { var col = i.status[1] === 'g' ? '#1f9d55' : i.status[1] === 'a' ? '#e2780f' : '#e0241f';
         return '<div class="cal-stc"><h3>' + i.label + '</h3><div class="nums"><b>' + (i.key === 'er' ? i.actual + '%' : nice(i.actual)) + (i.est ? ' <small>est.</small>' : '') + '</b><small>goal ' + (i.key === 'er' ? i.goal + '%' : nice(i.goal)) + '</small></div>'
           + '<div class="bar"><i style="width:' + Math.min(100, i.pct) + '%;background:' + col + '"></i></div><div>' + st(i.status[1], i.status[0]) + ' <small class="muted">' + Math.round(i.pct) + '% of goal</small></div></div>'; }
-      return '<div class="cal-stc"><h3>' + i.label + '</h3><div class="nums"><b style="font-size:17px">' + i.text.split(' at the end')[0] + '</b></div><div>' + st(i.status[1], i.status[0]) + '</div>' + (i.limit ? '<p>' + i.limit + (i.text.indexOf('at the end') > 0 ? ' · projected to the end' : '') + '</p>' : '') + '</div>';
+      return '<div class="cal-stc"><h3>' + i.label + '</h3><div class="nums"><b style="font-size:var(--t-lg,17px)">' + i.text.split(' at the end')[0] + '</b></div><div>' + st(i.status[1], i.status[0]) + '</div>' + (i.limit ? '<p>' + i.limit + (i.text.indexOf('at the end') > 0 ? ' · projected to the end' : '') + '</p>' : '') + '</div>';
     }).join('');
     box.innerHTML = '<div class="card"><div class="cal-h"><span class="cal-bigchip cal-st--' + sv.overall[1] + '">' + sv.overall[0] + '</span></div>'
       + '<p class="price-hint" style="margin:0">' + sv.camp.name + ' · goals: ' + (sv.saved ? 'the ones saved for this campaign' : 'suggested minimum (none saved yet)') + ' · ' + Math.round(sv.elapsed * 100) + '% of the time has passed · ' + (sv.camp.measured.posts || 0) + ' posts live'
@@ -4878,3 +4994,18 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
 })();
 </script>"""
     return page("ROI calculator", body, "/calculator")
+
+
+# The selection editor's scripts, served once as a cached file (round 4).
+def _split_assets(*blocks):
+    styles, scripts = [], []
+    for b in blocks:
+        for m in re.finditer(r"<style>(.*?)</style>", b, re.S):
+            styles.append(m.group(1))
+        for m in re.finditer(r"<script>(.*?)</script>", b, re.S):
+            scripts.append(m.group(1))
+    return "<style>" + "".join(styles) + "</style>", "\n;".join(scripts)
+
+
+EDITOR_STYLE, EDITOR_JS = _split_assets(MARGIN_JS, VERDICT_JS, SEL_JS)
+EDITOR_VER = __import__("hashlib").sha256(EDITOR_JS.encode()).hexdigest()[:10]

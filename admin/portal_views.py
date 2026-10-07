@@ -32,10 +32,10 @@ def _stat(label, value, sub=""):
 
 STAT_CSS = ("<style>.pstats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:0 0 18px}"
             ".pstats .stat{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:2px}"
-            ".pstats .k{font-size:12px;color:var(--gray);text-transform:uppercase;letter-spacing:.06em}"
-            ".pstats .v{font-size:26px;font-family:'Bebas Neue',sans-serif;letter-spacing:.02em}"
+            ".pstats .k{font-size:var(--t-xs,12px);color:var(--gray);text-transform:uppercase;letter-spacing:.06em}"
+            ".pstats .v{font-size:var(--t-xl,28px);font-family:'Bebas Neue',sans-serif;letter-spacing:.02em}"
             ".fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px}"
-            "textarea.mono{font-family:ui-monospace,monospace;font-size:13px;min-height:90px;width:100%}</style>")
+            "textarea.mono{font-family:ui-monospace,monospace;font-size:var(--t-sm,13px);min-height:90px;width:100%}</style>")
 
 
 def _status_pill(s):
@@ -132,7 +132,7 @@ def _chats_tab():
 def chat_page(th):
     x = portal.user_for_code(th["code_id"]) if th["code_id"] else None
     who = ("%s · %s" % (x["company"] or "—", x["email"])) if x else ("Admin copilot · %s" % th["owner"] if th["scope"] == "admin" else "Access code #%s" % th["code_id"])
-    msgs = "".join("<div style='margin:0 0 12px;max-width:80%%;%s'><div class='muted' style='font-size:12px'>%s · %s</div>"
+    msgs = "".join("<div style='margin:0 0 12px;max-width:80%%;%s'><div class='muted' style='font-size:var(--t-xs,12px)'>%s · %s</div>"
                    "<div style='white-space:pre-wrap;background:%s;color:%s;padding:10px 14px;border-radius:14px'>%s</div></div>"
                    % ("margin-left:auto" if m["role"] == "user" else "", "Client" if m["role"] == "user" else "Assistant", e(ago(m["at"])),
                       "var(--ink)" if m["role"] == "user" else "#f3f1ec", "#fff" if m["role"] == "user" else "inherit", e(m["content"]))
@@ -160,15 +160,15 @@ def quote_page(sel, origin):
         lo, hi = (p, p) if isinstance(p, (int, float)) else (tuple(p) if isinstance(p, list) and len(p) == 2 else (db.price_for(c, bands, sel["platform"]) or (0, 0)))
         lo_t += lo or 0; hi_t += hi or 0
         lines.append("<tr><td>%d</td><td><strong>%s</strong><br><span class='muted'>%s</span></td><td>%s</td><td>%s</td><td>%s</td><td class='right'>%s</td></tr>" % (
-            i, e(c["name"]), e(code), e(c["platform"]), "{:,}".format(c["followers"] or 0), e(c["tier"]),
-            ("SAR {:,}".format(int(lo)) + (" – {:,}".format(int(hi)) if hi and hi != lo else "")) if lo else "On request"))
+            i, e(c["name"]), e(code), e(c["platform"]), ui.compact(c["followers"] or 0), e(c["tier"]),
+            ui.sar_range(lo, hi) if lo else "On request"))
     total_from = sel["total_from"] or lo_t
     total_to = sel["total_to"] or hi_t
-    rng = lambda a, z: "SAR {:,}".format(int(a)) + (" – {:,}".format(int(z)) if z and z != a else "")
+    rng = lambda a, z: ui.sar_range(a, z)
     vat = lambda a, z: rng(a * 1.15, z * 1.15)
     css = ("<style>@media print{.sidebar,.topbar,.no-print,nav,header.app-top{display:none!important}main,.main{margin:0!important;padding:0!important}"
            ".card{border:0!important;box-shadow:none!important}} .q-h{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}"
-           ".q-h h1{font-family:'Bebas Neue',sans-serif;font-size:44px;margin:0;letter-spacing:.02em} .q-tot td{font-weight:600}</style>")
+           ".q-h h1{font-family:'Bebas Neue',sans-serif;font-size:var(--t-2xl,38px);margin:0;letter-spacing:.02em} .q-tot td{font-weight:600}</style>")
     body = (css + "<div class='no-print' style='margin-bottom:14px'><button class='btn lime' onclick='window.print()'>Print / save as PDF</button></div>"
             "<div class='card'><div class='q-h'><div><h1>Quotation</h1><p class='muted'>%s · Ref Q-%d-%s</p></div>"
             "<div style='text-align:right'><strong>HelloVoice</strong><br><span class='muted'>Al-Olaya, Riyadh<br>info@hellovoice.co.uk · +966 11 463 4518</span></div></div>"
@@ -332,7 +332,7 @@ def _settings_tab():
                    u("/portal/keys"), which, "Replace key" if hint else "API key",
                    ("<form method='post' action='%s' class='inline' style='margin-top:10px'><input type='hidden' name='which' value='%s'>"
                     "<input type='hidden' name='back' value='/portal?tab=settings'><button class='btn small danger' name='action' value='clear' "
-                    "onclick=\"return confirm('Remove the key?')\">Remove key</button></form>" % (u("/portal/keys"), which)) if hint else ""))
+                    "data-confirm-title='Remove this key?' data-confirm='The features that use it switch off until a new key is saved.' data-confirm-ok='Remove key'>Remove key</button></form>" % (u("/portal/keys"), which)) if hint else ""))
 
     form = (
         "<form method='post' action='%s'><input type='hidden' name='back' value='/portal?tab=settings'>" % u("/portal/settings")
@@ -406,7 +406,7 @@ def graph_card():
               "<div><label>Send a test to (optional)</label><input name='test' type='email' placeholder='you@hellovoice.co.uk'></div></div>"
               "<button class='btn lime' name='action' value='save'>%s</button></form>" % (u("/portal/keys"), back, "Replace" if hint else "Connect")
             + (("<form method='post' action='%s' class='inline' style='margin-top:10px'>%s<button class='btn small danger' name='action' value='clear' "
-                "onclick=\"return confirm('Disconnect?')\">Disconnect</button></form>") % (u("/portal/keys"), back) if hint else "")
+                "data-confirm-title='Disconnect email sending?' data-confirm='Sign-in codes and team emails stop until it is connected again.' data-confirm-ok='Disconnect'>Disconnect</button></form>") % (u("/portal/keys"), back) if hint else "")
             + "</div>")
 
 
@@ -429,7 +429,7 @@ def smtp_card():
               "<div class='price-hint'>SES: email-smtp.&lt;region&gt;.amazonaws.com, e.g. email-smtp.eu-west-1.amazonaws.com</div></div></div>"
               "<button class='btn lime' name='action' value='save'>%s</button></form>" % (u("/portal/keys"), back, "Replace mailbox" if hint else "Connect mailbox")
             + (("<form method='post' action='%s' class='inline' style='margin-top:10px'>%s<button class='btn small danger' name='action' value='clear' "
-                "onclick=\"return confirm('Disconnect the mailbox?')\">Disconnect</button></form>") % (u("/portal/keys"), back) if hint else "")
+                "data-confirm-title='Disconnect the mailbox?' data-confirm='Sign-in codes and team emails stop until it is connected again.' data-confirm-ok='Disconnect'>Disconnect</button></form>") % (u("/portal/keys"), back) if hint else "")
             + "</div>")
 
 
@@ -564,11 +564,11 @@ def copilot_page(email, configured, embed=False):
                                  % u("/portal?tab=settings"))
     css = ("<style>.cp{display:flex;flex-direction:column;height:calc(100vh - 250px);min-height:420px}"
            "#cp-log{flex:1;overflow:auto;background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:10px}"
-           ".cp-m{max-width:78%;padding:10px 14px;border-radius:14px;line-height:1.5;font-size:14px}.cp-m p{margin:0 0 6px}.cp-m ul{margin:4px 0 6px 18px;padding:0}"
+           ".cp-m{max-width:78%;padding:10px 14px;border-radius:14px;line-height:1.5;font-size:var(--t-md,14.5px)}.cp-m p{margin:0 0 6px}.cp-m ul{margin:4px 0 6px 18px;padding:0}"
            ".cp-me{align-self:flex-end;background:var(--ink);color:#fff}.cp-bot{align-self:flex-start;background:#f3f1ec}"
            ".cp-act{align-self:flex-start;background:var(--amber-soft);border:1px solid var(--amber);width:78%}.cp-btns{margin-top:8px}"
            ".cp-err{color:var(--red)}#cp-form{display:flex;gap:10px;margin-top:12px}#cp-text{flex:1;min-height:46px;max-height:140px;border-radius:14px;padding:10px 14px;font:inherit;border:1px solid var(--line-strong)}"
-           ".cp-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.cp-chip{border:1px solid var(--line-strong);background:#fff;border-radius:999px;padding:6px 14px;font:inherit;font-size:13px;cursor:pointer}"
+           ".cp-chips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}.cp-chip{border:1px solid var(--line-strong);background:#fff;border-radius:999px;padding:6px 14px;font:inherit;font-size:var(--t-sm,13px);cursor:pointer}"
            ".cp-chip:hover{border-color:var(--ink)}</style>")
     js = COPILOT_JS % {"chat": json.dumps(u("/ai/chat")), "ok": json.dumps(u("/ai/confirm")), "no": json.dumps(u("/ai/dismiss"))}
     body = (css + ui.header("AI copilot", "Ask about your data, build selections, check client activity, or ask it to make a change. "

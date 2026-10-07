@@ -388,7 +388,24 @@ def client_view(plan):
 
 # ----------------------------------------------- selections and campaigns --
 
-def _creator_row(c, price=None, posts=None):
+def _analysis_index():
+    """Every creator's main analysis in two queries, for pages that list many
+    creators at once (the calculator read them one by one: ~3,000 queries)."""
+    import analysis as _an
+    with db.connect() as conn:
+        rows = conn.execute("SELECT * FROM creator_analysis ORDER BY updated_at DESC").fetchall()
+        plat = {r["code"]: r for r in conn.execute("SELECT code, platform, profiles FROM creators")}
+    by = {}
+    for r in rows:
+        by.setdefault(r["code"], []).append(r)
+    out = {}
+    for code, rs in by.items():
+        main = _an.creator_platforms(plat[code])[0] if code in plat else None
+        out[code] = db._analysis_row(next((r for r in rs if r["platform"] == main), rs[0]))
+    return out
+
+
+def _creator_row(c, price=None, posts=None, an_index=None):
     """One creator as the calculator needs them: followers per platform, what
     they are priced at, and — when their analysis is on file — their own
     averages, which beat any benchmark."""
@@ -398,7 +415,7 @@ def _creator_row(c, price=None, posts=None):
             foll[a["platform"]] = int(a["followers"])
     if c["followers"] and c["platform"] and c["platform"] not in foll:
         foll[c["platform"]] = int(c["followers"])
-    an = (db.analysis(c["code"]) or {}).get("data") or {}
+    an = ((an_index.get(c["code"]) if an_index is not None else db.analysis(c["code"])) or {}).get("data") or {}
     views = an.get("avg_reel_plays") or an.get("avg_views")
     likes, comments = an.get("avg_likes"), an.get("avg_comments")
     eng = ((likes or 0) + (comments or 0)) if (likes is not None or comments is not None) else None
@@ -425,6 +442,10 @@ def sources():
     A selection's budget is its total (typed, else the sum of its creators'
     client prices); a campaign's is its linked selection's."""
     bands = db.tier_prices()
+    an_index = _analysis_index()
+    with db.connect() as conn:
+        everyone = {r["code"]: r for r in conn.execute("SELECT * FROM creators")}
+    creator = everyone.get
     sels, by_id = [], {}
     for sel in db.list_selections():
         if "archived_at" in sel.keys() and sel["archived_at"]:
@@ -436,14 +457,14 @@ def sources():
             continue
         rows, lo, hi = [], 0, 0
         for code in codes:
-            c = db.creator(code)
+            c = creator(code)
             if c is None:
                 continue
             eff = own.get(code) or db.price_of(c, bands) or (None, None)
             mid = (eff[0] + eff[1]) / 2.0 if eff and eff[0] is not None else None
             if eff and eff[0] is not None:
                 lo += eff[0]; hi += eff[1]
-            rows.append(_creator_row(c, price=mid))
+            rows.append(_creator_row(c, price=mid, an_index=an_index))
         # A typed total counts; a placeholder like "1" does not.
         typed = [v for v in (sel["total_from"], sel["total_to"]) if v and v >= 100]
         if typed:
@@ -463,7 +484,7 @@ def sources():
         for m in db.campaign_creators(k["id"]):
             if m["code"] is None:
                 continue
-            members.append(_creator_row(m, price=m["campaign_cost"], posts=m["planned"]))
+            members.append(_creator_row(m, price=m["campaign_cost"], posts=m["planned"], an_index=an_index))
         link = by_id.get(k["selection_id"]) if k["selection_id"] else None
         budget, from_ = (link["budget"], 'selection "%s"' % link["name"]) if link else (None, None)
         saved = ((plan_of(k) or {}).get("brief") or {}).get("budget")      # what the planner was last given

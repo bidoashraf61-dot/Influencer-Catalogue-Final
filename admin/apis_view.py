@@ -70,7 +70,7 @@ def pack_card():
         "<p class='sec-desc'>One press runs the full set of actors for the platforms you tick: profile numbers, "
         "engagement analytics, and audience demographics. Each step is a normal job below, so it can be "
         "edited or scheduled on its own. If the whole collection would pass the monthly budget, nothing starts.</p>"
-        "<form method='post' action='" + u("/apis/pack") + "' onsubmit=\"return confirm('This starts several runs and spends money. Continue?')\">"
+        "<form method='post' action='" + u("/apis/pack") + "' data-confirm-title='Start the data collection?' data-confirm='It starts several paid runs on Apify for the ticked platforms. Nothing starts if it would pass the monthly budget.' data-confirm-ok='Start runs' data-confirm-tone='plain'>"
         "<div style='margin:6px 0 12px'>" + chk("plat_instagram", "Instagram") + chk("plat_tiktok", "TikTok") + "</div>"
         "<div class='row'><div><label>Which creators</label><select name='source'>" + _sources("sample20") + "</select></div>"
         "<div><label>Max creators</label><input name='max_handles' type='number' min='1' max='1000' value='20'></div>"
@@ -87,7 +87,7 @@ def data_tab(query_q=""):
     cov = []
     for plat in ("Instagram", "TikTok"):
         cov.append("<tr><td colspan='3'><strong>" + plat + "</strong></td></tr>"
-                   + "".join("<tr><td>" + e(l) + "</td><td class='muted' style='font-size:12px'>" + e(a) + "</td><td>"
+                   + "".join("<tr><td>" + e(l) + "</td><td class='muted' style='font-size:var(--t-xs,12px)'>" + e(a) + "</td><td>"
                              + str(n) + " creators</td></tr>" for l, a, n in apify.coverage(plat)))
     rows = "".join(
         "<tr><td><a href='" + u("/apis/creator?code=" + r["code"]) + "'><strong>" + e(r["name"]) + "</strong></a> "
@@ -115,7 +115,7 @@ def creator_page(code):
         except ValueError:
             pretty = r["data"]
         cards.append("<details class='card' open><summary class='hd'><h2>" + e(r["platform"] or "") + " · " + e(r["actor"] or "")
-                     + "</h2><span class='muted'>" + V.ts(r["at"]) + "</span></summary><pre style='white-space:pre-wrap;font-size:12px;"
+                     + "</h2><span class='muted'>" + V.ts(r["at"]) + "</span></summary><pre style='white-space:pre-wrap;font-size:var(--t-xs,12px);"
                      "max-height:520px;overflow:auto'>" + e(pretty) + "</pre></details>")
     body = (ui.header(c["name"] if c else code, "Everything collected for this creator, latest result from each source.",
                       crumbs=[("APIs", u("/apis?tab=data")), (code, None)])
@@ -178,7 +178,7 @@ def apify_tab(query=None):
         "<p class='sec-desc'>The token stays on the server. It is never shown again after saving, only its last four characters.</p>"
         + ("<p>Saved token: <code>" + e(hint) + "</code></p>"
            "<form method='post' action='" + u("/apis/test") + "' class='inline'><button class='btn small'>Test connection</button></form> "
-           "<form method='post' action='" + u("/apis/token/clear") + "' class='inline' onsubmit=\"return confirm('Remove the token? Scheduled jobs stop until a new one is saved.')\">"
+           "<form method='post' action='" + u("/apis/token/clear") + "' class='inline' data-confirm-title='Remove the Apify token?' data-confirm='Scheduled jobs stop until a new token is saved.' data-confirm-ok='Remove token'>"
            "<button class='btn small danger'>Remove token</button></form>" if hint else "")
         + "<form method='post' action='" + u("/apis/token") + "' autocomplete='off' style='margin-top:12px'>"
           "<label>" + ("Replace token" if hint else "Apify API token") + "</label>"
@@ -202,10 +202,10 @@ def apify_tab(query=None):
         pid = "job-%d" % j["id"]
         post = lambda path, label, cls="small", confirm=None: (
             "<form method='post' action='" + u(path) + "' class='inline'"
-            + (" onsubmit=\"return confirm('" + confirm + "')\"" if confirm else "")
+            + (" data-confirm-what='" + e(j["name"]) + "' data-confirm='" + e(confirm) + "'" if confirm else "")
             + "><input type='hidden' name='id' value='" + str(j["id"]) + "'><button class='btn " + cls + "'>" + label + "</button></form> ")
         rows.append(
-            "<tr><td><strong>" + e(j["name"]) + "</strong><br><span class='muted' style='font-size:12px'>"
+            "<tr><td><strong>" + e(j["name"]) + "</strong><br><span class='muted' style='font-size:var(--t-xs,12px)'>"
             + e(j["actor"]) + " · " + e(j["platform"]) + " · up to " + str(j["max_handles"]) + "</span></td>"
             "<td>" + e(when) + "</td><td class='muted'>" + V.ago(j["last_started"]) + "</td>"
             "<td><span class='pill " + ("live" if j["enabled"] else "dead") + "'>" + ("on" if j["enabled"] else "paused") + "</span></td>"
@@ -247,11 +247,11 @@ def apify_tab(query=None):
                    "<button class='btn small'>Retry</button></form>" % r["id"])
         view = (" <a href='" + u("/apis/run?id=%d" % r["id"]) + "'>" + ("View" if r["results"] else "Details") + "</a>") if (r["results"] or r["apify_run"]) else ""
         runs.append(
-            "<tr><td>" + e(r["job_name"] or "—") + "<br><span class='muted' style='font-size:12px'>" + e(r["trigger"]) + "</span></td>"
+            "<tr><td>" + e(r["job_name"] or "—") + "<br><span class='muted' style='font-size:var(--t-xs,12px)'>" + e(r["trigger"]) + "</span></td>"
             "<td><span class='pill " + cls + "'>" + e(r["status"].lower()) + "</span></td>"
             "<td>" + str(r["handles"]) + "</td><td>" + str(r["results"]) + "</td><td>" + str(r["saved"]) + "</td>"
             "<td>$%.2f</td><td class='muted'>" % r["cost"] + V.ts(r["started_at"]) + "</td>"
-            "<td class='muted' style='font-size:12px'>" + e((r["message"] or "")[:200]) + view + ctl + "</td></tr>")
+            "<td class='muted' style='font-size:var(--t-xs,12px)'>" + e((r["message"] or "")[:200]) + view + ctl + "</td></tr>")
     runs_body = "".join(runs) or "<tr><td colspan='8' class='muted'>No runs yet.</td></tr>"
     names = sorted({j["name"] for j in apify.list_jobs()} | {r["job_name"] for r in apify.list_runs(200) if r["job_name"]})
     filt = ("<form method='get' action='" + u("/apis") + "' class='row' style='margin-bottom:10px'><input type='hidden' name='tab' value='apify'>"
@@ -319,7 +319,7 @@ def run_page(rid):
         except ValueError:
             pretty = r["data"]
         rows.append("<details class='card'><summary class='hd'><h2>" + e(who) + "</h2><span class='muted'>"
-                    + e(r["actor"] or "") + "</span></summary><pre style='white-space:pre-wrap;font-size:12px;"
+                    + e(r["actor"] or "") + "</span></summary><pre style='white-space:pre-wrap;font-size:var(--t-xs,12px);"
                     "max-height:480px;overflow:auto'>" + e(pretty) + "</pre></details>")
     body = (ui.header("Run results", e(run["job_name"] or "") + " · " + V.ts(run["started_at"]) + " · $%.2f" % run["cost"],
                       crumbs=[("APIs", u("/apis?tab=apify")), ("Run %d" % rid, None)],

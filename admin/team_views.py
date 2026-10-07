@@ -12,8 +12,8 @@ def _banner(ok, err):
 def _standalone(title, inner):
     """A small centred page before sign-in completes (no sidebar)."""
     return (HEAD + "<title>" + e(title) + " — HelloVoice Admin</title><link rel='stylesheet' href='" + u("/static/admin.css") + "'>"
-            "<style>.solo{max-width:440px;margin:8vh auto;padding:0 16px}.solo .card{padding:26px}.code-in{font-size:28px;letter-spacing:.3em;"
-            "text-align:center;font-variant-numeric:tabular-nums}.secret{font-family:ui-monospace,monospace;font-size:15px;word-break:break-all;"
+            "<style>.solo{max-width:440px;margin:8vh auto;padding:0 16px}.solo .card{padding:26px}.code-in{font-size:var(--t-xl,28px);letter-spacing:.3em;"
+            "text-align:center;font-variant-numeric:tabular-nums}.secret{font-family:ui-monospace,monospace;font-size:var(--t-md,14.5px);word-break:break-all;"
             "background:var(--paper);padding:10px 12px;border-radius:8px;display:block;margin:8px 0}</style></head><body>"
             "<main class='solo' id='main'><img src='" + u("/static/logo-knockout.webp") + "' alt='HelloVoice' height='26' "
             "style='filter:invert(1);margin-bottom:22px'>" + inner + "</main></body></html>")
@@ -23,7 +23,7 @@ def two_step_page(email, setup_secret=None, error=None):
     code_field = ("<label for='otp'>6-digit code from your authenticator app</label>"
                   "<input id='otp' class='code-in' name='code' inputmode='numeric' autocomplete='one-time-code' maxlength='6' pattern='[0-9]*' required autofocus>")
     if setup_secret:
-        inner = ("<div class='card'><h1 style='font-size:28px;margin:0 0 6px'>Set up two-step sign-in</h1>"
+        inner = ("<div class='card'><h1 style='font-size:var(--t-xl,28px);margin:0 0 6px'>Set up two-step sign-in</h1>"
                  "<p class='muted'>Your team requires it for your role. It takes a minute.</p><ol style='padding-left:18px;line-height:1.6'>"
                  "<li>Open Google Authenticator, Microsoft Authenticator or 1Password on your phone.</li>"
                  "<li>Add an account and choose <b>Enter a setup key</b> (or tap the link below on your phone).</li>"
@@ -33,10 +33,10 @@ def two_step_page(email, setup_secret=None, error=None):
                  + (("<div class='err'>" + e(error) + "</div>") if error else "")
                  + "<form method='post' action='" + u("/login/2fa") + "'>" + code_field + "<button class='btn lime' style='margin-top:14px;width:100%'>Turn on and sign in</button></form></div>")
     else:
-        inner = ("<div class='card'><h1 style='font-size:28px;margin:0 0 6px'>Two-step sign-in</h1><p class='muted'>Signed in as " + e(email) + ".</p>"
+        inner = ("<div class='card'><h1 style='font-size:var(--t-xl,28px);margin:0 0 6px'>Two-step sign-in</h1><p class='muted'>Signed in as " + e(email) + ".</p>"
                  + (("<div class='err'>" + e(error) + "</div>") if error else "")
                  + "<form method='post' action='" + u("/login/2fa") + "'>" + code_field + "<button class='btn lime' style='margin-top:14px;width:100%'>Sign in</button></form>"
-                 "<p class='muted' style='font-size:13px;margin-top:14px'>Lost your phone? Ask an owner to reset your two-step sign-in.</p></div>")
+                 "<p class='muted' style='font-size:var(--t-sm,13px);margin-top:14px'>Lost your phone? Ask an owner to reset your two-step sign-in.</p></div>")
     return _standalone("Two-step sign-in", inner)
 
 
@@ -82,7 +82,7 @@ def team_page(who, ok=None, err=None, setup_secret=None, new_member=None):
         mine = ("<p><span class='pill warn'>Off</span> Add a code from your phone at sign-in, so a stolen password is not enough.</p>"
                 "<form method='post' action='" + u("/account/2fa/start") + "'><button class='btn lime'>Set up two-step sign-in</button></form>")
     account = ("<div class='card'><h2>My account</h2><p class='muted'>" + e(who["email"]) + " · " + e(team.ROLE_LABEL[me_role]) + "</p>"
-               "<h3 style='font-size:15px;margin:16px 0 6px'>Two-step sign-in</h3>" + mine + "</div>")
+               "<h3 style='font-size:var(--t-md,14.5px);margin:16px 0 6px'>Two-step sign-in</h3>" + mine + "</div>")
     if not is_owner:
         return page("My account", ui.header("My account", "Your sign-in and security.") + _banner(ok, err) + account, "/team")
 
@@ -118,7 +118,7 @@ def team_page(who, ok=None, err=None, setup_secret=None, new_member=None):
                  "<div><label for='in-role'>Role</label><select id='in-role' name='role'>" + "".join(
                      "<option value='%s'%s>%s</option>" % (k, " selected" if k == "kam" else "", e(team.ROLE_LABEL[k])) for k in team.ROLES) + "</select></div>"
                  "<div><button class='btn lime'>Add</button></div></form></details>"
-                 "<dl class='roles' style='margin-top:16px;font-size:13.5px'>" + "".join(
+                 "<dl class='roles' style='margin-top:16px;font-size:var(--t-sm,13px)'>" + "".join(
                      "<dt><b>%s</b></dt><dd class='muted' style='margin:0 0 6px'>%s</dd>" % (e(team.ROLE_LABEL[k]), e(team.ROLE_HELP[k])) for k in team.ROLES) + "</dl></div>")
     req = team.required_roles()
     policy = ("<div class='card'><h2>Sign-in rules</h2><form method='post' action='" + u("/team/policy") + "'>"
@@ -128,7 +128,7 @@ def team_page(who, ok=None, err=None, setup_secret=None, new_member=None):
               "<label for='idle'>Sign out after this many minutes without activity</label>"
               "<input id='idle' name='idle' type='number' min='5' max='1440' value='" + str(team.idle_minutes()) + "' style='max-width:140px'>"
               "<div style='margin-top:14px'><button class='btn lime'>Save rules</button></div></form>"
-              "<p class='muted' style='font-size:13px;margin-top:10px'>People without two-step sign-in in a required role set it up at their next sign-in.</p></div>")
+              "<p class='muted' style='font-size:var(--t-sm,13px);margin-top:10px'>People without two-step sign-in in a required role set it up at their next sign-in.</p></div>")
     labels = {"login": "Signed in", "login_fail": "Wrong password", "2fa_fail": "Wrong two-step code", "2fa_on": "Turned on two-step sign-in",
               "2fa_off": "Turned off two-step sign-in", "2fa_reset": "Reset two-step sign-in", "role": "Changed a role", "invite": "Added a team member",
               "disable": "Removed access", "enable": "Re-enabled access", "key": "Saved or removed a key", "export": "Exported data",

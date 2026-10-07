@@ -41,6 +41,16 @@ def actor():
     return getattr(_actor, "who", None) or "system"
 
 
+def start_request():
+    """Forget what the previous request on this thread recorded (for the Undo toast)."""
+    _actor.made = []
+
+
+def made():
+    """[(history id, label)] recorded during this request, undos excluded."""
+    return list(getattr(_actor, "made", None) or [])
+
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS history (
   id         INTEGER PRIMARY KEY,
@@ -195,6 +205,8 @@ def record(action, entity, key, label, before, after, conn=None, undo_of=None):
         (db.now(), actor(), action, entity, None if key is None else str(key), label,
          json.dumps(before, ensure_ascii=False) if before is not None else None,
          json.dumps(after, ensure_ascii=False) if after is not None else None, undo_of))
+    if action != "undo" and hasattr(_actor, "made"):
+        _actor.made.append((cur.lastrowid, label or ""))
     return cur.lastrowid
 
 

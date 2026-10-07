@@ -228,7 +228,21 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if to.startswith("/") and BASE and not to.startswith(BASE + "/") and to != BASE:
             to = BASE + to
         h = [("Location", to)] + list(headers or [])
+        if getattr(self, "_held", None) is None:
+            h += self.undo_cookie()
         self.send(303, b"", "text/plain", h)
+
+    def undo_cookie(self):
+        """The next page offers Undo for what this POST just changed in History."""
+        made = history.made() if self.command == "POST" else []
+        if not made:
+            return []
+        label = made[0][1] or "Change saved"
+        if len(made) > 1:
+            label = "%d changes saved" % len(made)
+        history.start_request()
+        val = urllib.parse.quote(",".join(str(i) for i, _ in made[-50:]) + "|" + label[:140], safe="")
+        return [("Set-Cookie", "hv_undo=%s; Path=/; Max-Age=60; SameSite=Lax%s" % (val, self.secure_flag()))]
 
     def secure_flag(self):
         """'; Secure' when we are served over https (an https --origin is set)."""
@@ -350,6 +364,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True})
         if path == "/static/admin.css":
             return self.send(200, views.CSS, "text/css; charset=utf-8")
+        if path == "/editor.js":
+            return self.send(200, views.EDITOR_JS, "application/javascript; charset=utf-8",
+                             [("Cache-Control", "public, max-age=31536000, immutable")])
+        if path == "/shell.js":
+            return self.send(200, ui.SHELL_JS, "application/javascript; charset=utf-8",
+                             [("Cache-Control", "public, max-age=31536000, immutable")])
         if path == "/manifest.webmanifest":
             # Lets the admin be added to a phone's home screen and open full-screen, like an app.
             return self.send(200, json.dumps({
@@ -568,7 +588,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send(200, views.selection_edit_page(
                 sel, db.list_creators(), db.tier_prices(), self.site_origin(),
                 query.get("e"), query.get("ok"), db.campaigns_for_selection(sel["id"]),
-                scores=self.selection_scores(sel), interests=db.known_interests(), access_codes=db.list_codes()))
+                interests=db.known_interests(), access_codes=db.list_codes()))
+        if path == "/selections/fit":
+            # The Fit & tags tab, fetched when it is opened.
+            sid = query.get("id", "")
+            sel = db.selection(int(sid)) if sid.isdigit() else None
+            if sel is None:
+                return self.send(404, "<p class='err'>That selection no longer exists.</p>")
+            return self.send(200, views.selection_fit_panel(sel, db.list_creators(), self.selection_scores(sel), db.known_interests()))
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
                 db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok"),
@@ -750,6 +777,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def do_POST(self):
         path = self.route(urllib.parse.urlparse(self.path).path)
+        history.start_request()
 
         # CSRF: a cross-site form post cannot forge Origin / Sec-Fetch-Site.
         if not guard.origin_ok(self.headers, ALLOWED_ORIGINS):
@@ -973,8 +1001,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                    None, history.snapshot("creator", code))
         finally:
             held, self._held = self._held, None
-            for args in held:
-                self.send(*args)
+            extra = self.undo_cookie()                 # recorded only now, after the block
+            for code, body, ctype, headers in held:
+                if extra and 300 <= code < 400:
+                    headers, extra = list(headers or []) + extra, []
+                self.send(code, body, ctype, headers)
         return out
 
     def post_campaign_status(self):
@@ -999,6 +1030,18 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def post_history_undo(self):
         f = self.form_body()
         hid = (f.get("id") or "").strip()
+        ids = [int(x) for x in (f.get("ids") or "").split(",") if x.strip().isdigit()]
+        if ids:                                   # the Undo toast: undo the whole action, newest first
+            done = [history.undo(i) for i in sorted(ids, reverse=True)]
+            ok = all(d[0] for d in done)
+            msg = done[0][1] if len(done) == 1 else ("Undone." if ok else "Some of it could not be undone; see History.")
+            back = f.get("back") or "/"
+            if not back.startswith("/") or back.startswith("//") or "\\" in back:
+                back = "/"
+            if BASE and back.startswith(BASE + "/"):
+                back = back[len(BASE):]
+            history.start_request()
+            return self.redirect(back + ("&" if "?" in back else "?") + ("ok=" if ok else "e=") + urllib.parse.quote(msg))
         ok, msg = history.undo(int(hid)) if hid.isdigit() else (False, "Nothing to undo.")
         back = "/history" + ("?kind=" + urllib.parse.quote(f["kind"]) if f.get("kind") else "")
         sep = "&" if "?" in back else "?"
@@ -1112,7 +1155,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 a = team.admin_by_id(who["admin_id"])
                 step = team.totp_matches(a["totp_secret"], f.get("code"), a["totp_last"])
                 if step is None:
-                    return self.redirect("/team?setup=1&e=" + urllib.parse.quote("That code is not right. Try the newest one."))
+                    return self.redirect("/team?setup=1&f=code&e=" + urllib.parse.quote("That code is not right. Try the newest one."))
                 team.set_totp(a["id"], a["totp_secret"], True)
                 team.use_totp_step(a["id"], step)
                 team.log("2fa_on", me, "", ip)
@@ -1726,7 +1769,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         known = {c["code"]: c for c in db.list_creators() if c["code"] in set(codes)}
         if action in ("hide", "show", "tier"):
             if action == "tier" and value not in db.tier_names():
-                return self.redirect(back + sep + "e=" + urllib.parse.quote("Choose a tier."))
+                return self.redirect(back + sep + "f=value&e=" + urllib.parse.quote("Choose a tier."))
             n = 0
             for code, c in known.items():
                 row = dict(c)
@@ -2033,7 +2076,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # A new, empty selection built here: a name, the client, the platform and the currency.
             name = (f.get("name") or "").strip()[:120]
             if not name:
-                return self.redirect("/selections?e=" + urllib.parse.quote("Give the selection a name."))
+                return self.redirect("/selections?f=name&e=" + urllib.parse.quote("Give the selection a name."))
             cid = (f.get("code_id") or "").strip()
             cur = (f.get("currency") or "SAR").strip().upper()
             plat = (f.get("platform") or "").strip() or None
@@ -2150,7 +2193,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         remove = set(f.get("drop") or [])
         # The Fit & tags tab has its own row per creator (vcode), so its lists
         # line up with each other whatever the pricing table holds.
-        vc = f.get("vcode") or f.get("code") or []
+        # The tab is fetched only when opened: if it never was, leave its data as it is.
+        fit_loaded = bool(f.get("fit_loaded"))
+        vc = (f.get("vcode") or []) if fit_loaded else []
         vc = [vc] if isinstance(vc, str) else list(vc)
         tag_in = f.get("tags") or []
         tag_in = [tag_in] if isinstance(tag_in, str) else list(tag_in)
@@ -2263,10 +2308,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "category": self.clean_categories(f.get("t_category"))})
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs, margin_max=margin_max,
-                          tags={k: v for k, v in tags.items() if k in codes},
-                          verdicts={k: v for k, v in verdicts.items() if k in codes},
-                          platforms={k: v for k, v in platforms_map.items() if k in codes},
-                          segments=({k: v for k, v in segments.items() if k in codes} if "segs" in f else None))
+                          tags=({k: v for k, v in tags.items() if k in codes} if fit_loaded else None),
+                          verdicts=({k: v for k, v in verdicts.items() if k in codes} if fit_loaded else None),
+                          platforms=({k: v for k, v in platforms_map.items() if k in codes} if fit_loaded else None),
+                          segments=({k: v for k, v in segments.items() if k in codes} if fit_loaded and "segs" in f else None))
         if "sel_group" in f and (f.get("sel_group") or "") in dict(db.GROUPS):
             db.set_selection_group(sel["id"], f.get("sel_group") or "")
         # A price typed here belongs to THIS selection. Only the ones ticked
@@ -2327,7 +2372,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "Campaign started from the selection. Set its dates and rules, then set it live.")))
         name = (f.get("name") or "").strip()
         if not name:
-            return self.redirect("/campaigns?e=" + urllib.parse.quote("Give the campaign a name."))
+            return self.redirect("/campaigns?f=name&e=" + urllib.parse.quote("Give the campaign a name."))
         code_id = (f.get("code_id") or "").strip()
         cid = db.create_campaign(name, client=(f.get("client") or "").strip() or None,
                                  code_id=int(code_id) if code_id.isdigit() else None)
@@ -2544,7 +2589,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not re.match(r"^https://[^\s/]+\.[^\s]+$", url):
             return self.redirect(back + "&e=" + urllib.parse.quote("The post link must start with https://"))
         if code not in {m["cc_code"] for m in db.campaign_creators(k["id"])}:
-            return self.redirect(back + "&e=" + urllib.parse.quote("Pick a creator in this campaign."))
+            return self.redirect(back + "&f=code&e=" + urllib.parse.quote("Pick a creator in this campaign."))
         platform = f.get("platform") if f.get("platform") in db.PLATFORMS else "Instagram"
         kind = f.get("kind") if f.get("kind") in db.KINDS else "post"
         posted = db.day_bounds(f.get("posted") or "", None)
@@ -2618,7 +2663,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect(back + "&ok=" + urllib.parse.quote(msg))
         code = (f.get("code") or "").strip().upper()
         if code not in {m["cc_code"] for m in db.campaign_creators(k["id"])}:
-            return self.redirect(back + "&e=" + urllib.parse.quote("Pick a creator in this campaign."))
+            return self.redirect(back + "&f=code&e=" + urllib.parse.quote("Pick a creator in this campaign."))
         platform = f.get("platform") if f.get("platform") in db.PLATFORMS else "Instagram"
         kind = f.get("kind") if f.get("kind") in db.KINDS else "post"
         posted = db.day_bounds(f.get("posted") or "", None)
@@ -3073,7 +3118,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         back = "/campaigns/insights?id=%d" % k["id"]
         code = (f.get("code") or "").strip().upper()
         if code not in {m["cc_code"] for m in db.campaign_creators(k["id"])}:
-            return self.redirect(back + "&e=" + urllib.parse.quote("Pick a creator in this campaign."))
+            return self.redirect(back + "&f=code&e=" + urllib.parse.quote("Pick a creator in this campaign."))
         names, err = self.save_insight_files(f.get("shots") or [])
         if err:
             return self.redirect(back + "&e=" + urllib.parse.quote(err))
