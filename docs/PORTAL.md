@@ -48,7 +48,7 @@ working, and the email sign-in only appears on the catalogue once mail is set up
 - **Funnel:** sign-ups → sign-ins → briefs → selections → quote requests, last 30 days.
 - **Printable quotation** from any selection (Print → Save as PDF), linked from the selection page.
 - **Data rights:** clients download their data and can delete their account; admins can too.
-- **Arabic:** sign-in, questions, results, chat and account switch to Arabic, right-to-left.
+- **Language:** the portal is English only for now; the chat assistant understands and replies in any language (Arabic, English, ...). An Arabic UI table is kept in portal.js for later.
 
 ## Matching quality (tested on the production roster, 7 Oct 2026)
 

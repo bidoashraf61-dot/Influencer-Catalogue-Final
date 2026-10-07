@@ -325,6 +325,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return
         if path == "/api/roster":
             return self.api_roster()
+        if path == "/api/discover/facets":
+            return self.api_discover("facets")
         if path == "/api/selection":
             return self.api_selection(
                 query.get("s") or "", query.get("n") or "",
@@ -706,6 +708,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_unlock()
         if path == "/api/request":
             return self.api_request()
+        if path in ("/api/discover", "/api/discover/like", "/api/discover/parse"):
+            return self.api_discover(path.rsplit("/", 1)[-1])
         if path == "/api/event":
             return self.api_event()
         if path == "/api/selection/tags":
@@ -3661,6 +3665,22 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         return self.send_json(200, {"ok": True, "roster": self.roster_payload(),
                                     "tiers": self.tier_payload(), "fx": fx.rates()}, self.cors())
+
+    def api_discover(self, job):
+        """The catalogue's Audience and Performance filters, lookalikes and
+        typed searches. Analyses never leave the server: the page gets codes."""
+        if not self.viewer_code_id():
+            return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+        import discover
+        if job == "facets":
+            return self.send_json(200, {"ok": True, "facets": discover.facets()}, self.cors())
+        b = self.json_body()
+        if job == "like":
+            return self.send_json(200, {"ok": True, "codes": discover.like(str(b.get("code") or "")[:40])}, self.cors())
+        if job == "parse":
+            return self.send_json(200, {"ok": True, "filters": discover.parse(str(b.get("text") or "")[:400])}, self.cors())
+        plat = b.get("platform") if b.get("platform") in ("Instagram", "TikTok", "Snapchat", "YouTube", "X", "Facebook") else None
+        return self.send_json(200, {"ok": True, "codes": discover.match(b.get("filters"), plat)}, self.cors())
 
     def tier_payload(self):
         """Sent with the roster so the page totals a selection at today's

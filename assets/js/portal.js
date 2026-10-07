@@ -25,10 +25,10 @@
   /* ------------------------------------------------------------- language */
   // English by default, Arabic for an Arabic browser or when chosen. Every static string goes
   // through T() inside h(), so a missing translation simply stays English.
-  var LANG = (function () {
-    try { var v = localStorage.getItem("hv_lang"); if (v) return v; } catch (e) { /* blocked */ }
-    return /^ar/i.test(navigator.language || "") ? "ar" : "en";
-  })();
+  // The portal is English only for now (Bido, 2026-10-08). The chat assistant still replies in
+  // whatever language the client writes. The Arabic table below is kept for later: set LANG to "ar".
+  var LANG = "en";
+  try { localStorage.removeItem("hv_lang"); } catch (e) { /* blocked */ }
   var AR = {
     "Sign in with your work email. We'll send a one-time code. No password needed.": "سجّل الدخول ببريد العمل. سنرسل لك رمزاً لمرة واحدة، بدون كلمة مرور.",
     "Email me a code": "أرسل لي الرمز", "Work email": "بريد العمل", "Verify and continue": "تحقق وتابع",
@@ -213,8 +213,7 @@
     var toCodeLink = h("button", { class: "pt-link", type: "button" }, "I have an access code instead");
     var panel = h("div", { class: "pt-gate" },
       h("p", { class: "pt-gate__lead" }, "Sign in with your work email. We'll send a one-time code. No password needed."),
-      formEmail, formCode, formProfile, msg, h("div", { class: "pt-gate__alt" }, toCodeLink, " · ",
-        h("button", { class: "pt-link", type: "button", onclick: function () { setLang(LANG === "ar" ? "en" : "ar"); } }, LANG === "ar" ? "English" : "العربية")));
+      formEmail, formCode, formProfile, msg, h("div", { class: "pt-gate__alt" }, toCodeLink));
     if (LANG === "ar") { panel.setAttribute("dir", "rtl"); panel.setAttribute("lang", "ar"); }
 
     inner.insertBefore(panel, note || oldForm);
@@ -330,8 +329,6 @@
     chip.appendChild(h("span", { id: "pt-chip-name" }, ME.user ? ME.user.name.split(" ")[0] : ME.kind === "admin" ? "Admin" : "Account"));
     if (ME.credits != null) chip.appendChild(h("span", { class: "pt-credits", id: "pt-chip-credits" }, ME.credits + " cr"));
     dock.appendChild(chip);
-    dock.appendChild(h("button", { class: "pt-chip", type: "button", "aria-label": "Language", title: "Language",
-      onclick: function () { setLang(LANG === "ar" ? "en" : "ar"); } }, LANG === "ar" ? "EN" : "ع"));
     if (cat) cat.insertBefore(dock, cat.firstChild); else document.body.appendChild(dock);
   }
 

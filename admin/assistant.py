@@ -25,7 +25,7 @@ import history
 import matcher
 import portal
 
-MAX_STEPS = 5
+MAX_STEPS = 7
 PENDING_TTL = 600
 _pending = {}
 _lock = threading.Lock()
@@ -185,6 +185,7 @@ METRICS = {
     "audience_share_in_country_pct": lambda d, a: next((c.get("pct") for c in (d.get("audience") or {}).get("countries") or []
                                                          if str(c.get("code", "")).upper() == (a or "SA").upper()), None),
 }
+ER_CEILING = 20.0
 NUMERIC = ["engagement_rate_pct", "followers", "avg_views", "avg_likes", "avg_comments", "fake_followers_pct",
            "audience_share_in_country_pct"]
 
@@ -219,6 +220,9 @@ def t_creator_metrics(ctx, codes=None, fields=None, platform="", country="SA"):
             item["basis"] = "public numbers only" if d.get("basic") else "full analysis"
             for f in fields:
                 item[f] = METRICS[f](d, country)
+            er = item.get("engagement_rate_pct")
+            if isinstance(er, (int, float)) and er > ER_CEILING and d.get("er_basis") != "views":
+                item["warning"] = "engagement rate looks implausible; treat as unverified"
         out.append(item)
     return {"fields": fields, "creators": out}
 
@@ -242,16 +246,22 @@ def t_rank_by_metric(ctx, metric="engagement_rate_pct", order="desc", category="
             continue
         pool.append(c)
     every = db.analyses_for([c["code"] for c in pool])
-    ranked = []
+    ranked, doubtful = [], 0
     for c in pool:
         pl, d = _best_analysis(every.get(c["code"]), plat)
         if d is None:
             continue
         v = METRICS[metric](d, country)
+        # A feed account engaging over 20% of its followers is almost always a data error (often a
+        # per-view rate filed as per-follower). Leave it out of a ranking rather than crown it.
+        if metric == "engagement_rate_pct" and isinstance(v, (int, float)) and v > ER_CEILING and d.get("er_basis") != "views":
+            doubtful += 1
+            continue
         if isinstance(v, (int, float)):
             ranked.append((v, c, pl, d))
     ranked.sort(key=lambda x: x[0], reverse=(order != "asc"))
     return {"metric": metric, "order": order, "analysed_in_pool": len(ranked), "pool": len(pool),
+            "left_out_as_implausible": doubtful,
             "creators": [{"code": c["code"], "name": c["name"], "platform": pl, metric: v,
                           "basis": "public numbers only" if d.get("basic") else "full analysis",
                           "followers": c["followers"], "city": c["city"]} for v, c, pl, d in ranked[:limit]]}
@@ -866,7 +876,12 @@ def converse(scope, ctx, history_msgs, text, code_id=None, kind="chat", credits=
     tools = declarations(scope)
     cards = []
     for step in range(MAX_STEPS):
-        out = gemini.generate(contents, system=system_prompt(scope, ctx), tools=tools, temperature=0.3,
+        last = step == MAX_STEPS - 1
+        if last:
+            # Out of tool steps: answer now from what has been fetched, rather than give up.
+            contents.append({"role": "user", "parts": [{"text": "Answer now in a few lines using only the tool results above. "
+                                                                 "Say plainly if something is missing."}]})
+        out = gemini.generate(contents, system=system_prompt(scope, ctx), tools=None if last else tools, temperature=0.3,
                               max_tokens=4096, kind=kind, code_id=code_id, credits=credits if step == 0 else 0,
                               model_name=gemini.copilot_model() if scope == "admin" else None)
         if not out["calls"]:
@@ -875,8 +890,8 @@ def converse(scope, ctx, history_msgs, text, code_id=None, kind="chat", credits=
         responses = []
         for call in out["calls"][:4]:
             res = run_tool(scope, call["name"], call["args"], ctx)
-            if call["name"] in ("suggest_shortlist", "search_creators") and isinstance(res, dict):
-                cards += [c["code"] for c in (res.get("shortlist") or res.get("creators") or [])][:12]
+            if call["name"] in ("suggest_shortlist", "search_creators", "rank_by_metric", "creator_metrics") and isinstance(res, dict):
+                cards += [c["code"] for c in (res.get("shortlist") or res.get("creators") or []) if c.get("code") and not c.get("error")][:12]
             responses.append({"functionResponse": {"name": call["name"], "response": {"result": res}}})
         contents.append({"role": "user", "parts": responses})
     return {"reply": "I could not finish that in a few steps. Try asking in smaller parts.", "cards": cards,
