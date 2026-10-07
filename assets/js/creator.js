@@ -435,7 +435,7 @@
     return '<div class="pp-posts">' + list.map(function (p, i) {
       return '<a class="pp-post" href="' + esc(p.url) + '" target="_blank" rel="noopener" aria-label="Play post ' + (i + 1) + '" data-post="' + i + '"' + (sponsored ? ' data-sp="1"' : "") + ">"
         + '<span class="pp-post__media"' + (p.thumb ? ' style="background-image:url(\'' + esc(p.thumb) + '\')"' : "") + ">"
-        + (p.thumb ? "" : '<span class="pp-post__none">Instagram post</span>')
+        + (p.thumb ? "" : '<span class="pp-post__none">' + esc(PLAT || "Instagram") + " post</span>")
         + '<span class="pp-post__play">' + I_PLAY + "</span>"
         + (sponsored && p.brand ? '<span class="pp-post__brand">' + esc(p.brand) + "</span>" : "")
         + '<span class="pp-post__nums">' + (p.likes != null ? "<span>" + I_LIKE + num(p.likes) + "</span>" : "") + (p.comments != null ? "<span>" + I_COMMENT + num(p.comments) + "</span>" : "")
