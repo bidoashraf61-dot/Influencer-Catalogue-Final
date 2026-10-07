@@ -822,3 +822,17 @@ body.pt-lock { overflow: hidden; }
   .ai-sl__tk-score { position: static; margin: 6px 0 4px; transform: rotate(-2deg); }
   .ai-sl__name { width: 100%; }
 }
+
+/* licence filter, in the setup panel */
+.lic-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 4px; }
+.lic-filter__label { font-family: Bebasneue, Arial, sans-serif; font-size: 22px; letter-spacing: .08em; color: #121212; margin-right: 6px; }
+.lic-chip {
+  min-height: 40px; padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  font: 600 14px/1.2 "DM Sans", Arial, sans-serif; color: #121212; background: #fff; border: 1.5px solid rgba(18,18,18,.22);
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.lic-chip:hover { border-color: #121212; }
+.lic-chip[aria-pressed="true"] { background: #121212; color: #e8ff76; border-color: #121212; }
+.lic-chip:focus-visible { outline: 3px solid #ee1515; outline-offset: 2px; }
+.lic-filter__note { font-size: 13px; color: #383838; margin-left: 4px; }
+.cat-grid .cat-card.lic-out { display: none !important; }

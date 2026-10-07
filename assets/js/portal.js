@@ -1930,6 +1930,45 @@
       });
     });
   }
+  // A licence filter in the setup panel: Any, Mawthooq, UAE permit, Verified only.
+  // Works over the catalogue's own filters: a card has to pass both.
+  var licWant = "";
+  function licMatch(code) {
+    if (!licWant) return true;
+    var list = (LIC && LIC[code]) || [];
+    if (licWant === "verified") return list.some(function (l) { return l.status === "verified"; });
+    if (licWant === "any") return list.length > 0;
+    return list.some(function (l) { return l.country === licWant; });
+  }
+  function applyLicFilter() {
+    var shown = 0;
+    Array.prototype.forEach.call(document.querySelectorAll(".cat-card[data-code]"), function (card) {
+      var ok = licMatch(card.getAttribute("data-code"));
+      card.classList.toggle("lic-out", !ok);
+      if (ok && !card.hidden && !card.classList.contains("ai-out")) shown++;
+    });
+    var note = $("lic-note");
+    if (note) note.textContent = licWant ? shown + " creator" + (shown === 1 ? "" : "s") + " with " +
+      ({ any: "a licence", SA: "Mawthooq", AE: "a UAE permit", verified: "a verified licence" })[licWant] : "";
+  }
+  function mountLicFilter() {
+    if (document.body.getAttribute("data-page") !== "catalogue" || $("lic-filter")) return;
+    var bar = document.querySelector(".cat-controls .cat-bar");
+    if (!bar) return;
+    var box = h("div", { id: "lic-filter", class: "lic-filter", role: "group", "aria-label": "Advertising licence" });
+    box.appendChild(h("span", { class: "lic-filter__label" }, "Licence"));
+    [["", "Any"], ["any", "Licensed"], ["SA", "Mawthooq"], ["AE", "UAE permit"], ["verified", "Verified only"]].forEach(function (o) {
+      var b = h("button", { class: "lic-chip", type: "button", "aria-pressed": String(o[0] === licWant) }, o[1]);
+      b.addEventListener("click", function () {
+        licWant = o[0];
+        Array.prototype.forEach.call(box.querySelectorAll(".lic-chip"), function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+        applyLicFilter();
+      });
+      box.appendChild(b);
+    });
+    box.appendChild(h("span", { class: "lic-filter__note", id: "lic-note", "aria-live": "polite" }));
+    bar.parentNode.insertBefore(box, bar.nextSibling);
+  }
   function mountLicences() {
     var page = document.body.getAttribute("data-page");
     if (page !== "catalogue" && page !== "selection") return;
@@ -1937,9 +1976,10 @@
       if (!r.b || !r.b.ok) return;
       LIC = r.b.licences || {};
       paintLicences();
+      mountLicFilter();
       if (!licObserver && "MutationObserver" in window) {
         var t = null, app = document.getElementById("cat-grid") || document.body;
-        licObserver = new MutationObserver(function () { clearTimeout(t); t = setTimeout(paintLicences, 150); });
+        licObserver = new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { paintLicences(); if (licWant) applyLicFilter(); }, 150); });
         licObserver.observe(app, { childList: true, subtree: true });
       }
     });
