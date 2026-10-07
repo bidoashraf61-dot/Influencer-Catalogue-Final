@@ -79,7 +79,6 @@ import plans  # noqa: E402
 import thumbs  # noqa: E402
 import track  # noqa: E402
 import uploads  # noqa: E402
-import account  # noqa: E402
 import apify
 import profile_thumbs
 import apis_view
@@ -4290,7 +4289,6 @@ def main():
     db.init()
     history.init()
     portal.init()
-    account.init()
     team.init()
     apify.start_scheduler()
     profile_thumbs.start()
