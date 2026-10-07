@@ -342,7 +342,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     else:
         video = True                                  # a TikTok/YouTube report's own rate is per view
     bars = bench.get("video_er") if video else (bench.get("er") or {}).get(band)
-    good, ok = bars if bars else ((6.0, 3.0) if video else (3.0, 1.5))
+    good, ok = bars if bars else ((4.5, 3.0) if video else (3.0, 1.5))
     parts = []
     wmul = {}
 

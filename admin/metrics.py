@@ -64,7 +64,7 @@ DEFAULT_BENCHMARKS = {
     "er": {"nano": [4.0, 2.0], "micro": [3.0, 1.5], "mid": [2.0, 1.0],
            "macro": [1.5, 0.8], "mega": [1.0, 0.5]},
     # engagement ÷ views, % — reels, TikToks, videos
-    "video_er": [6.0, 3.0],
+    "video_er": [4.5, 3.0],
     # views ÷ followers, % — how far a video travelled
     "view_rate": [30.0, 10.0],
     # story reach ÷ followers, %
