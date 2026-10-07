@@ -2995,18 +2995,29 @@ class Handler(BaseHTTPRequestHandler):
             if c is None:
                 continue
             mine = every.get(code) or {}
+            rec = dict(records[code], typical_er=typical) if code in records else None
+
+            def one(pl):
+                doc = mine[pl]["data"]
+                followers = doc.get("followers") or c["followers"]
+                return fit_mod.score(doc, pl, c["followers"], objective=objective, target=target,
+                                     band=metrics.band_of(followers), bench=bench, record=rec,
+                                     creator_interest=c["interest"])
             plat = analysis.canon_platform(wanted) if wanted and analysis.canon_platform(wanted) in mine else None
-            if not plat and mine:
-                # the creator's fullest analysis (their main platform on a tie)
+            if plat:
+                out[code] = one(plat)
+            elif mine:
+                # "Every platform": judge the creator where they do best, and say where.
                 import profile_pdf as _pp
                 main = analysis.creator_platforms(c)
-                plat = max(mine, key=lambda p: (_pp.completeness(mine[p]["data"]), p == main[0]))
-            doc = mine[plat]["data"] if plat else None
-            followers = (doc or {}).get("followers") or c["followers"]
-            rec = dict(records[code], typical_er=typical) if code in records else None
-            out[code] = fit_mod.score(doc, plat, c["followers"], objective=objective, target=target,
-                                      band=metrics.band_of(followers), bench=bench, record=rec,
-                                      creator_interest=c["interest"])
+                tried = {pl: one(pl) for pl in mine}
+                best = max(tried, key=lambda pl: (tried[pl]["score"] is not None, tried[pl]["score"] or 0,
+                                                  _pp.completeness(mine[pl]["data"]), pl == main[0]))
+                out[code] = dict(tried[best])
+                out[code]["others"] = [{"platform": pl, "score": v["score"]} for pl, v in tried.items()
+                                       if pl != best and v["score"] is not None]
+            else:
+                out[code] = fit_mod.score(None, None, c["followers"], objective=objective, target=target)
         return out
 
     def selection_suggest(self, query):
@@ -3414,7 +3425,8 @@ class Handler(BaseHTTPRequestHandler):
                                     "scores": {k: {"score": v["score"], "tag": v["tag"], "strengths": v["strengths"],
                                                    "watchouts": v["watchouts"], "conclusion": v["conclusion"],
                                                    "parts": [{"label": p["label"], "s": p["s"]} for p in v["parts"]],
-                                                   "platform": v["platform"], "objective": v["objective"]}
+                                                   "platform": v["platform"], "objective": v["objective"],
+                                                   "others": v.get("others") or []}
                                                for k, v in self.selection_scores(sel).items()},
                                     "client_tags": {k: v for k, v in json.loads((sel["client_tags"] if "client_tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "verdicts": {k: v for k, v in json.loads((sel["verdicts"] if "verdicts" in sel.keys() else None) or "{}").items() if k in by and k in codes},

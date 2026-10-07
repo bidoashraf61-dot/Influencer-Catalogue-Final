@@ -254,6 +254,15 @@ def score(doc, platform, followers=None, objective="Balanced", target=None, band
         fake = round(100 - doc["credibility_pct"], 1)
     au = doc.get("audience") or {}
     feed = platform in (None, "Instagram", "Facebook", "X")
+    if er is not None and doc.get("er_note") and not feed:
+        # A video account's rate that the importer had to work out is likes per FOLLOWER, which
+        # a 6% per-view benchmark would crush. Use per-view when the report has the views,
+        # else judge it against the follower-based range.
+        views = doc.get("avg_views")
+        if views:
+            er = ((doc.get("avg_likes") or 0) + (doc.get("avg_comments") or 0)) / float(views) * 100
+        else:
+            feed = True
     bars = (bench.get("er") or {}).get(band) if feed else bench.get("video_er")
     good, ok = bars if bars else ((3.0, 1.5) if feed else (6.0, 3.0))
     fk_good, fk_bad = bench.get("fake_followers") or (15.0, 30.0)

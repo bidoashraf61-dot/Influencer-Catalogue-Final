@@ -1250,3 +1250,5 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cst-bar { display: grid; grid-template-columns: 110px 1fr; gap: 10px; align-items: center; margin: 4px 0; }
 .cst-bar i { display: block; height: 7px; border-radius: 99px; background: rgba(255,255,255,.18); overflow: hidden; }
 .cst-bar b { display: block; height: 100%; background: #14884a; border-radius: 99px; }
+
+.cst-head small { display: block; }
