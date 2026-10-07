@@ -438,7 +438,6 @@
     return '<article class="cat-card" data-tier="' + esc(c.tier) +
       '" data-platform="' + esc(c.platform) + '" data-city="' + esc(c.city || "Unspecified") +
       '" data-interest="' + esc(c.interest || "") + '" data-code="' + esc(c.code) +
-      '" data-nationality="' + esc(c.nationality || "") + '" data-measured="' + (c.analysis ? 1 : 0) +
       (c.price && c.price.length ? '" data-price="' + esc(c.price.join("-")) : "") +
       '" data-followers="' + totalFollowers(c) + '" data-name="' + esc(c.name) +
       '" data-idx="' + (i || 0) +
@@ -644,78 +643,22 @@
     return "Followers up to " + short(r[1]);
   }
 
-  // Discovery: a search bar with three ways in (filters, a typed brief,
-  // "creators like this one") over a grouped filter sidebar — Creator from the
-  // cards themselves, Audience and Performance from the analyses on the
-  // server, and on the selection page the selection's own fit, role and tags.
-  // OR within a filter, AND across them. The sidebar is a bottom sheet on a
-  // phone. Built from the cards, so the selection page gets options for
-  // exactly the creators in that selection.
-  var ICON_SEARCH = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>';
-  var ICON_SPARK = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>';
-  var ICON_TWINS = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8.5" cy="8" r="3.2"/><circle cx="15.5" cy="8" r="3.2"/><path d="M2.8 19.5c.6-3.2 3-5 5.7-5s5.1 1.8 5.7 5"/><path d="M14.6 14.6c.3 0 .6-.1.9-.1 2.7 0 5.1 1.8 5.7 5"/></svg>';
-  var ICON_SLIDERS = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg>';
-
-  var MODES = [
-    ["filters", "Filters", ICON_SEARCH, "Search creators by name", "Narrow the roster with the filters, or search a name."],
-    ["ai", "AI search", ICON_SPARK, "Describe who you need, e.g. micro mums in Riyadh on Snapchat",
-     "Type the brief in a sentence and it becomes filters you can adjust."],
-    ["like", "Lookalike", ICON_TWINS, "Type a creator's name to find similar ones",
-     "Pick a creator you like; the most similar come first."]
-  ];
-
-  // Threshold choices for the analysis filters: [value, label].
-  var STEPS = {
-    real_min: [["", "Any"], ["60", "60%+"], ["70", "70%+"], ["80", "80%+"], ["90", "90%+"]],
-    er_min: [["", "Any"], ["1", "1%+"], ["2", "2%+"], ["3", "3%+"], ["5", "5%+"]],
-    reels_er_min: [["", "Any"], ["1", "1%+"], ["3", "3%+"], ["5", "5%+"], ["10", "10%+"]],
-    views_min: [["", "Any"], ["1000", "1K+"], ["5000", "5K+"], ["10000", "10K+"], ["50000", "50K+"], ["100000", "100K+"]],
-    likes_min: [["", "Any"], ["100", "100+"], ["500", "500+"], ["1000", "1K+"], ["5000", "5K+"]],
-    comments_min: [["", "Any"], ["10", "10+"], ["50", "50+"], ["100", "100+"]],
-    growth_min: [["", "Any"], ["0", "Growing"], ["2", "2%+"], ["5", "5%+"]],
-    ppw_min: [["", "Any"], ["1", "1+ a week"], ["3", "3+"], ["5", "5+"]],
-    active_days: [["", "Any"], ["30", "Last 30 days"], ["90", "Last 90 days"]],
-    a_country_min: [["10", "10%+"], ["20", "20%+"], ["30", "30%+"], ["50", "50%+"]],
-    a_city_min: [["5", "5%+"], ["10", "10%+"], ["20", "20%+"]],
-    a_lang_min: [["20", "20%+"], ["40", "40%+"], ["60", "60%+"]],
-    a_age_min: [["25", "25%+"], ["40", "40%+"], ["60", "60%+"]]
-  };
-  var MIN_DEFAULT = { a_country_min: "20", a_city_min: "10", a_lang_min: "20", a_age_min: "25" };
-  var GENDERS = [["women", "Mostly women (60%+)"], ["men", "Mostly men (60%+)"], ["balanced", "Balanced (40–60%)"]];
-  var SRV_LISTS = ["a_country", "a_city", "a_lang", "a_age", "a_gender", "a_interest", "a_affinity", "brands", "topics", "account"];
-  var SRV_STEPS = ["real_min", "er_min", "reels_er_min", "views_min", "likes_min", "comments_min", "growth_min", "ppw_min", "active_days"];
-  var SRV_TITLES = {
-    a_country: "Audience country", a_city: "Audience city", a_lang: "Audience language", a_age: "Audience age",
-    a_gender: "Audience gender", a_interest: "Audience interests", a_affinity: "Audience brand affinity",
-    real_min: "Real audience", er_min: "Engagement rate", reels_er_min: "Reels engagement", views_min: "Average views",
-    likes_min: "Average likes", comments_min: "Average comments", growth_min: "Follower growth",
-    ppw_min: "Posting frequency", active_days: "Last post", brands: "Brands worked with", topics: "Content topics",
-    account: "Account type", sponsored: "Sponsored posts"
-  };
-  var regionName = (function () {
-    try { var d = new Intl.DisplayNames(["en"], { type: "region" }); return function (c) { return d.of(c) || c; }; }
-    catch (e) { return function (c) { return c; }; }
-  })();
-
+  // One filter bar for a set of cards: Tier, Platform, Location, Interest,
+  // each a dropdown of checkboxes, plus a sort. OR within a dimension, AND
+  // across them. Built from the cards themselves, so the selection page gets
+  // options for exactly the creators in that selection.
   function Controls(host, cards, onChange, extras) {
-    var LOCAL = ["tier", "platform", "place", "nationality", "interest"];
     // followers: [] for no limit, else [min, max] with either end null.
-    var state = { tier: [], platform: [], place: [], nationality: [], interest: [], followers: [], sort: "", q: "" };
-    var srv = {};                          // analysis filters, sent to the server
-    SRV_LISTS.forEach(function (k) { srv[k] = []; });
-    Object.keys(MIN_DEFAULT).forEach(function (k) { srv[k] = MIN_DEFAULT[k]; });
-    var srvSet = null, srvBusy = false, srvSeq = 0, unmeasured = false;
-    var mode = "filters", like = null;      // like: {code, name, rank: {code: i}}
-    var facets = null;
+    var state = { tier: [], platform: [], place: [], interest: [], followers: [], sort: "", q: "" };
+    // `extras` (the selection page): more filters of the same kind, in their own colour (fit,
+    // role, tags), and the matching score to sort on.
     var xdims = extras ? extras.dims : [];
     xdims.forEach(function (d) { state[d] = []; });
-    var SAVED_KEY = "hv-saved-searches:" + (document.body.getAttribute("data-page") || "catalogue");
 
     cards.forEach(function (card) {
       card._tier = card.dataset.tier ? [card.dataset.tier] : [];
       card._platform = values(card.dataset.platform);
       card._interest = values(card.dataset.interest);
-      card._nationality = card.dataset.nationality ? values(card.dataset.nationality) : [];
       card._place = values(card.dataset.city).filter(function (v) {
         return !/^unspecified$/i.test(v);
       }).map(function (v) { return place(v).key; });
@@ -729,55 +672,27 @@
       return out;
     }
 
-    function option(dim, value, label, extra) {
+    function option(dim, value, label) {
       return '<label class="cat-opt"><input type="checkbox" data-dim="' + dim +
         '" value="' + esc(value) + '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
-        (extra || "") + '<span class="cat-opt__label">' + esc(label) + "</span></label>";
-    }
-    // A long list shows its first eight with "Show all", and a finder above it when long.
-    function checklist(dim, opts, extraOf) {
-      var long = opts.length > 12;
-      return (long ? '<label class="cat-facet__find">' + ICON_SEARCH + '<input type="search" placeholder="Find" ' +
-          'aria-label="Find in this list" autocomplete="off"/></label>' : "") +
-        '<div class="cat-facet__opts' + (opts.length > 8 ? " is-clipped" : "") + '">' +
-        opts.map(function (o) { return option(dim, o[0], o[1], extraOf ? extraOf(o[0]) : ""); }).join("") + "</div>" +
-        (opts.length > 8 ? '<button type="button" class="cat-facet__more" data-more="' + opts.length +
-          '">Show all ' + opts.length + "</button>" : "");
-    }
-    function steps(key) {
-      return '<div class="cat-steps" role="radiogroup" aria-label="' + esc(SRV_TITLES[key] || key) + '">' +
-        STEPS[key].map(function (s) {
-          return '<button type="button" class="cat-step" role="radio" aria-checked="false" data-step="' + key +
-            '" data-value="' + s[0] + '">' + s[1] + "</button>";
-        }).join("") + "</div>";
-    }
-    function minRow(key, label) {
-      return '<div class="cat-facet__min"><span>' + label + "</span>" + steps(key) + "</div>";
-    }
-    function facet(dim, title, body, openNow) {
-      var id = "cat-f-" + dim + "-" + Math.random().toString(36).slice(2, 7);
-      return '<div class="cat-facet' + (openNow ? " is-open" : "") + '" data-facet="' + dim + '">' +
-        '<button type="button" class="cat-facet__head" aria-expanded="' + !!openNow + '" aria-controls="' + id + '">' +
-        '<span class="cat-facet__title">' + title + '</span><span class="cat-facet__sum"></span>' + CHEVRON + "</button>" +
-        '<div class="cat-facet__body" id="' + id + '"' + (openNow ? "" : " hidden") + ">" + body + "</div></div>";
-    }
-    function group(key, title, body, note, closed) {
-      return '<section class="cat-sg' + (closed ? "" : " is-open") + '" data-group="' + key + '">' +
-        '<h3 class="cat-sg__h"><button type="button" class="cat-sg__head" aria-expanded="' + !closed + '">' +
-        '<span>' + title + '</span><span class="cat-sg__n" hidden></span>' + CHEVRON + "</button></h3>" +
-        '<div class="cat-sg__body"' + (closed ? " hidden" : "") + ">" + (note || "") + body + "</div></section>";
+        '<span class="cat-opt__label">' + esc(label) + "</span></label>";
     }
 
-    /* -- Creator: from the cards -- */
-    var cf = "";
-    var plats = tally("platform");
-    var platKeys = Object.keys(plats).sort(function (a, b) { return plats[b] - plats[a]; });
-    if (platKeys.length > 1) {
-      cf += facet("platform", "Platform", '<div class="cat-facet__opts">' + platKeys.map(function (p) {
-        return option("platform", p, p, ICONS[p] ? '<span class="cat-opt__mark ' + (BRAND[p] || "") + '">' + ICONS[p] + "</span>" : "");
-      }).join("") + "</div>", true);
+    function dropdown(dim, title, body, wide, cls) {
+      return '<div class="cat-dd' + (wide ? " cat-dd--wide" : "") + (cls ? " " + cls : "") + '" data-dim="' + dim + '">' +
+        '<button type="button" class="cat-dd__btn" aria-expanded="false">' +
+        '<span>' + title + '</span>' + CHEVRON + "</button>" +
+        '<div class="cat-dd__panel" role="group" aria-label="' + title + '" hidden>' +
+        '<div class="cat-dd__head"><span>' + title + '</span>' +
+        '<button type="button" class="cat-dd__close" aria-label="Close">' + CROSS + "</button></div>" +
+        '<div class="cat-dd__body">' + body + "</div>" +
+        '<div class="cat-dd__foot"><button type="button" class="cat-dd__clear">Clear</button>' +
+        '<button type="button" class="cat-dd__done">Show creators</button></div></div></div>';
     }
-    // Size: follower bands first, healthcare professionals as their own group.
+
+    var html = "";
+
+    // Tier: follower bands first, healthcare professionals as their own group.
     var tiers = tally("tier");
     var tierKeys = Object.keys(tiers).sort(function (a, b) { return tierRank(a) - tierRank(b); });
     var reg = tierKeys.filter(function (t) { return !/^hcp/i.test(t); });
@@ -785,30 +700,41 @@
     if (tierKeys.length > 1) {
       var tb = "";
       if (reg.length) {
-        tb += '<div class="cat-facet__opts">' + (hcp.length ? '<p class="cat-facet__sub">Creators</p>' : "") +
-          reg.map(function (t) { return option("tier", t, tierLabel(t)); }).join("") + "</div>";
+        tb += '<div class="cat-dd__group">' + (hcp.length ? '<p class="cat-dd__title">Creators</p>' : "") +
+          reg.map(function (t) { return option("tier", t, tierLabel(t), tiers[t]); }).join("") + "</div>";
       }
       if (hcp.length) {
-        tb += '<div class="cat-facet__opts"><p class="cat-facet__sub">Healthcare professionals</p>' +
-          hcp.map(function (t) { return option("tier", t, tierLabel(t.replace(/^hcp\s*-\s*/i, ""))); }).join("") + "</div>";
+        tb += '<div class="cat-dd__group"><p class="cat-dd__title">Healthcare professionals</p>' +
+          hcp.map(function (t) {
+            return option("tier", t, tierLabel(t.replace(/^hcp\s*-\s*/i, "")), tiers[t]);
+          }).join("") + "</div>";
       }
-      cf += facet("tier", "Size", tb, true);
+      html += dropdown("tier", "Tier", tb);
     }
+
     // Followers: any range, typed as 50K, 1.2M or 50,000. Counted across all
     // of a creator's accounts — the same figure "Most followers" sorts on.
-    cf += facet("followers", "Followers",
+    html += dropdown("followers", "Followers",
       '<div class="cat-range">' +
       '<label class="cat-range__field"><span>From</span><input type="text" inputmode="decimal" ' +
       'data-range="min" placeholder="e.g. 50K" autocomplete="off"/></label>' +
       '<span class="cat-range__dash" aria-hidden="true">–</span>' +
       '<label class="cat-range__field"><span>To</span><input type="text" inputmode="decimal" ' +
       'data-range="max" placeholder="no limit" autocomplete="off"/></label></div>' +
-      '<div class="cat-range__presets">' +
+      '<p class="cat-dd__title">Quick picks</p><div class="cat-range__presets">' +
       [["Under 10K", 0, 10000], ["10K – 100K", 10000, 100000], ["100K – 1M", 100000, 1000000],
        ["50K+", 50000, null], ["500K+", 500000, null], ["1M+", 1000000, null]].map(function (q) {
         return '<button type="button" class="cat-range__preset" data-min="' + (q[1] || "") +
           '" data-max="' + (q[2] || "") + '">' + q[0] + "</button>";
       }).join("") + "</div>");
+
+    var plats = tally("platform");
+    var platKeys = Object.keys(plats).sort(function (a, b) { return plats[b] - plats[a]; });
+    if (platKeys.length > 1) {
+      html += dropdown("platform", "Platform", '<div class="cat-dd__group">' +
+        platKeys.map(function (p) { return option("platform", p, p, plats[p]); }).join("") + "</div>");
+    }
+
     // Location: countries in a fixed order, each with its cities by size.
     var places = tally("place");
     var byCountry = {};
@@ -823,652 +749,286 @@
       return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
     });
     if (Object.keys(places).length > 1) {
-      cf += facet("place", "Location", countries.map(function (country) {
+      var lb = countries.map(function (country) {
         var keys = byCountry[country].sort(function (a, b) {
           var na = /\|City not specified$/.test(a), nb = /\|City not specified$/.test(b);
           return (na - nb) || (places[b] - places[a]);
         });
-        return '<div class="cat-facet__country">' +
+        return '<div class="cat-dd__group cat-dd__group--country">' +
           '<label class="cat-opt cat-opt--country"><input type="checkbox" data-country="' +
           esc(country) + '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
-          (country !== "Other" ? flagOf(country) : "") +
           '<span class="cat-opt__label">' + esc(country === "Other" ? "Other locations" : country) +
           "</span></label>" +
-          '<div class="cat-facet__cities">' +
-          keys.map(function (k) { return option("place", k, k.split("|")[1]); }).join("") +
+          '<div class="cat-dd__cities">' +
+          keys.map(function (k) { return option("place", k, k.split("|")[1], places[k]); }).join("") +
           "</div></div>";
-      }).join(""));
+      }).join("");
+      html += dropdown("place", "Location", lb, true);
     }
-    var nats = tally("nationality");
-    var natKeys = Object.keys(nats).sort(function (a, b) { return nats[b] - nats[a] || a.localeCompare(b); });
-    if (natKeys.length > 1) {
-      cf += facet("nationality", "Nationality", checklist("nationality", natKeys.map(function (v) { return [v, v]; })));
-    }
-    // Niche only when it separates anyone — one value across the roster is a claim, not a filter.
+
+    // Interest only when it separates anyone — one value across the roster
+    // is a claim, not a filter.
     var ints = tally("interest");
     var intKeys = Object.keys(ints).sort(function (a, b) { return ints[b] - ints[a]; });
     if (intKeys.length > 1) {
-      cf += facet("interest", "Niche", checklist("interest", intKeys.map(function (v) { return [v, v]; })));
+      html += dropdown("interest", "Interest", '<div class="cat-dd__group cat-dd__group--cols">' +
+        intKeys.map(function (v) { return option("interest", v, v, ints[v]); }).join("") + "</div>",
+        intKeys.length > 8);
     }
 
-    var groupsHtml = group("creator", "Creator", cf);
-
+    var sortList = SORTS.concat(extras ? [["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]] : []);
     var sort = '<label class="cat-sort"><span class="cat-sort__label">Sort</span>' +
       '<select class="cat-sort__select" aria-label="Sort creators">' +
-      SORTS.concat(extras ? [["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]] : [])
-        .map(function (s) { return '<option value="' + s[0] + '">' + s[1] + "</option>"; }).join("") +
-      '<option value="like" hidden disabled>Most similar first</option>' +
+      sortList.map(function (s) { return '<option value="' + s[0] + '">' + s[1] + "</option>"; }).join("") +
       "</select>" + CHEVRON + "</label>";
 
-    /* -- the frame: search bar on top, sidebar beside the grid -- */
-    var grid = $("cat-grid");
-    var empty = $("cat-empty");
-    var wrap = document.createElement("div");
-    wrap.className = "cat-discover";
-    wrap.innerHTML =
-      '<div class="cat-find">' +
-        '<div class="cat-modes" role="tablist" aria-label="How to search">' +
-        MODES.map(function (m, i) {
-          return '<button type="button" class="cat-mode" role="tab" data-mode="' + m[0] + '" aria-selected="' + (i === 0) +
-            '" tabindex="' + (i === 0 ? 0 : -1) + '">' + m[2] + "<span>" + m[1] + "</span></button>";
-        }).join("") + "</div>" +
-        '<div class="cat-bar__row">' +
-          '<button type="button" class="cat-find__open" aria-controls="cat-side">' + ICON_SLIDERS +
-          '<span>Filters</span><b class="cat-find__n" hidden></b></button>' +
-          '<form class="cat-search" role="search">' + ICON_SEARCH +
-          '<input type="search" class="cat-search__input" placeholder="' + MODES[0][3] + '" aria-label="' + MODES[0][3] +
-          '" autocomplete="off" spellcheck="false" list=""/>' +
-          '<button type="submit" class="cat-search__go" hidden>Search</button></form>' +
-          sort +
-        "</div>" +
-        '<p class="cat-find__hint" aria-live="polite"></p>' +
-      "</div>" +
-      '<div class="cat-discover__body">' +
-        '<aside class="cat-side" id="cat-side" aria-label="Filters">' +
-          '<div class="cat-side__head"><h2 class="cat-side__title">Filters</h2>' +
-          '<button type="button" class="cat-side__clear" hidden>Clear all</button>' +
-          '<button type="button" class="cat-side__close" aria-label="Close filters">' + CROSS + "</button></div>" +
-          '<div class="cat-side__scroll">' + groupsHtml +
-            '<div class="cat-side__srv"></div><div class="cat-side__match"></div></div>' +
-          '<div class="cat-side__foot">' +
-            '<div class="cat-saved"><button type="button" class="cat-saved__save">Save this search</button>' +
-            '<form class="cat-saved__form" hidden><input type="text" maxlength="40" placeholder="Name it, e.g. KSA mums micro" ' +
-            'aria-label="Name this search"/><button type="submit">Save</button></form>' +
-            '<div class="cat-saved__list"></div></div>' +
-            '<button type="button" class="cat-side__done">Show creators</button>' +
-          "</div>" +
-        "</aside>" +
-        '<div class="cat-results">' +
-          '<div class="cat-results__head"><p class="cat-count" aria-live="polite"></p>' +
-          '<div class="cat-active" hidden></div></div>' +
-        "</div>" +
-      "</div>";
-    grid.parentNode.insertBefore(wrap, grid);
-    var results = wrap.querySelector(".cat-results");
-    results.appendChild(grid);
-    if (empty) results.appendChild(empty);
-    if (host && host.closest(".cat-controls")) host.closest(".cat-controls").hidden = true;
+    var bar = document.createElement("div");
+    bar.className = "cat-bar";
+    // Search by name (or code), above the filters. Matching ignores case and
+    // the decorative letters some creators use in their display names.
+    bar.innerHTML = '<label class="cat-search"><svg viewBox="0 0 24 24" width="18" height="18" ' +
+      'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">' +
+      '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>' +
+      '<input type="search" class="cat-search__input" placeholder="Search creators by name" ' +
+      'aria-label="Search creators by name" autocomplete="off" spellcheck="false"/></label>' +
+      '<div class="cat-bar__row"><div class="cat-bar__filters">' +
+      '<span class="cat-bar__label">Filter</span>' + html +
+      (extras ? '<span class="cat-bar__sep" aria-hidden="true"></span><div class="cat-bar__match" hidden></div>' : "") +
+      "</div>" + sort + "</div>" +
+      '<div class="cat-active" hidden></div>';
+    host.insertBefore(bar, host.firstChild);
 
-    var bar = wrap;                          // every query below is scoped to the discovery frame
-    // Typed briefs and lookalikes need the service behind the page; a static build searches by name only.
-    if (!CFG.api) wrap.querySelector(".cat-modes").hidden = true;
-    var side = wrap.querySelector(".cat-side");
-    var active = wrap.querySelector(".cat-active");
-    var input = wrap.querySelector(".cat-search__input");
-    var hint = wrap.querySelector(".cat-find__hint");
-    var count = wrap.querySelector(".cat-count");
+    var active = bar.querySelector(".cat-active");
+    function ddList() { return all(".cat-dd", bar); }
 
-    // Lookalike picks a creator by name: the browser's own suggestion list.
-    var dl = document.createElement("datalist");
-    dl.id = "cat-like-names-" + Math.random().toString(36).slice(2, 7);
-    dl.innerHTML = cards.map(function (c) { return '<option value="' + esc(c.dataset.name) + '"></option>'; }).join("");
-    wrap.appendChild(dl);
-
-    /* -- Audience and Performance: options from the server -- */
-    function renderServerGroups() {
-      if (!facets || !facets.measured) return;
-      var F = facets;
-      function names(list) { return list.map(function (v) { return [v, v]; }); }
-      var au = "";
-      if (F.countries.length) au += facet("a_country", "Country", checklist("a_country", F.countries.map(function (c) { return [c, regionName(c)]; })) +
-        minRow("a_country_min", "Share of audience"));
-      if (F.cities.length) au += facet("a_city", "City", checklist("a_city", names(F.cities)) + minRow("a_city_min", "Share of audience"));
-      au += facet("a_gender", "Gender", '<div class="cat-facet__opts">' + GENDERS.map(function (g) { return option("a_gender", g[0], g[1]); }).join("") + "</div>");
-      if (F.ages.length) au += facet("a_age", "Age", '<div class="cat-facet__opts cat-facet__opts--pair">' +
-        F.ages.map(function (a) { return option("a_age", a, a); }).join("") + "</div>" + minRow("a_age_min", "Together at least"));
-      if (F.languages.length) au += facet("a_lang", "Language", checklist("a_lang", names(F.languages)) + minRow("a_lang_min", "Share of audience"));
-      if (F.interests.length) au += facet("a_interest", "Interests", checklist("a_interest", names(F.interests)));
-      if (F.affinity.length) au += facet("a_affinity", "Brand affinity", checklist("a_affinity", names(F.affinity)));
-      au += facet("real_min", "Real audience", steps("real_min"));
-      var pf = facet("er_min", "Engagement rate", steps("er_min")) +
-        facet("reels_er_min", "Reels engagement", steps("reels_er_min")) +
-        facet("views_min", "Average views", steps("views_min")) +
-        facet("likes_min", "Average likes", steps("likes_min")) +
-        facet("comments_min", "Average comments", steps("comments_min")) +
-        facet("growth_min", "Follower growth", steps("growth_min")) +
-        facet("ppw_min", "Posting frequency", steps("ppw_min")) +
-        facet("active_days", "Last post", steps("active_days")) +
-        (F.topics.length ? facet("topics", "Content topics", checklist("topics", names(F.topics))) : "") +
-        (F.brands.length ? facet("brands", "Brands worked with", checklist("brands", names(F.brands))) : "") +
-        facet("sponsored", "Sponsored posts", '<label class="cat-opt"><input type="checkbox" data-flag="sponsored"/>' +
-          '<span class="cat-opt__box" aria-hidden="true"></span><span class="cat-opt__label">Has run sponsored posts</span></label>') +
-        (F.accounts.length > 1 ? facet("account", "Account type", '<div class="cat-facet__opts">' +
-          F.accounts.map(function (a) { return option("account", a, a); }).join("") + "</div>") : "");
-      var note = '<label class="cat-measured"><input type="checkbox" data-flag="unmeasured"/>' +
-        '<span class="cat-measured__track" aria-hidden="true"></span>' +
-        "<span>Include creators not measured yet</span></label>";
-      wrap.querySelector(".cat-side__srv").innerHTML =
-        group("audience", "Audience", au, '<p class="cat-sg__note">From each creator\'s profile analysis.</p>', true) +
-        group("performance", "Performance", pf, note, true);
-      sync();
+    function close(dd) {
+      if (!dd) return;
+      dd.classList.remove("is-open");
+      dd.querySelector(".cat-dd__btn").setAttribute("aria-expanded", "false");
+      dd.querySelector(".cat-dd__panel").hidden = true;
+      document.body.classList.remove("cat-sheet-open");
     }
-    if (CFG.api) {
-      fetch(CFG.api + "/api/discover/facets", { credentials: "include" })
-        .then(function (r) { return r.ok ? r.json() : null; })
-        .then(function (d) { if (d && d.ok) { facets = d.facets; renderServerGroups(); } })
-        .catch(function () { /* the card filters still work without the server */ });
-    }
-
-    function srvActive() {
-      return SRV_LISTS.some(function (k) { return srv[k].length; }) ||
-        SRV_STEPS.some(function (k) { return srv[k]; }) || !!srv.sponsored;
-    }
-    function srvPayload() {
-      var f = {};
-      SRV_LISTS.forEach(function (k) { if (srv[k].length) f[k] = srv[k]; });
-      SRV_STEPS.forEach(function (k) { if (srv[k]) f[k] = srv[k]; });
-      ["a_country", "a_city", "a_lang", "a_age"].forEach(function (k) { if (f[k]) f[k + "_min"] = srv[k + "_min"]; });
-      if (srv.sponsored) f.sponsored = true;
-      return f;
-    }
-    var srvTimer = null;
-    function querySrv() {
-      clearTimeout(srvTimer);
-      if (!srvActive()) { srvSet = null; srvBusy = false; results.removeAttribute("aria-busy"); return; }
-      srvBusy = true; results.setAttribute("aria-busy", "true");
-      var seq = ++srvSeq;
-      srvTimer = setTimeout(function () {
-        fetch(CFG.api + "/api/discover", {
-          method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ filters: srvPayload() })
-        }).then(function (r) { return r.json(); }).then(function (d) {
-          if (seq !== srvSeq) return;
-          srvSet = {};
-          (d.codes || []).forEach(function (c) { srvSet[c] = 1; });
-          srvBusy = false; results.removeAttribute("aria-busy");
-          sync(); onChange(); tell();
-        }).catch(function () {
-          if (seq !== srvSeq) return;
-          srvBusy = false; results.removeAttribute("aria-busy");
-          hint.textContent = "The audience filters could not be checked just now. Try again in a moment.";
-        });
-      }, 220);
+    function closeAll(except) { ddList().forEach(function (d) { if (d !== except) close(d); }); }
+    function open(dd) {
+      closeAll(dd);
+      dd.classList.add("is-open");
+      dd.querySelector(".cat-dd__btn").setAttribute("aria-expanded", "true");
+      var panel = dd.querySelector(".cat-dd__panel");
+      panel.hidden = false;
+      // Keep the panel on screen when its button sits near the right edge.
+      panel.style.left = ""; panel.style.right = "";
+      if (window.innerWidth > 767) {
+        var r = panel.getBoundingClientRect();
+        if (r.right > window.innerWidth - 12) { panel.style.left = "auto"; panel.style.right = "0"; }
+      } else {
+        document.body.classList.add("cat-sheet-open");
+      }
     }
 
     function labelOf(dim, v) {
-      if (dim === "place") return v.split("|")[1] === "City not specified" ? v.split("|")[0] : v.split("|")[1];
+      if (dim === "place") return v.split("|")[1] === "City not specified"
+        ? v.split("|")[0] : v.split("|")[1];
       if (dim === "tier") return /^hcp/i.test(v) ? "HCP " + tierLabel(v.replace(/^hcp\s*-\s*/i, "")) : tierLabel(v);
-      if (dim === "a_country") return "Audience in " + regionName(v);
-      if (dim === "a_city") return "Audience in " + v;
-      if (dim === "a_gender") return (GENDERS.filter(function (g) { return g[0] === v; })[0] || [0, v])[1].replace(/ \(.*/, "") + " audience";
-      if (dim === "a_age") return "Audience " + v;
-      if (dim === "a_lang") return v + " speakers";
-      if (dim === "brands") return "Worked with " + v;
       return v;
-    }
-    function stepLabel(key) {
-      var s = (STEPS[key] || []).filter(function (x) { return x[0] === String(srv[key]); })[0];
-      return SRV_TITLES[key] + " " + (s ? s[1] : srv[key]);
-    }
-
-    function summaryOf(dim) {
-      if (dim === "followers") return state.followers.length ? rangeLabel(state.followers).replace(/^Followers /, "") : "";
-      if (STEPS[dim] && dim.slice(-4) !== "_min" || ["real_min", "er_min", "reels_er_min", "views_min", "likes_min",
-          "comments_min", "growth_min", "ppw_min"].indexOf(dim) !== -1) {
-        if (!srv[dim]) return "";
-        var s = STEPS[dim].filter(function (x) { return x[0] === String(srv[dim]); })[0];
-        return s ? s[1] : "";
-      }
-      if (dim === "sponsored") return srv.sponsored ? "Yes" : "";
-      var list = state[dim] || srv[dim] || [];
-      if (!list.length) return "";
-      if (list.length > 2) return list.length + " selected";
-      return list.map(function (v) {
-        return dim === "a_country" ? regionName(v) : dim === "place" ? labelOf("place", v) : dim === "tier" ? labelOf("tier", v) :
-          dim === "a_gender" ? (GENDERS.filter(function (g) { return g[0] === v; })[0] || [0, v])[1].replace(/ \(.*/, "") : v;
-      }).join(", ");
     }
 
     function sync() {
+      // The range boxes, unless someone is typing in them.
       all("input[data-range]", bar).forEach(function (box) {
         if (box === document.activeElement) return;
         var v = state.followers[box.dataset.range === "min" ? 0 : 1];
         box.value = v ? short(v) : "";
       });
+      // Checkboxes, counts on the buttons, country tri-state, active pills.
       all("input[data-dim]", bar).forEach(function (box) {
-        var list = state[box.dataset.dim] || srv[box.dataset.dim] || [];
-        box.checked = list.indexOf(box.value) !== -1;
+        box.checked = state[box.dataset.dim].indexOf(box.value) !== -1;
       });
       all("input[data-country]", bar).forEach(function (box) {
-        var cities = all('input[data-dim="place"]', box.closest(".cat-facet__country"));
+        var cities = all('input[data-dim="place"]', box.closest(".cat-dd__group"));
         var on = cities.filter(function (c) { return c.checked; }).length;
         box.checked = on > 0 && on === cities.length;
         box.indeterminate = on > 0 && on < cities.length;
       });
-      all(".cat-step", bar).forEach(function (b) {
-        b.setAttribute("aria-checked", String(String(srv[b.dataset.step] || "") === b.dataset.value));
+      ddList().forEach(function (dd) {
+        var n = state[dd.dataset.dim].length;
+        dd.classList.toggle("has-value", n > 0);
       });
-      var sp = bar.querySelector('input[data-flag="sponsored"]');
-      if (sp) sp.checked = !!srv.sponsored;
-      var um = bar.querySelector('input[data-flag="unmeasured"]');
-      if (um) um.checked = unmeasured;
-      all(".cat-facet", bar).forEach(function (f) {
-        var s = summaryOf(f.dataset.facet);
-        f.classList.toggle("has-value", !!s);
-        f.querySelector(".cat-facet__sum").textContent = s;
-      });
-      all(".cat-sg", bar).forEach(function (g) {
-        var n = all(".cat-facet.has-value", g).length;
-        var b = g.querySelector(".cat-sg__n");
-        b.hidden = !n; b.textContent = n;
-      });
-
       var pills = [];
-      LOCAL.concat(xdims).forEach(function (dim) {
+      ["tier", "platform", "place", "interest"].concat(xdims).forEach(function (dim) {
         // A whole country picked reads as the country, not ten cities.
         var shown = state[dim].slice();
         if (dim === "place") {
           all("input[data-country]", bar).forEach(function (box) {
             if (!box.checked) return;
-            var cities = all('input[data-dim="place"]', box.closest(".cat-facet__country")).map(function (c) { return c.value; });
+            var cities = all('input[data-dim="place"]', box.closest(".cat-dd__group"))
+              .map(function (c) { return c.value; });
             if (cities.length < 2) return;
             shown = shown.filter(function (v) { return cities.indexOf(v) === -1; });
             pills.push('<button type="button" class="cat-pill-x" data-country="' + esc(box.dataset.country) +
-              '">' + esc(box.dataset.country === "Other" ? "Other locations" : box.dataset.country) + CROSS + "</button>");
+              '">' + esc(box.dataset.country === "Other" ? "Other locations" : box.dataset.country) +
+              CROSS + "</button>");
           });
         }
         shown.forEach(function (v) {
-          pills.push('<button type="button" class="cat-pill-x" data-dim="' + dim + '" data-value="' + esc(v) +
-            '" aria-label="Remove ' + esc(labelOf(dim, v)) + '">' + esc(labelOf(dim, v)) + CROSS + "</button>");
+          pills.push('<button type="button" class="cat-pill-x" data-dim="' + dim + '" data-value="' +
+            esc(v) + '" aria-label="Remove ' + esc(labelOf(dim, v)) + '">' + esc(labelOf(dim, v)) +
+            CROSS + "</button>");
         });
       });
       if (state.followers.length) {
-        pills.push('<button type="button" class="cat-pill-x" data-range-pill="1">' + esc(rangeLabel(state.followers)) + CROSS + "</button>");
+        pills.push('<button type="button" class="cat-pill-x" data-range-pill="1">' +
+          esc(rangeLabel(state.followers)) + CROSS + "</button>");
       }
-      SRV_LISTS.forEach(function (dim) {
-        srv[dim].forEach(function (v) {
-          pills.push('<button type="button" class="cat-pill-x cat-pill-x--srv" data-sdim="' + dim + '" data-value="' + esc(v) +
-            '">' + esc(labelOf(dim, v)) + CROSS + "</button>");
-        });
-      });
-      SRV_STEPS.forEach(function (k) {
-        if (srv[k]) pills.push('<button type="button" class="cat-pill-x cat-pill-x--srv" data-sstep="' + k + '">' + esc(stepLabel(k)) + CROSS + "</button>");
-      });
-      if (srv.sponsored) pills.push('<button type="button" class="cat-pill-x cat-pill-x--srv" data-sflag="sponsored">Has run sponsored posts' + CROSS + "</button>");
-      if (like) pills.unshift('<button type="button" class="cat-pill-x cat-pill-x--like" data-like-x="1">' + ICON_TWINS +
-        "Like " + esc(like.name) + CROSS + "</button>");
       active.hidden = !pills.length;
-      active.innerHTML = pills.join("") + (pills.length ? '<button type="button" class="cat-active__clear">Clear all</button>' : "");
-      var n = pills.length;
-      wrap.querySelector(".cat-side__clear").hidden = !n;
-      var fn = wrap.querySelector(".cat-find__n");
-      fn.hidden = !n; fn.textContent = n;
-      renderSaved();
+      active.innerHTML = pills.join("") +
+        (pills.length ? '<button type="button" class="cat-active__clear">Clear all</button>' : "");
     }
 
-    // How many creators a filter leaves: shown once the client narrows, never the size of the roster.
-    function tell() {
-      var narrowed = filtering();
-      var shown = cards.filter(function (c) { return !c.hidden; }).length;
-      count.innerHTML = narrowed ? (srvBusy ? '<span class="cat-count__busy">Checking audiences…</span>'
-        : '<b>' + shown + "</b> " + (shown === 1 ? "creator matches" : "creators match")) : "";
-      var done = wrap.querySelector(".cat-side__done");
-      done.textContent = narrowed && !srvBusy ? "Show " + shown + " creator" + (shown === 1 ? "" : "s") : "Show creators";
-    }
+    function changed() { sync(); onChange(); }
 
-    function changed() { sync(); onChange(); tell(); }
-    function changedSrv() { sync(); querySrv(); onChange(); tell(); }
-
-    function clearAll() {
-      LOCAL.forEach(function (d) { state[d] = []; });
-      state.followers = []; xdims.forEach(function (d) { state[d] = []; });
-      SRV_LISTS.forEach(function (k) { srv[k] = []; });
-      SRV_STEPS.forEach(function (k) { srv[k] = ""; });
-      srv.sponsored = false;
-      state.q = ""; like = null;
-      if (mode !== "like") input.value = "";
-      setSortOption();
-      changedSrv();
-    }
-
-    /* -- search modes -- */
-    function setMode(m) {
-      mode = m;
-      var def = MODES.filter(function (x) { return x[0] === m; })[0];
-      all(".cat-mode", wrap).forEach(function (b) {
-        var on = b.dataset.mode === m;
-        b.setAttribute("aria-selected", String(on)); b.tabIndex = on ? 0 : -1;
-      });
-      input.placeholder = def[3]; input.setAttribute("aria-label", def[3]);
-      input.setAttribute("list", m === "like" ? dl.id : "");
-      wrap.querySelector(".cat-search__go").hidden = m === "filters";
-      wrap.querySelector(".cat-search__go").textContent = m === "ai" ? "Search" : "Find similar";
-      input.value = m === "filters" ? (state.q ? input.value : "") : "";
-      if (m !== "filters" && state.q) { state.q = ""; changed(); }
-      hint.textContent = def[4];
-      wrap.classList.toggle("is-ai", m === "ai");
-    }
-    wrap.querySelector(".cat-modes").addEventListener("click", function (e) {
-      var b = e.target.closest(".cat-mode");
-      if (b) { setMode(b.dataset.mode); input.focus(); }
-    });
-    wrap.querySelector(".cat-modes").addEventListener("keydown", function (e) {
-      if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-      var i = MODES.map(function (m) { return m[0]; }).indexOf(mode);
-      var dir = (e.key === "ArrowRight") !== (document.dir === "rtl") ? 1 : -1;
-      var next = MODES[(i + dir + MODES.length) % MODES.length][0];
-      setMode(next);
-      wrap.querySelector('.cat-mode[data-mode="' + next + '"]').focus();
-      e.preventDefault();
-    });
-
-    function findCard(text) {
-      var t = fold(text);
-      if (!t) return null;
-      return cards.filter(function (c) { return fold(c.dataset.name) === t || fold(c.dataset.code) === t; })[0] ||
-        cards.filter(function (c) { return fold(c.dataset.name).indexOf(t) === 0; })[0] || null;
-    }
-    function setSortOption() {
-      var sel = wrap.querySelector('.cat-sort:not(.cat-group-by) .cat-sort__select');
-      var opt = sel.querySelector('option[value="like"]');
-      opt.hidden = opt.disabled = !like;
-      if (like && !state.sort) { sel.value = "like"; state.sort = "like"; }
-      if (!like && state.sort === "like") { sel.value = ""; state.sort = ""; }
-    }
-    function runLike(card) {
-      if (!card) { hint.textContent = "No creator by that name on this page. Pick one from the suggestions."; return; }
-      hint.textContent = "Finding creators like " + card.dataset.name + "…";
-      fetch(CFG.api + "/api/discover/like", {
-        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: card.dataset.code })
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        var rank = {};
-        (d.codes || []).forEach(function (c, i) { rank[c] = i; });
-        like = { code: card.dataset.code, name: card.dataset.name, rank: rank };
-        hint.textContent = (d.codes || []).length ? "The " + (d.codes || []).length + " creators most like " + card.dataset.name +
-          ", most similar first. Filters still apply." : "No close matches for " + card.dataset.name + " yet.";
-        state.sort = ""; setSortOption(); changed();
-      }).catch(function () { hint.textContent = "Lookalikes could not be loaded just now. Try again in a moment."; });
-    }
-    function runAi(text) {
-      if (!text.trim()) return;
-      hint.textContent = "Reading your brief…";
-      fetch(CFG.api + "/api/discover/parse", {
-        method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text })
-      }).then(function (r) { return r.json(); }).then(function (d) {
-        var p = d.filters || {};
-        if (!p.understood) {
-          hint.textContent = "No filters found in that. Name a platform, city, size or topic, e.g. “micro skincare creators in Jeddah on TikTok”.";
-          return;
-        }
-        clearAll();
-        var platOpts = all('input[data-dim="platform"]', bar).map(function (b) { return b.value; });
-        state.platform = (p.platform || []).filter(function (x) { return platOpts.indexOf(x) !== -1; });
-        var tierOpts = all('input[data-dim="tier"]', bar).map(function (b) { return b.value; });
-        state.tier = tierOpts.filter(function (t) {
-          var hcpT = /^hcp/i.test(t), base = tierLabel(t.replace(/^hcp\s*-\s*/i, "")).toLowerCase();
-          var sized = !(p.tier || []).length || (p.tier || []).some(function (x) { return base.indexOf(x.toLowerCase().replace("-tier", "")) === 0; });
-          return p.hcp ? hcpT && sized : (p.tier || []).length && !hcpT && sized;
-        });
-        var placeOpts = all('input[data-dim="place"]', bar).map(function (b) { return b.value; });
-        state.place = placeOpts.filter(function (k) {
-          var c = k.split("|")[0], city = k.split("|")[1];
-          if ((p.city || []).length) return (p.city || []).some(function (x) { return fold(city).indexOf(fold(x)) === 0; });
-          return (p.country || []).indexOf(c) !== -1 && !(p.a_country || []).length;
-        });
-        var intOpts = all('input[data-dim="interest"]', bar).map(function (b) { return b.value; });
-        state.interest = intOpts.filter(function (v) {
-          var f = " " + fold(v) + " ";
-          return (p.interest_words || []).some(function (w) { return w && f.indexOf(fold(w)) !== -1; });
-        });
-        if (p.a_gender && facets && facets.measured) srv.a_gender = [p.a_gender];
-        if ((p.a_country || []).length && facets && facets.measured) srv.a_country = p.a_country.filter(function (c) { return facets.countries.indexOf(c) !== -1; });
-        changedSrv();
-        var wantsMore = window.HV_PORTAL_FIND || document.querySelector(".pt-chip--lime");
-        hint.innerHTML = "Filters set from your brief. Adjust them in the sidebar." +
-          (wantsMore ? ' <button type="button" class="cat-find__ai">Want a scored shortlist with reasons? Use Find creators</button>' : "");
-      }).catch(function () { hint.textContent = "That could not be read just now. Try again in a moment."; });
-    }
-    wrap.querySelector(".cat-search").addEventListener("submit", function (e) {
-      e.preventDefault();
-      if (mode === "like") runLike(findCard(input.value));
-      else if (mode === "ai") runAi(input.value);
-    });
-    input.addEventListener("input", function () {
-      if (mode === "filters") { state.q = fold(input.value); onChange(); tell(); return; }
-      // Choosing from the browser's suggestions fills the box in one go: run it straight away.
-      if (mode === "like") { var c = findCard(input.value); if (c && fold(c.dataset.name) === fold(input.value)) runLike(c); }
-    });
-
-    /* -- clicks -- */
-    function openSheet(on) {
-      wrap.classList.toggle("is-sheet", on);
-      document.body.classList.toggle("cat-sheet-open", on);
-      if (on) side.querySelector(".cat-side__close").focus();
-    }
-    function moreToggle(btn) {
-      var opts = btn.parentNode.querySelector(".cat-facet__opts");
-      var open = opts.classList.toggle("is-clipped") === false;
-      btn.textContent = open ? "Show fewer" : "Show all " + btn.dataset.more;
-    }
-    wrap.addEventListener("click", function (e) {
-      var t = e.target;
-      if (t.closest(".cat-find__open")) { openSheet(true); return; }
-      if (t.closest(".cat-side__close, .cat-side__done")) { openSheet(false); return; }
-      if (t.closest(".cat-find__ai")) {
-        var dock = document.querySelector(".pt-chip--lime");
-        if (dock) dock.click();
+    bar.addEventListener("click", function (e) {
+      var btn = e.target.closest(".cat-dd__btn");
+      if (btn) {
+        var dd = btn.closest(".cat-dd");
+        if (dd.classList.contains("is-open")) close(dd); else open(dd);
         return;
       }
-      var sg = t.closest(".cat-sg__head");
-      if (sg) {
-        var g = sg.closest(".cat-sg"), openG = !g.classList.contains("is-open");
-        g.classList.toggle("is-open", openG);
-        sg.setAttribute("aria-expanded", String(openG));
-        g.querySelector(".cat-sg__body").hidden = !openG;
+      if (e.target.closest(".cat-dd__done, .cat-dd__close")) { close(e.target.closest(".cat-dd")); return; }
+      if (e.target.closest(".cat-dd__clear")) {
+        state[e.target.closest(".cat-dd").dataset.dim] = [];
+        changed(); return;
+      }
+      var preset = e.target.closest(".cat-range__preset");
+      if (preset) {
+        setRange(Number(preset.dataset.min) || null, Number(preset.dataset.max) || null);
         return;
       }
-      var fh = t.closest(".cat-facet__head");
-      if (fh) {
-        var f = fh.closest(".cat-facet"), openF = !f.classList.contains("is-open");
-        f.classList.toggle("is-open", openF);
-        fh.setAttribute("aria-expanded", String(openF));
-        f.querySelector(".cat-facet__body").hidden = !openF;
-        return;
-      }
-      if (t.closest(".cat-facet__more")) { moreToggle(t.closest(".cat-facet__more")); return; }
-      var step = t.closest(".cat-step");
-      if (step) {
-        var k = step.dataset.step;
-        srv[k] = String(srv[k] || "") === step.dataset.value && !MIN_DEFAULT[k] ? "" : step.dataset.value;
-        if (MIN_DEFAULT[k]) { sync(); if (srv[k.replace(/_min$/, "")].length) querySrv(); return; }
-        changedSrv(); return;
-      }
-      var preset = t.closest(".cat-range__preset");
-      if (preset) { setRange(Number(preset.dataset.min) || null, Number(preset.dataset.max) || null); return; }
-      var pill = t.closest(".cat-pill-x");
+      var pill = e.target.closest(".cat-pill-x");
+      if (pill && pill.dataset.rangePill) { state.followers = []; changed(); return; }
       if (pill) {
-        if (pill.dataset.likeX) { like = null; setSortOption(); hint.textContent = ""; changed(); return; }
-        if (pill.dataset.rangePill) { state.followers = []; changed(); return; }
-        if (pill.dataset.sdim) { srv[pill.dataset.sdim] = srv[pill.dataset.sdim].filter(function (v) { return v !== pill.dataset.value; }); changedSrv(); return; }
-        if (pill.dataset.sstep) { srv[pill.dataset.sstep] = ""; changedSrv(); return; }
-        if (pill.dataset.sflag) { srv.sponsored = false; changedSrv(); return; }
         if (pill.dataset.country) {
-          var grp = bar.querySelector('input[data-country="' + pill.dataset.country + '"]').closest(".cat-facet__country");
-          var drop = all('input[data-dim="place"]', grp).map(function (c) { return c.value; });
+          var group = bar.querySelector('input[data-country="' + pill.dataset.country + '"]')
+            .closest(".cat-dd__group");
+          var drop = all('input[data-dim="place"]', group).map(function (c) { return c.value; });
           state.place = state.place.filter(function (v) { return drop.indexOf(v) === -1; });
         } else {
-          state[pill.dataset.dim] = state[pill.dataset.dim].filter(function (v) { return v !== pill.dataset.value; });
+          state[pill.dataset.dim] = state[pill.dataset.dim].filter(function (v) {
+            return v !== pill.dataset.value;
+          });
         }
         changed(); return;
       }
-      if (t.closest(".cat-active__clear, .cat-side__clear")) { clearAll(); return; }
-      if (t.closest(".cat-saved__save")) {
-        var form = wrap.querySelector(".cat-saved__form");
-        form.hidden = !form.hidden;
-        if (!form.hidden) form.querySelector("input").focus();
-        return;
-      }
-      var load = t.closest("[data-saved]");
-      if (load) { restore(savedList()[Number(load.dataset.saved)]); return; }
-      var del = t.closest("[data-saved-x]");
-      if (del) {
-        var list = savedList(); list.splice(Number(del.dataset.savedX), 1); store(list); renderSaved(); return;
+      if (e.target.closest(".cat-active__clear")) {
+        state.tier = []; state.platform = []; state.place = []; state.interest = [];
+        state.followers = []; xdims.forEach(function (d) { state[d] = []; });
+        state.q = "";
+        var sbox = bar.querySelector(".cat-search__input");
+        if (sbox) sbox.value = "";
+        changed();
       }
     });
 
     function setRange(min, max) {
-      if (min && max && max < min) { var x = min; min = max; max = x; }
+      if (min && max && max < min) { var t = min; min = max; max = t; }
       state.followers = (min || max) ? [min || null, max || null] : [];
       changed();
     }
-    wrap.addEventListener("input", function (e) {
-      var t = e.target;
-      if (t.closest(".cat-facet__find")) {
-        var q = fold(t.value), body = t.closest(".cat-facet__body");
-        var opts = body.querySelector(".cat-facet__opts");
-        if (q) opts.classList.remove("is-clipped");
-        all(".cat-opt", opts).forEach(function (o) { o.hidden = !!q && fold(o.textContent).indexOf(q) === -1; });
-        var more = body.querySelector(".cat-facet__more");
-        if (more) more.hidden = !!q;
+    // Typing narrows the cards as you go; the pill and button follow.
+    bar.addEventListener("input", function (e) {
+      if (e.target.classList && e.target.classList.contains("cat-search__input")) {
+        state.q = fold(e.target.value);
+        onChange();
         return;
       }
-      if (!t.dataset || !t.dataset.range) return;
-      setRange(readCount(bar.querySelector('input[data-range="min"]').value),
-               readCount(bar.querySelector('input[data-range="max"]').value));
+      if (!e.target.dataset || !e.target.dataset.range) return;
+      var lo = readCount(bar.querySelector('input[data-range="min"]').value);
+      var hi = readCount(bar.querySelector('input[data-range="max"]').value);
+      setRange(lo, hi);
     });
-    wrap.addEventListener("change", function (e) {
+
+    bar.addEventListener("change", function (e) {
       var box = e.target;
       if (box.dataset.dim) {
-        var srvDim = SRV_LISTS.indexOf(box.dataset.dim) !== -1;
-        var list = srvDim ? srv[box.dataset.dim] : state[box.dataset.dim], at = list.indexOf(box.value);
+        var list = state[box.dataset.dim], at = list.indexOf(box.value);
         if (box.checked && at === -1) list.push(box.value);
         if (!box.checked && at !== -1) list.splice(at, 1);
-        if (srvDim) changedSrv(); else changed();
+        changed();
       } else if (box.dataset.country) {
         // A country picks or clears every city under it.
-        var cities = all('input[data-dim="place"]', box.closest(".cat-facet__country")).map(function (c) { return c.value; });
+        var cities = all('input[data-dim="place"]', box.closest(".cat-dd__group"))
+          .map(function (c) { return c.value; });
         state.place = state.place.filter(function (v) { return cities.indexOf(v) === -1; });
         if (box.checked) state.place = state.place.concat(cities);
         changed();
-      } else if (box.dataset.flag === "sponsored") {
-        srv.sponsored = box.checked; changedSrv();
-      } else if (box.dataset.flag === "unmeasured") {
-        unmeasured = box.checked; changed();
-      } else if (box.classList.contains("cat-sort__select") && !box.closest(".cat-group-by")) {
-        state.sort = box.value; onChange();
+      } else if (box.classList.contains("cat-sort__select")) {
+        state.sort = box.value;
+        onChange();
       }
     });
-    wrap.querySelector(".cat-saved__form").addEventListener("submit", function (e) {
-      e.preventDefault();
-      var name = e.target.querySelector("input").value.trim();
-      if (!name) return;
-      var list = savedList().filter(function (s) { return s.name !== name; });
-      list.unshift({ name: name, state: snapshot() });
-      store(list.slice(0, 12));
-      e.target.querySelector("input").value = "";
-      e.target.hidden = true;
-      renderSaved();
+
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest || !e.target.closest(".cat-dd")) closeAll();
     });
     document.addEventListener("keydown", function (e) {
-      if (e.key === "Escape" && wrap.classList.contains("is-sheet")) openSheet(false);
+      if (e.key === "Escape") closeAll();
     });
 
-    /* -- saved searches: this browser only -- */
-    function savedList() {
-      try { return JSON.parse(localStorage.getItem(SAVED_KEY) || "[]") || []; } catch (e) { return []; }
-    }
-    function store(list) { try { localStorage.setItem(SAVED_KEY, JSON.stringify(list)); } catch (e) { /* private window */ } }
-    function snapshot() {
-      var s = {};
-      LOCAL.concat(["followers"]).forEach(function (k) { s[k] = state[k].slice(); });
-      var v = {};
-      Object.keys(srv).forEach(function (k) { v[k] = Array.isArray(srv[k]) ? srv[k].slice() : srv[k]; });
-      return { s: s, v: v, u: unmeasured };
-    }
-    function restore(saved) {
-      if (!saved) return;
-      clearAll();
-      Object.keys(saved.state.s || {}).forEach(function (k) { if (state[k]) state[k] = saved.state.s[k].slice(); });
-      Object.keys(saved.state.v || {}).forEach(function (k) { srv[k] = saved.state.v[k]; });
-      unmeasured = !!saved.state.u;
-      hint.textContent = "Loaded “" + saved.name + "”.";
-      changedSrv();
-    }
-    function renderSaved() {
-      var list = savedList(), box = wrap.querySelector(".cat-saved__list");
-      box.innerHTML = list.length ? '<p class="cat-saved__h">Saved searches</p>' + list.map(function (s, i) {
-        return '<span class="cat-saved__item"><button type="button" data-saved="' + i + '">' + esc(s.name) +
-          '</button><button type="button" class="cat-saved__x" data-saved-x="' + i + '" aria-label="Delete ' + esc(s.name) + '">' + CROSS + "</button></span>";
-      }).join("") : "";
-      wrap.querySelector(".cat-saved__save").disabled = !filtering();
-    }
-
-    function filtering() {
-      return !!(LOCAL.some(function (d) { return state[d].length; }) || state.followers.length || !!state.q || like ||
-                srvActive() || xdims.some(function (d) { return state[d].length; }));
-    }
-
     sync();
-    tell();
 
     return {
       matches: function (card) {
         if (state.q) {
-          if (card._search === undefined) card._search = fold((card.dataset.name || "") + " " + (card.dataset.code || ""));
+          if (card._search === undefined) {
+            card._search = fold((card.dataset.name || "") + " " + (card.dataset.code || ""));
+          }
           if (card._search.indexOf(state.q) === -1) return false;
         }
-        if (like && (card.dataset.code === like.code || like.rank[card.dataset.code] === undefined)) return false;
         if (state.followers.length) {
           var f = Number(card.dataset.followers) || 0;
           if (state.followers[0] && f < state.followers[0]) return false;
           if (state.followers[1] && f > state.followers[1]) return false;
         }
-        if (!LOCAL.every(function (dim) {
+        if (!["tier", "platform", "place", "interest"].every(function (dim) {
           if (!state[dim].length) return true;
           return card["_" + dim].some(function (v) { return state[dim].indexOf(v) !== -1; });
         })) return false;
-        if (srvActive()) {
-          var measured = card.dataset.measured === "1";
-          if (srvSet && !srvSet[card.dataset.code] && !(unmeasured && !measured)) return false;
-          if (!srvSet && !(unmeasured && !measured) && !measured) return false;
-        }
         return xdims.every(function (dim) {
           if (!state[dim].length) return true;
           return extras.of(card, dim).some(function (v) { return state[dim].indexOf(v) !== -1; });
         });
       },
-      filtering: filtering,
-      // Rebuild the selection's own filters from what the cards say now (scores load late, tags change).
+      filtering: function () {
+        return !!(state.tier.length || state.platform.length || state.place.length ||
+                  state.interest.length || state.followers.length || !!state.q ||
+                  xdims.some(function (d) { return state[d].length; }));
+      },
+      // Rebuild the extra dropdowns from what the cards say now (scores load late, tags change).
       refresh: function () {
         if (!extras) return;
-        var holder = wrap.querySelector(".cat-side__match");
-        var body = "";
+        var holder = bar.querySelector(".cat-bar__match");
+        var any = false;
         xdims.forEach(function (dim) {
           var vals = extras.values(dim);
           state[dim] = state[dim].filter(function (v) { return vals.some(function (x) { return x[0] === v; }); });
-          if (!vals.length) return;
-          body += facet(dim, extras.titles[dim], '<div class="cat-facet__opts">' + vals.map(function (x) {
-            return option(dim, x[0], x[0], extras.dot && extras.dot(dim, x[0]) ? '<i class="cat-dot cat-dot--' + extras.dot(dim, x[0]) + '"></i>' : "");
-          }).join("") + "</div>", true);
+          var body = vals.length ? '<div class="cat-dd__group">' + vals.map(function (x) {
+            return '<label class="cat-opt"><input type="checkbox" data-dim="' + dim + '" value="' + esc(x[0]) +
+              '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
+              (extras.dot && extras.dot(dim, x[0]) ? '<i class="cat-dot cat-dot--' + extras.dot(dim, x[0]) + '"></i>' : "") +
+              '<span class="cat-opt__label">' + esc(x[0]) + '</span><span class="cat-opt__n">' + x[1] + "</span></label>";
+          }).join("") + "</div>" : "";
+          var dd = holder.querySelector('.cat-dd[data-dim="' + dim + '"]');
+          if (!vals.length) { if (dd) dd.remove(); return; }
+          any = true;
+          if (!dd) {
+            holder.insertAdjacentHTML("beforeend", dropdown(dim, extras.titles[dim], body, vals.length > 8, "cat-dd--match"));
+          } else if (dd.dataset.sig !== body) {
+            // Only when the options really changed: rewriting them under a finger loses focus.
+            dd.querySelector(".cat-dd__body").innerHTML = body;
+          }
+          holder.querySelector('.cat-dd[data-dim="' + dim + '"]').dataset.sig = body;
         });
-        var sig = body.replace(/cat-f-[a-z_]+-[a-z0-9]+/g, "");
-        if (holder.dataset.sig !== sig) {
-          // Only when the options really changed: rewriting them under a finger loses focus.
-          holder.innerHTML = body ? group("selection", "This selection", body) : "";
-          holder.dataset.sig = sig;
-        }
+        holder.hidden = !any;
+        bar.querySelector(".cat-bar__sep").hidden = !any;
         sync();
       },
       // Sorted copy of `list`; with no sort chosen, the list as given.
@@ -1478,10 +1038,6 @@
         var f = function (c) { return Number(c.dataset.followers) || 0; };
         var name = function (c) { return (c.dataset.name || "").toLowerCase(); };
         return list.slice().sort(function (a, b) {
-          if (s === "like" && like) {
-            var ra = like.rank[a.dataset.code], rb = like.rank[b.dataset.code];
-            return (ra === undefined ? 1e6 : ra) - (rb === undefined ? 1e6 : rb);
-          }
           if (s === "followers-desc") return f(b) - f(a);
           if (s === "followers-asc") return f(a) - f(b);
           if (s === "tier-desc") return (tierRank(b.dataset.tier) - tierRank(a.dataset.tier)) || f(b) - f(a);
@@ -1497,8 +1053,7 @@
           return 0;
         });
       },
-      sorted: function () { return !!state.sort; },
-      tell: tell
+      sorted: function () { return !!state.sort; }
     };
   }
 
