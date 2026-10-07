@@ -739,12 +739,36 @@ def passcode_form(c, back):
             "anyone already inside stays inside, new visitors need the new one.</p>")
 
 
+def client_name_form(c):
+    """Rename the client a code belongs to, and optionally carry the new name
+    to the selections and campaigns it opens."""
+    cid = str(c["id"])
+    keys = c.keys()
+    n_sel = c["n_selections"] if "n_selections" in keys else 0
+    n_camp = c["n_campaigns"] if "n_campaigns" in keys else 0
+    parts = [("%d selection%s" % (n_sel, "" if n_sel == 1 else "s")) if n_sel else "",
+             ("%d campaign%s" % (n_camp, "" if n_camp == 1 else "s")) if n_camp else ""]
+    attached = " and ".join(p for p in parts if p)
+    cascade = ("<label class='check' style='display:flex;gap:8px;align-items:center;margin-top:6px'>"
+               "<input type='checkbox' name='cascade' value='1' checked> Also show it on its "
+               + attached + "</label>") if attached else ""
+    return ("<form method='post' action='" + u("/codes/rename") + "' class='row limits'>"
+            "<input type='hidden' name='id' value='" + cid + "'>"
+            "<div style='flex:2'><label>Client name</label><input name='label' maxlength='80' value='"
+            + e(c["label"] or "") + "' required>" + cascade + "</div>"
+            "<div style='align-self:end'><button class='btn small'>Rename client</button></div></form>"
+            "<p class='price-hint'>The name this passcode is filed under"
+            + (", and the client name its selection pages and campaign reports show" if attached else "")
+            + ". The passcode itself does not change.</p>")
+
+
 def code_manage(c, devices):
-    """The panel under a code: its limits, and every device it opened on."""
+    """The panel under a code: its name, limits, and every device it opened on."""
     cid = str(c["id"])
     maxd = c["max_devices"] if "max_devices" in c.keys() else None
     form = (
-        passcode_form(c, "/codes#code-" + cid)
+        client_name_form(c)
+        + passcode_form(c, "/codes#code-" + cid)
         + "<form method='post' action='" + u("/codes/limits") + "' class='row limits'>"
         "<input type='hidden' name='id' value='" + cid + "'>"
         "<div><label>Max devices</label><input name='max_devices' type='number' min='1' "

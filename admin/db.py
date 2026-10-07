@@ -691,9 +691,29 @@ def list_codes():
         return conn.execute(
             "SELECT c.*, "
             " (SELECT MAX(at) FROM events e WHERE e.code_id = c.id AND e.kind='unlock_ok') last_used, "
-            " (SELECT COUNT(*) FROM code_devices d WHERE d.code_id = c.id) devices "
+            " (SELECT COUNT(*) FROM code_devices d WHERE d.code_id = c.id) devices, "
+            " (SELECT COUNT(*) FROM selections s WHERE s.code_id = c.id) n_selections, "
+            " (SELECT COUNT(*) FROM campaigns k WHERE k.code_id = c.id) n_campaigns "
             "FROM codes c WHERE c.label != '" + ADMIN_LABEL + "' ORDER BY c.created_at DESC"
         ).fetchall()
+
+
+def code_attached(code_id):
+    """The ids of the selections and campaigns a code opens."""
+    with connect() as conn:
+        return ([r[0] for r in conn.execute("SELECT id FROM selections WHERE code_id = ?", (code_id,))],
+                [r[0] for r in conn.execute("SELECT id FROM campaigns WHERE code_id = ?", (code_id,))])
+
+
+def rename_code(code_id, label):
+    """Change who a code was issued to: the client name the admin shows."""
+    with connect() as conn:
+        conn.execute("UPDATE codes SET label = ? WHERE id = ?", (label, code_id))
+
+
+def set_campaign_client(cid, client):
+    with connect() as conn:
+        conn.execute("UPDATE campaigns SET client = ?, updated_at = ? WHERE id = ?", (client or None, now(), cid))
 
 
 def set_code_passcode(code_id, code, hash_, hint):

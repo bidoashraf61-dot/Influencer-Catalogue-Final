@@ -767,6 +767,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_code_delete()
         if path == "/codes/passcode":
             return self.post_code_passcode()
+        if path == "/codes/rename":
+            return self.post_code_rename()
         if path == "/codes/limits":
             return self.post_code_limits()
         if path == "/codes/device/remove":
@@ -1021,6 +1023,49 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return go("e", "That passcode is already in use. Choose another.")
         db.set_code_passcode(row["id"], code, auth.hash_code(code), auth.code_hint(code))
         return go("ok", "Passcode for " + row["label"] + " changed. Tell the client the new one.")
+
+    def post_code_rename(self):
+        """Rename the client a code is issued to. With `cascade`, the selections
+        and campaigns it opens show the new name too; each is its own History
+        entry, so any one can be undone."""
+        f = self.form_body()
+        cid = (f.get("id") or "").strip()
+        row = db.get_code(int(cid)) if cid.isdigit() else None
+        if row is None or row["label"] == db.ADMIN_LABEL:
+            return self.redirect("/codes")
+        label = " ".join((f.get("label") or "").split())[:80]
+        back = "#code-" + str(row["id"])
+        if not label:
+            return self.redirect("/codes?e=" + urllib.parse.quote("The client name cannot be empty.") + back)
+        if label == db.ADMIN_LABEL:
+            return self.redirect("/codes?e=" + urllib.parse.quote("That name is reserved. Choose another.") + back)
+        old = row["label"]
+        if label != old:
+            with history.tracked("code", str(row["id"]), "Renamed client " + old + " to " + label):
+                db.rename_code(row["id"], label)
+        n_sel = n_camp = 0
+        if f.get("cascade") == "1":
+            sel_ids, camp_ids = db.code_attached(row["id"])
+            for sid in sel_ids:
+                sel = db.selection(sid)
+                if sel is None or ((sel["client_name"] if "client_name" in sel.keys() else None) or label) == label:
+                    continue
+                with history.tracked("selection", str(sid), describe("selection", sid, "Client name to " + label + " on")):
+                    db.set_selection_client(sid, sel["code_id"], label)
+                n_sel += 1
+            for kid in camp_ids:
+                k = db.campaign(kid)
+                if k is None or (k["client"] or "") == label:
+                    continue
+                with history.tracked("campaign", str(kid), describe("campaign", kid, "Client name to " + label + " on")):
+                    db.set_campaign_client(kid, label)
+                n_camp += 1
+        also = [("%d selection%s" % (n_sel, "" if n_sel == 1 else "s")) if n_sel else "",
+                ("%d campaign%s" % (n_camp, "" if n_camp == 1 else "s")) if n_camp else ""]
+        also = " and ".join(a for a in also if a)
+        msg = ("Renamed " + old + " to " + label if label != old else "Name unchanged") + (
+            "; also updated " + also + "." if also else ".")
+        return self.redirect("/codes?ok=" + urllib.parse.quote(msg) + back)
 
     def post_code_limits(self):
         """Change a code's device limit, use limit and expiry. Empty = none."""
