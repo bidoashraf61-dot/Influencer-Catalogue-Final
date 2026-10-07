@@ -2086,6 +2086,18 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
     return page("Selections", body, "/selections")
 
 
+TAG_JS = r'''<script>(function(){var pool=document.getElementById('tag-pool');if(!pool)return;var last=null;
+function esc(t){return String(t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function all(){var s={};document.querySelectorAll('.tag-in').forEach(function(i){i.value.split(/[,;]+/).forEach(function(t){t=t.trim();if(t)s[t.toLowerCase()]=t})});return Object.keys(s).map(function(k){return s[k]}).sort()}
+function draw(){var t=all();pool.innerHTML=t.length?'Tags in use: '+t.map(function(x){return '<a href="#" class="pill" data-t="'+esc(x)+'">'+esc(x)+'</a>'}).join(' '):'No tags yet — type some in the Tags column.'}
+document.addEventListener('focusin',function(e){if(e.target.classList&&e.target.classList.contains('tag-in'))last=e.target});
+document.addEventListener('input',function(e){if(e.target.classList&&e.target.classList.contains('tag-in'))draw()});
+pool.addEventListener('click',function(e){var a=e.target.closest('a[data-t]');if(!a)return;e.preventDefault();if(!last)return;
+var cur=last.value.split(/[,;]+/).map(function(x){return x.trim()}).filter(Boolean);var t=a.dataset.t;
+if(cur.map(function(x){return x.toLowerCase()}).indexOf(t.toLowerCase())<0)cur.push(t);last.value=cur.join(', ');draw()});
+draw()})();</script>'''
+
+
 def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=()):
     by = {c["code"]: c for c in creators}
     codes = json.loads(sel["codes"] or "[]")
@@ -2101,6 +2113,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     money_c = lambda lo, hi: "—" if lo is None else (
         (format(conv(lo), ",") if lo == hi else format(conv(lo), ",") + " – " + format(conv(hi), ",")) + " " + cur)
     costs = json.loads((sel["costs"] if "costs" in keys else None) or "{}")
+    tags_of = json.loads((sel["tags"] if "tags" in keys else None) or "{}")
     margin = sel["margin"] if "margin" in keys else None
     margin_txt = "" if margin is None else ("%g" % margin)
     mmax = sel["margin_max"] if "margin_max" in keys else None
@@ -2153,8 +2166,9 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
               "<input type='checkbox' name='default' value='" + e(code) + "'> make default</label>"
             + ("<div class='muted' style='font-size:12px'>roster now: " + money_c(c["price_from"], c["price_to"] or c["price_from"]) + "</div>"
                if ("price_from" in c.keys() and c["price_from"]) else "<div class='muted' style='font-size:12px'>roster: tier price</div>") + "</td>"
+            + "<td><input name='tags' class='tag-in' value='" + e(", ".join(tags_of.get(code) or [])) + "' placeholder='e.g. Hero, Beauty' maxlength='200' autocomplete='off'></td>"
             + "<td><label class='tick'><input type='checkbox' name='drop' value='" + e(code) + "'> remove</label></td></tr>")
-    table = "".join(rows) or "<tr><td colspan='8' class='muted'>No creators yet — add some below.</td></tr>"
+    table = "".join(rows) or "<tr><td colspan='9' class='muted'>No creators yet — add some below.</td></tr>"
     missing = [c for c in codes if c not in by]
     link = selection_link(sel, origin)
     tf = "" if sel["total_from"] is None else format(conv(sel["total_from"]), ",")
@@ -2212,10 +2226,13 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<div style='flex:2'><dl class='money-sum' id='sel-money'></dl></div>"
           "</div>"
         + "<div class='card'><table class='sel-table'><thead><tr><th></th><th>Creator</th><th>Tier</th>"
-          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th></th>"
+          "<th>Standard price</th><th>Cost to us (<span class='cur-lbl'>" + cur + "</span>)</th><th>Price for this client (<span class='cur-lbl'>" + cur + "</span>)</th><th></th><th>Creator's default</th><th>Tags (client sees)</th><th></th>"
           "</tr></thead><tbody>"
         + table + "</tbody></table>"
         + ("<p class='err'>No longer in the roster, left out: " + e(", ".join(missing)) + "</p>" if missing else "")
+        + "<div class='price-hint' id='tag-pool' data-pool='" + e(json.dumps(sorted({t for v in tags_of.values() for t in v}, key=str.lower))) + "'></div>"
+        + "<p class='price-hint'><b>Tags</b> are your own labels for this selection only (Hero, Beauty, Backup…). Separate them with commas. "
+          "The client sees them on each card and can filter the selection by tag. Click a tag above to add it to the last box you were typing in.</p>"
         + "<p class='price-hint'>Type a creator's cost and their price is worked out from the "
           "margin above. With no cost, type the price yourself, or leave it empty to use the "
           "creator's standard price. One figure = a fixed price. The client never sees a price "
@@ -2258,7 +2275,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "<form method='post' action='" + u("/selections/delete") + "' data-confirm='Delete this selection? Its link stops working. You can restore it from History.' style='margin-top:12px'>"
         + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
         + "<button class='btn small danger'>Delete selection</button></form></details>"
-        + MARGIN_JS
+        + MARGIN_JS + TAG_JS
     )
     return page(sel["name"] + " — Selection", body, "/selections")
 

@@ -1538,6 +1538,7 @@
             if (b.currency && FX[b.currency]) CURRENCY = b.currency;
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
+                        tags: b.tags || {},
                         platform: b.platform || "" };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
@@ -1690,10 +1691,67 @@
           "</p>" : "") + platHtml;
     }
 
+    // Labels the admin put on each creator of this selection (Hero, Beauty…).
+    // They belong to the selection, so they show here and nowhere else.
+    var activeTag = null;
+    function tagsOf(code) {
+      var t = CURATED && CURATED.tags && CURATED.tags[code];
+      return t && t.length ? t : [];
+    }
+    function renderTags() {
+      var counts = {}, order = [];
+      selected.forEach(function (code) {
+        tagsOf(code).forEach(function (t) {
+          if (!counts[t]) { counts[t] = 0; order.push(t); }
+          counts[t]++;
+        });
+      });
+      if (activeTag && !counts[activeTag]) activeTag = null;
+      cards.forEach(function (c) {
+        var body = c.querySelector(".cat-card__body");
+        if (!body) return;
+        var box = c.querySelector(".cat-tags");
+        var mine = tagsOf(c.dataset.code);
+        if (!mine.length) { if (box) box.remove(); return; }
+        if (!box) {
+          box = document.createElement("div");
+          box.className = "cat-tags";
+          body.insertBefore(box, body.firstChild);
+        }
+        box.innerHTML = mine.map(function (t) {
+          return '<span class="cat-tag">' + esc(t) + "</span>";
+        }).join("");
+      });
+      var bar = $("sel-tags");
+      if (!order.length) { if (bar) bar.hidden = true; return; }
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "sel-tags"; bar.className = "cat-tagbar"; bar.setAttribute("role", "group");
+        bar.setAttribute("aria-label", "Filter by tag");
+        $("cat-grid").insertAdjacentElement("beforebegin", bar);
+        bar.addEventListener("click", function (e) {
+          var b = e.target.closest("button[data-tag]"); if (!b) return;
+          var t = b.getAttribute("data-tag");
+          activeTag = t === "" ? null : (activeTag === t ? null : t);
+          render();
+        });
+      }
+      bar.hidden = false;
+      order.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
+      bar.innerHTML = '<span class="cat-tagbar__label">Tags</span>' +
+        '<button type="button" data-tag="" aria-pressed="' + (!activeTag) + '">All <b>' + selected.length + "</b></button>" +
+        order.map(function (t) {
+          return '<button type="button" data-tag="' + esc(t) + '" aria-pressed="' + (t === activeTag) + '">' +
+            esc(t) + " <b>" + counts[t] + "</b></button>";
+        }).join("");
+    }
+
     function render() {
+      renderTags();
       var shown = 0;
       cards.forEach(function (c) {
-        var ok = selected.indexOf(c.dataset.code) !== -1 && (!controls || controls.matches(c));
+        var ok = selected.indexOf(c.dataset.code) !== -1 && (!controls || controls.matches(c)) &&
+          (!activeTag || tagsOf(c.dataset.code).indexOf(activeTag) !== -1);
         c.hidden = !ok;
         if (ok) shown++;
       });

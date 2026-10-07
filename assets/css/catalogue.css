@@ -1163,3 +1163,25 @@ body[data-page="selection"] .cat-card__check { display: none; }
 }
 .cat-cur button:hover { border-color: var(--ink); }
 .cat-cur button[aria-pressed="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+
+
+/* Admin's own labels on a selection's cards, and the filter over them. */
+.cat-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.cat-tag {
+  display: inline-block; padding: 3px 11px; border-radius: 999px;
+  background: var(--lime); color: var(--ink);
+  font-size: 12px; font-weight: 600; letter-spacing: .02em; line-height: 1.5;
+}
+.cat-tagbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 0 0 22px;
+}
+.cat-tagbar__label { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; margin-right: 4px; }
+.cat-tagbar button {
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+  padding: 7px 16px; border-radius: 999px; border: 1px solid var(--ink);
+  background: transparent; color: var(--ink);
+}
+.cat-tagbar button b { font-weight: 700; opacity: .6; margin-left: 4px; }
+.cat-tagbar button[aria-pressed="true"] { background: var(--ink); color: var(--lime); }
+.cat-tagbar button:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }

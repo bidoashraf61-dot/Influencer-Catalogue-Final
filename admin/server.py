@@ -1723,7 +1723,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/selections/edit?id=%d" % sid)
 
     def post_selection_save(self):
-        f = self.form_body(multi=("code", "p_from", "p_to", "cost", "drop", "default"))
+        f = self.form_body(multi=("code", "p_from", "p_to", "cost", "tags", "drop", "default"))
         sid = (f.get("id") or "").strip()
         sel = db.selection(int(sid)) if sid.isdigit() else None
         if sel is None:
@@ -1755,6 +1755,18 @@ class Handler(BaseHTTPRequestHandler):
         rows = zip(f.get("code") or [], f.get("p_from") or [], f.get("p_to") or [],
                    cost_in + [""] * (len(f.get("code") or []) - len(cost_in)))
         remove = set(f.get("drop") or [])
+        tag_in = f.get("tags") or []
+        tag_in = [tag_in] if isinstance(tag_in, str) else list(tag_in)
+        tag_in = tag_in + [""] * (len(f.get("code") or []) - len(tag_in))
+        tags = {}
+        for code_, raw in zip(f.get("code") or [], tag_in):
+            seen_t, mine = set(), []
+            for t in re.split(r"[,;\n]+", raw or ""):
+                t = re.sub(r"\s+", " ", t).strip()[:24]
+                if t and t.lower() not in seen_t and len(mine) < 8:
+                    seen_t.add(t.lower()); mine.append(t)
+            if mine:
+                tags[code_.strip().upper()] = mine
         for code, lo, hi, cost in rows:
             code = code.strip().upper()
             if not code or code in codes or code in remove or code not in known:
@@ -1807,7 +1819,8 @@ class Handler(BaseHTTPRequestHandler):
         name = (f.get("name") or "").strip() or sel["name"]
         db.set_selection_currency(sel["id"], cur)
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
-                          margin=margin, costs=costs, margin_max=margin_max)
+                          margin=margin, costs=costs, margin_max=margin_max,
+                          tags={k: v for k, v in tags.items() if k in codes})
         # A price typed here belongs to THIS selection. Only the ones ticked
         # "make default" also become the creator's price on the roster, so a
         # one-off deal does not silently change what every later selection
@@ -3198,6 +3211,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.send_json(200, {"ok": True, "name": sel["name"], "codes": codes,
                                     "prices": prices, "total": total,
                                     "platform": platform,
+                                    "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "currency": (sel["currency"] if "currency" in sel.keys() else None) or "SAR",
                                     "fx": fx.rates(),
                                     "token": sel["token"]}, self.cors())

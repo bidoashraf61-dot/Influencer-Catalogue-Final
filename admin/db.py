@@ -457,6 +457,9 @@ def migrate(conn):
         # Archived = out of the Clients list, nothing else: the code still
         # works until it is revoked.
         conn.execute("ALTER TABLE codes ADD COLUMN archived_at INTEGER")
+    if "tags" not in sel_cols:
+        # {code: [tag, ...]}: labels the admin puts on each creator of THIS selection.
+        conn.execute("ALTER TABLE selections ADD COLUMN tags TEXT")
     if "currency" not in sel_cols:
         # The currency this selection is quoted in (prices are kept in SAR).
         conn.execute("ALTER TABLE selections ADD COLUMN currency TEXT")
@@ -1642,7 +1645,8 @@ def selection(sid=None, token=None):
 
 
 def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
-                   code_id=None, platform=None, margin=None, costs=None, margin_max=False):
+                   code_id=None, platform=None, margin=None, costs=None, margin_max=False,
+                   tags=None):
     """Create (sid None) or update one priced selection. Returns its id.
 
     margin and costs are left as they are when not given, so a client
@@ -1671,6 +1675,8 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
                          (margin, json.dumps(costs or {}), sid))
         if margin_max is not False:        # not given = left as it is; None = cleared
             conn.execute("UPDATE selections SET margin_max=? WHERE id=?", (margin_max, sid))
+        if tags is not None:               # not given = left as it is
+            conn.execute("UPDATE selections SET tags=? WHERE id=?", (json.dumps(tags), sid))
         return sid
 
 
