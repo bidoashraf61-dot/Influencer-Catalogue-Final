@@ -1534,7 +1534,27 @@
     })();
   }
 
+  // Setup above, results below: the client-logo band moves above the setup, the setup
+  // gets its own heading and frame, and the roster opens with a Results header.
+  function frameSetup(host) {
+    var controls = host.closest(".cat-controls"), clients = document.querySelector(".cat-clients"), grid = $("cat-grid");
+    if (!controls || controls.classList.contains("is-setup")) return;
+    if (clients && controls.compareDocumentPosition(clients) & Node.DOCUMENT_POSITION_FOLLOWING) controls.parentNode.insertBefore(clients, controls);
+    controls.classList.add("is-setup");
+    var head = h("div", { class: "setup-head" });
+    head.innerHTML = '<h2 class="setup-head__title">Find your creators</h2>' +
+      '<p class="setup-head__sub">Filter the roster yourself, or let AI build the list. Your results open just below.</p>';
+    host.insertBefore(head, host.firstChild);
+    if (grid && !$("results-head")) {
+      var rh = h("div", { id: "results-head", class: "results-head" });
+      rh.innerHTML = '<h2 class="results-head__title">Results</h2><p class="results-head__sub" id="results-sub">Every creator that matches your filters. Tick the ones you want.</p>';
+      // Above the roster's own count/sort row when there is one, so "Results" opens the section.
+      var bar = grid.previousElementSibling, anchor = bar && bar.classList.contains("cat-results") ? bar : grid;
+      grid.parentNode.insertBefore(rh, anchor);
+    }
+  }
   function buildAiCard(host) {
+    frameSetup(host);
     var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
     var V = ROOT + "assets/brand/voice/";
     host.classList.add("ai-host");
@@ -1571,11 +1591,64 @@
     track.appendChild(fill);
     head.appendChild(track); head.appendChild(level); head.appendChild(quit);
     var stage = h("div", { class: "ai-sl__stage" });
-    run.appendChild(head); run.appendChild(stage);
+    // The coach: the character reacts to every step (points at a new question, thinks
+    // while you choose, thumbs-up on an answer, cheers at the end), over a power meter.
+    var coach = h("div", { class: "ai-sl__coach", "aria-hidden": "true" });
+    var cvid = h("video", { class: "ai-sl__cvid", muted: "", playsinline: "", preload: "auto", poster: V + "voice-loop-poster.webp" });
+    cvid.muted = true;
+    var cring = h("div", { class: "ai-sl__cring" }, cvid);
+    var power = h("div", { class: "ai-sl__power" });
+    power.innerHTML = '<p class="ai-sl__pw-h">Campaign power</p><p class="ai-sl__pw-n"><b>0</b><small> / ' + 1000 + '</small></p>' +
+      '<div class="ai-sl__pw-bar"><i></i></div><p class="ai-sl__pw-lvl">Draft</p>';
+    coach.appendChild(cring); coach.appendChild(power);
+    var main = h("div", { class: "ai-sl__main" });
+    main.appendChild(head); main.appendChild(stage);
+    run.appendChild(coach); run.appendChild(main);
     card.appendChild(intro); card.appendChild(run);
     host.appendChild(card);
 
     var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null;
+
+    /* -- the game layer: coach animations and campaign power -- */
+    var CLIPS = { point: "voice-point", think: "voice-think", thumbs: "voice-thumbs", cheer: "voice-cheer", wave: "voice-loop" };
+    var coachTimer = null, coachNow = "";
+    function coachPlay(kind, back, after) {
+      clearTimeout(coachTimer);
+      if (reduce) return;
+      if (coachNow !== kind) {
+        coachNow = kind;
+        cvid.innerHTML = '<source src="' + V + CLIPS[kind] + '.webm" type="video/webm"/><source src="' + V + CLIPS[kind] + '.mp4" type="video/mp4"/>';
+        cvid.load();
+      } else { try { cvid.currentTime = 0; } catch (e) { /* not ready */ } }
+      cvid.loop = !back;
+      var pr = cvid.play(); if (pr && pr.catch) pr.catch(function () { /* autoplay blocked: poster stays */ });
+      cring.classList.remove("is-" + "bump"); void cring.offsetWidth; cring.classList.add("is-bump");
+      if (back) coachTimer = setTimeout(function () { coachPlay(back); }, after || 2600);
+    }
+    var POINTS = { goal: 150, platforms: 100, market: 150, category: 200, budget: 150, count: 100 };
+    var LEVELS = [[0, "Draft"], [250, "Focused"], [500, "Sharp"], [800, "Ready to launch"]];
+    function scoreOf(id) {
+      var v = answers[id];
+      if (v == null || (Array.isArray(v) && !v.length)) return 0;
+      var n = POINTS[id] || 100;
+      if (Array.isArray(v) && v[0] !== "any") n += Math.min(2, v.length - 1) * 50;
+      return n;
+    }
+    function powerNow() { return AI_STEPS.reduce(function (t, s) { return t + scoreOf(s[0]); }, 0); }
+    function levelOf(n) { var l = LEVELS[0][1]; LEVELS.forEach(function (x) { if (n >= x[0]) l = x[1]; }); return l; }
+    var shown = 0;
+    function paintPower(gain) {
+      var n = Math.min(1000, powerNow()), before = levelOf(shown);
+      power.querySelector("b").textContent = n;
+      power.querySelector(".ai-sl__pw-bar i").style.width = (n / 10) + "%";
+      var lvl = levelOf(n);
+      power.querySelector(".ai-sl__pw-lvl").textContent = lvl;
+      if (gain && lvl !== before) {
+        var up = h("span", { class: "ai-sl__lvlup" }, "Level up · " + lvl);
+        power.appendChild(up); setTimeout(function () { up.remove(); }, 1800);
+      }
+      shown = n;
+    }
 
     function setTrack(at, done) {
       Array.prototype.forEach.call(track.querySelectorAll(".ai-sl__node"), function (n, i) {
@@ -1587,7 +1660,8 @@
       level.innerHTML = done ? "<b>Brief</b> complete" : "<b>Brief " + Math.min(at + 1, AI_STEPS.length) + "</b> / " + AI_STEPS.length;
     }
     function open() {
-      card.classList.add("is-open"); intro.hidden = true; run.hidden = false;
+      card.classList.add("is-open"); intro.hidden = true; run.hidden = false; run.classList.remove("is-staging");
+      shown = 0;
       loadQuestions().then(function (list) {
         qs = list; byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
         ask(0);
@@ -1607,7 +1681,8 @@
       if (f) f.focus({ preventScroll: true });
     }
     function ask(i) {
-      step = i; setTrack(i);
+      step = i; setTrack(i); paintPower(false);
+      coachPlay("point", "think", 3200);
       var id = AI_STEPS[i][0], q = byId[id];
       if (!q) return i + 1 < AI_STEPS.length ? ask(i + 1) : review();
       var many = q.type === "many";
@@ -1620,7 +1695,7 @@
         var on = many ? picked.indexOf(o.value) > -1 : answers[id] === o.value;
         var b = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(on) }, o.label);
         b.addEventListener("click", function () {
-          if (!many) { answers[id] = o.value; b.setAttribute("aria-pressed", "true"); pop(b); setTimeout(function () { next(); }, reduce ? 0 : 260); return; }
+          if (!many) { answers[id] = o.value; b.setAttribute("aria-pressed", "true"); pop(b, scoreOf(id)); paintPower(true); coachPlay("thumbs", "think", 2400); setTimeout(function () { next(); }, reduce ? 0 : 650); return; }
           var k = picked.indexOf(o.value);
           if (o.value === "any") picked = k > -1 ? [] : ["any"];
           else { picked = picked.filter(function (v) { return v !== "any"; }); if (k > -1) picked.splice(picked.indexOf(o.value), 1); else picked.push(o.value); }
@@ -1633,15 +1708,15 @@
       var nav = h("div", { class: "ai-sl__nav" });
       if (i > 0) nav.appendChild(h("button", { class: "ai-sl__back", type: "button", onclick: function () { ask(i - 1); } }, "Back"));
       if (!q.required && !many) nav.appendChild(h("button", { class: "ai-sl__skip", type: "button", onclick: function () { delete answers[id]; next(); } }, "Skip"));
-      var nextBtn = h("button", { class: "ai-sl__next", type: "button", onclick: function () { answers[id] = picked.slice(); pop(nextBtn); next(); } }, "Next");
+      var nextBtn = h("button", { class: "ai-sl__next", type: "button", onclick: function () { answers[id] = picked.slice(); pop(nextBtn, scoreOf(id)); paintPower(true); coachPlay("thumbs", "think", 2400); setTimeout(next, reduce ? 0 : 650); } }, "Next");
       if (many) { nextBtn.disabled = !picked.length; nav.appendChild(nextBtn); }
       p.appendChild(nav);
       swap(p);
       function next() { if (i + 1 < AI_STEPS.length) ask(i + 1); else review(); }
     }
-    function pop(el) {
+    function pop(el, pts) {
       if (reduce) return;
-      var s = h("span", { class: "ai-sl__plus", "aria-hidden": "true" }, "+1");
+      var s = h("span", { class: "ai-sl__plus", "aria-hidden": "true" }, "+" + (pts || 100));
       el.appendChild(s); setTimeout(function () { s.remove(); }, 700);
     }
     function label(id) {
@@ -1664,6 +1739,9 @@
       var p = h("div", { class: "ai-sl__review" });
       var ticket = h("div", { class: "ai-sl__ticket" });
       ticket.appendChild(h("p", { class: "ai-sl__tk-h" }, "Campaign brief"));
+      paintPower(true); coachPlay("cheer", "wave", 4800);
+      var pw = Math.min(1000, powerNow());
+      ticket.appendChild(h("span", { class: "ai-sl__tk-score" }, h("b", null, String(pw)), h("small", null, levelOf(pw))));
       var nameIn = h("input", { class: "ai-sl__name", type: "text", maxlength: "80", value: nameFor(), "aria-label": "Name this shortlist" });
       ticket.appendChild(nameIn);
       var dl = h("dl", { class: "ai-sl__rows" });
@@ -1693,6 +1771,7 @@
     var STAGES = ["Reading your brief", "Scoring every creator", "Fitting your budget", "Writing the reasons"];
     function go(name) {
       busy = true;
+      run.classList.add("is-staging"); clearTimeout(coachTimer); try { cvid.pause(); } catch (e) { /* none */ }
       var p = h("div", { class: "ai-sl__wait", role: "status", "aria-live": "polite" });
       var scene = h("div", { class: "ai-sl__scene", "aria-hidden": "true" });
       scene.innerHTML = '<div class="ai-sl__orbit ai-sl__orbit--a"><i></i><i></i><i></i></div>' +
@@ -1754,6 +1833,8 @@
       var burst = h("div", { class: "ai-sl__burst", "aria-hidden": "true" });
       for (var i = 0; i < 18; i++) { var c = h("i"); c.style.setProperty("--a", (i * 20) + "deg"); c.style.setProperty("--d", (60 + (i % 3) * 26) + "px"); burst.appendChild(c); }
       p.appendChild(burst);
+      if (!reduce) p.insertAdjacentHTML("beforeend", '<div class="ai-sl__cheer"><video muted autoplay playsinline loop>' +
+        '<source src="' + V + 'voice-cheer.webm" type="video/webm"/><source src="' + V + 'voice-cheer.mp4" type="video/mp4"/></video></div>');
       p.appendChild(h("p", { class: "ai-sl__big" }, h("b", null, String(res.picks.length)), " creators picked"));
       p.appendChild(h("p", { class: "ai-sl__hint" }, "Best fit first, scored per platform. They're ticked in your tray: add or remove anyone, then save."));
       swap(p);
@@ -1776,6 +1857,7 @@
       });
       var bar = $("ai-result"); if (bar) bar.remove();
       document.body.classList.remove("ai-mode");
+      var sub = $("results-sub"); if (sub) sub.textContent = "Every creator that matches your filters. Tick the ones you want.";
     }
     function showResult(res, name) {
       clearResult();
@@ -1815,6 +1897,8 @@
       acts.appendChild(h("button", { class: "ai-result__btn ai-result__btn--ghost", type: "button", onclick: function () { clearResult(); answers = {}; open(); card.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" }); } }, "New brief"));
       bar.appendChild(acts);
       grid.parentNode.insertBefore(bar, grid);
+      var sub = $("results-sub");
+      if (sub) sub.textContent = "AI shortlist: " + res.picks.length + " creators, best fit first. Show all creators to go back to the full roster.";
     }
   }
 
