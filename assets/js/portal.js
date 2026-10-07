@@ -4,8 +4,8 @@
  *    one-time profile step. The old access-code form stays one click away.
  *    Success reloads the page; the page's own script then finds the session
  *    cookie and unlocks itself, so every page that has a gate works unchanged.
- *  - Dock: "Find creators" (AI brief), "Ask" (chat) and the account chip, shown
- *    once signed in.
+ *  - Account circle: initials top right, opening a menu (profile, campaigns,
+ *    credits, admin, sign out), shown once signed in.
  *  - Voice: the character in the corner; a chat that greets, then gets tasks done.
  *  - Brief wizard: a few multiple-choice questions (or one sentence the AI turns
  *    into answers), then a scored shortlist saved as a real selection.
@@ -317,20 +317,59 @@
 
   /* ------------------------------------------------------------------ dock */
 
+  // The account circle, top right: initials on lime, opening a small menu.
+  // Ask and Find creators live in the HELV Assistant now, and admin moves into
+  // the menu, so the bar keeps only the site's own links and this circle.
   function mountDock() {
     if (!ME || !ME.signed_in || $("pt-dock")) return;
     var cat = document.querySelector(".cat-topbar__links");
     var dock = h("div", { id: "pt-dock", class: "pt-dock" + (cat ? "" : " pt-dock--fixed") });
-    if (ME.kind !== "guest" || ME.ai) {
-      dock.appendChild(h("button", { class: "pt-chip pt-chip--lime", type: "button", html: ICON.spark + "<span>" + T("Find creators") + "</span>", onclick: openWizard }));
+    var u = ME.user;
+    var name = u && u.name ? u.name : ME.kind === "admin" ? "HelloVoice team" : "Guest access";
+    var initials = u && u.name ? u.name.trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase()
+      : ME.kind === "admin" ? "HV" : "G";
+    var btn = h("button", { class: "pt-avatar", type: "button", id: "pt-avatar", "aria-haspopup": "menu", "aria-expanded": "false", "aria-controls": "pt-menu", "aria-label": "Account menu" });
+    btn.appendChild(h("span", { id: "pt-chip-name", class: "pt-avatar__ini" }, initials));
+    var menu = h("div", { class: "pt-menu", id: "pt-menu", role: "menu", "aria-labelledby": "pt-avatar", hidden: true });
+    var head = h("div", { class: "pt-menu__head" }, h("b", { class: "pt-menu__name" }, name));
+    var sub = u ? [u.job_title, u.company].filter(Boolean).join(" · ") : ME.kind === "admin" ? "Administrator" : "Signed in with an access code";
+    if (sub) head.appendChild(h("span", { class: "pt-menu__sub" }, sub));
+    menu.appendChild(head);
+    function item(label, act, extra, cls) {
+      var el = act.href ? h("a", { class: "pt-menu__item" + (cls ? " " + cls : ""), role: "menuitem", href: act.href })
+                        : h("button", { class: "pt-menu__item" + (cls ? " " + cls : ""), role: "menuitem", type: "button" });
+      el.appendChild(h("span", null, label));
+      if (extra) el.appendChild(extra);
+      if (act.go) el.addEventListener("click", function () { toggle(false); act.go(); });
+      menu.appendChild(el);
+      return el;
     }
-    if (ME.ai) dock.appendChild(h("button", { class: "pt-chip", type: "button", html: ICON.chat + "<span>" + T("Ask") + "</span>", onclick: openChat }));
-    var chip = h("button", { class: "pt-chip", type: "button", "aria-label": "My account", onclick: openAccount });
-    chip.innerHTML = ICON.user;
-    chip.appendChild(h("span", { id: "pt-chip-name" }, ME.user ? ME.user.name.split(" ")[0] : ME.kind === "admin" ? "Admin" : "Account"));
-    if (ME.credits != null) chip.appendChild(h("span", { class: "pt-credits", id: "pt-chip-credits" }, ME.credits + " cr"));
-    dock.appendChild(chip);
-    if (cat) cat.insertBefore(dock, cat.firstChild); else document.body.appendChild(dock);
+    item(u ? "My profile" : "My access", { go: openAccount });
+    item("My campaigns", { href: ROOT + "campaign/dashboard/" });
+    if (ME.credits != null) item("AI credits", { go: openAccount }, h("span", { class: "pt-menu__badge", id: "pt-chip-credits" }, ME.credits + " cr"));
+    menu.appendChild(h("div", { class: "pt-menu__rule", role: "separator" }));
+    if (ME.kind === "admin") item("Open admin", { href: API + "/" });
+    item("Sign out", { go: function () { api("POST", "/api/auth/logout", {}).then(function () { location.reload(); }); } }, null, "pt-menu__item--quiet");
+
+    function toggle(open) {
+      menu.hidden = !open;
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) { var first = menu.querySelector(".pt-menu__item"); if (first) first.focus(); }
+    }
+    btn.addEventListener("click", function (e) { e.stopPropagation(); toggle(menu.hidden); });
+    document.addEventListener("click", function (e) { if (!menu.hidden && !dock.contains(e.target)) toggle(false); });
+    document.addEventListener("keydown", function (e) {
+      if (menu.hidden) return;
+      if (e.key === "Escape") { toggle(false); btn.focus(); return; }
+      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+      var items = Array.prototype.slice.call(menu.querySelectorAll(".pt-menu__item"));
+      var i = items.indexOf(document.activeElement);
+      items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
+      e.preventDefault();
+    });
+    dock.appendChild(btn);
+    dock.appendChild(menu);
+    if (cat) cat.appendChild(dock); else document.body.appendChild(dock);
   }
 
   function setCredits(n) {
@@ -856,7 +895,7 @@
         e.preventDefault();
         api("POST", "/api/me/update", { name: f.name.value, company: f.company.value, job_title: f.job_title.value, phone: f.phone.value }).then(function (r) {
           saved.textContent = r.b.ok ? "Saved" : "Couldn't save";
-          if (r.b.ok) { ME.user = r.b.user; var n = $("pt-chip-name"); if (n) n.textContent = r.b.user.name.split(" ")[0]; }
+          if (r.b.ok) { ME.user = r.b.user; var n = $("pt-chip-name"); if (n) n.textContent = r.b.user.name.trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase(); }
         });
       });
       body.appendChild(form);
@@ -1449,4 +1488,7 @@
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot); else boot();
+  // A passcode typed into the gate unlocks without a reload, so look again
+  // then: the account circle and the assistant appear straight away.
+  document.addEventListener("cat:unlocked", function () { if (!ME) boot(); });
 })();

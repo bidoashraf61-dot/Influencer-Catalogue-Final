@@ -129,6 +129,7 @@
     initApp();
     backToTop();
     welcome();
+    try { document.dispatchEvent(new CustomEvent("cat:unlocked")); } catch (e) {}
   }
 
   /* The cover tag greets a signed-in client by first name; access-code
