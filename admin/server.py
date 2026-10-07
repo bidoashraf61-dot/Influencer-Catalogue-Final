@@ -1565,9 +1565,11 @@ class Handler(BaseHTTPRequestHandler):
         # analysis and its pictures
         d_all, k_all = db.analyses(drop), db.analyses(keep)
         # Both are the same person, so both analyses are valid: a platform only the
-        # duplicate has moves across, and where both have one the newer is kept.
+        # duplicate has moves across, and where both have one the fuller is kept
+        # (a full PDF report is never lost to a thin basic copy).
+        import profile_pdf as _pp
         moved = {pl: a for pl, a in d_all.items()
-                 if pl not in k_all or (a["updated_at"] or 0) > (k_all[pl]["updated_at"] or 0)}
+                 if pl not in k_all or _pp.completeness(a["data"]) > _pp.completeness(k_all[pl]["data"])}
         if moved:
             import analysis as analysis_mod, shutil
             for pl, a in moved.items():
@@ -1579,6 +1581,8 @@ class Handler(BaseHTTPRequestHandler):
                     shutil.copy(str(fn), str(dst / fn.name))
         with db.connect() as conn:
             conn.execute("UPDATE analysis_requests SET code = ? WHERE code = ?", (keep, drop))
+        # whatever was not carried over is the weaker copy; the duplicate leaves nothing behind
+        db.delete_analysis(drop)
         # fill the kept creator's gaps from the duplicate
         k, d = db.creator(keep), db.creator(drop)
         row = {x: k[x] for x in k.keys()}
