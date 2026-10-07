@@ -66,6 +66,8 @@ import auth  # noqa: E402
 import guard  # noqa: E402
 import portal  # noqa: E402
 import portal_api  # noqa: E402
+import team  # noqa: E402
+import team_views  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
 import history  # noqa: E402
@@ -81,6 +83,7 @@ import apify
 import profile_thumbs
 import apis_view
 import views  # noqa: E402
+import ui  # noqa: E402
 
 SECRET = auth.load_secret(HERE / ".secret")
 # Salt for the visitor hash on tracking-link clicks: derived from the server
@@ -246,7 +249,15 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def admin(self):
         token = auth.unsign(self.cookies().get(ADMIN_COOKIE, ""), SECRET)
-        return db.session(token) if token else None
+        if not token:
+            return None
+        row = db.session(token)
+        if row is None:
+            return None
+        row = team.check_idle(token, row)          # signed out after the team's idle limit
+        if row is not None:
+            self._admin_token = token
+        return row
 
     def require_admin(self):
         who = self.admin()
@@ -387,6 +398,18 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send(404, b"", "text/plain")
         if path == "/login":
             return self.send(200, views.login_page(query.get("e"), BASE))
+        if path == "/login/2fa":
+            row = self.pending_2fa()
+            if row is None:
+                return self.redirect("/login")
+            secret = None
+            if not row["totp_on"]:
+                secret = row["totp_secret"] or team.new_secret()
+                if not row["totp_secret"]:
+                    with db.connect() as conn:
+                        conn.execute("UPDATE admins SET totp_secret = ? WHERE id = ?", (secret, row["id"]))
+            return self.send(200, team_views.two_step_page(row["email"], secret,
+                                                           "That code is not right. Try the newest one." if query.get("e") else None))
         if path == "/logout":
             token = auth.unsign(self.cookies().get(ADMIN_COOKIE, ""), SECRET)
             if token:
@@ -397,7 +420,27 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not who:
             return
         views.set_user(who["email"] if "email" in who.keys() else "")
+        ui.set_role(team.role_of(who))
 
+        # Roles, and a password re-check for exports.
+        if not team.can(who, "GET", path, query):
+            return self.send(403, team_views.forbidden_page(team.role_of(who)))
+        if team.needs_step_up("GET", path) and not team.fresh(who):
+            raw_q = urllib.parse.urlparse(self.path).query
+            return self.redirect("/reauth?next=" + urllib.parse.quote(path + ("?" + raw_q if raw_q else "")))
+        if team.needs_step_up("GET", path):
+            team.log("export", who["email"], path, self.client_ip())
+        if path == "/team":
+            secret = None
+            if query.get("setup") and not who["totp_on"]:
+                a = team.admin_by_id(who["admin_id"])
+                secret = a["totp_secret"]
+            return self.send(200, team_views.team_page(who, query.get("ok"), query.get("e"), secret,
+                                                       (query.get("new"), query.get("pw")) if query.get("new") and query.get("pw") else None))
+        if path == "/reauth":
+            nxt = query.get("next") or "/"
+            return self.send(200, team_views.reauth_page(nxt if nxt.startswith("/") and not nxt.startswith("//") else "/",
+                                                         bool(who["totp_on"]), bool(query.get("again")), "That is not right." if query.get("e") else None))
         if path in ("/ai", "/ai/history", "/portal", "/portal/user", "/portal/usage.csv", "/portal/chat", "/portal/quote"):
             return self.portal_admin_get(path, query, who)
         if path == "/api/search":
@@ -743,13 +786,29 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.insights_upload(path[len("/insights/"):])
         if path == "/login":
             return self.post_login()
+        if path == "/login/2fa":
+            return self.post_login_2fa()
 
         who = self.require_admin()
         if not who:
             return
         history.set_actor(who["email"] if "email" in who.keys() else "admin")
         views.set_user(who["email"] if "email" in who.keys() else "")
+        ui.set_role(team.role_of(who))
+        if not team.can(who, "POST", path):
+            return self.send(403, team_views.forbidden_page(team.role_of(who)))
+        if team.needs_step_up("POST", path) and not team.fresh(who):
+            ref = urllib.parse.urlparse(self.headers.get("Referer") or "").path or "/"
+            if BASE and ref.startswith(BASE):
+                ref = ref[len(BASE):] or "/"
+            return self.redirect("/reauth?again=1&next=" + urllib.parse.quote(ref))
+        if path == "/reauth":
+            return self.post_reauth(who)
+        if path.startswith("/team/") or path.startswith("/account/2fa/"):
+            return self.post_team(path, who)
         if path in ("/ai/chat", "/ai/confirm", "/ai/dismiss") or path.startswith("/portal/"):
+            if path == "/portal/keys":
+                team.log("key", who["email"], (self.form_body().get("which") or "") + " " + (self.form_body().get("action") or "save"), self.client_ip())
             return self.portal_admin_post(path, who)
         if path == "/history/undo":
             return self.post_history_undo()
@@ -962,18 +1021,143 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         ok = row and auth.verify_password(form.get("password") or "", row["password_hash"])
         # Same delay either way: a fast "no" tells an attacker the email is wrong.
         time.sleep(0.4)
+        if ok and row["disabled_at"]:
+            ok = False
         if not ok:
             guard.limiter.hit(ip_key)
             guard.limiter.hit(em_key)
             db.log("admin_fail", ip=self.client_ip(), user_agent=self.headers.get("User-Agent"),
                    detail=email[:80])
+            team.log("login_fail", email[:80], "", self.client_ip())
             return self.redirect("/login?e=1")
         guard.limiter.reset(em_key)
+        if row["totp_on"] or team.must_use_2fa(row):
+            # Password is right; now the code from their phone (or, the first time, setting it up).
+            pend = auth.sign("2fa:%d:%d" % (row["id"], db.now() + 300), SECRET)
+            return self.redirect("/login/2fa", [("Set-Cookie", "hv_2fa=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=300%s" % (pend, self.secure_flag()))])
+        return self.start_session(row)
+
+    def start_session(self, row, extra_cookies=()):
         db.touch_admin_login(row["id"])
         token = db.create_session(row["id"], ADMIN_TTL)
+        with db.connect() as conn:
+            conn.execute("UPDATE sessions SET last_seen = ? WHERE token = ?", (db.now(), token))
+        team.log("login", row["email"], "", self.client_ip())
         cookie = (f"{ADMIN_COOKIE}={auth.sign(token, SECRET)}; Path=/; HttpOnly; "
                   f"SameSite=Lax; Max-Age={ADMIN_TTL}{self.secure_flag()}")
-        return self.redirect("/", [("Set-Cookie", cookie)])
+        return self.redirect("/", [("Set-Cookie", cookie)] + list(extra_cookies))
+
+    def pending_2fa(self):
+        raw = auth.unsign(self.cookies().get("hv_2fa", ""), SECRET)
+        if not raw or not raw.startswith("2fa:"):
+            return None
+        _, aid, exp = raw.split(":")
+        if not exp.isdigit() or int(exp) < db.now():
+            return None
+        row = team.admin_by_id(int(aid))
+        return row if row is not None and not row["disabled_at"] else None
+
+    def post_login_2fa(self):
+        row = self.pending_2fa()
+        if row is None:
+            return self.redirect("/login")
+        key = "2fa:%d" % row["id"]
+        if not guard.limiter.allow(key, 6, 300):
+            return self.too_many(guard.limiter.retry_after(key, 6, 300))
+        step = team.totp_matches(row["totp_secret"], self.form_body().get("code"), row["totp_last"])
+        if step is None:
+            guard.limiter.hit(key)
+            team.log("2fa_fail", row["email"], "", self.client_ip())
+            return self.redirect("/login/2fa?e=1")
+        if not row["totp_on"]:
+            team.set_totp(row["id"], row["totp_secret"], True)
+            team.log("2fa_on", row["email"], "at sign-in", self.client_ip())
+        team.use_totp_step(row["id"], step)
+        return self.start_session(row, [("Set-Cookie", "hv_2fa=; Path=/; Max-Age=0")])
+
+    def post_reauth(self, who):
+        f = self.form_body()
+        nxt = f.get("next") or "/"
+        nxt = nxt if nxt.startswith("/") and not nxt.startswith("//") and "\\" not in nxt else "/"
+        key = "reauth:%d" % who["admin_id"]
+        if not guard.limiter.allow(key, 5, 600):
+            return self.too_many(guard.limiter.retry_after(key, 5, 600))
+        a = team.admin_by_id(who["admin_id"])
+        ok = auth.verify_password(f.get("password") or "", a["password_hash"])
+        step = None
+        if ok and a["totp_on"]:
+            step = team.totp_matches(a["totp_secret"], f.get("code"), a["totp_last"])
+            ok = step is not None
+        if not ok:
+            guard.limiter.hit(key)
+            team.log("reauth_fail", who["email"], "", self.client_ip())
+            return self.redirect("/reauth?e=1&next=" + urllib.parse.quote(nxt))
+        if step is not None:
+            team.use_totp_step(a["id"], step)
+        team.mark_reauth(self._admin_token)
+        return self.redirect(nxt)
+
+    def post_team(self, path, who):
+        f = self.form_body()
+        me, ip = who["email"], self.client_ip()
+
+        def back(msg, ok=True, extra=""):
+            return self.redirect("/team?" + ("ok=" if ok else "e=") + urllib.parse.quote(msg) + extra)
+        try:
+            if path == "/account/2fa/start":
+                with db.connect() as conn:
+                    conn.execute("UPDATE admins SET totp_secret = ?, totp_on = 0 WHERE id = ?", (team.new_secret(), who["admin_id"]))
+                return self.redirect("/team?setup=1")
+            if path == "/account/2fa/enable":
+                a = team.admin_by_id(who["admin_id"])
+                step = team.totp_matches(a["totp_secret"], f.get("code"), a["totp_last"])
+                if step is None:
+                    return self.redirect("/team?setup=1&e=" + urllib.parse.quote("That code is not right. Try the newest one."))
+                team.set_totp(a["id"], a["totp_secret"], True)
+                team.use_totp_step(a["id"], step)
+                team.log("2fa_on", me, "", ip)
+                return back("Two-step sign-in is on.")
+            if path == "/account/2fa/disable":
+                if team.must_use_2fa(who):
+                    return back("Your role requires two-step sign-in.", False)
+                team.set_totp(who["admin_id"], None, False)
+                team.log("2fa_off", me, "", ip)
+                return back("Two-step sign-in is off.")
+            if path == "/team/policy":
+                roles = [r for r in urllib.parse.parse_qs(self.body().decode()).get("req", []) if r in team.ROLES]
+                db.set_setting("require_2fa_roles", roles)
+                try:
+                    db.set_setting("admin_idle_minutes", max(5, min(1440, int(f.get("idle") or 120))))
+                except ValueError:
+                    pass
+                team.log("policy", me, "2-step for %s; idle %s min" % (",".join(roles) or "nobody", f.get("idle")), ip)
+                return back("Sign-in rules saved.")
+            aid = int(f.get("id") or 0)
+            target = team.admin_by_id(aid) if aid else None
+            if path == "/team/invite":
+                pw = team.invite(f.get("email"), f.get("name"), f.get("role"))
+                team.log("invite", me, "%s as %s" % (f.get("email"), f.get("role")), ip)
+                return self.redirect("/team?ok=" + urllib.parse.quote("Added.") + "&new=" + urllib.parse.quote(f.get("email").strip().lower())
+                                     + "&pw=" + urllib.parse.quote(pw))
+            if target is None:
+                return back("No such person.", False)
+            if path == "/team/role":
+                team.set_role(aid, f.get("role"))
+                team.end_sessions(aid)
+                team.log("role", me, "%s -> %s" % (target["email"], f.get("role")), ip)
+                return back("%s is now %s." % (target["email"], team.ROLE_LABEL.get(f.get("role"), f.get("role"))))
+            if path in ("/team/disable", "/team/enable"):
+                team.set_disabled(aid, path.endswith("disable"))
+                team.log(path.rsplit("/", 1)[1], me, target["email"], ip)
+                return back("Access removed." if path.endswith("disable") else "Access restored.")
+            if path == "/team/reset2fa":
+                team.set_totp(aid, None, False)
+                team.end_sessions(aid)
+                team.log("2fa_reset", me, target["email"], ip)
+                return back("Two-step sign-in reset for %s." % target["email"])
+        except ValueError as exc:
+            return back(str(exc), False)
+        return back("Unknown action.", False)
 
     def post_password(self):
         who = self.admin()
@@ -4057,6 +4241,7 @@ def main():
     db.init()
     history.init()
     portal.init()
+    team.init()
     apify.start_scheduler()
     profile_thumbs.start()
     db.purge_expired_sessions()

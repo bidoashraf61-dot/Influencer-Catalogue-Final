@@ -615,6 +615,36 @@ def _kpi_strip(kpis):
             "<span class='muted'>Compared with the same days of last month</span></div><div class='kpi-row'>" + tiles + "</div></section>")
 
 
+def _my_accounts(who):
+    """For a key account manager: the portal clients assigned to them, with credits and open quotes."""
+    import db
+    import portal
+    keys = [k.strip().lower() for k in (who["email"], who["name"] if "name" in who.keys() else "") if k and k.strip()]
+    if not keys:
+        return ""
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT u.id, u.email, u.name, u.company, u.code_id, u.last_login_at, "
+            "(SELECT COUNT(*) FROM requests r WHERE r.code_id = u.code_id AND r.handled_at IS NULL) AS open_q "
+            "FROM users u WHERE u.deleted_at IS NULL AND LOWER(TRIM(COALESCE(u.kam, ''))) IN (%s) "
+            "ORDER BY open_q DESC, u.last_login_at DESC LIMIT 40" % ",".join("?" * len(keys)), keys).fetchall()
+    if not rows:
+        body = ui.empty("building", "No accounts assigned yet",
+                        "An owner or admin sets the key account manager on each client's page.",
+                        "<a class='btn small ghost' href='" + u("/portal") + "'>See all clients</a>")
+    else:
+        body = ("<table class='list'><thead><tr><th>Client</th><th>Company</th><th class='num'>Credits</th>"
+                "<th class='num'>Open quotes</th><th>Last seen</th></tr></thead><tbody>" + "".join(
+                    "<tr><td><a href='%s'>%s</a></td><td>%s</td><td class='num'>%s</td><td class='num'>%s</td><td>%s</td></tr>" % (
+                        u("/portal/user?id=%d" % r["id"]), e(r["name"] or r["email"]), e(r["company"] or ""),
+                        portal.balance(r["code_id"]) if r["code_id"] else "-",
+                        ("<a href='%s'><b>%d</b></a>" % (u("/requests"), r["open_q"])) if r["open_q"] else "0",
+                        e(ago(r["last_login_at"]) if r["last_login_at"] else "never"))
+                    for r in rows) + "</tbody></table>")
+    return ("<section class='card' aria-labelledby='h-mine'><div class='hd'><h2 id='h-mine'>My accounts</h2>"
+            "<span class='muted'>%d assigned to you</span></div>%s</section>" % (len(rows), body))
+
+
 def dashboard(s, events, who, message=None, error=None):
     """Home: what needs a person today, where everything stands, how the live
     campaigns are going, and how busy the catalogue has been."""
@@ -684,6 +714,7 @@ def dashboard(s, events, who, message=None, error=None):
                   actions="<a class='btn lime' href='" + u("/open-catalogue") + "' target='_blank' rel='noopener'>"
                           + "Open catalogue as admin " + ui.icon("arrow", 16) + "</a>")
         + banner
+        + (_my_accounts(who) if (who["role"] if "role" in who.keys() else None) == "kam" else "")
         + "<div class='home-grid'><section class='card' aria-labelledby='h-needs'><div class='hd'><h2 id='h-needs'>Needs you today</h2>"
           "<span class='muted'>Most urgent first</span></div>" + needs + "</section>"
         + "<section class='card' aria-labelledby='h-start'><div class='hd'><h2 id='h-start'>Start something</h2></div>" + start + "</section></div>"

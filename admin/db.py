@@ -638,8 +638,8 @@ def session(token):
         return None
     with connect() as conn:
         row = conn.execute(
-            "SELECT s.*, a.email FROM sessions s JOIN admins a ON a.id = s.admin_id "
-            "WHERE s.token = ? AND s.expires_at > ?",
+            "SELECT s.*, a.email, a.role, a.name, a.totp_on, a.disabled_at FROM sessions s JOIN admins a ON a.id = s.admin_id "
+            "WHERE s.token = ? AND s.expires_at > ? AND a.disabled_at IS NULL",
             (token, now()),
         ).fetchone()
     return row

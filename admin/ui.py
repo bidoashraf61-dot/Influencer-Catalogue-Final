@@ -85,8 +85,21 @@ CHILDREN = {
     "/roster": [("/analysis", "Creator analysis", "an")],
     "/clients": [("/portal", "Client portal", None), ("/codes", "Access codes", None)],
     "/analytics": [("/calculator", "ROI calculator", None)],
-    "/settings": [("/apis", "APIs & keys", None), ("/history", "History & undo", None)],
+    "/settings": [("/apis", "APIs & keys", None), ("/history", "History & undo", None), ("/team", "Team & security", None)],
 }
+STAFF_ONLY = {"/apis"}          # hidden from KAMs and viewers (the server refuses them anyway)
+
+import threading as _threading
+_role = _threading.local()
+
+
+def set_role(role):
+    """The signed-in person's role for this request; trims the sidebar to what they can open."""
+    _role.value = role or "owner"
+
+
+def _staff():
+    return getattr(_role, "value", "owner") in ("owner", "admin")
 PARENT = {c[0]: p for p, kids in CHILDREN.items() for c in kids}
 
 # Which sidebar item a page belongs under, so sub-pages keep it highlighted.
@@ -657,13 +670,14 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
 
     nav = ""
     open_parent = PARENT.get(a_href, a_href)
+    staff = _staff()
     for gname, items in NAV:
         links = ""
         for href, label, ic, bk in items:
-            kids = CHILDREN.get(href, [])
+            kids = [k for k in CHILDREN.get(href, []) if staff or k[0] not in STAFF_ONLY]
             in_family = open_parent == href
             links += '<a class="nav-item" href="%s"%s title="%s">%s<span class="t">%s</span>%s</a>' % (
-                u(href), ' aria-current="page"' if href == a_href else (' aria-current="true"' if in_family and kids else ""),
+                u(href if staff or href != "/settings" else "/team"), ' aria-current="page"' if href == a_href else (' aria-current="true"' if in_family and kids else ""),
                 e(label), icon(ic, 19), e(label), badge(bk) if not (kids and not in_family) else
                 "".join(badge(k[2]) for k in kids if k[2]) + badge(bk))
             if kids and in_family:
@@ -673,7 +687,7 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
 
     bell_n = pulse.get("open", 0) + pulse.get("a_open", 0)
     pages_js = json.dumps([{"href": u(h), "label": l, "hint": g or "Home", "kw": ""} for g, its in NAV for h, l, _i, _b in its]
-                          + [{"href": u(c[0]), "label": c[1], "hint": "Go to", "kw": ""} for kids in CHILDREN.values() for c in kids]
+                          + [{"href": u(c[0]), "label": c[1], "hint": "Go to", "kw": ""} for kids in CHILDREN.values() for c in kids if staff or c[0] not in STAFF_ONLY]
                           + [{"href": u("/selections"), "label": "New selection", "hint": "Create", "kw": "quote create add"},
                              {"href": u("/campaigns"), "label": "New campaign", "hint": "Create", "kw": "start create add"},
                              {"href": u("/roster"), "label": "Add a creator", "hint": "Create", "kw": "new influencer"},

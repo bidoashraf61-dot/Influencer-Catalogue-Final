@@ -26,12 +26,12 @@ for f in SRC.glob("*.py"):
 shutil.copytree(SRC / "static", TMP / "static", dirs_exist_ok=True)
 sys.path.insert(0, str(TMP))
 
-import auth, db, gemini, guard, history, mailer, portal, server, views  # noqa: E402
+import auth, db, gemini, guard, history, mailer, portal, server, team, views  # noqa: E402
 from http.server import ThreadingHTTPServer  # noqa: E402
 
 
 def seed():
-    db.init(); history.init(); portal.init()
+    db.init(); history.init(); portal.init(); team.init()
     db.save_tier("Micro", "MI", 1500, 3000, reach="10-50K")
     db.save_tier("Mid-Tier", "MD", 5000, 9000, reach="50-250K")
     rows = [
@@ -719,10 +719,12 @@ class Portal(unittest.TestCase):
         self.assertIn("nav-sub", a.get("/codes")[1])                       # sub-pages open under their parent
 
     # ------------------------------------------------------------------- admin
-    def admin(self):
+    def admin(self, fresh=True):
         c = Client(self.base)
         s, _, r = c.req("POST", "/login", form={"email": "boss@hellovoice.co.uk", "password": "correct-horse-battery"})
         self.assertEqual(s, 303)
+        if fresh:                                    # exports and keys ask for the password again
+            c.req("POST", "/reauth", form={"password": "correct-horse-battery", "next": "/"})
         return c
 
     def test_20_admin_pages_render(self):
@@ -776,6 +778,109 @@ class Portal(unittest.TestCase):
         s, _, _ = c.req("POST", "/ai/chat", body={"message": "hi"})
         self.assertEqual(s, 303)
 
+
+    # ------------------------------------------------------- team & security
+    def member(self, email, role):
+        if not db.admin_by_email(email):
+            pw = team.invite(email, email.split("@")[0], role)
+            with db.connect() as conn:
+                conn.execute("UPDATE admins SET password_hash = ? WHERE email = ?", (auth.hash_password("pw-" + role), email))
+        c = Client(self.base)
+        s, _, r = c.req("POST", "/login", form={"email": email, "password": "pw-" + role})
+        return c, s, r.headers.get("Location", "")
+
+    def test_70_roles_enforced_on_server(self):
+        k, s, _ = self.member("kam1@hellovoice.co.uk", "kam")
+        self.assertEqual(s, 303)
+        self.assertEqual(k.get("/selections")[0], 200)
+        self.assertEqual(k.get("/settings")[0], 403)
+        self.assertEqual(k.get("/apis")[0], 403)
+        self.assertEqual(k.get("/portal?tab=settings")[0], 403)
+        self.assertEqual(k.req("POST", "/portal/keys", form={"which": "gemini", "action": "clear"})[0], 403)
+        self.assertEqual(k.req("POST", "/ai/confirm", form={"id": "1"})[0], 403)
+        self.assertEqual(k.req("POST", "/team/invite", form={"email": "x@y.z", "role": "owner"})[0], 403)
+        home = k.get("/")[1]
+        self.assertIn("My accounts", home)
+        self.assertNotIn('href="/apis"', home)                       # sidebar trimmed to what they can open
+        v, s, _ = self.member("view1@hellovoice.co.uk", "viewer")
+        self.assertEqual(v.get("/roster")[0], 200)
+        self.assertEqual(v.req("POST", "/selections/new", form={"name": "x"})[0], 403)
+        self.assertEqual(v.get("/team")[0], 200)                       # their own account page
+
+    def test_71_step_up_before_keys_and_exports(self):
+        a = self.admin(fresh=False)
+        s, _, r = a.get("/roster/export")
+        self.assertEqual(s, 303)
+        self.assertIn("/reauth", r.headers["Location"])
+        s, _, r = a.req("POST", "/reauth", form={"password": "wrong", "next": "/roster/export"})
+        self.assertIn("e=1", r.headers["Location"])
+        s, _, r = a.req("POST", "/reauth", form={"password": "correct-horse-battery", "next": "/roster/export"})
+        self.assertEqual(r.headers["Location"].split("?")[0].rstrip("/") or "/", "/roster/export")
+        self.assertEqual(a.get("/roster/export")[0], 200)
+        s, _, r = a.req("POST", "/reauth", form={"password": "correct-horse-battery", "next": "//evil.example"})
+        self.assertEqual(r.headers["Location"].rstrip("/") or "/", "/".rstrip("/") or "/")
+        self.assertTrue(any(x["kind"] == "export" for x in team.recent_log()))
+
+    def test_72_two_step_sign_in(self):
+        c, s, loc = self.member("twofa@hellovoice.co.uk", "admin")
+        a = db.admin_by_email("twofa@hellovoice.co.uk")
+        secret = team.new_secret()
+        team.set_totp(a["id"], secret, True)
+        c = Client(self.base)
+        s, _, r = c.req("POST", "/login", form={"email": "twofa@hellovoice.co.uk", "password": "pw-admin"})
+        self.assertIn("/login/2fa", r.headers["Location"])
+        self.assertEqual(c.get("/")[0], 303)                            # not signed in yet
+        self.assertIn("/login/2fa?e=1", c.req("POST", "/login/2fa", form={"code": "000000"})[2].headers["Location"])
+        code = team._code(secret, int(time.time() // 30))
+        s, _, r = c.req("POST", "/login/2fa", form={"code": code})
+        self.assertEqual(s, 303)
+        self.assertEqual(c.get("/")[0], 200)
+        c2 = Client(self.base)                                          # the same code cannot be used twice
+        c2.req("POST", "/login", form={"email": "twofa@hellovoice.co.uk", "password": "pw-admin"})
+        self.assertIn("e=1", c2.req("POST", "/login/2fa", form={"code": code})[2].headers["Location"])
+
+    def test_73_required_2fa_forces_setup(self):
+        db.set_setting("require_2fa_roles", ["viewer"])
+        try:
+            c, s, loc = self.member("req2fa@hellovoice.co.uk", "viewer")
+            self.assertIn("/login/2fa", loc)
+            s, page, _ = c.get("/login/2fa")
+            self.assertIn("otpauth://", page)
+            a = db.admin_by_email("req2fa@hellovoice.co.uk")
+            s, _, r = c.req("POST", "/login/2fa", form={"code": team._code(a["totp_secret"], int(time.time() // 30))})
+            self.assertEqual(s, 303)
+            self.assertEqual(db.admin_by_email("req2fa@hellovoice.co.uk")["totp_on"], 1)
+        finally:
+            db.set_setting("require_2fa_roles", [])
+
+    def test_74_idle_and_disabled_sign_out(self):
+        c, s, _ = self.member("idle@hellovoice.co.uk", "kam")
+        self.assertEqual(c.get("/")[0], 200)
+        with db.connect() as conn:
+            conn.execute("UPDATE sessions SET last_seen = ? WHERE admin_id = (SELECT id FROM admins WHERE email = ?)",
+                         (db.now() - 3 * 3600, "idle@hellovoice.co.uk"))
+        self.assertEqual(c.get("/")[0], 303)
+        c, s, _ = self.member("idle@hellovoice.co.uk", "kam")
+        self.assertEqual(c.get("/")[0], 200)
+        team.set_disabled(db.admin_by_email("idle@hellovoice.co.uk")["id"], True)
+        self.assertEqual(c.get("/")[0], 303)
+        self.assertEqual(self.member("idle@hellovoice.co.uk", "kam")[1], 303)  # refused: back to /login?e=1
+        self.assertIn("e=1", self.member("idle@hellovoice.co.uk", "kam")[2])
+
+    def test_75_team_page_and_last_owner(self):
+        a = self.admin()
+        self.assertEqual(a.get("/team")[0], 200)
+        s, _, r = a.req("POST", "/team/invite", form={"email": "new.kam@hellovoice.co.uk", "name": "New", "role": "kam"})
+        self.assertIn("pw=HV-", r.headers["Location"])
+        boss = db.admin_by_email("boss@hellovoice.co.uk")
+        for other in team.list_admins():                                 # make boss the only owner
+            if other["id"] != boss["id"] and team.role_of(other) == "owner":
+                team.set_role(other["id"], "admin")
+        s, _, r = a.req("POST", "/team/role", form={"id": str(boss["id"]), "role": "kam"})
+        self.assertIn("e=", r.headers["Location"])
+        self.assertEqual(team.role_of(db.admin_by_email("boss@hellovoice.co.uk")), "owner")
+        kinds = {x["kind"] for x in team.recent_log()}
+        self.assertTrue({"login", "invite"} <= kinds, kinds)
 
 def assistant_sql(sql):
     import assistant
