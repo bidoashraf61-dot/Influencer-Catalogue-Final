@@ -1298,3 +1298,5 @@ body[data-page="selection"] .cat-card__check { display: none; }
 .cat-score--basic { border-style: dashed; border-color: rgba(255,255,255,.9); }
 .cat-score--basic small { letter-spacing: .1em; }
 .cst-basic { margin: 12px 0 0; padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.1); font-size: 12px; line-height: 1.4; opacity: .9; }
+.cst-basic b { display: block; margin-bottom: 2px; }
+.cst-basic--warn { background: rgba(255, 183, 77, .22); border-left: 3px solid #ffb74d; }
