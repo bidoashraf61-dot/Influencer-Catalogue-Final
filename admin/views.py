@@ -804,6 +804,12 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
         ok, reason = code_state(c)
         cls = "live" if ok else ("warn" if reason in ("expired", "exhausted") else "dead")
         used = str(c["uses"]) + (" / " + str(c["max_uses"]) if c["max_uses"] else "")
+        try:
+            import portal as _portal
+            _cr = _portal.balance(c["id"])
+            used += "<br><span class='muted' style='font-size:12px'>" + str(_cr) + " AI credit" + ("" if _cr == 1 else "s") + "</span>"
+        except Exception:
+            pass
         revoke = ""
         if ok:
             confirm = "return confirm('Revoke this code? Anyone using it loses access at once.')"
@@ -2201,6 +2207,25 @@ if(cur.map(function(x){return x.toLowerCase()}).indexOf(t.toLowerCase())<0)cur.p
 draw()})();</script>'''
 
 
+def _brief_note(sel):
+    """What the client asked for, when this selection came from the AI brief."""
+    try:
+        from db import connect as db_connect
+        with db_connect() as conn:
+            row = conn.execute("SELECT * FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1", (sel["id"],)).fetchone()
+    except Exception:
+        return ""
+    if not row:
+        return ""
+    try:
+        notes = json.loads(row["answers"] or "{}").get("notes") or ""
+    except ValueError:
+        notes = ""
+    return ("<div class='note'><strong>Client brief.</strong> " + e(row["summary"] or "")
+            + ((" <span class='muted'>“" + e(notes) + "”</span>") if notes else "")
+            + " <span class='muted'>Built by the AI shortlist " + e(ago(row["created_at"])) + ". Scores on this page use that objective and audience.</span></div>")
+
+
 def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=()):
     by = {c["code"]: c for c in creators}
     codes = json.loads(sel["codes"] or "[]")
@@ -2321,7 +2346,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + ui.header(sel["name"], "A priced shortlist for one client: " + str(n_cr) + " creator" + ("" if n_cr == 1 else "s") + ". " + client_pill,
                     crumbs=[("Selections", u("/selections")), (sel["name"], None)],
                     actions="<button type='button' class='btn lime' data-go-tab='st:share'>" + ui.icon("send", 16) + " Share</button>")
-        + note + stepper_html
+        + note + _brief_note(sel) + stepper_html
         + "<div data-tabs='st'>" + ui.tab_nav("st", [("creators", "Creators & prices", n_cr), ("fit", "Fit & tags", (sum(1 for v in verdicts_of.values() if v) or None)), ("details", "Details", None),
                                                     ("share", "Share", None), ("campaign", "Campaign", len(campaigns) or None)])
         + "<form method='post' action='" + u("/selections/save") + "' enctype='multipart/form-data'>"

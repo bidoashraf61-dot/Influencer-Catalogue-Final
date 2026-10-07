@@ -253,7 +253,7 @@ class Portal(unittest.TestCase):
         s, r, _ = c.post("/api/chat", {"message": "I need a campaign for skincare"})
         self.assertEqual(s, 200, r)
         self.assertTrue(r["reply"].startswith("Done via suggest_shortlist"))
-        self.assertTrue(r["cards"] and r["credits"] == 49)
+        self.assertTrue(r["cards"] and r["cards"][0]["name"] and r["credits"] == 49)
         s, h, _ = c.get("/api/chat/history?t=%d" % r["thread"])
         self.assertEqual([m["role"] for m in h["messages"]], ["user", "model"])
         # a client cannot read admin tools or another client's thread
@@ -308,6 +308,29 @@ class Portal(unittest.TestCase):
         finally:
             db.set_setting("domain_allow", [])
 
+    def test_14_closed_mode_only_blocks_new_addresses(self):
+        self.signup("existing@lilly.com")
+        db.set_setting("signup_mode", "closed")
+        try:
+            c = Client(self.base)
+            s, b, _ = c.post("/api/auth/start", {"email": "stranger@novo.com"})
+            self.assertEqual((s, b["reason"]), (400, "closed"))
+            s, b, _ = c.post("/api/auth/start", {"email": "existing@lilly.com"})
+            self.assertEqual(s, 200, b)
+        finally:
+            db.set_setting("signup_mode", "open")
+
+    def test_15_email_signin_flag_follows_mail_config(self):
+        c = Client(self.base)
+        self.assertTrue(c.get("/api/me")[1]["email_signin"])
+        mailer.CAPTURE = False
+        try:
+            self.assertFalse(c.get("/api/me")[1]["email_signin"])
+            s, b, _ = c.post("/api/auth/start", {"email": "a@bayer.com"})
+            self.assertEqual((s, b["reason"]), (503, "mail_not_configured"))
+        finally:
+            mailer.CAPTURE = True
+
     def test_13_csrf_blocks_foreign_origin(self):
         c = Client(self.base)
         s, b, _ = c.req("POST", "/api/auth/start", body={"email": "a@bayer.com"}, headers={"Origin": "https://evil.example"})
@@ -359,7 +382,7 @@ class Portal(unittest.TestCase):
         self.assertEqual(out["rows"][0][0], 5)
         for bad in ("select code_plain from codes", "select * from admins", "select value from settings",
                     "delete from creators", "select 1; select 2", "pragma table_info(creators)",
-                    "select * from sessions", "select code_hash from otp"):
+                    "select * from sessions", "select code_hash from otp", "select * from history"):
             self.assertIn("error", assistant_sql(bad), bad)
         self.assertEqual(db.creator("HV-MI-001")["code"], "HV-MI-001")
 

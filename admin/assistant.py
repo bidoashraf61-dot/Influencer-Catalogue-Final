@@ -230,11 +230,11 @@ def t_list_campaigns(ctx, limit=15):
     return [dict(r) for r in rows]
 
 
-# Tables the SQL tool may read. Secrets live in admins, sessions, codes (code_plain), otp and
-# settings; they are not on the list and the authorizer refuses them outright.
+# Tables the SQL tool may read. Secrets live in admins, sessions, codes (code_plain), otp, settings and
+# history (whose snapshots include settings rows); they are not on the list and the authorizer refuses them outright.
 SQL_TABLES = {"creators", "tiers", "selections", "campaigns", "campaign_creators", "content", "snapshots", "links",
               "clicks", "creator_analysis", "requests", "events", "users", "briefs", "credit_ledger", "ai_audit",
-              "history", "profile_metrics"}
+              "profile_metrics"}
 
 
 def t_sql_query(ctx, sql):
@@ -537,7 +537,7 @@ def converse(scope, ctx, history_msgs, text, code_id=None, kind="chat", credits=
     cards = []
     for step in range(MAX_STEPS):
         out = gemini.generate(contents, system=system_prompt(scope, ctx), tools=tools, temperature=0.3,
-                              max_tokens=1200, kind=kind, code_id=code_id, credits=credits if step == 0 else 0)
+                              max_tokens=4096, kind=kind, code_id=code_id, credits=credits if step == 0 else 0)
         if not out["calls"]:
             return {"reply": out["text"], "cards": cards, "queued": ctx.get("queued", [])}
         contents.append({"role": "model", "parts": out["parts"]})

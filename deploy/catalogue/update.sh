@@ -67,7 +67,8 @@ python3 - "$DST" <<'PYSTAMP'
 import hashlib, re, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
-names = ('js/catalogue.js', 'css/catalogue.css', 'js/campaign.js', 'css/campaign.css',
+names = ('js/catalogue.js', 'css/catalogue.css', 'js/portal.js', 'css/portal.css',
+         'js/campaign.js', 'css/campaign.css',
          'js/creator.js', 'css/creator.css', 'js/hv-icons.js',
          'js/dashboard.js', 'css/dashboard.css')
 stamp = {n: h('assets/' + n) for n in names}

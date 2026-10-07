@@ -141,8 +141,11 @@ class PortalMixin:
         if path == "/api/me":
             cid, user, kind = self._identity()
             if cid is None:
+                # email_signin: only offer the email gate once mail can actually be sent,
+                # so clients with an access code never see a sign-in that cannot work yet.
                 self.send_json(200, {"ok": True, "signed_in": False, "ai": gemini.configured(),
-                                     "signup": portal.signup_mode()}, self.cors())
+                                     "signup": portal.signup_mode(),
+                                     "email_signin": mailer.configured()}, self.cors())
             else:
                 self.send_json(200, dict(self._me_payload(cid, user, kind), ok=True), self.cors())
             return True
@@ -199,7 +202,9 @@ class PortalMixin:
         if why:
             return self.send_json(400, {"ok": False, "reason": why, "message": REASON_TEXT.get(why, "Can't use that email.")}, self.cors())
         ip = self.client_ip()
-        if self._throttled("otp:ip:" + ip, 12, 3600) or self._throttled("otp:em:" + email, 6, 3600):
+        # Per address, per email, and a global ceiling that protects the sender's reputation.
+        if (self._throttled("otp:ip:" + ip, 12, 3600) or self._throttled("otp:em:" + email, 6, 3600)
+                or self._throttled("otp:all", 300, 3600)):
             return
         if not mailer.configured():
             return self.send_json(503, {"ok": False, "reason": "mail_not_configured",
@@ -209,6 +214,7 @@ class PortalMixin:
             return self.send_json(200, {"ok": True, "sent": False, "wait": portal.OTP_RESEND_SECONDS}, self.cors())
         guard.limiter.hit("otp:ip:" + ip)
         guard.limiter.hit("otp:em:" + email)
+        guard.limiter.hit("otp:all")
         try:
             subject, text, html = mailer.otp_message(code, portal.OTP_MINUTES)
             mailer.send(email, subject, text, html)
@@ -375,11 +381,13 @@ class PortalMixin:
                           {"codes": codes, "summary": summary})
         db.log("brief", cid, self.client_ip(), self._ua(), text[:80])
         token = db.selection(sid)["token"]
+        shown = {r["code"]: r for r in self.roster_payload(only=set(codes) | {a["code"] for a in result["alternates"]})}
         return self.send_json(200, {
             "ok": True, "token": token, "name": name, "summary": summary, "narrated": narrated, "brief": text,
             "objective": brief["objective"], "totals": result["totals"], "pool": result["pool"],
-            "picks": [dict(p, why=reasons.get(p["code"], "")) for p in result["picks"]],
-            "alternates": [{k: a[k] for k in ("code", "score", "tag", "basis", "price")} for a in result["alternates"]],
+            "picks": [dict(p, why=reasons.get(p["code"], ""), creator=shown.get(p["code"])) for p in result["picks"]],
+            "alternates": [dict({k: a[k] for k in ("code", "score", "tag", "basis", "price")}, creator=shown.get(a["code"]))
+                           for a in result["alternates"]],
             "spent": cost, "credits": bal if kind != "admin" else None}, self.cors())
 
     # ------------------------------------------------------------------ chat --
@@ -411,7 +419,9 @@ class PortalMixin:
         portal.add_message(th["id"], "user", text)
         portal.add_message(th["id"], "model", res["reply"], {"cards": res["cards"]})
         db.log("chat", cid, self.client_ip(), self._ua(), text[:60])
-        return self.send_json(200, {"ok": True, "reply": res["reply"], "cards": list(dict.fromkeys(res["cards"]))[:12],
+        card_codes = list(dict.fromkeys(res["cards"]))[:12]
+        shown = {r["code"]: r for r in self.roster_payload(only=set(card_codes))} if card_codes else {}
+        return self.send_json(200, {"ok": True, "reply": res["reply"], "cards": [shown[c] for c in card_codes if c in shown],
                                     "thread": th["id"], "credits": portal.balance(cid) if kind != "admin" else None}, self.cors())
 
     # =============================================================== admin ==

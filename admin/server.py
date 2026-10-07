@@ -3568,7 +3568,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             for t in db.list_tiers()
         ]
 
-    def roster_payload(self, platform=None):
+    def roster_payload(self, platform=None, only=None):
         bands = db.tier_prices()
         analysed = db.analysis_codes()
         def accounts(r):
@@ -3602,6 +3602,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "profiles": db.split_profiles(r["profiles"]),
             }
             for r in db.list_creators(active_only=True)
+            if only is None or r["code"] in only
         ]
 
     # Measuring 154 files on every unlock would be wasteful and they rarely

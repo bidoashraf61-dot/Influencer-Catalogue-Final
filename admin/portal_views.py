@@ -150,7 +150,7 @@ def _settings_tab():
         + "<div class='card'><h2>AI credits</h2><p class='sec-desc'>What each action costs a client. A failed AI call is refunded automatically. The admin is never charged.</p>"
           "<div class='fgrid'>" + cost_inputs + "</div></div>"
         + "<div class='card'><h2>AI &amp; email</h2><div class='fgrid'>"
-          "<div><label>Gemini model</label><input name='gemini_model' value='%s'><div class='price-hint'>Default %s.</div></div>" % (e(gemini.model()), e(gemini.DEFAULT_MODEL))
+          "<div><label>Gemini model</label><input name='gemini_model' value='%s'><div class='price-hint'>Default %s. If a model is retired the next one in line is tried automatically.</div></div>" % (e(gemini.model()), e(gemini.DEFAULT_MODEL))
         + "<div><label>Monthly token ceiling</label><input type='number' min='10000' name='ai_monthly_tokens' value='%d'>"
           "<div class='price-hint'>AI stops for everyone when this is reached.</div></div>" % gemini.monthly_cap()
         + "<div><label>Send email from</label><input name='mail_from' value='%s'><div class='price-hint'>Its domain must be verified in Resend.</div></div></div>" % e(mailer.sender())

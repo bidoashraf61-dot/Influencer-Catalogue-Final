@@ -23,7 +23,10 @@ import db
 
 KEY_FILE = Path(__file__).resolve().parent / ".gemini-key"
 ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-DEFAULT_MODEL = "gemini-2.5-flash"
+# Google retires models without much notice (2.5-flash already answers 404 to new keys), so a
+# call walks this chain when the chosen model is gone or overloaded.
+DEFAULT_MODEL = "gemini-3.8-flash"
+FALLBACKS = ("gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-flash-latest")
 DEFAULT_MONTHLY_TOKENS = 5_000_000
 MAX_CONCURRENT = 4
 
@@ -46,6 +49,10 @@ class OverBudget(AIError):
 
 class Upstream(AIError):
     reason = "upstream"
+
+    def __init__(self, msg="", status=None):
+        super().__init__(msg)
+        self.status = status
 
 
 class Busy(AIError):
@@ -120,11 +127,12 @@ def _audit(kind, code_id, mdl, usage, credits, ok, started, detail=""):
         conn.execute(
             "INSERT INTO ai_audit (at, code_id, kind, model, prompt_tokens, out_tokens, credits, ok, latency_ms, detail) "
             "VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (db.now(), code_id, kind, mdl, usage.get("promptTokenCount", 0), usage.get("candidatesTokenCount", 0),
+            (db.now(), code_id, kind, mdl, usage.get("promptTokenCount", 0),
+             usage.get("candidatesTokenCount", 0) + usage.get("thoughtsTokenCount", 0),
              credits, 1 if ok else 0, int((time.time() - started) * 1000), (detail or "")[:300]))
 
 
-def generate(contents, *, system=None, schema=None, tools=None, temperature=0.4, max_tokens=1500,
+def generate(contents, *, system=None, schema=None, tools=None, temperature=0.4, max_tokens=4096,
              kind="chat", code_id=None, credits=0, timeout=45):
     """One model call. Returns ``{"text", "calls", "parts", "usage"}``.
 
@@ -149,12 +157,20 @@ def generate(contents, *, system=None, schema=None, tools=None, temperature=0.4,
     if tools:
         body["tools"] = [{"functionDeclarations": tools}]
 
-    mdl = model()
+    chain = [model()] + [m for m in FALLBACKS if m != model()]
     started = time.time()
     if not _slots.acquire(timeout=8):
         raise Busy("The assistant is busy. Try again in a moment.")
+    data, mdl = None, chain[0]
     try:
-        data = _post(mdl, body, timeout)
+        for i, mdl in enumerate(chain):
+            try:
+                data = _post(mdl, body, timeout)
+                break
+            except Upstream as exc:
+                if i < len(chain) - 1 and exc.status in (None, 404, 429, 500, 502, 503, 504):
+                    continue                  # that model is gone or overloaded: try the next
+                raise
     except AIError as exc:
         _audit(kind, code_id, mdl, {}, 0, False, started, str(exc))
         raise
@@ -205,11 +221,11 @@ def _post(mdl, body, timeout):
                 continue
             if exc.code in (400, 401, 403) and "key" in detail.lower():
                 raise NotConfigured("The Gemini key was refused.")
-            raise Upstream("Gemini error %s" % exc.code)
+            raise Upstream("Gemini error %s" % exc.code, exc.code)
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             if attempt == 0:
                 time.sleep(1.0)
                 last = exc
                 continue
-            raise Upstream("Could not reach Gemini.")
-    raise Upstream("Gemini is not responding (%s)." % (last,))
+            raise Upstream("Could not reach Gemini.", None)
+    raise Upstream("Gemini is not responding (%s)." % (last,), getattr(last, "code", None))

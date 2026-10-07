@@ -172,11 +172,13 @@ def check_email(raw):
     email, why = guard.company_email(raw, allow, block)
     if why:
         return "", why
+    if user_by_email(email):
+        return email, None                    # an existing client can always sign back in
     if signup_mode() == "closed":
         return "", "closed"
     if signup_mode() == "allowlist":
         domain = email.rsplit("@", 1)[1]
-        if not guard._matches(domain, set(allow)) and not user_by_email(email):
+        if not guard._matches(domain, set(allow)):
             return "", "not_invited"
     return email, None
 

@@ -695,6 +695,7 @@ def build():
 <link rel="icon" href="/assets/icons/icon-32.png" type="image/png"/>
 <link rel="apple-touch-icon" href="/assets/icons/icon-180.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
+<link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
 </head>
 <body class="cat-locked" data-page="catalogue">
 
@@ -834,6 +835,7 @@ def build():
   }};
 </script>
 <script src="{stamp('/assets/js/catalogue.js')}"></script>
+<script src="{stamp('/assets/js/portal.js')}"></script>
 </body>
 </html>
 """
@@ -858,6 +860,7 @@ def build():
 <link rel="icon" href="/assets/icons/icon-32.png" type="image/png"/>
 <link rel="apple-touch-icon" href="/assets/icons/icon-180.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
+<link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
 </head>
 <body class="cat-locked" data-page="selection">
 
@@ -1021,6 +1024,7 @@ def build():
   }};
 </script>
 <script src="{stamp('/assets/js/catalogue.js')}"></script>
+<script src="{stamp('/assets/js/portal.js')}"></script>
 </body>
 </html>
 """
