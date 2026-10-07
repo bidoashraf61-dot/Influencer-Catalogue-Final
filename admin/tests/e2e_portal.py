@@ -526,6 +526,32 @@ class Portal(unittest.TestCase):
         self.assertIn("Brief the client filled in", seen[0]["contents"][-1]["parts"][0]["text"])
         self.assertEqual(portal.balance(cid), 49)                        # one paid call for the whole brief
 
+    def test_35_analysis_fields_on_demand(self):
+        import assistant
+        big = {"followers": 42000, "er": 4.2, "fake_followers_pct": 11.0, "avg_views": 9000,
+               "audience": {"countries": [{"code": "SA", "pct": 71.0}, {"code": "EG", "pct": 9.0}],
+                            "gender": {"female": 80, "male": 20}, "interests": [{"name": "Beauty", "pct": 40}]},
+               "bio": "x" * 5000, "posts": [{"caption": "y" * 500}] * 30}
+        db.save_analysis("HV-MI-001", big, platform="Instagram")
+        db.save_analysis("HV-MI-002", dict(big, er=6.5, fake_followers_pct=25.0), platform="Instagram")
+        def wipe():
+            with db.connect() as conn:
+                conn.execute("DELETE FROM creator_analysis")
+        self.addCleanup(wipe)
+        r = assistant.t_creator_metrics({}, codes=["HV-MI-001", "HV-MD-003"], fields=["engagement_rate_pct"])
+        one = r["creators"][0]
+        self.assertEqual(one["engagement_rate_pct"], 4.2)
+        self.assertNotIn("fake_followers_pct", one)                     # only what was asked for
+        self.assertIsNone(r["creators"][1]["analysis"])                 # no report on file
+        self.assertLess(len(json.dumps(r)), 400)                        # a few hundred bytes, not the 20 KB report
+        r = assistant.t_creator_metrics({}, codes=["HV-MI-001"], fields=["audience_share_in_country_pct", "audience_gender"])
+        self.assertEqual((r["creators"][0]["audience_share_in_country_pct"], r["creators"][0]["audience_gender"]["female"]), (71.0, 80))
+        top = assistant.t_rank_by_metric({}, metric="engagement_rate_pct", limit=1)
+        self.assertEqual(top["creators"][0]["code"], "HV-MI-002")
+        low = assistant.t_rank_by_metric({}, metric="fake_followers_pct", order="asc", limit=1)
+        self.assertEqual(low["creators"][0]["code"], "HV-MI-001")
+        self.assertIn("error", assistant.t_rank_by_metric({}, metric="bio"))
+
     # ------------------------------------------------------------------- admin
     def admin(self):
         c = Client(self.base)
