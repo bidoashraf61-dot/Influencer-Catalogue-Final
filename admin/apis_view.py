@@ -54,7 +54,7 @@ def _job_form(job, presets_js=False):
         + "<button class='btn lime'>Save job</button></form>")
 
 
-def apis_page(error=None, message=None):
+def apify_tab():
     hint = apify.token_hint()
     spent, bud, cap = apify.spent_this_month(), apify.budget(), apify.run_cap()
     n_snap, n_creators, last = apify.snapshot_summary()
@@ -134,7 +134,38 @@ def apis_page(error=None, message=None):
         + "</span></div><table><thead><tr><th>Job</th><th>Status</th><th>Sent</th><th>Results</th><th>Saved</th>"
         "<th>Cost</th><th>Started</th><th></th></tr></thead><tbody>" + runs_body + "</tbody></table></section>")
 
-    body = (ui.header("APIs", "Connect outside data services and run them from here. Apify first: follower counts and posts "
-                      "for the creators in the catalogue.", crumbs=[("System", None), ("APIs", None)])
-            + V._notes(error, message) + conn_card + limits + jobs + runs_card)
+    return conn_card + limits + jobs + runs_card
+
+
+# One entry per integration. A new service adds a tab here (label, one-line
+# purpose, a function returning its tab body, one returning its status) and
+# its own /apis/<key>/* routes; the page, tabs and overview need no change.
+INTEGRATIONS = [
+    {"key": "apify", "label": "Apify",
+     "about": "Follower counts and posts for the creators, from Instagram, TikTok and Snapchat.",
+     "body": apify_tab, "status": lambda: ("connected", True) if apify.token_hint() else ("not connected", False)},
+]
+
+
+def overview_tab():
+    cards = []
+    for i in INTEGRATIONS:
+        text, ok = i["status"]()
+        cards.append(
+            "<section class='card'><div class='hd'><h2>" + e(i["label"]) + "</h2><span class='pill "
+            + ("live" if ok else "dead") + "'>" + e(text) + "</span></div><p class='sec-desc'>" + e(i["about"])
+            + "</p><a class='btn small' href='" + u("/apis?tab=" + i["key"]) + "'>Open</a></section>")
+    return ("<div class='home-grid'>" + "".join(cards) + "</div>"
+            "<p class='muted'>More services can be added here as tabs, each with its own connection and settings.</p>")
+
+
+def apis_page(error=None, message=None, tab="overview"):
+    keys = {i["key"]: i for i in INTEGRATIONS}
+    tab = tab if tab in keys else "overview"
+    tabs = [(u("/apis?tab=overview"), "Overview", None, tab == "overview")]
+    tabs += [(u("/apis?tab=" + i["key"]), i["label"], None, tab == i["key"]) for i in INTEGRATIONS]
+    inner = keys[tab]["body"]() if tab in keys else overview_tab()
+    body = (ui.header("APIs", "Connect outside services and run them from here.",
+                      crumbs=[("System", None), ("APIs", None)], tabs=tabs)
+            + V._notes(error, message) + inner)
     return V.page("APIs", body, "/apis")

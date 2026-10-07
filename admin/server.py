@@ -560,7 +560,7 @@ class Handler(BaseHTTPRequestHandler):
                 bool(db.setting("capture_token")), db.capture_runs(), track.GEO_DB.exists(),
                 None, query.get("e"), query.get("ok"), metrics.benchmarks(), fx_rates=fx.rates()))
         if path == "/apis":
-            return self.send(200, apis_view.apis_page(query.get("e"), query.get("ok")))
+            return self.send(200, apis_view.apis_page(query.get("e"), query.get("ok"), query.get("tab", "overview")))
         if path == "/campaigns/links":
             cid = query.get("id", "")
             k = db.campaign(int(cid)) if cid.isdigit() else None
@@ -961,16 +961,16 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/apis/token":
                 apify.save_token(f.get("token"))
                 info = apify.test_connection()
-                return self.redirect("/apis?ok=" + q("Connected as %s." % (info.get("username") or "your account")))
+                return self.redirect("/apis?tab=apify&ok=" + q("Connected as %s." % (info.get("username") or "your account")))
             if path == "/apis/token/clear":
                 apify.clear_token()
-                return self.redirect("/apis?ok=" + q("Token removed."))
+                return self.redirect("/apis?tab=apify&ok=" + q("Token removed."))
             if path == "/apis/test":
                 i = apify.test_connection()
                 bits = [i.get("username") or "connected", i.get("plan") or ""]
                 if i.get("used") is not None and i.get("cap") is not None:
                     bits.append("$%.2f of $%.2f used this month" % (i["used"], i["cap"]))
-                return self.redirect("/apis?ok=" + q("Connected: " + ", ".join(b for b in bits if b)))
+                return self.redirect("/apis?tab=apify&ok=" + q("Connected: " + ", ".join(b for b in bits if b)))
             if path == "/apis/budget":
                 for key, field in (("apify_budget_usd", "budget"), ("apify_run_cap_usd", "run_cap")):
                     try:
@@ -980,25 +980,25 @@ class Handler(BaseHTTPRequestHandler):
                     if not 0 < v <= 1000:
                         raise apify.ApifyError("Budget and per-run limit must be between 0 and 1000.")
                     db.set_setting(key, v)
-                return self.redirect("/apis?ok=" + q("Limits saved."))
+                return self.redirect("/apis?tab=apify&ok=" + q("Limits saved."))
             if path == "/apis/job/save":
                 apify.save_job(f)
-                return self.redirect("/apis?ok=" + q("Job saved."))
+                return self.redirect("/apis?tab=apify&ok=" + q("Job saved."))
             if path == "/apis/job/delete" and jid:
                 apify.delete_job(jid)
-                return self.redirect("/apis?ok=" + q("Job deleted."))
+                return self.redirect("/apis?tab=apify&ok=" + q("Job deleted."))
             if path == "/apis/job/toggle" and jid:
                 apify.toggle_job(jid)
-                return self.redirect("/apis")
+                return self.redirect("/apis?tab=apify")
             if path == "/apis/job/run" and jid:
                 ok, msg = apify.start_job(jid)
-                return self.redirect("/apis?" + ("ok=" if ok else "e=") + q(msg))
+                return self.redirect("/apis?tab=apify&" + ("ok=" if ok else "e=") + q(msg))
             if path == "/apis/refresh":
                 n = apify.refresh_all()
-                return self.redirect("/apis?ok=" + q("Checked %d running job(s)." % n))
+                return self.redirect("/apis?tab=apify&ok=" + q("Checked %d running job(s)." % n))
         except apify.ApifyError as ex:
-            return self.redirect("/apis?e=" + q(str(ex)))
-        return self.redirect("/apis")
+            return self.redirect("/apis?tab=apify&e=" + q(str(ex)))
+        return self.redirect("/apis?tab=apify")
 
     def post_code_archive(self):
         cid = self.form_body().get("id")
