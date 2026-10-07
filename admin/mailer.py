@@ -76,12 +76,15 @@ def smtp_conf():
 
 
 def save_smtp(user, password, host="smtp.office365.com", port=587, send_as=""):
-    user, host = (user or "").strip().lower(), (host or "smtp.office365.com").strip()
+    user, host = (user or "").strip(), (host or "smtp.office365.com").strip()
+    user = user.lower() if "@" in user else user          # SES / SendGrid log in with a key, not an address
     send_as = (send_as or "").strip().lower()
     if send_as and "@" not in send_as:
-        raise ValueError("'Send as' must be an email address (the shared mailbox).")
-    if "@" not in user or not password or len(password) < 6:
-        raise ValueError("Enter the mailbox address and its password (or app password).")
+        raise ValueError("'Send as' must be an email address.")
+    if not user or not password or len(password) < 6:
+        raise ValueError("Enter the SMTP username and password.")
+    if "@" not in user and not send_as:
+        raise ValueError("This username is not an email address, so fill 'Send as' with the address to send from.")
     if any(c.isspace() for c in host) or not host:
         raise ValueError("That is not a mail server name.")
     SMTP_FILE.write_text(json.dumps({"host": host, "port": int(port or 587), "user": user, "password": password,
@@ -296,7 +299,7 @@ def _send_smtp(c, to, subject, text, html=None, reply_to=None):
     from email.utils import make_msgid
     msg = EmailMessage()
     msg["From"], msg["To"], msg["Subject"] = sender(), to, subject
-    msg["Message-ID"] = make_msgid(domain=c["user"].rsplit("@", 1)[1])
+    msg["Message-ID"] = make_msgid(domain=(c.get("send_as") or c["user"]).rsplit("@", 1)[-1])
     if reply_to:
         msg["Reply-To"] = reply_to
     msg.set_content(text)

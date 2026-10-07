@@ -132,6 +132,15 @@ class Mailbox(unittest.TestCase):
             mailer._graph_post = orig
             mailer.clear_graph()
 
+    def test_ses_style_key_login(self):
+        mailer.save_smtp("AKIAEXAMPLEKEY123", "right-pass", "127.0.0.1", self.port, send_as="info@hellovoice.co.uk")
+        mailer.send("client@pfizer.com", "s", "t")
+        self.assertEqual(GOT[-1]["user"], "AKIAEXAMPLEKEY123")                  # case kept
+        self.assertIn("From: HelloVoice <info@hellovoice.co.uk>", GOT[-1]["msg"])
+        with self.assertRaises(ValueError):
+            mailer.save_smtp("AKIAEXAMPLEKEY123", "right-pass", "127.0.0.1", self.port)   # needs Send as
+        mailer.clear_smtp()
+
     def test_validation_and_clear(self):
         with self.assertRaises(ValueError):
             mailer.save_smtp("not-an-email", "x")

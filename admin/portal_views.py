@@ -413,19 +413,20 @@ def graph_card():
 def smtp_card():
     hint = mailer.smtp_hint()
     back = "<input type='hidden' name='back' value='/portal?tab=settings'><input type='hidden' name='which' value='smtp'>"
-    return ("<div class='card'><h2>Email: user mailbox with password (Microsoft 365 SMTP) — alternative</h2>"
+    return ("<div class='card'><h2>Email: SMTP server (Amazon SES, Microsoft 365 or other)</h2>"
             "<p class='sec-desc'>Sends the sign-in codes and team notifications from one of your own Outlook mailboxes, the same email "
             "hellovoice.co.uk already uses, so no DNS change is needed. In Microsoft 365 admin, turn on <b>Authenticated SMTP</b> for that "
             "mailbox (Exchange admin → Recipients → Mailboxes → the mailbox → Manage email apps). If the mailbox uses MFA, use an app password. "
             "The password stays on the server in a private file and is never shown again.</p>"
             + ("<p>Connected: <code>%s</code></p>" % e(hint) if hint else "<p class='muted'>No mailbox connected.</p>")
             + "<form method='post' action='%s' autocomplete='off'>%s<div class='fgrid'>"
-              "<div><label>Mailbox address</label><input name='user' type='email' placeholder='portal@hellovoice.co.uk' required></div>"
-              "<div><label>Password or app password</label><input name='password' type='password' autocomplete='new-password' required></div>"
+              "<div><label>SMTP username</label><input name='user' placeholder='AKIA… (SES) or name@hellovoice.co.uk' required></div>"
+              "<div><label>SMTP password</label><input name='password' type='password' autocomplete='new-password' required></div>"
               "<div><label>Send a test to (optional)</label><input name='test' type='email' placeholder='you@hellovoice.co.uk'></div>"
-              "<div><label>Send as (shared mailbox, optional)</label><input name='send_as' type='email' placeholder='info@hellovoice.co.uk'>"
-              "<div class='price-hint'>The user above needs Send As rights on it.</div></div>"
-              "<div><label>Server</label><input name='host' value='smtp.office365.com'></div></div>"
+              "<div><label>Send as</label><input name='send_as' type='email' placeholder='info@hellovoice.co.uk'>"
+              "<div class='price-hint'>Required for SES (a verified address or domain there). For Microsoft 365, a shared mailbox the user may send as.</div></div>"
+              "<div><label>Server</label><input name='host' value='smtp.office365.com'>"
+              "<div class='price-hint'>SES: email-smtp.&lt;region&gt;.amazonaws.com, e.g. email-smtp.eu-west-1.amazonaws.com</div></div></div>"
               "<button class='btn lime' name='action' value='save'>%s</button></form>" % (u("/portal/keys"), back, "Replace mailbox" if hint else "Connect mailbox")
             + (("<form method='post' action='%s' class='inline' style='margin-top:10px'>%s<button class='btn small danger' name='action' value='clear' "
                 "onclick=\"return confirm('Disconnect the mailbox?')\">Disconnect</button></form>") % (u("/portal/keys"), back) if hint else "")
