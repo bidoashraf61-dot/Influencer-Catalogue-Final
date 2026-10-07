@@ -673,6 +673,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_code_revoke()
         if path == "/codes/restore":
             return self.post_code_restore()
+        if path == "/codes/archive":
+            return self.post_code_archive()
+        if path == "/codes/unarchive":
+            return self.post_code_unarchive()
         if path == "/codes/delete":
             return self.post_code_delete()
         if path == "/codes/passcode":
@@ -943,14 +947,24 @@ class Handler(BaseHTTPRequestHandler):
         return self.redirect("/codes?ok=" + urllib.parse.quote("Device removed.")
                              + ("#code-" + cid if cid.isdigit() else ""))
 
-    def post_code_delete(self):
+    def post_code_archive(self):
         cid = self.form_body().get("id")
         row = db.get_code(int(cid)) if cid and cid.isdigit() else None
-        # Only a code that is already off can be deleted: revoke first, so a
-        # live client is never cut off by a single stray click.
+        # Revoke first: a live code is never put away by a stray click.
         if row is not None and not db.code_state(row)[0]:
-            db.delete_code(row["id"])
+            db.archive_code(row["id"])
         return self.redirect("/codes")
+
+    def post_code_unarchive(self):
+        cid = self.form_body().get("id")
+        if cid and cid.isdigit():
+            db.unarchive_code(int(cid))
+        return self.redirect("/codes")
+
+    def post_code_delete(self):
+        cid = self.form_body().get("id")
+        why = db.delete_code(int(cid)) if cid and cid.isdigit() else "Unknown code."
+        return self.redirect("/codes" + ("?e=" + urllib.parse.quote(why) if why else ""))
 
     def post_code_restore(self):
         cid = self.form_body().get("id")
@@ -3152,7 +3166,9 @@ TRACKED = {
     "/codes/new": ("code", None, "Created access code"),
     "/codes/revoke": ("code", "id", "Revoked access code"),
     "/codes/restore": ("code", "id", "Restored access code"),
-    "/codes/delete": ("code", "id", "Deleted access code"),
+    "/codes/archive": ("code", "id", "Archived access code"),
+    "/codes/unarchive": ("code", "id", "Took an access code out of the archive"),
+    "/codes/delete": ("code", "id", "Deleted archived access code"),
     "/codes/limits": ("code", "id", "Changed access code limits"),
     "/codes/passcode": ("code", "id", "Changed a passcode"),
     "/codes/device/remove": ("code", "code", "Removed a device"),

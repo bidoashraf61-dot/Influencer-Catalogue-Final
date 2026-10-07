@@ -425,6 +425,9 @@ def migrate(conn):
         # limit set when they are created.
         conn.execute("UPDATE codes SET max_devices = 5 WHERE revoked_at IS NULL")
 
+    if "archived_at" not in code_cols:
+        conn.execute("ALTER TABLE codes ADD COLUMN archived_at INTEGER")
+
     sel_cols = {r["name"] for r in conn.execute("PRAGMA table_info(selections)")}
     if "code_id" not in sel_cols:
         conn.execute("ALTER TABLE selections ADD COLUMN code_id INTEGER")
@@ -643,13 +646,44 @@ def revoke_code(code_id):
         conn.execute("UPDATE codes SET revoked_at = ? WHERE id = ?", (now(), code_id))
 
 
-def delete_code(code_id):
-    """Permanently remove a code. Its devices go with it; events, requests and
-    campaigns keep their rows with the code cleared. Selections have no foreign
-    key, so they are detached by hand and keep working by their own link."""
+def archive_code(code_id):
+    """Put a code away. It is revoked too, so every check that already refuses
+    a revoked code refuses it; nothing it is linked to is touched."""
     with connect() as conn:
-        conn.execute("UPDATE selections SET code_id = NULL WHERE code_id = ?", (code_id,))
+        conn.execute("UPDATE codes SET archived_at = ?, revoked_at = COALESCE(revoked_at, ?) "
+                     "WHERE id = ?", (now(), now(), code_id))
+
+
+def unarchive_code(code_id):
+    """Take it out of the archive. It stays revoked until it is restored."""
+    with connect() as conn:
+        conn.execute("UPDATE codes SET archived_at = NULL WHERE id = ?", (code_id,))
+
+
+def code_links(code_id):
+    """Selections and campaigns still tied to a code, by name."""
+    with connect() as conn:
+        sels = [r["name"] for r in conn.execute(
+            "SELECT name FROM selections WHERE code_id = ?", (code_id,))]
+        camps = [r["name"] for r in conn.execute(
+            "SELECT name FROM campaigns WHERE code_id = ?", (code_id,))]
+    return sels, camps
+
+
+def delete_code(code_id):
+    """Permanently remove an ARCHIVED code that nothing is tied to. Returns
+    None when done, or the reason it was refused. A selection with no code is
+    open to any client, so one still tied to this code must be moved first."""
+    row = get_code(code_id)
+    if row is None or not row["archived_at"]:
+        return "Only an archived code can be deleted."
+    sels, camps = code_links(code_id)
+    if sels or camps:
+        return ("Still tied to " + ", ".join(sels + camps)
+                + ". Give those a different passcode, then delete.")
+    with connect() as conn:
         conn.execute("DELETE FROM codes WHERE id = ?", (code_id,))
+    return None
 
 
 def restore_code(code_id):
@@ -735,6 +769,8 @@ def code_state(row):
     """Why a code is or is not usable. Returns (ok, reason)."""
     if row is None:
         return False, "unknown"
+    if row["archived_at"]:
+        return False, "archived"
     if row["revoked_at"]:
         return False, "revoked"
     if row["expires_at"] and row["expires_at"] < now():

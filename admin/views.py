@@ -796,7 +796,7 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
     if message:
         banner += "<div class='ok'>" + e(message) + "</div>"
 
-    rows = []
+    rows, arch_rows = [], []
     for c in codes:
         ok, reason = code_state(c)
         cls = "live" if ok else ("warn" if reason in ("expired", "exhausted") else "dead")
@@ -816,13 +816,23 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
                 + "<input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small'>Restore</button></form>"
             )
-        if not ok:
-            revoke += (
-                " <form method='post' action='" + u("/codes/delete") + "' class='inline' onsubmit=\""
-                + "return confirm('Delete this code for good? It cannot be restored. "
-                + "Selections keep working by their own link.')\">"
+        if reason == "archived":
+            revoke = (
+                "<form method='post' action='" + u("/codes/unarchive") + "' class='inline'>"
+                + "<input type='hidden' name='id' value='" + str(c["id"])
+                + "'><button class='btn small'>Unarchive</button></form> "
+                + "<form method='post' action='" + u("/codes/delete") + "' class='inline' onsubmit=\""
+                + "return confirm('Delete this archived code for good? It cannot be restored.')\">"
                 + "<input type='hidden' name='id' value='" + str(c["id"])
                 + "'><button class='btn small danger'>Delete</button></form>"
+            )
+        elif not ok:
+            revoke += (
+                " <form method='post' action='" + u("/codes/archive") + "' class='inline' onsubmit=\""
+                + "return confirm('Archive this code? It moves to the Archived list and stays off. "
+                + "Selections and campaigns tied to it are not changed.')\">"
+                + "<input type='hidden' name='id' value='" + str(c["id"])
+                + "'><button class='btn small ghost'>Archive</button></form>"
             )
         # Codes issued before code_plain existed are hashed and gone; the last
         # four characters are all that was ever kept of them.
@@ -842,7 +852,7 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
         hay = " ".join([c["label"] or "", plain or "", c["hint"] or ""] + names).lower()
         listed = ("<br><span class='muted' style='font-size:12px'>" + e(", ".join(names[:3]))
                   + ("…" if len(names) > 3 else "") + "</span>") if names else ""
-        rows.append(
+        (arch_rows if reason == "archived" else rows).append(
             "<tr class='code-row' data-q='" + e(hay) + "'><td><strong>" + e(c["label"]) + "</strong><br>" + shown + listed
             + "</td><td><span class='pill " + cls + "'>" + e(reason) + "</span></td>"
             + "<td>" + devs + "</td>"
@@ -853,6 +863,13 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
         )
     body_rows = "".join(rows) or ("<tr><td colspan='7'>" + ui.empty("key", "No access codes yet", "Create one above. A client needs a code to open the catalogue.") + "</td></tr>")
 
+    arch_html = ""
+    if arch_rows:
+        arch_html = ("<details class='card' id='archived-codes'><summary class='hd'><h2>Archived</h2>"
+                     "<span class='muted'>" + str(len(arch_rows) // 2) + "</span></summary>"
+                     "<p class='sec-desc'>Put away and switched off. Unarchive to bring one back, "
+                     "or delete it for good once nothing is tied to it.</p>"
+                     "<table><tbody>" + "".join(arch_rows) + "</tbody></table></details>")
     live_n = sum(1 for c in codes if code_state(c)[0])
     body = (
         ui.header("Access codes", "One passcode per client. It opens the catalogue and only that client's selections and campaigns. "
@@ -860,7 +877,7 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
                   actions="<a class='btn lime' href='#new-code'>" + ui.icon("plus", 16) + " New code</a>", tabs=_client_tabs("codes"))
         + banner
         + "<details class='card' id='new-code'" + ("" if codes else " open") + "><summary class='hd'><h2>Create a code</h2>"
-          "<span class='muted'>" + str(live_n) + " live of " + str(len(codes)) + "</span></summary>"
+          "<span class='muted'>" + str(live_n) + " live of " + str(len(codes) - len(arch_rows) // 2) + "</span></summary>"
           "<p class='sec-desc'>Give it to the client. They type it once on the catalogue and it remembers their device.</p>"
         + "<form method='post' action='" + u("/codes/new") + "'><div class='row'>"
         + "<div><label>Issued to</label><input name='label' placeholder='Alpha Plus' required></div>"
@@ -882,12 +899,12 @@ def codes_page(codes, new_code=None, error=None, devices=(), message=None, lists
           "<p id='code-none' class='muted' style='display:none'>No code matches.</p>"
           "<table><thead><tr><th>Code</th><th>State</th><th>Devices</th><th>Uses</th>"
         + "<th>Expires</th><th>Last used</th><th></th></tr></thead><tbody>"
-        + body_rows + "</tbody></table></div>"
+        + body_rows + "</tbody></table></div>" + arch_html
         + "<script>(function(){var i=document.getElementById('code-search');if(!i)return;"
           "i.addEventListener('input',function(){var q=i.value.trim().toLowerCase(),n=0;"
           "document.querySelectorAll('tr.code-row,tr.manage-row').forEach(function(r){"
           "var h=r.getAttribute('data-q')||r.getAttribute('data-for')||'';"
-          "var on=!q||h.indexOf(q)>-1;r.style.display=on?'':'none';"
+          "var on=!q||h.indexOf(q)>-1;r.style.display=on?'':'none';if(on&&q&&r.closest('#archived-codes'))r.closest('#archived-codes').open=true;"
           "if(on&&r.classList.contains('code-row'))n++;});"
           "document.getElementById('code-none').style.display=(q&&!n)?'':'none';});})();</script>"
     )
