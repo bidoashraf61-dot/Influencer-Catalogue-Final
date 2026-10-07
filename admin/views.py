@@ -1652,8 +1652,8 @@ def date_carry(dates):
 
 
 def duplicate_group_card(group):
-    """One set of creators that look like the same person, with a Keep button
-    on each: choosing one merges the others into it."""
+    """One set of creators that look like the same person, with a Combine button
+    on each: choosing one combines the others into it."""
     members = ""
     for c in group:
         others = [x["code"] for x in group if x["code"] != c["code"]]
@@ -1662,10 +1662,10 @@ def duplicate_group_card(group):
             + ("<img class='tface' src='" + e(links.thumb(c["photo"])) + "' alt=''>" if c["photo"] else "<span class='tface none'>—</span>")
             + "<div><b>" + e(c["name"]) + "</b><br><code>" + e(c["code"]) + "</code> <span class='muted'>" + e(c["tier"] or "") + " · "
             + num(c["followers"]) + " followers · " + e(c["platform"] or "") + "</span></div></div>"
-            "<form method='post' action='" + u("/roster/merge") + "' data-confirm='Keep " + e(c["name"]) + " and merge the others into it?'>"
+            "<form method='post' action='" + u("/roster/merge") + "' data-confirm='Combine the records into " + e(c["code"]) + "? Both are kept as one creator, nothing is lost.'>"
             "<input type='hidden' name='keep' value='" + e(c["code"]) + "'>"
             + "".join("<input type='hidden' name='drop' value='" + e(o) + "'>" for o in others)
-            + "<button class='btn small lime'>" + ui.icon("merge", 15) + " Keep this one</button></form></div>")
+            + "<button class='btn small lime'>" + ui.icon("merge", 15) + " Combine into this one</button></form></div>")
     return "<div class='card dups'>" + members + "</div>"
 
 
@@ -1840,7 +1840,8 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
     if dupes:
         dgroups = "".join(duplicate_group_card(g) for g in dupes)
         dup_panel = ("<p class='sec-desc'>These creators share a profile link or handle, so they are probably one person. "
-                     "Pick the one to keep: its selections, campaigns and analysis are kept, and the other is merged into it. "
+                     "They are combined into one creator, not thrown away: pick the record whose code stays, and every platform, profile link, analysis, "
+                     "selection and campaign from the other is added to it (where both have an analysis for the same platform, the newer is kept). "
                      "Every merge can be undone from History.</p>" + dgroups)
     else:
         dup_panel = ui.empty("check", "No duplicates found", "Creators are checked by profile link and handle. Nothing looks doubled.")

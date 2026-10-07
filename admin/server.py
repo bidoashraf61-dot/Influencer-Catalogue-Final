@@ -1516,7 +1516,7 @@ class Handler(BaseHTTPRequestHandler):
             self.merge_one(keep, d)
             done.append(d)
         return self.redirect("/roster?tab=dupes&ok=" + urllib.parse.quote(
-            "Merged %s into %s. Undo from History if it was a mistake." % (", ".join(done) or "nothing", keep)))
+            "Combined %s into %s: every platform, link, analysis, selection and campaign is kept on %s. Undo from History if it was a mistake." % (", ".join(done) or "nothing", keep, keep)))
 
     def merge_one(self, keep, drop):
         label = "Merged duplicate %s into %s" % (drop, keep)
@@ -1564,7 +1564,10 @@ class Handler(BaseHTTPRequestHandler):
                         conn.execute("UPDATE %s SET code = ? WHERE campaign_id = ? AND code = ?" % table, (keep, cid, drop))
         # analysis and its pictures
         d_all, k_all = db.analyses(drop), db.analyses(keep)
-        moved = {pl: a for pl, a in d_all.items() if pl not in k_all}
+        # Both are the same person, so both analyses are valid: a platform only the
+        # duplicate has moves across, and where both have one the newer is kept.
+        moved = {pl: a for pl, a in d_all.items()
+                 if pl not in k_all or (a["updated_at"] or 0) > (k_all[pl]["updated_at"] or 0)}
         if moved:
             import analysis as analysis_mod, shutil
             for pl, a in moved.items():
@@ -1588,6 +1591,22 @@ class Handler(BaseHTTPRequestHandler):
             if (p["platform"], (p.get("url") or "").lower()) not in have:
                 profs.append(p)
         row["profiles"] = json.dumps(profs)
+        # One creator on several platforms: the platform list and the total reach
+        # are the sum of what both records knew.
+        import analysis as _an
+        plats = []
+        for src in (k, d):
+            for pl in _an.creator_platforms(src):
+                if pl not in plats:
+                    plats.append(pl)
+        for p in profs:
+            pl = _an.canon_platform(p.get("platform"))
+            if pl and pl not in plats:
+                plats.append(pl)
+        row["platform"] = ", ".join(plats)
+        total = db.total_followers(profs)
+        if total:
+            row["followers"] = total
         adopted_photo = bool(row.get("photo")) and row.get("photo") == d["photo"] and k["photo"] != d["photo"]
         with history.tracked("creator", keep, label):
             with db.connect() as conn:
