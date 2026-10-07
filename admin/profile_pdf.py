@@ -373,7 +373,7 @@ def import_pdf(data, code, handle=None, source=None, platform=None):
         raise RuntimeError("The PDF reader (PyMuPDF) is not installed on this server yet.")
     if db.creator(code) is None:
         raise ValueError("Unknown creator " + code)
-    platform = analysis.canon_platform(platform) or detect_platform(data) or db.platforms_of(code)[0]
+    platform = analysis.canon_platform(platform) or detect_platform(data)
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as t:
         t.write(data)
         path = t.name
@@ -383,6 +383,13 @@ def import_pdf(data, code, handle=None, source=None, platform=None):
     finally:
         os.unlink(path)
     fix_er(a)
+    if not platform:
+        # Nothing in the report names its platform (a channel report with no posts
+        # to link): the platform whose follower count it matches, else their main one.
+        crow = db.creator(code)
+        near = [analysis.canon_platform(p.get("platform")) for p in db.split_profiles(crow["profiles"] or "")
+                if p.get("followers") and a.get("followers") and abs(p["followers"] - a["followers"]) <= 0.08 * a["followers"]]
+        platform = next((p for p in near if p), None) or db.platforms_of(code)[0]
     a["platform"] = platform
     a["updated"] = time.strftime("%Y-%m-%d", time.gmtime())
     a["source"] = source or "profile report PDF"

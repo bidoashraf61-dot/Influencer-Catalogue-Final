@@ -3581,7 +3581,7 @@ def _creator_picker(sources, platforms):
             "<div><select id='pk-src'><option value=''>Whole roster</option>"
             + "".join("<option value='%s'>%s</option>" % (e(v), e(l)) for v, l in sources) + "</select></div></div>"
             "<div class='row' style='margin-top:8px'><div><label>Analysis for</label><select id='pk-ap'><option value=''>Each creator's main platform</option>"
-            "<option>Instagram</option><option>TikTok</option><option>Snapchat</option></select></div>"
+            "<option>Instagram</option><option>TikTok</option><option>Snapchat</option><option>YouTube</option></select></div>"
             "<div style='align-self:flex-end'><label class='tick'><input type='checkbox' id='pk-no'> Only creators still without that analysis</label></div></div>"
             "<div class='muted' id='pk-count' style='margin:4px 0'></div><div class='pk-list' id='pk-list'></div>"
             "<div style='margin:8px 0'><button type='button' class='btn tiny ghost' id='pk-all'>Add all</button> "
@@ -3633,7 +3633,7 @@ def analysis_review_page(kind, token, items, matched, creators, res, error=None,
 def _plat_select(name="platform", first="Each creator's main platform", cid=None, selected=""):
     import analysis as _an
     return ("<select name='" + name + "'" + (" id='" + cid + "'" if cid else "") + "><option value=''>" + e(first) + "</option>"
-            + "".join("<option" + (" selected" if p == selected else "") + ">" + p + "</option>" for p in _an.PLATFORMS[:3])
+            + "".join("<option" + (" selected" if p == selected else "") + ">" + p + "</option>" for p in _an.PLATFORMS[:4])
             + "</select>")
 
 
