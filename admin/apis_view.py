@@ -13,7 +13,8 @@ DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sun
 
 
 def _sources(current):
-    opts = [("all", "All active creators"),
+    opts = [("sample20", "Test sample: 20 creators (those with an analysis first)"),
+            ("all", "All active creators"),
             ("noanalysis", "Only creators with no analysis uploaded yet"),
             ("nosnap", "Only creators not scraped yet on this platform")]
     for s in db.list_selections():
@@ -37,16 +38,21 @@ def _job_form(job, presets_js=False):
         + "<div><label>Platform</label><input name='platform' value='" + e(g("platform", "Instagram")) + "'></div>"
         + "<div><label>What it brings back</label><select name='kind'>"
         + opt("profiles", "Profile numbers (saved as snapshots)", g("kind", "profiles"))
-        + opt("posts", "Posts (kept in Apify)", g("kind")) + opt("other", "Other (kept in Apify)", g("kind"))
+        + opt("analysis", "Analysis (results kept as returned)", g("kind"))
+        + opt("posts", "Posts (results kept as returned)", g("kind")) + opt("other", "Other", g("kind"))
         + "</select></div></div><div class='row'>"
         + "<div><label>Actor</label><input name='actor' required value='" + e(g("actor")) + "' placeholder='username/actor-name'></div>"
         + "<div><label>Which creators</label><select name='source'>" + _sources(g("source", "all")) + "</select></div>"
         + "<div><label>Max handles per run</label><input name='max_handles' type='number' min='1' max='1000' value='"
-        + str(g("max_handles", 100)) + "'></div></div>"
+        + str(g("max_handles", 100)) + "'></div>"
+        + "<div><label>Estimated cost per creator (USD)</label><input name='est_each' type='number' step='0.001' min='0' value='"
+        + str(g("est_each", 0.003)) + "'></div></div>"
         + "<label>Input sent to the actor (JSON)</label><textarea name='input' rows='3' style='font-family:monospace;width:100%'>"
         + e(g("input", apify.PRESETS["ig_profiles"]["input"])) + "</textarea>"
-        + "<div class='price-hint'><code>{{handles}}</code> is replaced with the creators' handles. "
-          "Field names differ per actor, so copy them from the actor's Input tab in Apify.</div>"
+        + "<div class='price-hint'><code>{{handles}}</code> sends all the handles in one run. <code>{{handle}}</code> makes "
+          "one run per creator (needed by actors that take a single handle). <code>{{count}}</code> is how many. "
+          "A run that would pass the monthly budget is refused. Field names differ per actor, so copy them from "
+          "the actor's Input tab in Apify.</div>"
         + "<div class='row'><div><label>Runs</label><select name='schedule'>"
         + opt("manual", "Only when I press Run", sched) + opt("daily", "Every day", sched)
         + opt("weekly", "Every week", sched) + "</select></div>"
@@ -108,7 +114,7 @@ def apify_tab():
     presets = "".join("<option value='%s'>%s</option>" % (k, e(p["label"])) for k, p in apify.PRESETS.items())
     preset_js = ("<script>(function(){var P=" + json.dumps({k: p for k, p in apify.PRESETS.items()}) + ";"
                  "var s=document.getElementById('preset');if(!s)return;s.addEventListener('change',function(){"
-                 "var p=P[s.value],f=s.form;f.actor.value=p.actor;f.platform.value=p.platform;f.kind.value=p.kind;f.input.value=p.input;});})();</script>")
+                 "var p=P[s.value],f=s.form;f.actor.value=p.actor;f.platform.value=p.platform;f.kind.value=p.kind;f.input.value=p.input;f.est_each.value=p.est;});})();</script>")
     jobs = (
         "<section class='card'><div class='hd'><h2>Jobs</h2>"
         "<form method='post' action='" + u("/apis/refresh") + "' class='inline'><button class='btn small ghost'>Check running jobs</button></form></div>"
@@ -123,13 +129,14 @@ def apify_tab():
 
     runs = []
     for r in apify.list_runs():
-        cls = {"SUCCEEDED": "live", "RUNNING": "warn"}.get(r["status"], "dead")
+        cls = {"SUCCEEDED": "live", "RUNNING": "warn", "QUEUED": "warn"}.get(r["status"], "dead")
+        view = (" <a href='" + u("/apis/run?id=%d" % r["id"]) + "'>View</a>") if r["results"] else ""
         runs.append(
             "<tr><td>" + e(r["job_name"] or "—") + "<br><span class='muted' style='font-size:12px'>" + e(r["trigger"]) + "</span></td>"
             "<td><span class='pill " + cls + "'>" + e(r["status"].lower()) + "</span></td>"
             "<td>" + str(r["handles"]) + "</td><td>" + str(r["results"]) + "</td><td>" + str(r["saved"]) + "</td>"
             "<td>$%.2f</td><td class='muted'>" % r["cost"] + V.ts(r["started_at"]) + "</td>"
-            "<td class='muted' style='font-size:12px'>" + e((r["message"] or "")[:200]) + "</td></tr>")
+            "<td class='muted' style='font-size:12px'>" + e((r["message"] or "")[:200]) + view + "</td></tr>")
     runs_body = "".join(runs) or "<tr><td colspan='8' class='muted'>No runs yet.</td></tr>"
     runs_card = (
         "<section class='card'><div class='hd'><h2>Runs</h2><span class='muted'>"
@@ -171,4 +178,26 @@ def apis_page(error=None, message=None, tab="overview"):
     body = (ui.header("APIs", "Connect outside services and run them from here.",
                       crumbs=[("System", None), ("APIs", None)], tabs=tabs)
             + V._notes(error, message) + inner)
+    return V.page("APIs", body, "/apis")
+
+
+def run_page(rid):
+    """What one run brought back, exactly as the actor returned it."""
+    run = apify.get_run(rid)
+    if run is None:
+        return V.page("APIs", ui.header("APIs", "That run does not exist.") , "/apis")
+    rows = []
+    for r in apify.run_results(rid):
+        who = (r["name"] + " · " if r["name"] else "") + (r["code"] or "not matched to a creator")
+        try:
+            pretty = json.dumps(json.loads(r["data"]), indent=2, ensure_ascii=False)
+        except ValueError:
+            pretty = r["data"]
+        rows.append("<details class='card'><summary class='hd'><h2>" + e(who) + "</h2><span class='muted'>"
+                    + e(r["actor"] or "") + "</span></summary><pre style='white-space:pre-wrap;font-size:12px;"
+                    "max-height:480px;overflow:auto'>" + e(pretty) + "</pre></details>")
+    body = (ui.header("Run results", e(run["job_name"] or "") + " · " + V.ts(run["started_at"]) + " · $%.2f" % run["cost"],
+                      crumbs=[("APIs", u("/apis?tab=apify")), ("Run %d" % rid, None)],
+                      actions="<a class='btn small' href='" + u("/apis/run.json?id=%d" % rid) + "'>Download JSON</a>")
+            + ("".join(rows) or "<p class='muted'>No results were kept for this run.</p>"))
     return V.page("APIs", body, "/apis")

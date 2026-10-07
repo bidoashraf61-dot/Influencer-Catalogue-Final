@@ -31,28 +31,39 @@ DEFAULT_RUN_CAP = 1.0                  # USD per run, sent to Apify as maxTotalC
 # different actor needs no code change. Only "profiles" jobs are read back into
 # snapshots; any other kind is run and recorded, and its results stay in Apify.
 PRESETS = {
-    "ig_profiles": {"label": "Instagram profiles", "platform": "Instagram", "kind": "profiles",
-                    "actor": "apify/instagram-profile-scraper",
-                    "input": '{"usernames": "{{handles}}"}'},
-    "ig_posts": {"label": "Instagram posts", "platform": "Instagram", "kind": "posts",
-                 "actor": "apify/instagram-post-scraper",
-                 "input": '{"username": "{{handles}}", "resultsLimit": 5}'},
-    "tt_profiles": {"label": "TikTok profiles (check input on the actor page)", "platform": "TikTok",
-                    "kind": "profiles", "actor": "khadinakbar/tiktok-profile-scraper",
-                    "input": '{"usernames": "{{handles}}"}'},
-    "sc_profiles": {"label": "Snapchat profiles (check input on the actor page)", "platform": "Snapchat",
-                    "kind": "profiles", "actor": "scraper-engine/snapchat-profile-scraper",
-                    "input": '{"usernames": "{{handles}}"}'},
-    "custom": {"label": "Another actor", "platform": "", "kind": "other",
-               "actor": "", "input": '{"profiles": "{{handles}}"}'},
+    "ig_profiles": {"label": "Instagram · profile numbers", "platform": "Instagram", "kind": "profiles",
+                    "actor": "apify/instagram-profile-scraper", "est": 0.003,
+                    "input": '{"usernames": "{{handles}}", "includeAboutSection": false}'},
+    "ig_fakes": {"label": "Instagram · fake-follower score (cheap)", "platform": "Instagram", "kind": "analysis",
+                 "actor": "charlestechy/instagram-influencer-deep-analyzer", "est": 0.001,
+                 "input": '{"usernames": "{{handles}}"}'},
+    "ig_audience": {"label": "Instagram · audience demographics (one run per creator)", "platform": "Instagram",
+                    "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 0.15,
+                    "input": '{"influencerHandle": "{{handle}}", "platform": "instagram"}'},
+    "ig_audit": {"label": "Instagram · follower audit (about $1 per creator)", "platform": "Instagram",
+                 "kind": "analysis", "actor": "seemuapps/instagram-fake-follower-auditor", "est": 0.99,
+                 "input": '{"username": "{{handle}}", "sampleSize": 200}'},
+    "tt_profiles": {"label": "TikTok · profile numbers", "platform": "TikTok", "kind": "profiles",
+                    "actor": "khadinakbar/tiktok-profile-scraper", "est": 0.002,
+                    "input": '{"profiles": "{{handles}}", "maxResults": "{{count}}"}'},
+    "tt_analytics": {"label": "TikTok · engagement analytics", "platform": "TikTok", "kind": "analysis",
+                     "actor": "maximedupre/tiktok-creator-analytics", "est": 0.001,
+                     "input": '{"target": "handles", "creatorHandles": "{{handles}}", "postSampleSize": 20}'},
+    "tt_audience": {"label": "TikTok · audience demographics (one run per creator)", "platform": "TikTok",
+                    "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 0.15,
+                    "input": '{"influencerHandle": "{{handle}}", "platform": "tiktok"}'},
+    "custom": {"label": "Another actor", "platform": "", "kind": "other", "actor": "", "est": 0.01,
+               "input": '{"profiles": "{{handles}}"}'},
 }
+
+MAX_PARALLEL = 5                       # per-creator runs in flight at once
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS api_jobs (
   id          INTEGER PRIMARY KEY,
   name        TEXT NOT NULL,
   actor       TEXT NOT NULL,
-  kind        TEXT NOT NULL DEFAULT 'profiles',   -- profiles | posts | other
+  kind        TEXT NOT NULL DEFAULT 'profiles',   -- profiles | analysis | posts | other
   platform    TEXT NOT NULL DEFAULT 'Instagram',
   source      TEXT NOT NULL DEFAULT 'all',        -- all | selection:<id> | campaign:<id>
   input       TEXT NOT NULL,                      -- JSON; "{{handles}}" is replaced
@@ -71,7 +82,7 @@ CREATE TABLE IF NOT EXISTS api_runs (
   trigger     TEXT NOT NULL,                      -- manual | schedule
   apify_run   TEXT,
   dataset     TEXT,
-  status      TEXT NOT NULL,                      -- RUNNING | SUCCEEDED | FAILED | REFUSED
+  status      TEXT NOT NULL,                      -- QUEUED | RUNNING | SUCCEEDED | FAILED | REFUSED
   handles     INTEGER NOT NULL DEFAULT 0,
   results     INTEGER NOT NULL DEFAULT 0,
   saved       INTEGER NOT NULL DEFAULT 0,
@@ -93,6 +104,17 @@ CREATE TABLE IF NOT EXISTS profile_snapshots (
   verified  INTEGER,
   run_id    INTEGER
 );
+CREATE TABLE IF NOT EXISTS profile_raw (
+  id      INTEGER PRIMARY KEY,
+  run_id  INTEGER NOT NULL,
+  code    TEXT,                                   -- creators.code, empty when unmatched
+  platform TEXT,
+  actor   TEXT,
+  at      INTEGER NOT NULL,
+  data    TEXT NOT NULL                           -- the actor's own result, as returned
+);
+CREATE INDEX IF NOT EXISTS profile_raw_run ON profile_raw(run_id);
+CREATE INDEX IF NOT EXISTS profile_raw_code ON profile_raw(code, at DESC);
 CREATE INDEX IF NOT EXISTS profile_snapshots_code ON profile_snapshots(code, at DESC);
 """
 
@@ -104,6 +126,9 @@ class ApifyError(Exception):
 def init():
     with db.connect() as conn:
         conn.executescript(SCHEMA)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(api_jobs)")}
+        if "est_each" not in cols:
+            conn.execute("ALTER TABLE api_jobs ADD COLUMN est_each REAL NOT NULL DEFAULT 0.01")
 
 
 # -------------------------------------------------------------------- token --
@@ -249,6 +274,11 @@ def build_handles(job):
         if src.startswith("selection:") and src[10:].isdigit():
             r = conn.execute("SELECT codes FROM selections WHERE id = ?", (int(src[10:]),)).fetchone()
             allowed = set(json.loads(r["codes"] or "[]")) if r else set()
+        elif src == "sample20":
+            have = {r["code"] for r in conn.execute("SELECT code FROM creator_analysis")}
+            ranked = sorted(rows, key=lambda c: (c["code"] not in have, c["code"]))
+            usable = [c["code"] for c in ranked if creator_handles(c).get(plat)]
+            allowed = set(usable[:20])
         elif src == "noanalysis":
             have = {r["code"] for r in conn.execute("SELECT code FROM creator_analysis")}
             allowed = {c["code"] for c in rows} - have
@@ -292,24 +322,29 @@ def save_job(f):
         json.loads(tmpl)
     except ValueError:
         raise ApifyError("The input is not valid JSON.")
-    if "{{handles}}" not in tmpl:
-        raise ApifyError("The input must contain {{handles}} where the creators' handles go.")
+    if "{{handles}}" not in tmpl and "{{handle}}" not in tmpl:
+        raise ApifyError("The input must contain {{handles}} (all in one run) or {{handle}} "
+                         "(one run per creator) where the handles go.")
     sched = f.get("schedule") if f.get("schedule") in ("manual", "daily", "weekly") else "manual"
     at = f.get("at_time") if re.fullmatch(r"\d{2}:\d{2}", f.get("at_time") or "") else "03:00"
     wd = int(f["weekday"]) if (f.get("weekday") or "").isdigit() and int(f["weekday"]) < 7 else 0
     mh = int(f["max_handles"]) if (f.get("max_handles") or "").isdigit() else 100
+    try:
+        est = max(0.0, float(f.get("est_each") or 0.01))
+    except ValueError:
+        est = 0.01
     vals = ((f.get("name") or "").strip() or "Untitled job", actor,
-            f.get("kind") if f.get("kind") in ("profiles", "posts", "other") else "other",
+            f.get("kind") if f.get("kind") in ("profiles", "analysis", "posts", "other") else "other",
             (f.get("platform") or "").strip(), (f.get("source") or "all").strip(),
-            tmpl, max(1, min(mh, HARD_MAX_HANDLES)), sched, at, wd)
+            tmpl, max(1, min(mh, HARD_MAX_HANDLES)), sched, at, wd, est)
     with db.connect() as conn:
         if (f.get("id") or "").isdigit():
             conn.execute("UPDATE api_jobs SET name=?,actor=?,kind=?,platform=?,source=?,input=?,"
-                         "max_handles=?,schedule=?,at_time=?,weekday=? WHERE id=?",
+                         "max_handles=?,schedule=?,at_time=?,weekday=?,est_each=? WHERE id=?",
                          vals + (int(f["id"]),))
             return int(f["id"])
         cur = conn.execute("INSERT INTO api_jobs (name,actor,kind,platform,source,input,max_handles,"
-                           "schedule,at_time,weekday,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                           "schedule,at_time,weekday,est_each,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
                            vals + (db.now(),))
         return cur.lastrowid
 
@@ -338,28 +373,50 @@ def _refuse(job, trigger, why):
     return why
 
 
+def render_input(tmpl, handles):
+    """The job's JSON with the handles put in. "{{handles}}" becomes the list,
+    "{{handle}}" the first one, "{{count}}" how many there are."""
+    t = tmpl.replace('"{{handles}}"', json.dumps(handles))
+    t = t.replace('"{{handle}}"', json.dumps(handles[0] if handles else ""))
+    t = t.replace('"{{count}}"', str(max(1, len(handles))))
+    return json.loads(t)
+
+
 def start_job(jid, trigger="manual"):
-    """Start one run. Returns (ok, message). Refuses, and records why, when the
-    month's budget is spent, there is nothing to send or the token is missing."""
+    """Start a job. A job whose input uses {{handles}} is one Apify run for all
+    of them; one that uses {{handle}} is one run per creator, queued and fed to
+    Apify a few at a time. Returns (ok, message). Refuses, and records why,
+    when the month's budget would be passed, nothing matches or no token is saved."""
     job = get_job(jid)
     if job is None:
         return False, "That job no longer exists."
     if not get_token():
         return False, "Save an Apify token first."
     with db.connect() as conn:
-        busy = conn.execute("SELECT 1 FROM api_runs WHERE job_id = ? AND status = 'RUNNING'", (jid,)).fetchone()
+        busy = conn.execute("SELECT 1 FROM api_runs WHERE job_id = ? AND status IN ('RUNNING','QUEUED')",
+                            (jid,)).fetchone()
     if busy:
         return False, "This job is already running."
-    if spent_this_month() >= budget():
-        return False, _refuse(job, trigger, "Monthly budget of $%.2f reached." % budget())
     pairs = build_handles(job)
     if not pairs:
         return False, _refuse(job, trigger, "No creator has a %s handle for this source." % (job["platform"] or "matching"))
+    est = len(pairs) * float(job["est_each"] or 0)
+    if spent_this_month() + est > budget():
+        return False, _refuse(job, trigger, "About $%.2f for %d creators would pass the monthly budget of $%.2f "
+                                            "(already $%.2f this month). Raise the budget or run fewer."
+                              % (est, len(pairs), budget(), spent_this_month()))
+    if "{{handle}}" in job["input"]:
+        with db.connect() as conn:
+            for code, h in pairs:
+                conn.execute("INSERT INTO api_runs (job_id, job_name, trigger, status, handles, handle_map, started_at) "
+                             "VALUES (?,?,?,?,?,?,?)", (jid, job["name"], trigger, "QUEUED", 1,
+                                                       json.dumps({h.lower(): code}), db.now()))
+            conn.execute("UPDATE api_jobs SET last_started = ? WHERE id = ?", (db.now(), jid))
+        pump()
+        return True, "Queued %d runs, about $%.2f." % (len(pairs), est)
     handles = [h for _c, h in pairs]
-    body = json.loads(job["input"].replace('"{{handles}}"', json.dumps(handles)))
     try:
-        res = call("POST", "/acts/" + job["actor"].replace("/", "~") + "/runs", body,
-                   params={"maxTotalChargeUsd": "%.2f" % run_cap()})["data"]
+        res = _launch(job, handles)
     except ApifyError as ex:
         return False, _refuse(job, trigger, str(ex))
     with db.connect() as conn:
@@ -368,7 +425,38 @@ def start_job(jid, trigger="manual"):
                      (jid, job["name"], trigger, res.get("id"), res.get("defaultDatasetId"), "RUNNING",
                       len(handles), json.dumps({h.lower(): c for c, h in pairs}), db.now()))
         conn.execute("UPDATE api_jobs SET last_started = ? WHERE id = ?", (db.now(), jid))
-    return True, "Started with %d handles." % len(handles)
+    return True, "Started with %d handles, about $%.2f." % (len(handles), est)
+
+
+def _launch(job, handles):
+    return call("POST", "/acts/" + job["actor"].replace("/", "~") + "/runs", render_input(job["input"], handles),
+                params={"maxTotalChargeUsd": "%.2f" % run_cap()})["data"]
+
+
+def pump():
+    """Start queued per-creator runs, up to MAX_PARALLEL in flight."""
+    with db.connect() as conn:
+        running = conn.execute("SELECT COUNT(*) c FROM api_runs WHERE status = 'RUNNING'").fetchone()["c"]
+        queued = conn.execute("SELECT * FROM api_runs WHERE status = 'QUEUED' ORDER BY id").fetchall()
+    for r in queued:
+        if running >= MAX_PARALLEL:
+            break
+        job = get_job(r["job_id"]) if r["job_id"] else None
+        if job is None:
+            _finish(r, "FAILED", 0, 0, 0.0, "The job was deleted before this run started.")
+            continue
+        if spent_this_month() >= budget():
+            _finish(r, "REFUSED", 0, 0, 0.0, "Monthly budget of $%.2f reached." % budget())
+            continue
+        try:
+            res = _launch(job, list(json.loads(r["handle_map"]).keys()))
+        except ApifyError as ex:
+            _finish(r, "FAILED", 0, 0, 0.0, str(ex))
+            continue
+        with db.connect() as conn:
+            conn.execute("UPDATE api_runs SET status='RUNNING', apify_run=?, dataset=?, started_at=? WHERE id=?",
+                         (res.get("id"), res.get("defaultDatasetId"), db.now(), r["id"]))
+        running += 1
 
 
 def _num(v):
@@ -378,30 +466,66 @@ def _num(v):
         return None
 
 
-def ingest_profiles(run, items):
-    """Dated follower snapshots from a profile run. Field names differ a little
-    between actors, so a few spellings are accepted."""
+_HANDLE_KEYS = ("username", "uniqueId", "handle", "influencerHandle", "userName", "profileName", "nickname_id")
+
+
+def _match(item, hmap):
+    """Which handle in this run an item belongs to."""
+    for k in _HANDLE_KEYS:
+        v = item.get(k)
+        if isinstance(v, str) and v.lstrip("@").lower() in hmap:
+            return v.lstrip("@").lower()
+    am = item.get("authorMeta")
+    if isinstance(am, dict) and str(am.get("name", "")).lower() in hmap:
+        return str(am["name"]).lower()
+    for v in item.values():                      # a profile link or a nested name
+        if isinstance(v, str):
+            tail = v.rstrip("/").rsplit("/", 1)[-1].lstrip("@").lower()
+            if tail in hmap:
+                return tail
+    if len(hmap) == 1:                           # a one-creator run: it is theirs
+        return next(iter(hmap))
+    return None
+
+
+def _compact(item):
+    """The result as returned, except fields over 2 KB (post lists, related
+    accounts) are replaced by a note, so a large run does not fill the database."""
+    out = {}
+    for k, v in item.items():
+        size = len(json.dumps(v, default=str))
+        out[k] = v if size <= 2000 else "[omitted: %d bytes]" % size
+    return out
+
+
+def ingest(run, job, items):
+    """Keep every result as the actor returned it, and, for profile jobs, the
+    follower number as a dated snapshot."""
     hmap = json.loads(run["handle_map"] or "{}")
-    job = get_job(run["job_id"]) if run["job_id"] else None
     plat = job["platform"] if job else ""
     saved = 0
     with db.connect() as conn:
         for it in items:
-            h = str(it.get("username") or it.get("uniqueId") or it.get("handle")
-                    or (it.get("authorMeta") or {}).get("name") or "").lstrip("@").lower()
-            code = hmap.get(h)
-            if not code:
+            if not isinstance(it, dict):
                 continue
-            f = next((x for x in (_num(it.get(k)) for k in (
-                "followersCount", "followers", "followerCount", "subscriberCount",
-                "subscribersCount", "subscribers")) if x is not None), None)
-            if f is None:
-                continue
-            conn.execute("INSERT INTO profile_snapshots (code,platform,handle,at,followers,following,posts,verified,run_id) "
-                         "VALUES (?,?,?,?,?,?,?,?,?)",
-                         (code, plat, h, db.now(), f, _num(it.get("followsCount", it.get("following"))),
-                          _num(it.get("postsCount", it.get("posts"))), 1 if it.get("verified") else 0, run["id"]))
-            saved += 1
+            h = _match(it, hmap)
+            code = hmap.get(h) if h else None
+            small = it if len(json.dumps(it, default=str)) <= 20000 else _compact(it)
+            conn.execute("INSERT INTO profile_raw (run_id, code, platform, actor, at, data) VALUES (?,?,?,?,?,?)",
+                         (run["id"], code or "", plat, job["actor"] if job else "", db.now(),
+                          json.dumps(small, default=str)))
+            if job and job["kind"] == "profiles" and code:
+                f = next((x for x in (_num(it.get(k)) for k in (
+                    "followersCount", "followers", "followerCount", "subscriberCount",
+                    "subscribersCount", "subscribers")) if x is not None), None)
+                if f is None and isinstance(it.get("authorMeta"), dict):
+                    f = _num(it["authorMeta"].get("fans"))
+                if f is not None:
+                    conn.execute("INSERT INTO profile_snapshots (code,platform,handle,at,followers,following,posts,verified,run_id) "
+                                 "VALUES (?,?,?,?,?,?,?,?,?)",
+                                 (code, plat, h, db.now(), f, _num(it.get("followsCount", it.get("following"))),
+                                  _num(it.get("postsCount", it.get("posts"))), 1 if it.get("verified") else 0, run["id"]))
+                    saved += 1
     return saved
 
 
@@ -426,10 +550,11 @@ def refresh_run(run):
                      params={"format": "json", "clean": "1", "limit": "5000"}, timeout=60)
         items = items if isinstance(items, list) else []
         job = get_job(run["job_id"]) if run["job_id"] else None
-        if job and job["kind"] == "profiles":
-            saved = ingest_profiles(run, items)
-            if not saved:
-                note = "Results came back but none matched a creator handle."
+        saved = ingest(run, job, items)
+        if not items:
+            note = "The run finished but returned no results."
+        elif job and job["kind"] == "profiles" and not saved:
+            note = "Results kept, but no follower count was recognised in them."
     except ApifyError as ex:
         note = "Run finished but the results could not be read: " + str(ex)
     _finish(run, "SUCCEEDED", len(items), saved, cost, note)
@@ -446,7 +571,19 @@ def refresh_all():
         live = conn.execute("SELECT * FROM api_runs WHERE status = 'RUNNING' AND apify_run IS NOT NULL").fetchall()
     for r in live:
         refresh_run(r)
+    pump()
     return len(live)
+
+
+def get_run(rid):
+    with db.connect() as conn:
+        return conn.execute("SELECT * FROM api_runs WHERE id = ?", (rid,)).fetchone()
+
+
+def run_results(rid):
+    with db.connect() as conn:
+        return conn.execute("SELECT r.*, c.name FROM profile_raw r LEFT JOIN creators c ON c.code = r.code "
+                            "WHERE r.run_id = ? ORDER BY r.id", (rid,)).fetchall()
 
 
 # ---------------------------------------------------------------- scheduler --

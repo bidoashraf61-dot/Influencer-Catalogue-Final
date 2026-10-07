@@ -559,6 +559,14 @@ class Handler(BaseHTTPRequestHandler):
                 db.setting("emv_rates") or {}, metrics.factors(),
                 bool(db.setting("capture_token")), db.capture_runs(), track.GEO_DB.exists(),
                 None, query.get("e"), query.get("ok"), metrics.benchmarks(), fx_rates=fx.rates()))
+        if path == "/apis/run" and query.get("id", "").isdigit():
+            return self.send(200, apis_view.run_page(int(query["id"])))
+        if path == "/apis/run.json" and query.get("id", "").isdigit():
+            data = [dict(code=r["code"], actor=r["actor"], data=json.loads(r["data"]))
+                    for r in apify.run_results(int(query["id"]))]
+            return self.send(200, json.dumps(data, indent=2, ensure_ascii=False).encode(),
+                             "application/json; charset=utf-8",
+                             [("Content-Disposition", "attachment; filename=run-%s.json" % query["id"])])
         if path == "/apis":
             return self.send(200, apis_view.apis_page(query.get("e"), query.get("ok"), query.get("tab", "overview")))
         if path == "/campaigns/links":
