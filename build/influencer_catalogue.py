@@ -726,14 +726,13 @@ def build():
 
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
-        <img class="cat-hero__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+        <div class="cat-brand">
+          <img class="cat-hero__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+          <a class="cat-portfolio cat-portfolio--quiet" href="https://hellovoice.co.uk" target="_blank" rel="noopener">Portfolio<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+        </div>
         <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
           Campaign tracking
-        </a>
-        <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
-          Portfolio
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
         </a>
       </div>
       </div>
@@ -922,14 +921,13 @@ def build():
 
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
-        <img class="cat-hero__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+        <div class="cat-brand">
+          <img class="cat-hero__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+          <a class="cat-portfolio cat-portfolio--quiet" href="https://hellovoice.co.uk" target="_blank" rel="noopener">Portfolio<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
+        </div>
         <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
           Campaign tracking
-        </a>
-        <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
-          Portfolio
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
         </a>
       </div>
       </div>

@@ -1527,7 +1527,7 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 /* Catalogue cover, centred: the brand, what this is, one way in. The footage
    carries burned-in captions, so the centre gets its own shade (a soft ink
    pool behind the text) on top of the edge shade. */
-.cat-cover__body--center { margin: auto 0 0; padding: 32px 0 clamp(20px, 3.5vh, 40px); }
+.cat-cover__body--center { margin: auto 0; padding: 32px 0 clamp(32px, 6vh, 64px); }
 .cat-hero--cover:has(.cat-cover__body--center) .cat-cover__shade {
   /* Three layers: an even ink veil over the whole film so it reads as a
      backdrop, a darker pool behind the centred text, and the top and bottom
@@ -1742,4 +1742,23 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
   .cat-cover__sub { white-space: normal; max-width: 26ch; text-wrap: balance; }
   .cat-results { padding-bottom: 8px; }
   .cat-results .cat-sort { width: auto; }
+}
+
+
+/* Portfolio leaves the action buttons: a quiet text link beside the logo,
+   so brand links sit left, actions right, and the lime account circle is the
+   only lime shape in the bar. */
+.cat-brand { display: flex; align-items: center; gap: 20px; min-width: 0; }
+.cat-portfolio.cat-portfolio--quiet {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 0 0 20px;
+  background: transparent; border: 0; border-left: 1px solid rgba(255,255,255,.3); border-radius: 0;
+  font-family: var(--heading); font-size: 18px; letter-spacing: .08em; color: rgba(255,255,255,.88);
+  text-decoration: none;
+}
+.cat-portfolio.cat-portfolio--quiet:hover { background: transparent; color: var(--lime); border-color: rgba(255,255,255,.3); }
+.cat-portfolio.cat-portfolio--quiet:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; border-radius: 4px; }
+@media screen and (max-width: 767px) {
+  .cat-brand { gap: 14px; }
+  .cat-portfolio.cat-portfolio--quiet { font-size: 16px; padding-left: 14px; }
+  .cat-hero .cat-topbar .pt-dock { top: 0; }   /* the brand row is 44px tall now */
 }
