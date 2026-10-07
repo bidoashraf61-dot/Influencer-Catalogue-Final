@@ -994,6 +994,9 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/apis/pack":
                 plats = [p for p in ("Instagram", "TikTok") if f.get("plat_" + p.lower())]
                 mh = int(f["max_handles"]) if (f.get("max_handles") or "").isdigit() else 20
+                one = (f.get("one_creator") or "").strip().upper()
+                if one:
+                    f["source"], f["max_handles"] = "creator:" + one, "1"
                 ok, msg = apify.run_pack(plats, f.get("source") or "sample20", max(1, min(mh, apify.HARD_MAX_HANDLES)),
                                          bool(f.get("audience")), bool(f.get("audit")),
                                          f.get("schedule") if f.get("schedule") in ("manual", "daily", "weekly") else "manual",

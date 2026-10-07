@@ -74,6 +74,7 @@ def pack_card():
         "<div style='margin:6px 0 12px'>" + chk("plat_instagram", "Instagram") + chk("plat_tiktok", "TikTok") + "</div>"
         "<div class='row'><div><label>Which creators</label><select name='source'>" + _sources("sample20") + "</select></div>"
         "<div><label>Max creators</label><input name='max_handles' type='number' min='1' max='1000' value='20'></div>"
+        "<div><label>Or one specific creator (code)</label><input name='one_creator' placeholder='e.g. HV-MI-007' autocomplete='off'></div>"
         "<div><label>Repeat</label><select name='schedule'><option value='manual'>Only now</option>"
         "<option value='weekly'>Every week</option><option value='daily'>Every day</option></select></div>"
         "<div><label>At (Riyadh time)</label><input name='at_time' type='time' value='03:00'></div></div>"

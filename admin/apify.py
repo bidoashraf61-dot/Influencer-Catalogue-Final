@@ -317,6 +317,8 @@ def build_handles(job):
         if src.startswith("selection:") and src[10:].isdigit():
             r = conn.execute("SELECT codes FROM selections WHERE id = ?", (int(src[10:]),)).fetchone()
             allowed = set(json.loads(r["codes"] or "[]")) if r else set()
+        elif src.startswith("creator:"):
+            allowed = {src[8:].strip().upper()}
         elif src == "sample20":
             have = {r["code"] for r in conn.execute("SELECT code FROM creator_analysis")}
             ranked = sorted(rows, key=lambda c: (c["code"] not in have, c["code"]))
