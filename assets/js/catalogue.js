@@ -1910,7 +1910,7 @@
     function renderHead(lo, hi) {
       var br = CURATED && CURATED.brief;
       var cl = $("sel-client");
-      if (cl) { cl.hidden = !(br && br.client); cl.textContent = br && br.client ? "for " + br.client : ""; }
+      if (cl) { cl.hidden = !(br && br.client); cl.textContent = br && br.client ? "Prepared for " + br.client : ""; }
       var bx = $("sel-brief");
       if (bx) {
         if (!br) { bx.hidden = true; }
@@ -1921,8 +1921,25 @@
           if (t.age && t.age !== "Any") chips.push(["Age", t.age]);
           var cats = String(t.category || "").split("|").filter(function (x) { return x && x !== "Any"; });
           if (cats.length) chips.push(["Category", cats.join(", ")]);
+          // The objective leads and is named as the campaign objective; the
+          // targeting reads after it as plain facts.
           bx.hidden = false;
-          bx.textContent = chips.map(function (c) { return c[1]; }).join("  ·  ");
+          bx.textContent = "";
+          chips.forEach(function (c, i) {
+            if (!c[1]) return;
+            var el = document.createElement("span");
+            if (i === 0) {
+              el.className = "cat-selhead__obj";
+              var k = document.createElement("small"); k.textContent = "Campaign objective";
+              var v = document.createElement("strong"); v.textContent = c[1];
+              el.appendChild(k); el.appendChild(v);
+            } else {
+              el.className = "cat-selhead__fact";
+              el.title = c[0];
+              el.textContent = c[1];
+            }
+            bx.appendChild(el);
+          });
         }
       }
       var st = $("sel-headstats");

@@ -891,13 +891,29 @@ def build():
 
 <main class="cat-app" id="cat-app" hidden>
 
-  <header class="cat-hero cat-hero--cover cat-hero--short">
-    <video class="cat-cover__video" autoplay muted loop playsinline
-           preload="metadata" poster="/assets/video/hero-reel-poster.jpg"
-           aria-hidden="true" tabindex="-1">
-      <source src="/assets/video/hero-reel.mp4" type="video/mp4"/>
-    </video>
-    <div class="cat-cover__shade" aria-hidden="true"></div>
+  <header class="cat-hero cat-hero--cover cat-hero--short cat-hero--desk">
+    <!-- A shortlist, drawn: three creator cards fanned on the desk, the front
+         one ticked. The portraits are faceless flat illustrations (generated
+         on Higgsfield, 2026-10-08), never real creators. -->
+    <svg class="cat-desk" viewBox="0 0 560 420" aria-hidden="true" focusable="false">
+      <defs><clipPath id="dk-ph"><rect x="14" y="14" width="152" height="150" rx="10"/></clipPath></defs>
+      <g class="cat-desk__card" transform="translate(300 40) rotate(9 90 120)">
+        <rect width="180" height="240" rx="18"/>
+        <image class="cat-desk__photo" href="/assets/illustrations/creator-curly.jpg" x="14" y="14" width="152" height="150" preserveAspectRatio="xMidYMin slice" clip-path="url(#dk-ph)"/>
+        <rect class="cat-desk__ln" x="14" y="182" width="96" height="10" rx="5"/><rect class="cat-desk__ln" x="14" y="202" width="64" height="8" rx="4"/>
+      </g>
+      <g class="cat-desk__card" transform="translate(70 70) rotate(-8 90 120)">
+        <rect width="180" height="240" rx="18"/>
+        <image class="cat-desk__photo" href="/assets/illustrations/creator-ghutra.jpg" x="14" y="14" width="152" height="150" preserveAspectRatio="xMidYMin slice" clip-path="url(#dk-ph)"/>
+        <rect class="cat-desk__ln" x="14" y="182" width="110" height="10" rx="5"/><rect class="cat-desk__ln" x="14" y="202" width="70" height="8" rx="4"/>
+      </g>
+      <g class="cat-desk__card is-picked" transform="translate(190 120) rotate(2 90 120)">
+        <rect width="180" height="240" rx="18"/>
+        <image class="cat-desk__photo" href="/assets/illustrations/creator-shayla.jpg" x="14" y="14" width="152" height="150" preserveAspectRatio="xMidYMin slice" clip-path="url(#dk-ph)"/>
+        <rect class="cat-desk__ln" x="14" y="182" width="104" height="10" rx="5"/><rect class="cat-desk__ln" x="14" y="202" width="58" height="8" rx="4"/>
+        <circle class="cat-desk__tick" cx="152" cy="28" r="22"/><path class="cat-desk__mark" d="M141 28l8 8 15-16"/>
+      </g>
+    </svg>
 
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
@@ -915,15 +931,18 @@ def build():
     </div></div></div>
 
     <div class="cat-cover__body"><div class="cat-pad"><div class="cat-container">
-      <a class="cat-back" href="/catalogue/">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-        Full catalogue
-      </a>
       <div class="cat-selhead">
-        <div class="cat-selhead__main">
-          <div class="cat-selhead__eyebrow"><span class="cat-selhead__tag">Selection</span><span class="cat-selhead__client" id="sel-client" hidden></span></div>
+        <div class="cat-selhead__lock">
+          <span class="cat-selhead__tag">Selection</span>
           <h1 class="cat-selhead__title" id="sel-title">Selection</h1>
-          <p class="cat-selhead__brief" id="sel-brief" hidden></p>
+        </div>
+        <p class="cat-selhead__client" id="sel-client" hidden></p>
+        <div class="cat-selhead__foot">
+          <a class="cat-back" href="/catalogue/">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+            Full catalogue
+          </a>
+          <div class="cat-selhead__brief" id="sel-brief" hidden></div>
         </div>
       </div>
     </div></div></div>
