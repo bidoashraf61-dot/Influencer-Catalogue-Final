@@ -243,6 +243,7 @@
     renderPlatforms(c);
     $("pp-sealed").hidden = !!a;
     $("pp-pages").hidden = !a;
+    var rs = $("pp-request-sec"); if (rs) rs.remove();
     if (!a) return renderSealed(c);
     if (a.basic) return renderBasic(a);
     $("pp-posts-sec").after($("pp-real-sec"));
@@ -300,10 +301,11 @@
     if (a.hashtags && a.hashtags.length) renderTags(a);
     if (a.avg_likes != null || a.avg_views != null) renderBasicPerf(a);
     var c = D.creator, asked = (D.requested || []).indexOf(PLAT) !== -1;
-    $("pp-real").insertAdjacentHTML("beforeend", '<div class="pp-request"><div><b>Want the full ' + esc(PLAT || "") + ' analysis?</b>'
+    var old = $("pp-request-sec"); if (old) old.remove();
+    $("pp-source").insertAdjacentHTML("afterend", '<section class="pp-page" id="pp-request-sec"><div class="pp-request"><div><b>Want the full ' + esc(PLAT || "") + ' analysis?</b>'
       + '<p>Audience countries, age and gender, real versus fake followers and brand affinity are pending for ' + esc(c.name) + ".</p></div>"
       + '<button type="button" class="pp-btn" id="pp-ask"' + (asked ? " disabled" : "") + ">" + (asked ? "Requested ✓" : "Request full analysis") + "</button>"
-      + '<p class="pp-sealed__done" id="pp-ask-done"' + (asked ? "" : " hidden") + ">Your request is with the HelloVoice team — we will add it and let you know.</p></div>");
+      + '<p class="pp-sealed__done" id="pp-ask-done"' + (asked ? "" : " hidden") + ">Your request is with the HelloVoice team — we will add it and let you know.</p></div></section>");
     var ask = $("pp-ask");
     if (ask && !asked) ask.addEventListener("click", function () {
       ask.disabled = true; ask.textContent = "Sending…";

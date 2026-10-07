@@ -93,7 +93,11 @@ def data_tab(query_q=""):
         "<tr><td><a href='" + u("/apis/creator?code=" + r["code"]) + "'><strong>" + e(r["name"]) + "</strong></a> "
         "<span class='muted'>" + e(r["code"]) + "</span></td><td>" + str(r["actors"]) + " sources</td>"
         "<td class='muted'>" + V.ago(r["last"]) + "</td></tr>" for r in apify.creators_with_data(query_q))
-    return ("<section class='card'><div class='hd'><h2>Coverage</h2></div><table><tbody>" + "".join(cov) + "</tbody></table></section>"
+    import profile_thumbs
+    td, tt, tp = profile_thumbs.stats()
+    return ("<section class='card'><div class='hd'><h2>Post pictures</h2><span class='muted'>%d of %d creators done, %d pictures stored</span></div>"
+            "<p class='sec-desc'>Fetched in the background, one a second, from the platforms' own public pages. No Apify credit is used.</p></section>"
+            "<section class='card'><div class='hd'><h2>Coverage</h2></div><table><tbody>" + "".join(cov) + "</tbody></table></section>"
             "<section class='card'><div class='hd'><h2>Creators with collected data</h2></div>"
             "<form method='get' action='" + u("/apis") + "'><input type='hidden' name='tab' value='data'>"
             "<input name='q' value='" + e(query_q) + "' placeholder='Search by creator name or code' style='width:100%;margin-bottom:12px'></form>"

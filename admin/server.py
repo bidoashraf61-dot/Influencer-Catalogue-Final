@@ -71,6 +71,7 @@ import thumbs  # noqa: E402
 import track  # noqa: E402
 import uploads  # noqa: E402
 import apify
+import profile_thumbs
 import apis_view
 import views  # noqa: E402
 
@@ -3779,6 +3780,7 @@ def main():
     db.init()
     history.init()
     apify.start_scheduler()
+    profile_thumbs.start()
     db.purge_expired_sessions()
     ALLOWED_ORIGINS.update(args.origin)
     global BASE

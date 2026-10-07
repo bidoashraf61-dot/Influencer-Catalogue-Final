@@ -707,10 +707,13 @@ def save_basic(conn, code, plat, handle, it, m, run_id):
                  (code, plat, handle, db.now(), m["followers"], m["following"], m["posts"], m["avg_likes"], m["avg_comments"],
                   m["er_pct"], m["posts_per_week"], m["last_post"], m["sample_posts"], m["verified"], m["category"], run_id))
     cur = conn.execute("SELECT data FROM creator_analysis WHERE code = ? AND platform = ?", (code, plat)).fetchone()
+    kept = {}
     if cur is not None:
         try:
-            if not json.loads(cur["data"]).get("basic"):
+            old = json.loads(cur["data"])
+            if not old.get("basic"):
                 return False
+            kept = {p.get("url"): p["thumb"] for p in old.get("top_posts") or [] if p.get("thumb")}
         except ValueError:
             return False
     data = {"basic": True, "platform": plat, "handle": handle, "updated": time.strftime("%Y-%m-%d", time.gmtime()),
@@ -720,6 +723,9 @@ def save_basic(conn, code, plat, handle, it, m, run_id):
             "verified": bool(m["verified"]), "account_type": m["category"] or None,
             "bio": it.get("biography") or m.get("bio") or "", "external_url": it.get("externalUrl") or ""}
     data["posts_stored"] = True
+    for p in m.get("top_posts") or []:
+        if p.get("url") in kept:
+            p["thumb"] = kept[p["url"]]
     for k in ("top_posts", "hashtags", "avg_reel_likes", "avg_reel_comments", "reels_er", "reel_posts"):
         if m.get(k) not in (None, [], ""):
             data[k] = m[k]
