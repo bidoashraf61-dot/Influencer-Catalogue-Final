@@ -244,6 +244,15 @@ class Handler(BaseHTTPRequestHandler):
         return who
 
     def viewer_code_id(self):
+        """Who is looking at the catalogue: the client's passcode pass, or —
+        for a signed-in admin with no pass — the internal admin preview code,
+        so the admin never needs a passcode."""
+        cid = self.viewer_cookie_id()
+        if cid is None and self.admin():
+            cid = db.admin_code_id()
+        return cid
+
+    def viewer_cookie_id(self):
         raw = auth.unsign(self.cookies().get(VIEWER_COOKIE, ""), SECRET)
         if not raw or ":" not in raw:
             return None
@@ -380,6 +389,14 @@ class Handler(BaseHTTPRequestHandler):
                     lists.setdefault(sel["code_id"], []).append(sel["name"])
             return self.send(200, views.codes_page(db.list_codes(), query.get("new"), query.get("e"),
                                                    db.code_devices(), query.get("ok"), lists))
+        if path == "/open-catalogue":
+            # Straight into the catalogue as the signed-in admin: the page
+            # opens on the "already unlocked" cookie and the admin session
+            # stands in for the passcode on every call it then makes.
+            db.admin_code_id()
+            return self.send(303, b"", "text/plain", [
+                ("Location", self.site_origin() + "/"),
+                ("Set-Cookie", "cat-ok=1; Path=/; SameSite=Lax")])
         if path == "/analytics":
             # Two dates off a calendar, not a fixed window. int(query["days"])
             # used to sit here and raised ValueError on anything non-numeric in
@@ -521,7 +538,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, views.analysis_page(
                 db.list_creators(), db.analysis_codes(), db.analysis_requests(), self.site_origin(),
                 query.get("q", ""), query.get("e"), query.get("ok"),
+                sources=([("selection:%d" % r["id"], "Selection · " + r["name"]) for r in db.list_selections()]
+                         + [("campaign:%d" % r["id"], "Campaign · " + r["name"]) for r in db.list_campaigns()]),
                 page_no=int(query["page"]) if (query.get("page") or "").isdigit() and int(query["page"]) > 0 else 1))
+        if path == "/analysis/review":
+            return self.analysis_review_get(query)
+        if path == "/analysis/find":
+            return self.analysis_find(query)
         if path == "/analysis/template.xlsx":
             code = re.sub(r"[^A-Z0-9-]", "", (query.get("code") or "").upper())[:20] or None
             return self.send(200, analysis.template_xlsx(code),
@@ -744,6 +767,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.post_analysis_pdf()
         if path == "/analysis/upload":
             return self.post_analysis_upload()
+        if path == "/analysis/template":
+            return self.post_analysis_template()
+        if path == "/analysis/find":
+            return self.analysis_find({}, self.form_body())
+        if path == "/analysis/review":
+            return self.post_analysis_review()
         if path == "/analysis/save":
             return self.post_analysis_save()
         if path == "/analysis/delete":
@@ -2829,10 +2858,90 @@ class Handler(BaseHTTPRequestHandler):
 
     # --------------------------------------------------- creator analysis --
 
+    def analysis_resolver(self):
+        return analysis.Resolver(db.list_creators(), db.creator_aliases())
+
+    def analysis_find(self, query, form=None):
+        """The creator picker's data. GET: search the roster (q, platform,
+        only those still without an analysis, or the creators of a selection
+        or campaign). POST `list`: turn pasted handles, links or names into
+        creators. Answers JSON: the first rows to show, and every match to add
+        in one click."""
+        have = db.analysis_codes()
+        if form is not None:
+            res = self.analysis_resolver()
+            found, missing = [], []
+            for line in re.split(r"[\n,;]+", form.get("list") or ""):
+                line = line.strip()
+                if not line:
+                    continue
+                code, sug = res.resolve(line)
+                (found if code else missing).append(code or line)
+            rows = [c for c in db.list_creators() if c["code"] in set(found)]
+        else:
+            src = (query.get("source") or "").strip()
+            rows = db.list_creators(search=query.get("q") or None)
+            if src.startswith("selection:") and src[10:].isdigit():
+                sel = db.selection(int(src[10:]))
+                keep = set(json.loads(sel["codes"])) if sel else set()
+                rows = [c for c in db.list_creators() if c["code"] in keep]
+            elif src.startswith("campaign:") and src[9:].isdigit():
+                keep = {r["cc_code"] for r in db.campaign_creators(int(src[9:]))}
+                rows = [c for c in db.list_creators() if c["code"] in keep]
+            if query.get("platform"):
+                rows = [c for c in rows if (c["platform"] or "").lower() == query["platform"].lower()]
+            if query.get("nohave") == "1":
+                rows = [c for c in rows if c["code"] not in have]
+            missing = []
+        item = lambda c: {"code": c["code"], "name": c["name"], "handle": c["handle"] or "",
+                          "platform": c["platform"] or "", "followers": c["followers"],
+                          "has": c["code"] in have}
+        return self.send_json(200, {"total": len(rows), "items": [item(c) for c in rows[:150]],
+                                    "all": [[c["code"], c["name"]] for c in rows[:3000]],
+                                    "missing": missing})
+
+    def post_analysis_template(self):
+        """A workbook prefilled with the creators of a selection, a campaign,
+        everyone still without an analysis, or a pasted list of handles/names."""
+        f = self.form_body()
+        src = (f.get("source") or "").strip()
+        everyone = db.list_creators()
+        by_code = {c["code"]: c for c in everyone}
+        codes, missing = [], []
+        if src.startswith("selection:") and src[10:].isdigit():
+            sel = db.selection(int(src[10:]))
+            codes = json.loads(sel["codes"]) if sel else []
+        elif src.startswith("campaign:") and src[9:].isdigit():
+            codes = [r["cc_code"] for r in db.campaign_creators(int(src[9:]))]
+        elif src == "codes":
+            codes = [c for c in re.split(r"[\s,]+", f.get("codes") or "") if c]
+        elif src == "missing":
+            have = db.analysis_codes()
+            codes = [c["code"] for c in everyone if c["code"] not in have][:500]
+        else:
+            res = self.analysis_resolver()
+            for line in re.split(r"[\n,;]+", f.get("list") or ""):
+                line = line.strip()
+                if not line:
+                    continue
+                code, _ = res.resolve(line)
+                if code:
+                    codes.append(code)
+                else:
+                    missing.append(line)
+        chosen = [by_code[c] for c in dict.fromkeys(codes) if c in by_code]
+        if not chosen:
+            return self.redirect("/analysis?e=" + urllib.parse.quote(
+                "No creators found for that choice." + (" Not recognised: " + ", ".join(missing[:8]) if missing else "")) + "#prefilled")
+        return self.send(200, analysis.template_xlsx(chosen, missing=missing),
+                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                         [("Content-Disposition", 'attachment; filename="creator-analysis-%d-creators.xlsx"' % len(chosen))])
+
     def post_analysis_pdf(self):
         """Profile report PDFs -> analyses. Each file is matched to a creator by
-        the handle in its name (report-<handle>-Oct-06-2026.pdf); with one file
-        a creator can be picked instead."""
+        the handle in its name (report-<handle>-Oct-06-2026.pdf), then by a
+        roster handle printed on its first page; what cannot be matched goes
+        to the review screen instead of being refused."""
         import profile_pdf
         f = self.form_body(multi=("file",))
         parts = [p for p in (f.get("file") or []) if isinstance(p, dict) and p.get("data")]
@@ -2841,21 +2950,20 @@ class Handler(BaseHTTPRequestHandler):
         if not profile_pdf.available():
             return self.redirect("/analysis?e=" + urllib.parse.quote(
                 "The PDF reader is not installed on this server yet. Ask whoever deploys the admin to install it.") + "#pdf")
-        creators = db.list_creators()
-        by_handle = {}
-        for c in creators:
-            h = (c["handle"] or "").strip().lstrip("@").lower()
-            if h:
-                by_handle[h] = c["code"]
-        picked = (f.get("code") or "").strip().upper()
-        done, bad = [], []
+        res = self.analysis_resolver()
+        picked = res.resolve((f.get("code") or "").strip())[0] if len(parts) == 1 else None
+        done, bad, held = [], [], []
         for p in parts:
             name = p.get("filename") or "file.pdf"
-            m = re.match(r"report-(.+?)-[A-Za-z]{3}-\d\d-\d{4}\.pdf$", name)
-            handle = m.group(1) if m else None
-            code = picked if (len(parts) == 1 and picked) else by_handle.get((handle or "").lower())
+            m = re.match(r"report-(.+?)-[A-Za-z]{3}-\d\d-\d{4}(?: ?\(\d+\))?\.pdf$", name)
+            handle = m.group(1) if m else re.sub(r"\.pdf$", "", name, flags=re.I)
+            code = picked
             if not code:
-                bad.append(name + " (no creator with handle " + (handle or "?") + " — pick the creator and upload it alone)")
+                code = res.resolve(handle)[0]
+            if not code:
+                code = profile_pdf.sniff_creator(p["data"], res)
+            if not code:
+                held.append((name, p["data"]))
                 continue
             try:
                 profile_pdf.import_pdf(p["data"], code, handle, source="profile report PDF")
@@ -2864,30 +2972,115 @@ class Handler(BaseHTTPRequestHandler):
                 bad.append(name + " (" + str(ex)[:120] + ")")
         msg = "Imported %d analysis%s: %s." % (len(done), "" if len(done) == 1 else "es", ", ".join(done)) if done else ""
         if bad:
-            return self.redirect("/analysis?%s=%s#pdf" % ("ok" if done else "e", urllib.parse.quote(
-                (msg + " " if msg else "") + "Could not import: " + "; ".join(bad))))
-        return self.redirect("/analysis?ok=" + urllib.parse.quote(msg))
+            msg += (" " if msg else "") + "Could not import: " + "; ".join(bad)
+        if held:
+            token = analysis.stash("pdf", held)
+            return self.redirect("/analysis/review?t=%s&%s=%s" % (token, "ok" if not bad else "e", urllib.parse.quote(msg)))
+        return self.redirect("/analysis?%s=%s#pdf" % ("e" if bad and not done else "ok", urllib.parse.quote(msg)))
 
     def post_analysis_upload(self):
         f = self.form_body()
         part = f.get("file")
         if not isinstance(part, dict) or not part.get("data"):
             return self.redirect("/analysis?e=" + urllib.parse.quote("Choose the filled-in template (.xlsx)."))
-        known = {c["code"] for c in db.list_creators()}
         try:
-            docs, problems = analysis.parse_workbook(part["data"], known)
+            docs, problems, unresolved = analysis.parse_workbook(part["data"], self.analysis_resolver())
         except Exception as ex:
             return self.redirect("/analysis?e=" + urllib.parse.quote(str(ex)[:200]))
+        if unresolved:
+            token = analysis.stash("xlsx", [(part.get("filename") or "analysis.xlsx", part["data"])])
+            return self.redirect("/analysis/review?t=" + token)
         if not docs:
             return self.redirect("/analysis?e=" + urllib.parse.quote(
-                "No creators found in that file. " + " ".join(problems[:5])))
+                "No creators with numbers found in that file. " + " ".join(problems[:5])))
+        return self.save_analysis_docs(docs, problems)
+
+    def save_analysis_docs(self, docs, problems, prefix=""):
         with db.connect() as conn:
             for code, d in docs.items():
                 db.save_analysis(code, d, d.get("source") or "template upload", conn)
-        msg = "Saved full analysis for %d creator(s)." % len(docs)
+        msg = prefix + "Saved full analysis for %d creator(s)." % len(docs)
         if problems:
             msg += " Skipped: " + " ".join(problems[:6])
         return self.redirect("/analysis?ok=" + urllib.parse.quote(msg))
+
+    def analysis_review_get(self, query):
+        h = analysis.held(query.get("t"))
+        if not h:
+            return self.redirect("/analysis?e=" + urllib.parse.quote("That upload has expired — please upload it again."))
+        kind, files = h
+        res = self.analysis_resolver()
+        creators = db.list_creators()
+        if kind == "xlsx":
+            docs, problems, unresolved = analysis.parse_workbook(files[0][1], res)
+            items = [(k, [res.describe(c) for c in sug], (res.describe(sug[0]) if len(sug) == 1 else ""))
+                     for k, sug in unresolved.items()]
+            matched = len(docs)
+        else:
+            items, matched = [], 0
+            for name, _ in files:
+                m = re.match(r"report-(.+?)-[A-Za-z]{3}-\d\d-\d{4}", name)
+                guess = m.group(1) if m else re.sub(r"\.pdf$", "", name, flags=re.I)
+                sug = res.resolve(guess)[1]
+                items.append((name, [res.describe(c) for c in sug], (res.describe(sug[0]) if len(sug) == 1 else "")))
+        return self.send(200, views.analysis_review_page(
+            kind, query["t"], items, matched, creators, res, query.get("e"), query.get("ok")))
+
+    def post_analysis_review(self):
+        f = self.form_body()
+        token = f.get("t")
+        h = analysis.held(token)
+        if not h:
+            return self.redirect("/analysis?e=" + urllib.parse.quote("That upload has expired — please upload it again."))
+        kind, files = h
+        res = self.analysis_resolver()
+        remember = f.get("remember") == "1"
+        picks, bad = {}, []
+        n = 0
+        while ("key_%d" % n) in f:
+            key, raw = f["key_%d" % n], (f.get("pick_%d" % n) or "").strip()
+            n += 1
+            if not raw:
+                picks[key] = ""
+                continue
+            code = analysis.code_from_pick(raw)
+            if code not in res.label:
+                bad.append(key)
+                picks[key] = ""
+            else:
+                picks[key] = code
+        if kind == "xlsx":
+            docs, problems, still = analysis.parse_workbook(files[0][1], res, picks)
+            problems += ["%s was not recognised — skipped." % k for k in bad]
+            problems += ["%s skipped." % k for k in still]
+            if remember:
+                for key, code in picks.items():
+                    if code:
+                        db.remember_alias(analysis.norm(key), code)
+            analysis.release(token)
+            if not docs:
+                return self.redirect("/analysis?e=" + urllib.parse.quote("Nothing to save. " + " ".join(problems[:5])))
+            return self.save_analysis_docs(docs, problems)
+        import profile_pdf
+        done, failed = [], list(bad)
+        for name, data in files:
+            code = picks.get(name)
+            if not code:
+                continue
+            m = re.match(r"report-(.+?)-[A-Za-z]{3}-\d\d-\d{4}", name)
+            handle = m.group(1) if m else None
+            try:
+                profile_pdf.import_pdf(data, code, handle, source="profile report PDF")
+                done.append(code)
+                if remember and handle:
+                    db.remember_alias(analysis.norm(handle), code)
+            except Exception as ex:
+                failed.append(name + " (" + str(ex)[:100] + ")")
+        analysis.release(token)
+        msg = "Imported %d analysis%s: %s." % (len(done), "" if len(done) == 1 else "es", ", ".join(done)) if done else ""
+        if failed:
+            msg += (" " if msg else "") + "Not imported: " + "; ".join(failed)
+        return self.redirect("/analysis?%s=%s" % ("ok" if done else "e", urllib.parse.quote(msg or "Nothing was imported.")))
 
     def post_analysis_save(self):
         f = self.form_body()
@@ -2976,7 +3169,7 @@ class Handler(BaseHTTPRequestHandler):
             # who is reading it.
             if sel is not None and sel["code_id"] is not None:
                 try:
-                    if int(viewer) != sel["code_id"]:
+                    if int(viewer) != sel["code_id"] and int(viewer) != db.admin_code_id():
                         sel = None
                 except (TypeError, ValueError):
                     sel = None

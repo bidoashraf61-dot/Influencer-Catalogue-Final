@@ -290,6 +290,13 @@ CREATE TABLE IF NOT EXISTS creator_analysis (
   updated_at INTEGER NOT NULL
 );
 
+-- What the admin typed in an upload, mapped to the creator they said it meant,
+-- so the same handle or name is recognised next time without asking.
+CREATE TABLE IF NOT EXISTS creator_aliases (
+  alias TEXT PRIMARY KEY,                -- analysis.norm() of what was typed
+  code  TEXT NOT NULL                    -- creators.code
+);
+
 -- A client asking for a creator's full analysis that is not uploaded yet.
 CREATE TABLE IF NOT EXISTS analysis_requests (
   id         INTEGER PRIMARY KEY,
@@ -628,7 +635,7 @@ def list_codes():
             "SELECT c.*, "
             " (SELECT MAX(at) FROM events e WHERE e.code_id = c.id AND e.kind='unlock_ok') last_used, "
             " (SELECT COUNT(*) FROM code_devices d WHERE d.code_id = c.id) devices "
-            "FROM codes c ORDER BY c.created_at DESC"
+            "FROM codes c WHERE c.label != '" + ADMIN_LABEL + "' ORDER BY c.created_at DESC"
         ).fetchall()
 
 
@@ -782,7 +789,32 @@ def code_state(row):
 
 # ------------------------------------------------------------------ events --
 
+# The pass the admin uses to open the catalogue without a client's passcode.
+# It is a real code row (so every catalogue call behaves normally) that the
+# lists and the analytics leave out, and whose visits are not recorded.
+ADMIN_LABEL = "Admin preview (internal)"
+_admin_id = None
+
+
+def admin_code_id():
+    global _admin_id
+    import secrets
+    with connect() as conn:
+        r = conn.execute("SELECT id, revoked_at FROM codes WHERE label = ?", (ADMIN_LABEL,)).fetchone()
+        if r is None:
+            cur = conn.execute("INSERT INTO codes (code_hash, hint, label, created_at) VALUES (?,?,?,?)",
+                               (secrets.token_hex(32), "····", ADMIN_LABEL, now()))
+            _admin_id = cur.lastrowid
+        else:
+            if r["revoked_at"]:
+                conn.execute("UPDATE codes SET revoked_at = NULL WHERE id = ?", (r["id"],))
+            _admin_id = r["id"]
+    return _admin_id
+
+
 def log(kind, code_id=None, ip=None, user_agent=None, detail=None):
+    if code_id is not None and code_id == _admin_id:
+        return
     with connect() as conn:
         conn.execute(
             "INSERT INTO events (code_id, kind, at, ip, user_agent, detail) VALUES (?,?,?,?,?,?)",
@@ -844,11 +876,11 @@ def stats(days=30, start=None, end=None):
             "SELECT COUNT(DISTINCT detail) c FROM events "
             "WHERE kind='shortlist' AND at >= ? AND at < ? AND detail IS NOT NULL", (since, until))
         out["live_codes"] = one(
-            "SELECT COUNT(*) c FROM codes WHERE revoked_at IS NULL "
+            "SELECT COUNT(*) c FROM codes WHERE revoked_at IS NULL AND label != '" + ADMIN_LABEL + "' "
             "AND (expires_at IS NULL OR expires_at > ?)", (now(),))
 
         # ---- funnel: how far each issued code actually got -----------------
-        out["codes_total"] = one("SELECT COUNT(*) c FROM codes")
+        out["codes_total"] = one("SELECT COUNT(*) c FROM codes WHERE label != '" + ADMIN_LABEL + "'")
         out["codes_opened"] = one(
             "SELECT COUNT(DISTINCT code_id) c FROM events "
             "WHERE kind='unlock_ok' AND at >= ? AND at < ? AND code_id IS NOT NULL", (since, until))
@@ -863,7 +895,7 @@ def stats(days=30, start=None, end=None):
         out["by_code"] = conn.execute(
             # max_uses and uses come along because code_state() reads them —
             # a partial SELECT here raised IndexError on the rendered page.
-            "SELECT c.id, c.label, c.hint, c.revoked_at, c.expires_at,"
+            "SELECT c.id, c.label, c.hint, c.revoked_at, c.expires_at, c.archived_at,"
             " c.max_uses, c.uses,"
             " (SELECT COUNT(*) FROM events e WHERE e.code_id=c.id"
             "    AND e.kind='unlock_ok' AND e.at >= ? AND e.at < ?) opens,"
@@ -872,7 +904,7 @@ def stats(days=30, start=None, end=None):
             " (SELECT COUNT(*) FROM requests r WHERE r.code_id=c.id AND r.at >= ? AND r.at < ?) requests,"
             " (SELECT MAX(e.at) FROM events e WHERE e.code_id=c.id"
             "    AND e.kind='unlock_ok' AND e.at >= ? AND e.at < ?) last "
-            "FROM codes c ORDER BY opens DESC, c.created_at DESC",
+            "FROM codes c WHERE c.label != '" + ADMIN_LABEL + "' ORDER BY opens DESC, c.created_at DESC",
             (since, until, since, until, since, until, since, until)).fetchall()
 
         # ---- daily activity, three series ---------------------------------
@@ -2140,6 +2172,20 @@ def analysis_codes():
     with connect() as conn:
         return {r["code"]: r["updated_at"] for r in conn.execute(
             "SELECT code, updated_at FROM creator_analysis")}
+
+
+def creator_aliases():
+    with connect() as conn:
+        return {r["alias"]: r["code"] for r in conn.execute("SELECT alias, code FROM creator_aliases")}
+
+
+def remember_alias(alias, code, conn=None):
+    if conn is None:
+        with connect() as own:
+            return remember_alias(alias, code, own)
+    if alias and code:
+        conn.execute("INSERT INTO creator_aliases (alias, code) VALUES (?,?) "
+                     "ON CONFLICT(alias) DO UPDATE SET code = excluded.code", (alias, code))
 
 
 def save_analysis(code, data, source=None, conn=None):

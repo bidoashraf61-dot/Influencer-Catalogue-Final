@@ -318,6 +318,29 @@ def available():
         return False
 
 
+def sniff_creator(data, resolver):
+    """The creator a report PDF belongs to, read from the PDF itself: first the
+    profile links on page 1, then any roster handle printed there. Returns a
+    code only when exactly one creator fits."""
+    import fitz, analysis
+    try:
+        page = fitz.open(stream=data, filetype="pdf")[0]
+        links = [l.get("uri") or "" for l in page.get_links()]
+        text = page.get_text()
+    except Exception:
+        return None
+    found = set()
+    for uri in links:
+        n = analysis.norm(analysis.handle_from(uri)) if analysis.is_link(uri) else ""
+        found.update(resolver.by_handle.get(n, []))
+    if len(found) == 1:
+        return next(iter(found))
+    found = set()
+    for w in set(re.findall(r"[A-Za-z0-9._]{4,}", text)):
+        found.update(resolver.by_handle.get(analysis.norm(w), []))
+    return next(iter(found)) if len(found) == 1 else None
+
+
 def import_pdf(data, code, handle=None, source=None):
     """Read one profile report PDF and store it as creator `code`'s analysis,
     pictures included. Returns the stored document."""

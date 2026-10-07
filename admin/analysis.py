@@ -26,7 +26,7 @@ import xlsx
 MEDIA = Path(__file__).resolve().parent / "analysis_media"
 
 OVERVIEW = [
-    ("code", "Creator code (HV-…)"), ("platform", "Platform"), ("handle", "Handle"),
+    ("code", "Creator (code, @handle or name)"), ("platform", "Platform"), ("handle", "Handle"),
     ("followers", "Followers"), ("following", "Following"), ("posts_count", "Posts"),
     ("er", "Engagement rate %"), ("avg_likes", "Avg likes"), ("avg_comments", "Avg comments"),
     ("avg_views", "Avg views"), ("avg_reel_plays", "Avg reel plays"),
@@ -48,14 +48,14 @@ AUDIENCE_SECTIONS = ["countries", "cities", "gender", "ages", "languages", "inte
                      "brand_affinity", "reachability"]
 SHEETS = {
     "Overview": [label for _, label in OVERVIEW],
-    "Audience": ["Creator code", "Section (" + " / ".join(AUDIENCE_SECTIONS) + ")",
+    "Audience": ["Creator (code, @handle or name)", "Section (" + " / ".join(AUDIENCE_SECTIONS) + ")",
                  "Label (country code SA, city, female/male, 18-24, …)", "Percent",
                  "Audience of (followers / likers — empty means followers)"],
-    "Growth": ["Creator code", "Month (YYYY-MM)", "Followers", "Avg likes (optional)"],
-    "Posts": ["Creator code", "Kind (top / sponsored)", "Post link", "Image link (optional)",
+    "Growth": ["Creator (code, @handle or name)", "Month (YYYY-MM)", "Followers", "Avg likes (optional)"],
+    "Posts": ["Creator (code, @handle or name)", "Kind (top / sponsored)", "Post link", "Image link (optional)",
               "Date (YYYY-MM-DD)", "Likes", "Comments", "Views", "Brand (sponsored)"],
-    "Brands": ["Creator code", "Brand", "Posts mentioning it", "Logo link or website (optional)"],
-    "Hashtags": ["Creator code", "Hashtag or @mention", "Times used or %"],
+    "Brands": ["Creator (code, @handle or name)", "Brand", "Posts mentioning it", "Logo link or website (optional)"],
+    "Hashtags": ["Creator (code, @handle or name)", "Hashtag or @mention", "Times used or %"],
 }
 EXAMPLE = {
     "Overview": ["HV-XX-000", "Instagram", "example_handle", "84000", "610", "512", "3.4", "2700",
@@ -70,14 +70,158 @@ EXAMPLE = {
 }
 
 
-def template_xlsx(code=None):
-    """The blank template; with a creator code, the example rows already
-    carry that code, so the file only needs the numbers."""
+def norm(s):
+    """A name or handle reduced to what identifies it: lower case, no @, no
+    spaces or punctuation, so "@Sara.Ali", "sara ali" and "SaraAli" agree."""
+    return re.sub(r"[^\w]+", "", str(s or "").lower().lstrip("@"), flags=re.UNICODE).replace("_", "")
+
+
+_NOT_HANDLES = {"p", "reel", "reels", "explore", "stories", "watch", "channel", "video", "tv", "accounts", "share"}
+
+
+def handle_from(text):
+    """The handle in a pasted profile link or @mention, else the text itself.
+    A link to a post or reel names no creator, so it gives back nothing."""
+    t = str(text or "").strip()
+    m = re.search(r"(?:instagram|tiktok|snapchat|twitter|x|youtube|facebook|threads)\.(?:com|net)/(?:add/|@|user/|c/)?([A-Za-z0-9._]+)", t)
+    if m:
+        return "" if m.group(1).lower() in _NOT_HANDLES else m.group(1)
+    return t
+
+
+def is_link(text):
+    return bool(re.match(r"\s*(https?://|www\.)", str(text or ""), re.I))
+
+
+class Resolver:
+    """Finds a creator from whatever the person typed: the HV code, the
+    handle (with or without @, or a profile link), or the name. Anything that
+    is not exact is offered as a suggestion, never silently guessed."""
+
+    def __init__(self, creators, aliases=None):
+        self.by_code = {}
+        self.by_handle, self.by_name = {}, {}
+        self.aliases = {norm(k): v for k, v in (aliases or {}).items()}
+        self.label = {}
+        for c in creators:
+            code = c["code"]
+            self.by_code[code.upper()] = code
+            self.label[code] = c
+            for table, val in ((self.by_handle, c["handle"]), (self.by_name, c["name"])):
+                n = norm(val)
+                if n and code not in table.get(n, []):
+                    table.setdefault(n, []).append(code)
+            # The same person's other accounts: their profile links name handles too.
+            try:
+                profiles = json.loads(c["profiles"] or "[]")
+            except (ValueError, TypeError, KeyError, IndexError):
+                profiles = []
+            for item in profiles if isinstance(profiles, list) else []:
+                url = item.get("url") if isinstance(item, dict) else None
+                n = norm(handle_from(url)) if is_link(url) else ""
+                if n and code not in self.by_handle.get(n, []):
+                    self.by_handle.setdefault(n, []).append(code)
+        self._fuzzy_keys = None
+
+    def resolve(self, key, platform=None):
+        """(code or None, [suggested codes]). A code is returned only when
+        exactly one creator fits; when several share a handle, the platform
+        (if the sheet says one) breaks the tie."""
+        raw = str(key or "").strip()
+        up = raw.upper()
+        if up in self.by_code:
+            return self.by_code[up], []
+        n = norm(raw)
+        alias = self.aliases.get(n)
+        if alias and alias in self.label:
+            return alias, []
+        for table in (self.by_handle, self.by_name):
+            for probe in (n, norm(handle_from(raw))):
+                hits = table.get(probe) or []
+                if len(hits) == 1:
+                    return hits[0], []
+                if len(hits) > 1 and platform:
+                    same = [h for h in hits if (self.label[h]["platform"] or "").lower() == platform.strip().lower()]
+                    if len(same) == 1:
+                        return same[0], []
+                if len(hits) > 1:
+                    return None, hits[:8]
+        return None, self.suggest(raw)
+
+    def suggest(self, raw, limit=5):
+        import difflib
+        n = norm(handle_from(raw))
+        if not n:
+            return []
+        if self._fuzzy_keys is None:
+            self._fuzzy_keys = {}
+            for table in (self.by_handle, self.by_name):
+                for k, codes in table.items():
+                    self._fuzzy_keys.setdefault(k, []).extend(codes)
+        out = []
+        for k in difflib.get_close_matches(n, list(self._fuzzy_keys), n=limit, cutoff=0.72):
+            for code in self._fuzzy_keys[k]:
+                if code not in out:
+                    out.append(code)
+        # A partial name ("sara" for "Sara Ali") is also worth offering.
+        if len(out) < limit and len(n) >= 3:
+            for k, codes in self._fuzzy_keys.items():
+                if n in k:
+                    for code in codes:
+                        if code not in out:
+                            out.append(code)
+        return out[:limit]
+
+    def describe(self, code):
+        c = self.label.get(code)
+        if not c:
+            return code
+        h = ("@" + c["handle"].lstrip("@")) if c["handle"] else ""
+        return "%s · %s%s%s" % (code, c["name"], (" · " + h) if h else "",
+                                (" · " + c["platform"]) if c["platform"] else "")
+
+
+def code_from_pick(text):
+    """The creator code at the front of a review-screen entry ("HV-MC-001 · Name")."""
+    m = re.match(r"\s*([A-Za-z0-9]+(?:-[A-Za-z0-9]+)+)", str(text or ""))
+    return m.group(1).upper() if m else None
+
+
+# What a prefilled workbook asks for under each section, so the numbers can
+# be typed straight in.
+AUDIENCE_SKELETON = [("gender", "female"), ("gender", "male"),
+                     ("ages", "13-17"), ("ages", "18-24"), ("ages", "25-34"), ("ages", "35-44"), ("ages", "45+"),
+                     ("countries", "SA"), ("countries", "AE"), ("countries", "EG")]
+
+
+def template_xlsx(creators=None, code=None, missing=()):
+    """The template. With `creators` (roster rows) it comes prefilled: the
+    identity is on every row and the Audience sheet carries the usual
+    questions, so only numbers are typed. A single `code` is the old
+    one-creator download."""
     sheets = []
+    if creators:
+        for name, header in SHEETS.items():
+            rows = [header + ["Name (for reference, ignored)"]]
+            for c in creators:
+                pad = lambda row: row + [""] * (len(header) - len(row)) + [c["name"]]
+                if name == "Overview":
+                    row = [c["code"], c["platform"] or "", (c["handle"] or "").lstrip("@")]
+                    rows.append(pad(row))
+                elif name == "Audience":
+                    for sec, label in AUDIENCE_SKELETON:
+                        rows.append(pad([c["code"], sec, label]))
+                else:
+                    rows.append(pad([c["code"]]))
+            sheets.append((name, rows, {i: 22 for i in range(len(header) + 1)}, None))
+        ref = [["Code", "Name", "Handle", "Platform"]] + [
+            [c["code"], c["name"], c["handle"] or "", c["platform"] or ""] for c in creators] + [
+            ["NOT FOUND", m, "", ""] for m in missing]
+        sheets.append(("Creators (reference)", ref, {0: 16, 1: 28, 2: 24, 3: 14}, None))
+        return xlsx.write_book(sheets)
     for name, header in SHEETS.items():
         example = [code if (code and v == "HV-XX-000") else v for v in EXAMPLE[name]]
-        rows = [header, example]
-        sheets.append((name, rows, {i: 22 for i in range(len(header))}, None))
+        sheets.append((name, [header, example], {i: 22 for i in range(len(header))}, None))
     return xlsx.write_book(sheets)
 
 
@@ -97,48 +241,80 @@ def _intish(v):
     return int(round(n)) if isinstance(n, (int, float)) else None
 
 
-def parse_workbook(data, known_codes):
-    """{code: analysis document}, [problems]. Rows for codes not in the roster
-    and the template's example rows are skipped with a note."""
+def parse_workbook(data, resolver, picks=None):
+    """(docs {code: analysis}, problems, unresolved {key: [suggested codes]}).
+
+    The first column of every row names the creator — code, @handle or name.
+    A name that fits more than one creator, or none, is listed in
+    `unresolved` so the admin can pick; `picks` {key: code or ""} carries
+    those answers on a second pass (an empty answer skips the rows). The
+    template's example rows and rows with nothing but the identity filled in
+    are ignored."""
     book = xlsx.read_all(data)
-    docs, problems = {}, []
+    picks = {norm(k): v for k, v in (picks or {}).items()}
+    docs, problems, unresolved = {}, [], {}
 
     def rows(name):
         table = book.get(name) or []
         return [r for r in table[1:] if any(c.strip() for c in r)]
 
-    def doc(code):
-        code = (code or "").strip().upper()
-        if not code or code.startswith("HV-XX"):
+    def cell(r, i):
+        return r[i].strip() if len(r) > i else ""
+
+    def doc(key, platform=None, alt=()):
+        """The analysis being built for whoever `key` names; when the first
+        column is empty or unknown, the handle or profile link on the same
+        row (`alt`) is tried before asking."""
+        key = (key or "").strip()
+        if key.upper().startswith("HV-XX"):
             return None
-        if code not in known_codes:
-            problems.append(code + " is not in the roster — skipped.")
+        code, suggestions = (None, [])
+        for k in [key] + [a.strip() for a in alt if a and a.strip()]:
+            if not k:
+                continue
+            code, suggestions = resolver.resolve(k, platform)
+            if code:
+                break
+        key = key or next((a.strip() for a in alt if a and a.strip()), "")
+        if not key:
             return None
+        if code is None:
+            pick = picks.get(norm(key))
+            if pick:
+                code = pick
+            elif pick == "":
+                return None
+            else:
+                unresolved.setdefault(key, suggestions)
+                return None
         return docs.setdefault(code, {"audience": {}})
 
     keys = [k for k, _ in OVERVIEW]
     for r in rows("Overview"):
-        d = doc(r[0] if r else "")
-        if d is None:
-            continue
         r = r + [""] * (len(keys) - len(r))
+        vals = {}
         for i, k in enumerate(keys[1:], start=1):
             v = r[i].strip()
-            if not v:
-                continue
-            if k in TEXT_KEYS:
-                d[k] = v
-            else:
-                d[k] = _num(v)
-    for r in rows("Audience"):
-        d = doc(r[0] if r else "")
-        if d is None or len(r) < 4:
+            if v:
+                vals[k] = v if k in TEXT_KEYS else _num(v)
+        # Platform and handle come prefilled; they alone are not data.
+        if not {k for k, v in vals.items() if v is not None} - {"platform", "handle"}:
             continue
-        section, label, pct = r[1].strip().lower().replace(" ", "_"), r[2].strip(), _num(r[3])
-        if section not in AUDIENCE_SECTIONS or pct is None:
+        d = doc(r[0], vals.get("platform"), [vals.get("handle")] + [c for c in r if is_link(c)])
+        if d is not None:
+            d.update({k: v for k, v in vals.items() if v is not None or k in TEXT_KEYS})
+    for r in rows("Audience"):
+        pct = _num(cell(r, 3))
+        if pct is None:
+            continue
+        section, label = cell(r, 1).lower().replace(" ", "_"), cell(r, 2)
+        d = doc(r[0])
+        if d is None:
+            continue
+        if section not in AUDIENCE_SECTIONS or not label:
             problems.append("Audience row for %s skipped: section '%s'." % (r[0], r[1]))
             continue
-        who = (r[4].strip().lower() if len(r) > 4 else "")
+        who = cell(r, 4).lower()
         aud = d.setdefault("audience_likers", {}) if who.startswith("lik") else d["audience"]
         if section == "gender":
             aud.setdefault("gender", {})[label.lower()] = pct
@@ -147,14 +323,19 @@ def parse_workbook(data, known_codes):
         else:
             aud.setdefault(section, []).append({"name": label, "pct": pct})
     for r in rows("Growth"):
-        d = doc(r[0] if r else "")
-        if d is None or len(r) < 3:
+        followers = _intish(cell(r, 2))
+        if followers is None:
             continue
-        d.setdefault("growth", []).append({"month": r[1].strip()[:7], "followers": _intish(r[2]),
-                                           "avg_likes": _intish(r[3]) if len(r) > 3 else None})
+        d = doc(r[0])
+        if d is None:
+            continue
+        d.setdefault("growth", []).append({"month": cell(r, 1)[:7], "followers": followers,
+                                           "avg_likes": _intish(cell(r, 3))})
     for r in rows("Posts"):
-        d = doc(r[0] if r else "")
-        if d is None or len(r) < 3 or not r[2].startswith("https://"):
+        if not cell(r, 2).startswith("https://"):
+            continue
+        d = doc(r[0])
+        if d is None:
             continue
         r = r + [""] * (9 - len(r))
         kind = "sponsored_posts" if r[1].strip().lower().startswith("spon") else "top_posts"
@@ -165,7 +346,9 @@ def parse_workbook(data, known_codes):
     for sheet, key, fields in (("Brands", "brands", ("name", "count", "logo")),
                                ("Hashtags", "hashtags", ("tag", "count"))):
         for r in rows(sheet):
-            d = doc(r[0] if r else "")
+            if not cell(r, 1):
+                continue
+            d = doc(r[0])
             if d is None:
                 continue
             vals = (r[1:] + [""] * len(fields))[:len(fields)]
@@ -174,6 +357,9 @@ def parse_workbook(data, known_codes):
                 item[f] = _num(v) if f in ("count", "followers") else (v.strip() or None)
             if item.get(fields[0]):
                 d.setdefault(key, []).append(item)
+    # A creator whose rows held nothing is not an analysis.
+    docs = {c: d for c, d in docs.items()
+            if any(v for k, v in d.items() if k != "audience") or d["audience"]}
     for d in docs.values():
         for aud in (d["audience"], d.get("audience_likers") or {}):
             for k in ("countries", "cities", "ages", "languages", "interests", "brand_affinity"):
@@ -181,7 +367,7 @@ def parse_workbook(data, known_codes):
                     aud[k].sort(key=lambda x: -(x.get("pct") or 0))
         if "growth" in d:
             d["growth"].sort(key=lambda x: x["month"])
-    return docs, problems
+    return docs, problems, unresolved
 
 
 # Further fields read off a profile report (tools/profile_import.py), kept when
@@ -233,3 +419,43 @@ def clean_json(doc):
         raise ValueError("'audience' must be an object.")
     out.setdefault("audience", {})
     return json.loads(json.dumps(out))
+
+
+# --------------------------------------------------------- held uploads --
+# An upload that names creators we cannot match waits here (client data: not
+# in git) while the admin picks who each one is; a day later it is gone.
+PENDING = Path(__file__).resolve().parent / "analysis_pending"
+
+
+def stash(kind, files):
+    """Hold [(name, bytes)] for the review screen; returns its token."""
+    import secrets, shutil, time
+    PENDING.mkdir(exist_ok=True)
+    for d in PENDING.iterdir():
+        if d.is_dir() and time.time() - d.stat().st_mtime > 86400:
+            shutil.rmtree(d, ignore_errors=True)
+    token = secrets.token_hex(12)
+    d = PENDING / token
+    d.mkdir()
+    for i, (_, data) in enumerate(files):
+        (d / ("%d.bin" % i)).write_bytes(data)
+    (d / "meta.json").write_text(json.dumps({"kind": kind, "names": [n for n, _ in files]}))
+    return token
+
+
+def held(token):
+    """(kind, [(name, bytes)]) for a token, or None when it is gone."""
+    if not re.fullmatch(r"[0-9a-f]{24}", str(token or "")):
+        return None
+    d = PENDING / token
+    try:
+        meta = json.loads((d / "meta.json").read_text())
+        return meta["kind"], [(n, (d / ("%d.bin" % i)).read_bytes()) for i, n in enumerate(meta["names"])]
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def release(token):
+    import shutil
+    if re.fullmatch(r"[0-9a-f]{24}", str(token or "")):
+        shutil.rmtree(PENDING / token, ignore_errors=True)

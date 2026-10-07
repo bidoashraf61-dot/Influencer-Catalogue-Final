@@ -539,3 +539,18 @@ Deliberately. The catalogue is what clients open; a visible "Admin" button
 advertises the login page to every one of them and invites a guess at the
 password. Bookmark `/admin` instead — it is one path on a domain you already
 have open.
+
+## Creator analysis uploads (no codes to type)
+
+`/analysis` has two routes, both ending in a review screen for anything unclear:
+
+- **PDF reports** — drop one or many. The creator is found from the file name
+  (`report-<handle>-Oct-06-2026.pdf`), then from a roster handle printed on page 1.
+  Unmatched files go to `/analysis/review` to be assigned; nothing is refused.
+- **Spreadsheet** — download a *prefilled* template (selection, campaign, everyone
+  without an analysis, or a pasted list of handles/names). Identity is already on
+  every row; type the numbers only. The first column also accepts `@handle`, a
+  profile link or a name instead of the code. Unrecognised/ambiguous names are
+  asked about once and remembered (`creator_aliases` table).
+
+Held uploads live in `admin/analysis_pending/` (not in git) and are swept after 24 h.

@@ -659,7 +659,9 @@ def dashboard(s, events, who, message=None, error=None):
     tt = d["totals"]
     body = (
         ui.header("Home", ("%d thing%s need%s you today." % (len(q), "" if len(q) == 1 else "s", "s" if len(q) == 1 else "")) if q
-                  else "All clear. Nothing is waiting for you.")
+                  else "All clear. Nothing is waiting for you.",
+                  actions="<a class='btn lime' href='" + u("/open-catalogue") + "' target='_blank' rel='noopener'>"
+                          + ui.icon("open", 16) + " Open catalogue as admin</a>")
         + banner
         + "<div class='home-grid'><section class='card' aria-labelledby='h-needs'><div class='hd'><h2 id='h-needs'>Needs you today</h2>"
           "<span class='muted'>Most urgent first</span></div>" + needs + "</section>"
@@ -3391,7 +3393,111 @@ def clients_page(overview, origin, archived=False, n_archived=0, page_no=1, tota
     return page("Clients", body, "/clients")
 
 
-def analysis_page(creators, have, requests, origin, q="", error=None, message=None, page_no=1):
+def _dropzone(zid, name, accept, multiple, label):
+    """A file picker that also takes dropped files and lists what was chosen."""
+    return ("<div class='dz' id='" + zid + "' style='border:2px dashed #c9c2b2;border-radius:10px;padding:22px;"
+            "text-align:center;cursor:pointer;margin:8px 0 12px;background:#faf8f3'>"
+            "<div class='dz-t'>" + e(label) + "</div><div class='muted dz-l' style='margin-top:6px'></div>"
+            "<input type='file' name='" + name + "' accept='" + accept + "'" + (" multiple" if multiple else "")
+            + " required style='position:absolute;left:-9999px'></div>"
+            "<script>(function(){var z=document.getElementById('" + zid + "'),i=z.querySelector('input'),"
+            "l=z.querySelector('.dz-l');function show(){var n=i.files.length;l.textContent=n?(n==1?i.files[0].name:n+' files chosen'):''}"
+            "z.onclick=function(){i.click()};i.onchange=show;"
+            "['dragenter','dragover'].forEach(function(ev){z.addEventListener(ev,function(x){x.preventDefault();z.style.background='#eef6d8'})});"
+            "['dragleave','drop'].forEach(function(ev){z.addEventListener(ev,function(x){x.preventDefault();z.style.background='#faf8f3'})});"
+            "z.addEventListener('drop',function(x){var f=x.dataTransfer.files;if(!f.length)return;i.files=f;show()});"
+            "i.onclick=function(x){x.stopPropagation()};})();</script>")
+
+
+_PICKER_JS = r"""(function(){
+var B='%BASE%',$=function(i){return document.getElementById(i)};
+var basket={},timer,last={all:[]};
+function esc(t){return String(t==null?'':t).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function params(){var p=new URLSearchParams();p.set('q',$('pk-q').value);p.set('platform',$('pk-pl').value);
+ if($('pk-no').checked)p.set('nohave','1');if($('pk-src').value)p.set('source',$('pk-src').value);return p}
+function search(){fetch(B+'/analysis/find?'+params()).then(function(r){return r.json()}).then(function(d){last=d;drawResults()})}
+function drawResults(){var rows=last.items.map(function(c){
+ return '<label class="pk-row"><input type="checkbox" data-c="'+esc(c.code)+'" data-n="'+esc(c.name)+'"'+(basket[c.code]?' checked':'')+'> <strong>'+esc(c.name)+'</strong> <span class="muted">'+(c.handle?'@'+esc(c.handle)+' · ':'')+esc(c.platform)+(c.followers?' · '+c.followers.toLocaleString():'')+'</span>'+(c.has?' <span class="pill live">has analysis</span>':'')+'</label>'}).join('');
+ $('pk-list').innerHTML=rows||'<div class="muted" style="padding:10px">No creators match.</div>';
+ $('pk-count').textContent=last.total+' match'+(last.total==1?'':'es')+(last.total>last.items.length?' (showing '+last.items.length+')':'');
+ $('pk-all').disabled=!last.total;$('pk-all').textContent='Add all '+last.total}
+function drawBasket(){var k=Object.keys(basket);$('pk-n').textContent=k.length;
+ $('pk-chips').innerHTML=k.slice(0,40).map(function(c){return '<span class="pk-chip">'+esc(basket[c])+' <a href="#" data-x="'+esc(c)+'">×</a></span>'}).join('')+(k.length>40?' <span class="muted">+'+(k.length-40)+' more</span>':'');
+ $('pk-codes').value=k.join(',');$('pk-dl').disabled=!k.length}
+$('pk-list').addEventListener('change',function(e){var t=e.target;if(t.dataset.c){if(t.checked)basket[t.dataset.c]=t.dataset.n;else delete basket[t.dataset.c];drawBasket()}});
+$('pk-chips').addEventListener('click',function(e){var c=e.target.dataset.x;if(c){delete basket[c];drawBasket();drawResults();e.preventDefault()}});
+$('pk-all').onclick=function(){last.all.forEach(function(r){basket[r[0]]=r[1]});drawBasket();drawResults()};
+$('pk-clear').onclick=function(){basket={};drawBasket();drawResults()};
+['pk-q'].forEach(function(i){$(i).oninput=function(){clearTimeout(timer);timer=setTimeout(search,250)}});
+['pk-pl','pk-no','pk-src'].forEach(function(i){$(i).onchange=search});
+$('pk-paste').onclick=function(){var b=new URLSearchParams();b.set('list',$('pk-list-in').value);
+ fetch(B+'/analysis/find',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b}).then(function(r){return r.json()}).then(function(d){
+  d.all.forEach(function(r){basket[r[0]]=r[1]});drawBasket();
+  $('pk-pmsg').textContent='Added '+d.all.length+(d.missing.length?'. Not recognised: '+d.missing.slice(0,8).join(', ')+(d.missing.length>8?' …':''):'.')})};
+search();drawBasket()})();"""
+
+
+def _creator_picker(sources, platforms):
+    """Search the roster, tick creators (or add every match, or paste a list of
+    handles / profile links / names), and download a sheet for exactly them."""
+    return ("<style>.pk-list{max-height:280px;overflow:auto;border:1px solid #e6e1d6;border-radius:8px;background:#fff}"
+            ".pk-row{display:block;padding:7px 10px;border-bottom:1px solid #f0ece2;cursor:pointer}"
+            ".pk-chip{display:inline-block;background:#eef6d8;border-radius:12px;padding:2px 9px;margin:2px;font-size:12px}"
+            ".pk-chip a{text-decoration:none;margin-left:4px}</style>"
+            "<label>1 · Find the creators</label>"
+            "<div class='row'><div style='flex:3'><input id='pk-q' placeholder='Search by name, @handle, code or city' autocomplete='off'></div>"
+            "<div><select id='pk-pl'><option value=''>Any platform</option>"
+            + "".join("<option>%s</option>" % e(p) for p in platforms) + "</select></div>"
+            "<div><select id='pk-src'><option value=''>Whole roster</option>"
+            + "".join("<option value='%s'>%s</option>" % (e(v), e(l)) for v, l in sources) + "</select></div></div>"
+            "<label style='display:block;margin:8px 0'><input type='checkbox' id='pk-no'> Only creators without an analysis yet</label>"
+            "<div class='muted' id='pk-count' style='margin:4px 0'></div><div class='pk-list' id='pk-list'></div>"
+            "<div style='margin:8px 0'><button type='button' class='btn tiny ghost' id='pk-all'>Add all</button> "
+            "<button type='button' class='btn tiny ghost' id='pk-clear'>Clear chosen</button></div>"
+            "<details style='margin:8px 0'><summary>Or paste a list of handles, profile links or names</summary>"
+            "<textarea id='pk-list-in' placeholder='One per line — @handle, instagram.com/handle, or a name' style='min-height:90px;margin-top:8px'></textarea>"
+            "<button type='button' class='btn tiny ghost' id='pk-paste'>Add these</button> <span class='muted' id='pk-pmsg'></span></details>"
+            "<form method='post' action='" + u("/analysis/template") + "'>"
+            "<input type='hidden' name='source' value='codes'><input type='hidden' name='codes' id='pk-codes'>"
+            "<div style='margin:10px 0 4px'><strong id='pk-n'>0</strong> chosen <span id='pk-chips'></span></div>"
+            "<button class='btn small' id='pk-dl' disabled>Download sheet for the chosen creators (.xlsx)</button> "
+            "<a class='btn small ghost' href='" + u("/analysis/template.xlsx") + "'>Blank template</a></form>"
+            "<script>" + _PICKER_JS.replace("%BASE%", BASE) + "</script>")
+
+
+def analysis_review_page(kind, token, items, matched, creators, res, error=None, message=None):
+    """Upload held until the admin says who each unrecognised name is."""
+    opts = "".join("<option value=\"%s\">" % e(res.describe(c["code"])) for c in creators)
+    what = "name in the spreadsheet" if kind == "xlsx" else "PDF file"
+    rows = ""
+    for i, (key, sug, pre) in enumerate(items):
+        rows += ("<tr><td><input type='hidden' name='key_%d' value=\"%s\"><strong>%s</strong>%s</td><td>"
+                 "<input name='pick_%d' list='rv-creators' value=\"%s\" placeholder='Type a name, handle or code — empty skips' "
+                 "autocomplete='off' style='width:100%%'>%s</td></tr>") % (
+            i, e(key), e(key), "" if kind == "xlsx" else "", i, e(pre),
+            ("<div class='muted' style='margin-top:4px'>Did you mean: " + " · ".join(
+                "<a href='#' onclick=\"this.closest('td').querySelector('input').value=this.dataset.v;return false\" "
+                "data-v=\"%s\">%s</a>" % (e(x), e(x)) for x in sug) + "</div>") if sug else
+            "<div class='muted' style='margin-top:4px'>No close match in the roster.</div>")
+    lead = ("%d creator%s matched and ready. " % (matched, "" if matched == 1 else "s") if kind == "xlsx" else "")
+    n = len(items)
+    body = (ui.header("Who is this?", lead + "%d %s%s can't be matched on its own. Pick the creator, or leave it empty to skip."
+                      % (n, what, "" if n == 1 else "s"),
+                      crumbs=[("Library", None), ("Creator analysis", "/analysis"), ("Review", None)])
+            + _notes(error, message)
+            + "<form method='post' action='" + u("/analysis/review") + "' class='card'>"
+              "<input type='hidden' name='t' value='" + e(token) + "'>"
+              "<datalist id='rv-creators'>" + opts + "</datalist>"
+              "<table><thead><tr><th>" + ("As written" if kind == "xlsx" else "File") + "</th><th>Creator</th></tr></thead><tbody>"
+            + rows + "</tbody></table>"
+              "<label style='display:block;margin:12px 0'><input type='checkbox' name='remember' value='1' checked> "
+              "Remember these, so the same name is recognised next time</label>"
+              "<div class='savebar'><button class='btn small'>Save</button> "
+              "<a class='btn small ghost' href='" + u("/analysis") + "'>Cancel</a></div></form>")
+    return page("Review upload", body, "/analysis")
+
+
+def analysis_page(creators, have, requests, origin, q="", error=None, message=None, page_no=1, sources=()):
     open_reqs = [r for r in requests if not r["handled_at"]]
     req_rows = "".join(
         "<tr><td><code>" + e(r["code"]) + "</code> " + e(r["creator_name"] or "") + "</td><td>" + e(r["code_label"] or "—")
@@ -3422,24 +3528,30 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
     body = (
         ui.header("Creator analysis", "Full profile analyses clients open from the catalogue and reports. A creator without one shows a locked page with Request full analysis; requests land below.", crumbs=[("Library", None), ("Creator analysis", None)])
         + _notes(error, message)
-        + "<div class='card' id='pdf'><div class='hd'><h2>Import profile report PDFs</h2></div>"
-          "<p class='sec-desc'>Drop the report PDFs exported from the analysis tool. Each is read and saved as that creator's full analysis, "
+        + "<div class='card' id='pdf'><div class='hd'><h2>Option A · Drop profile report PDFs</h2></div>"
+          "<p class='sec-desc'>Drop one or many report PDFs. Each is read and saved as that creator's full analysis, "
           "with their photo and post covers. The creator is found from the handle in the file name "
-          "(<code>report-handle-Oct-06-2026.pdf</code>). One file at a time? Pick the creator yourself.</p>"
+          "(<code>report-handle-Oct-06-2026.pdf</code>) or printed on the report; anything that cannot be matched "
+          "comes up on a review screen where you pick the creator — nothing is refused.</p>"
           "<form method='post' action='" + u("/analysis/pdf") + "' enctype='multipart/form-data'>"
-          "<div class='row'><div style='flex:2'><label>PDF files</label><input type='file' name='file' accept='application/pdf,.pdf' multiple required></div>"
-          "<div><label>Creator (only for a single file)</label><input name='code' list='an-creators' placeholder='Type a name or code' autocomplete='off'></div></div>"
+          + _dropzone("pdf-file", "file", "application/pdf,.pdf", True, "Drop PDF reports here or click to choose")
+          + "<div class='row'><div><label>Creator (only when uploading a single file)</label>"
+            "<input name='code' list='an-creators' placeholder='Type a name, handle or code' autocomplete='off'></div></div>"
           "<datalist id='an-creators'>" + "".join("<option value=\"%s\">%s</option>" % (e(c["code"]), e(c["name"])) for c in creators) + "</datalist>"
           "<button class='btn lime'>" + ui.icon("upload", 15) + " Import</button></form></div>"
-        + "<div class='grid2'><div class='card'><h3 style='margin-top:0'>1 · Download the template</h3>"
-          "<p class='muted'>One workbook, many creators, laid out like a profile report: Overview, Audience "
-          "(followers and likers), Growth, Posts, Brands (with logos), Hashtags &amp; mentions — every row starts with "
-          "the creator code.</p>"
-          "<a class='btn small' href='" + u("/analysis/template.xlsx") + "'>Download template (.xlsx)</a></div>"
-        + "<form class='card' method='post' action='" + u("/analysis/upload") + "' enctype='multipart/form-data'>"
-          "<h3 style='margin-top:0'>2 · Upload it filled in</h3><input type='file' name='file' accept='.xlsx' required>"
-          "<p class='price-hint'>Uploading a creator again replaces their analysis and closes their open requests.</p>"
-          "<button class='btn small'>Upload analyses</button></form></div>"
+        + "<div class='card' id='prefilled'><div class='hd'><h2>Option B · Numbers in a spreadsheet</h2></div>"
+          "<p class='sec-desc'>Step 1 — search and tick the creators you have numbers for (as many as you like), then download "
+          "a sheet with them already filled in, so you never type a code. Step 2 — type the numbers and upload it. "
+          "The creator is recognised from the code, <strong>@handle</strong>, profile link or name in the first column — "
+          "or from the handle/link in the Overview row — and anything unclear is asked about before saving.</p>"
+          + _creator_picker(sources, sorted({c["platform"] for c in creators if c["platform"]}))
+          +           "<hr style='border:0;border-top:1px solid #e6e1d6;margin:16px 0'>"
+          "<form method='post' action='" + u("/analysis/upload") + "' enctype='multipart/form-data'>"
+          "<label>2 · Upload it filled in</label>"
+          + _dropzone("xlsx-file", "file", ".xlsx", False, "Drop the filled-in workbook here or click to choose")
+          + "<p class='price-hint'>Rows with only the creator filled in are ignored. Uploading a creator again replaces "
+            "their analysis and closes their open requests.</p>"
+            "<button class='btn small'>Upload analyses</button></form></div>"
         + "<h2>Requests from clients</h2><div class='card'><table><thead><tr><th>Creator</th><th>Client</th><th>Asked</th>"
           "<th>Status</th><th></th></tr></thead><tbody>" + (req_rows or "<tr><td colspan='5' class='muted'>No open requests.</td></tr>")
         + "</tbody></table></div>"
