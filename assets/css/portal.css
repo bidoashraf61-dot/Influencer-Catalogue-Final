@@ -1037,3 +1037,13 @@ body.pt-lock { overflow: hidden; }
   .hv-head__grow { display: none; }
   .hv-voice.is-open { z-index: 300; }          /* full screen: above the page's own fixed buttons */
 }
+
+
+/* The panel sits 98px above the launcher, which is itself lifted by
+   --hv-lift over the selection tray; its height subtracts both so the
+   header never runs off the top of the screen, normal or enlarged. */
+.hv-panel { height: min(640px, calc(100vh - 146px - var(--hv-lift, 0px))); height: min(640px, calc(100dvh - 146px - var(--hv-lift, 0px))); }
+@media (min-width: 561px) {
+  .hv-voice.is-big .hv-panel { height: min(860px, calc(100vh - 146px - var(--hv-lift, 0px))); height: min(860px, calc(100dvh - 146px - var(--hv-lift, 0px))); }
+}
+@media (max-width: 560px) { .hv-panel { height: auto; } }

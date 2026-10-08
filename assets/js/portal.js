@@ -962,6 +962,7 @@
   var V_ICON = {
     send: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>',
     close: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+    minimize: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 13h12"/></svg>',
     fresh: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>',
     grow: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>',
     shrink: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7"/></svg>',
@@ -1021,7 +1022,10 @@
     closeBtn.innerHTML = V_ICON.close;
     var growBtn = h("button", { class: "hv-head__btn hv-head__grow", type: "button", "aria-label": "Make the chat bigger", "aria-pressed": "false", title: "Bigger" });
     growBtn.innerHTML = V_ICON.grow;
-    head.appendChild(h("div", { class: "hv-head__tools" }, growBtn, freshBtn, closeBtn));
+    // Minimize folds the chat down to its round launcher; the conversation stays.
+    var minBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Minimize chat", title: "Minimize" });
+    minBtn.innerHTML = V_ICON.minimize;
+    head.appendChild(h("div", { class: "hv-head__tools" }, growBtn, freshBtn, minBtn, closeBtn));
     var log = h("div", { class: "hv-log", role: "log", "aria-live": "polite", "aria-relevant": "additions" });
     var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message HELV Assistant" });
     var send = h("button", { class: "hv-send", type: "button", "aria-label": "Send" });
@@ -1741,6 +1745,7 @@
     }
     launch.addEventListener("click", function () { toggle(); });
     closeBtn.addEventListener("click", function () { toggle(false); });
+    minBtn.addEventListener("click", function () { toggle(false); });
     // The account page's "Message your account manager" opens straight onto the hand-off.
     HV.talk = function () { toggle(true); setTimeout(flowHuman, 400); };
     freshBtn.addEventListener("click", function () {
