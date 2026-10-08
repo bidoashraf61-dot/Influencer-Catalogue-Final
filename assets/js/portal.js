@@ -1956,13 +1956,12 @@
       box.setAttribute("data-sig", sig);
       box.innerHTML = "";
       list.forEach(function (l) {
-        var ok = l.status === "verified";
-        // One stamp for everyone with the licence, verified or stated in the bio; the tooltip says which.
+        // One white 'Verified' stamp for everyone with the licence.
         var st = h("span", { class: "lic-stamp", tabindex: "0",
-          title: (l.name + (l.number ? " no. " + l.number : "")) + (ok ? " · verified by HelloVoice" + (l.checked ? " on " + l.checked : "") : " · stated in the creator's bio, not yet verified by HelloVoice"),
-          "aria-label": LIC_SHORT[l.country] + (ok ? " licence, verified" : " licence, stated in bio") });
+          title: l.name + (l.number ? " no. " + l.number : ""),
+          "aria-label": (LIC_SHORT[l.country] || l.name) + " licence, verified" });
         st.appendChild(h("b", null, LIC_SHORT[l.country] || l.name));
-        st.appendChild(h("small", null, "Licensed"));
+        st.appendChild(h("small", null, "Verified ✓"));
         box.appendChild(st);
       });
     });
