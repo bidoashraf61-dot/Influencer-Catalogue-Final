@@ -974,6 +974,8 @@
   function mountVoice() {
     var page = document.body.getAttribute("data-page");
     if (!VOICE_PAGES[page] || $("hv-voice")) return;
+    // Inside the profile-analysis side panel (an iframe of the creator page) the page around it already has the assistant.
+    if (window.self !== window.top || /[?&]embed=1\b/.test(location.search)) return;
     var first = ME && ME.user ? ME.user.name.split(" ")[0] : "";
     // One conversation per access (signed-in client or access code), carried across pages for a week.
     var STORE = "hv-chat:" + ((ME && ME.chat_key) || (ME && ME.user ? ME.user.email : ME && ME.kind) || "guest");
