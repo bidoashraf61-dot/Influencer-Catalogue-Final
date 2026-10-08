@@ -1020,6 +1020,21 @@ class Portal(unittest.TestCase):
             gemini.STUB = old
         self.assertTrue(any("Derm launch" in x and "main goal" in x for x in seen))
 
+    def test_82_selection_stats_uses_only_the_selections_own_figures(self):
+        import assistant
+        c1, c2 = [x["code"] for x in db.list_creators()][:2]
+        sid = db.save_selection(None, "Stats pick", [c1, c2], {c1: [1000, 3000]}, None, None)
+        tok = db.selection(sid)["token"]
+        none = assistant.t_selection_stats({}, "engagement_rate_pct")
+        self.assertIn("error", none)                                     # only with a selection open
+        ctx = {"selection": {"token": tok}}
+        er = assistant.t_selection_stats(ctx, "engagement_rate_pct")
+        self.assertEqual(er["creators_total"], 2)
+        self.assertEqual(er["creators_with_data"] + len(er["without_data"]), 2)   # gaps named, never estimated
+        pr = assistant.t_selection_stats(ctx, "client_price_sar")
+        self.assertEqual([r["value"] for r in pr["breakdown"] if r["code"] == c1], [2000.0])   # the selection's own price
+        self.assertIn("total", pr)
+
 def assistant_sql(sql):
     import assistant
     return assistant.t_sql_query({}, sql)

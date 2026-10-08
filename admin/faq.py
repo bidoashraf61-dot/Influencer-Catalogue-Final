@@ -13,7 +13,7 @@ CONTACT = "info@hellovoice.co.uk · +966 11 463 4518"
 
 # (intent, English and Arabic cues). Order matters: the first match wins.
 INTENTS = [
-    ("prices", r"\b(price|prices|pricing|rate|rates|cost|costs|how much|budget per|fee|fees)\b|كم السعر|الأسعار|اسعار|سعر|تكلفة|بكم"),
+    ("prices", r"\b(price|prices|pricing|rate card|cost|costs|how much|fee|fees|per video)\b|كم السعر|الأسعار|اسعار|سعر|تكلفة|بكم"),
     ("credits", r"\bcredits?\b|رصيد|نقاط|كريدت"),
     ("book", r"\b(book|booking|hire|order|quote|quotation|proceed|next step)\b|احجز|حجز|عرض سعر|طلب"),
     ("how", r"\b(how (does|do) (this|it|you) work|how it works|what (is|does) (this|helv|hellovoice))\b|كيف يعمل|كيف تعمل|ما هو"),
@@ -22,6 +22,9 @@ INTENTS = [
     ("contact", r"\b(contact|phone|email|call|whatsapp|talk to (someone|a person)|reach you)\b|تواصل|رقم|ايميل|بريد|اتصال"),
 ]
 # A creator request ("find me skincare creators under 5k") is not an FAQ even if it says "price".
+# Questions about numbers (engagement, views, reach, averages…) need the creators' own figures: never an FAQ.
+ANALYTIC = re.compile(r"\b(engagement|engage|er|views?|reach|impressions?|followers?|likes?|comments?|average|avg|mean|total|"
+                      r"audience|demographic\w*|fake|selection|these creators|my list|compare|best|top|highest|lowest)\b|تفاعل|مشاهد|متابع|متوسط", re.I)
 SEARCHY = re.compile(r"\b(find|show|suggest|recommend|looking for|shortlist|creators? (in|for|who)|influencers? (in|for|who))\b|ابحث|اقترح|أبحث", re.I)
 
 
@@ -42,7 +45,7 @@ def _prices():
 
 def answer(text):
     t = " ".join(str(text or "").split())
-    if not t or len(t.split()) > 14 or SEARCHY.search(t):
+    if not t or len(t.split()) > 14 or SEARCHY.search(t) or ANALYTIC.search(t):
         return None
     for intent, cue in INTENTS:
         if re.search(cue, t, re.I):

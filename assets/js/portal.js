@@ -1617,6 +1617,23 @@
       });
     }
 
+    /* -- a calculated answer: how it was worked out, per creator, on tap -- */
+    function breakdown(b) {
+      var pct = /%/.test(b.label), money = /SAR/.test(b.label);
+      function fmt(v) { return pct ? (Math.round(v * 10) / 10) + "%" : money ? "SAR " + money_(v) : followers(v); }
+      function money_(v) { return Math.round(v).toLocaleString("en-US"); }
+      var box = h("details", { class: "hv-msg hv-msg--ai hv-break" });
+      box.appendChild(h("summary", null, "See breakdown · " + b.covered + " of " + b.of + " creators"));
+      var ol = h("ol", { class: "hv-break__list" });
+      b.rows.forEach(function (r) { ol.appendChild(h("li", null, h("span", null, r.name), h("b", null, fmt(r.value)))); });
+      box.appendChild(ol);
+      var how = (b.label.replace(/\s*\(.*\)/, "")) + ": " + (b.total != null ? "total " + fmt(b.total) + " · " : "") + "average " + fmt(b.average) +
+                " across the " + b.covered + " creator" + (b.covered === 1 ? "" : "s") + " with figures on their analysis page.";
+      box.appendChild(h("p", { class: "hv-break__how" }, how));
+      if (b.missing && b.missing.length) box.appendChild(h("p", { class: "hv-break__miss" }, "No analysis yet: " + b.missing.join(", ") + "."));
+      row("ai", box);
+    }
+
     /* -- after an answer: the likely next asks, one tap each -- */
     function followUps(list) {
       var acts = { "Find creators": flowFind, "Find creators within my budget": flowFind, "Get a quote": flowQuote,
@@ -1696,6 +1713,7 @@
           if (ev.credits != null) { setCredits(ev.credits); refreshFoot(); }
           // Cards and next steps follow once the answer has finished typing.
           ty.end(ev.reply, function () {
+            if (ev.breakdown && ev.breakdown.rows && ev.breakdown.rows.length) breakdown(ev.breakdown);
             if (ev.cards && ev.cards.length) creatorCards(ev.cards);
             followUps(ev.next);
           });

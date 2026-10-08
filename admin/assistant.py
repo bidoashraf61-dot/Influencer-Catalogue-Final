@@ -148,7 +148,7 @@ def t_my_work(ctx):
         sels = conn.execute("SELECT name, token, codes, updated_at FROM selections WHERE code_id = ? ORDER BY updated_at DESC LIMIT 10",
                             (cid,)).fetchall()
         camps = conn.execute("SELECT name, client, status, platform, starts_at, ends_at FROM campaigns WHERE code_id = ? "
-                             "ORDER BY id DESC LIMIT 10", (cid,)).fetchall()
+                             "AND status != 'draft' ORDER BY id DESC LIMIT 10", (cid,)).fetchall()
     return {"credits_left": portal.balance(cid),
             "briefs": [{"summary": b["summary"], "objective": b["objective"]} for b in portal.briefs_for(cid, 5)],
             "selections": [{"name": s["name"], "creators": len(json.loads(s["codes"] or "[]"))} for s in sels],
@@ -687,6 +687,64 @@ def t_list_tiers(ctx):
 
 # --------------------------------------------------------------- registries --
 
+
+# ------------------------------------------------------ the open selection --
+# Numbers for the selection the client has open, worked out here from the same
+# analysis figures the client sees on each creator's page. Creators without an
+# analysis are counted out and named, never filled in with estimates.
+RATE_METRICS = {"engagement_rate_pct", "fake_followers_pct", "audience_share_in_country_pct"}
+SUM_METRICS = {"followers", "avg_views", "avg_likes", "avg_comments", "client_price_sar"}
+LABEL = {"engagement_rate_pct": "Engagement rate (%)", "fake_followers_pct": "Fake followers (%)",
+         "audience_share_in_country_pct": "Audience in country (%)", "followers": "Followers", "avg_views": "Average views",
+         "avg_likes": "Average likes", "avg_comments": "Average comments", "client_price_sar": "Price (SAR, midpoint)"}
+
+
+def t_selection_stats(ctx, metric="engagement_rate_pct", platform="", country="SA"):
+    sel_ctx = ctx.get("selection")
+    if not sel_ctx:
+        return {"error": "No selection is open. Ask the client to open the selection on its page."}
+    if metric not in RATE_METRICS | SUM_METRICS:
+        return {"error": "Unknown metric. Use one of: " + ", ".join(sorted(RATE_METRICS | SUM_METRICS))}
+    sel = db.selection(token=sel_ctx["token"])
+    if sel is None:
+        return {"error": "That selection no longer exists."}
+    codes = json.loads(sel["codes"] or "[]")
+    rows = {c["code"]: c for c in db.list_creators(active_only=True) if c["code"] in set(codes)}
+    plat = analysis.canon_platform(platform) if platform else None
+    every = db.analyses_for(list(rows)) if metric != "client_price_sar" else {}
+    own = json.loads(sel["prices"] or "{}")
+    bands = _bands()
+    got, missing = [], []
+    for code in codes:
+        c = rows.get(code)
+        if c is None:
+            continue
+        if metric == "client_price_sar":
+            p = own.get(code) or db.price_for(c, bands, sel["platform"] if "platform" in sel.keys() else None)
+            v = (p[0] + p[1]) / 2.0 if p else None
+            pl = None
+        else:
+            pl, d = _best_analysis(every.get(code), plat)
+            v = METRICS[metric](d, country) if d else None
+            if metric == "engagement_rate_pct" and isinstance(v, (int, float)) and v > ER_CEILING and d.get("er_basis") != "views":
+                v = None                                     # implausible: left out, as in rankings
+        if isinstance(v, (int, float)):
+            got.append({"name": c["name"], "code": code, "platform": pl, "value": round(float(v), 2)})
+        else:
+            missing.append(c["name"])
+    got.sort(key=lambda r: -r["value"])
+    vals = [r["value"] for r in got]
+    out = {"metric": metric, "label": LABEL[metric], "selection": sel["name"],
+           "creators_with_data": len(got), "creators_total": len([c for c in codes if c in rows]),
+           "without_data": missing[:40], "breakdown": got}
+    if vals:
+        out["average"] = round(sum(vals) / len(vals), 2)
+        out["highest"] = got[0]
+        out["lowest"] = got[-1]
+        if metric in SUM_METRICS:
+            out["total"] = round(sum(vals), 2)
+    return out
+
 def _decl(name, description, props=None, required=None):
     return {"name": name, "description": description,
             "parameters": {"type": "OBJECT", "properties": props or {"_": {"type": "STRING"}}, **({"required": required} if required else {})}}
@@ -706,6 +764,11 @@ CLIENT_TOOLS = {
         {"goal": {"type": "STRING", "enum": ["awareness", "engagement", "conversion", "balanced"]}, "category": SA,
          "market": {"type": "STRING", "enum": [o[0] for o in matcher._BY_ID["market"]["options"]]},
          "platforms": SA, "budget_max_sar": I, "count": I})),
+    "selection_stats": (t_selection_stats, _decl("selection_stats",
+        "Work out a number across the selection the client has open (average, total, highest, lowest, per creator), from "
+        "the creators' own analysis figures. Use it for any question about the selection as a whole, e.g. its average "
+        "engagement rate or total followers. Metrics: " + ", ".join(sorted(RATE_METRICS | SUM_METRICS)) + ".",
+        {"metric": S, "platform": S, "country": S}, ["metric"])),
     "creator_metrics": (t_creator_metrics, _decl("creator_metrics",
         "Specific analysis numbers for up to 25 creators. Ask only for the fields you need, e.g. just engagement_rate_pct. "
         "Fields: " + ", ".join(METRICS) + ". 'country' is used by audience_share_in_country_pct.",
@@ -853,7 +916,11 @@ def system_prompt(scope, ctx):
     user = ctx.get("user") or {}
     return (
         "You are the HelloVoice campaign assistant inside the Influencer Catalogue, talking to %s%s. You help marketing teams choose "
-        "creators and plan influencer campaigns in KSA, UAE and Egypt, mainly healthcare, pharma, FMCG and retail. Rules: (1) Use the tools "
+        "creators and plan influencer campaigns in KSA, UAE and Egypt, mainly healthcare, pharma, FMCG and retail. Rules: (0) Your only "
+        "knowledge is what this client can see in the catalogue: creator cards, each creator's analysis page, their own selections and "
+        "their own campaign reports, all through the tools. Never use general benchmarks, industry averages or estimates as if they were "
+        "these creators' numbers. For anything about the open selection as a whole (averages, totals, best/worst), call selection_stats "
+        "and give the result with how many creators it covers, naming that the others have no analysis yet. (1) Use the tools "
         "for every fact about creators, prices and the client's own work; never invent creators, numbers or prices. "
         "For analysis numbers ask creator_metrics for only the fields the question needs, and use rank_by_metric for "
         "'best/highest/lowest by' questions instead of fetching many creators. (2) When the client "
@@ -892,6 +959,7 @@ def _selection_note(sel):
 STEP_LABEL = {
     "search_creators": "Searching the roster", "suggest_shortlist": "Matching creators to your brief",
     "get_creator": "Reading the creator's profile", "creator_metrics": "Checking engagement and reach",
+    "selection_stats": "Calculating across your selection",
     "rank_by_metric": "Ranking creators", "price_bands": "Looking up prices", "company_info": "Checking HelloVoice details",
     "my_work": "Opening your selections and campaigns",
 }
@@ -929,6 +997,11 @@ def converse(scope, ctx, history_msgs, text, code_id=None, kind="chat", credits=
             if on_event:
                 on_event("step", STEP_LABEL.get(call["name"], "Looking that up"))
             res = run_tool(scope, call["name"], call["args"], ctx)
+            if call["name"] == "selection_stats" and isinstance(res, dict) and res.get("breakdown"):
+                ctx.setdefault("breakdowns", []).append({"label": res["label"], "average": res.get("average"), "total": res.get("total"),
+                                                         "covered": res["creators_with_data"], "of": res["creators_total"],
+                                                         "rows": [{"name": r["name"], "value": r["value"]} for r in res["breakdown"]],
+                                                         "missing": res.get("without_data") or []})
             if call["name"] in ("suggest_shortlist", "search_creators", "rank_by_metric", "creator_metrics") and isinstance(res, dict):
                 cards += [c["code"] for c in (res.get("shortlist") or res.get("creators") or []) if c.get("code") and not c.get("error")][:12]
             responses.append({"functionResponse": {"name": call["name"], "response": {"result": res}}})

@@ -891,6 +891,7 @@ class PortalMixin:
         nxt = (["Show cheaper options", "Only bigger creators", "Save all as a selection"] if cards
                else ["Find creators", "Get a quote"])
         emit({"t": "done", "reply": res["reply"], "cards": cards, "next": nxt, "thread": th["id"],
+              "breakdown": (ctx.get("breakdowns") or [None])[-1],
               "credits": portal.balance(cid) if kind != "admin" else None})
 
     # =============================================================== admin ==
