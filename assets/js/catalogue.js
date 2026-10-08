@@ -2773,6 +2773,22 @@
   });
 })();
 
+/* The showreel starts only once the creator grid is drawn, so its download
+   does not compete with the roster and the first photos. Reduced motion keeps
+   the poster. */
+(function () {
+  var v = document.querySelector('.cat-showreel__video'), grid = document.getElementById('cat-grid');
+  if (!v || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+  var started = false;
+  function go() {
+    if (started || !grid || !grid.children.length) return;
+    started = true;
+    setTimeout(function () { var p = v.play(); if (p && p.catch) p.catch(function () {}); }, 600);
+  }
+  if (grid && window.MutationObserver) new MutationObserver(go).observe(grid, { childList: true });
+  go();
+})();
+
 /* The roster count and Group / Sort sit at the end of the filter row: one
    compact toolbar. The count is the headline number ("2,137 creators", or
    "128 of 2,137" while filtered); Group and Sort read as plain text menus. */

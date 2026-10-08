@@ -47,6 +47,7 @@ if __name__ == "__main__" and _LIB.is_dir() and str(_LIB) not in _os.environ.get
     _os.execv(_sys.executable, [_sys.executable] + _sys.argv)
 
 import argparse
+import gzip
 import hashlib
 import html
 import json
@@ -88,6 +89,8 @@ import views  # noqa: E402
 import ui  # noqa: E402
 
 SECRET = auth.load_secret(HERE / ".secret")
+_GZIP_TYPES = {"application/json", "text/html", "text/plain", "text/css", "application/javascript", "text/javascript", "image/svg+xml"}
+_ROSTER_CACHE = {}
 # Salt for the visitor hash on tracking-link clicks: derived from the server
 # secret so it is stable across restarts, but not the secret itself.
 CLICK_SALT = __import__("hashlib").sha256(b"clicks|" + SECRET).hexdigest()
@@ -217,9 +220,20 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return
         if isinstance(body, str):
             body = body.encode()
+        # Text answers go out gzipped when the browser accepts it: the roster
+        # alone is ~1.5 MB of JSON and shrinks about 7x. NPM proxies /admin
+        # straight here, so nothing upstream compresses it.
+        zipped = (len(body) > 1024 and ctype.split(";")[0] in _GZIP_TYPES
+                  and "gzip" in (self.headers.get("Accept-Encoding") or "")
+                  and not any(k.lower() == "content-encoding" for k, _ in (headers or [])))
+        if zipped:
+            body = gzip.compress(body, 5)
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
+        if zipped:
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Referrer-Policy", "same-origin")
         for k, v in (headers or {}):
@@ -4116,6 +4130,29 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         ]
 
     def roster_payload(self, platform=None, only=None):
+        # The full roster is the same for every viewer, so it is built once and
+        # reused until a creator, an analysis or a tier changes (or 5 minutes
+        # pass, or the day's photo signatures roll over). It took ~0.45 s per
+        # unlock with 2,100+ creators.
+        if only is not None:
+            return self._roster_build(platform, only)
+        key = (platform, links.expires_at(), self._roster_fingerprint())
+        hit = _ROSTER_CACHE.get(key)
+        if hit and time.time() - hit[0] < 300:
+            return hit[1]
+        out = self._roster_build(platform, None)
+        _ROSTER_CACHE.clear()
+        _ROSTER_CACHE[key] = (time.time(), out)
+        return out
+
+    def _roster_fingerprint(self):
+        with db.connect() as conn:
+            return tuple(conn.execute(
+                "SELECT (SELECT count(*) || ':' || coalesce(max(updated_at), 0) FROM creators),"
+                " (SELECT count(*) || ':' || coalesce(max(rowid), 0) FROM creator_analysis),"
+                " (SELECT group_concat(name || ':' || coalesce(price_from, '') || ':' || coalesce(price_to, '')) FROM tiers)").fetchone())
+
+    def _roster_build(self, platform=None, only=None):
         bands = db.tier_prices()
         analysed = db.analysis_codes()
         def accounts(r):
@@ -4162,6 +4199,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     @classmethod
     def forget_photo_widths(cls):
         cls._widths = {}
+        _ROSTER_CACHE.clear()        # a new photo changes photo_url and lowres
 
     def is_lowres(self, photo):
         if not photo:
