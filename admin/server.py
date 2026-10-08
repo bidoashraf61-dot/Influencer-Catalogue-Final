@@ -479,6 +479,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return self.send(200, f.read_bytes(), ctype, [("Cache-Control", "public, max-age=604800")])
             return self.send(404, b"", "text/plain")
         if path == "/static/logo.webp":
+            # Full-colour mark for the light sign-in page (the knockout one is white on white there).
+            f = STATIC / "logo-color.webp"
+            if f.exists():
+                return self.send(200, f.read_bytes(), "image/webp", [("Cache-Control", "public, max-age=604800")])
             if LOGO.exists():
                 return self.send(200, LOGO.read_bytes(), "image/webp")
             return self.send(404, b"", "text/plain")
