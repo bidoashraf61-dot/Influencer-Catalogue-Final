@@ -239,7 +239,16 @@
     D.analysis = a;
     document.title = c.name + " — Creator analysis — HelloVoice";
     window.scrollTo(0, 0);
+    var gate = D.gate || { state: "unlocked" };
+    var oldGate = $("pp-gate"); if (oldGate) oldGate.remove();
+    var oldBand = $("pp-gate-band"); if (oldBand) oldBand.remove();
     renderId(c, a);
+    if (gate.state !== "unlocked") {
+      // Analysis gating: the real headline, then the locked sections drawn from sample data.
+      $("pp-plat").hidden = true; $("pp-sealed").hidden = true; $("pp-pages").hidden = true;
+      return renderGate(c, gate);
+    }
+    $("pp-id").insertAdjacentElement("afterend", gateBand(c, gate));
     renderPlatforms(c);
     $("pp-sealed").hidden = !!a;
     $("pp-pages").hidden = !a;
@@ -327,7 +336,8 @@
     }).join("");
     var line = [a && a.handle ? "@" + String(a.handle).replace(/^@/, "") : "", a && a.account_type ? a.account_type + " account" : "",
       (a && a.location) || c.city || ""].filter(Boolean);
-    var key = a ? [
+    var hl = D.gate && D.gate.state !== "unlocked" ? D.gate.headline : null;
+    var key = hl ? [] : a ? [
       ["Followers", num(a.followers || c.followers), delta(a.followers_change_pct)],
       ["Avg. likes", a.likes_hidden ? "Hidden" : num(a.avg_likes), delta(a.avg_likes_change_pct)],
       ["Engagement rate", pct2(a.er), erTag(a.er, a.followers || c.followers)]
@@ -340,7 +350,8 @@
       + '<div class="pp-fields">'
       + (a ? '<p class="pp-badge pp-badge--ok"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.4 1.8 3 .1.9 2.9 2.4 1.8-.9 2.9.9 2.9-2.4 1.8-.9 2.9-3 .1L12 21.5l-2.4-1.8-3-.1-.9-2.9-2.4-1.8.9-2.9-.9-2.9 2.4-1.8.9-2.9 3-.1z" fill="currentColor"/><path d="M8.2 12.3l2.6 2.6 5-5.2" fill="none" stroke="#e8ff76" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
            + "<span><b>" + (a.basic ? "Basic data" : "Verified analysis") + "</b>" + (a.updated ? "<small>Data from " + esc(day(a.updated)) + "</small>" : "") + "</span></p>"
-         : '<p class="pp-badge pp-badge--locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg><span><b>Not analysed yet</b><small>Basics only</small></span></p>')
+         : '<p class="pp-badge pp-badge--locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10.5" width="14" height="10" rx="2"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg><span><b>' +
+           (D.gate && D.gate.state !== "unlocked" ? "Full analysis locked</b><small>Headline numbers are free" : "Not analysed yet</b><small>Basics only") + "</small></span></p>")
       + '<h1 class="pp-name">' + esc(c.name) + "</h1>"
       + '<p class="pp-line"><span class="pp-code">' + esc(c.code) + "</span>" + line.map(esc).join(" · ") + (c.tier || c.band ? " · " + esc(c.tier || BANDS[c.band]) + " tier" : "") + "</p>"
       + '<div class="pp-handles">' + handles + "</div>"
@@ -351,6 +362,92 @@
     var pb = $("pp-print"); if (pb) pb.addEventListener("click", function () { downloadPdf(pb); });
   }
   function day(iso) { var d = new Date(String(iso).slice(0, 10) + "T00:00:00Z"); return isNaN(d) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }); }
+
+  /* ------------------------------------------------ analysis gating (v3)
+     Followers, platforms, average views and engagement are real and free. Every
+     other section is drawn from SAMPLE data the server made up for this page
+     (the real values never reach the browser) and stays blurred until HelloVoice
+     unlocks the analysis for this client. */
+  function hvi(n) { return window.hvPortal && window.hvPortal.icon ? window.hvPortal.icon(n) : ""; }
+  function when(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""; }
+  function whenLong(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : ""; }
+  function gateBand(c, g) {
+    var box = document.createElement("section");
+    box.className = "pp-req" + (g.state === "unlocked" ? " pp-req--open" : g.state === "outside" ? " pp-req--out" : "");
+    box.id = "pp-gate-band";
+    box.setAttribute("aria-live", "polite");
+    var sels = (g.selections || []).map(function (x) { return x.name; });
+    var st = {
+      locked: ["lock", "Full analysis", "Audience, growth, fake-follower check, brand history, best posts and a pricing benchmark. <b>Free</b> for creators in your selections" +
+        (sels.length ? " (this one is in <b>" + esc(sels[0]) + "</b>)" : "") + ", ready <b>within 2 working days</b>.",
+        '<button type="button" class="pp-gbtn" id="pp-ask-full">' + hvi("lock") + "Request full analysis</button>"],
+      requested: ["clock", "Analysis requested", "You asked on <b>" + esc(when(g.requested_at)) + "</b>. It will be ready by <b>" + esc(whenLong(g.ready_by)) +
+        "</b>, within 2 working days. Helvy rings your bell when it opens.", '<button type="button" class="pp-gbtn" disabled>' + hvi("clock") + "Requested</button>"],
+      outside: ["lock", "Full analysis", "Add this creator to a selection to request the full analysis. It's free, and ready within 2 working days.",
+        '<button type="button" class="pp-gbtn is-off" aria-disabled="true" title="Add this creator to a selection to request the full analysis.">' + hvi("lock") + "Request full analysis</button>"],
+      unlocked: ["unlock", "Full analysis ready", (g.granted_at ? "Opened <b>" + esc(when(g.granted_at)) + "</b> for your team. " : "") +
+        "Every section is live: audience, authenticity, content and brand history, and the PDF.", '<button type="button" class="pp-gbtn" id="pp-view-full">' + hvi("unlock") + "View full analysis</button>"]
+    }[g.state] || ["lock", "Full analysis", "", ""];
+    box.innerHTML = '<span class="pp-req__lock">' + hvi(st[0]) + '</span><div><h2 class="pp-req__h">' + st[1] + "</h2><p>" + st[2] + '</p><p class="pp-req__err" role="alert" hidden></p></div><div class="pp-req__side">' + st[3] + "</div>" +
+      (g.state === "requested" ? '<div class="pp-req__track"><span class="on">Requested · ' + esc(when(g.requested_at)) + '</span><span class="now">Being prepared</span><span>Ready by ' + esc(when(g.ready_by)) + "</span></div>" : "");
+    var ask = box.querySelector("#pp-ask-full");
+    if (ask) ask.addEventListener("click", function () {
+      ask.disabled = true;
+      fetch(API + "/api/creator/request", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: c.code }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (b) {
+          if (b && b.ok && b.gate) { D.gate = Object.assign({}, D.gate, b.gate); render(); return; }
+          ask.disabled = false;
+          var e = box.querySelector(".pp-req__err"); e.textContent = (b && b.message) || "Could not send the request. Please try again."; e.hidden = false;
+        })
+        .catch(function () { ask.disabled = false; var e = box.querySelector(".pp-req__err"); e.textContent = "Could not reach the server. Please try again."; e.hidden = false; });
+    });
+    var view = box.querySelector("#pp-view-full");
+    if (view) view.addEventListener("click", function () { var p = $("pp-pages").hidden ? $("pp-sealed") : $("pp-pages"); if (p) p.scrollIntoView({ behavior: "smooth", block: "start" }); });
+    return box;
+  }
+  function freeStrip(g) {
+    var hl = g.headline || {};
+    var plats = (hl.platforms || []).map(function (p) { return '<span class="pp-free__pm" title="' + esc(p) + '">' + icon(p) + "</span>"; }).join("");
+    var band = bandOf(hl.er_followers || hl.followers || 0), pair = bench("er", band), v = hl.er != null ? verdict(hl.er, pair) : null;
+    return '<section class="pp-free" aria-label="Headline numbers"><dl>' +
+      "<div><dt>Followers</dt><dd>" + (hl.followers ? num(hl.followers) : "—") + "</dd></div>" +
+      '<div><dt>Platforms</dt><dd><span class="pp-free__pms">' + (plats || "—") + "</span></dd></div>" +
+      "<div><dt>Avg views</dt><dd>" + (hl.avg_views != null ? num(hl.avg_views) : "—") + "</dd></div>" +
+      "<div><dt>Engagement</dt><dd>" + (hl.er != null ? (+hl.er).toFixed(1) + "%" + (hl.er != null ? erTag(hl.er, hl.er_followers || hl.followers) : "") : "—") + "</dd></div></dl>" +
+      '<p class="pp-free__note">From public profile data' + (hl.updated ? ", " + esc(day(hl.updated)) : "") + "." +
+      (v ? " " + VWORD[v] + " against the industry guide for creators of this size." : "") + "</p></section>";
+  }
+  function lockCard(title, inner, wide, g) {
+    var veil = g.state === "requested" ? hvi("clock") + "Being prepared" : hvi("lock") + "Locked";
+    return '<section class="pp-lk is-locked' + (wide ? " pp-lk--wide" : "") + '"><div class="pp-lk__hd"><h3>' + title + '</h3><span class="pp-lk__tag">' + hvi("lock") + "Sample data</span></div>" +
+      '<div class="pp-lk__data" aria-hidden="true" inert>' + inner + '</div><div class="pp-lk__veil"><span>' + veil + "</span></div></section>";
+  }
+  function renderGate(c, g) {
+    var x = g.sample || {};
+    var bars = function (rows, cls) {
+      var peak = Math.max.apply(null, rows.map(function (r) { return r[1]; }).concat([1]));
+      return '<div class="pp-sbars' + (cls ? " " + cls : "") + '">' + rows.map(function (r) {
+        return "<div><span>" + esc(r[0]) + '</span><i><b style="width:' + Math.round(r[1] / peak * 100) + '%"></b></i><strong>' + r[1] + "%</strong></div>"; }).join("") + "</div>";
+    };
+    var gr = x.growth || [], gmin = Math.min.apply(null, gr), gmax = Math.max.apply(null, gr);
+    var pts = gr.map(function (v, i) { return (i * 320 / Math.max(1, gr.length - 1)).toFixed(0) + " " + (110 - (v - gmin) / Math.max(1, gmax - gmin) * 84).toFixed(0); });
+    var g1 = (x.gender || {}).female || 50;
+    var html = '<div class="pp-gate" id="pp-gate">' + freeStrip(g) + '<div id="pp-gate-band-slot"></div><div class="pp-locks">' +
+      lockCard("Audience age and gender", '<div class="pp-gsplit"><b style="width:' + g1 + '%">Women ' + g1 + '%</b><b style="width:' + (100 - g1) + '%">Men ' + (100 - g1) + "%</b></div>" + bars(x.ages || [], "pp-sbars--o"), false, g) +
+      lockCard("Audience countries", '<div class="pp-stamps">' + (x.countries || []).map(function (r) { return '<div class="pp-stp"><b>' + r[1] + "%</b><small>" + esc(r[0]) + "</small></div>"; }).join("") + "</div>", false, g) +
+      lockCard("Growth, last 12 months", '<svg viewBox="0 0 320 120" width="100%" height="120" preserveAspectRatio="none"><path d="M' + pts.join(" L") + ' L320 120 L0 120Z" fill="#e7f7ed"/><path d="M' + pts.join(" L") +
+        '" fill="none" stroke="#14884a" stroke-width="3"/></svg><p class="pp-lk__sub">+' + (x.growth_pct || 0) + "% followers · steady</p>", false, g) +
+      lockCard("Fake-follower check", '<div class="pp-gauge"><b>' + (x.real_pct || 0) + "%<small>real followers</small></b></div>" + bars([["Real", x.real_pct || 0], ["Suspect", 100 - (x.real_pct || 0)]]), false, g) +
+      lockCard("Brand history", '<div class="pp-brandrow">' + (x.brands || []).map(function (b) { return "<span>" + esc(b) + "</span>"; }).join("") + '</div><p class="pp-lk__sub">' + (x.partnerships || 0) + " paid partnerships in 12 months</p>", false, g) +
+      lockCard("Pricing benchmark", '<div class="pp-bench"><b></b><u style="left:' + Math.round(((x.pricing || {}).pos || .5) * 100) + '%"></u></div><div class="pp-bench__k"><span>SAR ' + num((x.pricing || {}).low || 0) +
+        "</span><span>Where the fee sits</span><span>SAR " + num((x.pricing || {}).high || 0) + "</span></div>", false, g) +
+      lockCard("Best posts", '<div class="pp-sposts">' + (x.posts || []).map(function (v) { return '<div data-v="' + esc(v) + '"></div>'; }).join("") + "</div>", true, g) +
+      "</div></div>";
+    $("pp-id").insertAdjacentHTML("afterend", html);
+    $("pp-gate-band-slot").replaceWith(gateBand(c, g));
+    $("pp-source").textContent = "";
+  }
 
   /* one tab per platform the creator is on; a platform with no analysis is a locked tab */
   function renderPlatforms(c) {

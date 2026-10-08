@@ -509,7 +509,7 @@
     if (u) dock.appendChild(mountBell());
     dock.appendChild(btn);
     dock.appendChild(menu);
-    if (cat) cat.appendChild(dock); else document.body.appendChild(dock);
+    if (cat) cat.appendChild(dock); else { document.body.appendChild(dock); document.body.classList.add("has-pt-dock"); }
   }
 
   // The bell: account holders only, between Campaign tracking and the account circle.
@@ -560,7 +560,18 @@
         });
       });
     }
+    // Fixed to the window, under the bell: some page headers clip what overflows them.
+    function place() {
+      if (window.innerWidth <= 767) { drop.style.top = drop.style.right = drop.style.position = ""; return; }
+      var r = bell.getBoundingClientRect();
+      drop.style.position = "fixed";
+      drop.style.top = Math.round(r.bottom + 12) + "px";
+      drop.style.right = Math.max(10, Math.round(window.innerWidth - r.right - 58)) + "px";
+    }
+    window.addEventListener("resize", function () { if (!drop.hidden) place(); });
+    window.addEventListener("scroll", function () { if (!drop.hidden && window.innerWidth > 767) toggle(false); }, { passive: true });
     function toggle(open) {
+      if (open) place();
       drop.hidden = !open;
       bell.setAttribute("aria-expanded", open ? "true" : "false");
       if (open) { load(); var m = $("pt-menu"); if (m && !m.hidden) $("pt-avatar").click(); }

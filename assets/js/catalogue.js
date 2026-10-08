@@ -1761,7 +1761,9 @@
                         prices: b.prices || {}, total: b.total,
                         tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null, clientPlatforms: b.client_platforms || {},
                         segments: b.segments || {}, groupBy: b.group_by || "",
-                        platform: b.platform || "" };
+                        platform: b.platform || "",
+                        status: b.status || {}, statusCounts: b.status_counts || null, role: b.role || "viewer",
+                        owner: b.owner || "", kam: b.kam || "", replaceCost: b.replace_cost || 2, credits: b.credits };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
           startSelection();
@@ -1837,6 +1839,7 @@
       else if (dim === "fit") out = fitOf(code) ? [fitOf(code)] : [];
       else if (dim === "role") out = rolesOf(code);
       else if (dim === "tag") out = allTagsOf(code);
+      else if (dim === "status") out = [stLabel(statusOf(code).s)];
       else if (dim === "country") {
         values(card.dataset.city).forEach(function (v) {
           if (/^unspecified$/i.test(v)) return;
@@ -1879,6 +1882,7 @@
     }
     function groupOrder(dim, names, count) {
       var fixed = dim === "tier" ? Object.keys(TIER_PRICE)
+        : dim === "status" ? ST_ORDER.map(function (k) { return ST_LABEL[k]; })
         : dim === "fit" ? ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
         : dim === "country" ? COUNTRY_ORDER : null;
       return names.sort(function (a, b) {
@@ -1913,6 +1917,12 @@
         var pct = total ? Math.round(100 * count[k] / total) : 0;
         var flag = groupBy === "country" && k !== NONE_LABEL.country ? flagOf(k) : "";
         var mark = groupBy === "platform" && ICONS[k] ? '<span class="cat-places__mark ' + (BRAND[k] || "") + '">' + ICONS[k] + "</span>" : "";
+        if (groupBy === "status") {
+          // Under review 4 · Waiting for your yes or no.
+          sec.className = "cat-group sel-grp";
+          sec.innerHTML = '<header class="sel-grp__hd"><h2>' + esc(k) + '</h2><span class="sel-grp__n">' + count[k] + "</span><p>" +
+            esc(ST_SUB[ST_KEY[k]] ? ST_SUB[ST_KEY[k]]() : "") + "</p></header>";
+        } else
         sec.innerHTML = '<header class="cat-group__head">' + flag + mark + '<h2 class="cat-group__name">' + esc(k) + "</h2>" +
           '<span class="cat-group__n">' + count[k] + (count[k] === 1 ? " creator" : " creators") + "</span>" +
           '<span class="cat-group__pct">' + pct + "% of the selection</span></header>";
@@ -2360,6 +2370,7 @@
         var why = (v && v.reason) || "";     // the generated conclusion is in the hover on the stamp
         renderStamp(c, sc);
         renderPlat(c);
+        renderStatus(c);
         var box = c.querySelector(".cat-verdict");
         if (!fitNow && !(v && (v.roles || []).length) && !why) { if (box) box.remove(); }
         else {
@@ -2395,6 +2406,226 @@
       });
       if (controls) controls.refresh();
     }
+
+    /* ---- selection status (HELVY Connect v3) ----------------------------
+       Every creator is Under review until the selection's owner approves or
+       rejects them; HelloVoice can set any status, and only HelloVoice marks a
+       creator Unavailable. Colleagues see the same statuses and cannot change
+       them. The summary bar's chips filter the cards; "Group by status" lays
+       them out in the four groups. */
+    var ST_ORDER = ["review", "approved", "rejected", "unavailable"];
+    var ST_LABEL = { review: "Under review", approved: "Approved", rejected: "Rejected", unavailable: "Unavailable" };
+    var ST_KEY = { "Under review": "review", "Approved": "approved", "Rejected": "rejected", "Unavailable": "unavailable" };
+    var ST_SIG = { review: "wait", approved: "ok", rejected: "no", unavailable: "off" };
+    var REASONS = [["price", "Price"], ["audience", "Audience"], ["style", "Content style"], ["competitor", "Worked with a competitor"], ["other", "Other"]];
+    var ROLE = (CURATED && CURATED.role) || "viewer";
+    var KAM = (CURATED && CURATED.kam) || "";
+    var ST_SUB = {
+      review: function () { return ROLE === "owner" ? "Waiting for your yes or no." : "Waiting for " + ((CURATED && CURATED.owner) ? CURATED.owner.split(" ")[0] : "the owner") + "'s yes or no."; },
+      approved: function () { return "These go to " + (KAM ? KAM.split(" ")[0] : "HelloVoice") + " for the quote."; },
+      rejected: function () { return ROLE === "owner" ? "Tell Helvy why and it finds a better fit." : "Left out of the quote."; },
+      unavailable: function () { return "Set by HelloVoice when a creator can't take the job."; }
+    };
+    var STATUS_ON = !!(CURATED && CURATED.token && CFG.api && CURATED.status);
+    var stFilter = "";               // "", a status, "influencers" or "doctors"
+    var openWhy = {};                // codes whose reject reasons are open
+    var openRepl = {};               // codes whose replacements are shown
+    var replList = {};               // code -> creators Helvy suggested
+    function stLabel(k) { return { review: "Under review", approved: "Approved", rejected: "Rejected", unavailable: "Unavailable" }[k] || k; }
+    function hvIcon(n) { return window.hvPortal && window.hvPortal.icon ? window.hvPortal.icon(n) : ""; }
+    function statusOf(code) { return (STATUS_ON && CURATED.status[code]) || { s: "review", by: "", hv: false, at: null, reason: "", note: "", replacements: [] }; }
+    function isDoctor(code) { var c = byCode[code]; return !!(c && /^hcp/i.test(c.dataset.tier || "")); }
+    function stDay(ts) {
+      if (!ts) return "";
+      var d = new Date(ts * 1000), s = Date.now() / 1000 - ts;
+      if (s < 120) return "just now";
+      return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + (s < 86400 * 2 ? ", " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
+    }
+    function stCounts() {
+      var n = { creators: selected.length, influencers: 0, doctors: 0, review: 0, approved: 0, rejected: 0, unavailable: 0 };
+      selected.forEach(function (code) { n[statusOf(code).s]++; n[isDoctor(code) ? "doctors" : "influencers"]++; });
+      return n;
+    }
+    function stMatches(code) {
+      if (!stFilter) return true;
+      if (stFilter === "doctors") return isDoctor(code);
+      if (stFilter === "influencers") return !isDoctor(code);
+      return statusOf(code).s === stFilter;
+    }
+    function stSave(code, body, then) {
+      body.token = CURATED.token; body.code = code;
+      return fetch(CFG.api + (body.reason !== undefined && body.status === undefined ? "/api/selection/reason" : "/api/selection/status"),
+        { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (b) {
+          if (b && b.ok) { CURATED.status[code] = b.status; if (then) then(b); render(); }
+          else stToast((b && b.message) || "That didn't save. Please try again.");
+        })
+        .catch(function () { stToast("Couldn't reach the server. Please try again."); });
+    }
+    var toastEl = null;
+    function stToast(text) {
+      if (!toastEl) { toastEl = document.createElement("div"); toastEl.className = "sel-toast"; toastEl.setAttribute("role", "status"); document.body.appendChild(toastEl); }
+      toastEl.textContent = text; toastEl.hidden = false;
+      clearTimeout(toastEl._t); toastEl._t = setTimeout(function () { toastEl.hidden = true; }, 4200);
+    }
+    function whoLine(st) {
+      if (!st.at) return st.s === "review" ? (ROLE === "owner" ? "Your call." : "Not decided yet.") : "";
+      var by = st.hv ? "<b>" + esc(st.by || "HelloVoice") + "</b> · HelloVoice" : "<b>" + esc(st.by || "Client") + "</b>";
+      var lead = st.s === "review" ? "Set back by " : st.s === "unavailable" ? "Marked by " : "by ";
+      return lead + by + " · " + esc(stDay(st.at)) + (st.s === "review" && st.note ? " · " + esc(st.note) : "");
+    }
+    function replButton(code, st) {
+      var have = (st.replacements || []).length;
+      var cost = (CURATED && CURATED.replaceCost) || 2;
+      if (have) return '<button type="button" class="sel-repl sel-repl--ink" data-st-repl="' + esc(code) + '">' + hvIcon("swap") + " See " + have + " replacement" + (have === 1 ? "" : "s") + " from Helvy</button>";
+      var helvy = window.hvPortal && window.hvPortal.helvy ? '<img src="' + esc(window.hvPortal.helvy) + '" alt="" aria-hidden="true">' : "";
+      return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '">' + helvy + "<span>Find a replacement with Helvy</span>" +
+        '<span class="sel-cost">' + cost + " credits</span></button>";
+    }
+    function replPanel(code) {
+      var list = replList[code];
+      if (!list) return '<p class="sel-replbox__wait">Helvy is looking…</p>';
+      if (!list.length) return '<p class="sel-replbox__wait">Helvy found no one close enough. ' + (KAM ? esc(KAM.split(" ")[0]) : "Your account manager") + " can help.</p>";
+      return '<ul class="sel-replbox">' + list.map(function (c) {
+        var inSel = selected.indexOf(c.code) !== -1;
+        return '<li><span class="sel-replbox__ph">' + esc(String(c.code).split("-").pop()) + "</span><span><b>" + esc(c.name) + "</b><small>" +
+          esc(tierLabel(c.tier)) + " · " + esc(short(totalFollowers(c))) + " followers</small></span>" +
+          (inSel ? '<span class="sel-replbox__in">' + hvIcon("check") + " Added</span>"
+                 : '<button type="button" data-st-add="' + esc(c.code) + '">' + hvIcon("plus") + " Add</button>") + "</li>";
+      }).join("") + "</ul>";
+    }
+    function renderStatus(card) {
+      var body = card.querySelector(".cat-card__body");
+      if (!body) return;
+      var box = card.querySelector(".sel-st");
+      if (!STATUS_ON) { if (box) box.remove(); return; }
+      var code = card.dataset.code, st = statusOf(code);
+      if (!box) { box = document.createElement("div"); box.className = "sel-st"; box.setAttribute("data-noselect", ""); body.appendChild(box); }
+      card.classList.toggle("is-no", st.s === "rejected");
+      card.classList.toggle("is-off", st.s === "unavailable");
+      var canDecide = ROLE === "owner" || ROLE === "admin";
+      var html = '<div class="sel-st__line"><span class="sel-sig sel-sig--' + ST_SIG[st.s] + '">' + ST_LABEL[st.s] + "</span>" +
+        (canDecide && st.s !== "review" && (st.s !== "unavailable" || ROLE === "admin") ? '<button type="button" class="sel-st__change" data-st-set="review" data-st-code="' + esc(code) + '">' + (st.s === "rejected" ? "Undo" : "Change") + "</button>" : "") +
+        "</div>";
+      var who = whoLine(st);
+      if (who) html += '<p class="sel-st__by">' + who + "</p>";
+      if (st.s === "unavailable" && st.note) html += '<p class="sel-offnote">' + esc(st.note) + "</p>";
+      if (st.s === "rejected" && st.reason && !openWhy[code]) {
+        var lab = (REASONS.filter(function (r) { return r[0] === st.reason; })[0] || ["", ""])[1];
+        html += '<p class="sel-st__by">Why: ' + esc(lab) + (st.note ? " · " + esc(st.note) : "") + "</p>";
+      }
+      if (canDecide && st.s === "review") {
+        html += '<div class="sel-st__acts"><button type="button" class="sel-dec sel-dec--yes" data-st-set="approved" data-st-code="' + esc(code) + '">' + hvIcon("check") + " Approve</button>" +
+          '<button type="button" class="sel-dec sel-dec--no" data-st-set="rejected" data-st-code="' + esc(code) + '">' + hvIcon("x") + " Reject</button></div>";
+        if (ROLE === "admin") html += '<button type="button" class="sel-st__change sel-st__off" data-st-set="unavailable" data-st-code="' + esc(code) + '">Mark unavailable (HelloVoice)</button>';
+      }
+      if (canDecide && st.s === "rejected" && openWhy[code]) {
+        html += '<div class="sel-why"><p class="sel-why__q">Why? <span>Optional. Helps Helvy suggest better.</span></p><div class="sel-why__chips">' +
+          REASONS.map(function (r) { return '<button type="button" aria-pressed="' + (st.reason === r[0]) + '" data-st-why="' + r[0] + '" data-st-code="' + esc(code) + '">' + esc(r[1]) + "</button>"; }).join("") +
+          "</div>" + (st.reason === "other" ? '<input class="sel-why__other" maxlength="200" placeholder="In a few words" aria-label="Why, in a few words" value="' + esc(st.note || "") + '" data-st-other="' + esc(code) + '">' : "") +
+          '<button type="button" class="sel-why__skip" data-st-whydone="' + esc(code) + '">' + (st.reason ? "Done" : "Skip") + "</button></div>";
+      }
+      if (canDecide && (st.s === "rejected" || st.s === "unavailable")) {
+        html += replButton(code, st);
+        if (openRepl[code]) html += replPanel(code);
+      }
+      box.innerHTML = html;
+    }
+    function renderStatusBar() {
+      var host = $("sel-statusbar");
+      if (!STATUS_ON || !selected.length) { if (host) host.hidden = true; return; }
+      if (!host) {
+        host = document.createElement("section");
+        host.id = "sel-statusbar"; host.className = "sel-sbar"; host.setAttribute("aria-label", "Creators by status");
+        var anchor = document.querySelector(".cat-grid-section");
+        anchor.parentNode.insertBefore(host, anchor);
+        host.addEventListener("click", function (e) {
+          var b = e.target.closest("[data-st-filter]");
+          if (b) { var v = b.getAttribute("data-st-filter"); stFilter = stFilter === v ? "" : v; render(); return; }
+          var g = e.target.closest("[data-st-group]");
+          if (g) {
+            groupBy = groupBy === "status" ? "" : "status";
+            try { sessionStorage.setItem(groupKey, groupBy); } catch (x) {}
+            if (groupSel) groupSel.value = groupBy === "status" ? "" : groupBy;
+            render();
+          }
+        });
+      }
+      host.hidden = false;
+      var n = stCounts();
+      var chip = function (key, label, dot, all) {
+        if (!all && !n[key] && key !== "approved" && key !== "review") return "";
+        return '<button type="button" class="sel-chip' + (all ? " sel-chip--all" : "") + '" aria-pressed="' + (all ? !stFilter : stFilter === key) + '" data-st-filter="' + (all ? "" : key) + '">' +
+          (dot ? '<span class="sel-d sel-d--' + dot + '"></span>' : "") + label + "</button>";
+      };
+      var kinds = (n.doctors && n.influencers) ? chip("influencers", n.influencers + " influencer" + (n.influencers === 1 ? "" : "s")) + chip("doctors", n.doctors + " doctor" + (n.doctors === 1 ? "" : "s")) : "";
+      host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-sbar__in"><div class="sel-sum" role="group" aria-label="Show">' +
+        chip("", n.creators + " creator" + (n.creators === 1 ? "" : "s"), null, true) + kinds +
+        '<span class="sel-sum__sep" aria-hidden="true"></span>' +
+        chip("approved", n.approved + " approved", "ok") + chip("rejected", n.rejected + " rejected", "no") +
+        chip("review", n.review + " under review", "wait") + chip("unavailable", n.unavailable + " unavailable", "off") +
+        '</div><div class="sel-sbar__tools"><button type="button" class="sel-swrow" data-st-group role="switch" aria-checked="' + (groupBy === "status") + '"><span class="sel-sw" aria-hidden="true"></span>Group by status</button></div></div></div>';
+    }
+    if (STATUS_ON) {
+      // A selection that has statuses opens grouped by them, unless the client chose otherwise.
+      var gbStored = null;
+      try { gbStored = sessionStorage.getItem(groupKey); } catch (e) {}
+      if (gbStored === null && !(CURATED && CURATED.groupBy)) groupBy = "status";
+    }
+    $("cat-grid").addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest("[data-st-set], [data-st-why], [data-st-whydone], [data-st-repl], [data-st-add]");
+      if (!t || !STATUS_ON) return;
+      e.preventDefault(); e.stopPropagation();
+      var code = t.getAttribute("data-st-code") || t.getAttribute("data-st-whydone") || t.getAttribute("data-st-repl");
+      if (t.hasAttribute("data-st-set")) {
+        var to = t.getAttribute("data-st-set");
+        t.disabled = true;
+        stSave(code, { status: to }, function () {
+          if (to === "rejected") openWhy[code] = true;
+          if (to !== "rejected") delete openWhy[code];
+        });
+      } else if (t.hasAttribute("data-st-why")) {
+        var why = t.getAttribute("data-st-why");
+        stSave(code, { reason: why, note: why === "other" ? (statusOf(code).note || "") : "" }, function () {
+          if (why !== "other") delete openWhy[code];
+          setTimeout(function () { var o = document.querySelector('[data-st-other="' + code + '"]'); if (o) o.focus(); }, 30);
+        });
+      } else if (t.hasAttribute("data-st-whydone")) {
+        delete openWhy[code]; render();
+      } else if (t.hasAttribute("data-st-repl")) {
+        if (openRepl[code] && replList[code]) { delete openRepl[code]; render(); return; }
+        openRepl[code] = true; render();
+        fetch(CFG.api + "/api/selection/replace", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: CURATED.token, code: code }) })
+          .then(function (r) { return r.json().catch(function () { return {}; }); })
+          .then(function (b) {
+            if (!b.ok) { delete openRepl[code]; stToast(b.message || "Helvy couldn't look just now."); render(); return; }
+            replList[code] = b.replacements || [];
+            var st = statusOf(code);
+            st.replacements = replList[code].map(function (c) { return c.code; });
+            CURATED.status[code] = st;
+            if (b.spent) stToast(b.spent + " credits used." + (b.credits != null ? " " + b.credits + " left." : ""));
+            render();
+          })
+          .catch(function () { delete openRepl[code]; stToast("Couldn't reach the server. Please try again."); render(); });
+      } else if (t.hasAttribute("data-st-add")) {
+        var add = t.getAttribute("data-st-add");
+        if (byCode[add] && selected.indexOf(add) === -1) {
+          selected.push(add);
+          render(); saveShortlist();
+          stToast("Added to this selection, under review.");
+        } else if (!byCode[add]) stToast("That creator isn't in the catalogue right now.");
+      }
+    }, true);
+    $("cat-grid").addEventListener("change", function (e) {
+      var o = e.target.closest && e.target.closest("[data-st-other]");
+      if (o) stSave(o.getAttribute("data-st-other"), { reason: "other", note: o.value });
+    }, true);
+    $("cat-grid").addEventListener("keydown", function (e) {
+      var o = e.target.closest && e.target.closest("[data-st-other]");
+      if (o && e.key === "Enter") { e.preventDefault(); o.blur(); }
+    }, true);
 
     $("cat-grid").addEventListener("click", function (e) {
       var pb = e.target.closest && e.target.closest("[data-plat]");
@@ -2466,7 +2697,7 @@
       renderTags();
       var shown = 0;
       cards.forEach(function (c) {
-        var ok = selected.indexOf(c.dataset.code) !== -1 && (!controls || controls.matches(c));
+        var ok = selected.indexOf(c.dataset.code) !== -1 && (!controls || controls.matches(c)) && stMatches(c.dataset.code);
         c.hidden = !ok;
         if (ok) shown++;
       });
@@ -2483,7 +2714,7 @@
       $("sel-title").textContent = selectionName;
       document.title = selectionName + " — HelloVoice";
       $("cat-empty").textContent = selected.length
-        ? "No creators in this selection match those filters."
+        ? (stFilter ? "No creators in this selection are " + (ST_LABEL[stFilter] || stFilter).toLowerCase() + " right now." : "No creators in this selection match those filters.")
         : "This link does not name any creators.";
       $("cat-empty").hidden = shown !== 0;
 
@@ -2511,6 +2742,7 @@
       renderPlaces();
       renderCurrency();
       renderHead(lo, hi);
+      renderStatusBar();
 
       // keep the URL in step so what they see is what they can re-share
       // The short link only while the server holds exactly these creators.
