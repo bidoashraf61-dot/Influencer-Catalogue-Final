@@ -72,7 +72,7 @@ def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
 names = ('js/catalogue.js', 'css/catalogue.css', 'js/portal.js', 'css/portal.css',
          'js/campaign.js', 'css/campaign.css',
          'js/creator.js', 'css/creator.css', 'js/hv-icons.js',
-         'js/dashboard.js', 'css/dashboard.css', 'js/account.js', 'css/account.css')
+         'js/dashboard.js', 'css/dashboard.css', 'js/account.js', 'css/account.css', 'js/hv-loader.js')
 stamp = {n: h('assets/' + n) for n in names}
 for page in ('index.html', 'selection/index.html', 'campaign/index.html',
              'campaign/dashboard/index.html', 'creator/index.html', 'account/index.html'):
