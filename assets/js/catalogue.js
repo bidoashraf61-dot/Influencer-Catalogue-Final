@@ -2712,7 +2712,7 @@
       layoutGroups(grid, ordered);
 
       $("sel-title").textContent = selectionName;
-      document.title = selectionName + " — HelloVoice";
+      document.title = selectionName + " — HELVY Connect";
       $("cat-empty").textContent = selected.length
         ? (stFilter ? "No creators in this selection are " + (ST_LABEL[stFilter] || stFilter).toLowerCase() + " right now." : "No creators in this selection match those filters.")
         : "This link does not name any creators.";

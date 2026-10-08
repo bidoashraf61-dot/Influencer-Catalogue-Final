@@ -19,7 +19,7 @@
 /* ----------------------------------------------------------- top bar */
 .mx-top { padding-top: 22px; padding-bottom: 22px; }
 .mx-top__in { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.mx-top__logo img { width: 132px; height: auto; display: block; }
+.mx-top__logo img { width: 140px; height: auto; display: block; }
 .mx-top__links { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .mx-link {
   display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px;

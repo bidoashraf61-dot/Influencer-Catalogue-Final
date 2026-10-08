@@ -324,18 +324,32 @@ def _send_smtp(c, to, subject, text, html=None, reply_to=None):
         raise MailError("Could not send through the mailbox (%s)." % type(exc).__name__)
 
 
+# The HELVY Connect logo for client emails. An absolute URL on the catalogue host:
+# mail clients cannot reach relative paths, and PNG because Outlook shows no WebP.
+EMAIL_LOGO = "https://influencer-catalogue.hellovoice.co.uk/assets/brand/helvy-connect/helvy-connect-email-480.png"
+
+
 def otp_message(code, minutes=10):
-    """(subject, text, html) for a sign-in code."""
-    subject = "Your HelloVoice sign-in code: %s" % code
-    text = ("Your HelloVoice Influencer Catalogue sign-in code is %s.\n\n"
+    """(subject, text, html) for a sign-in code. The HTML is email-safe: one
+    table, inline styles, an image with width/height and alt text."""
+    subject = "Your HELVY Connect sign-in code: %s" % code
+    text = ("Your HELVY Connect sign-in code is %s.\n\n"
             "It works for %d minutes. If you did not ask for it, ignore this email.\n\n"
-            "HelloVoice · Riyadh" % (code, minutes))
+            "HELVY Connect · Powered by HelloVoice · A BlueHolding Company" % (code, minutes))
     page = (
-        "<div style='font-family:Arial,sans-serif;max-width:420px;margin:auto;padding:24px;color:#111'>"
-        "<p style='font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:#666;margin:0 0 8px'>HelloVoice</p>"
-        "<h1 style='font-size:22px;margin:0 0 16px'>Your sign-in code</h1>"
-        "<p style='font-size:34px;letter-spacing:.3em;font-weight:700;background:#f4f4ee;padding:16px;"
-        "text-align:center;border-radius:8px;margin:0 0 16px'>%s</p>"
-        "<p style='font-size:14px;color:#444;margin:0 0 8px'>It works for %d minutes. "
-        "If you did not ask for it, you can ignore this email.</p></div>" % (_html.escape(code), minutes))
+        "<table role='presentation' width='100%%' cellpadding='0' cellspacing='0' border='0' style='background:#ffffff'>"
+        "<tr><td align='center' style='padding:24px 12px'>"
+        "<table role='presentation' width='420' cellpadding='0' cellspacing='0' border='0' "
+        "style='width:100%%;max-width:420px;font-family:Arial,Helvetica,sans-serif;color:#111111'>"
+        "<tr><td style='padding:0 0 20px'>"
+        "<img src='%s' width='160' height='80' alt='HELVY Connect' "
+        "style='display:block;width:160px;height:80px;border:0;outline:none;text-decoration:none'></td></tr>"
+        "<tr><td style='font-size:22px;font-weight:700;line-height:1.3;padding:0 0 16px'>Your sign-in code</td></tr>"
+        "<tr><td style='font-size:34px;letter-spacing:.3em;font-weight:700;background:#f4f4ee;padding:16px;"
+        "text-align:center;border-radius:8px'>%s</td></tr>"
+        "<tr><td style='font-size:14px;line-height:1.5;color:#444444;padding:16px 0 24px'>It works for %d minutes. "
+        "If you did not ask for it, you can ignore this email.</td></tr>"
+        "<tr><td style='font-size:12px;line-height:1.5;color:#888888;border-top:1px solid #e5e5e5;padding:14px 0 0'>"
+        "Powered by HelloVoice &middot; A BlueHolding Company</td></tr>"
+        "</table></td></tr></table>" % (EMAIL_LOGO, _html.escape(code), minutes))
     return subject, text, page

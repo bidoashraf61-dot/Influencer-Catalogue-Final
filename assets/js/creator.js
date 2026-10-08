@@ -237,7 +237,7 @@
     PLAT = choosePlat();
     var a = (D.analyses || {})[PLAT] || null;
     D.analysis = a;
-    document.title = c.name + " — Creator analysis — HelloVoice";
+    document.title = c.name + " — Creator analysis — HELVY Connect";
     window.scrollTo(0, 0);
     var gate = D.gate || { state: "unlocked" };
     var oldGate = $("pp-gate"); if (oldGate) oldGate.remove();

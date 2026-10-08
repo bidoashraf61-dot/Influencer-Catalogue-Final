@@ -126,7 +126,7 @@
   }
 
   function showList(list) {
-    document.title = "My campaigns — HelloVoice";
+    document.title = "My campaigns — HELVY Connect";
     if (!list.length) { showNone(); return; }
     var live = list.filter(function (c) { return c.status === "live"; }).length;
     $("mx-list-sum").innerHTML = tile("Campaigns", list.length, "") + tile("Live now", live, live ? "go" : "")
@@ -345,7 +345,7 @@
 
   function render(t) {
     var c = R.campaign;
-    document.title = c.name + " — Campaign report — HelloVoice";
+    document.title = c.name + " — Campaign report — HELVY Connect";
     renderBug(c);
     renderScoreline();
     renderProgress(c);

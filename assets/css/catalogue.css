@@ -98,7 +98,8 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   padding: var(--pad);
 }
 .cat-gate__inner { max-width: 560px; text-align: center; }
-.cat-gate__logo { width: 132px; height: auto; margin-bottom: 40px; opacity: .9; }
+/* HELVY Connect, the portal's own mark (dark variant: white HELVY). */
+.cat-gate__logo { display: block; width: 200px; height: auto; margin: 0 auto 36px; }
 .cat-gate__eyebrow {
   display: inline-block;
   font-family: var(--heading); font-size: 18px; letter-spacing: .18em;
@@ -131,7 +132,7 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   display: flex; align-items: center; justify-content: space-between;
   gap: 20px; margin-bottom: 72px;
 }
-.cat-hero__logo { width: 148px; height: auto; margin: 0; flex: none; }
+.cat-hero__logo { width: 168px; height: auto; margin: 0; flex: none; }
 .cat-portfolio {
   display: inline-flex; align-items: center; gap: 9px; flex: none;
   font-family: var(--heading); font-size: 20px; letter-spacing: .06em;
@@ -653,6 +654,9 @@ body:has(#cat-tray:not([hidden])) .cat-footer { padding-bottom: 128px; }
   border-top: 1px solid rgba(255,255,255,.12);
 }
 .cat-footer__note { color: rgba(255,255,255,.58); font-size: 14px; line-height: 1.55; max-width: 60ch; margin: 0; }
+/* Powered by Hello Voice, a BlueHolding company: the house behind HELVY Connect. */
+.cat-footer__by { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; color: rgba(255,255,255,.58); font-size: 13px; }
+.cat-footer__by img { display: block; width: 104px; height: auto; }
 .cat-footer__portfolio {
   display: inline-flex; align-items: center; gap: 9px;
   min-height: 44px;
@@ -713,7 +717,7 @@ body.cat-away::after {
   .cat-card__remove { width: 44px; height: 44px; right: 10px; top: 10px; }
   .cat-hero { padding: 32px 0 60px; }
   .cat-topbar { margin-bottom: 44px; }
-  .cat-hero__logo { width: 120px; }
+  .cat-hero__logo { width: 132px; }
   .cat-portfolio { font-size: 17px; padding: 11px 18px; letter-spacing: .04em; }
   .cat-footer__portfolio { font-size: 18px; }
   .cat-footer { padding-top: 44px; }

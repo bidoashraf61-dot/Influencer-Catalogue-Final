@@ -691,10 +691,10 @@ def build():
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
-<title>Influencer Catalogue — HelloVoice</title>
+<title>HELVY Connect — Influencer Catalogue</title>
 <script src="/assets/js/hv-loader.js" data-tone="dark"></script>
-<link rel="icon" href="/assets/icons/icon-32.png" type="image/png"/>
-<link rel="apple-touch-icon" href="/assets/icons/icon-180.png"/>
+<link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png" type="image/png"/>
+<link rel="apple-touch-icon" href="/assets/brand/helvy-connect/helvy-icon-180.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
 </head>
@@ -702,7 +702,9 @@ def build():
 
 <div class="cat-gate" id="cat-gate">
   <div class="cat-gate__inner">
-    <img class="cat-gate__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+    <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp"
+         srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp 2x"
+         alt="HELVY Connect" width="320" height="160"/>
     <p class="cat-gate__eyebrow">Confidential</p>
     <h1 class="cat-gate__title">Influencer<br/>Catalogue</h1>
     <p class="cat-gate__note">Enter the access code you were given.</p>
@@ -728,7 +730,9 @@ def build():
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
         <div class="cat-brand">
-          <img class="cat-hero__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+          <img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp"
+               srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp 2x"
+               alt="HELVY Connect" width="320" height="160"/>
           <a class="cat-portfolio cat-portfolio--quiet" href="https://hellovoice.co.uk" target="_blank" rel="noopener">Portfolio<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
         </div>
         <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
@@ -788,9 +792,9 @@ def build():
   <footer class="cat-footer">
     <div class="cat-pad"><div class="cat-container">
       <div class="cat-footer__top">
-        <img class="cat-footer__logo" src="/assets/helv/logo-knockout.webp"
-             srcset="/assets/helv/logo-knockout@2x.webp 2x"
-             alt="HelloVoice" width="760" height="166"/>
+        <img class="cat-footer__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp"
+             srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp 2x"
+             alt="HELVY Connect" width="320" height="160"/>
         <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
           See the portfolio at hellovoice.co.uk
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
@@ -800,7 +804,8 @@ def build():
         <p class="cat-footer__note">
           Confidential and not for redistribution.
           Creator identities are released on agreement.
-        </p>{admin_link}
+        </p>
+        <p class="cat-footer__by"><span>Powered by</span><img src="/assets/brand/logo-knockout.webp" alt="HelloVoice" width="112" height="25"/><span>A BlueHolding Company</span></p>{admin_link}
       </div>
     </div></div>
   </footer>
@@ -871,10 +876,10 @@ def build():
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
-<title>Selection — HelloVoice</title>
+<title>Selection — HELVY Connect</title>
 <script src="/assets/js/hv-loader.js" data-tone="light" data-wait="all"></script>
-<link rel="icon" href="/assets/icons/icon-32.png" type="image/png"/>
-<link rel="apple-touch-icon" href="/assets/icons/icon-180.png"/>
+<link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png" type="image/png"/>
+<link rel="apple-touch-icon" href="/assets/brand/helvy-connect/helvy-icon-180.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
 </head>
@@ -882,7 +887,9 @@ def build():
 
 <div class="cat-gate" id="cat-gate">
   <div class="cat-gate__inner">
-    <img class="cat-gate__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+    <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp"
+         srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp 2x"
+         alt="HELVY Connect" width="320" height="160"/>
     <p class="cat-gate__eyebrow">Confidential</p>
     <h1 class="cat-gate__title">Selection</h1>
     <p class="cat-gate__note">Enter the access code you were given.</p>
@@ -924,7 +931,9 @@ def build():
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
         <div class="cat-brand">
-          <img class="cat-hero__logo" src="/assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+          <img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp"
+               srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp 2x"
+               alt="HELVY Connect" width="320" height="160"/>
           <a class="cat-portfolio cat-portfolio--quiet" href="https://hellovoice.co.uk" target="_blank" rel="noopener">Portfolio<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
         </div>
         <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
@@ -1002,9 +1011,9 @@ def build():
   <footer class="cat-footer">
     <div class="cat-pad"><div class="cat-container">
       <div class="cat-footer__top">
-        <img class="cat-footer__logo" src="/assets/helv/logo-knockout.webp"
-             srcset="/assets/helv/logo-knockout@2x.webp 2x"
-             alt="HelloVoice" width="760" height="166"/>
+        <img class="cat-footer__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp"
+             srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp 2x"
+             alt="HELVY Connect" width="320" height="160"/>
         <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
           See the portfolio at hellovoice.co.uk
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
@@ -1014,7 +1023,8 @@ def build():
         <p class="cat-footer__note">
           Confidential and not for redistribution.
           Creator identities are released on agreement.
-        </p>{admin_link}
+        </p>
+        <p class="cat-footer__by"><span>Powered by</span><img src="/assets/brand/logo-knockout.webp" alt="HelloVoice" width="112" height="25"/><span>A BlueHolding Company</span></p>{admin_link}
       </div>
     </div></div>
   </footer>

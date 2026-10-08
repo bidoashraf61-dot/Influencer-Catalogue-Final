@@ -15,7 +15,7 @@
 
 /* ---------------------------------------------------------------- header */
 .db-head { display: flex; align-items: center; gap: 16px; padding: 12px 0 10px; }
-.db-head__logo img { width: 104px; display: block; }
+.db-head__logo img { width: 104px; height: auto; display: block; }
 .db-head__brands { display: flex; align-items: center; gap: 8px; }
 .db-head__brands img { height: 40px; width: auto; max-width: 130px; object-fit: contain; }
 .db-head__brands span { color: var(--gray); font-family: var(--heading); font-size: 18px; }

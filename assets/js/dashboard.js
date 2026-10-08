@@ -95,7 +95,7 @@
   /* ------------------------------------------------------------- header */
   function setupHeader() {
     var c = R.campaign;
-    document.title = c.name + " — Dashboard — HelloVoice";
+    document.title = c.name + " — Dashboard — HELVY Connect";
     $("db-title").textContent = c.name;
     var logos = (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("");
     $("db-brands").innerHTML = logos ? logos + "<span>×</span>" : "";
