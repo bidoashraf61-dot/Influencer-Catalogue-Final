@@ -1651,14 +1651,14 @@
       var b = h("span", { class: "ai-sl__say" }, text);
       cring.parentNode.appendChild(b); setTimeout(function () { b.remove(); }, 1500);
     }
-    var POINTS = { goal: 150, platforms: 100, market: 150, category: 200, budget: 150, count: 100 };
+    // A complete brief is worth exactly 1000: every answered question counts in full,
+    // whatever was picked (one platform or three, "not decided yet" included).
+    var POINTS = { goal: 150, platforms: 150, market: 150, category: 250, budget: 150, count: 150 };
     var LEVELS = [[0, "Draft"], [250, "Focused"], [500, "Sharp"], [800, "Ready to launch"]];
     function scoreOf(id) {
       var v = answers[id];
       if (v == null || (Array.isArray(v) && !v.length)) return 0;
-      var n = POINTS[id] || 100;
-      if (Array.isArray(v) && v[0] !== "any") n += Math.min(2, v.length - 1) * 50;
-      return n;
+      return POINTS[id] || 0;
     }
     function powerNow() { return AI_STEPS.reduce(function (t, s) { return t + scoreOf(s[0]); }, 0); }
     function levelOf(n) { var l = LEVELS[0][1]; LEVELS.forEach(function (x) { if (n >= x[0]) l = x[1]; }); return l; }
