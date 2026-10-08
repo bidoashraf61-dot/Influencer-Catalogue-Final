@@ -5,8 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
-<title>My account — HelloVoice</title>
-<script src="../assets/js/hv-loader.js" data-tone="dark"></script>
+<title>My profile — HELVY Connect</title>
+<script src="../assets/js/hv-loader.js" data-tone="light"></script>
 <link rel="icon" href="../assets/icons/icon-32.png" type="image/png"/>
 <link rel="stylesheet" href="../assets/css/catalogue.css"/>
 <link rel="stylesheet" href="../assets/css/portal.css"/>
@@ -14,69 +14,49 @@
 </head>
 <body data-page="account">
 <!--
-The client's own space, for signed-in account holders only. Same ink stage
-and menu bar as the catalogue; under it a white working area with four tabs:
-Home (their profile only), Campaigns (each live campaign as the report's
-scorebug, then the rest), Selections and Settings.
-Everything is drawn by assets/js/account.js from /api/account.
+HELVY Connect: the client's profile, a full page for signed-in account holders.
+White bar with the HELVY Connect wordmark, then a side nav (tabs on a phone):
+Overview, Selections, Analyses, Campaigns, Briefs, Notifications, Credits, Account.
+Everything below the bar is drawn by assets/js/account.js from /api/account.
+Approved design: .impeccable/mockups/portal-v3/ (2026-10-09).
 -->
 
-<header class="ac-head">
-  <div class="cat-pad"><div class="cat-container">
-    <div class="cat-topbar">
-      <div class="cat-brand">
-        <a href="../" class="ac-head__logo"><img class="cat-hero__logo" src="../assets/brand/logo-knockout.webp" alt="HelloVoice — back to the catalogue"/></a>
-      </div>
-      <div class="cat-topbar__links">
-        <a class="cat-track" href="../">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-          Catalogue
-        </a>
-      </div>
+<header class="hc-bar">
+  <div class="cat-pad"><div class="cat-container cat-topbar hc-bar__in">
+    <a class="hc-mark" href="../" aria-label="HELVY Connect, back to the catalogue">
+      <span class="hc-mark__word">HELVY <span>Connect</span></span>
+      <span class="hc-mark__tag">Connecting Brands with the Right Voices</span>
+    </a>
+    <div class="cat-topbar__links">
+      <a class="hc-link hc-link--hide" href="../">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Catalogue
+      </a>
+      <a class="cat-track hc-track" href="../campaign/dashboard/" aria-label="Campaign tracking">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
+        <span>Campaign tracking</span>
+      </a>
     </div>
-
-    <div class="ac-who" id="ac-who" hidden>
-      <div class="ac-who__face" id="ac-face" aria-hidden="true"></div>
-      <div class="ac-who__text">
-        <h1 class="ac-who__name" id="ac-name"></h1>
-        <p class="ac-who__role" id="ac-role"></p>
-        <p class="ac-who__status" id="ac-status"></p>
-      </div>
-      <div class="ac-who__logo" id="ac-logo" hidden></div>
-    </div>
-
-    <nav class="ac-tabs" id="ac-tabs" aria-label="My account" hidden>
-      <a href="#home" data-tab="home">Home</a>
-      <a href="#campaigns" data-tab="campaigns">Campaigns</a>
-      <a href="#selections" data-tab="selections">Selections</a>
-      <a href="#settings" data-tab="settings">Settings</a>
-    </nav>
   </div></div>
 </header>
 
-<main class="ac-main" id="ac-main">
+<main class="hc-main" id="ac-main">
   <div class="cat-pad"><div class="cat-container">
-    <div class="ac-loading" id="ac-loading">Loading your account…</div>
+    <div class="ac-loading" id="ac-loading" role="status">Loading your profile…</div>
     <div class="ac-closed" id="ac-closed" hidden></div>
-    <section class="ac-panel" id="tab-home" data-panel="home" hidden></section>
-    <section class="ac-panel" id="tab-selections" data-panel="selections" hidden></section>
-    <section class="ac-panel" id="tab-campaigns" data-panel="campaigns" hidden></section>
-    <section class="ac-panel" id="tab-settings" data-panel="settings" hidden></section>
+    <div class="hc-acc" id="hc-acc" hidden>
+      <aside class="hc-side" id="hc-side" aria-label="Your profile"></aside>
+      <div class="hc-body" id="hc-body" tabindex="-1"></div>
+    </div>
   </div></div>
 </main>
 
-<footer class="cat-footer">
-  <div class="cat-pad"><div class="cat-container">
-    <div class="cat-footer__top">
-      <img class="cat-footer__logo" src="../assets/helv/logo-knockout.webp" srcset="../assets/helv/logo-knockout@2x.webp 2x" alt="HelloVoice" width="760" height="166"/>
-      <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
-        See the portfolio at hellovoice.co.uk
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
-      </a>
-    </div>
-    <div class="cat-footer__base">
-      <p class="cat-footer__note">Confidential and not for redistribution.</p>
-    </div>
+<div class="hc-toast" id="hc-toast" role="status" aria-live="polite" hidden></div>
+
+<footer class="hc-foot">
+  <div class="cat-pad"><div class="cat-container hc-foot__in">
+    <span class="hc-foot__mark">HELVY <span>Connect</span></span>
+    <span class="hc-foot__by"><span>Powered by</span><img src="../assets/brand/logo-knockout.webp" alt="Hello Voice" width="112" height="25"/><span>| A Blue Holding Company</span></span>
   </div></div>
 </footer>
 

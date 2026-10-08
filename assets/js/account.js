@@ -1,13 +1,16 @@
-/* The client's own space (/account/): drawn from /api/account.
+/* HELVY Connect: the client's profile (/account/), drawn from /api/account.
  *
- * Tabs by hash: #home (default), #selections, #campaigns, #settings, and
- * #settings/<section> for profile, team, notifications or privacy.
+ * Sections by hash: #overview (default), #selections, #analyses, #campaigns,
+ * #briefs, #notifications, #credits, #account. A side nav on a desktop, a strip
+ * of tabs on a phone.
  *
- * Home leads with the live campaign as a scorebug, in the campaign report's
- * own vocabulary (verdict stamp, red LIVE dot, scoreline, Strong / Fair / Low
- * signals), so the account and the report read as one product.
+ * Overview leads with Helvy and ONE next step, then the status line, the latest
+ * notifications, profile completion (each step priced in what its credits buy)
+ * and the invite. Campaigns keep the report's own scorebug.
  *
  * Everything from the server goes on the page with textContent, never HTML.
+ * Icons, the notification row and Helvy's picture come from portal.js
+ * (window.hvPortal), which has loaded by the time /api/account answers.
  */
 (function () {
   "use strict";
@@ -16,8 +19,12 @@
   var API = (CFG.api != null ? CFG.api : "/admin").replace(/\/$/, "");
   var ROOT = "../";
   var DATA = null;
-  var FLASH = null;           // a message that must survive the next re-render
+  var FLASH = null;            // a message that must survive the next re-render
+  var SECTION = "overview";
+  var FILTER = "all";          // the notifications filter chip
 
+  function HV() { return window.hvPortal || {}; }
+  function ic(name) { return HV().icon ? HV().icon(name) : ""; }
   function $(id) { return document.getElementById(id); }
   function h(tag, props) {
     var el = document.createElement(tag);
@@ -27,7 +34,7 @@
       if (v == null || v === false) return;
       if (k === "class") el.className = v;
       else if (k === "text") el.textContent = v;
-      else if (k === "html") el.innerHTML = v;           // only our own static strings
+      else if (k === "html") el.innerHTML = v;           // only our own static strings and icons
       else if (k.slice(0, 2) === "on") el.addEventListener(k.slice(2), v);
       else el.setAttribute(k, v === true ? "" : v);
     });
@@ -39,6 +46,7 @@
     if (Array.isArray(c)) { c.forEach(function (x) { add(el, x); }); return; }
     el.appendChild(typeof c === "string" || typeof c === "number" ? document.createTextNode(String(c)) : c);
   }
+  function icon(name) { var s = h("span", { class: "hc-icw", "aria-hidden": "true", html: ic(name) }); return s.firstChild || s; }
   function api(method, path, body) {
     return fetch(API + path, {
       method: method, credentials: "include", cache: "no-store",
@@ -48,7 +56,7 @@
       return r.json().catch(function () { return {}; }).then(function (b) { return { s: r.status, b: b }; });
     }, function () { return { s: 0, b: {} }; });
   }
-  function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (e) { return null; } }
+  function store(k, v) { try { if (v === undefined) return sessionStorage.getItem(k); sessionStorage.setItem(k, v); } catch (e) { return null; } }
 
   /* ------------------------------------------------------------ formatting */
 
@@ -62,6 +70,8 @@
     if (!ts) return "";
     return new Date(ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
   }
+  function shortDay(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" }) : ""; }
+  function dm(ts) { return ts ? new Date(ts * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" }) : ""; }
   function ago(ts) {
     if (!ts) return "";
     var s = Date.now() / 1000 - ts;
@@ -73,15 +83,279 @@
   function initials(name) {
     return String(name || "").trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase() || "?";
   }
-  // The report's words: a signal is Strong / Fair / Low, a campaign is On track / Close to target / Behind target.
+  function first(name) { return String(name || "").trim().split(/\s+/)[0] || ""; }
+  function plural(n, one, many) { return n + " " + (n === 1 ? one : (many || one + "s")); }
+  function imgUrl(kind, v) { return API + "/api/me/image?k=" + kind + "&v=" + encodeURIComponent(v || ""); }
+  function note(el, text, bad) { el.textContent = text || ""; el.className = "ac-note" + (bad ? " ac-note--bad" : ""); }
+  function costs() { return DATA.costs || {}; }
+  // What credits buy, in the client's terms: +5 = 1 free AI shortlist.
+  function buys(n) {
+    var c = costs(), brief = c.brief || 5, rep = c.replace || 2, chat = c.chat || 1;
+    if (n >= brief && n % brief === 0) return n === brief ? "1 free AI shortlist" : (n / brief) + " more AI shortlists";
+    if (n === rep) return "1 replacement search";
+    return Math.floor(n / chat) + " questions to Helvy";
+  }
   var SIG = { good: "Strong", moderate: "Fair", low: "Low" };
-  function sig(grade, label) {
-    return h("span", { class: "ac-sig ac-sig--" + (grade || "none") }, label || SIG[grade] || "Too early");
+  function sig(grade, label) { return h("span", { class: "ac-sig ac-sig--" + (grade || "none") }, label || SIG[grade] || "Too early"); }
+  function stamp(v) { return h("span", { class: "ac-verdict ac-verdict--" + (v.grade || "none") }, v.label || "Getting started"); }
+
+  /* -------------------------------------------------------------- side nav */
+
+  var NAV = [["overview", "Overview", "home"], ["selections", "Selections", "list"], ["analyses", "Analyses", "scan"],
+             ["campaigns", "Campaigns", "mega"], ["briefs", "Briefs", "brief"], ["notifications", "Notifications", "bell"],
+             ["credits", "Credits", "coin"], ["hr"], ["account", "Account", "user"]];
+
+  function face(u, cls) {
+    var f = h("span", { class: cls || "hc-face", "aria-hidden": "true" });
+    if (u.photo) f.appendChild(h("img", { src: imgUrl("photo", u.photo), alt: "" }));
+    else f.textContent = initials(u.name);
+    return f;
   }
-  function stamp(v) {
-    return h("span", { class: "ac-verdict ac-verdict--" + (v.grade || "none") }, v.label || "Getting started");
+  function pending() { return DATA.analyses.filter(function (a) { return a.state === "requested"; }); }
+  function countFor(key) {
+    if (key === "selections") return DATA.selections.length || null;
+    if (key === "analyses") return pending().length || null;
+    if (key === "campaigns") return DATA.insights.live_campaigns || null;
+    if (key === "notifications") return DATA.notifications.unread || null;
+    if (key === "credits") return DATA.credits != null ? DATA.credits : null;
+    return null;
   }
-  // Posts against the calendar: how much of the plan is live versus how much of the campaign has run.
+  function renderSide() {
+    var u = DATA.user, side = $("hc-side");
+    side.textContent = "";
+    side.appendChild(h("div", { class: "hc-me" }, face(u),
+      h("div", null, h("b", null, u.name || u.email), h("small", null, [u.job_title, u.company].filter(Boolean).join(" · ") || u.email))));
+    var nav = h("nav", { class: "hc-nav", "aria-label": "Your profile" });
+    NAV.forEach(function (it) {
+      if (it[0] === "hr") { nav.appendChild(h("hr")); return; }
+      var n = countFor(it[0]);
+      var a = h("a", { href: "#" + it[0], "aria-current": it[0] === SECTION ? "page" : null, "data-nav": it[0] }, icon(it[2]), it[1]);
+      if (n != null) a.appendChild(h("span", { class: "n" + (it[0] === "notifications" ? " n--new" : ""), "data-count": it[0] }, String(n)));
+      nav.appendChild(a);
+    });
+    side.appendChild(nav);
+    var out = h("button", { class: "hc-more", type: "button", onclick: signOut }, icon("out"), "Sign out");
+    side.appendChild(h("div", { class: "hc-out" }, out));
+    var cur = nav.querySelector('[aria-current="page"]');
+    if (cur && window.matchMedia("(max-width: 1100px)").matches) cur.scrollIntoView({ block: "nearest", inline: "center" });
+  }
+  function signOut() { api("POST", "/api/auth/logout", {}).then(function () { location.href = ROOT; }); }
+
+  // Credits count up when a reward lands, so the reward is seen as well as said.
+  function countUp(from, to) {
+    DATA.credits = to;
+    var el = document.querySelector('[data-count="credits"]');
+    if (!el || from === to || window.matchMedia("(prefers-reduced-motion: reduce)").matches) { if (el) el.textContent = String(to); return; }
+    var t0 = null, d = 900;
+    function step(t) {
+      t0 = t0 || t;
+      var k = Math.min(1, (t - t0) / d), e = 1 - Math.pow(1 - k, 3);
+      el.textContent = String(Math.round(from + (to - from) * e));
+      if (k < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  var toastTimer = null;
+  function toast(n, text) {
+    var t = $("hc-toast");
+    t.textContent = "";
+    t.appendChild(h("span", { class: "hc-reward" }, "+" + n));
+    t.appendChild(h("span", null, text));
+    t.hidden = false;
+    t.style.animation = "none"; void t.offsetWidth; t.style.animation = "";
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.hidden = true; }, 5200);
+  }
+  function celebrate(earned, credits) {
+    if (!earned || !earned.length) { if (credits != null) DATA.credits = credits; return; }
+    var total = earned.reduce(function (s, e) { return s + e.credits; }, 0);
+    var before = DATA.credits;
+    toast(total, (earned.length === 1 ? earned[0].label.replace(/^Add your /, "Thanks for your ") : "Profile rewards") + ". That's " + buys(total) + ".");
+    countUp(before, credits != null ? credits : before + total);
+  }
+
+  /* -------------------------------------------------------------- overview */
+
+  function greeting() {
+    var hr = new Date().getHours();
+    return hr < 12 ? "Morning" : hr < 17 ? "Afternoon" : "Evening";
+  }
+  function greet() {
+    var u = DATA.user, nx = DATA.next;
+    var hi = h("h1", { class: "hc-greet__hi" }, greeting() + ", ", h("span", null, first(u.name) || "there"));
+    var p = h("p", null, nx.lead, h("b", null, nx.strong), nx.tail);
+    var later = "hc-later:" + nx.kind + ":" + nx.href;
+    var go = h("div", { class: "hc-bubble__go" });
+    if (store(later)) {
+      go.appendChild(h("span", { class: "ac-muted" }, "Saved for later. It's here whenever you're ready."));
+      go.appendChild(h("a", { class: "hc-more", href: ROOT + nx.href }, nx.cta));
+    } else {
+      var cta = h("a", { class: "hc-btn", href: ROOT + nx.href }, nx.cta, " ", icon("arrow"));
+      if (!nx.href) cta.addEventListener("click", function (e) { if (HV().talk) { e.preventDefault(); HV().talk(); } });
+      go.appendChild(cta);
+      go.appendChild(h("button", { class: "hc-more", type: "button", onclick: function () { store(later, "1"); renderSection(); } }, "Later"));
+    }
+    var img = h("img", { src: HV().helvy || ROOT + "assets/brand/helvy.webp", alt: "Helvy, your AI assistant", width: "148", height: "148" });
+    return h("section", { class: "hc-greet", "aria-label": "Helvy's next step for you" },
+      h("div", { class: "hc-greet__helvy" }, img),
+      h("div", { class: "hc-greet__body" }, hi,
+        h("div", { class: "hc-bubble" }, h("div", { class: "hc-bubble__who" }, h("b", null, "Helvy"), " · your next step"), p, go)));
+  }
+  function scoreline() {
+    var mine = DATA.selections.filter(function (s) { return s.mine && s.counts.review; }).length;
+    var pend = pending();
+    var soon = pend.map(function (a) { return a.ready_by; }).sort()[0];
+    var monthly = DATA.monthly_credits;
+    function cell(term, fig, sub, link, href) {
+      return h("div", null, h("dt", null, term), h("dd", { class: "hc-score__fig" }, fig),
+        h("dd", { class: "hc-score__sub" }, sub), h("dd", { class: "hc-score__go" }, h("a", { class: "hc-more", href: href }, link)));
+    }
+    return h("dl", { class: "hc-score" },
+      cell("Active selections", String(DATA.selections.length),
+        mine ? [h("b", null, String(mine)), " waiting for your review"] : "Nothing waiting for you", "Open selections", "#selections"),
+      cell("Analyses pending", String(pend.length),
+        pend.length ? ["Ready by ", h("b", null, shortDay(soon))] : "Free for creators in your selections", "Track requests", "#analyses"),
+      cell("Credits left", [String(DATA.credits), monthly && DATA.credits <= monthly ? h("small", null, "of " + monthly) : null],
+        monthly ? ["Tops up to " + monthly + " on ", h("b", null, dm(DATA.next_refill))] : "Ask your account manager for more", "See credits", "#credits"));
+  }
+  function latest() {
+    var items = DATA.notifications.items.slice(0, 4);
+    var list = h("ul", { class: "hc-notes" });
+    items.forEach(function (n) { var li = h("li"); li.appendChild(HV().noteRow(n, noteOpened)); list.appendChild(li); });
+    return h("section", { class: "hc-panel", "aria-labelledby": "hc-latest" },
+      h("div", { class: "hc-sechd" }, h("h2", { class: "hc-h2", id: "hc-latest" }, "Latest"), h("a", { class: "hc-more", href: "#notifications" }, "See all")),
+      items.length ? list : h("p", { class: "ac-muted" }, "Nothing yet. When HelloVoice reviews a creator, answers an analysis request or updates a campaign, it shows here and in the bell."));
+  }
+  function noteOpened() {
+    DATA.notifications.unread = Math.max(0, DATA.notifications.unread - 1);
+    if (HV().setUnread) HV().setUnread(DATA.notifications.unread);
+  }
+  var STEP_IC = { photo: "camera", job_title: "case", phone: "phone", logo: "image", brands: "tag", industry_markets: "globe" };
+  var STEP_WHY = { brands: "Helvy matches creators to them", industry_markets: "your briefs start filled in" };
+  var STEP_FIELD = { photo: "photo", job_title: "job_title", phone: "phone", logo: "logo", brands: "brands", industry_markets: "industry" };
+  function ring(pct) {
+    var r = 58, c = 2 * Math.PI * r;
+    var svg = '<svg viewBox="0 0 136 136" aria-hidden="true"><circle cx="68" cy="68" r="' + r + '" fill="none" stroke="#efede8" stroke-width="12"/>' +
+      '<circle cx="68" cy="68" r="' + r + '" fill="none" stroke="#121212" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + c.toFixed(1) +
+      '" stroke-dashoffset="' + (c * (1 - pct / 100)).toFixed(1) + '"/></svg>';
+    return h("div", { class: "hc-ring", role: "img", "aria-label": pct + "% of your profile is complete" },
+      h("span", { html: svg }), h("div", { class: "hc-ring__in" }, h("b", null, pct + "%"), h("small", null, "Complete")));
+  }
+  function stepRow(s) {
+    var b = h("button", { class: "hc-step", type: "button", "data-focus": STEP_FIELD[s.key],
+      onclick: function () { focusField(STEP_FIELD[s.key]); } },
+      h("span", { class: "hc-step__ic" }, icon(STEP_IC[s.key] || "plus")),
+      h("span", null, h("b", null, s.label), h("small", null, h("em", null, "= " + buys(s.credits)), STEP_WHY[s.key] ? " · " + STEP_WHY[s.key] : " with Helvy")),
+      h("span", { class: "hc-reward" }, "+" + s.credits));
+    return h("li", null, b);
+  }
+  function finish() {
+    var c = DATA.completion;
+    var open = c.steps.filter(function (s) { return !s.paid; });
+    var left = c.steps.filter(function (s) { return !s.done; }).length;
+    var lead = c.waiting
+      ? h("p", { class: "hc-done__lead" }, h("mark", null, plural(c.waiting, "credit") + " waiting"),
+          left ? " for " + plural(left, "quick detail") + ". Helvy uses them to pre-fill your briefs." : ". Save your profile to collect them.")
+      : h("p", { class: "hc-done__lead" }, "All profile credits earned. Helvy uses your details to pre-fill your briefs.");
+    var steps = h("ul", { class: "hc-steps" });
+    open.slice(0, 3).forEach(function (s) { steps.appendChild(stepRow(s)); });
+    if (!c.bonus_paid) {
+      steps.appendChild(h("li", null, h("div", { class: "hc-step hc-step--bonus" },
+        h("span", { class: "hc-step__ic" }, icon("gift")),
+        h("span", null, h("b", null, "Reach 100%"), h("small", null, h("em", null, "= " + buys(c.bonus)), " as a bonus")),
+        h("span", { class: "hc-reward" }, "+" + c.bonus))));
+    }
+    var got = h("ul", { class: "hc-got", "aria-label": "Already earned" });
+    c.steps.filter(function (s) { return s.paid; }).forEach(function (s) {
+      got.appendChild(h("li", null, icon("check"), s.label.replace(/^Add your /, "").replace(/^./, function (x) { return x.toUpperCase(); }) + " +" + s.credits));
+    });
+    return h("section", { class: "hc-panel", "aria-labelledby": "hc-finish" },
+      h("div", { class: "hc-done__top" }, ring(c.pct), h("div", null, h("h2", { class: "hc-h2", id: "hc-finish" }, c.pct >= 100 ? "Profile complete" : "Finish your profile"), lead)),
+      steps.children.length ? steps : null, got.children.length ? got : null);
+  }
+  function inviteLink() { return new URL(ROOT + "?invite=" + encodeURIComponent(DATA.invite.token), location.href).href; }
+  function copy(text, btn, done) {
+    var ok = function () { var was = btn.textContent; btn.textContent = done || "Copied"; setTimeout(function () { btn.textContent = was; }, 1800); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, function () { window.prompt("Copy this link:", text); });
+    else window.prompt("Copy this link:", text);
+  }
+  function inviteBand() {
+    var inv = DATA.invite, worth = Math.floor(inv.credits / (costs().brief || 5));
+    var btn = h("button", { class: "hc-btn hc-btn--ink", type: "button" }, icon("link"), " Copy invite link");
+    btn.addEventListener("click", function () { copy(inviteLink(), btn, "Link copied"); });
+    return h("section", { class: "hc-invite", "aria-labelledby": "hc-inv" },
+      h("div", null, h("h2", { class: "hc-h2", id: "hc-inv" }, "Bring a colleague, get " + worth + " AI shortlists"),
+        h("p", null, "Share your invite link with someone on your team. When HelloVoice approves their account and they sign in for the first time, you get " + inv.credits + " credits."),
+        h("p", { class: "hc-invite__fine" }, "Same company email domain · up to " + inv.max + " paid invites" + (inv.paid ? " · " + inv.left + " left" : ""))),
+      h("div", { class: "hc-invite__act" }, h("span", { class: "hc-invite__big", "aria-hidden": "true" }, "+" + inv.credits), btn));
+  }
+  function renderOverview(p) {
+    add(p, greet());
+    add(p, scoreline());
+    add(p, h("div", { class: "hc-cols" }, latest(), finish()));
+    if (DATA.invite.left > 0) add(p, inviteBand());
+  }
+
+  /* ------------------------------------------------------------ selections */
+
+  function statusSigs(c) {
+    var out = [];
+    if (c.approved) out.push(h("span", { class: "hc-sig hc-sig--ok" }, c.approved + " approved"));
+    if (c.rejected) out.push(h("span", { class: "hc-sig hc-sig--no" }, c.rejected + " rejected"));
+    if (c.review) out.push(h("span", { class: "hc-sig hc-sig--wait" }, c.review + " under review"));
+    if (c.unavailable) out.push(h("span", { class: "hc-sig hc-sig--off" }, c.unavailable + " unavailable"));
+    return out;
+  }
+  function head(title, lead, side) {
+    return h("div", { class: "hc-head" }, h("div", null, h("h1", { class: "hc-h1" }, title), lead ? h("p", null, lead) : null), side || null);
+  }
+  function renderSelections(p) {
+    add(p, head("Selections", "Approve the creators you want and reject the ones you don't. Your account manager sees every change and quotes the approved list.",
+      h("a", { class: "hc-btn hc-btn--line hc-btn--sm", href: ROOT + "#cat-roster" }, "Browse creators")));
+    if (!DATA.selections.length) {
+      add(p, h("div", { class: "hc-empty" }, h("b", null, "No selections yet"),
+        h("p", null, "Pick creators in the catalogue, or let Helvy build a scored shortlist from a short brief."),
+        h("a", { class: "hc-btn", href: ROOT }, "Find creators")));
+      return;
+    }
+    var list = h("ul", { class: "hc-list" });
+    DATA.selections.forEach(function (s) {
+      var c = s.counts;
+      list.appendChild(h("li", null, h("a", { class: "hc-row", href: ROOT + "selection/#s=" + encodeURIComponent(s.token) },
+        h("div", null, h("span", { class: "hc-row__name" }, s.name),
+          h("div", { class: "hc-row__meta" },
+            h("span", null, plural(c.creators, "creator") + (c.doctors ? " · " + plural(c.doctors, "doctor") : "")),
+            statusSigs(c), h("span", null, (s.owner ? s.owner + "'s · " : "") + "updated " + ago(s.updated_at)))),
+        h("span", { class: "hc-row__go" }, s.mine && c.review ? "Review" : "Open", " ", icon("arrow")))));
+    });
+    add(p, list);
+  }
+
+  /* -------------------------------------------------------------- analyses */
+
+  function renderAnalyses(p) {
+    add(p, head("Analyses", "A full analysis opens a creator's audience, growth, fake-follower check, brand history, best posts and a pricing benchmark. It is free for any creator in one of your selections and ready within 2 working days."));
+    if (!DATA.analyses.length) {
+      add(p, h("div", { class: "hc-empty" }, h("b", null, "No analyses requested yet"),
+        h("p", null, "Open a creator from one of your selections and press Request full analysis. Helvy rings your bell when it opens."),
+        h("a", { class: "hc-btn", href: "#selections" }, "Go to my selections")));
+      return;
+    }
+    var list = h("ul", { class: "hc-list" });
+    DATA.analyses.forEach(function (a) {
+      var open = a.state === "unlocked";
+      list.appendChild(h("li", null, h("a", { class: "hc-row", href: ROOT + "creator/#c=" + encodeURIComponent(a.code) },
+        h("div", null, h("span", { class: "hc-row__name" }, a.name),
+          h("div", { class: "hc-row__meta" }, h("span", null, a.code),
+            open ? h("span", { class: "hc-sig hc-sig--ok" }, "Unlocked " + dm(a.at))
+                 : h("span", { class: "hc-sig hc-sig--wait" }, "Requested · ready by " + shortDay(a.ready_by)))),
+        h("span", { class: "hc-row__go" }, open ? "View full analysis" : "See what's free now", " ", icon("arrow")))));
+    });
+    add(p, list);
+  }
+
+  /* ------------------------------------------------------------- campaigns */
+
   function pace(c) {
     if (!c.planned || !c.starts_at || !c.ends_at) return null;
     var span = c.ends_at - c.starts_at;
@@ -92,35 +366,7 @@
     if (done >= ran - .3) return { grade: "moderate", label: "Slightly behind" };
     return { grade: "low", label: "Behind plan" };
   }
-  function imgUrl(kind, v) { return API + "/api/me/image?k=" + kind + "&v=" + encodeURIComponent(v || ""); }
-  function note(el, text, bad) { el.textContent = text || ""; el.className = "ac-note" + (bad ? " ac-note--bad" : ""); }
-
-  /* ------------------------------------------------------------------ head */
-
-  function face(el, u) {
-    el.textContent = "";
-    if (u.photo) el.appendChild(h("img", { src: imgUrl("photo", u.photo), alt: "" }));
-    else el.appendChild(h("span", null, initials(u.name)));
-  }
-
-  // The header names the page and holds the tabs; who the client is lives on Home.
-  function renderHead() {
-    var ins = DATA.insights;
-    $("ac-face").hidden = true;
-    $("ac-logo").hidden = true;
-    $("ac-name").textContent = "My account";
-    $("ac-role").textContent = DATA.user.name || DATA.user.email;
-    var bits = [];
-    bits.push(ins.live_campaigns ? ins.live_campaigns + " campaign" + (ins.live_campaigns === 1 ? "" : "s") + " live" : "No live campaigns");
-    bits.push(DATA.selections.length + " selection" + (DATA.selections.length === 1 ? "" : "s"));
-    $("ac-status").textContent = bits.join(" · ");
-    $("ac-who").hidden = false;
-    $("ac-tabs").hidden = false;
-  }
-
-  /* ------------------------------------------------------------------ home */
-
-  function scoreline(items) {
+  function scorelineDl(items) {
     var dl = h("dl", { class: "ac-scoreline" });
     items.forEach(function (it) {
       dl.appendChild(h("div", null, h("dt", null, it[0]), h("dd", null, it[1], it[2] ? h("small", null, it[2]) : null),
@@ -128,188 +374,217 @@
     });
     return dl;
   }
-
-  // The live campaign, as the report's scorebug: brands, LIVE, name, verdict, scoreline, one way in.
-  function scorebug(c, more) {
+  function scorebug(c) {
     var u = DATA.user, p = pace(c);
     var brands = h("div", { class: "ac-bug__brands" });
     if (u.logo) { brands.appendChild(h("img", { src: imgUrl("logo", u.logo), alt: u.company || "" })); brands.appendChild(h("span", { class: "ac-bug__x", "aria-hidden": "true" }, "×")); }
     brands.appendChild(h("img", { class: "ac-bug__hv", src: ROOT + "assets/brand/logo.png", alt: "HelloVoice" }));
-    return h("section", { class: "ac-bug", "aria-labelledby": "ac-bug-title" },
-      h("div", { class: "ac-bug__top" }, brands,
-        h("span", { class: "ac-live" }, "Live"),
+    return h("section", { class: "ac-bug", "aria-label": c.name },
+      h("div", { class: "ac-bug__top" }, brands, h("span", { class: "ac-live" }, "Live"),
         h("span", { class: "ac-muted" }, [day(c.starts_at), day(c.ends_at)].filter(Boolean).join(" – "))),
-      h("div", { class: "ac-bug__row" },
-        h("h2", { class: "ac-bug__title", id: "ac-bug-title" }, c.name),
-        stamp(c.verdict)),
-      scoreline([
+      h("div", { class: "ac-bug__row" }, h("h2", { class: "ac-bug__title" }, c.name), stamp(c.verdict)),
+      scorelineDl([
         ["Views", big(c.views), null, null],
         ["Reach", big(c.reach), null, h("span", { class: "ac-muted" }, "people reached")],
         ["Engagement", c.er != null ? c.er.toFixed(1) : "—", c.er != null ? "%" : null, c.er_grade ? sig(c.er_grade) : null],
         ["Posts live", String(c.delivered), c.planned ? "/" + c.planned : null, p ? sig(p.grade, p.label) : null]
       ]),
-      h("div", { class: "ac-bug__go" },
-        h("a", { class: "cat-btn cat-btn--lime", href: ROOT + "campaign/#t=" + encodeURIComponent(c.token) }, "Open the full report"),
-        more ? h("a", { class: "ac-more", href: "#campaigns" }, more) : null));
+      h("div", { class: "ac-bug__go" }, h("a", { class: "hc-btn", href: ROOT + "campaign/#t=" + encodeURIComponent(c.token) }, "Open the full report")));
   }
-
-  function completionStrip() {
-    var c = DATA.completion;
-    if (!c || c.pct >= 100) return null;
-    var key = "ac-strip:" + DATA.user.email;
-    if (store(key) === String(c.missing.length)) return null;   // dismissed at this many steps
-    var strip = h("div", { class: "ac-strip", role: "note" },
-      h("span", { class: "ac-strip__meter", "aria-hidden": "true" }, h("i", { style: "width:" + c.pct + "%" })),
-      h("span", null, h("b", null, c.missing.length + " step" + (c.missing.length === 1 ? "" : "s") + " to finish your profile"),
-        " · " + c.missing.map(function (m) { return m.label.replace(/^Add (a |an |your )?/, ""); }).join(", ")),
-      h("a", { href: "#settings/profile", "data-focus": c.missing[0].key }, "Finish →"),
-      h("button", { class: "ac-strip__x", type: "button", "aria-label": "Hide this reminder", onclick: function () { store(key, String(c.missing.length)); strip.remove(); } }, "×"));
-    return strip;
-  }
-
-  function attentionCard() {
-    if (!DATA.attention.length) return null;
-    var list = h("ul", { class: "ac-attn" });
-    DATA.attention.forEach(function (a) {
-      var label = h("span", null, a.text);
-      list.appendChild(h("li", { class: "ac-attn__" + a.kind },
-        h("span", { class: "ac-attn__dot", "aria-hidden": "true" }),
-        a.href ? h("a", { href: ROOT + a.href }, label, h("span", { "aria-hidden": "true" }, " →")) : label));
-    });
-    return h("div", { class: "ac-card ac-card--attn" }, h("h2", { class: "ac-h2" }, "Needs your attention"), list);
-  }
-
-  function explainer() {
-    return h("details", { class: "ac-explain" }, h("summary", null, "What these numbers mean"),
-      h("dl", null,
-        h("dt", null, "Views"), h("dd", null, "How many times the campaign's videos and posts were played or seen."),
-        h("dt", null, "Reach"), h("dd", null, "How many different people saw them at least once."),
-        h("dt", null, "Engagement"), h("dd", null, "Likes, comments, shares and saves as a share of views, graded against HelloVoice's benchmark for creators of the same size: Strong, Fair or Low."),
-        h("dt", null, "Posts live"), h("dd", null, "Posts published so far against the plan, compared with how far into the campaign we are."),
-        h("dt", null, "AI credits"), h("dd", null, "Used by the HELV Assistant for written shortlists and chat answers. Browsing, selections and reports never use credits.")));
-  }
-
   function campaignCard(c) {
-    var href = ROOT + "campaign/#t=" + encodeURIComponent(c.token);
-    var dates = [day(c.starts_at), day(c.ends_at)].filter(Boolean).join(" – ");
     var p = pace(c);
-    return h("a", { class: "ac-item ac-item--camp", href: href },
+    return h("a", { class: "ac-item ac-item--camp", href: ROOT + "campaign/#t=" + encodeURIComponent(c.token) },
       h("div", { class: "ac-item__top" },
         c.status === "live" ? h("span", { class: "ac-live" }, "Live") : h("span", { class: "ac-status" }, c.status === "ended" ? "Ended" : c.status),
         h("span", { class: "ac-item__verdict ac-item__verdict--" + (c.verdict.grade || "none") }, c.verdict.label || "Getting started")),
       h("b", { class: "ac-item__name" }, c.name),
-      h("span", { class: "ac-muted" }, dates),
+      h("span", { class: "ac-muted" }, [day(c.starts_at), day(c.ends_at)].filter(Boolean).join(" – ")),
       h("div", { class: "ac-item__nums" },
         h("span", null, h("b", null, big(c.views)), " views"),
         h("span", null, h("b", null, c.delivered + (c.planned ? "/" + c.planned : "")), " posts"),
         p && c.status === "live" ? sig(p.grade, p.label) : null),
       h("span", { class: "ac-item__go" }, "Open report →"));
   }
-
-  function selectionCard(s) {
-    return h("a", { class: "ac-item", href: ROOT + "selection/#s=" + encodeURIComponent(s.token) },
-      h("span", { class: "ac-item__kicker" }, s.creators + " creator" + (s.creators === 1 ? "" : "s")),
-      h("b", { class: "ac-item__name" }, s.name),
-      h("span", { class: "ac-muted" }, "Updated " + ago(s.updated_at)),
-      h("span", { class: "ac-item__go" }, "Open selection →"));
-  }
-
-  function empty(title, line, cta, href, go) {
-    return h("div", { class: "ac-empty" }, h("b", null, title), h("p", null, line),
-      cta ? (go ? h("button", { class: "cat-btn cat-btn--lime", type: "button", onclick: go }, cta)
-                : h("a", { class: "cat-btn cat-btn--lime", href: href }, cta)) : null);
-  }
-
-  function section(title, link, items, emptyEl, sub) {
-    return h("div", { class: "ac-sec" },
-      h("div", { class: "ac-sec__hd" }, h("div", null, h("h2", { class: "ac-h2" }, title), sub ? h("p", { class: "ac-muted ac-sec__sub" }, sub) : null), link),
-      items.length ? h("div", { class: "ac-grid" }, items) : emptyEl);
-  }
-
-  function talk() { if (window.hvPortal && window.hvPortal.talk) window.hvPortal.talk(); else location.href = ROOT; }
-
-  function shortlistLine() {
-    var i = DATA.insights;
-    if (!i.shortlisted) return null;
-    var tiers = Object.keys(i.tiers || {}).sort(function (a, b) { return i.tiers[b] - i.tiers[a]; })
-      .slice(0, 3).map(function (t) { return t + ": " + i.tiers[t]; }).join(" · ");
-    return i.shortlisted + " creators shortlisted" + (tiers ? " — " + tiers : "");
-  }
-
-  function contactCard() {
-    var who = DATA.kam || "Your HelloVoice team";
-    return h("div", { class: "ac-card ac-contact" },
-      h("div", null, h("span", { class: "ac-label" }, DATA.kam ? "Your account manager" : "Your contact"),
-        h("b", { class: "ac-contact__name" }, who),
-        h("p", { class: "ac-muted" }, "Questions about a selection, a quote or a campaign? Message here and it reaches " + (DATA.kam ? DATA.kam.split(" ")[0] : "the team") + " with the context.")),
-      h("button", { class: "cat-btn cat-btn--lime", type: "button", onclick: talk }, "Message " + (DATA.kam ? DATA.kam.split(" ")[0] : "the team")));
-  }
-
-  // Home is the client's own profile, nothing else: who they are, how to
-  // reach them, their contact at HelloVoice, their credits and team.
-  function renderHome() {
-    var p = $("tab-home");
-    p.textContent = "";
-    var u = DATA.user;
-    add(p, completionStrip());
-    var facts = [["Email", u.email], ["Phone", u.phone], ["Job title", u.job_title], ["Company", u.company],
-                 ["Member since", u.created_at ? day(u.created_at) : null],
-                 ["Account manager", DATA.kam || "Your HelloVoice team"],
-                 ["AI credits", DATA.credits != null ? DATA.credits + " left" + (DATA.monthly_credits ? " · " + DATA.monthly_credits + " added monthly" : "") : null]];
-    var dl = h("dl", { class: "ac-facts" });
-    facts.forEach(function (f) {
-      dl.appendChild(h("div", null, h("dt", null, f[0]), h("dd", { class: f[1] ? null : "is-empty" }, f[1] || "Not added yet")));
-    });
-    var faceEl = h("div", { class: "ac-profile__face", "aria-hidden": "true" });
-    face(faceEl, u);
-    add(p, h("section", { class: "ac-profile", "aria-labelledby": "ac-profile-name" },
-      h("div", { class: "ac-profile__who" }, faceEl,
-        h("div", null, h("h2", { class: "ac-profile__name", id: "ac-profile-name" }, u.name || u.email),
-          h("p", { class: "ac-muted" }, [u.job_title, u.company].filter(Boolean).join(" · ") || u.email)),
-        u.logo ? h("div", { class: "ac-profile__logo" }, h("img", { src: imgUrl("logo", u.logo), alt: u.company || "Company logo" })) : null),
-      dl,
-      h("div", { class: "ac-row" },
-        h("a", { class: "cat-btn cat-btn--lime", href: "#settings/profile" }, "Edit profile"),
-        h("button", { class: "ac-btn-line", type: "button", onclick: talk }, "Message " + (DATA.kam ? DATA.kam.split(" ")[0] : "the team")))));
-    if (DATA.team.length) {
-      var list = h("ul", { class: "ac-people" });
-      DATA.team.forEach(function (t) {
-        list.appendChild(h("li", null, h("span", { class: "ac-people__ini", "aria-hidden": "true" }, initials(t.name)),
-          h("div", null, h("b", null, t.name), t.job_title ? h("span", { class: "ac-muted" }, t.job_title) : null)));
-      });
-      add(p, h("div", { class: "ac-sec" }, h("div", { class: "ac-sec__hd" }, h("h2", { class: "ac-h2" }, "Your team"),
-        h("a", { class: "ac-more", href: "#settings/team" }, "Invite a colleague →")), list));
-    }
-  }
-
-  function renderSelections() {
-    var p = $("tab-selections");
-    p.textContent = "";
-    add(p, section("My selections", h("a", { class: "ac-more", href: ROOT + "#cat-roster" }, "Browse creators →"),
-      DATA.selections.map(selectionCard),
-      empty("No selections yet", "Pick creators in the catalogue and review them as a selection.", "Browse creators", ROOT + "#cat-roster"),
-      shortlistLine()));
-  }
-
-  // Campaigns: each live campaign as the report's scorebug, then the rest.
-  function renderCampaigns() {
-    var p = $("tab-campaigns");
-    p.textContent = "";
+  function renderCampaigns(p) {
+    add(p, head("Campaigns", "Every campaign HelloVoice runs for your team, with its live report. Numbers refresh every 24 hours.",
+      h("a", { class: "hc-btn hc-btn--ink hc-btn--sm", href: ROOT + "campaign/dashboard/" }, icon("chart"), " Campaign tracking")));
     var live = DATA.campaigns.filter(function (c) { return c.status === "live"; });
     var rest = DATA.campaigns.filter(function (c) { return c.status !== "live"; });
-    live.forEach(function (c) { add(p, scorebug(c, null)); });
-    if (live.length) add(p, explainer());
-    add(p, attentionCard());
-    if (!live.length || rest.length) {
-      add(p, section(live.length ? "Earlier campaigns" : "My campaigns", null, rest.map(campaignCard),
-        empty("No campaigns yet", "When we run a campaign for you, its live results and report appear here.", "Ask for a proposal", null, talk)));
+    live.forEach(function (c) { add(p, scorebug(c)); });
+    if (rest.length) add(p, h("div", null, h("h2", { class: "hc-h2", style: "margin-bottom:14px" }, live.length ? "Earlier campaigns" : "Your campaigns"),
+      h("div", { class: "ac-grid" }, rest.map(campaignCard))));
+    if (!DATA.campaigns.length) {
+      add(p, h("div", { class: "hc-empty" }, h("b", null, "No campaigns yet"),
+        h("p", null, "When HelloVoice runs a campaign for you, it goes live here with its report, and your bell tells you."),
+        h("button", { class: "hc-btn", type: "button", onclick: talk }, "Ask for a proposal")));
     }
   }
+  function talk() { if (HV().talk) HV().talk(); else location.href = ROOT; }
 
-  /* -------------------------------------------------------------- settings */
+  /* ---------------------------------------------------------------- briefs */
 
-  var SET_TABS = [["profile", "Profile & company"], ["team", "Team"], ["notifications", "Notifications"], ["privacy", "Privacy & data"]];
+  function renderBriefs(p) {
+    add(p, head("Briefs", "The campaign briefs you gave Helvy. Each one scores creators and can be opened as a selection."));
+    if (!DATA.briefs.length) {
+      add(p, h("div", { class: "hc-empty" }, h("b", null, "No briefs yet"),
+        h("p", null, "Answer six quick questions about a campaign and Helvy ranks the roster against them. Your industry and markets fill in for you."),
+        h("a", { class: "hc-btn", href: ROOT }, "Start a brief")));
+      return;
+    }
+    var list = h("ul", { class: "hc-list" });
+    DATA.briefs.forEach(function (b) {
+      var inner = [h("div", null, h("span", { class: "hc-row__name" }, b.selection_name || (b.objective ? b.objective + " brief" : "Brief")),
+        h("div", { class: "hc-row__meta" }, h("span", null, b.summary || ""), h("span", null, day(b.at)))),
+        b.selection ? h("span", { class: "hc-row__go" }, "Open selection ", icon("arrow")) : null];
+      list.appendChild(h("li", null, b.selection
+        ? h("a", { class: "hc-row", href: ROOT + "selection/#s=" + encodeURIComponent(b.selection) }, inner)
+        : h("div", { class: "hc-row" }, inner)));
+    });
+    add(p, list);
+  }
 
+  /* --------------------------------------------------------- notifications */
+
+  var GROUPS = [["selections", "Selections", "Feedback on creators, a selection shared or updated, a creator no longer available"],
+                ["analysis", "Analysis", "A full analysis you requested is ready"],
+                ["campaigns", "Campaigns", "Goes live, report updated, final report ready"],
+                ["account", "Account", "Credits running low, monthly credits added, a colleague joined"],
+                ["ideas", "Ideas from HelloVoice", "New creators that match your past briefs, season and congress ideas"]];
+  function bucket(ts) {
+    var d = new Date(ts * 1000), now = new Date();
+    if (d.toDateString() === now.toDateString()) return "Today";
+    var y = new Date(now); y.setDate(now.getDate() - 1);
+    if (d.toDateString() === y.toDateString()) return "Yesterday";
+    if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) return "Earlier this month";
+    return "Earlier";
+  }
+  function renderNotifications(p) {
+    var N = DATA.notifications;
+    var markAll = N.unread ? h("button", { class: "hc-more", type: "button", onclick: function () {
+      api("POST", "/api/notifications/read", {}).then(function (r) {
+        if (!r.b.ok) return;
+        N.unread = 0; N.items.forEach(function (n) { n.unread = false; });
+        if (HV().setUnread) HV().setUnread(0);
+        renderSide(); renderSection();
+      });
+    } }, "Mark all as read") : null;
+    add(p, head("Notifications", null, markAll));
+    var chips = h("div", { class: "hc-chips", role: "group", "aria-label": "Show" });
+    var total = N.items.length;
+    [["all", "All", total]].concat(GROUPS.map(function (g) { return [g[0], g[1].replace(" from HelloVoice", ""), N.counts[g[0]] || 0]; }))
+      .forEach(function (c) {
+        if (c[0] === "ideas" && !c[2]) return;
+        chips.appendChild(h("button", { class: "hc-chip", type: "button", "aria-pressed": String(FILTER === c[0]),
+          onclick: function () { FILTER = c[0]; renderSection(); } }, c[1], " ", h("b", null, String(c[2]))));
+      });
+    var feed = h("div", { class: "hc-feed" });
+    var shown = N.items.filter(function (n) { return FILTER === "all" || n.group === FILTER; });
+    var last = null, ul = null;
+    shown.forEach(function (n) {
+      var b = bucket(n.at);
+      if (b !== last) { feed.appendChild(h("h3", null, b)); ul = h("ul"); feed.appendChild(ul); last = b; }
+      var li = h("li"); li.appendChild(HV().noteRow(n, noteOpened)); ul.appendChild(li);
+    });
+    if (!shown.length) feed.appendChild(h("p", { class: "ac-muted", style: "margin-top:18px" }, total ? "Nothing in this group yet." : "Nothing yet. Updates from HelloVoice land here and in the bell."));
+    var prefs = h("ul", { class: "hc-prefs" });
+    var msg = h("span", { class: "ac-note", role: "status", "aria-live": "polite" });
+    GROUPS.forEach(function (g) {
+      var on = !!N.prefs[g[0]];
+      var sw = h("button", { class: "hc-sw", type: "button", role: "switch", "aria-checked": String(on), "aria-label": "Show " + g[1] + " in my bell" });
+      sw.addEventListener("click", function () {
+        var want = sw.getAttribute("aria-checked") !== "true", body = {};
+        body[g[0]] = want;
+        sw.setAttribute("aria-checked", String(want));
+        api("POST", "/api/me/notify", body).then(function (r) {
+          if (!r.b.ok) { sw.setAttribute("aria-checked", String(!want)); note(msg, "Couldn't save that. Please try again.", true); return; }
+          N.prefs = r.b.prefs; N.unread = r.b.unread;
+          if (HV().setUnread) HV().setUnread(r.b.unread);
+          note(msg, g[1] + (want ? " now shows" : " no longer shows") + " in your bell.");
+          var badge = document.querySelector('[data-count="notifications"]'); if (badge) badge.textContent = String(r.b.unread || "");
+        });
+      });
+      prefs.appendChild(h("li", null, h("span", null, h("b", null, g[1]), h("small", null, g[2])), sw));
+    });
+    add(p, h("div", { class: "hc-split" }, h("div", null, chips, feed),
+      h("aside", { class: "hc-panel", "aria-labelledby": "hc-bellprefs" },
+        h("h2", { class: "hc-h2", id: "hc-bellprefs" }, "Show in my bell"),
+        h("p", { class: "ac-muted" }, "Updates appear in the bell and here. We don't send them by email; your sign-in code is the only email we send."),
+        prefs, msg)));
+  }
+
+  /* --------------------------------------------------------------- credits */
+
+  function renderCredits(p) {
+    add(p, head("Credits"));
+    var monthly = DATA.monthly_credits || 0, bal = DATA.credits || 0;
+    var cells = Math.min(60, Math.max(monthly || 30, bal));
+    var meter = h("div", { class: "hc-meter", "aria-hidden": "true" });
+    for (var i = 0; i < cells; i++) meter.appendChild(h("i", { class: i < Math.min(bal, monthly || cells) ? "on" : (i < bal ? "extra" : null) }));
+    var kam = DATA.kam ? first(DATA.kam.split("<")[0]) : null;
+    var msg = h("span", { class: "ac-note", role: "status", "aria-live": "polite" });
+    var ask = h("div", { class: "hc-ask", hidden: true });
+    var amt = h("select", { "aria-label": "How many credits" });
+    [50, 200, 500].forEach(function (n) { amt.appendChild(h("option", { value: String(n) }, "+" + n + " credits")); });
+    var why = h("input", { type: "text", maxlength: "200", placeholder: "What for? (optional)", "aria-label": "What the credits are for" });
+    var send = h("button", { class: "hc-btn hc-btn--sm", type: "button" }, "Send request");
+    send.addEventListener("click", function () {
+      send.disabled = true;
+      api("POST", "/api/credits/request", { amount: +amt.value, note: why.value }).then(function (r) {
+        send.disabled = false;
+        if (r.s === 429) { note(msg, "You've asked a few times today. Your account manager has your requests.", true); return; }
+        note(msg, r.b.message || (r.b.ok ? "Request sent." : "Couldn't send. Please try again."), !r.b.ok);
+        if (r.b.ok) ask.hidden = true;
+      });
+    });
+    ask.appendChild(amt); ask.appendChild(why); ask.appendChild(send);
+    var reqBtn = h("button", { class: "hc-btn", type: "button", onclick: function () { ask.hidden = !ask.hidden; if (!ask.hidden) amt.focus(); } }, "Request more credits");
+    add(p, h("section", { class: "hc-bal", "aria-label": "Your balance" },
+      h("div", null, h("div", { class: "hc-bal__fig" }, String(bal), h("small", null, "Credits left")), meter,
+        h("p", { class: "hc-bal__meta" }, monthly ? ["Tops up to ", h("b", null, monthly + " on " + dm(DATA.next_refill)), ". Credits you earn from your profile and invites come on top."]
+                                                   : "Credits you earn from your profile and invites are added straight away.")),
+      h("div", { class: "hc-bal__ask" }, reqBtn, ask, h("p", null, (kam ? kam + ", your account manager," : "Your HelloVoice team") + " tops you up. Usually the same working day."), msg)));
+    var c = costs();
+    var rows = [["AI shortlist", "Answer six questions about your campaign; Helvy ranks the roster against them.", c.brief],
+                ["Find a replacement", "After you reject a creator: 3 similar creators that fit the same campaign.", c.replace],
+                ["A typed question to Helvy", "Tapping Helvy's options is always free.", c.chat],
+                ["Full creator analysis", "For any creator in one of your selections. Ready within 2 working days.", 0]];
+    var tb = h("tbody");
+    rows.forEach(function (r) {
+      tb.appendChild(h("tr", null, h("td", null, h("b", null, r[0]), h("small", null, r[1])),
+        h("td", null, r[2] ? h("span", { class: "hc-price__c" }, String(r[2]), h("small", null, r[2] === 1 ? "credit" : "credits")) : h("span", { class: "hc-price__free" }, "Free"))));
+    });
+    add(p, h("section", { "aria-labelledby": "hc-buy" }, h("h2", { class: "hc-h2", id: "hc-buy", style: "margin-bottom:14px" }, "What credits buy"),
+      h("table", { class: "hc-price" }, h("thead", null, h("tr", null, h("th", null, "With Helvy"), h("th", null, "Cost"))), tb)));
+    var comp = DATA.completion, inv = DATA.invite;
+    var left = comp.steps.filter(function (s) { return !s.done; }).length;
+    add(p, h("section", { "aria-labelledby": "hc-earn" }, h("h2", { class: "hc-h2", id: "hc-earn", style: "margin-bottom:14px" }, "Earn more"),
+      h("div", { class: "hc-earn" },
+        h("a", { href: "#account", "data-focus": "job_title" }, h("span", { class: "hc-earn__ic" }, icon("user")),
+          h("span", null, h("b", null, comp.waiting ? "Finish your profile" : "Profile complete"),
+            h("small", null, comp.waiting ? (left ? plural(left, "detail") + " left" + (comp.bonus_paid ? "" : ", then a 100% bonus") : "Save your profile to collect them") : "All profile credits earned")),
+          comp.waiting ? h("span", { class: "hc-reward" }, "+" + comp.waiting) : null),
+        h("a", { href: "#account", "data-focus": "invite" }, h("span", { class: "hc-earn__ic" }, icon("link")),
+          h("span", null, h("b", null, "Invite a colleague"), h("small", null, "Paid when they sign in · " + inv.left + " of " + inv.max + " invites left")),
+          inv.left ? h("span", { class: "hc-reward" }, "+" + inv.credits) : null))));
+    var since = DATA.ledger.length ? new Date(DATA.ledger[DATA.ledger.length - 1].at * 1000).toLocaleDateString("en-GB", { month: "long" }) : "";
+    var lt = h("tbody");
+    DATA.ledger.forEach(function (l) {
+      lt.appendChild(h("tr", null, h("td", null, l.reason, h("small", null, day(l.at))),
+        h("td", { class: l.delta > 0 ? "up" : null }, (l.delta > 0 ? "+" : "") + l.delta), h("td", null, String(l.balance))));
+    });
+    add(p, h("details", { class: "hc-hist" },
+      h("summary", null, "History", h("small", null, DATA.ledger.length ? " · " + plural(DATA.ledger.length, "entry", "entries") + (since ? " since " + since : "") : " · nothing yet"), icon("down")),
+      DATA.ledger.length ? h("table", { class: "hc-ledger" }, lt) : null));
+  }
+
+  /* --------------------------------------------------------------- account */
+
+  function stepOf(key) { return DATA.completion.steps.filter(function (s) { return s.key === key; })[0]; }
+  function hint(key) {
+    var s = stepOf(key);
+    if (!s) return null;
+    return h("span", { class: "hc-earnhint" + (s.paid ? " is-paid" : "") }, s.paid ? "Earned +" + s.credits : "+" + s.credits + " credits");
+  }
   function readImage(file, kind) {
     // The photo is cropped to a centred square; the logo keeps its shape.
     return new Promise(function (resolve, reject) {
@@ -329,7 +604,6 @@
       img.src = URL.createObjectURL(file);
     });
   }
-
   function flashFor(key) {
     var f = FLASH && FLASH.key === key ? FLASH : null;
     if (f) FLASH = null;
@@ -337,14 +611,17 @@
     if (f) note(el, f.text, f.bad);
     return el;
   }
-
-  function imageField(kind, label, hint) {
+  function afterSave(b) {
+    if (b.completion) DATA.completion = b.completion;
+    celebrate(b.earned, b.credits);
+  }
+  function imageField(kind, label, help) {
     var u = DATA.user, has = !!u[kind];
     var prev = h("div", { class: "ac-img ac-img--" + kind });
     if (has) prev.appendChild(h("img", { src: imgUrl(kind, u[kind]), alt: "" }));
     else prev.appendChild(h("span", null, kind === "photo" ? initials(u.name) : "Logo"));
     var msg = flashFor(kind);
-    var input = h("input", { type: "file", accept: "image/jpeg,image/png,image/webp", class: "ac-file" });
+    var input = h("input", { type: "file", accept: "image/jpeg,image/png,image/webp", class: "ac-file", "aria-label": (has ? "Change " : "Upload ") + label.toLowerCase() });
     var pick = h("label", { class: "ac-upload" }, input, h("span", null, has ? "Change" : "Upload " + (kind === "photo" ? "a photo" : "a logo")));
     var remove = null;
     if (has) {
@@ -355,8 +632,8 @@
           if (!r.b.ok) { note(msg, "Couldn't remove it. Please try again.", true); return; }
           DATA.user[kind] = null;
           FLASH = { key: kind, text: (kind === "photo" ? "Photo" : "Logo") + " removed." };
-          if (kind === "photo" && window.hvPortal && window.hvPortal.setPhoto) window.hvPortal.setPhoto(null);
-          refreshCompletion(); renderHead(); route();
+          if (kind === "photo" && HV().setPhoto) HV().setPhoto(null);
+          renderSide(); renderSection();
         });
       } }, "Remove");
     }
@@ -369,62 +646,104 @@
       }).then(function (r) {
         if (!r.b.ok) { note(msg, r.b.message || "Couldn't save that image. Please try again.", true); return; }
         DATA.user[kind] = r.b.version;
-        if (r.b.completion) DATA.completion = r.b.completion;
-        if (kind === "photo" && window.hvPortal && window.hvPortal.setPhoto) window.hvPortal.setPhoto(r.b.version);
+        if (kind === "photo" && HV().setPhoto) HV().setPhoto(r.b.version);
         FLASH = { key: kind, text: (kind === "photo" ? "Photo" : "Logo") + " saved." };
-        renderHead(); route();
+        afterSave(r.b);
+        renderSide(); renderSection();
       }, function (err) { note(msg, typeof err === "string" ? err : "Couldn't read that image.", true); });
     });
     return h("div", { class: "ac-imgfield", "data-key": kind }, prev,
-      h("div", null, h("b", null, label), h("p", { class: "ac-muted" }, hint), h("div", { class: "ac-row" }, pick, remove, msg)));
+      h("div", null, h("b", null, label), hint(kind), h("p", { class: "ac-muted" }, help), h("div", { class: "ac-row" }, pick, remove, msg)));
   }
-
-  function refreshCompletion() {
-    api("GET", "/api/account").then(function (r) { if (r.b && r.b.ok) { DATA.completion = r.b.completion; } });
+  function field(key, label, type, auto, extra) {
+    var id = "hc-f-" + key;
+    var inp = h("input", { class: "ac-input", id: id, name: key, type: type || "text", value: DATA.user[key] || "", autocomplete: auto || "off", "data-key": key });
+    return [h("div", { class: "ac-field" + (extra ? " " + extra : "") }, h("label", { for: id }, label, hint(key)), inp), inp];
   }
-
-  function settingsProfile() {
+  function profileForm() {
     var u = DATA.user, f = {};
-    var form = h("form", { class: "ac-form" });
-    [["name", "Name", "name"], ["job_title", "Job title", "organization-title"], ["company", "Company", "organization"], ["phone", "Phone", "tel"]].forEach(function (x) {
-      f[x[0]] = h("input", { class: "ac-input", id: "ac-f-" + x[0], name: x[0], value: u[x[0]] || "", autocomplete: x[2], "data-key": x[0], required: x[0] === "name" ? true : null });
-      form.appendChild(h("div", { class: "ac-field" }, h("label", { for: "ac-f-" + x[0] }, x[1]), f[x[0]]));
-    });
+    var form = h("form", { class: "ac-form", novalidate: true });
+    [["name", "Name", "text", "name"], ["job_title", "Job title", "text", "organization-title"], ["company", "Company", "text", "organization"], ["phone", "Phone", "tel", "tel"]]
+      .forEach(function (x) { var r = field(x[0], x[1], x[2], x[3]); f[x[0]] = r[1]; form.appendChild(r[0]); });
     form.appendChild(h("div", { class: "ac-field" }, h("span", { class: "ac-field__label" }, "Email"), h("p", { class: "ac-static" }, u.email)));
     var msg = flashFor("profile");
-    form.appendChild(h("div", { class: "ac-row" }, h("button", { class: "cat-btn cat-btn--lime", type: "submit" }, "Save changes"), msg));
+    form.appendChild(h("div", { class: "ac-row" }, h("button", { class: "hc-btn hc-btn--sm", type: "submit" }, "Save changes"), msg));
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (f.name.value.trim().length < 2) { note(msg, "Please keep your name on your profile.", true); f.name.focus(); return; }
       note(msg, "Saving…");
       api("POST", "/api/me/update", { name: f.name.value, company: f.company.value, job_title: f.job_title.value, phone: f.phone.value }).then(function (r) {
         if (!r.b.ok) { note(msg, r.b.message || "Couldn't save. Please try again.", true); return; }
-        ["name", "company", "job_title", "phone"].forEach(function (k) { if (r.b.user && k in r.b.user) DATA.user[k] = r.b.user[k]; });
-        renderHead();
-        note(msg, "Saved.");
-        refreshCompletion();
+        DATA.user = Object.assign(DATA.user, r.b.user);
+        afterSave(r.b);
+        FLASH = { key: "profile", text: "Saved." };
+        renderSide(); renderSection();
       });
     });
-    return [h("h2", { class: "ac-h2" }, "Profile & company"),
-      imageField("photo", "Profile photo", "Shown in the menu and on your account. A square crop is made for you."),
-      imageField("logo", "Company logo", "Shown next to your name and on your live campaign's scoreboard."),
-      form];
+    return form;
   }
-
-  function settingsTeam() {
+  function brandForm() {
+    var u = DATA.user;
+    var form = h("form", { class: "ac-form", novalidate: true });
+    var br = field("brands", "Your brands and products", "text", "off", "ac-field--wide");
+    br[1].placeholder = "e.g. Cetaphil, Daylong, Spectraban";
+    br[1].maxLength = 300;
+    form.appendChild(br[0]);
+    var ind = h("select", { class: "ac-input", id: "hc-f-industry", "data-key": "industry" });
+    ind.appendChild(h("option", { value: "" }, "Choose your industry"));
+    DATA.industries.forEach(function (o) { var op = h("option", { value: o.value }, o.label); if (o.value === u.industry) op.selected = true; ind.appendChild(op); });
+    form.appendChild(h("div", { class: "ac-field" }, h("label", { for: "hc-f-industry" }, "Industry", hint("industry_markets")), ind));
+    var lang = h("select", { class: "ac-input", id: "hc-f-language" });
+    lang.appendChild(h("option", { value: "" }, "Choose a language"));
+    DATA.languages.forEach(function (l) { var op = h("option", { value: l }, l); if (l === u.language) op.selected = true; lang.appendChild(op); });
+    form.appendChild(h("div", { class: "ac-field" }, h("label", { for: "hc-f-language" }, "Campaign language"), lang));
+    var picked = (u.markets || []).slice();
+    var mk = h("div", { class: "hc-mk", role: "group", "aria-labelledby": "hc-f-markets" });
+    DATA.markets.forEach(function (m) {
+      var b = h("button", { type: "button", "aria-pressed": String(picked.indexOf(m.value) > -1) }, m.label);
+      b.addEventListener("click", function () {
+        var i = picked.indexOf(m.value);
+        if (i > -1) picked.splice(i, 1); else picked.push(m.value);
+        b.setAttribute("aria-pressed", String(i === -1));
+      });
+      mk.appendChild(b);
+    });
+    form.appendChild(h("div", { class: "ac-field ac-field--wide" }, h("span", { class: "ac-field__label", id: "hc-f-markets" }, "Markets (your first one leads your briefs)"), mk));
+    var msg = flashFor("brand");
+    form.appendChild(h("div", { class: "ac-row" }, h("button", { class: "hc-btn hc-btn--sm", type: "submit" }, "Save"), msg));
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      note(msg, "Saving…");
+      api("POST", "/api/me/update", { brands: br[1].value, industry: ind.value, markets: picked, language: lang.value }).then(function (r) {
+        if (!r.b.ok) { note(msg, r.b.message || "Couldn't save. Please try again.", true); return; }
+        DATA.user = Object.assign(DATA.user, r.b.user);
+        afterSave(r.b);
+        FLASH = { key: "brand", text: "Saved. Your next brief starts from these." };
+        renderSide(); renderSection();
+      });
+    });
+    return form;
+  }
+  function teamSection() {
     var list = h("ul", { class: "ac-people" });
     DATA.team.forEach(function (t) {
       list.appendChild(h("li", null, h("span", { class: "ac-people__ini", "aria-hidden": "true" }, initials(t.name)),
         h("div", null, h("b", null, t.name), t.job_title ? h("span", { class: "ac-muted" }, t.job_title) : null)));
     });
-    var name = h("input", { class: "ac-input", id: "ac-inv-name", autocomplete: "off", required: true });
-    var email = h("input", { class: "ac-input", id: "ac-inv-email", type: "email", autocomplete: "off", required: true });
+    var inv = DATA.invite;
+    var linkIn = h("input", { value: inviteLink(), readonly: true, "aria-label": "Your invite link", "data-key": "invite" });
+    var copyBtn = h("button", { class: "hc-btn hc-btn--ink hc-btn--sm", type: "button" }, icon("link"), " Copy invite link");
+    copyBtn.addEventListener("click", function () { copy(linkIn.value, copyBtn, "Link copied"); });
+    var name = h("input", { class: "ac-input", id: "hc-inv-name", autocomplete: "off" });
+    var email = h("input", { class: "ac-input", id: "hc-inv-email", type: "email", autocomplete: "off" });
     var msg = h("span", { class: "ac-note", role: "status", "aria-live": "polite" });
-    var form = h("form", { class: "ac-form ac-form--inline" },
-      h("div", { class: "ac-field" }, h("label", { for: "ac-inv-name" }, "Colleague's name"), name),
-      h("div", { class: "ac-field" }, h("label", { for: "ac-inv-email" }, "Work email"), email),
-      h("div", { class: "ac-row" }, h("button", { class: "cat-btn cat-btn--lime", type: "submit" }, "Ask for access"), msg));
+    var form = h("form", { class: "ac-form ac-form--inline", novalidate: true },
+      h("div", { class: "ac-field" }, h("label", { for: "hc-inv-name" }, "Colleague's name"), name),
+      h("div", { class: "ac-field" }, h("label", { for: "hc-inv-email" }, "Work email"), email),
+      h("div", { class: "ac-row" }, h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "submit" }, "Ask for their access"), msg));
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (email.value.indexOf("@") < 1) { note(msg, "Please add your colleague's work email.", true); email.focus(); return; }
       note(msg, "Sending…");
       api("POST", "/api/team/invite", { name: name.value, email: email.value }).then(function (r) {
         if (r.s === 429) { note(msg, "You've sent enough requests today. Your account manager has them.", true); return; }
@@ -432,38 +751,17 @@
         if (r.b.ok) { name.value = ""; email.value = ""; }
       });
     });
-    return [h("h2", { class: "ac-h2" }, "Team"),
-      h("p", { class: "ac-muted" }, "Colleagues from your company with their own HelloVoice account. You see each other's selections."),
-      DATA.team.length ? list : h("p", { class: "ac-empty-line" }, "No colleagues yet."),
-      h("h3", { class: "ac-h3" }, "Invite a colleague"),
-      h("p", { class: "ac-muted" }, "We'll set up their access and let them know. Access is always given by HelloVoice."),
-      form];
+    return h("section", { class: "hc-sec", "aria-labelledby": "hc-team" },
+      h("h2", { class: "hc-h2", id: "hc-team" }, "Team"),
+      h("p", null, "Colleagues from your company with their own account. You see each other's selections and campaigns."),
+      DATA.team.length ? list : h("p", { class: "ac-muted" }, "No colleagues yet."),
+      h("h3", { class: "ac-h3" }, "Invite a colleague", h("span", { class: "hc-earnhint" + (inv.left ? "" : " is-paid") }, inv.left ? "+" + inv.credits + " credits each" : "All 5 paid invites used")),
+      h("p", { class: "ac-muted" }, "Send your link. When HelloVoice approves their account and they sign in for the first time, you get " + inv.credits +
+        " credits (same company email domain, up to " + inv.max + " paid invites; " + inv.left + " left)."),
+      h("div", { class: "hc-linkbox" }, linkIn, copyBtn),
+      h("p", { class: "ac-muted", style: "margin-top:18px" }, "Or ask HelloVoice to set up their access:"), form);
   }
-
-  function settingsNotifications() {
-    var rows = [["quote", "A quote is ready", "When we answer a quote request."],
-                ["live", "A campaign goes live", "The day the first posts are published."],
-                ["report", "The report updates", "When new results are added to a live campaign."]];
-    var msg = h("span", { class: "ac-note", role: "status", "aria-live": "polite" });
-    var box = h("div", { class: "ac-switches" });
-    rows.forEach(function (r) {
-      var id = "ac-n-" + r[0];
-      var input = h("input", { type: "checkbox", id: id, role: "switch" });
-      input.checked = !!DATA.notify[r[0]];
-      input.addEventListener("change", function () {
-        var body = {}; body[r[0]] = input.checked;
-        api("POST", "/api/me/notify", body).then(function (res) {
-          if (res.b.ok) { DATA.notify = res.b.notify; note(msg, r[1] + ": " + (input.checked ? "on" : "off") + ". Saved."); }
-          else { input.checked = !input.checked; note(msg, "Couldn't save that. Please try again.", true); }
-        });
-      });
-      box.appendChild(h("label", { class: "ac-switch", for: id }, h("span", null, h("b", null, r[1]), h("span", { class: "ac-muted" }, r[2])), input, h("i", { "aria-hidden": "true" })));
-    });
-    return [h("h2", { class: "ac-h2" }, "Notifications"),
-      h("p", { class: "ac-muted" }, "Sent to " + DATA.user.email + ". Your choices are saved now; these emails are being switched on shortly."), box, msg];
-  }
-
-  function settingsPrivacy() {
+  function privacySection() {
     var msg = h("span", { class: "ac-note", role: "status", "aria-live": "polite" });
     var confirmBox = h("div", { class: "ac-confirm", hidden: true });
     var typed = h("input", { class: "ac-input", id: "ac-del", autocomplete: "off", placeholder: "DELETE" });
@@ -479,7 +777,8 @@
     confirmBox.appendChild(h("label", { for: "ac-del" }, "Type DELETE to confirm. Your account and personal data are erased; this can't be undone."));
     confirmBox.appendChild(h("div", { class: "ac-row" }, typed, go,
       h("button", { class: "ac-link", type: "button", onclick: function () { confirmBox.hidden = true; typed.value = ""; go.disabled = true; } }, "Cancel")));
-    return [h("h2", { class: "ac-h2" }, "Privacy & data"),
+    return h("section", { class: "hc-sec", "aria-labelledby": "hc-priv" },
+      h("h2", { class: "hc-h2", id: "hc-priv" }, "Privacy and data"),
       h("div", { class: "ac-action" }, h("div", null, h("b", null, "Download my data"), h("p", { class: "ac-muted" }, "Your profile, briefs and credit history as a file.")),
         h("button", { class: "ac-btn-line", type: "button", onclick: function () {
           note(msg, "Preparing your file…");
@@ -493,52 +792,63 @@
         } }, "Download")),
       h("div", { class: "ac-action" }, h("div", null, h("b", null, "Sign out of other devices"), h("p", { class: "ac-muted" }, "Every other browser loses access. You stay signed in here.")),
         h("button", { class: "ac-btn-line", type: "button", onclick: function () {
-          api("POST", "/api/me/signout-others", {}).then(function (r) { note(msg, r.b.ok ? (r.b.removed ? "Signed out of " + r.b.removed + " other device" + (r.b.removed === 1 ? "" : "s") + "." : "No other devices were signed in.") : "Couldn't do that. Please try again.", !r.b.ok); });
+          api("POST", "/api/me/signout-others", {}).then(function (r) { note(msg, r.b.ok ? (r.b.removed ? "Signed out of " + plural(r.b.removed, "other device") + "." : "No other devices were signed in.") : "Couldn't do that. Please try again.", !r.b.ok); });
         } }, "Sign out others")),
       msg,
       h("div", { class: "ac-action ac-action--danger" }, h("div", null, h("b", null, "Delete my account"), h("p", { class: "ac-muted" }, "Your account and personal data are erased. Selections and campaigns stay with your company.")),
         h("button", { class: "cat-btn ac-btn-danger", type: "button", onclick: function () { confirmBox.hidden = false; typed.focus(); } }, "Delete account")),
-      confirmBox];
+      confirmBox,
+      h("div", { class: "ac-action" }, h("div", null, h("b", null, "Sign out"), h("p", { class: "ac-muted" }, "Sign out of HELVY Connect on this browser.")),
+        h("button", { class: "ac-btn-line", type: "button", onclick: signOut }, "Sign out")));
   }
-
-  function renderSettings(sub) {
-    var p = $("tab-settings");
-    p.textContent = "";
-    sub = SET_TABS.some(function (t) { return t[0] === sub; }) ? sub : "profile";
-    var nav = h("nav", { class: "ac-subnav", "aria-label": "Settings" });
-    var pick = h("select", { class: "ac-input ac-subnav__select", "aria-label": "Settings section" });
-    SET_TABS.forEach(function (t) {
-      nav.appendChild(h("a", { href: "#settings/" + t[0], "aria-current": t[0] === sub ? "page" : null }, t[1]));
-      var o = h("option", { value: t[0] }, t[1]); if (t[0] === sub) o.selected = true; pick.appendChild(o);
-    });
-    pick.addEventListener("change", function () { location.hash = "#settings/" + pick.value; });
-    var body = h("div", { class: "ac-setbody" });
-    add(body, { profile: settingsProfile, team: settingsTeam, notifications: settingsNotifications, privacy: settingsPrivacy }[sub]());
-    add(p, h("div", { class: "ac-settings" }, h("div", null, nav, pick), body));
+  function renderAccount(p) {
+    add(p, head("Account", "Who you are and who you work with. A complete profile earns " + (DATA.completion.steps.reduce(function (s, x) { return s + x.credits; }, 0) + DATA.completion.bonus) + " credits, once."));
+    add(p, h("section", { class: "hc-sec", "aria-labelledby": "hc-prof" }, h("h2", { class: "hc-h2", id: "hc-prof" }, "Profile"),
+      imageField("photo", "Profile photo", "Shown in the menu and on your profile. A square crop is made for you."),
+      imageField("logo", "Company logo", "Shown on your live campaign's scoreboard."),
+      profileForm()));
+    add(p, h("section", { class: "hc-sec", "aria-labelledby": "hc-brand" }, h("h2", { class: "hc-h2", id: "hc-brand" }, "Your brands and markets"),
+      h("p", null, "Helvy uses these to pre-fill your briefs, so a new shortlist starts from your industry and market."), brandForm()));
+    add(p, teamSection());
+    add(p, privacySection());
   }
 
   /* ---------------------------------------------------------------- routing */
 
-  function route() {
-    if (!DATA) return;
-    var hash = (location.hash || "#home").slice(1).split("/");
-    var tab = ["home", "selections", "campaigns", "settings"].indexOf(hash[0]) >= 0 ? hash[0] : "home";
-    document.querySelectorAll(".ac-panel").forEach(function (el) { el.hidden = el.getAttribute("data-panel") !== tab; });
-    document.querySelectorAll(".ac-tabs a").forEach(function (a) {
-      if (a.getAttribute("data-tab") === tab) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
-    });
-    ({ home: renderHome, selections: renderSelections, campaigns: renderCampaigns, settings: function () { renderSettings(hash[1]); } })[tab]();
-    var want = null;
-    try { want = sessionStorage.getItem("ac-focus"); sessionStorage.removeItem("ac-focus"); } catch (e) {}
+  var RENDER = { overview: renderOverview, selections: renderSelections, analyses: renderAnalyses, campaigns: renderCampaigns,
+                 briefs: renderBriefs, notifications: renderNotifications, credits: renderCredits, account: renderAccount };
+  var TITLES = { overview: "My profile", selections: "Selections", analyses: "Analyses", campaigns: "Campaigns", briefs: "Briefs",
+                 notifications: "Notifications", credits: "Credits", account: "Account" };
+  function renderSection() {
+    var p = $("hc-body");
+    p.textContent = "";
+    RENDER[SECTION](p);
+    document.title = TITLES[SECTION] + " — HELVY Connect";
+    var want = store("ac-focus");
     if (want) {
+      try { sessionStorage.removeItem("ac-focus"); } catch (e) { /* blocked */ }
       var el = document.querySelector('[data-key="' + want + '"]');
-      if (el) { el.scrollIntoView({ block: "center" }); var inp = el.matches("input") ? el : el.querySelector("input"); if (inp) inp.focus(); }
+      if (el) {
+        el.scrollIntoView({ block: "center" });
+        var inp = el.matches("input, select") ? el : el.querySelector("input, select");
+        if (inp) inp.focus({ preventScroll: true });
+      }
     }
   }
-
+  function focusField(key) { store("ac-focus", key); if (location.hash === "#account") renderSection(); else location.hash = "#account"; }
+  function route(scroll) {
+    if (!DATA) return;
+    var want = (location.hash || "#overview").slice(1).split("/")[0];
+    // Old links: #home and #settings became Overview and Account.
+    want = { home: "overview", settings: "account" }[want] || want;
+    SECTION = RENDER[want] ? want : "overview";
+    renderSide();
+    renderSection();
+    if (scroll) { window.scrollTo(0, 0); $("hc-body").focus({ preventScroll: true }); }
+  }
   document.addEventListener("click", function (e) {
     var a = e.target.closest && e.target.closest("[data-focus]");
-    if (a) { try { sessionStorage.setItem("ac-focus", a.getAttribute("data-focus")); } catch (err) {} }
+    if (a && a.tagName === "A") { store("ac-focus", a.getAttribute("data-focus")); if (location.hash === a.getAttribute("href")) { e.preventDefault(); renderSection(); } }
   });
 
   function closed(title, line) {
@@ -547,22 +857,30 @@
     c.textContent = "";
     c.appendChild(h("b", null, title));
     c.appendChild(h("p", null, line));
-    c.appendChild(h("a", { class: "cat-btn cat-btn--lime", href: ROOT }, "Go to the catalogue"));
+    c.appendChild(h("a", { class: "hc-btn", href: ROOT }, "Go to the catalogue"));
     c.hidden = false;
   }
-
   function load() {
     return api("GET", "/api/account").then(function (r) {
-      if (r.s === 401) { closed("Please sign in", "Sign in on the catalogue to see your account."); return; }
-      if (r.s === 403) { closed("Accounts are for signed-in clients", "You're using an access code. Your campaigns are in campaign tracking."); return; }
-      if (!r.b.ok) { closed("Something went wrong", "Your account couldn't be loaded. Please try again shortly."); return; }
+      if (r.s === 401) { closed("Please sign in", "Sign in on the catalogue to see your profile."); return; }
+      if (r.s === 403) { closed("Profiles are for signed-in clients", "You're using an access code. Your campaigns are in campaign tracking."); return; }
+      if (!r.b.ok) { closed("Something went wrong", "Your profile couldn't be loaded. Please try again shortly."); return; }
       DATA = r.b;
       $("ac-loading").hidden = true;
-      renderHead();
-      route();
+      $("hc-acc").hidden = false;
+      // The bell and this page stay in step.
+      var hv = window.hvPortal = window.hvPortal || {};
+      hv.onUnread = function (n) {
+        if (!DATA) return;
+        DATA.notifications.unread = n;
+        var b = document.querySelector('[data-count="notifications"]');
+        if (b) { b.textContent = String(n); b.hidden = !n; }
+      };
+      hv.onReadAll = function () { if (DATA) { DATA.notifications.items.forEach(function (x) { x.unread = false; }); if (SECTION === "notifications" || SECTION === "overview") renderSection(); } };
+      route(false);
     });
   }
 
-  window.addEventListener("hashchange", route);
+  window.addEventListener("hashchange", function () { route(true); });
   load();
 })();

@@ -22,8 +22,95 @@
   var CFGS = window.CATALOGUE_CONFIG || window.CAMPAIGN_CONFIG || {};
   var API = (CFGS.api != null ? CFGS.api : "/admin").replace(/\/$/, "");
   var ME = null;
-  // A few hooks other pages use (the account page): talk, setPhoto.
+  // A few hooks other pages use (the account page): talk, setPhoto, icon, noteRow, when.
   var HV = window.hvPortal = window.hvPortal || {};
+
+  /* ------------------------------------------------------------ ui icons */
+  // One drawn set (24px grid, 1.8 stroke) for the bell, the profile page, selection
+  // statuses and the analysis lock, so every page speaks the same marks.
+  var UI_PATHS = {
+    bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.6 2H4.4z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
+    check: '<path d="M4.5 12.5l5 5 10-11"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><path d="M12 14.5v2.5"/>',
+    unlock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 7.6-1.7"/><path d="M12 14.5v2.5"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+    back: '<path d="M15 5l-7 7 7 7"/>', chart: '<path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/>',
+    home: '<path d="M4 11l8-6.5 8 6.5"/><path d="M6 9.5V19h12V9.5"/>',
+    list: '<rect x="3.5" y="4.5" width="7" height="7" rx="2"/><rect x="13.5" y="4.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><path d="M14 17h6M17 14v6"/>',
+    scan: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/><path d="M8.5 12.5V11M11 12.5V9M13.5 12.5v-2.5"/>',
+    mega: '<path d="M4 10v4h3l7 4.5V5.5L7 10z"/><path d="M17.5 9a4 4 0 0 1 0 6"/>',
+    brief: '<path d="M7 3.5h7l4.5 4.5v12.5h-11.5z"/><path d="M14 3.5V8h4.5M9.5 12.5h6M9.5 16h4"/>',
+    coin: '<circle cx="12" cy="12" r="8.5"/><path d="M14.6 9.2c-.5-.8-1.5-1.2-2.6-1.2-1.6 0-2.7.8-2.7 2s1.1 1.7 2.7 2 2.8.8 2.8 2-1.2 2-2.8 2c-1.2 0-2.2-.5-2.7-1.3M12 6.5v1.5M12 16v1.5"/>',
+    user: '<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.8-3.6 3.8-5.6 7.5-5.6s6.7 2 7.5 5.6"/>',
+    out: '<path d="M14 4.5H6.5v15H14"/><path d="M10.5 12H20M16.5 8.5L20 12l-3.5 3.5"/>',
+    camera: '<path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3V19H4z"/><circle cx="12" cy="13.2" r="3.4"/>',
+    "case": '<rect x="3.5" y="7.5" width="17" height="12" rx="2.5"/><path d="M9 7.5V5.5h6v2M3.5 12.5h17"/>',
+    phone: '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/>',
+    image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M20.5 16l-5-5-8.5 8.5"/>',
+    tag: '<path d="M3.5 12.2V4.5h7.7l9.3 9.3-7.7 7.7z"/><circle cx="8" cy="9" r="1.5"/>',
+    globe: '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.4 2.4 3.5 5.2 3.5 8.5s-1.1 6.1-3.5 8.5c-2.4-2.4-3.5-5.2-3.5-8.5s1.1-6.1 3.5-8.5z"/>',
+    gift: '<rect x="4" y="10" width="16" height="10" rx="1.5"/><path d="M3 7h18v3H3zM12 7v13M12 7c-1-2.6-4.6-3.6-5-1.4C6.6 7.4 10 7 12 7zM12 7c1-2.6 4.6-3.6 5-1.4.4 1.8-3 1.4-5 1.4z"/>',
+    info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.6v.2"/>', down: '<path d="M6 9l6 6 6-6"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>',
+    link: '<path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1 1"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1-1"/>',
+    swap: '<path d="M4 8.5h13.5M14 5l3.5 3.5L14 12M20 15.5H6.5M10 19l-3.5-3.5L10 12"/>',
+    ban: '<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
+    spark: '<path d="M12 3.5v4M12 16.5v4M3.5 12h4M16.5 12h4M6 6l2.6 2.6M15.4 15.4L18 18M6 18l2.6-2.6M15.4 8.6L18 6"/>'
+  };
+  function icon(name, cls) {
+    return '<svg class="hv-i' + (cls ? " " + cls : "") + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
+      'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (UI_PATHS[name] || "") + "</svg>";
+  }
+  HV.icon = icon;
+  // Helvy's picture lives in ONE file: swap assets/brand/helvy.webp for the smiling master and every page follows.
+  HV.helvy = ROOT + "assets/brand/helvy.webp";
+
+  /* ------------------------------------------------------- notifications */
+  var NOTE_ICON = { selections: ["list", "sel"], analysis: ["scan", "ana"], campaigns: ["mega", "cmp"], account: ["coin", "acc"], ideas: ["spark", "sug"] };
+  var KIND_ICON = { unavailable: "ban", colleague: "user" };
+  function when(ts) {
+    var s = Date.now() / 1000 - ts;
+    if (s < 60) return "now";
+    if (s < 3600) return Math.floor(s / 60) + " min";
+    var d = new Date(ts * 1000), today = new Date();
+    if (s < 86400 && d.getDate() === today.getDate()) return Math.floor(s / 3600) + " h";
+    var y = new Date(today); y.setDate(today.getDate() - 1);
+    if (d.toDateString() === y.toDateString()) return "Yesterday";
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  }
+  HV.when = when;
+  // One notification row, the same in the bell, on Overview and in the full list.
+  // Server text goes in as text, never HTML.
+  function noteRow(n, onOpen) {
+    var ic = NOTE_ICON[n.group] || NOTE_ICON.account;
+    var a = document.createElement(n.href ? "a" : "div");
+    a.className = "hv-note" + (n.unread ? " is-new" : "");
+    if (n.href) a.href = ROOT + n.href;
+    var icn = document.createElement("span");
+    icn.className = "hv-note__ic hv-note__ic--" + ic[1];
+    icn.innerHTML = icon(KIND_ICON[n.kind] || ic[0]);
+    var tx = document.createElement("span");
+    tx.className = "hv-note__tx";
+    var b = document.createElement("b"); b.textContent = n.title; tx.appendChild(b);
+    if (n.rest) tx.appendChild(document.createTextNode(n.rest));
+    if (n.body) { var sm = document.createElement("small"); sm.textContent = n.body; tx.appendChild(sm); }
+    var w = document.createElement("span");
+    w.className = "hv-note__when";
+    w.textContent = when(n.at);
+    if (n.unread) { var dot = document.createElement("span"); dot.className = "hv-note__unread"; dot.setAttribute("role", "img"); dot.setAttribute("aria-label", "Unread"); w.appendChild(dot); }
+    a.appendChild(icn); a.appendChild(tx); a.appendChild(w);
+    a.addEventListener("click", function (e) {
+      if (!n.unread) return;
+      n.unread = false;
+      var go = a.href;
+      if (go) e.preventDefault();
+      fetch(API + "/api/notifications/read", { method: "POST", credentials: "include", keepalive: true,
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ids: [n.id] }) })
+        .catch(function () {}).then(function () { if (onOpen) onOpen(n); if (go) location.href = go; });
+    });
+    return a;
+  }
+  HV.noteRow = noteRow;
 
   /* ------------------------------------------------------------- language */
   // English by default, Arabic for an Arabic browser or when chosen. Every static string goes
@@ -308,7 +395,8 @@
     formProfile.addEventListener("submit", function (e) {
       e.preventDefault();
       busy(pBtn, true, "Create my account");
-      api("POST", "/api/auth/profile", { ticket: state.ticket, name: pName.value, company: pCompany.value, job_title: pTitle.value, phone: pPhone.value })
+      api("POST", "/api/auth/profile", { ticket: state.ticket, name: pName.value, company: pCompany.value, job_title: pTitle.value, phone: pPhone.value,
+                                         invite: inviteToken() || undefined })
         .then(function (r) {
           busy(pBtn, false, "Create my account");
           if (!r.b.ok) { say(r.b.message || "Couldn't create the account.", "err"); return; }
@@ -316,6 +404,27 @@
         });
     });
   }
+
+  // A colleague's invite link (?invite=...) is kept for this visit and sent with the new
+  // account, so the colleague who invited is paid when this one is in.
+  function inviteToken() {
+    var m = /[?&]invite=([0-9]+\.[0-9a-f]+)/.exec(location.search || "");
+    try {
+      if (m) sessionStorage.setItem("hv_invite", m[1]);
+      return sessionStorage.getItem("hv_invite");
+    } catch (e) { return m ? m[1] : null; }
+  }
+  inviteToken();
+
+  // The brief can start from the profile: the client's industry and first market.
+  function profileAnswers() {
+    var u = ME && ME.user, out = {};
+    if (!u) return out;
+    if (u.markets && u.markets.length) out.market = u.markets[0];
+    if (u.industry) out.category = [u.industry];
+    return out;
+  }
+  HV.profileAnswers = profileAnswers;
 
   /* ------------------------------------------------------------------ dock */
 
@@ -360,13 +469,14 @@
     var ACC = ROOT + "account/";
     if (u) {
       // Account holders: their own space, then help, then out.
-      item("Profile", { href: ACC + "#home" });
-      item("My selections", { href: ACC + "#selections" });
-      item("My campaigns", { href: ACC + "#campaigns" });
-      if (credits) item("AI credits", { go: openAccount }, credits);
-      item("Settings", { href: ACC + "#settings" });
+      item("My profile", { href: ACC + "#overview" });
+      item("Selections", { href: ACC + "#selections" });
+      item("Analyses", { href: ACC + "#analyses" });
+      item("Campaigns", { href: ACC + "#campaigns" });
+      if (credits) item("Credits", { href: ACC + "#credits" }, credits);
+      item("Account", { href: ACC + "#account" });
       rule();
-      item("Help", { go: function () { if (HV.talk) HV.talk(); else location.href = ACC + "#home"; } });
+      item("Help", { go: function () { if (HV.talk) HV.talk(); else location.href = ACC + "#overview"; } });
     } else if (ME.kind === "admin") {
       item("Preview as client", { go: openAccount });
       item("My campaigns", { href: ROOT + "campaign/dashboard/" });
@@ -396,9 +506,84 @@
       items[(i + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length].focus();
       e.preventDefault();
     });
+    if (u) dock.appendChild(mountBell());
     dock.appendChild(btn);
     dock.appendChild(menu);
     if (cat) cat.appendChild(dock); else document.body.appendChild(dock);
+  }
+
+  // The bell: account holders only, between Campaign tracking and the account circle.
+  // In-portal only; nothing here is emailed. The list is the latest five the client's
+  // toggles allow; "See all" opens the full history on their profile.
+  function mountBell() {
+    var wrap = h("div", { class: "hv-bellwrap" });
+    var bell = h("button", { class: "hv-bell", type: "button", id: "hv-bell", "aria-haspopup": "dialog", "aria-expanded": "false",
+                             "aria-controls": "hv-bell-drop", "aria-label": "Notifications" });
+    bell.innerHTML = icon("bell") + '<span class="hv-bell__dot" hidden></span>';
+    var drop = h("div", { class: "hv-drop", id: "hv-bell-drop", role: "dialog", "aria-label": "Notifications", hidden: true });
+    var hd = h("div", { class: "hv-drop__hd" });
+    var title = h("h2", null, "Notifications");
+    var fresh = h("span", { class: "hv-drop__new", hidden: true });
+    var all = h("button", { class: "hv-drop__all", type: "button" }, "Mark all as read");
+    hd.appendChild(title); hd.appendChild(fresh); hd.appendChild(all);
+    var list = h("ul", { class: "hv-drop__list" });
+    var foot = h("div", { class: "hv-drop__ft" });
+    var see = h("a", { href: ROOT + "account/#notifications" }, "See all in your profile ");
+    see.insertAdjacentHTML("beforeend", icon("arrow"));
+    foot.appendChild(see);
+    drop.appendChild(hd); drop.appendChild(list);
+    drop.appendChild(h("p", { class: "hv-drop__note" }, "Updates show here only. We don't send them by email."));
+    drop.appendChild(foot);
+    wrap.appendChild(bell); wrap.appendChild(drop);
+    var unread = ME.unread || 0;
+    function paintCount(n) {
+      unread = n || 0;
+      bell.querySelector(".hv-bell__dot").hidden = !unread;
+      bell.setAttribute("aria-label", unread ? "Notifications, " + unread + " unread" : "Notifications");
+      fresh.hidden = !unread; fresh.textContent = unread + " new";
+      all.hidden = !unread;
+      if (HV.onUnread) HV.onUnread(unread);
+    }
+    HV.setUnread = paintCount;
+    function load() {
+      return api("GET", "/api/notifications?limit=5").then(function (r) {
+        if (!r.b || !r.b.ok) return;
+        paintCount(r.b.unread);
+        list.textContent = "";
+        if (!r.b.items.length) {
+          list.appendChild(h("li", { class: "hv-drop__empty" }, "Nothing yet. When HelloVoice answers a request, reviews a creator or updates a campaign, it shows here."));
+        }
+        r.b.items.forEach(function (n) {
+          var li = document.createElement("li");
+          li.appendChild(noteRow(n, function () { paintCount(Math.max(0, unread - 1)); }));
+          list.appendChild(li);
+        });
+      });
+    }
+    function toggle(open) {
+      drop.hidden = !open;
+      bell.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) { load(); var m = $("pt-menu"); if (m && !m.hidden) $("pt-avatar").click(); }
+    }
+    bell.addEventListener("click", function (e) { e.stopPropagation(); toggle(drop.hidden); });
+    document.addEventListener("click", function (e) { if (!drop.hidden && !wrap.contains(e.target)) toggle(false); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !drop.hidden) { toggle(false); bell.focus(); } });
+    all.addEventListener("click", function () {
+      api("POST", "/api/notifications/read", {}).then(function (r) {
+        if (r.b && r.b.ok) {
+          paintCount(0);
+          [].forEach.call(list.querySelectorAll(".is-new"), function (x) { x.classList.remove("is-new"); var d = x.querySelector(".hv-note__unread"); if (d) d.remove(); });
+        }
+        if (HV.onReadAll) HV.onReadAll();
+      });
+    });
+    paintCount(unread);
+    // A quiet check while the page is open, only when it is on screen.
+    setInterval(function () {
+      if (document.hidden || !drop.hidden) return;
+      api("GET", "/api/notifications?limit=1").then(function (r) { if (r.b && r.b.ok) paintCount(r.b.unread); });
+    }, 90000);
+    return wrap;
   }
 
   function setCredits(n) {
@@ -417,7 +602,7 @@
   }
 
   function openWizard() {
-    loadQuestions().then(function (qs) { wizard(qs, {}, 0); });
+    loadQuestions().then(function (qs) { wizard(qs, profileAnswers(), 0); });
   }
 
   var currentClose = null;
@@ -831,7 +1016,7 @@
       lock(true);
       Promise.all([loadQuestions(), api("POST", "/api/brief/guess", { text: text })]).then(function (res) {
         lock(false);
-        var qs = res[0], answers = (res[1].b && res[1].b.answers) || {};
+        var qs = res[0], answers = Object.assign(profileAnswers(), (res[1].b && res[1].b.answers) || {});
         var byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
         var todo = FLOW.filter(function (id) { return byId[id] && !(answers[id] && answers[id].length); });
         var known = FLOW.filter(function (id) { return answers[id] && answers[id].length; });
@@ -1409,7 +1594,7 @@
       say(attach ? "A few quick taps about the campaign, all free." :
           text ? "Got it. A few quick taps and I'll match the roster. This part is free." : "Let's find the right creators. A few quick taps, all free.");
       Promise.all([loadQuestions(), text ? api("POST", "/api/brief/guess", { text: text }) : Promise.resolve({ b: {} })]).then(function (res) {
-        var qs = res[0], answers = (res[1].b && res[1].b.answers) || {};
+        var qs = res[0], answers = Object.assign(profileAnswers(), (res[1].b && res[1].b.answers) || {});
         var byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
         var todo = ids.filter(function (id) { return byId[id] && !(answers[id] && answers[id].length); });
         var i = 0;
@@ -2213,7 +2398,7 @@
     function close() {
       card.classList.remove("is-open"); run.hidden = true; intro.hidden = false;
     }
-    start.addEventListener("click", function () { answers = {}; open(); });
+    start.addEventListener("click", function () { answers = profileAnswers(); open(); });
     quit.addEventListener("click", close);
 
     function swap(node) {
