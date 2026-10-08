@@ -2354,6 +2354,13 @@ def _analysis_row(row):
         data = json.loads(row["data"])
     except ValueError:
         data = {}
+    # Older Apify Snapchat runs saved followers as text ("73800"); the scoring
+    # compares it with numbers, so it is read back as a number.
+    if isinstance(data, dict) and isinstance(data.get("followers"), str):
+        try:
+            data["followers"] = int(float(data["followers"].replace(",", "")))
+        except ValueError:
+            data["followers"] = None
     return {"data": data, "source": row["source"], "updated_at": row["updated_at"], "platform": row["platform"]}
 
 
