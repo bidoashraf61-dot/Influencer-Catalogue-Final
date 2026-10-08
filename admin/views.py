@@ -785,8 +785,10 @@ def passcode_form(c, back):
     cur = (c["code_plain"] if "code_plain" in c.keys() else None) or ""
     return ("<form method='post' action='" + u("/codes/passcode") + "' class='row limits'>"
             "<input type='hidden' name='id' value='" + cid + "'><input type='hidden' name='back' value='" + e(back) + "'>"
-            "<div style='flex:2'><label>Passcode the client types</label><input name='passcode' value='" + e(cur)
-            + "' placeholder='at least 6 letters or numbers, with a number' autocomplete='off' required></div>"
+            "<div style='flex:2'><label for='pc-" + cid + "'>Passcode the client types</label>"
+            "<div style='display:flex;gap:8px;align-items:center'><input id='pc-" + cid + "' name='passcode' value='" + e(cur)
+            + "' placeholder='at least 6 letters or numbers, with a number' autocomplete='off' required>"
+            "<button type='button' class='btn small lime' data-copy='#pc-" + cid + "'>" + ui.icon("copy", 15) + " Copy</button></div></div>"
             "<div style='align-self:end'><button class='btn small'>Change passcode</button></div></form>"
             "<p class='price-hint'>Changing it is instant. Selections and campaigns stay attached; "
             "anyone already inside stays inside, new visitors need the new one.</p>")
