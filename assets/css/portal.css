@@ -1059,3 +1059,6 @@ body.pt-lock { overflow: hidden; }
 .hv-break__list li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-top: 1px solid rgba(18,18,18,.08); font-size: 13px; }
 .hv-break__list li b { font-variant-numeric: tabular-nums; }
 .hv-break__how, .hv-break__miss { margin: 8px 0 0; font-size: 12px; color: var(--hv-gray); line-height: 1.45; }
+
+/* The open chat sits above everything the page floats (report stamps, the account circle). */
+.hv-voice.is-open { z-index: 300; }

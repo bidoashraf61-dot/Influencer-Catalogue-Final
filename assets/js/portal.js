@@ -957,7 +957,7 @@
   // talk to a person). Typing goes to the AI assistant (credits, as in "Ask").
   // Every write is a button the client presses; the AI itself only answers.
 
-  var VOICE_PAGES = { catalogue: 1, selection: 1, creator: 1, account: 1 };
+  var VOICE_PAGES = { catalogue: 1, selection: 1, creator: 1, account: 1, campaign: 1 };
   var V_IMG = ROOT + "assets/brand/voice/";
   var V_ICON = {
     send: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>',
@@ -979,6 +979,21 @@
     var STORE = "hv-chat:" + ((ME && ME.chat_key) || (ME && ME.user ? ME.user.email : ME && ME.kind) || "guest");
     var KEEP_MS = 7 * 24 * 3600 * 1000;
     // On a selection's page the assistant works on that selection: its brief, its scores.
+    // What is on screen, sent with each question so the assistant knows where the client is.
+    function pageCtx() {
+      var out = { page: page };
+      var m;
+      if (page === "creator" && (m = /(?:^|[#&])c=([A-Za-z0-9-]+)/.exec(location.hash || ""))) out.creator = decodeURIComponent(m[1]).toUpperCase();
+      if (page === "campaign" && (m = /(?:^|[#&])t=([A-Za-z0-9_-]+)/.exec(location.hash || ""))) out.campaign = m[1];
+      if (page === "catalogue") {
+        var bar = document.querySelector(".cat-bar");
+        if (bar) out.filters = Array.prototype.map.call(bar.querySelectorAll("input[data-dim]:checked"), function (box) {
+          var l = box.closest("label"); return ((l && l.textContent) || box.value).replace(/\s+/g, " ").trim().slice(0, 40);
+        }).filter(Boolean).slice(0, 15);
+        out.shown = Array.prototype.filter.call(document.querySelectorAll(".cat-card"), function (c) { return !c.hidden && !c.classList.contains("cat-card--copy"); }).length;
+      }
+      return out;
+    }
     function selToken() { var m = page === "selection" && /(?:^|[#&])s=([A-Za-z0-9_-]+)/.exec(location.hash || ""); return m ? m[1] : ""; }
     var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -1105,11 +1120,14 @@
         var backlog = target.length - shown;
         shown = Math.min(target.length, shown + Math.max(1, Math.round((0.05 + backlog * 0.0007) * dt)));
         paint();
-        if (shown < target.length) { raf = requestAnimationFrame(frame); return; }
+        if (shown < target.length) { raf = tick(frame); return; }
         raf = 0; last = 0;
         if (ended) finish();
       }
-      function kick() { if (reduce) { shown = target.length; paint(); if (ended) finish(); return; } if (!raf) raf = requestAnimationFrame(frame); }
+      // Animation frames stop while the tab is in the background; a timer keeps the text coming,
+      // so an answer never stalls (and nothing queued behind it waits) when the client looks away.
+      function tick(fn) { return document.hidden ? setTimeout(function () { fn(performance.now()); }, 50) : requestAnimationFrame(fn); }
+      function kick() { if (reduce) { shown = target.length; paint(); if (ended) finish(); return; } if (!raf) raf = tick(frame); }
       return {
         push: function (more) { target += more; kick(); },
         end: function (full, then) {
@@ -1686,7 +1704,9 @@
       if (document.querySelector(".cat-bar") && /^(show|filter|only|display|اعرض|أظهر)\b/i.test(text)) { runShow(text); return; }
       // On a selection's page the client is discussing THAT selection: the assistant answers with its
       // brief and scores. Only elsewhere does a campaign description start the free find-creators taps.
-      if (!selToken() && REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
+      // Typed questions go to the assistant with the page as context; it decides (it can build a
+      // shortlist itself). The free tap-through questions stay one tap away in the menu.
+      if (!(ME && ME.ai) && !selToken() && REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
       if (!(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
       busy = true; send.disabled = true;
       // While it works: what it is doing right now, then the answer as it is written.
@@ -1699,7 +1719,7 @@
         var li = h("li", null, label + "…"); ol.appendChild(li); scroll();
       }
       function stop() { busy = false; send.disabled = false; ended = true; }
-      stream("/api/chat/stream", { message: text, thread: thread, selection: selToken() || undefined }, function (ev) {
+      stream("/api/chat/stream", Object.assign({ message: text, thread: thread, selection: selToken() || undefined }, pageCtx()), function (ev) {
         if (ev.t === "step") { step(ev.text); return; }
         if (ev.t === "delta") {
           if (!out) { workRow.remove(); out = h("div", { class: "hv-msg hv-msg--ai" }); row("ai", out); ty = typer(out); }
@@ -1739,7 +1759,7 @@
       if (on === undefined) on = panel.hidden;
       if (on) {
         panel.hidden = false;
-        requestAnimationFrame(function () { root.classList.add("is-open"); });
+        (document.hidden ? setTimeout : requestAnimationFrame)(function () { root.classList.add("is-open"); });
         launch.setAttribute("aria-expanded", "true");
         launch.querySelector(".hv-launch__dot").hidden = true;
         hideNudge(true);

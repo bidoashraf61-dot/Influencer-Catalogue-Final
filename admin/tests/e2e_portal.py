@@ -1035,6 +1035,21 @@ class Portal(unittest.TestCase):
         self.assertEqual([r["value"] for r in pr["breakdown"] if r["code"] == c1], [2000.0])   # the selection's own price
         self.assertIn("total", pr)
 
+    def test_83_assistant_knows_the_portal_and_the_open_page(self):
+        c, _ = self.signup("pageaware@pfizer.com")
+        code = [x["code"] for x in db.list_creators()][0]
+        seen = []
+        old = gemini.STUB
+        gemini.STUB = lambda body: (seen.append(json.dumps(body.get("systemInstruction"), ensure_ascii=False)), stub(body))[1]
+        try:
+            c.post("/api/chat/stream", {"message": "Is this creator good for us?", "page": "creator", "creator": code})
+            c.post("/api/chat/stream", {"message": "What am I looking at?", "page": "catalogue", "filters": ["TikTok", "Riyadh"], "shown": 12})
+        finally:
+            gemini.STUB = old
+        self.assertTrue(any("2\u20133 weeks" in x or "2–3 weeks" in x for x in seen))          # the knowledge base
+        self.assertTrue(any("CREATOR'S PROFILE OPEN" in x and code in x for x in seen))          # the creator page
+        self.assertTrue(any("ON THE CATALOGUE" in x and "TikTok" in x and "12 creators shown" in x for x in seen))
+
 def assistant_sql(sql):
     import assistant
     return assistant.t_sql_query({}, sql)

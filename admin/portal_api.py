@@ -822,6 +822,42 @@ class PortalMixin:
                 "objective": (sel["objective"] if "objective" in keys else None) or None,
                 "scores": scored[:40]}
 
+    def _page_context(self, b, cid):
+        """The page the client has open, as the assistant should see it: only what that page
+        shows the client. Creator: their card and analysis highlights. Campaign: the report's
+        own figures, for a report this browser may open. Catalogue: the filters that are on."""
+        page = str(b.get("page") or "")[:20]
+        if page == "creator" and b.get("creator"):
+            info = assistant.t_get_creator({"code_id": cid}, str(b.get("creator"))[:20])
+            if "error" not in info:
+                m = assistant.t_creator_metrics({"code_id": cid}, [info["code"]],
+                                                ["engagement_rate_pct", "avg_views", "avg_likes", "fake_followers_pct", "audience_countries"])
+                info["metrics"] = (m.get("creators") or [{}])[0]
+                return {"page": "creator", "creator": info}
+        if page == "campaign" and b.get("campaign"):
+            k, status = self.viewer_campaign(str(b.get("campaign"))[:40])
+            if k is not None:
+                import metrics
+                r = metrics.client_report(k)
+                tot = r.get("total") or {}
+                keep = ("posts", "planned", "views", "reach", "impressions", "engagement", "er", "likes", "comments", "shares", "saves", "clicks", "ctr")
+                return {"page": "campaign", "campaign": {
+                    "name": r["campaign"].get("name"), "client": r["campaign"].get("client"), "status": r["campaign"].get("status"),
+                    "platform": r["campaign"].get("platform"), "starts_at": r["campaign"].get("starts_at"), "ends_at": r["campaign"].get("ends_at"),
+                    "objective": (r.get("objective") or {}).get("label"), "verdict": (r.get("verdict") or {}).get("label"),
+                    "progress": [{k2: x.get(k2) for k2 in ("key", "goal", "actual", "pct", "grade")} for x in (r.get("progress") or {}).get("items", [])],
+                    "totals": {x: tot.get(x) for x in keep if tot.get(x) is not None},
+                    "creators": [{"name": c.get("name"), "posts": c.get("posts"), "planned": c.get("planned"), "reach": c.get("reach"),
+                                  "engagement": c.get("engagement"), "er": c.get("er")} for c in (r.get("creators") or [])[:30]],
+                    "updated_at": r.get("updated_at")}}
+        if page == "catalogue":
+            f = [str(x)[:40] for x in (b.get("filters") or [])[:15] if isinstance(x, str)]
+            shown = b.get("shown") if isinstance(b.get("shown"), int) else None
+            return {"page": "catalogue", "filters": f, "shown": shown}
+        if page in ("account", "selection"):
+            return {"page": page}
+        return None
+
     def api_chat_stream(self):
         """The chat, streamed: one JSON object per line (``application/x-ndjson``).
         ``{"t":"step","text"}`` while a lookup runs, ``{"t":"delta","text"}`` as
@@ -874,6 +910,7 @@ class PortalMixin:
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
         if b.get("selection"):
             ctx["selection"] = self._selection_context(b.get("selection"), cid)       # the page they are on
+        ctx["page"] = self._page_context(b, cid)
         try:
             res = assistant.converse("client", ctx, past, text, code_id=cid, kind="chat", credits=cost,
                                      on_event=lambda t, x: emit({"t": t, "text": x}), model_name=gemini.chat_model())
