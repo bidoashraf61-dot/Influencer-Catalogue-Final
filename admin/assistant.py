@@ -997,11 +997,15 @@ CLIENT_WRITE = {
 }
 
 
-def confirm_client(token, code_id):
+def confirm_client(token, code_id, name=None):
     with _lock:
         item = _pending.pop(token, None)
     if not item or item["owner"] != "client:%d" % code_id or time.time() - item["at"] > PENDING_TTL:
         return {"ok": False, "message": "That action expired. Ask again."}
+    # A new selection takes the name the client typed on the Confirm card, if any.
+    name = " ".join(str(name or "").split())[:120]
+    if name and item["tool"] == "save_as_selection":
+        item["args"]["name"] = name
     try:
         return CLIENT_WRITE[item["tool"]][1](item["args"], item["ctx"])
     except (ValueError, KeyError, TypeError) as exc:
@@ -1052,7 +1056,11 @@ def run_tool(scope, name, args, ctx):
             for k in [k for k, v in _pending.items() if now - v["at"] > PENDING_TTL]:
                 del _pending[k]
             _pending[token] = {"tool": name, "args": args, "owner": "client:%s" % ctx.get("code_id"), "at": now, "text": text, "ctx": keep}
-        ctx.setdefault("queued", []).append({"token": token, "text": text})
+        q = {"token": token, "text": text}
+        if name == "save_as_selection":
+            # The client can retype the name on the Confirm card before it is saved.
+            q.update(tool=name, name=args.get("name") or "")
+        ctx.setdefault("queued", []).append(q)
         return {"status": "waiting_for_client_confirmation", "will_do": text,
                 "instruction": "Tell the client in one line what will happen; it happens only when they press Confirm under your message. Do not say it is done."}
     if name in CLIENT_TOOLS:

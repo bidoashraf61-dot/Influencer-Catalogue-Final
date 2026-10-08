@@ -1074,3 +1074,28 @@ body.pt-lock { overflow: hidden; }
 .hv-act__yes:disabled { opacity: .6; cursor: default; }
 .hv-act.is-done { box-shadow: none; }
 .hv-act__state { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--hv-gray); }
+
+/* Naming an AI selection before it is saved or opened. Inherits the text colour,
+   so the same form sits on the dark AI result bar, the white modal and the chat. */
+.pt-namer { display: flex; flex-direction: column; gap: 6px; width: 100%; margin: 12px 0 0; }
+.pt-namer__l { font-size: 12px; font-weight: 600; letter-spacing: .02em; opacity: .75; }
+.pt-namer__row { display: flex; flex-wrap: wrap; gap: 8px; }
+.pt-namer__in {
+  flex: 1 1 200px; min-width: 0; min-height: 40px; padding: 8px 16px; border-radius: 999px;
+  font: 400 15px/1.3 "DM Sans", Arial, sans-serif; color: inherit; background: transparent; border: 1.5px solid currentColor;
+}
+.pt-namer__in:focus { outline: 3px solid #e8ff76; outline-offset: 1px; }
+.pt-namer__go {
+  min-height: 40px; padding: 0 18px; border-radius: 999px; border: 0; cursor: pointer;
+  font: 600 14px/1 "DM Sans", Arial, sans-serif; background: #e8ff76; color: #121212; box-shadow: inset 0 0 0 1.5px #121212;
+}
+.pt-namer__go:disabled, .pt-namer__in:disabled { opacity: .6; cursor: default; }
+.hv-act .pt-namer { margin: 0 0 10px; }
+
+/* "Other" on the brief questions: a short typed answer under the options. */
+.pt-other {
+  display: block; width: 100%; margin-top: 10px; min-height: 44px; padding: 10px 16px; border-radius: var(--r-sm, 12px);
+  font: 400 15px/1.3 "DM Sans", Arial, sans-serif; color: inherit; background: transparent; border: 1.5px solid currentColor;
+}
+.pt-other:focus { outline: 3px solid #e8ff76; outline-offset: 1px; }
+.pt-other[hidden] { display: none; }

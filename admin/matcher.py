@@ -63,8 +63,34 @@ COUNT_OF = {"5": 5, "8": 8, "15": 15, "25": 25}
 PLATFORMS = {"Instagram", "TikTok", "Snapchat", "YouTube"}
 
 
+# "Other": every multiple-choice question also takes a short value the client types. It is
+# stored as "other:<text>", read into the nearest option where the words allow (a number of
+# creators, a budget, a country, a category...) and always passed on in the notes.
+OTHER = "other:"
+OTHER_MAX = 80
+
+
+def other_text(v):
+    """The client's own words when ``v`` is an "Other" answer, else None."""
+    return v[len(OTHER):] if isinstance(v, str) and v.startswith(OTHER) else None
+
+
+def _clean_other(v):
+    t = " ".join(str(v)[len(OTHER):].split())[:OTHER_MAX]
+    return OTHER + t if t else None
+
+
+def answer_label(qid, v):
+    """How one stored value reads: the option's label, or the client's own words."""
+    t = other_text(v)
+    if t is not None:
+        return t
+    return next((l for o, l in _BY_ID[qid].get("options", []) if o == v), v)
+
+
 def public_questions():
-    return [dict(q, options=[{"value": v, "label": l} for v, l in q.get("options", [])]) for q in QUESTIONS]
+    return [dict(q, options=[{"value": v, "label": l} for v, l in q.get("options", [])],
+                 other=q["type"] != "text") for q in QUESTIONS]
 
 
 def clean_answers(raw):
@@ -81,37 +107,110 @@ def clean_answers(raw):
         allowed = {o[0] for o in q["options"]}
         if q["type"] == "many":
             vals = v if isinstance(v, list) else ([v] if v else [])
-            vals = [x for x in dict.fromkeys(str(x) for x in vals) if x in allowed][:6]
+            keep, typed = [], None
+            for x in dict.fromkeys(str(x) for x in vals):
+                if x in allowed:
+                    keep.append(x)
+                elif typed is None and x.startswith(OTHER):
+                    typed = _clean_other(x)
+            vals = keep[:6] + ([typed] if typed else [])
             if vals:
                 out[q["id"]] = vals
         else:
             if isinstance(v, str) and v in allowed:
                 out[q["id"]] = v
+            elif isinstance(v, str) and v.startswith(OTHER) and _clean_other(v):
+                out[q["id"]] = _clean_other(v)
         if q["required"] and q["id"] not in out:
             missing.append(q["id"])
     return out, missing
 
 
+def _amount(text):
+    """The first number in ``text``, with k / m / thousand / million applied. None if there is none."""
+    import re
+    m = re.search(r"(\d[\d,]*(?:\.\d+)?)\s*(k|m|thousand|million|ألف|الف|مليون)?", str(text).lower())
+    if not m:
+        return None
+    try:
+        v = float(m.group(1).replace(",", ""))
+    except ValueError:
+        return None
+    unit = m.group(2) or ""
+    return v * (1e6 if unit in ("m", "million", "مليون") else 1e3 if unit else 1)
+
+
+def _from_other(qid, text):
+    """An "Other" answer read into what the scorer understands, or None when the words do not say."""
+    if qid == "count":
+        n = _amount(text)
+        return max(1, min(int(n), 50)) if n else None
+    if qid == "budget":
+        n = _amount(text)
+        if not n:
+            return None
+        return n * 1000 if n < 1000 else n          # the question is asked in SAR; "120" means 120,000
+    if qid == "age":
+        n = _amount(text)
+        if not n:
+            return None
+        return "18-24" if n < 25 else "25-34" if n < 35 else "35-44" if n < 45 else "45-54"
+    got, _ = guess(text)                            # goal, platforms, market, category, gender
+    return got.get(qid)
+
+
+def resolve(answers):
+    """Answers with every "Other" read into option values where it can be. Also returns the
+    client's own words, question by question, for the notes."""
+    out, typed = {}, []
+    for q in QUESTIONS:
+        v = answers.get(q["id"])
+        if v is None:
+            continue
+        vals = v if isinstance(v, list) else [v]
+        own = [other_text(x) for x in vals if other_text(x) is not None]
+        if not own:
+            out[q["id"]] = v
+            continue
+        typed.append("%s: %s" % (q["label"].rstrip("?"), own[0]))
+        got = _from_other(q["id"], own[0])
+        if q["type"] == "many":
+            keep = [x for x in vals if other_text(x) is None]
+            for g in (got if isinstance(got, list) else [got] if got else []):
+                if g not in keep:
+                    keep.append(g)
+            if keep:
+                out[q["id"]] = keep
+        elif got is not None:
+            out[q["id"]] = got
+    return out, typed
+
+
 def to_brief(answers):
     """Answers -> the structured things the scorer and the shortlist use."""
+    answers, typed = resolve(answers)
     plats = [p for p in answers.get("platforms", []) if p in PLATFORMS]
     cats = answers.get("category", [])
-    count = COUNT_OF.get(answers.get("count"), 8)
+    count = answers.get("count")
+    count = count if isinstance(count, int) else COUNT_OF.get(count, 8)
+    budget = answers.get("budget")
+    notes = answers.get("notes", "")
+    if typed:
+        notes = "; ".join(typed) + (". " + notes if notes else "")
     return {
         "objective": OBJECTIVE_OF.get(answers.get("goal"), "Balanced"),
         "target": {"country": answers.get("market", "SA"), "gender": answers.get("gender", "Any"),
                    "age": answers.get("age", "Any"), "category": "|".join(cats) if cats else "Any"},
         "platforms": plats,
-        "budget_max": BUDGET_MAX.get(answers.get("budget")),
+        "budget_max": budget if isinstance(budget, (int, float)) else BUDGET_MAX.get(budget),
         "count": count,
-        "notes": answers.get("notes", ""),
+        "notes": notes,
     }
 
 
 def describe(answers):
     """The brief in a sentence, as stored beside the selection."""
-    def label(qid, val):
-        return next((l for v, l in _BY_ID[qid]["options"] if v == val), val)
+    label = answer_label
     bits = []
     if "goal" in answers:
         bits.append(label("goal", answers["goal"]).lower())
@@ -120,11 +219,12 @@ def describe(answers):
     if "market" in answers:
         bits.append("for " + label("market", answers["market"]))
     if answers.get("platforms"):
-        bits.append("on " + ", ".join(answers["platforms"]))
+        bits.append("on " + ", ".join(label("platforms", p) for p in answers["platforms"]))
     if answers.get("budget") and answers["budget"] != "open":
         bits.append("budget " + label("budget", answers["budget"]) + " SAR")
     if answers.get("count"):
-        bits.append(label("count", answers["count"]) + " creators")
+        n = label("count", answers["count"])
+        bits.append(n if "creator" in n.lower() else n + " creators")
     text = "; ".join(bits)
     return (text[:1].upper() + text[1:]) if text else "No details given"
 

@@ -4345,7 +4345,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # prices — which the admin can type again.
         t_from = sel["total_from"] if same else None
         t_to = sel["total_to"] if same else None
-        db.save_selection(sel["id"], name, codes, prices, t_from, t_to)
+        # Same creators = a rename (e.g. naming an AI shortlist before opening it): the
+        # single-platform mark the shortlist was saved with stays as it was.
+        db.save_selection(sel["id"], name, codes, prices, t_from, t_to,
+                          platform=sel["platform"] if same else None)
         return self.send_json(200, {"ok": True, "token": sel["token"]}, self.cors())
 
     def api_event(self):

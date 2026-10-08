@@ -360,13 +360,13 @@
     var ACC = ROOT + "account/";
     if (u) {
       // Account holders: their own space, then help, then out.
-      item("My home", { href: ACC + "#home" });
+      item("Profile", { href: ACC + "#home" });
       item("My selections", { href: ACC + "#selections" });
       item("My campaigns", { href: ACC + "#campaigns" });
       if (credits) item("AI credits", { go: openAccount }, credits);
       item("Settings", { href: ACC + "#settings" });
       rule();
-      item("Help · contact my account manager", { go: function () { if (HV.talk) HV.talk(); else location.href = ACC + "#home"; } });
+      item("Help", { go: function () { if (HV.talk) HV.talk(); else location.href = ACC + "#home"; } });
     } else if (ME.kind === "admin") {
       item("Preview as client", { go: openAccount });
       item("My campaigns", { href: ROOT + "campaign/dashboard/" });
@@ -483,7 +483,8 @@
               if (o.value === "any") list = i > -1 ? [] : ["any"];
               else { list = list.filter(function (v) { return v !== "any"; }); if (i > -1) list.splice(list.indexOf(o.value), 1); else list.push(o.value); }
               if (list.length) answers[q.id] = list; else delete answers[q.id];
-              Array.prototype.forEach.call(grid.children, function (b, bi) { b.setAttribute("aria-pressed", (answers[q.id] || []).indexOf(q.options[bi].value) > -1 ? "true" : "false"); });
+              Array.prototype.forEach.call(grid.children, function (b, bi) { if (q.options[bi]) b.setAttribute("aria-pressed", (answers[q.id] || []).indexOf(q.options[bi].value) > -1 ? "true" : "false"); });
+              if (o.value === "any" && oIn) { oIn.value = ""; oIn.hidden = true; oBtn.setAttribute("aria-pressed", "false"); }
             } else {
               answers[q.id] = o.value;
               setTimeout(function () { go(step + 1); }, 140);
@@ -492,6 +493,24 @@
           grid.appendChild(btn);
         });
         body.appendChild(grid);
+        var oBtn = null, oIn = null;
+        if (q.other) {
+          // "Other": a free answer the options don't list.
+          var own = otherOf(answers[q.id]);
+          oBtn = h("button", { class: "pt-opt", type: "button", "aria-pressed": own ? "true" : "false" }, h("span", { class: "pt-tick" }), "Other");
+          oIn = otherInput(q, own, function (txt) {
+            var nv = withOther(q, answers[q.id], txt);
+            if (nv) answers[q.id] = nv; else delete answers[q.id];
+            Array.prototype.forEach.call(grid.children, function (b, bi) {
+              if (q.options[bi]) b.setAttribute("aria-pressed", (many ? (answers[q.id] || []).indexOf(q.options[bi].value) > -1 : answers[q.id] === q.options[bi].value) ? "true" : "false");
+            });
+            oBtn.setAttribute("aria-pressed", txt.trim() ? "true" : "false");
+          }, function () { next.click(); });
+          oIn.hidden = !own;
+          oBtn.addEventListener("click", function () { oIn.hidden = false; oIn.focus(); });
+          grid.appendChild(oBtn);
+          body.appendChild(oIn);
+        }
       }
       body.appendChild(err);
       var back = h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { go(step - 1); } }, "Back");
@@ -509,7 +528,7 @@
         var v = answers[q.id];
         if (!v || (v.length === 0)) { if (!q.required) return; }
         var label = q.type === "text" ? (v || "") : (q.type === "many" ? (v || []) : [v]).map(function (val) {
-          var o = q.options.filter(function (op) { return op.value === val; })[0]; return o ? o.label : val;
+          return optionLabel(q, val);
         }).join(", ");
         list.appendChild(h("li", null, h("span", null, q.label.replace(/\?$/, "")), h("span", null, h("b", null, label || "Not answered"), " ",
           h("button", { type: "button", onclick: function () { go(i); } }, "change"))));
@@ -567,6 +586,59 @@
       h("div", { class: "pt-score pt-score--" + scoreClass(p.tag) }, h("b", null, String(p.score)), h("span", null, p.tag)));
   }
 
+  /* -- "Other": every option question also takes a short answer the client types.
+     It is sent as "other:<text>"; the server reads it into the brief (a number of
+     creators, a budget, a country...) and passes the words on in the notes. -- */
+  var OTHER = "other:";
+  function isOther(v) { return typeof v === "string" && v.indexOf(OTHER) === 0; }
+  function otherOf(v) {
+    var list = Array.isArray(v) ? v : [v];
+    for (var i = 0; i < list.length; i++) if (isOther(list[i])) return list[i].slice(OTHER.length);
+    return "";
+  }
+  // The answer with the typed words in place of any earlier ones; null when nothing is left.
+  function withOther(q, v, text) {
+    text = String(text || "").replace(/\s+/g, " ").trim().slice(0, 80);
+    if (q.type === "many") {
+      var list = (Array.isArray(v) ? v : []).filter(function (x) { return !isOther(x) && (!text || x !== "any"); });
+      if (text) list.push(OTHER + text);
+      return list.length ? list : null;
+    }
+    return text ? OTHER + text : null;
+  }
+  function otherInput(q, value, onInput, onEnter) {
+    var inp = h("input", { class: "pt-other", type: "text", maxlength: "80", placeholder: "Type your answer", "aria-label": "Other answer" });
+    inp.value = value || "";
+    inp.addEventListener("input", function () { onInput(inp.value); });
+    if (onEnter) inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); onEnter(); } });
+    return inp;
+  }
+
+  /* -- naming an AI selection: the AI saves it under a made-up name, so before
+     it opens the client can type their own (the same creators, re-saved). -- */
+  function nameForm(current, label, onSave) {
+    var form = h("form", { class: "pt-namer" });
+    var inp = h("input", { class: "pt-namer__in", type: "text", maxlength: "100", "aria-label": "Name this selection" });
+    inp.value = current || "";
+    var btn = h("button", { class: "pt-namer__go", type: "submit" }, label || "Save and open");
+    form.appendChild(h("span", { class: "pt-namer__l" }, "Name this selection"));
+    form.appendChild(h("span", { class: "pt-namer__row" }, inp, btn));
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = inp.value.replace(/\s+/g, " ").trim() || current;
+      inp.disabled = btn.disabled = true; btn.textContent = T("Saving…");
+      onSave(v, function () { inp.disabled = btn.disabled = false; btn.textContent = T(label || "Save and open"); });
+    });
+    setTimeout(function () { try { inp.focus({ preventScroll: false }); inp.select(); } catch (e) { /* old browser */ } }, 30);
+    return form;
+  }
+  function renameThenOpen(token, codes, current, name) {
+    var open = function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(token); };
+    if (!name || name === current || !codes || !codes.length) { open(); return; }
+    api("POST", "/api/selection", { token: token, codes: codes, name: name }).then(open);
+  }
+  function codesOf(picks) { return (picks || []).map(function (p) { return p.code; }); }
+
   function results(res, qs, answers, opts) {
     opts = opts || {};
     var modal = h("div", { class: "pt-modal pt-modal--wide", role: "dialog", "aria-modal": "true", "aria-labelledby": "pt-res-title" });
@@ -599,6 +671,14 @@
     var refine = h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { close(); wizard(qs, answers, 0, null, opts); } }, "Refine brief");
     if (opts.attach && /selection/.test(location.pathname) && location.hash.indexOf(encodeURIComponent(res.token)) > -1) {
       open.addEventListener("click", function (e) { e.preventDefault(); location.reload(); });
+    } else if (!opts.attach) {
+      // A new AI shortlist: the client names it before it opens.
+      open.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (modal.querySelector(".pt-namer")) return;
+        var current = res.name || "AI shortlist";
+        body.appendChild(nameForm(current, "Save and open", function (v) { renameThenOpen(res.token, codesOf(res.picks), current, v); }));
+      });
     }
     modal.appendChild(h("div", { class: "pt-bar" }, total, h("span", null, refine, " ", open)));
     close = layer(modal);
@@ -684,6 +764,7 @@
   var SHORT = { goal: "Goal", platforms: "Platforms", market: "Audience", category: "Product space", budget: "Budget (SAR)", count: "Creators" };
 
   function optionLabel(q, v) {
+    if (isOther(v)) return v.slice(OTHER.length);
     var o = (q.options || []).filter(function (x) { return x.value === v; })[0];
     return o ? o.label : v;
   }
@@ -772,6 +853,7 @@
               if (o.value === "any") picked = k > -1 ? [] : ["any"];
               else { picked = picked.filter(function (v) { return v !== "any"; }); if (k > -1) picked.splice(picked.indexOf(o.value), 1); else picked.push(o.value); }
               Array.prototype.forEach.call(opts.children, function (x, xi) {
+                if (!q.options[xi]) return;
                 var on = picked.indexOf(q.options[xi].value) > -1;
                 x.setAttribute("aria-pressed", on ? "true" : "false");
                 x.style.background = on ? "var(--lime)" : ""; x.style.borderColor = on ? "var(--ink)" : "";
@@ -781,9 +863,24 @@
           });
           card.appendChild(opts);
           var row = h("div", { style: "margin-top:10px;display:flex;gap:8px" });
+          if (q.other) {
+            // "Other": the client types an answer the options don't list.
+            var oIn = otherInput(q, "", function (txt) {
+              if (many) picked = withOther(q, picked, txt) || [];
+            }, function () { (many ? row.firstChild : oSend).click(); });
+            oIn.hidden = true;
+            var oSend = h("button", { class: "pt-idea", type: "button", hidden: true, style: "background:var(--ink);color:var(--white)", onclick: function () {
+              var nv = withOther(q, null, oIn.value); if (!nv) return; answers[q.id] = nv; done(optionLabel(q, nv));
+            } }, "Send");
+            opts.appendChild(h("button", { class: "pt-idea", type: "button", onclick: function () {
+              oIn.hidden = false; if (!many) oSend.hidden = false; oIn.focus();
+            } }, "Other"));
+            card.appendChild(oIn);
+          }
           if (many) row.appendChild(h("button", { class: "pt-idea", type: "button", style: "background:var(--ink);color:var(--white)", onclick: function () {
             if (!picked.length) return; answers[q.id] = picked.slice(); done(picked.map(function (v) { return optionLabel(q, v); }).join(", "));
           } }, "Next"));
+          if (oSend) row.appendChild(oSend);
           if (!q.required) row.appendChild(h("button", { class: "pt-idea", type: "button", onclick: function () { done("Skip"); } }, "Skip"));
           if (row.children.length) card.appendChild(row);
           log.appendChild(card); scroll();
@@ -815,6 +912,13 @@
               wait.textContent = (r.b.summary || (r.b.picks.length + " creators match your brief, best fit first.")) + " Scores are out of 100.";
               cards(r.b.picks.map(function (p) { var c = Object.assign({ code: p.code, name: p.code }, p.creator || {}); c.fit = p.score; return c; }));
               var a = h("a", { class: "pt-idea", href: ROOT + "selection/#s=" + encodeURIComponent(r.b.token), style: "text-decoration:none;background:var(--ink);color:var(--white)" }, "Open as selection");
+              a.addEventListener("click", function (e) {
+                e.preventDefault(); a.parentNode.remove();
+                var current = r.b.name || "Chat shortlist";
+                log.appendChild(h("div", { class: "pt-msg-b pt-msg-b--ai", style: "white-space:normal;max-width:100%" },
+                  nameForm(current, "Save and open", function (v) { renameThenOpen(r.b.token, codesOf(r.b.picks), current, v); })));
+                scroll();
+              });
               log.appendChild(h("div", { class: "pt-ideas" }, a)); scroll();
             });
           });
@@ -1316,8 +1420,14 @@
             back: i > 0 ? function () { i--; delete answers[todo[i]]; next(); } : null,
             skip: q.required ? null : function () { i++; next(); },
             done: function (vals, note) {
+              // Words that match no option are the client's "Other" answer: the server reads
+              // them into the brief (e.g. "40" creators) and keeps them in the notes.
+              if (note && q.other && (q.type === "many" || !vals.length)) {
+                var nv = withOther(q, q.type === "many" ? vals : null, note);
+                if (nv) { answers[q.id] = nv; note = ""; vals = []; }
+              }
               if (vals.length) answers[q.id] = q.type === "many" ? vals : vals[0];
-              else if (q.type === "many") answers[q.id] = ["any"];
+              else if (q.type === "many" && !answers[q.id]) answers[q.id] = ["any"];
               if (note) answers.notes = (answers.notes ? answers.notes + "; " : "") + note;
               i++; next();
             }
@@ -1370,7 +1480,11 @@
         say((r.b.summary || (r.b.picks.length + " creators match your brief.")) + " Best fit first, scored out of 100.");
         queue = queue.then(function () { creatorCards(r.b.picks.slice(0, 6).map(function (p) { var c = Object.assign({ code: p.code, name: p.code }, p.creator || {}); c.fit = p.score; return c; })); });
         say("I've saved them as a selection for you.");
-        chips([{ label: "Open the selection", primary: true, echo: false, go: function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(r.b.token); } },
+        chips([{ label: "Open the selection", primary: true, echo: false, go: function () {
+                 var current = r.b.name || "Voice shortlist";
+                 row("ai", h("div", { class: "hv-msg hv-msg--ai hv-act" },
+                   nameForm(current, "Save and open", function (v) { renameThenOpen(r.b.token, codesOf(r.b.picks), current, v); })));
+               } },
                { label: "Get a quote for it", go: function () { quoteFor({ name: "Voice shortlist", token: r.b.token }); } },
                { label: "Something else", ghost: true, go: function () { menu("What next?"); } }]);
       });
@@ -1388,15 +1502,23 @@
     }
     function savePicks() {
       if (!picked.length) return;
-      var codes = picked.slice();
-      api("POST", "/api/selection", { name: "Chat shortlist", codes: codes }).then(function (r) {
-        if (!r.b.ok) { say("I couldn't save that just now. Please try again."); return; }
-        picked = []; drawPicks();
-        log.querySelectorAll(".hv-card__add").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
-        say("Saved " + codes.length + " creator" + (codes.length === 1 ? "" : "s") + " as “Chat shortlist”.");
-        chips([{ label: "Open the selection", primary: true, echo: false, go: function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(r.b.token); } },
-               { label: "Get a quote for it", go: function () { quoteFor({ name: "Chat shortlist", token: r.b.token, codes: codes }); } }]);
-      });
+      // The client names it before it is saved; "Chat shortlist" is only the suggestion.
+      var old = log.querySelector(".hv-namer-row");
+      if (old) old.remove();
+      var box = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-act" }, nameForm("Chat shortlist", "Save", function (name, retry) {
+        var codes = picked.slice();
+        if (!codes.length) { box.remove(); return; }
+        api("POST", "/api/selection", { name: name, codes: codes }).then(function (r) {
+          if (!r.b.ok) { retry(); say("I couldn't save that just now. Please try again."); return; }
+          box.remove();
+          picked = []; drawPicks();
+          log.querySelectorAll(".hv-card__add").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+          say("Saved " + codes.length + " creator" + (codes.length === 1 ? "" : "s") + " as “" + name + "”.");
+          chips([{ label: "Open the selection", primary: true, echo: false, go: function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(r.b.token); } },
+                 { label: "Get a quote for it", go: function () { quoteFor({ name: name, token: r.b.token, codes: codes }); } }]);
+        });
+      })));
+      box.classList.add("hv-namer-row");
     }
     function togglePick(code, btn) {
       var k = picked.indexOf(code);
@@ -1641,6 +1763,13 @@
     function actionCard(a) {
       var box = h("div", { class: "hv-msg hv-msg--ai hv-act", role: "group", "aria-label": "Confirm this change" });
       box.appendChild(h("p", { class: "hv-act__what" }, a.text + "?"));
+      // A new selection: the client can type its name here before confirming.
+      var nameIn = null;
+      if (a.tool === "save_as_selection") {
+        nameIn = h("input", { class: "pt-namer__in hv-act__name", type: "text", maxlength: "100", "aria-label": "Name this selection" });
+        nameIn.value = a.name || "Chat shortlist";
+        box.appendChild(h("label", { class: "pt-namer" }, h("span", { class: "pt-namer__l" }, "Name this selection"), h("span", { class: "pt-namer__row" }, nameIn)));
+      }
       var yes = h("button", { class: "hv-act__yes", type: "button" }, "Confirm");
       var no = h("button", { class: "hv-act__no", type: "button" }, "Cancel");
       var row_ = h("div", { class: "hv-act__btns" }, yes, no);
@@ -1648,7 +1777,9 @@
       function settle(label) { row_.remove(); box.classList.add("is-done"); box.appendChild(h("p", { class: "hv-act__state" }, label)); }
       yes.addEventListener("click", function () {
         yes.disabled = no.disabled = true; yes.textContent = "Working…";
-        api("POST", "/api/chat/confirm", { token: a.token }).then(function (r) {
+        var body = { token: a.token };
+        if (nameIn) { body.name = nameIn.value.replace(/\s+/g, " ").trim(); nameIn.disabled = true; }
+        api("POST", "/api/chat/confirm", body).then(function (r) {
           var res = r.b || {};
           if (!res.ok) { settle("Not done"); say(res.message || "That didn't go through. Please try again."); return; }
           settle("Done");
@@ -2111,17 +2242,51 @@
           var k = picked.indexOf(o.value);
           if (o.value === "any") picked = k > -1 ? [] : ["any"];
           else { picked = picked.filter(function (v) { return v !== "any"; }); if (k > -1) picked.splice(picked.indexOf(o.value), 1); else picked.push(o.value); }
-          Array.prototype.forEach.call(opts.children, function (x, xi) { x.setAttribute("aria-pressed", String(picked.indexOf(q.options[xi].value) > -1)); });
+          Array.prototype.forEach.call(opts.children, function (x, xi) { if (q.options[xi]) x.setAttribute("aria-pressed", String(picked.indexOf(q.options[xi].value) > -1)); });
+          if (o.value === "any" && oIn) { oIn.value = ""; oIn.hidden = true; oBtn.setAttribute("aria-pressed", "false"); }
           nextBtn.disabled = !picked.length;
         });
         opts.appendChild(b);
       });
       p.appendChild(opts);
+      // "Other": the client's own answer when no option fits (e.g. 40 creators).
+      var oBtn = null, oIn = null, oNext = null;
+      if (q.other) {
+        var own = otherOf(answers[id]);
+        oBtn = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(!!own) }, "Other");
+        oIn = otherInput(q, own, function (txt) {
+          oBtn.setAttribute("aria-pressed", String(!!txt.trim()));
+          if (many) {
+            picked = withOther(q, picked, txt) || [];
+            Array.prototype.forEach.call(opts.children, function (x, xi) { if (q.options[xi]) x.setAttribute("aria-pressed", String(picked.indexOf(q.options[xi].value) > -1)); });
+            nextBtn.disabled = !picked.length;
+          } else {
+            Array.prototype.forEach.call(opts.children, function (x, xi) { if (q.options[xi]) x.setAttribute("aria-pressed", "false"); });
+            oNext.disabled = !txt.trim();
+          }
+        }, function () { (many ? nextBtn : oNext).click(); });
+        oIn.hidden = !own;
+        oBtn.addEventListener("click", function () {
+          oIn.hidden = false; oIn.focus();
+          if (!many) oNext.hidden = false;
+        });
+        opts.appendChild(oBtn);
+        p.appendChild(oIn);
+        if (!many) {
+          oNext = h("button", { class: "ai-sl__next", type: "button", onclick: function () {
+            var nv = withOther(q, null, oIn.value);
+            if (!nv) return;
+            answers[id] = nv; pop(oNext, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750);
+          } }, "Next");
+          oNext.hidden = !own; oNext.disabled = !own;
+        }
+      }
       var nav = h("div", { class: "ai-sl__nav" });
       if (i > 0) nav.appendChild(h("button", { class: "ai-sl__back", type: "button", onclick: function () { ask(i - 1); } }, "Back"));
       if (!q.required && !many) nav.appendChild(h("button", { class: "ai-sl__skip", type: "button", onclick: function () { delete answers[id]; next(); } }, "Skip"));
       var nextBtn = h("button", { class: "ai-sl__next", type: "button", onclick: function () { answers[id] = picked.slice(); pop(nextBtn, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750); } }, "Next");
       if (many) { nextBtn.disabled = !picked.length; nav.appendChild(nextBtn); }
+      if (oNext) nav.appendChild(oNext);
       p.appendChild(nav);
       swap(p);
       function next() { if (i + 1 < AI_STEPS.length) ask(i + 1); else review(); }
@@ -2304,7 +2469,17 @@
       txt.appendChild(h("p", { class: "ai-result__sum" }, res.summary || (res.picks.length + " creators match your brief, best fit first.")));
       bar.appendChild(txt);
       var acts = h("div", { class: "ai-result__acts" });
-      acts.appendChild(h("a", { class: "ai-result__btn ai-result__btn--lime", href: ROOT + "selection/#s=" + encodeURIComponent(res.token) }, "Open as selection"));
+      var openSel = h("a", { class: "ai-result__btn ai-result__btn--lime", href: ROOT + "selection/#s=" + encodeURIComponent(res.token) }, "Open as selection");
+      // The client names the selection before it opens (prefilled with the brief's name).
+      openSel.addEventListener("click", function (e) {
+        e.preventDefault();
+        if (bar.querySelector(".pt-namer")) return;
+        var current = res.name || name;
+        txt.appendChild(nameForm(current, "Save and open", function (v) {
+          renameThenOpen(res.token, codesOf(res.picks), current, v);
+        }));
+      });
+      acts.appendChild(openSel);
       acts.appendChild(h("a", { class: "ai-result__btn", href: ROOT + "selection/#s=" + encodeURIComponent(res.token) + "&quote=1" }, "Request a quote"));
       acts.appendChild(h("button", { class: "ai-result__btn ai-result__btn--ghost", type: "button", onclick: clearResult }, "Show all creators"));
       acts.appendChild(h("button", { class: "ai-result__btn ai-result__btn--ghost", type: "button", onclick: function () { clearResult(); answers = {}; open(); card.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" }); } }, "New brief"));

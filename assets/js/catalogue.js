@@ -673,7 +673,10 @@
   // options for exactly the creators in that selection.
   function Controls(host, cards, onChange, extras) {
     // followers: [] for no limit, else [min, max] with either end null.
-    var state = { tier: [], platform: [], place: [], interest: [], followers: [], sort: "", q: "" };
+    // The catalogue opens most-followed first (all platforms added up); a selection keeps
+    // the order its link gives. "Recommended" is still there to pick.
+    var DEFAULT_SORT = extras ? "" : "followers-desc";
+    var state = { tier: [], platform: [], place: [], interest: [], followers: [], sort: DEFAULT_SORT, q: "" };
     // `extras` (the selection page): more filters of the same kind, in their own colour (fit,
     // role, tags), and the matching score to sort on.
     var xdims = extras ? extras.dims : [];
@@ -803,7 +806,7 @@
     var sortList = SORTS.concat(extras ? [["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]] : []);
     var sort = '<label class="cat-sort"><span class="cat-sort__label">Sort</span>' +
       '<select class="cat-sort__select" aria-label="Sort creators">' +
-      sortList.map(function (s) { return '<option value="' + s[0] + '">' + s[1] + "</option>"; }).join("") +
+      sortList.map(function (s) { return '<option value="' + s[0] + '"' + (s[0] === DEFAULT_SORT ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") +
       "</select>" + CHEVRON + "</label>";
 
     var bar = document.createElement("div");
@@ -988,7 +991,7 @@
         state.place = state.place.filter(function (v) { return cities.indexOf(v) === -1; });
         if (box.checked) state.place = state.place.concat(cities);
         changed();
-      } else if (box.classList.contains("cat-sort__select")) {
+      } else if (box.classList.contains("cat-sort__select") && !box.closest(".cat-group-by")) {   // not the Group menu
         state.sort = box.value;
         onChange();
       }
@@ -1940,8 +1943,10 @@
       var cl = $("sel-client");
       if (cl) { cl.hidden = !(br && br.client); cl.textContent = br && br.client ? "Prepared for " + br.client : ""; }
       var bx = $("sel-brief");
+      var scored = !!(CURATED && CURATED.scores && Object.keys(CURATED.scores).length);
       if (bx) {
-        if (!br) { bx.hidden = true; }
+        if (!br && !scored) { bx.hidden = true; }
+        else if (!br) { bx.hidden = false; bx.textContent = ""; }
         else {
           var t = br.target || {}, chips = [["Objective", br.objective]];
           if (t.country) chips.push(["Market", COUNTRY_NAME[t.country] || t.country]);
@@ -1968,6 +1973,14 @@
             }
             bx.appendChild(el);
           });
+        }
+        // What the fit scores on the cards mean, in one quiet line.
+        if (scored) {
+          var note = document.createElement("span");
+          note.className = "cat-selhead__note";
+          note.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>';
+          note.appendChild(document.createTextNode("Scores compare each creator's profile analysis with your campaign objectives."));
+          bx.appendChild(note);
         }
       }
       var st = $("sel-headstats");

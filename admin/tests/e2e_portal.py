@@ -1073,6 +1073,40 @@ class Portal(unittest.TestCase):
         res = assistant.run_tool("client", "request_quote", {"note": "Ramadan"}, ctx2)
         s, b, _ = c.post("/api/chat/confirm", {"token": ctx2["queued"][-1]["token"]})
         self.assertTrue(b["ok"])
+    def test_85_ai_selection_is_named_before_it_opens(self):
+        # The AI shortlist is saved as "AI shortlist"; the client's name replaces it and nothing else.
+        c, _ = self.signup("namer@pfizer.com")
+        ans = {"goal": "awareness", "platforms": ["Instagram"], "market": "SA", "category": ["skincare"], "count": "other:3 creators"}
+        s, b, _ = c.post("/api/brief/run", {"answers": ans})
+        self.assertEqual(s, 200, b)
+        self.assertEqual(len(b["picks"]), 3)                                   # the typed "Other" count is used
+        self.assertIn("3 creators", b["brief"])
+        before = db.selection(token=b["token"])
+        self.assertEqual((before["name"], before["platform"]), ("AI shortlist", "Instagram"))
+        codes = [p["code"] for p in b["picks"]]
+        s, r, _ = c.post("/api/selection", {"token": b["token"], "codes": codes, "name": "Ramadan skincare"})
+        self.assertTrue(r["ok"] and r["token"] == b["token"], r)
+        after = db.selection(token=b["token"])
+        self.assertEqual((after["name"], after["platform"], after["codes"]), ("Ramadan skincare", "Instagram", before["codes"]))
+
+    def test_86_assistant_new_selection_takes_the_typed_name(self):
+        import assistant
+        c, _ = self.signup("named@pfizer.com")
+        u = portal.user_by_email("named@pfizer.com")
+        c1, c2 = [x["code"] for x in db.list_creators(active_only=True)][:2]
+        ctx = {"code_id": u["code_id"], "user": dict(u), "selection": None}
+        assistant.run_tool("client", "save_as_selection", {"codes": [c1, c2]}, ctx)
+        q = ctx["queued"][0]
+        self.assertEqual((q["tool"], q["name"]), ("save_as_selection", "Chat shortlist"))
+        s, b, _ = c.post("/api/chat/confirm", {"token": q["token"], "name": "  Eid   heroes "})
+        self.assertTrue(b["ok"], b)
+        self.assertEqual(db.selection(token=b["open"])["name"], "Eid heroes")
+        # Without a typed name the suggested one stands; other actions ignore a name.
+        ctx = {"code_id": u["code_id"], "user": dict(u), "selection": None}
+        assistant.run_tool("client", "save_as_selection", {"codes": [c1], "name": "Solo"}, ctx)
+        s, b, _ = c.post("/api/chat/confirm", {"token": ctx["queued"][0]["token"]})
+        self.assertEqual(db.selection(token=b["open"])["name"], "Solo")
+
 
 def assistant_sql(sql):
     import assistant

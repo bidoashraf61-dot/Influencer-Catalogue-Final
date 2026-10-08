@@ -1794,3 +1794,10 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 /* No creator numbers on the page at all, filtered or not (Bido, 2026-10-08). */
 .cat-tally { display: none !important; }
 .cat-bar__side .cat-bar__order { border-left: 0; padding-left: 0; }
+
+/* The one-line explanation of the fit scores, under the campaign objective. */
+.cat-selhead__note {
+  flex-basis: 100%; display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; line-height: 1.4; font-weight: 400; color: rgba(255,255,255,.62);
+}
+.cat-selhead__note svg { flex: none; }

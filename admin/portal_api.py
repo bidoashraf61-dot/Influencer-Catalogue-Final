@@ -806,8 +806,7 @@ class PortalMixin:
                 if v in (None, "", [], ["any"]):
                     continue
                 vals = v if isinstance(v, list) else [v]
-                labels = {(o["value"] if isinstance(o, dict) else o[0]): (o["label"] if isinstance(o, dict) else o[1]) for o in q.get("options", [])}
-                rows.append({"q": q["label"], "a": ", ".join(labels.get(x, str(x)) for x in vals)})
+                rows.append({"q": q["label"], "a": ", ".join(str(matcher.answer_label(q["id"], x)) for x in vals)})
             brief = {"summary": br["summary"] or "", "answers": rows, "source": br["source"], "at": br["created_at"]}
         scored = []
         try:
@@ -831,7 +830,8 @@ class PortalMixin:
         cid = who[0]
         if self._throttled("act:%d" % cid, 30, 600):
             return
-        res = assistant.confirm_client(str(self.json_body().get("token") or ""), cid)
+        b = self.json_body()
+        res = assistant.confirm_client(str(b.get("token") or ""), cid, b.get("name"))
         if res.get("ok"):
             db.log("chat_action", cid, self.client_ip(), self._ua(), res.get("message", "")[:80])
         return self.send_json(200, res, self.cors())
