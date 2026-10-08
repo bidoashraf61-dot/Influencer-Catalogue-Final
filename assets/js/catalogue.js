@@ -2775,10 +2775,13 @@
     // [hidden], the licence filter and the AI shortlist with classes.
     var cards = grid.querySelectorAll(".cat-card"), n = 0;
     for (var i = 0; i < cards.length; i++) if (!cards[i].hidden && getComputedStyle(cards[i]).display !== "none") n++;
+    // The size of the roster is never shown (Bido, 2026-10-08): only how many a filter leaves,
+    // and nothing at all while nothing is filtered.
+    var tally = num.parentNode, filtered = n < cards.length;
+    tally.hidden = !filtered;
     num.textContent = fmt(n);
-    of.textContent = n < cards.length ? "of " + fmt(cards.length) : "";
-    of.hidden = n >= cards.length;
-    lab.textContent = n === 1 && n >= cards.length ? "creator" : "creators";
+    of.textContent = ""; of.hidden = true;
+    lab.textContent = n === 1 ? "creator matches" : "creators match";
   }
   function mount() {
     var row = document.querySelector(".cat-bar__row");

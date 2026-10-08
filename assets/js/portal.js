@@ -1570,7 +1570,7 @@
     var intro = h("div", { class: "ai-sl__intro" });
     intro.innerHTML = '<div class="ai-sl__face">' + loop("voice-loop") + "</div>" +
       '<div class="ai-sl__copy"><h2 class="ai-sl__title" id="ai-sl-title">Build a shortlist with AI</h2>' +
-      "<p>Six quick taps. We score all " + (roster ? roster.toLocaleString("en-US") + " " : "") + "creators against your campaign and pick the best.</p></div>";
+      "<p>Six quick taps. We score every creator in the roster against your campaign and pick the best.</p></div>";
     var start = h("button", { class: "ai-sl__start", type: "button" }, "Start");
     start.insertAdjacentHTML("beforeend", aiSvg('<path d="M5 12h13M13 6l6 6-6 6"/>', 18));
     intro.appendChild(start);
@@ -1594,9 +1594,11 @@
     // The coach: the character reacts to every step (points at a new question, thinks
     // while you choose, thumbs-up on an answer, cheers at the end), over a power meter.
     var coach = h("div", { class: "ai-sl__coach", "aria-hidden": "true" });
-    var cvid = h("video", { class: "ai-sl__cvid", muted: "", playsinline: "", preload: "auto", poster: V + "voice-loop-poster.webp" });
-    cvid.muted = true;
-    var cring = h("div", { class: "ai-sl__cring" }, cvid);
+    // Each reaction is a fresh video element laid over the last one, which is removed once the
+    // new one is drawing. Re-using one element (swapping its source, or hiding and showing
+    // several) left blank or half-painted frames in Chrome.
+    var cring = h("div", { class: "ai-sl__cring" });
+    var CLIP = { point: "voice-point", think: "voice-think", thumbs: "voice-thumbs", cheer: "voice-cheer", wave: "voice-loop" };
     var power = h("div", { class: "ai-sl__power" });
     power.innerHTML = '<p class="ai-sl__pw-h">Campaign power</p><p class="ai-sl__pw-n"><b>0</b><small> / ' + 1000 + '</small></p>' +
       '<div class="ai-sl__pw-bar"><i></i></div><p class="ai-sl__pw-lvl">Draft</p>';
@@ -1610,19 +1612,21 @@
     var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null;
 
     /* -- the game layer: coach animations and campaign power -- */
-    var CLIPS = { point: "voice-point", think: "voice-think", thumbs: "voice-thumbs", cheer: "voice-cheer", wave: "voice-loop" };
-    var coachTimer = null, coachNow = "";
+    var coachTimer = null;
     function coachPlay(kind, back, after) {
       clearTimeout(coachTimer);
       if (reduce) return;
-      if (coachNow !== kind) {
-        coachNow = kind;
-        cvid.innerHTML = '<source src="' + V + CLIPS[kind] + '.webm" type="video/webm"/><source src="' + V + CLIPS[kind] + '.mp4" type="video/mp4"/>';
-        cvid.load();
-      } else { try { cvid.currentTime = 0; } catch (e) { /* not ready */ } }
-      cvid.loop = !back;
-      var pr = cvid.play(); if (pr && pr.catch) pr.catch(function () { /* autoplay blocked: poster stays */ });
-      cring.classList.remove("is-" + "bump"); void cring.offsetWidth; cring.classList.add("is-bump");
+      var v = document.createElement("video");
+      v.className = "ai-sl__cvid"; v.muted = true; v.loop = true; v.autoplay = true;
+      v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("aria-hidden", "true");
+      v.innerHTML = '<source src="' + V + CLIP[kind] + '.webm" type="video/webm"/><source src="' + V + CLIP[kind] + '.mp4" type="video/mp4"/>';
+      var old = [].slice.call(cring.querySelectorAll("video"));
+      var swap = function () { old.forEach(function (o) { o.remove(); }); };
+      v.addEventListener("playing", swap, { once: true });
+      setTimeout(swap, 1200);                       // never leave a pile if 'playing' is late
+      cring.appendChild(v);
+      var pr = v.play(); if (pr && pr.catch) pr.catch(function () { /* autoplay blocked: last frame stays */ });
+      cring.classList.remove("is-bump"); void cring.offsetWidth; cring.classList.add("is-bump");
       if (back) coachTimer = setTimeout(function () { coachPlay(back); }, after || 2600);
     }
     var POINTS = { goal: 150, platforms: 100, market: 150, category: 200, budget: 150, count: 100 };
@@ -1771,7 +1775,8 @@
     var STAGES = ["Reading your brief", "Scoring every creator", "Fitting your budget", "Writing the reasons"];
     function go(name) {
       busy = true;
-      run.classList.add("is-staging"); clearTimeout(coachTimer); try { cvid.pause(); } catch (e) { /* none */ }
+      run.classList.add("is-staging"); clearTimeout(coachTimer);
+      [].slice.call(cring.querySelectorAll("video")).forEach(function (o) { try { o.pause(); } catch (e) { /* none */ } });
       var p = h("div", { class: "ai-sl__wait", role: "status", "aria-live": "polite" });
       var scene = h("div", { class: "ai-sl__scene", "aria-hidden": "true" });
       scene.innerHTML = '<div class="ai-sl__orbit ai-sl__orbit--a"><i></i><i></i><i></i></div>' +
@@ -1786,7 +1791,7 @@
       var side = h("div", { class: "ai-sl__steps" });
       side.appendChild(h("p", { class: "ai-sl__ask" }, "Building “" + name + "”"));
       var list = h("ol", { class: "ai-sl__list" });
-      var counter = h("b", { class: "ai-sl__count" }, "0");
+      var counter = h("b", { class: "ai-sl__count" }, "0%");
       STAGES.forEach(function (t, i) {
         var li = h("li", { class: "ai-sl__st" }, h("span", { class: "ai-sl__st-dot", "aria-hidden": "true" }), h("span", null, t));
         if (i === 1) li.appendChild(counter);
@@ -1807,7 +1812,7 @@
         var s = (Date.now() - t0) / 1000;
         if (!done) {
           if (s > 1.2 && at < 1) mark(1);
-          if (at === 1) counter.textContent = Math.min(total, Math.round(total * Math.min(1, (s - 1.2) / 4))).toLocaleString("en-US");
+          if (at === 1) counter.textContent = Math.round(100 * Math.min(1, (s - 1.2) / 4)) + "%";   // progress, never the roster size
           if (s > 5.4 && at < 2) mark(2);
           if (s > 7.4 && at < 3) mark(3);
           bar.firstChild.style.width = Math.min(92, 8 + s * 4) + "%";
@@ -1821,7 +1826,7 @@
           err.appendChild(h("div", { class: "ai-sl__nav" }, h("button", { class: "ai-sl__next", type: "button", onclick: review }, "Change the brief")));
           swap(err); return;
         }
-        counter.textContent = (r.b.pool || total).toLocaleString ? Number(r.b.pool || total).toLocaleString("en-US") : String(r.b.pool || total);
+        counter.textContent = "100%";
         mark(STAGES.length); bar.firstChild.style.width = "100%";
         setCredits(r.b.credits);
         last = r.b;
@@ -1951,10 +1956,11 @@
     if (note) note.textContent = licWant ? shown + " creator" + (shown === 1 ? "" : "s") + " with " +
       ({ any: "a licence", SA: "Mawthooq", AE: "a UAE permit", verified: "a verified licence" })[licWant] : "";
   }
-  function mountLicFilter() {
+  function mountLicFilter(tries) {
     if (document.body.getAttribute("data-page") !== "catalogue" || $("lic-filter")) return;
     var bar = document.querySelector(".cat-controls .cat-bar");
-    if (!bar) return;
+    // The licences can arrive before the catalogue has drawn its filter bar: wait for it.
+    if (!bar) { if ((tries || 0) < 80) setTimeout(function () { mountLicFilter((tries || 0) + 1); }, 250); return; }
     var box = h("div", { id: "lic-filter", class: "lic-filter", role: "group", "aria-label": "Advertising licence" });
     box.appendChild(h("span", { class: "lic-filter__label" }, "Licence"));
     [["", "Any"], ["any", "Licensed"], ["SA", "Mawthooq"], ["AE", "UAE permit"], ["verified", "Verified only"]].forEach(function (o) {

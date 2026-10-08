@@ -770,9 +770,12 @@ body.pt-lock { overflow: hidden; }
   width: 176px; height: 176px; border-radius: 50%; overflow: hidden; background: var(--ai-lime);
   box-shadow: 0 0 0 5px rgba(232,255,118,.2), 0 0 0 12px rgba(232,255,118,.06);
 }
-.ai-sl__cring.is-bump { animation: ai-bump .45s var(--ai-ease); }
-@keyframes ai-bump { 0% { transform: scale(1); } 40% { transform: scale(1.07); } 100% { transform: scale(1); } }
-.ai-sl__cvid { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ai-sl__cring { position: relative; }
+/* the bump is a ring pulse, not a transform: scaling a clipped video box mid-frame mis-paints it */
+.ai-sl__cring.is-bump { animation: ai-bump .5s var(--ai-ease); }
+@keyframes ai-bump { 0% { box-shadow: 0 0 0 5px rgba(232,255,118,.2), 0 0 0 12px rgba(232,255,118,.06); } 40% { box-shadow: 0 0 0 9px rgba(232,255,118,.45), 0 0 0 20px rgba(232,255,118,.12); } 100% { box-shadow: 0 0 0 5px rgba(232,255,118,.2), 0 0 0 12px rgba(232,255,118,.06); } }
+.ai-sl__cvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.ai-sl__cring { background: var(--ai-lime) url("../brand/voice/voice-loop-poster.webp") center / cover no-repeat; }
 .ai-sl__power { position: relative; width: 100%; padding: 14px 16px 12px; border-radius: 18px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
 .ai-sl__pw-h { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); }
 .ai-sl__pw-n { margin: 4px 0 8px; color: rgba(255,255,255,.5); }
@@ -884,3 +887,6 @@ body.pt-lock { overflow: hidden; }
   .ai-sl:not(.is-open) .ai-sl__intro { grid-template-columns: 40px 1fr auto; }
   .ai-sl:not(.is-open) .ai-sl__title { font-size: 19px; white-space: normal; }
 }
+/* Back / Skip / Next sit in the right corner of the question, not under the answers */
+.ai-sl__q { display: flex; flex-direction: column; }
+.ai-sl__q .ai-sl__nav { justify-content: flex-end; align-self: stretch; margin-top: 26px; }
