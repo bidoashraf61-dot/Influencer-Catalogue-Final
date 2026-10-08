@@ -986,7 +986,8 @@ class Portal(unittest.TestCase):
         lines = [json.loads(x) for x in (raw if isinstance(raw, str) else json.dumps(raw)).splitlines() if x.strip()]
         done = [x for x in lines if x["t"] == "done"][0]
         self.assertTrue(done["instant"])
-        self.assertIn("SAR", done["reply"])                          # live tier prices
+        self.assertNotIn("SAR", done["reply"])                       # Helvy never quotes prices (phase C + D)
+        self.assertIn("quote", done["reply"])
         self.assertEqual(before, c.get("/api/credits")[1].get("credits"))                              # instant answers are free
         s, raw, _ = c.post("/api/chat/stream", {"message": "campaign for skincare in Riyadh please"})
         lines = [json.loads(x) for x in raw.splitlines() if x.strip()]
@@ -1032,8 +1033,7 @@ class Portal(unittest.TestCase):
         self.assertEqual(er["creators_total"], 2)
         self.assertEqual(er["creators_with_data"] + len(er["without_data"]), 2)   # gaps named, never estimated
         pr = assistant.t_selection_stats(ctx, "client_price_sar")
-        self.assertEqual([r["value"] for r in pr["breakdown"] if r["code"] == c1], [2000.0])   # the selection's own price
-        self.assertIn("total", pr)
+        self.assertIn("error", pr)                                  # prices are never a chat metric (phase C + D)
 
     def test_83_assistant_knows_the_portal_and_the_open_page(self):
         c, _ = self.signup("pageaware@pfizer.com")

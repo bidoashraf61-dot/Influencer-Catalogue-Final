@@ -1,4 +1,4 @@
-"""What the HELV Assistant knows about HelloVoice and the portal, beyond the live
+"""What Helvy (the HELVY Connect assistant, formerly "HELV Assistant") knows about HelloVoice and the portal, beyond the live
 data its tools read. Written from the portal itself and HelloVoice's answers
 (2026-10-08). Facts here are stable policy and how-to; anything numeric about
 creators, prices, selections or campaigns always comes from the tools.
@@ -25,8 +25,8 @@ CREATORS AND VETTING
 - Healthcare professionals (HCP) are a separate group of creators (doctors, pharmacists and similar), with their own tiers.
 
 PRICES
-- Catalogue prices are ranges per video, in SAR before 15% VAT, set by the creator's size tier; a creator's own rate can differ. Bundles are priced together. The final price is in the quote.
-- A selection can be shown in other currencies (e.g. AED, USD); the amounts are converted at HelloVoice's set rates.
+- Helvy never discusses prices, fees, rates, costs or budgets for creators or HelloVoice, not even ranges. Every pricing question gets the same answer: the account manager prepares a quote (Request a quote on the selection, or ask Helvy to request one).
+- The ROI Calculator works only with the client's own budget, to show what it can reach (reach, views, interactions, clicks) against industry benchmarks, labelled as an estimate. It never uses creator or HelloVoice prices.
 
 USING THE PORTAL
 - Catalogue: browse vetted creators, filter by platform, size, city or country, topic and licence, and open any creator's analysis in a side panel.
@@ -37,8 +37,11 @@ USING THE PORTAL
 - Campaign report: shown for live campaigns. Lists every post with views, reach and engagement, progress against the goals, and an overall verdict (e.g. on track or behind target). Numbers refresh once every 24 hours. Figures marked as estimates are replaced by the creators' real insights once approved. There is also a one-screen dashboard view and a CSV download.
 
 ACCOUNT AND CREDITS
-- Clients sign in with their access code (or their work email where enabled). Each shared link asks for its own access code once per browser.
-- In this chat, tapping options is free; a typed question uses 1 credit, building a scored shortlist uses 5, and common questions answered instantly are free. More credits can be requested from the account.
+- Clients sign in to HELVY Connect with their work email and a one-time 6-digit code (it expires in 10 minutes). Personal addresses (Gmail, Outlook.com and similar) can't sign in. The HelloVoice team signs in on the admin; admin access is given person by person (info@hellovoice.co.uk). Older shared links still ask for their own access code.
+- AI credits: tapping options in this chat is free; a typed question uses 1 credit, a scored shortlist with reasons 5, "Add more like these" 3, "Creators like this" 2 and "Find a replacement" 2. ALL AI is free while the client has an active campaign (from its start date until 30 days after its end date). Credits are earned by completing the profile (up to 30), inviting a colleague (+20) and finishing the 2-minute tour (+5); more can be requested from the profile.
+- The 2-minute tour shows the portal on sample data (Northwind Pharma); replay it from Help or the profile.
+- ROI Calculator: inside a selection, on its own page in the profile, or in this chat. Goals: Awareness (reach, views, impressions, frequency, CPM), Engagement (interactions, engagement rate, CPE), Traffic (tracking-link clicks, CTR, landing visits, CPC). The verdict is good, moderate or low against a fair range; after a campaign the estimate is compared with the live results. No sales or revenue figures: HelloVoice tracks up to the tracking link.
+- Selections: the owner approves or rejects each creator (with an optional reason); "Add more like these" adds creators like the approved ones as Under review; "Creators like this" on a card shows three look-alikes; a rejected creator gets "Find a replacement".
 
 WHAT THE ASSISTANT CANNOT DO
 - It cannot book creators, promise availability or dates, negotiate prices or discounts, or share anything about other clients. For these, offer to pass the request to the account manager.

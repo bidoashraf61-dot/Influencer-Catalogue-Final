@@ -28,21 +28,6 @@ ANALYTIC = re.compile(r"\b(engagement|engage|er|views?|reach|impressions?|follow
 SEARCHY = re.compile(r"\b(find|show|suggest|recommend|looking for|shortlist|creators? (in|for|who)|influencers? (in|for|who))\b|ابحث|اقترح|أبحث", re.I)
 
 
-def _money(v):
-    return "SAR {:,}".format(int(round(v))) if v else "—"
-
-
-def _prices():
-    rows = [t for t in db.list_tiers() if t["price_from"]]
-    if not rows:
-        return "Prices depend on the creator's size and the deliverables. Ask for a quote and your account manager will price it."
-    lines = ["• **%s**%s: %s–%s per video" % (t["name"], (" (" + t["reach"] + " followers)") if ("reach" in t.keys() and t["reach"]) else "",
-                                               _money(t["price_from"]), "{:,}".format(int(round(t["price_to"] or t["price_from"]))))
-             for t in rows]
-    return ("Typical prices per video, before VAT:\n" + "\n".join(lines)
-            + "\n\nA creator's own rate can differ, and bundles are priced together. A quote from your account manager is final.")
-
-
 def answer(text):
     t = " ".join(str(text or "").split())
     if not t or len(t.split()) > 14 or SEARCHY.search(t) or ANALYTIC.search(t):
@@ -56,10 +41,14 @@ def answer(text):
 def _reply(intent):
     costs = portal.costs()
     if intent == "prices":
-        return {"reply": _prices(), "next": ["Get a quote", "Find creators within my budget"]}
+        # Helvy never quotes prices (phase C + D): the account manager does.
+        return {"reply": "I don't quote prices: your account manager will prepare a quote for exactly the creators and content you want, "
+                         "usually within one working day. I can send the request now, or show what your own budget can reach.",
+                "next": ["Get a quote", "What can my budget reach?"]}
     if intent == "credits":
         return {"reply": "Tapping options in this chat is always free. A typed question uses **%d credit**, and building a scored shortlist uses **%d**. "
-                         "Your balance is shown under the chat; you can ask for more from your account." % (costs.get("chat", 1), costs.get("brief", 5)),
+                         "Everything AI is free while you have an active campaign. You can earn or request more from your profile."
+                         % (costs.get("chat", 1), costs.get("brief", 5)),
                 "next": ["Find creators", "Talk to a person"]}
     if intent == "book":
         return {"reply": "Pick the creators you like on the catalogue (or let me build a shortlist), save them as a selection, "

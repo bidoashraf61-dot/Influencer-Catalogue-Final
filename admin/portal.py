@@ -125,7 +125,11 @@ OTP_RESEND_SECONDS = 30
 
 # "search" is the scored shortlist without AI text: free, so every client (access code included)
 # can always get one. Written reasons, the brief reader and chat spend credits.
-DEFAULT_COSTS = {"brief": 5, "parse": 1, "chat": 1, "search": 0, "replace": 2}
+DEFAULT_COSTS = {"brief": 5, "parse": 1, "chat": 1, "search": 0, "replace": 2, "more": 3, "alike": 2}
+# "Active campaign": AI is free for a client whose campaign is live, from its start date to
+# 30 days after its end date (Phase C + D, 2026-10-09). Checked in charge(), so every AI action
+# (brief, parse, chat, replacement, add-more, look-alike) follows the one rule.
+ACTIVE_GRACE_DAYS = 30
 LOW_CREDITS = 5                    # the bell warns when a balance drops below this
 DEFAULT_GUEST_CREDITS = 10
 DEFAULT_SIGNUP_CREDITS = 50
@@ -144,11 +148,17 @@ def init():
                 conn.execute("ALTER TABLE users ADD COLUMN %s %s" % (col, ddl))
     # Portal v3: profile page, bell, analysis gating, selection status, rewards (all additive).
     import account
+    import aimore
+    import codelinks
     import gating
     import inbox
     import rewards
+    import roi
     import selstatus
     account.init()
+    codelinks.init()
+    roi.init()
+    aimore.init()
     rewards.init()
     inbox.init()
     selstatus.init()
@@ -345,6 +355,11 @@ def create_user(email, name, company, job_title="", phone="", ip=None):
         return user_by_email(email)
     if status == "active":
         grant(code_id, signup_credits(), "Welcome credits", actor="system")
+    try:
+        import codelinks
+        codelinks.claim(email, code_id)            # an access code HelloVoice invited this address to
+    except Exception:
+        pass
     return user_by_id(uid)
 
 
@@ -484,11 +499,49 @@ def _ring_low(code_id, left):
                href="account/#credits", ref="low:" + inbox.today(), once=True)
 
 
+def active_campaign(code_id):
+    """The campaign that makes AI free for this viewer, or None: one of their (team's) campaigns,
+    not a draft, from its start date until 30 days after its end date. A live campaign with no
+    dates counts while it is live."""
+    if code_id is None or code_id == db.admin_code_id():
+        return None
+    ids = sorted(team_codes(code_id))
+    now = db.now()
+    with db.connect() as conn:
+        rows = conn.execute("SELECT id, name, status, starts_at, ends_at FROM campaigns WHERE code_id IN (%s) AND status != 'draft'"
+                            % ",".join("?" * len(ids)), ids).fetchall()
+    best = None
+    for k in rows:
+        start, end = k["starts_at"], k["ends_at"]
+        if start is None and end is None:
+            ok = k["status"] == "live"
+            until = None
+        else:
+            until = (end or now) + ACTIVE_GRACE_DAYS * 86400 if end else None
+            ok = (start is None or start <= now) and (until is None or now <= until) and not (end is None and k["status"] == "ended")
+        if ok and (best is None or (until or 10 ** 12) > (best["until"] or 10 ** 12)):
+            best = {"id": k["id"], "name": k["name"], "until": until}
+    return best
+
+
+def ai_free(code_id):
+    """What the page shows instead of a price while AI is free: ``{"campaign", "until"}`` or None."""
+    k = active_campaign(code_id)
+    return {"campaign": k["name"], "until": k["until"]} if k else None
+
+
+def price_of(code_id, kind):
+    """What an AI action costs this viewer right now: 0 while they have an active campaign."""
+    if code_id == db.admin_code_id() or active_campaign(code_id):
+        return 0
+    return costs().get(kind, 1)
+
+
 def charge(code_id, kind, ref=""):
-    """Take the configured price of an AI action. The admin preview is free.
-    Returns ``(ok, cost, balance)``."""
+    """Take the configured price of an AI action. The admin preview is free, and so is every AI
+    action for a client with an active campaign. Returns ``(ok, cost, balance)``."""
     cost = costs().get(kind, 1)
-    if code_id == db.admin_code_id() or cost <= 0:
+    if code_id == db.admin_code_id() or cost <= 0 or active_campaign(code_id):
         return True, 0, balance(code_id)            # free: nothing to record
     ensure_allowance(code_id)
     monthly_refill(code_id)
@@ -607,13 +660,31 @@ def team_codes(code_id):
     """The access-code ids whose selections and campaigns this viewer may see: their own, plus
     colleagues on the same company domain when team sharing is on. Personal domains (only possible
     through the allow list) never form a team."""
+    import codelinks
     me = user_for_code(code_id)
-    if not me or not db.setting("team_sharing", True) or guard._matches(me["domain"] or "", guard.FREE_DOMAINS):
+    if not me:
         return {code_id}
+    if not db.setting("team_sharing", True) or guard._matches(me["domain"] or "", guard.FREE_DOMAINS):
+        return {code_id} | codelinks.linked_for({code_id})
     with db.connect() as conn:
         rows = conn.execute("SELECT code_id FROM users WHERE domain = ? AND status = 'active' AND deleted_at IS NULL",
                             (me["domain"],)).fetchall()
-    return {r["code_id"] for r in rows} | {code_id}
+    mine = {r["code_id"] for r in rows} | {code_id}
+    # Shared access codes HelloVoice moved onto these accounts: their selections and campaigns come along.
+    return mine | codelinks.linked_for(mine)
+
+
+def owns(reader, code_id):
+    """True when ``reader`` owns things filed under ``code_id``: it is their own code, or a shared
+    access code HelloVoice linked to their account (the code's selections became theirs)."""
+    if reader is None or code_id is None:
+        return False
+    if int(reader) == int(code_id):
+        return True
+    if not user_for_code(reader):
+        return False
+    import codelinks
+    return int(code_id) in codelinks.linked_for({int(reader)})
 
 
 def teammates(code_id):

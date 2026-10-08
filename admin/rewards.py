@@ -7,6 +7,8 @@ Invite a colleague: +20 to the inviter when the colleague's account is active an
 they sign in for the first time. Same company email domain, at most 5 paid
 invites per account, and an address is only ever paid for once.
 
+The onboarding tour (phase C): +5 once, the first time an account finishes it.
+
 Every reward is a credit-ledger line whose reason names the step and whose ref
 ("reward:<step>", "invite:<user id>") is what makes it once-only.
 """
@@ -50,7 +52,7 @@ def init():
     with db.connect() as conn:
         conn.executescript(SCHEMA)
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
-        for col in ("brands", "industry", "markets", "language"):
+        for col in ("brands", "industry", "markets", "language", "tour"):
             if col not in cols:
                 conn.execute("ALTER TABLE users ADD COLUMN %s TEXT" % col)
 
@@ -112,6 +114,44 @@ def check(user):
             portal._post(conn, user["code_id"], n, "Profile reward: " + label, "reward:" + key, "system")
         out.append({"key": key, "credits": n, "label": label})
     return out
+
+
+# --------------------------------------------------------------------- tour --
+# The 2-minute tour Helvy offers after the first sign-in. The state is only what the
+# page needs to decide whether to offer it again: None (never shown), "offered",
+# "later", "started" or "done". The +5 is paid once per account, enforced by the
+# ledger ref, however many times the tour is replayed.
+
+TOUR_CREDITS = 5
+TOUR_STATES = ("offered", "later", "started", "done")
+
+
+def tour_state(user):
+    return (user["tour"] if user is not None and "tour" in user.keys() else None) or None
+
+
+def set_tour(user, state):
+    if state not in TOUR_STATES or user is None:
+        return tour_state(user)
+    cur = tour_state(user)
+    if cur == "done" and state != "done":
+        return cur                                   # a replay never un-finishes it
+    with db.connect() as conn:
+        conn.execute("UPDATE users SET tour = ? WHERE id = ?", (state, user["id"]))
+    return state
+
+
+def tour_finished(user):
+    """Mark the tour done and pay +5 the first time. Returns the credits paid now (0 or 5)."""
+    if user is None or user["status"] != "active" or not user["code_id"]:
+        return 0
+    set_tour(user, "done")
+    with db.connect() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        if _paid(conn, user["code_id"], "reward:tour"):
+            return 0
+        portal._post(conn, user["code_id"], TOUR_CREDITS, "Tour reward: finished the HELVY Connect tour", "reward:tour", "system")
+    return TOUR_CREDITS
 
 
 # ------------------------------------------------------------------ invites --

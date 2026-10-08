@@ -37,6 +37,7 @@ import urllib.parse
 
 import account
 import assistant
+import connect_api
 import db
 import faq
 import fx
@@ -73,7 +74,7 @@ AI_FAIL = {
 }
 
 
-class PortalMixin:
+class PortalMixin(connect_api.ConnectMixin):
     # ------------------------------------------------------------ plumbing --
 
     def _srv(self):
@@ -99,6 +100,8 @@ class PortalMixin:
             portal.monthly_refill(cid)
         out = {"signed_in": True, "kind": kind, "credits": portal.balance(cid) if kind != "admin" else None,
                "costs": portal.costs(), "ai": gemini.configured(),
+               # AI is free while the client has an active campaign (start date to end date + 30 days).
+               "ai_free": portal.ai_free(cid) if kind != "admin" else None,
                # An opaque per-access key, so a browser keeps each client's chat apart.
                "chat_key": __import__("hashlib").sha256(b"chat:%d:" % cid + self._srv().SECRET).hexdigest()[:12]}
         if user:
@@ -110,6 +113,7 @@ class PortalMixin:
             out["unread"] = inbox.unread(user)
             out["team"] = [{"name": t["name"], "job_title": t["job_title"]} for t in portal.teammates(cid)]
             out["monthly_credits"] = portal.monthly_allowance(user)
+            out["tour"] = rewards.tour_state(user)
         return out
 
     def _issue_pass(self, row, extra=None):
@@ -189,6 +193,8 @@ class PortalMixin:
 
     def portal_get(self, path, query):
         """Handle a public portal GET. Returns True if the path was ours."""
+        if self.connect_get(path, query):
+            return True
         if path == "/api/me":
             cid, user, kind = self._identity()
             if cid is None:
@@ -330,6 +336,8 @@ class PortalMixin:
 
     def portal_post(self, path):
         """Handle a public portal POST. Returns True if the path was ours."""
+        if self.connect_post(path):
+            return True
         routes = {
             "/api/auth/start": self.api_auth_start, "/api/auth/verify": self.api_auth_verify,
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,
@@ -372,7 +380,7 @@ class PortalMixin:
         for k in ("otp:ip:" + ip, "otp:em:" + email, "otp:dom:" + domain, "otp:all"):
             guard.limiter.hit(k)
         try:
-            subject, text, html = mailer.otp_message(code, portal.OTP_MINUTES)
+            subject, text, html = mailer.otp_message(code, portal.OTP_MINUTES, to=email)
             mailer.send(email, subject, text, html)
         except mailer.MailError as exc:
             db.log("otp_mail_fail", None, ip, self._ua(), str(exc)[:80])
@@ -959,7 +967,12 @@ class PortalMixin:
         if self._throttled("chat:%d" % cid, 40, 600):
             return
         tid = self._int(b.get("thread")) or None
-        instant = faq.answer(text)
+        import roi
+        rcard = roi.from_text(text)
+        instant = faq.answer(text) if rcard is None else {
+            "reply": "Here's what %s can reach for %s, as an estimate from industry benchmarks. Open the calculator to change the creator mix."
+                     % ("SAR {:,}".format(rcard["budget"]), rcard["goal_label"].lower()),
+            "next": ["Get a quote", "Find creators"], "roi": rcard}
         if instant is None:
             if not gemini.configured():
                 return self.send_json(503, {"ok": False, "reason": "not_configured", "message": AI_FAIL["not_configured"][1]}, self.cors())
@@ -988,7 +1001,7 @@ class PortalMixin:
             portal.add_message(th["id"], "model", instant["reply"], {"cards": []})
             db.log("chat", cid, self.client_ip(), self._ua(), "faq: " + text[:50])
             emit({"t": "done", "reply": instant["reply"], "cards": [], "next": instant["next"], "thread": th["id"],
-                  "credits": portal.balance(cid) if kind != "admin" else None, "instant": True})
+                  "roi": instant.get("roi"), "credits": portal.balance(cid) if kind != "admin" else None, "instant": True})
             return
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
@@ -1012,7 +1025,7 @@ class PortalMixin:
         nxt = (["Show cheaper options", "Only bigger creators", "Save all as a selection"] if cards
                else ["Find creators", "Get a quote"])
         emit({"t": "done", "reply": res["reply"], "cards": cards, "next": nxt, "thread": th["id"],
-              "breakdown": (ctx.get("breakdowns") or [None])[-1], "actions": ctx.get("queued") or [],
+              "breakdown": (ctx.get("breakdowns") or [None])[-1], "actions": ctx.get("queued") or [], "roi": ctx.get("roi"),
               "credits": portal.balance(cid) if kind != "admin" else None})
 
     # =============================================================== admin ==
@@ -1142,6 +1155,17 @@ class PortalMixin:
                 return done("Enter a code and an amount.", False)
             bal = portal.grant(cid, n, (f.get("reason") or "Admin adjustment")[:100], actor=email)
             return done("Balance is now %d." % bal)
+        if path == "/portal/code/link":
+            import codelinks
+            row, err = codelinks.invite(self._int(f.get("code_id")), f.get("email"), by=email)
+            if err:
+                return done({"not_shared": "That is not an active shared access code.", "email": "Enter a valid email address."}[err], False)
+            return done(("Linked: %s now sees this code's selections and campaigns." if row["user_code_id"] else
+                         "Invited: when %s first signs in, this code's selections and campaigns are theirs. The code keeps working.") % row["email"])
+        if path == "/portal/code/unlink":
+            import codelinks
+            codelinks.remove(self._int(f.get("link")))
+            return done("Link removed. The code and its selections are unchanged.")
         if path == "/portal/settings":
             return self.portal_settings(f, done)
         if path == "/portal/keys":
@@ -1200,6 +1224,7 @@ class PortalMixin:
             db.set_setting("team_sharing", f.get("team_sharing") == "on")
             db.set_setting("notify_emails", sorted({x.strip().lower() for x in (f.get("notify_emails") or "").replace(",", " ").split() if "@" in x}))
             db.set_setting("kams", [l.strip() for l in (f.get("kams") or "").splitlines() if "@" in l][:50])
+            db.set_setting("case_study_campaigns", sorted({int(x) for x in (f.get("case_study_campaigns") or "").replace(",", " ").split() if x.isdigit()}))
             kb = (f.get("kb_text") or "").strip()
             db.set_setting("kb_text", kb[:4000] if kb else None)
         return done("Settings saved.")

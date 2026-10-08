@@ -4129,7 +4129,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         reject) or viewer (a colleague or a link holder: look only)."""
         if self.admin() or (reader is not None and int(reader) == db.admin_code_id()):
             return "admin"
-        if reader is not None and sel["code_id"] is not None and int(reader) == sel["code_id"]:
+        if reader is not None and sel["code_id"] is not None and portal.owns(int(reader), sel["code_id"]):
             return "owner"
         return "viewer"
 
@@ -4145,7 +4145,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return {"status": st, "status_counts": selstatus.counts(codes, st, tiers), "role": role,
                 "owner": (owner["name"] if owner is not None else None),
                 "kam": ((owner["kam"] or "").split("<")[0].strip() if owner is not None and owner["kam"] else None),
-                "replace_cost": portal.costs().get("replace", 2),
+                "replace_cost": portal.price_of(int(reader), "replace") if reader is not None else portal.costs().get("replace", 2),
+                "more_cost": portal.price_of(int(reader), "more") if reader is not None else portal.costs().get("more", 3),
+                "alike_cost": portal.price_of(int(reader), "alike") if reader is not None else portal.costs().get("alike", 2),
+                "ai_free": portal.ai_free(int(reader)) if reader is not None and role != "admin" else None,
                 "credits": portal.balance(int(reader)) if reader is not None and role != "admin" else None}
 
     def post_request_handled(self):
@@ -4400,7 +4403,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not viewer:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         sel = db.selection(token=str(b.get("token") or ""))
-        if sel is None or (sel["code_id"] is not None and int(viewer) not in (sel["code_id"], db.admin_code_id())):
+        if sel is None or (sel["code_id"] is not None and int(viewer) != db.admin_code_id() and not portal.owns(int(viewer), sel["code_id"])):
             return self.send_json(404, {"ok": False}, self.cors())
         code = str(b.get("code") or "").strip().upper()
         if code not in json.loads(sel["codes"] or "[]"):

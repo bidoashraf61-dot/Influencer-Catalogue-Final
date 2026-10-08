@@ -15,7 +15,8 @@ import ui
 import views
 from views import ago, e, page, ts, u
 
-TABS = [("accounts", "Client accounts"), ("briefs", "Briefs"), ("chats", "Chats"), ("usage", "Usage & cost"), ("settings", "Settings & keys")]
+TABS = [("accounts", "Client accounts"), ("codes", "Access codes → accounts"), ("briefs", "Briefs"), ("chats", "Chats"),
+        ("usage", "Usage & cost"), ("settings", "Settings & keys")]
 
 
 def _banner(ok, err):
@@ -321,7 +322,9 @@ def _settings_tab():
         ("allowlist", "Invite only — only allow-listed domains"), ("closed", "Closed — no new sign-ups")))
     cost_inputs = "".join("<div><label>%s</label><input type='number' min='0' max='1000' name='cost_%s' value='%d'></div>"
                           % (lbl, k, costs[k]) for k, lbl in (("brief", "AI shortlist with reasons"), ("search", "Shortlist without AI text (0 = free)"),
-                                                              ("parse", "Read a free-text brief"), ("chat", "Chat message")))
+                                                              ("parse", "Read a free-text brief"), ("chat", "Chat message"),
+                                                              ("replace", "Find a replacement (selection)"), ("more", "Add more like these (selection)"),
+                                                              ("alike", "Creators like this (selection)")))
 
     def key_card(which, title, mod, help_):
         hint = mod.key_hint()
@@ -382,7 +385,12 @@ def _settings_tab():
           "Each call stores its cost when it happens, so changing a price never rewrites past spend.</div>"
           % e("\n".join("%s %g %g" % (m, p[0], p[1]) for m, p in sorted(gemini.prices().items())))
         + "<label style='margin-top:14px'>What the assistant knows about HelloVoice</label>"
-          "<textarea class='mono' name='kb_text' rows='6'>%s</textarea></div>" % e(db.setting("kb_text", None) or __import__("assistant").DEFAULT_KB)
+          "<textarea class='mono' name='kb_text' rows='6'>%s</textarea>" % e(db.setting("kb_text", None) or __import__("assistant").DEFAULT_KB)
+        + "<label style='margin-top:14px'>Campaigns Helvy may name as case studies (campaign IDs, comma-separated)</label>"
+          "<input name='case_study_campaigns' value='%s' placeholder='e.g. 12, 15'>"
+          "<div class='price-hint'>Only for clients who approved being named. Every other campaign is used anonymised and in aggregate only. "
+          "All AI is free for a client while a campaign of theirs runs (start date to end date + 30 days).</div></div>"
+          % e(", ".join(str(x) for x in (db.setting("case_study_campaigns", []) or [])))
         + "<button class='btn lime'>Save settings</button></form>")
     keys = (key_card("gemini", "Gemini API key", gemini, "Powers the shortlist reasons, the chat and the copilot.")
             + graph_card() + smtp_card() + key_card("mail", "Email (Resend) API key — alternative", mailer,
@@ -436,12 +444,52 @@ def smtp_card():
 
 def portal_page(tab="accounts", ok=None, err=None, query=None):
     tab = tab if tab in dict(TABS) else "accounts"
-    body = {"accounts": _accounts_tab, "briefs": _briefs_tab, "chats": _chats_tab, "usage": _usage_tab, "settings": _settings_tab}[tab]()
+    body = {"accounts": _accounts_tab, "codes": _codes_tab, "briefs": _briefs_tab, "chats": _chats_tab, "usage": _usage_tab, "settings": _settings_tab}[tab]()
     status = ("<span class='pill %s'>Gemini %s</span> <span class='pill %s'>Email %s</span>" % (
         "live" if gemini.configured() else "warn", "ready" if gemini.configured() else "not set up",
         "live" if mailer.configured() else "warn", ("ready (%s)" % {"graph": "shared mailbox", "smtp": "mailbox", "resend": "Resend"}.get(mailer.engine(), "")) if mailer.configured() else "not set up"))
     return page("Client portal", STAT_CSS + ui.header("Client portal", "Company-email accounts, AI credits, briefs and AI settings. " + status,
                 tabs=_tabs(tab)) + _banner(ok, err) + body, "/portal")
+
+
+# ------------------------------------------------- access codes -> accounts --
+
+def _codes_tab():
+    """The shared access codes still in use, with what hangs off each, and the one action:
+    invite that client to an email account. Nothing here revokes a code or moves a link."""
+    import codelinks
+    rows = codelinks.shared_codes()
+    hid = lambda name, val: "<input type='hidden' name='%s' value='%s'>" % (name, e(val))
+    back = hid("back", "/portal?tab=codes")
+    intro = ("<div class='card'><h2>Move shared access codes onto email accounts</h2><p class='sec-desc'>The sign-in page no longer "
+             "offers access codes. Invite each client below to an email account: the code's selections and campaigns are linked to "
+             "that account (they see them and can approve or reject creators), and the code keeps working, so every link already "
+             "sent still opens. Nothing is revoked here; retire a code from <a href='%s'>Access codes</a> when its client is in. "
+             "No email is sent from here: tell the client to sign in at the catalogue with that address.</p></div>" % u("/codes"))
+    if not rows:
+        return intro + "<div class='card'><p class='muted'>No active shared access codes.</p></div>"
+    cards = []
+    for x in rows:
+        c = x["code"]
+        sels = "".join("<li><a href='%s'>%s</a> <span class='muted'>%d creators · %s</span></li>" % (
+            u("/selections/edit?id=%d" % s_["id"]), e(s_["name"]), len(json.loads(s_["codes"] or "[]")), e(ago(s_["updated_at"])))
+            for s_ in x["selections"]) or "<li class='muted'>none</li>"
+        camps = "".join("<li><a href='%s'>%s</a> <span class='pill'>%s</span></li>" % (u("/campaigns/edit?id=%d" % k["id"]), e(k["name"]), e(k["status"]))
+                        for k in x["campaigns"]) or "<li class='muted'>none</li>"
+        links = "".join(
+            "<li>%s %s <form method='post' action='%s' class='inline'>%s%s<button class='btn tiny ghost' title='Stop linking'>Remove</button></form></li>" % (
+                e(l["email"]),
+                ("<span class='pill live'>linked · %s</span>" % e(l["user_name"] or "account")) if l["user_code_id"] else "<span class='pill warn'>waiting for first sign-in</span>",
+                u("/portal/code/unlink"), hid("link", l["id"]), back) for l in x["links"]) or "<li class='muted'>not invited yet</li>"
+        form = ("<form method='post' action='%s' class='row'>%s%s<div><label>Client's work email</label>"
+                "<input type='email' name='email' required placeholder='name@company.com'></div>"
+                "<div><button class='btn lime'>Invite to email account</button></div></form>" % (u("/portal/code/link"), hid("code_id", c["id"]), back))
+        cards.append("<div class='card'><h2>%s <span class='muted'>· ····%s</span></h2><p class='muted'>Created %s · used %d times · last %s</p>"
+                     "<div class='fgrid'><div><strong>Selections</strong><ul>%s</ul></div><div><strong>Campaigns</strong><ul>%s</ul></div>"
+                     "<div><strong>Email accounts</strong><ul>%s</ul></div></div>%s</div>"
+                     % (e(c["label"]), e(c["hint"]), e(ts(c["created_at"])), c["uses"] or 0, e(ago(x["last_used"])) if x["last_used"] else "never",
+                        sels, camps, links, form))
+    return intro + "".join(cards)
 
 
 # ------------------------------------------------------------- one client --
