@@ -872,7 +872,7 @@ def build():
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
 <title>Selection — HelloVoice</title>
-<script src="/assets/js/hv-loader.js" data-tone="light"></script>
+<script src="/assets/js/hv-loader.js" data-tone="light" data-wait="all"></script>
 <link rel="icon" href="/assets/icons/icon-32.png" type="image/png"/>
 <link rel="apple-touch-icon" href="/assets/icons/icon-180.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>

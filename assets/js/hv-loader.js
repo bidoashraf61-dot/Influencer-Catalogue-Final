@@ -12,6 +12,10 @@
  *     runs), and every image on the first screen has loaded or failed. A
  *     page that ends on its passcode screen or an error message is ready
  *     too, because its requests have finished;
+ *   - data-wait="all" (selection, campaign report and dashboard) waits for the
+ *     whole page instead of the first screen: every displayed image, lazy
+ *     ones included, and every displayed CSS background photo (the creator
+ *     cards). Hidden cards (creators outside a selection) are not waited for;
  *   - there is no time limit (Bido's call); a request that fails still ends,
  *     so a broken network shows the page's own error, not an endless logo;
  *   - clicking a link to another catalogue page brings the cover back at
@@ -21,6 +25,7 @@
   "use strict";
   var me = document.currentScript;
   var tone = (me && me.getAttribute("data-tone")) === "light" ? "light" : "dark";
+  var waitAll = (me && me.getAttribute("data-wait")) === "all";
   var base = me && me.src ? me.src.replace(/assets\/js\/hv-loader\.js.*$/, "") : "/";
   var logo = base + (tone === "light" ? "assets/brand/logo.png" : "assets/brand/logo-knockout.webp");
   var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -75,6 +80,33 @@
     return out;
   }
 
+  // The whole page: every displayed <img> (lazy ones switched to eager so
+  // they actually load) and every displayed element's inline background photo.
+  function shown(el) {
+    if (el.closest(".hv-loader")) return false;
+    if (el.offsetParent === null && getComputedStyle(el).position !== "fixed") return false;
+    return getComputedStyle(el).visibility !== "hidden";
+  }
+  function wholePage() {
+    var waits = [];
+    Array.prototype.forEach.call(document.images, function (el) {
+      if (el === img || !el.getAttribute("src") || !shown(el)) return;
+      if (el.loading === "lazy") el.loading = "eager";
+      if (!el.complete) waits.push(el);
+    });
+    var seen = {};
+    Array.prototype.forEach.call(document.querySelectorAll("[style*='background-image']"), function (el) {
+      if (!shown(el)) return;
+      var m = /url\((['"]?)(.*?)\1\)/.exec(el.style.backgroundImage || "");
+      if (!m || !m[2] || seen[m[2]]) return;
+      seen[m[2]] = 1;
+      var probe = new Image();
+      probe.src = m[2];
+      if (!probe.complete) waits.push(probe);
+    });
+    return waits;
+  }
+
   var loaded = document.readyState === "complete", gone = false;
   window.addEventListener("load", function () { loaded = true; });
 
@@ -97,7 +129,7 @@
   function check() {
     if (gone) return;
     if (!loaded || inflight > 0 || Date.now() - lastEnd < 350) { setTimeout(check, 120); return; }
-    var pending = firstScreenImages().filter(function (el) { return !el.complete; });
+    var pending = waitAll ? wholePage() : firstScreenImages().filter(function (el) { return !el.complete; });
     if (!pending.length) { hide(); return; }
     var left = pending.length;
     pending.forEach(function (el) {
