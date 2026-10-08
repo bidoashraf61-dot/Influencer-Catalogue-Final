@@ -79,7 +79,10 @@ DEFAULT_BENCHMARKS = {
 
 
 def band_of(followers):
-    f = followers or 0
+    try:
+        f = float(followers or 0)
+    except (TypeError, ValueError):
+        f = 0
     for name, lo, hi in BANDS:
         if f >= lo and (hi is None or f < hi):
             return name
