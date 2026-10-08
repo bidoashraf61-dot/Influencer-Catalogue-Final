@@ -1961,17 +1961,16 @@
     var bar = document.querySelector(".cat-controls .cat-bar");
     // The licences can arrive before the catalogue has drawn its filter bar: wait for it.
     if (!bar) { if ((tries || 0) < 80) setTimeout(function () { mountLicFilter((tries || 0) + 1); }, 250); return; }
-    var box = h("div", { id: "lic-filter", class: "lic-filter", role: "group", "aria-label": "Advertising licence" });
-    box.appendChild(h("span", { class: "lic-filter__label" }, "Licence"));
-    [["", "Any"], ["any", "Licensed"], ["SA", "Mawthooq"], ["AE", "UAE permit"], ["verified", "Verified only"]].forEach(function (o) {
-      var b = h("button", { class: "lic-chip", type: "button", "aria-pressed": String(o[0] === licWant) }, o[1]);
-      b.addEventListener("click", function () {
-        licWant = o[0];
-        Array.prototype.forEach.call(box.querySelectorAll(".lic-chip"), function (x) { x.setAttribute("aria-pressed", String(x === b)); });
-        applyLicFilter();
-      });
-      box.appendChild(b);
+    // One switch: Mawthooq-licensed creators only, or everyone.
+    var box = h("div", { id: "lic-filter", class: "lic-filter" });
+    var sw = h("button", { class: "lic-toggle", type: "button", role: "switch", "aria-checked": "false" });
+    sw.innerHTML = '<span class="lic-toggle__track" aria-hidden="true"><i></i></span><span class="lic-toggle__txt">Mawthooq licensed only</span>';
+    sw.addEventListener("click", function () {
+      licWant = licWant === "SA" ? "" : "SA";
+      sw.setAttribute("aria-checked", String(licWant === "SA"));
+      applyLicFilter();
     });
+    box.appendChild(sw);
     box.appendChild(h("span", { class: "lic-filter__note", id: "lic-note", "aria-live": "polite" }));
     bar.parentNode.insertBefore(box, bar.nextSibling);
   }
