@@ -996,6 +996,30 @@ class Portal(unittest.TestCase):
         self.assertEqual(kinds[-1], "done")
         self.assertEqual("".join(x["text"] for x in lines if x["t"] == "delta").strip(), lines[-1]["reply"].strip())
 
+    def test_81_assistant_knows_the_selection_page(self):
+        c, _ = self.signup("selpage@pfizer.com")
+        u = portal.user_by_email("selpage@pfizer.com")
+        c1, c2 = [x["code"] for x in db.list_creators()][:2]
+        sid = db.save_selection(None, "Derm launch", [c1, c2], {}, None, None, None, u["code_id"])
+        tok = db.selection(sid)["token"]
+        s, b, _ = c.get("/api/voice/selection?s=" + tok)
+        self.assertEqual((s, b["brief"]), (200, None))                 # no brief yet: the chat offers to score it
+        s, r, _ = c.post("/api/brief/attach", {"token": tok, "answers": {"goal": "conversion", "platforms": ["Instagram"],
+                                                                         "market": "SA", "category": ["skincare"]}})
+        self.assertTrue(r["ok"])
+        s, b, _ = c.get("/api/voice/selection?s=" + tok)
+        qs = [x["q"] for x in b["brief"]["answers"]]
+        self.assertIn("What is the main goal of the campaign?", qs)
+        self.assertIn("scores", b)                                       # filled when creators have analyses
+        seen = []
+        old = gemini.STUB
+        gemini.STUB = lambda body: (seen.append(json.dumps(body.get("systemInstruction"))), stub(body))[1]
+        try:
+            c.post("/api/chat/stream", {"message": "Why are these a good fit?", "selection": tok})
+        finally:
+            gemini.STUB = old
+        self.assertTrue(any("Derm launch" in x and "main goal" in x for x in seen))
+
 def assistant_sql(sql):
     import assistant
     return assistant.t_sql_query({}, sql)

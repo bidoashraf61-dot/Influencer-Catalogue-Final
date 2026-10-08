@@ -977,6 +977,8 @@
     // One conversation per access (signed-in client or access code), carried across pages for a week.
     var STORE = "hv-chat:" + ((ME && ME.chat_key) || (ME && ME.user ? ME.user.email : ME && ME.kind) || "guest");
     var KEEP_MS = 7 * 24 * 3600 * 1000;
+    // On a selection's page the assistant works on that selection: its brief, its scores.
+    function selToken() { var m = page === "selection" && /(?:^|[#&])s=([A-Za-z0-9_-]+)/.exec(location.hash || ""); return m ? m[1] : ""; }
     var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     /* -- launcher -- */
@@ -1192,7 +1194,9 @@
     /* -- the menu -- */
     function menu(lead) {
       if (lead) say(lead);
-      var list = [{ label: "Find creators for a campaign", go: flowFind }];
+      var list = selToken()
+        ? [{ label: "About this selection", go: aboutSelection }, { label: "Find more creators", go: flowFind }]
+        : [{ label: "Find creators for a campaign", go: flowFind }];
       if (document.querySelector(".cat-bar")) list.push({ label: "Show creators on this page", go: flowShow });
       list.push({ label: "Work on my selection", go: flowSelection },
                 { label: "Get a quote", go: flowQuote },
@@ -1211,18 +1215,44 @@
     }
     function greet() {
       say("Hi" + (first ? " " + first : "") + ", I'm here to help you 👋");
+      if (selToken()) { aboutSelection(); return; }
       menu("How can I help you?");
+    }
+    // The selection on this page: its brief if one was recorded, else an offer to score it.
+    function aboutSelection() {
+      api("GET", "/api/voice/selection?s=" + encodeURIComponent(selToken())).then(function (r) {
+        var x = r.b;
+        if (!x || !x.ok) { menu("How can I help you?"); return; }
+        if (x.brief) {
+          say("This is “" + x.name + "” (" + x.count + " creator" + (x.count === 1 ? "" : "s") + "). Its brief is on file:\n" +
+              x.brief.answers.map(function (a) { return "• " + a.q.replace(/\?$/, "") + ": **" + a.a + "**"; }).join("\n"));
+          if (x.scores && x.scores.length) say("Everyone is scored against it. Best fit: " + x.scores.slice(0, 3).map(function (c) { return c.name + " (" + c.score + ")"; }).join(", ") + ".");
+          chips([{ label: "Why do the top creators fit?", echo: true, go: function () { ta.value = "Why do the top creators in this selection fit my brief?"; submit(); } },
+                 { label: "Change the brief and rescore", go: function () { flowFind("", { attach: x.token, name: x.name }); } },
+                 { label: "Get a quote for it", go: function () { quoteFor({ name: x.name, token: x.token }); } },
+                 { label: "Something else", ghost: true, go: function () { menu("What would you like to do?"); } }]);
+        } else {
+          say("This is “" + x.name + "” (" + x.count + " creator" + (x.count === 1 ? "" : "s") + "). It doesn't have a brief yet, so the creators aren't scored against your campaign.");
+          say("Answer a few quick questions (free) and I'll score every creator in it.");
+          chips([{ label: "Score this selection", primary: true, go: function () { flowFind("", { attach: x.token, name: x.name }); } },
+                 { label: "Not now", ghost: true, go: function () { menu("What would you like to do?"); } }]);
+        }
+      });
     }
 
     /* -- 1. find creators: the brief questions, free, then one paid shortlist -- */
     var FLOW_IDS = ["goal", "platforms", "market", "category", "budget", "count"];
-    function flowFind(seed) {
+    function flowFind(seed, mode) {
       var text = typeof seed === "string" ? seed : "";
-      say(text ? "Got it. A few quick taps and I'll match the roster. This part is free." : "Let's find the right creators. A few quick taps, all free.");
+      var attach = mode && mode.attach;
+      // Scoring an existing selection needs the campaign, not a budget or a head count.
+      var ids = attach ? ["goal", "platforms", "market", "gender", "category"] : FLOW_IDS;
+      say(attach ? "A few quick taps about the campaign, all free." :
+          text ? "Got it. A few quick taps and I'll match the roster. This part is free." : "Let's find the right creators. A few quick taps, all free.");
       Promise.all([loadQuestions(), text ? api("POST", "/api/brief/guess", { text: text }) : Promise.resolve({ b: {} })]).then(function (res) {
         var qs = res[0], answers = (res[1].b && res[1].b.answers) || {};
         var byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
-        var todo = FLOW_IDS.filter(function (id) { return byId[id] && !(answers[id] && answers[id].length); });
+        var todo = ids.filter(function (id) { return byId[id] && !(answers[id] && answers[id].length); });
         var i = 0;
         function next() {
           if (i >= todo.length) return review();
@@ -1240,17 +1270,40 @@
         }
         function review() {
           var costs = (ME && ME.costs) || { brief: 5 };
-          var lines = FLOW_IDS.filter(function (id) { return byId[id] && answers[id] && answers[id].length; }).map(function (id) {
+          var lines = ids.filter(function (id) { return byId[id] && answers[id] && answers[id].length; }).map(function (id) {
             var v = answers[id]; return (byId[id].label.replace(/\?$/, "")) + ": " + (Array.isArray(v) ? v : [v]).map(function (x) { return optionLabel(byId[id], x); }).join(", ");
           });
           say("Here's your brief:\n" + lines.join("\n"));
           var list = [];
+          if (!attach && selToken()) {
+            // They are on a selection: score it against these answers (free), or start a separate list.
+            chips([{ label: "Score this selection · free", primary: true, go: function () { scoreSelection(selToken(), answers); } },
+                   { label: "Build a separate new shortlist" + (ME && ME.ai ? " · " + costs.brief + " credits" : ""), go: function () { if (ME && ME.ai) build(answers); else handoff("handoff", "Brief from the chat:\n" + lines.join("\n")); } },
+                   { label: "Change answers", ghost: true, go: function () { flowFind(text); } }]);
+            return;
+          }
+          if (attach) {
+            chips([{ label: "Score “" + (mode.name || "this selection") + "” · free", primary: true, go: function () { scoreSelection(attach, answers); } },
+                   { label: "Change answers", ghost: true, go: function () { flowFind("", mode); } }]);
+            return;
+          }
           if (ME && ME.ai) list.push({ label: "Build my shortlist · " + costs.brief + " credits", primary: true, go: function () { build(answers); } });
           list.push({ label: "Change answers", ghost: true, go: function () { flowFind(text); } });
           if (!(ME && ME.ai)) list.push({ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", "Brief from Voice:\n" + lines.join("\n")); } });
           chips(list);
         }
         next();
+      });
+    }
+    function scoreSelection(token, answers) {
+      say("Scoring every creator in it against your brief…");
+      api("POST", "/api/brief/attach", { token: token, answers: answers }).then(function (r) {
+        if (!r.b.ok) { say(r.b.reason === "missing" ? "A required answer is missing. Let's go through it again." : "That didn't work. Please try again."); chips([{ label: "Try again", go: function () { flowFind("", { attach: token }); } }]); return; }
+        var picks = r.b.picks || [];
+        say("Done. Every creator now has a score out of 100 for this brief." + (picks.length ? " Best fit: " + picks.slice(0, 3).map(function (p) { return ((p.creator && p.creator.name) || p.code) + " (" + p.score + ")"; }).join(", ") + "." : ""));
+        queue = queue.then(function () { creatorCards(picks.slice(0, 8).map(function (p) { var c = Object.assign({ code: p.code, name: p.code }, p.creator || {}); c.fit = p.score; return c; })); });
+        chips([{ label: "Show the scores on this page", primary: true, echo: false, go: function () { location.reload(); } },
+               { label: "Why do the top creators fit?", go: function () { ta.value = "Why do the top creators in this selection fit my brief?"; submit(); } }]);
       });
     }
     function build(answers) {
@@ -1577,9 +1630,11 @@
       if (expecting) { var fn = expecting; expecting = null; ta.placeholder = "Type a message…"; fn(text); return; }
       if (/account manager|talk to (a )?(person|human|someone)|call me/i.test(text)) { handoff("handoff", text); return; }
       if (/\bquot(e|ation)|عرض سعر|تسعير/i.test(text)) { flowQuote(); return; }
-      if (/my selection|my shortlist|\b(add|remove|rename|compare)\b|قائمتي/i.test(text)) { flowSelection(); return; }
+      if (!selToken() && /my selection|my shortlist|\b(add|remove|rename|compare)\b|قائمتي/i.test(text)) { flowSelection(); return; }
       if (document.querySelector(".cat-bar") && /^(show|filter|only|display|اعرض|أظهر)\b/i.test(text)) { runShow(text); return; }
-      if (REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
+      // On a selection's page the client is discussing THAT selection: the assistant answers with its
+      // brief and scores. Only elsewhere does a campaign description start the free find-creators taps.
+      if (!selToken() && REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
       if (!(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
       busy = true; send.disabled = true;
       // While it works: what it is doing right now, then the answer as it is written.
@@ -1592,7 +1647,7 @@
         var li = h("li", null, label + "…"); ol.appendChild(li); scroll();
       }
       function stop() { busy = false; send.disabled = false; ended = true; }
-      stream("/api/chat/stream", { message: text, thread: thread }, function (ev) {
+      stream("/api/chat/stream", { message: text, thread: thread, selection: selToken() || undefined }, function (ev) {
         if (ev.t === "step") { step(ev.text); return; }
         if (ev.t === "delta") {
           if (!out) { workRow.remove(); out = h("div", { class: "hv-msg hv-msg--ai is-live" }); row("ai", out); }
@@ -1639,7 +1694,7 @@
             thread = (kept && kept.thread) || thread;
             msgs.forEach(function (m) { if (m.from === "cards") creatorCards(m.list, false); else bubble(m.from, m.text, false); });
             log.appendChild(h("p", { class: "hv-sep" }, "Earlier in this chat"));
-            menu("Welcome back. What would you like to do?");
+            if (selToken()) aboutSelection(); else menu("Welcome back. What would you like to do?");
           }
           else greet();
         }

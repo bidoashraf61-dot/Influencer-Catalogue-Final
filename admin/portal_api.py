@@ -249,6 +249,16 @@ class PortalMixin:
                 else:
                     self.send_json(200, {"ok": True, "brief": b["summary"], "scores": self._brief_scores(b)}, self.cors())
             return True
+        if path == "/api/voice/selection":
+            # The assistant on a selection's page: what it is, its brief and its scores (free).
+            who = self._need_viewer()
+            if who:
+                ctx = self._selection_context(query.get("s") or "", who[0])
+                if ctx is None:
+                    self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+                else:
+                    self.send_json(200, dict(ctx, ok=True), self.cors())
+            return True
         if path == "/api/voice/selections":
             # Voice ("Work on my selection"): the viewer's own shortlists, then their colleagues'.
             who = self._need_viewer()
@@ -750,6 +760,8 @@ class PortalMixin:
         th = portal.thread(cid, "client", "", tid=tid)
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
+        if b.get("selection"):
+            ctx["selection"] = self._selection_context(b.get("selection"), cid)
         brief, _ = matcher.clean_answers(b.get("brief")) if isinstance(b.get("brief"), dict) else ({}, [])
         asked = text
         if brief:
@@ -769,6 +781,46 @@ class PortalMixin:
         shown = {r["code"]: r for r in self.roster_payload(only=set(card_codes))} if card_codes else {}
         return self.send_json(200, {"ok": True, "reply": res["reply"], "cards": [shown[c] for c in card_codes if c in shown],
                                     "thread": th["id"], "credits": portal.balance(cid) if kind != "admin" else None}, self.cors())
+
+    def _selection_context(self, token, cid):
+        """A selection the viewer may see, as the assistant should know it: name, creators,
+        the brief recorded for it (every answer, labelled) and the scores against it."""
+        sel = db.selection(token=str(token or "")) if token else None
+        if sel is None:
+            return None
+        if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not self.admin():
+            return None
+        with db.connect() as conn:
+            br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1", (sel["id"],)).fetchone()
+        codes = json.loads(sel["codes"] or "[]")
+        brief = None
+        if br is not None:
+            try:
+                ans = json.loads(br["answers"] or "{}")
+            except ValueError:
+                ans = {}
+            rows = []
+            for q in matcher.QUESTIONS:
+                v = ans.get(q["id"])
+                if v in (None, "", [], ["any"]):
+                    continue
+                vals = v if isinstance(v, list) else [v]
+                labels = {(o["value"] if isinstance(o, dict) else o[0]): (o["label"] if isinstance(o, dict) else o[1]) for o in q.get("options", [])}
+                rows.append({"q": q["label"], "a": ", ".join(labels.get(x, str(x)) for x in vals)})
+            brief = {"summary": br["summary"] or "", "answers": rows, "source": br["source"], "at": br["created_at"]}
+        scored = []
+        try:
+            sc = self.selection_scores(sel)
+            names = {r["code"]: r["name"] for r in self.roster_payload(only=set(codes))}
+            scored = sorted(({"code": c, "name": names.get(c, c), "score": v.get("score"), "tag": v.get("tag")}
+                             for c, v in (sc or {}).items() if c in codes and v.get("score") is not None),
+                            key=lambda x: -x["score"])
+        except Exception:
+            scored = []
+        keys = sel.keys()
+        return {"token": sel["token"], "name": sel["name"], "count": len(codes), "brief": brief,
+                "objective": (sel["objective"] if "objective" in keys else None) or None,
+                "scores": scored[:40]}
 
     def api_chat_stream(self):
         """The chat, streamed: one JSON object per line (``application/x-ndjson``).
@@ -820,6 +872,8 @@ class PortalMixin:
             return
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
+        if b.get("selection"):
+            ctx["selection"] = self._selection_context(b.get("selection"), cid)       # the page they are on
         try:
             res = assistant.converse("client", ctx, past, text, code_id=cid, kind="chat", credits=cost,
                                      on_event=lambda t, x: emit({"t": t, "text": x}), model_name=gemini.chat_model())
