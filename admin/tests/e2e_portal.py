@@ -220,7 +220,7 @@ class Portal(unittest.TestCase):
         self.assertEqual(s, 200, sel)
         self.assertEqual(sorted(sel["codes"] if "codes" in sel else [x["code"] for x in sel["creators"]]), sorted(codes))
         s, briefs, _ = c.get("/api/briefs")
-        self.assertIn("Reach as many people", briefs["briefs"][0]["summary"])
+        self.assertIn("Awareness", briefs["briefs"][0]["summary"])
         self.assertIn("Saudi Arabia", briefs["briefs"][0]["summary"])
         # another client cannot open it
         other, _ = self.signup("other@gsk.com")
@@ -594,7 +594,7 @@ class Portal(unittest.TestCase):
         self.assertEqual(sorted(p["code"] for p in r["picks"]), ["HV-MD-004", "HV-MI-001", "HV-MI-005"])
         self.assertEqual(r["picks"][0]["code"], "HV-MI-001")
         self.assertEqual(portal.balance(cid), 50)                        # free
-        self.assertIn("Reach as many", c.get("/api/brief/for?s=" + token)[1]["brief"]["summary"])
+        self.assertIn("Awareness", c.get("/api/brief/for?s=" + token)[1]["brief"]["summary"])
         sel = db.selection(token=token)
         self.assertEqual(sel["objective"], "Awareness")
         scores = c.get("/api/brief/scores?b=%d" % r["brief_id"])[1]["scores"]

@@ -26,8 +26,8 @@ import metrics
 
 QUESTIONS = [
     {"id": "goal", "type": "one", "label": "What is the main goal of the campaign?", "required": True,
-     "options": [("awareness", "Reach as many people as possible"), ("engagement", "Get people talking and interacting"),
-                 ("conversion", "Drive sales, visits or sign-ups"), ("balanced", "A balance of all three")]},
+     "options": [("awareness", "Awareness"), ("engagement", "Engagement"),
+                 ("conversion", "Sales"), ("balanced", "Balanced")]},
     {"id": "platforms", "type": "many", "label": "Where should the content run?", "required": True,
      "options": [("Instagram", "Instagram"), ("TikTok", "TikTok"), ("Snapchat", "Snapchat"),
                  ("YouTube", "YouTube"), ("any", "No preference")]},
