@@ -82,6 +82,8 @@ import thumbs  # noqa: E402
 import track  # noqa: E402
 import uploads  # noqa: E402
 import account  # noqa: E402
+import gating  # noqa: E402
+import selstatus  # noqa: E402
 import apify
 import profile_thumbs
 import apis_view
@@ -900,6 +902,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_tags()
         if path == "/api/selection/platform":
             return self.api_selection_platform()
+        if path == "/api/selection/status":
+            return self.api_selection_status()
+        if path == "/api/selection/reason":
+            return self.api_selection_reason()
+        if path == "/api/selection/replace":
+            return self.api_selection_replace()
         if path == "/api/selection":
             return self.api_selection_save()
         if path == "/api/creator/request":
@@ -1031,7 +1039,23 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             f = self.form_body()
             if (f.get("id") or "").isdigit():
                 db.handle_analysis_request(int(f["id"]))
-            return self.redirect("/analysis?ok=" + urllib.parse.quote("Marked as handled."))
+            return self.redirect("/analysis?ok=" + urllib.parse.quote("Closed without unlocking."))
+        if path == "/analysis/fulfil":
+            # Unlock the full analysis for the client who asked, and ring their bell.
+            f = self.form_body()
+            rid = int(f["id"]) if (f.get("id") or "").isdigit() else 0
+            with db.connect() as conn:
+                r = conn.execute("SELECT * FROM analysis_requests WHERE id = ?", (rid,)).fetchone()
+            if r is None:
+                return self.redirect("/analysis?e=" + urllib.parse.quote("That request no longer exists."))
+            if not gating.has_analysis(r["code"]):
+                return self.redirect("/analysis?q=%s&e=%s" % (r["code"], urllib.parse.quote(
+                    "Upload %s's analysis first; uploading it unlocks this request by itself." % r["code"])))
+            a = self.admin()
+            gating.fulfil(rid, a["email"] if a is not None else "admin")
+            return self.redirect("/analysis?ok=" + urllib.parse.quote("Unlocked for the client. Their bell says it's ready."))
+        if path == "/selections/status":
+            return self.post_selection_status_admin()
         if path == "/settings/fx":
             return self.post_settings_fx()
         if path == "/planner/apply":
@@ -2444,7 +2468,51 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                     db.upsert_creator(row, conn)
             saved_default.append(code)
         msg = "Saved." + ((" Default price updated for " + ", ".join(saved_default) + ".") if saved_default else "")
+        self.ring_selection(sel)
         return self.redirect("/selections/edit?id=%d&ok=%s" % (sel["id"], urllib.parse.quote(msg)))
+
+    def post_selection_status_admin(self):
+        """The admin's Client status tab: one creator at a time, answered as JSON."""
+        f = self.form_body()
+        sid = (f.get("id") or "").strip()
+        sel = db.selection(int(sid)) if sid.isdigit() else None
+        if sel is None:
+            return self.send_json(404, {"ok": False, "message": "That selection no longer exists."})
+        code = (f.get("code") or "").strip().upper()
+        kind, name, _u = self._status_who("admin", db.admin_code_id())
+        row, err = selstatus.set_status(sel, code, f.get("status") or "", kind, name, f.get("reason"), f.get("note"))
+        if err:
+            return self.send_json(400, {"ok": False, "message": {"status": "Pick a status.",
+                                                                   "not_in_selection": "That creator is not in this selection."}.get(err, err)})
+        selstatus.ring_client(sel, code, row["s"], name, row.get("note"))
+        return self.send_json(200, {"ok": True, "status": row, "label": selstatus.LABEL[row["s"]],
+                                    "who": "%s · HelloVoice" % name})
+
+    def ring_selection(self, before):
+        """HelloVoice saved a client's selection: "shared with you" the first time it is
+        theirs, then "updated" (at most once a day)."""
+        import inbox
+        sel = db.selection(before["id"])
+        if sel is None or not sel["code_id"]:
+            return
+        users = inbox.for_codes([sel["code_id"]])
+        href = "selection/#s=" + sel["token"]
+        n = len(json.loads(sel["codes"] or "[]"))
+        if not n:
+            return
+        with db.connect() as conn:
+            made_here = conn.execute("SELECT 1 FROM history WHERE entity = 'selection' AND key = ? AND action = 'created' LIMIT 1",
+                                     (str(sel["id"]),)).fetchone() is not None
+        shared = 0
+        if before["code_id"] != sel["code_id"] or made_here:
+            # Made (or moved) here for this client: the first save with creators shares it.
+            shared = inbox.emit(users, "sel_shared", "HelloVoice shared a selection:", rest=" " + sel["name"],
+                                body="%d creator%s to review" % (n, "" if n == 1 else "s"), href=href,
+                                ref="shared:%d:%d" % (sel["id"], sel["code_id"]), once=True)
+        if not shared:
+            inbox.emit(users, "sel_updated", sel["name"] + " was updated",
+                       body="HelloVoice changed the creators or prices", href=href,
+                       ref="upd:%d:%s" % (sel["id"], inbox.today()), once=True)
 
     def post_selection_delete(self):
         sid = (self.form_body().get("id") or "").strip()
@@ -3915,19 +3983,32 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "photo_url": links.photo(r["photo"]) if r["photo"] else None,
                 "profiles": db.split_profiles(r["profiles"]),
                 "band": metrics.band_of(r["followers"])}
+        # Analysis gating: the headline numbers are free; the rest is for a client the team
+        # has unlocked it for. Anyone else gets sample data drawn here, never the real values.
+        gate = {"state": "unlocked"} if self.admin() else gating.state(code_id, code)
+        gate["headline"] = gating.headline(card, every)
+        if gate["state"] != "unlocked":
+            gate["sample"] = gating.sample(code)
+            return self.send_json(200, {"ok": True, "creator": card, "platforms": plats, "analyses": {},
+                                        "requested": [], "gate": gate, "benchmarks": metrics.benchmarks()},
+                                  self.cors() + [("Cache-Control", "no-store")])
         return self.send_json(200, {"ok": True, "creator": card,
                                     "platforms": plats,
                                     "analyses": {p: analysis.with_media_urls(a["data"], r["code"], BASE)
                                                  for p, a in every.items()},
-                                    "requested": asked,
+                                    "requested": asked, "gate": gate,
                                     "benchmarks": metrics.benchmarks()},
                               self.cors() + [("Cache-Control", "no-store")])
 
     def api_creator_media(self, code, name):
         """A picture from a creator's analysis — post cover, photo or brand
         logo — for a viewer who has unlocked the catalogue."""
-        if self.viewer_code_id() is None:
+        viewer = self.viewer_code_id()
+        if viewer is None:
             return self.send(401, b"", "text/plain")
+        # Post covers and brand logos are part of the locked analysis.
+        if not self.admin() and not gating.unlocked(viewer, str(code or "").strip().upper()):
+            return self.send(403, b"", "text/plain")
         f = analysis.media_path(code, name)
         if f is None:
             return self.send(404, b"", "text/plain")
@@ -3941,12 +4022,26 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if code_id is None:
             return self.send_json(401, {"ok": False}, self.cors())
         code = (self.json_body().get("code") or "").strip().upper()
-        if db.creator(code) is None:
+        c = db.creator(code)
+        if c is None:
             return self.send_json(404, {"ok": False}, self.cors())
         plat = analysis.canon_platform(self.json_body().get("platform")) or db.platforms_of(code)[0]
-        db.request_analysis(code, code_id, plat)
+        ok, why = gating.request(code_id, code, plat)
+        if not ok:
+            msg = {"outside": "Add this creator to a selection to request the full analysis.",
+                   "unlocked": "The full analysis is already open for you."}.get(why, "This can't be requested here.")
+            return self.send_json(403 if why == "outside" else 400, {"ok": False, "reason": why, "message": msg}, self.cors())
         db.log("shortlist", code_id, self.client_ip(), self.headers.get("User-Agent"), "analysis request:%s:%s" % (code, plat))
-        return self.send_json(200, {"ok": True}, self.cors())
+        if why != "already":
+            u = portal.user_for_code(code_id)
+            sels = gating.selections_with(code_id, code)
+            import notify
+            notify.send("analysis", ["%s asked for the full analysis of %s (%s)." % (
+                ((u["name"] or u["email"]) + ", " + (u["company"] or "")) if u else "An access-code client", c["name"], code),
+                "In: %s" % ", ".join(x["name"] for x in sels[:3]),
+                "Promised within 2 working days. Fulfil it on the Creator analysis page."],
+                kam=u["kam"] if u is not None else None)
+        return self.send_json(200, {"ok": True, "gate": gating.state(code_id, code)}, self.cors())
 
     def post_campaign_delete(self):
         cid = (self.form_body().get("id") or "").strip()
@@ -3993,7 +4088,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 prices[c] = list(p)
         total = ([sel["total_from"], sel["total_to"]]
                  if sel["total_from"] is not None else None)
-        return self.send_json(200, {"ok": True, "name": sel["name"], "codes": codes,
+        out = {"ok": True, "name": sel["name"], "codes": codes,
                                     "prices": prices, "total": total,
                                     "platform": platform,
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
@@ -4019,7 +4114,39 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                     "verdicts": {k: v for k, v in json.loads((sel["verdicts"] if "verdicts" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "currency": (sel["currency"] if "currency" in sel.keys() else None) or "SAR",
                                     "fx": fx.rates(),
-                                    "token": sel["token"]}, self.cors())
+                                    "token": sel["token"]}
+        reader = self.selection_viewer(sel["token"])
+        # Analysis gating: a score keeps its number, but the evidence that quotes locked
+        # figures (audience shares, fake followers) waits until that creator is unlocked.
+        open_ = None if self.admin() else gating.unlocked_set(reader, codes)
+        if open_ is not None:
+            out["scores"] = {k: (v if k in open_ else gating.redact_score(v)) for k, v in out["scores"].items()}
+        out.update(self.selection_status_payload(sel, codes, reader, by))
+        return self.send_json(200, out, self.cors())
+
+    def selection_role(self, sel, reader):
+        """admin (HelloVoice: any status), owner (the client it belongs to: approve and
+        reject) or viewer (a colleague or a link holder: look only)."""
+        if self.admin() or (reader is not None and int(reader) == db.admin_code_id()):
+            return "admin"
+        if reader is not None and sel["code_id"] is not None and int(reader) == sel["code_id"]:
+            return "owner"
+        return "viewer"
+
+    def selection_status_payload(self, sel, codes, reader, by=None):
+        """What the selection page needs for statuses: each creator's, the summary bar,
+        what this reader may do, and the price of a replacement search."""
+        st = {k: v for k, v in selstatus.of(sel["id"]).items() if k in codes}
+        if by is None:
+            by = {c["code"]: c for c in db.list_creators(active_only=True)}
+        tiers = {c: by[c]["tier"] for c in codes if c in by}
+        owner = portal.user_for_code(sel["code_id"]) if sel["code_id"] else None
+        role = self.selection_role(sel, reader)
+        return {"status": st, "status_counts": selstatus.counts(codes, st, tiers), "role": role,
+                "owner": (owner["name"] if owner is not None else None),
+                "kam": ((owner["kam"] or "").split("<")[0].strip() if owner is not None and owner["kam"] else None),
+                "replace_cost": portal.costs().get("replace", 2),
+                "credits": portal.balance(int(reader)) if reader is not None and role != "admin" else None}
 
     def post_request_handled(self):
         f = self.form_body()
@@ -4283,6 +4410,127 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if plat and plat != "Both" and plat not in db.analyses(code):
             return self.send_json(400, {"ok": False, "reason": "no analysis on that platform"}, self.cors())
         return self.send_json(200, {"ok": True, "client_platforms": db.set_client_platform(sel["id"], code, plat)}, self.cors())
+
+    def _status_target(self, b):
+        """(sel, reader, role, code) for a status action, or None after answering."""
+        token = str(b.get("token") or "")
+        reader = self.selection_viewer(token)
+        if not reader:
+            self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+            return None
+        sel = db.selection(token=token) if token else None
+        if sel is None or (sel["code_id"] is not None and int(reader) != db.admin_code_id()
+                           and sel["code_id"] not in portal.team_codes(int(reader))):
+            self.send_json(404, {"ok": False}, self.cors())
+            return None
+        code = str(b.get("code") or "").strip().upper()
+        if code not in json.loads(sel["codes"] or "[]"):
+            self.send_json(404, {"ok": False, "reason": "not_in_selection"}, self.cors())
+            return None
+        return sel, int(reader), self.selection_role(sel, reader), code
+
+    def _status_who(self, role, reader):
+        if role == "admin":
+            a = self.admin()
+            name = (a["name"] if a is not None and "name" in a.keys() and a["name"] else None) or \
+                   ((a["email"].split("@")[0].replace(".", " ").title()) if a is not None else "HelloVoice")
+            return "hv", name, None
+        u = portal.user_for_code(reader)
+        return "client", (u["name"] if u is not None and u["name"] else "Client"), u
+
+    def api_selection_status(self):
+        """Approve, reject or set back one creator. The selection's owner decides; HelloVoice
+        can set anything, including Unavailable; colleagues only look."""
+        b = self.json_body()
+        got = self._status_target(b)
+        if not got:
+            return
+        sel, reader, role, code = got
+        status = str(b.get("status") or "")
+        if role == "viewer":
+            owner = portal.user_for_code(sel["code_id"]) if sel["code_id"] else None
+            return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only %s can approve or reject creators in this selection." % (
+                (owner["name"] if owner is not None and owner["name"] else "the person who owns it"))}, self.cors())
+        if role == "owner" and status == "unavailable":
+            return self.send_json(403, {"ok": False, "reason": "hv_only", "message": "Only HelloVoice marks a creator unavailable."}, self.cors())
+        if self._throttled("status:%d" % reader, 240, 600):
+            return
+        kind, name, user = self._status_who(role, reader)
+        row, err = selstatus.set_status(sel, code, status, kind, name, b.get("reason"), b.get("note"))
+        if err:
+            return self.send_json(400, {"ok": False, "reason": err}, self.cors())
+        if kind == "hv":
+            selstatus.ring_client(sel, code, status, name, row.get("note"))
+        else:
+            selstatus.tell_kam(sel, code, status, user, row.get("reason"), row.get("note"))
+        db.log("shortlist", reader, self.client_ip(), self.headers.get("User-Agent"), "status:%s:%s" % (code, status))
+        codes = json.loads(sel["codes"] or "[]")
+        p = self.selection_status_payload(sel, codes, reader)
+        return self.send_json(200, {"ok": True, "status": row, "status_counts": p["status_counts"]}, self.cors())
+
+    def api_selection_reason(self):
+        """The optional "why" under a rejection: price, audience, content style, a competitor, other."""
+        b = self.json_body()
+        got = self._status_target(b)
+        if not got:
+            return
+        sel, reader, role, code = got
+        if role == "viewer":
+            return self.send_json(403, {"ok": False, "reason": "not_owner"}, self.cors())
+        row = selstatus.set_reason(sel, code, b.get("reason"), b.get("note"))
+        if row is None or row["s"] != "rejected":
+            return self.send_json(400, {"ok": False, "reason": "not_rejected"}, self.cors())
+        if role == "owner":
+            selstatus.tell_kam(sel, code, "rejected", portal.user_for_code(reader), row["reason"], row["note"])
+        return self.send_json(200, {"ok": True, "status": row}, self.cors())
+
+    def api_selection_replace(self):
+        """Find a replacement with Helvy: three creators like the rejected one that fit the
+        same campaign, not already in the selection. Costs credits once; the three are
+        kept, so opening them again is free."""
+        import matcher
+        b = self.json_body()
+        got = self._status_target(b)
+        if not got:
+            return
+        sel, reader, role, code = got
+        if role == "viewer":
+            return self.send_json(403, {"ok": False, "reason": "not_owner"}, self.cors())
+        row = selstatus.get(sel["id"], code)
+        if row is None or row["s"] not in ("rejected", "unavailable"):
+            return self.send_json(400, {"ok": False, "reason": "not_rejected"}, self.cors())
+        codes = json.loads(sel["codes"] or "[]")
+        if row["replacements"] and not b.get("again"):
+            picks, cost = [c for c in row["replacements"]], 0
+        else:
+            if self._throttled("replace:%d" % reader, 20, 3600):
+                return
+            ok, cost, bal = portal.charge(reader, "replace", "Helvy: replacement for " + code) if role == "owner" else (True, 0, None)
+            if not ok:
+                return self.send_json(402, {"ok": False, "reason": "no_credits", "balance": portal.balance(reader),
+                                            "cost": portal.costs().get("replace", 2),
+                                            "message": "You're out of credits. Request more from your profile."}, self.cors())
+            gone = db.creator(code)
+            hcp = str((gone["tier"] if gone is not None else "") or "").upper().startswith("HCP")
+            tier = gone["tier"] if gone is not None else None
+            plat = sel["platform"] if "platform" in sel.keys() and sel["platform"] else None
+            brief = {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
+                     "platforms": [plat] if plat else (analysis.creator_platforms(gone)[:1] if gone is not None else [])}
+            try:
+                items = matcher.score_all(brief, exclude=set(codes) | set(row["replacements"] or []))
+            except Exception:
+                items = []
+            tier_of = {c["code"]: c["tier"] for c in db.list_creators(active_only=True)}
+            items = [i for i in items if str(tier_of.get(i["code"]) or "").upper().startswith("HCP") == hcp]
+            items.sort(key=lambda i: (tier_of.get(i["code"]) != tier, -i["rank_score"]))
+            picks = [i["code"] for i in items[:3]]
+            if not picks:
+                portal.refund(reader, cost, "no replacement found")
+                return self.send_json(200, {"ok": True, "replacements": [], "message": "Helvy found no one close enough. Your account manager can help."}, self.cors())
+            selstatus.set_replacements(sel["id"], code, picks)
+        shown = {r["code"]: r for r in self.roster_payload(only=set(picks))}
+        return self.send_json(200, {"ok": True, "replacements": [shown[c] for c in picks if c in shown], "spent": cost,
+                                    "credits": portal.balance(reader) if role == "owner" else None}, self.cors())
 
     def api_selection_tags(self):
         """A client labelling a creator on their own selection page (Shortlist,

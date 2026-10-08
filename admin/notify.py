@@ -10,7 +10,8 @@ import threading
 import db
 import mailer
 
-EVENTS = {"signup": "New client", "brief": "New brief", "quote": "Quote request", "credits": "Credits requested"}
+EVENTS = {"signup": "New client", "brief": "New brief", "quote": "Quote request", "credits": "Credits requested",
+          "status": "Selection feedback", "analysis": "Analysis requested"}
 
 
 def recipients(kam=None):

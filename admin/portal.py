@@ -125,7 +125,8 @@ OTP_RESEND_SECONDS = 30
 
 # "search" is the scored shortlist without AI text: free, so every client (access code included)
 # can always get one. Written reasons, the brief reader and chat spend credits.
-DEFAULT_COSTS = {"brief": 5, "parse": 1, "chat": 1, "search": 0}
+DEFAULT_COSTS = {"brief": 5, "parse": 1, "chat": 1, "search": 0, "replace": 2}
+LOW_CREDITS = 5                    # the bell warns when a balance drops below this
 DEFAULT_GUEST_CREDITS = 10
 DEFAULT_SIGNUP_CREDITS = 50
 
@@ -141,6 +142,17 @@ def init():
         for col, ddl in (("kam", "TEXT"), ("monthly_credits", "INTEGER"), ("deleted_at", "INTEGER")):
             if col not in ucols:
                 conn.execute("ALTER TABLE users ADD COLUMN %s %s" % (col, ddl))
+    # Portal v3: profile page, bell, analysis gating, selection status, rewards (all additive).
+    import account
+    import gating
+    import inbox
+    import rewards
+    import selstatus
+    account.init()
+    rewards.init()
+    inbox.init()
+    selstatus.init()
+    gating.init()
 
 
 # ----------------------------------------------------------------- settings --
@@ -350,13 +362,26 @@ def signups_from(ip, hours=24):
                             (ip, db.now() - hours * 3600)).fetchone()[0]
 
 
+MARKETS = ("SA", "AE", "EG", "KW", "QA", "BH", "OM", "JO")
+LANGUAGES = ("Arabic", "English", "Arabic and English")
+
+
 def update_profile(uid, **fields):
-    allowed = {"name": 120, "company": 160, "job_title": 120, "phone": 40, "notes": 500, "kam": 160}
+    allowed = {"name": 120, "company": 160, "job_title": 120, "phone": 40, "notes": 500, "kam": 160,
+               "brands": 300, "industry": 60}
     sets, vals = [], []
     for k, n in allowed.items():
         if k in fields and fields[k] is not None:
             sets.append(k + " = ?")
             vals.append(" ".join(str(fields[k]).split())[:n])
+    if fields.get("markets") is not None:
+        raw = fields["markets"]
+        raw = raw if isinstance(raw, list) else str(raw).replace(",", " ").split()
+        sets.append("markets = ?")
+        vals.append(json.dumps([m for m in dict.fromkeys(str(x).strip().upper() for x in raw) if m in MARKETS]))
+    if fields.get("language") is not None:
+        sets.append("language = ?")
+        vals.append(fields["language"] if fields["language"] in LANGUAGES else "")
     if "monthly_credits" in fields:
         v = fields["monthly_credits"]
         sets.append("monthly_credits = ?")
@@ -443,7 +468,20 @@ def spend(code_id, n, reason, ref=""):
         bal = r["balance_after"] if r else 0
         if bal < n:
             return False, bal
-        return True, _post(conn, code_id, -n, reason[:120], ref, "")
+        after = _post(conn, code_id, -n, reason[:120], ref, "")
+    if after < LOW_CREDITS <= bal:
+        _ring_low(code_id, after)
+    return True, after
+
+
+def _ring_low(code_id, left):
+    import inbox
+    u = user_for_code(code_id)
+    if u is None or u["status"] != "active":
+        return
+    inbox.emit([u["id"]], "credits_low", "Credits running low",
+               body="%d left. Request more, or finish your profile to earn some." % left,
+               href="account/#credits", ref="low:" + inbox.today(), once=True)
 
 
 def charge(code_id, kind, ref=""):
@@ -618,6 +656,23 @@ def monthly_refill(code_id):
         r = conn.execute("SELECT balance_after FROM credit_ledger WHERE code_id = ? ORDER BY id DESC LIMIT 1", (code_id,)).fetchone()
         bal = r["balance_after"] if r else 0
         _post(conn, code_id, max(0, n - bal), "Monthly credits", time.strftime("%Y-%m", t), "system")
+    if n - bal > 0:
+        import inbox
+        inbox.emit([u["id"]], "credits_monthly", "%d monthly credits added" % (n - bal),
+                   body="Your balance tops up to %d on the 1st of each month" % n, href="account/#credits",
+                   ref="monthly:" + time.strftime("%Y-%m", t), once=True)
+
+
+def ring_added(code_id, n, why=""):
+    """An admin added credits (a top-up, a request granted): the client's bell."""
+    if n <= 0:
+        return
+    import inbox
+    u = user_for_code(code_id)
+    if u is None or u["status"] != "active":
+        return
+    inbox.emit([u["id"]], "credits_added", "%d credits added" % n, body=why or "Added by the HelloVoice team",
+               href="account/#credits")
 
 
 # ---------------------------------------------------------- credit requests --
@@ -646,6 +701,7 @@ def handle_credit_request(rid, grant_n, who):
                      (db.now(), grant_n, who, rid))
     if grant_n:
         grant(r["code_id"], grant_n, "Top-up on request", actor=who, ref="request %d" % rid)
+        ring_added(r["code_id"], grant_n, "Your request for more credits was granted")
     return r
 
 

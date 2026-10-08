@@ -2343,6 +2343,50 @@ if(cur.map(function(x){return x.toLowerCase()}).indexOf(t.toLowerCase())<0)cur.p
 draw()})();</script>'''
 
 
+def selection_status_panel(sel, members, status_map, counts):
+    """The Client status tab: what the client approved or rejected, and HelloVoice's own
+    say on every creator (any status, including Unavailable, with a note the client sees).
+    Each change saves on its own and rings the client's bell."""
+    import selstatus as _ss
+    opts = lambda cur: "".join("<option value='%s'%s>%s</option>" % (k, " selected" if k == cur else "", e(v)) for k, v in _ss.LABEL.items())
+    rows = []
+    for c in members:
+        st = status_map.get(c["code"]) or {"s": "review", "by": "", "hv": False, "at": None, "reason": "", "note": ""}
+        why = (_ss.REASONS.get(st["reason"], "") + ((": " + st["note"]) if st["note"] and st["s"] == "rejected" else "")) if st["s"] == "rejected" else ""
+        who = ((e(st["by"]) + (" · HelloVoice" if st["hv"] else " · client") + " · " + ago(st["at"])) if st["at"] else "<span class='muted'>Not decided yet</span>")
+        rows.append(
+            "<tr data-code='" + e(c["code"]) + "'><td><code>" + e(c["code"]) + "</code> " + e(c["name"])
+            + "<div class='muted'>" + e(c["tier"] or "") + "</div></td>"
+            + "<td><span class='pill ss-pill ss-" + st["s"] + "'>" + e(_ss.LABEL[st["s"]]) + "</span>"
+            + ("<div class='muted' style='margin-top:4px'>" + e(why) + "</div>" if why else "") + "</td>"
+            + "<td class='ss-who'>" + who + "</td>"
+            + "<td><select class='ss-status' aria-label='Status for " + e(c["name"]) + "'>" + opts(st["s"]) + "</select></td>"
+            + "<td><input class='ss-note' maxlength='200' placeholder='Note the client sees (optional)' value='"
+            + e(st["note"] if st["hv"] else "") + "' aria-label='Note for " + e(c["name"]) + "'></td>"
+            + "<td><button type='button' class='btn tiny lime ss-save'>Save</button><div class='muted ss-msg' role='status'></div></td></tr>")
+    chips = " ".join("<span class='pill ss-pill ss-%s'>%d %s</span>" % (k, counts[k], e(_ss.LABEL[k].lower())) for k in _ss.STATUSES)
+    return ("<div class='card'><div class='hd'><h2>Client status</h2></div>"
+            "<p class='sec-desc'>The client approves or rejects each creator on their selection page. You can set any status here, "
+            "including <b>Unavailable</b> (only HelloVoice can), with an optional note they see. Every change by HelloVoice rings "
+            "the client's bell; their changes are emailed to the KAM.</p>"
+            "<p>" + chips + "</p>"
+            + ("<table class='ss-table' data-nosort data-nocols><thead><tr><th>Creator</th><th>Status</th><th>Last change</th><th>Set to</th><th>Note</th><th></th></tr></thead><tbody>"
+               + "".join(rows) + "</tbody></table>" if rows else ui.empty("users", "No creators yet", "Add creators on the Creators & prices tab first."))
+            + "</div>"
+            "<style>.ss-pill.ss-approved{background:#e7f6ec;color:var(--green)}.ss-pill.ss-rejected{background:#fdeaea;color:var(--red)}"
+            ".ss-pill.ss-unavailable{background:#ece9e4;color:#555}.ss-table input,.ss-table select{min-width:120px}</style>"
+            "<script>(function(){var t=document.querySelector('.ss-table');if(!t)return;"
+            "t.addEventListener('keydown',function(ev){if(ev.key==='Enter'&&ev.target.classList.contains('ss-note')){ev.preventDefault();ev.target.closest('tr').querySelector('.ss-save').click();}});"
+            "t.addEventListener('click',function(ev){var b=ev.target.closest('.ss-save');if(!b)return;var tr=b.closest('tr'),m=tr.querySelector('.ss-msg');"
+            "b.disabled=true;m.textContent='Saving…';var body=new URLSearchParams({id:'" + str(sel["id"]) + "',code:tr.getAttribute('data-code'),"
+            "status:tr.querySelector('.ss-status').value,note:tr.querySelector('.ss-note').value});"
+            "fetch('" + u("/selections/status") + "',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:body})"
+            ".then(function(r){return r.json();}).then(function(j){b.disabled=false;if(!j.ok){m.textContent=j.message||'Could not save.';return;}"
+            "var p=tr.querySelector('.ss-pill');p.className='pill ss-pill ss-'+j.status.s;p.textContent=j.label;"
+            "tr.querySelector('.ss-who').textContent=j.who+' · just now';m.textContent='Saved. The client sees it now.';})"
+            ".catch(function(){b.disabled=false;m.textContent='Could not save. Try again.';});});})();</script>")
+
+
 def selection_fit_panel(sel, creators, scores=None, interests=()):
     """The Fit & tags tab, fetched when it is opened (round 4): on a large
     selection it is most of the page, and most visits never open it."""
@@ -2645,6 +2689,10 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         "<button type='button' class='btn small lime' data-copy='#sel-url'>" + ui.icon("copy", 15) + " Copy link</button>"
         "<a class='btn small ghost' href='" + e(link) + "' target='_blank' rel='noopener'>Preview as the client</a></div></div>")
     campaign_html = campaign_start_card(sel, campaigns)
+    import selstatus as _ss
+    status_map = _ss.of(sel["id"])
+    status_counts = _ss.counts([c for c in codes if c in by], status_map, {c: by[c]["tier"] for c in codes if c in by})
+    status_html = selection_status_panel(sel, [by[c] for c in codes if c in by], status_map, status_counts)
     body = (
         roster_list
         + ui.header(sel["name"], "A priced shortlist for one client: " + str(n_cr) + " creator" + ("" if n_cr == 1 else "s") + ". " + client_pill,
@@ -2652,7 +2700,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
                     actions=open_link("selection", sel["token"], "Open client link", "btn ghost")
                     + " <button type='button' class='btn lime' data-go-tab='st:share'>" + ui.icon("send", 16) + " Share</button>")
         + note + _brief_note(sel) + stepper_html
-        + "<div data-tabs='st'>" + ui.tab_nav("st", [("creators", "Creators & prices", n_cr), ("fit", "Fit & tags", (sum(1 for v in verdicts_of.values() if v) or None)), ("details", "Details", None),
+        + "<div data-tabs='st'>" + ui.tab_nav("st", [("creators", "Creators & prices", n_cr), ("fit", "Fit & tags", (sum(1 for v in verdicts_of.values() if v) or None)),
+                                                    ("status", "Client status", (status_counts["approved"] or None)), ("details", "Details", None),
                                                     ("share", "Share", None), ("campaign", "Campaign", len(campaigns) or None)])
         + "<form method='post' action='" + u("/selections/save") + "' enctype='multipart/form-data'>"
         + "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
@@ -2680,6 +2729,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<ul class='ta-list' id='sel-add-list' role='listbox' hidden></ul></div>"
           "<div class='price-hint'>They join when you save.</div></div>"
         + "</div>" + _SEL_DRAWER + "</div>"
+        + "<div class='panel' data-panel='status' hidden>" + status_html + "</div>"
         + "<div class='panel' data-panel='fit' hidden data-lazy='" + u("/selections/fit") + "?id=" + str(sel["id"]) + "'>"
           "<div class='card lazy-wait' aria-busy='true'><div class='sk'></div><div class='sk'></div><div class='sk short'></div></div></div>"
         + "<div class='panel' data-panel='details' hidden><div class='card'><div class='hd'><h2>Details</h2></div>"
@@ -4006,15 +4056,30 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
     """`have` is {code: {platform: saved at}}: an analysis belongs to one platform."""
     import analysis as _an
     main = lambda code: next((_an.creator_platforms(c)[0] for c in creators if c["code"] == code), "Instagram")
-    open_reqs = [r for r in requests if not r["handled_at"]]
-    req_rows = "".join(
-        "<tr><td><code>" + e(r["code"]) + "</code> " + e(r["creator_name"] or "") + "</td><td><b>"
-        + e(r["platform"] or main(r["code"])) + "</b></td><td>" + e(r["code_label"] or "—")
-        + "</td><td class='muted'>" + ago(r["at"]) + "</td><td>"
-        + ("<span class='pill live'>uploaded</span>" if (r["platform"] or main(r["code"])) in have.get(r["code"], {})
-           else "<span class='pill warn'>waiting</span>")
-        + "</td><td><form method='post' action='" + u("/analysis/handled") + "'><input type='hidden' name='id' value='"
-        + str(r["id"]) + "'><button class='btn tiny ghost'>Mark handled</button></form></td></tr>" for r in open_reqs)
+    import gating as _gating
+    import time as _time
+    queue = _gating.queue()
+    now_ = int(_time.time())
+
+    def _req_row(r):
+        late = r["ready_by"] < now_
+        client = r["company"] or r["user_name"] or r["code_label"] or "—"
+        act = ("<form method='post' action='" + u("/analysis/fulfil") + "' style='display:inline'><input type='hidden' name='id' value='"
+               + str(r["id"]) + "'><button class='btn tiny lime' title='Unlock it for this client and ring their bell'>"
+               + ui.icon("check", 13) + " Fulfil</button></form> " if r["has_analysis"] else
+               "<a class='btn tiny' href='" + u("/analysis") + "?q=" + e(r["code"]) + "#edit'>Upload first</a> ")
+        return ("<tr><td><code>" + e(r["code"]) + "</code> " + e(r["creator_name"] or "") + "</td><td>" + e(client)
+                + ("<div class='muted'>KAM: " + e(r["kam"].split("<")[0].strip()) + "</div>" if r["kam"] else "")
+                + "</td><td class='muted'>" + ago(r["at"]) + "</td><td>"
+                + ("<span class='pill dead'>Overdue</span>" if late else "<span class='pill'>" + e(_time.strftime("%a %d %b", _time.gmtime(r["ready_by"]))) + "</span>")
+                + "</td><td>" + ("<span class='pill live'>on file</span>" if r["has_analysis"] else "<span class='pill warn'>not uploaded</span>")
+                + "</td><td style='white-space:nowrap'>" + act
+                + "<form method='post' action='" + u("/analysis/handled") + "' style='display:inline'><input type='hidden' name='id' value='"
+                + str(r["id"]) + "'><button class='btn tiny ghost' title='Close without unlocking'>Close</button></form></td></tr>")
+    req_rows = "".join(_req_row(r) for r in queue)
+    granted = _gating.grants(8)
+    grant_rows = "".join("<li><code>" + e(g["code"]) + "</code> " + e(g["creator_name"] or "") + " → " + e(g["company"] or g["code_label"] or "—")
+                         + " <span class='muted'>· " + ago(g["granted_at"]) + "</span></li>" for g in granted)
     term = (q or "").strip().lower()
     shown = [c for c in creators if not term or term in (c["code"] + " " + c["name"]).lower()]
 
@@ -4059,6 +4124,14 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
     body = (
         ui.header("Creator analysis", "Full profile analyses clients open from the catalogue and reports — one per platform. A platform without one shows a locked tab with Request analysis; requests land below.", crumbs=[("Library", None), ("Creator analysis", None)])
         + _notes(error, message)
+        + "<div class='card' id='requests'><div class='hd'><h2>Full-analysis requests" + (" <span class='pill warn'>" + str(len(queue)) + " open</span>" if queue else "")
+        + "</h2></div><p class='sec-desc'>Clients only see a creator's full analysis (audience, growth, fake-follower check, brand history, best posts, pricing) "
+          "once you unlock it for them. They can ask for any creator in one of their selections; we promise it within 2 working days. "
+          "<b>Fulfil</b> unlocks it for that client's team and rings their bell; uploading the analysis does the same by itself.</p>"
+          "<table><thead><tr><th>Creator</th><th>Client</th><th>Asked</th><th>Due</th><th>Analysis</th><th></th></tr></thead><tbody>"
+        + (req_rows or "<tr><td colspan='6' class='muted'>No open requests.</td></tr>") + "</tbody></table>"
+        + ("<details style='margin-top:12px'><summary>Recently unlocked</summary><ul style='margin:8px 0 0;padding-left:18px'>" + grant_rows + "</ul></details>" if grant_rows else "")
+        + "</div>"
         + "<div class='card' id='pdf'><div class='hd'><h2>Option A · Drop profile report PDFs</h2></div>"
           "<p class='sec-desc'>Drop one or many report PDFs. Each is read and saved as that creator's analysis for the platform the report is about "
           "(read from the report, or set below), with their photo and post covers. The creator is found from the handle in the file name "
@@ -4085,9 +4158,6 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
           + "<p class='price-hint'>Rows with only the creator filled in are ignored. Uploading a creator's platform again replaces "
             "that platform's analysis and closes its open requests.</p>"
             "<button class='btn small'>Upload analyses</button></form></div>"
-        + "<h2>Requests from clients</h2><div class='card'><table><thead><tr><th>Creator</th><th>Platform</th><th>Client</th><th>Asked</th>"
-          "<th>Status</th><th></th></tr></thead><tbody>" + (req_rows or "<tr><td colspan='6' class='muted'>No open requests.</td></tr>")
-        + "</tbody></table></div>"
         + editor
         + "<h2>Creators</h2><form class='card' method='get' action='" + u("/analysis") + "'><div class='row'>"
           "<div style='flex:3'><input name='q' value='" + e(q) + "' placeholder='Search by code or name'></div>"

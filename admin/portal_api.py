@@ -13,10 +13,12 @@ Public (client) routes
     POST /api/auth/profile       name / company -> account created, signed in
     POST /api/auth/logout
     POST /api/me/update          edit profile
-    GET  /api/account            the client's own home: insights, campaigns, selections (account holders)
+    GET  /api/account            the client's whole profile page in one payload (account holders)
     GET  /api/me/image?k=photo   their profile photo or company logo (k=logo), owner only
     POST /api/me/image           {kind, data: data-URL} or {kind, remove: true}
-    POST /api/me/notify          which emails they want: {quote, live, report}
+    POST /api/me/notify          which groups show in the bell: {analysis, selections, campaigns, account, ideas}
+    GET  /api/notifications      the bell: {unread, items} (latest first; ?limit=5)
+    POST /api/notifications/read {ids: [..]} or {} for all
     POST /api/me/signout-others  every other browser on their account loses access
     POST /api/team/invite        ask HelloVoice to give a colleague access
     POST /api/brief/parse        free text -> MCQ answers   (credits)
@@ -39,12 +41,15 @@ import db
 import faq
 import fx
 import gemini
+import gating
 import guard
+import inbox
 import mailer
 import matcher
 import notify
 import portal
 import portal_views
+import rewards
 
 _score_cache = {}          # brief id -> (time, scores) for the catalogue's fit badges
 
@@ -99,6 +104,10 @@ class PortalMixin:
         if user:
             out["user"] = {k: user[k] for k in ("email", "name", "company", "job_title", "phone")}
             out["user"]["photo"] = account.image_version(user, "photo")
+            # What the brief questions can start from (profile: industry, markets).
+            prof = account.profile(user)
+            out["user"].update({k: prof[k] for k in ("industry", "markets", "language", "brands")})
+            out["unread"] = inbox.unread(user)
             out["team"] = [{"name": t["name"], "job_title": t["job_title"]} for t in portal.teammates(cid)]
             out["monthly_credits"] = portal.monthly_allowance(user)
         return out
@@ -195,7 +204,16 @@ class PortalMixin:
             who = self._need_account()
             if who:
                 cid, user = who
-                self.send_json(200, dict(account.summary(user, cid), ok=True), self.cors() + [("Cache-Control", "no-store")])
+                self.send_json(200, dict(account.summary(user, cid, self._srv().SECRET), ok=True),
+                               self.cors() + [("Cache-Control", "no-store")])
+            return True
+        if path == "/api/notifications":
+            who = self._need_account()
+            if who:
+                user = who[1]
+                n = max(1, min(self._int(query.get("limit"), 5), 60))
+                self.send_json(200, {"ok": True, "unread": inbox.unread(user), "items": inbox.feed(user, n)},
+                               self.cors() + [("Cache-Control", "no-store")])
             return True
         if path == "/api/me/image":
             who = self._need_account()
@@ -323,6 +341,7 @@ class PortalMixin:
             "/api/voice/handoff": self.api_voice_handoff,
             "/api/me/image": self.api_me_image, "/api/me/notify": self.api_me_notify,
             "/api/me/signout-others": self.api_me_signout_others, "/api/team/invite": self.api_team_invite,
+            "/api/notifications/read": self.api_notifications_read,
         }
         fn = routes.get(path)
         if not fn:
@@ -399,7 +418,13 @@ class PortalMixin:
             return self.send_json(200, {"ok": True, "step": "pending",
                                         "message": "Thanks. Your account is waiting for approval by the HelloVoice team. "
                                                    "We'll email you as soon as it's ready."}, self.cors())
+        first = user["last_login_at"] is None
         portal.touch_login(user["id"])
+        if first:
+            try:
+                rewards.first_sign_in(user)            # pays an inviter, tells the team
+            except Exception:
+                pass
         return self._issue_pass(self._code_row(user["code_id"]))
 
     def api_auth_profile(self):
@@ -422,6 +447,10 @@ class PortalMixin:
                                         "message": "Too many accounts were created from this network today. Please contact the HelloVoice team."}, self.cors())
         user = portal.create_user(email, name, company, b.get("job_title"), b.get("phone"), self.client_ip())
         db.log("signup", user["code_id"], self.client_ip(), self._ua(), email.rsplit("@", 1)[1])
+        # Arrived through a colleague's invite link: note it, so the colleague is paid when this account is in.
+        inviter = portal.user_by_id(rewards.read_token(b.get("invite"), self._srv().SECRET) or 0) if b.get("invite") else None
+        if inviter is not None:
+            rewards.record(inviter, email, name, via="link")
         notify.send("signup", ["%s (%s) from %s signed up." % (user["name"], user["email"], user["company"]),
                                "Job title: %s" % (user["job_title"] or "—"), "Phone: %s" % (user["phone"] or "—")])
         return self._enter(user)
@@ -440,11 +469,30 @@ class PortalMixin:
         if kind != "user":
             return self.send_json(400, {"ok": False, "reason": "no_profile"}, self.cors())
         b = self.json_body()
+        if "name" in b and len(" ".join(str(b.get("name") or "").split())) < 2:
+            return self.send_json(400, {"ok": False, "reason": "name", "message": "Please keep your name on your profile."}, self.cors())
         u = portal.update_profile(user["id"], name=b.get("name"), company=b.get("company"),
-                                  job_title=b.get("job_title"), phone=b.get("phone"))
-        return self.send_json(200, {"ok": True, "user": {k: u[k] for k in ("email", "name", "company", "job_title", "phone")}}, self.cors())
+                                  job_title=b.get("job_title"), phone=b.get("phone"), brands=b.get("brands"),
+                                  industry=b.get("industry") if b.get("industry") is None or b.get("industry") in
+                                  {v for v, _l in matcher._BY_ID["category"]["options"]} | {""} else None,
+                                  markets=b.get("markets"), language=b.get("language"))
+        earned = rewards.check(u)
+        return self.send_json(200, {"ok": True, "user": account.profile(u), "earned": earned,
+                                    "completion": account.completion(u), "credits": portal.balance(cid)}, self.cors())
 
     # ----------------------------------------------------------------- brief --
+
+    @staticmethod
+    def _redact(cid, items):
+        """Fit evidence that quotes locked analysis figures (audience shares, fake
+        followers) is taken out for creators this client has not had unlocked."""
+        open_ = gating.unlocked_set(cid, [i["code"] for i in items])
+        if open_ is None:
+            return items
+        for i, it in enumerate(items):
+            if it["code"] not in open_:
+                items[i] = gating.redact_score(it)
+        return items
 
     def _ai_fail(self, exc):
         code, msg = AI_FAIL.get(getattr(exc, "reason", ""), (502, "The assistant couldn't answer. You weren't charged."))
@@ -488,7 +536,7 @@ class PortalMixin:
         db.set_selection_objective(sel["id"], brief["objective"])
         db.set_selection_target(sel["id"], brief["target"])
         codes = json.loads(sel["codes"] or "[]")
-        items = matcher.score_all(brief, only=set(codes))
+        items = self._redact(cid, matcher.score_all(brief, only=set(codes)))
         text = matcher.describe(answers)
         bid = portal.save_brief(cid, user["id"] if user else None, "selection", answers, text, brief["objective"], brief["target"],
                                 sel["id"], {"codes": codes})
@@ -573,15 +621,24 @@ class PortalMixin:
                    "not_image": "Please choose a JPG, PNG or WebP image."}.get(why, "Couldn't save that image.")
             return self.send_json(400, {"ok": False, "reason": why, "message": msg}, self.cors())
         fresh = portal.user_by_id(user["id"])
-        return self.send_json(200, {"ok": True, "version": account.image_version(fresh, kind),
-                                    "completion": account.completion(fresh)}, self.cors())
+        earned = rewards.check(fresh)
+        return self.send_json(200, {"ok": True, "version": account.image_version(fresh, kind), "earned": earned,
+                                    "completion": account.completion(fresh), "credits": portal.balance(cid)}, self.cors())
 
     def api_me_notify(self):
         who = self._need_account()
         if not who:
             return
-        prefs = account.set_notify(who[1], self.json_body())
-        return self.send_json(200, {"ok": True, "notify": prefs}, self.cors())
+        prefs = inbox.set_prefs(who[1], self.json_body())
+        return self.send_json(200, {"ok": True, "prefs": prefs, "unread": inbox.unread(portal.user_by_id(who[1]["id"]))}, self.cors())
+
+    def api_notifications_read(self):
+        who = self._need_account()
+        if not who:
+            return
+        ids = self.json_body().get("ids")
+        inbox.mark_read(who[1], ids if isinstance(ids, list) else None)
+        return self.send_json(200, {"ok": True, "unread": inbox.unread(who[1])}, self.cors())
 
     def api_me_signout_others(self):
         """Take every other browser off this account's code. This one keeps its
@@ -609,9 +666,13 @@ class PortalMixin:
         email = " ".join(str(b.get("email") or "").split())[:160]
         if "@" not in email:
             return self.send_json(400, {"ok": False, "message": "Please add your colleague's work email."}, self.cors())
+        counted = rewards.record(user, email, name)
         notify.send("signup", ["%s (%s, %s) asked for access for a colleague: %s <%s>." % (
             user["name"], user["email"], user["company"] or "no company", name or "no name given", email)], kam=user["kam"])
-        return self.send_json(200, {"ok": True, "message": "Sent. Your account manager will set up access for %s." % (name or email)}, self.cors())
+        return self.send_json(200, {"ok": True, "counted": counted,
+                                    "message": "Sent. Your account manager will set up access for %s." % (name or email)
+                                    + ("" if counted else " Invites only earn credits for colleagues on your company email domain.")},
+                              self.cors())
 
     def api_me_delete(self):
         who = self._need_viewer()
@@ -687,6 +748,8 @@ class PortalMixin:
         try:
             brief = matcher.to_brief(answers)
             result = matcher.rank(brief)
+            self._redact(cid, result["picks"])
+            self._redact(cid, result["alternates"])
             if not result["picks"]:
                 portal.refund(cid, cost, "no creators matched")
                 return self.send_json(200, {"ok": True, "empty": True, "message":
@@ -1047,6 +1110,7 @@ class PortalMixin:
             if not u or n == 0 or abs(n) > 100000:
                 return done("Enter a non-zero amount.", False)
             bal = portal.grant(u["code_id"], n, (f.get("reason") or "Admin adjustment")[:100], actor=email)
+            portal.ring_added(u["code_id"], n)
             return done("Balance for %s is now %d." % (u["email"], bal))
         if path == "/portal/user/save":
             u = user_of(f)

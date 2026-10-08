@@ -585,6 +585,26 @@ def migrate(conn):
     seed_tiers(conn)
 
 
+# ------------------------------------------------------------------ hooks --
+# Other modules react to a change here without db importing them (the bell rings
+# when a campaign goes live, an uploaded analysis unlocks it for whoever asked).
+# A hook never breaks the write that fired it.
+_HOOKS = {}
+
+
+def on(name, fn):
+    _HOOKS.setdefault(name, {})[fn.__module__ + "." + fn.__name__] = fn
+
+
+def fire(name, *args):
+    for fn in list(_HOOKS.get(name, {}).values()):
+        try:
+            fn(*args)
+        except Exception:
+            pass
+    return bool(_HOOKS.get(name))
+
+
 def now():
     return int(time.time())
 
@@ -2027,9 +2047,12 @@ def save_campaign(cid, **fields):
         return
     cols = sorted(fields)
     with connect() as conn:
+        was = conn.execute("SELECT status FROM campaigns WHERE id = ?", (cid,)).fetchone()
         conn.execute("UPDATE campaigns SET " + ", ".join(c + " = ?" for c in cols)
                      + ", updated_at = ? WHERE id = ?",
                      [fields[c] for c in cols] + [now(), cid])
+    if fields.get("status") and was is not None and was["status"] != fields["status"]:
+        fire("campaign_status", cid, was["status"], fields["status"])
 
 
 def delete_campaign(cid):
@@ -2433,9 +2456,10 @@ def save_analysis(code, data, source=None, conn=None, platform=None):
                  "ON CONFLICT(code, platform) DO UPDATE SET data = excluded.data, source = excluded.source, "
                  "updated_at = excluded.updated_at", (code, platform, json.dumps(data), source, now()))
     # An uploaded analysis answers the open requests for that platform (and the
-    # older ones that never said which).
-    conn.execute("UPDATE analysis_requests SET handled_at = ? WHERE code = ? AND handled_at IS NULL "
-                 "AND (platform IS NULL OR platform = ?)", (now(), code, platform))
+    # older ones that never said which): gating unlocks it for each client who asked.
+    if not fire("analysis_saved", conn, code, platform):
+        conn.execute("UPDATE analysis_requests SET handled_at = ? WHERE code = ? AND handled_at IS NULL "
+                     "AND (platform IS NULL OR platform = ?)", (now(), code, platform))
 
 
 def delete_analysis(code, platform=None):
@@ -2606,6 +2630,7 @@ def add_content(cid, item, source="capture", conn=None):
              item.get("posted_at"), disc, content_id))
     if any(item.get(m) is not None for m in METRICS):
         add_snapshot(content_id, item, source, conn)
+    fire("campaign_content", conn, cid)
     return content_id, created
 
 
@@ -2766,6 +2791,9 @@ def decide_insight(iid, approve, values=None, content_id=None):
             conn.execute("UPDATE insights SET status = 'approved', approved = ?, decided_at = ?, "
                          "content_id = COALESCE(?, content_id) WHERE id = ?",
                          (json.dumps(clean_insight_values(values)), now(), content_id, iid))
+            row = conn.execute("SELECT campaign_id FROM insights WHERE id = ?", (iid,)).fetchone()
+            if row is not None:
+                fire("campaign_content", conn, row["campaign_id"])
         else:
             conn.execute("UPDATE insights SET status = 'rejected', decided_at = ? WHERE id = ?",
                          (now(), iid))
