@@ -956,6 +956,29 @@ class Portal(unittest.TestCase):
         self.assertEqual(s, 200)
         self.assertIn("open-link", page)
 
+    def test_79_saving_without_the_fit_tab_keeps_the_target(self):
+        a = self.admin()
+        c1 = [c["code"] for c in db.list_creators()][0]
+        sid = db.save_selection(None, "Egypt pick", [c1], {}, None, None)
+        sid = sid if isinstance(sid, int) else db.list_selections()[0]["id"]
+        target = {"country": "EG", "gender": "Any", "age": "Any", "category": "Skincare|Beauty"}
+        db.set_selection_target(sid, target)
+        db.set_selection_objective(sid, "Awareness")
+        import uploads
+        boundary = "XyZ"
+        parts = [("id", str(sid)), ("code", c1), ("cost", ""), ("p_from", ""), ("p_to", ""), ("name", "Egypt pick")]
+        body = "".join('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n' % (boundary, k, v) for k, v in parts) + "--%s--\r\n" % boundary
+        s, _, r = a.req("POST", "/selections/save", headers={"Content-Type": "multipart/form-data; boundary=" + boundary})
+        req = urllib.request.Request(self.base + "/selections/save", data=body.encode(), method="POST",
+                                     headers={"Origin": self.base, "Content-Type": "multipart/form-data; boundary=" + boundary})
+        try:
+            a.op.open(req)
+        except urllib.error.HTTPError:
+            pass
+        sel = db.selection(sid)
+        self.assertEqual(json.loads(sel["target"]), target)                   # untouched: the tab was not opened
+        self.assertEqual(sel["objective"], "Awareness")
+
 def assistant_sql(sql):
     import assistant
     return assistant.t_sql_query({}, sql)

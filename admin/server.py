@@ -2387,9 +2387,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             raw = (f.get("sel_client") or "").strip()
             cid = int(raw) if raw.isdigit() and db.get_code(int(raw)) is not None else None
             db.set_selection_client(sel["id"], cid, (f.get("client_name") or "").strip()[:80])
-        if (f.get("sel_objective") or "") in _fit_mod.OBJECTIVES:
+        if fit_loaded and (f.get("sel_objective") or "") in _fit_mod.OBJECTIVES:
             db.set_selection_objective(sel["id"], f["sel_objective"])
-        if any(k in f for k in ("t_country", "t_gender", "t_age", "t_category")):
+        # The audience target lives on the Fit & tags tab, which is only sent when it
+        # was opened: saving without it must leave the target as it is.
+        if fit_loaded and any(k in f for k in ("t_country", "t_gender", "t_age", "t_category")):
             db.set_selection_target(sel["id"], {
                 "country": f.get("t_country") if f.get("t_country") in dict(_fit_mod.COUNTRIES) else "SA",
                 "gender": f.get("t_gender") if f.get("t_gender") in _fit_mod.GENDERS else "Any",
