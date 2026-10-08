@@ -2126,6 +2126,21 @@ def _money(lo, hi):
     return ui.sar_range(lo, hi)
 
 
+def open_link(kind, token, label=None, cls="btn small ghost"):
+    """A one-click way from the admin to what the client sees: a selection's
+    link or a campaign's report, in a new tab. Signed-in admins skip the
+    access code there."""
+    if not token:
+        return ""
+    href = ("/selection/#s=" if kind == "selection" else "/campaign/#t=") + token
+    text = label or ("Client link" if kind == "selection" else "Client report")
+    return ("<a class='" + cls + " open-link' href='" + e(href) + "' target='_blank' rel='noopener' "
+            "title='Open what the client sees, in a new tab'>" + e(text)
+            + " <svg viewBox='0 0 24 24' width='13' height='13' fill='none' stroke='currentColor' stroke-width='2' "
+            "stroke-linecap='round' stroke-linejoin='round' aria-hidden='true'><path d='M7 17L17 7M9 7h8v8'/></svg>"
+            "<span class='vh'> (opens in a new tab)</span></a>")
+
+
 def selection_link(sel, origin):
     """What the client is sent: just the token, about 40 characters. The page
     reads the name, creators and prices from the server by it. Older long links
@@ -2160,7 +2175,7 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
             + "</td><td>" + client + "</td><td>" + prog + "<span class='muted' style='font-size:var(--t-xs,12px)'>Next: " + nxt + "</span></td><td>" + str(n)
             + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
             + "</td><td class='right nowrap'><a class='btn small' href='" + u("/selections/edit") + "?id="
-            + str(x["id"]) + "'>Open</a> " + archive_button("selection", x["id"], archived)
+            + str(x["id"]) + "'>Open</a> " + open_link("selection", x["token"]) + " " + archive_button("selection", x["id"], archived)
             + "<form method='post' action='" + u("/selections/delete") + "' class='inline' data-confirm=\"Delete "
             + e((x["name"] or "this selection").replace("'", "’")) + "? Its link stops working. You can restore it from History.\">"
             "<input type='hidden' name='id' value='" + str(x["id"]) + "'><button class='btn small danger'>Delete</button></form>"
@@ -2632,7 +2647,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         roster_list
         + ui.header(sel["name"], "A priced shortlist for one client: " + str(n_cr) + " creator" + ("" if n_cr == 1 else "s") + ". " + client_pill,
                     crumbs=[("Selections", u("/selections")), (sel["name"], None)],
-                    actions="<button type='button' class='btn lime' data-go-tab='st:share'>" + ui.icon("send", 16) + " Share</button>")
+                    actions=open_link("selection", sel["token"], "Open client link", "btn ghost")
+                    + " <button type='button' class='btn lime' data-go-tab='st:share'>" + ui.icon("send", 16) + " Share</button>")
         + note + _brief_note(sel) + stepper_html
         + "<div data-tabs='st'>" + ui.tab_nav("st", [("creators", "Creators & prices", n_cr), ("fit", "Fit & tags", (sum(1 for v in verdicts_of.values() if v) or None)), ("details", "Details", None),
                                                     ("share", "Share", None), ("campaign", "Campaign", len(campaigns) or None)])
@@ -2923,7 +2939,7 @@ def campaigns_page(camps, codes, error=None, message=None, selections=()):
             + "<td class='muted'>" + ago(k["updated_at"]) + "</td>"
             + "<td class='right nowrap'>" + status_button(k)
             + "<a class='btn small' href='" + u("/campaigns/edit") + "?id="
-            + str(k["id"]) + "'>Open</a></td></tr>")
+            + str(k["id"]) + "'>Open</a> " + open_link("campaign", k["token"]) + "</td></tr>")
     sel_opts = "".join("<option value='" + str(x["id"]) + "'>" + e(x["name"])
                        + (" — " + e(x["code_label"]) if x["code_label"] else "") + "</option>" for x in selections)
     start = (
@@ -3351,6 +3367,8 @@ def _head(k, tab, error=None, message=None):
            "<input type='hidden' name='campaign' value='" + str(k["id"]) + "'>"
            "<button class='btn ghost' title='Make a priced selection from this campaign&#39;s creators'>"
            + ui.icon("list", 15) + " Selection from this campaign</button></form>") if tab == "setup" and not k["selection_id"] else ""
+    # On every campaign tab: straight to what the client sees.
+    act = "<div class='hd-acts'>" + act + open_link("campaign", k["token"], "Open client report", "btn ghost") + "</div>"
     return (ui.header(k["name"], desc + " &middot; " + status_pill(k["status"]),
                       crumbs=[("Campaigns", u("/campaigns")), (k["name"], None)], actions=act,
                       tabs=[(u(h) + "?id=" + str(k["id"]), l, None, key == tab) for key, h, l, _d in CAMP_TABS])
@@ -3827,7 +3845,8 @@ def clients_page(overview, origin, archived=False, n_archived=0, page_no=1, tota
         ok, why = code_state(c)
         sels = "".join(
             "<li><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>" + e(x["name"]) + "</a> "
-            "<span class='muted'>" + str(len(json.loads(x["codes"] or "[]"))) + " creators</span>"
+            "<span class='muted'>" + str(len(json.loads(x["codes"] or "[]"))) + " creators</span> "
+            + open_link("selection", x["token"], "Link", "btn tiny ghost")
             + "".join(" <span class='arrow'>→</span> <a href='" + u("/campaigns/edit") + "?id=" + str(kk["id"]) + "'>"
                       + e(kk["name"]) + "</a> " + status_pill(kk["status"])
                       for kk in o["campaigns"] if kk["selection_id"] == x["id"]) + "</li>"
@@ -3838,7 +3857,8 @@ def clients_page(overview, origin, archived=False, n_archived=0, page_no=1, tota
             "<li><a href='" + u("/campaigns/edit") + "?id=" + str(kk["id"]) + "'>" + e(kk["name"]) + "</a> "
             + status_pill(kk["status"]) + " <span class='muted'>" + e(PHASE_LABEL.get(kk["phase"] or "", "")) + " · "
             + str(kk["creators"]) + " creators · " + str(kk["posts"]) + " posts</span> "
-            + "<a class='btn tiny ghost' href='" + u("/campaigns/report") + "?id=" + str(kk["id"]) + "'>Report</a></li>"
+            + "<a class='btn tiny ghost' href='" + u("/campaigns/report") + "?id=" + str(kk["id"]) + "'>Report</a> "
+            + open_link("campaign", kk["token"], "Client view", "btn tiny ghost") + "</li>"
             for kk in o["campaigns"])
         open_reqs = [r for r in o["requests"] if not r["handled_at"]]
         cards.append(

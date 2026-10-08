@@ -74,6 +74,7 @@
 
   var REFUSALS = { revoked: "This code has been withdrawn.", expired: "This code has expired.",
     exhausted: "This code has been used up.", devices: "This code is already open on its maximum number of devices.",
+    otherlink: "That code is for a different campaign. Use the code that came with this link.",
     unknown: "That code is not right." };
 
   function lock(msg) {
@@ -89,7 +90,7 @@
     var btn = this.querySelector("button");
     btn.disabled = true; $("cat-gate-error").hidden = true;
     fetch(API + "/api/unlock", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: $("cat-code").value.trim(), lite: true }) })
+      body: JSON.stringify({ code: $("cat-code").value.trim(), lite: true, link: token() ? "c:" + token() : "c:list" }) })
       .then(function (r) { return r.json(); })
       .then(function (b) {
         if (!b || !b.ok) { lock(REFUSALS[b && b.reason] || REFUSALS.unknown); return; }

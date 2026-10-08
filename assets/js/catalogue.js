@@ -190,7 +190,15 @@
 
   // What the server says when it refuses. "expired" is worth telling an honest
   // client plainly — they can ask for a new code instead of retyping.
+  // Which shared link this page is: each one asks for its own access code once
+  // in this browser (a selection by its token, otherwise the catalogue).
+  var LINK = (function () {
+    var m = /(?:^|[#&])s=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+    return /\/selection\/?/.test(location.pathname) && m ? "s:" + m[1] : "cat";
+  })();
+
   var REFUSALS = {
+    otherlink: "That code is for a different link. Use the code that came with this one.",
     expired: "That code has expired. Ask us for a new one.",
     revoked: "That code is no longer active. Ask us for a new one.",
     exhausted: "That code has already been used its maximum number of times.",
@@ -222,7 +230,7 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ code: val })
+      body: JSON.stringify({ code: val, link: LINK })
     })
       .then(function (r) { return r.json().then(function (b) { return { r: r, b: b }; }); })
       .then(function (res) {
@@ -2662,7 +2670,7 @@
     // an access-code screen flash up on every page change.
     document.body.classList.add("cat-checking");
     var settle = function () { document.body.classList.remove("cat-checking"); };
-    fetch(CFG.api + "/api/roster", { credentials: "include" })
+    fetch(CFG.api + "/api/roster?link=" + encodeURIComponent(LINK), { credentials: "include" })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (b) {
         settle();

@@ -2480,9 +2480,9 @@ def client_overview():
     from a client to their shortlists, campaigns and requests."""
     with connect() as conn:
         codes = conn.execute("SELECT * FROM codes ORDER BY created_at DESC").fetchall()
-        sels = conn.execute("SELECT id, name, code_id, codes, updated_at FROM selections").fetchall()
+        sels = conn.execute("SELECT id, name, code_id, codes, updated_at, token FROM selections").fetchall()
         camps = conn.execute(
-            "SELECT k.id, k.name, k.code_id, k.selection_id, k.status, k.phase, k.starts_at, k.ends_at, "
+            "SELECT k.id, k.name, k.token, k.code_id, k.selection_id, k.status, k.phase, k.starts_at, k.ends_at, "
             " (SELECT COUNT(*) FROM campaign_creators x WHERE x.campaign_id = k.id) creators, "
             " (SELECT COUNT(*) FROM content c WHERE c.campaign_id = k.id AND c.hidden = 0 "
             "   AND c.section = 'campaign') posts "

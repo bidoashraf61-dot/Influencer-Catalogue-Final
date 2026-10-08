@@ -61,9 +61,11 @@
   $("cat-gate-form").addEventListener("submit", function (e) {
     e.preventDefault();
     fetch(API + "/api/unlock", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: $("cat-code").value.trim(), lite: true }) })
+      body: JSON.stringify({ code: $("cat-code").value.trim(), lite: true, link: token() ? "c:" + token() : "c:list" }) })
       .then(function (r) { return r.json(); })
-      .then(function (b) { if (!b || !b.ok) lock("That code is not right."); else { $("cat-code").value = ""; load(); } })
+      .then(function (b) {
+        if (!b || !b.ok) lock(b && b.reason === "otherlink" ? "That code is for a different campaign. Use the code that came with this link." : "That code is not right.");
+        else { $("cat-code").value = ""; load(); } })
       .catch(function () { lock("Could not reach the server. Please try again."); });
   });
 

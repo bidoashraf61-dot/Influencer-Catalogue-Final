@@ -612,6 +612,9 @@ body:has(#cp-log) .hv-voice{display:none}
 @media (max-width:760px){.hv-voice{right:16px;bottom:16px}body:has(.savebar) .hv-voice{bottom:84px}.hv-launch{width:60px;height:60px}.hv-launch__face{width:60px;height:78px;clip-path:inset(0 0 0 0 round 0 0 30px 30px)}.hv-tip{display:none}
   body:has(#undo-toast:not([hidden])) .hv-voice{opacity:0;pointer-events:none}}
 @media print{.hv-voice{display:none!important}}
+.hd-acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.hd-acts form{margin:0}
+.open-link svg{vertical-align:-1px}
 """
 
 

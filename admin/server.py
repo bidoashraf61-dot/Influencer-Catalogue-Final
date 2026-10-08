@@ -47,6 +47,7 @@ if __name__ == "__main__" and _LIB.is_dir() and str(_LIB) not in _os.environ.get
     _os.execv(_sys.executable, [_sys.executable] + _sys.argv)
 
 import argparse
+import hashlib
 import html
 import json
 import math
@@ -115,6 +116,10 @@ LOGO = HERE.parent / "site" / "assets" / "helv" / "logo-knockout.webp"
 STATIC = HERE / "static"
 ADMIN_COOKIE = "hv_admin"
 VIEWER_COOKIE = "hv_view"
+# Every shared link (a selection, a campaign report, the catalogue itself)
+# remembers the access code that opened it, in this browser: each new link
+# asks for its own code once, and links of different clients open side by side.
+LINKS_COOKIE = "hv_links"
 ADMIN_TTL = 12 * 3600
 VIEWER_TTL = 12 * 3600
 
@@ -291,6 +296,67 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             cid = db.admin_code_id()
         return cid
 
+    # ------------------------------------------------- per-link access codes --
+
+    @staticmethod
+    def link_hash(key):
+        return hashlib.sha256(("link:" + key).encode()).hexdigest()[:16]
+
+    def link_entries(self):
+        """{link hash: (code id, expiry)} unlocked in this browser and not expired."""
+        raw = auth.unsign(self.cookies().get(LINKS_COOKIE, ""), SECRET) or ""
+        out = {}
+        for part in raw.split(","):
+            bits = part.split("~")
+            if len(bits) == 3 and bits[1].isdigit() and bits[2].isdigit() and int(bits[2]) > db.now():
+                out[bits[0]] = (int(bits[1]), int(bits[2]))
+        return out
+
+    def link_code(self, key):
+        """The access code this browser typed for this link, while it is still
+        good and this browser is still one of its devices; else None."""
+        e = self.link_entries().get(self.link_hash(key))
+        if not e:
+            return None
+        row = db.get_code(e[0])
+        if row is None or not db.code_state(row)[0]:
+            return None
+        if row["max_devices"] and not db.device_allowed(row["id"], db.device_hash(self.cookies().get(DEVICE_COOKIE, ""))):
+            return None
+        return row["id"]
+
+    def selection_viewer(self, token):
+        """Who acts on a selection page: the admin, else the code typed for that
+        link, else this browser's general pass."""
+        if self.admin():
+            return db.admin_code_id()
+        return (self.link_code("s:" + token) if token else None) or self.viewer_code_id()
+
+    def signed_in_client(self):
+        """A client signed in by email has no code to type: their pass counts for their own links."""
+        cid = self.viewer_cookie_id()
+        return cid if cid is not None and portal.user_for_code(cid) else None
+
+    def links_cookie(self, keys, code_id, expiry):
+        entries = self.link_entries()
+        for k in keys:
+            entries[self.link_hash(k)] = (code_id, expiry)
+        keep = sorted(entries.items(), key=lambda kv: -kv[1][1])[:40]
+        val = auth.sign(",".join("%s~%d~%d" % (h, c, x) for h, (c, x) in keep), SECRET)
+        policy = "SameSite=None; Secure" if ALLOWED_ORIGINS else "SameSite=Lax"
+        return ("Set-Cookie", f"{LINKS_COOKIE}={val}; Path=/; HttpOnly; {policy}; Max-Age={max(0, keep[0][1][1] - db.now())}")
+
+    def link_target_code(self, key):
+        """(found, code id) for a selection or campaign link key."""
+        kind, _, tok = key.partition(":")
+        if kind == "s" and tok:
+            sel = db.selection(token=tok)
+            return (sel is not None, sel["code_id"] if sel is not None else None)
+        if kind == "c" and tok and tok != "list":
+            k = db.campaign(token=tok)
+            return (k is not None, k["code_id"] if k is not None else None)
+        return (False, None)
+
     def viewer_cookie_id(self):
         raw = auth.unsign(self.cookies().get(VIEWER_COOKIE, ""), SECRET)
         if not raw or ":" not in raw:
@@ -355,7 +421,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path.startswith("/api/") and self.portal_get(path, query):
             return
         if path == "/api/roster":
-            return self.api_roster()
+            return self.api_roster((query.get("link") or "").strip()[:80])
         if path == "/api/licences":
             # Advertising licences for the cards: bio claims and verified ones only.
             if not self.viewer_code_id():
@@ -2798,9 +2864,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def api_campaigns(self):
         """The campaigns this passcode may see. Drafts are never listed."""
-        code_id = self.viewer_code_id()
+        code_id = (db.admin_code_id() if self.admin() else None) or self.link_code("c:list") or self.signed_in_client()
         if code_id is None:
-            return self.send_json(401, {"ok": False}, self.cors())
+            return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         team = sorted(portal.team_codes(code_id))
         with db.connect() as conn:
             rows = conn.execute(
@@ -2816,10 +2882,19 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                               self.cors() + [("Cache-Control", "no-store")])
 
     def viewer_campaign(self, token):
-        code_id = self.viewer_code_id()
+        k = db.campaign(token=token) if token else None
+        if k is not None and self.admin():
+            return k, 200                       # admins open any report, drafts included
+        # The code typed for this report, or for the client's campaign list it was opened from.
+        code_id = self.link_code("c:" + token) if token else None
+        if code_id is None:
+            listed = self.link_code("c:list")
+            if listed is not None and k is not None and k["code_id"] in portal.team_codes(listed):
+                code_id = listed
+        if code_id is None:
+            code_id = self.signed_in_client()
         if code_id is None:
             return None, 401
-        k = db.campaign(token=token) if token else None
         # Not found and not yours look the same from outside.
         if k is None or k["code_id"] not in portal.team_codes(code_id) or k["status"] == "draft":
             return None, 404
@@ -3864,19 +3939,18 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         name and creators of a link the client already holds. Behind the same
         passcode as the roster: the link alone shows nothing."""
         viewer = self.viewer_code_id()
-        if not viewer:
-            return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         if token:
             sel = db.selection(token=token)
             # Prices agreed with one client are for that client. The token is
-            # in a link, and a link travels; the passcode is what identifies
-            # who is reading it.
-            if sel is not None and sel["code_id"] is not None:
-                try:
-                    if sel["code_id"] not in portal.team_codes(int(viewer)) and int(viewer) != db.admin_code_id():
-                        sel = None
-                except (TypeError, ValueError):
-                    sel = None
+            # in a link, and a link travels; the code typed FOR THIS LINK is what
+            # identifies who is reading it. Admins signed in open any link.
+            if sel is not None and not self.admin():
+                cid = self.link_code("s:" + token) or self.signed_in_client()
+                if cid is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(int(cid))
+                                   and int(cid) != db.admin_code_id()):
+                    return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
+        elif not viewer:
+            return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         elif codes:
             try:
                 viewer_id = int(viewer)
@@ -3970,6 +4044,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             db.log("unlock_fail", row["id"], self.client_ip(), ua, why)
             return self.send_json(403, {"ok": False, "reason": why}, self.cors())
 
+        link = (body.get("link") or "").strip()[:80]
+        found, target = self.link_target_code(link) if link else (False, None)
+        if found and target is not None and target not in portal.team_codes(row["id"]):
+            guard.limiter.hit(gk)
+            db.log("unlock_fail", row["id"], self.client_ip(), ua, "other link")
+            return self.send_json(403, {"ok": False, "reason": "otherlink"}, self.cors())
+
         db.bump_code_use(row["id"])
         db.log("unlock_ok", row["id"], self.client_ip(), ua,
                "new device" if why == "new" else None)
@@ -3988,14 +4069,22 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         payload = {"ok": True, "label": row["label"]}
         if not lite:
             payload.update(roster=self.roster_payload(), tiers=self.tier_payload(), fx=fx.rates())
+        extra = []
+        if link:
+            # A selection's code also opens the catalogue behind it (adding creators);
+            # never the other way round.
+            extra.append(self.links_cookie([link] + (["cat"] if link.startswith("s:") else []), row["id"], expiry))
         return self.send_json(200, payload,
                               self.cors() + [("Set-Cookie", cookie),
-                                             ("Set-Cookie", dev_cookie)])
+                                             ("Set-Cookie", dev_cookie)] + extra)
 
-    def api_roster(self):
+    def api_roster(self, link=""):
         code_id = self.viewer_code_id()
         if not code_id:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+        # A page that names its link asks for that link's own code once.
+        if link and not self.admin() and not self.signed_in_client() and self.link_code(link) is None:
+            return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         return self.send_json(200, {"ok": True, "roster": self.roster_payload(),
                                     "tiers": self.tier_payload(), "fx": fx.rates()}, self.cors())
 
@@ -4135,10 +4224,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def api_selection_platform(self):
         """A client choosing which platform to see a creator's match on (and so, which one they
         want booked). Same rules as their tags: their own passcode, or the admin."""
-        viewer = self.viewer_code_id()
+        b = self.json_body()
+        viewer = self.selection_viewer(str(b.get("token") or ""))
         if not viewer:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
-        b = self.json_body()
         sel = db.selection(token=str(b.get("token") or ""))
         if sel is None or (sel["code_id"] is not None and int(viewer) not in (sel["code_id"], db.admin_code_id())):
             return self.send_json(404, {"ok": False}, self.cors())
@@ -4155,10 +4244,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         """A client labelling a creator on their own selection page (Shortlist,
         Backup, Phase 2…). Allowed for the passcode the selection belongs to,
         and for the admin; the labels are kept apart from the admin's own."""
-        viewer = self.viewer_code_id()
+        b = self.json_body()
+        viewer = self.selection_viewer(str(b.get("token") or ""))
         if not viewer:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
-        b = self.json_body()
         sel = db.selection(token=str(b.get("token") or ""))
         if sel is None or (sel["code_id"] is not None and int(viewer) != db.admin_code_id()
                            and sel["code_id"] not in portal.team_codes(int(viewer))):
@@ -4179,10 +4268,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         the dashboard by itself, ready to be priced, instead of an admin having
         to paste the link. Re-saving the same one — the client went back and
         added a creator — updates it rather than making another."""
-        viewer = self.viewer_code_id()
+        b = self.json_body()
+        viewer = self.selection_viewer((str(b.get("token") or "")).strip())
         if not viewer:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
-        b = self.json_body()
         name = (str(b.get("name") or "Selection")).strip()[:120] or "Selection"
         known = {c["code"] for c in db.list_creators(active_only=True)}
         codes, seen = [], set()

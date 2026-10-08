@@ -907,6 +907,55 @@ class Portal(unittest.TestCase):
                                                                for k, v in (("code", c), ("cost", ""), ("p_from", ""), ("p_to", ""))] + [("drop", c2)])
         self.assertEqual(json.loads(db.selection(sid)["codes"]), [c1], (resp[0], resp[2].headers.get("Location"), sid, db.selection(sid)["codes"]))
 
+    def test_78_every_link_asks_for_its_own_code(self):
+        a_id = db.create_code(auth.hash_code("Link Alpha 1"), "ha", "Alpha co", None, None, "Link Alpha 1", 5)
+        b_id = db.create_code(auth.hash_code("Link Beta 2"), "hb", "Beta co", None, None, "Link Beta 2", 5)
+        c1, c2 = [c["code"] for c in db.list_creators()][:2]
+        sa = db.selection(db.save_selection(None, "Alpha pick", [c1], {}, None, None, None, a_id))["token"]
+        sb = db.selection(db.save_selection(None, "Beta pick", [c2], {}, None, None, None, b_id))["token"]
+        kb = db.campaign(db.create_campaign("Beta launch", code_id=b_id))
+        db.save_campaign(kb["id"], status="live")
+        kb = db.campaign(kb["id"])
+        c = Client(self.base)
+        # Alpha's link, opened with Alpha's code
+        self.assertEqual(c.get("/api/roster?link=s:" + sa)[0], 401)
+        s, b, _ = c.post("/api/unlock", {"code": "Link Alpha 1", "link": "s:" + sa, "lite": True})
+        self.assertTrue(b["ok"])
+        self.assertEqual(c.get("/api/roster?link=s:" + sa)[0], 200)
+        self.assertEqual(c.get("/api/selection?s=" + sa)[1]["name"], "Alpha pick")
+        self.assertEqual(c.get("/api/roster?link=cat")[0], 200)                 # the catalogue behind it opens too
+        # Beta's link in the same browser: asks for Beta's code, never fails silently
+        s, b, _ = c.get("/api/selection?s=" + sb)
+        self.assertEqual((s, b["reason"]), (401, "link"))
+        s, b, _ = c.post("/api/unlock", {"code": "Link Alpha 1", "link": "s:" + sb, "lite": True})
+        self.assertEqual((s, b["reason"]), (403, "otherlink"))
+        c.post("/api/unlock", {"code": "Link Beta 2", "link": "s:" + sb, "lite": True})
+        self.assertEqual(c.get("/api/selection?s=" + sb)[1]["name"], "Beta pick")
+        self.assertEqual(c.get("/api/selection?s=" + sa)[1]["name"], "Alpha pick")  # both open side by side
+        # a second Alpha selection is a new link: asks again even with Alpha's pass in hand
+        sa2 = db.selection(db.save_selection(None, "Alpha two", [c2], {}, None, None, None, a_id))["token"]
+        self.assertEqual(c.get("/api/selection?s=" + sa2)[0], 401)
+        # campaign report: its own link too
+        self.assertEqual(c.get("/api/campaign?t=" + kb["token"])[0], 401)
+        c.post("/api/unlock", {"code": "Link Beta 2", "link": "c:" + kb["token"], "lite": True})
+        self.assertEqual(c.get("/api/campaign?t=" + kb["token"])[0], 200)
+        # a signed-in admin opens any link without a code
+        a = self.admin()
+        self.assertEqual(a.get("/api/selection?s=" + sa2)[1]["name"], "Alpha two")
+        self.assertEqual(a.get("/api/campaign?t=" + kb["token"])[0], 200)
+        # and every admin page that lists them offers the client's view
+        for path in ("/selections", "/campaigns", "/clients", "/campaigns/edit?id=%d" % kb["id"],
+                     "/selections/edit?id=%d" % db.selection(token=sa)["id"]):
+            s, page, _ = a.get(path)
+            self.assertEqual(s, 200, path)
+            self.assertIn("open-link", page, path)
+        self.signup("links@pfizer.com")
+        u = portal.user_by_email("links@pfizer.com")
+        db.save_selection(None, "Pfizer pick", [c1], {}, None, None, None, u["code_id"])
+        s, page, _ = a.get("/portal/user?id=%d" % u["id"])
+        self.assertEqual(s, 200)
+        self.assertIn("open-link", page)
+
 def assistant_sql(sql):
     import assistant
     return assistant.t_sql_query({}, sql)
