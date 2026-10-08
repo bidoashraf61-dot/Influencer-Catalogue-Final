@@ -832,8 +832,194 @@ ADMIN_WRITE = {
 }
 
 
+
+# --------------------------------------------------------- client actions --
+# What a client can ask the assistant to DO. Like the admin's writes, nothing
+# runs from the model: each call is queued and shown in the chat with a Confirm
+# button; only the client's tap applies it, and only to their own work.
+
+def _open_sel(ctx):
+    s = ctx.get("selection")
+    sel = db.selection(token=s["token"]) if s else None
+    if sel is None:
+        raise ValueError("Open the selection first: this works on the selection page.")
+    return sel
+
+
+def _own(sel, cid):
+    if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id():
+        raise ValueError("That selection is not yours.")
+
+
+def _names(codes):
+    by = {c["code"]: c["name"] for c in db.list_creators(active_only=True)}
+    return [by[c] for c in codes if c in by]
+
+
+def _clean_codes(codes, active=True):
+    want = [str(c).strip().upper() for c in (codes or [])][:60]
+    known = {c["code"] for c in db.list_creators(active_only=active)}
+    return [c for c in dict.fromkeys(want) if c in known]
+
+
+def _save_codes(sel, codes, name=None):
+    prices = {k: v for k, v in json.loads(sel["prices"] or "{}").items() if k in codes}
+    same = sorted(json.loads(sel["codes"] or "[]")) == sorted(codes)
+    db.save_selection(sel["id"], name or sel["name"], codes, prices,
+                      sel["total_from"] if same else None, sel["total_to"] if same else None)
+
+
+def d_sel_add(a, ctx):
+    sel = _open_sel(ctx); have = json.loads(sel["codes"] or "[]")
+    new = [c for c in _clean_codes(a.get("codes")) if c not in have]
+    if not new:
+        raise ValueError("Those creators are already in the selection, or were not found.")
+    a["codes"] = new
+    return "Add %s to “%s”" % (", ".join(_names(new)), sel["name"])
+
+
+def x_sel_add(a, ctx):
+    sel = _open_sel(ctx); _own(sel, ctx["code_id"]); have = json.loads(sel["codes"] or "[]")
+    new = [c for c in _clean_codes(a.get("codes")) if c not in have]
+    _save_codes(sel, have + new)
+    return {"ok": True, "message": "Added %d creator%s to “%s”." % (len(new), "" if len(new) == 1 else "s", sel["name"]), "reload": True}
+
+
+def d_sel_remove(a, ctx):
+    sel = _open_sel(ctx); have = json.loads(sel["codes"] or "[]")
+    drop = [c for c in _clean_codes(a.get("codes"), active=False) if c in have]
+    if not drop:
+        raise ValueError("None of those creators are in this selection.")
+    if len(drop) >= len(have):
+        raise ValueError("A selection needs at least one creator.")
+    a["codes"] = drop
+    return "Remove %s from “%s”" % (", ".join(_names(drop)) or ", ".join(drop), sel["name"])
+
+
+def x_sel_remove(a, ctx):
+    sel = _open_sel(ctx); _own(sel, ctx["code_id"]); have = json.loads(sel["codes"] or "[]")
+    drop = set(a.get("codes") or [])
+    keep = [c for c in have if c not in drop]
+    if not keep:
+        raise ValueError("A selection needs at least one creator.")
+    _save_codes(sel, keep)
+    return {"ok": True, "message": "Removed %d creator%s from “%s”." % (len(have) - len(keep), "" if len(have) - len(keep) == 1 else "s", sel["name"]), "reload": True}
+
+
+def d_sel_rename(a, ctx):
+    sel = _open_sel(ctx); name = " ".join(str(a.get("name") or "").split())[:120]
+    if not name:
+        raise ValueError("Give the new name.")
+    a["name"] = name
+    return "Rename “%s” to “%s”" % (sel["name"], name)
+
+
+def x_sel_rename(a, ctx):
+    sel = _open_sel(ctx); _own(sel, ctx["code_id"])
+    _save_codes(sel, json.loads(sel["codes"] or "[]"), a["name"])
+    return {"ok": True, "message": "Renamed to “%s”." % a["name"], "reload": True}
+
+
+def d_sel_tag(a, ctx):
+    sel = _open_sel(ctx); have = json.loads(sel["codes"] or "[]")
+    codes = [c for c in _clean_codes(a.get("codes"), active=False) if c in have]
+    tags = [" ".join(str(t).split())[:24] for t in (a.get("tags") or []) if str(t).strip()][:4]
+    if not codes or not tags:
+        raise ValueError("Say which creators and which tag.")
+    a["codes"], a["tags"] = codes, tags
+    return "Tag %s as %s in “%s”" % (", ".join(_names(codes)), ", ".join("“%s”" % t for t in tags), sel["name"])
+
+
+def x_sel_tag(a, ctx):
+    sel = _open_sel(ctx); _own(sel, ctx["code_id"])
+    mine = json.loads((sel["client_tags"] if "client_tags" in sel.keys() else None) or "{}")
+    for c in a["codes"]:
+        cur = list(mine.get(c) or [])
+        for t in a["tags"]:
+            if t.lower() not in [x.lower() for x in cur] and len(cur) < 8:
+                cur.append(t)
+        db.set_client_tags(sel["id"], c, cur)
+    return {"ok": True, "message": "Tagged %d creator%s." % (len(a["codes"]), "" if len(a["codes"]) == 1 else "s"), "reload": True}
+
+
+def d_new_sel(a, ctx):
+    codes = _clean_codes(a.get("codes"))
+    name = " ".join(str(a.get("name") or "").split())[:120] or "Chat shortlist"
+    if not codes:
+        raise ValueError("Name the creators to put in it.")
+    a["codes"], a["name"] = codes, name
+    return "Save %d creator%s as a new selection “%s”" % (len(codes), "" if len(codes) == 1 else "s", name)
+
+
+def x_new_sel(a, ctx):
+    sid = db.save_selection(None, a["name"], a["codes"], {}, None, None, None, ctx["code_id"])
+    return {"ok": True, "message": "Saved as “%s”." % a["name"], "open": db.selection(sid)["token"]}
+
+
+def d_quote(a, ctx):
+    sel = _open_sel(ctx)
+    a["note"] = str(a.get("note") or "").strip()[:800]
+    return "Send a quote request for “%s” (%d creators) to your account manager" % (sel["name"], len(json.loads(sel["codes"] or "[]"))) + \
+           (" with the note: “%s”" % a["note"] if a["note"] else "")
+
+
+def x_quote(a, ctx):
+    import notify
+    sel = _open_sel(ctx); _own(sel, ctx["code_id"]); u = ctx.get("user") or {}
+    codes = json.loads(sel["codes"] or "[]")
+    db.create_request(ctx["code_id"], u.get("name"), u.get("company"), u.get("email"), u.get("phone"), sel["name"], codes)
+    notify.send("quote", ["%s asked for a quote on “%s” (%d creators) from the assistant." % (u.get("company") or u.get("email") or "A client", sel["name"], len(codes)),
+                          "Note: %s" % (a.get("note") or "—")], kam=u.get("kam"))
+    return {"ok": True, "message": "Quote request sent. Your account manager usually replies within one working day."}
+
+
+def d_analysis(a, ctx):
+    c = db.creator(str(a.get("code") or "").strip().upper())
+    if c is None or not c["active"]:
+        raise ValueError("No such creator.")
+    a["code"] = c["code"]
+    return "Request a full analysis of %s" % c["name"]
+
+
+def x_analysis(a, ctx):
+    db.request_analysis(a["code"], ctx["code_id"], db.platforms_of(a["code"])[0])
+    return {"ok": True, "message": "Requested. The team adds the analysis to the creator's page."}
+
+
+CLIENT_WRITE = {
+    "add_creators": (d_sel_add, x_sel_add, _decl("add_creators", "Add creators (by code) to the open selection. Needs the client's confirmation.", {"codes": SA}, ["codes"])),
+    "remove_creators": (d_sel_remove, x_sel_remove, _decl("remove_creators", "Remove creators (by code) from the open selection. Needs confirmation.", {"codes": SA}, ["codes"])),
+    "rename_selection": (d_sel_rename, x_sel_rename, _decl("rename_selection", "Rename the open selection. Needs confirmation.", {"name": S}, ["name"])),
+    "tag_creators": (d_sel_tag, x_sel_tag, _decl("tag_creators", "Put the client's own tags (e.g. Hero, Backup, Phase 2, a segment name) on creators in the open selection. Needs confirmation.", {"codes": SA, "tags": SA}, ["codes", "tags"])),
+    "save_as_selection": (d_new_sel, x_new_sel, _decl("save_as_selection", "Save creators (by code) as a new selection with a name. Needs confirmation.", {"codes": SA, "name": S}, ["codes"])),
+    "request_quote": (d_quote, x_quote, _decl("request_quote", "Send the open selection to the account manager for a quote, with an optional note. Needs confirmation.", {"note": S})),
+    "request_analysis": (d_analysis, x_analysis, _decl("request_analysis", "Ask the team for a creator's full analysis. Needs confirmation.", {"code": S}, ["code"])),
+}
+
+
+def confirm_client(token, code_id):
+    with _lock:
+        item = _pending.pop(token, None)
+    if not item or item["owner"] != "client:%d" % code_id or time.time() - item["at"] > PENDING_TTL:
+        return {"ok": False, "message": "That action expired. Ask again."}
+    try:
+        return CLIENT_WRITE[item["tool"]][1](item["args"], item["ctx"])
+    except (ValueError, KeyError, TypeError) as exc:
+        return {"ok": False, "message": str(exc)}
+
+
+def dismiss_client(token, code_id):
+    with _lock:
+        item = _pending.get(token)
+        if item and item["owner"] == "client:%d" % code_id:
+            del _pending[token]
+            return True
+    return False
+
 def declarations(scope):
     d = [v[1] for v in CLIENT_TOOLS.values()]
+    if scope == "client":
+        d += [v[2] for v in CLIENT_WRITE.values()]
     if scope == "admin":
         d += [v[1] for v in ADMIN_READ.values()] + [v[2] for v in ADMIN_WRITE.values()]
     return d
@@ -853,6 +1039,22 @@ def run_tool(scope, name, args, ctx):
     if name in ADMIN_WRITE and ctx.get("tainted"):
         return {"error": "Not queued: this answer used client-written text, so changes are blocked in the same turn. "
                          "Tell the admin which change you suggest and ask them to request it in a new message."}
+    if scope == "client" and name in CLIENT_WRITE:
+        try:
+            text = CLIENT_WRITE[name][0](args, ctx)
+        except (ValueError, KeyError, TypeError) as exc:
+            return {"error": str(exc)}
+        token = secrets.token_urlsafe(12)
+        keep = {"code_id": ctx.get("code_id"), "user": ctx.get("user") or {},
+                "selection": {"token": ctx["selection"]["token"]} if ctx.get("selection") else None}
+        with _lock:
+            now = time.time()
+            for k in [k for k, v in _pending.items() if now - v["at"] > PENDING_TTL]:
+                del _pending[k]
+            _pending[token] = {"tool": name, "args": args, "owner": "client:%s" % ctx.get("code_id"), "at": now, "text": text, "ctx": keep}
+        ctx.setdefault("queued", []).append({"token": token, "text": text})
+        return {"status": "waiting_for_client_confirmation", "will_do": text,
+                "instruction": "Tell the client in one line what will happen; it happens only when they press Confirm under your message. Do not say it is done."}
     if name in CLIENT_TOOLS:
         fn = CLIENT_TOOLS[name][0]
     elif scope == "admin" and name in ADMIN_READ:
@@ -920,7 +1122,10 @@ def system_prompt(scope, ctx):
         "knowledge is what this client can see in the catalogue: creator cards, each creator's analysis page, their own selections and "
         "their own campaign reports, all through the tools. Never use general benchmarks, industry averages or estimates as if they were "
         "these creators' numbers. For anything about the open selection as a whole (averages, totals, best/worst), call selection_stats "
-        "and give the result with how many creators it covers, naming that the others have no analysis yet. (1) Use the tools "
+        "and give the result with how many creators it covers, naming that the others have no analysis yet. When the client asks you to "
+        "change something (add or remove creators, rename, tag, save a new selection, request a quote or an analysis), call the matching "
+        "action tool: it shows them a Confirm button and nothing changes until they press it. Work out WHICH creators from the page "
+        "(e.g. the lowest engagement via selection_stats) before calling it. (1) Use the tools "
         "for every fact about creators, prices and the client's own work; never invent creators, numbers or prices. "
         "For analysis numbers ask creator_metrics for only the fields the question needs, and use rank_by_metric for "
         "'best/highest/lowest by' questions instead of fetching many creators. (2) When the client "
@@ -992,6 +1197,9 @@ STEP_LABEL = {
     "search_creators": "Searching the roster", "suggest_shortlist": "Matching creators to your brief",
     "get_creator": "Reading the creator's profile", "creator_metrics": "Checking engagement and reach",
     "selection_stats": "Calculating across your selection",
+    "add_creators": "Preparing the change", "remove_creators": "Preparing the change", "rename_selection": "Preparing the change",
+    "tag_creators": "Preparing the change", "save_as_selection": "Preparing the change", "request_quote": "Preparing the request",
+    "request_analysis": "Preparing the request",
     "rank_by_metric": "Ranking creators", "price_bands": "Looking up prices", "company_info": "Checking HelloVoice details",
     "my_work": "Opening your selections and campaigns",
 }

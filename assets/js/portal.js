@@ -1635,6 +1635,32 @@
       });
     }
 
+    /* -- an action the assistant prepared: nothing happens until the client confirms -- */
+    function actionCard(a) {
+      var box = h("div", { class: "hv-msg hv-msg--ai hv-act", role: "group", "aria-label": "Confirm this change" });
+      box.appendChild(h("p", { class: "hv-act__what" }, a.text + "?"));
+      var yes = h("button", { class: "hv-act__yes", type: "button" }, "Confirm");
+      var no = h("button", { class: "hv-act__no", type: "button" }, "Cancel");
+      var row_ = h("div", { class: "hv-act__btns" }, yes, no);
+      box.appendChild(row_);
+      function settle(label) { row_.remove(); box.classList.add("is-done"); box.appendChild(h("p", { class: "hv-act__state" }, label)); }
+      yes.addEventListener("click", function () {
+        yes.disabled = no.disabled = true; yes.textContent = "Working…";
+        api("POST", "/api/chat/confirm", { token: a.token }).then(function (r) {
+          var res = r.b || {};
+          if (!res.ok) { settle("Not done"); say(res.message || "That didn't go through. Please try again."); return; }
+          settle("Done");
+          say(res.message || "Done.");
+          if (res.open) chips([{ label: "Open the new selection", primary: true, echo: false, go: function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(res.open); } }]);
+          else if (res.reload && selToken()) { say("Updating the page…"); queue = queue.then(function () { setTimeout(function () { location.reload(); }, 700); }); }
+        });
+      });
+      no.addEventListener("click", function () {
+        settle("Cancelled"); api("POST", "/api/chat/dismiss", { token: a.token });
+      });
+      row("ai", box);
+    }
+
     /* -- a calculated answer: how it was worked out, per creator, on tap -- */
     function breakdown(b) {
       var pct = /%/.test(b.label), money = /SAR/.test(b.label);
@@ -1734,6 +1760,7 @@
           // Cards and next steps follow once the answer has finished typing.
           ty.end(ev.reply, function () {
             if (ev.breakdown && ev.breakdown.rows && ev.breakdown.rows.length) breakdown(ev.breakdown);
+            (ev.actions || []).forEach(actionCard);
             if (ev.cards && ev.cards.length) creatorCards(ev.cards);
             followUps(ev.next);
           });

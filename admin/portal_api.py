@@ -317,6 +317,7 @@ class PortalMixin:
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,
             "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
             "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat, "/api/chat/stream": self.api_chat_stream,
+            "/api/chat/confirm": self.api_chat_confirm, "/api/chat/dismiss": self.api_chat_dismiss,
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
             "/api/credits/request": self.api_credits_request, "/api/me/delete": self.api_me_delete,
             "/api/voice/handoff": self.api_voice_handoff,
@@ -822,6 +823,26 @@ class PortalMixin:
                 "objective": (sel["objective"] if "objective" in keys else None) or None,
                 "scores": scored[:40]}
 
+    def api_chat_confirm(self):
+        """The client pressed Confirm under an action the assistant prepared."""
+        who = self._need_viewer()
+        if not who:
+            return
+        cid = who[0]
+        if self._throttled("act:%d" % cid, 30, 600):
+            return
+        res = assistant.confirm_client(str(self.json_body().get("token") or ""), cid)
+        if res.get("ok"):
+            db.log("chat_action", cid, self.client_ip(), self._ua(), res.get("message", "")[:80])
+        return self.send_json(200, res, self.cors())
+
+    def api_chat_dismiss(self):
+        who = self._need_viewer()
+        if not who:
+            return
+        assistant.dismiss_client(str(self.json_body().get("token") or ""), who[0])
+        return self.send_json(200, {"ok": True}, self.cors())
+
     def _page_context(self, b, cid):
         """The page the client has open, as the assistant should see it: only what that page
         shows the client. Creator: their card and analysis highlights. Campaign: the report's
@@ -928,7 +949,7 @@ class PortalMixin:
         nxt = (["Show cheaper options", "Only bigger creators", "Save all as a selection"] if cards
                else ["Find creators", "Get a quote"])
         emit({"t": "done", "reply": res["reply"], "cards": cards, "next": nxt, "thread": th["id"],
-              "breakdown": (ctx.get("breakdowns") or [None])[-1],
+              "breakdown": (ctx.get("breakdowns") or [None])[-1], "actions": ctx.get("queued") or [],
               "credits": portal.balance(cid) if kind != "admin" else None})
 
     # =============================================================== admin ==

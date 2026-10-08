@@ -1050,6 +1050,30 @@ class Portal(unittest.TestCase):
         self.assertTrue(any("CREATOR'S PROFILE OPEN" in x and code in x for x in seen))          # the creator page
         self.assertTrue(any("ON THE CATALOGUE" in x and "TikTok" in x and "12 creators shown" in x for x in seen))
 
+    def test_84_assistant_actions_wait_for_the_clients_confirm(self):
+        import assistant
+        c, _ = self.signup("actions@pfizer.com")
+        u = portal.user_by_email("actions@pfizer.com")
+        c1, c2, c3 = [x["code"] for x in db.list_creators(active_only=True)][:3]
+        sid = db.save_selection(None, "Act pick", [c1, c2, c3], {}, None, None, None, u["code_id"])
+        tok = db.selection(sid)["token"]
+        ctx = {"code_id": u["code_id"], "user": dict(u), "selection": {"token": tok}}
+        res = assistant.run_tool("client", "remove_creators", {"codes": [c3]}, ctx)
+        self.assertEqual(res["status"], "waiting_for_client_confirmation")
+        self.assertIn(c3, json.loads(db.selection(sid)["codes"]))                       # nothing happens yet
+        token = ctx["queued"][0]["token"]
+        other, _ = self.signup("intruder@pfizer.com")
+        self.assertFalse(other.post("/api/chat/confirm", {"token": token})[1]["ok"])   # not their action
+        ctx2 = dict(ctx); ctx2.pop("queued", None)
+        res = assistant.run_tool("client", "remove_creators", {"codes": [c3]}, ctx2)
+        s, b, _ = c.post("/api/chat/confirm", {"token": ctx2["queued"][0]["token"]})
+        self.assertTrue(b["ok"], b)
+        self.assertEqual(json.loads(db.selection(sid)["codes"]), [c1, c2])
+        self.assertIn("error", assistant.run_tool("client", "remove_creators", {"codes": [c1, c2]}, dict(ctx, queued=[])))  # never empty it
+        res = assistant.run_tool("client", "request_quote", {"note": "Ramadan"}, ctx2)
+        s, b, _ = c.post("/api/chat/confirm", {"token": ctx2["queued"][-1]["token"]})
+        self.assertTrue(b["ok"])
+
 def assistant_sql(sql):
     import assistant
     return assistant.t_sql_query({}, sql)

@@ -1062,3 +1062,15 @@ body.pt-lock { overflow: hidden; }
 
 /* The open chat sits above everything the page floats (report stamps, the account circle). */
 .hv-voice.is-open { z-index: 300; }
+
+/* an action waiting for the client's Confirm */
+.hv-act { max-width: calc(100% - 40px); padding: 12px 14px; white-space: normal; box-shadow: inset 0 0 0 1.5px var(--hv-ink); }
+.hv-act__what { margin: 0 0 10px; font-weight: 600; font-size: 14px; line-height: 1.4; }
+.hv-act__btns { display: flex; gap: 8px; }
+.hv-act__yes, .hv-act__no { min-height: 38px; padding: 0 18px; border-radius: 999px; cursor: pointer; font: 600 14px/1 "DM Sans", Arial, sans-serif; }
+.hv-act__yes { border: 0; background: var(--hv-lime); color: var(--hv-ink); box-shadow: inset 0 0 0 1.5px var(--hv-ink); }
+.hv-act__no { border: 1.5px solid rgba(18,18,18,.25); background: transparent; color: var(--hv-ink); }
+.hv-act__yes:focus-visible, .hv-act__no:focus-visible { outline: 3px solid var(--hv-red); outline-offset: 2px; }
+.hv-act__yes:disabled { opacity: .6; cursor: default; }
+.hv-act.is-done { box-shadow: none; }
+.hv-act__state { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--hv-gray); }
