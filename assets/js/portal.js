@@ -1966,43 +1966,37 @@
       });
     });
   }
-  // A licence filter in the setup panel: Any, Mawthooq, UAE permit, Verified only.
-  // Works over the catalogue's own filters: a card has to pass both.
-  var licWant = "";
+  // The licence filter: "License:" and two chips, Mawthooq (KSA) and UAE.
+  // Pick one, both (either licence passes) or none (everyone). It works over
+  // the catalogue's own filters: a card has to pass both. No counts are shown.
+  var licWant = [];
   function licMatch(code) {
-    if (!licWant) return true;
+    if (!licWant.length) return true;
     var list = (LIC && LIC[code]) || [];
-    if (licWant === "verified") return list.some(function (l) { return l.status === "verified"; });
-    if (licWant === "any") return list.length > 0;
-    return list.some(function (l) { return l.country === licWant; });
+    return list.some(function (l) { return licWant.indexOf(l.country) !== -1; });
   }
   function applyLicFilter() {
-    var shown = 0;
     Array.prototype.forEach.call(document.querySelectorAll(".cat-card[data-code]"), function (card) {
-      var ok = licMatch(card.getAttribute("data-code"));
-      card.classList.toggle("lic-out", !ok);
-      if (ok && !card.hidden && !card.classList.contains("ai-out")) shown++;
+      card.classList.toggle("lic-out", !licMatch(card.getAttribute("data-code")));
     });
-    var note = $("lic-note");
-    if (note) note.textContent = licWant ? shown + " creator" + (shown === 1 ? "" : "s") + " with " +
-      ({ any: "a licence", SA: "Mawthooq", AE: "a UAE permit", verified: "a verified licence" })[licWant] : "";
   }
   function mountLicFilter(tries) {
     if (document.body.getAttribute("data-page") !== "catalogue" || $("lic-filter")) return;
     var bar = document.querySelector(".cat-controls .cat-bar");
     // The licences can arrive before the catalogue has drawn its filter bar: wait for it.
     if (!bar) { if ((tries || 0) < 80) setTimeout(function () { mountLicFilter((tries || 0) + 1); }, 250); return; }
-    // One switch: Mawthooq-licensed creators only, or everyone.
-    var box = h("div", { id: "lic-filter", class: "lic-filter" });
-    var sw = h("button", { class: "lic-toggle", type: "button", role: "switch", "aria-checked": "false" });
-    sw.innerHTML = '<span class="lic-toggle__track" aria-hidden="true"><i></i></span><span class="lic-toggle__txt">Mawthooq licensed only</span>';
-    sw.addEventListener("click", function () {
-      licWant = licWant === "SA" ? "" : "SA";
-      sw.setAttribute("aria-checked", String(licWant === "SA"));
-      applyLicFilter();
+    var box = h("div", { id: "lic-filter", class: "lic-filter", role: "group", "aria-label": "License" });
+    box.appendChild(h("span", { class: "lic-filter__label" }, "License"));
+    [["SA", "Mawthooq license"], ["AE", "UAE license"]].forEach(function (o) {
+      var chip = h("button", { class: "lic-chip", type: "button", "aria-pressed": "false", "data-lic": o[0] }, o[1]);
+      chip.addEventListener("click", function () {
+        var i = licWant.indexOf(o[0]);
+        if (i === -1) licWant.push(o[0]); else licWant.splice(i, 1);
+        chip.setAttribute("aria-pressed", String(i === -1));
+        applyLicFilter();
+      });
+      box.appendChild(chip);
     });
-    box.appendChild(sw);
-    box.appendChild(h("span", { class: "lic-filter__note", id: "lic-note", "aria-live": "polite" }));
     bar.parentNode.insertBefore(box, bar.nextSibling);
   }
   function mountLicences() {
@@ -2015,7 +2009,7 @@
       mountLicFilter();
       if (!licObserver && "MutationObserver" in window) {
         var t = null, app = document.getElementById("cat-grid") || document.body;
-        licObserver = new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { paintLicences(); if (licWant) applyLicFilter(); }, 150); });
+        licObserver = new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { paintLicences(); if (licWant.length) applyLicFilter(); }, 150); });
         licObserver.observe(app, { childList: true, subtree: true });
       }
     });
