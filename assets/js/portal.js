@@ -1085,15 +1085,46 @@
       if (kind === "ai" && panel.hidden) launch.querySelector(".hv-launch__dot").hidden = false;
       return b;
     }
-    // Voice "types" for a moment before each message: short, so it reads as a reply, not a wait.
+    // Text that types itself out: a steady pace that speeds up when a long answer is waiting,
+    // so it reads like typing and never falls far behind the stream. Instant under reduced motion.
+    function typer(node) {
+      var target = "", shown = 0, raf = 0, last = 0, ended = false, after = null;
+      node.classList.add("is-live");
+      function visible(txt) {                   // never show half of a **bold** marker
+        var n = (txt.match(/\*\*/g) || []).length;
+        return n % 2 ? txt.slice(0, txt.lastIndexOf("**")) : txt;
+      }
+      function paint() { node.textContent = ""; node.appendChild(rich(visible(target.slice(0, shown)))); scroll(); }
+      function finish() { node.classList.remove("is-live"); var f = after; after = null; if (f) f(); }
+      function frame(t) {
+        var dt = last ? Math.min(64, t - last) : 16; last = t;
+        var backlog = target.length - shown;
+        shown = Math.min(target.length, shown + Math.max(1, Math.round((0.05 + backlog * 0.0007) * dt)));
+        paint();
+        if (shown < target.length) { raf = requestAnimationFrame(frame); return; }
+        raf = 0; last = 0;
+        if (ended) finish();
+      }
+      function kick() { if (reduce) { shown = target.length; paint(); if (ended) finish(); return; } if (!raf) raf = requestAnimationFrame(frame); }
+      return {
+        push: function (more) { target += more; kick(); },
+        end: function (full, then) {
+          if (typeof full === "string" && full.length >= target.length) target = full;
+          ended = true; after = then || null; kick();
+        }
+      };
+    }
+    // The assistant's own messages: a short "typing" pause, then the words type out.
     var queue = Promise.resolve();
     function say(text, then) {
       queue = queue.then(function () {
         return new Promise(function (done) {
           var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "The assistant is typing" }, h("i"), h("i"), h("i")));
           setTimeout(function () {
-            dots.remove(); bubble("ai", text); if (then) then(); done();
-          }, reduce ? 0 : Math.min(900, 280 + text.length * 9));
+            dots.remove();
+            var b = bubble("ai", text); b.textContent = "";
+            typer(b).end(text, function () { if (then) then(); done(); });
+          }, reduce ? 0 : Math.min(500, 200 + text.length * 3));
         });
       });
       return queue;
@@ -1640,7 +1671,7 @@
       // While it works: what it is doing right now, then the answer as it is written.
       var work = h("div", { class: "hv-msg hv-msg--ai hv-work", "aria-label": "The assistant is working" },
         h("span", { class: "hv-work__dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), h("ol", { class: "hv-work__steps" }));
-      var workRow = row("ai", work), out = null, acc = "", ended = false;
+      var workRow = row("ai", work), out = null, ty = null, acc = "", ended = false;
       function step(label) {
         var ol = work.querySelector(".hv-work__steps");
         ol.querySelectorAll("li:not(.is-done)").forEach(function (li) { li.classList.add("is-done"); });
@@ -1650,23 +1681,25 @@
       stream("/api/chat/stream", { message: text, thread: thread, selection: selToken() || undefined }, function (ev) {
         if (ev.t === "step") { step(ev.text); return; }
         if (ev.t === "delta") {
-          if (!out) { workRow.remove(); out = h("div", { class: "hv-msg hv-msg--ai is-live" }); row("ai", out); }
-          acc += ev.text; out.textContent = ""; out.appendChild(rich(acc)); scroll();
+          if (!out) { workRow.remove(); out = h("div", { class: "hv-msg hv-msg--ai" }); row("ai", out); ty = typer(out); }
+          acc += ev.text; ty.push(ev.text);
           return;
         }
         if (ev.t === "done") {
           stop();
-          if (out) { out.classList.remove("is-live"); out.textContent = ""; out.appendChild(rich(ev.reply)); msgs.push({ from: "ai", text: ev.reply }); save(); }
-          else { workRow.remove(); bubble("ai", ev.reply); }
-          thread = ev.thread || thread; save();
+          if (!out) { workRow.remove(); out = h("div", { class: "hv-msg hv-msg--ai" }); row("ai", out); ty = typer(out); }
+          msgs.push({ from: "ai", text: ev.reply }); thread = ev.thread || thread; save();
           if (ev.credits != null) { setCredits(ev.credits); refreshFoot(); }
-          if (ev.cards && ev.cards.length) creatorCards(ev.cards);
-          followUps(ev.next);
+          // Cards and next steps follow once the answer has finished typing.
+          ty.end(ev.reply, function () {
+            if (ev.cards && ev.cards.length) creatorCards(ev.cards);
+            followUps(ev.next);
+          });
           return;
         }
         if (ev.t === "error") {
           stop(); workRow.remove();
-          if (out) out.classList.remove("is-live");
+          if (out && ty) ty.end(acc);
           if (ev.reason === "no_credits") { say(ev.message || "You're out of AI credits."); chips([{ label: "Talk to a person", go: flowHuman }]); return; }
           say(ev.status === 429 ? "One moment, that was quick. Try again in a few seconds." : (ev.message || "That didn't work, and you weren't charged."));
           if (ev.credits != null) { setCredits(ev.credits); refreshFoot(); }
