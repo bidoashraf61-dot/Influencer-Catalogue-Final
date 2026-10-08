@@ -201,3 +201,19 @@ python3 admin/tests/e2e_portal.py     # full flows on a throwaway server and dat
 
 The e2e suite uses a stubbed Gemini and captured mail, and never touches
 `catalogue.db` or the network.
+
+## Portal v3: HELVY Connect (branch `portal-v3`)
+
+| Piece | File | Notes |
+|---|---|---|
+| Bell (in-portal notifications) | `inbox.py` | Table `notifications`, per account. Groups: analysis, selections, campaigns, account, ideas (off by default). Toggles only filter the bell; history keeps everything. Never emailed. |
+| Analysis gating | `gating.py` | Table `analysis_grants`. Free headline; locked sections are sample data made on the server. Requests only for creators in the client's (team's) selections. Admin **Fulfil** on Creator analysis, or an upload, unlocks for the client's team and rings the bell. Past handled requests became grants on first start. Fit-score evidence and assistant tools hide locked figures. |
+| Selection status | `selstatus.py` | Table `selection_status`. Owner approves / rejects (optional reason); HelloVoice sets anything incl. Unavailable (admin selection page → **Client status** tab, or the client page). HelloVoice changes ring the bell; client changes email the KAM once per 5-minute burst (`notify` event `status`). **Find a replacement**: 2 credits (`costs.replace`), three similar creators kept on the row, reopening is free. |
+| Rewards and invites | `rewards.py` | Profile rewards (30 in all, once, non-blank) as ledger lines `Profile reward: …` with ref `reward:<step>`; invites table; +20 to the inviter on the colleague's first sign-in (same domain, max 5). |
+| Profile page | `account/index.html`, `assets/js/account.js`, `assets/css/account.css` | Overview, Selections, Analyses, Campaigns, Briefs, Notifications, Credits, Account. New profile fields: brands, industry, markets, language (pre-fill briefs). Helvy's picture is ONE file: `assets/brand/helvy.webp`. |
+| Bell UI, icons | `assets/js/portal.js`, `assets/css/portal.css` | Bell between Campaign tracking and the account circle, account holders only. |
+
+New client routes: `GET /api/notifications`, `POST /api/notifications/read`, `POST /api/selection/status`, `/api/selection/reason`,
+`/api/selection/replace`. Admin: `POST /analysis/fulfil`, `POST /selections/status`. All tables are created by `portal.init()`.
+
+Tests: `python3 admin/tests/e2e_portal_v3.py` (includes a check that locked figures never appear in `/api/creator` or `/api/selection`).

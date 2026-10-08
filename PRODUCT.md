@@ -34,8 +34,8 @@ The creators, the campaign data and the analysis are HelloVoice's own: run end t
 - Clients view only; they never create or edit campaigns.
 - Internal figures (costs, CPM, margins, creator ratings, notes) never reach a client page. EMV is hidden from clients.
 - Benchmarks: built-in defaults by platform and follower tier, editable in Settings, plus per-campaign targets.
-- Creator full analysis: uploaded by admins (template / bulk); creators without one show a locked page with "Request full analysis", which lands in the admin inbox.
-- Clients with any valid code may open creator analysis pages.
+- Creator full analysis: uploaded by admins (template / bulk). Since portal v3 it is gated per client: followers, platforms, average views and engagement are free; everything else is locked (drawn from server-side sample data) until a client requests it from inside one of their selections and HelloVoice fulfils it (promise: 2 working days). Uploading an analysis fulfils open requests.
+- HELVY Connect (portal v3): in-portal notification bell (never emailed to clients), a full profile page at /account/ with credit rewards and invites, and per-creator selection statuses decided by the selection's owner.
 
 ## Brand Commitments
 
