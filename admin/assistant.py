@@ -868,9 +868,20 @@ def system_prompt(scope, ctx):
 
 # ------------------------------------------------------------------ the loop --
 
-def converse(scope, ctx, history_msgs, text, code_id=None, kind="chat", credits=0):
+# What the client sees while a tool runs (streamed chat).
+STEP_LABEL = {
+    "search_creators": "Searching the roster", "suggest_shortlist": "Matching creators to your brief",
+    "get_creator": "Reading the creator's profile", "creator_metrics": "Checking engagement and reach",
+    "rank_by_metric": "Ranking creators", "price_bands": "Looking up prices", "company_info": "Checking HelloVoice details",
+    "my_work": "Opening your selections and campaigns",
+}
+
+
+def converse(scope, ctx, history_msgs, text, code_id=None, kind="chat", credits=0, on_event=None, model_name=None):
     """Run one user turn. ``history_msgs`` are prior ``(role, content)`` pairs.
-    Returns ``{"reply", "cards", "queued"}``; raises ``gemini.AIError``."""
+    Returns ``{"reply", "cards", "queued"}``; raises ``gemini.AIError``.
+    With ``on_event`` the turn streams: ``on_event("step", label)`` before a
+    tool runs and ``on_event("delta", text)`` as the answer is written."""
     contents = [{"role": "model" if r == "model" else "user", "parts": [{"text": c}]} for r, c in history_msgs if c]
     contents.append({"role": "user", "parts": [{"text": text}]})
     tools = declarations(scope)
@@ -881,14 +892,22 @@ def converse(scope, ctx, history_msgs, text, code_id=None, kind="chat", credits=
             # Out of tool steps: answer now from what has been fetched, rather than give up.
             contents.append({"role": "user", "parts": [{"text": "Answer now in a few lines using only the tool results above. "
                                                                  "Say plainly if something is missing."}]})
-        out = gemini.generate(contents, system=system_prompt(scope, ctx), tools=None if last else tools, temperature=0.3,
-                              max_tokens=4096, kind=kind, code_id=code_id, credits=credits if step == 0 else 0,
-                              model_name=gemini.copilot_model() if scope == "admin" else None)
+        mdl = model_name or (gemini.copilot_model() if scope == "admin" else None)
+        if on_event:
+            out = gemini.generate_stream(contents, on_text=lambda d: on_event("delta", d), system=system_prompt(scope, ctx),
+                                         tools=None if last else tools, temperature=0.3, max_tokens=4096, kind=kind,
+                                         code_id=code_id, credits=credits if step == 0 else 0, model_name=mdl)
+        else:
+            out = gemini.generate(contents, system=system_prompt(scope, ctx), tools=None if last else tools, temperature=0.3,
+                                  max_tokens=4096, kind=kind, code_id=code_id, credits=credits if step == 0 else 0,
+                                  model_name=mdl)
         if not out["calls"]:
             return {"reply": out["text"], "cards": cards, "queued": ctx.get("queued", [])}
         contents.append({"role": "model", "parts": out["parts"]})
         responses = []
         for call in out["calls"][:4]:
+            if on_event:
+                on_event("step", STEP_LABEL.get(call["name"], "Looking that up"))
             res = run_tool(scope, call["name"], call["args"], ctx)
             if call["name"] in ("suggest_shortlist", "search_creators", "rank_by_metric", "creator_metrics") and isinstance(res, dict):
                 cards += [c["code"] for c in (res.get("shortlist") or res.get("creators") or []) if c.get("code") and not c.get("error")][:12]

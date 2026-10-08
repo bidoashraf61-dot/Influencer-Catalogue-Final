@@ -962,14 +962,21 @@
   var V_ICON = {
     send: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>',
     close: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
-    fresh: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>'
+    fresh: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg>',
+    grow: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>',
+    shrink: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M10 14l-7 7"/></svg>',
+    mic: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>',
+    check: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+    plus: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>'
   };
 
   function mountVoice() {
     var page = document.body.getAttribute("data-page");
     if (!VOICE_PAGES[page] || $("hv-voice")) return;
     var first = ME && ME.user ? ME.user.name.split(" ")[0] : "";
-    var STORE = "hv-voice:" + (ME && ME.user ? ME.user.email : ME && ME.kind) + ":" + page;
+    // One conversation per access (signed-in client or access code), carried across pages for a week.
+    var STORE = "hv-chat:" + ((ME && ME.chat_key) || (ME && ME.user ? ME.user.email : ME && ME.kind) || "guest");
+    var KEEP_MS = 7 * 24 * 3600 * 1000;
     var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     /* -- launcher -- */
@@ -1010,14 +1017,21 @@
     freshBtn.innerHTML = V_ICON.fresh;
     var closeBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Close chat", title: "Close" });
     closeBtn.innerHTML = V_ICON.close;
-    head.appendChild(h("div", { class: "hv-head__tools" }, freshBtn, closeBtn));
+    var growBtn = h("button", { class: "hv-head__btn hv-head__grow", type: "button", "aria-label": "Make the chat bigger", "aria-pressed": "false", title: "Bigger" });
+    growBtn.innerHTML = V_ICON.grow;
+    head.appendChild(h("div", { class: "hv-head__tools" }, growBtn, freshBtn, closeBtn));
     var log = h("div", { class: "hv-log", role: "log", "aria-live": "polite", "aria-relevant": "additions" });
     var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message HELV Assistant" });
     var send = h("button", { class: "hv-send", type: "button", "aria-label": "Send" });
     send.innerHTML = V_ICON.send;
-    var compose = h("div", { class: "hv-compose" }, ta, send);
+    var Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
+    var mic = Speech ? h("button", { class: "hv-mic", type: "button", "aria-label": "Speak your message", "aria-pressed": "false", title: "Speak" }) : null;
+    if (mic) mic.innerHTML = V_ICON.mic;
+    var compose = h("div", { class: "hv-compose" }, ta, mic || document.createTextNode(""), send);
+    // Creators added from the chat's cards, waiting to be saved as a selection.
+    var picksBar = h("div", { class: "hv-picks", hidden: "" });
     var foot = h("p", { class: "hv-foot" });
-    panel.appendChild(head); panel.appendChild(log); panel.appendChild(compose);
+    panel.appendChild(head); panel.appendChild(log); panel.appendChild(picksBar); panel.appendChild(compose);
     root.appendChild(panel); root.appendChild(nudge); root.appendChild(launch);
     document.body.appendChild(root);
     document.body.classList.add("has-voice");
@@ -1040,9 +1054,12 @@
     lift();
 
     /* -- transcript -- */
-    var msgs = [];
-    try { msgs = JSON.parse(sessionStorage.getItem(STORE) || "[]") || []; } catch (e) { msgs = []; }
-    function save() { try { sessionStorage.setItem(STORE, JSON.stringify(msgs.slice(-60))); } catch (e) { /* private */ } }
+    var msgs = [], kept = null;
+    try { kept = JSON.parse(localStorage.getItem(STORE) || "null"); } catch (e) { kept = null; }
+    if (kept && kept.at && Date.now() - kept.at < KEEP_MS && Array.isArray(kept.msgs)) msgs = kept.msgs; else kept = null;
+    function save() {
+      try { localStorage.setItem(STORE, JSON.stringify({ at: Date.now(), thread: thread, msgs: msgs.slice(-60) })); } catch (e) { /* private */ }
+    }
     function scroll() { log.scrollTop = log.scrollHeight; }
     function row(kind, node) {
       var r = h("div", { class: "hv-row hv-row--" + kind });
@@ -1105,6 +1122,73 @@
       say(text, function () { ta.placeholder = placeholder || "Type here…"; expecting = fn; ta.focus(); });
     }
 
+    /* -- a brief question: options fill the message box; the client sends --
+       Tapping an option writes its label into the box (tap again to take it
+       out), several can be combined, and the client can add their own words.
+       Nothing moves on until they press Send. */
+    function question(q, idx, total, how) {
+      queue = queue.then(function () {
+        var many = q.type === "many";
+        var card = h("div", { class: "hv-msg hv-msg--ai hv-q", role: "group", "aria-label": q.label });
+        card.appendChild(h("p", { class: "hv-q__count" }, "Question " + (idx + 1) + " of " + total));
+        card.appendChild(h("p", { class: "hv-q__label" }, q.label));
+        var grid = h("div", { class: "hv-q__opts" });
+        // Read the box: which options it names (whole labels, which may hold commas) and the client's own words.
+        var byLen = q.options.slice().sort(function (a, b) { return b.label.length - a.label.length; });
+        function read(text) {
+          var rest = " " + text + " ", hit = [];
+          byLen.forEach(function (o) {
+            var k = rest.toLowerCase().indexOf(o.label.toLowerCase());
+            if (k > -1) { hit.push(o); rest = rest.slice(0, k) + " " + rest.slice(k + o.label.length); }
+          });
+          hit.sort(function (a, b) { return text.toLowerCase().indexOf(a.label.toLowerCase()) - text.toLowerCase().indexOf(b.label.toLowerCase()); });
+          return { opts: hit, own: rest.replace(/^[\s;,،+·-]+|[\s;,،+·-]+$/g, "").replace(/\s*[;،]\s*[;،]+\s*/g, "; ").replace(/\s{2,}/g, " ") };
+        }
+        function sync() {
+          var on = read(ta.value).opts.map(function (o) { return o.label; });
+          grid.querySelectorAll(".hv-opt").forEach(function (b) { b.setAttribute("aria-pressed", String(on.indexOf(b.dataset.label) > -1)); });
+        }
+        q.options.forEach(function (o) {
+          var b = h("button", { class: "hv-opt", type: "button", "aria-pressed": "false", "data-label": o.label },
+            h("span", { class: "hv-opt__tick", "aria-hidden": "true" }), h("span", null, o.label));
+          b.querySelector(".hv-opt__tick").innerHTML = V_ICON.check;
+          b.addEventListener("click", function () {
+            var now = read(ta.value), mine = now.opts.map(function (x) { return x.label; });
+            if (mine.indexOf(o.label) > -1) mine = mine.filter(function (x) { return x !== o.label; });
+            else mine = many ? mine.concat([o.label]) : [o.label];
+            ta.value = mine.concat(now.own ? [now.own] : []).join("; ");
+            grow(); sync();
+            if (window.matchMedia && !matchMedia("(pointer: coarse)").matches) ta.focus();
+          });
+          grid.appendChild(b);
+        });
+        card.appendChild(grid);
+        var foot = h("div", { class: "hv-q__foot" },
+          h("span", { class: "hv-q__hint" }, many ? "Pick one or more, add your own words, then Send" : "Pick one or type your answer, then Send"));
+        if (how.back) foot.appendChild(h("button", { class: "hv-q__link", type: "button", onclick: function () { finish(); bubble("me", "Back", false); how.back(); } }, "Back"));
+        if (how.skip) foot.appendChild(h("button", { class: "hv-q__link", type: "button", onclick: function () { finish(); bubble("me", "Skip"); how.skip(); } }, "Skip"));
+        card.appendChild(foot);
+        row("ai", card);
+        ta.placeholder = "Tap above or type your answer";
+        ta.addEventListener("input", sync);
+        function finish() {
+          card.classList.add("is-done");
+          grid.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+          foot.remove(); ta.removeEventListener("input", sync);
+          expecting = null; ta.placeholder = "Type a message…";
+        }
+        expecting = function (text) {
+          var got = read(text), vals = got.opts.map(function (o) { return o.value; }), own = got.own ? [got.own] : [];
+          if (!many && vals.length > 1) vals = vals.slice(-1);
+          card.classList.add("is-done");
+          grid.querySelectorAll("button").forEach(function (b) { b.disabled = true; });
+          foot.remove(); ta.removeEventListener("input", sync); ta.placeholder = "Type a message…";
+          how.done(vals, own.join(", "));
+        };
+      });
+      return queue;
+    }
+
     /* -- the menu -- */
     function menu(lead) {
       if (lead) say(lead);
@@ -1142,26 +1226,16 @@
         var i = 0;
         function next() {
           if (i >= todo.length) return review();
-          var q = byId[todo[i]], many = q.type === "many", picked = [];
-          say(q.label);
-          var list = q.options.map(function (o) {
-            return many ? { label: o.label, pressed: false, toggle: function (b) {
-              var k = picked.indexOf(o.value);
-              if (k > -1) picked.splice(k, 1); else picked.push(o.value);
-              b.setAttribute("aria-pressed", String(k === -1));
-            } } : { label: o.label, go: function () { answers[q.id] = o.value; i++; next(); } };
-          });
-          if (many) list.push({ label: "Next", primary: true, echo: false, go: function () {
-            answers[q.id] = picked.length ? picked.slice() : ["any"];
-            bubble("me", picked.length ? picked.map(function (v) { return optionLabel(q, v); }).join(", ") : "Any");
-            i++; next();
-          } });
-          if (!q.required) list.push({ label: "Skip", ghost: true, go: function () { i++; next(); } });
-          chips(list, { keep: many });
-          if (many) queue = queue.then(function () {
-            // The "Next" press removes the whole option set.
-            var sets = log.querySelectorAll(".hv-chips"); var last = sets[sets.length - 1];
-            last.addEventListener("click", function (e) { if (e.target.closest(".hv-chip--lime")) last.remove(); });
+          var q = byId[todo[i]];
+          question(q, i, todo.length, {
+            back: i > 0 ? function () { i--; delete answers[todo[i]]; next(); } : null,
+            skip: q.required ? null : function () { i++; next(); },
+            done: function (vals, note) {
+              if (vals.length) answers[q.id] = q.type === "many" ? vals : vals[0];
+              else if (q.type === "many") answers[q.id] = ["any"];
+              if (note) answers.notes = (answers.notes ? answers.notes + "; " : "") + note;
+              i++; next();
+            }
           });
         }
         function review() {
@@ -1193,22 +1267,62 @@
                { label: "Something else", ghost: true, go: function () { menu("What next?"); } }]);
       });
     }
-    function creatorCards(list) {
+    var picked = [];                      // codes added from the chat's cards
+    function drawPicks() {
+      picksBar.innerHTML = "";
+      if (!picked.length) { picksBar.hidden = true; return; }
+      picksBar.hidden = false;
+      picksBar.appendChild(h("span", { class: "hv-picks__n" }, picked.length + " added"));
+      picksBar.appendChild(h("button", { class: "hv-picks__save", type: "button", onclick: savePicks }, "Save as a selection"));
+      picksBar.appendChild(h("button", { class: "hv-picks__clear", type: "button", "aria-label": "Clear the added creators", onclick: function () {
+        picked = []; drawPicks(); log.querySelectorAll(".hv-card__add").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+      } }, "Clear"));
+    }
+    function savePicks() {
+      if (!picked.length) return;
+      var codes = picked.slice();
+      api("POST", "/api/selection", { name: "Chat shortlist", codes: codes }).then(function (r) {
+        if (!r.b.ok) { say("I couldn't save that just now. Please try again."); return; }
+        picked = []; drawPicks();
+        log.querySelectorAll(".hv-card__add").forEach(function (b) { b.setAttribute("aria-pressed", "false"); });
+        say("Saved " + codes.length + " creator" + (codes.length === 1 ? "" : "s") + " as “Chat shortlist”.");
+        chips([{ label: "Open the selection", primary: true, echo: false, go: function () { location.href = ROOT + "selection/#s=" + encodeURIComponent(r.b.token); } },
+               { label: "Get a quote for it", go: function () { quoteFor({ name: "Chat shortlist", token: r.b.token, codes: codes }); } }]);
+      });
+    }
+    function togglePick(code, btn) {
+      var k = picked.indexOf(code);
+      if (k > -1) picked.splice(k, 1); else picked.push(code);
+      log.querySelectorAll('.hv-card__add[data-code="' + code + '"]').forEach(function (b) { b.setAttribute("aria-pressed", String(k === -1)); });
+      drawPicks();
+    }
+    function openProfile(c) {
+      var card = document.querySelector('.cat-card[data-code="' + c.code + '"]');
+      var pp = card && card.querySelector("a.cat-card__analysis[data-analysis]");      // opens the side panel over the roster
+      if (pp) { pp.click(); return; }
+      window.open(ROOT + "creator/#c=" + encodeURIComponent(c.code), "_blank", "noopener");
+    }
+    function creatorCards(list, keep) {
       if (!list || !list.length) return;
-      var wrap = h("div", { class: "hv-cards" });
+      if (keep !== false) { msgs.push({ from: "cards", list: list.map(function (c) { return { code: c.code, name: c.name, photo_url: c.photo_url, fit: c.fit, followers: c.followers, city: c.city, tier: c.tier }; }) }); save(); }
+      var wrap = h("div", { class: "hv-cards", role: "list", "aria-label": "Creators" });
       list.forEach(function (c) {
         var ph = h("span", { class: "hv-card__photo" }); bg(ph, c.photo_url);
-        var b = h("button", { class: "hv-card", type: "button" }, ph,
+        if (c.fit != null) ph.appendChild(h("span", { class: "hv-card__fit" }, String(c.fit)));
+        var open = h("button", { class: "hv-card__open", type: "button", "aria-label": "Open " + c.name + "'s profile" }, ph,
           h("span", { class: "hv-card__txt" }, h("b", null, c.name),
-            h("span", null, [c.fit != null ? "Fit " + c.fit : "", c.followers ? followers(c.followers) : "", c.city].filter(Boolean).join(" · "))));
-        b.addEventListener("click", function () {
-          var card = document.querySelector('.cat-card[data-code="' + c.code + '"]');
-          if (card) { card.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" }); card.classList.add("hv-flash"); setTimeout(function () { card.classList.remove("hv-flash"); }, 2400); }
-        });
-        wrap.appendChild(b);
+            h("span", null, [c.tier, c.followers ? followers(c.followers) : "", c.city].filter(Boolean).join(" · "))));
+        open.addEventListener("click", function () { openProfile(c); });
+        var add = h("button", { class: "hv-card__add", type: "button", "data-code": c.code, "aria-pressed": String(picked.indexOf(c.code) > -1),
+                                "aria-label": "Add " + c.name + " to my shortlist" });
+        add.innerHTML = V_ICON.plus + "<span>Add</span>" + V_ICON.check.replace("<svg", '<svg class="hv-card__ok"') + "<span class=\"hv-card__added\">Added</span>";
+        add.addEventListener("click", function () { togglePick(c.code, add); });
+        wrap.appendChild(h("div", { class: "hv-card", role: "listitem" }, open, add));
       });
       log.appendChild(wrap); scroll();
+      lastCards = list;
     }
+    var lastCards = [];
 
     /* -- 2. show creators on this page: a sentence becomes the page's filters -- */
     function flowShow() {
@@ -1415,6 +1529,42 @@
       });
     }
 
+    /* -- after an answer: the likely next asks, one tap each -- */
+    function followUps(list) {
+      var acts = { "Find creators": flowFind, "Find creators within my budget": flowFind, "Get a quote": flowQuote,
+                   "Talk to a person": flowHuman,
+                   "Save all as a selection": function () { (lastCards || []).forEach(function (c) { if (picked.indexOf(c.code) === -1) picked.push(c.code); }); drawPicks(); savePicks(); } };
+      chips((list || []).map(function (label) {
+        return acts[label] ? { label: label, go: acts[label] } : { label: label, echo: false, go: function () { ta.value = label; submit(); } };
+      }), { hint: "Suggested next · or type below" });
+    }
+
+    /* -- streamed answers: one JSON object per line -- */
+    function stream(path, body, onEvent) {
+      return fetch(API + path, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        .then(function (r) {
+          var type = r.headers.get("Content-Type") || "";
+          if (!r.ok || type.indexOf("ndjson") === -1 || !r.body || !r.body.getReader) {
+            return r.json().catch(function () { return {}; }).then(function (b) {
+              if (r.ok && b && b.t) { onEvent(b); return; }
+              onEvent({ t: "error", status: r.status, message: (b && b.message) || "", reason: b && b.reason });
+            });
+          }
+          var reader = r.body.getReader(), dec = new TextDecoder(), buf = "";
+          function pump() {
+            return reader.read().then(function (res) {
+              if (res.done) { if (buf.trim()) try { onEvent(JSON.parse(buf)); } catch (e) { /* cut */ } return; }
+              buf += dec.decode(res.value, { stream: true });
+              var lines = buf.split("\n"); buf = lines.pop();
+              lines.forEach(function (l) { if (l.trim()) try { onEvent(JSON.parse(l)); } catch (e) { /* skip */ } });
+              return pump();
+            });
+          }
+          return pump();
+        })
+        .catch(function () { onEvent({ t: "error", status: 0, message: "Could not reach the server. Please try again." }); });
+    }
+
     /* -- typing: answers a pending question, or goes to the AI -- */
     var REQ = /campaign|creator|influencer|shortlist|launch|recommend|suggest|find|looking for|ugc|حمل|مؤثر|إطلاق|اطلاق|ابحث|أبحث|اقترح/i;
     var thread = null, busy = false;
@@ -1432,17 +1582,41 @@
       if (REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
       if (!(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
       busy = true; send.disabled = true;
-      var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "The assistant is typing" }, h("i"), h("i"), h("i")));
-      api("POST", "/api/chat", { message: text, thread: thread }).then(function (r) {
-        busy = false; send.disabled = false; dots.remove();
-        if (r.b.ok) {
-          thread = r.b.thread; bubble("ai", r.b.reply); setCredits(r.b.credits); refreshFoot();
-          if (r.b.cards && r.b.cards.length) creatorCards(r.b.cards);
-          nextUp();
-        } else {
-          say(r.s === 429 ? "One moment, that was quick. Try again in a few seconds." : (r.b.message || "That didn't work, and you weren't charged."));
+      // While it works: what it is doing right now, then the answer as it is written.
+      var work = h("div", { class: "hv-msg hv-msg--ai hv-work", "aria-label": "The assistant is working" },
+        h("span", { class: "hv-work__dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), h("ol", { class: "hv-work__steps" }));
+      var workRow = row("ai", work), out = null, acc = "", ended = false;
+      function step(label) {
+        var ol = work.querySelector(".hv-work__steps");
+        ol.querySelectorAll("li:not(.is-done)").forEach(function (li) { li.classList.add("is-done"); });
+        var li = h("li", null, label + "…"); ol.appendChild(li); scroll();
+      }
+      function stop() { busy = false; send.disabled = false; ended = true; }
+      stream("/api/chat/stream", { message: text, thread: thread }, function (ev) {
+        if (ev.t === "step") { step(ev.text); return; }
+        if (ev.t === "delta") {
+          if (!out) { workRow.remove(); out = h("div", { class: "hv-msg hv-msg--ai is-live" }); row("ai", out); }
+          acc += ev.text; out.textContent = ""; out.appendChild(rich(acc)); scroll();
+          return;
         }
-      });
+        if (ev.t === "done") {
+          stop();
+          if (out) { out.classList.remove("is-live"); out.textContent = ""; out.appendChild(rich(ev.reply)); msgs.push({ from: "ai", text: ev.reply }); save(); }
+          else { workRow.remove(); bubble("ai", ev.reply); }
+          thread = ev.thread || thread; save();
+          if (ev.credits != null) { setCredits(ev.credits); refreshFoot(); }
+          if (ev.cards && ev.cards.length) creatorCards(ev.cards);
+          followUps(ev.next);
+          return;
+        }
+        if (ev.t === "error") {
+          stop(); workRow.remove();
+          if (out) out.classList.remove("is-live");
+          if (ev.reason === "no_credits") { say(ev.message || "You're out of AI credits."); chips([{ label: "Talk to a person", go: flowHuman }]); return; }
+          say(ev.status === 429 ? "One moment, that was quick. Try again in a few seconds." : (ev.message || "That didn't work, and you weren't charged."));
+          if (ev.credits != null) { setCredits(ev.credits); refreshFoot(); }
+        }
+      }).then(function () { if (!ended) { stop(); if (!out) workRow.remove(); } });
     }
     function grow() { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 120) + "px"; }
     ta.addEventListener("input", grow);
@@ -1461,7 +1635,12 @@
         hideNudge(true);
         if (!started) {
           started = true;
-          if (msgs.length) { msgs.forEach(function (m) { bubble(m.from, m.text, false); }); menu("How can I help you?"); }
+          if (msgs.length) {
+            thread = (kept && kept.thread) || thread;
+            msgs.forEach(function (m) { if (m.from === "cards") creatorCards(m.list, false); else bubble(m.from, m.text, false); });
+            log.appendChild(h("p", { class: "hv-sep" }, "Earlier in this chat"));
+            menu("Welcome back. What would you like to do?");
+          }
           else greet();
         }
         setTimeout(function () { ta.focus({ preventScroll: true }); }, 60);
@@ -1477,9 +1656,47 @@
     // The account page's "Message your account manager" opens straight onto the hand-off.
     HV.talk = function () { toggle(true); setTimeout(flowHuman, 400); };
     freshBtn.addEventListener("click", function () {
-      msgs = []; save(); thread = null; expecting = null; log.innerHTML = ""; queue = Promise.resolve(); greet();
+      msgs = []; thread = null; save(); expecting = null; ta.placeholder = "Type a message…"; ta.value = ""; grow();
+      picked = []; drawPicks(); log.innerHTML = ""; queue = Promise.resolve(); greet();
     });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && root.classList.contains("is-open")) toggle(false); });
+
+    /* -- bigger window -- */
+    var BIG = "hv-chat-big";
+    function setBig(on) {
+      root.classList.toggle("is-big", on);
+      growBtn.setAttribute("aria-pressed", String(on));
+      growBtn.setAttribute("aria-label", on ? "Make the chat smaller" : "Make the chat bigger");
+      growBtn.innerHTML = on ? V_ICON.shrink : V_ICON.grow;
+      try { localStorage.setItem(BIG, on ? "1" : "0"); } catch (e) { /* private */ }
+      scroll();
+    }
+    growBtn.addEventListener("click", function () { setBig(!root.classList.contains("is-big")); });
+    try { if (localStorage.getItem(BIG) === "1") setBig(true); } catch (e) { /* private */ }
+
+    /* -- speak instead of typing: the words land in the box to check, then Send -- */
+    if (mic) {
+      var rec = null, base = "";
+      mic.addEventListener("click", function () {
+        if (rec) { rec.stop(); return; }
+        rec = new Speech();
+        rec.lang = /[\u0600-\u06FF]/.test(ta.value) || /^ar/i.test(document.documentElement.lang || navigator.language || "") ? "ar-SA" : (navigator.language || "en-US");
+        rec.interimResults = true; rec.continuous = false;
+        base = ta.value ? ta.value.replace(/\s*$/, " ") : "";
+        mic.classList.add("is-on"); mic.setAttribute("aria-pressed", "true"); ta.placeholder = "Listening…";
+        rec.onresult = function (e) {
+          var said = ""; for (var k = 0; k < e.results.length; k++) said += e.results[k][0].transcript;
+          ta.value = base + said; grow();
+          ta.dispatchEvent(new Event("input"));
+        };
+        rec.onend = rec.onerror = function () {
+          mic.classList.remove("is-on"); mic.setAttribute("aria-pressed", "false"); rec = null;
+          if (!expecting) ta.placeholder = "Type a message…";
+          ta.focus();
+        };
+        try { rec.start(); } catch (e) { rec = null; mic.classList.remove("is-on"); }
+      });
+    }
 
     /* -- the nudge: once per visit, after the client has had a look around -- */
     var NUDGE = "hv-voice-nudged";

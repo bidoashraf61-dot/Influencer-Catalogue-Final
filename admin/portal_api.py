@@ -36,6 +36,7 @@ import urllib.parse
 import account
 import assistant
 import db
+import faq
 import fx
 import gemini
 import guard
@@ -92,7 +93,9 @@ class PortalMixin:
         if kind == "user":
             portal.monthly_refill(cid)
         out = {"signed_in": True, "kind": kind, "credits": portal.balance(cid) if kind != "admin" else None,
-               "costs": portal.costs(), "ai": gemini.configured()}
+               "costs": portal.costs(), "ai": gemini.configured(),
+               # An opaque per-access key, so a browser keeps each client's chat apart.
+               "chat_key": __import__("hashlib").sha256(b"chat:%d:" % cid + self._srv().SECRET).hexdigest()[:12]}
         if user:
             out["user"] = {k: user[k] for k in ("email", "name", "company", "job_title", "phone")}
             out["user"]["photo"] = account.image_version(user, "photo")
@@ -303,7 +306,7 @@ class PortalMixin:
             "/api/auth/start": self.api_auth_start, "/api/auth/verify": self.api_auth_verify,
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,
             "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
-            "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat,
+            "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat, "/api/chat/stream": self.api_chat_stream,
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
             "/api/credits/request": self.api_credits_request, "/api/me/delete": self.api_me_delete,
             "/api/voice/handoff": self.api_voice_handoff,
@@ -766,6 +769,75 @@ class PortalMixin:
         shown = {r["code"]: r for r in self.roster_payload(only=set(card_codes))} if card_codes else {}
         return self.send_json(200, {"ok": True, "reply": res["reply"], "cards": [shown[c] for c in card_codes if c in shown],
                                     "thread": th["id"], "credits": portal.balance(cid) if kind != "admin" else None}, self.cors())
+
+    def api_chat_stream(self):
+        """The chat, streamed: one JSON object per line (``application/x-ndjson``).
+        ``{"t":"step","text"}`` while a lookup runs, ``{"t":"delta","text"}`` as
+        the answer is written, then ``{"t":"done", reply, cards, next, thread,
+        credits, instant}`` or ``{"t":"error", message}``. Common questions are
+        answered at once from faq.py: no AI call, no credit."""
+        who = self._need_viewer()
+        if not who:
+            return
+        cid, user, kind = who
+        b = self.json_body()
+        text = " ".join(str(b.get("message") or "").split())[:800]
+        if not text:
+            return self.send_json(400, {"ok": False, "reason": "empty"}, self.cors())
+        if self._throttled("chat:%d" % cid, 40, 600):
+            return
+        tid = self._int(b.get("thread")) or None
+        instant = faq.answer(text)
+        if instant is None:
+            if not gemini.configured():
+                return self.send_json(503, {"ok": False, "reason": "not_configured", "message": AI_FAIL["not_configured"][1]}, self.cors())
+            ok, cost, bal = portal.charge(cid, "chat", "chat message")
+            if not ok:
+                return self._no_credits(cid, "chat")
+        # From here on the answer is a stream.
+        self.send_response(200)
+        for k, v in self.cors() + [("Content-Type", "application/x-ndjson; charset=utf-8"), ("Cache-Control", "no-store"),
+                                   ("X-Accel-Buffering", "no"), ("Connection", "close")]:
+            self.send_header(k, v)
+        self.end_headers()
+        self.close_connection = True
+
+        def emit(obj):
+            try:
+                self.wfile.write((json.dumps(obj, ensure_ascii=False) + "\n").encode())
+                self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass
+
+        th = portal.thread(cid, "client", "", tid=tid)
+        if instant is not None:
+            emit({"t": "delta", "text": instant["reply"]})
+            portal.add_message(th["id"], "user", text)
+            portal.add_message(th["id"], "model", instant["reply"], {"cards": []})
+            db.log("chat", cid, self.client_ip(), self._ua(), "faq: " + text[:50])
+            emit({"t": "done", "reply": instant["reply"], "cards": [], "next": instant["next"], "thread": th["id"],
+                  "credits": portal.balance(cid) if kind != "admin" else None, "instant": True})
+            return
+        past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
+        ctx = {"code_id": cid, "user": dict(user) if user else {}}
+        try:
+            res = assistant.converse("client", ctx, past, text, code_id=cid, kind="chat", credits=cost,
+                                     on_event=lambda t, x: emit({"t": t, "text": x}), model_name=gemini.chat_model())
+        except gemini.AIError as exc:
+            portal.refund(cid, cost, "failed chat")
+            code, msg = AI_FAIL.get(getattr(exc, "reason", ""), (502, "The assistant couldn't answer. You weren't charged."))
+            emit({"t": "error", "message": msg, "credits": portal.balance(cid) if kind != "admin" else None})
+            return
+        portal.add_message(th["id"], "user", text)
+        portal.add_message(th["id"], "model", res["reply"], {"cards": res["cards"]})
+        db.log("chat", cid, self.client_ip(), self._ua(), text[:60])
+        card_codes = list(dict.fromkeys(res["cards"]))[:12]
+        shown = {r["code"]: r for r in self.roster_payload(only=set(card_codes))} if card_codes else {}
+        cards = [shown[c] for c in card_codes if c in shown]
+        nxt = (["Show cheaper options", "Only bigger creators", "Save all as a selection"] if cards
+               else ["Find creators", "Get a quote"])
+        emit({"t": "done", "reply": res["reply"], "cards": cards, "next": nxt, "thread": th["id"],
+              "credits": portal.balance(cid) if kind != "admin" else None})
 
     # =============================================================== admin ==
 

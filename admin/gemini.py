@@ -150,6 +150,15 @@ def copilot_model():
     return db.setting("copilot_model", None) or model()
 
 
+# Typed chat on the catalogue answers short questions: a lighter, faster model
+# is enough there. Shortlists (brief/run) keep the main model.
+DEFAULT_CHAT_MODEL = "gemini-3.1-flash-lite"
+
+
+def chat_model():
+    return db.setting("chat_model", None) or DEFAULT_CHAT_MODEL
+
+
 # ------------------------------------------------------------------- budget --
 
 def month_start():
@@ -292,3 +301,103 @@ def _post(mdl, body, timeout):
                 continue
             raise Upstream("Could not reach Gemini.", None)
     raise Upstream("Gemini is not responding (%s)." % (last,), getattr(last, "code", None))
+
+
+
+# ---------------------------------------------------------------- streaming --
+STREAM_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse"
+
+
+def generate_stream(contents, *, on_text=None, system=None, tools=None, temperature=0.4, max_tokens=4096,
+                    kind="chat", code_id=None, credits=0, timeout=45, model_name=None):
+    """Like ``generate`` but the reply's text arrives piece by piece through
+    ``on_text(delta)`` as the model writes it. Returns the same dict. Falls
+    back to the whole answer at once (still through ``on_text``) when the
+    stream cannot start; once text has been shown, an error is raised rather
+    than repeated."""
+    if STUB is not None:
+        out = generate(contents, system=system, tools=tools, temperature=temperature, max_tokens=max_tokens,
+                       kind=kind, code_id=code_id, credits=credits, timeout=timeout, model_name=model_name)
+        if on_text and out["text"]:
+            for i in range(0, len(out["text"]), 24):
+                on_text(out["text"][i:i + 24])
+        return out
+    if not configured():
+        raise NotConfigured("Gemini is not set up yet.")
+    if tokens_this_month() >= monthly_cap():
+        raise OverBudget("The monthly AI allowance has been used.")
+    cap = monthly_usd_cap()
+    if cap > 0 and usd_this_month() >= cap:
+        raise OverBudget("The monthly AI budget has been spent.")
+    if isinstance(contents, str):
+        contents = [{"role": "user", "parts": [{"text": contents}]}]
+    body = {"contents": contents, "generationConfig": {"temperature": temperature, "maxOutputTokens": max_tokens}}
+    if system:
+        body["systemInstruction"] = {"parts": [{"text": system}]}
+    if tools:
+        body["tools"] = [{"functionDeclarations": tools}]
+    first = model_name or model()
+    chain = [first] + [m for m in FALLBACKS if m != first]
+    started = time.time()
+    if not _slots.acquire(timeout=8):
+        raise Busy("The assistant is busy. Try again in a moment.")
+    parts, usage, mdl, shown = [], {}, chain[0], False
+    try:
+        for i, mdl in enumerate(chain):
+            try:
+                req = urllib.request.Request(STREAM_ENDPOINT.format(model=mdl), data=json.dumps(body).encode(), method="POST",
+                                             headers={"Content-Type": "application/json", "x-goog-api-key": key()})
+                with urllib.request.urlopen(req, timeout=max(5, min(timeout, started + OVERALL_SECONDS - time.time()))) as r:
+                    for raw in r:
+                        line = raw.decode("utf-8", "replace").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        try:
+                            chunk = json.loads(line[5:].strip())
+                        except ValueError:
+                            continue
+                        usage = chunk.get("usageMetadata") or usage
+                        for part in ((chunk.get("candidates") or [{}])[0].get("content") or {}).get("parts") or []:
+                            if "text" in part and not part.get("thought"):
+                                if parts and "text" in parts[-1] and "functionCall" not in parts[-1]:
+                                    parts[-1] = dict(parts[-1], text=parts[-1]["text"] + part["text"])
+                                else:
+                                    parts.append(dict(part))
+                                if on_text and part["text"]:
+                                    shown = True
+                                    on_text(part["text"])
+                            elif "functionCall" in part:
+                                parts.append(part)
+                            else:
+                                parts.append(part)
+                break
+            except urllib.error.HTTPError as exc:
+                if exc.code in (400, 401, 403):
+                    detail = ""
+                    try:
+                        detail = json.loads(exc.read().decode()).get("error", {}).get("message", "")
+                    except Exception:
+                        pass
+                    if "key" in detail.lower():
+                        raise NotConfigured("The Gemini key was refused.")
+                if not shown and i < len(chain) - 1 and exc.code in (404, 429, 500, 502, 503, 504):
+                    continue
+                raise Upstream("Gemini error %s" % exc.code, exc.code)
+            except (urllib.error.URLError, TimeoutError, OSError):
+                if shown:
+                    raise Upstream("The answer was cut off. Please try again.", None)
+                if i < len(chain) - 1:
+                    continue
+                raise Upstream("Could not reach Gemini.", None)
+    except AIError as exc:
+        _audit(kind, code_id, mdl, usage, 0, False, started, str(exc))
+        raise
+    finally:
+        _slots.release()
+    text = "".join(p.get("text", "") for p in parts if "text" in p).strip()
+    calls = [{"name": p["functionCall"].get("name"), "args": p["functionCall"].get("args") or {}} for p in parts if "functionCall" in p]
+    if not text and not calls:
+        _audit(kind, code_id, mdl, usage, 0, False, started, "empty stream")
+        raise Upstream("The assistant returned nothing. Try rephrasing.")
+    _audit(kind, code_id, mdl, usage, credits, True, started)
+    return {"text": text, "calls": calls, "parts": parts, "usage": usage}

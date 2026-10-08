@@ -979,6 +979,23 @@ class Portal(unittest.TestCase):
         self.assertEqual(json.loads(sel["target"]), target)                   # untouched: the tab was not opened
         self.assertEqual(sel["objective"], "Awareness")
 
+    def test_80_chat_streams_and_answers_common_questions_free(self):
+        c, _ = self.signup("stream@pfizer.com")
+        before = c.get("/api/credits")[1].get("credits")
+        s, raw, _ = c.post("/api/chat/stream", {"message": "How much does it cost?"})
+        lines = [json.loads(x) for x in (raw if isinstance(raw, str) else json.dumps(raw)).splitlines() if x.strip()]
+        done = [x for x in lines if x["t"] == "done"][0]
+        self.assertTrue(done["instant"])
+        self.assertIn("SAR", done["reply"])                          # live tier prices
+        self.assertEqual(before, c.get("/api/credits")[1].get("credits"))                              # instant answers are free
+        s, raw, _ = c.post("/api/chat/stream", {"message": "campaign for skincare in Riyadh please"})
+        lines = [json.loads(x) for x in raw.splitlines() if x.strip()]
+        kinds = [x["t"] for x in lines]
+        self.assertIn("step", kinds)                                 # the lookup is shown while it runs
+        self.assertIn("delta", kinds)
+        self.assertEqual(kinds[-1], "done")
+        self.assertEqual("".join(x["text"] for x in lines if x["t"] == "delta").strip(), lines[-1]["reply"].strip())
+
 def assistant_sql(sql):
     import assistant
     return assistant.t_sql_query({}, sql)
