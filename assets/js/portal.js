@@ -1598,7 +1598,9 @@
     // new one is drawing. Re-using one element (swapping its source, or hiding and showing
     // several) left blank or half-painted frames in Chrome.
     var cring = h("div", { class: "ai-sl__cring" });
-    var CLIP = { point: "voice-point", think: "voice-think", thumbs: "voice-thumbs", cheer: "voice-cheer", wave: "voice-loop" };
+    // Trimmed to the action itself, so a reaction starts the instant the client taps.
+    var CLIP = { point: "voice-point-act", think: "voice-think-act", thumbs: "voice-thumbs-act", cheer: "voice-cheer-act", wave: "voice-loop" };
+    var IDLE = { think: 1, wave: 1 };
     var power = h("div", { class: "ai-sl__power" });
     power.innerHTML = '<p class="ai-sl__pw-h">Campaign power</p><p class="ai-sl__pw-n"><b>0</b><small> / ' + 1000 + '</small></p>' +
       '<div class="ai-sl__pw-bar"><i></i></div><p class="ai-sl__pw-lvl">Draft</p>';
@@ -1612,22 +1614,42 @@
     var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null;
 
     /* -- the game layer: coach animations and campaign power -- */
-    var coachTimer = null;
-    function coachPlay(kind, back, after) {
-      clearTimeout(coachTimer);
-      if (reduce) return;
+    // The coach: idle poses loop; reactions (thumbs, cheer, point) play once, in full, then hand
+    // over to whatever is waiting, so a tap is always answered before the next pose.
+    var coachTimer = null, reacting = false, queued = null;
+    function coachShow(kind, loop, onEnd) {
       var v = document.createElement("video");
-      v.className = "ai-sl__cvid"; v.muted = true; v.loop = true; v.autoplay = true;
+      v.className = "ai-sl__cvid"; v.muted = true; v.loop = !!loop; v.autoplay = true;
       v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("aria-hidden", "true");
       v.innerHTML = '<source src="' + V + CLIP[kind] + '.webm" type="video/webm"/><source src="' + V + CLIP[kind] + '.mp4" type="video/mp4"/>';
       var old = [].slice.call(cring.querySelectorAll("video"));
       var swap = function () { old.forEach(function (o) { o.remove(); }); };
       v.addEventListener("playing", swap, { once: true });
-      setTimeout(swap, 1200);                       // never leave a pile if 'playing' is late
+      setTimeout(swap, 900);
+      if (onEnd) { v.addEventListener("ended", onEnd, { once: true }); coachTimer = setTimeout(onEnd, 3200); }
       cring.appendChild(v);
       var pr = v.play(); if (pr && pr.catch) pr.catch(function () { /* autoplay blocked: last frame stays */ });
+    }
+    function coachPlay(kind, then) {
+      if (reduce) return;
+      clearTimeout(coachTimer);
+      if (IDLE[kind]) { reacting = false; queued = null; coachShow(kind, true); return; }
+      reacting = true; queued = then || "think";
       cring.classList.remove("is-bump"); void cring.offsetWidth; cring.classList.add("is-bump");
-      if (back) coachTimer = setTimeout(function () { coachPlay(back); }, after || 2600);
+      var done = false;
+      coachShow(kind, false, function () {
+        if (done) return; done = true; clearTimeout(coachTimer);
+        reacting = false;
+        var next = queued; queued = null;
+        if (next === "point") coachPlay("point", "think"); else coachPlay(next || "think");
+      });
+    }
+    // A new question asks for a point, unless the coach is still celebrating: then it waits its turn.
+    function coachCue(kind) { if (reacting) queued = kind; else coachPlay(kind, "think"); }
+    function coachSay(text) {
+      if (reduce) return;
+      var b = h("span", { class: "ai-sl__say" }, text);
+      cring.parentNode.appendChild(b); setTimeout(function () { b.remove(); }, 1500);
     }
     var POINTS = { goal: 150, platforms: 100, market: 150, category: 200, budget: 150, count: 100 };
     var LEVELS = [[0, "Draft"], [250, "Focused"], [500, "Sharp"], [800, "Ready to launch"]];
@@ -1647,11 +1669,20 @@
       power.querySelector(".ai-sl__pw-bar i").style.width = (n / 10) + "%";
       var lvl = levelOf(n);
       power.querySelector(".ai-sl__pw-lvl").textContent = lvl;
-      if (gain && lvl !== before) {
+      var leveled = !!(gain && lvl !== before);
+      if (leveled) {
         var up = h("span", { class: "ai-sl__lvlup" }, "Level up · " + lvl);
         power.appendChild(up); setTimeout(function () { up.remove(); }, 1800);
       }
+      if (gain && n > shown) { power.classList.remove("is-gain"); void power.offsetWidth; power.classList.add("is-gain"); }
       shown = n;
+      return leveled;
+    }
+    // Every answer gets a reaction: a thumbs-up and the points, or a cheer on a level-up.
+    function reward(pts) {
+      var leveled = paintPower(true);
+      coachSay(leveled ? "Level up!" : "+" + pts);
+      coachPlay(leveled ? "cheer" : "thumbs", "think");
     }
 
     function setTrack(at, done) {
@@ -1686,7 +1717,7 @@
     }
     function ask(i) {
       step = i; setTrack(i); paintPower(false);
-      coachPlay("point", "think", 3200);
+      coachCue("point");
       var id = AI_STEPS[i][0], q = byId[id];
       if (!q) return i + 1 < AI_STEPS.length ? ask(i + 1) : review();
       var many = q.type === "many";
@@ -1699,7 +1730,7 @@
         var on = many ? picked.indexOf(o.value) > -1 : answers[id] === o.value;
         var b = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(on) }, o.label);
         b.addEventListener("click", function () {
-          if (!many) { answers[id] = o.value; b.setAttribute("aria-pressed", "true"); pop(b, scoreOf(id)); paintPower(true); coachPlay("thumbs", "think", 2400); setTimeout(function () { next(); }, reduce ? 0 : 650); return; }
+          if (!many) { answers[id] = o.value; b.setAttribute("aria-pressed", "true"); pop(b, scoreOf(id)); reward(scoreOf(id)); setTimeout(function () { next(); }, reduce ? 0 : 750); return; }
           var k = picked.indexOf(o.value);
           if (o.value === "any") picked = k > -1 ? [] : ["any"];
           else { picked = picked.filter(function (v) { return v !== "any"; }); if (k > -1) picked.splice(picked.indexOf(o.value), 1); else picked.push(o.value); }
@@ -1712,7 +1743,7 @@
       var nav = h("div", { class: "ai-sl__nav" });
       if (i > 0) nav.appendChild(h("button", { class: "ai-sl__back", type: "button", onclick: function () { ask(i - 1); } }, "Back"));
       if (!q.required && !many) nav.appendChild(h("button", { class: "ai-sl__skip", type: "button", onclick: function () { delete answers[id]; next(); } }, "Skip"));
-      var nextBtn = h("button", { class: "ai-sl__next", type: "button", onclick: function () { answers[id] = picked.slice(); pop(nextBtn, scoreOf(id)); paintPower(true); coachPlay("thumbs", "think", 2400); setTimeout(next, reduce ? 0 : 650); } }, "Next");
+      var nextBtn = h("button", { class: "ai-sl__next", type: "button", onclick: function () { answers[id] = picked.slice(); pop(nextBtn, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750); } }, "Next");
       if (many) { nextBtn.disabled = !picked.length; nav.appendChild(nextBtn); }
       p.appendChild(nav);
       swap(p);
@@ -1743,7 +1774,7 @@
       var p = h("div", { class: "ai-sl__review" });
       var ticket = h("div", { class: "ai-sl__ticket" });
       ticket.appendChild(h("p", { class: "ai-sl__tk-h" }, "Campaign brief"));
-      paintPower(true); coachPlay("cheer", "wave", 4800);
+      paintPower(true); coachSay("Ready!"); coachPlay("cheer", "wave");
       var pw = Math.min(1000, powerNow());
       ticket.appendChild(h("span", { class: "ai-sl__tk-score" }, h("b", null, String(pw)), h("small", null, levelOf(pw))));
       var nameIn = h("input", { class: "ai-sl__name", type: "text", maxlength: "80", value: nameFor(), "aria-label": "Name this shortlist" });

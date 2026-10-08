@@ -907,3 +907,16 @@ body.pt-lock { overflow: hidden; }
 .lic-toggle[aria-checked="true"] .lic-toggle__track i { transform: translateX(18px); background: #121212; }
 .lic-toggle:focus-visible { outline: 3px solid #ee1515; outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .lic-toggle, .lic-toggle__track, .lic-toggle__track i { transition: none; } }
+
+/* the coach's speech pops and the meter's gain flash */
+.ai-sl__coach { position: relative; }
+.ai-sl__say {
+  position: absolute; top: 4px; right: -6px; z-index: 3; padding: 6px 12px; border-radius: 999px 999px 999px 4px;
+  font-family: Bebasneue, Arial, sans-serif; font-size: 22px; letter-spacing: .04em; line-height: 1;
+  background: var(--ai-orange); color: #fff; box-shadow: 0 8px 18px rgba(0,0,0,.35);
+  animation: ai-say 1.5s var(--ai-ease) forwards; pointer-events: none;
+}
+@keyframes ai-say { 0% { opacity: 0; transform: translateY(10px) scale(.6) rotate(-6deg); } 18% { opacity: 1; transform: translateY(-4px) scale(1.12) rotate(4deg); } 30% { transform: none; } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-14px); } }
+.ai-sl__power.is-gain .ai-sl__pw-n b { animation: ai-gain .6s var(--ai-ease); }
+@keyframes ai-gain { 0% { transform: scale(1); } 35% { transform: scale(1.25); color: #fff; } 100% { transform: scale(1); } }
+.ai-sl__pw-n b { display: inline-block; }
