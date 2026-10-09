@@ -307,9 +307,11 @@ treats `success:"false"` as an error. Keep that if you swap the endpoint.
 
 ## 5. Hero showreel
 
-The header plays `/assets/video/hero-reel.mp4` — the same reel the influencer
-campaigns page uses — muted, looping, `playsinline`, `preload="none"` behind
-`hero-reel-poster.jpg`. Swap the path in the builder's hero block to change it.
+The header plays `/assets/video/hero-reel-720.mp4` (a 720p cut of the reel the
+influencer campaigns page uses) — muted, looping, `playsinline`, `preload="none"`
+behind `hero-reel-poster.jpg`, and only after the grid has drawn (`data-src`). Swap
+the path in the builder's hero block to change it. The old 10.6 MB full-size
+`hero-reel.mp4` was removed from the repo on 2026-10-09: nothing referenced it.
 
 The lime pill overlaps the giant heading via a negative bottom margin that
 scales with the title (`clamp`), so the bite stays proportional at every width
