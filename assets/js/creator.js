@@ -379,11 +379,11 @@
     var sels = (g.selections || []).map(function (x) { return x.name; });
     var st = {
       locked: ["lock", "Full analysis", "Audience, growth, fake-follower check, brand history, best posts and a pricing benchmark. <b>Free</b> for creators in your selections" +
-        (sels.length ? " (this one is in <b>" + esc(sels[0]) + "</b>)" : "") + ", ready <b>within 2 working days</b>.",
+        (sels.length ? " (this one is in <b>" + esc(sels[0]) + "</b>)" : "") + ", ready <b>within 1 working day</b>.",
         '<button type="button" class="pp-gbtn" id="pp-ask-full">' + hvi("lock") + "Request full analysis</button>"],
       requested: ["clock", "Analysis requested", "You asked on <b>" + esc(when(g.requested_at)) + "</b>. It will be ready by <b>" + esc(whenLong(g.ready_by)) +
-        "</b>, within 2 working days. Helvy rings your bell when it opens.", '<button type="button" class="pp-gbtn" disabled>' + hvi("clock") + "Requested</button>"],
-      outside: ["lock", "Full analysis", "Add this creator to a selection to request the full analysis. It's free, and ready within 2 working days.",
+        "</b>, within 1 working day. Helvy rings your bell when it opens.", '<button type="button" class="pp-gbtn" disabled>' + hvi("clock") + "Requested</button>"],
+      outside: ["lock", "Full analysis", "Add this creator to a selection to request the full analysis. It's free, and ready within 1 working day.",
         '<button type="button" class="pp-gbtn is-off" aria-disabled="true" title="Add this creator to a selection to request the full analysis.">' + hvi("lock") + "Request full analysis</button>"],
       unlocked: ["unlock", "Full analysis ready", (g.granted_at ? "Opened <b>" + esc(when(g.granted_at)) + "</b> for your team. " : "") +
         "Every section is live: audience, authenticity, content and brand history, and the PDF.", '<button type="button" class="pp-gbtn" id="pp-view-full">' + hvi("unlock") + "View full analysis</button>"]

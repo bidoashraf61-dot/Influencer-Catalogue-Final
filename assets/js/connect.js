@@ -515,7 +515,7 @@
       { view: "catalogue", target: ".cx-aipill", clip: "point", t: "Let AI build your shortlist", p: "Answer six quick questions and I’ll pick creators that fit your brief, each with the reasons why." },
       { view: "selection", target: ".cx-card__acts", clip: "point", t: "Approve or reject", p: "Your selection opens with everyone Under review. Approve the ones you want; reject the rest and tell me why, and I’ll find a better fit." },
       { view: "selection", target: ".cx-chiprow", clip: "point", t: "Scores and status at a glance", p: "Each creator is scored out of 100 against your brief. The chips count who is approved, rejected or still under review, and filter the page." },
-      { view: "analysis", target: ".cx-req", clip: "point", t: "Unlock the full analysis", p: "Headline numbers are open. Request the full analysis and HelloVoice sends it within 2 working days, free." },
+      { view: "analysis", target: ".cx-req", clip: "point", t: "Unlock the full analysis", p: "Headline numbers are open. Request the full analysis and HelloVoice sends it within 1 working day, free." },
       { view: "campaign", target: ".cx-report", clip: "point", t: "Follow your campaign", p: "Once it’s live, the report updates every 24 hours with every post, the reach and engagement, and the verdict first." },
       { view: "catalogue", target: "bell", clip: "celebrate", t: "You’re all set", p: "Updates land in the bell. Your selections, analyses and credits live in your profile.", next: "Finish tour", prize: true }
     ];
@@ -572,7 +572,7 @@
         [["Followers", cr[3]], ["Avg views", "148K"], ["Engagement", cr[4]], ["Platforms", "IG · TT"]].forEach(function (x) { free.appendChild(h("div", null, h("dt", null, x[0]), h("dd", null, x[1]))); });
         panel.appendChild(free);
         panel.appendChild(h("div", { class: "cx-req" }, h("span", { class: "cx-req__lock", html: ic("lock") }),
-          h("div", null, h("h4", null, "Full analysis is locked"), h("p", null, "Audience age, gender and country, growth, fake-follower check, brand history, best posts and a pricing benchmark. ", h("b", null, "Free, within 2 working days."))),
+          h("div", null, h("h4", null, "Full analysis is locked"), h("p", null, "Audience age, gender and country, growth, fake-follower check, brand history, best posts and a pricing benchmark. ", h("b", null, "Free, within 1 working day."))),
           h("span", { class: "cx-btn", html: ic("lock") + "<span>Request full analysis</span>" })));
         var locks = h("div", { class: "cx-locks" });
         ["Audience", "Authenticity"].forEach(function (t) {

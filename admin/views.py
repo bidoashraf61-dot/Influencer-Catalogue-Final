@@ -4126,7 +4126,7 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
         + _notes(error, message)
         + "<div class='card' id='requests'><div class='hd'><h2>Full-analysis requests" + (" <span class='pill warn'>" + str(len(queue)) + " open</span>" if queue else "")
         + "</h2></div><p class='sec-desc'>Clients only see a creator's full analysis (audience, growth, fake-follower check, brand history, best posts, pricing) "
-          "once you unlock it for them. They can ask for any creator in one of their selections; we promise it within 2 working days. "
+          "once you unlock it for them. They can ask for any creator in one of their selections; we promise it within 1 working day. "
           "<b>Fulfil</b> unlocks it for that client's team and rings their bell; uploading the analysis does the same by itself.</p>"
           "<table><thead><tr><th>Creator</th><th>Client</th><th>Asked</th><th>Due</th><th>Analysis</th><th></th></tr></thead><tbody>"
         + (req_rows or "<tr><td colspan='6' class='muted'>No open requests.</td></tr>") + "</tbody></table>"

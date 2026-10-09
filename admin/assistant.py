@@ -1048,8 +1048,8 @@ def d_analysis(a, ctx):
         raise ValueError("%s is not in any of this client's selections. A full analysis can only be requested for a creator "
                          "in one of their selections: tell them to add the creator first." % c["name"])
     if st == "requested":
-        raise ValueError("%s's full analysis is already requested; it is ready within 2 working days." % c["name"])
-    return "Request the full analysis of %s (free, ready within 2 working days)" % c["name"]
+        raise ValueError("%s's full analysis is already requested; it is ready within 1 working day." % c["name"])
+    return "Request the full analysis of %s (free, ready within 1 working day)" % c["name"]
 
 
 def x_analysis(a, ctx):
@@ -1058,7 +1058,7 @@ def x_analysis(a, ctx):
     if not ok:
         return {"ok": False, "message": "Add this creator to a selection to request the full analysis." if why == "outside"
                 else "That analysis is already open for you."}
-    return {"ok": True, "message": "Requested. It will be ready within 2 working days, and your bell rings when it opens."}
+    return {"ok": True, "message": "Requested. It will be ready within 1 working day, and your bell rings when it opens."}
 
 
 CLIENT_WRITE = {
@@ -1068,7 +1068,7 @@ CLIENT_WRITE = {
     "tag_creators": (d_sel_tag, x_sel_tag, _decl("tag_creators", "Put the client's own tags (e.g. Hero, Backup, Phase 2, a segment name) on creators in the open selection. Needs confirmation.", {"codes": SA, "tags": SA}, ["codes", "tags"])),
     "save_as_selection": (d_new_sel, x_new_sel, _decl("save_as_selection", "Save creators (by code) as a new selection with a name. Needs confirmation.", {"codes": SA, "name": S}, ["codes"])),
     "request_quote": (d_quote, x_quote, _decl("request_quote", "Send the open selection to the account manager for a quote, with an optional note. Needs confirmation.", {"note": S})),
-    "request_analysis": (d_analysis, x_analysis, _decl("request_analysis", "Ask the team to unlock a creator's full analysis (free, ready within 2 working days; only for creators in one of the client's selections). Needs confirmation.", {"code": S}, ["code"])),
+    "request_analysis": (d_analysis, x_analysis, _decl("request_analysis", "Ask the team to unlock a creator's full analysis (free, ready within 1 working day; only for creators in one of the client's selections). Needs confirmation.", {"code": S}, ["code"])),
 }
 
 
@@ -1223,7 +1223,7 @@ def system_prompt(scope, ctx):
         "Reply in the language the client writes in. (6) Refer to creators as 'Name (CODE)'. "
         "(7) A creator's full analysis (audience age, gender and countries, growth, fake-follower check, brand history, best posts, "
         "pricing benchmark) is locked until HelloVoice unlocks it for this client; tools mark it 'locked'. When asked for any of it, say "
-        "it isn't available yet and offer to request it: call request_analysis (free, ready within 2 working days), which works only "
+        "it isn't available yet and offer to request it: call request_analysis (free, ready within 1 working day), which works only "
         "for creators in one of their selections; for anyone else, tell them to add the creator to a selection first. Never guess "
         "locked figures. Followers, platforms, average views and engagement rate are always free. "
         "(8) Timing: when a client mentions a season, occasion, congress or launch date, check occasions and say when to brief "

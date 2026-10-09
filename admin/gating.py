@@ -37,7 +37,7 @@ CREATE TABLE IF NOT EXISTS analysis_grants (
 );
 """
 
-WORK_DAYS = 2                      # the promise: ready within 2 working days
+WORK_DAYS = 1                      # the promise: ready within 1 working day (client-approved 2026-10-09)
 WEEKEND = (4, 5)                   # Friday, Saturday (KSA); time.gmtime().tm_wday, Monday = 0
 
 
@@ -56,7 +56,7 @@ def init():
 
 
 def ready_by(ts):
-    """Two working days after ``ts`` (Friday and Saturday do not count)."""
+    """WORK_DAYS working days after ``ts`` (Friday and Saturday do not count)."""
     t, left = int(ts), WORK_DAYS
     while left:
         t += 86400

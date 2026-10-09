@@ -337,7 +337,7 @@
   /* -------------------------------------------------------------- analyses */
 
   function renderAnalyses(p) {
-    add(p, head("Analyses", "A full analysis opens a creator's audience, growth, fake-follower check, brand history, best posts and a pricing benchmark. It is free for any creator in one of your selections and ready within 2 working days."));
+    add(p, head("Analyses", "A full analysis opens a creator's audience, growth, fake-follower check, brand history, best posts and a pricing benchmark. It is free for any creator in one of your selections and ready within 1 working day."));
     if (!DATA.analyses.length) {
       add(p, h("div", { class: "hc-empty" }, h("b", null, "No analyses requested yet"),
         h("p", null, "Open a creator from one of your selections and press Request full analysis. Helvy rings your bell when it opens."),
@@ -550,7 +550,7 @@
     var rows = [["AI shortlist", "Answer six questions about your campaign; Helvy ranks the roster against them.", c.brief],
                 ["Find a replacement", "After you reject a creator: 3 similar creators that fit the same campaign.", c.replace],
                 ["A typed question to Helvy", "Tapping Helvy's options is always free.", c.chat],
-                ["Full creator analysis", "For any creator in one of your selections. Ready within 2 working days.", 0]];
+                ["Full creator analysis", "For any creator in one of your selections. Ready within 1 working day.", 0]];
     var tb = h("tbody");
     rows.forEach(function (r) {
       tb.appendChild(h("tr", null, h("td", null, h("b", null, r[0]), h("small", null, r[1])),

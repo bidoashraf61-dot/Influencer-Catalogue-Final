@@ -4039,7 +4039,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             notify.send("analysis", ["%s asked for the full analysis of %s (%s)." % (
                 ((u["name"] or u["email"]) + ", " + (u["company"] or "")) if u else "An access-code client", c["name"], code),
                 "In: %s" % ", ".join(x["name"] for x in sels[:3]),
-                "Promised within 2 working days. Fulfil it on the Creator analysis page."],
+                "Promised within 1 working day. Fulfil it on the Creator analysis page."],
                 kam=u["kam"] if u is not None else None)
         return self.send_json(200, {"ok": True, "gate": gating.state(code_id, code)}, self.cors())
 
