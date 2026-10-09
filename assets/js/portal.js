@@ -77,36 +77,26 @@
       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (UI_PATHS[name] || "") + "</svg>";
   }
   HV.icon = icon;
-  // Helvy's picture lives in ONE file: the smile B master (2026-10-09), head and shoulders on the lime disc.
-  HV.helvy = ROOT + "assets/brand/helvy.webp";
-  // Helvy's moving states (2026-10-09 set, each starts and ends on the smile): idle, hello, bye,
-  // loader, thinking, celebrate, point. Reduced motion shows the smiling still instead.
-  var HELVY_DIR = ROOT + "assets/brand/helvy/";
+  // Helvy's files are named in ONE place: window.HVHelvy in hv-loader.js (every page loads it first).
+  // Transparent cut-outs framed waist-up; HV.helvy is the transparent head still (small avatars).
+  var HVH = window.HVHelvy || null;
+  HV.helvy = HVH ? HVH.head : ROOT + "assets/brand/helvy.webp";
   var REDUCE = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
-  function clipSrc(v, name) {
-    v.innerHTML = '<source src="' + HELVY_DIR + "helvy-" + name + '.webm" type="video/webm"/><source src="' + HELVY_DIR + "helvy-" + name + '.mp4" type="video/mp4"/>';
-  }
+  // clip(name, cls, {once, then, seq, still}) -> a frame holding Helvy. Autoplay and loop are
+  // forced (muted, playsinline, set before the source) and a refused autoplay shows the still.
   function clip(name, cls, opts) {
     opts = opts || {};
     var box = document.createElement("span");
     box.className = "cx-hd" + (cls ? " " + cls : "");
     box.setAttribute("aria-hidden", "true");
-    if (REDUCE || opts.still) {
+    if (!HVH || REDUCE || opts.still) {
       var im = document.createElement("img");
-      im.className = "cx-hd__full"; im.alt = ""; im.decoding = "async"; im.src = HELVY_DIR + "helvy-smile-full.webp";
+      im.className = "hv-clip hv-clip--still"; im.alt = ""; im.decoding = "async";
+      im.src = HVH ? HVH.still : ROOT + "assets/brand/helvy/helvy-still.webp";
       box.appendChild(im);
       return box;
     }
-    var v = document.createElement("video");
-    v.muted = true; v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.autoplay = true; v.loop = !opts.once;
-    v.preload = "auto"; v.poster = HELVY_DIR + "helvy-poster.webp"; v.setAttribute("data-clip", name);
-    clipSrc(v, name);
-    if (opts.once && opts.then) v.addEventListener("ended", function () {
-      v.loop = true; v.setAttribute("data-clip", opts.then); clipSrc(v, opts.then); v.load();
-      var q = v.play && v.play(); if (q && q.catch) q.catch(function () { /* autoplay blocked: the poster stays */ });
-    }, { once: true });
-    box.appendChild(v);
-    var p = v.play && v.play(); if (p && p.catch) p.catch(function () { /* autoplay blocked */ });
+    box.appendChild(HVH.video(name, { once: opts.once, then: opts.then, seq: opts.seq }));
     return box;
   }
   HV.clip = clip;
@@ -332,17 +322,15 @@
 
   /* ------------------------------------------------------------------ gate */
 
-  // HELVY Connect sign-in (phase C, approved 2026-10-09). The passcode gate each page
-  // ships becomes one scene: a blurred wall of HelloVoice's own film stills, the
-  // pitch on the left (logo, three value lines, confirmed client logos) and the
-  // door on the right, where Helvy waves in beside the card. Two doors: Client
-  // (work email -> 6-digit code -> first-time name, company, job title) and
-  // HelloVoice team (the admin, where access is given person by person).
-  // Shared access codes are no longer offered here; a link that still needs its
-  // code (selection, campaign) shows "Opened a shared link?" under the card, and
-  // ?access=code brings the same form up on the catalogue.
+  // HELVY Connect sign-in (simplified 2026-10-09, client-approved). One scene on a blurred wall
+  // of HelloVoice's own film stills: the logo and one line, then the sign-in card with Helvy
+  // standing on its top edge (a transparent cut-out, waving hello, then idling), and one small,
+  // quiet row of client logos at the foot. Client sign-in only: work email -> 6-digit code ->
+  // first-time name, company, job title. There is no team door; HelloVoice reaches the admin by
+  // its own address. A selection or campaign link that still needs its access code shows
+  // "Opened a shared link?" under the card, and ?access=code brings the same form up.
   var LOGOS = [["bayer", "Bayer"], ["abbott", "Abbott"], ["pfizer", "Pfizer"], ["astrazeneca", "AstraZeneca"], ["molnlycke", "Mölnlycke"],
-               ["whites", "Whites"], ["nahdi", "Nahdi"], ["biotech-cigalah", "Biotech Cigalah"]];
+               ["menarini-group", "Menarini"], ["whites", "Whites"], ["nahdi", "Nahdi"], ["biotech-cigalah", "Biotech Cigalah"]];
   var PERSONAL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|aol|proton|protonmail|gmx|yandex|mail|zoho)\.[a-z.]+$/i;
 
   function enhanceGate() {
@@ -361,37 +349,19 @@
     scene.appendChild(h("div", { class: "cx-wall", "aria-hidden": "true" }));
     var wrap = h("div", { class: "cx-wrap cx-scene__in" });
 
-    /* -- the pitch -- */
+    /* -- the name and one line -- */
     var pitch = h("section", { class: "cx-pitch", "aria-label": "About HELVY Connect" });
     pitch.appendChild(h("h1", { class: "cx-vh" }, "HELVY Connect"));
-    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp", alt: "HELVY Connect", width: "440", height: "220" }));
+    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp", alt: "HELVY Connect", width: "440", height: "220", fetchpriority: "high" }));
     pitch.appendChild(h("p", { class: "cx-pitch__tag" }, "Connecting Brands with the Right Voices"));
-    var vals = h("ul", { class: "cx-vals" });
-    [["shield", "Vetted creators", "Every creator is checked by HelloVoice before they reach your list."],
-     ["scan", "Real analysis", "Audience, authenticity and content history, from the creators’ own insights."],
-     ["chart", "Live campaign tracking", "Your report updates every 24 hours, with the verdict first."]].forEach(function (v) {
-      vals.appendChild(h("li", null, h("span", { class: "cx-ico", html: icon(v[0], "cx-i") }), h("span", null, h("b", null, v[1]), h("small", null, v[2]))));
-    });
-    pitch.appendChild(vals);
-    var logos = h("div", { class: "cx-logos__row" });
-    LOGOS.forEach(function (l) {
-      logos.appendChild(h("img", { src: ROOT + "assets/clients/" + l[0] + ".webp", srcset: ROOT + "assets/clients/" + l[0] + "@2x.webp 2x", alt: l[1], loading: "lazy", height: "30" }));
-    });
-    pitch.appendChild(h("div", { class: "cx-logos" }, h("p", null, "Brands HelloVoice has made content for"), logos));
 
-    /* -- the door -- */
+    /* -- the card, Helvy standing on it -- */
     var door = h("section", { class: "cx-door", "aria-label": "Sign in" });
-    var mhead = h("div", { class: "cx-mhead" });
-    mhead.appendChild(clip("hello", "cx-hd--head", { once: true, then: "idle" }));
-    mhead.appendChild(h("div", null, h("img", { src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-320.webp", alt: "HELVY Connect", width: "190", height: "95" }),
-      h("p", null, "Connecting Brands with the Right Voices")));
-    var helvy = h("div", { class: "cx-door__helvy" }, clip("hello", "", { once: true, then: "idle" }));
+    var helvy = h("div", { class: "cx-door__helvy" }, clip("hello", "cx-hd--edge", { once: true, then: "idle" }));
     var bubble = h("span", { class: "cx-door__say", "aria-hidden": "true" }, "Hi, I’m Helvy");
-    var tClient = h("button", { type: "button", role: "tab", id: "cx-t-client", "aria-selected": "true", "aria-controls": "cx-pane", html: icon("case", "cx-i") + "Client" });
-    var tTeam = h("button", { type: "button", role: "tab", id: "cx-t-team", "aria-selected": "false", "aria-controls": "cx-pane", html: icon("shield", "cx-i") + "HelloVoice team" });
-    var pane = h("div", { id: "cx-pane", role: "tabpanel", "aria-live": "polite" });
-    var card = h("div", { class: "cx-door__card" }, h("div", { class: "cx-doors", role: "tablist", "aria-label": "Who is signing in" }, tClient, tTeam), pane);
-    door.appendChild(mhead); door.appendChild(helvy); door.appendChild(bubble); door.appendChild(card);
+    var pane = h("div", { id: "cx-pane", "aria-live": "polite" });
+    var card = h("div", { class: "cx-door__card" }, pane);
+    door.appendChild(helvy); door.appendChild(bubble); door.appendChild(card);
     var sharedLine = null;
     if (sharedOk && oldForm) {
       sharedLine = h("p", { class: "cx-shared" }, "Opened a shared link with an access code? ",
@@ -400,6 +370,13 @@
     }
     wrap.appendChild(pitch); wrap.appendChild(door);
     scene.appendChild(wrap);
+
+    /* -- one quiet row of client logos -- */
+    var logos = h("div", { class: "cx-logos__row" });
+    LOGOS.forEach(function (l) {
+      logos.appendChild(h("img", { src: ROOT + "assets/clients/" + l[0] + ".webp", srcset: ROOT + "assets/clients/" + l[0] + "@2x.webp 2x", alt: l[1], loading: "lazy", decoding: "async", height: "22" }));
+    });
+    scene.appendChild(h("div", { class: "cx-logos" }, h("div", { class: "cx-wrap" }, h("p", null, "Trusted by"), logos)));
 
     var foot = h("footer", { class: "cx-scene__foot" });
     var fw = h("div", { class: "cx-wrap" });
@@ -412,7 +389,7 @@
 
     /* -- the steps -- */
     var st = { step: "email", email: "", ticket: "", expires: 0, resendAt: 0, timer: null, company: "" };
-    var SAY = { email: "Hi, I’m Helvy", blocked: "Work email, please", team: "Welcome back, team", code: "It’s on its way",
+    var SAY = { email: "Hi, I’m Helvy", blocked: "Work email, please", code: "It’s on its way",
                 details: "Nice to meet you", shared: "Got a code?", pending: "Almost there" };
     function setSay(k) { bubble.textContent = SAY[k] || SAY.email; }
     function errLine(text) { return h("p", { class: "cx-err", role: "alert", html: icon("info", "cx-i") }, h("span", null, text)); }
@@ -427,32 +404,21 @@
       opts = opts || {};
       clearInterval(st.timer);
       st.step = step;
-      var team = step === "team";
-      tClient.setAttribute("aria-selected", String(!team)); tTeam.setAttribute("aria-selected", String(team));
       setSay(opts.blocked ? "blocked" : step);
       pane.textContent = "";
-      ({ email: paneEmail, code: paneCode, details: paneDetails, team: paneTeam, shared: paneShared, pending: panePending }[step] || paneEmail)(opts);
-      if (sharedLine) sharedLine.hidden = step === "shared" || step === "team";
+      ({ email: paneEmail, code: paneCode, details: paneDetails, shared: paneShared, pending: panePending }[step] || paneEmail)(opts);
+      if (sharedLine) sharedLine.hidden = step === "shared";
     }
-    tClient.addEventListener("click", function () { if (st.step === "team" || st.step === "shared") show(st.ticket ? "details" : "email"); });
-    tTeam.addEventListener("click", function () { show("team"); });
-    [tClient, tTeam].forEach(function (t) {
-      t.addEventListener("keydown", function (e) {
-        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
-        var other = t === tClient ? tTeam : tClient; other.click(); other.focus(); e.preventDefault();
-      });
-    });
 
     function paneEmail(opts) {
-      pane.appendChild(h("h2", { class: "cx-door__title" }, "Sign in or join"));
-      pane.appendChild(h("p", { class: "cx-door__lead" }, "We’ll email you a one-time code. No password to remember, and the same step creates your account if you’re new."));
+      pane.appendChild(h("h2", { class: "cx-vh" }, "Sign in or join"));
       var input = h("input", { type: "email", name: "email", autocomplete: "email", inputmode: "email", spellcheck: "false", required: true,
         placeholder: "name@yourcompany.com", value: st.email || "", "aria-describedby": "cx-email-err" });
       var fld = h("label", { class: "cx-fld" }, h("span", null, "Work email"), input);
       var err = h("div", { id: "cx-email-err" });
       var btn = label(goBtn(), "Email me a code");
       var form = h("form", { novalidate: true }, fld, err, btn);
-      var fine = h("p", { class: "cx-fine" }, "Personal addresses (Gmail, Hotmail, Outlook.com, Yahoo, iCloud) can’t sign in. Your HelloVoice account manager is told when someone from your company joins.");
+      var fine = h("p", { class: "cx-fine" }, "We email you a one-time code. No password, and new accounts are made in the same step.");
       pane.appendChild(form); pane.appendChild(fine);
       function bad(text, personal) {
         fld.classList.add("cx-fld--err"); input.setAttribute("aria-invalid", "true");
@@ -590,17 +556,6 @@
         });
       });
       setTimeout(function () { name.focus({ preventScroll: true }); }, 30);
-    }
-
-    function paneTeam() {
-      pane.appendChild(h("h2", { class: "cx-door__title" }, "HelloVoice team"));
-      pane.appendChild(h("p", { class: "cx-door__lead" }, "Team accounts sign in on the admin, where you run the roster, selections and campaigns."));
-      pane.appendChild(h("div", { class: "cx-team" }, h("span", { class: "cx-ico", html: icon("shield", "cx-i") }),
-        h("p", null, h("b", null, "Admin access is given person by person."), " A company email on its own doesn’t open the admin. If you need access, contact ",
-          h("a", { href: "mailto:info@hellovoice.co.uk" }, "info@hellovoice.co.uk"), ".")));
-      pane.appendChild(h("a", { class: "cx-btn cx-btn--ink cx-go", href: API + "/", html: "<span>Go to team sign-in</span>" + icon("arrow", "cx-i") }));
-      pane.appendChild(h("p", { class: "cx-fine" }, "Looking for your client account? ",
-        h("button", { type: "button", class: "cx-link", onclick: function () { show("email"); } }, "Sign in as a client")));
     }
 
     function paneShared() {
@@ -1477,7 +1432,6 @@
   // Every write is a button the client presses; the AI itself only answers.
 
   var VOICE_PAGES = { catalogue: 1, selection: 1, creator: 1, account: 1, campaign: 1 };
-  var V_IMG = ROOT + "assets/brand/voice/";
   var V_ICON = {
     send: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>',
     close: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -1521,26 +1475,13 @@
     /* -- launcher -- */
     var root = h("div", { id: "hv-voice", class: "hv-voice" });
     var launch = h("button", { class: "hv-launch cx-launch", type: "button", "aria-label": "Chat with Helvy, your AI assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
-    // Helvy: the smile B still by default, the idle loop (smiling, lime) once it can play.
+    // Helvy rises out of an ink disc: the transparent idle loop, cut at the disc's curve.
+    // Reduced motion, or a browser that refuses autoplay, gets the transparent still instead.
     launch.innerHTML = '<span class="hv-launch__disc" aria-hidden="true"></span>' +
-      '<img class="hv-launch__face cx-face" src="' + HV.helvy + '" alt="" width="76" height="76" decoding="async"/>' +
-      (reduce ? "" : '<video class="hv-launch__vid" muted loop playsinline autoplay preload="auto" aria-hidden="true" poster="' + HELVY_DIR + 'helvy-poster.webp">' +
-        '<source src="' + HELVY_DIR + 'helvy-idle.webm" type="video/webm"/><source src="' + HELVY_DIR + 'helvy-idle.mp4" type="video/mp4"/></video>') +
       '<span class="hv-launch__x" aria-hidden="true">' + V_ICON.close + "</span>" +
       '<span class="hv-launch__dot" aria-hidden="true" hidden></span>';
-    // The waving loop (made with Higgsfield) replaces the still once it can play; the still stays if it can't.
-    var vid = launch.querySelector(".hv-launch__vid");
-    if (vid) {
-      // Autoplay can start before this listener exists, so check the clock too.
-      var live = function () { launch.classList.add("has-video"); };
-      vid.addEventListener("playing", live);
-      vid.addEventListener("timeupdate", live, { once: true });
-      // If the browser stops the loop (power saving, background tab), fall back to the still.
-      vid.addEventListener("pause", function () { launch.classList.remove("has-video"); });
-      if (!vid.paused && vid.readyState > 2) live();
-      vid.addEventListener("error", function () { vid.remove(); }, true);
-      var p = vid.play && vid.play(); if (p && p.catch) p.catch(function () { /* autoplay blocked: keep the still */ });
-    }
+    var face = HVH && !reduce ? HVH.video("idle", { cls: "hv-launch__vid" }) : h("img", { class: "hv-launch__vid hv-clip--still", src: HVH ? HVH.still : HV.helvy, alt: "", decoding: "async" });
+    launch.insertBefore(face, launch.children[1]);
     var nudge = h("div", { class: "hv-nudge", role: "status", hidden: "" });
     nudge.innerHTML = "<span><b>Need a hand?</b>Ask me to shortlist creators or check what your budget can reach.</span>";
     var nudgeX = h("button", { class: "hv-nudge__x", type: "button", "aria-label": "Dismiss" });
@@ -2507,24 +2448,22 @@
   function buildAiCard(host) {
     frameSetup(host);
     var reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
-    var V = ROOT + "assets/brand/voice/";
     host.classList.add("ai-host");
     var card = h("section", { id: "ai-sl", class: "ai-sl", "aria-labelledby": "ai-sl-title" });
     var roster = document.querySelectorAll(".cat-card").length;
-    function loop(name) {
-      return reduce ? '<img src="' + V + 'voice-loop-poster.webp" alt="" width="120" height="120"/>'
-        : '<video muted loop playsinline autoplay preload="metadata" poster="' + V + 'voice-loop-poster.webp" aria-hidden="true">' +
-          '<source src="' + V + name + '.webm" type="video/webm"/><source src="' + V + name + '.mp4" type="video/mp4"/></video>';
-    }
+    // Helvy's 2026-10-09 transparent set (hv-loader.js names the files). The wait is the
+    // "director's desk": thinking -> flipping through creator cards -> stamping approval, round and round.
+    function loop(name, seq) { return clip(name, "ai-sl__hv", seq ? { seq: seq } : null); }
 
     // Collapsed: the invitation.
     var intro = h("div", { class: "ai-sl__intro" });
-    intro.innerHTML = '<div class="ai-sl__face">' + loop("voice-loop") + "</div>" +
+    intro.innerHTML = '<div class="ai-sl__face"></div>' +
       '<div class="ai-sl__copy"><h2 class="ai-sl__title" id="ai-sl-title">Build a shortlist with AI</h2>' +
       "<p>Six quick taps. We score every creator in the roster against your campaign and pick the best.</p></div>";
     var start = h("button", { class: "ai-sl__start", type: "button" }, "Start");
     start.insertAdjacentHTML("beforeend", aiSvg('<path d="M5 12h13M13 6l6 6-6 6"/>', 18));
     intro.appendChild(start);
+    intro.querySelector(".ai-sl__face").appendChild(clip("idle", "ai-sl__hv cx-hd--head"));
 
     // Expanded: the journey.
     var run = h("div", { class: "ai-sl__run", hidden: "" });
@@ -2550,7 +2489,7 @@
     // several) left blank or half-painted frames in Chrome.
     var cring = h("div", { class: "ai-sl__cring" });
     // Trimmed to the action itself, so a reaction starts the instant the client taps.
-    var CLIP = { point: "voice-point-act", think: "voice-think-act", thumbs: "voice-thumbs-act", cheer: "voice-cheer-act", wave: "voice-loop" };
+    var CLIP = { point: "point", think: "thinking", thumbs: "stamp", cheer: "celebrate", wave: "idle" };
     var IDLE = { think: 1, wave: 1 };
     var power = h("div", { class: "ai-sl__power" });
     power.innerHTML = '<p class="ai-sl__pw-h">Campaign power</p><p class="ai-sl__pw-n"><b>0</b><small> / ' + 1000 + '</small></p>' +
@@ -2569,17 +2508,15 @@
     // over to whatever is waiting, so a tap is always answered before the next pose.
     var coachTimer = null, reacting = false, queued = null;
     function coachShow(kind, loop, onEnd) {
-      var v = document.createElement("video");
-      v.className = "ai-sl__cvid"; v.muted = true; v.loop = !!loop; v.autoplay = true;
-      v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.setAttribute("aria-hidden", "true");
-      v.innerHTML = '<source src="' + V + CLIP[kind] + '.webm" type="video/webm"/><source src="' + V + CLIP[kind] + '.mp4" type="video/mp4"/>';
+      if (!window.HVHelvy) return;
+      var v = window.HVHelvy.video(CLIP[kind], { once: !loop, cls: "ai-sl__cvid", eager: true });
       var old = [].slice.call(cring.querySelectorAll("video"));
       var swap = function () { old.forEach(function (o) { o.remove(); }); };
       v.addEventListener("playing", swap, { once: true });
       setTimeout(swap, 900);
-      if (onEnd) { v.addEventListener("ended", onEnd, { once: true }); coachTimer = setTimeout(onEnd, 3200); }
+      if (onEnd) { v.addEventListener("ended", onEnd, { once: true }); coachTimer = setTimeout(onEnd, 5400); }
       cring.appendChild(v);
-      var pr = v.play(); if (pr && pr.catch) pr.catch(function () { /* autoplay blocked: last frame stays */ });
+      window.HVHelvy.play(v);
     }
     function coachPlay(kind, then) {
       if (reduce) return;
@@ -2788,7 +2725,7 @@
     }
 
     /* -- the wait, staged -- */
-    var STAGES = ["Reading your brief", "Scoring every creator", "Fitting your budget", "Writing the reasons"];
+    var STAGES = ["Reading your brief", "Flipping through creators", "Scoring fit", "Approving your picks"];
     function go(name) {
       busy = true;
       run.classList.add("is-staging"); clearTimeout(coachTimer);
@@ -2801,8 +2738,9 @@
           var ic = window.HV_ICONS && window.HV_ICONS.icons && window.HV_ICONS.icons[pl];
           return '<b class="ai-sl__mark ai-sl__mark--' + pl.toLowerCase() + '">' + (ic || '<em>' + AI_SHORT[pl] + "</em>") + "</b>";
         }).join("") + "</div>" +
-        '<div class="ai-sl__lens">' + loop("voice-scan") + "</div>" +
+        '<div class="ai-sl__lens"></div>' +
         '<span class="ai-sl__spark ai-sl__spark--1"></span><span class="ai-sl__spark ai-sl__spark--2"></span><span class="ai-sl__spark ai-sl__spark--3"></span>';
+      scene.querySelector(".ai-sl__lens").appendChild(loop("thinking", ["thinking", "cards", "stamp"]));
       p.appendChild(scene);
       var side = h("div", { class: "ai-sl__steps" });
       side.appendChild(h("p", { class: "ai-sl__ask" }, "Building “" + name + "”"));
@@ -2854,8 +2792,7 @@
       var burst = h("div", { class: "ai-sl__burst", "aria-hidden": "true" });
       for (var i = 0; i < 18; i++) { var c = h("i"); c.style.setProperty("--a", (i * 20) + "deg"); c.style.setProperty("--d", (60 + (i % 3) * 26) + "px"); burst.appendChild(c); }
       p.appendChild(burst);
-      if (!reduce) p.insertAdjacentHTML("beforeend", '<div class="ai-sl__cheer"><video muted autoplay playsinline loop>' +
-        '<source src="' + V + 'voice-cheer.webm" type="video/webm"/><source src="' + V + 'voice-cheer.mp4" type="video/mp4"/></video></div>');
+      if (!reduce) p.appendChild(h("div", { class: "ai-sl__cheer" }, clip("celebrate", "ai-sl__hv", { once: true, then: "idle" })));
       p.appendChild(h("p", { class: "ai-sl__big" }, h("b", null, String(res.picks.length)), " creators picked"));
       p.appendChild(h("p", { class: "ai-sl__hint" }, "Best fit first, scored per platform. They're ticked in your tray: add or remove anyone, then save."));
       swap(p);

@@ -553,8 +553,9 @@ body.pt-lock { overflow: hidden; }
 
 /* invitation */
 .ai-sl__intro { display: grid; grid-template-columns: 84px 1fr; gap: 14px 16px; align-items: center; padding: 20px 20px 20px 18px; }
-.ai-sl__face { width: 84px; height: 84px; border-radius: 50%; overflow: hidden; background: var(--ai-lime); box-shadow: 0 0 0 3px rgba(232,255,118,.25); }
-.ai-sl__face video, .ai-sl__face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Helvy on the AI card: transparent cut-outs (hv-loader.js / connect.css .cx-hd), no lime disc */
+.ai-sl__face { width: 84px; height: 84px; }
+.ai-sl__face .cx-hd, .ai-sl__lens .cx-hd, .ai-sl__cheer .cx-hd { width: 100%; height: 100%; }
 .ai-sl__title { margin: 0; font-family: Bebasneue, Arial, sans-serif; font-weight: 400; font-size: 30px; line-height: .95; letter-spacing: .02em; color: var(--ai-lime); }
 .ai-sl__copy p { margin: 6px 0 0; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,.78); }
 .ai-sl__start {
@@ -659,8 +660,7 @@ body.pt-lock { overflow: hidden; }
 /* the wait */
 .ai-sl__wait { display: grid; grid-template-columns: 280px 1fr; gap: 34px; align-items: center; }
 .ai-sl__scene { position: relative; width: 280px; height: 280px; display: grid; place-items: center; }
-.ai-sl__lens { position: relative; z-index: 2; width: 168px; height: 168px; border-radius: 50%; overflow: hidden; background: var(--ai-lime); box-shadow: 0 0 0 6px rgba(232,255,118,.18), 0 0 0 14px rgba(232,255,118,.07); }
-.ai-sl__lens video, .ai-sl__lens img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ai-sl__lens { position: relative; z-index: 2; width: 196px; height: 196px; }
 .ai-sl__orbit { position: absolute; inset: 0; border-radius: 50%; animation: ai-spin 9s linear infinite; }
 .ai-sl__orbit--a { inset: 22px; border: 1.5px dashed rgba(255,255,255,.18); }
 .ai-sl__orbit--b { inset: 4px; border: 1px solid rgba(232,255,118,.16); animation-duration: 14s; animation-direction: reverse; }
@@ -788,16 +788,12 @@ body.pt-lock { overflow: hidden; }
 .ai-sl__run.is-staging .ai-sl__coach { display: none; }
 .ai-sl__main { min-width: 0; }
 .ai-sl__coach { position: sticky; top: 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 4px; }
-.ai-sl__cring {
-  width: 176px; height: 176px; border-radius: 50%; overflow: hidden; background: var(--ai-lime);
-  box-shadow: 0 0 0 5px rgba(232,255,118,.2), 0 0 0 12px rgba(232,255,118,.06);
-}
-.ai-sl__cring { position: relative; }
-/* the bump is a ring pulse, not a transform: scaling a clipped video box mid-frame mis-paints it */
+/* the coach: Helvy stands on the meter below him (transparent clip, soft shadow, faded waist) */
+.ai-sl__cring { position: relative; width: 176px; height: 176px; }
 .ai-sl__cring.is-bump { animation: ai-bump .5s var(--ai-ease); }
-@keyframes ai-bump { 0% { box-shadow: 0 0 0 5px rgba(232,255,118,.2), 0 0 0 12px rgba(232,255,118,.06); } 40% { box-shadow: 0 0 0 9px rgba(232,255,118,.45), 0 0 0 20px rgba(232,255,118,.12); } 100% { box-shadow: 0 0 0 5px rgba(232,255,118,.2), 0 0 0 12px rgba(232,255,118,.06); } }
-.ai-sl__cvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
-.ai-sl__cring { background: var(--ai-lime) url("../brand/voice/voice-loop-poster.webp") center / cover no-repeat; }
+@keyframes ai-bump { 40% { transform: translateY(-6px); } }
+.ai-sl__cvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; display: block;
+  filter: drop-shadow(0 10px 12px rgba(0,0,0,.3)); -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent); mask-image: linear-gradient(180deg, #000 78%, transparent); }
 .ai-sl__power { position: relative; width: 100%; padding: 14px 16px 12px; border-radius: 18px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
 .ai-sl__pw-h { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); }
 .ai-sl__pw-n { margin: 4px 0 8px; color: rgba(255,255,255,.5); }
@@ -820,8 +816,7 @@ body.pt-lock { overflow: hidden; }
 .ai-sl__tk-score b { font: 400 30px/.9 Bebasneue, Arial, sans-serif; color: var(--ai-ink); }
 .ai-sl__tk-score small { font: 700 9px/1.2 "DM Sans", Arial, sans-serif; letter-spacing: .1em; text-transform: uppercase; color: var(--ai-ink); }
 .ai-sl__name { width: calc(100% - 110px); }
-.ai-sl__cheer { width: 150px; height: 150px; margin: 0 auto 12px; border-radius: 50%; overflow: hidden; background: var(--ai-lime); position: relative; z-index: 1; }
-.ai-sl__cheer video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ai-sl__cheer { width: 170px; height: 170px; margin: 0 auto 12px; position: relative; z-index: 1; }
 
 /* setup above, results below */
 .cat-controls.is-setup { padding-top: 40px; padding-bottom: 40px; }
@@ -895,7 +890,7 @@ body.pt-lock { overflow: hidden; }
 .ai-sl:not(.is-open) .ai-sl__intro {
   grid-template-columns: 40px auto auto; gap: 12px; padding: 5px 5px 5px 6px; align-items: center;
 }
-.ai-sl:not(.is-open) .ai-sl__face { width: 40px; height: 40px; box-shadow: none; }
+.ai-sl:not(.is-open) .ai-sl__face { width: 44px; height: 44px; }
 .ai-sl:not(.is-open) .ai-sl__title { font-size: 21px; white-space: nowrap; }
 .ai-sl:not(.is-open) .ai-sl__copy p { display: none; }
 .ai-sl:not(.is-open) .ai-sl__start { grid-column: auto; min-height: 44px; padding: 0 20px; font-size: 19px; }

@@ -156,7 +156,7 @@
       }
       if (res.skipped && res.skipped.length) box.appendChild(h("p", { class: "cx-skipped" }, "Not on these platforms, so left out: " + res.skipped.slice(0, 6).join(", ") + (res.skipped.length > 6 ? "…" : "") + "."));
       if (!opts.compact) {
-        var face = h("span", { class: "cx-hd" }); face.appendChild(h("img", { src: HV.helvy, alt: "" }));
+        var face = h("span", { class: "cx-hd" }); face.appendChild(h("img", { class: "hv-clip", src: HV.helvy, alt: "" }));
         box.appendChild(h("div", { class: "cx-advice" }, face, h("p", { class: "cx-advice__b" }, h("b", null, "Helvy"), res.advice)));
         box.appendChild(h("p", { class: "cx-srcs" }, h("span", { class: "cx-tag cx-tag--est", html: ic("info") + "Estimate" }),
           h("span", null, (res.sources || []).join("; ") + ". Costs use your budget only. Not a forecast of sales.")));
@@ -304,7 +304,7 @@
       });
       box.appendChild(rows);
       if (v.helvy) {
-        var face = h("span", { class: "cx-hd" }); face.appendChild(h("img", { src: HV.helvy, alt: "" }));
+        var face = h("span", { class: "cx-hd" }); face.appendChild(h("img", { class: "hv-clip", src: HV.helvy, alt: "" }));
         box.appendChild(h("div", { class: "cx-advice" }, face, h("p", { class: "cx-advice__b" }, h("b", null, "Helvy"), v.helvy)));
       }
       return box;
@@ -649,7 +649,7 @@
       [].forEach.call(tour.layer.querySelectorAll(".cx-spot, .cx-scrim, .cx-tc"), function (n) { n.remove(); });
       var dots = h("span", { class: "cx-dots", "aria-hidden": "true" });
       for (var k = 0; k < STOPS.length; k++) dots.appendChild(h("i", { class: k < i ? "is-done" : k === i ? "is-now" : "" }));
-      var hv = h("div", { class: "cx-tc__helvy" }, clip(s.clip, "", s.clip === "hello" ? { once: true, then: "idle" } : null));
+      var hv = h("div", { class: "cx-tc__helvy" }, clip(s.clip, "cx-hd--edge", s.clip === "hello" ? { once: true, then: "idle" } : null));
       var card = h("aside", { class: "cx-tc" + (s.center ? " cx-tc--center" : ""), role: "dialog", "aria-modal": "true", "aria-labelledby": "cx-tc-t", tabindex: "-1" },
         hv, h("div", { class: "cx-tc__prog" }, dots, h("span", { class: "cx-tc__n" }, (i + 1) + " of " + STOPS.length)),
         h("h2", { id: "cx-tc-t" }, s.t), h("p", null, s.p));

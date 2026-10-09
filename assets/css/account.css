@@ -311,8 +311,9 @@ p.ac-muted { margin: 6px 0 0; max-width: 64ch; }
   display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 28px; align-items: center; overflow: hidden; }
 .hc-greet::after { content: ""; position: absolute; inset: 0; pointer-events: none;
   background: repeating-radial-gradient(circle at 8% 110%, transparent 0 22px, rgba(255,255,255,.03) 22px 23px); }
-.hc-greet__helvy { position: relative; z-index: 1; width: 148px; height: 148px; border-radius: 50%; background: var(--lime); overflow: hidden; align-self: end; }
-.hc-greet__helvy img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; }
+.hc-greet__helvy { position: relative; z-index: 1; width: 148px; height: 148px; align-self: end; }
+.hc-greet__helvy .cx-hd { width: 100%; height: 100%; }
+.hc-greet__helvy > img { width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; }
 .hc-greet__body { position: relative; z-index: 1; min-width: 0; }
 .hc-greet__hi { font-family: var(--heading); font-weight: 400; font-size: clamp(2.6rem, 1.6rem + 2.4vw, 4rem); line-height: .92; margin: 0 0 16px; letter-spacing: .01em; overflow-wrap: anywhere; }
 .hc-greet__hi span { color: var(--lime); }
