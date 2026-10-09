@@ -55,15 +55,79 @@
     link: '<path d="M10 13.5a3.5 3.5 0 0 0 5 0l3-3a3.5 3.5 0 0 0-5-5l-1 1"/><path d="M14 10.5a3.5 3.5 0 0 0-5 0l-3 3a3.5 3.5 0 0 0 5 5l1-1"/>',
     swap: '<path d="M4 8.5h13.5M14 5l3.5 3.5L14 12M20 15.5H6.5M10 19l-3.5-3.5L10 12"/>',
     ban: '<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
-    spark: '<path d="M12 3.5v4M12 16.5v4M3.5 12h4M16.5 12h4M6 6l2.6 2.6M15.4 15.4L18 18M6 18l2.6-2.6M15.4 8.6L18 6"/>'
+    spark: '<path d="M12 3.5v4M12 16.5v4M3.5 12h4M16.5 12h4M6 6l2.6 2.6M15.4 15.4L18 18M6 18l2.6-2.6M15.4 8.6L18 6"/>',
+    // HELVY Connect C + D
+    shield: '<path d="M12 3.5l7 2.8v5.2c0 4.4-3 7.9-7 9-4-1.1-7-4.6-7-9V6.3z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
+    mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M4.5 7l7.5 6 7.5-6"/>',
+    calc: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7h7M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5v3M8.5 17.5h.01M12 17.5h.01"/>',
+    save: '<path d="M6 3.5h9.5l3 3V20.5H6z"/><path d="M9 3.5v5h6v-5M9 20.5v-6h6v6"/>',
+    dl: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>',
+    help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2.1-2.4 3.6M12 17v.2"/>',
+    minus: '<path d="M5 12h14"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/>',
+    filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
+    target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
+    sparkle: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z"/><path d="M18.5 16l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
+    ig: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/>',
+    tt: '<path d="M14.2 3v11.6a3.6 3.6 0 1 1-3.6-3.6"/><path d="M14.2 3.2c.45 2.7 2.05 4.3 4.75 4.6"/>',
+    sc: '<path d="M12 3.2c2.4 0 4 1.7 4 4.1 0 1 .1 1.7.3 2.1.3.4.9.4 1.4.3.4-.1.8.2.8.6 0 .5-.6.8-1.2 1-.3.1-.4.3-.3.6.4 1.2 1.6 2.4 3 2.7.3.1.4.4.2.6-.5.6-1.6.9-2.5 1-.2.5-.3 1-.9 1-.5 0-1-.3-1.8-.3-1.1 0-1.6 1.1-3 1.1s-1.9-1.1-3-1.1c-.8 0-1.3.3-1.8.3-.6 0-.7-.5-.9-1-.9-.1-2-.4-2.5-1-.2-.2-.1-.5.2-.6 1.4-.3 2.6-1.5 3-2.7.1-.3 0-.5-.3-.6-.6-.2-1.2-.5-1.2-1 0-.4.4-.7.8-.6.5.1 1.1.1 1.4-.3.2-.4.3-1.1.3-2.1 0-2.4 1.6-4.1 4-4.1z"/>',
+    yt: '<rect x="2.5" y="5.5" width="19" height="13" rx="4"/><path d="M10 9.2v5.6l4.8-2.8z"/>'
   };
   function icon(name, cls) {
     return '<svg class="hv-i' + (cls ? " " + cls : "") + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" ' +
       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (UI_PATHS[name] || "") + "</svg>";
   }
   HV.icon = icon;
-  // Helvy's picture lives in ONE file: swap assets/brand/helvy.webp for the smiling master and every page follows.
+  // Helvy's picture lives in ONE file: the smile B master (2026-10-09), head and shoulders on the lime disc.
   HV.helvy = ROOT + "assets/brand/helvy.webp";
+  // Helvy's moving states (2026-10-09 set, each starts and ends on the smile): idle, hello, bye,
+  // loader, thinking, celebrate, point. Reduced motion shows the smiling still instead.
+  var HELVY_DIR = ROOT + "assets/brand/helvy/";
+  var REDUCE = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function clipSrc(v, name) {
+    v.innerHTML = '<source src="' + HELVY_DIR + "helvy-" + name + '.webm" type="video/webm"/><source src="' + HELVY_DIR + "helvy-" + name + '.mp4" type="video/mp4"/>';
+  }
+  function clip(name, cls, opts) {
+    opts = opts || {};
+    var box = document.createElement("span");
+    box.className = "cx-hd" + (cls ? " " + cls : "");
+    box.setAttribute("aria-hidden", "true");
+    if (REDUCE || opts.still) {
+      var im = document.createElement("img");
+      im.className = "cx-hd__full"; im.alt = ""; im.decoding = "async"; im.src = HELVY_DIR + "helvy-smile-full.webp";
+      box.appendChild(im);
+      return box;
+    }
+    var v = document.createElement("video");
+    v.muted = true; v.setAttribute("muted", ""); v.setAttribute("playsinline", ""); v.autoplay = true; v.loop = !opts.once;
+    v.preload = "auto"; v.poster = HELVY_DIR + "helvy-poster.webp"; v.setAttribute("data-clip", name);
+    clipSrc(v, name);
+    if (opts.once && opts.then) v.addEventListener("ended", function () {
+      v.loop = true; v.setAttribute("data-clip", opts.then); clipSrc(v, opts.then); v.load();
+      var q = v.play && v.play(); if (q && q.catch) q.catch(function () { /* autoplay blocked: the poster stays */ });
+    }, { once: true });
+    box.appendChild(v);
+    var p = v.play && v.play(); if (p && p.catch) p.catch(function () { /* autoplay blocked */ });
+    return box;
+  }
+  HV.clip = clip;
+  HV.reduce = REDUCE;
+  HV.root = ROOT; HV.apiBase = API;
+  HV.h = function () { return h.apply(null, arguments); };
+  HV.api = function (m, p, b) { return api(m, p, b); };
+  HV.followers = function (n) { return followers(n); };
+  HV.setCredits = function (n) { return setCredits(n); };
+  // connect.css / connect.js (HELVY Connect C + D) ride along with this file on every page.
+  (function () {
+    var v = (/[?&]v=([0-9a-z]+)/.exec(SRC) || [])[1];
+    if (!document.querySelector('link[href*="assets/css/connect.css"]')) {
+      var l = document.createElement("link"); l.rel = "stylesheet"; l.href = ROOT + "assets/css/connect.css" + (v ? "?p=" + v : "");
+      document.head.appendChild(l);
+    }
+    if (!document.querySelector('script[src*="assets/js/connect.js"]')) {
+      var sc = document.createElement("script"); sc.src = ROOT + "assets/js/connect.js" + (v ? "?p=" + v : ""); sc.defer = true;
+      document.head.appendChild(sc);
+    }
+  })();
 
   /* ------------------------------------------------------- notifications */
   var NOTE_ICON = { selections: ["list", "sel"], analysis: ["scan", "ana"], campaigns: ["mega", "cmp"], account: ["coin", "acc"], ideas: ["spark", "sug"] };
@@ -268,141 +332,295 @@
 
   /* ------------------------------------------------------------------ gate */
 
+  // HELVY Connect sign-in (phase C, approved 2026-10-09). The passcode gate each page
+  // ships becomes one scene: a blurred wall of HelloVoice's own film stills, the
+  // pitch on the left (logo, three value lines, confirmed client logos) and the
+  // door on the right, where Helvy waves in beside the card. Two doors: Client
+  // (work email -> 6-digit code -> first-time name, company, job title) and
+  // HelloVoice team (the admin, where access is given person by person).
+  // Shared access codes are no longer offered here; a link that still needs its
+  // code (selection, campaign) shows "Opened a shared link?" under the card, and
+  // ?access=code brings the same form up on the catalogue.
+  var LOGOS = [["bayer", "Bayer"], ["abbott", "Abbott"], ["pfizer", "Pfizer"], ["astrazeneca", "AstraZeneca"], ["molnlycke", "Mölnlycke"],
+               ["whites", "Whites"], ["nahdi", "Nahdi"], ["biotech-cigalah", "Biotech Cigalah"]];
+  var PERSONAL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|aol|proton|protonmail|gmx|yandex|mail|zoho)\.[a-z.]+$/i;
+
   function enhanceGate() {
     var gate = $("cat-gate");
     if (!gate || gate.getAttribute("data-pt")) return;
     gate.setAttribute("data-pt", "1");
     var inner = gate.querySelector(".cat-gate__inner");
     if (!inner) return;
-    var note = inner.querySelector(".cat-gate__note");
     var oldForm = inner.querySelector(".cat-gate__form");
     var oldErr = inner.querySelector(".cat-gate__error");
+    var page = document.body.getAttribute("data-page");
+    var sharedOk = page !== "catalogue" || /[?&]access=code\b/.test(location.search || "");
+    gate.classList.add("cx-gate");
 
-    var msg = h("p", { class: "pt-msg", role: "status", "aria-live": "polite" });
-    function say(text, kind) { msg.textContent = T(text || ""); msg.className = "pt-msg" + (kind ? " is-" + kind : ""); }
+    var scene = h("main", { class: "cx-scene" });
+    scene.appendChild(h("div", { class: "cx-wall", "aria-hidden": "true" }));
+    var wrap = h("div", { class: "cx-wrap cx-scene__in" });
 
-    var email = h("input", { class: "pt-input", type: "email", name: "email", placeholder: "you@yourcompany.com", autocomplete: "email",
-      "aria-label": "Work email", required: true, inputmode: "email", spellcheck: "false" });
-    var emailBtn = h("button", { class: "cat-btn cat-btn--lime", type: "submit" }, "Email me a code");
-    var formEmail = h("form", { class: "pt-form", novalidate: true }, email, emailBtn);
-
-    var code = h("input", { class: "pt-input pt-input--code", type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6",
-      placeholder: "000000", "aria-label": "6-digit code", pattern: "[0-9]*" });
-    var codeBtn = h("button", { class: "cat-btn cat-btn--lime", type: "submit" }, "Verify and continue");
-    var resend = h("button", { class: "pt-link", type: "button" }, "Send a new code");
-    var other = h("button", { class: "pt-link", type: "button" }, "Use a different email");
-    var formCode = h("form", { class: "pt-form", hidden: true }, code, codeBtn, h("div", null, resend, other));
-
-    var pName = h("input", { class: "pt-input", name: "name", placeholder: "Your name", autocomplete: "name", required: true });
-    var pCompany = h("input", { class: "pt-input", name: "company", placeholder: "Company", autocomplete: "organization", required: true });
-    var pTitle = h("input", { class: "pt-input", name: "job_title", placeholder: "Job title (optional)", autocomplete: "organization-title" });
-    var pPhone = h("input", { class: "pt-input", name: "phone", placeholder: "Phone (optional)", autocomplete: "tel", type: "tel" });
-    var pBtn = h("button", { class: "cat-btn cat-btn--lime", type: "submit" }, "Create my account");
-    var formProfile = h("form", { class: "pt-form", hidden: true }, pName, pCompany, h("div", { class: "pt-row" }, pTitle, pPhone), pBtn);
-
-    var toCodeLink = h("button", { class: "pt-link", type: "button" }, "I have an access code instead");
-    var panel = h("div", { class: "pt-gate" },
-      h("p", { class: "pt-gate__lead" }, "Sign in with your work email. We'll send a one-time code. No password needed."),
-      formEmail, formCode, formProfile, msg, h("div", { class: "pt-gate__alt" }, toCodeLink));
-    if (LANG === "ar") { panel.setAttribute("dir", "rtl"); panel.setAttribute("lang", "ar"); }
-
-    inner.insertBefore(panel, note || oldForm);
-    if (note) note.hidden = true;
-    if (oldForm) oldForm.hidden = true;
-    if (oldErr) oldErr.style.display = "none";
-    var showingCode = false;
-    toCodeLink.addEventListener("click", function () {
-      showingCode = !showingCode;
-      if (oldForm) oldForm.hidden = !showingCode;
-      if (note) note.hidden = !showingCode;
-      if (oldErr) oldErr.style.display = "";
-      [formEmail, formCode, formProfile].forEach(function (f) { if (showingCode) f.hidden = true; });
-      if (!showingCode) { formEmail.hidden = false; say(""); }
-      toCodeLink.textContent = T(showingCode ? "Sign in with email instead" : "I have an access code instead");
-      var first = (showingCode ? oldForm : email);
-      var inp = first && first.querySelector ? (first.querySelector("input") || first) : first;
-      if (inp && inp.focus) inp.focus();
+    /* -- the pitch -- */
+    var pitch = h("section", { class: "cx-pitch", "aria-label": "About HELVY Connect" });
+    pitch.appendChild(h("h1", { class: "cx-vh" }, "HELVY Connect"));
+    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp", alt: "HELVY Connect", width: "440", height: "220" }));
+    pitch.appendChild(h("p", { class: "cx-pitch__tag" }, "Connecting Brands with the Right Voices"));
+    var vals = h("ul", { class: "cx-vals" });
+    [["shield", "Vetted creators", "Every creator is checked by HelloVoice before they reach your list."],
+     ["scan", "Real analysis", "Audience, authenticity and content history, from the creators’ own insights."],
+     ["chart", "Live campaign tracking", "Your report updates every 24 hours, with the verdict first."]].forEach(function (v) {
+      vals.appendChild(h("li", null, h("span", { class: "cx-ico", html: icon(v[0], "cx-i") }), h("span", null, h("b", null, v[1]), h("small", null, v[2]))));
     });
+    pitch.appendChild(vals);
+    var logos = h("div", { class: "cx-logos__row" });
+    LOGOS.forEach(function (l) {
+      logos.appendChild(h("img", { src: ROOT + "assets/clients/" + l[0] + ".webp", srcset: ROOT + "assets/clients/" + l[0] + "@2x.webp 2x", alt: l[1], loading: "lazy", height: "30" }));
+    });
+    pitch.appendChild(h("div", { class: "cx-logos" }, h("p", null, "Brands HelloVoice has made content for"), logos));
 
-    var state = { email: "", ticket: "", timer: null };
-    function busy(btn, on, label) {
-      btn.disabled = on;
-      btn.textContent = T(on ? "Please wait…" : label);
+    /* -- the door -- */
+    var door = h("section", { class: "cx-door", "aria-label": "Sign in" });
+    var mhead = h("div", { class: "cx-mhead" });
+    mhead.appendChild(clip("hello", "cx-hd--head", { once: true, then: "idle" }));
+    mhead.appendChild(h("div", null, h("img", { src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-320.webp", alt: "HELVY Connect", width: "190", height: "95" }),
+      h("p", null, "Connecting Brands with the Right Voices")));
+    var helvy = h("div", { class: "cx-door__helvy" }, clip("hello", "", { once: true, then: "idle" }));
+    var bubble = h("span", { class: "cx-door__say", "aria-hidden": "true" }, "Hi, I’m Helvy");
+    var tClient = h("button", { type: "button", role: "tab", id: "cx-t-client", "aria-selected": "true", "aria-controls": "cx-pane", html: icon("case", "cx-i") + "Client" });
+    var tTeam = h("button", { type: "button", role: "tab", id: "cx-t-team", "aria-selected": "false", "aria-controls": "cx-pane", html: icon("shield", "cx-i") + "HelloVoice team" });
+    var pane = h("div", { id: "cx-pane", role: "tabpanel", "aria-live": "polite" });
+    var card = h("div", { class: "cx-door__card" }, h("div", { class: "cx-doors", role: "tablist", "aria-label": "Who is signing in" }, tClient, tTeam), pane);
+    door.appendChild(mhead); door.appendChild(helvy); door.appendChild(bubble); door.appendChild(card);
+    var sharedLine = null;
+    if (sharedOk && oldForm) {
+      sharedLine = h("p", { class: "cx-shared" }, "Opened a shared link with an access code? ",
+        h("button", { type: "button", class: "cx-link", onclick: function () { show("shared"); } }, "Enter the code"));
+      door.appendChild(sharedLine);
     }
-    function countdown(secs) {
-      clearInterval(state.timer);
-      resend.disabled = true;
-      var left = secs;
-      resend.textContent = "Send a new code in " + left + "s";
-      state.timer = setInterval(function () {
-        left -= 1;
-        if (left <= 0) { clearInterval(state.timer); resend.disabled = false; resend.textContent = "Send a new code"; }
-        else resend.textContent = "Send a new code in " + left + "s";
-      }, 1000);
+    wrap.appendChild(pitch); wrap.appendChild(door);
+    scene.appendChild(wrap);
+
+    var foot = h("footer", { class: "cx-scene__foot" });
+    var fw = h("div", { class: "cx-wrap" });
+    fw.appendChild(h("span", null, "© " + new Date().getFullYear() + " HELVY Connect · ", h("a", { href: ROOT + "privacy/" }, "Privacy"), " · ", h("a", { href: ROOT + "terms/" }, "Terms")));
+    fw.appendChild(h("span", { class: "cx-by" }, h("span", null, "Powered by"),
+      h("img", { src: ROOT + "assets/brand/logo-knockout.webp", alt: "HelloVoice", width: "104", height: "23" }), h("span", null, "A BlueHolding Company")));
+    foot.appendChild(fw);
+    scene.appendChild(foot);
+    gate.appendChild(scene);
+
+    /* -- the steps -- */
+    var st = { step: "email", email: "", ticket: "", expires: 0, resendAt: 0, timer: null, company: "" };
+    var SAY = { email: "Hi, I’m Helvy", blocked: "Work email, please", team: "Welcome back, team", code: "It’s on its way",
+                details: "Nice to meet you", shared: "Got a code?", pending: "Almost there" };
+    function setSay(k) { bubble.textContent = SAY[k] || SAY.email; }
+    function errLine(text) { return h("p", { class: "cx-err", role: "alert", html: icon("info", "cx-i") }, h("span", null, text)); }
+    function goBtn(label, ink) {
+      return h("button", { class: "cx-btn cx-go" + (ink ? " cx-btn--ink" : ""), type: "submit", html: "<span></span>" + icon("arrow", "cx-i") }, null);
     }
-    function sendCode(fromResend) {
-      say("");
-      busy(emailBtn, true, "Email me a code");
-      return api("POST", "/api/auth/start", { email: state.email }).then(function (r) {
-        busy(emailBtn, false, "Email me a code");
-        if (r.s === 429) { say("Too many requests. Please wait a few minutes.", "err"); return; }
-        if (r.b.reason === "mail_not_configured") { say(r.b.message, "err"); toCodeLink.click(); return; }
-        if (!r.b.ok) { say(r.b.message || "Couldn't send the code.", "err"); return; }
-        formEmail.hidden = true; formCode.hidden = false; formProfile.hidden = true;
-        say(r.b.sent === false ? (LANG === "ar" ? "أُرسل رمز قبل لحظات. تحقق من بريدك." : "A code was sent a moment ago. Check your inbox.")
-          : (LANG === "ar" ? "أرسلنا رمزاً من 6 أرقام إلى " + state.email + ". صالح لمدة " + (r.b.minutes || 10) + " دقائق."
-             : "We sent a 6-digit code to " + state.email + ". It lasts " + (r.b.minutes || 10) + " minutes."), "ok");
-        countdown(r.b.resend_in || r.b.wait || 30);
-        code.value = ""; code.focus();
-      });
+    function label(btn, text) { btn.firstChild.textContent = text; return btn; }
+    function wait(btn, on, text) { btn.disabled = on; label(btn, on ? "One moment…" : text); }
+    function mmss(s) { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + ("0" + (s % 60)).slice(-2); }
+
+    function show(step, opts) {
+      opts = opts || {};
+      clearInterval(st.timer);
+      st.step = step;
+      var team = step === "team";
+      tClient.setAttribute("aria-selected", String(!team)); tTeam.setAttribute("aria-selected", String(team));
+      setSay(opts.blocked ? "blocked" : step);
+      pane.textContent = "";
+      ({ email: paneEmail, code: paneCode, details: paneDetails, team: paneTeam, shared: paneShared, pending: panePending }[step] || paneEmail)(opts);
+      if (sharedLine) sharedLine.hidden = step === "shared" || step === "team";
     }
-    formEmail.addEventListener("submit", function (e) {
-      e.preventDefault();
-      state.email = email.value.trim().toLowerCase();
-      if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(state.email)) { say("Enter a valid work email address.", "err"); return; }
-      sendCode(false);
-    });
-    resend.addEventListener("click", function () { sendCode(true); });
-    other.addEventListener("click", function () {
-      clearInterval(state.timer); formCode.hidden = true; formEmail.hidden = false; say(""); email.focus();
-    });
-    code.addEventListener("input", function () {
-      code.value = code.value.replace(/\D/g, "").slice(0, 6);
-      if (code.value.length === 6) formCode.requestSubmit();
-    });
-    formCode.addEventListener("submit", function (e) {
-      e.preventDefault();
-      if (code.value.length !== 6) { say("Enter the 6-digit code.", "err"); return; }
-      busy(codeBtn, true, "Verify and continue");
-      api("POST", "/api/auth/verify", { email: state.email, otp: code.value }).then(function (r) {
-        busy(codeBtn, false, "Verify and continue");
-        if (r.s === 429) { say("Too many attempts. Please wait a few minutes.", "err"); return; }
-        if (!r.b.ok) { say(r.b.message || "That code isn't right.", "err"); code.value = ""; code.focus(); return; }
-        finish(r.b);
+    tClient.addEventListener("click", function () { if (st.step === "team" || st.step === "shared") show(st.ticket ? "details" : "email"); });
+    tTeam.addEventListener("click", function () { show("team"); });
+    [tClient, tTeam].forEach(function (t) {
+      t.addEventListener("keydown", function (e) {
+        if (e.key !== "ArrowRight" && e.key !== "ArrowLeft") return;
+        var other = t === tClient ? tTeam : tClient; other.click(); other.focus(); e.preventDefault();
       });
     });
-    function finish(b) {
-      if (b.step === "profile") {
-        state.ticket = b.ticket;
-        formCode.hidden = true; formProfile.hidden = false;
-        pCompany.value = b.suggested_company || ""; say("Email confirmed. Tell us who you are.", "ok"); pName.focus();
-      } else if (b.step === "pending") {
-        formCode.hidden = true; formProfile.hidden = true; say(b.message, "ok");
-      } else if (b.step === "done") {
-        say("Welcome. Opening the catalogue…", "ok"); location.reload();
+
+    function paneEmail(opts) {
+      pane.appendChild(h("h2", { class: "cx-door__title" }, "Sign in or join"));
+      pane.appendChild(h("p", { class: "cx-door__lead" }, "We’ll email you a one-time code. No password to remember, and the same step creates your account if you’re new."));
+      var input = h("input", { type: "email", name: "email", autocomplete: "email", inputmode: "email", spellcheck: "false", required: true,
+        placeholder: "name@yourcompany.com", value: st.email || "", "aria-describedby": "cx-email-err" });
+      var fld = h("label", { class: "cx-fld" }, h("span", null, "Work email"), input);
+      var err = h("div", { id: "cx-email-err" });
+      var btn = label(goBtn(), "Email me a code");
+      var form = h("form", { novalidate: true }, fld, err, btn);
+      var fine = h("p", { class: "cx-fine" }, "Personal addresses (Gmail, Hotmail, Outlook.com, Yahoo, iCloud) can’t sign in. Your HelloVoice account manager is told when someone from your company joins.");
+      pane.appendChild(form); pane.appendChild(fine);
+      function bad(text, personal) {
+        fld.classList.add("cx-fld--err"); input.setAttribute("aria-invalid", "true");
+        err.textContent = ""; err.appendChild(errLine(text));
+        if (personal) { setSay("blocked"); fine.textContent = "No work email? Ask your HelloVoice account manager to invite you."; }
+        input.focus();
       }
-    }
-    formProfile.addEventListener("submit", function (e) {
-      e.preventDefault();
-      busy(pBtn, true, "Create my account");
-      api("POST", "/api/auth/profile", { ticket: state.ticket, name: pName.value, company: pCompany.value, job_title: pTitle.value, phone: pPhone.value,
-                                         invite: inviteToken() || undefined })
-        .then(function (r) {
-          busy(pBtn, false, "Create my account");
-          if (!r.b.ok) { say(r.b.message || "Couldn't create the account.", "err"); return; }
-          finish(r.b);
+      if (opts.error) bad(opts.error, opts.blocked);
+      input.addEventListener("input", function () { fld.classList.remove("cx-fld--err"); input.removeAttribute("aria-invalid"); err.textContent = ""; });
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var v = input.value.trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[^@\s]{2,}$/.test(v)) { bad("Enter your work email, like name@yourcompany.com."); return; }
+        if (PERSONAL.test(v)) { bad("That’s a personal address. Use your work email so we can link you to your company’s selections and campaigns.", true); return; }
+        st.email = v;
+        wait(btn, true, "Email me a code");
+        sendCode().then(function (r) {
+          wait(btn, false, "Email me a code");
+          if (r.error) bad(r.error, r.personal);
         });
-    });
+      });
+      if (!opts.keepFocus) setTimeout(function () { input.focus({ preventScroll: true }); }, 30);
+    }
+
+    function sendCode() {
+      return api("POST", "/api/auth/start", { email: st.email }).then(function (r) {
+        if (r.s === 429) return { error: "Too many requests. Please wait a few minutes and try again." };
+        if (r.b.reason === "mail_not_configured") return { error: r.b.message || "Email sign-in isn’t available yet." };
+        if (!r.b.ok) return { error: r.b.message || "We couldn’t send the code. Please try again.", personal: r.b.reason === "personal" };
+        var now = Date.now() / 1000;
+        if (r.b.sent !== false || !st.expires) st.expires = now + (r.b.minutes || 10) * 60;
+        st.resendAt = now + (r.b.resend_in || r.b.wait || 30);
+        show("code", { resent: r.b.sent === false });
+        return {};
+      });
+    }
+
+    function paneCode(opts) {
+      pane.appendChild(h("h2", { class: "cx-door__title" }, "Check your inbox"));
+      pane.appendChild(h("p", { class: "cx-door__lead" }, "We sent a 6-digit code to ", h("b", null, st.email), ". Enter it below."));
+      var input = h("input", { type: "text", inputmode: "numeric", autocomplete: "one-time-code", maxlength: "6", pattern: "[0-9]*",
+        "aria-label": "6-digit code", spellcheck: "false" });
+      var boxes = h("div", { class: "cx-otp__boxes", "aria-hidden": "true" });
+      for (var i = 0; i < 6; i++) boxes.appendChild(h("span"));
+      var otp = h("div", { class: "cx-otp", role: "group", "aria-label": "6-digit code" }, boxes, input);
+      var clock = h("b");
+      var again = h("span");
+      var meta = h("div", { class: "cx-otp__meta" }, h("span", { class: "cx-clock", html: icon("clock", "cx-i") }, "Expires in ", clock), again);
+      var err = h("div");
+      var btn = label(goBtn(), "Sign in");
+      btn.disabled = true;
+      var form = h("form", { novalidate: true }, otp, meta, err, btn);
+      var who = h("div", { class: "cx-who", html: icon("mail", "cx-i") }, h("span", null, "Nothing in your inbox? Check spam."),
+        h("button", { type: "button", class: "cx-link", onclick: function () { st.expires = 0; show("email"); } }, "Change email"));
+      pane.appendChild(form); pane.appendChild(who);
+      if (opts.resent) err.appendChild(h("p", { class: "cx-ok" }, "A code was sent a moment ago. Use the one in your inbox."));
+      function paint() {
+        var v = input.value, cur = Math.min(v.length, 5);
+        [].forEach.call(boxes.children, function (b, k) {
+          b.textContent = v.charAt(k); b.classList.toggle("is-on", k < v.length); b.classList.toggle("is-cur", k === cur && v.length < 6 || (v.length === 6 && k === 5));
+        });
+        btn.disabled = v.length !== 6;
+      }
+      function tick() {
+        var now = Date.now() / 1000, left = st.expires - now;
+        clock.textContent = " " + mmss(left);
+        again.textContent = "";
+        if (st.resendAt > now) again.appendChild(document.createTextNode("New code in ")), again.appendChild(h("b", null, mmss(st.resendAt - now)));
+        else again.appendChild(h("button", { type: "button", onclick: function () {
+          err.textContent = "";
+          sendCode().then(function (r) { if (r.error) { err.textContent = ""; err.appendChild(errLine(r.error)); } });
+        } }, "Send a new code"));
+        if (left <= 0) { clearInterval(st.timer); err.textContent = ""; err.appendChild(errLine("That code has expired. Send a new one.")); btn.disabled = true; }
+      }
+      input.addEventListener("input", function () {
+        input.value = input.value.replace(/\D/g, "").slice(0, 6);
+        otp.classList.remove("is-bad"); err.textContent = "";
+        paint();
+        if (input.value.length === 6) form.requestSubmit ? form.requestSubmit() : form.dispatchEvent(new Event("submit", { cancelable: true }));
+      });
+      input.addEventListener("focus", function () { otp.classList.add("is-focus"); });
+      input.addEventListener("blur", function () { otp.classList.remove("is-focus"); });
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        if (input.value.length !== 6 || btn.getAttribute("data-busy")) return;
+        btn.setAttribute("data-busy", "1"); wait(btn, true, "Sign in");
+        api("POST", "/api/auth/verify", { email: st.email, otp: input.value }).then(function (r) {
+          btn.removeAttribute("data-busy"); wait(btn, false, "Sign in");
+          if (r.s === 429) { err.textContent = ""; err.appendChild(errLine("Too many tries. Please wait a few minutes.")); return; }
+          if (!r.b.ok) {
+            otp.classList.add("is-bad"); err.textContent = ""; err.appendChild(errLine(r.b.message || "That code isn’t right."));
+            input.value = ""; paint(); input.focus(); return;
+          }
+          done(r.b);
+        });
+      });
+      paint(); tick();
+      st.timer = setInterval(tick, 1000);
+      setTimeout(function () { input.focus({ preventScroll: true }); }, 30);
+    }
+
+    function done(b) {
+      if (b.step === "profile") { st.ticket = b.ticket; st.company = b.suggested_company || ""; show("details"); }
+      else if (b.step === "pending") show("pending", { message: b.message });
+      else if (b.step === "done") { setSay("details"); location.reload(); }
+    }
+
+    function paneDetails() {
+      pane.appendChild(h("h2", { class: "cx-door__title" }, "One last thing"));
+      pane.appendChild(h("p", { class: "cx-door__lead" }, "First time here. Tell us who you are so HelloVoice can set up your account."));
+      var name = h("input", { type: "text", name: "name", autocomplete: "name", required: true });
+      var company = h("input", { type: "text", name: "company", autocomplete: "organization", required: true, value: st.company });
+      var title = h("input", { type: "text", name: "job_title", autocomplete: "organization-title", required: true, placeholder: "e.g. Brand Manager" });
+      var err = h("div");
+      var btn = label(goBtn(), "Enter HELVY Connect");
+      var form = h("form", { novalidate: true },
+        h("label", { class: "cx-fld" }, h("span", null, "Full name"), name),
+        h("div", { class: "cx-row2" }, h("label", { class: "cx-fld" }, h("span", null, "Company"), company),
+                                       h("label", { class: "cx-fld" }, h("span", null, "Job title"), title)),
+        err, btn);
+      pane.appendChild(form);
+      pane.appendChild(h("div", { class: "cx-who", html: icon("check", "cx-i") }, h("span", null, "Signed in as " + st.email)));
+      pane.appendChild(h("p", { class: "cx-fine" }, "That’s all for now. Your photo, brands and markets are optional later, and each one earns credits."));
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        err.textContent = "";
+        var miss = [[name, "your name"], [company, "your company"], [title, "your job title"]].filter(function (x) { return x[0].value.trim().length < 2; });
+        if (miss.length) { err.appendChild(errLine("Please add " + miss.map(function (x) { return x[1]; }).join(", ") + ".")); miss[0][0].focus(); return; }
+        wait(btn, true, "Enter HELVY Connect");
+        api("POST", "/api/auth/profile", { ticket: st.ticket, name: name.value, company: company.value, job_title: title.value,
+                                           invite: inviteToken() || undefined }).then(function (r) {
+          wait(btn, false, "Enter HELVY Connect");
+          if (!r.b.ok) { err.appendChild(errLine(r.b.message || "We couldn’t create the account. Please try again.")); return; }
+          done(r.b);
+        });
+      });
+      setTimeout(function () { name.focus({ preventScroll: true }); }, 30);
+    }
+
+    function paneTeam() {
+      pane.appendChild(h("h2", { class: "cx-door__title" }, "HelloVoice team"));
+      pane.appendChild(h("p", { class: "cx-door__lead" }, "Team accounts sign in on the admin, where you run the roster, selections and campaigns."));
+      pane.appendChild(h("div", { class: "cx-team" }, h("span", { class: "cx-ico", html: icon("shield", "cx-i") }),
+        h("p", null, h("b", null, "Admin access is given person by person."), " A company email on its own doesn’t open the admin. If you need access, contact ",
+          h("a", { href: "mailto:info@hellovoice.co.uk" }, "info@hellovoice.co.uk"), ".")));
+      pane.appendChild(h("a", { class: "cx-btn cx-btn--ink cx-go", href: API + "/", html: "<span>Go to team sign-in</span>" + icon("arrow", "cx-i") }));
+      pane.appendChild(h("p", { class: "cx-fine" }, "Looking for your client account? ",
+        h("button", { type: "button", class: "cx-link", onclick: function () { show("email"); } }, "Sign in as a client")));
+    }
+
+    function paneShared() {
+      pane.appendChild(h("h2", { class: "cx-door__title" }, "Shared link"));
+      pane.appendChild(h("p", { class: "cx-door__lead" }, "This link was sent with its own access code. Enter it to open it. To keep everything in one place, sign in with your work email next time."));
+      var box = h("div", { class: "cx-codeform" });
+      if (oldForm) { oldForm.hidden = false; box.appendChild(oldForm); }
+      if (oldErr) box.appendChild(oldErr);
+      pane.appendChild(box);
+      pane.appendChild(h("p", { class: "cx-fine" }, h("button", { type: "button", class: "cx-link", onclick: function () { show("email"); } }, "Sign in with your work email instead")));
+      var inp = oldForm && oldForm.querySelector("input");
+      if (inp) setTimeout(function () { inp.focus({ preventScroll: true }); }, 30);
+    }
+
+    function panePending(opts) {
+      pane.appendChild(h("h2", { class: "cx-door__title" }, "Almost there"));
+      pane.appendChild(h("p", { class: "cx-door__lead" }, opts.message || "Your account is waiting for approval by the HelloVoice team. We’ll email you as soon as it’s ready."));
+    }
+
+    show(/[?&]access=code\b/.test(location.search || "") && oldForm ? "shared" : "email", { keepFocus: true });
   }
 
   // A colleague's invite link (?invite=...) is kept for this visit and sent with the new
@@ -429,7 +647,7 @@
   /* ------------------------------------------------------------------ dock */
 
   // The account circle, top right: initials on lime, opening a small menu.
-  // Ask and Find creators live in the HELV Assistant now, and admin moves into
+  // Ask and Find creators live in Helvy (the chat) now, and admin moves into
   // the menu, so the bar keeps only the site's own links and this circle.
   function mountDock() {
     if (!ME || !ME.signed_in || $("pt-dock")) return;
@@ -477,6 +695,7 @@
       item("Account", { href: ACC + "#account" });
       rule();
       item("Help", { go: function () { if (HV.talk) HV.talk(); else location.href = ACC + "#overview"; } });
+      item("Take the tour", { go: function () { if (HV.tour) HV.tour(true); } });
     } else if (ME.kind === "admin") {
       item("Preview as client", { go: openAccount });
       item("My campaigns", { href: ROOT + "campaign/dashboard/" });
@@ -952,7 +1171,7 @@
 
   var chatThread = null;
   var chatBrief = null;                // the answers gathered for free in this chat
-  var IDEAS = ["Plan a campaign with me", "Suggest creators for a skincare launch in KSA", "What does a campaign cost?", "What happens after I pick a selection?"];
+  var IDEAS = ["Plan a campaign with me", "Suggest creators for a skincare launch in KSA", "What can SAR 80,000 reach on Instagram?", "What happens after I pick a selection?"];
   // A message that asks for creators or a campaign gets the free questions first, so the one paid
   // call that follows has everything it needs.
   var REQUEST = /campaign|creator|influencer|shortlist|launch|recommend|suggest|find|looking for|need .*(people|creators)|ugc|حمل|مؤثر|إطلاق|اطلاق|ابحث|أبحث|اقترح/i;
@@ -1301,11 +1520,12 @@
 
     /* -- launcher -- */
     var root = h("div", { id: "hv-voice", class: "hv-voice" });
-    var launch = h("button", { class: "hv-launch", type: "button", "aria-label": "Chat with HELV Assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
+    var launch = h("button", { class: "hv-launch cx-launch", type: "button", "aria-label": "Chat with Helvy, your AI assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
+    // Helvy: the smile B still by default, the idle loop (smiling, lime) once it can play.
     launch.innerHTML = '<span class="hv-launch__disc" aria-hidden="true"></span>' +
-      '<img class="hv-launch__face" src="' + V_IMG + 'voice-head-160.webp" srcset="' + V_IMG + 'voice-head-320.webp 2x" alt="" width="84" height="84" decoding="async"/>' +
-      (reduce ? "" : '<video class="hv-launch__vid" muted loop playsinline autoplay preload="auto" aria-hidden="true" poster="' + V_IMG + 'voice-loop-poster.webp">' +
-        '<source src="' + V_IMG + 'voice-loop.webm" type="video/webm"/><source src="' + V_IMG + 'voice-loop.mp4" type="video/mp4"/></video>') +
+      '<img class="hv-launch__face cx-face" src="' + HV.helvy + '" alt="" width="76" height="76" decoding="async"/>' +
+      (reduce ? "" : '<video class="hv-launch__vid" muted loop playsinline autoplay preload="auto" aria-hidden="true" poster="' + HELVY_DIR + 'helvy-poster.webp">' +
+        '<source src="' + HELVY_DIR + 'helvy-idle.webm" type="video/webm"/><source src="' + HELVY_DIR + 'helvy-idle.mp4" type="video/mp4"/></video>') +
       '<span class="hv-launch__x" aria-hidden="true">' + V_ICON.close + "</span>" +
       '<span class="hv-launch__dot" aria-hidden="true" hidden></span>';
     // The waving loop (made with Higgsfield) replaces the still once it can play; the still stays if it can't.
@@ -1322,7 +1542,7 @@
       var p = vid.play && vid.play(); if (p && p.catch) p.catch(function () { /* autoplay blocked: keep the still */ });
     }
     var nudge = h("div", { class: "hv-nudge", role: "status", hidden: "" });
-    nudge.innerHTML = "<span>Need a hand finding creators?</span>";
+    nudge.innerHTML = "<span><b>Need a hand?</b>Ask me to shortlist creators or check what your budget can reach.</span>";
     var nudgeX = h("button", { class: "hv-nudge__x", type: "button", "aria-label": "Dismiss" });
     nudgeX.innerHTML = V_ICON.close;
     nudge.appendChild(nudgeX);
@@ -1330,9 +1550,10 @@
     /* -- panel -- */
     var panel = h("section", { id: "hv-panel", class: "hv-panel", role: "dialog", "aria-modal": "false", "aria-labelledby": "hv-name", hidden: "" });
     var head = h("header", { class: "hv-head" });
-    head.innerHTML = '<img class="hv-head__fig" src="' + V_IMG + 'voice-figure-360.webp" srcset="' + V_IMG + 'voice-figure-720.webp 2x" alt="" width="120" height="192" decoding="async"/>' +
-      '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">HELV Assistant</h2>' +
-      '<p class="hv-head__role"><span class="hv-head__on"><i aria-hidden="true"></i>Online</span><span class="hv-tag">Replies instantly</span></p></div>';
+    head.classList.add("cx-chathead");
+    head.appendChild(clip("idle", "hv-head__helvy"));
+    head.insertAdjacentHTML("beforeend", '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">Helvy</h2>' +
+      '<p class="hv-head__role"><span class="hv-head__on"><i aria-hidden="true"></i>Your AI assistant · online</span></p></div>');
     var freshBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Start a new chat", title: "New chat" });
     freshBtn.innerHTML = V_ICON.fresh;
     var closeBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Close chat", title: "Close" });
@@ -1344,7 +1565,7 @@
     minBtn.innerHTML = V_ICON.minimize;
     head.appendChild(h("div", { class: "hv-head__tools" }, growBtn, freshBtn, minBtn, closeBtn));
     var log = h("div", { class: "hv-log", role: "log", "aria-live": "polite", "aria-relevant": "additions" });
-    var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message HELV Assistant" });
+    var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message Helvy" });
     var send = h("button", { class: "hv-send", type: "button", "aria-label": "Send" });
     send.innerHTML = V_ICON.send;
     var Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -1386,7 +1607,7 @@
     function scroll() { log.scrollTop = log.scrollHeight; }
     function row(kind, node) {
       var r = h("div", { class: "hv-row hv-row--" + kind });
-      if (kind === "ai") { var ava = h("span", { class: "hv-row__ava", "aria-hidden": "true" }); bg(ava, V_IMG + "voice-head-160.webp"); r.appendChild(ava); }
+      if (kind === "ai") { var ava = h("span", { class: "hv-row__ava cx-ava", "aria-hidden": "true" }); bg(ava, HV.helvy); r.appendChild(ava); }
       r.appendChild(node); log.appendChild(r); scroll(); return r;
     }
     // The AI writes light markdown: **bold** and "* " bullets. Rendered as text nodes, never as HTML.
@@ -1443,7 +1664,7 @@
     function say(text, then) {
       queue = queue.then(function () {
         return new Promise(function (done) {
-          var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "The assistant is typing" }, h("i"), h("i"), h("i")));
+          var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "Helvy is typing" }, h("i"), h("i"), h("i")));
           setTimeout(function () {
             dots.remove();
             var b = bubble("ai", text); b.textContent = "";
@@ -1456,12 +1677,14 @@
     function chips(list, opts) {
       opts = opts || {};
       queue = queue.then(function () {
-        var wrap = h("div", { class: "hv-chips" + (opts.stack ? " hv-chips--stack" : "") });
+        // Options arrive one by one (60 ms apart); reduced motion shows them at once.
+        var wrap = h("div", { class: "hv-chips" + (opts.stack ? " hv-chips--stack" : "") + (REDUCE ? "" : " cx-stagger") });
         var many = list.some(function (c) { return c.toggle; });
         wrap.appendChild(h("p", { class: "hv-chips__hint" }, opts.hint || (many ? "Pick any, then confirm" : "Tap to choose")));
         list.forEach(function (c) {
           var b = h("button", { class: "hv-chip" + (c.primary ? " hv-chip--lime" : "") + (c.ghost ? " hv-chip--ghost" : ""), type: "button" }, c.label);
           if (c.pressed != null) b.setAttribute("aria-pressed", String(!!c.pressed));
+          b.style.setProperty("--i", String(wrap.querySelectorAll(".hv-chip").length));
           b.addEventListener("click", function () {
             if (c.toggle) { c.toggle(b); return; }
             if (!opts.keep) wrap.remove();
@@ -1554,6 +1777,7 @@
         : [{ label: "Find creators for a campaign", go: flowFind }];
       if (document.querySelector(".cat-bar")) list.push({ label: "Show creators on this page", go: flowShow });
       list.push({ label: "Work on my selection", go: flowSelection },
+                { label: "What can my budget reach?", go: flowBudget },
                 { label: "Get a quote", go: flowQuote },
                 { label: "Talk to my account manager", go: flowHuman },
                 { label: "Just browsing", ghost: true, go: function () { say("Sure. I'll be right here in the corner whenever you need me."); } });
@@ -1568,8 +1792,16 @@
                 { label: "Talk to a person", go: flowHuman });
       chips(list, { hint: "Tap to choose · or type below" });
     }
+    // "What can my budget reach?": the client's own budget, answered with the ROI card (free).
+    function flowBudget() {
+      askFor("What's your budget in SAR, and what matters most: reach, engagement or clicks?", "e.g. 80,000 for reach on Instagram", function (text) {
+        var n = /(\d[\d,.]*)\s*(k|m|thousand|million|ألف)?/i.exec(text);
+        if (!n) { say("I need a number, like 80,000."); flowBudget(); return; }
+        submit("What can SAR " + n[1] + (n[2] ? n[2] : "") + " reach " + text.replace(n[0], "").trim(), true);
+      });
+    }
     function greet() {
-      say("Hi" + (first ? " " + first : "") + ", I'm here to help you 👋");
+      say("Hi" + (first ? " " + first : "") + ", I'm Helvy 👋");
       if (selToken()) { aboutSelection(); return; }
       menu("How can I help you?");
     }
@@ -2010,6 +2242,7 @@
     /* -- after an answer: the likely next asks, one tap each -- */
     function followUps(list) {
       var acts = { "Find creators": flowFind, "Find creators within my budget": flowFind, "Get a quote": flowQuote,
+                   "What can my budget reach?": flowBudget,
                    "Talk to a person": flowHuman,
                    "Save all as a selection": function () { (lastCards || []).forEach(function (c) { if (picked.indexOf(c.code) === -1) picked.push(c.code); }); drawPicks(); savePicks(); } };
       chips((list || []).map(function (label) {
@@ -2046,11 +2279,12 @@
     /* -- typing: answers a pending question, or goes to the AI -- */
     var REQ = /campaign|creator|influencer|shortlist|launch|recommend|suggest|find|looking for|ugc|حمل|مؤثر|إطلاق|اطلاق|ابحث|أبحث|اقترح/i;
     var thread = null, busy = false;
-    function submit() {
-      var text = ta.value.trim();
+    function submit(given, silent) {
+      var typed = typeof given !== "string";
+      var text = typed ? ta.value.trim() : given;
       if (!text || busy) return;
-      ta.value = ""; grow();
-      bubble("me", text);
+      if (typed) { ta.value = ""; grow(); }
+      if (!silent) bubble("me", text);
       Array.prototype.forEach.call(log.querySelectorAll(".hv-chips"), function (c) { c.remove(); });
       if (expecting) { var fn = expecting; expecting = null; ta.placeholder = "Type a message…"; fn(text); return; }
       if (/account manager|talk to (a )?(person|human|someone)|call me/i.test(text)) { handoff("handoff", text); return; }
@@ -2061,19 +2295,27 @@
       // brief and scores. Only elsewhere does a campaign description start the free find-creators taps.
       // Typed questions go to the assistant with the page as context; it decides (it can build a
       // shortlist itself). The free tap-through questions stay one tap away in the menu.
-      if (!(ME && ME.ai) && !selToken() && REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
-      if (!(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
+      // "What can SAR 60,000 reach?" is answered on the server with the ROI card: free, no AI needed.
+      var roiAsk = /(sar|sr|riyals?|ريال)\s*\d|\d[\d,.]*\s*(k|thousand|ألف)?\s*(sar|sr|riyals?|ريال)/i.test(text);
+      if (!roiAsk && !(ME && ME.ai) && !selToken() && REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
+      if (!roiAsk && !(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
       busy = true; send.disabled = true;
       // While it works: what it is doing right now, then the answer as it is written.
-      var work = h("div", { class: "hv-msg hv-msg--ai hv-work", "aria-label": "The assistant is working" },
-        h("span", { class: "hv-work__dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), h("ol", { class: "hv-work__steps" }));
-      var workRow = row("ai", work), out = null, ty = null, acc = "", ended = false;
+      // Helvy thinks: the thinking clip beside one live step line with a light sweep across it.
+      // Until the server names its steps, the line rotates every 1.4 s; each real step then ticks.
+      var now = h("p", { class: "cx-think__now" }, "Reading your message…");
+      var steps = h("ol", { class: "cx-think__steps" });
+      var work = h("div", { class: "hv-msg hv-msg--ai cx-think", role: "status", "aria-label": "Helvy is working on it" }, clip("thinking"), h("div", null, now, steps));
+      var workRow = row("ai", work), out = null, ty = null, acc = "", ended = false, real = false;
+      var ROT = ["Reading your message…", "Checking the catalogue…", "Thinking it through…", "Writing your answer…"], ri = 0;
+      var rot = setInterval(function () { if (!real) { ri = (ri + 1) % ROT.length; now.textContent = ROT[ri]; } }, 1400);
       function step(label) {
-        var ol = work.querySelector(".hv-work__steps");
-        ol.querySelectorAll("li:not(.is-done)").forEach(function (li) { li.classList.add("is-done"); });
-        var li = h("li", null, label + "…"); ol.appendChild(li); scroll();
+        real = true;
+        steps.querySelectorAll("li.is-now").forEach(function (li) { li.classList.remove("is-now"); li.classList.add("is-done"); });
+        steps.appendChild(h("li", { class: "is-now" }, label));
+        now.textContent = label + "…"; scroll();
       }
-      function stop() { busy = false; send.disabled = false; ended = true; }
+      function stop() { busy = false; send.disabled = false; ended = true; clearInterval(rot); }
       stream("/api/chat/stream", Object.assign({ message: text, thread: thread, selection: selToken() || undefined }, pageCtx()), function (ev) {
         if (ev.t === "step") { step(ev.text); return; }
         if (ev.t === "delta") {
@@ -2088,6 +2330,7 @@
           if (ev.credits != null) { setCredits(ev.credits); refreshFoot(); }
           // Cards and next steps follow once the answer has finished typing.
           ty.end(ev.reply, function () {
+            if (ev.roi && HV.roiCard) { row("ai", HV.roiCard(ev.roi)); msgs.push({ from: "roi", roi: ev.roi }); save(); }
             if (ev.breakdown && ev.breakdown.rows && ev.breakdown.rows.length) breakdown(ev.breakdown);
             (ev.actions || []).forEach(actionCard);
             if (ev.cards && ev.cards.length) creatorCards(ev.cards);
@@ -2123,7 +2366,11 @@
           started = true;
           if (msgs.length) {
             thread = (kept && kept.thread) || thread;
-            msgs.forEach(function (m) { if (m.from === "cards") creatorCards(m.list, false); else bubble(m.from, m.text, false); });
+            msgs.forEach(function (m) {
+              if (m.from === "cards") creatorCards(m.list, false);
+              else if (m.from === "roi") { if (HV.roiCard) row("ai", HV.roiCard(m.roi)); }
+              else bubble(m.from, m.text, false);
+            });
             log.appendChild(h("p", { class: "hv-sep" }, "Earlier in this chat"));
             if (selToken()) aboutSelection(); else menu("Welcome back. What would you like to do?");
           }
@@ -2768,7 +3015,8 @@
   function boot() {
     api("GET", "/api/me").then(function (r) {
       if (r.b && r.b.signed_in) {
-        ME = r.b; mountDock(); mountVoice(); mountAiCard(); mountLicences();
+        ME = r.b; HV.me = ME; mountDock(); mountVoice(); mountAiCard(); mountLicences();
+        try { document.dispatchEvent(new CustomEvent("hv:me", { detail: ME })); } catch (e) { /* old browser */ }
         var m = /[#&]s=([^&]+)/.exec(location.hash || "");
         if (document.body.getAttribute("data-page") === "selection" && m) setTimeout(function () { offerBrief(decodeURIComponent(m[1])); }, 1200);
         // Arriving from the AI shortlist's "Request a quote": open the quote form straight away.

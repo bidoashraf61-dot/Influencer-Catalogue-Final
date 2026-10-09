@@ -697,6 +697,7 @@ def build():
 <link rel="apple-touch-icon" href="/assets/brand/helvy-connect/helvy-icon-180.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
+<link rel="stylesheet" href="{stamp('/assets/css/connect.css')}"/>
 </head>
 <body class="cat-locked" data-page="catalogue">
 
@@ -805,7 +806,8 @@ def build():
           Confidential and not for redistribution.
           Creator identities are released on agreement.
         </p>
-        <p class="cat-footer__by"><span>Powered by</span><img src="/assets/brand/logo-knockout.webp" alt="HelloVoice" width="112" height="25"/><span>A BlueHolding Company</span></p>{admin_link}
+        <p class="cat-footer__by"><span>Powered by</span><img src="/assets/brand/logo-knockout.webp" alt="HelloVoice" width="112" height="25"/><span>A BlueHolding Company</span></p>
+        <p class="cat-footer__legal"><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a></p>{admin_link}
       </div>
     </div></div>
   </footer>
@@ -856,6 +858,7 @@ def build():
 </script>
 <script src="{stamp('/assets/js/catalogue.js')}"></script>
 <script src="{stamp('/assets/js/portal.js')}"></script>
+<script src="{stamp('/assets/js/connect.js')}"></script>
 </body>
 </html>
 """
@@ -882,6 +885,7 @@ def build():
 <link rel="apple-touch-icon" href="/assets/brand/helvy-connect/helvy-icon-180.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
+<link rel="stylesheet" href="{stamp('/assets/css/connect.css')}"/>
 </head>
 <body class="cat-locked" data-page="selection">
 
@@ -1024,7 +1028,8 @@ def build():
           Confidential and not for redistribution.
           Creator identities are released on agreement.
         </p>
-        <p class="cat-footer__by"><span>Powered by</span><img src="/assets/brand/logo-knockout.webp" alt="HelloVoice" width="112" height="25"/><span>A BlueHolding Company</span></p>{admin_link}
+        <p class="cat-footer__by"><span>Powered by</span><img src="/assets/brand/logo-knockout.webp" alt="HelloVoice" width="112" height="25"/><span>A BlueHolding Company</span></p>
+        <p class="cat-footer__legal"><a href="/privacy/">Privacy</a> · <a href="/terms/">Terms</a></p>{admin_link}
       </div>
     </div></div>
   </footer>
@@ -1081,6 +1086,7 @@ def build():
 </script>
 <script src="{stamp('/assets/js/catalogue.js')}"></script>
 <script src="{stamp('/assets/js/portal.js')}"></script>
+<script src="{stamp('/assets/js/connect.js')}"></script>
 </body>
 </html>
 """

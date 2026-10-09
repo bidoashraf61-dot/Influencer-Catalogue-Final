@@ -1763,7 +1763,10 @@
                         segments: b.segments || {}, groupBy: b.group_by || "",
                         platform: b.platform || "",
                         status: b.status || {}, statusCounts: b.status_counts || null, role: b.role || "viewer",
-                        owner: b.owner || "", kam: b.kam || "", replaceCost: b.replace_cost || 2, credits: b.credits };
+                        owner: b.owner || "", kam: b.kam || "", credits: b.credits,
+                        // 0 while AI is free (active campaign); null only on an old server.
+                        replaceCost: b.replace_cost != null ? b.replace_cost : 2, moreCost: b.more_cost != null ? b.more_cost : 3,
+                        alikeCost: b.alike_cost != null ? b.alike_cost : 2, aiFree: b.ai_free || null };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
           startSelection();
@@ -2477,11 +2480,11 @@
     }
     function replButton(code, st) {
       var have = (st.replacements || []).length;
-      var cost = (CURATED && CURATED.replaceCost) || 2;
+      var cost = CURATED && CURATED.replaceCost != null ? CURATED.replaceCost : 2;
       if (have) return '<button type="button" class="sel-repl sel-repl--ink" data-st-repl="' + esc(code) + '">' + hvIcon("swap") + " See " + have + " replacement" + (have === 1 ? "" : "s") + " from Helvy</button>";
       var helvy = window.hvPortal && window.hvPortal.helvy ? '<img src="' + esc(window.hvPortal.helvy) + '" alt="" aria-hidden="true">' : "";
       return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '">' + helvy + "<span>Find a replacement with Helvy</span>" +
-        '<span class="sel-cost">' + cost + " credits</span></button>";
+        '<span class="sel-cost">' + (cost ? cost + " credits" : "Free") + "</span></button>";
     }
     function replPanel(code) {
       var list = replList[code];
@@ -2530,6 +2533,12 @@
         html += replButton(code, st);
         if (openRepl[code]) html += replPanel(code);
       }
+      // "Creators like this" (Helvy look-alikes): on every card the owner has not turned down.
+      if (canDecide && st.s !== "rejected" && st.s !== "unavailable") {
+        var ac = CURATED.alikeCost != null ? CURATED.alikeCost : 2;
+        html += '<button type="button" class="sel-alike" data-alike="' + esc(code) + '" title="' + (ac ? "Helvy finds 3 creators like this one · " + ac + " credits" : "Free with your active campaign") + '">' +
+          hvIcon("spark") + "<span>Creators like this</span></button>";
+      }
       box.innerHTML = html;
     }
     function renderStatusBar() {
@@ -2567,6 +2576,31 @@
         chip("review", n.review + " under review", "wait") + chip("unavailable", n.unavailable + " unavailable", "off") +
         '</div><div class="sel-sbar__tools"><button type="button" class="sel-swrow" data-st-group role="switch" aria-checked="' + (groupBy === "status") + '"><span class="sel-sw" aria-hidden="true"></span>Group by status</button></div></div></div>';
     }
+    // HELVY Connect phase D (assets/js/connect.js): the ROI Calculator, "Add more like these"
+    // and "Creators like this" read the selection through this small hook and add creators
+    // the same way the replacement's Add button does.
+    window.hvSelection = {
+      token: function () { return CURATED && CURATED.token; },
+      name: function () { return (CURATED && CURATED.name) || ""; },
+      role: function () { return ROLE; },
+      curated: function () { return CURATED; },
+      codes: function () { return selected.slice(); },
+      status: function (code) { return statusOf(code); },
+      creator: function (code) {
+        var c = byCode[code]; if (!c) return null;
+        var nm = c.querySelector(".cat-card__name");
+        return { code: code, name: nm ? nm.textContent.trim() : code, tier: c.dataset.tier || "", doctor: isDoctor(code) };
+      },
+      add: function (codes) {
+        var n = 0;
+        (codes || []).forEach(function (c) { if (byCode[c] && selected.indexOf(c) === -1) { selected.push(c); n++; } });
+        if (n) { render(); saveShortlist(); }
+        return n;
+      },
+      toast: function (t) { stToast(t); },
+      rerender: function () { render(); }
+    };
+    try { document.dispatchEvent(new CustomEvent("hv:selection")); } catch (e) { /* old browser */ }
     if (STATUS_ON) {
       // A selection that has statuses opens grouped by them, unless the client chose otherwise.
       var gbStored = null;

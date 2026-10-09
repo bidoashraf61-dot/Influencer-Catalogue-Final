@@ -102,7 +102,7 @@
   /* -------------------------------------------------------------- side nav */
 
   var NAV = [["overview", "Overview", "home"], ["selections", "Selections", "list"], ["analyses", "Analyses", "scan"],
-             ["campaigns", "Campaigns", "mega"], ["briefs", "Briefs", "brief"], ["notifications", "Notifications", "bell"],
+             ["campaigns", "Campaigns", "mega"], ["briefs", "Briefs", "brief"], ["roi", "ROI Calculator", "calc"], ["notifications", "Notifications", "bell"],
              ["credits", "Credits", "coin"], ["hr"], ["account", "Account", "user"]];
 
   function face(u, cls) {
@@ -135,7 +135,9 @@
     });
     side.appendChild(nav);
     var out = h("button", { class: "hc-more", type: "button", onclick: signOut }, icon("out"), "Sign out");
-    side.appendChild(h("div", { class: "hc-out" }, out));
+    // The 2-minute tour, replayable any time (HELVY Connect phase C).
+    var tourB = h("button", { class: "hc-more", type: "button", onclick: function () { if (HV().tour) HV().tour(); } }, icon("help"), "Take the tour");
+    side.appendChild(h("div", { class: "hc-out" }, tourB, out));
     var cur = nav.querySelector('[aria-current="page"]');
     if (cur && window.matchMedia("(max-width: 1100px)").matches) cur.scrollIntoView({ block: "nearest", inline: "center" });
   }
@@ -816,9 +818,11 @@
   /* ---------------------------------------------------------------- routing */
 
   var RENDER = { overview: renderOverview, selections: renderSelections, analyses: renderAnalyses, campaigns: renderCampaigns,
-                 briefs: renderBriefs, notifications: renderNotifications, credits: renderCredits, account: renderAccount };
+                 briefs: renderBriefs, notifications: renderNotifications, credits: renderCredits, account: renderAccount,
+                 // ROI Calculator: drawn by assets/js/connect.js (tier mix, save to a selection, estimate vs actual).
+                 roi: function (p) { if (HV().roiPage) HV().roiPage(p); else setTimeout(function () { if (SECTION === "roi") renderSection(); }, 200); } };
   var TITLES = { overview: "My profile", selections: "Selections", analyses: "Analyses", campaigns: "Campaigns", briefs: "Briefs",
-                 notifications: "Notifications", credits: "Credits", account: "Account" };
+                 roi: "ROI Calculator", notifications: "Notifications", credits: "Credits", account: "Account" };
   function renderSection() {
     var p = $("hc-body");
     p.textContent = "";

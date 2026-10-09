@@ -52,12 +52,15 @@ cp "$SRC/dist/index.html"           "$DST/index.html"
 cp "$SRC/dist/selection/index.html" "$DST/selection/index.html"
 # The campaign report is hand-written in the repo, not built.
 # The campaign report and the creator passport are hand-written, not built.
-mkdir -p "$DST/campaign/dashboard" "$DST/creator" "$DST/account"
+mkdir -p "$DST/campaign/dashboard" "$DST/creator" "$DST/account" "$DST/privacy" "$DST/terms"
 cp "$SRC/campaign/index.html"       "$DST/campaign/index.html"
 cp "$SRC/campaign/dashboard/index.html" "$DST/campaign/dashboard/index.html"
 cp "$SRC/creator/index.html"        "$DST/creator/index.html"
 # The client's own account page, also hand-written.
 cp "$SRC/account/index.html"        "$DST/account/index.html"
+# HELVY Connect privacy notice and terms (drafts pending legal review), hand-written.
+cp "$SRC/privacy/index.html"        "$DST/privacy/index.html"
+cp "$SRC/terms/index.html"          "$DST/terms/index.html"
 
 # Stamp a ?v=<hash> onto the js/css URLs. The source templates carry one but
 # the dist build drops it, so catalogue.js sits at a URL that never changes —
@@ -72,10 +75,12 @@ def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
 names = ('js/catalogue.js', 'css/catalogue.css', 'js/portal.js', 'css/portal.css',
          'js/campaign.js', 'css/campaign.css',
          'js/creator.js', 'css/creator.css', 'js/hv-icons.js',
-         'js/dashboard.js', 'css/dashboard.css', 'js/account.js', 'css/account.css', 'js/hv-loader.js')
+         'js/dashboard.js', 'css/dashboard.css', 'js/account.js', 'css/account.css', 'js/hv-loader.js',
+         'js/connect.js', 'css/connect.css')
 stamp = {n: h('assets/' + n) for n in names}
 for page in ('index.html', 'selection/index.html', 'campaign/index.html',
-             'campaign/dashboard/index.html', 'creator/index.html', 'account/index.html'):
+             'campaign/dashboard/index.html', 'creator/index.html', 'account/index.html',
+             'privacy/index.html', 'terms/index.html'):
     f = root / page
     s = f.read_text()
     for n, v in stamp.items():
