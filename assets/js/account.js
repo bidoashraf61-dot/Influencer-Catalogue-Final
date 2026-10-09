@@ -135,7 +135,7 @@
     });
     side.appendChild(nav);
     var out = h("button", { class: "hc-more", type: "button", onclick: signOut }, icon("out"), "Sign out");
-    // The 2-minute tour, replayable any time (HELVY Connect phase C).
+    // The 3-minute tour, replayable any time (HELVY Connect phase C).
     var tourB = h("button", { class: "hc-more", type: "button", onclick: function () { if (HV().tour) HV().tour(); } }, icon("help"), "Take the tour");
     side.appendChild(h("div", { class: "hc-out" }, tourB, out));
     var cur = nav.querySelector('[aria-current="page"]');

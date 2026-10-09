@@ -226,7 +226,7 @@ Tests: `python3 admin/tests/e2e_portal_v3.py` (includes a check that locked figu
 | Sign-in code email | `admin/mailer.py` (`OTP_HTML`) | 600px table, inline styles, PNGs on the catalogue host (`assets/brand/email/`), VML button, dark mode. |
 | Access codes → accounts | `admin/codelinks.py`, Client portal → **Access codes → accounts** | Invite a shared code's client to an email account: the account sees and owns the code's selections and campaigns (`portal.team_codes` / `portal.owns`). Codes are never revoked or moved here. |
 | AI free during a campaign | `portal.charge` / `portal.active_campaign` | Every AI action is free from a (team) campaign's start date to its end date + 30 days. `/api/me` → `ai_free`. |
-| Tour | `assets/js/connect.js`, `admin/rewards.py` | Offered once (`users.tour`), replay from Help / profile; +5 once (`reward:tour`). `POST /api/tour`. |
+| Tour (v2) | `assets/js/connect.js` (opener + loader), `assets/js/tour.js` + `assets/css/tour.css` (fetched on start), `assets/demo/`, `admin/rewards.py` | Offered once (`users.tour`), replay from Help / profile; +5 once (`reward:tour`). `POST /api/tour`. See *Onboarding tour v2* below. |
 | ROI Calculator | `admin/roi.py`, `admin/connect_api.py`, `connect.js` | Deterministic, free. `plans.LIBRARY` (+ house results, + creators' own averages), grades good / moderate / low. Table `roi_estimates`; estimate vs actual per campaign. Routes `/api/roi/*`. |
 | AI on selections | `admin/aimore.py` | `/api/selection/more` (3 credits), `/api/selection/alike` (2, kept so reopening is free). Tables `selection_more`, `selection_alike`. |
 | Helvy knowledge | `admin/helvy_kb.py`, `admin/occasions.py`, `assistant.py`, `knowledge.py`, `faq.py` | Tools `campaign_results` (own, named via Settings, or aggregates over 3+ campaigns), `occasions`, `my_decisions`, `roi_estimate`; KSA rules; **no prices ever** (price tool removed, prices stripped from creator views, FAQ routes to a quote). |
@@ -248,3 +248,34 @@ Tests: `python3 admin/tests/e2e_portal_cd.py`, `python3 admin/tests/test_roi.py`
 | Promise | `gating.WORK_DAYS = 1` | Full analysis within 1 working day (Friday and Saturday skipped). |
 
 Tests: `python3 admin/tests/e2e_portal_fixes2.py`.
+
+
+## Onboarding tour v2 (2026-10-09)
+
+"Take the 3-minute tour?" — 7 stops in 4 chapters, the customer's own path: **Brief Helvy**
+(the chat brief + "what can 50,000 SAR reach?", the AI shortlist desk) · **Build your
+shortlist** (browse and filter; the selection: chips, score badge breakdown, approve /
+reject, reason, replacement) · **Check & book** (a complete sample full analysis to scroll,
+the locked request, request a quote, the bell) · **Track results** (the live demo campaign,
+where everything lives, +5 credits).
+
+How it works: the tour opens a frame over the page and plays the **real** pages in it
+(catalogue, selection, creator, campaign, Helvy's chat). `hv-loader.js` — the first script on
+every page — sees the frame belongs to a running tour (`top.hvTourDemo.active`) and calls
+`hvTourDemo.install(window)` before any page script runs. From then on, in the frame:
+
+- every `/api/` call is answered by tour.js from the demo world (Northwind Pharma · Ramadan
+  Skincare, eight AI-generated demo creators `DEMO-01..08`, photos in `assets/demo/`):
+  nothing reaches the server, so nothing is saved, no AI call is made and no credit is used;
+- `localStorage`, `sessionStorage` and `document.cookie` are in-memory, so the client's own
+  roster cache, chat history and settings are untouched; outside links and new windows are
+  blocked; the "Paused" privacy cover and the showreel are off.
+
+`portal.js` exposes two hooks only inside a demo frame (`window.hvDemo`): `HV.voiceDemo` (types
+the scripted brief into the real chat) and `HV.aiDemo` (runs the AI shortlist card's desk).
+The tour's only real call is `POST /api/tour`.
+
+Versioning: connect.js names `tour.js?v=…` / `tour.css?v=…`; `update.sh` rewrites both to the
+files' hash inside connect.js before it hashes connect.js itself. Tests:
+`admin/tests/e2e_tour_v2.py` (server + contract); the on-screen journey is checked in a
+browser at 1440 and 390 wide.

@@ -117,7 +117,7 @@ def check(user):
 
 
 # --------------------------------------------------------------------- tour --
-# The 2-minute tour Helvy offers after the first sign-in. The state is only what the
+# The 3-minute tour Helvy offers after the first sign-in. The state is only what the
 # page needs to decide whether to offer it again: None (never shown), "offered",
 # "later", "started" or "done". The +5 is paid once per account, enforced by the
 # ledger ref, however many times the tour is replayed.
