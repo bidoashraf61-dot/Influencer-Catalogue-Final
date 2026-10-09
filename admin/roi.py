@@ -422,6 +422,8 @@ def versus(k):
         e, a = est.get(key), act.get(key)
         if e is None or a is None or not e:
             continue
+        if key == "clicks" and not a:
+            continue                     # no tracking links on this campaign: nothing to compare
         if key == "er":
             delta = round(a - e, 1)
             grade = "good" if a >= e else "moderate" if a >= e - 0.7 else "low"

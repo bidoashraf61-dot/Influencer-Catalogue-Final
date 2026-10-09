@@ -397,8 +397,8 @@ OTP_HTML = """<!DOCTYPE html>
         <img src="{HELVY}" width="92" height="92" alt="Helvy, smiling" style="display:block;width:92px;height:92px;border-radius:46px;border:0;">
       </td>
       <td valign="middle">
-        <p class="mu" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#6b6b6b;">Your sign-in code</p>
-        <p class="tx hi" style="margin:6px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:24px;line-height:30px;font-weight:700;color:#121212;">Hi, it&rsquo;s Helvy. Here&rsquo;s your code &#128075;</p>
+        <p class="tx hi" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:26px;line-height:32px;font-weight:700;color:#121212;">Hi, it&rsquo;s Helvy &#128075;</p>
+        <p class="mu" style="margin:6px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#383838;">Here&rsquo;s your code to sign in to HELVY Connect.</p>
       </td>
     </tr></table>
   </td></tr>
