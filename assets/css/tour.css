@@ -1,0 +1,151 @@
+/* HELVY Connect onboarding tour v2 (tour.js). Fetched only when a client starts the tour.
+   An ink broadcast bar (DEMO, the four chapters, Exit) over the real pages playing in a
+   frame; a lime-ringed spotlight; Helvy standing on the coach card, never in a circle.
+   Catalogue world: ink / lime / linen, Bebas for names and actions, DM Sans for sentences. */
+
+.tv { position: fixed; inset: 0; z-index: 2147482000; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--ink, #121212);
+  font-family: var(--body, "DM Sans", Arial, sans-serif); color: var(--ink, #121212); text-align: left; opacity: 0; transition: opacity .25s ease; }
+.tv.is-in { opacity: 1; }
+.tv-i { width: 18px; height: 18px; flex: none; }
+.tv-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; margin: 0; }
+.tv :focus-visible { outline: 3px solid var(--vivid-red, #ee1515); outline-offset: 2px; }
+
+/* ------------------------------------------------------------------ the bar */
+.tv-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; min-height: 64px; padding: 8px 16px 8px 20px; color: var(--white, #fff); }
+.tv-bar__id { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.tv-badge { flex: none; font-family: var(--heading); font-size: 20px; letter-spacing: .1em; line-height: 1; padding: 7px 14px 5px; border-radius: 999px; color: var(--ink);
+  background: var(--lime); transform: rotate(-2deg); }
+.tv-bar__id p { margin: 0; min-width: 0; line-height: 1.2; }
+.tv-bar__id b { display: block; font-family: var(--heading); font-weight: 400; font-size: 21px; letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-bar__id p span { display: block; font-size: 12.5px; color: rgba(255,255,255,.66); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-chaps { list-style: none; margin: 0; padding: 4px; display: flex; gap: 2px; border-radius: 999px; background: rgba(255,255,255,.07); }
+.tv-chap { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 14px 0 10px; border: 0; border-radius: 999px; background: transparent; cursor: pointer;
+  color: rgba(255,255,255,.62); font: inherit; font-size: 13.5px; font-weight: 600; white-space: nowrap; transition: background .2s ease, color .2s ease; }
+.tv-chap small { font-size: 11px; font-weight: 800; margin-right: 6px; opacity: .7; }
+.tv-chap .tv-i { width: 17px; height: 17px; }
+.tv-chap:hover { color: var(--white); background: rgba(255,255,255,.08); }
+.tv-chap.is-done { color: rgba(255,255,255,.88); }
+.tv-chap.is-now { background: var(--lime); color: var(--ink); }
+.tv-chap.is-now small { opacity: 1; }
+.tv-exit { justify-self: end; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.3); background: transparent; color: var(--white); font-family: var(--heading); font-size: 19px; letter-spacing: .06em; transition: border-color .2s ease, color .2s ease; }
+.tv-exit:hover { border-color: var(--lime); color: var(--lime); }
+
+/* ---------------------------------------------------------------- the stage */
+.tv-stage { position: relative; overflow: hidden; margin: 0 8px; border-radius: 16px 16px 0 0; background: var(--white); isolation: isolate; }
+.tv-frame { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: var(--white); }
+.tv-spot { position: absolute; left: 0; top: 0; z-index: 2; border-radius: 20px; pointer-events: none;
+  box-shadow: 0 0 0 3px var(--lime), 0 0 0 200vmax rgba(18,18,18,.52);
+  transition: transform .5s cubic-bezier(.16,1,.3,1), width .5s cubic-bezier(.16,1,.3,1), height .5s cubic-bezier(.16,1,.3,1); }
+.tv-spot::after { content: ""; position: absolute; inset: -9px; border-radius: 28px; border: 2px solid rgba(232,255,118,.5); animation: tv-pulse 2.4s ease-out infinite; }
+@keyframes tv-pulse { from { opacity: 1; transform: scale(.985); } to { opacity: 0; transform: scale(1.05); } }
+.tv-spot[hidden] { display: none; }
+/* while a demo page loads: linen, Helvy's breathing logo line */
+.tv-shutter { position: absolute; inset: 0; z-index: 3; display: grid; place-items: center; background: var(--linen); opacity: 0; pointer-events: none; transition: opacity .28s ease; }
+.tv-shutter::after { content: "Setting up the demo…"; font-size: 14px; letter-spacing: .02em; color: #383838; animation: tv-breathe 1.4s ease-in-out infinite; }
+@keyframes tv-breathe { 50% { opacity: .35; } }
+.tv-shutter.is-on { opacity: 1; pointer-events: auto; }
+.tv.is-finish .tv-stage::after { content: ""; position: absolute; inset: 0; z-index: 2; background: rgba(18,18,18,.6); }
+
+/* ---------------------------------------------------------------- the coach */
+.tv-coach { position: fixed; z-index: 4; right: 28px; bottom: 28px; width: 392px; max-width: calc(100vw - 24px); box-sizing: border-box; padding: 20px 22px 14px;
+  background: var(--white); border-radius: 22px; box-shadow: 0 30px 70px rgba(0,0,0,.34), 0 2px 8px rgba(0,0,0,.12);
+  transition: left .45s cubic-bezier(.16,1,.3,1), top .45s cubic-bezier(.16,1,.3,1), opacity .2s ease; }
+.tv-coach:focus { outline: none; }
+.tv-coach.is-pop { animation: tv-pop .42s cubic-bezier(.16,1,.3,1) both; }
+@keyframes tv-pop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
+.tv-coach.is-wait { opacity: .72; }
+/* Helvy stands on the card, his waist cut on its top edge; he turns to face the lit area */
+.tv-coach__helvy { position: absolute; left: 14px; bottom: calc(100% - 2px); pointer-events: none; }
+.tv-coach .cx-hd.tv-hv { width: 116px; height: 116px; }
+.tv-coach .tv-hv .hv-clip { -webkit-mask-image: none; mask-image: none; filter: drop-shadow(0 -2px 10px rgba(18,18,18,.18)); }
+.tv-coach.is-flip .tv-coach__helvy { left: auto; right: 14px; }
+.tv-coach.is-flip .tv-hv .hv-clip { transform: scaleX(-1); }
+.tv-coach__prog { display: flex; align-items: center; gap: 12px; min-height: 22px; }
+.tv-coach__prog > span { font-size: 12px; font-weight: 600; letter-spacing: .02em; color: #4a4a4a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-coach__prog > span b { color: var(--ink); font-weight: 800; }
+.tv-dots { list-style: none; margin: 0; padding: 0; display: flex; gap: 5px; flex: none; }
+.tv-dots li { position: relative; width: 8px; height: 8px; border-radius: 50%; background: #e5e1d9; overflow: hidden; }
+.tv-dots li.is-done { background: var(--ink); }
+.tv-dots li.is-now { width: 26px; border-radius: 6px; background: #e5e1d9; box-shadow: inset 0 0 0 1.5px var(--ink); }
+.tv-dots li.is-now i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--lime); box-shadow: inset 0 0 0 1.5px var(--ink); border-radius: 6px; transition: width .4s ease; }
+.tv-dots li.is-now:not(:has(i)) { background: var(--lime); }
+.tv-coach h2 { margin: 14px 0 0; font-family: var(--heading); font-weight: 400; font-size: 34px; line-height: .95; letter-spacing: .01em; text-transform: none; text-wrap: balance; color: var(--ink); }
+.tv-coach p { margin: 8px 0 0; font-size: 15px; line-height: 1.5; color: #262626; }
+.tv-coach__hint { display: flex; align-items: flex-start; gap: 8px; padding: 9px 12px; border-radius: 12px; background: #f6f3ee; font-size: 13.5px !important; line-height: 1.4 !important; }
+.tv-coach__hint .tv-i { width: 16px; height: 16px; margin-top: 1px; color: #7a8f00; }
+.tv-nav { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding-top: 12px; border-top: 1px solid rgba(18,18,18,.08); }
+.tv-skip { margin-right: auto; min-height: 44px; padding: 0 4px; border: 0; background: none; cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 600; color: #4a4a4a;
+  text-decoration: underline; text-underline-offset: 4px; text-decoration-color: rgba(18,18,18,.3); }
+.tv-skip:hover { color: var(--ink); text-decoration-color: currentColor; }
+.tv-nav__gap { margin-right: auto; }
+.tv-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 20px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  border: 1px solid var(--lime); background: var(--lime); color: var(--ink); font-family: var(--heading); font-size: 19px; letter-spacing: .06em; line-height: 1;
+  transition: background .2s ease, color .2s ease, border-color .2s ease; }
+.tv-btn:hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.tv-btn--line { background: transparent; border-color: var(--ink); }
+.tv-btn .tv-i { width: 17px; height: 17px; }
+
+/* the finish: the coach in the middle, Helvy celebrating, the +5 stamp */
+.tv-coach--finish { left: 50% !important; top: 50% !important; right: auto; bottom: auto; width: 460px; transform: translate(-50%, -42%); padding: 26px 28px 16px; text-align: center; }
+.tv-coach--finish.is-pop { animation: tv-pop-c .5s cubic-bezier(.16,1,.3,1) both; }
+@keyframes tv-pop-c { from { opacity: 0; transform: translate(-50%, -38%) scale(.97); } }
+.tv-coach--finish .tv-coach__helvy { left: 50%; right: auto; transform: translateX(-50%); }
+.tv-coach--finish .cx-hd.tv-hv { width: 170px; height: 170px; }
+.tv-coach--finish .tv-coach__prog { padding: 0; justify-content: center; }
+.tv-coach--finish h2 { font-size: 46px; }
+.tv-prize { display: flex; align-items: center; gap: 16px; margin-top: 16px; padding: 14px 16px; border-radius: 16px; background: #f6f3ee; text-align: left; }
+.tv-prize__stamp { flex: none; display: inline-flex; align-items: baseline; gap: 4px; font-family: var(--heading); font-size: 44px; line-height: .9; padding: 10px 14px 6px; border-radius: 14px;
+  background: var(--lime); border: 2px solid var(--ink); box-shadow: inset 0 0 0 3px var(--lime), inset 0 0 0 4px var(--ink); transform: rotate(-4deg); animation: tv-stamp .6s cubic-bezier(.16,1,.3,1) .35s both; }
+.tv-prize__stamp small { font-size: .42em; letter-spacing: .06em; }
+@keyframes tv-stamp { 0% { opacity: 0; transform: scale(1.8) rotate(-12deg); } 60% { opacity: 1; transform: scale(.94) rotate(-3deg); } 100% { transform: rotate(-4deg); } }
+.tv-prize p { margin: 0 !important; font-size: 13.5px !important; line-height: 1.45 !important; }
+.tv-prize p b { display: block; font-size: 15px; color: var(--ink); }
+.tv-coach__fine { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13.5px !important; color: #4a4a4a !important; }
+.tv-coach__fine .tv-i { width: 16px; height: 16px; }
+
+/* --------------------------------------------------------------- the phone */
+@media (max-width: 1100px) {
+  .tv-chap span { display: none; }
+  .tv-chap { padding: 0 11px; }
+  .tv-chap.is-now span { display: inline; }
+  .tv-chap.is-now { padding: 0 14px 0 10px; }
+}
+@media (max-width: 760px) {
+  .tv-bar { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; min-height: 56px; padding: 6px 8px 6px 12px; }
+  .tv-bar__id p { display: none; }
+  .tv-badge { font-size: 17px; padding: 6px 11px 4px; }
+  .tv-chaps { justify-self: center; padding: 3px; }
+  .tv-chap { min-height: 36px; padding: 0 9px; }
+  .tv-chap.is-now { padding: 0 10px 0 8px; }
+  .tv-chap.is-now span { display: none; }
+  .tv-chap .tv-i { width: 16px; height: 16px; }
+  .tv-exit { min-height: 40px; padding: 0 12px; font-size: 17px; }
+  .tv-exit span { display: none; }
+  .tv-exit::after { content: "Exit"; }
+  .tv-stage { margin: 0 4px; border-radius: 12px 12px 0 0; }
+  .tv-coach, .tv-coach--finish { left: 8px !important; right: 8px; top: auto !important; bottom: 8px; width: auto; max-width: none; transform: none;
+    max-height: 52vh; max-height: 52dvh; overflow: visible; padding: 14px 16px 10px; border-radius: 20px; }
+  .tv-coach--finish { bottom: 12px; }
+  .tv-coach--finish.is-pop { animation-name: tv-pop; }
+  .tv-coach__words { max-height: calc(52dvh - 24px); overflow-y: auto; overscroll-behavior: contain; }
+  .tv-coach__helvy, .tv-coach.is-flip .tv-coach__helvy { left: auto; right: 10px; }
+  .tv-coach .cx-hd.tv-hv { width: 84px; height: 84px; }
+  .tv-coach--finish .cx-hd.tv-hv { width: 120px; height: 120px; }
+  .tv-coach--finish .tv-coach__helvy { left: 50%; right: auto; }
+  .tv-coach.is-flip .tv-hv .hv-clip { transform: none; }
+  .tv-coach__prog, .tv-coach.is-flip .tv-coach__prog { padding: 0 86px 0 0; }
+  .tv-coach h2 { margin-top: 8px; font-size: 27px; }
+  .tv-coach--finish h2 { font-size: 34px; }
+  .tv-coach p { font-size: 14px; margin-top: 6px; }
+  .tv-nav { margin-top: 10px; padding-top: 8px; gap: 6px; }
+  .tv-btn { min-height: 42px; padding: 0 15px; font-size: 18px; }
+  .tv-btn--line span { display: none; }
+  .tv-btn--line { width: 44px; padding: 0; }
+  .tv-prize { margin-top: 10px; padding: 10px 12px; }
+  .tv-prize__stamp { font-size: 34px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tv, .tv-spot, .tv-coach, .tv-shutter, .tv-dots li.is-now i { transition: none; }
+  .tv-spot::after, .tv-shutter::after, .tv-coach.is-pop, .tv-coach--finish.is-pop, .tv-prize__stamp { animation: none; }
+}

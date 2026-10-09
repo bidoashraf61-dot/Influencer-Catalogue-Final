@@ -64,7 +64,7 @@
     save: '<path d="M6 3.5h9.5l3 3V20.5H6z"/><path d="M9 3.5v5h6v-5M9 20.5v-6h6v6"/>',
     dl: '<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>',
     help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2.1-2.4 3.6M12 17v.2"/>',
-    minus: '<path d="M5 12h14"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/>',
+    minus: '<path d="M5 12h14"/>', chat: '<path d="M4.5 5.5h15v10.5h-8.2l-4.3 3.5V16h-2.5z"/><path d="M8.5 10.8h.01M12 10.8h.01M15.5 10.8h.01"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/>',
     filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
     target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
     sparkle: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z"/><path d="M18.5 16l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
@@ -102,7 +102,7 @@
   }
   HV.clip = clip;
   // "Cooking": Helvy at the director's desk while the AI works (thinking -> flipping through
-  // creator cards -> stamping approval, round and round) with a rotating step line. Used by
+  // creator cards -> pressing a green check on a card, round and round) with a rotating step line. Used by
   // Add more like these, Creators like this and Find a replacement; the AI shortlist card has
   // the same sequence in its own stage.
   var COOK_STEPS = ["Reading your brief…", "Flipping through creators…", "Scoring fit…", "Approving your picks…"];
@@ -112,7 +112,7 @@
     var el = document.createElement("div");
     el.className = "cx-cook" + (opts.compact ? " cx-cook--compact" : "") + (opts.dark ? " cx-cook--dark" : "");
     el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
-    el.appendChild(clip("thinking", "cx-cook__hv", { seq: ["thinking", "cards", "stamp"] }));
+    el.appendChild(clip("thinking", "cx-cook__hv", { seq: ["thinking", "cards", "approve"] }));
     var tx = document.createElement("div"); tx.className = "cx-cook__tx";
     var now = document.createElement("p"); now.className = "cx-think__now cx-cook__now"; now.textContent = steps[0];
     var dots = document.createElement("ol"); dots.className = "cx-cook__dots"; dots.setAttribute("aria-hidden", "true");
@@ -1483,7 +1483,8 @@
     var page = document.body.getAttribute("data-page");
     if (!VOICE_PAGES[page] || $("hv-voice")) return;
     // Inside the profile-analysis side panel (an iframe of the creator page) the page around it already has the assistant.
-    if (window.self !== window.top || /[?&]embed=1\b/.test(location.search)) return;
+    // The onboarding tour plays this page in a demo frame (tour.js): there the chat runs, on demo answers.
+    if ((window.self !== window.top && !window.hvDemo) || /[?&]embed=1\b/.test(location.search)) return;
     var first = ME && ME.user ? ME.user.name.split(" ")[0] : "";
     // One conversation per access (signed-in client or access code), carried across pages for a week.
     var STORE = "hv-chat:" + ((ME && ME.chat_key) || (ME && ME.user ? ME.user.email : ME && ME.kind) || "guest");
@@ -2365,6 +2366,23 @@
     minBtn.addEventListener("click", function () { toggle(false); });
     // The account page's "Message your account manager" opens straight onto the hand-off.
     HV.talk = function () { toggle(true); setTimeout(flowHuman, 400); };
+    // Tour demo only: Helvy is briefed on screen, letter by letter, then answers from the demo world.
+    if (window.hvDemo) {
+      HV.voiceDemo = function (text, fresh) {
+        var wasOpen = root.classList.contains("is-open");
+        toggle(true);
+        if (fresh) { log.innerHTML = ""; msgs = []; queue = Promise.resolve(); }
+        var i = 0;
+        (function type() {
+          if (busy) { setTimeout(type, 200); return; }
+          if (i === 0 && fresh && !wasOpen) { i = -1; setTimeout(type, reduce ? 0 : 1300); return; }
+          if (i < 0) i = 0;
+          if (i <= text.length) { ta.value = text.slice(0, i); grow(); i += 1; setTimeout(type, reduce ? 0 : 26); return; }
+          setTimeout(function () { submit(); ta.blur(); }, reduce ? 0 : 260);
+        })();
+      };
+      HV.voiceClose = function () { if (root.classList.contains("is-open")) toggle(false); };
+    }
     freshBtn.addEventListener("click", function () {
       msgs = []; thread = null; save(); expecting = null; ta.placeholder = "Type a message…"; ta.value = ""; grow();
       picked = []; drawPicks(); log.innerHTML = ""; queue = Promise.resolve(); greet();
@@ -2487,7 +2505,7 @@
     var card = h("section", { id: "ai-sl", class: "ai-sl", "aria-labelledby": "ai-sl-title" });
     var roster = document.querySelectorAll(".cat-card").length;
     // Helvy's 2026-10-09 transparent set (hv-loader.js names the files). The wait is the
-    // "director's desk": thinking -> flipping through creator cards -> stamping approval, round and round.
+    // "director's desk": thinking -> flipping through creator cards -> pressing a green check on the pick, round and round.
     function loop(name, seq) { return clip(name, "ai-sl__hv", seq ? { seq: seq } : null); }
 
     // Collapsed: the invitation.
@@ -2524,7 +2542,7 @@
     // several) left blank or half-painted frames in Chrome.
     var cring = h("div", { class: "ai-sl__cring" });
     // Trimmed to the action itself, so a reaction starts the instant the client taps.
-    var CLIP = { point: "point", think: "thinking", thumbs: "stamp", cheer: "celebrate", wave: "idle" };
+    var CLIP = { point: "point", think: "thinking", thumbs: "approve", cheer: "celebrate", wave: "idle" };
     var IDLE = { think: 1, wave: 1 };
     var power = h("div", { class: "ai-sl__power" });
     power.innerHTML = '<p class="ai-sl__pw-h">Campaign power</p><p class="ai-sl__pw-n"><b>0</b><small> / ' + 1000 + '</small></p>' +
@@ -2537,6 +2555,8 @@
     host.appendChild(card);
 
     var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null;
+    // Tour demo only: skip the six taps and go straight to the director's desk.
+    if (window.hvDemo) HV.aiDemo = function (ans, name) { answers = ans || {}; card.classList.add("is-open"); intro.hidden = true; run.hidden = false; go(name); };
 
     /* -- the game layer: coach animations and campaign power -- */
     // The coach: idle poses loop; reactions (thumbs, cheer, point) play once, in full, then hand
@@ -2775,7 +2795,7 @@
         }).join("") + "</div>" +
         '<div class="ai-sl__lens"></div>' +
         '<span class="ai-sl__spark ai-sl__spark--1"></span><span class="ai-sl__spark ai-sl__spark--2"></span><span class="ai-sl__spark ai-sl__spark--3"></span>';
-      scene.querySelector(".ai-sl__lens").appendChild(loop("thinking", ["thinking", "cards", "stamp"]));
+      scene.querySelector(".ai-sl__lens").appendChild(loop("thinking", ["thinking", "cards", "approve"]));
       p.appendChild(scene);
       var side = h("div", { class: "ai-sl__steps" });
       side.appendChild(h("p", { class: "ai-sl__ask" }, "Building “" + name + "”"));

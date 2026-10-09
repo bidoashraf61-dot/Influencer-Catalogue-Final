@@ -1,10 +1,9 @@
 /* HELVY Connect, phases C + D (approved mockups .impeccable/mockups/portal-v3-cd/).
  *
- *  - The onboarding tour: offered once after the first sign-in ("Take the 2-minute
- *    tour?"), replayable from Help and the profile. It runs in a demo world laid
- *    over the page (DEMO badge, Exit demo, the fictional Northwind Pharma ·
- *    Ramadan Skincare), with a spotlight, Helvy and Back / Next / Skip. Nothing
- *    in the demo is saved; finishing pays +5 credits once (server-enforced).
+ *  - The onboarding tour's opener ("Take the 3-minute tour?", four chapters), offered
+ *    once after the first sign-in and replayable from Help and the profile. The tour
+ *    itself (tour.js / tour.css, loaded on start) plays the real pages on demo data;
+ *    finishing pays +5 credits once (server-enforced).
  *  - The ROI Calculator: a drawer inside a selection (its creators' own numbers),
  *    a page in the profile (a tier mix), a compact card in Helvy's chat, the
  *    "Download PDF" (verdict first) and estimate vs actual on the campaign report.
@@ -427,7 +426,7 @@
       card.appendChild(msg);
       go.addEventListener("click", function () {
         go.disabled = true; msg.textContent = "";
-        // While Helvy works: the director's desk (thinking -> cards -> stamp) and the step line.
+        // While Helvy works: the director's desk (thinking -> cards -> approve) and the step line.
         var cook = HV.cooking ? HV.cooking({ dark: true }) : null;
         if (cook) { card.classList.add("is-cooking"); card.appendChild(cook); }
         api("POST", "/api/selection/more", { token: S.token(), note: note.value, count: count,
@@ -512,210 +511,31 @@
     }, true);
 
     /* ================================================================ TOUR */
-    var DEMO = {
-      creators: [["LR", "Lulwa R.", "Macro", "612K", "4.1%"], ["DA", "Dr. Adel K.", "Doctor", "88K", "6.0%"], ["MS", "Maha S.", "Mid", "204K", "3.7%"], ["TB", "Tariq B.", "Micro", "47K", "7.2%"],
-                 ["NH", "Nada H.", "Mid", "151K", "4.4%"], ["YO", "Yousef O.", "Macro", "530K", "2.9%"], ["DG", "Dr. Ghada M.", "Doctor", "73K", "5.6%"], ["RA", "Rana A.", "Micro", "39K", "8.1%"]],
-      brand: "Northwind Pharma", campaign: "Ramadan Skincare"
+    // Tour v2 lives in tour.js + tour.css, fetched only when the client starts it (the demo
+    // photos load with the demo pages). Here: the opener card and the loader.
+    var TOUR_JS = "assets/js/tour.js?v=t2a", TOUR_CSS = "assets/css/tour.css?v=t2a";
+    var tourLoad = null;
+    function loadTour() {
+      if (window.hvTour) return Promise.resolve(window.hvTour);
+      if (tourLoad) return tourLoad;
+      tourLoad = new Promise(function (ok, no) {
+        var left = 2, fail = function () { tourLoad = null; no(); };
+        var one = function () { if (--left === 0) ok(window.hvTour); };
+        var l = document.createElement("link"); l.rel = "stylesheet"; l.href = ROOT + TOUR_CSS; l.onload = one; l.onerror = one;
+        var sc = document.createElement("script"); sc.src = ROOT + TOUR_JS; sc.onload = one; sc.onerror = fail;
+        document.head.appendChild(l); document.head.appendChild(sc);
+      });
+      return tourLoad;
+    }
+    // HV.tour() from Help, the profile and the opener; a chapter number jumps straight to it.
+    HV.tour = function (chapter) {
+      loadTour().then(function (t) { if (t) t.start(typeof chapter === "number" ? chapter : null); })
+        .catch(function () { toast("The tour didn't load. Please try again."); });
     };
-    var STOPS = [
-      { view: "catalogue", center: true, clip: "hello", t: "Welcome to HELVY Connect", p: "I’m Helvy. In two minutes I’ll show you how to find creators, approve them and follow your campaign, on sample data.", next: "Let’s go" },
-      { view: "catalogue", target: ".cx-fchips", clip: "point", t: "Filter the catalogue", p: "Narrow vetted creators by platform, size, city, audience, or doctors only. Every card shows real followers and engagement." },
-      { view: "catalogue", target: ".cx-aipill", clip: "point", t: "Let AI build your shortlist", p: "Answer six quick questions and I’ll pick creators that fit your brief, each with the reasons why." },
-      { view: "selection", target: ".cx-card__acts", clip: "point", t: "Approve or reject", p: "Your selection opens with everyone Under review. Approve the ones you want; reject the rest and tell me why, and I’ll find a better fit." },
-      { view: "selection", target: ".cx-chiprow", clip: "point", t: "Scores and status at a glance", p: "Each creator gets a match score against your brief, shown as a %. The chips count who is approved, rejected or still under review, and filter the page." },
-      { view: "analysis", target: ".cx-req", clip: "point", t: "Unlock the full analysis", p: "Headline numbers are open. Request the full analysis and HelloVoice sends it within 1 working day, free." },
-      { view: "campaign", target: ".cx-report", clip: "point", t: "Follow your campaign", p: "Once it’s live, the report updates every 24 hours with every post, the reach and engagement, and the verdict first." },
-      { view: "catalogue", target: "bell", clip: "celebrate", t: "You’re all set", p: "Updates land in the bell. Your selections, analyses and credits live in your profile.", next: "Finish tour", prize: true }
-    ];
-    var tour = null;
-
-    function demoCard(c, i, opts) {
-      opts = opts || {};
-      var doc = c[2] === "Doctor";
-      var media = h("div", { class: "cx-card__media" }, h("span", { class: "cx-card__plate" }, c[0]),
-        h("span", { class: "cx-card__tier" + (doc ? " cx-card__tier--doc" : "") }, c[2]));
-      if (opts.score) media.appendChild(h("span", { class: "cx-score" }, h("b", null, String([91, 88, 85, 82][i] || 79), h("i", null, "%")), h("small", null, "MATCH")));
-      var body = h("div", { class: "cx-card__body" }, h("p", { class: "cx-card__code" }, "DEMO-0" + (412 + i * 37)), h("h3", { class: "cx-card__name" }, c[1]),
-        h("ul", { class: "cx-card__meta" }, h("li", null, h("span", null, "Followers"), h("strong", null, c[3])), h("li", null, h("span", null, "Engagement"), h("strong", null, c[4]))));
-      if (opts.decide) {
-        var yes = h("button", { type: "button", class: "cx-yes", "aria-pressed": "false", html: ic("check") + "Approve" });
-        var no = h("button", { type: "button", class: "cx-no", "aria-pressed": "false", html: ic("x") + "Reject" });
-        yes.addEventListener("click", function () { yes.setAttribute("aria-pressed", "true"); no.setAttribute("aria-pressed", "false"); });
-        no.addEventListener("click", function () { no.setAttribute("aria-pressed", "true"); yes.setAttribute("aria-pressed", "false"); });
-        body.appendChild(h("div", { class: "cx-card__acts" }, yes, no));
-      }
-      return h("article", { class: "cx-card" }, media, body);
-    }
-    function demoView(view) {
-      var c = h("div", { class: "cx-wrap" });
-      if (view === "catalogue") {
-        var tool = h("div", { class: "cx-tool" }, h("div", { class: "cx-srch", html: ic("search") + "<span>Search by name, city or topic</span>" }));
-        var ai = h("div", { class: "cx-aipill" }, clip("idle", "cx-hd--head"), h("b", null, "Build a shortlist with AI"), h("span", { class: "cx-btn" }, "Start"));
-        tool.appendChild(ai);
-        var f = h("div", { class: "cx-fchips" });
-        [["Filters", 0], ["Platform", 0], ["Tier", 0], ["City", 0], ["Audience", 0], ["Doctors only", 1]].forEach(function (x, i) {
-          f.appendChild(h("span", { class: "cx-fchip" + (x[1] ? " cx-fchip--on" : ""), html: (i === 0 ? ic("filter") : "") + "<span></span>" + (i ? ic("down") : "") }));
-          f.lastChild.querySelector("span").textContent = x[0];
-        });
-        tool.appendChild(f);
-        c.appendChild(tool);
-        var g = h("div", { class: "cx-grid" });
-        DEMO.creators.forEach(function (x, i) { g.appendChild(demoCard(x, i)); });
-        c.appendChild(g);
-      } else if (view === "selection") {
-        c.appendChild(h("div", { class: "cx-sechd" }, h("h2", null, DEMO.brand + " · " + DEMO.campaign), h("p", null, "Demo selection · 8 creators")));
-        var row = h("div", { class: "cx-chiprow" });
-        row.appendChild(h("span", { class: "is-all" }, "8 creators"));
-        // The same drawn marks as the real selection page (portal.js icon set).
-        [["6 influencers", "user", ""], ["2 doctors", "steth", ""], ["3 approved", "check", "ok"], ["1 rejected", "x", "no"], ["4 under review", "clock", ""]].forEach(function (x) {
-          var s = h("span", null, h("i", { class: "cx-chipic" + (x[2] ? " cx-chipic--" + x[2] : ""), html: ic(x[1]) }), x[0]); row.appendChild(s);
-        });
-        c.appendChild(row);
-        var g2 = h("div", { class: "cx-grid" });
-        DEMO.creators.slice(0, 4).forEach(function (x, i) { g2.appendChild(demoCard(x, i, { score: true, decide: true })); });
-        c.appendChild(g2);
-      } else if (view === "analysis") {
-        var cr = DEMO.creators[0];
-        var panel = h("div", { class: "cx-panel" }, h("h3", null, cr[1]), h("p", { class: "cx-fine" }, "Macro · Riyadh · Beauty and skincare · Arabic and English"));
-        var free = h("dl", { class: "cx-free" });
-        [["Followers", cr[3]], ["Avg views", "148K"], ["Engagement", cr[4]], ["Platforms", "IG · TT"]].forEach(function (x) { free.appendChild(h("div", null, h("dt", null, x[0]), h("dd", null, x[1]))); });
-        panel.appendChild(free);
-        panel.appendChild(h("div", { class: "cx-req" }, h("span", { class: "cx-req__lock", html: ic("lock") }),
-          h("div", null, h("h4", null, "Full analysis is locked"), h("p", null, "Audience age, gender and country, growth, fake-follower check, brand history, best posts and a pricing benchmark. ", h("b", null, "Free, within 1 working day."))),
-          h("span", { class: "cx-btn", html: ic("lock") + "<span>Request full analysis</span>" })));
-        var locks = h("div", { class: "cx-locks" });
-        ["Audience", "Authenticity"].forEach(function (t) {
-          var d = h("div", { class: "cx-lk__data" });
-          [62, 80, 30].forEach(function (w) { var b = h("div", { class: "cx-lk__bar" }), i_ = h("i"); i_.style.width = w + "%"; b.appendChild(i_); d.appendChild(b); });
-          locks.appendChild(h("div", { class: "cx-lk" }, h("h5", null, t), d, h("div", { class: "cx-lk__veil" }, h("span", { html: ic("lock") + "Sample data" }))));
-        });
-        panel.appendChild(locks);
-        c.appendChild(h("div", { class: "cx-sechd" }, h("h2", null, "Creator analysis"), h("p", null, "Demo creator")));
-        c.appendChild(panel);
-      } else if (view === "campaign") {
-        var rep = h("div", { class: "cx-report" }, h("div", { class: "cx-report__top" },
-          h("div", null, h("h3", null, DEMO.campaign + " · live"), h("p", null, DEMO.brand + " · 8 creators · Instagram and TikTok · updated every 24 hours")),
-          h("span", { class: "cx-verdict" }, h("b", null, "On track"), h("small", null, "overall, against target"))));
-        var k = h("dl", { class: "cx-kpis" });
-        [["Views", "1.2M", "good"], ["Reach", "640K", "good"], ["Engagement", "4.6%", "good"], ["Link clicks", "3.1K", "moderate"]].forEach(function (x) {
-          k.appendChild(h("div", null, h("dt", null, x[0]), h("dd", null, x[1]), h("span", { class: "cx-sig cx-sig--" + x[2] }, x[2] === "good" ? "Good" : "Moderate")));
-        });
-        rep.appendChild(k);
-        c.appendChild(h("div", { class: "cx-sechd" }, h("h2", null, "Campaign tracking"), h("p", null, "Demo campaign")));
-        c.appendChild(rep);
-      }
-      return c;
-    }
-    function endTour(reason) {
-      if (!tour) return;
-      document.removeEventListener("keydown", tour.onKey);
-      window.removeEventListener("resize", tour.place);
-      tour.layer.remove();
-      document.documentElement.style.overflow = tour.overflow;
-      var prev = tour.prev;
-      tour = null;
-      if (reason === "skip") api("POST", "/api/tour", { action: "later" });
-      if (prev && prev.focus) prev.focus();
-    }
-    function startTour() {
-      if (tour) return;
-      var m = me();
-      var layer = h("div", { class: "cx-demo", role: "region", "aria-label": "HELVY Connect tour, demo mode" });
-      var exit = h("button", { class: "cx-btn cx-btn--ghost", type: "button", html: ic("x") + "<span>Exit demo</span>" });
-      layer.appendChild(h("div", { class: "cx-demo-strip" }, h("div", { class: "cx-wrap" }, h("span", { class: "cx-demo-badge" }, "Demo"),
-        h("p", null, "Sample creators, selection and campaign. Nothing you do here is saved."), exit)));
-      var ini = m && m.user && m.user.name ? initials(m.user.name) : "HV";
-      layer.appendChild(h("div", { class: "cx-demo-bar" }, h("div", { class: "cx-wrap" },
-        h("img", { src: ROOT + "assets/brand/helvy-connect/helvy-connect-light-320.webp", alt: "HELVY Connect", width: "152", height: "76" }),
-        h("span", { class: "cx-pill", html: ic("back") + "Catalogue" }), h("span", { class: "cx-pill cx-pill--ink", html: ic("chart") + "Campaign tracking" }),
-        h("span", { class: "cx-bell", id: "cx-demo-bell", html: ic("bell") + "<i></i>" }), h("span", { class: "cx-av", id: "cx-demo-av" }, ini))));
-      var canvas = h("div", { class: "cx-canvas" });
-      layer.appendChild(canvas);
-      document.body.appendChild(layer);
-      tour = { layer: layer, canvas: canvas, i: 0, view: null, prev: document.activeElement, overflow: document.documentElement.style.overflow };
-      document.documentElement.style.overflow = "hidden";
-      exit.addEventListener("click", function () { endTour("skip"); });
-      tour.onKey = function (e) {
-        if (!tour) return;
-        if (e.key === "Escape") endTour("skip");
-        else if (e.key === "ArrowRight" && !STOPS[tour.i].prize) go(tour.i + 1);
-        else if (e.key === "ArrowLeft" && tour.i > 0) go(tour.i - 1);
-      };
-      document.addEventListener("keydown", tour.onKey);
-      tour.place = function () { place(); };
-      window.addEventListener("resize", tour.place);
-      api("POST", "/api/tour", { action: "started" });
-      go(0);
-    }
-    var placeFn = null;
-    function place() { if (placeFn) placeFn(); }
-    function go(i) {
-      if (!tour) return;
-      i = Math.max(0, Math.min(STOPS.length - 1, i));
-      tour.i = i;
-      var s = STOPS[i];
-      if (tour.view !== s.view) { tour.canvas.textContent = ""; tour.canvas.appendChild(demoView(s.view)); tour.view = s.view; tour.layer.scrollTop = 0; }
-      [].forEach.call(tour.layer.querySelectorAll(".cx-spot, .cx-scrim, .cx-tc"), function (n) { n.remove(); });
-      var dots = h("span", { class: "cx-dots", "aria-hidden": "true" });
-      for (var k = 0; k < STOPS.length; k++) dots.appendChild(h("i", { class: k < i ? "is-done" : k === i ? "is-now" : "" }));
-      var hv = h("div", { class: "cx-tc__helvy" }, clip(s.clip, "cx-hd--edge", s.clip === "hello" ? { once: true, then: "idle" } : null));
-      var card = h("aside", { class: "cx-tc" + (s.center ? " cx-tc--center" : ""), role: "dialog", "aria-modal": "true", "aria-labelledby": "cx-tc-t", tabindex: "-1" },
-        hv, h("div", { class: "cx-tc__prog" }, dots, h("span", { class: "cx-tc__n" }, (i + 1) + " of " + STOPS.length)),
-        h("h2", { id: "cx-tc-t" }, s.t), h("p", null, s.p));
-      if (s.prize) {
-        var prize = h("div", { class: "cx-prize" }, h("span", { class: "cx-prize__stamp" }, "+5 ", h("small", null, "credits")),
-          h("p", null, h("b", null, "Added for finishing the tour"), "Spend them on AI shortlists and replacements."));
-        card.appendChild(prize);
-        api("POST", "/api/tour", { action: "done" }).then(function (r) {
-          if (!r.b || !r.b.ok) return;
-          if (r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);
-          var p = prize.querySelector("p");
-          p.textContent = "";
-          if (r.b.earned) { p.appendChild(h("b", null, "Added for finishing the tour")); p.appendChild(document.createTextNode("Your balance is now " + r.b.credits + ". Spend them on AI shortlists and replacements.")); }
-          else { prize.querySelector(".cx-prize__stamp").textContent = "Done"; p.appendChild(h("b", null, "Tour replayed")); p.appendChild(document.createTextNode("Your 5 credits were added the first time you finished it.")); }
-        });
-      }
-      var nav = h("div", { class: "cx-tc__nav" });
-      if (!s.prize) nav.appendChild(h("button", { class: "cx-tc__skip", type: "button", onclick: function () { endTour("skip"); } }, "Skip tour"));
-      else nav.appendChild(h("span", { style: "margin-right:auto" }));
-      if (i > 0) nav.appendChild(h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("back") + "<span>Back</span>", onclick: function () { go(i - 1); } }));
-      nav.appendChild(h("button", { class: "cx-btn", type: "button", html: "<span>" + (s.next || "Next") + "</span>" + ic("arrow"),
-        onclick: function () { if (s.prize) endTour("done"); else go(i + 1); } }));
-      card.appendChild(nav);
-      var spot = null;
-      if (s.center) tour.layer.appendChild(h("div", { class: "cx-scrim" }));
-      else { spot = h("div", { class: "cx-spot" }); tour.layer.appendChild(spot); }
-      tour.layer.appendChild(card);
-      placeFn = function () {
-        if (!tour || s.center || !spot) return;
-        var el, r;
-        if (s.target === "bell") {
-          var a = document.getElementById("cx-demo-bell").getBoundingClientRect(), b = document.getElementById("cx-demo-av").getBoundingClientRect();
-          r = { left: a.left, top: Math.min(a.top, b.top), right: b.right, bottom: Math.max(a.bottom, b.bottom) };
-        } else {
-          el = tour.canvas.querySelector(s.target);
-          if (!el) return;
-          var r0 = el.getBoundingClientRect(), mob = window.innerWidth <= 700;
-          if (r0.top < 120 || r0.bottom > window.innerHeight - (mob ? 300 : 220)) { tour.layer.scrollTop += r0.top - (mob ? 140 : 160); }
-          r = el.getBoundingClientRect();
-        }
-        var pad = 10;
-        spot.style.left = (r.left - pad) + "px"; spot.style.top = (r.top - pad) + "px";
-        spot.style.width = (r.right - r.left + pad * 2) + "px"; spot.style.height = (r.bottom - r.top + pad * 2) + "px";
-        spot.style.borderRadius = s.target === "bell" ? "999px" : "22px";
-        if (window.innerWidth > 700) {
-          var w = card.offsetWidth, hh = card.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
-          var left = Math.min(vw - w - 40, Math.max(20, r.right - w + 10)), top = r.bottom + 90;
-          if (top + hh > vh - 16) top = Math.max(90, r.top - hh - 90);
-          if (top < 90) { left = Math.max(20, r.left - w - 48); top = Math.max(100, r.top); }
-          card.style.left = left + "px"; card.style.top = top + "px";
-          var vid = hv.querySelector("video");
-          if (vid) vid.style.transform = s.clip === "point" && (r.left + r.right) / 2 > left + w / 2 ? "scaleX(-1)" : "";
-        }
-      };
-      requestAnimationFrame(function () { placeFn(); setTimeout(placeFn, 60); card.focus({ preventScroll: true, focusVisible: false }); });
-    }
-    HV.tour = function () { startTour(); };
+    var CHAPTERS = [["chat", "Brief Helvy", "Describe your campaign, get a shortlist"],
+                    ["list", "Build your shortlist", "Filter, compare, approve or replace"],
+                    ["shield", "Check & book", "The full analysis, then a quote"],
+                    ["chart", "Track results", "Live posts, clicks and the verdict"]];
 
     function offerTour() {
       var m = me();
@@ -726,17 +546,46 @@
       try { sessionStorage.setItem("cx-offer-shown", "1"); } catch (e) { /* blocked */ }
       api("POST", "/api/tour", { action: "offered" });
       var first = m.user && m.user.name ? m.user.name.split(" ")[0] : "";
-      var later = h("button", { class: "cx-btn cx-btn--ghost", type: "button" }, "Later");
-      var start = h("button", { class: "cx-btn", type: "button" }, "Start the tour", h("span", { class: "cx-cost" }, "+5 credits"));
-      var box = h("aside", { class: "cx-offer", id: "cx-offer", role: "dialog", "aria-labelledby": "cx-of-t" }, clip("hello", "", { once: true, then: "idle" }),
-        h("h2", { id: "cx-of-t" }, "Welcome" + (first ? ", " + first : "") + ". Take the 2-minute tour?"),
-        h("p", null, "I’ll show you 8 things on sample data: filters, AI shortlists, approving creators, analyses and campaign tracking."),
-        h("div", { class: "cx-offer__go" }, start, later),
-        h("p", { class: "cx-offer__fine" }, "Replay it any time from Help or your profile. Finishing it once adds 5 credits."));
-      later.addEventListener("click", function () { box.remove(); api("POST", "/api/tour", { action: "later" }); });
-      start.addEventListener("click", function () { box.remove(); startTour(); });
-      document.body.appendChild(box);
-      start.focus({ preventScroll: true, focusVisible: false });
+      var prev = document.activeElement;
+      var scrim = h("div", { class: "cx-offer-scrim" });
+      function close(then) {
+        box.classList.add("is-out"); scrim.classList.add("is-out");
+        document.removeEventListener("keydown", onKey, true);
+        setTimeout(function () { box.remove(); scrim.remove(); if (then) then(); else if (prev && prev.focus) prev.focus({ preventScroll: true }); }, HV.reduce ? 0 : 180);
+      }
+      function later() { api("POST", "/api/tour", { action: "later" }); close(); }
+      function go(ch) { close(function () { HV.tour(ch); }); }
+      var list = h("ol", { class: "cx-offer__chaps", "aria-label": "Chapters. Pick one to jump straight to it." });
+      CHAPTERS.forEach(function (c, i) {
+        var b = h("button", { type: "button", class: "cx-offer__chap", html: '<span class="cx-offer__ic">' + ic(c[0]) + "</span><span><b></b><small></small></span>" + ic("arrow", "cx-offer__go-i") });
+        b.querySelector("b").textContent = (i + 1) + " · " + c[1];
+        b.querySelector("small").textContent = c[2];
+        b.addEventListener("click", function () { go(i); });
+        list.appendChild(h("li", null, b));
+      });
+      var start = h("button", { class: "cx-btn", type: "button", html: "<span>Start the tour</span>" + '<span class="cx-cost cx-cost--prize">+5 credits</span>' });
+      var no = h("button", { class: "cx-btn cx-btn--ghost", type: "button" }, "Later");
+      var box = h("aside", { class: "cx-offer", id: "cx-offer", role: "dialog", "aria-modal": "true", "aria-labelledby": "cx-of-t", "aria-describedby": "cx-of-p" },
+        h("div", { class: "cx-offer__helvy" }, clip("hello", "cx-hd--edge", { once: true, then: "idle" })),
+        h("div", { class: "cx-offer__in" },
+          h("h2", { id: "cx-of-t" }, "Take the 3-minute tour?"),
+          h("p", { id: "cx-of-p", class: "cx-offer__lead" }, (first ? "Welcome, " + first + ". " : "") + "Four short chapters on a sample brand. Nothing you do in it is saved."),
+          list,
+          h("div", { class: "cx-offer__go" }, start, no),
+          h("p", { class: "cx-offer__fine" }, "Replay it any time from Help or your profile.")));
+      start.addEventListener("click", function () { go(null); });
+      no.addEventListener("click", later);
+      scrim.addEventListener("click", later);
+      function onKey(e) {
+        if (e.key === "Escape") { e.preventDefault(); later(); return; }
+        if (e.key !== "Tab") return;
+        var f = [].slice.call(box.querySelectorAll("button")), i = f.indexOf(document.activeElement);
+        if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
+        else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
+      }
+      document.addEventListener("keydown", onKey, true);
+      document.body.appendChild(scrim); document.body.appendChild(box);
+      start.focus({ preventScroll: true });
     }
 
     /* ================================================================ boot */

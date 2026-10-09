@@ -31,20 +31,29 @@
   var T0 = Date.now();
   var SHOW_AFTER = 600, GONE_BY = 1500;
 
+  /* The onboarding tour (tour.js) plays the real pages in a frame on demo data. The frame
+     is handed to the tour before any other script runs: from here every /api/ call is
+     answered from the demo world and storage stays in memory, so nothing is saved. */
+  var DEMO = false;
+  try {
+    var top_ = window.top;
+    if (top_ !== window && top_.hvTourDemo && top_.hvTourDemo.active) { top_.hvTourDemo.install(window); DEMO = true; }
+  } catch (e) { DEMO = false; }
+
   /* ================================================================ Helvy */
   var HELVY = window.HVHelvy = (function () {
     var dir = base + "assets/brand/helvy/";
-    var CLIPS = { idle: 1, hello: 1, bye: 1, loader: 1, thinking: 1, celebrate: 1, point: 1, cards: 1, stamp: 1 };
+    var CLIPS = { idle: 1, hello: 1, bye: 1, loader: 1, thinking: 1, celebrate: 1, point: 1, cards: 1, approve: 1 };
     var ua = navigator.userAgent || "";
     // Safari, and every browser on iOS / iPadOS (all WebKit): HEVC with alpha.
     // Safari decodes VP9 but drops its alpha, so it must never get the .webm.
     var apple = /iP(hone|od|ad)/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ||
       (/Safari\//.test(ua) && !/Chrome\/|Chromium|CriOS|Edg\/|OPR\/|Firefox\/|Android/.test(ua));
-    var still = dir + "helvy-still.webp" + "?v=t2";
+    var still = dir + "helvy-still.webp" + "?v=t3";
     var watching = [], io = null;
 
     // VER changes whenever the files are replaced: /assets/ is cached for 30 days as immutable.
-    var VER = "?v=t2";
+    var VER = "?v=t3";
     function src(name) { return dir + "helvy-" + (CLIPS[name] ? name : "idle") + (apple ? ".mov" : ".webm") + VER; }
     function img(cls) {
       var im = document.createElement("img");
@@ -230,7 +239,8 @@
     if (!loaded || inflight > 0 || Date.now() - lastEnd < 250) { setTimeout(check, 100); return; }
     done();
   }
-  arm(T0);
+  // In the tour's demo frame the tour draws its own cover while the page loads.
+  if (DEMO) ready = true; else arm(T0);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(check, 30); });
   else setTimeout(check, 30);
 

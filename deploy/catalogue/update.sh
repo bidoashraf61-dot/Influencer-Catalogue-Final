@@ -72,6 +72,13 @@ python3 - "$DST" <<'PYSTAMP'
 import hashlib, re, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
+# The tour (tour.js / tour.css) is fetched by connect.js when a client starts it, not
+# named in any page: stamp it inside connect.js first, so connect.js's own hash changes too.
+cj = root / 'assets/js/connect.js'
+cs = cj.read_text()
+for n in ('js/tour.js', 'css/tour.css'):
+    cs = re.sub(r'(assets/' + re.escape(n) + r')(\?v=[0-9a-z]+)?', r'\1?v=' + h('assets/' + n), cs)
+cj.write_text(cs)
 names = ('js/catalogue.js', 'css/catalogue.css', 'js/portal.js', 'css/portal.css',
          'js/campaign.js', 'css/campaign.css',
          'js/creator.js', 'css/creator.css', 'js/hv-icons.js',
