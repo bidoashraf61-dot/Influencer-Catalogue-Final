@@ -522,7 +522,7 @@
       { view: "catalogue", target: ".cx-fchips", clip: "point", t: "Filter the catalogue", p: "Narrow vetted creators by platform, size, city, audience, or doctors only. Every card shows real followers and engagement." },
       { view: "catalogue", target: ".cx-aipill", clip: "point", t: "Let AI build your shortlist", p: "Answer six quick questions and I’ll pick creators that fit your brief, each with the reasons why." },
       { view: "selection", target: ".cx-card__acts", clip: "point", t: "Approve or reject", p: "Your selection opens with everyone Under review. Approve the ones you want; reject the rest and tell me why, and I’ll find a better fit." },
-      { view: "selection", target: ".cx-chiprow", clip: "point", t: "Scores and status at a glance", p: "Each creator is scored out of 100 against your brief. The chips count who is approved, rejected or still under review, and filter the page." },
+      { view: "selection", target: ".cx-chiprow", clip: "point", t: "Scores and status at a glance", p: "Each creator gets a match score against your brief, shown as a %. The chips count who is approved, rejected or still under review, and filter the page." },
       { view: "analysis", target: ".cx-req", clip: "point", t: "Unlock the full analysis", p: "Headline numbers are open. Request the full analysis and HelloVoice sends it within 1 working day, free." },
       { view: "campaign", target: ".cx-report", clip: "point", t: "Follow your campaign", p: "Once it’s live, the report updates every 24 hours with every post, the reach and engagement, and the verdict first." },
       { view: "catalogue", target: "bell", clip: "celebrate", t: "You’re all set", p: "Updates land in the bell. Your selections, analyses and credits live in your profile.", next: "Finish tour", prize: true }
@@ -566,8 +566,9 @@
         c.appendChild(h("div", { class: "cx-sechd" }, h("h2", null, DEMO.brand + " · " + DEMO.campaign), h("p", null, "Demo selection · 8 creators")));
         var row = h("div", { class: "cx-chiprow" });
         row.appendChild(h("span", { class: "is-all" }, "8 creators"));
-        [["6 influencers"], ["2 doctors"], ["3 approved", "var(--go)"], ["1 rejected", "var(--vivid-red)"], ["4 under review", null]].forEach(function (x) {
-          var s = h("span", null); if (x[1]) { var d = h("i", { class: "cx-dot" }); d.style.background = x[1]; s.appendChild(d); } s.appendChild(document.createTextNode(x[0])); row.appendChild(s);
+        // The same drawn marks as the real selection page (portal.js icon set).
+        [["6 influencers", "user", ""], ["2 doctors", "steth", ""], ["3 approved", "check", "ok"], ["1 rejected", "x", "no"], ["4 under review", "clock", ""]].forEach(function (x) {
+          var s = h("span", null, h("i", { class: "cx-chipic" + (x[2] ? " cx-chipic--" + x[2] : ""), html: ic(x[1]) }), x[0]); row.appendChild(s);
         });
         c.appendChild(row);
         var g2 = h("div", { class: "cx-grid" });

@@ -220,7 +220,10 @@
 .cx-chiprow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--white); padding: 12px 16px; border-radius: 999px; }
 .cx-chiprow span { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--cx-rule); font-size: 13.5px; font-weight: 600; }
 .cx-chiprow span.is-all { background: var(--ink); color: var(--lime); font-family: var(--heading); font-size: 20px; letter-spacing: .04em; border-color: var(--ink); }
-.cx-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.cx-chipic { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; margin-left: -6px; background: #efede8; color: var(--ink); }
+.cx-chipic .hv-i { width: 14px; height: 14px; stroke-width: 2.2; }
+.cx-chipic--ok { background: var(--go-soft); color: #0e6b39; }
+.cx-chipic--no { background: #fde9e9; color: #c01010; }
 .cx-panel { background: var(--white); border-radius: 28px; padding: 22px 24px; max-width: 760px; }
 .cx-panel h3 { margin: 0; font-family: var(--heading); font-weight: 400; font-size: 34px; line-height: 1; }
 .cx-free { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin: 16px 0 0; }
@@ -638,7 +641,7 @@
 .cx-chathead { min-height: 96px; padding-left: 108px; }
 .cx-chathead .hv-head__helvy { position: absolute; left: 14px; bottom: 0; width: 84px; height: 84px; }
 .cx-chathead .hv-head__helvy .hv-clip { -webkit-mask-image: none; mask-image: none; }
-.hv-row__ava.cx-ava { background-size: cover; background-position: center; }
+.hv-row__ava.cx-ava { background-color: transparent; background-size: 118%; background-position: 50% 10%; background-repeat: no-repeat; box-shadow: none; }
 .hv-nudge b { display: block; font-family: var(--heading); font-weight: 400; font-size: 20px; letter-spacing: .04em; line-height: 1; color: var(--lime); margin-bottom: 4px; }
 .hv-msg.cx-think { padding: 10px 14px 10px 10px; }
 .hv-msg .cx-rcard, .cx-rcard { max-width: 100%; }
