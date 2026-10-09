@@ -1,7 +1,9 @@
 /* The page loader, on every catalogue page (Bido, 2026-10-08).
  *
  * The HelloVoice logo breathes on a full-screen cover until the page is
- * ready, and the page is never shown half-built:
+ * ready, with Helvy's loader clip beside it (HELVY Connect, phase D: the
+ * clip starts and ends on his smile; reduced motion shows the still), and
+ * the page is never shown half-built:
  *   - loaded here, synchronously, in <head>, so the cover is up before the
  *     page draws anything;
  *   - data-tone="dark" is the white logo on ink (catalogue, account),
@@ -35,7 +37,16 @@
     ".hv-loader{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;" +
     "background:#121212;opacity:1;transition:opacity .28s ease;}" +
     ".hv-loader--light{background:#fff;}" +
-    ".hv-loader img{width:150px;height:auto;" + (reduce ? "" : "animation:hv-breathe 1.4s ease-in-out infinite;") + "}" +
+    ".hv-loader__in{display:flex;flex-direction:column;align-items:center;gap:28px;}" +
+    ".hv-loader__pair{display:flex;align-items:center;gap:28px;}" +
+    ".hv-loader__logo{width:150px;height:auto;" + (reduce ? "" : "animation:hv-breathe 1.4s ease-in-out infinite;") + "}" +
+    ".hv-loader__line{width:1px;height:64px;background:rgba(255,255,255,.18);}" +
+    ".hv-loader--light .hv-loader__line{background:rgba(18,18,18,.14);}" +
+    ".hv-loader__helvy{position:relative;width:120px;height:120px;border-radius:50%;overflow:hidden;background:#e4fb78;box-shadow:0 0 0 6px rgba(232,255,118,.14);}" +
+    ".hv-loader__helvy video,.hv-loader__helvy img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 30%;}" +
+    ".hv-loader p{margin:0;font:14px/1.4 'DM Sans',Arial,sans-serif;letter-spacing:.02em;color:rgba(255,255,255,.66);}" +
+    ".hv-loader--light p{color:#4a4a4a;}" +
+    "@media (max-width:600px){.hv-loader__pair{flex-direction:column;gap:20px;}.hv-loader__line{width:64px;height:1px;}}" +
     ".hv-loader.is-gone{opacity:0;pointer-events:none;}" +
     "@keyframes hv-breathe{50%{opacity:.35}}" +
     "html.hv-loading,html.hv-loading body{overflow:hidden;}";
@@ -46,8 +57,33 @@
   cover.setAttribute("role", "status");
   cover.setAttribute("aria-label", "Loading");
   var img = document.createElement("img");
-  img.src = logo; img.alt = "HelloVoice";
-  cover.appendChild(img);
+  img.src = logo; img.alt = "HelloVoice"; img.className = "hv-loader__logo";
+  var pair = document.createElement("div");
+  pair.className = "hv-loader__pair";
+  var line = document.createElement("span");
+  line.className = "hv-loader__line"; line.setAttribute("aria-hidden", "true");
+  var disc = document.createElement("span");
+  disc.className = "hv-loader__helvy"; disc.setAttribute("aria-hidden", "true");
+  var hdir = base + "assets/brand/helvy/";
+  if (reduce) {
+    var still = document.createElement("img");
+    still.src = hdir + "helvy-smile-full.webp"; still.alt = "";
+    disc.appendChild(still);
+  } else {
+    var clip = document.createElement("video");
+    clip.muted = true; clip.loop = true; clip.autoplay = true;
+    clip.setAttribute("muted", ""); clip.setAttribute("playsinline", ""); clip.poster = hdir + "helvy-poster.webp";
+    clip.innerHTML = '<source src="' + hdir + 'helvy-loader.webm" type="video/webm"/><source src="' + hdir + 'helvy-loader.mp4" type="video/mp4"/>';
+    disc.appendChild(clip);
+    var pp = clip.play && clip.play(); if (pp && pp.catch) pp.catch(function () { /* the poster stays */ });
+  }
+  pair.appendChild(img); pair.appendChild(line); pair.appendChild(disc);
+  var words = document.createElement("p");
+  words.textContent = "Getting your creators ready";
+  var holder = document.createElement("div");
+  holder.className = "hv-loader__in";
+  holder.appendChild(pair); holder.appendChild(words);
+  cover.appendChild(holder);
   document.documentElement.appendChild(cover);
   document.documentElement.classList.add("hv-loading");
 
@@ -115,6 +151,7 @@
     gone = true;
     cover.classList.add("is-gone");
     document.documentElement.classList.remove("hv-loading");
+    var v = cover.querySelector("video"); if (v && v.pause) v.pause();
     setTimeout(function () { if (gone) cover.style.display = "none"; }, 320);
   }
   function show() {
@@ -122,6 +159,7 @@
     cover.style.display = "";
     cover.classList.remove("is-gone");
     document.documentElement.classList.add("hv-loading");
+    var v = cover.querySelector("video"); if (v && v.play) { var q = v.play(); if (q && q.catch) q.catch(function () {}); }
   }
 
   // Ready = loaded, no request in flight for a short beat (pages often chain
