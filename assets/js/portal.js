@@ -81,7 +81,7 @@
   // Helvy's files are named in ONE place: window.HVHelvy in hv-loader.js (every page loads it first).
   // Transparent cut-outs framed waist-up; HV.helvy is the transparent head still (small avatars).
   var HVH = window.HVHelvy || null;
-  HV.helvy = HVH ? HVH.head : ROOT + "assets/brand/helvy.webp";
+  HV.helvy = HVH ? HVH.head : ROOT + "assets/brand/helvy.webp?v=c2";
   var REDUCE = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   // clip(name, cls, {once, then, seq, still}) -> a frame holding Helvy. Autoplay and loop are
   // forced (muted, playsinline, set before the source) and a refused autoplay shows the still.
@@ -379,7 +379,7 @@
     /* -- the name and one line -- */
     var pitch = h("section", { class: "cx-pitch", "aria-label": "About HELVY Connect" });
     pitch.appendChild(h("h1", { class: "cx-vh" }, "HELVY Connect"));
-    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp", alt: "HELVY Connect", width: "440", height: "220", fetchpriority: "high" }));
+    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c2", alt: "HELVY Connect", width: "440", height: "220", fetchpriority: "high" }));
     pitch.appendChild(h("p", { class: "cx-pitch__tag" }, "Connecting Brands with the Right Voices"));
 
     /* -- the card, Helvy standing on it -- */
@@ -401,7 +401,7 @@
     /* -- one quiet row of client logos -- */
     var logos = h("div", { class: "cx-logos__row" });
     LOGOS.forEach(function (l) {
-      logos.appendChild(h("img", { src: ROOT + "assets/clients/" + l[0] + ".webp", srcset: ROOT + "assets/clients/" + l[0] + "@2x.webp 2x", alt: l[1], loading: "lazy", decoding: "async", height: "22" }));
+      logos.appendChild(h("img", { src: ROOT + "assets/clients/" + l[0] + ".webp?v=c2", srcset: ROOT + "assets/clients/" + l[0] + "@2x.webp?v=c2 2x", alt: l[1], loading: "lazy", decoding: "async", height: "22" }));
     });
     scene.appendChild(h("div", { class: "cx-logos" }, h("div", { class: "cx-wrap" }, h("p", null, "Trusted by"), logos)));
 

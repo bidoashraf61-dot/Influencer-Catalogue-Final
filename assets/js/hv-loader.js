@@ -40,10 +40,12 @@
     // Safari decodes VP9 but drops its alpha, so it must never get the .webm.
     var apple = /iP(hone|od|ad)/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) ||
       (/Safari\//.test(ua) && !/Chrome\/|Chromium|CriOS|Edg\/|OPR\/|Firefox\/|Android/.test(ua));
-    var still = dir + "helvy-still.webp";
+    var still = dir + "helvy-still.webp" + "?v=t2";
     var watching = [], io = null;
 
-    function src(name) { return dir + "helvy-" + (CLIPS[name] ? name : "idle") + (apple ? ".mov" : ".webm"); }
+    // VER changes whenever the files are replaced: /assets/ is cached for 30 days as immutable.
+    var VER = "?v=t2";
+    function src(name) { return dir + "helvy-" + (CLIPS[name] ? name : "idle") + (apple ? ".mov" : ".webm") + VER; }
     function img(cls) {
       var im = document.createElement("img");
       im.className = "hv-clip hv-clip--still" + (cls ? " " + cls : ""); im.alt = ""; im.decoding = "async"; im.src = still;
@@ -129,7 +131,7 @@
       setTimeout(function () { observe(v); }, 0);
       return v;
     }
-    return { dir: dir, still: still, head: base + "assets/brand/helvy.webp", apple: apple, src: src, video: video, play: play, img: img };
+    return { dir: dir, still: still, head: base + "assets/brand/helvy.webp?v=c2", apple: apple, src: src, video: video, play: play, img: img };
   })();
 
   /* =============================================================== loader */

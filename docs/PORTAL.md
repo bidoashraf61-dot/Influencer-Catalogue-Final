@@ -233,3 +233,18 @@ Tests: `python3 admin/tests/e2e_portal_v3.py` (includes a check that locked figu
 | Privacy / Terms | `privacy/`, `terms/` | **Drafts pending legal review.** |
 
 Tests: `python3 admin/tests/e2e_portal_cd.py`, `python3 admin/tests/test_roi.py`.
+
+## Fix batch 2026-10-09 (branch `portal-fixes-2`)
+
+| Piece | Where | Notes |
+|---|---|---|
+| Helvy's files | `assets/js/hv-loader.js` (`window.HVHelvy`) | The ONE place the clips are named. Transparent, waist-up: `helvy-<name>.webm` (VP9 alpha, Chrome/Edge/Firefox) and `.mov` (HEVC alpha, Safari and every iOS browser), `helvy-still.webp`; `assets/brand/helvy.webp` is the transparent head still for small avatars. Names: idle, hello, bye, loader, thinking, celebrate, point, cards, stamp. Bump `VER` (and the `?v=` on the still) when the files are replaced: `/assets/` is cached 30 days as immutable. |
+| Autoplay | `HVHelvy.video()` | muted / defaultMuted / playsinline / autoplay / loop set before the source, retried on canplay and visibility, paused off screen, the still if autoplay is refused (no play button). Ambient clips wait for the page to load; `eager` ones (loader, coach) do not. |
+| Cooking | `portal.js` `HV.cooking()` | thinking -> cards -> stamp with rotating steps, for Add more like these, Creators like this and Find a replacement. |
+| Loader rule | `hv-loader.js` | Shell first; the Helvy loader only if the page is not ready after 0.6 s, gone by 1.5 s; images never waited for. The catalogue calls `hvLoader.done()` when its first cards are drawn. |
+| Roster | `server.py` `roster_body()`, `catalogue.js` | Serialised + gzipped once per roster version with an ETag (304 on If-None-Match); the page keeps it in sessionStorage per tab (`hv-roster`, dropped on sign-out / 401 / before `exp`), shows the shell and skeletons at once, renders 48 cards then the rest in idle slices. Card photos are lazy `<img>`. |
+| No objective, no score | `server.py` `selection_has_objective()` | `/api/selection` sends `scores: {}` and `needs_objective: true` until the selection has an objective (client brief, AI brief, admin, or its campaign). The page shows "Add your campaign objective to score these creators" (`HV.scoreBrief`). |
+| Reject reason | `catalogue.js` | A "?" beside Rejected: pop-up with the reasons, Other + note, Skip / Save; the saved reason on hover / focus. |
+| Promise | `gating.WORK_DAYS = 1` | Full analysis within 1 working day (Friday and Saturday skipped). |
+
+Tests: `python3 admin/tests/e2e_portal_fixes2.py`.

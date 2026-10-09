@@ -198,7 +198,7 @@
       go.appendChild(h("button", { class: "hc-more", type: "button", onclick: function () { store(later, "1"); renderSection(); } }, "Later"));
     }
     // Helvy's idle loop (transparent, waist-up); the still when motion is reduced or refused.
-    var img = HV().clip ? HV().clip("idle", "hc-greet__clip") : h("img", { class: "hv-clip", src: HV().helvy || ROOT + "assets/brand/helvy.webp", alt: "", width: "148", height: "148" });
+    var img = HV().clip ? HV().clip("idle", "hc-greet__clip") : h("img", { class: "hv-clip", src: HV().helvy || ROOT + "assets/brand/helvy.webp?v=c2", alt: "", width: "148", height: "148" });
     return h("section", { class: "hc-greet", "aria-label": "Helvy's next step for you" },
       h("div", { class: "hc-greet__helvy" }, img),
       h("div", { class: "hc-greet__body" }, hi,
