@@ -217,3 +217,19 @@ New client routes: `GET /api/notifications`, `POST /api/notifications/read`, `PO
 `/api/selection/replace`. Admin: `POST /analysis/fulfil`, `POST /selections/status`. All tables are created by `portal.init()`.
 
 Tests: `python3 admin/tests/e2e_portal_v3.py` (includes a check that locked figures never appear in `/api/creator` or `/api/selection`).
+
+## Phases C + D: HELVY Connect (branch `portal-cd`)
+
+| Piece | File | Notes |
+|---|---|---|
+| Sign-in scene | `assets/js/portal.js` (`enhanceGate`), `assets/css/connect.css` | Client door (work email, six-box code, first-time name / company / job title) and HelloVoice team door (admin access person by person). No access-code link on the client door; a selection or campaign link that still needs its code shows "Opened a shared link?", and `?access=code` shows it on the catalogue. |
+| Sign-in code email | `admin/mailer.py` (`OTP_HTML`) | 600px table, inline styles, PNGs on the catalogue host (`assets/brand/email/`), VML button, dark mode. |
+| Access codes → accounts | `admin/codelinks.py`, Client portal → **Access codes → accounts** | Invite a shared code's client to an email account: the account sees and owns the code's selections and campaigns (`portal.team_codes` / `portal.owns`). Codes are never revoked or moved here. |
+| AI free during a campaign | `portal.charge` / `portal.active_campaign` | Every AI action is free from a (team) campaign's start date to its end date + 30 days. `/api/me` → `ai_free`. |
+| Tour | `assets/js/connect.js`, `admin/rewards.py` | Offered once (`users.tour`), replay from Help / profile; +5 once (`reward:tour`). `POST /api/tour`. |
+| ROI Calculator | `admin/roi.py`, `admin/connect_api.py`, `connect.js` | Deterministic, free. `plans.LIBRARY` (+ house results, + creators' own averages), grades good / moderate / low. Table `roi_estimates`; estimate vs actual per campaign. Routes `/api/roi/*`. |
+| AI on selections | `admin/aimore.py` | `/api/selection/more` (3 credits), `/api/selection/alike` (2, kept so reopening is free). Tables `selection_more`, `selection_alike`. |
+| Helvy knowledge | `admin/helvy_kb.py`, `admin/occasions.py`, `assistant.py`, `knowledge.py`, `faq.py` | Tools `campaign_results` (own, named via Settings, or aggregates over 3+ campaigns), `occasions`, `my_decisions`, `roi_estimate`; KSA rules; **no prices ever** (price tool removed, prices stripped from creator views, FAQ routes to a quote). |
+| Privacy / Terms | `privacy/`, `terms/` | **Drafts pending legal review.** |
+
+Tests: `python3 admin/tests/e2e_portal_cd.py`, `python3 admin/tests/test_roi.py`.
