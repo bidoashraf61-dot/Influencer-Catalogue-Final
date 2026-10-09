@@ -734,7 +734,6 @@ def build():
           <img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp"
                srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp 2x"
                alt="HELVY Connect" width="320" height="160"/>
-          <a class="cat-portfolio cat-portfolio--quiet" href="https://hellovoice.co.uk" target="_blank" rel="noopener">Portfolio<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
         </div>
         <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
@@ -938,7 +937,6 @@ def build():
           <img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp"
                srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp 2x"
                alt="HELVY Connect" width="320" height="160"/>
-          <a class="cat-portfolio cat-portfolio--quiet" href="https://hellovoice.co.uk" target="_blank" rel="noopener">Portfolio<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>
         </div>
         <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
