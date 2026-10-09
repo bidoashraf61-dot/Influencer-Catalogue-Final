@@ -40,8 +40,13 @@
 .cx-btn--ghost { background: transparent; color: var(--white); border-color: rgba(255,255,255,.35); }
 .cx-btn--ghost:hover { color: var(--lime); border-color: var(--lime); background: transparent; }
 .cx-btn[disabled] { cursor: not-allowed; background: var(--cx-stone); color: #6b6b6b; border-color: var(--cx-stone); }
-.cx-btn .cx-cost { font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: .02em; padding: 3px 9px; border-radius: 999px; background: var(--ink); color: var(--lime); }
-.cx-btn:hover .cx-cost { background: var(--lime); color: var(--ink); }
+/* The credit cost, one look everywhere (selection, chat, tour, AI cards): vivid orange with ink
+   text and a coin, so it reads on lime buttons, on ink cards and on white (ink on orange 6:1). */
+.hv-cost, .cx-btn .cx-cost, .cx-tag--cost { display: inline-flex; align-items: center; gap: 4px; flex: none; font-family: var(--body); font-size: 12px; font-weight: 800; letter-spacing: .01em;
+  line-height: 1.2; text-transform: none; white-space: nowrap; padding: 4px 9px 4px 6px; border-radius: 999px; background: var(--vivid-orange, #ff691e); color: var(--ink);
+  box-shadow: inset 0 0 0 1px rgba(18,18,18,.18); }
+.hv-cost .hv-i, .cx-tag--cost .hv-i, .cx-cost .hv-i { width: 14px; height: 14px; stroke-width: 2.2; }
+.hv-cost--free { background: var(--go-soft); color: #0e6b39; padding-left: 9px; }
 .cx-link { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: inherit; cursor: pointer; text-decoration: underline;
   text-decoration-color: #b9d400; text-decoration-thickness: 3px; text-underline-offset: 6px; min-height: 32px; }
 .cx-link:hover { text-decoration-color: currentColor; }
@@ -60,7 +65,7 @@
 .cx-tag .cx-i { width: 14px; height: 14px; }
 .cx-tag--est { background: var(--cx-stone); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(18,18,18,.18); }
 .cx-tag--free { background: var(--go-soft); color: #0e6b39; }
-.cx-tag--cost { background: var(--ink); color: var(--lime); }
+
 
 /* ------------------------------------------------------------ Helvy frame */
 /* Helvy is a transparent cut-out framed waist-up (head and torso fill the square), never a
@@ -210,6 +215,7 @@
 .cx-card__acts .cx-no[aria-pressed="true"] { background: var(--cx-red-text); color: var(--white); border-color: var(--cx-red-text); }
 .cx-score { position: absolute; left: 12px; bottom: 12px; width: 52px; height: 52px; border-radius: 50%; background: var(--go); color: var(--white); display: grid; place-items: center; box-shadow: 0 0 0 3px var(--white);
   font-family: var(--heading); font-size: 24px; line-height: .8; text-align: center; }
+.cx-score b { font-weight: 400; white-space: nowrap; } .cx-score i { font-style: normal; font-size: .55em; vertical-align: .35em; }
 .cx-score small { display: block; font-family: var(--body); font-size: 8px; font-weight: 700; letter-spacing: .12em; }
 .cx-chiprow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--white); padding: 12px 16px; border-radius: 999px; }
 .cx-chiprow span { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--cx-rule); font-size: 13.5px; font-weight: 600; }
@@ -623,8 +629,8 @@
 
 /* ---- Helvy in the live chat widget (portal.js): launcher, header, avatars, nudge */
 /* the launcher: Helvy rises out of an ink disc (no lime), his cut hidden by the disc's curve */
-.cx-launch .hv-launch__disc { background: var(--ink); box-shadow: 0 0 0 2px rgba(232,255,118,.55), 0 14px 30px rgba(18,18,18,.28); }
-.cx-launch::after { box-shadow: 0 0 0 0 rgba(18,18,18,.35); }
+.cx-launch .hv-launch__disc { background: var(--ink); box-shadow: 0 0 0 2px var(--white), 0 14px 30px rgba(18,18,18,.28); }
+.cx-launch::after { display: none; }
 .cx-launch .hv-launch__vid { position: absolute; inset: auto 0 0 0; width: 76px; height: 100px; border-radius: 0; object-fit: cover; object-position: 50% 0; opacity: 1; transform: none;
   clip-path: inset(0 0 0 0 round 0 0 38px 38px); transition: opacity .2s ease, transform .25s var(--cx-ease); pointer-events: none; }
 .cx-launch:hover .hv-launch__vid { transform: translateY(-4px); }
@@ -643,3 +649,25 @@
 .cat-footer__legal a, .hc-foot__legal a { color: inherit; text-underline-offset: 3px; }
 .cat-footer__legal a:hover, .hc-foot__legal a:hover { color: var(--lime); }
 .cx-tc:focus, .cx-offer:focus { outline: none; }
+
+/* ---- "Cooking": Helvy at the director's desk while the AI works (portal.js HV.cooking) */
+.cx-cook { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; align-items: center; text-align: left; font-family: var(--body); color: var(--ink); }
+.cx-cook .cx-hd { width: 120px; height: 120px; }
+.cx-cook__now { margin: 0; font-weight: 700; font-size: 15.5px; line-height: 1.35; }
+.cx-cook__dots { list-style: none; display: flex; align-items: center; gap: 5px; margin: 10px 0 0; padding: 0; }
+.cx-cook__dots li { width: 7px; height: 7px; border-radius: 50%; background: rgba(18,18,18,.16); transition: width .3s var(--cx-ease), background .3s ease; }
+.cx-cook__dots li.is-done { background: var(--ink); }
+.cx-cook__dots li.is-now { width: 20px; border-radius: 4px; background: var(--lime); box-shadow: inset 0 0 0 1.5px var(--ink); }
+.cx-cook--dark { color: var(--white); }
+.cx-cook--dark .cx-cook__now { color: var(--white); }
+.cx-cook--dark .cx-cook__dots li { background: rgba(255,255,255,.2); }
+.cx-cook--dark .cx-cook__dots li.is-done { background: var(--white); }
+.cx-cook--dark .cx-cook__dots li.is-now { box-shadow: none; }
+.cx-cook--compact { grid-template-columns: 76px minmax(0, 1fr); gap: 10px; }
+.cx-cook--compact .cx-hd { width: 76px; height: 76px; }
+.cx-cook--compact .cx-cook__now { font-size: 13.5px; }
+.cx-more.is-cooking > .cx-cook { grid-column: 1 / -1; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.12); }
+.cx-more.is-cooking .cx-more__form { opacity: .5; pointer-events: none; }
+.cx-sheet__cook { display: flex; justify-content: center; padding: 26px 22px; }
+.sel-replbox__cook { margin-top: 10px; padding: 10px 12px 10px 4px; border-radius: 14px; background: #f7f4ef; }
+@media (prefers-reduced-motion: reduce) { .cx-cook__dots li { transition: none; } .cx-cook__now { animation: none; } }

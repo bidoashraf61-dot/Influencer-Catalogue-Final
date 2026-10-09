@@ -42,6 +42,7 @@
     brief: '<path d="M7 3.5h7l4.5 4.5v12.5h-11.5z"/><path d="M14 3.5V8h4.5M9.5 12.5h6M9.5 16h4"/>',
     coin: '<circle cx="12" cy="12" r="8.5"/><path d="M14.6 9.2c-.5-.8-1.5-1.2-2.6-1.2-1.6 0-2.7.8-2.7 2s1.1 1.7 2.7 2 2.8.8 2.8 2-1.2 2-2.8 2c-1.2 0-2.2-.5-2.7-1.3M12 6.5v1.5M12 16v1.5"/>',
     user: '<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c.8-3.6 3.8-5.6 7.5-5.6s6.7 2 7.5 5.6"/>',
+    steth: '<path d="M5.5 3.5H4.8v4.8a4.2 4.2 0 0 0 8.4 0V3.5h-.7"/><path d="M9 12.5v2.2a5 5 0 0 0 10 0v-2.4"/><circle cx="19" cy="10.3" r="2"/>',
     out: '<path d="M14 4.5H6.5v15H14"/><path d="M10.5 12H20M16.5 8.5L20 12l-3.5 3.5"/>',
     camera: '<path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3V19H4z"/><circle cx="12" cy="13.2" r="3.4"/>',
     "case": '<rect x="3.5" y="7.5" width="17" height="12" rx="2.5"/><path d="M9 7.5V5.5h6v2M3.5 12.5h17"/>',
@@ -100,6 +101,32 @@
     return box;
   }
   HV.clip = clip;
+  // "Cooking": Helvy at the director's desk while the AI works (thinking -> flipping through
+  // creator cards -> stamping approval, round and round) with a rotating step line. Used by
+  // Add more like these, Creators like this and Find a replacement; the AI shortlist card has
+  // the same sequence in its own stage.
+  var COOK_STEPS = ["Reading your brief…", "Flipping through creators…", "Scoring fit…", "Approving your picks…"];
+  HV.cooking = function (opts) {
+    opts = opts || {};
+    var steps = opts.steps || COOK_STEPS, i = 0, seen = false;
+    var el = document.createElement("div");
+    el.className = "cx-cook" + (opts.compact ? " cx-cook--compact" : "") + (opts.dark ? " cx-cook--dark" : "");
+    el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
+    el.appendChild(clip("thinking", "cx-cook__hv", { seq: ["thinking", "cards", "stamp"] }));
+    var tx = document.createElement("div"); tx.className = "cx-cook__tx";
+    var now = document.createElement("p"); now.className = "cx-think__now cx-cook__now"; now.textContent = steps[0];
+    var dots = document.createElement("ol"); dots.className = "cx-cook__dots"; dots.setAttribute("aria-hidden", "true");
+    steps.forEach(function (_, k) { var li = document.createElement("li"); if (!k) li.className = "is-now"; dots.appendChild(li); });
+    tx.appendChild(now); tx.appendChild(dots); el.appendChild(tx);
+    var t = setInterval(function () {
+      if (el.isConnected) seen = true; else if (seen) { clearInterval(t); return; }
+      if (i >= steps.length - 1 && opts.hold) return;
+      i = (i + 1) % steps.length; now.textContent = steps[i];
+      [].forEach.call(dots.children, function (li, k) { li.className = k < i ? "is-done" : k === i ? "is-now" : ""; });
+    }, 1700);
+    el.stop = function () { clearInterval(t); };
+    return el;
+  };
   HV.reduce = REDUCE;
   HV.root = ROOT; HV.apiBase = API;
   HV.h = function () { return h.apply(null, arguments); };
@@ -1078,6 +1105,14 @@
     });
   }
   window.addEventListener("hv:selection-saved", function (e) { offerBrief(e.detail && e.detail.token); });
+  // The selection page's "Add your campaign objective" action: the same free questions.
+  HV.scoreBrief = function (token) {
+    if (!token) return;
+    offered[token] = 1;
+    loadQuestions().then(function (qs) {
+      wizard(qs.filter(function (q) { return q.required || q.id === "gender" || q.id === "age"; }), {}, 0, null, { attach: token });
+    });
+  };
 
   function rememberBrief(id) { if (id) { try { sessionStorage.setItem("hv_brief", String(id)); } catch (e) { /* blocked */ } applyFit(); } }
   function storedBrief() { try { return sessionStorage.getItem("hv_brief"); } catch (e) { return null; } }
@@ -1095,7 +1130,7 @@
         if (!v) { if (b) b.remove(); return; }
         if (!b) { b = h("span", { class: "pt-fit" }); card.classList.add("pt-has-fit"); card.appendChild(b); }
         b.className = "pt-fit pt-fit--" + scoreClass(v[1]);
-        b.textContent = (LANG === "ar" ? "ملاءمة " : "Fit ") + v[0];
+        b.textContent = (LANG === "ar" ? "ملاءمة " : "Fit ") + v[0] + "%";
         b.title = v[1] + (v[2] === "roster" ? " · " + T("Estimated") : "");
       });
     };
@@ -2837,7 +2872,7 @@
         if (!plats.length) { var only = res.picks[n - 1]; if (only && only.score != null) { ps = { Match: only.score }; plats = ["Match"]; } }
         plats.sort(function (a, b) { return ps[b] - ps[a]; }).forEach(function (pl) {
           var s = h("span", { class: "ai-pscore ai-pscore--" + bandOf(ps[pl]), title: pl + " match " + ps[pl] + " / 100" });
-          s.appendChild(h("small", null, AI_SHORT[pl] || pl)); s.appendChild(h("b", null, String(ps[pl])));
+          s.appendChild(h("small", null, AI_SHORT[pl] || pl)); s.appendChild(h("b", null, ps[pl] + "%"));
           box.appendChild(s);
         });
         media.appendChild(box);
@@ -2955,7 +2990,7 @@
         ME = r.b; HV.me = ME; mountDock(); mountVoice(); mountAiCard(); mountLicences();
         try { document.dispatchEvent(new CustomEvent("hv:me", { detail: ME })); } catch (e) { /* old browser */ }
         var m = /[#&]s=([^&]+)/.exec(location.hash || "");
-        if (document.body.getAttribute("data-page") === "selection" && m) setTimeout(function () { offerBrief(decodeURIComponent(m[1])); }, 1200);
+        // (The selection page asks for a missing objective in its own bar: catalogue.js renderObjective.)
         // Arriving from the AI shortlist's "Request a quote": open the quote form straight away.
         if (document.body.getAttribute("data-page") === "selection" && /[#&]quote=1/.test(location.hash)) setTimeout(function () {
           var q = document.getElementById("cat-request") || document.getElementById("cat-request-2"); if (q) q.click();

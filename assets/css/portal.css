@@ -1184,8 +1184,13 @@ a.hv-note:hover { background: #efede8; }
 .sel-chip[aria-pressed="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }
 .sel-chip:focus-visible, .sel-swrow:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
 .sel-chip--all { font-family: var(--heading); font-size: 20px; letter-spacing: .05em; font-weight: 400; text-transform: uppercase; }
-.sel-d { width: 9px; height: 9px; border-radius: 50%; flex: none; }
-.sel-d--ok { background: var(--go); } .sel-d--no { background: #c01010; } .sel-d--wait { box-shadow: inset 0 0 0 2px currentColor; } .sel-d--off { background: #9a9a9a; }
+/* each chip names itself with a drawn mark (the portal's icon set), coloured by what it counts */
+.sel-ci { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; flex: none; margin-left: -4px; background: #efede8; color: var(--ink); }
+.sel-ci .hv-i { width: 14px; height: 14px; stroke-width: 2.2; }
+.sel-chip--approved .sel-ci { background: var(--go-soft); color: #0e6b39; }
+.sel-chip--rejected .sel-ci { background: #fde9e9; color: #c01010; }
+.sel-chip--unavailable .sel-ci { color: #383838; }
+.sel-chip[aria-pressed="true"] .sel-ci { background: rgba(232,255,118,.16); color: var(--lime); }
 .sel-sbar__tools { margin-left: auto; display: flex; align-items: center; gap: 14px; }
 .sel-swrow { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; border: 0; background: none; color: var(--ink); font: 600 14px var(--body); cursor: pointer; padding: 0; }
 .sel-sw { position: relative; width: 46px; height: 26px; border-radius: var(--r-pill); background: #e5e1d9; flex: none; transition: background .2s ease; }
@@ -1203,14 +1208,53 @@ a.hv-note:hover { background: #efede8; }
 .sel-st { margin-top: auto; border-top: 1px solid rgba(18,18,18,.12); padding-top: 14px; position: relative; z-index: 2; }
 .cat-card__body .sel-st { margin-top: 14px; }
 .sel-st__line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.sel-sig { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 11px 4px 9px; border-radius: var(--r-pill); white-space: nowrap; line-height: 1.3; }
-.sel-sig::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.sel-sig { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 11px 4px 8px; border-radius: var(--r-pill); white-space: nowrap; line-height: 1.3; }
+.sel-sig .hv-i { width: 14px; height: 14px; stroke-width: 2.3; flex: none; }
 .sel-sig--ok { color: #0e6b39; background: var(--go-soft); }
 .sel-sig--no { color: #c01010; background: #fde9e9; }
 .sel-sig--wait { color: var(--ink); background: #efede8; }
-.sel-sig--wait::before { background: transparent; box-shadow: inset 0 0 0 2px var(--ink); }
-.sel-sig--off { color: #4a4a4a; background: transparent; box-shadow: inset 0 0 0 1px rgba(18,18,18,.3); }
-.sel-sig--off::before { background: #4a4a4a; width: 9px; height: 2px; border-radius: 1px; }
+.sel-sig--off { color: #383838; background: transparent; box-shadow: inset 0 0 0 1px rgba(18,18,18,.3); }
+/* the "?" beside Rejected: the reason on hover or focus, a small pop-up to give one */
+.sel-whyq { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: -2px; border-radius: 50%; padding: 0; cursor: pointer;
+  border: 1.5px dashed rgba(192,16,16,.55); background: var(--white); color: #c01010; font: 800 13px/1 var(--body); transition: background .2s ease, border-color .2s ease; }
+.sel-whyq:hover { border-style: solid; border-color: #c01010; }
+.sel-whyq.has-reason { border-style: solid; border-color: #fde9e9; background: #fde9e9; }
+.sel-whyq:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.sel-whyq.is-new { animation: sel-whyq 1.2s ease-out 2; }
+@keyframes sel-whyq { 0% { box-shadow: 0 0 0 0 rgba(192,16,16,.45); } 100% { box-shadow: 0 0 0 10px rgba(192,16,16,0); } }
+.sel-whytip { position: fixed; z-index: 140; max-width: 260px; padding: 9px 12px; border-radius: 12px; background: var(--ink); color: var(--white);
+  font: 400 13px/1.45 var(--body); box-shadow: 0 12px 28px rgba(18,18,18,.28); pointer-events: none; }
+.sel-whytip b { display: block; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--lime); margin-bottom: 2px; }
+.sel-whytip[hidden] { display: none; }
+.sel-whypop { position: fixed; z-index: 150; width: min(300px, calc(100vw - 20px)); box-sizing: border-box; padding: 16px 16px 12px; border-radius: 18px;
+  background: var(--white); color: var(--ink); box-shadow: 0 0 0 1px rgba(18,18,18,.08), 0 22px 50px rgba(18,18,18,.28); font-family: var(--body);
+  animation: sel-pop .22s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes sel-pop { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+.sel-whypop__t { margin: 0; font-family: var(--heading); font-size: 24px; line-height: 1; letter-spacing: .02em; }
+.sel-whypop__s { margin: 4px 0 12px; font-size: 12.5px; color: var(--gray); }
+.sel-whypop__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.sel-whypop__chips button { min-height: 34px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.14); background: var(--white); color: var(--ink); font: 600 13px var(--body); cursor: pointer; }
+.sel-whypop__chips button:hover { border-color: var(--ink); }
+.sel-whypop__chips button[aria-pressed="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.sel-whypop__other { margin-top: 10px; width: 100%; box-sizing: border-box; min-height: 40px; border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.25); padding: 0 14px; font: 400 14px var(--body); }
+.sel-whypop__other:focus { border-color: var(--ink); outline: 2px solid var(--ink); outline-offset: 1px; }
+.sel-whypop__ft { display: flex; justify-content: flex-end; align-items: center; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid rgba(18,18,18,.08); }
+.sel-whypop__skip { border: 0; background: none; min-height: 40px; padding: 0 10px; font: 600 13px var(--body); color: var(--gray); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; margin-right: auto; }
+.sel-whypop__save { min-height: 40px; padding: 0 20px; border-radius: var(--r-pill); border: 0; background: var(--ink); color: var(--lime); font-family: var(--heading); font-size: 19px; letter-spacing: .05em; cursor: pointer; }
+.sel-whypop__save[disabled] { opacity: .35; cursor: default; }
+.sel-whypop button:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+/* no campaign objective: one bar asks for it, nothing is scored until then */
+.sel-obj { background: var(--ink); color: var(--white); }
+.sel-obj__in { display: flex; align-items: center; gap: 14px 18px; padding: 16px 0; flex-wrap: wrap; }
+.sel-obj__ic { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: rgba(232,255,118,.14); color: var(--lime); flex: none; }
+.sel-obj__ic .hv-i { width: 22px; height: 22px; }
+.sel-obj__tx { margin: 0; flex: 1 1 320px; font-size: 14px; line-height: 1.45; color: rgba(255,255,255,.8); }
+.sel-obj__tx b { display: block; font-family: var(--heading); font-weight: 400; font-size: 26px; line-height: 1; letter-spacing: .02em; color: var(--white); margin-bottom: 3px; }
+.sel-obj__go { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 22px; border-radius: var(--r-pill); border: 0; background: var(--lime); color: var(--ink);
+  font-family: var(--heading); font-size: 20px; letter-spacing: .05em; cursor: pointer; transition: transform .2s ease; }
+.sel-obj__go .hv-i { width: 18px; height: 18px; }
+.sel-obj__go:hover { transform: translateY(-1px); }
+.sel-obj__go:focus-visible { outline: 3px solid var(--white); outline-offset: 2px; }
 .sel-st__by { font-size: 12.5px; color: var(--gray); line-height: 1.4; margin: 6px 0 0; }
 .sel-st__by b { color: var(--ink); font-weight: 600; }
 .sel-st__acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
@@ -1219,29 +1263,23 @@ a.hv-note:hover { background: #efede8; }
 .sel-dec .hv-i { width: 16px; height: 16px; }
 .sel-dec--yes:hover { background: var(--go); border-color: var(--go); color: var(--white); }
 .sel-dec--no:hover { background: #c01010; border-color: #c01010; color: var(--white); }
-.sel-dec:focus-visible, .sel-st__change:focus-visible, .sel-why button:focus-visible, .sel-repl:focus-visible, .sel-replbox button:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.sel-dec:focus-visible, .sel-st__change:focus-visible, .sel-repl:focus-visible, .sel-replbox button:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
 .sel-dec[disabled] { opacity: .6; cursor: progress; }
 .sel-st__change { border: 0; background: none; color: var(--ink); padding: 0 2px; min-height: 32px; font: 600 12.5px var(--body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; margin-left: auto; }
 .sel-st__off { margin: 8px 0 0; color: var(--gray); }
-.sel-why { margin-top: 12px; }
-.sel-why__q { font-size: 13px; font-weight: 600; margin: 0 0 8px; }
-.sel-why__q span { font-weight: 400; color: var(--gray); }
-.sel-why__chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.sel-why__chips button { min-height: 36px; padding: 0 12px; border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.12); background: var(--white); color: var(--ink); font: 600 13px var(--body); cursor: pointer; }
-.sel-why__chips button:hover { border-color: var(--ink); }
-.sel-why__chips button[aria-pressed="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }
-.sel-why__other { margin-top: 8px; width: 100%; min-height: 40px; border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.25); padding: 0 14px; font: 400 13px var(--body); -webkit-user-select: text; user-select: text; }
-.sel-why__other:focus { border-color: var(--ink); outline: 2px solid var(--ink); outline-offset: 1px; }
-.sel-why__skip { border: 0; background: none; font: 400 12.5px var(--body); color: var(--gray); text-decoration: underline; cursor: pointer; padding: 0; min-height: 32px; margin-top: 4px; }
-.sel-repl { margin-top: 12px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px 10px; flex-wrap: wrap; min-height: 48px; padding: 8px 14px;
+/* "Find a replacement": one compact line, Helvy's face, the cost inline */
+.sel-repl { margin-top: 12px; max-width: 100%; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 6px 4px 5px;
   border-radius: var(--r-pill); border: 1px solid var(--lime); background: var(--lime); color: var(--ink); cursor: pointer;
-  font-family: var(--heading); font-size: 18px; letter-spacing: .06em; line-height: 1.05; text-transform: uppercase; transition: background .2s ease, color .2s ease; }
+  font: 700 13px/1.2 var(--body); white-space: nowrap; transition: background .2s ease, color .2s ease, border-color .2s ease; }
+.sel-repl span:not(.hv-cost) { overflow: hidden; text-overflow: ellipsis; }
 .sel-repl:hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
-.sel-repl img { width: 30px; height: 30px; border-radius: 50%; background: var(--white); object-fit: cover; }
-.sel-repl--ink { background: var(--ink); color: var(--white); border-color: var(--ink); }
+.sel-repl img { width: 26px; height: 26px; flex: none; object-fit: contain; object-position: 50% 100%; }
+.sel-repl { gap: 6px; }
+.sel-repl .hv-cost { padding: 3px 8px; }
+.sel-repl .hv-cost .hv-i { display: none; }
+.sel-repl .hv-i { width: 16px; height: 16px; }
+.sel-repl--ink { padding: 4px 14px; background: var(--ink); color: var(--white); border-color: var(--ink); }
 .sel-repl--ink:hover { background: var(--lime); color: var(--ink); border-color: var(--lime); }
-.sel-cost { font-family: var(--body); font-size: 12px; font-weight: 700; letter-spacing: .02em; text-transform: none; padding: 3px 9px; border-radius: var(--r-pill); background: var(--ink); color: var(--lime); }
-.sel-repl:hover .sel-cost { background: var(--lime); color: var(--ink); }
 .sel-replbox { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 6px; }
 .sel-replbox li { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; padding: 8px; border-radius: 14px; background: #f7f4ef; }
 .sel-replbox__ph { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(150deg, #2a2a2a, #121212); color: rgba(255,255,255,.6); font-family: var(--heading); font-size: 15px; }

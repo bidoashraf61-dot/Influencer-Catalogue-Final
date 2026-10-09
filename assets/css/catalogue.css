@@ -1242,7 +1242,8 @@ body[data-page="selection"] .cat-card__check { display: none; }
   border: 3px solid var(--white); color: var(--white); background: #14884a;
   box-shadow: 0 2px 10px rgba(0,0,0,.35); transform: rotate(-8deg); font-family: inherit;
 }
-.cat-score b { font-size: 21px; line-height: 1; font-weight: 800; letter-spacing: -.02em; }
+.cat-score b { font-size: 21px; line-height: 1; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+.cat-score__pct { font-style: normal; font-size: .58em; font-weight: 800; margin-left: 1px; vertical-align: .32em; letter-spacing: 0; }
 .cat-score small { font-size: 8px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; opacity: .9; margin-top: 2px; }
 .cat-score--g { background: #14884a; }
 .cat-score--l { background: #7d8f00; }

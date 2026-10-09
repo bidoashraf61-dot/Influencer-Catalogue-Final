@@ -881,7 +881,7 @@ class PortalMixin(connect_api.ConnectMixin):
             brief = {"summary": br["summary"] or "", "answers": rows, "source": br["source"], "at": br["created_at"]}
         scored = []
         try:
-            sc = self.selection_scores(sel)
+            sc = self.selection_scores(sel) if self.selection_has_objective(sel) else {}
             names = {r["code"]: r["name"] for r in self.roster_payload(only=set(codes))}
             scored = sorted(({"code": c, "name": names.get(c, c), "score": v.get("score"), "tag": v.get("tag")}
                              for c, v in (sc or {}).items() if c in codes and v.get("score") is not None),

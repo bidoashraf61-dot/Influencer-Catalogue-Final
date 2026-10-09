@@ -376,7 +376,7 @@
     /* =================================================== AI ON SELECTIONS */
     function costTag(cost) {
       return aiFree() || !cost ? h("span", { class: "cx-tag cx-tag--free", html: ic("check") + "Free with your active campaign" })
-        : h("span", { class: "cx-tag cx-tag--cost" }, cost + " credits");
+        : h("span", { class: "cx-tag cx-tag--cost", html: ic("coin") + cost + " credits" });
     }
     function mountSelection() {
       var S = window.hvSelection;
@@ -426,10 +426,14 @@
       card.appendChild(h("div", { class: "cx-more__form" }, note, quick, h("div", { class: "cx-more__go" }, cnt, go)));
       card.appendChild(msg);
       go.addEventListener("click", function () {
-        go.disabled = true; msg.textContent = "Helvy is looking…";
+        go.disabled = true; msg.textContent = "";
+        // While Helvy works: the director's desk (thinking -> cards -> stamp) and the step line.
+        var cook = HV.cooking ? HV.cooking({ dark: true }) : null;
+        if (cook) { card.classList.add("is-cooking"); card.appendChild(cook); }
         api("POST", "/api/selection/more", { token: S.token(), note: note.value, count: count,
                                               chips: Object.keys(chips).filter(function (k) { return chips[k]; }) }).then(function (r) {
           go.disabled = false;
+          if (cook) { cook.stop(); cook.remove(); card.classList.remove("is-cooking"); }
           if (!r.b || !r.b.ok) { msg.textContent = (r.b && r.b.message) || "Helvy couldn’t look just now. Please try again."; return; }
           var codes = (r.b.added || []).map(function (c) { return c.code; });
           if (!codes.length) { msg.textContent = r.b.message || "Helvy found no one close enough."; return; }
@@ -457,7 +461,7 @@
       var body = h("div", { class: "cx-sheet__body" });
       var cost = (S.curated() || {}).alikeCost;
       body.appendChild(h("div", { class: "cx-sheet__ctx" }, h("span", { html: ic("target") + "Like " + cr.name }), costTag(cost)));
-      var list = h("div", { class: "cx-sugs" }, h("div", { class: "cx-sheet__empty" }, "Helvy is looking…"));
+      var list = h("div", { class: "cx-sugs" });
       body.appendChild(list);
       sheet.appendChild(body);
       var more = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("sparkle") + "<span>Show 3 more</span>" });
@@ -467,8 +471,12 @@
       x.addEventListener("click", close); scrim.addEventListener("click", close); document.addEventListener("keydown", onKey);
       document.body.appendChild(scrim); document.body.appendChild(sheet); document.body.classList.add("pt-lock"); x.focus();
       function load(againFlag) {
-        list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, "Helvy is looking…"));
+        list.textContent = "";
+        var cook = HV.cooking ? HV.cooking({ steps: ["Reading " + cr.name + "’s profile…", "Flipping through creators…", "Matching audience and style…", "Picking the closest three…"] })
+          : h("div", { class: "cx-sheet__empty" }, "Helvy is looking…");
+        list.appendChild(h("div", { class: "cx-sheet__empty cx-sheet__cook" }, cook));
         api("POST", "/api/selection/alike", { token: S.token(), code: code, again: !!againFlag }).then(function (r) {
+          if (cook.stop) cook.stop();
           list.textContent = "";
           if (!r.b || !r.b.ok) { list.appendChild(h("div", { class: "cx-sheet__empty" }, (r.b && r.b.message) || "Helvy couldn’t look just now.")); return; }
           if (r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);
@@ -526,7 +534,7 @@
       var doc = c[2] === "Doctor";
       var media = h("div", { class: "cx-card__media" }, h("span", { class: "cx-card__plate" }, c[0]),
         h("span", { class: "cx-card__tier" + (doc ? " cx-card__tier--doc" : "") }, c[2]));
-      if (opts.score) media.appendChild(h("span", { class: "cx-score" }, String([91, 88, 85, 82][i] || 79), h("small", null, "MATCH")));
+      if (opts.score) media.appendChild(h("span", { class: "cx-score" }, h("b", null, String([91, 88, 85, 82][i] || 79), h("i", null, "%")), h("small", null, "MATCH")));
       var body = h("div", { class: "cx-card__body" }, h("p", { class: "cx-card__code" }, "DEMO-0" + (412 + i * 37)), h("h3", { class: "cx-card__name" }, c[1]),
         h("ul", { class: "cx-card__meta" }, h("li", null, h("span", null, "Followers"), h("strong", null, c[3])), h("li", null, h("span", null, "Engagement"), h("strong", null, c[4]))));
       if (opts.decide) {

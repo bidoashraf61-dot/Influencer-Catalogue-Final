@@ -1766,7 +1766,9 @@
                         owner: b.owner || "", kam: b.kam || "", credits: b.credits,
                         // 0 while AI is free (active campaign); null only on an old server.
                         replaceCost: b.replace_cost != null ? b.replace_cost : 2, moreCost: b.more_cost != null ? b.more_cost : 3,
-                        alikeCost: b.alike_cost != null ? b.alike_cost : 2, aiFree: b.ai_free || null };
+                        alikeCost: b.alike_cost != null ? b.alike_cost : 2, aiFree: b.ai_free || null,
+                        // No campaign objective yet: nothing is scored, the page asks for it.
+                        needsObjective: !!b.needs_objective };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
           startSelection();
@@ -2273,7 +2275,7 @@
       var bars = (sc.parts || []).map(function (p) {
         return '<div class="cst-bar"><span>' + esc(p.label) + '</span><i><b class="' + bandOf(p.s * 100) + '" style="width:' + Math.round(p.s * 100) + '%"></b></i></div>';
       }).join("");
-      tip.innerHTML = '<div class="cst-head"><b class="' + bandOf(sc.score) + '">' + sc.score + '</b><div><strong>' + esc(sc.tag) +
+      tip.innerHTML = '<div class="cst-head"><b class="' + bandOf(sc.score) + '">' + sc.score + '%</b><div><strong>' + esc(sc.tag) +
         '</strong><small>' + (sc.basic ? "Screening score · " : "") + 'Match for ' + esc((sc.objective || "").toLowerCase()) + (sc.platform ? " · on " + esc(sc.platform) : "") + "</small>" +
         (audienceEstimated(sc) ? "<small>Audience estimated: no audience report yet, so it counts lightly</small>" : "") +
         (sc.others && sc.others.length ? "<small>Also: " + sc.others.map(function (o) { return esc(o.platform) + " " + o.score; }).join(", ") + "</small>" : "") + "</div></div>" +
@@ -2329,9 +2331,9 @@
           st.title = "Not scored yet — the full analysis is needed.";
         } else {
           st.className = "cat-score cat-score--" + bandOf(item.score) + (item.basic ? " cat-score--basic" : "") + (multi ? " cat-score--multi" : "");
-          st.innerHTML = "<b>" + item.score + "</b><small>" + (multi ? (PLAT_SHORT[item.platform] || item.platform) : (item.basic ? "Basic" : "Match")) + "</small>" +
+          st.innerHTML = "<b>" + item.score + '<i class="cat-score__pct">%</i></b><small>' + (multi ? (PLAT_SHORT[item.platform] || item.platform) : (item.basic ? "Basic" : "Match")) + "</small>" +
             "";
-          st.setAttribute("aria-label", "Matching score " + item.score + " out of 100 on " + (item.platform || "the platform") + ", " + item.tag + ". Show why.");
+          st.setAttribute("aria-label", item.score + "% match on " + (item.platform || "the platform") + ", " + item.tag + ". Show why.");
           st.removeAttribute("title");
         }
       });
@@ -2421,6 +2423,18 @@
     var ST_KEY = { "Under review": "review", "Approved": "approved", "Rejected": "rejected", "Unavailable": "unavailable" };
     var ST_SIG = { review: "wait", approved: "ok", rejected: "no", unavailable: "off" };
     var REASONS = [["price", "Price"], ["audience", "Audience"], ["style", "Content style"], ["competitor", "Worked with a competitor"], ["other", "Other"]];
+    var ST_ICON = { review: "clock", approved: "check", rejected: "x", unavailable: "ban" };
+    var justRejected = {};           // codes rejected in this visit: their "?" pulses once
+    function reasonText(st) {
+      if (!st || !st.reason) return "";
+      var lab = (REASONS.filter(function (r) { return r[0] === st.reason; })[0] || ["", ""])[1];
+      return st.reason === "other" ? (st.note || "Other") : lab + (st.note ? " · " + st.note : "");
+    }
+    // The credit cost, one look everywhere: an orange chip with a coin (or "Free").
+    function costChip(cost) {
+      return cost ? '<span class="hv-cost">' + hvIcon("coin") + cost + " credit" + (cost === 1 ? "" : "s") + "</span>"
+                  : '<span class="hv-cost hv-cost--free">Free</span>';
+    }
     var ROLE = (CURATED && CURATED.role) || "viewer";
     var KAM = (CURATED && CURATED.kam) || "";
     var ST_SUB = {
@@ -2431,9 +2445,9 @@
     };
     var STATUS_ON = !!(CURATED && CURATED.token && CFG.api && CURATED.status);
     var stFilter = "";               // "", a status, "influencers" or "doctors"
-    var openWhy = {};                // codes whose reject reasons are open
     var openRepl = {};               // codes whose replacements are shown
     var replList = {};               // code -> creators Helvy suggested
+    var cooks = {};                  // code -> the "cooking" Helvy shown while a replacement is found
     function stLabel(k) { return { review: "Under review", approved: "Approved", rejected: "Rejected", unavailable: "Unavailable" }[k] || k; }
     function hvIcon(n) { return window.hvPortal && window.hvPortal.icon ? window.hvPortal.icon(n) : ""; }
     function statusOf(code) { return (STATUS_ON && CURATED.status[code]) || { s: "review", by: "", hv: false, at: null, reason: "", note: "", replacements: [] }; }
@@ -2483,12 +2497,13 @@
       var cost = CURATED && CURATED.replaceCost != null ? CURATED.replaceCost : 2;
       if (have) return '<button type="button" class="sel-repl sel-repl--ink" data-st-repl="' + esc(code) + '">' + hvIcon("swap") + " See " + have + " replacement" + (have === 1 ? "" : "s") + " from Helvy</button>";
       var helvy = window.hvPortal && window.hvPortal.helvy ? '<img src="' + esc(window.hvPortal.helvy) + '" alt="" aria-hidden="true">' : "";
-      return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '">' + helvy + "<span>Find a replacement with Helvy</span>" +
-        '<span class="sel-cost">' + (cost ? cost + " credits" : "Free") + "</span></button>";
+      // A compact one-line pill: Helvy's face, the action, the cost inline.
+      return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '" aria-label="Find a replacement with Helvy, ' + (cost ? cost + " credits" : "free") + '">' +
+        helvy + "<span>Find a replacement</span>" + costChip(cost) + "</button>";
     }
     function replPanel(code) {
       var list = replList[code];
-      if (!list) return '<p class="sel-replbox__wait">Helvy is looking…</p>';
+      if (!list) return '<div class="sel-replbox__cook" data-cook="' + esc(code) + '"></div>';
       if (!list.length) return '<p class="sel-replbox__wait">Helvy found no one close enough. ' + (KAM ? esc(KAM.split(" ")[0]) : "Your account manager") + " can help.</p>";
       return '<ul class="sel-replbox">' + list.map(function (c) {
         var inSel = selected.indexOf(c.code) !== -1;
@@ -2497,6 +2512,83 @@
           (inSel ? '<span class="sel-replbox__in">' + hvIcon("check") + " Added</span>"
                  : '<button type="button" data-st-add="' + esc(c.code) + '">' + hvIcon("plus") + " Add</button>") + "</li>";
       }).join("") + "</ul>";
+    }
+    /* -- why a creator was rejected: a "?" beside the status, a small pop-up to answer -- */
+    var whyTip = null, whyPop = null, whyBack = null;
+    function placeFloat(el, anchor, gap) {
+      var r = anchor.getBoundingClientRect(), w = el.offsetWidth, hgt = el.offsetHeight;
+      var left = Math.max(10, Math.min(r.left + r.width / 2 - w / 2, window.innerWidth - w - 10));
+      var top = r.bottom + gap;
+      if (top + hgt > window.innerHeight - 10) top = Math.max(10, r.top - hgt - gap);
+      el.style.left = left + "px"; el.style.top = top + "px";
+    }
+    function showWhyTip(q, code) {
+      var st = statusOf(code), txt = reasonText(st);
+      if (!txt && !(ROLE === "owner" || ROLE === "admin")) return;
+      if (whyPop) return;
+      if (!whyTip) { whyTip = document.createElement("div"); whyTip.className = "sel-whytip"; whyTip.setAttribute("role", "tooltip"); whyTip.id = "sel-whytip"; document.body.appendChild(whyTip); }
+      whyTip.innerHTML = txt ? "<b>Why rejected</b>" + esc(txt) : "<b>Why rejected?</b>Add a reason (optional). It helps Helvy suggest better.";
+      whyTip.hidden = false;
+      q.setAttribute("aria-describedby", "sel-whytip");
+      placeFloat(whyTip, q, 8);
+    }
+    function hideWhyTip() { if (whyTip) whyTip.hidden = true; }
+    function closeWhyPop(back) {
+      if (!whyPop) return;
+      whyPop.remove(); whyPop = null;
+      document.removeEventListener("keydown", whyKey, true);
+      document.removeEventListener("mousedown", whyOut, true);
+      window.removeEventListener("scroll", whyScroll, true);
+      if (back && whyBack && whyBack.isConnected) whyBack.focus();
+    }
+    function whyKey(e) { if (e.key === "Escape") { e.preventDefault(); closeWhyPop(true); } }
+    function whyOut(e) { if (whyPop && !whyPop.contains(e.target) && !(e.target.closest && e.target.closest("[data-st-whyq]"))) closeWhyPop(false); }
+    function whyScroll(e) { if (whyPop && !whyPop.contains(e.target)) closeWhyPop(false); }
+    function openWhyPop(q, code) {
+      closeWhyPop(false);
+      whyBack = q;
+      var st = statusOf(code), pick = st.reason || "";
+      var card = byCode[code], nm = card && card.querySelector(".cat-card__name");
+      var pop = document.createElement("div");
+      pop.className = "sel-whypop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-labelledby", "sel-whypop-t");
+      pop.innerHTML = '<p class="sel-whypop__t" id="sel-whypop-t">Why not ' + esc(nm ? nm.textContent.trim() : code) + "?</p>" +
+        '<p class="sel-whypop__s">Optional. It helps Helvy suggest better.</p>' +
+        '<div class="sel-whypop__chips" role="group" aria-label="Reason">' + REASONS.map(function (r) {
+          return '<button type="button" aria-pressed="' + (pick === r[0]) + '" data-why="' + r[0] + '">' + esc(r[1]) + "</button>";
+        }).join("") + "</div>" +
+        '<input class="sel-whypop__other" type="text" maxlength="200" placeholder="In a few words" aria-label="The reason, in a few words"' + (pick === "other" ? "" : " hidden") + ' value="' + esc(pick === "other" ? st.note || "" : "") + '">' +
+        '<div class="sel-whypop__ft"><button type="button" class="sel-whypop__skip">Skip</button><button type="button" class="sel-whypop__save"' + (pick ? "" : " disabled") + ">Save</button></div>";
+      document.body.appendChild(pop);
+      whyPop = pop;
+      var other = pop.querySelector(".sel-whypop__other"), save = pop.querySelector(".sel-whypop__save");
+      pop.addEventListener("click", function (e) {
+        var b = e.target.closest("button");
+        if (!b) return;
+        if (b.hasAttribute("data-why")) {
+          pick = b.getAttribute("data-why");
+          [].forEach.call(pop.querySelectorAll("[data-why]"), function (x) { x.setAttribute("aria-pressed", String(x === b)); });
+          other.hidden = pick !== "other"; save.disabled = false;
+          if (pick === "other") other.focus();
+          placeFloat(pop, q, 8);
+        } else if (b.classList.contains("sel-whypop__skip")) {
+          delete justRejected[code]; closeWhyPop(true); render();
+        } else if (b === save && pick) {
+          save.disabled = true;
+          stSave(code, { reason: pick, note: pick === "other" ? other.value.replace(/\s+/g, " ").trim() : "" }, function () {
+            delete justRejected[code];
+            stToast("Thanks. Helvy will remember that.");
+          });
+          closeWhyPop(false);
+          setTimeout(function () { var nq = document.querySelector('[data-st-whyq="' + code + '"]'); if (nq) nq.focus(); }, 60);
+        }
+      });
+      other.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); save.click(); } });
+      placeFloat(pop, q, 8);
+      document.addEventListener("keydown", whyKey, true);
+      document.addEventListener("mousedown", whyOut, true);
+      window.addEventListener("scroll", whyScroll, true);
+      var first = pop.querySelector('[aria-pressed="true"]') || pop.querySelector("[data-why]");
+      if (first) first.focus();
     }
     function renderStatus(card) {
       var body = card.querySelector(".cat-card__body");
@@ -2508,26 +2600,18 @@
       card.classList.toggle("is-no", st.s === "rejected");
       card.classList.toggle("is-off", st.s === "unavailable");
       var canDecide = ROLE === "owner" || ROLE === "admin";
-      var html = '<div class="sel-st__line"><span class="sel-sig sel-sig--' + ST_SIG[st.s] + '">' + ST_LABEL[st.s] + "</span>" +
+      var why = st.s === "rejected" && (canDecide || st.reason) ? '<button type="button" class="sel-whyq' + (st.reason ? " has-reason" : "") + (justRejected[code] ? " is-new" : "") +
+          '" data-st-whyq="' + esc(code) + '" aria-haspopup="dialog" aria-label="' + esc(reasonText(st) ? "Why rejected: " + reasonText(st) : "Add a reason (optional)") + '">?</button>' : "";
+      var html = '<div class="sel-st__line"><span class="sel-sig sel-sig--' + ST_SIG[st.s] + '">' + hvIcon(ST_ICON[st.s]) + ST_LABEL[st.s] + "</span>" + why +
         (canDecide && st.s !== "review" && (st.s !== "unavailable" || ROLE === "admin") ? '<button type="button" class="sel-st__change" data-st-set="review" data-st-code="' + esc(code) + '">' + (st.s === "rejected" ? "Undo" : "Change") + "</button>" : "") +
         "</div>";
       var who = whoLine(st);
       if (who) html += '<p class="sel-st__by">' + who + "</p>";
       if (st.s === "unavailable" && st.note) html += '<p class="sel-offnote">' + esc(st.note) + "</p>";
-      if (st.s === "rejected" && st.reason && !openWhy[code]) {
-        var lab = (REASONS.filter(function (r) { return r[0] === st.reason; })[0] || ["", ""])[1];
-        html += '<p class="sel-st__by">Why: ' + esc(lab) + (st.note ? " · " + esc(st.note) : "") + "</p>";
-      }
       if (canDecide && st.s === "review") {
         html += '<div class="sel-st__acts"><button type="button" class="sel-dec sel-dec--yes" data-st-set="approved" data-st-code="' + esc(code) + '">' + hvIcon("check") + " Approve</button>" +
           '<button type="button" class="sel-dec sel-dec--no" data-st-set="rejected" data-st-code="' + esc(code) + '">' + hvIcon("x") + " Reject</button></div>";
         if (ROLE === "admin") html += '<button type="button" class="sel-st__change sel-st__off" data-st-set="unavailable" data-st-code="' + esc(code) + '">Mark unavailable (HelloVoice)</button>';
-      }
-      if (canDecide && st.s === "rejected" && openWhy[code]) {
-        html += '<div class="sel-why"><p class="sel-why__q">Why? <span>Optional. Helps Helvy suggest better.</span></p><div class="sel-why__chips">' +
-          REASONS.map(function (r) { return '<button type="button" aria-pressed="' + (st.reason === r[0]) + '" data-st-why="' + r[0] + '" data-st-code="' + esc(code) + '">' + esc(r[1]) + "</button>"; }).join("") +
-          "</div>" + (st.reason === "other" ? '<input class="sel-why__other" maxlength="200" placeholder="In a few words" aria-label="Why, in a few words" value="' + esc(st.note || "") + '" data-st-other="' + esc(code) + '">' : "") +
-          '<button type="button" class="sel-why__skip" data-st-whydone="' + esc(code) + '">' + (st.reason ? "Done" : "Skip") + "</button></div>";
       }
       if (canDecide && (st.s === "rejected" || st.s === "unavailable")) {
         html += replButton(code, st);
@@ -2540,6 +2624,37 @@
           hvIcon("spark") + "<span>Creators like this</span></button>";
       }
       box.innerHTML = html;
+      // While Helvy looks for a replacement: the same "cooking" desk as Add more like these.
+      var spot = box.querySelector("[data-cook]");
+      if (spot) {
+        var cook = cooks[code] || (window.hvPortal && window.hvPortal.cooking ? window.hvPortal.cooking({ compact: true,
+          steps: ["Reading why you said no…", "Flipping through creators…", "Scoring fit…", "Picking three for you…"] }) : null);
+        if (cook) { cooks[code] = cook; spot.appendChild(cook); }
+        else spot.textContent = "Helvy is looking…";
+      } else if (cooks[code]) { cooks[code].stop(); delete cooks[code]; }
+    }
+    // No campaign objective on this selection: nothing is scored (the server sends no scores),
+    // and one bar above the creators asks for it. The same free questions as the brief card.
+    function renderObjective() {
+      var host = $("sel-objective");
+      var need = !!(CURATED && CURATED.needsObjective && selected.length);
+      if (!need) { if (host) host.remove(); return; }
+      if (!host) {
+        host = document.createElement("section");
+        host.id = "sel-objective"; host.className = "sel-obj"; host.setAttribute("aria-label", "Campaign objective");
+        var anchor = document.querySelector(".cat-grid-section");
+        anchor.parentNode.insertBefore(host, anchor);
+        host.addEventListener("click", function (e) {
+          if (!e.target.closest(".sel-obj__go")) return;
+          if (window.hvPortal && window.hvPortal.scoreBrief) window.hvPortal.scoreBrief(CURATED.token);
+        });
+      }
+      var canAct = ROLE === "owner" || ROLE === "admin";
+      host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic">' + hvIcon("target") + "</span>" +
+        '<p class="sel-obj__tx"><b>Add your campaign objective to score these creators</b>' +
+        "<span>" + (canAct ? "Six quick questions: the goal and who you want to reach. Free. Until then, no creator here is scored."
+                           : "Scores appear once the selection’s owner adds the campaign objective.") + "</span></p>" +
+        (canAct ? '<button type="button" class="sel-obj__go">Add objective' + hvIcon("arrow") + "</button>" : "") + "</div></div>";
     }
     function renderStatusBar() {
       var host = $("sel-statusbar");
@@ -2563,17 +2678,17 @@
       }
       host.hidden = false;
       var n = stCounts();
-      var chip = function (key, label, dot, all) {
+      var chip = function (key, label, ico, all) {
         if (!all && !n[key] && key !== "approved" && key !== "review") return "";
-        return '<button type="button" class="sel-chip' + (all ? " sel-chip--all" : "") + '" aria-pressed="' + (all ? !stFilter : stFilter === key) + '" data-st-filter="' + (all ? "" : key) + '">' +
-          (dot ? '<span class="sel-d sel-d--' + dot + '"></span>' : "") + label + "</button>";
+        return '<button type="button" class="sel-chip' + (all ? " sel-chip--all" : "") + (ico ? " sel-chip--" + key : "") + '" aria-pressed="' + (all ? !stFilter : stFilter === key) + '" data-st-filter="' + (all ? "" : key) + '">' +
+          (ico ? '<span class="sel-ci">' + hvIcon(ico) + "</span>" : "") + label + "</button>";
       };
-      var kinds = (n.doctors && n.influencers) ? chip("influencers", n.influencers + " influencer" + (n.influencers === 1 ? "" : "s")) + chip("doctors", n.doctors + " doctor" + (n.doctors === 1 ? "" : "s")) : "";
+      var kinds = (n.doctors && n.influencers) ? chip("influencers", n.influencers + " influencer" + (n.influencers === 1 ? "" : "s"), "user") + chip("doctors", n.doctors + " doctor" + (n.doctors === 1 ? "" : "s"), "steth") : "";
       host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-sbar__in"><div class="sel-sum" role="group" aria-label="Show">' +
         chip("", n.creators + " creator" + (n.creators === 1 ? "" : "s"), null, true) + kinds +
         '<span class="sel-sum__sep" aria-hidden="true"></span>' +
-        chip("approved", n.approved + " approved", "ok") + chip("rejected", n.rejected + " rejected", "no") +
-        chip("review", n.review + " under review", "wait") + chip("unavailable", n.unavailable + " unavailable", "off") +
+        chip("approved", n.approved + " approved", "check") + chip("rejected", n.rejected + " rejected", "x") +
+        chip("review", n.review + " under review", "clock") + chip("unavailable", n.unavailable + " unavailable", "ban") +
         '</div><div class="sel-sbar__tools"><button type="button" class="sel-swrow" data-st-group role="switch" aria-checked="' + (groupBy === "status") + '"><span class="sel-sw" aria-hidden="true"></span>Group by status</button></div></div></div>';
     }
     // HELVY Connect phase D (assets/js/connect.js): the ROI Calculator, "Add more like these"
@@ -2608,25 +2723,19 @@
       if (gbStored === null && !(CURATED && CURATED.groupBy)) groupBy = "status";
     }
     $("cat-grid").addEventListener("click", function (e) {
-      var t = e.target.closest && e.target.closest("[data-st-set], [data-st-why], [data-st-whydone], [data-st-repl], [data-st-add]");
+      var t = e.target.closest && e.target.closest("[data-st-set], [data-st-whyq], [data-st-repl], [data-st-add]");
       if (!t || !STATUS_ON) return;
       e.preventDefault(); e.stopPropagation();
-      var code = t.getAttribute("data-st-code") || t.getAttribute("data-st-whydone") || t.getAttribute("data-st-repl");
+      var code = t.getAttribute("data-st-code") || t.getAttribute("data-st-whyq") || t.getAttribute("data-st-repl");
       if (t.hasAttribute("data-st-set")) {
         var to = t.getAttribute("data-st-set");
         t.disabled = true;
         stSave(code, { status: to }, function () {
-          if (to === "rejected") openWhy[code] = true;
-          if (to !== "rejected") delete openWhy[code];
+          if (to === "rejected") justRejected[code] = true; else delete justRejected[code];
         });
-      } else if (t.hasAttribute("data-st-why")) {
-        var why = t.getAttribute("data-st-why");
-        stSave(code, { reason: why, note: why === "other" ? (statusOf(code).note || "") : "" }, function () {
-          if (why !== "other") delete openWhy[code];
-          setTimeout(function () { var o = document.querySelector('[data-st-other="' + code + '"]'); if (o) o.focus(); }, 30);
-        });
-      } else if (t.hasAttribute("data-st-whydone")) {
-        delete openWhy[code]; render();
+      } else if (t.hasAttribute("data-st-whyq")) {
+        hideWhyTip();
+        if (ROLE === "owner" || ROLE === "admin") openWhyPop(t, code); else showWhyTip(t, code);
       } else if (t.hasAttribute("data-st-repl")) {
         if (openRepl[code] && replList[code]) { delete openRepl[code]; render(); return; }
         openRepl[code] = true; render();
@@ -2652,14 +2761,22 @@
         } else if (!byCode[add]) stToast("That creator isn't in the catalogue right now.");
       }
     }, true);
-    $("cat-grid").addEventListener("change", function (e) {
-      var o = e.target.closest && e.target.closest("[data-st-other]");
-      if (o) stSave(o.getAttribute("data-st-other"), { reason: "other", note: o.value });
-    }, true);
-    $("cat-grid").addEventListener("keydown", function (e) {
-      var o = e.target.closest && e.target.closest("[data-st-other]");
-      if (o && e.key === "Enter") { e.preventDefault(); o.blur(); }
-    }, true);
+    // The saved reason reads on hover or focus of the "?"; the card itself stays compact.
+    $("cat-grid").addEventListener("mouseover", function (e) {
+      var q = e.target.closest && e.target.closest("[data-st-whyq]");
+      if (q) showWhyTip(q, q.getAttribute("data-st-whyq"));
+    });
+    $("cat-grid").addEventListener("mouseout", function (e) {
+      var q = e.target.closest && e.target.closest("[data-st-whyq]");
+      if (q && !q.contains(e.relatedTarget)) hideWhyTip();
+    });
+    $("cat-grid").addEventListener("focusin", function (e) {
+      var q = e.target.closest && e.target.closest("[data-st-whyq]");
+      if (q) showWhyTip(q, q.getAttribute("data-st-whyq"));
+    });
+    $("cat-grid").addEventListener("focusout", function (e) {
+      if (e.target.closest && e.target.closest("[data-st-whyq]")) hideWhyTip();
+    });
 
     $("cat-grid").addEventListener("click", function (e) {
       var pb = e.target.closest && e.target.closest("[data-plat]");
@@ -2777,6 +2894,7 @@
       renderCurrency();
       renderHead(lo, hi);
       renderStatusBar();
+      renderObjective();
 
       // keep the URL in step so what they see is what they can re-share
       // The short link only while the server holds exactly these creators.

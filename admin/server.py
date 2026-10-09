@@ -3592,6 +3592,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 out.append(i)
         return "|".join(out[:8]) or "Any"
 
+    def selection_has_objective(self, sel):
+        """True once the selection has a campaign objective of its own: one the client gave
+        (the brief questions), the AI shortlist's brief, the admin's, or its campaign's.
+        Without one nothing is scored (client decision 2026-10-09): a score against an
+        assumed "Balanced" goal read as a real verdict."""
+        keys = sel.keys()
+        return bool((sel["objective"] if "objective" in keys else None) or db.selection_campaign_objective(sel["id"]))
+
     def selection_objective(self, sel):
         import fit as fit_mod
         keys = sel.keys()
@@ -4115,6 +4123,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                     "currency": (sel["currency"] if "currency" in sel.keys() else None) or "SAR",
                                     "fx": fx.rates(),
                                     "token": sel["token"]}
+        if not self.selection_has_objective(sel):
+            # No campaign objective: no scores at all, and the page asks for the objective.
+            out["scores"] = {}
+            out["needs_objective"] = True
+            out["brief"]["objective"] = None
         reader = self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.
