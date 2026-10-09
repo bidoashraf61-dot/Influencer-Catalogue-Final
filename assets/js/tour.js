@@ -472,7 +472,7 @@
         t: "Every post, live", p: "Each post with its views, engagement and a good, moderate or low signal against the benchmark." },
       { target: "#mx-clicks", clip: "point", run: "tab:clicks",
         t: "Clicks from tracking links", p: "Each creator gets their own link: clicks, unique people and click-through, by creator, app, country and device." },
-      { target: "#mx-podium", clip: "celebrate", run: "tab:leaderboard",
+      { target: "#mx-podium", alt: "#sec-leaderboard", clip: "celebrate", run: "tab:leaderboard",
         t: "Who performed best", p: "Creators ranked against the campaign objective, with the medals and the full table." },
       { target: ".cx-eva", also: "#mx-carousel-wrap", clip: "point", run: "tab:overview",
         t: "Estimate vs actual", p: "The ROI estimate you saved before the campaign, against what really happened. Plus the timeline of every step, from brief to report." }
@@ -657,7 +657,7 @@
     c.appendChild(helvy); c.appendChild(words);
     T.live.textContent = "Stop " + (o.s + 1) + " of " + STOPS.length + ": " + b.t;
     if (!REDUCE) { c.classList.remove("is-pop"); void c.offsetWidth; c.classList.add("is-pop"); }
-    setTimeout(function () { if (T && T.coach === c) { var nb = c.querySelector(".tv-nav .tv-btn:last-child"); if (nb) nb.focus({ preventScroll: true }); } }, 30);
+    setTimeout(function () { if (T && T.coach === c) { var nb = c.querySelector(".tv-nav .tv-btn:last-child"); if (nb) nb.focus({ preventScroll: true, focusVisible: false }); } }, 30);
   }
 
   /* -- what a beat does in the frame, then where the light goes -- */
@@ -729,7 +729,8 @@
     if (run.indexOf("tab:") === 0) {
       var tab = d.getElementById("tab-" + run.slice(4));
       if (tab) { tab.click(); }
-      later_(function () { light(b); }, 350);
+      // The tab scrolls smoothly to its section: light once it has landed, then make sure.
+      later_(function () { light(b); }, 350); later_(function () { light(b); }, 1100);
       return;
     }
     light(b);
@@ -743,6 +744,7 @@
     var d = doc(), w = win();
     if (!d) return;
     var el = d.querySelector(b.target);
+    if ((!el || !el.getBoundingClientRect().height) && b.alt) el = d.querySelector(b.alt);
     if (!el || !el.getBoundingClientRect().height) { T.spot.hidden = true; place(); return; }
     var mob = window.innerWidth <= 760;
     var stageR = T.stage.getBoundingClientRect(), coachH = mob ? T.coach.offsetHeight : 0;

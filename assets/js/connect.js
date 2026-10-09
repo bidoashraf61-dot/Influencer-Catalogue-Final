@@ -568,7 +568,7 @@
       var box = h("aside", { class: "cx-offer", id: "cx-offer", role: "dialog", "aria-modal": "true", "aria-labelledby": "cx-of-t", "aria-describedby": "cx-of-p" },
         h("div", { class: "cx-offer__helvy" }, clip("hello", "cx-hd--edge", { once: true, then: "idle" })),
         h("div", { class: "cx-offer__in" },
-          h("h2", { id: "cx-of-t" }, "Take the 3-minute tour?"),
+          h("h2", { id: "cx-of-t" }, "Take the ", h("span", { class: "cx-nowrap" }, "3-minute"), " tour?"),
           h("p", { id: "cx-of-p", class: "cx-offer__lead" }, (first ? "Welcome, " + first + ". " : "") + "Four short chapters on a sample brand. Nothing you do in it is saved."),
           list,
           h("div", { class: "cx-offer__go" }, start, no),
@@ -585,7 +585,7 @@
       }
       document.addEventListener("keydown", onKey, true);
       document.body.appendChild(scrim); document.body.appendChild(box);
-      start.focus({ preventScroll: true });
+      start.focus({ preventScroll: true, focusVisible: false });
     }
 
     /* ================================================================ boot */

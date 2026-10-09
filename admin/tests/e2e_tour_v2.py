@@ -109,7 +109,7 @@ class TourV2(unittest.TestCase):
         self.assertIn('typeof chapter === "number" ? chapter : null', self.connect)
 
     def test_03_opener_copy_and_chapters(self):
-        self.assertIn("Take the 3-minute tour?", self.connect)
+        self.assertIn('"Take the ", h("span", { class: "cx-nowrap" }, "3-minute"), " tour?"', self.connect)
         for ch in ("Brief Helvy", "Build your shortlist", "Check & book", "Track results"):
             self.assertIn('"%s"' % ch, self.connect, ch)
             self.assertIn('"%s"' % ch, self.tour, ch)
