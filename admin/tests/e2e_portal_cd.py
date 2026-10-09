@@ -304,7 +304,7 @@ class CD(unittest.TestCase):
             self.assertIn("width=", img)
             self.assertIn("alt=", img)
         self.assertNotIn("7fa8ff", html)                                            # no temporary blue
-        for f in ("assets/brand/email/helvy-connect-on-ink-480.png", "assets/brand/email/helvy-smile-240.png",
+        for f in ("assets/brand/email/helvy-connect-on-ink-480.png", "assets/brand/email/helvy-still-192.png",
                   "assets/brand/email/hellovoice-white-240.png"):
             self.assertTrue((Path(__file__).resolve().parents[2] / f).is_file(), f)
 

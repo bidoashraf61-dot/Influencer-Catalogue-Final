@@ -167,6 +167,10 @@
     "html.hv-loading,html.hv-loading body{overflow:hidden;}";
   (document.head || document.documentElement).appendChild(css);
 
+  // data-helvy-only: the admin pages load this file for Helvy's clips (the copilot launcher)
+  // and nothing else: no page loader, no request counting.
+  if (me && me.hasAttribute("data-helvy-only")) return;
+
   var cover = null, shown = false, ready = false, timer = null, capTimer = null;
   function build() {
     cover = document.createElement("div");

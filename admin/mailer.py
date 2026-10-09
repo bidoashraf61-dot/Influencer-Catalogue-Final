@@ -329,7 +329,7 @@ def _send_smtp(c, to, subject, text, html=None, reply_to=None):
 SITE = "https://influencer-catalogue.hellovoice.co.uk"
 EMAIL_LOGO = SITE + "/assets/brand/helvy-connect/helvy-connect-email-480.png"        # on white
 EMAIL_LOGO_INK = SITE + "/assets/brand/email/helvy-connect-on-ink-480.png"            # on the ink header
-EMAIL_HELVY = SITE + "/assets/brand/email/helvy-smile-240.png"                        # smile B, lime disc
+EMAIL_HELVY = SITE + "/assets/brand/email/helvy-still-192.png"                        # smile, transparent cut-out (no disc)
 EMAIL_HV = SITE + "/assets/brand/email/hellovoice-white-240.png"                      # Powered by
 
 # The sign-in code email (HELVY Connect, phase C, v2). Built for the inbox, not the
@@ -394,7 +394,7 @@ OTP_HTML = """<!DOCTYPE html>
   <tr><td class="card px" style="background-color:#ffffff;padding:34px 40px 6px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
       <td width="92" valign="middle" style="width:92px;padding-right:18px;">
-        <img src="{HELVY}" width="92" height="92" alt="Helvy, smiling" style="display:block;width:92px;height:92px;border-radius:46px;border:0;">
+        <img src="{HELVY}" width="92" height="92" alt="Helvy, smiling" style="display:block;width:92px;height:92px;border:0;outline:none;text-decoration:none;">
       </td>
       <td valign="middle">
         <p class="tx hi" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:26px;line-height:32px;font-weight:700;color:#121212;">Hi, it&rsquo;s Helvy &#128075;</p>

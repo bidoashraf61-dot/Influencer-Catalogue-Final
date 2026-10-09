@@ -529,10 +529,18 @@ body.pt-lock { overflow: hidden; }
 @media screen and (max-width: 767px) {
   .pt-avatar { width: 44px; height: 44px; font-size: 17px; }
   .pt-menu { min-width: 228px; }
-  /* On a phone the bar's links wrap under the logo; the circle stays up on
-     the logo's row, top right, where an account lives on every phone app. */
+  /* On a phone the bar is one row: the logo, then Campaign tracking as a round
+     icon (its words stay its accessible name), the bell and the account circle.
+     The circle used to float over the bar, and the pill ran under it. */
   .cat-topbar { position: relative; }
-  .cat-topbar .pt-dock { position: absolute; top: -9px; right: 0; }
+  .cat-topbar:has(.pt-dock) { flex-wrap: nowrap; gap: 10px; }
+  .cat-topbar:has(.pt-dock) .cat-topbar__links { flex-wrap: nowrap; gap: 8px; min-width: 0; }
+  .cat-topbar .pt-dock { position: static; flex-wrap: nowrap; gap: 8px; }
+  .cat-topbar:has(.pt-dock) .cat-track { flex: none; width: 44px; height: 44px; min-height: 0; padding: 0; gap: 0; font-size: 0; justify-content: center; border-radius: 50%; }
+  .cat-topbar:has(.pt-dock) .cat-track svg { width: 18px; height: 18px; }
+  .cat-topbar:has(.pt-dock) .cat-hero__logo { width: 132px; }
+  /* Campaign and creator pages pin the circle top right: their links start on the next row. */
+  .has-pt-dock .mx-top__links, .has-pt-dock .pp-top__links { flex-basis: 100%; margin-right: 0; }
 }
 
 /* ------------------------------------------------------- AI shortlist card
