@@ -120,17 +120,70 @@
 
   /* ---------------------------------------------------------------- gate */
 
+  var unlocked = false;
   function unlock() {
-    document.body.classList.remove("cat-locked");
-    $("cat-gate").remove();
+    if (unlocked) return;
+    unlocked = true;
+    document.body.classList.remove("cat-locked", "cat-shell");
+    var gate = $("cat-gate"); if (gate) gate.remove();
     var app = $("cat-app");
     app.hidden = false;
-    if (CFG.api && ROSTER) renderRoster(ROSTER);
-    initApp();
-    backToTop();
-    welcome();
-    try { document.dispatchEvent(new CustomEvent("cat:unlocked")); } catch (e) {}
+    var go = function () {
+      initApp();
+      backToTop();
+      welcome();
+      try { document.dispatchEvent(new CustomEvent("cat:unlocked")); } catch (e) {}
+    };
+    if (CFG.api && ROSTER) renderRoster(ROSTER, go); else go();
+    // The catalogue is "ready" the moment its first screen of cards is drawn; the selection
+    // page still waits for its own requests (the loader's generic check).
+    if (PAGE === "catalogue" && window.hvLoader) window.hvLoader.done();
   }
+
+  /* -- the page shell while the roster is on its way -- */
+  // A browser that has been in before (the session hint or a kept roster) sees the page at
+  // once: header, filters and skeleton cards, never the sign-in flashing up. If the server
+  // then says no, the gate comes back.
+  function skeletons(n) {
+    var one = '<div class="cat-skel" aria-hidden="true"><span class="cat-skel__media"></span><span class="cat-skel__line"></span>' +
+      '<span class="cat-skel__line cat-skel__line--short"></span><span class="cat-skel__line"></span></div>';
+    return new Array(n + 1).join(one);
+  }
+  function showShell() {
+    var app = $("cat-app"), grid = $("cat-grid"), gate = $("cat-gate");
+    if (!app || !grid || unlocked) return;
+    document.body.classList.add("cat-shell");
+    document.body.classList.remove("cat-locked");
+    if (gate) gate.hidden = true;
+    app.hidden = false;
+    if (PAGE === "catalogue" && !grid.children.length) grid.innerHTML = skeletons(8);
+  }
+  function hideShell() {
+    if (unlocked || !document.body.classList.contains("cat-shell")) return;
+    var app = $("cat-app"), grid = $("cat-grid"), gate = $("cat-gate");
+    document.body.classList.remove("cat-shell");
+    document.body.classList.add("cat-locked");
+    if (grid) grid.innerHTML = "";
+    if (app) app.hidden = true;
+    if (gate) gate.hidden = false;
+  }
+
+  /* -- the roster kept for this tab, keyed by the server's ETag -- */
+  // sessionStorage only (this tab, gone when it closes), dropped on sign-out, on a 401 and
+  // an hour before the signed photo links in it expire.
+  var RKEY = "hv-roster";
+  function keptRoster() {
+    try {
+      var k = JSON.parse(sessionStorage.getItem(RKEY) || "null");
+      if (!k || !k.tag || !k.text || !(k.exp > Date.now() / 1000 + 3600)) return null;
+      return k;
+    } catch (e) { return null; }
+  }
+  function keepRoster(tag, text, exp) {
+    try { if (tag && exp) sessionStorage.setItem(RKEY, JSON.stringify({ tag: tag, exp: exp, text: text })); } catch (e) { /* full or blocked */ }
+  }
+  function dropRoster() { try { sessionStorage.removeItem(RKEY); } catch (e) { /* blocked */ } }
+  window.hvRosterDrop = dropRoster;
 
   /* The cover tag greets a signed-in client by first name; access-code
      guests and anyone the service does not know keep the plain "Welcome". */
@@ -431,9 +484,11 @@
     // photoBase remains the fallback for a page built with the roster inside
     // it, where there is no service to sign anything.
     var src = c.photo_url || (c.photo ? (CFG.photoBase || "assets/catalogue/") + c.photo : "");
+    // A real <img>: loaded only as it nears the screen, decoded off the main thread, sized by
+    // the card. (It used to be a CSS background, which the browser cannot lazy-load.)
     var photo = src
-      ? '<div class="cat-card__photo' + soft + '" style="background-image:url(' +
-        esc(src) + ')"></div>'
+      ? '<div class="cat-card__photo' + soft + '"><img class="cat-card__img" src="' + esc(src) +
+        '" alt="" loading="lazy" decoding="async" width="330" height="330" fetchpriority="' + (i < 8 ? "high" : "low") + '"></div>'
       : '<div class="cat-card__photo cat-card__photo--fallback" data-plate="' +
         esc(String(c.code).split("-").pop()) + '"></div>';
 
@@ -488,10 +543,29 @@
       "</div></article>";
   }
 
-  function renderRoster(list) {
+  // The first screen of cards at once, the rest in small slices while the browser is idle,
+  // then `done` (filters, sort and selection are wired on the full set). On the selection
+  // page every card starts hidden: only the selection's own are shown, by initSelection.
+  var FIRST = 48;
+  function renderRoster(list, done) {
     var grid = $("cat-grid");
-    if (!grid) return;
-    grid.innerHTML = list.map(cardMarkup).join("");
+    if (!grid) { if (done) done(); return; }
+    var hide = PAGE === "selection";
+    var mark = function (c, i) { var html = cardMarkup(c, i); return hide ? html.replace("<article ", "<article hidden ") : html; };
+    if (PAGE !== "catalogue" || list.length <= FIRST) {
+      grid.innerHTML = list.map(mark).join("");
+      if (done) done();
+      return;
+    }
+    grid.innerHTML = list.slice(0, FIRST).map(mark).join("");
+    var i = FIRST;
+    var later = window.requestIdleCallback ? function (fn) { requestIdleCallback(fn, { timeout: 120 }); } : function (fn) { setTimeout(fn, 16); };
+    (function slice() {
+      var t0 = Date.now(), html = [];
+      while (i < list.length && (html.length < 40 || Date.now() - t0 < 10)) { html.push(mark(list[i], i)); i++; if (html.length >= 160) break; }
+      grid.insertAdjacentHTML("beforeend", html.join(""));
+      if (i < list.length) later(slice); else if (done) done();
+    })();
   }
 
   /* ------------------------------------------------------ places, by country */
@@ -3065,16 +3139,43 @@
     //
     // While asking, the gate form is hidden (cat-checking), so nobody sees
     // an access-code screen flash up on every page change.
-    document.body.classList.add("cat-checking");
     var settle = function () { document.body.classList.remove("cat-checking"); };
-    fetch(CFG.api + "/api/roster?link=" + encodeURIComponent(LINK), { credentials: "include" })
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (b) {
-        settle();
-        if (b && b.ok) { ROSTER = b.roster || []; adoptTiers(b.tiers); adoptFx(b.fx); remember(); unlock(); }
-        else { forget(); }
-      })
-      .catch(settle);
+    var kept = keptRoster();
+    var adopt = function (b) { ROSTER = b.roster || []; adoptTiers(b.tiers); adoptFx(b.fx); remember(); unlock(); };
+    if (kept || wasUnlocked) showShell(); else document.body.classList.add("cat-checking");
+    if (kept) {
+      // Instant: this tab already holds the roster. Then ask the server, cheaply (an empty
+      // 304 when nothing changed); a refusal brings the gate back.
+      var b0 = null;
+      try { b0 = JSON.parse(kept.text); } catch (e) { dropRoster(); }
+      if (b0 && b0.ok) adopt(b0);
+      fetch(CFG.api + "/api/roster?link=" + encodeURIComponent(LINK), { credentials: "include", cache: "no-store", headers: { "If-None-Match": kept.tag } })
+        .then(function (r) {
+          if (r.status === 304) return;
+          if (r.status === 401 || r.status === 403) { dropRoster(); forget(); location.reload(); return; }
+          if (!r.ok) return;
+          var tag = r.headers.get("ETag");
+          return r.text().then(function (t) {
+            var b = JSON.parse(t);
+            keepRoster(tag, t, b.exp);
+            if (!b0 || !b0.ok) adopt(b);       // the kept copy was unreadable: use the fresh one now
+          });
+        })
+        .catch(function () { /* offline: the kept roster stays on screen */ });
+    } else {
+      fetch(CFG.api + "/api/roster?link=" + encodeURIComponent(LINK), { credentials: "include" })
+        .then(function (r) {
+          if (!r.ok) return null;
+          var tag = r.headers.get("ETag");
+          return r.text().then(function (t) { var b = JSON.parse(t); if (b && b.ok) keepRoster(tag, t, b.exp); return b; });
+        })
+        .then(function (b) {
+          settle();
+          if (b && b.ok) adopt(b);
+          else { forget(); dropRoster(); hideShell(); }
+        })
+        .catch(function () { settle(); hideShell(); });
+    }
   } else if (wasUnlocked) {
     unlock();
   }
@@ -3144,22 +3245,39 @@
   })();
 })();
 
-/* Cover header: honour reduced motion by holding the showreel on its poster,
-   and glide to the roster from the "Browse creators" cue. */
+/* Cover header: the poster is the first paint. The 720p reel gets its source only once the
+   app is on screen and the browser is idle, and never on a phone, on Save-Data or under
+   reduced motion (the poster stays). It pauses whenever it scrolls out of view. */
 (function () {
   var v = document.querySelector('.cat-cover__video');
   var still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
-  if (v && still && still.matches) { v.removeAttribute('autoplay'); v.pause(); }
-  else if (v) {
-    // The roster sits hidden behind the passcode gate, and a browser will not
-    // start autoplay on a hidden video — so start it when the app is shown.
-    var go = function () { var p = v.play(); if (p && p.catch) p.catch(function () {}); };
+  var conn = navigator.connection || {};
+  var small = window.matchMedia && window.matchMedia('(max-width: 767px), (pointer: coarse)').matches;
+  var posterOnly = (still && still.matches) || conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '') || small;
+  if (v && !posterOnly) {
+    var started = false;
+    var play = function () { var p = v.play(); if (p && p.catch) p.catch(function () {}); };
+    var start = function () {
+      if (started) return;
+      started = true;
+      if (!v.getAttribute('src') && v.getAttribute('data-src')) { v.preload = 'auto'; v.src = v.getAttribute('data-src'); }
+      play();
+      if ('IntersectionObserver' in window) new IntersectionObserver(function (en) {
+        if (en[0].isIntersecting) play(); else v.pause();
+      }).observe(v);
+    };
+    var later = function () {
+      // after the first frame of the app, then when the main thread is free
+      requestAnimationFrame(function () { setTimeout(function () {
+        if (window.requestIdleCallback) requestIdleCallback(start, { timeout: 2500 }); else setTimeout(start, 400);
+      }, 0); });
+    };
     var app = document.getElementById('cat-app');
-    if (app && window.MutationObserver) {
-      new MutationObserver(function () { if (!app.hidden) go(); })
-        .observe(app, { attributes: true, attributeFilter: ['hidden'] });
+    if (app && !app.hidden) later();
+    else if (app && window.MutationObserver) {
+      var mo = new MutationObserver(function () { if (!app.hidden) { mo.disconnect(); later(); } });
+      mo.observe(app, { attributes: true, attributeFilter: ['hidden'] });
     }
-    if (v.readyState >= 2) go(); else v.addEventListener('loadeddata', go, { once: true });
   }
   var cue = document.querySelector('.cat-cover__cue');
   if (cue) cue.addEventListener('click', function (ev) {
@@ -3194,8 +3312,13 @@
   function count(grid, num, of, lab) {
     // What is actually on screen: the catalogue's own filters hide cards with
     // [hidden], the licence filter and the AI shortlist with classes.
-    var cards = grid.querySelectorAll(".cat-card"), n = 0;
-    for (var i = 0; i < cards.length; i++) if (!cards[i].hidden && getComputedStyle(cards[i]).display !== "none") n++;
+    // Read from classes, not getComputedStyle: 2,000+ style reads on every grid change was a
+    // forced style recalculation each time.
+    var cards = grid.querySelectorAll(".cat-card:not(.cat-card--copy)"), n = 0, ai = grid.classList.contains("ai-on");
+    for (var i = 0; i < cards.length; i++) {
+      var c = cards[i];
+      if (!c.hidden && !c.classList.contains("lic-out") && !(ai && c.classList.contains("ai-out"))) n++;
+    }
     // The size of the roster is never shown (Bido, 2026-10-08): only how many a filter leaves,
     // and nothing at all while nothing is filtered.
     var tally = num.parentNode, filtered = n < cards.length;
@@ -3222,7 +3345,7 @@
     row.appendChild(side);
     count(grid, num, of, lab);
     var t = null;
-    new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { count(grid, num, of, lab); }, 60); })
+    new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { count(grid, num, of, lab); }, 180); })
       .observe(grid, { subtree: true, childList: true, attributes: true, attributeFilter: ["hidden", "class"] });
     return true;
   }

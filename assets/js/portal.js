@@ -689,7 +689,7 @@
       if (credits) item("AI credits", { go: openAccount }, credits);
       rule();
     }
-    item("Sign out", { go: function () { api("POST", "/api/auth/logout", {}).then(function () { location.href = ROOT; }); } }, null, "pt-menu__item--quiet");
+    item("Sign out", { go: function () { (function () { try { sessionStorage.removeItem("hv-roster"); } catch (e) { /* blocked */ } })(), api("POST", "/api/auth/logout", {}).then(function () { location.href = ROOT; }); } }, null, "pt-menu__item--quiet");
 
     function toggle(open) {
       menu.hidden = !open;
@@ -1454,7 +1454,7 @@
       } }, "Delete my account"));
     }
     body.appendChild(h("div", { class: "pt-actions" }, extra, h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () {
-      api("POST", "/api/auth/logout", {}).then(function () { location.reload(); });
+      (function () { try { sessionStorage.removeItem("hv-roster"); } catch (e) { /* blocked */ } })(), api("POST", "/api/auth/logout", {}).then(function () { location.reload(); });
     } }, "Sign out")));
     close = layer(modal);
   }

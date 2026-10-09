@@ -399,8 +399,7 @@
 .mx-sec--progress .mx-note { margin: 0 0 8px; }
 
 /* section jump bar: every section is on the page, these scroll to it */
-.mx-tabs { position: sticky; top: 0; z-index: 20; background: rgba(255,255,255,.96); border-bottom: 1px solid var(--line);
-  backdrop-filter: saturate(1.2) blur(6px); -webkit-backdrop-filter: saturate(1.2) blur(6px); }
+.mx-tabs { position: sticky; top: 0; z-index: 20; background: var(--white); border-bottom: 1px solid var(--line); }
 .mx-tabs__in { display: flex; gap: 6px; overflow-x: auto; padding: 12px 0; scrollbar-width: none; }
 .mx-tabs__in::-webkit-scrollbar { display: none; }
 .mx-tab {

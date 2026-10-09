@@ -93,6 +93,12 @@ import ui  # noqa: E402
 SECRET = auth.load_secret(HERE / ".secret")
 _GZIP_TYPES = {"application/json", "text/html", "text/plain", "text/css", "application/javascript", "text/javascript", "image/svg+xml"}
 _ROSTER_CACHE = {}
+# The /api/roster answer itself, serialised and gzipped once per roster version, with its
+# ETag: a repeat visit costs an empty 304 and nobody pays the ~0.8 s build or the 1.7 MB
+# json.dumps + gzip again until a creator, an analysis, a tier, a rate or the day's photo
+# signatures change. One entry; cleared with _ROSTER_CACHE.
+_ROSTER_BODY = {}
+ROSTER_SAFETY_S = 3600                 # rebuilt at least hourly, in case a change slips past the fingerprint
 # Salt for the visitor hash on tracking-link clicks: derived from the server
 # secret so it is stable across restarts, but not the secret itself.
 CLICK_SALT = __import__("hashlib").sha256(b"clicks|" + SECRET).hexdigest()
@@ -4248,8 +4254,32 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # A page that names its link asks for that link's own code once.
         if link and not self.admin() and not self.signed_in_client() and self.link_code(link) is None:
             return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
-        return self.send_json(200, {"ok": True, "roster": self.roster_payload(),
-                                    "tiers": self.tier_payload(), "fx": fx.rates()}, self.cors())
+        raw, gz, tag, stamp = self.roster_body()
+        head = self.cors() + [("ETag", tag), ("Cache-Control", "private, no-cache"),
+                              ("Last-Modified", formatdate(stamp, usegmt=True)), ("Vary", "Cookie")]
+        if tag in [t.strip() for t in (self.headers.get("If-None-Match") or "").split(",")]:
+            return self.send(304, b"", "application/json; charset=utf-8", head)
+        if "gzip" in (self.headers.get("Accept-Encoding") or ""):
+            return self.send(200, gz, "application/json; charset=utf-8",
+                             head + [("Content-Encoding", "gzip"), ("Vary", "Accept-Encoding")])
+        return self.send(200, raw, "application/json; charset=utf-8", head)
+
+    def roster_body(self):
+        """(json bytes, gzipped bytes, ETag, built-at) of the roster answer, built once per version.
+        "exp" tells the page when the signed photo links expire, so a copy it keeps in
+        sessionStorage is never used past them."""
+        tiers, rates = self.tier_payload(), fx.rates()
+        key = (links.expires_at(), self._roster_fingerprint(), json.dumps(tiers, sort_keys=True), json.dumps(rates, sort_keys=True))
+        hit = _ROSTER_BODY.get("v")
+        if hit and hit[0] == key and time.time() - hit[1][3] < ROSTER_SAFETY_S:
+            return hit[1]
+        payload = {"ok": True, "roster": self.roster_payload(), "tiers": tiers, "fx": rates, "exp": links.expires_at()}
+        raw = json.dumps(payload, separators=(",", ":")).encode()
+        tag = '"r-' + __import__("hashlib").sha1(raw).hexdigest()[:24] + '"'
+        out = (raw, gzip.compress(raw, 6), tag, time.time())
+        _ROSTER_BODY.clear()
+        _ROSTER_BODY["v"] = (key, out)
+        return out
 
     def api_discover(self, job):
         """The catalogue's Audience and Performance filters, lookalikes and
@@ -4278,14 +4308,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def roster_payload(self, platform=None, only=None):
         # The full roster is the same for every viewer, so it is built once and
-        # reused until a creator, an analysis or a tier changes (or 5 minutes
+        # reused until a creator, an analysis or a tier changes (or an hour
         # pass, or the day's photo signatures roll over). It took ~0.45 s per
         # unlock with 2,100+ creators.
         if only is not None:
             return self._roster_build(platform, only)
         key = (platform, links.expires_at(), self._roster_fingerprint())
         hit = _ROSTER_CACHE.get(key)
-        if hit and time.time() - hit[0] < 300:
+        if hit and time.time() - hit[0] < ROSTER_SAFETY_S:
             return hit[1]
         out = self._roster_build(platform, None)
         _ROSTER_CACHE.clear()
@@ -4347,6 +4377,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def forget_photo_widths(cls):
         cls._widths = {}
         _ROSTER_CACHE.clear()        # a new photo changes photo_url and lowres
+        _ROSTER_BODY.clear()
 
     def is_lowres(self, photo):
         if not photo:

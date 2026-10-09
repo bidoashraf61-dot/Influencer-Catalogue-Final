@@ -721,11 +721,12 @@ def build():
 <main class="cat-app" id="cat-app" hidden>
 
   <header class="cat-hero cat-hero--cover">
-    <video class="cat-cover__video" autoplay muted loop playsinline
-           preload="metadata" poster="/assets/video/hero-reel-poster.jpg"
-           aria-hidden="true" tabindex="-1">
-      <source src="/assets/video/hero-reel.mp4" type="video/mp4"/>
-    </video>
+    <!-- The poster paints first; catalogue.js gives the 720p reel its source only after the
+         page has drawn and gone idle, and never on a phone or with Save-Data (poster only). -->
+    <video class="cat-cover__video" muted loop playsinline
+           preload="none" poster="/assets/video/hero-reel-poster.jpg"
+           data-src="/assets/video/hero-reel-720.mp4"
+           aria-hidden="true" tabindex="-1"></video>
     <div class="cat-cover__shade" aria-hidden="true"></div>
 
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">

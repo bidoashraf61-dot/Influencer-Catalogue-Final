@@ -59,8 +59,15 @@
       v.parentNode.replaceChild(im, v);
       try { v.removeAttribute("src"); v.load(); } catch (e) { /* gone */ }
     }
+    // Ambient clips (launcher, cards) wait until the page has loaded and settled, so they never
+    // compete with the roster and the first photos; "eager" ones (loader, reactions) do not.
+    var settled = document.readyState === "complete";
+    if (!settled) window.addEventListener("load", function () {
+      setTimeout(function () { settled = true; watching.forEach(function (v) { if (!v.getAttribute("data-off")) play(v); }); }, 400);
+    });
     function play(v) {
       if (!v.isConnected || v.getAttribute("data-fallback") || v.getAttribute("data-off") || document.hidden) return;
+      if (!settled && !v.hasAttribute("data-eager")) return;
       if (!v.getAttribute("src")) { v.src = src(v.getAttribute("data-clip")); }
       if (!v.paused) return;
       var p;
@@ -117,7 +124,7 @@
       v.addEventListener("canplay", function () { play(v); });
       v.addEventListener("loadeddata", function () { play(v); });
       v.addEventListener("error", function () { fallback(v); });
-      if (o.eager) { v.src = src(cur); setTimeout(function () { play(v); }, 0); }
+      if (o.eager) { v.setAttribute("data-eager", ""); v.src = src(cur); setTimeout(function () { play(v); }, 0); }
       // Off screen it neither downloads nor plays; on screen it plays.
       setTimeout(function () { observe(v); }, 0);
       return v;

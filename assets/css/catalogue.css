@@ -340,6 +340,17 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
   background-size: cover; background-position: center;
   background-repeat: no-repeat;
 }
+/* The photo is a lazy <img> (loading=lazy, decoding=async) under the shield. */
+.cat-card__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; display: block;
+  -webkit-user-drag: none; user-select: none; pointer-events: none; }
+/* Skeleton cards: the page shell shows these while the roster is on its way. */
+.cat-skel { display: flex; flex-direction: column; gap: 12px; padding-bottom: 22px; background: var(--white); border-radius: var(--r-lg); overflow: hidden; }
+.cat-skel__media { display: block; aspect-ratio: 1 / 1; background: #ddd2c8; }
+.cat-skel__line { display: block; height: 12px; margin: 0 22px; border-radius: 6px; background: #eee8e1; }
+.cat-skel__line--short { width: 45%; height: 22px; }
+.cat-skel { animation: cat-skel 1.3s ease-in-out infinite; }
+@keyframes cat-skel { 50% { opacity: .55; } }
+@media (prefers-reduced-motion: reduce) { .cat-skel { animation: none; } }
 /* Every photo fills the whole square, small sources included. Drawing a small
    one at its own pixel size left most of the frame empty, which read worse
    than a soft photo (client feedback 2026-10-06). The fix for a small source
@@ -1485,9 +1496,9 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 .cat-cover__nav { padding-top: 28px; }
 .cat-hero--cover .cat-topbar { margin-bottom: 0; }
 .cat-hero--cover .cat-track {
-  color: var(--white); background: rgba(18,18,18,.28);
+  /* a solid tint, not a backdrop blur: blurring the playing reel behind it cost a repaint every frame */
+  color: var(--white); background: rgba(18,18,18,.58);
   border-color: rgba(255,255,255,.55);
-  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
 }
 .cat-hero--cover .cat-track:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
 .cat-hero--cover .cat-portfolio:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
