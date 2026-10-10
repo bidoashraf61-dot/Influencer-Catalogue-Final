@@ -47,6 +47,15 @@
   box-shadow: inset 0 0 0 1px rgba(18,18,18,.18); }
 .hv-cost .hv-i, .cx-tag--cost .hv-i, .cx-cost .hv-i { width: 14px; height: 14px; stroke-width: 2.2; }
 .hv-cost--free { background: var(--go-soft); color: #0e6b39; padding-left: 9px; }
+/* Credit tokens, shared by every credit number (account, tour, menu, AI cards): the chip's
+   orange with ink text (6.9:1); on ink, the chip as it is or --hv-credit-on-ink text (9:1);
+   --hv-credit-soft + --hv-credit-deep for a quiet "already earned" (7:1). */
+:root { --hv-credit: #ff691e; --hv-credit-text: #121212; --hv-credit-on-ink: #ff9a5c; --hv-credit-soft: #ffe4d3; --hv-credit-deep: #8a3a08;
+  --hv-credit-ring: inset 0 0 0 1px rgba(18,18,18,.18); }
+.hv-credit-num { display: inline-block; background: var(--hv-credit); color: var(--hv-credit-text); border-radius: .22em; padding: .06em .2em 0; line-height: .95; box-shadow: var(--hv-credit-ring); }
+.pt-menu__badge.hv-cost { padding: 3px 9px; box-shadow: var(--hv-credit-ring); }
+.ai-sl__build small:has(.hv-cost) { opacity: 1; display: inline-flex; align-items: center; gap: 6px; }   /* the chip at full strength */
+.pt-idea .hv-cost { margin-left: 4px; vertical-align: middle; }
 .cx-link { background: none; border: 0; padding: 0; font: inherit; font-weight: 600; color: inherit; cursor: pointer; text-decoration: underline;
   text-decoration-color: #b9d400; text-decoration-thickness: 3px; text-underline-offset: 6px; min-height: 32px; }
 .cx-link:hover { text-decoration-color: currentColor; }
@@ -200,8 +209,8 @@
 .cx-offer__chap:hover .cx-offer__go-i, .cx-offer__chap:focus-visible .cx-offer__go-i { opacity: 1; transform: none; }
 .cx-offer__go { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
 .cx-offer__go .cx-btn:first-child { flex: 1 1 220px; }
-.cx-btn .cx-cost--prize { background: var(--ink); color: var(--lime); box-shadow: none; padding: 4px 10px; }
-.cx-btn:hover .cx-cost--prize { background: var(--lime); color: var(--ink); }
+.cx-btn .cx-cost--prize { background: var(--hv-credit, #ff691e); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(18,18,18,.18); padding: 4px 10px; }
+.cx-btn:hover .cx-cost--prize { background: var(--hv-credit, #ff691e); color: var(--ink); }
 .cx-nowrap { white-space: nowrap; }
 .cx-offer__fine { margin: 12px 0 0; font-size: 12.5px; color: rgba(255,255,255,.62); }
 

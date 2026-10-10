@@ -84,7 +84,7 @@ def _brief_of(sel):
         return None
     import matcher
     with db.connect() as conn:
-        br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1", (sel["id"],)).fetchone()
+        br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1", (sel["id"],)).fetchone()
     keys = sel.keys()
     out = {"selection": sel["name"], "objective": (sel["objective"] if "objective" in keys else None) or None}
     if br is not None:

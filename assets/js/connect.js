@@ -608,7 +608,10 @@
           list.appendChild(art);
         });
         again.hidden = false;
-        again.querySelector("span").textContent = "New ideas" + (cost ? " · " + cost + " credits" : "");
+        again.querySelector("span").textContent = "New ideas";
+        var chip = again.querySelector(".hv-cost");
+        if (chip) chip.remove();
+        if (cost) again.appendChild(h("span", { class: "hv-cost", html: ic("coin") + cost + " credits" }));
       }
       function intro() {
         list.textContent = "";

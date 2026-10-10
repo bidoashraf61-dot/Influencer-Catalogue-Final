@@ -517,6 +517,23 @@ def migrate(conn):
     if "currency" not in sel_cols:
         # The currency this selection is quoted in (prices are kept in SAR).
         conn.execute("ALTER TABLE selections ADD COLUMN currency TEXT")
+    if "origin" not in sel_cols:
+        # Who made the selection: "client" (saved from the catalogue, an AI shortlist, the
+        # chat) or "admin" (HelloVoice built or priced it). Only a client's own work can be
+        # deleted from their profile. Rows from before the column are classed once,
+        # conservatively: anything HelloVoice created (History), built from a quote request,
+        # priced, or not filed under a client counts as HelloVoice's.
+        conn.execute("ALTER TABLE selections ADD COLUMN origin TEXT")
+        has_hist = conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'history'").fetchone()
+        made = ("OR CAST(id AS TEXT) IN (SELECT key FROM history WHERE entity = 'selection' AND action = 'created') "
+                if has_hist else "")
+        conn.execute("UPDATE selections SET origin = CASE WHEN code_id IS NULL OR request_id IS NOT NULL "
+                     "OR COALESCE(prices, '{}') NOT IN ('{}', '', 'null') " + made + "THEN 'admin' ELSE 'client' END")
+    if "deleted_at" not in sel_cols:
+        # A client deleted it from their profile: gone from every client list and its link
+        # stops opening for clients, but HelloVoice keeps it (marked) and can restore it.
+        conn.execute("ALTER TABLE selections ADD COLUMN deleted_at INTEGER")
+        conn.execute("ALTER TABLE selections ADD COLUMN deleted_by INTEGER")
     creator_cols = {r["name"] for r in conn.execute("PRAGMA table_info(creators)")}
     if "created_at" not in creator_cols:
         # When a creator was added, so the roster can be narrowed to a batch
@@ -1770,17 +1787,21 @@ def list_selections():
             "LEFT JOIN codes c ON c.id = s.code_id ORDER BY s.updated_at DESC").fetchall()
 
 
-def selection(sid=None, token=None):
+def selection(sid=None, token=None, deleted=False):
+    """One selection by id or by token. By token is how a client's link reaches it, so a
+    selection the client deleted is not found that way unless ``deleted`` (admin) is asked."""
     with connect() as conn:
         if token is not None:
-            return conn.execute("SELECT * FROM selections WHERE token = ?", (token,)).fetchone()
+            return conn.execute("SELECT * FROM selections WHERE token = ?" + ("" if deleted else " AND deleted_at IS NULL"),
+                                (token,)).fetchone()
         return conn.execute("SELECT * FROM selections WHERE id = ?", (sid,)).fetchone()
 
 
 def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
                    code_id=None, platform=None, margin=None, costs=None, margin_max=False,
-                   tags=None, verdicts=None, platforms=None, segments=None):
+                   tags=None, verdicts=None, platforms=None, segments=None, origin="admin"):
     """Create (sid None) or update one priced selection. Returns its id.
+    ``origin`` ("client" | "admin") is recorded on create only.
 
     margin and costs are left as they are when not given, so a client
     re-saving their shortlist from the catalogue cannot wipe the margin an
@@ -1790,13 +1811,13 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
         if sid is None:
             cur = conn.execute(
                 "INSERT INTO selections (token,name,codes,prices,total_from,total_to,"
-                "request_id,code_id,platform,margin,costs,created_at,updated_at,margin_max) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "request_id,code_id,platform,margin,costs,created_at,updated_at,margin_max,origin) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 (secrets.token_urlsafe(9), name, json.dumps(codes), json.dumps(prices),
                  total_from, total_to, request_id, code_id, platform,
                  margin if margin is not None else last_margin(conn),
                  json.dumps(costs or {}), now(), now(),
-                 None if margin_max is False else margin_max))
+                 None if margin_max is False else margin_max, "client" if origin == "client" else "admin"))
             return cur.lastrowid
         conn.execute(
             "UPDATE selections SET name=?, codes=?, prices=?, total_from=?, total_to=?, "
@@ -1821,10 +1842,21 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
 
 def set_archived(table, rid, on):
     """Put a client (access code) or a selection into the archive, or take it
-    out. Nothing else about it changes."""
+    out. Nothing else about it changes, except that taking a selection the client
+    deleted out of the archive restores it for them too."""
     assert table in ("codes", "selections")
     with connect() as conn:
         conn.execute("UPDATE %s SET archived_at = ? WHERE id = ?" % table, (now() if on else None, rid))
+        if table == "selections" and not on:
+            conn.execute("UPDATE selections SET deleted_at = NULL, deleted_by = NULL WHERE id = ?", (rid,))
+
+
+def client_delete_selection(sid, by_code_id):
+    """A client deleted their own selection: archived and marked, never erased, so HelloVoice
+    still has it. A second delete changes nothing (the first date stands)."""
+    with connect() as conn:
+        conn.execute("UPDATE selections SET deleted_at = COALESCE(deleted_at, ?), deleted_by = COALESCE(deleted_by, ?), "
+                     "archived_at = COALESCE(archived_at, ?) WHERE id = ?", (now(), by_code_id, now(), sid))
 
 
 def set_selection_objective(sid, objective):
@@ -1949,7 +1981,7 @@ def selection_for_link(name, codes, code_id=None):
     a request, only the passcode that made the request sees it."""
     want = sorted(codes)
     with connect() as conn:
-        rows = conn.execute("SELECT * FROM selections WHERE name = ? "
+        rows = conn.execute("SELECT * FROM selections WHERE name = ? AND deleted_at IS NULL "
                             "ORDER BY updated_at DESC", (name,)).fetchall()
     for r in rows:
         if sorted(json.loads(r["codes"] or "[]")) != want:

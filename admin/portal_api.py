@@ -170,6 +170,12 @@ class PortalMixin(connect_api.ConnectMixin):
         except (TypeError, ValueError):
             return default
 
+    @staticmethod
+    def _live_token(sid):
+        """The token of a selection a client can still open (not deleted), else None."""
+        sel = db.selection(sid) if sid else None
+        return sel["token"] if sel is not None and not sel["deleted_at"] else None
+
     def _need_viewer(self):
         cid, user, kind = self._identity()
         if cid is None:
@@ -248,7 +254,7 @@ class PortalMixin(connect_api.ConnectMixin):
             if who:
                 self.send_json(200, {"ok": True, "briefs": [
                     {"id": b["id"], "summary": b["summary"], "objective": b["objective"], "at": b["created_at"],
-                     "selection": (db.selection(b["selection_id"])["token"] if b["selection_id"] and db.selection(b["selection_id"]) else None)}
+                     "selection": self._live_token(b["selection_id"])}
                     for b in portal.briefs_for(who[0], 20)]}, self.cors())
             return True
         if path == "/api/brief/for":
@@ -260,7 +266,7 @@ class PortalMixin(connect_api.ConnectMixin):
                     self.send_json(404, {"ok": False}, self.cors())
                 else:
                     with db.connect() as conn:
-                        b = conn.execute("SELECT id, summary, answers FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1",
+                        b = conn.execute("SELECT id, summary, answers FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",
                                          (sel["id"],)).fetchone()
                     out = None
                     if b:
@@ -276,7 +282,8 @@ class PortalMixin(connect_api.ConnectMixin):
             who = self._need_viewer()
             if who:
                 b = portal.brief(self._int(query.get("b")))
-                if b is None or (b["code_id"] not in portal.team_codes(who[0]) and who[0] != db.admin_code_id()):
+                if b is None or (b["deleted_at"] and who[0] != db.admin_code_id()) or \
+                        (b["code_id"] not in portal.team_codes(who[0]) and who[0] != db.admin_code_id()):
                     self.send_json(404, {"ok": False}, self.cors())
                 else:
                     self.send_json(200, {"ok": True, "brief": b["summary"], "scores": self._brief_scores(b)}, self.cors())
@@ -353,6 +360,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat, "/api/chat/stream": self.api_chat_stream,
             "/api/chat/confirm": self.api_chat_confirm, "/api/chat/dismiss": self.api_chat_dismiss,
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
+            "/api/selection/delete": self.api_selection_delete, "/api/brief/delete": self.api_brief_delete,
             "/api/credits/request": self.api_credits_request, "/api/me/delete": self.api_me_delete,
             "/api/voice/handoff": self.api_voice_handoff,
             "/api/me/image": self.api_me_image, "/api/me/notify": self.api_me_notify,
@@ -564,6 +572,54 @@ class PortalMixin(connect_api.ConnectMixin):
         return self.send_json(200, {"ok": True, "brief_id": bid, "brief": text, "token": sel["token"], "name": sel["name"],
                                     "picks": [dict(i, why="", creator=shown.get(i["code"])) for i in items],
                                     "totals": {"n": len(items)}, "narrated": False, "summary": "", "alternates": []}, self.cors())
+
+    def _may_delete_selection(self, sel, cid):
+        """A client may delete a selection only when it is their own work: filed under their
+        account (or a code HelloVoice linked to it) and made by them, not built or shared by
+        HelloVoice. A colleague's shortlist and the admin preview never qualify."""
+        if sel is None or cid is None or cid == db.admin_code_id():
+            return False
+        return (sel["origin"] or "admin") == "client" and portal.owns(cid, sel["code_id"])
+
+    def api_selection_delete(self):
+        """POST {token}: the client deletes one of their own selections from their profile. A soft
+        delete: it leaves every client list and its link stops opening for clients; HelloVoice
+        still sees it, marked "Deleted by client", and can restore it from the archive."""
+        who = self._need_viewer()
+        if not who:
+            return
+        cid = who[0]
+        if self._throttled("seldel:%d" % cid, 60, 3600):
+            return
+        token = str(self.json_body().get("token") or "").strip()[:80]
+        sel = db.selection(token=token, deleted=True) if token else None
+        if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid)):
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        if not self._may_delete_selection(sel, cid):
+            return self.send_json(403, {"ok": False, "reason": "not_yours"}, self.cors())
+        if not sel["deleted_at"]:
+            db.client_delete_selection(sel["id"], cid)
+            db.log("selection_deleted", cid, self.client_ip(), self._ua(), sel["name"][:80])
+        return self.send_json(200, {"ok": True, "token": sel["token"]}, self.cors())
+
+    def api_brief_delete(self):
+        """POST {id}: the client deletes one of their own briefs. Soft: HelloVoice still sees it.
+        The selection it scored goes back to asking for a campaign objective (no scores)."""
+        who = self._need_viewer()
+        if not who:
+            return
+        cid = who[0]
+        if self._throttled("briefdel:%d" % cid, 60, 3600):
+            return
+        b = portal.brief(self._int(self.json_body().get("id")))
+        if b is None or (b["code_id"] not in portal.team_codes(cid) and not portal.owns(cid, b["code_id"])):
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        if cid == db.admin_code_id() or not portal.owns(cid, b["code_id"]):
+            return self.send_json(403, {"ok": False, "reason": "not_yours"}, self.cors())
+        if portal.delete_brief(b["id"], cid):
+            _score_cache.pop(b["id"], None)
+            db.log("brief_deleted", cid, self.client_ip(), self._ua(), (b["summary"] or "")[:80])
+        return self.send_json(200, {"ok": True, "id": b["id"]}, self.cors())
 
     def api_credits_request(self):
         who = self._need_viewer()
@@ -789,7 +845,7 @@ class PortalMixin(connect_api.ConnectMixin):
         codes = [p["code"] for p in result["picks"]]
         name = (str(b.get("name") or "").strip() or "AI shortlist") [:100]
         single = brief["platforms"][0] if len(brief["platforms"]) == 1 else None
-        sid = db.save_selection(None, name, codes, {}, None, None, None, cid, single)
+        sid = db.save_selection(None, name, codes, {}, None, None, None, cid, single, origin="client")
         db.set_selection_objective(sid, brief["objective"])
         db.set_selection_target(sid, brief["target"])
         text = matcher.describe(answers)
@@ -873,7 +929,8 @@ class PortalMixin(connect_api.ConnectMixin):
         if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not self.admin():
             return None
         with db.connect() as conn:
-            br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1", (sel["id"],)).fetchone()
+            br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",
+                              (sel["id"],)).fetchone()
         codes = json.loads(sel["codes"] or "[]")
         brief = None
         if br is not None:

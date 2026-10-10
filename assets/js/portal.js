@@ -681,7 +681,7 @@
       return el;
     }
     function rule() { menu.appendChild(h("div", { class: "pt-menu__rule", role: "separator" })); }
-    var credits = ME.credits != null ? h("span", { class: "pt-menu__badge", id: "pt-chip-credits" }, ME.credits + " cr") : null;
+    var credits = ME.credits != null ? h("span", { class: "pt-menu__badge hv-cost", id: "pt-chip-credits" }, ME.credits + " cr") : null;
     var ACC = ROOT + "account/";
     if (u) {
       // Account holders: their own space, then help, then out.
@@ -1745,10 +1745,13 @@
           var card = h("div", { class: "pt-msg-b pt-msg-b--ai", style: "white-space:normal;max-width:100%" },
             h("p", { style: "margin:0 0 8px;font-weight:600" }, "Your brief"), h("p", { style: "margin:0 0 12px;white-space:pre-line" }, lines.join("\n")));
           var costs = (ME && ME.costs) || { brief: 5, chat: 1 };
-          var label = (!costs.search && ME && ME.credits != null && ME.credits < costs.brief) ? "Build my shortlist · free"
-            : "Build my shortlist · " + costs.brief + " credits" + (!costs.search ? " (free without reasons)" : "");
-          var build = h("button", { class: "pt-idea", type: "button", style: "background:var(--lime);border-color:var(--ink);font-weight:600" }, label);
-          var talk = h("button", { class: "pt-idea", type: "button" }, "Ask the assistant · " + costs.chat + " credit");
+          var freeBuild = !costs.search && ME && ME.credits != null && ME.credits < costs.brief;
+          // Credit amounts wear the orange coin chip (.hv-cost), the one look for credits everywhere.
+          var build = h("button", { class: "pt-idea", type: "button", style: "background:var(--lime);border-color:var(--ink);font-weight:600" }, "Build my shortlist ",
+            freeBuild ? h("span", { class: "hv-cost hv-cost--free" }, "Free")
+                      : h("span", { class: "hv-cost", html: icon("coin") + costs.brief + " credits" }), !freeBuild && !costs.search ? " (free without reasons)" : null);
+          var talk = h("button", { class: "pt-idea", type: "button" }, "Ask the assistant ",
+            h("span", { class: "hv-cost", html: icon("coin") + costs.chat + " credit" + (costs.chat === 1 ? "" : "s") }));
           var redo = h("button", { class: "pt-idea", type: "button" }, "Change answers");
           card.appendChild(h("div", { class: "pt-ideas" }, build, talk, redo));
           log.appendChild(card); scroll();
@@ -1811,7 +1814,7 @@
 
     if (ME.credits != null) {
       var bal = h("div", { class: "pt-sec" }, h("h3", null, "AI credits"),
-        h("div", { class: "pt-balance" }, h("b", { id: "pt-bal" }, String(ME.credits)), h("span", { class: "pt-sub", style: "margin:0" }, "credits left")),
+        h("div", { class: "pt-balance" }, h("b", { id: "pt-bal", class: "hv-credit-num" }, String(ME.credits)), h("span", { class: "pt-sub", style: "margin:0" }, "credits left")),
         h("p", { class: "pt-sub" }, LANG === "ar" ? "القائمة مع الأسباب تكلف " + ME.costs.brief + "، والرسالة " + ME.costs.chat + ". أسئلة الملخص مجانية."
           : "A shortlist with written reasons costs " + ME.costs.brief + ", a chat message " + ME.costs.chat + ". Brief questions are free."));
       var ask = h("div", { class: "pt-actions", style: "margin-top:10px;justify-content:flex-start" });
@@ -3338,7 +3341,11 @@
       }
       side.appendChild(h("p", { class: "ai-sl__hint" }, "We score every creator on each platform, fit your budget and explain each pick."));
       var build = h("button", { class: "ai-sl__build", type: "button" }, "Build my shortlist");
-      build.appendChild(h("small", null, costLine()));
+      var cl = costLine();
+      // A price in credits is the orange coin chip; "Free" and the admin preview stay plain words.
+      build.appendChild(/^\d+ credits/.test(cl) ? h("small", null, h("span", { class: "hv-cost", html: icon("coin") + cl.split(" · ")[0] }),
+                                                        cl.indexOf(" · ") > 0 ? " " + cl.split(" · ").slice(1).join(" · ") : null)
+                                                   : h("small", null, cl));
       build.addEventListener("click", function () { if (!busy) go(nameIn.value.trim() || nameFor()); });
       side.appendChild(build);
       p.appendChild(side);

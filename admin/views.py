@@ -2173,7 +2173,7 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
                   else "<span class='pill warn'>No client</span>")
         rows.append(
             "<tr><td><strong><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>"
-            + e(x["name"]) + "</a></strong>"
+            + e(x["name"]) + "</a></strong>" + client_deleted_pill(x)
             + "</td><td>" + client + "</td><td>" + prog + "<span class='muted' style='font-size:var(--t-xs,12px)'>Next: " + nxt + "</span></td><td>" + str(n)
             + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
             + "</td><td class='right nowrap'><a class='btn small' href='" + u("/selections/edit") + "?id="
@@ -2546,6 +2546,15 @@ SEL_JS = r"""<script>
 </script>"""
 
 
+def client_deleted_pill(sel):
+    """"Deleted by client <date>" for a selection (or brief) its client deleted from their profile.
+    It is only hidden from them: HelloVoice keeps it, and restoring it from the archive gives it back."""
+    at = sel["deleted_at"] if "deleted_at" in sel.keys() else None
+    if not at:
+        return ""
+    return " <span class='pill warn' title='Hidden from the client. Take it out of the archive to restore it for them.'>Deleted by client " + e(ts(at)) + "</span>"
+
+
 def _brief_note(sel):
     """What the client asked for, when this selection came from the AI brief."""
     try:
@@ -2569,7 +2578,7 @@ def _brief_note(sel):
         notes = json.loads(row["answers"] or "{}").get("notes") or ""
     except ValueError:
         notes = ""
-    return ("<div class='note'><strong>Client brief.</strong> " + e(row["summary"] or "")
+    return ("<div class='note'><strong>Client brief.</strong>" + client_deleted_pill(row) + " " + e(row["summary"] or "")
             + ((" <span class='muted'>“" + e(notes) + "”</span>") if notes else "")
             + " <span class='muted'>" + ("Answered for this selection " if row["source"] == "selection" else "Built by the AI shortlist ")
             + e(ago(row["created_at"])) + ". Scores on this page use that objective and audience.</span>" + quote + "</div>")
@@ -2699,7 +2708,9 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
                     crumbs=[("Selections", u("/selections")), (sel["name"], None)],
                     actions=open_link("selection", sel["token"], "Open client link", "btn ghost")
                     + " <button type='button' class='btn lime' data-go-tab='st:share'>" + ui.icon("send", 16) + " Share</button>")
-        + note + _brief_note(sel) + stepper_html
+        + note + (("<div class='err'>" + client_deleted_pill(sel).strip() + " The client no longer sees this selection and its link does not open for them. "
+                   "Take it out of the archive to restore it.</div>") if client_deleted_pill(sel) else "")
+        + _brief_note(sel) + stepper_html
         + "<div data-tabs='st'>" + ui.tab_nav("st", [("creators", "Creators & prices", n_cr), ("fit", "Fit & tags", (sum(1 for v in verdicts_of.values() if v) or None)),
                                                     ("status", "Client status", (status_counts["approved"] or None)), ("details", "Details", None),
                                                     ("share", "Share", None), ("campaign", "Campaign", len(campaigns) or None)])
