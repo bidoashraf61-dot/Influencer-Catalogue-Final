@@ -2075,10 +2075,12 @@
     launch.innerHTML = '<span class="hv-launch__disc" aria-hidden="true"></span>' +
       '<span class="hv-launch__x" aria-hidden="true">' + V_ICON.close + "</span>" +
       '<span class="hv-launch__dot" aria-hidden="true" hidden></span>';
-    var face = HVH && !reduce ? HVH.video("idle", { cls: "hv-launch__vid" }) : h("img", { class: "hv-launch__vid hv-clip--still", src: HVH ? HVH.still : HV.helvy, alt: "", decoding: "async" });
+    // Helvy smiling and waving bye-bye on the lime disc: the "voice" loop (5 s, muted, looping); the lime still under reduced motion.
+    var face = HVH && !reduce ? HVH.video("loop", { set: "voice", cls: "hv-launch__vid", eager: true }) : h("img", { class: "hv-launch__vid hv-clip--still", src: HVH ? HVH.vstill : ROOT + "assets/brand/voice/voice-loop-poster.webp", alt: "", decoding: "async" });
     launch.insertBefore(face, launch.children[1]);
     var nudge = h("div", { class: "hv-nudge", role: "status", hidden: "" });
-    nudge.innerHTML = "<span><b>Need a hand?</b>Ask me to shortlist creators or check what your budget can reach.</span>";
+    var nudgeText = h("span", null);
+    nudge.appendChild(nudgeText);
     var nudgeX = h("button", { class: "hv-nudge__x", type: "button", "aria-label": "Dismiss" });
     nudgeX.innerHTML = V_ICON.close;
     nudge.appendChild(nudgeX);
@@ -3093,24 +3095,38 @@
       });
     }
 
-    /* -- the nudge: once per visit, after the client has had a look around -- */
-    var NUDGE = "hv-voice-nudged";
-    function hideNudge(forever) {
+    /* -- the page tip: a bubble from the launcher saying what Helvy can do on THIS page --
+       Once per page per visit (sessionStorage), after a short beat; auto-hides, dismissible.
+       Never prices or costs. Every page is a full load, so moving between pages brings the next tip. */
+    var TIPS = {
+      catalogue: ["Looking for creators?", "Tell me your goal and city and I'll shortlist the best fits."],
+      creator: ["Weighing this creator?", "I can explain the score and suggest similar creators."],
+      selection: ["Working on your selection?", "I can compare creators, add more like these or request a full analysis."],
+      campaign: ["Reading the report?", "Ask me what any number means and how the campaign is doing."],
+      account: ["Need a hand here?", "I can explain your credits, selections and campaigns."]
+    };
+    var tipKey = "hv-tip:" + page;
+    function hideNudge(remember) {
       nudge.classList.remove("is-in");
       setTimeout(function () { nudge.hidden = true; }, 200);
-      if (forever) { try { sessionStorage.setItem(NUDGE, "1"); } catch (e) { /* private */ } }
+      if (remember) { try { sessionStorage.setItem(tipKey, "1"); } catch (e) { /* private */ } }
     }
     nudge.addEventListener("click", function (e) { if (e.target.closest(".hv-nudge__x")) { hideNudge(true); return; } toggle(true); });
-    var nudged = false;
-    try { nudged = sessionStorage.getItem(NUDGE) === "1"; } catch (e) { /* private */ }
-    if (!nudged) {
+    var tip = TIPS[page], tipSeen = false;
+    try { tipSeen = sessionStorage.getItem(tipKey) === "1"; } catch (e) { /* private */ }
+    if (tip && !tipSeen) {
+      nudgeText.innerHTML = "<b></b>";
+      nudgeText.querySelector("b").textContent = tip[0];
+      nudgeText.appendChild(document.createTextNode(tip[1]));
       setTimeout(function () {
         if (root.classList.contains("is-open")) return;
         nudge.hidden = false;
         requestAnimationFrame(function () { nudge.classList.add("is-in"); launch.classList.add("is-waving"); });
         setTimeout(function () { launch.classList.remove("is-waving"); }, 1600);
-        setTimeout(function () { if (!root.classList.contains("is-open")) hideNudge(true); }, 9000);
-      }, 4500);
+        // The tip counts as seen once it has shown, so a quick page change does not repeat it.
+        try { sessionStorage.setItem(tipKey, "1"); } catch (e) { /* private */ }
+        setTimeout(function () { if (!root.classList.contains("is-open")) hideNudge(true); }, 8000);
+      }, 1800);
     }
   }
 

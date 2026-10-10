@@ -19,7 +19,7 @@ LOOK:        HelloVoice catalogue theme (DESIGN.md: ink / lime / linen, Bebas + 
 
 1. **Launcher.** The character sits in a round button at the bottom-right.
    - It is animated in code from a still cut-out: idle bob, an occasional head tilt and wave, and a speech
-     bubble ("Need a hand?") that pops out once per visit after a short delay.
+     bubble that pops out once per page per visit with a tip for that page (TIPS in portal.js).
    - On click it bounces and the chat panel springs open from the corner. Clicking again closes it.
    - Unread-dot when Voice has said something while closed.
    - Reduced motion: everything static.

@@ -417,7 +417,7 @@
     active: false, user: "Sara Haddad",
     install: function (win) {
       win.hvDemo = true;
-      var mem = { local: memStore({ "hv-chat-big": "0" }), session: memStore({ "hv_brief": "demo", "hv-voice-nudged": "1", "cx-offer-shown": "1", "cat-ok": "1" }) };
+      var mem = { local: memStore({ "hv-chat-big": "0" }), session: memStore({ "hv_brief": "demo", "hv-tip:catalogue": "1", "hv-tip:creator": "1", "hv-tip:selection": "1", "hv-tip:campaign": "1", "hv-tip:account": "1", "cx-offer-shown": "1", "cat-ok": "1" }) };
       try { Object.defineProperty(win, "localStorage", { configurable: true, get: function () { return mem.local; } }); } catch (e) { /* stays real: reads only */ }
       try { Object.defineProperty(win, "sessionStorage", { configurable: true, get: function () { return mem.session; } }); } catch (e) { /* idem */ }
       var jar = "cat-ok=1";
