@@ -168,20 +168,9 @@
     if (gate) gate.hidden = false;
   }
 
-  /* -- the roster kept for this tab, keyed by the server's ETag -- */
-  // sessionStorage only (this tab, gone when it closes), dropped on sign-out, on a 401 and
-  // an hour before the signed photo links in it expire.
+  /* -- the whole roster used to be kept for this tab (sessionStorage "hv-roster"); the page is
+     now served in batches, and an old copy is dropped on sight and on sign-out. -- */
   var RKEY = "hv-roster";
-  function keptRoster() {
-    try {
-      var k = JSON.parse(sessionStorage.getItem(RKEY) || "null");
-      if (!k || !k.tag || !k.text || !(k.exp > Date.now() / 1000 + 3600)) return null;
-      return k;
-    } catch (e) { return null; }
-  }
-  function keepRoster(tag, text, exp) {
-    try { if (tag && exp) sessionStorage.setItem(RKEY, JSON.stringify({ tag: tag, exp: exp, text: text })); } catch (e) { /* full or blocked */ }
-  }
   function dropRoster() { try { sessionStorage.removeItem(RKEY); } catch (e) { /* blocked */ } }
   window.hvRosterDrop = dropRoster;
 
@@ -283,7 +272,7 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ code: val, link: LINK })
+      body: JSON.stringify({ code: val, link: LINK, lite: true })
     })
       .then(function (r) { return r.json().then(function (b) { return { r: r, b: b }; }); })
       .then(function (res) {
@@ -291,11 +280,9 @@
           gateFail(REFUSALS[res.b && res.b.reason] || "That code is not right.");
           return;
         }
-        ROSTER = res.b.roster || [];
-        adoptTiers(res.b.tiers);
-        adoptFx(res.b.fx);
+        // The pass is set; the roster itself comes the same way as on any visit (bootApi).
         remember();
-        unlock();
+        bootApi(true);
       })
       .catch(function () {
         gateFail("Could not reach the server. Please try again.");
@@ -745,7 +732,10 @@
   // each a dropdown of checkboxes, plus a sort. OR within a dimension, AND
   // across them. Built from the cards themselves, so the selection page gets
   // options for exactly the creators in that selection.
-  function Controls(host, cards, onChange, extras) {
+  // `facets` (the catalogue served page by page): the options come from the server
+  // (/api/roster/facets, most common first) instead of from cards on the page, and
+  // filtering, sorting and grouping happen on the server; query() hands it the state.
+  function Controls(host, cards, onChange, extras, facets) {
     // followers: [] for no limit, else [min, max] with either end null.
     // The catalogue opens most-followed first (all platforms added up); a selection keeps
     // the order its link gives. "Recommended" is still there to pick.
@@ -767,6 +757,12 @@
 
     function tally(field) {
       var out = {};
+      if (facets) {
+        // Only the order matters to the bar (it shows no counts): first is most common.
+        var list = facets[field] || [];
+        list.forEach(function (v, i) { out[v] = list.length - i; });
+        return out;
+      }
       cards.forEach(function (c) {
         c["_" + field].forEach(function (v) { out[v] = (out[v] || 0) + 1; });
       });
@@ -1158,7 +1154,23 @@
           return 0;
         });
       },
-      sorted: function () { return !!state.sort; }
+      sorted: function () { return !!state.sort; },
+      // The catalogue's server mode: the state to send, and to put back on return.
+      query: function () {
+        return { tier: state.tier.slice(), platform: state.platform.slice(), place: state.place.slice(),
+                 interest: state.interest.slice(), followers: state.followers.slice(), sort: state.sort, q: state.q,
+                 text: (bar.querySelector(".cat-search__input") || {}).value || "" };
+      },
+      restore: function (st) {
+        ["tier", "platform", "place", "interest", "followers"].forEach(function (d) { if (st && Array.isArray(st[d])) state[d] = st[d].slice(); });
+        if (st && typeof st.sort === "string") state.sort = st.sort;
+        if (st && typeof st.q === "string") state.q = st.q;
+        var sbox = bar.querySelector(".cat-search__input");
+        if (sbox && st && typeof st.text === "string") sbox.value = st.text;
+        var sel = bar.querySelector(".cat-sort:not(.cat-group-by) .cat-sort__select");
+        if (sel) sel.value = state.sort;
+        sync();
+      }
     };
   }
 
@@ -1167,9 +1179,12 @@
   function initApp() {
     if (PAGE === "selection") { initSelection(); return; }
     var grid = $("cat-grid");
-    var cards = all(".cat-card");
+    // With the service behind the page the roster arrives in batches (FEED, from the loader at
+    // the bottom of this file); the static build still carries every card in its HTML.
+    var SERVER = !!(CFG.api && FEED);
+    var cards = SERVER ? [] : all(".cat-card");
     var host = document.querySelector(".cat-controls .cat-container");
-    var controls = host ? Controls(host, cards, apply) : null;
+    var controls = host ? Controls(host, cards, apply, null, SERVER ? FEED.facets : null) : null;
 
     /* -- group by: the roster split into sections by one parameter -- */
     var G_DIMS = [["", "None"], ["tier", "Creator size"], ["platform", "Platform"], ["country", "Country"], ["interest", "Interest"]];
@@ -1261,9 +1276,241 @@
       });
     }
 
+    /* -- the catalogue served page by page (fix batch 3, item 16) --
+       The page used to download the whole roster and filter, sort and group it here. Now the
+       server does that (admin/paging.py) and hands over 48 cards at a time: the next batch is
+       asked for as the reader nears the end of the grid. What is on screen is kept for this
+       tab (filters, group, picks, how far they scrolled), so coming back from a creator's
+       profile lands on the same card. */
+    var feed = { gen: 0, cursor: null, more: false, busy: false, n: 0, match: null, v: "", seen: {}, lastG: null, lastInner: null,
+                 pinned: null, waiters: [] };
+    var EXTRA = { lic: [], disc: null, dplat: null };
+    var VIEW = "hv-cat-view", VIEW_TTL = 30 * 60 * 1000;
+    function feedParams() {
+      var st = controls ? controls.query() : { tier: [], platform: [], place: [], interest: [], followers: [], sort: "followers-desc", q: "" };
+      var p = new URLSearchParams();
+      p.set("link", LINK);
+      ["tier", "platform", "place", "interest"].forEach(function (d) { st[d].forEach(function (v) { p.append(d, v); }); });
+      if (st.q) p.set("q", st.q);
+      if (st.followers[0]) p.set("fmin", st.followers[0]);
+      if (st.followers[1]) p.set("fmax", st.followers[1]);
+      p.set("sort", st.sort || "");
+      if (gBy) p.set("group", gBy);
+      EXTRA.lic.forEach(function (v) { p.append("lic", v); });
+      if (EXTRA.disc) { p.set("disc", JSON.stringify(EXTRA.disc)); if (EXTRA.dplat) p.set("dplat", EXTRA.dplat); }
+      return p;
+    }
+    function feedGet(path, p) {
+      return fetch(CFG.api + path + "?" + p.toString(), { credentials: "include" }).then(function (r) {
+        // The pass ended (12 hours, a revoked code): back to the gate, as /api/roster did.
+        if (r.status === 401 || r.status === 403) { forget(); try { sessionStorage.removeItem(VIEW); } catch (e) { /* blocked */ } location.reload(); return null; }
+        return r.ok ? r.json() : null;
+      });
+    }
+    // "Loading more": Helvy flipping through cards, and a row of skeleton cards, under the grid.
+    var moreRow = document.createElement("div");
+    moreRow.className = "cat-more";
+    moreRow.hidden = true;
+    moreRow.setAttribute("role", "status");
+    moreRow.innerHTML = '<div class="cat-more__bar"><span class="cat-more__helvy" aria-hidden="true"></span>' +
+      '<p class="cat-more__txt">Loading more creators</p></div><div class="cat-grid cat-more__skel" aria-hidden="true">' + skeletons(4) + "</div>";
+    var sentinel = document.createElement("div");
+    sentinel.className = "cat-sentinel";
+    sentinel.setAttribute("aria-hidden", "true");
+    function mountMore() {
+      if (!grid || moreRow.parentNode) return;
+      grid.parentNode.insertBefore(moreRow, grid.nextSibling);
+      grid.parentNode.insertBefore(sentinel, moreRow);
+      var slot = moreRow.querySelector(".cat-more__helvy");
+      if (window.HVHelvy && window.HVHelvy.video) slot.appendChild(window.HVHelvy.video("cards", { cls: "cat-more__clip" }));
+      else slot.innerHTML = '<span class="cat-more__dot"></span>';
+    }
+    function settleWaiters() { var w = feed.waiters; feed.waiters = []; w.forEach(function (fn) { try { fn(); } catch (e) { /* a listener */ } }); }
+    function paintItems(items) {
+      var html = [], target = grid, flush = function () {
+        if (html.length) target.insertAdjacentHTML("beforeend", html.join(""));
+        html = [];
+      };
+      items.forEach(function (c) {
+        if (gBy && c.g !== feed.lastG) {
+          flush();
+          feed.lastG = c.g;
+          var sec = document.createElement("section");
+          sec.className = "cat-group";
+          var flag = gBy === "country" && c.g !== G_NONE.country ? flagOf(c.g) : "";
+          var mark = gBy === "platform" && ICONS[c.g] ? '<span class="cat-places__mark ' + (BRAND[c.g] || "") + '">' + ICONS[c.g] + "</span>" : "";
+          sec.innerHTML = '<header class="cat-group__head">' + flag + mark + '<h2 class="cat-group__name">' + esc(c.g) + "</h2></header>";
+          var inner = document.createElement("div");
+          inner.className = "cat-grid cat-group__grid";
+          sec.appendChild(inner);
+          grid.appendChild(sec);
+          feed.lastInner = inner;
+        }
+        if (gBy) target = feed.lastInner;
+        var markup = cardMarkup(c, feed.n++);
+        // A creator in two groups shows in both: the second is a copy; any click on either picks the creator.
+        if (feed.seen[c.code]) markup = markup.replace('class="cat-card"', 'class="cat-card cat-card--copy"');
+        feed.seen[c.code] = 1;
+        if (selected.indexOf(c.code) !== -1) markup = markup.replace('aria-pressed="false"', 'aria-pressed="true"');
+        html.push(markup);
+      });
+      flush();
+    }
+    function feedTake(b, gen) {
+      if (gen !== feed.gen || !b) return false;
+      feed.cursor = b.cursor || null;
+      feed.more = !!b.has_more;
+      feed.v = b.v || feed.v;
+      paintItems(b.items || []);
+      return true;
+    }
+    function feedReset(first, opts) {
+      opts = opts || {};
+      var gen = ++feed.gen;
+      feed.pinned = null;
+      feed.cursor = null; feed.more = false; feed.busy = true; feed.n = 0; feed.seen = {}; feed.lastG = null; feed.lastInner = null;
+      grid.classList.toggle("is-grouped", !!gBy);
+      var draw = function (b) {
+        if (gen !== feed.gen) return;
+        feed.busy = false;
+        moreRow.hidden = true;
+        if (!b || !b.ok) { feed.match = null; settleWaiters(); return; }
+        grid.innerHTML = "";
+        feed.match = b.match != null ? b.match : null;
+        feedTake(b, gen);
+        $("cat-empty").hidden = !!(b.items && b.items.length);
+        if (opts.then) opts.then();
+        settleWaiters();
+        watchEnd();
+      };
+      if (first) { draw(first); return; }
+      // The old cards stay until the new ones arrive (no flash); the grid dims meanwhile.
+      grid.classList.add("is-loading");
+      var p = feedParams();
+      if (opts.limit) p.set("limit", opts.limit);
+      feedGet("/api/roster/page", p).then(function (b) { if (gen === feed.gen) grid.classList.remove("is-loading"); draw(b); })
+        .catch(function () { if (gen === feed.gen) { grid.classList.remove("is-loading"); feed.busy = false; settleWaiters(); } });
+    }
+    function feedMore() {
+      if (feed.busy || !feed.more || !feed.cursor || feed.pinned) return;
+      var gen = feed.gen;
+      feed.busy = true;
+      moreRow.hidden = false;
+      var p = feedParams();
+      p.set("cursor", feed.cursor);
+      feedGet("/api/roster/page", p).then(function (b) {
+        if (gen !== feed.gen) return;
+        feed.busy = false;
+        moreRow.hidden = true;
+        if (b && b.ok) { feedTake(b, gen); watchEnd(); }
+      }).catch(function () { if (gen === feed.gen) { feed.busy = false; moreRow.hidden = true; } });
+    }
+    // The next batch is asked for about two screens before the end, so a steady scroll never waits.
+    var endWatch = null;
+    function watchEnd() {
+      mountMore();
+      if (!("IntersectionObserver" in window)) {
+        if (!endWatch) { endWatch = true; window.addEventListener("scroll", function () { if (sentinel.getBoundingClientRect().top < window.innerHeight * 3) feedMore(); }, { passive: true }); }
+        return;
+      }
+      if (!endWatch) endWatch = new IntersectionObserver(function (en) { if (en[0].isIntersecting) feedMore(); }, { rootMargin: "0px 0px 1600px 0px" });
+      // Observe afresh: still in view after a batch landed means "load the next one too".
+      endWatch.unobserve(sentinel); endWatch.observe(sentinel);
+    }
+    var feedTimer = null;
+    function feedApply() {
+      if (!SERVER) return;
+      clearTimeout(feedTimer);
+      // Typing in the search box waits for a pause; a click on a filter goes at once.
+      var typing = document.activeElement && document.activeElement.classList && document.activeElement.classList.contains("cat-search__input");
+      feedTimer = setTimeout(function () { feedTimer = null; feedReset(null); }, typing ? 220 : 0);
+    }
+    /* -- where the reader was, kept for this tab -- */
+    // The first card on screen and how far it sits from the top: the page above the grid can
+    // change height between visits (the AI card, the licence row), a card cannot move.
+    function viewAnchor() {
+      var list = grid.querySelectorAll(".cat-card");
+      for (var i = 0; i < list.length; i++) {
+        var r = list[i].getBoundingClientRect();
+        if (r.bottom > 80) return { code: list[i].dataset.code, copy: list[i].classList.contains("cat-card--copy"), top: Math.round(r.top) };
+      }
+      return null;
+    }
+    function viewSave() {
+      if (!SERVER || feed.pinned) return;
+      try {
+        sessionStorage.setItem(VIEW, JSON.stringify({ t: Date.now(), q: controls ? controls.query() : null, g: gBy, x: EXTRA,
+          n: feed.n, y: Math.round(window.scrollY), a: window.scrollY > 200 ? viewAnchor() : null,
+          sel: selected, name: selectionName, tok: CARRIED_TOKEN }));
+      } catch (e) { /* full or blocked */ }
+    }
+    function viewGo(k) {
+      var go = function () {
+        var el = k.a && grid.querySelector('.cat-card' + (k.a.copy ? ".cat-card--copy" : ":not(.cat-card--copy)") + '[data-code="' + String(k.a.code).replace(/"/g, "") + '"]');
+        if (el) window.scrollTo(0, Math.max(0, window.scrollY + el.getBoundingClientRect().top - k.a.top));
+        else window.scrollTo(0, k.y || 0);
+      };
+      requestAnimationFrame(go);
+      // Once more after the parts above the grid have settled, unless the reader has moved since.
+      var at = null;
+      setTimeout(function () { at = window.scrollY; }, 60);
+      setTimeout(function () { if (at === null || Math.abs(window.scrollY - at) < 4) go(); }, 900);
+    }
+    function viewKept() {
+      try {
+        var k = JSON.parse(sessionStorage.getItem(VIEW) || "null");
+        return k && Date.now() - k.t < VIEW_TTL ? k : null;
+      } catch (e) { return null; }
+    }
+    if (SERVER) {
+      // pagehide, not unload: the page stays eligible for the back/forward cache, which brings
+      // it back exactly as it was without asking the server for anything.
+      window.addEventListener("pagehide", viewSave);
+      document.addEventListener("visibilitychange", function () { if (document.visibilityState === "hidden") viewSave(); });
+      document.addEventListener("click", function (e) { if (e.target.closest && e.target.closest("a[href]")) viewSave(); }, true);
+      try { if ("scrollRestoration" in history) history.scrollRestoration = "manual"; } catch (e) { /* old browser */ }
+    }
+    function cardsByCode(codes) {
+      if (!codes.length) return Promise.resolve([]);
+      var p = new URLSearchParams();
+      p.set("link", LINK);
+      p.set("codes", codes.slice(0, 200).join(","));
+      return feedGet("/api/roster/cards", p).then(function (b) { return (b && b.ok && b.cards) || []; });
+    }
+    // portal.js reaches the server-side feed through this: the licence chips, the AI shortlist
+    // (which shows only its picks, fetched by code), the assistant's "show me" and its counts.
+    if (SERVER) window.hvCatalogue = {
+      server: true,
+      filter: function (key, value) { EXTRA[key] = value; feedApply(); },
+      get: function (key) { return EXTRA[key]; },
+      matched: function () { return feed.match; },
+      loaded: function () { return feed.n; },
+      settled: function () { return new Promise(function (ok) { if (!feed.busy && !feedTimer) ok(); else feed.waiters.push(ok); }); },
+      cards: cardsByCode,
+      pin: function (codes) {
+        var gen = ++feed.gen;
+        feed.busy = true;
+        return cardsByCode(codes).then(function (list) {
+          if (gen !== feed.gen) return [];
+          feed.busy = false; feed.pinned = codes.slice(); feed.more = false; feed.cursor = null;
+          feed.n = 0; feed.seen = {}; feed.lastG = null; feed.lastInner = null;
+          grid.classList.remove("is-grouped");
+          grid.innerHTML = "";
+          var keep = gBy; gBy = ""; paintItems(list); gBy = keep;
+          feed.match = list.length;
+          moreRow.hidden = true;
+          $("cat-empty").hidden = list.length > 0;
+          settleWaiters();
+          return list.map(function (c) { return c.code; });
+        });
+      },
+      unpin: function () { if (feed.pinned) feedReset(null); }
+    };
+
     /* -- filtering and sorting -- */
 
     function apply() {
+      if (SERVER) { feedApply(); return; }
       var shown = 0;
       cards.forEach(function (card) {
         var ok = !controls || controls.matches(card);
@@ -1309,7 +1556,7 @@
       var i = selected.indexOf(code);
       if (i === -1) selected.push(code); else selected.splice(i, 1);
       card.setAttribute("aria-pressed", i === -1 ? "true" : "false");
-      all('.cat-card--copy[data-code="' + code + '"]').forEach(function (cp) { cp.setAttribute("aria-pressed", i === -1 ? "true" : "false"); });
+      all('.cat-card[data-code="' + code.replace(/"/g, "") + '"]').forEach(function (cp) { cp.setAttribute("aria-pressed", i === -1 ? "true" : "false"); });
       renderTray();
 
       // Only additions are recorded, and only the code. It answers "which
@@ -1335,10 +1582,22 @@
         if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(card); }
       });
     });
+    // Batches keep arriving, so the grid listens once for every card in it, now and later.
+    if (SERVER) {
+      grid.addEventListener("click", function (e) {
+        var card = e.target.closest && e.target.closest(".cat-card");
+        if (!card || (e.target.closest("[data-noselect]"))) return;
+        toggle(card);
+      });
+      grid.addEventListener("keydown", function (e) {
+        var card = e.target.classList && e.target.classList.contains("cat-card") ? e.target : null;
+        if (card && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(card); }
+      });
+    }
 
     $("cat-clear").addEventListener("click", function () {
       selected = [];
-      cards.concat(all(".cat-card--copy")).forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
+      all(".cat-card").forEach(function (c) { c.setAttribute("aria-pressed", "false"); });
       renderTray();
     });
 
@@ -1420,7 +1679,15 @@
     // which ones are already in it, so the catalogue opens with them picked
     // and saving again updates that same shortlist.
     function carryIn(codes, name, token) {
-      selected = codes.filter(function (c) { return !!byCode(c); });
+      // Served page by page, most of the shortlist is not on screen yet: keep the codes, and
+      // let the server drop any creator who has left the roster since.
+      selected = SERVER ? codes.slice() : codes.filter(function (c) { return !!byCode(c); });
+      if (SERVER) cardsByCode(codes).then(function (list) {
+        var on = {};
+        list.forEach(function (c) { on[c.code] = 1; });
+        selected = selected.filter(function (c) { return on[c]; });
+        renderTray();
+      });
       selectionName = name || "";
       CARRIED_TOKEN = token || "";
       selected.forEach(function (c) {
@@ -1436,6 +1703,24 @@
     }
 
     var back = readFragment();
+    // Back on the catalogue in this tab (from a creator's page, a refresh): the same filters,
+    // group, picks and batches, then the same scroll position.
+    var kept = SERVER && !back.codes.length && !back.token ? viewKept() : null;
+    var plain = SERVER ? feedParams().toString() : "";
+    if (kept) {
+      if (controls && kept.q) controls.restore(kept.q);
+      if (kept.x) { EXTRA.lic = kept.x.lic || []; EXTRA.disc = kept.x.disc || null; EXTRA.dplat = kept.x.dplat || null; }
+      if (kept.g !== undefined && kept.g !== gBy) {
+        gBy = kept.g || "";
+        var gSel = document.querySelector(".cat-group-by select");
+        if (gSel) gSel.value = gBy;
+      }
+      selected = (kept.sel || []).slice();
+      selectionName = kept.name || "";
+      CARRIED_TOKEN = kept.tok || "";
+      var nf = $("cat-save-form") && $("cat-save-form").querySelector("[name=selname]");
+      if (nf && selectionName) nf.value = selectionName;
+    }
     if (back.codes.length) {
       carryIn(back.codes, back.name, back.token);
     } else if (back.token && CFG.api) {
@@ -1448,13 +1733,18 @@
         .then(function (b) {
           if (!b || !b.ok) return;
           carryIn(b.codes || [], b.name, b.token || back.token);
-          apply();
+          if (SERVER) all(".cat-card").forEach(function (c) { c.setAttribute("aria-pressed", selected.indexOf(c.dataset.code) !== -1 ? "true" : "false"); });
+          else apply();
           renderTray();
         })
         .catch(function () { /* the catalogue still works, just unpicked */ });
     }
 
-    apply();
+    if (!SERVER) apply();
+    else if (kept && (kept.n > FIRST || kept.y > 0 || feedParams().toString() !== plain)) {
+      // Every batch they had, in one request (the server allows up to ten), then their place.
+      feedReset(null, { limit: Math.min(480, Math.max(FIRST, kept.n || 0)), then: function () { viewGo(kept); } });
+    } else feedReset(FEED.key === feedParams().toString() ? FEED.first : null);
     renderTray();
   }
 
@@ -1845,12 +2135,22 @@
                         needsObjective: !!b.needs_objective };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
-          startSelection();
+          withCards(startSelection);
         })
-        .catch(startSelection);
+        .catch(function () { withCards(startSelection); });
       return;
     }
-    startSelection();
+    withCards(startSelection);
+  }
+  // The selection's creators the page does not hold yet (a link that is only a token names
+  // none of them up front): fetched by code, then the page starts.
+  function withCards(then) {
+    var want = readFragment().codes.concat((CURATED && CURATED.codes) || []);
+    var have = {};
+    all(".cat-card").forEach(function (c) { have[c.dataset.code] = 1; });
+    var miss = want.filter(function (c, i) { return !have[c] && want.indexOf(c) === i; });
+    if (!CFG.api || !miss.length) { then(); return; }
+    fetchCards(miss).then(function (list) { addCards(list); then(); }, function () { then(); });
   }
 
   function startSelection() {
@@ -2793,11 +3093,18 @@
         var nm = c.querySelector(".cat-card__name");
         return { code: code, name: nm ? nm.textContent.trim() : code, tier: c.dataset.tier || "", doctor: isDoctor(code) };
       },
+      // Creators the page does not hold yet are fetched by code first (the page holds only
+      // the selection's own cards); the answer is how many were taken in.
       add: function (codes) {
-        var n = 0;
-        (codes || []).forEach(function (c) { if (byCode[c] && selected.indexOf(c) === -1) { selected.push(c); n++; } });
-        if (n) { render(); saveShortlist(); }
-        return n;
+        var want = (codes || []).filter(function (c, i, a) { return c && selected.indexOf(c) === -1 && a.indexOf(c) === i; });
+        if (!want.length) return 0;
+        withCodes(want, function () {
+          var n = 0;
+          want.forEach(function (c) { if (byCode[c] && selected.indexOf(c) === -1) { selected.push(c); n++; } });
+          if (n) { render(); saveShortlist(); }
+          if (n < want.length) stToast(want.length - n === 1 ? "One creator isn't in the catalogue right now." : (want.length - n) + " creators aren't in the catalogue right now.");
+        });
+        return want.length;
       },
       toast: function (t) { stToast(t); },
       rerender: function () { render(); },
@@ -2848,11 +3155,13 @@
         });
       } else if (t.hasAttribute("data-st-add")) {
         var add = t.getAttribute("data-st-add");
-        if (byCode[add] && selected.indexOf(add) === -1) {
-          selected.push(add);
-          render(); saveShortlist();
-          stToast("Added to this selection, under review.");
-        } else if (!byCode[add]) stToast("That creator isn't in the catalogue right now.");
+        withCodes([add], function () {
+          if (byCode[add] && selected.indexOf(add) === -1) {
+            selected.push(add);
+            render(); saveShortlist();
+            stToast("Added to this selection, under review.");
+          } else if (!byCode[add]) stToast("That creator isn't in the catalogue right now.");
+        });
       }
     }, true);
     // The saved reason reads on hover or focus of the "?"; the card itself stays compact.
@@ -2942,6 +3251,16 @@
     // roster card in the grid, hidden, and every render (each Approve, Reject, tag, add) walked,
     // restyled and re-appended all ~2,000 of them: 150-190 ms of main-thread work per click on a
     // fast laptop. Cards outside the selection now wait off the page until they are added.
+    // A creator's card, fetched by code when the page does not hold it (an add from a replacement,
+    // "Creators like this", "Add more like these"): it joins `cards` and `byCode` like the others.
+    function withCodes(codes, then) {
+      var miss = codes.filter(function (c) { return !byCode[c]; });
+      if (!miss.length || !CFG.api) { then(); return; }
+      fetchCards(miss).then(function (list) {
+        addCards(list).forEach(function (el) { cards.push(el); byCode[el.dataset.code] = el; });
+        then();
+      }, function () { then(); });
+    }
     function selCards() { return selected.map(function (code) { return byCode[code]; }).filter(Boolean); }
     function render() {
       var grid = $("cat-grid");
@@ -3131,6 +3450,93 @@
     if (window.hvLoader) window.hvLoader.done();
   }
 
+  /* ------------------------------------------- the roster, from the service */
+
+  // Fix batch 3, item 16: the page never downloads the whole roster any more. The catalogue
+  // asks for its filter options and its first 48 cards (admin/paging.py does the filtering,
+  // sorting and grouping); the selection page asks only for its own creators, by code. Either
+  // answer is also the "is this browser in?" check /api/roster used to be.
+  var FEED = null;
+  function firstParams() {
+    var p = new URLSearchParams(), g = "";
+    p.set("link", LINK);
+    p.set("sort", "followers-desc");
+    try { g = sessionStorage.getItem("hv-group:catalogue") || ""; } catch (e) { /* blocked */ }
+    if (g) p.set("group", g);
+    return p;
+  }
+  function viewWaiting() {
+    try { var k = JSON.parse(sessionStorage.getItem("hv-cat-view") || "null"); return !!(k && Date.now() - k.t < 30 * 60 * 1000); } catch (e) { return false; }
+  }
+  function apiJson(path, p) {
+    return fetch(CFG.api + path + "?" + p.toString(), { credentials: "include" })
+      .then(function (r) { return r.ok ? r.json() : { ok: false, status: r.status }; });
+  }
+  // The named creators that are on the roster, in that order (at most 200 a call).
+  function fetchCards(codes) {
+    var list = (codes || []).filter(Boolean), out = [], calls = [];
+    for (var i = 0; i < list.length; i += 200) {
+      var p = new URLSearchParams();
+      p.set("link", LINK);
+      p.set("codes", list.slice(i, i + 200).join(","));
+      calls.push(apiJson("/api/roster/cards", p));
+    }
+    return Promise.all(calls).then(function (all_) {
+      all_.forEach(function (b) { if (b && b.ok) out = out.concat(b.cards || []); });
+      return out;
+    });
+  }
+  // Cards fetched by code, added to the selection page's grid (hidden: render() shows them).
+  function addCards(list) {
+    var grid = $("cat-grid"), have = {}, made = [];
+    if (!grid) return made;
+    all(".cat-card", grid).forEach(function (c) { have[c.dataset.code] = 1; });
+    var html = list.filter(function (c) { return !have[c.code] && (have[c.code] = 1); })
+      .map(function (c, i) { return cardMarkup(c, i).replace("<article ", "<article hidden "); }).join("");
+    var box = document.createElement("div");
+    box.innerHTML = html;
+    while (box.firstChild) { made.push(box.firstChild); grid.appendChild(box.firstChild); }
+    return made;
+  }
+  function bootApi(fromGate) {
+    var settle = function () { document.body.classList.remove("cat-checking"); };
+    var refused = function () { settle(); forget(); if (!fromGate) hideShell(); };
+    dropRoster();
+    if (!fromGate) {
+      // A browser that has been in before sees the page shell at once; a new one sees nothing
+      // until the server answers (never the gate flashing up).
+      if (wasUnlocked || viewWaiting()) showShell(); else document.body.classList.add("cat-checking");
+    }
+    if (PAGE === "catalogue") {
+      var fp = firstParams(), lp = new URLSearchParams();
+      lp.set("link", LINK);
+      // Back on this tab with a view kept: its own batches load in initApp, so only the options
+      // (and the pass check that comes with them) are asked for here.
+      var skipFirst = viewWaiting() && !/[#&](c|s)=/.test(location.hash || "");
+      if (skipFirst) fp.set("limit", "1");
+      Promise.all([apiJson("/api/roster/page", fp), apiJson("/api/roster/facets", lp)]).then(function (res) {
+        settle();
+        var a = res[0], f = res[1];
+        if (!a || !a.ok || !f || !f.ok) { refused(); return; }
+        if (skipFirst) fp.delete("limit");
+        FEED = { first: skipFirst ? null : a, key: skipFirst ? "" : fp.toString(), facets: f.facets || {} };
+        adoptTiers(a.tiers); adoptFx(a.fx); remember(); unlock();
+      }).catch(function () { settle(); if (!fromGate) hideShell(); });
+      return;
+    }
+    // The selection page: the creators its link names now; the rest of the selection (a link that
+    // is only a token) once /api/selection has answered (initSelection).
+    var lp2 = new URLSearchParams();
+    lp2.set("link", LINK);
+    lp2.set("codes", readFragment().codes.slice(0, 200).join(","));
+    apiJson("/api/roster/cards", lp2).then(function (b) {
+      settle();
+      if (!b || !b.ok) { refused(); return; }
+      ROSTER = b.cards || [];
+      adoptTiers(b.tiers); adoptFx(b.fx); remember(); unlock();
+    }).catch(function () { settle(); if (!fromGate) hideShell(); });
+  }
+
   /* --------------------------------------------------------- deterrence */
 
   ["contextmenu", "dragstart", "selectstart", "copy", "cut"].forEach(function (evt) {
@@ -3175,43 +3581,7 @@
     //
     // While asking, the gate form is hidden (cat-checking), so nobody sees
     // an access-code screen flash up on every page change.
-    var settle = function () { document.body.classList.remove("cat-checking"); };
-    var kept = keptRoster();
-    var adopt = function (b) { ROSTER = b.roster || []; adoptTiers(b.tiers); adoptFx(b.fx); remember(); unlock(); };
-    if (kept || wasUnlocked) showShell(); else document.body.classList.add("cat-checking");
-    if (kept) {
-      // Instant: this tab already holds the roster. Then ask the server, cheaply (an empty
-      // 304 when nothing changed); a refusal brings the gate back.
-      var b0 = null;
-      try { b0 = JSON.parse(kept.text); } catch (e) { dropRoster(); }
-      if (b0 && b0.ok) adopt(b0);
-      fetch(CFG.api + "/api/roster?link=" + encodeURIComponent(LINK), { credentials: "include", cache: "no-store", headers: { "If-None-Match": kept.tag } })
-        .then(function (r) {
-          if (r.status === 304) return;
-          if (r.status === 401 || r.status === 403) { dropRoster(); forget(); location.reload(); return; }
-          if (!r.ok) return;
-          var tag = r.headers.get("ETag");
-          return r.text().then(function (t) {
-            var b = JSON.parse(t);
-            keepRoster(tag, t, b.exp);
-            if (!b0 || !b0.ok) adopt(b);       // the kept copy was unreadable: use the fresh one now
-          });
-        })
-        .catch(function () { /* offline: the kept roster stays on screen */ });
-    } else {
-      fetch(CFG.api + "/api/roster?link=" + encodeURIComponent(LINK), { credentials: "include" })
-        .then(function (r) {
-          if (!r.ok) return null;
-          var tag = r.headers.get("ETag");
-          return r.text().then(function (t) { var b = JSON.parse(t); if (b && b.ok) keepRoster(tag, t, b.exp); return b; });
-        })
-        .then(function (b) {
-          settle();
-          if (b && b.ok) adopt(b);
-          else { forget(); dropRoster(); hideShell(); }
-        })
-        .catch(function () { settle(); hideShell(); });
-    }
+    bootApi(false);
   } else if (wasUnlocked) {
     unlock();
   }
@@ -3346,6 +3716,16 @@
 (function () {
   function fmt(n) { return Number(n).toLocaleString("en-US"); }
   function count(grid, num, of, lab) {
+    var paged = window.hvCatalogue && window.hvCatalogue.server;
+    if (paged) {
+      // Served in batches: the server says how many match, and only while a filter or a search is on.
+      var m = window.hvCatalogue.matched();
+      num.parentNode.hidden = m == null;
+      num.textContent = fmt(m || 0);
+      of.textContent = ""; of.hidden = true;
+      lab.textContent = m === 1 ? "creator matches" : "creators match";
+      return;
+    }
     // What is actually on screen: the catalogue's own filters hide cards with
     // [hidden], the licence filter and the AI shortlist with classes.
     // Read from classes, not getComputedStyle: 2,000+ style reads on every grid change was a

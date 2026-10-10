@@ -351,6 +351,25 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 .cat-skel { animation: cat-skel 1.3s ease-in-out infinite; }
 @keyframes cat-skel { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .cat-skel { animation: none; } }
+/* The roster in batches (fix batch 3): the next 48 load as the reader nears the end. While
+   they come, Helvy flips through cards above a row of skeleton cards; a filter change dims
+   the cards on screen until the new ones arrive. */
+.cat-grid.is-loading { opacity: .45; transition: opacity .18s ease .12s; pointer-events: none; }
+.cat-sentinel { height: 1px; }
+.cat-more { margin-top: 28px; }
+.cat-more[hidden] { display: none; }
+.cat-more__bar { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 0 auto 22px; }
+.cat-more__helvy { position: relative; width: 76px; height: 76px; flex: none; }
+.cat-more__helvy .hv-clip { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.cat-more__dot { position: absolute; inset: 26px; border-radius: 50%; background: var(--lime); animation: cat-skel 1.3s ease-in-out infinite; }
+.cat-more__txt { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ink); }
+.cat-more__txt::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: cat-more-dots 1.2s steps(4, end) infinite; }
+@keyframes cat-more-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+@media (prefers-reduced-motion: reduce) { .cat-more__txt::after, .cat-more__dot { animation: none; } .cat-grid.is-loading { transition: none; } }
+@media screen and (max-width: 767px) {
+  .cat-more__skel .cat-skel:nth-child(n+2) { display: none; }
+  .cat-more__helvy { width: 60px; height: 60px; }
+}
 /* Every photo fills the whole square, small sources included. Drawing a small
    one at its own pixel size left most of the frame empty, which read worse
    than a soft photo (client feedback 2026-10-06). The fix for a small source

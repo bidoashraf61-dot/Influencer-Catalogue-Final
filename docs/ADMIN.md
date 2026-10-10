@@ -519,12 +519,24 @@ What changes:
 passcode in the page, FormSubmit. Both modes are tested; the static one is what
 ships until the service is running.
 
-### One thing this does not solve
+### The roster in batches (fix batch 3, 2026-10)
 
-A selection link still hands over the whole roster. `/api/roster` returns
-everything and the page hides what the link does not name, so a client who
-opens a three-creator shortlist has received all 161 over the wire. Narrowing
-that means scoping a code to a set of creators — worth doing, not done.
+The page no longer downloads the whole roster. `admin/paging.py` keeps an
+in-memory index of the roster cards, rebuilt only when the roster version
+changes (the same version `/api/roster`'s ETag follows), and answers:
+
+- `GET /api/roster/page?link=&q=&tier=&platform=&place=&interest=&fmin=&fmax=&lic=&disc=&dplat=&sort=&group=&cursor=&limit=`
+  — 48 cards, `has_more` and a `cursor`; search, every filter, sort and
+  group-by run on the server. A `match` count only while a filter or a search
+  is on; never the roster's size. The first batch also carries tiers and rates.
+- `GET /api/roster/facets?link=` — the filter options, most common first, no counts.
+- `GET /api/roster/cards?link=&codes=A,B` — named creators (max 200): the
+  selection page loads only its own creators, and the AI shortlist and "add"
+  flows fetch theirs by code.
+
+All three are gated exactly like `/api/roster` (which still answers, for pages
+cached before the change). A selection link now hands over only its own
+creators. **Deploying the admin code must include the new `admin/paging.py`.**
 
 ### Deploy order matters
 
