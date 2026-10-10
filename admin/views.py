@@ -2422,11 +2422,15 @@ def selection_fit_panel(sel, creators, scores=None, interests=()):
             "Nothing is shown to the client until you save.</span></div>"
             "<div class='card' style='background:#f7f5f0;margin:0 0 14px'><strong>Who this selection is for</strong>"
             "<div class='price-hint' style='margin:4px 0 8px'>The matching score on every card is measured against this and the objective above.</div>"
-            "<div class='row'><div><label>Target country</label><select name='t_country' id='t-country'>" + "".join(
+            "<div class='row'><div><label>Target country</label><select name='t_country' id='t-country'>"
+                + ("<option value='" + e(target_now["country"]) + "' selected>" + e(_fit.country_names(target_now["country"])) + "</option>"
+                   if "|" in str(target_now["country"]) else "") + "".join(
                 "<option value='" + k_ + "'" + (" selected" if k_ == target_now["country"] else "") + ">" + e(n_) + "</option>" for k_, n_ in _fit.COUNTRIES) + "</select></div>"
             "<div><label>Audience gender</label><select name='t_gender' id='t-gender'>" + "".join(
                 "<option" + (" selected" if g_ == target_now["gender"] else "") + ">" + g_ + "</option>" for g_ in _fit.GENDERS) + "</select></div>"
-            "<div><label>Audience age</label><select name='t_age' id='t-age'><option>Any</option>" + "".join(
+            "<div><label>Audience age</label><select name='t_age' id='t-age'><option>Any</option>"
+                + ("<option value='" + e(target_now["age"]) + "' selected>" + e(_fit.age_text(target_now["age"])) + "</option>"
+                   if "|" in str(target_now["age"]) else "") + "".join(
                 "<option" + (" selected" if a_ == target_now["age"] else "") + ">" + a_ + "</option>" for a_ in _fit.AGE_BANDS) + "</select></div>"
             "<div style='flex:3'><label>Product categories (tick all that apply)</label><div class='vd-roles' id='t-category'>" + "".join(
                 "<label class='vd-role'><input type='checkbox' name='t_category' value=\"" + e(i_) + "\""

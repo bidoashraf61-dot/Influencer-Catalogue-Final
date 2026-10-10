@@ -237,8 +237,44 @@ def _clamp(x):
     return max(0.0, min(1.0, x))
 
 
+def target_list(v):
+    """The values of a target field that may hold several ("SA|AE", "18-24|25-34", or a list) as
+    a list. "Any", empty and None give []. One value is a list of one: old selections hold one."""
+    parts = v if isinstance(v, (list, tuple)) else str(v or "").split("|")
+    out = [str(p).strip() for p in parts if str(p).strip() and str(p).strip().lower() != "any"]
+    return list(dict.fromkeys(out))
+
+
+def one_gender(v):
+    """The audience gender as one value: "Women" and "Men" together mean everyone."""
+    g = target_list(v)
+    return g[0] if len(g) == 1 and g[0] in ("Women", "Men") else "Any"
+
+
+def _join_words(names):
+    names = list(names)
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1] if names else ""
+
+
+def country_names(v):
+    """"Saudi Arabia and UAE" for "SA|AE"."""
+    return _join_words([dict(COUNTRIES).get(c, c) for c in target_list(v)] or [dict(COUNTRIES).get(DEFAULT_TARGET["country"])])
+
+
+def age_text(v):
+    """"18-24 and 25-34" for "18-24|25-34"."""
+    return _join_words(target_list(v))
+
+
+def age_need(n):
+    """The share of the audience that counts as a full match for ``n`` age bands: 40% for one band,
+    20 points more for each extra band (a wider age range holds more of the audience), up to 80%."""
+    return 40.0 if n <= 1 else min(40.0 + 20.0 * (n - 1), 80.0)
+
+
 def _age_share(ages, wanted):
-    """Share of the audience in an age band, adding up the report's bands that overlap it."""
+    """Share of the audience in the wanted age band(s), adding up the report's bands that overlap
+    any of them (each report band counted once)."""
     def span(name):
         n = str(name).replace("+", "-99")
         lo, _, hi = n.partition("-")
@@ -246,13 +282,13 @@ def _age_share(ages, wanted):
             return int(lo), int(hi or lo)
         except ValueError:
             return None
-    w = span(wanted)
-    if not w:
+    ws = [w for w in (span(x) for x in target_list(wanted)) if w]
+    if not ws:
         return None
     total = 0.0
     for a in ages or []:
         s = span(a.get("name", ""))
-        if s and s[0] <= w[1] and s[1] >= w[0]:
+        if s and any(s[0] <= w[1] and s[1] >= w[0] for w in ws):
             total += a.get("pct") or 0
     return total
 
@@ -336,8 +372,8 @@ PLACE_WORDS = {
 
 
 def _place_mark(creator, target_cc):
-    """1.0 when the roster places the creator in the target country, 0.2 when it places them
-    elsewhere, 0.5 when it says nothing useful."""
+    """1.0 when the roster places the creator in the target country (any of them, when several
+    are asked for), 0.2 when it places them elsewhere, 0.5 when it says nothing useful."""
     def tokens(text):
         t = str(text or "").lower()
         return [x.strip() for x in re.split(r"[,/|;&+]|\band\b", t) if x.strip()]
@@ -348,7 +384,7 @@ def _place_mark(creator, target_cc):
                 hits.add(cc)
     if not hits:
         return 0.5, None
-    return (1.0 if target_cc in hits else 0.2), hits
+    return (1.0 if hits & set(target_list(target_cc) or [DEFAULT_TARGET["country"]]) else 0.2), hits
 
 
 def typical_views(doc):
@@ -379,6 +415,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
            "objective": objective, "platform": platform, "basic": not verified, "checks": []}
     bench = bench or {}
     target = dict(DEFAULT_TARGET, **{k: v for k, v in (target or {}).items() if v})
+    target["gender"] = one_gender(target["gender"])
     objective = objective if known_objective(objective) else "Balanced"
     w = blend(WEIGHTS_BASIC, objective)
     f = doc.get("followers") or followers
@@ -431,7 +468,8 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     # audience match, estimated from the roster and the profile text
     subs = []
     pm, hits = _place_mark(creator, target["country"])
-    cname = dict(COUNTRIES).get(target["country"], target["country"])
+    tcs = target_list(target["country"]) or [DEFAULT_TARGET["country"]]
+    cname = country_names(tcs)
     if hits:
         subs.append((pm, "Based in %s" % cname, "Based outside %s" % cname))
     cats = [c for c in str(target["category"]).split("|") if c.strip() and c.strip().lower() != "any"]
@@ -447,17 +485,18 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     if verified and (au.get("countries") or au.get("gender") or au.get("ages")):
         # a full analysis: the audience as it was measured
         if au.get("countries"):
-            home = next((c.get("pct") for c in au["countries"] if str(c.get("code", "")).upper() == target["country"]), 0) or 0
+            home = sum((c.get("pct") or 0) for c in au["countries"] if str(c.get("code", "")).upper() in tcs)
             measured.append((home / 60.0, "%s of the audience is in %s" % (_pct(home), cname), "Only %s of the audience is in %s" % (_pct(home), cname)))
         if target["gender"] in ("Women", "Men") and au.get("gender"):
             share = au["gender"].get("female" if target["gender"] == "Women" else "male") or 0
             measured.append((share / 60.0, "%s of the audience are %s" % (_pct(share), target["gender"].lower()),
                              "Only %s of the audience are %s" % (_pct(share), target["gender"].lower())))
-        if target["age"] != "Any" and au.get("ages"):
+        if target_list(target["age"]) and au.get("ages"):
             share = _age_share(au["ages"], target["age"])
             if share is not None:
-                measured.append((share / 40.0, "%s of the audience is aged %s" % (_pct(share), target["age"]),
-                                 "Only %s of the audience is aged %s" % (_pct(share), target["age"])))
+                need = age_need(len(target_list(target["age"])))
+                measured.append((share / need, "%s of the audience is aged %s" % (_pct(share), age_text(target["age"])),
+                                 "Only %s of the audience is aged %s" % (_pct(share), age_text(target["age"]))))
         if cats:
             nm = _niche("|".join(cats), doc, creator["interest"] if creator is not None else "")
             names = ", ".join(c.strip().lower() for c in cats)
@@ -489,19 +528,20 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         au = doc.get("audience") or {}
         countries = au.get("countries") or []
         if countries:
-            home = next((c.get("pct") for c in countries if str(c.get("code", "")).upper() == target["country"]), 0) or 0
-            cn = dict(COUNTRIES).get(target["country"], target["country"])
+            home = sum((c.get("pct") or 0) for c in countries if str(c.get("code", "")).upper() in tcs)
+            cn = cname
             out["checks"].append({"label": "Measured audience", "text": "%s of the measured audience is in %s" % (_pct(home), cn),
                                   "level": "ok" if home >= 60 else "warn" if home >= 30 else "bad"})
         if target["gender"] in ("Women", "Men") and au.get("gender"):
             share = au["gender"].get("female" if target["gender"] == "Women" else "male") or 0
             out["checks"].append({"label": "Gender", "text": "%s of the audience are %s" % (_pct(share), target["gender"].lower()),
                                   "level": "ok" if share >= 60 else "warn" if share >= 40 else "bad"})
-        if target["age"] != "Any" and au.get("ages"):
+        if target_list(target["age"]) and au.get("ages"):
             share = _age_share(au["ages"], target["age"])
             if share is not None:
-                out["checks"].append({"label": "Age", "text": "%s of the audience is aged %s" % (_pct(share), target["age"]),
-                                      "level": "ok" if share >= 40 else "warn" if share >= 20 else "bad"})
+                need = age_need(len(target_list(target["age"])))
+                out["checks"].append({"label": "Age", "text": "%s of the audience is aged %s" % (_pct(share), age_text(target["age"])),
+                                      "level": "ok" if share >= need else "warn" if share >= need / 2 else "bad"})
         if record and record.get("posts", 0) >= 2 and record.get("er") is not None and record.get("typical_er"):
             r = record["er"] / record["typical_er"]
             out["checks"].append({"label": "Our campaigns", "text": "%s engagement per view in %d of our campaign%s (typical %s)" % (

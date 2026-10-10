@@ -141,7 +141,7 @@ class PhaseE(unittest.TestCase):
         self.assertEqual(s, 200, b)
         self.assertTrue(b["ai"])
         a = b["answers"]
-        self.assertEqual((a["goal"], a["market"], a["category"], a["gender"], a["age"]), ("awareness", "SA", ["skincare"], "Women", "25-34"))
+        self.assertEqual((a["goal"], a["market"], a["category"], a["gender"], a["age"]), ("awareness", ["SA", "AE"], ["skincare"], "Women", "25-34"))   # fix batch 5: the brief takes every country the file names
         self.assertIn("Product: GlowSun SPF50", a["notes"])
         self.assertIn("uploaded brief", a["notes"])
         self.assertEqual(b["fields"]["markets"], ["SA", "AE"])                   # unknown markets dropped

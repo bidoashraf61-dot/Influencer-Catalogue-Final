@@ -875,7 +875,7 @@ class PortalMixin(connect_api.ConnectMixin):
                            for a in result["alternates"]],
             "platform_scores": plat_scores,
             # Phase E timing advisor: the launch windows that suit this brief (free, no prices).
-            "timing": __import__("occasions").advise(answers.get("category") or [], answers.get("market") or "SA", answers.get("timing")),
+            "timing": __import__("occasions").advise(answers.get("category") or [], matcher.timing_market(answers.get("market")), answers.get("timing")),
             "spent": cost, "credits": bal if kind != "admin" else None}, self.cors())
 
     # ------------------------------------------------------------------ chat --

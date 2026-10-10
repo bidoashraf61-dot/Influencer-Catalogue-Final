@@ -250,7 +250,7 @@
         h("label", null, h("input", { type: "radio", name: "cx-src", onchange: function () { state.src = "mix"; mixWrap.hidden = false; run(); } }),
           h("span", null, h("b", null, "A tier mix instead"), h("small", null, "Try a different mix of creator sizes before you choose."))));
       body.appendChild(h("div", { class: "cx-inp" },
-        q("Your budget", h("div", null, h("p", { class: "cx-fine", style: "margin:0 0 8px" }, "Your own number. We use it only to work out cost per result."), budgetBox(state, run))),
+        q("Your budget", h("div", null, h("p", { class: "cx-fine", style: "margin:0 0 8px" }, (state.seeded ? "Pre-filled from this selection’s brief; change anything. " : "") + "Your own number. We use it only to work out cost per result."), budgetBox(state, run))),
         q("Goal", seg(state, "goal", run)), q("Platforms", platToggles(state, run)), q("Creators", h("div", { class: "cx-src" }, srcBox, mixWrap))));
       body.appendChild(outBox);
       dr.appendChild(body);
@@ -280,11 +280,14 @@
       var prev = document.activeElement;
       api("GET", "/api/roi/saved?s=" + encodeURIComponent(S.token())).then(function (r) {
         var sv = r.b && r.b.saved && r.b.saved.input;
+        // No estimate saved yet: start from the brief that built or scored this selection (fix batch 5).
+        var seeded = !sv && r.b && r.b.seed;
+        if (seeded) sv = r.b.seed;
         var approved = S.codes().filter(function (c) { return S.status(c).s === "approved"; });
         var pool = approved.length ? approved : S.codes().filter(function (c) { var s = S.status(c).s; return s !== "rejected" && s !== "unavailable"; });
         var state = { goal: (sv && sv.goal) || "awareness", budget: (sv && Number(sv.budget)) || 0,
                       platforms: (sv && sv.platforms && sv.platforms.length ? sv.platforms : ["Instagram", "TikTok"]).slice(),
-                      mix: { mid: 2, micro: 6 }, src: "sel", market: "SA" };
+                      mix: { mid: 2, micro: 6 }, src: "sel", market: (sv && sv.market) || "SA", seeded: !!seeded };
         buildDrawer(S, state, pool, approved, prev);
       });
     }

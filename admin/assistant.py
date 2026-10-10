@@ -360,8 +360,9 @@ def t_demand_gap(ctx):
             continue
         for cat in a.get("category", []):
             want[cat] = want.get(cat, 0) + 1
-        if a.get("market"):
-            market[a["market"]] = market.get(a["market"], 0) + 1
+        for m in (a["market"] if isinstance(a.get("market"), list) else [a.get("market")]):
+            if m:
+                market[m] = market.get(m, 0) + 1
     creators = [c for c in db.list_creators(active_only=True)]
     rows = [{"category": cat, "briefs": n, "creators_available": sum(1 for c in creators if _in_category(c, cat))}
             for cat, n in sorted(want.items(), key=lambda kv: -kv[1])]
@@ -807,7 +808,7 @@ CLIENT_TOOLS = {
     "suggest_shortlist": (t_suggest_shortlist, _decl("suggest_shortlist",
         "Build a scored, budget-aware shortlist of creators for a campaign. Use when the client describes a campaign.",
         {"goal": {"type": "STRING", "enum": ["awareness", "engagement", "traffic", "conversion"]}, "category": SA,
-         "market": {"type": "STRING", "enum": [o[0] for o in matcher._BY_ID["market"]["options"]]},
+         "market": {"type": "ARRAY", "items": {"type": "STRING", "enum": [o[0] for o in matcher._BY_ID["market"]["options"]]}},
          "platforms": SA, "budget_max_sar": I, "count": I})),
     "selection_stats": (t_selection_stats, _decl("selection_stats",
         "Work out a number across the selection the client has open (average, total, highest, lowest, per creator), from "

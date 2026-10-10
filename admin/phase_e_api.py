@@ -32,7 +32,8 @@ class PhaseEMixin:
             who = self._need_viewer()
             if who:
                 cats = [c for c in str(query.get("c") or "").split(",") if c in matcher._enum("category")][:6]
-                market = query.get("m") if query.get("m") in matcher._enum("market") else "SA"
+                ms = [m for m in str(query.get("m") or "").split(",") if m in matcher._enum("market")]
+                market = "SA" if (not ms or "SA" in ms) else ms[0]          # several countries: a Saudi window counts for any list that has KSA
                 timing = query.get("t") if query.get("t") in matcher._enum("timing") else None
                 self.send_json(200, dict(occasions.advise(cats, market, timing, str(query.get("l") or "")[:10]), ok=True), self.cors())
             return True
@@ -113,7 +114,7 @@ class PhaseEMixin:
                                         "fields": {"product": src["title"][:80], "brand": "", "audience": "", "markets": [answers["market"]] if answers.get("market") else [], "launch": ""},
                                         "confidence": {k: ("low" if (answers.get(k) if k != "product" else src["title"]) else "missing") for k in briefsrc.SCHEMA_FIELDS},
                                         "claims": [], "regulated": briefsrc.regulated_kind(got["text"], answers.get("category")),
-                                        "flags": [], "timing": occasions.advise(answers.get("category") or [], answers.get("market") or "SA"),
+                                        "flags": [], "timing": occasions.advise(answers.get("category") or [], matcher.timing_market(answers.get("market"))),
                                         "spent": 0, "credits": portal.balance(cid) if kind != "admin" else None}, self.cors())
         # 3. Gemini fills the brief; charged first, refunded on failure.
         if kind == "guest":

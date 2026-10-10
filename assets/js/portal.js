@@ -354,9 +354,9 @@
   var QAR = {
     goal: ["ما الهدف الرئيسي من الحملة؟", { awareness: "الوصول لأكبر عدد من الناس", engagement: "زيادة التفاعل", traffic: "زيارات ونقرات على الرابط", conversion: "زيادة المبيعات أو التسجيلات", balanced: "مزيج متوازن" }],
     platforms: ["أين سيُنشر المحتوى؟", { any: "لا تفضيل" }],
-    market: ["في أي دولة الجمهور؟", { SA: "السعودية", AE: "الإمارات", EG: "مصر", KW: "الكويت", QA: "قطر", BH: "البحرين", OM: "عُمان", JO: "الأردن" }],
+    market: ["في أي دول الجمهور؟", { SA: "السعودية", AE: "الإمارات", EG: "مصر", KW: "الكويت", QA: "قطر", BH: "البحرين", OM: "عُمان", JO: "الأردن" }],
     gender: ["من الجمهور؟", { Any: "الجميع", Women: "غالباً نساء", Men: "غالباً رجال" }],
-    age: ["الفئة العمرية الرئيسية", { Any: "كل الأعمار", "45-54": "45+" }],
+    age: ["الفئات العمرية الرئيسية", { Any: "كل الأعمار", "45-54": "45+" }],
     category: ["في أي مجال المنتج؟", { "health care": "الرعاية الصحية / الأدوية", skincare: "العناية بالبشرة والجلدية", beauty: "التجميل", "hair care": "العناية بالشعر",
       fragrance: "العطور", "mother & baby": "الأم والطفل", food: "الأغذية والمشروبات", fitness: "اللياقة والصحة", fashion: "الأزياء", lifestyle: "أسلوب الحياة",
       technology: "التقنية", automotive: "السيارات", travel: "السفر", finance: "المال", gaming: "الألعاب" }],
@@ -999,28 +999,26 @@
       }
       body.appendChild(h("p", { class: "pt-note", style: "margin-top:0" }, LANG === "ar" ? "سؤال " + (step + 1) + " من " + qs.length + (q.required ? "" : " · اختياري")
         : "Question " + (step + 1) + " of " + qs.length + (q.required ? "" : " · optional")));
-      body.appendChild(h("h3", { class: "pt-q" }, q.label));
+      body.appendChild(h("h3", { class: "pt-q" }, q.id === "goal" ? "What are the campaign’s goals?" : q.label));
+      if (q.multi_ok) body.appendChild(h("p", { class: "pt-note", style: "margin-top:-4px" }, "Pick one or more."));
       if (q.type === "text") {
         var ta = h("textarea", { class: "pt-text", maxlength: String(q.max || 500), "aria-label": q.label, placeholder: "A city, a product name, a tone, anything that helps." }, answers[q.id] || "");
         ta.value = answers[q.id] || "";
         ta.addEventListener("input", function () { if (ta.value.trim()) answers[q.id] = ta.value.trim(); else delete answers[q.id]; });
         body.appendChild(ta);
       } else {
-        var many = q.type === "many";
+        var many = isMany(q);
         var grid = h("div", { class: "pt-opts", role: many ? "group" : "radiogroup", "aria-label": q.label });
         q.options.forEach(function (o) {
           var cur = answers[q.id];
-          var on = many ? (cur || []).indexOf(o.value) > -1 : cur === o.value;
+          var on = many ? asList(cur).indexOf(o.value) > -1 : cur === o.value;
           var btn = h("button", { class: "pt-opt", type: "button", "aria-pressed": on ? "true" : "false" }, h("span", { class: "pt-tick" }), o.label);
           btn.addEventListener("click", function () {
             if (many) {
-              var list = answers[q.id] || [];
-              var i = list.indexOf(o.value);
-              if (o.value === "any") list = i > -1 ? [] : ["any"];
-              else { list = list.filter(function (v) { return v !== "any"; }); if (i > -1) list.splice(list.indexOf(o.value), 1); else list.push(o.value); }
+              var list = toggleMulti(q, answers[q.id], o.value);
               if (list.length) answers[q.id] = list; else delete answers[q.id];
-              Array.prototype.forEach.call(grid.children, function (b, bi) { if (q.options[bi]) b.setAttribute("aria-pressed", (answers[q.id] || []).indexOf(q.options[bi].value) > -1 ? "true" : "false"); });
-              if (o.value === "any" && oIn) { oIn.value = ""; oIn.hidden = true; oBtn.setAttribute("aria-pressed", "false"); }
+              Array.prototype.forEach.call(grid.children, function (b, bi) { if (q.options[bi]) b.setAttribute("aria-pressed", asList(answers[q.id]).indexOf(q.options[bi].value) > -1 ? "true" : "false"); });
+              if (isAny(o.value) && oIn) { oIn.value = ""; oIn.hidden = true; oBtn.setAttribute("aria-pressed", "false"); }
             } else {
               answers[q.id] = o.value;
               setTimeout(function () { go(step + 1); }, 140);
@@ -1038,7 +1036,7 @@
             var nv = withOther(q, answers[q.id], txt);
             if (nv) answers[q.id] = nv; else delete answers[q.id];
             Array.prototype.forEach.call(grid.children, function (b, bi) {
-              if (q.options[bi]) b.setAttribute("aria-pressed", (many ? (answers[q.id] || []).indexOf(q.options[bi].value) > -1 : answers[q.id] === q.options[bi].value) ? "true" : "false");
+              if (q.options[bi]) b.setAttribute("aria-pressed", (many ? asList(answers[q.id]).indexOf(q.options[bi].value) > -1 : answers[q.id] === q.options[bi].value) ? "true" : "false");
             });
             oBtn.setAttribute("aria-pressed", txt.trim() ? "true" : "false");
           }, function () { next.click(); });
@@ -1072,7 +1070,7 @@
       qs.forEach(function (q, i) {
         var v = answers[q.id];
         if (!v || (v.length === 0)) { if (!q.required) return; }
-        var label = q.type === "text" ? (v || "") : (q.type === "many" ? (v || []) : [v]).map(function (val) {
+        var label = q.type === "text" ? (v || "") : asList(v).map(function (val) {
           return optionLabel(q, val);
         }).join(", ");
         list.appendChild(h("li", null, h("span", null, q.label.replace(/\?$/, "")), h("span", null, h("b", null, label || "Not answered"), " ",
@@ -1332,12 +1330,29 @@
   // The answer with the typed words in place of any earlier ones; null when nothing is left.
   function withOther(q, v, text) {
     text = String(text || "").replace(/\s+/g, " ").trim().slice(0, 80);
-    if (q.type === "many") {
-      var list = (Array.isArray(v) ? v : []).filter(function (x) { return !isOther(x) && (!text || x !== "any"); });
+    if (isMany(q)) {
+      var list = asList(v).filter(function (x) { return !isOther(x) && (!text || !isAny(x)); });
       if (text) list.push(OTHER + text);
       return list.length ? list : null;
     }
     return text ? OTHER + text : null;
+  }
+  // Multiple-choice taps (fix batch 5): "Any"/"Everyone"/"All ages" clears the rest and any
+  // other pick clears it; the retired "balanced" goal stands alone; Women and Men together are Everyone.
+  function isAny(v) { return String(v).toLowerCase() === "any"; }
+  function isMany(q) { return q.type === "many" || !!q.multi_ok; }
+  function asList(v) { return Array.isArray(v) ? v : v ? [v] : []; }
+  function toggleMulti(q, list, value) {
+    list = asList(list).slice();
+    var k = list.indexOf(value);
+    if (isAny(value)) return k > -1 ? [] : [value];
+    list = list.filter(function (v) { return !isAny(v); });
+    if (k > -1) list.splice(list.indexOf(value), 1); else list.push(value);
+    if (q.id === "goal") list = value === "balanced" && k === -1 ? ["balanced"] : list.filter(function (v) { return v !== "balanced" || list.length === 1; });
+    var max = q.multi_max || 3;
+    if (list.length > max) list = list.slice(list.length - max);
+    if (q.id === "gender" && list.indexOf("Women") > -1 && list.indexOf("Men") > -1) return ["Any"];
+    return list;
   }
   function otherInput(q, value, onInput, onEnter) {
     var inp = h("input", { class: "pt-other", type: "text", maxlength: "80", placeholder: "Type your answer", "aria-label": "Other answer" });
@@ -1450,7 +1465,7 @@
   var OB_STEPS = {
     goal: ["Goal", '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/>'],
     platforms: ["Platforms", '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/>'],
-    market: ["Country", '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17"/>'],
+    market: ["Countries", '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17"/>'],
     gender: ["Audience", '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.6-3.8 3.3-6 7-6s6.4 2.2 7 6"/>'],
     age: ["Age", '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>'],
     category: ["Space", '<path d="M3.5 12.5l8-8h7v7l-8 8z"/><circle cx="15" cy="9" r="1.3"/>']
@@ -1458,9 +1473,9 @@
   var OB_HINT = {
     goal: "Pick one or more. Each one counts in every creator’s score.",
     platforms: "Pick every platform the content runs on.",
-    market: "Where the people you want to reach live.",
-    gender: "Leave it if the product is for everyone.",
-    age: "Leave it if every age group matters.",
+    market: "Pick every country where the people you want to reach live.",
+    gender: "Pick Women, Men or both. Leave it if the product is for everyone.",
+    age: "Pick one or more age groups. Leave it if every age group matters.",
     category: "Pick one or more."
   };
   function obPoints(q) { return q.required ? 200 : 100; }
@@ -1558,7 +1573,7 @@
       /* -- one question -- */
       function show(i) {
         step = Math.max(0, Math.min(i, qs.length - 1));
-        var q = qs[step], many = q.type === "many" || q.id === "goal";
+        var q = qs[step], many = isMany(q);
         stage.textContent = "";
         var panel = h("div", { class: "ai-sl__panel ai-sl__q" });
         panel.appendChild(h("p", { class: "ob__count" }, "Question " + (step + 1) + " of " + qs.length + (q.required ? "" : " · optional")));
@@ -1572,11 +1587,7 @@
           b.addEventListener("click", function () {
             var was = answered(q);
             if (many) {
-              var list = cur().slice(), k = list.indexOf(o.value);
-              if (o.value === "any") list = k > -1 ? [] : ["any"];
-              else { list = list.filter(function (v) { return v !== "any"; }); if (k > -1) list.splice(k, 1); else list.push(o.value); }
-              if (q.id === "goal" && o.value === "balanced" && k === -1) list = ["balanced"];
-              else if (q.id === "goal") list = list.filter(function (v) { return v !== "balanced" || list.length === 1; });
+              var list = toggleMulti(q, cur(), o.value);
               if (list.length) answers[q.id] = list; else delete answers[q.id];
               [].forEach.call(opts.children, function (bb, bi) { bb.setAttribute("aria-pressed", String(cur().indexOf(q.options[bi].value) > -1)); });
               next.disabled = q.required && !answered(q);
@@ -1800,7 +1811,7 @@
         var i = 0;
         function next() {
           if (i >= todo.length) return summary();
-          var q = byId[todo[i]], many = q.type === "many";
+          var q = byId[todo[i]], many = isMany(q);
           var card = h("div", { class: "pt-msg-b pt-msg-b--ai", style: "white-space:normal;max-width:100%" });
           card.appendChild(h("p", { style: "margin:0 0 10px;font-weight:600" }, q.label));
           var opts = h("div", { class: "pt-ideas" });
@@ -1809,9 +1820,7 @@
             var b = h("button", { class: "pt-idea", type: "button", "aria-pressed": "false" }, o.label);
             b.addEventListener("click", function () {
               if (!many) { answers[q.id] = o.value; done(o.label); return; }
-              var k = picked.indexOf(o.value);
-              if (o.value === "any") picked = k > -1 ? [] : ["any"];
-              else { picked = picked.filter(function (v) { return v !== "any"; }); if (k > -1) picked.splice(picked.indexOf(o.value), 1); else picked.push(o.value); }
+              picked = toggleMulti(q, picked, o.value);
               Array.prototype.forEach.call(opts.children, function (x, xi) {
                 if (!q.options[xi]) return;
                 var on = picked.indexOf(q.options[xi].value) > -1;
@@ -2274,7 +2283,7 @@
        Nothing moves on until they press Send. */
     function question(q, idx, total, how) {
       queue = queue.then(function () {
-        var many = q.type === "many";
+        var many = isMany(q);
         var card = h("div", { class: "hv-msg hv-msg--ai hv-q", role: "group", "aria-label": q.label });
         card.appendChild(h("p", { class: "hv-q__count" }, "Question " + (idx + 1) + " of " + total));
         card.appendChild(h("p", { class: "hv-q__label" }, q.label));
@@ -2441,11 +2450,11 @@
             done: function (vals, note) {
               // Words that match no option are the client's "Other" answer: the server reads
               // them into the brief (e.g. "40" creators) and keeps them in the notes.
-              if (note && q.other && (q.type === "many" || !vals.length)) {
-                var nv = withOther(q, q.type === "many" ? vals : null, note);
+              if (note && q.other && (isMany(q) || !vals.length)) {
+                var nv = withOther(q, isMany(q) ? vals : null, note);
                 if (nv) { answers[q.id] = nv; note = ""; vals = []; }
               }
-              if (vals.length) answers[q.id] = q.type === "many" ? vals : vals[0];
+              if (vals.length) answers[q.id] = isMany(q) ? vals : vals[0];
               else if (q.type === "many" && !answers[q.id]) answers[q.id] = ["any"];
               if (note) answers.notes = (answers.notes ? answers.notes + "; " : "") + note;
               i++; next();
@@ -3370,14 +3379,15 @@
       coachCue("point");
       var id = AI_STEPS[i][0], q = byId[id];
       if (!q) return i + 1 < AI_STEPS.length ? ask(i + 1) : review();
-      // The goal takes several (fix batch 4, as the selection objective does): stored as a list,
-      // scored on the server as "Awareness+Engagement".
+      // The goal, the countries (and gender and age) take several (fix batches 4 and 5): stored as
+      // a list, scored on the server as "Awareness+Engagement" / "SA|AE". Budget and the number of
+      // creators are one value by nature and stay single choice.
       var multiGoal = !!q.multi_ok;
       var many = q.type === "many" || multiGoal;
       if (multiGoal && q.type !== "many") q = Object.assign({}, q, { type: "many" });
       var picked = Array.isArray(answers[id]) ? answers[id].slice() : answers[id] ? [answers[id]] : [];
       var p = h("div", { class: "ai-sl__q" });
-      p.appendChild(h("p", { class: "ai-sl__ask" }, multiGoal ? "What are the campaign’s goals?" : q.label));
+      p.appendChild(h("p", { class: "ai-sl__ask" }, id === "goal" ? "What are the campaign’s goals?" : q.label));
       p.appendChild(h("p", { class: "ai-sl__hint" }, multiGoal ? "Pick one or more, then Next" : many ? "Pick any, then Next" : "Tap one"));
       var opts = h("div", { class: "ai-sl__opts" + (q.options.length > 6 ? " ai-sl__opts--many" : "") });
       q.options.forEach(function (o) {
@@ -3385,11 +3395,9 @@
         var b = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(on) }, o.label);
         b.addEventListener("click", function () {
           if (!many) { answers[id] = o.value; b.setAttribute("aria-pressed", "true"); pop(b, scoreOf(id)); reward(scoreOf(id)); setTimeout(function () { next(); }, reduce ? 0 : 750); return; }
-          var k = picked.indexOf(o.value);
-          if (o.value === "any") picked = k > -1 ? [] : ["any"];
-          else { picked = picked.filter(function (v) { return v !== "any"; }); if (k > -1) picked.splice(picked.indexOf(o.value), 1); else picked.push(o.value); }
+          picked = toggleMulti(q, picked, o.value);
           Array.prototype.forEach.call(opts.children, function (x, xi) { if (q.options[xi]) x.setAttribute("aria-pressed", String(picked.indexOf(q.options[xi].value) > -1)); });
-          if (o.value === "any" && oIn) { oIn.value = ""; oIn.hidden = true; oBtn.setAttribute("aria-pressed", "false"); }
+          if (isAny(o.value) && oIn) { oIn.value = ""; oIn.hidden = true; oBtn.setAttribute("aria-pressed", "false"); }
           nextBtn.disabled = !picked.length;
         });
         opts.appendChild(b);
@@ -3450,7 +3458,8 @@
     function nameFor() {
       var cat = Array.isArray(answers.category) && answers.category[0] && answers.category[0] !== "any" ? optionLabel(byId.category, answers.category[0]).split(/ [&\/] /)[0] : "Creators";
       var goals = (Array.isArray(answers.goal) ? answers.goal : [answers.goal]).map(function (g) { return AI_GOAL[g]; }).filter(Boolean);
-      return [cat, AI_MARKET[answers.market] || "", goals.join(" + ")].filter(Boolean).join(" · ");
+      var markets = (Array.isArray(answers.market) ? answers.market : [answers.market]).map(function (m) { return AI_MARKET[m]; }).filter(Boolean);
+      return [cat, markets.join(" + "), goals.join(" + ")].filter(Boolean).join(" · ");
     }
     function costLine() {
       var c = (ME && ME.costs) || { brief: 5, search: 0 };

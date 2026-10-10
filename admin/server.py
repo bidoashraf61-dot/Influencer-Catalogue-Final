@@ -84,6 +84,7 @@ import uploads  # noqa: E402
 import account  # noqa: E402
 import gating  # noqa: E402
 import selstatus  # noqa: E402
+import matcher  # noqa: E402
 import apify
 import profile_thumbs
 import apis_view
@@ -2248,9 +2249,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 if (f.get("sel_objective") or "") in _fit_new.OBJECTIVES:
                     db.set_selection_objective(sid, f["sel_objective"])
                 db.set_selection_target(sid, {
-                    "country": f.get("t_country") if f.get("t_country") in dict(_fit_new.COUNTRIES) else "SA",
+                    "country": self.clean_multi(f.get("t_country"), dict(_fit_new.COUNTRIES), "SA"),
                     "gender": f.get("t_gender") if f.get("t_gender") in _fit_new.GENDERS else "Any",
-                    "age": f.get("t_age") if f.get("t_age") in _fit_new.AGE_BANDS else "Any",
+                    "age": self.clean_multi(f.get("t_age"), _fit_new.AGE_BANDS, "Any"),
                     "category": self.clean_categories(f.get("t_category"))})
                 t["key"] = sid
             return self.redirect("/selections/edit?id=%d&ok=%s#st=creators" % (
@@ -2464,9 +2465,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # was opened: saving without it must leave the target as it is.
         if fit_loaded and any(k in f for k in ("t_country", "t_gender", "t_age", "t_category")):
             db.set_selection_target(sel["id"], {
-                "country": f.get("t_country") if f.get("t_country") in dict(_fit_mod.COUNTRIES) else "SA",
+                "country": self.clean_multi(f.get("t_country"), dict(_fit_mod.COUNTRIES), "SA"),
                 "gender": f.get("t_gender") if f.get("t_gender") in _fit_mod.GENDERS else "Any",
-                "age": f.get("t_age") if f.get("t_age") in _fit_mod.AGE_BANDS else "Any",
+                "age": self.clean_multi(f.get("t_age"), _fit_mod.AGE_BANDS, "Any"),
                 "category": self.clean_categories(f.get("t_category"))})
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs, margin_max=margin_max,
@@ -3609,6 +3610,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def analysis_resolver(self):
         return analysis.Resolver(db.list_creators(), db.creator_aliases())
 
+    def clean_multi(self, raw, allowed, default):
+        """A target field that may hold several values ("SA|AE"): the ones that are allowed, joined."""
+        import fit as fit_mod
+        got = [x for x in fit_mod.target_list(raw) if x in allowed]
+        return "|".join(got) or default
+
     def clean_categories(self, raw):
         """The ticked product categories, kept to ones the roster knows, as "A|B|C" (or "Any")."""
         items = [raw] if isinstance(raw, str) else list(raw or [])
@@ -3675,15 +3682,19 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                      band=metrics.band_of(followers), bench=bench, record=rec,
                                      creator_interest=c["interest"], creator=c)
             if not mine:
-                out[code] = fit_mod.score(None, None, c["followers"], objective=objective, target=target)
-                out[code]["assigned"] = "Auto"
+                # Nobody has analysed this creator: the same roster estimate the AI shortlist gave
+                # them, so the page and the shortlist show one number (fix batch 5).
+                out[code] = dict(matcher._roster_estimate(c, objective, target, analysis.canon_platform(wanted) if wanted else None),
+                                 assigned="Auto")
+                out[code] = self._brief_rules(c, out[code], "roster", target)
                 continue
             import profile_pdf as _pp
             main = analysis.creator_platforms(c)
             tried = {pl: one(pl) for pl in mine}
             scored = [pl for pl in tried if tried[pl]["score"] is not None]
             # Which platform the creator is scored on: the one assigned for this selection; "Both"
-            # shows both and ranks by the weaker; else the selection's platform; else the best.
+            # shows both and ranks by the weaker; else the selection's platform; else the best, a
+            # measured analysis before public numbers (as the AI shortlist chooses).
             assigned = (assign.get(code) or "").strip()
             sel_plat = analysis.canon_platform(wanted) if wanted else None
             if assigned == "Both" and len(scored) >= 2:
@@ -3693,13 +3704,30 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             elif sel_plat in tried:
                 shown = sel_plat
             else:
-                shown = max(scored or list(tried), key=lambda pl: (tried[pl]["score"] is not None, tried[pl]["score"] or 0,
-                                                                  not mine[pl]["data"].get("basic"), _pp.completeness(mine[pl]["data"]), pl == main[0]))
+                full = [pl for pl in scored if not mine[pl]["data"].get("basic")]
+                shown = max(full or scored or list(tried), key=lambda pl: (tried[pl]["score"] is not None, tried[pl]["score"] or 0,
+                                                                          _pp.completeness(mine[pl]["data"]), pl == (main[0] if main else "")))
+            # The brief's own requirements (country, product space), the same as on the shortlist.
+            for pl in tried:
+                if tried[pl]["score"] is not None:
+                    tried[pl] = self._brief_rules(c, tried[pl], "basic" if tried[pl].get("basic") else "analysis", target)
             out[code] = dict(tried[shown])
             out[code]["assigned"] = assigned if (assigned in tried or (assigned == "Both" and len(scored) >= 2)) else "Auto"
             out[code]["platforms"] = {pl: tried[pl] for pl in tried if tried[pl]["score"] is not None}
             out[code]["available"] = sorted(tried)
+            if out[code]["score"] is None:
+                # Not enough public data to score from the analysis: the roster estimate stands in.
+                est = matcher._roster_estimate(c, objective, target, sel_plat)
+                if est.get("score") is not None:
+                    out[code] = dict(self._brief_rules(c, est, "roster", target), assigned=out[code]["assigned"],
+                                     platforms=out[code]["platforms"], available=out[code]["available"])
         return out
+
+    def _brief_rules(self, c, s, basis, target):
+        """``s`` (a fit result) with the brief's country and product-space rules applied."""
+        if s.get("score") is None:
+            return s
+        return matcher.apply_rules(c, s, s["score"], basis, target)[2]
 
     def selection_suggest(self, query):
         """A suggested fit and role for one creator, from their analysis of a
