@@ -872,3 +872,34 @@
   .cx-ways .cx-btn { grid-column: 2; justify-self: start; }
   .cx-res { padding: 20px 18px 16px; }
 }
+
+/* ROI v4 (fix batch 7): structure vs performance. The Selection quality stamp, the gap in words and
+   the side-by-side table of HelloVoice's recommended structure and the client's selection. Ranges
+   wrap, nothing is clipped (fix batch 4 layout rule). */
+.cx-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.cx-quality { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 18px 8px; border-radius: 18px; background: var(--ink); color: var(--white); text-align: center; }
+.cx-quality b { font-family: var(--heading); font-weight: 400; font-size: 34px; line-height: 1; letter-spacing: .04em; color: var(--lime); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cx-quality small { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: rgba(255,255,255,.78); }
+.cx-rcard__hd .cx-quality { padding: 6px 12px 5px; border-radius: 14px; flex-direction: row; gap: 6px; align-items: baseline; }
+.cx-rcard__hd .cx-quality b { font-size: 22px; }
+.cx-rcard__hd .cx-quality small { font-size: 10px; }
+.cx-gap { margin: 14px 0 0; font-size: 14.5px; line-height: 1.5; max-width: 62ch; }
+.cx-gap b { font-weight: 700; }
+.cx-cmpwrap { margin-top: 16px; overflow-x: auto; }
+.cx-cmp { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; }
+.cx-cmp th, .cx-cmp td { text-align: left; vertical-align: top; padding: 9px 10px 9px 0; border-bottom: 1px solid rgba(18,18,18,.12); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.cx-cmp thead th { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--cx-mute); border-bottom: 1.5px solid var(--ink); vertical-align: bottom; }
+.cx-cmp thead th small { display: block; margin-top: 3px; font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; line-height: 1.35; }
+.cx-cmp tbody th { font-weight: 500; width: 34%; }
+.cx-cmp__size th { padding-left: 14px; font-weight: 400; color: var(--cx-mute); }
+.cx-cmp__goal th, .cx-cmp__goal td { font-weight: 700; }
+.cx-cmp__goal td { font-family: var(--heading); font-weight: 400; font-size: 20px; letter-spacing: .02em; line-height: 1.1; }
+.cx-cmp__short { color: var(--cx-amber-text); font-weight: 700; }
+.cx-cmp__over { color: var(--cx-mute); }
+.cx-cmp td:last-child { padding-right: 0; }
+@media (max-width: 560px) {
+  .cx-cmp { font-size: 13px; }
+  .cx-cmp tbody th { width: 30%; }
+  .cx-quality b { font-size: 30px; }
+}
+.cx-cmpnote { margin: 8px 0 0; font-size: 12.5px; color: var(--cx-mute); }

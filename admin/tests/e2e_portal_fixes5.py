@@ -170,17 +170,19 @@ class Fixes5(unittest.TestCase):
         self.assertEqual(s, 200, r)
         self.assertIsNone(r["saved"])
         seed = r["seed"]
-        self.assertEqual((seed["goal"], seed["platforms"], seed["market"], seed["budget"]), ("engagement", ["TikTok"], "AE", 150000))
+        # fix batch 7: no budget and no market in the seed; the brief's number of creators is
+        self.assertEqual((seed["goal"], seed["platforms"], seed["count"]), ("engagement", ["TikTok"], 15))
+        self.assertNotIn("budget", seed)
+        self.assertNotIn("market", seed)
         # the same inputs the drawer will send are valid for the calculator
-        s, est, _ = c.post("/api/roi/estimate", {"goal": seed["goal"], "budget": seed["budget"], "platforms": seed["platforms"],
-                                                  "market": seed["market"], "token": b["token"]})
+        s, est, _ = c.post("/api/roi/estimate", {"goal": seed["goal"], "platforms": seed["platforms"], "token": b["token"]})
         self.assertEqual(s, 200, est)
-        self.assertEqual(est["result"]["market_label"], roi.MARKETS["AE"])
-        self.assertEqual(est["result"]["budget"], 150000)
-        # a brief with no budget gives no budget; Conversion reads as Traffic
+        self.assertNotIn("market_label", est["result"])
+        self.assertNotIn("budget", est["result"])
+        # Conversion reads as Traffic
         s, b2, _ = c.post("/api/brief/run", {"answers": dict(ANS, budget="open", goal="conversion", market="EG", platforms=["Instagram", "TikTok"]), "name": "No budget"})
         seed2 = c.get("/api/roi/saved?s=" + b2["token"])[1]["seed"]
-        self.assertEqual((seed2["goal"], seed2["market"], seed2["platforms"]), ("traffic", "EG", ["Instagram", "TikTok"]))
+        self.assertEqual((seed2["goal"], seed2["platforms"]), ("traffic", ["Instagram", "TikTok"]))
         self.assertNotIn("budget", seed2)
         # a saved estimate wins over the seed
         s, sv, _ = c.post("/api/roi/save", {"token": b["token"], "goal": "awareness", "budget": 80000, "platforms": ["Instagram"], "market": "SA"})

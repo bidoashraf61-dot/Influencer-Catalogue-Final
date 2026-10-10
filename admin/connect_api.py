@@ -2,8 +2,8 @@
 
 Client routes
     POST /api/tour                 {action: offered|later|started|done} -> state (+5 credits once on done)
-    POST /api/roi/estimate         {goal, budget, platforms, market, token?, which?, mix?} -> the calculator's result (free)
-    POST /api/roi/save             {token, goal, budget, platforms, market, which?|mix?} -> kept with the selection
+    POST /api/roi/estimate         {goals, platforms, token?, which?, mix?, count?} -> structure vs performance (free; no budget, no prices)
+    POST /api/roi/save             {token, goals, platforms, which?|mix?} -> kept with the selection
     GET  /api/roi/saved?s=token    the latest estimate kept with a selection
     GET  /api/roi/vs[?t=token]     saved estimate against the live report, per campaign the viewer may see
     GET  /api/roi/selections       the viewer's selections to save an estimate to (name, token)
@@ -97,7 +97,7 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
 
     def _roi_seed(self, sel):
         """Starting values for the calculator from the brief that built or scored this selection
-        (goal, platforms, market, and the budget when the brief has one). None without a brief."""
+        (goals, platforms, and the number of creators it asked for). None without a brief."""
         br = portal.live_brief_for_selection(sel["id"])
         if br is None:
             # no brief, but the selection may carry an objective (the admin's, or its campaign's)
@@ -106,7 +106,7 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
             if obj and fit.known_objective(obj):
                 parts = fit.parts_of(obj)
                 goals = [p.lower() for p in (parts if parts != ["Balanced"] else fit.CAMPAIGN_TYPES)]
-                return {"goal": goals[0], "goals": goals, "platforms": ["Instagram", "TikTok"], "market": "SA",
+                return {"goal": goals[0], "goals": goals, "platforms": ["Instagram", "TikTok"],
                         "platforms_from_brief": False, "summary": ""}
             return None
         try:
@@ -122,7 +122,6 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
         goals = list(dict.fromkeys(g for g in goals if g in roi.GOALS)) or ["awareness"]
         goal = goals[0]
         plats = [p for p in (b.get("platforms") or []) if p in roi.PLATFORMS][:4] or ["Instagram"]
-        market = b.get("market") if b.get("market") in roi.MARKETS else "SA"
         mix = None
         if isinstance(b.get("mix"), dict):
             m = b["mix"]
@@ -133,8 +132,10 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
                 mix = {t: max(0, min(self._int(m.get(t)), 200)) for t in roi.TIER_ORDER}
         which = "all" if b.get("which") == "all" else "approved"
         second = [str(c).strip().upper()[:24] for c in (b.get("second_posts") or []) if isinstance(c, str)][:20]
-        return {"goal": goal, "goals": goals, "budget": b.get("budget"), "platforms": plats, "market": market, "mix": mix,
-                "which": which, "second_posts": second}
+        count = max(0, min(self._int(b.get("count")), 100)) or None
+        # no budget and no market: the calculator compares structure and performance only
+        return {"goal": goal, "goals": goals, "platforms": plats, "mix": mix,
+                "which": which, "second_posts": second, "count": count}
 
     def api_roi_estimate(self):
         who = self._need_viewer()
@@ -151,9 +152,9 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
                 return
             sel = got[0]
             creators = roi.creators_of(sel, inp["which"], goals=inp["goals"])
-        res = roi.full(inp["goal"], inp["budget"], inp["platforms"], inp["market"], creators=creators,
+        res = roi.full(inp["goal"], inp["platforms"], creators=creators,
                        mix=inp["mix"] if creators is None else None, goals=inp["goals"],
-                       second_posts=inp["second_posts"], sel=sel)
+                       second_posts=inp["second_posts"], sel=sel, count=inp["count"])
         return self.send_json(200, {"ok": True, "result": res}, self.cors())
 
     def api_roi_save(self):
@@ -168,8 +169,8 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
             return
         inp = self._roi_input(b)
         creators = None if inp["mix"] else roi.creators_of(sel, inp["which"], goals=inp["goals"])
-        res = roi.full(inp["goal"], inp["budget"], inp["platforms"], inp["market"], creators=creators, mix=inp["mix"],
-                       goals=inp["goals"], second_posts=inp["second_posts"], sel=sel, with_advice=False)
+        res = roi.full(inp["goal"], inp["platforms"], creators=creators, mix=inp["mix"],
+                       goals=inp["goals"], second_posts=inp["second_posts"], sel=sel, with_advice=False, count=inp["count"])
         u = portal.user_for_code(reader)
         rid = roi.save(reader, sel["id"], inp["goal"], {k: v for k, v in inp.items() if v is not None}, res,
                        by=(u["name"] if u is not None and u["name"] else "HelloVoice" if reader == db.admin_code_id() else "Client"))

@@ -1057,8 +1057,8 @@ class PortalMixin(connect_api.ConnectMixin):
         import roi
         rcard = roi.from_text(text)
         instant = faq.answer(text) if rcard is None else {
-            "reply": "Here's what %s can reach for %s, as an estimate from industry benchmarks. Open the calculator to change the creator mix."
-                     % ("SAR {:,}".format(rcard["budget"]), rcard["goal_label"].lower()),
+            "reply": "Here is HelloVoice's recommended structure for %d creators and %s, as an estimate. Open the calculator to compare it with your own selection."
+                     % (rcard["count"], rcard["goal_label"].lower()),
             "next": ["Get a quote", "Find creators"], "roi": rcard}
         if instant is None:
             if not gemini.configured():
@@ -1314,21 +1314,29 @@ class PortalMixin(connect_api.ConnectMixin):
             db.set_setting("case_study_campaigns", sorted({int(x) for x in (f.get("case_study_campaigns") or "").replace(",", " ").split() if x.isdigit()}))
             kb = (f.get("kb_text") or "").strip()
             db.set_setting("kb_text", kb[:4000] if kb else None)
-            # ROI planner (internal, never shown to a client): the creators' share of a client's total
-            # budget and the planning price per post by size. Left alone when the card was not posted.
-            if "roi_creator_share" in f:
+            # Recommended structure (internal): percent of creators by size for each campaign type.
+            # Left alone when the card was not posted. A goal whose percentages do not add up to 100
+            # keeps its previous shape and the answer says which one.
+            bad = []
+            if any(k.startswith("roi_shape_") for k in f):
                 import roi
-                share = money("roi_creator_share", roi.SHARE_DEFAULT * 100, 100) / 100.0
-                db.set_setting("roi_creator_share", round(max(0.1, min(1.0, share)), 3))
-                prices = {}
-                for t in roi.PRICES_DEFAULT:
-                    try:
-                        v = float(str(f.get("roi_price_" + t, "")).replace(",", ""))
-                    except ValueError:
-                        v = 0
-                    if v > 0:
-                        prices[t] = min(v, 1000000)
-                db.set_setting("roi_planning_prices", prices or None)
+                raw = {}
+                for g in roi.GOALS:
+                    raw[g] = {}
+                    for t in roi.TIER_ORDER:
+                        v = str(f.get("roi_shape_%s_%s" % (g, t), "")).replace(",", ".").strip()
+                        try:
+                            raw[g][t] = float(v) if v else 0.0
+                        except ValueError:
+                            raw[g][t] = -1.0
+                clean, errors = roi.validate_shapes(raw)
+                have = roi.shapes()
+                have.update(clean)
+                bad = ["%s: %s" % (roi.GOAL_LABEL[g], m) for g, m in errors.items()]
+                same = all(have[g] == {t: float(v) for t, v in roi.SHAPES_DEFAULT[g].items()} for g in roi.GOALS)
+                db.set_setting("roi_shapes", None if same else {g: {t: round(v, 1) for t, v in have[g].items()} for g in roi.GOALS})
+            if bad:
+                return done("Settings saved, except the recommended structure: " + "; ".join(bad), False)
         return done("Settings saved.")
 
     def portal_keys(self, f, done):

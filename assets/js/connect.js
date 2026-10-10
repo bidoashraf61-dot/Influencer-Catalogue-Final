@@ -4,11 +4,13 @@
  *    once after the first sign-in and replayable from Help and the profile. The tour
  *    itself (tour.js / tour.css, loaded on start) plays the real pages on demo data;
  *    finishing pays +5 credits once (server-enforced).
- *  - The ROI Calculator (v3): a drawer inside a selection (its creators' own numbers),
- *    a page in the profile (a mix of sizes), a compact card in Helvy's chat, the
- *    "Download PDF" and estimate vs actual on the campaign report. Results are RANGES
- *    with a line saying how sure we are and up to three ranked "Ways to improve"; no
- *    cost per result, no verdict against the market, never a creator or HelloVoice price.
+ *  - The ROI Calculator (v4, structure vs performance): a drawer inside a selection (its
+ *    creators' own numbers), a page in the profile (a mix of sizes), a compact card in
+ *    Helvy's chat, the "Download PDF" and estimate vs actual on the campaign report. A
+ *    side-by-side table of HelloVoice's recommended structure for the same number of creators
+ *    and the client's selection, the Selection quality, the gap in words and up to three ranked
+ *    "Ways to improve". Results are RANGES. No budget, no cost per result, no market verdict,
+ *    never a creator or HelloVoice price.
  *  - AI on selections: "Add more like these" and "Creators like this".
  *
  * Needs portal.js (window.hvPortal: h, api, icon, clip). Everything the server or
@@ -114,35 +116,6 @@
       box.sync = function () { [].forEach.call(box.children, function (b) { b.setAttribute("aria-pressed", String(state.platforms.indexOf(b.getAttribute("data-plat")) > -1)); }); };
       return box;
     }
-    function budgetBox(state, onChange) {
-      var inp = h("input", { type: "text", inputmode: "numeric", autocomplete: "off", "aria-label": "Your budget in SAR", placeholder: "e.g. 120,000",
-        value: state.budget ? money(state.budget) : "" });
-      // Arabic-Indic (٠-٩) and Persian (۰-۹) digits count as digits (fix batch 4): the field used
-      // to strip everything but 0-9, so a budget typed on an Arabic keyboard vanished. The caret
-      // keeps its place among the digits when the grouping commas are redrawn, and nothing is
-      // rewritten while an input method is still composing.
-      function ascii(s) {
-        return String(s).replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); })
-                        .replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); });
-      }
-      function tidy() {
-        var raw = ascii(inp.value), caret = inp.selectionStart == null ? raw.length : inp.selectionStart;
-        var before = raw.slice(0, caret).replace(/[^0-9]/g, "").length;
-        var n = raw.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "").slice(0, 10);
-        state.budget = n ? Number(n) : 0;
-        var out = n ? money(n) : "";
-        if (inp.value !== out) {
-          inp.value = out;
-          var pos = 0, seen = 0;
-          while (pos < out.length && seen < Math.min(before, n.length)) { if (/[0-9]/.test(out[pos])) seen++; pos++; }
-          if (document.activeElement === inp) { try { inp.setSelectionRange(pos, pos); } catch (e) { /* not a text field */ } }
-        }
-        onChange();
-      }
-      inp.addEventListener("input", function (e) { if (!e.isComposing) tidy(); });
-      inp.addEventListener("compositionend", tidy);
-      return h("label", { class: "cx-money" }, h("span", null, "SAR"), inp, h("em", null, "excl. VAT"));
-    }
     function mixBox(state, onChange) {
       var box = h("div", { class: "cx-mix" });
       TIERS.forEach(function (t) {
@@ -159,30 +132,85 @@
 
     var ESTIMATE_LINE = "Estimate, not a result. Real results depend on the content, the timing and the audience.";
     var WAY_BUTTON = {
+      replace: function () { return "Swap"; },
       remove: function (a) { return "Remove " + a.codes.length; },
       add: function (a) { return "Add " + a.codes.length; },
       second_post: function () { return "Count second posts"; },
       add_platform: function (a) { return "Add " + a.platform; },
       use_mix: function () { return "Use this mix"; }
     };
-    // The results: ranges (never one exact-looking number), how sure we are, and up to three ranked
-    // ways to improve, each with one button. opts.onWay(action) runs a way; without it none is shown.
+    var GOAL_FIG = { awareness: "views", engagement: "interactions", traffic: "clicks" };
+    function rangeText(r) { return r && r.range && r.range.length === 2 && r.range[0] !== r.range[1] ? big(r.range[0]) + "–" + big(r.range[1]) : (r && r.value != null ? big(r.value) : "–"); }
+    // The rows of the comparison: [label, recommended, yours, kind]; shared by the table and the PDF.
+    function compareRows(res) {
+      var I = res.ideal || {}, S = res.selection || {}, rows = [];
+      rows.push(["Creators", String(I.creators || 0), String(S.creators || 0), "n"]);
+      rows.push(["Posts", String(I.posts || 0), String(S.posts || 0), "n"]);
+      var sizes = {}; (S.by_size || []).forEach(function (x) { sizes[x.size] = x; });
+      var st = S.on_structure || {};
+      (I.by_size || []).forEach(function (x) {
+        var m = sizes[x.size] || { n: 0, pct: 0 };
+        if (!x.n && !m.n) return;
+        var mark = S.posts ? (st[x.size] === "short" ? "short" : st[x.size] === "over" ? "over" : "n") : "n";
+        rows.push([x.label + " · % of creators", x.n + " (" + x.pct + "%)", S.creators ? m.n + " (" + m.pct + "%)" : "–", mark, "size"]);
+      });
+      var plats = res.platforms || [];
+      if (plats.length > 1) {
+        var bp = {}; (S.by_platform || []).forEach(function (x) { bp[x.platform] = x.posts; });
+        (I.by_platform || []).forEach(function (x) { rows.push([x.platform + " posts", String(x.posts), String(bp[x.platform] || 0), "n", "size"]); });
+      }
+      var goalKeys = (res.goals || [res.goal]).map(function (g) { return GOAL_FIG[g]; });
+      [["views", "Expected views"], ["interactions", "Expected interactions"], ["clicks", "Expected clicks"]].forEach(function (k) {
+        var a = (I.ranges || {})[k[0]], b = (S.ranges || {})[k[0]];
+        rows.push([k[1], rangeText(a), S.posts ? rangeText(b) : "–", goalKeys.indexOf(k[0]) > -1 ? "goal" : "n"]);
+      });
+      rows.push(["Average creator score", I.score != null ? I.score + " (typical)" : "–", S.score != null ? String(S.score) : "–", "n"]);
+      return rows;
+    }
+    function qualityChip(q) {
+      if (!q) return null;
+      var txt = q.band ? q.low + "–" + q.high + "%" : q.pct + "%";
+      return h("div", { class: "cx-quality", title: "Selection quality: your selection’s expected result as a share of HelloVoice’s recommended structure for the same number of creators" },
+        h("b", null, txt), h("small", null, "of the ideal"));
+    }
+    function compareTable(res) {
+      var I = res.ideal || {};
+      var t = h("table", { class: "cx-cmp" });
+      t.appendChild(h("caption", { class: "cx-sr" }, "HelloVoice’s recommended structure compared with your selection"));
+      t.appendChild(h("thead", null, h("tr", null, h("th", { scope: "col" }, ""),
+        h("th", { scope: "col" }, "Recommended", h("small", null, I.title || "")),
+        h("th", { scope: "col" }, "Your selection", h("small", null, res.creators ? res.creators + " creator" + (res.creators === 1 ? "" : "s") : "nothing chosen yet")))));
+      var tb = h("tbody");
+      compareRows(res).forEach(function (r) {
+        var tr = h("tr", { class: (r[3] === "goal" ? "cx-cmp__goal " : "") + (r[4] === "size" ? "cx-cmp__size" : "") });
+        tr.appendChild(h("th", { scope: "row" }, r[0]));
+        tr.appendChild(h("td", null, r[1]));
+        tr.appendChild(h("td", { class: r[3] === "short" ? "cx-cmp__short" : r[3] === "over" ? "cx-cmp__over" : "" }, r[2]));
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+      return h("div", { class: "cx-cmpwrap" }, t);
+    }
+    // The comparison: the quality headline, the gap in words, the side-by-side table, up to three
+    // ranked ways to improve with one button each. opts.onWay(action) runs a way; without it none is shown.
     function resultPanel(res, opts) {
       opts = opts || {};
       var box = h("section", { class: "cx-res", "aria-live": "polite" });
       var t = res.trust || {};
+      var q = res.quality;
       box.appendChild(h("div", { class: "cx-res__top" },
-        h("div", null, h("h3", null, titleOf(res)), h("p", null, res.summary + (res.posts ? " · " + res.posts + " post" + (res.posts === 1 ? "" : "s") : ""))),
-        t.line ? h("div", { class: "cx-sure", title: t.line },
-          h("b", null, t.of ? t.measured + " of " + t.of : "Peers"), h("small", null, t.of ? "creators measured" : "similar creators")) : null));
-      var dl = h("dl", { class: "cx-figs" });
-      (res.figures || []).forEach(function (f) {
-        var n = h("span", { class: "cx-n" }, h("span", { class: "cx-v" }, fig(f)));
-        if (f.unit) n.appendChild(h("small", null, f.unit === "%" ? "%" : " " + f.unit));
-        var about = f.value != null && f.range && f.range[0] !== f.range[1] ? h("div", { class: "cx-about" }, "about " + (f.unit === "%" ? f.value + "%" : big(f.value))) : null;
-        dl.appendChild(h("div", null, h("dt", null, f.label), h("dd", null, n, about)));
-      });
-      box.appendChild(dl);
+        h("div", null, h("h3", null, q ? "Selection quality" : "Recommended structure"),
+          h("p", null, res.summary + (res.posts ? " · " + res.posts + " post" + (res.posts === 1 ? "" : "s") : ""))),
+        qualityChip(q)));
+      if (q) {
+        var gap = res.gap || [];
+        box.appendChild(h("p", { class: "cx-gap" }, gap.length ? h("span", null, h("b", null, "The gap: "), gap.join("; ") + ".")
+          : "Your selection is close to HelloVoice’s recommended structure."));
+      } else if (!res.creators) {
+        box.appendChild(h("p", { class: "cx-gap" }, "HelloVoice’s recommended structure for this goal. Choose creators to see how your selection compares."));
+      }
+      box.appendChild(compareTable(res));
+      if (q) box.appendChild(h("p", { class: "cx-fine cx-cmpnote" }, "A tier within ±" + ((res.ideal && res.ideal.tolerance) || 10) + " points of its recommended share of creators counts as on structure."));
       if (res.skipped && res.skipped.length) box.appendChild(h("p", { class: "cx-skipped" }, "Not on these platforms, so left out: " + res.skipped.slice(0, 6).join(", ") + (res.skipped.length > 6 ? "…" : "") + "."));
       var ways = (res.ways || []).slice(0, 3);
       if (opts.onWay && ways.length) {
@@ -196,9 +224,7 @@
         box.appendChild(h("div", { class: "cx-waysbox" }, h("h4", null, "Ways to improve"), ol));
       }
       if (!opts.compact) {
-        if (res.plan && res.plan.text && res.budget)
-          box.appendChild(h("p", { class: "cx-plan" }, h("b", null, "A mix that suits your goals and budget: "), res.plan.text + "."));
-        box.appendChild(h("p", { class: "cx-srcs" }, (t.line ? t.line + " " : "") + ESTIMATE_LINE + " After the campaign, your report compares it with what happened."));
+        box.appendChild(h("p", { class: "cx-srcs" }, (t.line ? t.line + " " : "") + "The recommended structure is HelloVoice’s proposal for this campaign type. " + ESTIMATE_LINE + " After the campaign, your report compares it with what happened."));
       }
       return box;
     }
@@ -211,20 +237,26 @@
       var w = window.open("", "_blank");
       if (!w) { toast("Allow pop-ups to download the PDF."); return; }
       var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-      var figs = (res.figures || []).map(function (f) {
-        return "<tr><td>" + esc(f.label) + "</td><td class='n'>" + esc(fig(f)) + (f.unit === "%" ? " %" : "") + "</td></tr>";
+      var q = res.quality;
+      var rows = compareRows(res).map(function (r) {
+        return "<tr><th>" + esc(r[0]) + "</th><td>" + esc(r[1]) + "</td><td>" + esc(r[2]) + "</td></tr>";
       }).join("");
+      var qTxt = q ? (q.band ? q.low + "–" + q.high + "%" : q.pct + "%") : "";
+      var head = q ? "<p class='q'><b>" + esc(qTxt) + "</b> Selection quality: your selection’s expected result as a share of HelloVoice’s recommended structure for the same number of creators.</p>" +
+        ((res.gap || []).length ? "<p><b>The gap:</b> " + esc(res.gap.join("; ")) + ".</p>" : "") : "";
+      var ways = (res.ways || []).slice(0, 3).map(function (w) { return "<li>" + esc(w.text) + "</li>"; }).join("");
       var html = "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><title>ROI estimate · HELVY Connect</title>" +
         "<style>@page{size:A4;margin:18mm}body{font:14px/1.55 'DM Sans',Arial,sans-serif;color:#121212;margin:0}" +
         "h1{font:400 40px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;margin:18px 0 4px;letter-spacing:.01em}" +
         ".hd{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #121212;padding-bottom:12px}" +
-        ".hd img{width:150px}.muted{color:#4a4a4a}table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:9px 6px;border-bottom:1px solid #ddd}td.n{font-weight:700;text-align:right;font-size:18px}" +
+        ".hd img{width:150px}.muted{color:#4a4a4a}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{padding:9px 6px;border-bottom:1px solid #ddd;text-align:left}td{font-weight:700;text-align:right}thead th{font-size:12px;color:#4a4a4a;text-align:right}thead th:first-child{text-align:left}.q b{font:400 44px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;margin-right:10px}" +
         ".fine{margin-top:22px;font-size:11.5px;color:#4a4a4a}</style></head><body>" +
         "<div class='hd'><img src='" + esc(ROOT) + "assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c4' alt='HELVY Connect'><span class='muted'>" + esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + "</span></div>" +
         "<h1>ROI estimate" + (ctx && ctx.name ? " · " + esc(ctx.name) : "") + "</h1><p class='muted'>" + esc(res.summary) + "</p>" +
-        "<table>" + figs + "</table>" +
+        head + "<table><thead><tr><th></th><th>Recommended structure<br>" + esc((res.ideal && res.ideal.title) || "") + "</th><th>Your selection</th></tr></thead><tbody>" + rows + "</tbody></table>" +
+        (ways ? "<h3>Ways to improve</h3><ol>" + ways + "</ol>" : "") +
         "<p class='muted'>" + esc((res.trust && res.trust.line) || "") + "</p>" +
-        "<p class='fine'>" + esc(ESTIMATE_LINE) + " Ranges show what is likely, not a promise; this is not a quote. " +
+        "<p class='fine'>" + esc(ESTIMATE_LINE) + " Ranges show what is likely, not a promise. The recommended structure is HelloVoice’s proposal for this campaign type. " +
         "Powered by HelloVoice · A BlueHolding Company.</p><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>";
       w.document.open(); w.document.write(html); w.document.close();
     }
@@ -248,7 +280,8 @@
       var outBox = h("div");
       var last = null, platBox = null, mixNote = h("p", { class: "cx-fine cx-mixnote", hidden: true });
       function request() {
-        var b = { goal: state.goals[0], goals: state.goals, budget: state.budget, platforms: state.platforms, market: state.market };
+        var b = { goal: state.goals[0], goals: state.goals, platforms: state.platforms };
+        if (state.count) b.count = state.count;
         if (state.second && state.second.length) b.second_posts = state.second;
         if (state.src === "mix") b.mix = state.mixP || state.mix; else { b.token = S.token(); b.which = state.which; }
         return b;
@@ -258,6 +291,11 @@
         if (a.type === "remove") {
           var n = S.remove ? S.remove(a.codes) : 0;
           toast(n ? "Removed " + n + " creator" + (n === 1 ? "" : "s") + " from " + S.name() + "." : "Those creators could not be removed.");
+        } else if (a.type === "replace") {
+          if (S.remove) S.remove(a.remove);
+          state.which = "all";
+          S.add(a.add);
+          toast("Swapped in " + S.name() + "; the new creator is under review.");
         } else if (a.type === "add") {
           state.which = "all";                                           // the new ones are under review: count them
           S.add(a.codes);
@@ -295,7 +333,7 @@
           h("span", null, h("b", null, "A mix of sizes instead"), h("small", null, "Try a different mix of creator sizes before you choose."))));
       platBox = platToggles(state, run);
       body.appendChild(h("div", { class: "cx-inp" },
-        q("Your budget", h("div", null, h("p", { class: "cx-fine", style: "margin:0 0 8px" }, (state.seeded ? "Pre-filled from this selection’s brief; change anything. " : "") + "Your total budget. It does not change the estimate: it helps us suggest the right mix of creators."), budgetBox(state, run))),
+        state.seeded ? h("p", { class: "cx-fine", style: "margin:0" }, "Pre-filled from this selection’s brief; change anything.") : null,
         q("Campaign type", seg(state, "goal", run), h("em", null, "pick one or more")), q("Platforms", platBox), q("Creators", h("div", { class: "cx-src" }, srcBox, mixWrap))));
       body.appendChild(outBox);
       dr.appendChild(body);
@@ -331,9 +369,9 @@
         var approved = S.codes().filter(function (c) { return S.status(c).s === "approved"; });
         var pool = approved.length ? approved : S.codes().filter(function (c) { var s = S.status(c).s; return s !== "rejected" && s !== "unavailable"; });
         var goals = (sv && sv.goals && sv.goals.length ? sv.goals : sv && sv.goal ? [sv.goal] : ["awareness"]).filter(function (g) { return g !== "conversion"; });
-        var state = { goals: goals.length ? goals : ["traffic"], goal: (goals[0] || "traffic"), budget: (sv && Number(sv.budget)) || 0,
+        var state = { goals: goals.length ? goals : ["traffic"], goal: (goals[0] || "traffic"), count: (sv && Number(sv.count)) || 0,
                       platforms: (sv && sv.platforms && sv.platforms.length ? sv.platforms : ["Instagram", "TikTok"]).slice(),
-                      mix: { mid: 2, micro: 6 }, mixP: null, second: [], which: "approved", src: "sel", market: (sv && sv.market) || "SA", seeded: !!seeded };
+                      mix: { mid: 2, micro: 6 }, mixP: null, second: [], which: "approved", src: "sel", seeded: !!seeded };
         buildDrawer(S, state, pool, approved, prev);
       });
     }
@@ -342,28 +380,30 @@
     /* -- the compact card in Helvy's chat -- */
     HV.roiCard = function (res) {
       var card = h("div", { class: "hv-msg hv-msg--ai cx-rcard" });
-      card.appendChild(h("div", { class: "cx-rcard__hd" }, h("b", { html: ic("calc") + "ROI Calculator" }), h("span", { class: "cx-tag cx-tag--est" }, "Estimate")));
-      card.appendChild(h("p", null, res.summary || ""));
+      card.appendChild(h("div", { class: "cx-rcard__hd" }, h("b", { html: ic("calc") + "ROI Calculator" }),
+        res.quality ? qualityChip(res.quality) : null, h("span", { class: "cx-tag cx-tag--est" }, "Estimate")));
+      var I = res.ideal || {};
+      card.appendChild(h("p", null, res.ideal_only ? (I.title || res.summary || "") : (res.summary || "")));
       var dl = h("dl", { class: "cx-figs" });
-      (res.figures || []).filter(function (f) { return ["cpm", "cpe", "cpc", "frequency"].indexOf(f.key) === -1 && !/^cost|^cpm|^cpe|^cpc/i.test(f.label || ""); }).slice(0, 4).forEach(function (f) {
+      (res.figures || []).filter(function (f) { return ["cpm", "cpe", "cpc", "frequency", "reach", "er"].indexOf(f.key) === -1; }).slice(0, 4).forEach(function (f) {
         var n = h("span", { class: "cx-n" }, h("span", { class: "cx-v" }, fig(f)));
-        if (f.unit === "%") n.appendChild(h("small", null, "%"));
-        dl.appendChild(h("div", null, h("dt", null, f.label), h("dd", null, n)));
+        dl.appendChild(h("div", null, h("dt", null, (res.ideal_only ? "Recommended " : "") + f.label.toLowerCase()), h("dd", null, n)));
       });
       card.appendChild(dl);
-      if (res.plan && res.plan.text) card.appendChild(h("p", { class: "cx-rcard__plan" }, "Suggested mix: " + res.plan.text + "."));
-      else if (res.mix && typeof res.mix === "object") {
-        var flat = Object.keys(res.mix).some(function (k) { return typeof res.mix[k] === "object"; });
-        if (flat) card.appendChild(h("p", { class: "cx-rcard__plan" }, "Suggested mix: " + mixSentence(res.mix) + "."));
+      var gap = (res.gap || []).slice(0, 2).join("; ");
+      var top = res.ways && res.ways[0];
+      if (res.quality && gap) card.appendChild(h("p", { class: "cx-rcard__plan" }, h("b", null, "Gap: "), gap + "."));
+      if (top) card.appendChild(h("p", { class: "cx-rcard__plan" }, h("b", null, "Best next step: "), top.text));
+      if (res.ideal_only && res.mix) {
+        var txt = mixSentence(res.mix);
+        if (txt) card.appendChild(h("p", { class: "cx-rcard__plan" }, "HelloVoice’s recommended structure: " + txt + "."));
       }
       var open = h("button", { class: "cx-btn", type: "button" }, "Open calculator");
       open.addEventListener("click", function () {
-        try { sessionStorage.setItem("cx-roi-seed", JSON.stringify({ goal: res.goal, goals: res.goals || [res.goal], budget: res.budget, platforms: res.platforms, mix: res.mix || null })); } catch (e) { /* blocked */ }
+        try { sessionStorage.setItem("cx-roi-seed", JSON.stringify({ goal: res.goal, goals: res.goals || [res.goal], platforms: res.platforms, mix: res.ideal_only ? null : (res.mix || null), count: res.count || 0 })); } catch (e) { /* blocked */ }
         if (PAGE === "selection" && window.hvSelection && window.hvSelection.token()) roiForSelection(); else location.href = ROOT + "account/#roi";
       });
-      var save = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("save") + "<span>Save</span>" });
-      save.addEventListener("click", function () { open.click(); });
-      card.appendChild(h("div", { class: "cx-rcard__go" }, open, save));
+      card.appendChild(h("div", { class: "cx-rcard__go" }, open));
       card.appendChild(h("p", { class: "cx-rcard__fine" }, ESTIMATE_LINE + " For creator prices, your account manager prepares a quote."));
       return card;
     };
@@ -404,11 +444,11 @@
       try { seed = JSON.parse(sessionStorage.getItem("cx-roi-seed") || "null"); sessionStorage.removeItem("cx-roi-seed"); } catch (e) { seed = null; }
       var flatSeed = seed && seed.mix && Object.keys(seed.mix).every(function (k) { return typeof seed.mix[k] !== "object"; });
       var goals = (seed && seed.goals && seed.goals.length ? seed.goals : seed && seed.goal ? [seed.goal] : ["engagement"]).filter(function (g) { return g !== "conversion"; });
-      var state = { goals: goals.length ? goals : ["traffic"], goal: goals[0] || "traffic", budget: (seed && seed.budget) || 0,
+      var state = { goals: goals.length ? goals : ["traffic"], goal: goals[0] || "traffic",
                     platforms: (seed && seed.platforms) || ["Instagram", "TikTok"], mix: (flatSeed && seed.mix) || { macro: 1, mid: 3, micro: 6 },
-                    mixP: seed && seed.mix && !flatSeed ? seed.mix : null, second: [], market: "SA" };
+                    mixP: seed && seed.mix && !flatSeed ? seed.mix : null, second: [] };
       p.appendChild(h("h1", { class: "cx-roipg__h1" }, "ROI Calculator"));
-      p.appendChild(h("p", { class: "cx-roipg__lead" }, "See what a mix of creators can deliver before you brief HelloVoice: views, reach, interactions or tracking-link clicks, as honest ranges. Add your total budget to get a suggested mix."));
+      p.appendChild(h("p", { class: "cx-roipg__lead" }, "Try a mix of creator sizes before you brief HelloVoice and see how it compares with HelloVoice’s recommended structure for the same number of creators: views, interactions and tracking-link clicks, as honest ranges."));
       var outBox = h("div"), last = null, platBox = null;
       function way(a) {
         if (!a) return;
@@ -417,14 +457,13 @@
       }
       var run = debounce(function () {
         outBox.classList.add("cx-busy");
-        estimate({ goal: state.goals[0], goals: state.goals, budget: state.budget, platforms: state.platforms, market: state.market, mix: state.mixP || state.mix }).then(function (res) {
+        estimate({ goal: state.goals[0], goals: state.goals, platforms: state.platforms, mix: state.mixP || state.mix }).then(function (res) {
           outBox.classList.remove("cx-busy"); if (!res) return; last = res; outBox.textContent = ""; outBox.appendChild(resultPanel(res, { onWay: way })); outBox.appendChild(acts);
         });
       }, 260);
       var useSel = h("button", { type: "button", class: "cx-link" }, "use a selection");
       platBox = platToggles(state, run);
       var inBox = h("div", { class: "cx-roipg__in" }, h("div", { class: "cx-inp" },
-        q("Your budget", h("div", null, h("p", { class: "cx-fine", style: "margin:0 0 8px" }, "Your total budget. It does not change the estimate: it helps us suggest a mix."), budgetBox(state, run))),
         q("Campaign type", seg(state, "goal", run), h("em", null, "pick one or more")), q("Platforms", platBox),
         q("Creators", mixBox(state, run), h("em", null, "or ", useSel))));
       var pick = h("select", { class: "cx-pick", "aria-label": "Selection to save to" });
@@ -441,7 +480,7 @@
       saveB.addEventListener("click", function () {
         if (!pick.value) return;
         saveB.disabled = true;
-        api("POST", "/api/roi/save", { token: pick.value, goal: state.goals[0], goals: state.goals, budget: state.budget, platforms: state.platforms, market: state.market, mix: state.mixP || state.mix })
+        api("POST", "/api/roi/save", { token: pick.value, goal: state.goals[0], goals: state.goals, platforms: state.platforms, mix: state.mixP || state.mix })
           .then(function (r) { saveB.disabled = false; note.className = "cx-note" + (r.b && r.b.ok ? "" : " cx-note--bad");
             note.textContent = r.b && r.b.ok ? "Saved with " + r.b.selection + "." : "That didn’t save. Please try again."; });
       });

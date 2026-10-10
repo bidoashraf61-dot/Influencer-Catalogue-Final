@@ -3,9 +3,8 @@
 - Awareness, Engagement and Traffic are the only campaign types; a stored Conversion reads as Traffic,
   Balanced as an equal blend; a campaign without an objective of its own takes its selection's goals;
 - scoring v2: scores carry confidence, reach and a limited-data flag; reach is not scored;
-- ROI Calculator v3: ranges, a trust line, a suggested mix and ways to improve with machine-readable
-  actions through the API; nothing about cost or prices; the admin's planner settings stay internal;
-- Helvy's roi_plan tool.
+- ROI Calculator (v3 here; v4 = fix batch 7, see e2e_portal_fixes7.py): ranges, a trust line and ways
+  to improve with machine-readable actions through the API; nothing about cost or prices.
 
 Same harness as e2e_portal.py (throwaway copy of admin/*.py, empty database, captured mail,
 scripted Gemini), so it never touches catalogue.db or the network.
@@ -112,11 +111,11 @@ class Fixes6(unittest.TestCase):
             self.assertNotIn("Reach", [p["label"] for p in sc["parts"]])
 
     # ---------------------------------------------------------------------- ROI --
-    def test_04_roi_api_ranges_trust_plan_and_ways(self):
+    def test_04_roi_api_ranges_trust_and_ways(self):
         c, _ = self.signup("roi6@glowderma.com")
         tok = self.selection(c, "ROI", ["HV-MI-001", "HV-MI-002", "HV-MD-004"])
-        s, r, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness", "traffic"], "budget": 200000,
-                                               "platforms": ["Instagram", "TikTok"], "market": "EG"})
+        s, r, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness", "traffic"],
+                                               "platforms": ["Instagram", "TikTok"]})
         self.assertEqual(s, 200, r)
         res = r["result"]
         self.assertEqual(res["goals"], ["awareness", "traffic"])
@@ -127,65 +126,50 @@ class Fixes6(unittest.TestCase):
         for f in res["figures"]:
             self.assertLessEqual(f["range"][0], f["value"] * 1.0001)
         txt = json.dumps(res).lower()
-        for word in ("cpm", "cpe", "cpc", "frequency", "verdict", "price", "creators_budget"):
+        for word in ("cpm", "cpe", "cpc", "frequency", "verdict", "price", "creators_budget", "budget", "market"):
             self.assertNotIn(word, txt, word)
-        self.assertIn("plan", res)
         self.assertLessEqual(len(res["ways"]), 3)
         for w in res["ways"]:
-            self.assertIn(w["action"]["type"], ("remove", "add", "second_post", "add_platform", "use_mix"))
-            self.assertNotRegex(w["text"].lower(), r"sar|price|cost|cheap")
-        # the market does not change a number
-        s, r2, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness", "traffic"], "budget": 200000,
-                                                "platforms": ["Instagram", "TikTok"], "market": "SA"})
-        self.assertEqual(r2["result"]["figures"], res["figures"])
-        # the budget does not change the estimate either
-        s, r3, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness", "traffic"], "budget": 5000,
+            self.assertIn(w["action"]["type"], ("replace", "remove", "add", "second_post", "add_platform", "use_mix"))
+            self.assertNotRegex(w["text"].lower(), r"\bsar\b|price|cost|cheap")
+        # an old client's budget or market changes nothing
+        s, r2, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness", "traffic"], "budget": 5000, "market": "EG",
                                                 "platforms": ["Instagram", "TikTok"]})
-        self.assertEqual(r3["result"]["figures"], res["figures"])
+        self.assertEqual(r2["result"]["figures"], res["figures"])
         # a second post for a creator is counted
         s, r4, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness"], "platforms": ["Instagram"], "second_posts": ["HV-MI-001"]})
         s, r5, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness"], "platforms": ["Instagram"]})
         self.assertGreater(r4["result"]["totals"]["views"], r5["result"]["totals"]["views"])
 
-    def test_05_mix_input_gets_a_suggested_mix_and_old_estimates_read(self):
+    def test_05_mix_input_gets_the_recommended_mix_and_old_estimates_read(self):
         c, _ = self.signup("mix6@glowderma.com")
-        s, r, _ = c.post("/api/roi/estimate", {"goals": ["engagement"], "budget": 150000, "platforms": ["TikTok"], "mix": {"micro": 1}})
+        s, r, _ = c.post("/api/roi/estimate", {"goals": ["engagement"], "platforms": ["TikTok"], "mix": {"micro": 1}})
         res = r["result"]
-        self.assertTrue(res["plan"]["mix"])
+        self.assertTrue(res["ideal"]["mix"])
         self.assertEqual(res["trust"]["of"], 0)
-        # a per-platform mix (the suggested one) is accepted back
-        s, r, _ = c.post("/api/roi/estimate", {"goals": ["engagement"], "platforms": ["TikTok"], "mix": res["plan"]["mix"]})
+        # a per-platform mix (the recommended one) is accepted back
+        s, r, _ = c.post("/api/roi/estimate", {"goals": ["engagement"], "platforms": ["TikTok"], "mix": res["ideal"]["mix"]})
         self.assertEqual(s, 200)
-        self.assertEqual(r["result"]["creators"], res["plan"]["creators"])
+        self.assertEqual(r["result"]["creators"], res["ideal"]["creators"])
         # saving keeps ranges and reads back clean
         tok = self.selection(c, "Saved", ["HV-MI-001"])
         s, b, _ = c.post("/api/roi/save", {"token": tok, "goals": ["awareness"], "platforms": ["Instagram"], "budget": 90000})
         self.assertTrue(b["ok"], b)
         saved = c.get("/api/roi/saved?s=" + tok)[1]["saved"]
         self.assertEqual(saved["input"]["goals"], ["awareness"])
+        self.assertNotIn("budget", saved["input"])
         self.assertNotIn("cost", saved["result"])
 
-    def test_06_helvy_plan_tool(self):
+    def test_06_helvy_compare_tool(self):
         ctx = {"code_id": 1, "kind": "client"}
-        out = assistant._roi_plan_tool(ctx, ["awareness", "conversion"], 120000, ["Instagram"])
-        self.assertTrue(out["suggested_mix"])
-        self.assertIn("rules", out)
+        out = assistant._roi_compare_tool(ctx, ["awareness", "conversion"], ["Instagram"], 8)
+        self.assertTrue(out["recommended_structure"]["creators_by_size"])
         self.assertEqual(ctx["roi"]["goals"], ["awareness", "traffic"])
-        for word in ("sar", "price", "cost"):
-            self.assertNotIn(word, json.dumps({k: v for k, v in out.items() if k != "rules"}).lower())
-        self.assertIn("error", assistant._roi_plan_tool({"code_id": 1}, ["awareness"], 0, ["Instagram"]))
-        self.assertIn("roi_plan", assistant.CLIENT_TOOLS)
-
-    def test_07_planner_settings_are_internal(self):
-        db.set_setting("roi_creator_share", 0.5)
-        db.set_setting("roi_planning_prices", {"micro": 2345})
-        share, prices = roi.settings()
-        self.assertEqual((share, prices["micro"], prices["nano"]), (0.5, 2345, 650))
-        c, _ = self.signup("priv6@glowderma.com")
-        s, r, _ = c.post("/api/roi/estimate", {"goals": ["awareness"], "budget": 100000, "platforms": ["Instagram"], "mix": {"micro": 2}})
-        self.assertNotIn("2345", json.dumps(r))
-        db.set_setting("roi_creator_share", None)
-        db.set_setting("roi_planning_prices", None)
+        for word in ("sar", "price", "cost", "budget"):
+            self.assertNotIn(word, json.dumps({k: v for k, v in out.items() if k != "note"}).lower())
+        self.assertIn("roi_compare", assistant.CLIENT_TOOLS)
+        self.assertNotIn("roi_plan", assistant.CLIENT_TOOLS)
+        self.assertIn("roi_estimate", assistant.CLIENT_TOOLS)
 
 
 if __name__ == "__main__":

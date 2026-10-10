@@ -114,6 +114,34 @@ class Backtest(unittest.TestCase):
         self.assertLessEqual(lo, tot)
         self.assertGreaterEqual(hi, tot)
 
+    def test_v4_structure_vs_performance(self):
+        """Fix batch 7. (1) the 18 posts' total views against the actual; (2) the Selection quality of the
+        campaign's creators against the Awareness ideal for the same number of creators.
+        NOTE: IG_VIEW_RATE was calibrated on 39 reels that include these 18, so (1) is in-sample."""
+        creators = list(self._creators().values())
+        for c in creators:
+            d = c["docs"]["Instagram"]
+            c["scores"]["Instagram"] = fit.score_core(dict(d), "Instagram", c["followers"]["Instagram"], "Awareness", None, "mid",
+                                                       None, None, None, 1)["score"]
+        res = roi.estimate("awareness", ["Instagram"], creators=creators, goals=["awareness"])
+        # each of the 18 posts as its own post (repeat posts count again), as the v2/v3 backtest did
+        raw = []
+        for p in POSTS:
+            d = dict(p["doc"], followers=p["followers"])
+            s = fit.score_core(dict(d), "Instagram", p["followers"], "Awareness", None, "mid", None, None, None, 1)["score"]
+            raw.append(roi.post_values("Instagram", p["followers"], d, s, plans.library()))
+        tot, lo, hi = roi.combine(raw, "views", "m_views")
+        print("\n== Penduline backtest v4 ==")
+        print("18 posts: predicted %s, range %s-%s, predicted/actual %.2f, actual in range: %s" % (
+            format(int(tot), ","), format(lo, ","), format(hi, ","), tot / ACTUAL, lo <= ACTUAL <= hi))
+        q = res["quality"]
+        print("%d creators, %d posts (one each): expected views %s; ideal for the same number %s; Selection quality %s (band %s, overlap %.2f)" % (
+            res["creators"], res["posts"], res["figures"][0]["range"], res["ideal"]["figures"][0]["range"], q["text"], q["band"], q["overlap"]))
+        print("gap:", res["gap"], "| by size:", [(x["label"], x["n"]) for x in res["selection"]["by_size"] if x["n"]],
+              "| ideal:", res["ideal"]["mix"])
+        self.assertGreater(tot, 0)
+        self.assertIsNotNone(q)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

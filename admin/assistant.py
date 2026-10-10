@@ -140,57 +140,60 @@ def t_suggest_shortlist(ctx, goal="awareness", category=None, market="SA", platf
                     "the account manager prepares a quote."}
 
 
-def _roi_tool(ctx, goal, budget, platforms, mix, market):
-    """What a mix of creator sizes delivers, as ranges. No cost, no verdict (ROI Calculator v3)."""
+def _roi_tool(ctx, goal, platforms, mix):
+    """What a mix of creator sizes is expected to deliver, as ranges, beside HelloVoice's recommended
+    structure for the same number of creators. No budget, no prices, no cost (ROI Calculator v4)."""
     import roi
     mix = {k: max(0, min(int(v or 0), 50)) for k, v in mix.items()}
     if not sum(mix.values()):
         mix = {"mid": 2, "micro": 6}
     goal = "traffic" if goal == "conversion" else goal
-    res = roi.public(roi.estimate(goal, budget, platforms or ["Instagram"], market if market in roi.MARKETS else "SA", mix=mix))
+    res = roi.full(goal, platforms or ["Instagram"], mix=mix, goals=[goal], with_advice=True)
     ctx["roi"] = dict(res, mix=mix)
+    q = res.get("quality") or {}
     return {"summary": res["summary"],
             "figures": {f["label"]: "%s to %s" % tuple(f["range"]) if f.get("range") else f["value"] for f in res["figures"]},
+            "recommended_structure": {"title": res["ideal"]["title"], "creators_by_size": roi.mix_text(res["ideal"]["mix"])},
+            "quality_of_the_mix": q.get("text"), "gap": res.get("gap"),
             "how_sure": res["trust"]["line"],
             "note": "A calculator card with these figures is shown to the client. Quote one or two figures as a range "
-                    "(e.g. 4K-6K); say it is an estimate, not a result. Do not name benchmark sources or explain the method. "
-                    "Never state creator or HelloVoice prices, costs per result or any verdict against the market."}
+                    "(e.g. 4K-6K); say it is an estimate, not a result. Call the structure 'HelloVoice's recommended structure'; never "
+                    "call it an industry benchmark or best practice. Do not explain the method. Never state prices or costs."}
 
 
-def _roi_plan_tool(ctx, goals, budget, platforms, market="SA"):
-    """The planner: a suggested mix for goals + budget; with a selection open, ways to improve it,
-    each with an action Helvy can offer through add_creators / remove_creators (confirm-before-write)."""
+def _roi_compare_tool(ctx, goals, platforms, count=0):
+    """Structure vs performance: the open selection's creators against HelloVoice's recommended
+    structure for the same number of creators, with ways to improve, each carrying an action Helvy
+    can offer through add_creators / remove_creators (confirm-before-write)."""
     import roi
     gl = [("traffic" if g == "conversion" else g) for g in (goals or [])]
     gl = list(dict.fromkeys(g for g in gl if g in roi.GOALS)) or ["awareness"]
     platforms = [p for p in (platforms or []) if p in roi.PLATFORMS] or ["Instagram"]
-    budget = roi.parse_budget(budget)
-    if not budget:
-        return {"error": "Ask the client for their total budget in SAR first."}
-    planned = roi.plan(gl, budget, platforms, market if market in roi.MARKETS else "SA", supply=roi.supply_from_db())
-    pub = roi.public(planned)
-    out = {"suggested_mix": roi.mix_text(planned["mix"]), "creators_in_plan": planned["planned_creators"],
-           "expected": {f["label"]: "%s to %s" % tuple(f["range"]) for f in planned["figures"] if f.get("range")},
-           "how_sure": planned["trust"]["line"]}
-    ctx["roi"] = dict(pub, mix=planned["mix"])
     sel_ctx = ctx.get("selection")
     sel = db.selection(token=sel_ctx["token"]) if sel_ctx else None
-    if sel is not None:
-        creators = roi.creators_of(sel, "approved", goals=gl)
-        res = roi.estimate(gl[0], budget, platforms, market, creators=creators, goals=gl)
-        cands = None
-        try:
-            cands = roi.candidates_from_db([c["code"] for c in creators] + json.loads(sel["codes"] or "[]"), platforms, gl,
-                                           roi.objective_for_selection(sel, gl))
-        except Exception:
-            cands = None
-        cov = roi.coverage(res, planned, gl)
-        out["selection"] = {"creators": res["creators"], "reaches_about_pct_of_plan": int(round(cov * 100)) if cov is not None else None}
-        out["ways_to_improve"] = [{"text": w["text"], "action": w["action"]} for w in roi.advise(res, planned, gl, candidates=cands, creators=creators)]
-        out["note"] = ("Offer each way as one short sentence. To act on 'add' or 'remove', call add_creators or remove_creators with the "
-                       "codes in the action; the client confirms. 'second_post' and 'add_platform' are changed in the ROI Calculator.")
-    out["rules"] = "Advice only, never a verdict. Never state prices, fees or costs. An estimate, not a result."
-    return out
+    if sel is None:
+        n = max(1, min(int(count or 8), 100))
+        res = roi.full(gl[0], platforms, creators=[], goals=gl, count=n)
+        ctx["roi"] = dict(res, mix=res["ideal"]["mix"], ideal_only=True, figures=res["ideal"]["figures"])
+        return {"recommended_structure": {"title": res["ideal"]["title"], "creators_by_size": roi.mix_text(res["ideal"]["mix"])},
+                "expected": {f["label"]: "%s to %s" % tuple(f["range"]) for f in res["ideal"]["figures"] if f.get("range")},
+                "how_sure": res["trust"]["line"],
+                "note": "No selection is open, so this is the recommended structure only. Offer to compare once they open a selection."}
+    creators = roi.creators_of(sel, "approved", goals=gl)
+    res = roi.full(gl[0], platforms, creators=creators, goals=gl, sel=sel)
+    ctx["roi"] = dict(res, mix=res["ideal"]["mix"])
+    q = res.get("quality") or {}
+    return {"selection_quality": q.get("text"), "ideal": res["ideal"]["title"],
+            "recommended_structure": roi.mix_text(res["ideal"]["mix"]),
+            "gap": res.get("gap"),
+            "selection": {f["label"]: "%s to %s" % tuple(f["range"]) for f in res["figures"] if f.get("range")},
+            "recommended": {f["label"]: "%s to %s" % tuple(f["range"]) for f in res["ideal"]["figures"] if f.get("range")},
+            "how_sure": res["trust"]["line"],
+            "ways_to_improve": [{"text": w["text"], "action": w["action"]} for w in res.get("ways", [])],
+            "note": ("Give the quality as a rounded percentage of HelloVoice's recommended structure, then at most one way to improve "
+                     "as one short sentence. To act on 'add', 'remove' or 'replace' call add_creators and/or remove_creators with the codes in "
+                     "the action; the client confirms. 'second_post' and 'add_platform' are changed in the ROI Calculator. Never state prices "
+                     "or costs; never call the structure an industry benchmark.")}
 
 
 def t_price_bands(ctx):
@@ -875,24 +878,24 @@ CLIENT_TOOLS = {
     "my_decisions": (lambda ctx: __import__("helvy_kb").decisions(ctx.get("code_id")), _decl("my_decisions",
         "The creators this client approved and rejected in their selections, with their reject reasons. Use it to suggest "
         "creators that match their taste.")),
-    "roi_estimate": (lambda ctx, goal="awareness", budget_sar=0, platforms=None, mega=0, macro=0, mid=0, micro=0, nano=0, market="SA":
-                     _roi_tool(ctx, goal, budget_sar, platforms, {"mega": mega, "macro": macro, "mid": mid, "micro": micro, "nano": nano}, market),
+    "roi_estimate": (lambda ctx, goal="awareness", platforms=None, mega=0, macro=0, mid=0, micro=0, nano=0:
+                     _roi_tool(ctx, goal, platforms, {"mega": mega, "macro": macro, "mid": mid, "micro": micro, "nano": nano}),
                      _decl("roi_estimate",
-        "ROI Calculator: what a mix of creators can deliver for a goal (awareness, engagement or traffic), as ranges of views, "
-        "reach, interactions and clicks. Give the number of creators per size (mega 1M+, macro "
-        "500K-1M, mid 100-500K, micro 20-100K, nano under 20K); if the client did not say, use 2 mid and 6 micro. Shows a "
-        "calculator card in the chat. It never uses or reveals prices, and gives no cost per result and no market verdict.",
-        {"goal": {"type": "STRING", "enum": ["awareness", "engagement", "traffic"]}, "budget_sar": N, "platforms": SA,
-         "mega": I, "macro": I, "mid": I, "micro": I, "nano": I, "market": S}, ["goal"])),
-    "roi_plan": (lambda ctx, goals=None, budget_sar=0, platforms=None, market="SA": _roi_plan_tool(ctx, goals, budget_sar, platforms, market),
-                 _decl("roi_plan",
-        "ROI planner: given the client's goals (one or several of awareness, engagement, traffic), their TOTAL budget in SAR and "
-        "platforms, suggest a mix of creator sizes and what it should deliver (ranges). When a selection is open it also compares "
-        "the selection with the plan and returns ways to improve, each with an action (add or remove creator codes, a second "
-        "post, another platform) you can offer; apply add/remove only through add_creators / remove_creators. Advice only: never "
-        "state prices, costs or a verdict, and never reveal how the budget is split.",
-        {"goals": {"type": "ARRAY", "items": {"type": "STRING", "enum": ["awareness", "engagement", "traffic"]}}, "budget_sar": N,
-         "platforms": SA, "market": S}, ["goals", "budget_sar"])),
+        "ROI Calculator: what a mix of creators is expected to deliver for a goal (awareness, engagement or traffic), as ranges of views, "
+        "reach, interactions and clicks, beside HelloVoice's recommended structure for the same number of creators. Give the number of "
+        "creators per size (mega 1M+, macro 500K-1M, mid 100-500K, micro 20-100K, nano under 20K); if the client did not say, use 2 mid "
+        "and 6 micro. Shows a calculator card in the chat. It has no budget and no prices, and gives no cost per result.",
+        {"goal": {"type": "STRING", "enum": ["awareness", "engagement", "traffic"]}, "platforms": SA,
+         "mega": I, "macro": I, "mid": I, "micro": I, "nano": I}, ["goal"])),
+    "roi_compare": (lambda ctx, goals=None, platforms=None, creators=0: _roi_compare_tool(ctx, goals, platforms, creators),
+                    _decl("roi_compare",
+        "ROI Calculator, structure vs performance: compares the open selection with HelloVoice's recommended structure for the same "
+        "number of creators and returns the Selection quality (a rounded percentage), the gap in plain words and up to three ways to "
+        "improve, each with an action (add, remove or replace creator codes, a second post, another platform) you can offer; apply "
+        "add/remove only through add_creators / remove_creators. With no selection open, give the number of creators and it returns the "
+        "recommended structure. Advice only: no budget, no prices, no costs.",
+        {"goals": {"type": "ARRAY", "items": {"type": "STRING", "enum": ["awareness", "engagement", "traffic"]}},
+         "platforms": SA, "creators": I}, ["goals"])),
     "company_info": (t_company_info, _decl("company_info", "About HelloVoice: services, contact, how quotes work.")),
     "my_work": (t_my_work, _decl("my_work", "This client's own credits, past briefs, selections and campaigns.")),
 }
@@ -1268,7 +1271,8 @@ def system_prompt(scope, ctx):
         "(3) HARD RULE, NO PRICES: never state, estimate, compare or hint at prices, fees, rates, costs or budgets for creators, "
         "HelloVoice services or campaigns, not even ranges, and never say what something 'usually costs'. For any pricing question say "
         "your account manager will prepare a quote, and offer to request one (request_quote). The only money you may discuss is the "
-        "client's OWN budget inside the ROI Calculator (roi_estimate, roi_plan), which never uses or reveals creator prices. You cannot book, promise availability or "
+        "ROI Calculator (roi_estimate, roi_compare) has no budget and no prices: it compares a campaign's structure with its expected performance. "
+        "Call its structure 'HelloVoice's recommended structure', never an industry benchmark. You cannot book, promise availability or "
         "discount. (4) If asked something you cannot answer from the tools, offer to pass it to the team (info@hellovoice.co.uk). (5) Answer ONLY what was "
         "asked, straight away: one to three short sentences, or at most five short bullets when listing. No greeting, no restating the "
         "question, no background they did not ask for, no closing offer or question unless a choice is genuinely needed to continue. "
@@ -1352,7 +1356,7 @@ STEP_LABEL = {
     "request_analysis": "Preparing the request",
     "rank_by_metric": "Ranking creators", "company_info": "Checking HelloVoice details",
     "campaign_results": "Reading HelloVoice campaign results", "occasions": "Checking the occasions calendar",
-    "my_decisions": "Reading your approvals and rejections", "roi_estimate": "Working out what your budget can reach", "roi_plan": "Planning the best mix for your budget",
+    "my_decisions": "Reading your approvals and rejections", "roi_estimate": "Working out what this mix can deliver", "roi_compare": "Comparing with the recommended structure",
     "my_work": "Opening your selections and campaigns",
 }
 

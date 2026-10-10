@@ -77,12 +77,13 @@ class Fixes4(unittest.TestCase):
         self.assertEqual(sel2["brief"]["objective"], "Traffic")           # a saved "conversion" reads as Traffic
 
     # ---------------------------------------------------------- ROI Calculator --
-    def test_03_roi_reads_arabic_digits_and_shows_ranges_only(self):
+    def test_03_roi_ignores_a_budget_and_shows_ranges_only(self):
+        # fix batch 7: the calculator has no budget; one sent by an old client changes nothing and is not echoed
         c, _ = self.signup("roi4@glowderma.com")
         body = {"goal": "engagement", "platforms": ["Instagram"], "mix": {"micro": 6}}
         a = c.post("/api/roi/estimate", dict(body, budget="١٢٠٬٠٠٠"))[1]["result"]
-        b = c.post("/api/roi/estimate", dict(body, budget=120000))[1]["result"]
-        self.assertEqual(a["budget"], 120000)
+        b = c.post("/api/roi/estimate", dict(body))[1]["result"]
+        self.assertNotIn("budget", a)
         self.assertEqual(a["figures"], b["figures"])
         for f in a["figures"]:
             self.assertTrue(f["range"][0] <= f["value"] <= f["range"][1], f)

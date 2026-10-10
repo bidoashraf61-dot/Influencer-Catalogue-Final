@@ -276,22 +276,24 @@
   }
   function later(ms, fn) { return new Promise(function (ok) { setTimeout(function () { ok(fn()); }, REDUCE ? Math.min(ms, 400) : ms); }); }
   function chatStream(win, text) {
-    var roi = /sar|riyal|budget|reach\?/i.test(text);
+    var roi = /creators? (do|reach)|ideal|mix/i.test(text);
     var events = roi ? [
-      [500, { t: "step", text: "Reading your budget" }], [900, { t: "step", text: "Checking Saudi market benchmarks" }], [900, { t: "step", text: "Working out the reach" }],
-      [500, { t: "done", thread: "demo", reply: "With **SAR 50,000** on Instagram and TikTok in Saudi Arabia, a mix of 1 macro, 3 mid-tier and 6 micro creators could reach about **1.1M–1.7M people**. It's an estimate, not a result.",
-        roi: { goal: "awareness", budget: 50000, platforms: ["Instagram", "TikTok"], summary: "Awareness · 1 macro, 3 mid, 6 micro · Saudi Arabia",
-          figures: [{ key: "reach", label: "Reach", value: 1400000, range: [1100000, 1700000] }, { key: "views", label: "Views", value: 2100000, range: [1700000, 2600000] }, { key: "interactions", label: "Interactions", value: 88000, range: [70000, 110000] }],
-          trust: { line: "Based on what similar creators of each size deliver; no individual creator measured.", measured: 0, of: 0 },
-          plan: { text: "1 macro, 3 mid-size, 6 micro on Instagram and TikTok" } },
-        next: ["Find creators within my budget", "Talk to a person"] }]]
+      [500, { t: "step", text: "Reading your request" }], [900, { t: "step", text: "Building the recommended structure" }], [900, { t: "step", text: "Working out the views" }],
+      [500, { t: "done", thread: "demo", reply: "For **10 creators** on Instagram and TikTok, HelloVoice's recommended structure for awareness is 1 macro, 3 mid-tier and 6 micro creators, and could reach about **2.1M–3.2M views**. It's an estimate, not a result.",
+        roi: { goal: "awareness", goals: ["awareness"], platforms: ["Instagram", "TikTok"], count: 10, ideal_only: true, creators: 0,
+          summary: "Ideal for Awareness with 10 creators · Instagram and TikTok",
+          ideal: { title: "Ideal for Awareness with 10 creators" },
+          mix: { Instagram: { macro: 1, mid: 3, micro: 6 }, TikTok: { macro: 1, mid: 3, micro: 6 } },
+          figures: [{ key: "views", label: "Views", value: 2600000, range: [2100000, 3200000] }, { key: "interactions", label: "Interactions", value: 88000, range: [70000, 110000] }],
+          trust: { line: "Based on what similar creators of each size deliver; no individual creator measured.", measured: 0, of: 0 } },
+        next: ["Find creators", "Talk to a person"] }]]
       : [
       [500, { t: "step", text: "Reading your brief" }], [1000, { t: "step", text: "Scanning the catalogue" }], [1100, { t: "step", text: "Scoring fit for Ramadan skincare" }], [900, { t: "step", text: "Picking the best five" }],
       [400, { t: "delta", text: "Here are **5 creators** for a Ramadan skincare launch in Riyadh, best fit first. " }],
       [300, { t: "delta", text: "Dr. Ghada leads: a dermatologist carries skincare claims best. Lulwa brings reach with a 71% female audience." }],
       [300, { t: "done", thread: "demo", reply: "Here are **5 creators** for a Ramadan skincare launch in Riyadh, best fit first. Dr. Ghada leads: a dermatologist carries skincare claims best. Lulwa brings reach with a 71% female audience.",
         cards: PICKS.map(function (x) { var p = BY[x[0]]; return { code: p[0], name: p[1], photo_url: photo(p[6]), fit: x[1], followers: p[7][0][1], city: p[4], tier: p[3].replace(/^HCP - /, "Doctor · ") }; }),
-        next: ["Save all as a selection", "What can my budget reach?"] }]];
+        next: ["Save all as a selection", "What is the ideal creator mix?"] }]];
     var enc = new TextEncoder();
     var body = new win.ReadableStream({
       start: function (ctl) {
@@ -476,7 +478,7 @@
       { view: "catalogue", fresh: true, target: "#hv-panel", clip: "thinking", run: "chatBrief", wait: "#hv-panel:not([hidden])",
         t: "Tell Helvy your campaign", p: "Write it the way you'd say it. Helvy reads the brief, scores the roster and hands back a shortlist, with the reasons.", hint: "Watch: “5 skincare creators in Riyadh for a Ramadan launch”" },
       { target: "#hv-panel", clip: "point", run: "chatBudget",
-        t: "Ask what your budget can reach", p: "An estimate from your own budget and Saudi market benchmarks: reach, views, engagement. Creator prices come in your quote, never in the chat.", hint: "Watch: “What can 50,000 SAR reach?”" },
+        t: "Ask for the ideal creator mix", p: "HelloVoice's recommended structure for the number of creators you have in mind: expected views, interactions and clicks as ranges. Creator prices come in your quote, never in the chat.", hint: "Watch: “What can 10 creators do for awareness?”" },
       { target: "#ai-sl", clip: "cards", run: "aiCard", pad: 12,
         t: "Or brief Helvy in six taps", p: "The AI shortlist card asks six quick questions. Helvy flips through the creators, scores every one and puts a green check on the best picks." }
     ] },
@@ -720,7 +722,7 @@
     if (run !== "menu") { var mm = d.getElementById("pt-menu"); if (mm && !mm.hidden) { var av = d.getElementById("pt-avatar"); if (av) av.click(); } }
     if (run !== "bell") { var bd = d.getElementById("hv-bell-drop"); if (bd && !bd.hidden) { var bl = d.getElementById("hv-bell"); if (bl) bl.click(); } }
     if (run === "chatBrief" || run === "chatBudget") {
-      var text = run === "chatBrief" ? "Find me 5 skincare creators in Riyadh for a Ramadan launch" : "What can 50,000 SAR reach?";
+      var text = run === "chatBrief" ? "Find me 5 skincare creators in Riyadh for a Ramadan launch" : "What can 10 creators do for awareness on Instagram and TikTok?";
       if (P.voiceDemo) P.voiceDemo(text, run === "chatBrief");
       waitFor("#hv-panel:not([hidden])", 4000, function () { light(b); });
       // The panel grows as the answer arrives: keep the light on it.

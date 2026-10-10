@@ -139,7 +139,7 @@ class CD(unittest.TestCase):
     # --------------------------------------------------------------------- ROI --
     def test_04_roi_calculator_mix_selection_save_and_versus(self):
         c, _ = self.signup("roi@bayer-test.com")
-        r = c.post("/api/roi/estimate", {"goal": "awareness", "budget": 120000, "platforms": ["Instagram", "TikTok"],
+        r = c.post("/api/roi/estimate", {"goal": "awareness", "platforms": ["Instagram", "TikTok"],
                                          "mix": {"mid": 3, "micro": 6}})[1]["result"]
         self.assertTrue(r["estimate"])
         self.assertNotIn("verdict", r)                                              # fix batch 6: no market verdict
@@ -155,20 +155,18 @@ class CD(unittest.TestCase):
         self.assertNotIn("advice", r)
         self.assertNotIn("sources", r)
         self.assertNotIn("Kolsquare", json.dumps(r))
-        # the budget no longer changes what the creators deliver; it feeds the planner (advice) only
-        a = roi.estimate("engagement", 1000, ["Instagram"], mix={"micro": 10})
-        b = roi.estimate("engagement", 5000000, ["Instagram"], mix={"micro": 10})
-        self.assertEqual(a["figures"], b["figures"])
-        t = roi.estimate("traffic", 60000, ["TikTok"], mix={"mid": 2, "micro": 6})
+        # fix batch 7: no budget anywhere; the recommended structure for the same creators is returned
+        t = roi.estimate("traffic", ["TikTok"], mix={"mid": 2, "micro": 6})
         self.assertEqual([f["key"] for f in t["figures"]], ["clicks", "views"])
-        self.assertTrue(r["plan"]["mix"])                                           # the planner answered the budget
+        self.assertEqual(r["ideal"]["creators"], 9)
+        self.assertNotIn("budget", r)
         # a selection: its own creators, one post per platform they are on
         tok = self.sel(c, "Derm launch", ["HV-MI-001", "HV-MD-003", "HV-MI-002"])
         self.approve(c, tok, "HV-MI-001")
         self.approve(c, tok, "HV-MD-003")
-        r = c.post("/api/roi/estimate", {"token": tok, "goal": "engagement", "budget": 50000, "platforms": ["Instagram", "TikTok"]})[1]["result"]
+        r = c.post("/api/roi/estimate", {"token": tok, "goal": "engagement", "platforms": ["Instagram", "TikTok"]})[1]["result"]
         self.assertEqual(r["creators"], 2)                                         # the approved ones
-        s, b, _ = c.post("/api/roi/save", {"token": tok, "goal": "engagement", "budget": 50000, "platforms": ["Instagram", "TikTok"]})
+        s, b, _ = c.post("/api/roi/save", {"token": tok, "goal": "engagement", "platforms": ["Instagram", "TikTok"]})
         self.assertTrue(b["ok"], b)
         saved = c.get("/api/roi/saved?s=" + tok)[1]["saved"]
         self.assertEqual(saved["goal"], "engagement")
@@ -283,15 +281,16 @@ class CD(unittest.TestCase):
         self.assertEqual(d["reject_reasons"], {"Audience": 1})
         self.assertEqual(helvy_kb.decisions(ub["code_id"])["selections"], [])
 
-    def test_07_budget_question_in_chat_is_an_instant_free_roi_card(self):
+    def test_07_count_question_in_chat_is_an_instant_free_roi_card(self):
         c, _ = self.signup("chatroi@nahdi-test.com")
         before = c.get("/api/me")[1]["credits"]
-        s, raw, _ = c.post("/api/chat/stream", {"message": "What can SAR 60,000 do on TikTok if we want clicks?"})
+        s, raw, _ = c.post("/api/chat/stream", {"message": "What can 10 creators do on TikTok if we want clicks?"})
         lines = [json.loads(x) for x in raw.splitlines() if x.strip()]
         done = [x for x in lines if x["t"] == "done"][0]
         self.assertEqual(done["roi"]["goal"], "traffic")
         self.assertEqual(done["roi"]["platforms"], ["TikTok"])
-        self.assertEqual(done["roi"]["budget"], 60000)
+        self.assertEqual(done["roi"]["count"], 10)
+        self.assertNotIn("budget", done["roi"])
         self.assertEqual(before, c.get("/api/me")[1]["credits"])
         self.assertIsNone(roi.from_text("Hello there"))
 

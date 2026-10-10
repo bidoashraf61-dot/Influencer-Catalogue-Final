@@ -246,22 +246,20 @@ def _values(v, allowed):
 
 
 def roi_seed(answers):
-    """The ROI Calculator's starting values from a brief's answers: ``{goal, platforms, market,
-    budget}`` (budget only when the brief has one). The calculator takes one goal and one market:
-    the first goal named (an old brief's Conversion reads as Traffic; Balanced as Awareness) and the
-    first country it covers. Nothing here changes the calculator itself."""
+    """The ROI Calculator's starting values from a brief's answers: ``{goal, goals, platforms,
+    count}`` (count = the number of creators the brief asked for, when it did). No budget and no
+    market: the calculator compares a campaign's structure with its performance only."""
     import roi
     b = to_brief(answers)
     first = str(b["objective"]).split("+")[0].lower()
     goal = first if first in roi.GOALS else "awareness"
     plats = [p for p in b["platforms"] if p in roi.PLATFORMS]
-    market = next((m for m in fit.target_list(b["target"]["country"]) if m in roi.MARKETS), "SA")
     parts = [g.lower() for g in fit.parts_of(b["objective"])]
     goals = [g for g in (parts if parts != ["balanced"] else list(roi.GOALS)) if g in roi.GOALS]
-    out = {"goal": goal, "goals": goals or [goal], "platforms": plats or ["Instagram", "TikTok"], "market": market,
+    out = {"goal": goal, "goals": goals or [goal], "platforms": plats or ["Instagram", "TikTok"],
            "platforms_from_brief": bool(plats)}
-    if isinstance(b.get("budget_max"), (int, float)) and b["budget_max"] > 0:
-        out["budget"] = int(b["budget_max"])
+    if isinstance(b.get("count"), int) and b["count"] > 0:
+        out["count"] = int(b["count"])
     return out
 
 

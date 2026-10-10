@@ -2368,7 +2368,7 @@
         : [{ label: "Find creators for a campaign", go: flowFind }];
       if (document.querySelector(".cat-bar")) list.push({ label: "Show creators on this page", go: flowShow });
       list.push({ label: "Work on my selection", go: flowSelection },
-                { label: "What can my budget reach?", go: flowBudget },
+                { label: "What is the ideal creator mix?", go: flowIdeal },
                 { label: "Get a quote", go: flowQuote },
                 { label: "Talk to my account manager", go: flowHuman },
                 { label: "Just browsing", ghost: true, go: function () { say("Sure. I'll be right here in the corner whenever you need me."); } });
@@ -2383,12 +2383,13 @@
                 { label: "Talk to a person", go: flowHuman });
       chips(list, { hint: "Tap to choose · or type below" });
     }
-    // "What can my budget reach?": the client's own budget, answered with the ROI card (free).
-    function flowBudget() {
-      askFor("What's your budget in SAR, and what matters most: reach, engagement or clicks?", "e.g. 80,000 for reach on Instagram", function (text) {
-        var n = /(\d[\d,.]*)\s*(k|m|thousand|million|ألف)?/i.exec(text);
-        if (!n) { say("I need a number, like 80,000."); flowBudget(); return; }
-        submit("What can SAR " + n[1] + (n[2] ? n[2] : "") + " reach " + text.replace(n[0], "").trim(), true);
+    // "What is the ideal creator mix?": how many creators, answered with the ROI card (free): HelloVoice's
+    // recommended structure for that number of creators and the goal. No budget, no prices.
+    function flowIdeal() {
+      askFor("How many creators, and what matters most: views, engagement or clicks?", "e.g. 10 creators for clicks on TikTok", function (text) {
+        var n = /(\d{1,3})/.exec(text.replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); }));
+        if (!n) { say("I need a number of creators, like 10."); flowIdeal(); return; }
+        submit("What can " + n[1] + " creators do " + text.replace(n[0], "").replace(/creators?/i, "").trim(), true);
       });
     }
     function greet() {
@@ -2879,7 +2880,7 @@
     /* -- after an answer: the likely next asks, one tap each -- */
     function followUps(list) {
       var acts = { "Find creators": flowFind, "Find creators within my budget": flowFind, "Get a quote": flowQuote,
-                   "What can my budget reach?": flowBudget,
+                   "What is the ideal creator mix?": flowIdeal,
                    "Talk to a person": flowHuman,
                    "Save all as a selection": function () { (lastCards || []).forEach(function (c) { if (picked.indexOf(c.code) === -1) picked.push(c.code); }); drawPicks(); savePicks(); } };
       chips((list || []).map(function (label) {
@@ -2932,8 +2933,8 @@
       // brief and scores. Only elsewhere does a campaign description start the free find-creators taps.
       // Typed questions go to the assistant with the page as context; it decides (it can build a
       // shortlist itself). The free tap-through questions stay one tap away in the menu.
-      // "What can SAR 60,000 reach?" is answered on the server with the ROI card: free, no AI needed.
-      var roiAsk = /(sar|sr|riyals?|ريال)\s*\d|\d[\d,.]*\s*(k|thousand|ألف)?\s*(sar|sr|riyals?|ريال)/i.test(text);
+      // "What can 10 creators do for clicks on TikTok?" is answered on the server with the ROI card: free, no AI needed.
+      var roiAsk = /\b\d{1,3}\s*(creators?|influencers?|bloggers?)\b/i.test(text) && /\b(reach|what can|roi|ideal|best mix|structure|mix)\b/i.test(text);
       if (!roiAsk && !(ME && ME.ai) && !selToken() && REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
       if (!roiAsk && !(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
       busy = true; send.disabled = true;

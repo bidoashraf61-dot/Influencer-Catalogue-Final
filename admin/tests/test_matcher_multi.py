@@ -89,15 +89,18 @@ class Multi(unittest.TestCase):
 
     def test_roi_seed_reads_the_brief(self):
         a, _ = clean(market=["KW", "AE"], goal=["engagement", "traffic"], platforms=["TikTok"], budget="150")
+        # fix batch 7: no budget and no market in the seed; the brief's number of creators instead
         self.assertEqual(matcher.roi_seed(a), {"goal": "engagement", "goals": ["engagement", "traffic"], "platforms": ["TikTok"],
-                                               "market": "AE", "platforms_from_brief": True, "budget": 150000})
+                                               "platforms_from_brief": True, "count": 8})
         a, _ = clean(market="SA", goal="conversion", budget="open")
         seed = matcher.roi_seed(a)
-        self.assertEqual((seed["goal"], seed["market"]), ("traffic", "SA"))
+        self.assertEqual(seed["goal"], "traffic")
         self.assertNotIn("budget", seed)
-        a, _ = clean(market="SA", goal="balanced", platforms=["any"], budget="other:120k")
+        self.assertNotIn("market", seed)
+        a, _ = clean(market="SA", goal="balanced", platforms=["any"], budget="other:120k", count="15")
         seed = matcher.roi_seed(a)
-        self.assertEqual((seed["goal"], seed["budget"], seed["platforms"]), ("awareness", 120000, ["Instagram", "TikTok"]))
+        self.assertEqual((seed["goal"], seed["count"], seed["platforms"]), ("awareness", 15, ["Instagram", "TikTok"]))
+        self.assertNotIn("budget", seed)
         self.assertEqual(matcher.timing_market(["AE", "SA"]), "SA")
         self.assertEqual(matcher.timing_market(["AE", "EG"]), "AE")
         self.assertEqual(matcher.timing_market("EG"), "EG")

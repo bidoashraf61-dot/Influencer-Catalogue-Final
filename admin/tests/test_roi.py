@@ -1,4 +1,4 @@
-"""Unit tests for the pure parts of phase C + D: ROI grades and sizes, reading a budget
+"""Unit tests for the pure parts of phase C + D: ROI grades and sizes, reading a count
 question typed in the chat, the occasions calendar and look-alike reasons. No database."""
 import datetime
 import sys
@@ -24,43 +24,34 @@ def _bare():
     roi.benchmarks.invalidate()
 
 
-class ChatBudget(unittest.TestCase):
-    def test_reads_amount_goal_and_platform(self):
-        cases = {"What can SAR 60,000 do on TikTok if we want clicks?": (60000, "traffic", ["TikTok"]),
-                 "what can 80k SAR reach on instagram": (80000, "awareness", ["Instagram"]),
-                 "budget of 50 thousand riyals for engagement": (50000, "engagement", ["Instagram", "TikTok"])}
+class ChatCount(unittest.TestCase):
+    """Fix batch 7: the chat reads how many creators, not a budget."""
+    def test_reads_count_goal_and_platform(self):
+        cases = {"What can 10 creators do on TikTok if we want clicks?": (10, "traffic", ["TikTok"]),
+                 "what can 6 influencers reach on instagram": (6, "awareness", ["Instagram"]),
+                 "best mix of 12 creators for engagement": (12, "engagement", ["Instagram", "TikTok"])}
         _bare()
-        for text, (budget, goal, plats) in cases.items():
+        for text, (count, goal, plats) in cases.items():
             r = roi.from_text(text)
             self.assertIsNotNone(r, text)
-            self.assertEqual((r["budget"], r["goal"], r["platforms"]), (budget, goal, plats), text)
+            self.assertEqual((r["count"], r["goal"], r["platforms"]), (count, goal, plats), text)
             self.assertNotIn("_posts", r)
+            self.assertNotIn("budget", r)
 
     def test_ignores_other_questions(self):
-        for text in ("How much does a reel cost?", "Find me 5 creators in Riyadh", "SAR 200 for a coffee"):
+        for text in ("How much does a reel cost?", "Find me creators in Riyadh", "SAR 200 for a coffee", "What can SAR 60,000 reach?"):
             self.assertIsNone(roi.from_text(text), text)
 
 
 class ArabicDigits(unittest.TestCase):
-    """Fix batch 4, item 24: a budget typed with Arabic-Indic or Persian digits."""
-    def test_parse_budget(self):
-        cases = {"١٢٠٠٠٠": 120000, "١٢٠٬٠٠٠": 120000, "۱۲۰,۰۰۰": 120000, "120,000": 120000, "12 000": 12000,
-                 "٧٥٠٠٠٫٥": 75000.5, 90000: 90000, "": 0, None: 0, "abc": 0, "-5": 0, "9" * 12: 1e9}
-        for raw, want in cases.items():
-            self.assertEqual(roi.parse_budget(raw), want, raw)
-
     def test_ascii_digits_leaves_other_text(self):
         self.assertEqual(roi.ascii_digits("SAR ٦٠٬٠٠٠ on TikTok"), "SAR 60,000 on TikTok")
 
-    def test_estimate_and_chat_read_arabic_digits(self):
+    def test_chat_reads_arabic_digits(self):
         _bare()
-        a = roi.estimate("awareness", "١٢٠٬٠٠٠", ["Instagram"], "SA", mix={"micro": 4})
-        b = roi.estimate("awareness", 120000, ["Instagram"], "SA", mix={"micro": 4})
-        self.assertEqual(a["budget"], 120000)
-        self.assertEqual(a["figures"], b["figures"])
-        r = roi.from_text("وش ممكن توصل ميزانية ٦٠٬٠٠٠ ريال على تيك توك")
+        r = roi.from_text("ماذا يحقق ١٢ مؤثرين على تيك توك reach")
         self.assertIsNotNone(r)
-        self.assertEqual(r["budget"], 60000)
+        self.assertEqual(r["count"], 12)
 
 
 class Ranges(unittest.TestCase):
@@ -72,7 +63,7 @@ class Ranges(unittest.TestCase):
     def test_estimate_has_ranges_and_nothing_removed(self):
         _bare()
         for goal in roi.GOALS:
-            r = roi.public(roi.estimate(goal, 90000, ["Instagram", "TikTok"], "SA", mix={"mid": 2, "micro": 6}))
+            r = roi.public(roi.estimate(goal, ["Instagram", "TikTok"], mix={"mid": 2, "micro": 6}))
             for gone in ("cost", "verdict", "advice", "sources", "split", "_posts"):
                 self.assertNotIn(gone, r)
             keys = {f["key"] for f in r["figures"]}

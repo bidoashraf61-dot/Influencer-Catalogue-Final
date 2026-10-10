@@ -400,17 +400,26 @@ def _settings_tab():
 
 
 def roi_card():
-    """ROI planner settings: internal only, never sent to a client or named in the calculator."""
+    """Recommended structure for the ROI Calculator: percent of creators by size per campaign type.
+    Internal; the client sees the result as "HelloVoice's recommended structure"."""
     import roi
-    share, prices = roi.settings()
-    names = {"nano": "Nano (under 20K)", "micro": "Micro (20K–100K)", "mid": "Mid (100K–500K)", "macro": "Macro (500K–1M)", "mega": "Mega (1M+)"}
-    return ("<div class='card'><h2>ROI planner (internal)</h2><p class='sec-desc'>Used only to suggest a mix of creator sizes for a client's total budget "
-            "and to advise on a selection. Never shown to clients, never part of an estimate.</p><div class='fgrid'>"
-            "<div><label>Creators' share of the client's budget (%%)</label><input type='number' min='10' max='100' step='1' name='roi_creator_share' value='%g'>"
-            "<div class='price-hint'>The rest covers production, agency fee and boosting. Default 60.</div></div>" % round(share * 100, 1)
-            + "".join("<div><label>Planning price per post, %s (SAR)</label><input type='number' min='1' step='50' name='roi_price_%s' value='%g'></div>"
-                      % (e(names[t]), t, prices[t]) for t in ("nano", "micro", "mid", "macro", "mega"))
-            + "</div><div class='price-hint'>Defaults are the middle of each tier's catalogue price band. These steer advice only.</div></div>")
+    cur = roi.shapes()
+    rows = ""
+    for g in roi.GOALS:
+        cells = "".join(
+            "<td><input type='number' min='0' max='100' step='1' name='roi_shape_%s_%s' value='%g' style='width:74px'></td>"
+            % (g, t, cur[g].get(t, 0)) for t in roi.TIER_ORDER)
+        rows += "<tr><th style='text-align:left'>%s</th>%s<td class='muted'>must add up to 100</td></tr>" % (e(roi.GOAL_LABEL[g]), cells)
+    head = "".join("<th>%s<br><small>%s</small></th>" % (e(roi.TIER_NAME[t][0]), e(roi.TIER_NAME[t][1])) for t in roi.TIER_ORDER)
+    return ("<div class='card'><h2>Recommended structure (ROI Calculator)</h2>"
+            "<p class='sec-desc'><b>Research-based starting point, low confidence on the exact percentages; not an industry benchmark.</b> "
+            "The share of creators by size HelloVoice recommends for each campaign type, one post per creator, the same for every product category. "
+            "A tier within &plusmn;10 points of its share counts as on structure. The calculator compares a client's selection with it for the same "
+            "number of creators and posts (Selection quality). Several campaign types average their rows. Clients see it as "
+            "&ldquo;HelloVoice&rsquo;s recommended structure&rdquo;; no budget and no prices are involved. Replace the numbers here as HelloVoice's own "
+            "tracked campaigns confirm or overturn them.</p>"
+            "<div style='overflow-x:auto'><table><thead><tr><th></th>" + head + "<th></th></tr></thead><tbody>" + rows + "</tbody></table></div>"
+            "<div class='price-hint'>Percent of creators. A row that does not add up to 100 is not saved. Empty means 0.</div></div>")
 
 
 def graph_card():
