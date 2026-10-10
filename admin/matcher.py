@@ -469,6 +469,9 @@ def apply_rules(c, s, val, basis, target):
         s = watch(s, "Not tagged for %s" % ", ".join(cats))
     if val != old:
         s = dict(s, score=val, tag=fit.band_for(val))
+        if s.get("score_range") and old:
+            lo, hi = [int(round(x * val / float(old))) for x in s["score_range"]]
+            s["score_range"], s["tag_range"] = [lo, hi], [fit.band_for(lo), fit.band_for(hi)]
         if s.get("conclusion"):
             import re
             s["conclusion"] = re.sub(r"\(%d/100\)" % old, "(%d/100)" % val, s["conclusion"], count=1)
