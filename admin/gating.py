@@ -73,10 +73,16 @@ def _team(code_id):
     return portal.team_codes(code_id) if code_id is not None else set()
 
 
+def _unlock_all():
+    """A person with admin access who switched "Show locked data" on (this request only)."""
+    import portal
+    return portal.unlock_all()
+
+
 def unlocked(code_id, code):
     if code_id is None:
         return False
-    if code_id == db.admin_code_id():
+    if code_id == db.admin_code_id() or _unlock_all():
         return True
     team = _team(code_id)
     with db.connect() as conn:
@@ -88,7 +94,7 @@ def unlocked_set(code_id, codes=None):
     """The creators this viewer may see in full (None = all, for the admin preview)."""
     if code_id is None:
         return set()
-    if code_id == db.admin_code_id():
+    if code_id == db.admin_code_id() or _unlock_all():
         return None
     team = _team(code_id)
     with db.connect() as conn:

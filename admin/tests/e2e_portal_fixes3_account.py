@@ -176,18 +176,29 @@ class Fixes3Account(unittest.TestCase):
 
     def test_02c_admin_access_opens_everything_and_preview_is_read_only(self):
         import auth as _auth
-        # a person with admin access, signed in to the portal by email, sees nothing locked
+        # a person with admin access keeps their own account; one switch reveals locked data
         db.create_admin("staff@acme-staff.com", _auth.hash_password("a-long-passphrase-here"))
         st, b = self.signup("staff@acme-staff.com")
-        self.assertEqual(st.get("/api/me")[1]["kind"], "admin")
+        me = st.get("/api/me")[1]
+        self.assertEqual((me["kind"], me["staff"], me["unlock"]), ("user", True, False))     # still themselves
         owner, _ = self.signup("owner@elsewhere-staff.com")
         tok = self.sel(owner, "Not theirs", ["HV-MI-001"])
-        s, g, _ = st.get("/api/selection?s=" + tok)
+        self.assertFalse(owner.get("/api/me")[1]["staff"])
+        self.assertEqual(owner.post("/api/me/unlock", {"on": True})[0], 403)                 # clients have no switch
+        # switch off: they see what any client sees (locked) and cannot open another company's selection
+        self.assertEqual(st.get("/api/selection?s=" + tok)[0], 401)
+        # switch on: only locked data opens; the account is still theirs
+        s, b, r = st.post("/api/me/unlock", {"on": True})
+        self.assertEqual((s, b["on"]), (200, True))
+        ck = r.headers.get("Set-Cookie").split(";")[0]
+        hdr = "; ".join("%s=%s" % (c.name, c.value) for c in st.jar) + "; " + ck
+        s, g, _ = st.get("/api/selection?s=" + tok, headers={"Cookie": hdr})
         self.assertEqual((s, g["role"]), (200, "admin"))
-        g = st.get("/api/ideas?c=HV-MI-001&s=" + tok)[1]
-        self.assertFalse(g.get("locked"))                                        # no campaign needed
-        # an ordinary client is untouched
-        self.assertEqual(owner.get("/api/me")[1]["kind"], "user")
+        me = st.get("/api/me", headers={"Cookie": hdr})[1]
+        self.assertEqual((me["kind"], me["unlock"], me["user"]["email"]), ("user", True, "staff@acme-staff.com"))
+        g = st.get("/api/ideas?c=HV-MI-001&s=" + tok, headers={"Cookie": hdr})[1]
+        self.assertFalse(g.get("locked"))
+        # an ordinary client is untouched, and the switch is theirs only
         self.assertTrue(owner.get("/api/ideas?c=HV-MI-001&s=" + tok)[1]["locked"])
         # Clients > Preview as client: the client's own pass, read-only, admin session required
         a = self.admin()

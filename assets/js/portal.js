@@ -790,6 +790,16 @@
       return el;
     }
     function rule() { menu.appendChild(h("div", { class: "pt-menu__rule", role: "separator" })); }
+    // Admin access, one switch: reveal locked data (analysis, ideas, owner-only tools). Off by default;
+    // everything else stays as it is, including this account.
+    if (ME.staff) {
+      var on = !!ME.unlock;
+      var sw = item("Show locked data", { go: function () {
+        api("POST", "/api/me/unlock", { on: !on }).then(function () { location.reload(); });
+      } }, h("span", { class: "pt-menu__badge", style: "background:" + (on ? "#e8ff76" : "rgba(18,18,18,.08)") + ";color:#121212" }, on ? "On" : "Off"));
+      sw.setAttribute("role", "menuitemcheckbox"); sw.setAttribute("aria-checked", on ? "true" : "false");
+      rule();
+    }
     var credits = ME.credits != null ? h("span", { class: "pt-menu__badge hv-cost", id: "pt-chip-credits" }, ME.credits + " cr") : null;
     var ACC = ROOT + "account/";
     if (u) {

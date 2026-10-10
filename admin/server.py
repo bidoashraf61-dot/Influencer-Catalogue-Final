@@ -132,7 +132,7 @@ VIEWER_COOKIE = "hv_view"
 PREVIEW_COOKIE = "hv_preview"
 PREVIEW_TTL = 3600
 # The only POSTs a preview may still make (a calculation and analytics; nothing is saved or charged).
-PREVIEW_POSTS = ("/api/event", "/api/roi/estimate", "/api/me/ping")
+PREVIEW_POSTS = ("/api/event", "/api/roi/estimate", "/api/me/ping", "/api/me/unlock")
 # Every shared link (a selection, a campaign report, the catalogue itself)
 # remembers the access code that opened it, in this browser: each new link
 # asks for its own code once, and links of different clients open side by side.
@@ -322,24 +322,28 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         cid = self.viewer_cookie_id()
         if cid is None and self.admin():
             cid = db.admin_code_id()
-        elif cid is not None and self.staff_viewer(cid):
-            cid = db.admin_code_id()           # a person with admin access sees everything unlocked
         return cid
 
     def staff_viewer(self, cid=None):
         """True when this browser is signed in to the portal as someone who ALSO has admin access
-        (their email is an admin account). Signing in by email code proves they own the address,
-        so they get the admin preview's view: nothing is locked, nothing is charged."""
+        (their email is an admin account). They stay themselves, with their own account; a switch in
+        their menu ("Show locked data") reveals what is locked, and nothing else changes."""
         cid = cid if cid is not None else self.viewer_cookie_id()
         if cid is None or cid == db.admin_code_id():
             return False
         u = portal.user_for_code(cid)
         return bool(u and u["email"] and db.admin_by_email(u["email"]))
 
+    UNLOCK_COOKIE = "hv_unlock"
+
+    def staff_unlocked(self):
+        """A person with admin access who has switched "Show locked data" on."""
+        return self.cookies().get(self.UNLOCK_COOKIE, "") == "1" and self.staff_viewer()
+
     def admin_like(self):
-        """HelloVoice admin session, or a portal sign-in by a person who has admin access: the
-        checks that mean "nothing is locked for this reader"."""
-        return bool(self.admin()) or self.staff_viewer()
+        """HelloVoice admin session, or admin access with the unlock switch on: the checks that
+        mean "nothing is locked for this reader"."""
+        return bool(self.admin()) or self.staff_unlocked()
 
     def preview_mode(self):
         """An admin looking at the portal AS a client (read-only): the preview cookie plus a live
@@ -378,7 +382,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def selection_viewer(self, token):
         """Who acts on a selection page: the admin, else the code typed for that
         link, else this browser's general pass."""
-        if self.admin() or self.staff_viewer():
+        if self.admin() or self.staff_unlocked():
             return db.admin_code_id()
         return (self.link_code("s:" + token) if token else None) or self.viewer_code_id()
 
@@ -451,9 +455,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def do_GET(self):
         portal.memo_begin()
+        portal.unlock_begin(self.staff_unlocked())
         try:
             return self._do_get()
         finally:
+            portal.unlock_begin(False)
             portal.memo_end()
 
     def _do_get(self):
@@ -929,9 +935,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def do_POST(self):
         if self.route(urllib.parse.urlparse(self.path).path) in self.MEMO_POSTS:
             portal.memo_begin()
+        portal.unlock_begin(self.staff_unlocked())
         try:
             return self._do_post()
         finally:
+            portal.unlock_begin(False)
             portal.memo_end()
 
     def _do_post(self):

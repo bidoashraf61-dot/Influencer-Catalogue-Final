@@ -100,6 +100,8 @@ class PortalMixin(connect_api.ConnectMixin):
             portal.monthly_refill(cid)
         out = {"signed_in": True, "kind": kind, "credits": portal.balance(cid) if kind != "admin" else None,
                "preview": bool(self.preview_mode()),
+               # A person with admin access: their own account, plus a switch that reveals locked data.
+               "staff": bool(self.staff_viewer(cid)), "unlock": bool(self.staff_unlocked()),
                "costs": portal.costs(), "ai": gemini.configured(),
                # AI is free while the client has an active campaign (start date to end date + 30 days).
                "ai_free": portal.ai_free(cid) if kind != "admin" else None,
@@ -357,7 +359,7 @@ class PortalMixin(connect_api.ConnectMixin):
         routes = {
             "/api/auth/start": self.api_auth_start, "/api/auth/verify": self.api_auth_verify,
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,
-            "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
+            "/api/me/unlock": self.api_me_unlock, "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
             "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat, "/api/chat/stream": self.api_chat_stream,
             "/api/chat/confirm": self.api_chat_confirm, "/api/chat/dismiss": self.api_chat_dismiss,
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
@@ -485,6 +487,21 @@ class PortalMixin(connect_api.ConnectMixin):
         policy = "SameSite=None; Secure" if srv.ALLOWED_ORIGINS else "SameSite=Lax"
         return self.send_json(200, {"ok": True}, self.cors() + [
             ("Set-Cookie", f"{srv.VIEWER_COOKIE}=; Path=/; HttpOnly; {policy}; Max-Age=0")])
+
+    def api_me_unlock(self):
+        """POST {on}: the "Show locked data" switch for a person with admin access."""
+        who = self._need_viewer()
+        if not who:
+            return
+        if not self.staff_viewer(who[0]):
+            return self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+        on = bool(self.json_body().get("on"))
+        srv = self._srv()
+        policy = "SameSite=None; Secure" if srv.ALLOWED_ORIGINS else "SameSite=Lax"
+        cookie = "%s=%s; Path=/; HttpOnly; %s; Max-Age=%d" % (srv.Handler.UNLOCK_COOKIE, "1" if on else "", policy,
+                                                             12 * 3600 if on else 0)
+        db.log("unlock_toggle", who[0], self.client_ip(), self._ua(), "on" if on else "off")
+        return self.send_json(200, {"ok": True, "on": on}, self.cors() + [("Set-Cookie", cookie)])
 
     def api_me_update(self):
         who = self._need_viewer()

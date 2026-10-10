@@ -61,7 +61,7 @@ def started(code_id, code):
     import portal
     if code_id is None:
         return False
-    if int(code_id) == db.admin_code_id():
+    if int(code_id) == db.admin_code_id() or portal.unlock_all():
         return True
     team = sorted(portal.team_codes(int(code_id)) | {int(code_id)})
     if not team:

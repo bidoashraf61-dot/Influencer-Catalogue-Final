@@ -147,6 +147,18 @@ import threading as _threading
 _memo = _threading.local()
 
 
+_unlock = _threading.local()
+
+
+def unlock_begin(on):
+    """Per request: this reader is a person with admin access who switched "Show locked data" on."""
+    _unlock.on = bool(on)
+
+
+def unlock_all():
+    return bool(getattr(_unlock, "on", False))
+
+
 def memo_begin():
     _memo.d = {}
 
@@ -779,6 +791,8 @@ def may_edit(reader, sel, admin_code_id=None):
     the same company domain may look (``team_codes``) but never edit."""
     if reader is None or sel is None:
         return False
+    if unlock_all():
+        return True
     if admin_code_id is not None and int(reader) == int(admin_code_id):
         return True
     if sel["code_id"] is None:
