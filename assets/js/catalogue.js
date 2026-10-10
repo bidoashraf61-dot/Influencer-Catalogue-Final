@@ -2340,9 +2340,10 @@
         else if (!br) { bx.hidden = false; bx.textContent = ""; }
         else {
           var t = br.target || {}, chips = [["Objective", br.objective]];
-          if (t.country) chips.push(["Market", COUNTRY_NAME[t.country] || t.country]);
+          // Country and age may hold several ("SA|AE", "18-24|25-34"): fix batch 5.
+          if (t.country) chips.push(["Market", String(t.country).split("|").map(function (c) { return COUNTRY_NAME[c] || c; }).join(", ")]);
           if (t.gender && t.gender !== "Any") chips.push(["Audience", t.gender]);
-          if (t.age && t.age !== "Any") chips.push(["Age", t.age]);
+          if (t.age && t.age !== "Any") chips.push(["Age", String(t.age).split("|").join(", ")]);
           var cats = String(t.category || "").split("|").filter(function (x) { return x && x !== "Any"; });
           if (cats.length) chips.push(["Category", cats.join(", ")]);
           // The objective leads and is named as the campaign objective; the

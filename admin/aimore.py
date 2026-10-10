@@ -135,9 +135,9 @@ def more(sel, objective, target, note="", chips=(), count=5):
     cities, ans = _read_note(note)
     brief_target = dict(target or {})
     if ans.get("market"):
-        brief_target["country"] = ans["market"]
+        brief_target["country"] = "|".join(ans["market"]) if isinstance(ans["market"], list) else ans["market"]
     if ans.get("gender"):
-        brief_target["gender"] = ans["gender"]
+        brief_target["gender"] = ans["gender"] if isinstance(ans["gender"], str) else "Any"
     if ans.get("category"):
         brief_target["category"] = "|".join(ans["category"])
     if "women2534" in chips:

@@ -32,7 +32,8 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
             got = self._roi_selection(query.get("s") or "")
             if got:
                 sel, cid = got
-                self.send_json(200, {"ok": True, "saved": roi.row_view(roi.latest_for(sel["id"]))}, self.cors())
+                self.send_json(200, {"ok": True, "saved": roi.row_view(roi.latest_for(sel["id"])),
+                                     "seed": self._roi_seed(sel)}, self.cors())
             return True
         if path == "/api/roi/vs":
             who = self._need_viewer()
@@ -93,6 +94,19 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
             self.send_json(404, {"ok": False}, self.cors())
             return None
         return sel, int(reader)
+
+    def _roi_seed(self, sel):
+        """Starting values for the calculator from the brief that built or scored this selection
+        (goal, platforms, market, and the budget when the brief has one). None without a brief."""
+        br = portal.live_brief_for_selection(sel["id"])
+        if br is None:
+            return None
+        try:
+            import matcher
+            answers, _ = matcher.clean_answers(json.loads(br["answers"] or "{}"))
+            return dict(matcher.roi_seed(answers), summary=br["summary"] or "")
+        except Exception:
+            return None
 
     def _roi_input(self, b):
         goal = b.get("goal") if b.get("goal") in roi.GOALS else "awareness"

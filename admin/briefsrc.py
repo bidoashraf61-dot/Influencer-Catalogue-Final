@@ -674,6 +674,8 @@ def read(text, origin, code_id=None, credits=0):
     markets = [m for m in dict.fromkeys(data.get("markets") or []) if m in dict(matcher._BY_ID["market"]["options"])]
     if answers.get("market") and answers["market"] not in markets:
         markets.insert(0, answers["market"])
+    if len(markets) > 1:
+        answers["market"] = markets[:4]          # the brief takes every country the document names (fix batch 5)
     claims = keep_claims(data.get("claims"), text)
     kind = data.get("regulated") if data.get("regulated") in REGULATED else "none"
     if kind == "none":
@@ -700,13 +702,13 @@ def read(text, origin, code_id=None, credits=0):
         flags.append({"kind": "claims", "title": "Regulated product",
                       "text": "This looks like %s. Health and benefit claims need your medical or regulatory team's approval, and "
                               "HelloVoice checks every script before it is posted. Helvy never adds claims." % REGULATED[kind]})
-    if (answers.get("market") or "SA") == "SA" or "SA" in markets:
+    if (not markets and not answers.get("market")) or "SA" in markets or answers.get("market") == "SA":
         flags.append({"kind": "licence", "title": "Mawthooq licence",
                       "text": "Paid posts in Saudi Arabia need creators with a Mawthooq licence. Filter the catalogue by licence, "
                               "or ask Helvy for licensed creators."})
     if claims and re.search(_CLAIM_WORDS, " ".join(claims), re.I):
         flags.append({"kind": "claims_found", "title": "Claims in your source",
                       "text": "Your source makes claims such as “%s”. Creators may only repeat claims your regulatory team approves." % claims[0][:90]})
-    timing = occasions.advise(answers.get("category") or [], answers.get("market") or "SA", answers.get("timing"), launch)
+    timing = occasions.advise(answers.get("category") or [], "SA" if "SA" in markets else (markets[0] if markets else "SA"), answers.get("timing"), launch)
     return {"answers": answers, "fields": {"product": product, "brand": brand, "audience": audience, "markets": markets, "launch": launch},
             "confidence": confidence, "claims": claims, "regulated": kind, "flags": flags, "timing": timing}

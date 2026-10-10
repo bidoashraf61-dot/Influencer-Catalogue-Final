@@ -34,12 +34,14 @@ QUESTIONS = [
     {"id": "platforms", "type": "many", "label": "Where should the content run?", "required": True,
      "options": [("Instagram", "Instagram"), ("TikTok", "TikTok"), ("Snapchat", "Snapchat"),
                  ("YouTube", "YouTube"), ("any", "No preference")]},
-    {"id": "market", "type": "one", "label": "Which country is the audience in?", "required": True,
+    # Fix batch 5: market, gender and age take several answers too (stored as a list, as the goal is).
+    # Budget, number of creators and timing are one value by nature and stay single choice.
+    {"id": "market", "type": "one", "multi_ok": True, "multi_max": 4, "label": "Which countries is the audience in?", "required": True,
      "options": [("SA", "Saudi Arabia"), ("AE", "UAE"), ("EG", "Egypt"), ("KW", "Kuwait"), ("QA", "Qatar"),
                  ("BH", "Bahrain"), ("OM", "Oman"), ("JO", "Jordan")]},
-    {"id": "gender", "type": "one", "label": "Who is the audience?", "required": False,
+    {"id": "gender", "type": "one", "multi_ok": True, "multi_max": 2, "label": "Who is the audience?", "required": False,
      "options": [("Any", "Everyone"), ("Women", "Mostly women"), ("Men", "Mostly men")]},
-    {"id": "age", "type": "one", "label": "Main age group", "required": False,
+    {"id": "age", "type": "one", "multi_ok": True, "multi_max": 4, "label": "Main age groups", "required": False,
      "options": [("Any", "All ages"), ("18-24", "18–24"), ("25-34", "25–34"), ("35-44", "35–44"), ("45-54", "45+")]},
     {"id": "category", "type": "many", "label": "Which space is the product in?", "required": True,
      "options": [("health care", "Healthcare / pharma"), ("skincare", "Skincare & dermatology"), ("beauty", "Beauty"),
@@ -127,10 +129,12 @@ def clean_answers(raw):
             if vals:
                 out[q["id"]] = vals
         elif q.get("multi_ok") and isinstance(v, list):
-            # The goal may be several (fix batch 3: "Awareness" AND "Engagement" for a selection).
-            keep = [x for x in dict.fromkeys(str(x) for x in v) if x in allowed][:3]
+            # The goal, the countries, the gender and the age groups may be several (fix batches 3 and 5).
+            keep = [x for x in dict.fromkeys(str(x) for x in v) if x in allowed][:q.get("multi_max", 3)]
             typed = next((_clean_other(x) for x in v if isinstance(x, str) and x.startswith(OTHER) and _clean_other(x)), None)
-            if typed:                                   # "Other" picked beside the listed goals (fix batch 4)
+            if "Any" in keep or (q["id"] == "gender" and {"Women", "Men"} <= set(keep)):
+                keep = ["Any"]                              # "Everyone", or Women and Men together
+            if typed:                                   # "Other" picked beside the listed options (fix batch 4)
                 keep.append(typed)
             if len(keep) == 1:
                 out[q["id"]] = keep[0]
@@ -219,13 +223,47 @@ def to_brief(answers):
         notes = "; ".join(typed) + (". " + notes if notes else "")
     return {
         "objective": objective_for(answers.get("goal")),
-        "target": {"country": answers.get("market", "SA"), "gender": answers.get("gender", "Any"),
-                   "age": answers.get("age", "Any"), "category": "|".join(cats) if cats else "Any"},
+        "target": {"country": "|".join(_values(answers.get("market"), _enum("market"))) or "SA",
+                   "gender": fit.one_gender(answers.get("gender")),
+                   "age": "|".join(_values(answers.get("age"), [a for a in _enum("age") if a != "Any"])) or "Any",
+                   "category": "|".join(cats) if cats else "Any"},
         "platforms": plats,
         "budget_max": budget if isinstance(budget, (int, float)) else BUDGET_MAX.get(budget),
         "count": count,
         "notes": notes,
     }
+
+
+def _values(v, allowed):
+    """The answers of a multiple-choice question as a list of allowed option values. A single
+    value (every brief saved before fix batch 5) is a list of one."""
+    got = v if isinstance(v, list) else [v] if v else []
+    return [x for x in dict.fromkeys(str(x) for x in got) if x in allowed]
+
+
+def roi_seed(answers):
+    """The ROI Calculator's starting values from a brief's answers: ``{goal, platforms, market,
+    budget}`` (budget only when the brief has one). The calculator takes one goal and one market:
+    the first goal named (Conversion reads as Traffic, the link-click goal; Balanced as Awareness)
+    and the first country it covers. Nothing here changes the calculator itself."""
+    import roi
+    b = to_brief(answers)
+    first = str(b["objective"]).split("+")[0].lower()
+    goal = first if first in roi.GOALS else "traffic" if first == "conversion" else "awareness"
+    plats = [p for p in b["platforms"] if p in roi.PLATFORMS]
+    market = next((m for m in fit.target_list(b["target"]["country"]) if m in roi.MARKETS), "SA")
+    out = {"goal": goal, "platforms": plats or ["Instagram", "TikTok"], "market": market, "platforms_from_brief": bool(plats)}
+    if isinstance(b.get("budget_max"), (int, float)) and b["budget_max"] > 0:
+        out["budget"] = int(b["budget_max"])
+    return out
+
+
+def timing_market(v):
+    """The one market the launch-window advisor takes, from an answer that may be several:
+    Saudi Arabia when it is among them (its national days count), else the first."""
+    ms = v if isinstance(v, list) else [v] if v else []
+    ms = [m for m in ms if isinstance(m, str) and m in _enum("market")]
+    return "SA" if (not ms or "SA" in ms) else ms[0]
 
 
 def describe(answers):
@@ -237,8 +275,10 @@ def describe(answers):
         bits.append(" and ".join(label("goal", g).lower() for g in goals))
     if answers.get("category"):
         bits.append("in " + ", ".join(label("category", c).lower() for c in answers["category"]))
-    if "market" in answers:
-        bits.append("for " + label("market", answers["market"]))
+    if answers.get("market"):
+        ms = answers["market"] if isinstance(answers["market"], list) else [answers["market"]]
+        names = [label("market", m) for m in ms]
+        bits.append("for " + (names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]))
     if answers.get("platforms"):
         bits.append("on " + ", ".join(label("platforms", p) for p in answers["platforms"]))
     if answers.get("budget") and answers["budget"] != "open":
@@ -387,6 +427,48 @@ CATEGORY_MISS_WEIGHT = 0.6
 HCP_BOOST = 1.15
 
 
+def apply_rules(c, s, val, basis, target):
+    """The brief's requirements applied to one creator's fit score.
+
+    ``s`` is the fit result (or the roster estimate), ``val`` its number, ``basis`` "analysis",
+    "basic" or "roster". Returns ``(val, factor, s)``: the number actually shown, the factor it
+    was multiplied by (the shortlist's ranking uses it too) and the result with the tag and the
+    watch-outs updated. One definition for the shortlist and for the selection page, so the two
+    always agree (fix batch 5).
+
+    * Country: a number built from public data alone (basic or roster) is marked down when the
+      roster places the creator outside every country asked for. A measured audience already
+      says where the followers are, so an analysed creator is not touched.
+    * Product space: a requirement, not one factor among five. A creator not tagged for any
+      asked-for space is marked down and says so.
+    """
+    factor = 1.0
+    old = val
+    target = target or {}
+
+    def watch(s, text, drop=None):
+        rest = [w for w in (s.get("watchouts") or []) if not (drop and w.startswith(drop))]
+        return dict(s, watchouts=[text] + rest)
+    if basis in ("roster", "basic"):
+        _, hits = fit._place_mark(c, target.get("country"))
+        want = set(fit.target_list(target.get("country")) or [fit.DEFAULT_TARGET["country"]])
+        if hits and not (want & hits):
+            factor *= MISMATCH_WEIGHT
+            val = int(round(val * MISMATCH_WEIGHT))
+            s = watch(s, "Based outside %s" % fit.country_names(target.get("country")), "Based outside")
+    cats = [x for x in str(target.get("category") or "").split("|") if x and x.lower() != "any"]
+    if cats and not _tagged(c, cats):
+        val = int(round(val * CATEGORY_MISS_WEIGHT))
+        factor *= CATEGORY_MISS_WEIGHT
+        s = watch(s, "Not tagged for %s" % ", ".join(cats))
+    if val != old:
+        s = dict(s, score=val, tag=fit.band_for(val))
+        if s.get("conclusion"):
+            import re
+            s["conclusion"] = re.sub(r"\(%d/100\)" % old, "(%d/100)" % val, s["conclusion"], count=1)
+    return val, factor, s
+
+
 def score_all(brief, exclude=(), only=None):
     """Every active creator scored against the brief, best first (no cut for count or budget)."""
     objective, target = brief["objective"], brief["target"]
@@ -412,23 +494,12 @@ def score_all(brief, exclude=(), only=None):
         if val is None:
             continue
         rank_score = val * (ESTIMATE_WEIGHT if basis == "roster" else 1.0)
-        if basis in ("roster", "basic"):
-            _, hits = fit._place_mark(c, target["country"])
-            if hits and target["country"] not in hits:
-                # The number shown carries the penalty too, so a card never reads higher than the order says.
-                rank_score *= MISMATCH_WEIGHT
-                val = int(round(val * MISMATCH_WEIGHT))
-                s = dict(s, tag=fit.band_for(val),
-                         watchouts=["Based outside %s" % dict(fit.COUNTRIES).get(target["country"], target["country"])]
-                         + [w for w in (s.get("watchouts") or []) if not w.startswith("Based outside")])
-        # The product space is a requirement, not one factor among five: a beauty creator with great
-        # engagement is still the wrong buy for a food brief. Judged on the creator's own tagged
-        # interests; one who is not tagged for any asked-for space is marked down and says so.
+        # The brief's two requirements (country for numbers that are only public, the product
+        # space for everyone). The selection page applies the same rules, so a creator's number
+        # is the same on the shortlist card and on the selection built from it.
+        val, factor, s = apply_rules(c, s, val, basis, target)
+        rank_score *= factor
         cats = [x for x in str(target.get("category") or "").split("|") if x and x.lower() != "any"]
-        if cats and not _tagged(c, cats):
-            val = int(round(val * CATEGORY_MISS_WEIGHT))
-            rank_score *= CATEGORY_MISS_WEIGHT
-            s = dict(s, tag=fit.band_for(val), watchouts=["Not tagged for %s" % ", ".join(cats)] + list(s.get("watchouts") or []))
         # Healthcare professionals first for a healthcare brief: that is what a pharma client is buying.
         if any(x in ("health care", "health") for x in cats) and str(c["tier"] or "").upper().startswith("HCP"):
             rank_score *= HCP_BOOST
