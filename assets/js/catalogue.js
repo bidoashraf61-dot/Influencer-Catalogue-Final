@@ -2915,11 +2915,26 @@
       if (whyPop) return;
       if (!whyTip) { whyTip = document.createElement("div"); whyTip.className = "sel-whytip"; whyTip.setAttribute("role", "tooltip"); whyTip.id = "sel-whytip"; document.body.appendChild(whyTip); }
       whyTip.innerHTML = txt ? "<b>Why rejected</b>" + esc(txt) : "<b>Why rejected?</b>Add a reason (optional). It helps Helvy suggest better.";
+      clearTimeout(whyTip._t);
       whyTip.hidden = false;
       q.setAttribute("aria-describedby", "sel-whytip");
       placeFloat(whyTip, q, 8);
+      requestAnimationFrame(function () { if (whyTip && !whyTip.hidden) whyTip.classList.add("is-in"); });
     }
-    function hideWhyTip() { if (whyTip) whyTip.hidden = true; }
+    // Fades out, then goes. Also called when the card redraws or the pointer is anywhere else, so a
+    // tip can never be left floating over a card whose "?" is gone.
+    function hideWhyTip() {
+      if (!whyTip || whyTip.hidden) return;
+      whyTip.classList.remove("is-in");
+      clearTimeout(whyTip._t);
+      whyTip._t = setTimeout(function () { if (whyTip && !whyTip.classList.contains("is-in")) whyTip.hidden = true; }, 180);
+    }
+    document.addEventListener("mouseover", function (e) {
+      if (whyTip && !whyTip.hidden && !(e.target.closest && e.target.closest("[data-st-whyq]"))) hideWhyTip();
+    }, true);
+    document.addEventListener("pointerdown", hideWhyTip, true);
+    window.addEventListener("scroll", hideWhyTip, true);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") hideWhyTip(); });
     function closeWhyPop(back) {
       if (!whyPop) return;
       whyPop.remove(); whyPop = null;
@@ -3273,6 +3288,7 @@
     function selCards() { return selected.map(function (code) { return byCode[code]; }).filter(Boolean); }
     function render() {
       if (window.hvGateQuote) window.hvGateQuote();
+      if (typeof hideWhyTip === "function") hideWhyTip();
       var grid = $("cat-grid");
       var keep = {};
       selected.forEach(function (code) { keep[code] = 1; });
