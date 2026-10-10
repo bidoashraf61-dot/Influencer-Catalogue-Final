@@ -69,7 +69,7 @@
     var still = dir + "helvy-still.webp" + "?v=t3";
     var watching = [], io = null;
     var vdir = base + "assets/brand/voice/";
-    var VOICE = { loop: 1, wave: 1, "point-act": 1, point: 1, think: 1, "think-act": 1, "thumbs-act": 1, thumbs: 1, "cheer-act": 1, cheer: 1, scan: 1 };
+    var VOICE = { loop: 1, wave: 1, hi: 1, "point-act": 1, point: 1, think: 1, "think-act": 1, "thumbs-act": 1, thumbs: 1, "cheer-act": 1, cheer: 1, scan: 1 };
     var vstill = vdir + "voice-loop-poster.webp?v=t3";
 
     // VER changes whenever the files are replaced: /assets/ is cached for 30 days as immutable.
@@ -207,7 +207,7 @@
       setTimeout(function () { observe(v); }, 0);
       return v;
     }
-    return { dir: dir, still: still, vstill: vstill, wavePoster: vdir + "voice-wave-poster.webp?v=t4", head: base + "assets/brand/helvy-head.webp?v=c3", apple: apple, src: src, video: video, play: play, img: img };
+    return { dir: dir, still: still, vstill: vstill, wavePoster: vdir + "voice-hi-poster.webp?v=t5", head: base + "assets/brand/helvy-head.webp?v=c3", apple: apple, src: src, video: video, play: play, img: img };
   })();
 
   /* =============================================================== loader */
