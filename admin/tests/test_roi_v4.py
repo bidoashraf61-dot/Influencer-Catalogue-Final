@@ -230,26 +230,39 @@ class Compare(Base):
     def test_quality_is_selection_over_ideal_on_the_primary_figure(self):
         cs = self.selection(10)
         r = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"])
-        sel = sum(p["views"] for p in r["_posts"])
+        def cred(res, key):          # the posts that count: at most the structure's number per size
+            return sum(p[key] for p in roi._credited(res["_posts"], res["_ideal_posts"], key))
+        sel = cred(r, "views")
         ide = sum(p["views"] for p in r["_ideal_posts"])
-        self.assertAlmostEqual(r["_q"], sel / ide)
-        self.assertEqual(r["quality"]["pct"], int(5 * round(sel / ide * 20)))
+        self.assertAlmostEqual(r["_q"], min(sel / ide, 1.0))
+        self.assertEqual(r["quality"]["pct"], min(100, int(5 * round(min(sel / ide, 1.0) * 20))))
         # engagement and traffic use interactions and clicks
         e = roi.estimate("engagement", ["TikTok"], creators=cs, goals=["engagement"])
-        self.assertAlmostEqual(e["_q"], sum(p["interactions"] for p in e["_posts"]) / sum(p["interactions"] for p in e["_ideal_posts"]))
+        self.assertAlmostEqual(e["_q"], min(cred(e, "interactions") / sum(p["interactions"] for p in e["_ideal_posts"]), 1.0))
         t = roi.estimate("traffic", ["TikTok"], creators=cs, goals=["traffic"])
-        self.assertAlmostEqual(t["_q"], sum(p["clicks"] for p in t["_posts"]) / sum(p["clicks"] for p in t["_ideal_posts"]))
+        self.assertAlmostEqual(t["_q"], min(cred(t, "clicks") / sum(p["clicks"] for p in t["_ideal_posts"]), 1.0))
         # several goals: the average of the goals' ratios
         m = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness", "traffic"])
-        parts = [sum(p["views"] for p in m["_posts"]) / sum(p["views"] for p in m["_ideal_posts"]),
-                 sum(p["clicks"] for p in m["_posts"]) / sum(p["clicks"] for p in m["_ideal_posts"])]
+        parts = [min(cred(m, "views") / sum(p["views"] for p in m["_ideal_posts"]), 1.0),
+                 min(cred(m, "clicks") / sum(p["clicks"] for p in m["_ideal_posts"]), 1.0)]
         self.assertAlmostEqual(m["_q"], sum(parts) / 2.0)
 
-    def test_quality_can_exceed_100_percent(self):
+    def test_quality_never_exceeds_100_percent_and_is_marked_met(self):
         cs = self.selection(6, views=900000, followers=60000)               # viral creators
         r = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"])
-        self.assertGreater(r["_q"], 1.0)
-        self.assertGreater(r["quality"]["pct"], 100)
+        self.assertEqual(r["_q"], 1.0)
+        self.assertEqual(r["quality"]["pct"], 100)
+        self.assertTrue(r["quality"]["met"])
+        self.assertLessEqual(r["quality"]["high"], 100)
+
+    def test_a_size_outside_the_structure_adds_no_credit(self):
+        cs = self.selection(6)
+        big = dict(cs[0], code="MEGA", name="Mega", followers={"TikTok": 3000000})
+        a = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"])
+        b = roi.estimate("awareness", ["TikTok"], creators=cs + [big], goals=["awareness"], count=6)
+        self.assertLessEqual(b["_q"], 1.0)
+        credited = roi._credited(b["_posts"], b["_ideal_posts"], "views")
+        self.assertFalse([p for p in credited if p["size"] == "mega"])
 
     def test_efficiency_gate_moves_the_selection_not_the_ideal(self):
         weak = roi.estimate("awareness", ["TikTok"], creators=self.selection(6, score=0), goals=["awareness"])
@@ -339,7 +352,8 @@ class Compare(Base):
         a = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"])
         b = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"], second_posts=["C00", "C01"])
         self.assertEqual(a["ideal"]["posts"], b["ideal"]["posts"])
-        self.assertGreater(b["_q"], a["_q"])
+        self.assertGreaterEqual(b["_q"], a["_q"])
+        self.assertGreater(sum(p["views"] for p in b["_posts"]), sum(p["views"] for p in a["_posts"]))
 
 
 class Advice(Base):
@@ -452,7 +466,7 @@ class Count(Base):
         self.assertIn("The ideal for 15 creators has", r["compare_line"])
         self.assertIn("you have 6 micro", r["compare_line"])
         self.assertEqual(r["ideal"]["title"], "Ideal for Awareness with 15 creators")
-        self.assertLess(r["_q"], base["_q"])                                       # a bigger ideal asks more of the same selection
+        self.assertTrue(0.0 <= r["_q"] <= 1.0)
         two = roi.estimate("awareness", ["TikTok", "Instagram"], creators=[dict(c, followers={"TikTok": 40000, "Instagram": 40000}) for c in cs],
                            goals=["awareness"], count=15)
         self.assertEqual(two["ideal"]["posts"], 30)

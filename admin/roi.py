@@ -542,37 +542,57 @@ def _ideal_posts(counts, lib):
     return posts
 
 
+def _credited(sel_posts, ideal_posts, vk):
+    """The selection's posts that count toward quality: in each (platform, size) at most as many as the
+    recommended structure has there, best first. A size the structure does not contain (a mega creator
+    in a structure without one) and any surplus in a size add nothing beyond the structure."""
+    ideal_n = {}
+    for p in ideal_posts:
+        k = (p.get("platform"), p.get("size"))
+        ideal_n[k] = ideal_n.get(k, 0) + 1
+    by = {}
+    for p in sel_posts:
+        by.setdefault((p.get("platform"), p.get("size")), []).append(p)
+    out = []
+    for k, ps in by.items():
+        out += sorted(ps, key=lambda q: -q[vk])[:ideal_n.get(k, 0)]
+    return out
+
+
 def _quality(sel, ideal, gl):
-    """Selection quality: selection / ideal on each goal's primary figure, averaged. {} when either side is empty."""
+    """Selection quality: the selection's CREDITED results / the recommended structure's, per goal's
+    primary figure, averaged, never above 100 % (a selection that meets the structure is "met";
+    off-structure sizes and surplus add no credit). {} when either side is empty."""
     ratios, rels = {}, []
     for g in gl:
         vk, mk = _PRIMARY_FIELD[g]
-        s_tot, s_half = _half(sel["_posts"], vk, mk)
+        s_tot, s_half = _half(_credited(sel["_posts"], ideal["_posts"], vk), vk, mk)
         o_tot, o_half = _half(ideal["_posts"], vk, mk)
         if not s_tot or not o_tot:
             continue
         r = s_tot / o_tot
-        ratios[g] = r
-        rels.append(r * math.sqrt((s_half / s_tot) ** 2 + (o_half / o_tot) ** 2))
+        ratios[g] = min(r, 1.0)
+        rels.append(ratios[g] * math.sqrt((s_half / s_tot) ** 2 + (o_half / o_tot) ** 2))
     if not ratios:
         return None
     q = sum(ratios.values()) / len(ratios)
     half = sum(rels) / len(rels)
-    lo, hi = max(q - half, 0.0), q + half
+    lo, hi = max(q - half, 0.0), min(q + half, 1.0)
     # the two ranges on the first goal's primary figure: how much they overlap
     vk, mk = _PRIMARY_FIELD[gl[0]]
-    s_tot, s_half = _half(sel["_posts"], vk, mk)
+    s_tot, s_half = _half(_credited(sel["_posts"], ideal["_posts"], vk), vk, mk)
     o_tot, o_half = _half(ideal["_posts"], vk, mk)
     overlap = 0.0
     if s_tot and o_tot:
         a_lo, a_hi, b_lo, b_hi = s_tot - s_half, s_tot + s_half, o_tot - o_half, o_tot + o_half
         overlap = max(0.0, min(a_hi, b_hi) - max(a_lo, b_lo)) / max(min(a_hi - a_lo, b_hi - b_lo), 1e-9)
     r5 = lambda x: int(5 * round(x * 100 / 5.0))          # noqa: E731
-    band = overlap >= 0.5
-    pct, plo, phi = r5(q), r5(lo), r5(hi)
-    text = ("%d–%d%%" % (plo, phi)) if band and plo != phi else ("about %d%%" % pct)
-    return {"pct": pct, "low": plo, "high": phi, "band": band and plo != phi, "overlap": round(overlap, 2), "text": text,
-            "by_goal": {g: r5(r) for g, r in ratios.items()}, "_q": q}
+    met = q >= 0.995
+    band = overlap >= 0.5 and not met
+    pct, plo, phi = min(r5(q), 100), min(r5(lo), 100), min(r5(hi), 100)
+    text = "meets the recommended structure" if met else (("%d–%d%%" % (plo, phi)) if band and plo != phi else ("about %d%%" % pct))
+    return {"pct": pct, "low": plo, "high": phi, "band": band and plo != phi, "met": met, "overlap": round(overlap, 2), "text": text,
+            "by_goal": {g: min(r5(r), 100) for g, r in ratios.items()}, "_q": q}
 
 
 def _list_sizes(c):

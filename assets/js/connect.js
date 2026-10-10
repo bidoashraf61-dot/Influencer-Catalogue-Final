@@ -203,9 +203,9 @@
     }
     function qualityChip(q) {
       if (!q) return null;
-      var txt = q.band ? q.low + "–" + q.high + "%" : q.pct + "%";
+      var txt = q.met ? "100%" : q.band ? q.low + "–" + q.high + "%" : q.pct + "%";
       return h("div", { class: "cx-quality", title: "Selection quality: your selection’s expected result as a share of HelloVoice’s recommended structure for the same number of creators" },
-        h("b", null, txt), h("small", null, "of the ideal"), goalSplit(q));
+        h("b", null, txt), h("small", null, q.met ? "meets the recommended structure" : "of the ideal"), goalSplit(q));
     }
     // Several goals chosen: each goal's own quality beside the average, so a strong result on one
     // goal never hides a weak one ("Awareness 80% · Traffic 50%").
