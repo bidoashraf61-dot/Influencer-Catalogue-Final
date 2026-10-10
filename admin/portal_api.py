@@ -340,6 +340,18 @@ class PortalMixin(connect_api.ConnectMixin):
                     self.send(200, json.dumps(portal.export(who[0]), indent=2, ensure_ascii=False), "application/json; charset=utf-8",
                               self.cors() + [("Content-Disposition", "attachment; filename=my-hellovoice-data.json")])
             return True
+        if path == "/api/analysis/sample":
+            # The sample full analysis (item 39): the one configured creator, anonymised. No creator
+            # code is read from the request, so nothing else can be asked for through it.
+            who = self._need_viewer()
+            if who:
+                import sample_analysis
+                got = sample_analysis.payload()
+                if got is None:
+                    self.send_json(404, {"ok": False, "reason": "off"}, self.cors())
+                else:
+                    self.send_json(200, got, self.cors() + [("Cache-Control", "private, max-age=300")])
+            return True
         if path == "/api/chat/history":
             who = self._need_viewer()
             if who:
@@ -365,7 +377,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
             "/api/selection/delete": self.api_selection_delete, "/api/brief/delete": self.api_brief_delete,
             "/api/credits/request": self.api_credits_request, "/api/me/delete": self.api_me_delete,
-            "/api/voice/handoff": self.api_voice_handoff,
+            "/api/voice/handoff": self.api_voice_handoff, "/api/chat/handoff": self.api_chat_handoff,
             "/api/me/image": self.api_me_image, "/api/me/notify": self.api_me_notify,
             "/api/me/signout-others": self.api_me_signout_others, "/api/team/invite": self.api_team_invite,
             "/api/notifications/read": self.api_notifications_read,
@@ -683,6 +695,22 @@ class PortalMixin(connect_api.ConnectMixin):
                               "", "Chat:", *lines], kam=user["kam"] if user else None)
         return self.send_json(200, {"ok": True, "kam": bool(user and user["kam"])}, self.cors())
 
+    def api_chat_handoff(self):
+        """Helvy's one-tap "Send this to my account manager" (item 38). The snippet is read from the
+        client's own stored chat thread (never from the request), with the open selection's link and a
+        short reason. One notify event (type handoff); throttled like the other hand-offs."""
+        who = self._need_viewer()
+        if not who:
+            return
+        cid, user, kind = who
+        if self._throttled("handoff:%d" % cid, 6, 86400):
+            return
+        b = self.json_body()
+        res = assistant.handoff_event(cid, user, b.get("thread"), str(b.get("selection") or "")[:80], str(b.get("reason") or "")[:300],
+                                      origin=self.site_origin(), contact_kam=user["kam"] if user else None)
+        db.log("request", cid, self.client_ip(), self.headers.get("User-Agent"), "chat handoff")
+        return self.send_json(200, res, self.cors())
+
     # --------------------------------------------------------------- account --
 
     def api_me_image(self):
@@ -966,7 +994,7 @@ class PortalMixin(connect_api.ConnectMixin):
                 vals = v if isinstance(v, list) else [v]
                 rows.append({"q": q["label"], "a": ", ".join(str(matcher.answer_label(q["id"], x)) for x in vals)})
             brief = {"summary": br["summary"] or "", "answers": rows, "source": br["source"], "at": br["created_at"]}
-        scored = []
+        scored, sc = [], {}
         try:
             sc = self.selection_scores(sel) if self.selection_has_objective(sel) else {}
             names = {r["code"]: r["name"] for r in self.roster_payload(only=set(codes))}
@@ -976,9 +1004,18 @@ class PortalMixin(connect_api.ConnectMixin):
         except Exception:
             scored = []
         keys = sel.keys()
+        # Each score's parts, for Helvy's explain_score / compare_creators (item 38). Locked creators are
+        # redacted in the assistant; nothing here goes to a browser.
+        details = {}
+        try:
+            for c, v in (sc or {}).items():
+                if c in codes and v.get("score") is not None:
+                    details[c] = {k: v.get(k) for k in ("score", "tag", "parts", "confidence", "platform", "limited_data", "basic", "note")}
+        except Exception:
+            details = {}
         return {"token": sel["token"], "name": sel["name"], "count": len(codes), "brief": brief,
                 "objective": (sel["objective"] if "objective" in keys else None) or None,
-                "scores": scored[:40]}
+                "scores": scored[:40], "details": details}
 
     def api_chat_confirm(self):
         """The client pressed Confirm under an action the assistant prepared."""
@@ -1020,7 +1057,7 @@ class PortalMixin(connect_api.ConnectMixin):
                 r = metrics.client_report(k)
                 tot = r.get("total") or {}
                 keep = ("posts", "planned", "views", "reach", "impressions", "engagement", "er", "likes", "comments", "shares", "saves", "clicks", "ctr")
-                return {"page": "campaign", "campaign": {
+                return {"page": "campaign", "campaign_token": k["token"], "campaign": {
                     "name": r["campaign"].get("name"), "client": r["campaign"].get("client"), "status": r["campaign"].get("status"),
                     "platform": r["campaign"].get("platform"), "starts_at": r["campaign"].get("starts_at"), "ends_at": r["campaign"].get("ends_at"),
                     "objective": (r.get("objective") or {}).get("label"), "verdict": (r.get("verdict") or {}).get("label"),
@@ -1088,7 +1125,7 @@ class PortalMixin(connect_api.ConnectMixin):
             portal.add_message(th["id"], "model", instant["reply"], {"cards": []})
             db.log("chat", cid, self.client_ip(), self._ua(), "faq: " + text[:50])
             emit({"t": "done", "reply": instant["reply"], "cards": [], "next": instant["next"], "thread": th["id"],
-                  "roi": instant.get("roi"), "credits": portal.balance(cid) if kind != "admin" else None, "instant": True})
+                  "roi": instant.get("roi"), "handoff": instant.get("handoff"), "credits": portal.balance(cid) if kind != "admin" else None, "instant": True})
             return
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
@@ -1113,7 +1150,7 @@ class PortalMixin(connect_api.ConnectMixin):
                else ["Find creators", "Get a quote"])
         emit({"t": "done", "reply": res["reply"], "cards": cards, "next": nxt, "thread": th["id"],
               "breakdown": (ctx.get("breakdowns") or [None])[-1], "actions": ctx.get("queued") or [], "roi": ctx.get("roi"),
-              "credits": portal.balance(cid) if kind != "admin" else None})
+              "handoff": ctx.get("handoff"), "credits": portal.balance(cid) if kind != "admin" else None})
 
     # =============================================================== admin ==
 
@@ -1314,6 +1351,11 @@ class PortalMixin(connect_api.ConnectMixin):
             db.set_setting("case_study_campaigns", sorted({int(x) for x in (f.get("case_study_campaigns") or "").replace(",", " ").split() if x.isdigit()}))
             kb = (f.get("kb_text") or "").strip()
             db.set_setting("kb_text", kb[:4000] if kb else None)
+            if "sample_analysis_code" in f:
+                import re as _re
+                sc = (f.get("sample_analysis_code") or "").strip().upper()
+                db.set_setting("sample_analysis_code", sc if _re.fullmatch(r"[A-Z0-9-]{3,30}", sc) else None)
+                db.set_setting("sample_analysis_on", f.get("sample_analysis_on") == "on")
             # Recommended structure (internal): percent of creators by size for each campaign type.
             # Left alone when the card was not posted. A goal whose percentages do not add up to 100
             # keeps its previous shape and the answer says which one.

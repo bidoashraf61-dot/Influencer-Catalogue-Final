@@ -369,6 +369,7 @@ def _settings_tab():
           "<div class='price-hint'>Each month a client is topped back up to this. 0 = off. A client's own page can override it.</div></div>"
           % e(db.setting("monthly_credits", 0) or 0) + "</div></div>"
         + roi_card()
+        + sample_card()
         + "<div class='card'><h2>AI &amp; email</h2><div class='fgrid'>"
           "<div><label>Gemini model</label><input name='gemini_model' value='%s'><div class='price-hint'>Default %s. If a model is retired the next one in line is tried automatically.</div></div>" % (e(gemini.model()), e(gemini.DEFAULT_MODEL))
         + "<div><label>Monthly token ceiling</label><input type='number' min='10000' name='ai_monthly_tokens' value='%d'>"
@@ -397,6 +398,26 @@ def _settings_tab():
             + graph_card() + smtp_card() + key_card("mail", "Email (Resend) API key — alternative", mailer,
                                      "Only needed if you do not use a company mailbox above."))
     return form + "<div style='margin-top:20px'>" + keys + "</div>"
+
+
+def sample_card():
+    """The sample full analysis a client can open from a locked analysis page."""
+    import sample_analysis
+    on, code = sample_analysis.config()
+    c = db.creator(code)
+    ok = sample_analysis.available()
+    state = ("Working: serving %s, anonymised." % e(code)) if ok else (
+        "Not serving anything yet: " + ("that code is not in the roster." if c is None else
+                                        "that creator is inactive." if not c["active"] else "that creator has no full analysis on file."))
+    return ("<div class='card'><h2>Sample full analysis</h2>"
+            "<p class='sec-desc'>A locked analysis page offers &ldquo;See a sample full analysis&rdquo;: the real analysis of one creator, "
+            "with the name, handle, bio, photo, links, post covers, brand names and hashtags removed, numbers only. It is the only analysis "
+            "this feature ever serves, whatever the client has unlocked.</p>"
+            "<div class='fgrid'><div><label>Sample creator code</label><input name='sample_analysis_code' value='%s' placeholder='%s'>"
+            "<div class='price-hint'>%s</div></div>"
+            "<div><label>Show the button</label><label style='display:flex;gap:8px;align-items:center;font-weight:400'>"
+            "<input type='checkbox' name='sample_analysis_on'%s> Clients can see the sample</label></div></div></div>"
+            % (e(code), e(sample_analysis.DEFAULT_CODE), state, " checked" if on else ""))
 
 
 def roi_card():

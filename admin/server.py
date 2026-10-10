@@ -4119,6 +4119,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # has unlocked it for. Anyone else gets sample data drawn here, never the real values.
         gate = {"state": "unlocked"} if self.admin_like() else gating.state(code_id, code)
         gate["headline"] = gating.headline(card, every)
+        import sample_analysis                       # item 39: is "See a sample full analysis" on?
+        gate["sample_full"] = sample_analysis.available()
+        if self.admin_like():
+            gate["admin"] = True
         if gate["state"] != "unlocked":
             gate["sample"] = gating.sample(code, plats[0] if plats else None)
             return self.send_json(200, {"ok": True, "creator": card, "platforms": plats, "analyses": {},

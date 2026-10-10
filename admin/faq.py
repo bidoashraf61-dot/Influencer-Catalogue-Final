@@ -44,7 +44,8 @@ def _reply(intent):
         # Helvy never quotes prices (phase C + D): the account manager does.
         return {"reply": "I don't quote prices: your account manager will prepare a quote for exactly the creators and content you want, "
                          "usually within one working day. I can send the request now, or show the ideal creator mix for a number of creators.",
-                "next": ["Get a quote", "What is the ideal creator mix?"]}
+                "next": ["Get a quote", "What is the ideal creator mix?"],
+                "handoff": {"reason": "Asked about prices"}}
     if intent == "credits":
         return {"reply": "Tapping options in this chat is always free. A typed question uses **%d credit**, and building a scored shortlist uses **%d**. "
                          "Everything AI is free while you have an active campaign. You can earn or request more from your profile."

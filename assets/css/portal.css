@@ -1403,3 +1403,26 @@ a.hv-note:hover { background: #efede8; }
   .sel-sbar__tools { margin-left: 0; }
   .sel-grp__hd h2, .sel-grp__n { font-size: 34px; }
 }
+
+/* ---- Helvy's working note (fix batch 8, item 41): his avatar, three typing dots, one typed line. No box. */
+.hv-row--wk { align-items: center; padding: 2px 0 2px 2px; }
+.hv-wk { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; color: var(--hv-ink); }
+.hv-wk .cx-hd.hv-wk__hd { width: 44px; height: 44px; flex: none; }
+.hv-wk .cx-hd.hv-wk__hd .hv-clip { filter: none; -webkit-mask-image: none; mask-image: none; object-position: 50% 50%; }
+.hv-wk__dots { display: inline-flex; gap: 4px; flex: none; }
+.hv-wk__dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--hv-gray); opacity: .35; animation: hv-dot 1s ease-in-out infinite; }
+.hv-wk__dots i:nth-child(2) { animation-delay: .15s; }
+.hv-wk__dots i:nth-child(3) { animation-delay: .3s; }
+.hv-wk__line { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font: 600 14px/1.3 "DM Sans", Arial, sans-serif; letter-spacing: .005em; }
+.hv-wk__sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+@media (prefers-reduced-motion: reduce) { .hv-wk__dots i { animation: none; opacity: .6; } }
+
+/* ---- Helvy cannot do it: one tap to the account manager (item 38) */
+.hv-hand { padding: 10px 12px; }
+.hv-hand__btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--hv-white); color: var(--hv-ink); box-shadow: inset 0 0 0 1.5px var(--hv-ink); font: 600 14px/1 "DM Sans", Arial, sans-serif;
+  transition: background .16s var(--hv-ease), color .16s var(--hv-ease); }
+.hv-hand__btn:hover { background: var(--hv-lime); }
+.hv-hand__btn:focus-visible { outline: 3px solid var(--hv-red); outline-offset: 2px; }
+.hv-hand .hv-act__yes, .hv-hand .hv-act__no { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .hv-hand__btn { transition: none; } }

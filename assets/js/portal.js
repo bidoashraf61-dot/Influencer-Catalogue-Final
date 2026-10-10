@@ -2929,6 +2929,79 @@
         .catch(function () { onEvent({ t: "error", status: 0, message: "Could not reach the server. Please try again." }); });
     }
 
+    /* -- Helvy's working note (item 41): avatar, three typing dots, one typed line -- */
+    var NOTE_PLAIN = [[/search|roster|find|rank|look/i, "Searching creators"], [/engage|reach|metric|calculat|check/i, "Checking engagement"],
+                      [/match|scor|fit|compar/i, "Scoring fit"], [/campaign|brief|your|read|open/i, "Reading your campaign"]];
+    function workNote() {
+      var MIN_LINE = 900, TYPE_MS = 26, MIN_NOTE = 900;
+      var born = Date.now(), shown = 0, want = "", typedT = 0, nextT = 0, rotT = 0, real = false, ri = 0;
+      var ROT = ["Reading your message", "Thinking it through", "Writing your answer"];
+      var vis = h("span", { class: "hv-wk__line", "aria-hidden": "true" });
+      var sr = h("span", { class: "hv-wk__sr" });                      // the whole line at once, for screen readers
+      var el = h("div", { class: "hv-wk", role: "status", "aria-live": "polite", "aria-atomic": "true" },
+        clip("thinking", "hv-wk__hd", { seq: COOK_SEQ }),
+        h("span", { class: "hv-wk__dots", "aria-hidden": "true" }, h("i"), h("i"), h("i")), vis, sr);
+      function plain(label) {                                            // a plain action; never a number or a tool name
+        var t = String(label || "").replace(/[…]+|\.{3}$/g, "").replace(/\d+/g, "").replace(/_/g, " ").trim();
+        for (var i = 0; i < NOTE_PLAIN.length; i++) if (NOTE_PLAIN[i][0].test(t) && t.length > 28) return NOTE_PLAIN[i][1];
+        return t || "Thinking it through";
+      }
+      function paint(text) {
+        clearInterval(typedT);
+        var full = text + "…";
+        sr.textContent = full;
+        if (reduce) { vis.textContent = full; shown = Date.now(); scroll(); return; }
+        var i = 0; vis.textContent = "";
+        shown = Date.now();
+        typedT = setInterval(function () { i += 1; vis.textContent = full.slice(0, i); if (i >= full.length) clearInterval(typedT); }, TYPE_MS);
+      }
+      function show() {
+        nextT = 0;
+        if (want && want !== vis._now) { vis._now = want; paint(want); }
+      }
+      return {
+        el: el,
+        start: function () {
+          vis._now = ROT[0]; paint(ROT[0]);
+          rotT = setInterval(function () { if (!real) { ri = (ri + 1) % ROT.length; want = ROT[ri]; if (Date.now() - shown >= MIN_LINE) show(); } }, 2200);
+        },
+        set: function (label) {
+          real = true; want = plain(label);
+          if (want === vis._now) return;
+          var wait = MIN_LINE - (Date.now() - shown);
+          if (wait <= 0) show(); else if (!nextT) nextT = setTimeout(show, wait);
+        },
+        minLeft: function () { return MIN_NOTE - (Date.now() - born); },
+        stop: function () { clearInterval(typedT); clearInterval(rotT); clearTimeout(nextT); }
+      };
+    }
+    /* -- Helvy cannot do it: one tap sends the chat to the account manager, after a confirm card (item 38) -- */
+    function handoffCard(hf) {
+      var box = h("div", { class: "hv-msg hv-msg--ai hv-act hv-hand", role: "group", "aria-label": "Send this to your account manager" });
+      var ask = h("button", { class: "hv-hand__btn", type: "button" }, "Send this to my account manager");
+      box.appendChild(ask);
+      ask.addEventListener("click", function () {
+        box.textContent = "";
+        box.appendChild(h("p", { class: "hv-act__what" }, "Send this chat" + (selToken() ? " and your open selection" : "") + " to your account manager?"));
+        var yes = h("button", { class: "hv-act__yes", type: "button" }, "Send");
+        var no = h("button", { class: "hv-act__no", type: "button" }, "Not now");
+        var btns = h("div", { class: "hv-act__btns" }, yes, no);
+        box.appendChild(btns); yes.focus({ preventScroll: true });
+        function settle(label) { btns.remove(); box.classList.add("is-done"); box.appendChild(h("p", { class: "hv-act__state" }, label)); }
+        yes.addEventListener("click", function () {
+          yes.disabled = no.disabled = true; yes.textContent = "Sending…";
+          api("POST", "/api/chat/handoff", { thread: thread, selection: selToken() || "", reason: hf && hf.reason || "" }).then(function (r) {
+            if (r.s === 429) { settle("Already sent"); say("You've sent a few requests already today. The team has them and will be in touch."); return; }
+            if (!r.b || !r.b.ok) { settle("Not sent"); say("That didn't go through. Please try again in a moment."); return; }
+            settle("Sent");
+            say(r.b.message || "Sent to your account manager. They usually reply within one working day.");
+          });
+        });
+        no.addEventListener("click", function () { settle("Not sent"); });
+      });
+      row("ai", box);
+    }
+
     /* -- typing: answers a pending question, or goes to the AI -- */
     var REQ = /campaign|creator|influencer|shortlist|launch|recommend|suggest|find|looking for|ugc|حمل|مؤثر|إطلاق|اطلاق|ابحث|أبحث|اقترح/i;
     var thread = null, busy = false;
@@ -2953,25 +3026,29 @@
       if (!roiAsk && !(ME && ME.ai) && !selToken() && REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
       if (!roiAsk && !(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
       busy = true; send.disabled = true;
-      // While it works: what it is doing right now, then the answer as it is written.
-      // Helvy thinks: the thinking clip beside one live step line with a light sweep across it.
-      // Until the server names its steps, the line rotates every 1.4 s; each real step then ticks.
-      var now = h("p", { class: "cx-think__now" }, "Reading your message…");
-      var steps = h("ol", { class: "cx-think__steps" });
-      var work = h("div", { class: "hv-msg hv-msg--ai cx-think", role: "status", "aria-label": "Helvy is working on it" }, clip("thinking", null, { seq: COOK_SEQ }), h("div", null, now, steps));
+      // While it works (item 41): Helvy's avatar, three typing dots and ONE line typed out that names
+      // what he is doing now. No box, no step list. A line stays at least 0.9 s so it never flickers;
+      // the answer waits until the note has been up for 0.9 s.
+      var note = workNote();
       headWorking(true);
-      var workRow = row("ai", work), out = null, ty = null, acc = "", ended = false, real = false;
-      var ROT = ["Reading your message…", "Checking the catalogue…", "Thinking it through…", "Writing your answer…"], ri = 0;
-      var rot = setInterval(function () { if (!real) { ri = (ri + 1) % ROT.length; now.textContent = ROT[ri]; } }, 1400);
-      function step(label) {
-        real = true;
-        steps.querySelectorAll("li.is-now").forEach(function (li) { li.classList.remove("is-now"); li.classList.add("is-done"); });
-        steps.appendChild(h("li", { class: "is-now" }, label));
-        now.textContent = label + "…"; scroll();
+      var workRow = h("div", { class: "hv-row hv-row--wk" }, note.el);
+      log.appendChild(workRow); scroll();
+      var out = null, ty = null, acc = "", ended = false;
+      note.start();
+      var held = [], holdT = 0;
+      function after(fn) {                 // run fn once the note has been seen long enough, in order
+        var wait = note.minLeft();
+        if (wait <= 0 && !held.length) return fn();
+        held.push(fn);
+        if (!holdT) holdT = setTimeout(function () { holdT = 0; var q = held; held = []; q.forEach(function (f) { f(); }); }, Math.max(0, wait));
       }
-      function stop() { busy = false; send.disabled = false; ended = true; clearInterval(rot); }
+      function stop() { busy = false; send.disabled = false; ended = true; note.stop(); }
       stream("/api/chat/stream", Object.assign({ message: text, thread: thread, selection: selToken() || undefined }, pageCtx()), function (ev) {
-        if (ev.t === "step") { step(ev.text); return; }
+        if (ev.t === "step") { note.set(ev.text); return; }
+        if (ev.t === "delta" || ev.t === "done") return after(function () { onEv(ev); });
+        onEv(ev);
+      }).then(function () { if (!ended) { stop(); headWorking(false); if (!out) workRow.remove(); } });
+      function onEv(ev) {
         if (ev.t === "delta") {
           if (!out) { workRow.remove(); out = h("div", { class: "hv-msg hv-msg--ai" }); row("ai", out); ty = typer(out); }
           acc += ev.text; ty.push(ev.text);
@@ -2989,6 +3066,7 @@
             if (ev.breakdown && ev.breakdown.rows && ev.breakdown.rows.length) breakdown(ev.breakdown);
             (ev.actions || []).forEach(actionCard);
             if (ev.cards && ev.cards.length) creatorCards(ev.cards);
+            if (ev.handoff) handoffCard(ev.handoff);
             followUps(ev.next);
           });
           return;
@@ -3000,7 +3078,7 @@
           say(ev.status === 429 ? "One moment, that was quick. Try again in a few seconds." : (ev.message || "That didn't work, and you weren't charged."));
           if (ev.credits != null) { setCredits(ev.credits); refreshFoot(); }
         }
-      }).then(function () { if (!ended) { stop(); headWorking(false); if (!out) workRow.remove(); } });
+      }
     }
     function grow() { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 120) + "px"; }
     ta.addEventListener("input", grow);

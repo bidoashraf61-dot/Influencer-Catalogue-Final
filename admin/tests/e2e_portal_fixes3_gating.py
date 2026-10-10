@@ -101,7 +101,7 @@ class Fixes3Gating(unittest.TestCase):
         self.assertEqual(set(b["creator"]), CARD_KEYS)
         self.assertEqual((b["analyses"], b["requested"]), ({}, []))
         g = b["gate"]
-        self.assertTrue(set(g) <= {"state", "selections", "headline", "sample", "requested_at", "ready_by"}, g.keys())
+        self.assertTrue(set(g) <= {"state", "selections", "headline", "sample", "requested_at", "ready_by", "sample_full"}, g.keys())
         self.assertEqual(set(g["headline"]), HEADLINE_KEYS)
         h = g["headline"]
         self.assertEqual((h["er"], h["avg_views"], h["updated"]), (4.2, 9100, "2026-09-30"))   # the free layer is real

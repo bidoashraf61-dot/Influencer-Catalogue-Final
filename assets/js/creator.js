@@ -81,8 +81,21 @@
     $("pp-back").addEventListener("click", function (e) { e.preventDefault(); history.back(); });
   }
 
+  // Item 39: "#c=CODE&sample=1" shows the anonymised sample full analysis in this same page.
+  function sampleOn() { return /(?:^|[#&])sample=1\b/.test(location.hash || ""); }
   function load() {
     var c = code();
+    if (sampleOn()) {
+      fetch(API + "/api/analysis/sample", { credentials: "include", cache: "no-store" })
+        .then(function (r) {
+          if (r.status === 401) { lock(); return null; }
+          if (!r.ok) { unlocked(); $("pp-empty").textContent = "The sample analysis isn't available right now."; $("pp-empty").hidden = false; return null; }
+          return r.json();
+        })
+        .then(function (b) { if (b) { D = b; unlocked(); render(); } })
+        .catch(function () { unlocked(); $("pp-empty").textContent = "Could not load the sample. Please try again."; $("pp-empty").hidden = false; });
+      return;
+    }
     if (!c) { unlocked(); $("pp-empty").textContent = "No creator chosen. Open one from the catalogue."; $("pp-empty").hidden = false; return; }
     fetch(API + "/api/creator?c=" + encodeURIComponent(c), { credentials: "include", cache: "no-store" })
       .then(function (r) {
@@ -237,7 +250,7 @@
     PLAT = choosePlat();
     var a = (D.analyses || {})[PLAT] || null;
     D.analysis = a;
-    document.title = c.name + " — Creator analysis — HELVY Connect";
+    document.title = D.sample ? "Sample full analysis — HELVY Connect" : c.name + " — Creator analysis — HELVY Connect";
     window.scrollTo(0, 0);
     var gate = D.gate || { state: "unlocked" };
     var oldGate = $("pp-gate"); if (oldGate) oldGate.remove();
@@ -250,7 +263,7 @@
       var rq = $("pp-request-sec"); if (rq) rq.remove();
       return renderGate(c, gate);
     }
-    $("pp-id").insertAdjacentElement("afterend", gateBand(c, gate));
+    $("pp-id").insertAdjacentElement("afterend", D.sample ? sampleBand() : gateBand(c, gate));
     renderPlatforms(c);
     $("pp-sealed").hidden = !!a;
     $("pp-pages").hidden = !a;
@@ -359,7 +372,7 @@
       + '<div class="pp-handles">' + handles + "</div>"
       + '<dl class="pp-key">' + key.map(function (k) { return "<div><dt>" + k[0] + "</dt><dd>" + esc(k[1]) + (k[2] ? " " + k[2] : "") + "</dd></div>"; }).join("") + "</dl>"
       + bio
-      + (a && !a.basic ? '<div class="pp-actions"><button type="button" class="pp-btn pp-btn--ink" id="pp-print">' + I_DOWN + "Download PDF</button></div>" : "")
+      + (a && !a.basic && !D.sample ? '<div class="pp-actions"><button type="button" class="pp-btn pp-btn--ink" id="pp-print">' + I_DOWN + "Download PDF</button></div>" : "")
       + "</div>";
     var pb = $("pp-print"); if (pb) pb.addEventListener("click", function () { downloadPdf(pb); });
   }
@@ -392,6 +405,9 @@
     }[g.state] || ["lock", "Full analysis", "", ""];
     box.innerHTML = '<span class="pp-req__lock">' + hvi(st[0]) + '</span><div><h2 class="pp-req__h">' + st[1] + "</h2><p>" + st[2] + '</p><p class="pp-req__err" role="alert" hidden></p></div><div class="pp-req__side">' + st[3] + "</div>" +
       (g.state === "requested" ? '<div class="pp-req__track"><span class="on">Requested · ' + esc(when(g.requested_at)) + '</span><span class="now">Being prepared</span><span>Ready by ' + esc(when(g.ready_by)) + "</span></div>" : "");
+    if (g.sample_full && g.state !== "unlocked" || (g.sample_full && g.admin)) {
+      box.querySelector(".pp-req__side").appendChild(sampleButton());
+    }
     var ask = box.querySelector("#pp-ask-full");
     if (ask) ask.addEventListener("click", function () {
       ask.disabled = true;
@@ -408,6 +424,75 @@
     if (view) view.addEventListener("click", function () { var p = $("pp-pages").hidden ? $("pp-sealed") : $("pp-pages"); if (p) p.scrollIntoView({ behavior: "smooth", block: "start" }); });
     return box;
   }
+  /* ------------------------------------------- the sample full analysis (item 39)
+     A real analysis of one creator, anonymised on the server: no name, handle, bio, photo, link, post
+     cover or hashtag, numbers only. The button opens it in this same page (read-only, labelled);
+     with a mouse a small card previews its headline sections first. A tap needs no hover. */
+  var SAMPLE_P = null;
+  function sampleData() {
+    if (!SAMPLE_P) SAMPLE_P = fetch(API + "/api/analysis/sample", { credentials: "include" })
+      .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
+    return SAMPLE_P;
+  }
+  function sampleButton() {
+    var wrap = document.createElement("div");
+    wrap.className = "pp-sample";
+    wrap.innerHTML = '<button type="button" class="pp-gbtn pp-gbtn--sample" id="pp-sample-btn" aria-describedby="pp-sample-card">' + hvi("unlock") + "See a sample full analysis</button>" +
+      '<div class="pp-sample__card" id="pp-sample-card" role="tooltip" hidden></div>';
+    var btn = wrap.querySelector("button"), card = wrap.querySelector(".pp-sample__card");
+    var fine = window.matchMedia && matchMedia("(hover: hover) and (pointer: fine)").matches;
+    btn.addEventListener("click", function () {
+      card.hidden = true;
+      var c = code();
+      location.hash = "#c=" + encodeURIComponent(c) + "&sample=1";
+    });
+    if (fine) {
+      var timer = 0;
+      var open = function () {
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+          sampleData().then(function (b) {
+            if (!b || !b.analyses) return;
+            card.innerHTML = previewCard(b);
+            card.classList.remove("pp-sample__card--up");
+            card.hidden = false;
+            // No room below the button in the window: open it above instead.
+            if (card.getBoundingClientRect().bottom > window.innerHeight - 8) card.classList.add("pp-sample__card--up");
+          });
+        }, 140);
+      };
+      var close = function () { clearTimeout(timer); card.hidden = true; };
+      wrap.addEventListener("mouseenter", open); wrap.addEventListener("mouseleave", close);
+      btn.addEventListener("focus", open); btn.addEventListener("blur", close);
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape") close(); });
+    }
+    return wrap;
+  }
+  function previewCard(b) {
+    var pl = (b.platforms || [])[0], a = (b.analyses || {})[pl] || {};
+    var au = a.audience || {}, top = (au.countries || [])[0];
+    var stats = [["Followers", a.followers != null ? num(a.followers) : null], ["Engagement", a.er != null ? pct2(a.er) : null],
+                 ["Avg. views", a.avg_views != null ? num(a.avg_views) : null],
+                 ["Fake followers", a.fake_followers_pct != null ? pct(a.fake_followers_pct) : null],
+                 ["Top country", top ? esc(String(top.code).toUpperCase()) + " " + pct(top.pct, 0) : null],
+                 ["Women", au.gender && au.gender.female != null ? pct(au.gender.female, 0) : null]].filter(function (x) { return x[1] != null; });
+    return '<p class="pp-sample__tag">Sample · anonymised creator</p><dl>' + stats.map(function (x) { return "<div><dt>" + x[0] + "</dt><dd>" + x[1] + "</dd></div>"; }).join("") + "</dl>" +
+      '<p class="pp-sample__secs">Popular posts · Followers &amp; growth · Content · Brand affinity · Audience by country, city, age and gender · Hashtags</p>' +
+      '<p class="pp-sample__cta">Click to open the whole analysis</p>';
+  }
+  function sampleBand() {
+    var box = document.createElement("section");
+    box.className = "pp-samplebar"; box.id = "pp-gate-band";
+    box.innerHTML = '<span class="pp-samplebar__tag">' + hvi("lock") + "Sample · anonymised creator</span>" +
+      "<p>A real full analysis with the name, handle, photo, links and post covers removed. Read-only: it is shown so you can see what a full analysis holds.</p>" +
+      '<button type="button" class="pp-gbtn pp-gbtn--back" id="pp-sample-back">Back to this creator</button>';
+    box.querySelector("button").addEventListener("click", function () {
+      var c = code();
+      location.hash = c ? "#c=" + encodeURIComponent(c) : "";
+    });
+    return box;
+  }
+
   function freeStrip(g) {
     var hl = g.headline || {};
     var plats = (hl.platforms || []).map(function (p) { return '<span class="pp-free__pm" title="' + esc(p) + '">' + icon(p) + "</span>"; }).join("");
@@ -484,7 +569,7 @@
     [].forEach.call(box.querySelectorAll("button"), function (b) {
       b.addEventListener("click", function () {
         var p = b.getAttribute("data-p");
-        history.replaceState(null, "", "#c=" + encodeURIComponent(c.code) + "&p=" + encodeURIComponent(p));
+        history.replaceState(null, "", "#c=" + encodeURIComponent(D.sample ? code() : c.code) + (D.sample ? "&sample=1" : "") + "&p=" + encodeURIComponent(p));
         render();
       });
     });
@@ -573,6 +658,7 @@
       : '<p class="pp-missing">Not in this report.</p>';
     $("pp-posts").onclick = function (e) {
       var el = e.target.closest("[data-post]"); if (!el) return;
+      if (D && D.sample) { e.preventDefault(); return; }          // the sample has no posts to open
       var list = el.getAttribute("data-sp") ? sp : top, p = list[+el.getAttribute("data-post")], sc = p && shortcode(p.url);
       if (!sc) return;            // not an Instagram post: let the link open it
       e.preventDefault(); openPost(p.url, sc);

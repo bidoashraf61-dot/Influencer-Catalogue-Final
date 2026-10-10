@@ -11,7 +11,7 @@ import db
 import mailer
 
 EVENTS = {"signup": "New client", "brief": "New brief", "quote": "Quote request", "credits": "Credits requested",
-          "status": "Selection feedback", "analysis": "Analysis requested"}
+          "status": "Selection feedback", "analysis": "Analysis requested", "handoff": "Account manager request"}
 
 
 def recipients(kam=None):
@@ -49,7 +49,9 @@ def kam_address(kam):
 
 def send(event, lines, kam=None, link=None):
     """Fire and forget."""
-    if event not in (db.setting("notify_events", list(EVENTS)) or []):
+    on = db.setting("notify_events", list(EVENTS)) or []
+    # A hand-off from Helvy follows "quote" for teams that saved an event list before it existed.
+    if event not in on and not (event == "handoff" and "quote" in on):
         return
     to = recipients(kam)
     if not to or not mailer.configured():

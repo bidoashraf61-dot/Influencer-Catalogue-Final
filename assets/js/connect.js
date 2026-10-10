@@ -943,7 +943,7 @@
       var place = function () {
         var fields = host.querySelector(".pp-fields");
         var m = /(?:^|[#&])c=([A-Za-z0-9-]+)/.exec(location.hash || "");
-        if (!fields || !m || fields.querySelector(".cx-ideabtn")) return;
+        if (!fields || !m || fields.querySelector(".cx-ideabtn") || /[#&]sample=1\b/.test(location.hash || "")) return;   // none on the sample analysis
         var nm = fields.querySelector(".pp-name");
         var b = h("button", { class: "cx-btn cx-btn--line cx-ideabtn", type: "button", "data-ideas": decodeURIComponent(m[1]).toUpperCase(),
                               "data-name": nm ? nm.textContent.trim() : "", html: ic("lock") + "<span>Content ideas</span>" });
