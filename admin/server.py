@@ -2296,7 +2296,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             frag = urllib.parse.unquote(link.split("#", 1)[1]) if "#" in link else ""
             parts = dict(p.split("=", 1) for p in frag.split("&") if "=" in p)
             if parts.get("s"):
-                sel = db.selection(token=parts["s"])
+                sel = db.selection(token=parts["s"], deleted=True)
                 if sel is not None:
                     return self.redirect("/selections/edit?id=%d" % sel["id"])
             name = (parts.get("n") or "").strip()
@@ -4089,7 +4089,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         passcode as the roster: the link alone shows nothing."""
         viewer = self.viewer_code_id()
         if token:
-            sel = db.selection(token=token)
+            # A selection its client deleted is "unknown" to clients; HelloVoice still opens it.
+            sel = db.selection(token=token, deleted=bool(self.admin()))
             # Prices agreed with one client are for that client. The token is
             # in a link, and a link travels; the code typed FOR THIS LINK is what
             # identifies who is reading it. Admins signed in open any link.
@@ -4649,7 +4650,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if sel is None:
             sel = db.selection_for_link(name, codes, viewer)
         if sel is None:
-            sid = db.save_selection(None, name, codes, {}, None, None, None, viewer)
+            sid = db.save_selection(None, name, codes, {}, None, None, None, viewer, origin="client")
             return self.send_json(200, {"ok": True, "token": db.selection(sid)["token"]},
                                   self.cors())
 

@@ -106,8 +106,8 @@ def _briefs_tab():
     for b in portal.briefs_for(None, 100):
         usr = portal.user_for_code(b["code_id"])
         who = (usr["company"] or usr["email"]) if usr else "Guest code #%d" % b["code_id"]
-        rows.append("<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td></tr>"
-                    % (e(who), e(b["summary"]), e(b["objective"] or ""),
+        rows.append("<tr><td>%s</td><td>%s%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td></tr>"
+                    % (e(who), e(b["summary"]), views.client_deleted_pill(b), e(b["objective"] or ""),
                        ("selection #%d" % b["selection_id"]) if b["selection_id"] else "—", e(ago(b["created_at"]))))
     return ("<div class='card'><p class='sec-desc'>Every brief a client answered. The selection it produced is on the Selections page, "
             "already scored against the brief.</p><table><thead><tr><th>Client</th><th>Brief</th><th>Objective</th><th>Result</th><th>When</th></tr></thead><tbody>"
@@ -499,7 +499,7 @@ def user_page(usr, ok=None, err=None):
     bal = portal.balance(cid)
     ledger = portal.ledger(cid, 25)
     with db.connect() as conn:
-        sels = conn.execute("SELECT id, name, updated_at, codes, token FROM selections WHERE code_id = ? ORDER BY updated_at DESC LIMIT 20", (cid,)).fetchall()
+        sels = conn.execute("SELECT id, name, updated_at, codes, token, deleted_at FROM selections WHERE code_id = ? ORDER BY updated_at DESC LIMIT 20", (cid,)).fetchall()
         camps = conn.execute("SELECT id, name, status, starts_at, token FROM campaigns WHERE code_id = ? ORDER BY id DESC LIMIT 20", (cid,)).fetchall()
         quotes = conn.execute("SELECT id, at, selection_name, handled_at FROM requests WHERE code_id = ? ORDER BY id DESC LIMIT 20", (cid,)).fetchall()
         ev = conn.execute("SELECT kind, COUNT(*) n, MAX(at) last FROM events WHERE code_id = ? GROUP BY kind ORDER BY n DESC", (cid,)).fetchall()
@@ -546,10 +546,11 @@ def user_page(usr, ok=None, err=None):
            "".join("<li><a href='%s'>%s</a> <span class='muted'>%s · %s</span></li>" % (u("/requests") + "#r%d" % r["id"], e(r["selection_name"] or "Quote"),
                    e(ago(r["at"])), "answered" if r["handled_at"] else "<b>waiting</b>") for r in quotes) or "<li class='muted'>none</li>")
         + "<p><strong>Selections</strong></p><ul>%s</ul><p><strong>Briefs</strong></p><ul>%s</ul><p><strong>Activity</strong></p><ul>%s</ul></div>"
-        % ("".join("<li><a href='%s'>%s</a> <span class='muted'>%d creators · %s</span> %s</li>" % (u("/selections/edit?id=%d" % s["id"]), e(s["name"]),
-                   len(json.loads(s["codes"] or "[]")), e(ago(s["updated_at"])), views.open_link("selection", s["token"], "Link", "btn tiny ghost")) for s in sels)
+        % ("".join("<li><a href='%s'>%s</a>%s <span class='muted'>%d creators · %s</span> %s</li>" % (u("/selections/edit?id=%d" % s["id"]), e(s["name"]),
+                   views.client_deleted_pill(s), len(json.loads(s["codes"] or "[]")), e(ago(s["updated_at"])), views.open_link("selection", s["token"], "Link", "btn tiny ghost")) for s in sels)
            or "<li class='muted'>none</li>",
-           "".join("<li>%s <span class='muted'>%s</span></li>" % (e(b["summary"]), e(ago(b["created_at"]))) for b in portal.briefs_for(cid, 10)) or "<li class='muted'>none</li>",
+           "".join("<li>%s%s <span class='muted'>%s</span></li>" % (e(b["summary"]), views.client_deleted_pill(b), e(ago(b["created_at"])))
+                   for b in portal.briefs_for(cid, 10, deleted=True)) or "<li class='muted'>none</li>",
            "".join("<li>%s × %d <span class='muted'>last %s</span></li>" % (e(r["kind"]), r["n"], e(ago(r["last"]))) for r in ev) or "<li class='muted'>none</li>"))
     reqs = [r for r in portal.open_credit_requests(cid) if not r["handled_at"]]
     req_html = "".join(

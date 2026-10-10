@@ -87,7 +87,7 @@ def decisions(code_id):
     import selstatus
     ids = sorted(portal.team_codes(code_id))
     with db.connect() as conn:
-        sels = conn.execute("SELECT id, name, codes, code_id FROM selections WHERE code_id IN (%s) ORDER BY updated_at DESC LIMIT 10"
+        sels = conn.execute("SELECT id, name, codes, code_id FROM selections WHERE code_id IN (%s) AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 10"
                             % ",".join("?" * len(ids)), ids).fetchall()
     roster = {c["code"]: c for c in db.list_creators()}
     reasons, out = {}, []

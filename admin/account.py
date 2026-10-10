@@ -189,7 +189,7 @@ def summary(user, code_id, secret=b""):
     team = sorted(portal.team_codes(code_id))
     with db.connect() as conn:
         sels = conn.execute(
-            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, u.name owner FROM selections s "
+            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, u.name owner FROM selections s "
             "LEFT JOIN users u ON u.code_id = s.code_id "
             "WHERE s.code_id IN (%s) AND s.archived_at IS NULL ORDER BY s.updated_at DESC LIMIT 60" % ",".join("?" * len(team)),
             team).fetchall()
@@ -210,6 +210,9 @@ def summary(user, code_id, secret=b""):
         st = selstatus.of(s["id"])
         selections.append({"name": s["name"], "token": s["token"], "creators": len(codes), "updated_at": s["updated_at"],
                            "mine": s["code_id"] == code_id, "owner": None if s["code_id"] == code_id else (s["owner"] or "A colleague"),
+                           # Only the client's own work can be deleted: not a colleague's, not HelloVoice's.
+                           "can_delete": (s["origin"] or "admin") == "client" and code_id != db.admin_code_id()
+                                         and portal.owns(code_id, s["code_id"]),
                            "counts": selstatus.counts(codes, st, tiers)})
 
     campaigns, grades = [], []
@@ -251,7 +254,9 @@ def summary(user, code_id, secret=b""):
     briefs = []
     for b in portal.briefs_for(code_id, 30):
         sel = db.selection(b["selection_id"]) if b["selection_id"] else None
-        briefs.append({"id": b["id"], "summary": b["summary"], "objective": b["objective"], "source": b["source"],
+        if sel is not None and sel["deleted_at"]:
+            sel = None                      # its selection was deleted: the brief no longer opens it
+        briefs.append({"id": b["id"], "can_delete": code_id != db.admin_code_id(), "summary": b["summary"], "objective": b["objective"], "source": b["source"],
                        "at": b["created_at"], "selection": sel["token"] if sel else None, "selection_name": sel["name"] if sel else None})
     return {"user": profile(user), "completion": comp, "credits": portal.balance(code_id),
             "monthly_credits": portal.monthly_allowance(user), "next_refill": _next_month(),

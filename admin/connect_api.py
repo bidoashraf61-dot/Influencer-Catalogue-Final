@@ -46,7 +46,7 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
                 cid = who[0]
                 ids = sorted(portal.team_codes(cid))
                 with db.connect() as conn:
-                    rows = conn.execute("SELECT name, token, codes FROM selections WHERE code_id IN (%s) ORDER BY updated_at DESC LIMIT 40"
+                    rows = conn.execute("SELECT name, token, codes FROM selections WHERE code_id IN (%s) AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 40"
                                         % ",".join("?" * len(ids)), ids).fetchall()
                 self.send_json(200, {"ok": True, "items": [{"name": r["name"], "token": r["token"],
                                                              "creators": len(json.loads(r["codes"] or "[]"))} for r in rows]}, self.cors())

@@ -164,7 +164,7 @@ def t_company_info(ctx):
 def t_my_work(ctx):
     cid = ctx["code_id"]
     with db.connect() as conn:
-        sels = conn.execute("SELECT name, token, codes, updated_at FROM selections WHERE code_id = ? ORDER BY updated_at DESC LIMIT 10",
+        sels = conn.execute("SELECT name, token, codes, updated_at FROM selections WHERE code_id = ? AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 10",
                             (cid,)).fetchall()
         camps = conn.execute("SELECT name, client, status, platform, starts_at, ends_at FROM campaigns WHERE code_id = ? "
                              "AND status != 'draft' ORDER BY id DESC LIMIT 10", (cid,)).fetchall()
@@ -323,7 +323,7 @@ def t_client_overview(ctx, email=""):
             "credits": portal.balance(cid), "events": {r["kind"]: r["n"] for r in ev},
             "selections": [dict(s) for s in sels],
             "briefs": [{"id": b["id"], "summary": b["summary"], "objective": b["objective"], "at": b["created_at"]}
-                       for b in portal.briefs_for(cid, 10)]}
+                       for b in portal.briefs_for(cid, 10, deleted=True)]}
 
 
 def t_list_clients(ctx, limit=30):
@@ -1014,7 +1014,7 @@ def d_new_sel(a, ctx):
 
 
 def x_new_sel(a, ctx):
-    sid = db.save_selection(None, a["name"], a["codes"], {}, None, None, None, ctx["code_id"])
+    sid = db.save_selection(None, a["name"], a["codes"], {}, None, None, None, ctx["code_id"], origin="client")
     return {"ok": True, "message": "Saved as “%s”." % a["name"], "open": db.selection(sid)["token"]}
 
 

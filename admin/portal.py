@@ -186,6 +186,11 @@ def init():
         for col, ddl in (("kam", "TEXT"), ("monthly_credits", "INTEGER"), ("deleted_at", "INTEGER")):
             if col not in ucols:
                 conn.execute("ALTER TABLE users ADD COLUMN %s %s" % (col, ddl))
+        bcols = {r["name"] for r in conn.execute("PRAGMA table_info(briefs)")}
+        for col in ("deleted_at", "deleted_by"):
+            # A client deleted the brief from their profile: hidden from them, kept for HelloVoice.
+            if col not in bcols:
+                conn.execute("ALTER TABLE briefs ADD COLUMN %s INTEGER" % col)
     # Portal v3: profile page, bell, analysis gating, selection status, rewards (all additive).
     import account
     import aimore
@@ -619,12 +624,45 @@ def save_brief(code_id, user_id, source, answers, summary, objective, target, se
         return cur.lastrowid
 
 
-def briefs_for(code_id=None, limit=50):
+def briefs_for(code_id=None, limit=50, deleted=False):
+    """A client's briefs, newest first; the ones they deleted only when ``deleted`` (admin views).
+    Every brief (code_id None) is the admin's list, deleted ones included."""
     with db.connect() as conn:
         if code_id is None:
             return conn.execute("SELECT * FROM briefs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
-        return conn.execute("SELECT * FROM briefs WHERE code_id = ? ORDER BY id DESC LIMIT ?",
-                            (code_id, limit)).fetchall()
+        return conn.execute("SELECT * FROM briefs WHERE code_id = ?" + ("" if deleted else " AND deleted_at IS NULL") +
+                            " ORDER BY id DESC LIMIT ?", (code_id, limit)).fetchall()
+
+
+def live_brief_for_selection(sid):
+    """The newest brief recorded for a selection that its client has not deleted."""
+    with db.connect() as conn:
+        return conn.execute("SELECT * FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",
+                            (sid,)).fetchone()
+
+
+def delete_brief(bid, by_code_id):
+    """A client deleted one of their briefs. The row stays (HelloVoice still sees it, marked).
+    The selection it scored loses the objective and audience this brief gave it, so its page
+    asks for an objective again; another live brief on the same selection takes over instead.
+    An objective the admin set since (different from the brief's) is left alone. Deleting
+    twice changes nothing."""
+    b = brief(bid)
+    if b is None or b["deleted_at"]:
+        return False
+    with db.connect() as conn:
+        conn.execute("UPDATE briefs SET deleted_at = ?, deleted_by = ? WHERE id = ? AND deleted_at IS NULL",
+                     (db.now(), by_code_id, bid))
+    sel = db.selection(b["selection_id"]) if b["selection_id"] else None
+    if sel is not None and (sel["objective"] or None) == (b["objective"] or None):
+        nxt = live_brief_for_selection(sel["id"])
+        with db.connect() as conn:
+            if nxt is not None:
+                conn.execute("UPDATE selections SET objective = ?, target = ? WHERE id = ?",
+                             (nxt["objective"], nxt["target"], sel["id"]))
+            else:
+                conn.execute("UPDATE selections SET objective = NULL, target = NULL WHERE id = ?", (sel["id"],))
+    return True
 
 
 def brief(bid):
