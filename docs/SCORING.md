@@ -1,4 +1,4 @@
-# Creator score (scoring v3, 2026-10-11)
+# Creator score (scoring v3, ranges, 2026-10-11)
 
 A creator's score compares their **engagement** with **international benchmarks**. It never
 compares them with our own roster. Source of truth: `admin/intl_benchmarks.py`; formula:
@@ -9,7 +9,11 @@ ratio = creator's engagement / benchmark for their platform and size band
 score = 100 x min(1, ratio / 2)
 ```
 
-| ratio | score | tag |
+A benchmark is a range (low to high), so the score is worked out at both ends and kept as a
+range: the number shown is the midpoint, and `score_range` / `tag_range` carry the ends (a
+creator can read "Possible fit to Strong fit").
+
+| ratio (at the midpoint) | score | tag |
 |---|---|---|
 | 0.8x or less | 40 or less | Not recommended (below 40) |
 | 1.0x (at benchmark) | 50 | Possible fit |
@@ -17,11 +21,7 @@ score = 100 x min(1, ratio / 2)
 | 1.6x | 80 | Strong fit |
 | 2x or more | 100 | Strong fit |
 
-## Benchmarks: a range, low to middle source (version 2026-10-11.2)
-
- = the lowest source's typical value for the band;  = the middle source's. A creator
-is scored against both ends: the score shown is the midpoint and  / 
-carry the ends (a creator can read "Possible fit to Strong fit").
+## Benchmarks: low = lowest source, high = middle source (version 2026-10-11.2)
 
 | Band (followers) | Instagram: (likes+comments) / followers | TikTok: interactions / views |
 |---|--:|--:|
@@ -31,12 +31,15 @@ carry the ends (a creator can read "Possible fit to Strong fit").
 | Macro 500K-1M | 0.9 - 1.5% | 3.4 - 3.7% |
 | Mega 1M+ | 0.7 - 1.5% | 3.4% (one source) |
 
-Instagram: low = IQFluence (Sep 2026, 30.1M creators), high = HypeAuditor (2025, the middle of
-IQFluence / HypeAuditor / Buffer). TikTok: low = Rival IQ (2025, median brand by view), high =
-the average of Rival IQ and Socialinsider (2025, 2M videos) because only two sources exist.
+Instagram: low = IQFluence (Sep 2026, 30.1M creators, median by tier); high = HypeAuditor
+(2025, the middle of IQFluence / HypeAuditor / Buffer). TikTok: low = Rival IQ (2025, median
+brand account by view); high = the average of Rival IQ and Socialinsider (2025, 2M videos),
+because only two sources exist. TikTok engagement here is (likes + comments + shares) / views;
+the benchmark also counts saves, which the scrape does not return, so our figure is slightly
+conservative.
 
 Editable in Admin > Settings > "Creator score benchmarks (international)"; saved as the
- setting, {platform: {band: [low, high]}}; cached 60 s. A figure equal to the
+`intl_benchmarks` setting, {platform: {band: [low, high]}}; cached 60 s. A figure equal to the
 table's default is not stored.
 
 ## Not scored
@@ -46,6 +49,5 @@ table's default is not stored.
 * Audience country/gender/age, fake followers, our own campaign record: shown as checks beside
   the score, never inside it.
 * The objective (Awareness / Engagement / Traffic) does not change the number.
-
-Override a figure without a deploy: Settings key `intl_benchmarks`, e.g.
-`{"Instagram": {"mid": 1.1}}`. Cached for 60 seconds.
+* The shortlist's country and product-space markdowns (`matcher.apply_rules`) still apply
+  after scoring and scale the range with the number.
