@@ -36,6 +36,41 @@ WEIGHTS = {
 FROM_CAMPAIGN = {"balanced": "Balanced", "awareness": "Awareness", "engagement": "Engagement", "traffic": "Conversion"}
 
 
+# More than one goal (fix batch 3: the selection objective takes several, e.g. awareness AND
+# engagement). Stored as "Awareness+Engagement"; scored with the average of those goals'
+# weights, so each one counts and none is dropped. "Balanced" alongside others adds nothing.
+def objective_of(goals):
+    """A list of goal names (Awareness, Engagement, Conversion, Balanced) -> one stored objective."""
+    names = [g for g in dict.fromkeys(goals or []) if g in OBJECTIVES]
+    named = [g for g in OBJECTIVES if g in names and g != "Balanced"]
+    if not named:
+        return "Balanced"
+    return "+".join(named)
+
+
+def parts_of(objective):
+    """'Awareness+Engagement' -> ['Awareness', 'Engagement']; anything unknown -> ['Balanced']."""
+    names = [p for p in str(objective or "").split("+") if p in OBJECTIVES]
+    return names or ["Balanced"]
+
+
+def known_objective(objective):
+    """True for one of OBJECTIVES or a "+" combination of them."""
+    return bool(objective) and all(p in OBJECTIVES for p in str(objective).split("+"))
+
+
+def blend(table, objective):
+    """The weights for an objective from ``table`` (WEIGHTS or WEIGHTS_BASIC), averaged over its goals."""
+    parts = parts_of(objective)
+    keys = table["Balanced"].keys()
+    return {k: sum(table[p][k] for p in parts) / float(len(parts)) for k in keys}
+
+
+def objective_label(objective):
+    """How a (combined) objective reads: 'Awareness + Engagement'."""
+    return " + ".join(parts_of(objective))
+
+
 def _pct(v):
     return ("%g" % round(v, 1)) + "%"
 
@@ -63,8 +98,8 @@ def suggest(doc, platform, followers=None, objective="Balanced", band="mid", ben
     if not doc:
         return {"note": "No %s analysis on file yet — nothing to suggest from." % (platform or "platform")}
     bench = bench or {}
-    objective = objective if objective in WEIGHTS else "Balanced"
-    w = WEIGHTS[objective]
+    objective = objective if known_objective(objective) else "Balanced"
+    w = blend(WEIGHTS, objective)
     f = doc.get("followers") or followers
     er = doc.get("er")
     fake = doc.get("fake_followers_pct")
@@ -141,7 +176,7 @@ def suggest(doc, platform, followers=None, objective="Balanced", band="mid", ben
     # the line the client reads: what matters most for this objective, first
     order = sorted((k for k in used), key=lambda k: -w[k])
     line = [e for k in order for e in evidence if _belongs(e, k)]
-    out.update({"fit": fit, "reason": ("For %s: " % objective.lower() if objective != "Balanced" else "") + " · ".join(line[:3]),
+    out.update({"fit": fit, "reason": ("For %s: " % objective_label(objective).lower() if objective != "Balanced" else "") + " · ".join(line[:3]),
                 "evidence": evidence})
     out["reason"] = out["reason"][:160]
     return out
@@ -332,8 +367,8 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
            "objective": objective, "platform": platform, "basic": not verified, "checks": []}
     bench = bench or {}
     target = dict(DEFAULT_TARGET, **{k: v for k, v in (target or {}).items() if v})
-    objective = objective if objective in WEIGHTS_BASIC else "Balanced"
-    w = WEIGHTS_BASIC[objective]
+    objective = objective if known_objective(objective) else "Balanced"
+    w = blend(WEIGHTS_BASIC, objective)
     f = doc.get("followers") or followers
     er = doc.get("er")
     feed = platform in (None, "Instagram", "Facebook", "X")
@@ -459,7 +494,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     order = sorted(parts, key=lambda p: -wt(p[0]))
     out["strengths"] = [st for _, _, s, st, _ in order if st and s >= 0.75][:4]
     out["watchouts"] = extra_watch + [wo for _, _, s, _, wo in order if wo and s <= 0.45][:3 - len(extra_watch)]
-    lead = {"Balanced": "", "Awareness": " for awareness", "Engagement": " for engagement", "Conversion": " for conversion"}[objective]
+    lead = "" if objective == "Balanced" else " for " + objective_label(objective).lower()
     txt = "%s%s (%d/100)%s." % (out["tag"], lead, val, ", from public numbers only" if not verified else "")
     if out["strengths"]:
         txt += " Strengths: " + "; ".join(out["strengths"][:2]) + "."

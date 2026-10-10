@@ -25,7 +25,7 @@ import metrics
 # type: "one" | "many" | "text". Option values are what is stored and scored.
 
 QUESTIONS = [
-    {"id": "goal", "type": "one", "label": "What is the main goal of the campaign?", "required": True,
+    {"id": "goal", "type": "one", "multi_ok": True, "label": "What is the main goal of the campaign?", "required": True,
      "options": [("awareness", "Awareness"), ("engagement", "Engagement"),
                  ("conversion", "Sales"), ("balanced", "Balanced")]},
     {"id": "platforms", "type": "many", "label": "Where should the content run?", "required": True,
@@ -58,6 +58,12 @@ QUESTIONS = [
 ]
 _BY_ID = {q["id"]: q for q in QUESTIONS}
 OBJECTIVE_OF = {"awareness": "Awareness", "engagement": "Engagement", "conversion": "Conversion", "balanced": "Balanced"}
+
+
+def objective_for(goal):
+    """One goal or several -> the objective the scorer uses ("Awareness+Engagement" for two)."""
+    goals = goal if isinstance(goal, list) else [goal] if goal else []
+    return fit.objective_of([OBJECTIVE_OF.get(g) for g in goals])
 BUDGET_MAX = {"50": 50000, "150": 150000, "400": 400000, "400+": None, "open": None}
 COUNT_OF = {"5": 5, "8": 8, "15": 15, "25": 25}
 PLATFORMS = {"Instagram", "TikTok", "Snapchat", "YouTube"}
@@ -116,6 +122,13 @@ def clean_answers(raw):
             vals = keep[:6] + ([typed] if typed else [])
             if vals:
                 out[q["id"]] = vals
+        elif q.get("multi_ok") and isinstance(v, list):
+            # The goal may be several (fix batch 3: "Awareness" AND "Engagement" for a selection).
+            keep = [x for x in dict.fromkeys(str(x) for x in v) if x in allowed][:3]
+            if len(keep) == 1:
+                out[q["id"]] = keep[0]
+            elif keep:
+                out[q["id"]] = keep
         else:
             if isinstance(v, str) and v in allowed:
                 out[q["id"]] = v
@@ -198,7 +211,7 @@ def to_brief(answers):
     if typed:
         notes = "; ".join(typed) + (". " + notes if notes else "")
     return {
-        "objective": OBJECTIVE_OF.get(answers.get("goal"), "Balanced"),
+        "objective": objective_for(answers.get("goal")),
         "target": {"country": answers.get("market", "SA"), "gender": answers.get("gender", "Any"),
                    "age": answers.get("age", "Any"), "category": "|".join(cats) if cats else "Any"},
         "platforms": plats,
@@ -213,7 +226,8 @@ def describe(answers):
     label = answer_label
     bits = []
     if "goal" in answers:
-        bits.append(label("goal", answers["goal"]).lower())
+        goals = answers["goal"] if isinstance(answers["goal"], list) else [answers["goal"]]
+        bits.append(" and ".join(label("goal", g).lower() for g in goals))
     if answers.get("category"):
         bits.append("in " + ", ".join(label("category", c).lower() for c in answers["category"]))
     if "market" in answers:
@@ -420,7 +434,7 @@ def score_all(brief, exclude=(), only=None):
         })
     # Equal scores are common on public data; break the tie the way the goal would: reach for
     # awareness, the smaller (cheaper, closer) account otherwise.
-    big_first = objective == "Awareness"
+    big_first = "Awareness" in str(objective).split("+")
     items.sort(key=lambda i: (-i["rank_score"], -i["followers"] if big_first else i["followers"], i["code"]))
     return items
 

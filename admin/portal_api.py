@@ -260,9 +260,17 @@ class PortalMixin(connect_api.ConnectMixin):
                     self.send_json(404, {"ok": False}, self.cors())
                 else:
                     with db.connect() as conn:
-                        b = conn.execute("SELECT id, summary FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1",
+                        b = conn.execute("SELECT id, summary, answers FROM briefs WHERE selection_id = ? ORDER BY id DESC LIMIT 1",
                                          (sel["id"],)).fetchone()
-                    self.send_json(200, {"ok": True, "brief": dict(b) if b else None}, self.cors())
+                    out = None
+                    if b:
+                        # The answers come back so "Edit" on the selection's objective reopens them filled in.
+                        try:
+                            ans = json.loads(b["answers"] or "{}")
+                        except ValueError:
+                            ans = {}
+                        out = {"id": b["id"], "summary": b["summary"], "answers": ans if isinstance(ans, dict) else {}}
+                    self.send_json(200, {"ok": True, "brief": out}, self.cors())
             return True
         if path == "/api/brief/scores":
             who = self._need_viewer()

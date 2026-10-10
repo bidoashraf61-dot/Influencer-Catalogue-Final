@@ -3630,7 +3630,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         import fit as fit_mod
         keys = sel.keys()
         got = (sel["objective"] if "objective" in keys else None) or fit_mod.FROM_CAMPAIGN.get(db.selection_campaign_objective(sel["id"]) or "", "Balanced")
-        return got if got in fit_mod.OBJECTIVES else "Balanced"
+        return got if fit_mod.known_objective(got) else "Balanced"
 
     def selection_target(self, sel):
         import fit as fit_mod
