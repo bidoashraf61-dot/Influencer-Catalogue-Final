@@ -43,6 +43,7 @@ KINDS = {
     "analysis_ready": "analysis",
     "sel_feedback": "selections", "sel_shared": "selections", "sel_updated": "selections", "unavailable": "selections",
     "camp_live": "campaigns", "camp_report": "campaigns", "camp_final": "campaigns",
+    "camp_weekly": "campaigns", "camp_next": "campaigns",
     "credits_low": "account", "credits_monthly": "account", "credits_added": "account", "colleague": "account",
     "idea": "ideas",
 }

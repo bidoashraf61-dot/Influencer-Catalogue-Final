@@ -115,4 +115,6 @@ def decisions(code_id):
 def upcoming(months=4, sector=""):
     items = _occ.upcoming(months=months, sector=sector)
     return {"today": time.strftime("%Y-%m-%d"), "occasions": items[:14],
-            "rule": "Influencer content needs 6-8 weeks from brief to posting: 'brief_by' is the latest comfortable date to brief."}
+            "rule": "Influencer content needs 6-8 weeks from brief to posting: 'brief_by' is the latest comfortable date to brief. "
+                    "Each occasion has 'weeks_away' and a ready 'advice' line (e.g. 'Saudi Derm Congress is in 14 weeks: cast now'); "
+                    "use it as written. Never mention prices."}

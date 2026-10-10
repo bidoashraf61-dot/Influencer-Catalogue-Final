@@ -16,15 +16,18 @@ active campaign. The ROI Calculator is deterministic and free for everyone.
 import json
 
 import aimore
+import phase_e_api
 import db
 import portal
 import rewards
 import roi
 
 
-class ConnectMixin:
+class ConnectMixin(phase_e_api.PhaseEMixin):
 
     def connect_get(self, path, query):
+        if self.phase_e_get(path, query):
+            return True
         if path == "/api/roi/saved":
             got = self._roi_selection(query.get("s") or "")
             if got:
@@ -51,6 +54,8 @@ class ConnectMixin:
         return False
 
     def connect_post(self, path):
+        if self.phase_e_post(path):
+            return True
         fn = {"/api/tour": self.api_tour, "/api/roi/estimate": self.api_roi_estimate, "/api/roi/save": self.api_roi_save,
               "/api/selection/more": self.api_selection_more, "/api/selection/alike": self.api_selection_alike}.get(path)
         if not fn:

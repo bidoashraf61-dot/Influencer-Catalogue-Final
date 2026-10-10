@@ -808,6 +808,8 @@ class PortalMixin(connect_api.ConnectMixin):
             "alternates": [dict({k: a[k] for k in ("code", "score", "tag", "basis", "price")}, creator=shown.get(a["code"]))
                            for a in result["alternates"]],
             "platform_scores": plat_scores,
+            # Phase E timing advisor: the launch windows that suit this brief (free, no prices).
+            "timing": __import__("occasions").advise(answers.get("category") or [], answers.get("market") or "SA", answers.get("timing")),
             "spent": cost, "credits": bal if kind != "admin" else None}, self.cors())
 
     # ------------------------------------------------------------------ chat --

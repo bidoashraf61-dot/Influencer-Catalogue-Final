@@ -4759,6 +4759,9 @@ def main():
     team.init()
     apify.start_scheduler()
     profile_thumbs.start()
+    # Phase E: weekly campaign updates + "what to do next time" (on start, then hourly; idempotent).
+    import weekly
+    weekly.start()
     db.purge_expired_sessions()
     ALLOWED_ORIGINS.update(args.origin)
     global BASE

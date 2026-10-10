@@ -10,6 +10,8 @@ content needs about 6–8 weeks from brief to posting, so each entry also says
 when to brief.
 
     upcoming(today=None, months=4, sector="")   the next occasions, soonest first
+    advise(categories, market, timing, launch)   launch windows for a brief, with one line each
+                                                 ("Saudi Derm Congress is in 14 weeks: cast now")
 """
 import datetime as _dt
 
@@ -70,9 +72,98 @@ def upcoming(today=None, months=4, sector=""):
         if sector and sector not in sectors.split() and "all" not in sectors.split():
             continue
         brief_by = s - _dt.timedelta(weeks=LEAD_WEEKS[1])
-        out.append({"name": name, "kind": kind, "starts": start, "ends": end,
+        weeks = max(0, (s - today).days // 7)
+        out.append({"name": name, "kind": kind, "starts": start, "ends": end, "weeks_away": weeks,
+                    "advice": line(name, s, e, today),
                     "dates": {"approx": "approximate (moon-sighted)", "confirm": "organiser to confirm"}.get(flag, "fixed"),
                     "suits": sectors, "note": note,
                     "brief_by": brief_by.isoformat(), "brief_late": brief_by < today})
     out.sort(key=lambda x: x["starts"])
     return out
+
+
+# The product spaces of the brief questions -> the calendar's sectors.
+SECTOR_OF = {"health care": "pharma", "skincare": "derma", "beauty": "beauty", "hair care": "beauty", "fragrance": "beauty",
+             "mother & baby": "fmcg", "food": "fmcg", "fitness": "fmcg", "fashion": "retail", "lifestyle": "retail",
+             "technology": "retail", "automotive": "auto", "travel": "retail", "finance": "retail", "gaming": "retail"}
+READY_WEEKS = 3          # under this, a window is too close to cast for
+CAST_NOW_WEEKS = 14      # up to this far out, the best creators are still free: cast now
+
+
+def _short(d):
+    return "%d %s" % (d.day, d.strftime("%b"))
+
+
+def status(start, end, today):
+    """now (cast now) | plan (brief by a date) | tight (brief this week) | on (running) | late."""
+    if start <= today <= end:
+        return "on"
+    weeks = (start - today).days / 7.0
+    if weeks < READY_WEEKS:
+        return "late"
+    if weeks < LEAD_WEEKS[0]:
+        return "tight"
+    if weeks <= CAST_NOW_WEEKS:
+        return "now"
+    return "plan"
+
+
+def line(name, start, end, today):
+    """One sentence a client can act on. No prices, ever."""
+    st = status(start, end, today)
+    weeks = max(0, (start - today).days // 7)
+    if st == "on":
+        return "%s is on now, until %s." % (name, _short(end))
+    if st == "late":
+        return "%s starts in under %d weeks: too close to cast for." % (name, READY_WEEKS)
+    when = "%d week%s" % (weeks, "" if weeks == 1 else "s")
+    if st == "tight":
+        return "%s is in %s: brief this week to make it." % (name, when)
+    if st == "now":
+        return "%s is in %s: cast now." % (name, when)
+    return "%s is in %s: brief by %s." % (name, when, _short(start - _dt.timedelta(weeks=LEAD_WEEKS[1])))
+
+
+def advise(categories=(), market="SA", timing=None, launch="", today=None, limit=3):
+    """The launch windows that suit a brief, best first. Sector-specific occasions (a
+    dermatology congress for skincare) come before ones that suit everyone; a launch date
+    pulls the windows around it forward. ``{"windows": [...], "headline": str or None}``."""
+    today = today or _dt.date.today()
+    sectors = {SECTOR_OF.get(c) for c in (categories or []) if SECTOR_OF.get(c)}
+    target = None
+    if launch:
+        try:
+            target = _dt.date.fromisoformat(launch if len(launch) == 10 else launch + "-15")
+        except ValueError:
+            target = None
+    months = 6 if timing in (None, "", "later", "quarter") else 3
+    horizon = today + _dt.timedelta(days=31 * months)
+    if target and target > horizon:
+        horizon = target + _dt.timedelta(days=45)
+    picks = []
+    for name, kind, start, end, flag, suits, note in CALENDAR:
+        s, e = _d(start), _d(end)
+        if e < today or s > horizon:
+            continue
+        tags = set(suits.split())
+        if market not in (None, "", "SA") and kind == "national":
+            continue                              # Saudi national days are for KSA briefs
+        own = bool(sectors & tags)
+        if sectors and not own and "all" not in tags:
+            continue
+        st = status(s, e, today)
+        if st == "late":
+            continue
+        rank = (0 if own else 1) + (0 if kind in ("congress", "religious", "season", "retail") else 0.5)
+        if target:
+            rank += min(3.0, abs((s - target).days) / 21.0)
+        else:
+            rank += (s - today).days / 120.0
+        picks.append((rank, {"name": name, "kind": kind, "starts": start, "ends": end, "status": st,
+                             "weeks_away": max(0, (s - today).days // 7), "message": line(name, s, e, today),
+                             "dates": {"approx": "approximate (moon-sighted)", "confirm": "organiser to confirm"}.get(flag, "fixed"),
+                             "brief_by": (s - _dt.timedelta(weeks=LEAD_WEEKS[1])).isoformat()}))
+    picks.sort(key=lambda x: x[0])
+    windows = [p for _, p in picks[:limit]]
+    return {"windows": windows, "headline": windows[0]["message"] if windows else None,
+            "rule": "Influencer content needs 6-8 weeks from brief to posting."}

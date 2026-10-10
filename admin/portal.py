@@ -125,7 +125,9 @@ OTP_RESEND_SECONDS = 30
 
 # "search" is the scored shortlist without AI text: free, so every client (access code included)
 # can always get one. Written reasons, the brief reader and chat spend credits.
-DEFAULT_COSTS = {"brief": 5, "parse": 1, "chat": 1, "search": 0, "replace": 2, "more": 3, "alike": 2}
+# Phase E: "source" reads a product link or an uploaded brief into the brief (priced like a brief),
+# "ideas" drafts content ideas for one creator.
+DEFAULT_COSTS = {"brief": 5, "parse": 1, "chat": 1, "search": 0, "replace": 2, "more": 3, "alike": 2, "source": 5, "ideas": 2}
 # "Active campaign": AI is free for a client whose campaign is live, from its start date to
 # 30 days after its end date (Phase C + D, 2026-10-09). Checked in charge(), so every AI action
 # (brief, parse, chat, replacement, add-more, look-alike) follows the one rule.
@@ -151,6 +153,7 @@ def init():
     import aimore
     import codelinks
     import gating
+    import ideas
     import inbox
     import rewards
     import roi
@@ -163,6 +166,10 @@ def init():
     inbox.init()
     selstatus.init()
     gating.init()
+    # Phase E: content ideas per creator; weekly campaign updates and "next time" (tables + hooks).
+    import weekly
+    ideas.init()
+    weekly.init()
 
 
 # ----------------------------------------------------------------- settings --
