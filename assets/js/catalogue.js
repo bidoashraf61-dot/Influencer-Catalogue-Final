@@ -3130,6 +3130,10 @@
       render();
     });
     render();
+    // The selection's cards are drawn: the page is ready. Without this the loader waited for
+    // every request on the page (account, licences, the bell) to go quiet, and on a slow line
+    // its cover came up over a page that was already there.
+    if (window.hvLoader) window.hvLoader.done();
   }
 
   /* --------------------------------------------------------- deterrence */
