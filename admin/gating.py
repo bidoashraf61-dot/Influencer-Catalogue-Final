@@ -1,8 +1,9 @@
 """Who may see a creator's full analysis, and what everyone else gets instead.
 
 Free layer (real numbers, always): followers, platforms, average views and
-engagement rate. Everything else in an analysis (audience, growth, fake-follower
-check, brand history, best posts, pricing benchmark, the PDF) is locked until
+engagement rate. Everything else in an analysis (popular posts, followers and
+fake followers, growth, content performance, brand affinity, audience data,
+hashtags, the PDF) is locked until
 HelloVoice fulfils a request for that client. A locked page is drawn from SAMPLE
 data made here, so the real values never reach a browser that has not been given
 them.
@@ -13,8 +14,8 @@ them.
     request(code_id, code, platform) the client asks (only from inside a selection)
     fulfil(request_id, who)     unlock for that client and ring their bell
     headline(card, analyses)    the free layer
-    sample(code)                the stand-in data for the locked sections
-    redact_score(score, open_)  strip locked numbers out of a fit score
+    sample(code, platform)      the stand-in analysis the locked sections are drawn from
+    redact_score(score)         strip locked evidence out of a fit score
 
 Requests are free and unlimited: every one is a lead for the account manager.
 """
@@ -183,7 +184,7 @@ def _ring(conn, code_id, code):
     u = conn.execute("SELECT id, status FROM users WHERE code_id = ?", (code_id,)).fetchone()
     users = [u["id"]] if u is not None and u["status"] == "active" else []
     inbox.emit(users, "analysis_ready", "Full analysis ready:", rest=" " + name,
-               body="Audience, growth, fake-follower check and pricing are open",
+               body="Audience, followers, content and brand affinity are open",
                href="creator/#c=" + code, ref="analysis:" + code, once=True, conn=conn)
 
 
@@ -268,37 +269,101 @@ def headline(card, analyses):
 
 # ----------------------------------------------------------- locked sample --
 
-_COUNTRIES = ["Saudi Arabia", "UAE", "Egypt", "Kuwait", "Qatar"]
+_S_COUNTRIES = ["SA", "AE", "EG", "KW", "QA"]
+_S_CITIES = ["Riyadh", "Jeddah", "Dammam", "Dubai", "Cairo"]
+_S_LANGS = ["Arabic", "English", "French"]
+_S_INTERESTS = ["Beauty & Cosmetics", "Clothes, Shoes & Accessories", "Friends, Family & Relationships",
+                "Restaurants, Food & Grocery", "Travel, Tourism & Aviation", "Health & Wellness", "Fitness & Yoga"]
+_S_AGES = ["13-17", "18-24", "25-34", "35-44", "45-64"]
+_S_BUCKETS = ["0-5%", "5-10%", "10-15%", "15-20%", "20-25%", "25-30%", "30-35%", "35%+"]
 
 
-def sample(code):
-    """Stand-in figures for the locked sections: shaped like a real analysis,
-    the same for a creator every time, and nothing to do with their real data."""
+def _shares(rnd, labels, lo, hi, key="name", total=100.0):
+    """Made-up shares for ``labels``, largest first, summing to under ``total``."""
+    raw = sorted((rnd.uniform(lo, hi) for _ in labels), reverse=True)
+    scale = total / (sum(raw) * rnd.uniform(1.05, 1.35))
+    return [{key: lab, "pct": round(v * scale, 2)} for lab, v in zip(labels, raw)]
+
+
+def _dist(rnd):
+    peak = rnd.randint(1, 3)
+    h = [round(max(4.0, 100 - abs(i - peak) * rnd.uniform(18, 30)), 1) for i in range(len(_S_BUCKETS))]
+    me = min(len(h) - 1, peak + rnd.choice([-1, 0, 1, 2]))
+    return {"buckets": [{"label": lab, "h": v} for lab, v in zip(_S_BUCKETS, h)], "creator": me,
+            "median": peak if peak != me else None}
+
+
+def sample(code, platform=None):
+    """Stand-in data for the locked sections: a whole analysis in the same shape
+    as an uploaded one (so the locked page draws the real sections, cards and
+    tabs), the same for a creator every time, and made from nothing but the code:
+    no figure in it is read from the creator's record or analysis.
+
+    Returned as ``{"sample": True, "analysis": {...}}``."""
     rnd = random.Random(int(hashlib.sha256(("sample:" + str(code)).encode()).hexdigest()[:12], 16))
-    women = rnd.randint(38, 74)
-    ages = [rnd.randint(18, 34), rnd.randint(28, 46), rnd.randint(10, 22), rnd.randint(4, 12)]
-    s = sum(ages)
-    ages = [round(a * 100 / s) for a in ages]
-    first = rnd.randint(42, 66)
-    second = rnd.randint(8, 18)
-    third = rnd.randint(4, 10)
-    base = rnd.randint(30, 60)
-    growth = []
-    for _ in range(12):
-        base += rnd.randint(0, 9)
-        growth.append(base)
-    low = rnd.choice([2000, 3000, 4000, 5000])
-    return {
-        "sample": True,
-        "gender": {"female": women, "male": 100 - women},
-        "ages": [["18–24", ages[0]], ["25–34", ages[1]], ["35–44", ages[2]], ["45+", ages[3]]],
-        "countries": [[_COUNTRIES[0], first], [_COUNTRIES[1], second], [_COUNTRIES[2], third]],
-        "growth": growth, "growth_pct": round((growth[-1] - growth[0]) * 100.0 / growth[0]),
-        "real_pct": rnd.randint(78, 95),
-        "brands": ["Brand %s" % ch for ch in "ABCDE"], "partnerships": rnd.randint(4, 14),
-        "pricing": {"low": low, "high": low * 4, "pos": round(rnd.uniform(0.3, 0.7), 2)},
-        "posts": ["%dK" % rnd.randint(200, 990) for _ in range(4)],
-    }
+    followers = rnd.randint(24, 480) * 1000
+    er = round(rnd.uniform(1.2, 4.8), 2)
+    likes = int(followers * er / 100 * 0.96)
+    comments = max(3, int(likes * rnd.uniform(0.015, 0.04)))
+    views = int(followers * rnd.uniform(0.25, 0.9))
+    women = round(rnd.uniform(38, 78), 2)
+    t = time.gmtime()
+    months = []
+    for back in range(11, -1, -1):
+        y, m = t.tm_year, t.tm_mon - back
+        while m <= 0:
+            y, m = y - 1, m + 12
+        months.append("%04d-%02d" % (y, m))
+    f0, l0, growth = followers * rnd.uniform(0.78, 0.94), likes * rnd.uniform(0.8, 1.1), []
+    for i, mo in enumerate(months):
+        growth.append({"month": mo, "followers": int(f0 + (followers - f0) * i / 11.0 * rnd.uniform(0.9, 1.1)),
+                       "avg_likes": int(l0 * rnd.uniform(0.85, 1.2))})
+    growth[-1]["followers"] = followers
+
+    def audience():
+        ages = _shares(rnd, _S_AGES, 4, 40)
+        ages.sort(key=lambda x: _S_AGES.index(x["name"]))
+        fem = [{"name": a["name"], "pct": round(a["pct"] * women / 100.0, 2)} for a in ages]
+        mal = [{"name": a["name"], "pct": round(a["pct"] - f["pct"], 2)} for a, f in zip(ages, fem)]
+        return {"countries": _shares(rnd, _S_COUNTRIES, 3, 60, key="code"),
+                "cities": _shares(rnd, _S_CITIES, 2, 30, total=70.0),
+                "gender": {"female": women, "male": round(100 - women, 2)},
+                "ages": ages, "ages_female": fem, "ages_male": mal,
+                "languages": _shares(rnd, _S_LANGS, 4, 70),
+                "interests": _shares(rnd, _S_INTERESTS, 10, 40),
+                "brand_affinity": _shares(rnd, ["Brand %s" % ch for ch in "ABCDEF"], 2, 12, total=40.0),
+                "reachability": [{"name": n, "pct": v["pct"]} for n, v in
+                                 zip(["<500", "500-1000", "1000-1500", ">1500"], _shares(rnd, range(4), 5, 50))]}
+
+    def post(i, brand=None):
+        p = {"url": "#", "thumb": None, "date": "%s-%02d" % (months[-1 - (i % 3)], rnd.randint(1, 28)),
+             "likes": int(likes * rnd.uniform(1.5, 4)), "comments": int(comments * rnd.uniform(1.2, 3)),
+             "views": int(views * rnd.uniform(1.5, 5))}
+        if brand:
+            p["brand"] = brand
+        return p
+    reel_likes = int(likes * rnd.uniform(1.1, 1.8))
+    return {"sample": True, "analysis": {
+        "sample": True, "platform": platform or "Instagram", "account_type": "Creator",
+        "followers": followers, "followers_change_pct": round(rnd.uniform(-1.5, 4.5), 2),
+        "avg_likes": likes, "avg_likes_change_pct": round(rnd.uniform(-6, 9), 2), "avg_comments": comments,
+        "avg_views": views, "er": er, "est_impressions": int(followers * rnd.uniform(0.3, 0.6)),
+        "est_reach": int(followers * rnd.uniform(0.15, 0.35)),
+        "avg_reel_plays": int(views * rnd.uniform(1.2, 2.2)), "avg_reel_likes": reel_likes,
+        "avg_reel_comments": int(comments * rnd.uniform(1.1, 1.6)), "avg_reel_shares": int(reel_likes * rnd.uniform(0.02, 0.08)),
+        "reels_er": round(er * rnd.uniform(1.0, 1.5), 2),
+        "story_reach": int(followers * rnd.uniform(0.04, 0.1)), "story_impressions": int(followers * rnd.uniform(0.05, 0.13)),
+        "paid_post_performance": round(rnd.uniform(40, 120), 2), "paid_views_pct": round(rnd.uniform(30, 110), 2),
+        "fake_followers_pct": round(rnd.uniform(4, 22), 2), "fake_likers_pct": round(rnd.uniform(3, 18), 2),
+        "fake_followers_dist": _dist(rnd), "er_dist": _dist(rnd),
+        "audience": audience(), "audience_likers": audience(), "growth": growth,
+        "top_posts": [post(i) for i in range(6)],
+        "sponsored_posts": [post(i, "Brand %s" % "ABC"[i]) for i in range(3)],
+        "brands": [{"name": "Brand %s" % ch, "count": rnd.randint(1, 9)} for ch in "ABCDEF"],
+        "creator_interests": rnd.sample(_S_INTERESTS, 4),
+        "hashtags": [{"tag": "#topic%d" % i, "count": round(rnd.uniform(3, 30), 2)} for i in range(1, 7)]
+                    + [{"tag": "@brand%s" % ch, "count": round(rnd.uniform(2, 20), 2)} for ch in "abcde"],
+    }}
 
 
 # ------------------------------------------------------------ fit scores --

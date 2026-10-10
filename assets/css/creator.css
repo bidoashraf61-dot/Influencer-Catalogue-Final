@@ -370,8 +370,7 @@ body.pp-modal-on { overflow: hidden; }
 
 /* ===================================================== analysis gating (v3)
    The free headline on linen, the ink request band that carries the one
-   action and its state, and the locked sections: real-shaped SAMPLE data
-   under a blur, each tagged as sample, with a Locked chip on top. */
+   action and its state; the locked sections follow below. */
 .pp-gate > * + * { margin-top: 22px; }
 .pp-gate { margin-top: 26px; }
 .pp-free { background: var(--linen); border-radius: var(--r-md); padding: 4px 22px 16px; }
@@ -408,43 +407,18 @@ body.pp-modal-on { overflow: hidden; }
 .pp-req--open .pp-req__lock { background: var(--go); color: var(--white); }
 .pp-req--out .pp-req__lock { background: rgba(255,255,255,.12); color: rgba(255,255,255,.8); }
 
-.pp-locks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
-.pp-lk { position: relative; border: 1px solid rgba(18,18,18,.12); border-radius: var(--r-md); padding: 18px 18px 20px; overflow: hidden; min-height: 200px; background: var(--white); }
-.pp-lk--wide { grid-column: 1 / -1; }
-.pp-lk__hd { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; position: relative; z-index: 2; }
-.pp-lk__hd h3 { margin: 0; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-.pp-lk__tag { margin-left: auto; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #efede8; }
+/* Locked: the real analysis sections, cards and tabs, drawn from the server's
+   SAMPLE analysis. Section and card titles stay sharp; everything they hold is
+   blurred, tagged "Sample data" in the section head, with one Locked chip. */
+.pp-head .pp-lktag { margin: 0 auto 4px 0; }
+.pp-lk__tag { white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; font-size: 11.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #efede8; }
 .pp-lk__tag .hv-i { width: 13px; height: 13px; }
-.pp-lk__data { filter: blur(7px) saturate(.7); opacity: .75; user-select: none; pointer-events: none; }
-.pp-lk__veil { display: grid; position: absolute; inset: 44px 0 0; place-content: center; z-index: 2; }
+.pp-locked { position: relative; }
+.pp-blur { filter: blur(7px) saturate(.7); opacity: .75; user-select: none; pointer-events: none; }
+.pp-lk__veil { display: grid; position: absolute; inset: 0; place-content: center; z-index: 2; pointer-events: none; }
 .pp-lk__veil span { display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; background: var(--white); font-size: 13px; font-weight: 700; box-shadow: 0 6px 18px rgba(18,18,18,.14); }
 .pp-lk__veil .hv-i { width: 16px; height: 16px; }
-.pp-lk__sub { margin: 10px 0 0; font-size: 13px; color: var(--gray); }
-.pp-sbars { display: grid; gap: 9px; }
-.pp-sbars div { display: grid; grid-template-columns: 54px 1fr 40px; gap: 10px; align-items: center; font-size: 12.5px; }
-.pp-sbars i { display: block; height: 10px; border-radius: 6px; background: #efede8; position: relative; overflow: hidden; }
-.pp-sbars i b { position: absolute; inset: 0 auto 0 0; border-radius: 6px; background: var(--go); }
-.pp-sbars--o i b { background: var(--vivid-orange); }
-.pp-sbars strong { text-align: right; }
-.pp-gsplit { display: flex; height: 22px; border-radius: 999px; overflow: hidden; margin-bottom: 14px; }
-.pp-gsplit b { display: grid; place-items: center; font-size: 11px; color: var(--white); background: var(--vivid-orange); }
-.pp-gsplit b + b { background: var(--go); }
-.pp-stamps { display: flex; gap: 10px; flex-wrap: wrap; }
-.pp-stp { border: 2px solid var(--ink); border-radius: 12px; padding: 8px 12px 6px; background: var(--white); }
-.pp-stp:first-child { background: var(--lime); transform: rotate(-3deg); }
-.pp-stp b { display: block; font-family: var(--heading); font-size: 30px; line-height: 1; }
-.pp-stp small { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-.pp-gauge b { font-family: var(--heading); font-weight: 400; font-size: 56px; line-height: .9; display: block; margin-bottom: 12px; }
-.pp-gauge small { display: block; font-family: var(--body); font-size: 12px; color: var(--gray); }
-.pp-brandrow { display: flex; gap: 8px; flex-wrap: wrap; }
-.pp-brandrow span { min-width: 92px; height: 44px; border-radius: 12px; border: 1px solid rgba(18,18,18,.12); display: grid; place-items: center; font-family: var(--heading); font-size: 18px; color: #6b6b6b; padding: 0 12px; }
-.pp-bench { position: relative; height: 26px; border-radius: 8px; background: #efede8; margin: 28px 0 8px; }
-.pp-bench b { position: absolute; top: 0; bottom: 0; left: 28%; right: 30%; border-radius: 8px; background: #b9d400; }
-.pp-bench u { position: absolute; top: -6px; bottom: -6px; width: 3px; background: var(--ink); border-radius: 2px; }
-.pp-bench__k { display: flex; justify-content: space-between; font-size: 12px; color: var(--gray); }
-.pp-sposts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
-.pp-sposts div { aspect-ratio: 1 / 1; border-radius: 12px; background: var(--linen); position: relative; }
-.pp-sposts div::after { content: attr(data-v); position: absolute; left: 8px; bottom: 6px; font-family: var(--heading); font-size: 18px; }
+.pp-pages--locked .pp-source { font-size: 13px; }
 @media (prefers-reduced-motion: reduce) { .pp-gbtn { transition: none; } }
 @media (max-width: 700px) {
   .pp-free { padding: 2px 16px 14px; }
@@ -457,8 +431,6 @@ body.pp-modal-on { overflow: hidden; }
   .pp-req__side { grid-column: 1 / -1; align-items: stretch; }
   .pp-req__side .pp-gbtn { width: 100%; }
   .pp-req__track { grid-column: 1 / -1; }
-  .pp-locks { grid-template-columns: 1fr; }
-  .pp-sposts { grid-template-columns: repeat(2, 1fr); }
 }
 /* The floating account dock (bell + circle) sits top right: keep the page links clear of it. */
 .has-pt-dock .pp-top__links { margin-right: 132px; }

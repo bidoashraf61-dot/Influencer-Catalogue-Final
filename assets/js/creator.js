@@ -242,10 +242,12 @@
     var gate = D.gate || { state: "unlocked" };
     var oldGate = $("pp-gate"); if (oldGate) oldGate.remove();
     var oldBand = $("pp-gate-band"); if (oldBand) oldBand.remove();
+    clearLocks();
     renderId(c, a);
     if (gate.state !== "unlocked") {
-      // Analysis gating: the real headline, then the locked sections drawn from sample data.
-      $("pp-plat").hidden = true; $("pp-sealed").hidden = true; $("pp-pages").hidden = true;
+      // Analysis gating: the real headline, then the real sections drawn from sample data.
+      $("pp-plat").hidden = true; $("pp-sealed").hidden = true;
+      var rq = $("pp-request-sec"); if (rq) rq.remove();
       return renderGate(c, gate);
     }
     $("pp-id").insertAdjacentElement("afterend", gateBand(c, gate));
@@ -378,7 +380,7 @@
     box.setAttribute("aria-live", "polite");
     var sels = (g.selections || []).map(function (x) { return x.name; });
     var st = {
-      locked: ["lock", "Full analysis", "Audience, growth, fake-follower check, brand history, best posts and a pricing benchmark. <b>Free</b> for creators in your selections" +
+      locked: ["lock", "Full analysis", "Popular posts, real and fake followers, growth, content performance, brand affinity and the audience by country, city, age and gender. <b>Free</b> for creators in your selections" +
         (sels.length ? " (this one is in <b>" + esc(sels[0]) + "</b>)" : "") + ", ready <b>within 1 working day</b>.",
         '<button type="button" class="pp-gbtn" id="pp-ask-full">' + hvi("lock") + "Request full analysis</button>"],
       requested: ["clock", "Analysis requested", "You asked on <b>" + esc(when(g.requested_at)) + "</b>. It will be ready by <b>" + esc(whenLong(g.ready_by)) +
@@ -418,35 +420,55 @@
       '<p class="pp-free__note">From public profile data' + (hl.updated ? ", " + esc(day(hl.updated)) : "") + "." +
       (v ? " " + VWORD[v] + " against the industry guide for creators of this size." : "") + "</p></section>";
   }
-  function lockCard(title, inner, wide, g) {
-    var veil = g.state === "requested" ? hvi("clock") + "Being prepared" : hvi("lock") + "Locked";
-    return '<section class="pp-lk is-locked' + (wide ? " pp-lk--wide" : "") + '"><div class="pp-lk__hd"><h3>' + title + '</h3><span class="pp-lk__tag">' + hvi("lock") + "Sample data</span></div>" +
-      '<div class="pp-lk__data" aria-hidden="true" inert>' + inner + '</div><div class="pp-lk__veil"><span>' + veil + "</span></div></section>";
+  /* The locked page is the real analysis page: the same sections, cards and
+     tabs, in the same order, drawn by the same functions from the SAMPLE
+     analysis the server made for this page (g.sample.analysis). Titles stay
+     sharp; the contents are blurred and inert under one chip per section. */
+  var LOCKED = null;                      // the gate, while the page shows sample data
+  var LOCK_BODIES = ["pp-posts", "pp-real", "pp-perf", "pp-net", "pp-aud", "pp-tags"];
+  function veilText(g) { return g.state === "requested" ? hvi("clock") + "Being prepared" : hvi("lock") + "Locked"; }
+  function lockBody(el) {
+    if (!LOCKED || !el || el.querySelector(":scope > .pp-lk__veil")) return;
+    (function blur(node) {
+      [].slice.call(node.children).forEach(function (ch) {
+        if (ch.classList.contains("pp-h3")) return;
+        if (ch.querySelector(".pp-h3")) return blur(ch);
+        ch.classList.add("pp-blur"); ch.setAttribute("aria-hidden", "true"); ch.inert = true;
+      });
+    })(el);
+    el.classList.add("pp-locked");
+    el.insertAdjacentHTML("beforeend", '<div class="pp-lk__veil"><span>' + veilText(LOCKED) + "</span></div>");
+  }
+  function clearLocks() {
+    LOCKED = null;
+    $("pp-pages").classList.remove("pp-pages--locked");
+    [].forEach.call(document.querySelectorAll("#pp-pages .pp-lktag"), function (t) { t.remove(); });
+    LOCK_BODIES.forEach(function (id) { $(id).classList.remove("pp-locked"); });
   }
   function renderGate(c, g) {
-    var x = g.sample || {};
-    var bars = function (rows, cls) {
-      var peak = Math.max.apply(null, rows.map(function (r) { return r[1]; }).concat([1]));
-      return '<div class="pp-sbars' + (cls ? " " + cls : "") + '">' + rows.map(function (r) {
-        return "<div><span>" + esc(r[0]) + '</span><i><b style="width:' + Math.round(r[1] / peak * 100) + '%"></b></i><strong>' + r[1] + "%</strong></div>"; }).join("") + "</div>";
-    };
-    var gr = x.growth || [], gmin = Math.min.apply(null, gr), gmax = Math.max.apply(null, gr);
-    var pts = gr.map(function (v, i) { return (i * 320 / Math.max(1, gr.length - 1)).toFixed(0) + " " + (110 - (v - gmin) / Math.max(1, gmax - gmin) * 84).toFixed(0); });
-    var g1 = (x.gender || {}).female || 50;
-    var html = '<div class="pp-gate" id="pp-gate">' + freeStrip(g) + '<div id="pp-gate-band-slot"></div><div class="pp-locks">' +
-      lockCard("Audience age and gender", '<div class="pp-gsplit"><b style="width:' + g1 + '%">Women ' + g1 + '%</b><b style="width:' + (100 - g1) + '%">Men ' + (100 - g1) + "%</b></div>" + bars(x.ages || [], "pp-sbars--o"), false, g) +
-      lockCard("Audience countries", '<div class="pp-stamps">' + (x.countries || []).map(function (r) { return '<div class="pp-stp"><b>' + r[1] + "%</b><small>" + esc(r[0]) + "</small></div>"; }).join("") + "</div>", false, g) +
-      lockCard("Growth, last 12 months", '<svg viewBox="0 0 320 120" width="100%" height="120" preserveAspectRatio="none"><path d="M' + pts.join(" L") + ' L320 120 L0 120Z" fill="#e7f7ed"/><path d="M' + pts.join(" L") +
-        '" fill="none" stroke="#14884a" stroke-width="3"/></svg><p class="pp-lk__sub">+' + (x.growth_pct || 0) + "% followers · steady</p>", false, g) +
-      lockCard("Fake-follower check", '<div class="pp-gauge"><b>' + (x.real_pct || 0) + "%<small>real followers</small></b></div>" + bars([["Real", x.real_pct || 0], ["Suspect", 100 - (x.real_pct || 0)]]), false, g) +
-      lockCard("Brand history", '<div class="pp-brandrow">' + (x.brands || []).map(function (b) { return "<span>" + esc(b) + "</span>"; }).join("") + '</div><p class="pp-lk__sub">' + (x.partnerships || 0) + " paid partnerships in 12 months</p>", false, g) +
-      lockCard("Pricing benchmark", '<div class="pp-bench"><b></b><u style="left:' + Math.round(((x.pricing || {}).pos || .5) * 100) + '%"></u></div><div class="pp-bench__k"><span>SAR ' + num((x.pricing || {}).low || 0) +
-        "</span><span>Where the fee sits</span><span>SAR " + num((x.pricing || {}).high || 0) + "</span></div>", false, g) +
-      lockCard("Best posts", '<div class="pp-sposts">' + (x.posts || []).map(function (v) { return '<div data-v="' + esc(v) + '"></div>'; }).join("") + "</div>", true, g) +
-      "</div></div>";
-    $("pp-id").insertAdjacentHTML("afterend", html);
+    var x = (g.sample || {}).analysis;
+    $("pp-id").insertAdjacentHTML("afterend", '<div class="pp-gate" id="pp-gate">' + freeStrip(g) + '<div id="pp-gate-band-slot"></div></div>');
     $("pp-gate-band-slot").replaceWith(gateBand(c, g));
     $("pp-source").textContent = "";
+    $("pp-pages").hidden = !x;
+    if (!x) return;
+    LOCKED = g;
+    D.analysis = x;
+    $("pp-pages").classList.add("pp-pages--locked");
+    $("pp-posts-sec").after($("pp-real-sec"));
+    $("pp-h-real").textContent = "Followers";
+    renderPosts(x);
+    renderReal(x);
+    renderPerf(x);
+    renderNetwork(x);
+    renderAudience(x);
+    renderTags(x);
+    addTips();
+    LOCK_BODIES.forEach(function (id) { lockBody($(id)); });
+    [].forEach.call(document.querySelectorAll("#pp-pages .pp-page:not([hidden]) > .pp-head"), function (h) {
+      h.querySelector(".pp-h2").insertAdjacentHTML("afterend", '<span class="pp-lk__tag pp-lktag">' + hvi("lock") + "Sample data</span>");
+    });
+    $("pp-source").textContent = "Sample data, shown for layout only. The real figures open when HelloVoice unlocks this analysis for your team.";
   }
 
   /* one tab per platform the creator is on; a platform with no analysis is a locked tab */
@@ -493,6 +515,7 @@
       $(pane).innerHTML = list.map(function (t, i) { return '<div class="pp-pane" data-tab="' + esc(t.label) + '"' + (i === on ? "" : " hidden") + ">" + draw(t) + "</div>"; }).join("");
       if (pane === "pp-perf") collab();
       addTips($(pane));
+      lockBody($(pane));
     }
     paint();
     $(box).onclick = function (e) { var b = e.target.closest("button[data-i]"); if (!b) return; on = +b.getAttribute("data-i"); paint(); };

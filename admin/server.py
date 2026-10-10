@@ -4022,7 +4022,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         gate = {"state": "unlocked"} if self.admin() else gating.state(code_id, code)
         gate["headline"] = gating.headline(card, every)
         if gate["state"] != "unlocked":
-            gate["sample"] = gating.sample(code)
+            gate["sample"] = gating.sample(code, plats[0] if plats else None)
             return self.send_json(200, {"ok": True, "creator": card, "platforms": plats, "analyses": {},
                                         "requested": [], "gate": gate, "benchmarks": metrics.benchmarks()},
                                   self.cors() + [("Cache-Control", "no-store")])
