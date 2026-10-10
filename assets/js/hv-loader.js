@@ -69,7 +69,7 @@
     var still = dir + "helvy-still.webp" + "?v=t3";
     var watching = [], io = null;
     var vdir = base + "assets/brand/voice/";
-    var VOICE = { loop: 1, "point-act": 1, point: 1, think: 1, "think-act": 1, "thumbs-act": 1, thumbs: 1, "cheer-act": 1, cheer: 1, scan: 1 };
+    var VOICE = { loop: 1, wave: 1, "point-act": 1, point: 1, think: 1, "think-act": 1, "thumbs-act": 1, thumbs: 1, "cheer-act": 1, cheer: 1, scan: 1 };
     var vstill = vdir + "voice-loop-poster.webp?v=t3";
 
     // VER changes whenever the files are replaced: /assets/ is cached for 30 days as immutable.
@@ -78,9 +78,9 @@
       if (set === "voice") return vdir + "voice-" + (VOICE[name] ? name : "loop") + (apple ? ".mp4" : ".webm") + VER;
       return dir + "helvy-" + (CLIPS[name] ? name : "idle") + (apple ? ".mov" : ".webm") + VER;
     }
-    function img(cls, set) {
+    function img(cls, set, poster) {
       var im = document.createElement("img");
-      im.className = "hv-clip hv-clip--still" + (cls ? " " + cls : ""); im.alt = ""; im.decoding = "async"; im.src = set === "voice" ? vstill : still;
+      im.className = "hv-clip hv-clip--still" + (cls ? " " + cls : ""); im.alt = ""; im.decoding = "async"; im.src = poster || (set === "voice" ? vstill : still);
       im.setAttribute("aria-hidden", "true");
       return im;
     }
@@ -89,7 +89,7 @@
       if (!v.parentNode || v.getAttribute("data-fallback")) return;
       v.setAttribute("data-fallback", "1");
       unwait(v);
-      var im = img(v.getAttribute("data-cls"), v.getAttribute("data-set"));
+      var im = img(v.getAttribute("data-cls"), v.getAttribute("data-set"), v.getAttribute("data-poster"));
       v.parentNode.replaceChild(im, v);
       try { v.removeAttribute("src"); v.load(); } catch (e) { /* gone */ }
     }
@@ -99,7 +99,7 @@
     function wait(v) {
       if (v.getAttribute("data-wait") || !v.parentNode) return;
       v.setAttribute("data-wait", "1");
-      var im = img(v.getAttribute("data-cls"), v.getAttribute("data-set"));
+      var im = img(v.getAttribute("data-cls"), v.getAttribute("data-set"), v.getAttribute("data-poster"));
       im.setAttribute("data-for-wait", "1");
       v.parentNode.insertBefore(im, v);
       v._still = im;
@@ -172,7 +172,7 @@
     function video(name, o) {
       o = o || {};
       var set = o.set === "voice" ? "voice" : "";
-      if (reduce) return img(o.cls, set);
+      if (reduce) return img(o.cls, set, o.poster);
       var list = o.seq && o.seq.length ? o.seq.slice() : null;
       var v = document.createElement("video");
       // Every attribute that lets a browser autoplay goes on BEFORE the source.
@@ -181,7 +181,8 @@
       v.setAttribute("autoplay", ""); v.autoplay = true;
       v.setAttribute("disablepictureinpicture", ""); v.setAttribute("disableremoteplayback", "");
       v.setAttribute("aria-hidden", "true"); v.setAttribute("tabindex", "-1");
-      v.controls = false; v.preload = "auto"; v.poster = set ? vstill : still;
+      v.controls = false; v.preload = "auto"; v.poster = o.poster || (set ? vstill : still);
+      if (o.poster) v.setAttribute("data-poster", o.poster);
       if (set) v.setAttribute("data-set", set);
       v.className = "hv-clip" + (o.cls ? " " + o.cls : "");
       if (o.cls) v.setAttribute("data-cls", o.cls);
@@ -206,7 +207,7 @@
       setTimeout(function () { observe(v); }, 0);
       return v;
     }
-    return { dir: dir, still: still, vstill: vstill, head: base + "assets/brand/helvy-head.webp?v=c3", apple: apple, src: src, video: video, play: play, img: img };
+    return { dir: dir, still: still, vstill: vstill, wavePoster: vdir + "voice-wave-poster.webp?v=t4", head: base + "assets/brand/helvy-head.webp?v=c3", apple: apple, src: src, video: video, play: play, img: img };
   })();
 
   /* =============================================================== loader */

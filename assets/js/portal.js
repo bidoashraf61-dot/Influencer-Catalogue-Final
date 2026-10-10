@@ -2097,7 +2097,9 @@
       '<span class="hv-launch__x" aria-hidden="true">' + V_ICON.close + "</span>" +
       '<span class="hv-launch__dot" aria-hidden="true" hidden></span>';
     // Helvy smiling and waving bye-bye on the lime disc: the "voice" loop (5 s, muted, looping); the lime still under reduced motion.
-    var face = HVH && !reduce ? HVH.video("loop", { set: "voice", cls: "hv-launch__vid", eager: true }) : h("img", { class: "hv-launch__vid hv-clip--still", src: HVH ? HVH.vstill : ROOT + "assets/brand/voice/voice-loop-poster.webp", alt: "", decoding: "async" });
+    // The clip opens on the smile and the wave (no neutral face first); its poster is a smiling frame too.
+    var wavePoster = HVH ? HVH.wavePoster : ROOT + "assets/brand/voice/voice-wave-poster.webp?v=t4";
+    var face = HVH && !reduce ? HVH.video("wave", { set: "voice", cls: "hv-launch__vid", eager: true, poster: wavePoster }) : h("img", { class: "hv-launch__vid hv-clip--still", src: wavePoster, alt: "", decoding: "async" });
     launch.insertBefore(face, launch.children[1]);
     var nudge = h("div", { class: "hv-nudge", role: "status", hidden: "" });
     var nudgeText = h("span", null);
