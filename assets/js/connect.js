@@ -412,9 +412,10 @@
     function mountSelection() {
       var S = window.hvSelection;
       if (!S || !S.token() || document.getElementById("cx-selact")) return;
-      var foot = document.querySelector(".cat-selhead__foot") || document.querySelector(".cat-selhead");
+      // Top-right corner of the selection header (CSS), a lime primary button.
+      var foot = document.querySelector(".cat-selhead") || document.querySelector(".cat-selhead__foot");
       if (foot) {
-        var b = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("calc") + "<span>ROI Calculator</span>", onclick: roiForSelection });
+        var b = h("button", { class: "cx-btn cx-btn--roi", type: "button", html: ic("calc") + "<span>ROI Calculator</span>", onclick: roiForSelection });
         foot.appendChild(h("div", { class: "cx-selact", id: "cx-selact" }, b));
       }
       var role = S.role();
