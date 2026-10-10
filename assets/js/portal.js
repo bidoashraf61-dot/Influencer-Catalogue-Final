@@ -113,6 +113,7 @@
   // creator cards -> pressing a green check on a card, round and round) with a rotating step line. Used by
   // Add more like these, Creators like this and Find a replacement; the AI shortlist card has
   // the same sequence in its own stage.
+  var COOK_SEQ = ["thinking", "cards", "approve"];   // the director's desk, the one definition
   var COOK_STEPS = ["Reading your brief…", "Flipping through creators…", "Scoring fit…", "Approving your picks…"];
   HV.cooking = function (opts) {
     opts = opts || {};
@@ -121,7 +122,7 @@
     var el = document.createElement("div");
     el.className = "cx-cook" + (opts.compact ? " cx-cook--compact" : "") + (opts.dark ? " cx-cook--dark" : "");
     el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
-    el.appendChild(clip("thinking", "cx-cook__hv", { seq: ["thinking", "cards", "approve"] }));
+    el.appendChild(clip("thinking", "cx-cook__hv", { seq: COOK_SEQ }));
     var tx = document.createElement("div"); tx.className = "cx-cook__tx";
     var now = document.createElement("p"); now.className = "cx-think__now cx-cook__now"; now.textContent = steps[0];
     var dots = document.createElement("ol"); dots.className = "cx-cook__dots"; dots.setAttribute("aria-hidden", "true");
@@ -145,7 +146,7 @@
     var el = document.createElement("div");
     el.className = "cx-cook cx-cook--steps" + (opts.dark ? " cx-cook--dark" : "");
     el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
-    el.appendChild(clip("thinking", "cx-cook__hv", { seq: ["thinking", "cards", "approve"] }));
+    el.appendChild(clip("thinking", "cx-cook__hv", { seq: COOK_SEQ }));
     var tx = document.createElement("div"); tx.className = "cx-cook__tx";
     if (opts.title) { var t = document.createElement("p"); t.className = "cx-cook__title"; t.textContent = opts.title; tx.appendChild(t); }
     var list = document.createElement("ol"); list.className = "ai-sl__list cx-cook__list";
@@ -1573,7 +1574,7 @@
         [].forEach.call(track.querySelectorAll(".ai-sl__node"), function (li) { li.classList.add("is-done"); li.classList.remove("is-now"); });
         fill.style.setProperty("--p", "100%");
         x.disabled = true;
-        react("think", false, ["thinking", "cards", "approve"]);
+        react("think", false, COOK_SEQ);
         say("Full power");
         var goals = (answers.goal || []).map(function (g) { return optionLabel(qs[0], g); });
         var STEPS = ["Reading your " + (goals.length > 1 ? "goals" : "goal") + "…", "Checking audiences…", "Scoring each creator…", "Putting the scores on your cards…"];
