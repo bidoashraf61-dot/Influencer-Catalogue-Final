@@ -205,7 +205,15 @@
       if (!q) return null;
       var txt = q.band ? q.low + "–" + q.high + "%" : q.pct + "%";
       return h("div", { class: "cx-quality", title: "Selection quality: your selection’s expected result as a share of HelloVoice’s recommended structure for the same number of creators" },
-        h("b", null, txt), h("small", null, "of the ideal"));
+        h("b", null, txt), h("small", null, "of the ideal"), goalSplit(q));
+    }
+    // Several goals chosen: each goal's own quality beside the average, so a strong result on one
+    // goal never hides a weak one ("Awareness 80% · Traffic 50%").
+    var GOAL_NAME = { awareness: "Awareness", engagement: "Engagement", traffic: "Traffic" };
+    function goalSplit(q) {
+      var g = q && q.by_goal ? Object.keys(q.by_goal) : [];
+      if (g.length < 2) return null;
+      return h("span", { class: "cx-quality__goals" }, g.map(function (k) { return (GOAL_NAME[k] || k) + " " + q.by_goal[k] + "%"; }).join(" · "));
     }
     function compareTable(res) {
       var I = res.ideal || {};
