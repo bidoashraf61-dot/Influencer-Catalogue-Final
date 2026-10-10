@@ -519,8 +519,11 @@
 }
 
 /* ---- Helvy in the live chat widget (portal.js): launcher, header, avatars, nudge */
-/* the launcher: Helvy rises out of an ink disc (no lime), his cut hidden by the disc's curve */
-.cx-launch .hv-launch__disc { background: var(--ink); box-shadow: 0 0 0 2px var(--white), 0 14px 30px rgba(18,18,18,.28); }
+/* the launcher: Helvy rises out of a lime disc (client, 2026-10-10: the launcher only; every
+   other Helvy stays a transparent cut-out), his cut hidden by the disc's curve. Open, the disc
+   turns ink behind the close cross. */
+.cx-launch .hv-launch__disc { background: #d8ff45; box-shadow: 0 0 0 2px var(--white), 0 14px 30px rgba(18,18,18,.28); }
+.is-open .cx-launch .hv-launch__disc { background: var(--ink); }
 .cx-launch::after { display: none; }
 .cx-launch .hv-launch__vid { position: absolute; inset: auto 0 0 0; width: 76px; height: 100px; border-radius: 0; object-fit: cover; object-position: 50% 0; opacity: 1; transform: none;
   clip-path: inset(0 0 0 0 round 0 0 38px 38px); transition: opacity .2s ease, transform .25s var(--cx-ease); pointer-events: none; }
