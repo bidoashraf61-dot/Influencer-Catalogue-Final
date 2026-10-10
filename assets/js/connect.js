@@ -15,6 +15,10 @@
  */
 (function () {
   "use strict";
+  // Pages name this file AND portal.js adds it when it runs first: run once, or every
+  // listener here (the look-alike and ideas sheets, the tour) would fire twice.
+  if (window.__hvConnect) return;
+  window.__hvConnect = true;
   var HV = window.hvPortal = window.hvPortal || {};
   var started = false;
 
@@ -510,6 +514,182 @@
       alikeSheet(b.getAttribute("data-alike"));
     }, true);
 
+    /* ======================================================= CONTENT IDEAS (phase E)
+       On a selection card and on the creator's page: Helvy drafts 2-3 hooks and concepts,
+       English and Saudi Arabic, fitted to that creator's style and the selection's brief.
+       Nothing is spent until the client presses "Write ideas"; ideas are kept, so opening
+       them again is free. No prices, and no claims beyond the brief. */
+    function ideasSheet(code, ctx) {
+      ctx = ctx || {};
+      var prev = document.activeElement;
+      var name = ctx.name || code;
+      var scrim = h("div", { class: "cx-dr__scrim" });
+      var sheet = h("aside", { class: "cx-sheet cx-ideas", role: "dialog", "aria-modal": "true", "aria-labelledby": "cx-id-t" });
+      var x = h("button", { class: "cx-x", type: "button", "aria-label": "Close", html: ic("x") });
+      var sub = h("p", null, "Hooks and concepts fitted to their style" + (ctx.selName ? " and the brief of " + ctx.selName : "") + ".");
+      sheet.appendChild(h("header", { class: "cx-sheet__hd" }, clip("point", "cx-hd--head"),
+        h("div", null, h("h2", { id: "cx-id-t" }, "Content ideas for " + name), sub), x));
+      var body = h("div", { class: "cx-sheet__body" });
+      var ctxRow = h("div", { class: "cx-sheet__ctx" });
+      body.appendChild(ctxRow);
+      var list = h("div", { class: "cx-ideas__list", "aria-live": "polite" });
+      body.appendChild(list);
+      sheet.appendChild(body);
+      var again = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("redo") + "<span>New ideas</span>" });
+      again.hidden = true;
+      sheet.appendChild(h("footer", { class: "cx-sheet__ft" }, h("span", null, "Drafts to brief the creator. No prices or new claims: your medical or regulatory team approves every script."), again));
+      function close() { scrim.remove(); sheet.remove(); document.removeEventListener("keydown", onKey); document.body.classList.remove("pt-lock"); if (prev && prev.focus) prev.focus(); }
+      function onKey(e) { if (e.key === "Escape") close(); }
+      x.addEventListener("click", close); scrim.addEventListener("click", close); document.addEventListener("keydown", onKey);
+      document.body.appendChild(scrim); document.body.appendChild(sheet); document.body.classList.add("pt-lock"); x.focus();
+
+      var token = ctx.token || "", cost = null;
+      function setCtx(info) {
+        ctxRow.textContent = "";
+        if (info.selection) ctxRow.appendChild(h("span", { html: ic("brief") + "Brief: " }, info.selection.name));
+        else ctxRow.appendChild(h("span", { html: ic("info") + "No selection brief: ideas follow their style and your profile" }));
+        if ((info.selections || []).length > 1 && !ctx.token) {
+          var pickSel = h("select", { class: "cx-ideas__sel", "aria-label": "Write for which selection" });
+          info.selections.forEach(function (s2) { var o = h("option", { value: s2.token }, "For " + s2.name); if (info.selection && s2.token === info.selection.token) o.selected = true; pickSel.appendChild(o); });
+          pickSel.addEventListener("change", function () { token = pickSel.value; load(); });
+          ctxRow.appendChild(pickSel);
+        }
+        cost = info.cost;
+        ctxRow.appendChild(costTag(cost));
+      }
+      function cards(items, fresh) {
+        list.textContent = "";
+        items.forEach(function (it, i) {
+          var copy = h("button", { class: "cx-idea__copy", type: "button", "aria-label": "Copy idea " + (i + 1), html: ic("copy") + "<span>Copy</span>" });
+          copy.addEventListener("click", function () {
+            var txt = it.hook_en + "\n" + it.concept_en + "\n\n" + it.hook_ar + "\n" + it.concept_ar;
+            var ok = function () { copy.lastChild.textContent = "Copied"; setTimeout(function () { copy.lastChild.textContent = "Copy"; }, 1600); };
+            if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(ok, function () { toast("Copy didn't work. Select the text instead."); });
+            else toast("Copy isn't available here. Select the text instead.");
+          });
+          var art = h("article", { class: "cx-idea" + (fresh && !HV.reduce ? " is-in" : "") },
+            h("div", { class: "cx-idea__top" }, h("span", { class: "cx-idea__n" }, String(i + 1)), h("span", { class: "cx-idea__fmt" }, it.format), copy),
+            h("div", { class: "cx-idea__cols" },
+              h("div", { class: "cx-idea__en", lang: "en" }, h("p", { class: "cx-idea__hook" }, "“" + it.hook_en + "”"), h("p", { class: "cx-idea__con" }, it.concept_en)),
+              h("div", { class: "cx-idea__ar", lang: "ar", dir: "rtl" }, h("p", { class: "cx-idea__hook" }, it.hook_ar), h("p", { class: "cx-idea__con" }, it.concept_ar))));
+          if (fresh && !HV.reduce) art.style.animationDelay = (i * 90) + "ms";
+          list.appendChild(art);
+        });
+        again.hidden = false;
+        again.querySelector("span").textContent = "New ideas" + (cost ? " · " + cost + " credits" : "");
+      }
+      function intro() {
+        list.textContent = "";
+        var write = h("button", { class: "cx-btn", type: "button", html: ic("bulb") + "<span>Write ideas</span>" });
+        write.addEventListener("click", function () { generate(false); });
+        list.appendChild(h("div", { class: "cx-ideas__intro" },
+          h("p", null, h("b", null, "Three ideas, in English and Arabic. "), "Helvy reads " + name + "’s platforms, interests and audience size" +
+            " (their best posts too, once the full analysis is unlocked) and writes a hook and a concept for each."), write));
+      }
+      function generate(isAgain) {
+        again.disabled = true;
+        list.textContent = "";
+        var cook = HV.cooking ? HV.cooking({ steps: ["Reading " + name + "’s style…", "Reading the brief…", "Writing hooks in English and Arabic…", "Checking: no prices, no claims…"] }) : null;
+        list.appendChild(h("div", { class: "cx-sheet__empty cx-sheet__cook" }, cook || "Helvy is writing…"));
+        api("POST", "/api/ideas", { code: code, token: token || undefined, again: !!isAgain }).then(function (r) {
+          if (cook && cook.stop) cook.stop();
+          again.disabled = false;
+          if (r.b && r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);
+          if (!r.b || !r.b.ok) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, (r.b && r.b.message) || "Helvy couldn’t write just now. You weren’t charged.")); if (!isAgain) again.hidden = true; return; }
+          if (!(r.b.ideas || []).length) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, r.b.message || "No ideas this time. You weren’t charged.")); return; }
+          cards(r.b.ideas, true);
+          if (r.b.spent) toast(r.b.spent + " credits used.");
+        });
+      }
+      again.addEventListener("click", function () { generate(true); });
+      function load() {
+        list.textContent = "";
+        list.appendChild(h("div", { class: "cx-sheet__empty" }, "Opening…"));
+        api("GET", "/api/ideas?c=" + encodeURIComponent(code) + (token ? "&s=" + encodeURIComponent(token) : "")).then(function (r) {
+          if (!r.b || !r.b.ok) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, "These ideas aren’t available here.")); return; }
+          setCtx(r.b);
+          if (r.b.selection && !token) token = r.b.selection.token;
+          if (!r.b.ai && !(r.b.ideas || []).length) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, "Helvy can’t write ideas right now. Please try again later.")); return; }
+          if ((r.b.ideas || []).length) cards(r.b.ideas, false); else intro();
+        });
+      }
+      load();
+    }
+    HV.ideas = ideasSheet;
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest("[data-ideas]");
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      var S = window.hvSelection, code = b.getAttribute("data-ideas");
+      var cr = S && S.creator ? S.creator(code) : null;
+      ideasSheet(code, { token: S && S.token ? S.token() : "", selName: S && S.name ? S.name() : "", name: (cr && cr.name) || b.getAttribute("data-name") || code });
+    }, true);
+    // The creator's page: one button under the key numbers (the page redraws itself, so it is re-added).
+    function mountCreatorIdeas() {
+      var host = document.getElementById("pp-id");
+      if (!host) return;
+      var place = function () {
+        var fields = host.querySelector(".pp-fields");
+        var m = /(?:^|[#&])c=([A-Za-z0-9-]+)/.exec(location.hash || "");
+        if (!fields || !m || fields.querySelector(".cx-ideabtn")) return;
+        var nm = fields.querySelector(".pp-name");
+        var b = h("button", { class: "cx-btn cx-btn--line cx-ideabtn", type: "button", "data-ideas": decodeURIComponent(m[1]).toUpperCase(),
+                              "data-name": nm ? nm.textContent.trim() : "", html: ic("bulb") + "<span>Content ideas</span>" });
+        var key = fields.querySelector(".pp-key");
+        if (key && key.nextSibling) fields.insertBefore(b, key.nextSibling); else fields.appendChild(b);
+      };
+      place();
+      if (window.MutationObserver) new MutationObserver(place).observe(host, { childList: true });
+    }
+
+    /* ========================================================= NEXT TIME (phase E)
+       On an ended campaign's report: who to book again, who to replace, who to test once
+       more, with the reasons from the campaign's own results. Deterministic (weekly.py). */
+    var NEXT_GROUPS = [["rebook", "Book again", "check", "go"], ["replace", "Replace", "swap", "low"], ["watch", "One more test", "clock", "mid"]];
+    function campaignNextTime() {
+      var m = /(?:^|[#&])t=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+      var host = document.querySelector("#sec-overview .cat-container");
+      if (!m || !host || host.querySelector(".cx-next")) return;
+      api("GET", "/api/campaign/next?t=" + encodeURIComponent(m[1])).then(function (r) {
+        var d = r.b && r.b.next;
+        if (!d || host.querySelector(".cx-next")) return;
+        var sec = h("section", { class: "cx-next", "aria-labelledby": "cx-next-t" });
+        sec.appendChild(h("header", { class: "cx-next__hd" }, clip("point", "cx-next__hv cx-hd--head"),
+          h("div", null, h("h2", { id: "cx-next-t" }, "Next time"), h("p", { class: "cx-next__sum" }, d.ai_summary || d.summary))));
+        var cols = h("div", { class: "cx-next__cols" });
+        NEXT_GROUPS.forEach(function (g) {
+          var items = d[g[0]] || [];
+          if (!items.length) return;
+          var col = h("div", { class: "cx-next__col cx-next__col--" + g[3] });
+          col.appendChild(h("h3", { class: "cx-next__h", html: '<span class="cx-next__ic">' + ic(g[2]) + "</span>" }, g[1], h("small", null, String(items.length))));
+          var ul = h("ul", { class: "cx-next__list" });
+          items.forEach(function (it) {
+            ul.appendChild(h("li", null, h("b", null, it.name), h("span", { class: "cx-next__lead" }, it.lead),
+              it.why && it.why.length ? h("span", { class: "cx-next__why" }, it.why.join(" · ")) : null));
+          });
+          col.appendChild(ul);
+          cols.appendChild(col);
+        });
+        sec.appendChild(cols);
+        if (d.instead && d.instead.length) {
+          var row = h("div", { class: "cx-next__alt" }, h("p", null, h("b", null, "To replace them: "), "creators like " + (d.instead_like || "your best performer") + "."));
+          var chipsRow = h("div", { class: "cx-next__alts" });
+          d.instead.forEach(function (c) {
+            var a = h("a", { class: "cx-next__p", href: ROOT + "creator/#c=" + encodeURIComponent(c.code) });
+            var ph = h("span", { class: "cx-ph" }, c.photo_url ? "" : initials(c.name));
+            if (c.photo_url) ph.style.backgroundImage = 'url("' + String(c.photo_url).replace(/"/g, "%22") + '")';
+            a.appendChild(ph);
+            a.appendChild(h("span", null, h("b", null, c.name), h("small", null, [c.followers ? big(c.followers) + " followers" : "", c.city].filter(Boolean).join(" · "))));
+            chipsRow.appendChild(a);
+          });
+          row.appendChild(chipsRow);
+          sec.appendChild(row);
+        }
+        sec.appendChild(h("p", { class: "cx-next__fine" }, "From this campaign’s results against the benchmarks for each creator’s size. Your account manager can rebook or replace anyone."));
+        host.insertBefore(sec, host.firstChild ? host.firstChild.nextSibling : null);
+      });
+    }
+
     /* ================================================================ TOUR */
     // Tour v2 lives in tour.js + tour.css, fetched only when the client starts it (the demo
     // photos load with the demo pages). Here: the opener card and the loader.
@@ -597,9 +777,11 @@
       waitLoader(function () { setTimeout(offerTour, 900); });
       if (PAGE === "campaign") {
         campaignVersus();
-        window.addEventListener("hashchange", function () { setTimeout(campaignVersus, 600); });
+        window.addEventListener("hashchange", function () { setTimeout(campaignVersus, 600); setTimeout(campaignNextTime, 700); });
         setTimeout(campaignVersus, 1500);
+        setTimeout(campaignNextTime, 1200);
       }
+      if (PAGE === "creator") mountCreatorIdeas();
     }
     if (HV.me) onMe(); else document.addEventListener("hv:me", onMe);
     if (window.hvSelection) mountSelection();

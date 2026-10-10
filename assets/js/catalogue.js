@@ -2697,6 +2697,11 @@
         html += '<button type="button" class="sel-alike" data-alike="' + esc(code) + '" title="' + (ac ? "Helvy finds 3 creators like this one · " + ac + " credits" : "Free with your active campaign") + '">' +
           hvIcon("spark") + "<span>Creators like this</span></button>";
       }
+      // Phase E: Helvy's content ideas for this creator (hooks and concepts, AR + EN), for anyone who can open the selection.
+      if (st.s !== "rejected" && st.s !== "unavailable") {
+        html += '<button type="button" class="sel-ideas" data-ideas="' + esc(code) + '" title="Helvy drafts hooks and concepts for this creator, in English and Arabic">' +
+          hvIcon("bulb") + "<span>Content ideas</span></button>";
+      }
       box.innerHTML = html;
       // While Helvy looks for a replacement: the same "cooking" desk as Add more like these.
       var spot = box.querySelector("[data-cook]");

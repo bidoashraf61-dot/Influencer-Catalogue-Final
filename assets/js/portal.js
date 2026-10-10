@@ -66,6 +66,14 @@
     help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2.1-2.4 3.6M12 17v.2"/>',
     minus: '<path d="M5 12h14"/>', chat: '<path d="M4.5 5.5h15v10.5h-8.2l-4.3 3.5V16h-2.5z"/><path d="M8.5 10.8h.01M12 10.8h.01M15.5 10.8h.01"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/>',
     filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
+    // HELVY Connect phase E
+    upload: '<path d="M12 15.5V4.5M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v4.5h15V15"/>',
+    cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M7.5 14h3v3h-3z"/>',
+    bulb: '<path d="M9 17.5h6M10 21h4"/><path d="M12 3.5a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2v1h5v-1c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3.5z"/>',
+    copy: '<rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 6v8A1.5 1.5 0 0 0 6 15.5h2.5"/>',
+    redo: '<path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 4.5v4h-4"/>',
+    flag: '<path d="M5.5 21V4M5.5 4.5h11l-2 4 2 4h-11"/>',
+    mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
     target: '<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/>',
     sparkle: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z"/><path d="M18.5 16l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
     ig: '<rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/>',
@@ -838,13 +846,27 @@
 
     if (!onReview) {
       var q = qs[step];
+      if (step === 0 && HV.briefSource) {
+        // Phase E: start from what the client already has: a product page or their own brief.
+        body.appendChild(HV.briefSource({
+          lead: opts.attach ? "Have a product page or a brief? Helvy can answer these questions from it." : "Start from what you have",
+          onUse: function (got, res) {
+            Object.keys(got).forEach(function (k) { if (k !== "notes" || !opts.attach) answers[k] = got[k]; });
+            if (opts.attach && got.notes) answers.notes = got.notes;
+            var src = res.source || {};
+            wizard(qs, answers, qs.length, "Helvy filled this from " + (src.kind === "file" ? "your brief" : src.label || "the page") +
+              ". Check every answer and change anything that's off.", Object.assign({}, opts, { source: res }));
+          }
+        }));
+        body.appendChild(h("div", { class: "pt-or" }, opts.attach ? "or answer the questions" : "or describe it in a sentence"));
+      }
       if (step === 0 && !opts.attach) {
         // The one-sentence shortcut lives on the first screen only.
         var free = h("textarea", { class: "pt-text", placeholder: "e.g. We're launching a sunscreen in Riyadh and want 8 micro-creators on Instagram, budget around 100k SAR.", maxlength: "1500", "aria-label": "Describe your campaign" });
         var fillBtn = h("button", { class: "pt-btn pt-btn--ghost", type: "button" }, "Fill it in for me");
         var cost = ME && ME.costs ? ME.costs.parse : 1;
         if (ME && ME.ai) {
-          body.appendChild(h("p", { class: "pt-sub" }, "Describe your campaign in a sentence and our AI will fill the questions. Or answer them yourself below."));
+          body.appendChild(h("p", { class: "pt-sub", style: "margin-top:0" }, "Our AI fills the questions from a sentence. Or answer them yourself below."));
           body.appendChild(h("div", { style: "margin-top:14px" }, free));
           body.appendChild(h("div", { class: "pt-actions", style: "margin-top:12px" }, h("span", { class: "pt-note", style: "margin:0" }, creditsLine(cost)), fillBtn));
           body.appendChild(h("div", { class: "pt-or" }, "or answer a few questions"));
@@ -920,6 +942,15 @@
       body.appendChild(h("div", { class: "pt-actions" }, back, next));
     } else {
       body.appendChild(h("p", { class: "pt-sub" }, prefillNote || "This is what we'll match creators against."));
+      if (opts.source) {
+        // What Helvy flagged in the link or file, and when to launch, stay in view while the client checks.
+        (opts.source.flags || []).filter(function (f) { return f.kind !== "claims_found"; }).forEach(function (f) {
+          body.appendChild(h("div", { class: "bs-flag bs-flag--" + f.kind + " bs-flag--slim" }, h("span", { class: "bs-flag__ic", html: icon(f.kind === "licence" ? "shield" : "flag") }),
+            h("p", null, h("b", null, f.title + ". "), f.text)));
+        });
+        var tl0 = timingLine(opts.source.timing, { short: true });
+        if (tl0) body.appendChild(tl0);
+      }
       var list = h("ul", { class: "pt-review" });
       qs.forEach(function (q, i) {
         var v = answers[q.id];
@@ -963,6 +994,194 @@
     currentClose = close;
     x.onclick = function () { close(); };
   }
+
+  /* ------------------------------------- brief from a link or a file (phase E)
+     "Paste a product link" / "Upload a brief (PDF or Word)". The server reads it (public
+     pages only; an uploaded file is read and dropped, never kept), Helvy fills the brief
+     with a confidence for every field, copies only claims the source itself makes and
+     flags regulated products. Nothing is used until the client presses "Use this brief",
+     and every answer can still be changed after. One component for the brief window, the
+     AI shortlist card and the chat. */
+  var SRC_ROWS = [["product", "Product"], ["category", "Space"], ["audience", "Audience"], ["market", "Market"], ["goal", "Objective"], ["timing", "Timing"]];
+  var CONF = { high: ["Found", "hi"], medium: ["Check", "md"], low: ["A guess", "lo"], missing: ["Not found", "no"] };
+  var SRC_MAX = 4 * 1024 * 1024;
+  function srcCostTag(kind) {
+    if (ME && ME.kind === "admin") return null;
+    if (ME && ME.ai_free) return h("span", { class: "hv-cost hv-cost--free" }, "Free with your campaign");
+    if (!(ME && ME.ai)) return h("span", { class: "hv-cost hv-cost--free" }, "Free");
+    var c = ME.costs && ME.costs[kind || "source"] != null ? ME.costs[kind || "source"] : 5;
+    return h("span", { class: "hv-cost", html: icon("coin") + c + " credits" });
+  }
+  // "Saudi Derm Congress is in 14 weeks: cast now." The first window leads; two more follow, quieter.
+  function timingLine(t, opts) {
+    opts = opts || {};
+    if (!t || !t.windows || !t.windows.length) return null;
+    var box = h("div", { class: "bs-time" + (opts.dark ? " bs-time--dark" : "") });
+    box.appendChild(h("span", { class: "bs-time__ic", html: icon("cal") }));
+    var tx = h("div", { class: "bs-time__tx" });
+    tx.appendChild(h("p", { class: "bs-time__lead" }, h("span", { class: "bs-time__k" }, "Best launch window"), t.windows[0].message));
+    if (!opts.short && t.windows.length > 1) {
+      var more = h("ul", { class: "bs-time__more" });
+      t.windows.slice(1, 3).forEach(function (w) { more.appendChild(h("li", null, w.message)); });
+      tx.appendChild(more);
+    }
+    if (!opts.short) tx.appendChild(h("p", { class: "bs-time__note" }, "Creator content needs 6–8 weeks from brief to posting." +
+      (t.windows[0].dates && t.windows[0].dates !== "fixed" ? " Dates " + t.windows[0].dates + "." : "")));
+    box.appendChild(tx);
+    return box;
+  }
+  HV.timingLine = timingLine;
+
+  function srcValue(id, res, qs) {
+    var a = res.answers || {}, f = res.fields || {}, q = (qs || []).filter(function (x) { return x.id === id; })[0];
+    var lab = function (qid, v) { var qq = (qs || []).filter(function (x) { return x.id === qid; })[0]; return qq ? optionLabel(qq, v) : v; };
+    if (id === "category") return (a.category || []).map(function (v) { return lab("category", v); }).join(", ");
+    if (id === "market") return (f.markets && f.markets.length ? f.markets : a.market ? [a.market] : []).map(function (v) { return lab("market", v); }).join(", ");
+    if (id === "goal") return a.goal ? lab("goal", a.goal) : "";
+    if (id === "timing") return [f.launch ? "Launch " + f.launch : "", a.timing ? lab("timing", a.timing) : ""].filter(Boolean).join(" · ");
+    if (id === "audience") return [f.audience, a.gender && a.gender !== "Any" ? lab("gender", a.gender) : "", a.age && a.age !== "Any" ? lab("age", a.age) : ""].filter(Boolean).join(" · ");
+    return q ? "" : (f[id] || "");
+  }
+  // The notes the server wrote, re-made from the fields the client edited (the "From ..." part stays).
+  function srcNotes(res, product, audience) {
+    var f = res.fields || {}, bits = [];
+    var from = /(?:^|\. )(From .*)$/.exec((res.answers && res.answers.notes) || "");
+    if (product) bits.push("Product: " + product + (f.brand && product.toLowerCase().indexOf(f.brand.toLowerCase()) < 0 ? " (" + f.brand + ")" : ""));
+    if (audience) bits.push("Audience: " + audience);
+    if (f.markets && f.markets.length > 1) bits.push("Markets: " + f.markets.join(", "));
+    if (f.launch) bits.push("Launch: " + f.launch);
+    if (from) bits.push(from[1]);
+    return bits.join(". ").slice(0, 600);
+  }
+
+  HV.briefSource = function (opts) {
+    opts = opts || {};
+    var dark = !!opts.dark;
+    var root = h("div", { class: "bs" + (dark ? " bs--dark" : "") + (opts.chat ? " bs--chat" : "") });
+    var file = h("input", { type: "file", class: "bs__file", accept: ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain", tabindex: "-1", "aria-hidden": "true" });
+    var linkBtn = h("button", { class: "bs__opt", type: "button", "aria-expanded": "false", html: icon("link") + "<span>Paste a product link</span>" });
+    var fileBtn = h("button", { class: "bs__opt", type: "button", html: icon("upload") + "<span>Upload a brief <small>PDF or Word</small></span>" });
+    var pick = h("div", { class: "bs__pick", role: "group", "aria-label": "Start from a link or a file" }, linkBtn, fileBtn, file);
+    var urlIn = h("input", { class: "bs__url", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", maxlength: "2000",
+                             placeholder: "https://brand.com/product", "aria-label": "Product page link" });
+    var go = h("button", { class: "bs__go", type: "submit" }, "Read it");
+    var form = h("form", { class: "bs__link", hidden: "" }, urlIn, go);
+    var fine = h("p", { class: "bs__fine" });
+    var tag = srcCostTag("source");
+    if (tag) fine.appendChild(tag);
+    fine.appendChild(h("span", null, "Helvy reads the page or file and fills the brief for you to check. Files are read, never kept."));
+    var err = h("p", { class: "bs__err", role: "alert", hidden: "" });
+    var out = h("div", { class: "bs__out", "aria-live": "polite" });
+    if (opts.lead) root.appendChild(h("p", { class: "bs__lead" }, opts.lead));
+    root.appendChild(pick); root.appendChild(form); root.appendChild(fine); root.appendChild(err); root.appendChild(out);
+
+    function fail(t) { err.hidden = !t; err.textContent = t || ""; }
+    function busy(on, label) {
+      linkBtn.disabled = fileBtn.disabled = go.disabled = urlIn.disabled = on;
+      root.classList.toggle("is-busy", on);
+      out.textContent = "";
+      if (on && HV.cooking) {
+        var cook = HV.cooking({ compact: true, dark: dark, hold: true, steps: [label, "Finding the product and who it's for…", "Filling your brief…", "Checking claims and timing…"] });
+        out.appendChild(h("div", { class: "bs__cook" }, cook));
+        root._cook = cook;
+      } else if (root._cook) { root._cook.stop(); root._cook = null; }
+    }
+    function send(body, label) {
+      fail("");
+      busy(true, label);
+      return api("POST", "/api/brief/source", body).then(function (r) {
+        busy(false);
+        if (r.b && r.b.ok) {
+          if (r.b.credits != null) setCredits(r.b.credits);
+          loadQuestions().then(function (qs) { show(r.b, qs); });
+          return;
+        }
+        fail(r.s === 429 ? "Too many tries. Please wait a few minutes." : r.s === 413 ? "That file is too large. Briefs up to 4 MB can be read." :
+             (r.b && r.b.message) || "That couldn't be read. Please try again.");
+      });
+    }
+    linkBtn.addEventListener("click", function () {
+      var open = form.hidden;
+      form.hidden = !open; linkBtn.setAttribute("aria-expanded", String(open));
+      linkBtn.classList.toggle("is-on", open);
+      if (open) urlIn.focus();
+    });
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = urlIn.value.trim();
+      if (v.length < 4 || /\s/.test(v)) { fail("Paste the product page's full address."); urlIn.focus(); return; }
+      send({ url: v }, "Opening the page…");
+    });
+    fileBtn.addEventListener("click", function () { file.value = ""; file.click(); });
+    file.addEventListener("change", function () {
+      var f = file.files && file.files[0];
+      if (!f) return;
+      if (/\.doc$/i.test(f.name)) { fail("Old Word files (.doc) can't be read. Save it as .docx or PDF and upload again."); return; }
+      if (f.size > SRC_MAX) { fail("That file is too large. Briefs up to 4 MB can be read."); return; }
+      var rd = new FileReader();
+      rd.onload = function () { send({ file: { name: f.name, data: rd.result } }, "Reading " + f.name + "…"); };
+      rd.onerror = function () { fail("That file couldn't be opened."); };
+      rd.readAsDataURL(f);
+    });
+
+    function show(res, qs) {
+      out.textContent = "";
+      var card = h("section", { class: "bs-res", "aria-label": "What Helvy read" });
+      var src = res.source || {};
+      card.appendChild(h("header", { class: "bs-res__hd" },
+        h("span", { class: "bs-res__ic", html: icon(src.kind === "file" ? "brief" : "link") }),
+        h("div", null, h("h3", { class: "bs-res__t" }, "Helvy read " + (src.kind === "file" ? "your brief" : src.label || "the page")),
+          h("p", { class: "bs-res__s" }, src.kind === "file" ? src.label + " · not kept" : "Check each line. Anything Helvy wasn't sure of is marked.")),
+        res.spent ? h("span", { class: "bs-res__spent" }, res.spent + " credits used") : null));
+      if (!res.ai) card.appendChild(h("p", { class: "bs-res__warn" }, "Helvy's AI is resting, so only the plain facts were picked out. Check every answer."));
+      var dl = h("dl", { class: "bs-rows" });
+      var edits = {};
+      SRC_ROWS.forEach(function (r) {
+        var conf = (res.confidence || {})[r[0]] || "missing", c = CONF[conf] || CONF.missing;
+        var val = srcValue(r[0], res, qs), dd;
+        if (r[0] === "product" || r[0] === "audience") {
+          var inp = h("input", { class: "bs-rows__in", type: "text", maxlength: r[0] === "product" ? "80" : "160", "aria-label": r[1],
+                                 placeholder: r[0] === "product" ? "Product name" : "Who it's for" });
+          inp.value = r[0] === "product" ? ((res.fields || {}).product || "") : ((res.fields || {}).audience || "");
+          edits[r[0]] = inp;
+          dd = h("dd", null, inp);
+          if (r[0] === "audience" && val && val !== inp.value) dd.appendChild(h("small", null, val.replace(inp.value, "").replace(/^ · /, "")));
+        } else dd = h("dd", null, val || "—");
+        dl.appendChild(h("div", { class: "bs-rows__r" }, h("dt", null, r[1]), dd,
+          h("span", { class: "bs-conf bs-conf--" + c[1], title: conf === "missing" ? "Not in the source: answer it in the next step" : "How sure Helvy is" }, c[0])));
+      });
+      card.appendChild(dl);
+      (res.flags || []).filter(function (f) { return f.kind !== "claims_found" || !(res.claims && res.claims.length); }).forEach(function (f) {
+        card.appendChild(h("div", { class: "bs-flag bs-flag--" + f.kind }, h("span", { class: "bs-flag__ic", html: icon(f.kind === "licence" ? "shield" : "flag") }),
+          h("p", null, h("b", null, f.title + ". "), f.text)));
+      });
+      if (res.claims && res.claims.length) {
+        var cl = h("ul", { class: "bs-claims" });
+        res.claims.forEach(function (c) { cl.appendChild(h("li", null, "“" + c + "”")); });
+        card.appendChild(h("div", { class: "bs-claims__w" }, h("p", { class: "bs-claims__h" }, "Claims your source makes (Helvy adds none)"), cl));
+      }
+      var tl = timingLine(res.timing, { dark: false });
+      if (tl) card.appendChild(tl);
+      var use = h("button", { class: "bs__use", type: "button", html: "<span>Use this brief</span>" + icon("arrow") });
+      var again = h("button", { class: "bs__again", type: "button" }, "Try another link or file");
+      card.appendChild(h("div", { class: "bs-res__go" }, again, use));
+      out.appendChild(card);
+      again.addEventListener("click", function () { out.textContent = ""; pick.hidden = false; fine.hidden = false; urlIn.value = ""; urlIn.focus(); });
+      use.addEventListener("click", function () {
+        var answers = {};
+        Object.keys(res.answers || {}).forEach(function (k) { answers[k] = res.answers[k]; });
+        answers.notes = srcNotes(res, edits.product.value.trim(), edits.audience.value.trim());
+        if (!answers.notes) delete answers.notes;
+        if (opts.onUse) opts.onUse(answers, res);
+      });
+      pick.hidden = true; form.hidden = true; fine.hidden = true;
+      linkBtn.classList.remove("is-on"); linkBtn.setAttribute("aria-expanded", "false");
+      try { card.scrollIntoView({ block: "nearest", behavior: REDUCE ? "auto" : "smooth" }); } catch (e) { /* old browser */ }
+      if (opts.onShow) opts.onShow(res);
+    }
+    root.reset = function () { out.textContent = ""; pick.hidden = false; fine.hidden = false; fail(""); };
+    return root;
+  };
 
   var BASIS = { analysis: ["Measured", "pt-tag--good"], basic: ["Public data", ""], roster: ["Estimated", "pt-tag--warn"] };
   function scoreClass(tag) { return /Strong/.test(tag) ? "strong" : /Good/.test(tag) ? "good" : /Possible/.test(tag) ? "possible" : "no"; }
@@ -1048,6 +1267,8 @@
         : (LANG === "ar" ? res.picks.length + " مؤثرين يطابقون طلبك، مرتبين حسب الملاءمة." : res.picks.length + " creators matched your brief, ranked by fit.")),
       h("small", null, res.brief));
     body.appendChild(sum);
+    var tlr = timingLine(res.timing, { short: true });
+    if (tlr) body.appendChild(tlr);
     var list = h("div", { class: "pt-list" });
     res.picks.forEach(function (p) { list.appendChild(creatorCard(p)); });
     body.appendChild(list);
@@ -1546,14 +1767,31 @@
     var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message Helvy" });
     var send = h("button", { class: "hv-send", type: "button", "aria-label": "Send" });
     send.innerHTML = V_ICON.send;
+    // Voice (phase E): the browser's own speech-to-text, Arabic (Saudi) or English. Nothing is
+    // recorded or uploaded by HelloVoice; the words become a normal typed message and Helvy
+    // answers in text. Browsers without speech recognition get no mic, just a tooltip.
     var Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
-    var mic = Speech ? h("button", { class: "hv-mic", type: "button", "aria-label": "Speak your message", "aria-pressed": "false", title: "Speak" }) : null;
+    var VLANG = { "ar-SA": ["ع", "Arabic (Saudi)"], "en-US": ["EN", "English"] };
+    var vlang = "en-US";
+    try { vlang = localStorage.getItem("hv-voice-lang") || (/^ar/i.test(navigator.language || "") ? "ar-SA" : "en-US"); } catch (e) { /* private */ }
+    if (!VLANG[vlang]) vlang = "en-US";
+    var mic = Speech ? h("button", { class: "hv-mic", type: "button", "aria-label": "Speak your message", "aria-pressed": "false", title: "Speak to Helvy" }) : null;
     if (mic) mic.innerHTML = V_ICON.mic;
-    var compose = h("div", { class: "hv-compose" }, ta, mic || document.createTextNode(""), send);
+    var langBtn = Speech ? h("button", { class: "hv-vlang", type: "button", title: "Voice language" }) : null;
+    function paintLang() {
+      if (!langBtn) return;
+      langBtn.textContent = VLANG[vlang][0];
+      langBtn.setAttribute("lang", vlang.slice(0, 2));
+      langBtn.setAttribute("aria-label", "Voice language: " + VLANG[vlang][1] + ". Switch to " + VLANG[vlang === "ar-SA" ? "en-US" : "ar-SA"][1]);
+    }
+    paintLang();
+    if (!Speech) ta.title = "Voice messages work in Chrome, Edge and Safari";
+    var heard = h("div", { class: "hv-heard", role: "status", "aria-live": "polite", hidden: "" });
+    var compose = h("div", { class: "hv-compose" + (Speech ? " hv-compose--voice" : "") }, ta, langBtn || document.createTextNode(""), mic || document.createTextNode(""), send);
     // Creators added from the chat's cards, waiting to be saved as a selection.
     var picksBar = h("div", { class: "hv-picks", hidden: "" });
     var foot = h("p", { class: "hv-foot" });
-    panel.appendChild(head); panel.appendChild(log); panel.appendChild(picksBar); panel.appendChild(compose);
+    panel.appendChild(head); panel.appendChild(log); panel.appendChild(picksBar); panel.appendChild(heard); panel.appendChild(compose);
     root.appendChild(panel); root.appendChild(nudge); root.appendChild(launch);
     document.body.appendChild(root);
     document.body.classList.add("has-voice");
@@ -1807,15 +2045,40 @@
 
     /* -- 1. find creators: the brief questions, free, then one paid shortlist -- */
     var FLOW_IDS = ["goal", "platforms", "market", "category", "budget", "count"];
-    function flowFind(seed, mode) {
+    // Phase E: a product page or the client's own brief, read into the brief right here in the chat.
+    function flowSource(which, mode) {
+      say(which === "file" ? "Choose the brief file. I'll read it and fill the questions; the file isn't kept." :
+          "Paste the product page. I'll read it and fill the questions for you to check.", function () {
+        var box = HV.briefSource({ chat: true, onUse: function (got, res) {
+          box.classList.add("is-done");
+          [].forEach.call(box.querySelectorAll("button, input"), function (b) { b.disabled = true; });
+          bubble("me", "Use this brief");
+          flowFind("", mode, got, res);
+        } });
+        row("ai", h("div", { class: "hv-msg hv-msg--ai hv-msg--wide hv-src" }, box));
+        var b = box.querySelectorAll(".bs__opt")[which === "file" ? 1 : 0];
+        if (b) b.click();
+      });
+    }
+    function flowFind(seed, mode, preset, srcRes) {
       var text = typeof seed === "string" ? seed : "";
       var attach = mode && mode.attach;
+      if (!text && !preset) {
+        // Three ways in: quick taps (free), a product link or a brief file.
+        say(attach ? "How would you like to give me the campaign?" : "Let's find the right creators. How would you like to start?");
+        chips([{ label: "Answer a few quick taps · free", primary: true, go: function () { flowFind("", mode, {}); } },
+               { label: "Paste a product link", go: function () { flowSource("link", mode); } },
+               { label: "Upload a brief (PDF or Word)", go: function () { flowSource("file", mode); } }]);
+        return;
+      }
       // Scoring an existing selection needs the campaign, not a budget or a head count.
       var ids = attach ? ["goal", "platforms", "market", "gender", "category"] : FLOW_IDS;
-      say(attach ? "A few quick taps about the campaign, all free." :
-          text ? "Got it. A few quick taps and I'll match the roster. This part is free." : "Let's find the right creators. A few quick taps, all free.");
+      var fromSrc = preset && Object.keys(preset).length;
+      say(fromSrc ? "Thanks. I filled what your " + (srcRes && srcRes.source && srcRes.source.kind === "file" ? "brief" : "page") + " says. Just a few taps for the rest." :
+          attach ? "A few quick taps about the campaign, all free." :
+          text ? "Got it. A few quick taps and I'll match the roster. This part is free." : "A few quick taps, all free.");
       Promise.all([loadQuestions(), text ? api("POST", "/api/brief/guess", { text: text }) : Promise.resolve({ b: {} })]).then(function (res) {
-        var qs = res[0], answers = Object.assign(profileAnswers(), (res[1].b && res[1].b.answers) || {});
+        var qs = res[0], answers = Object.assign(profileAnswers(), (res[1].b && res[1].b.answers) || {}, preset || {});
         var byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
         var todo = ids.filter(function (id) { return byId[id] && !(answers[id] && answers[id].length); });
         var i = 0;
@@ -1845,25 +2108,37 @@
             var v = answers[id]; return (byId[id].label.replace(/\?$/, "")) + ": " + (Array.isArray(v) ? v : [v]).map(function (x) { return optionLabel(byId[id], x); }).join(", ");
           });
           say("Here's your brief:\n" + lines.join("\n"));
+          sayTiming(answers, srcRes);
           var list = [];
           if (!attach && selToken()) {
             // They are on a selection: score it against these answers (free), or start a separate list.
             chips([{ label: "Score this selection · free", primary: true, go: function () { scoreSelection(selToken(), answers); } },
                    { label: "Build a separate new shortlist" + (ME && ME.ai ? " · " + costs.brief + " credits" : ""), go: function () { if (ME && ME.ai) build(answers); else handoff("handoff", "Brief from the chat:\n" + lines.join("\n")); } },
-                   { label: "Change answers", ghost: true, go: function () { flowFind(text); } }]);
+                   { label: "Change answers", ghost: true, go: function () { flowFind(text, null, {}); } }]);
             return;
           }
           if (attach) {
             chips([{ label: "Score “" + (mode.name || "this selection") + "” · free", primary: true, go: function () { scoreSelection(attach, answers); } },
-                   { label: "Change answers", ghost: true, go: function () { flowFind("", mode); } }]);
+                   { label: "Change answers", ghost: true, go: function () { flowFind("", mode, {}); } }]);
             return;
           }
           if (ME && ME.ai) list.push({ label: "Build my shortlist · " + costs.brief + " credits", primary: true, go: function () { build(answers); } });
-          list.push({ label: "Change answers", ghost: true, go: function () { flowFind(text); } });
+          list.push({ label: "Change answers", ghost: true, go: function () { flowFind(text, null, {}); } });
           if (!(ME && ME.ai)) list.push({ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", "Brief from Voice:\n" + lines.join("\n")); } });
           chips(list);
         }
         next();
+      });
+    }
+    // Timing advisor in the chat: the best launch window from the occasions calendar, one line, free.
+    function sayTiming(answers, srcRes) {
+      var t = srcRes && srcRes.timing;
+      var put = function (tm) { if (tm && tm.headline) say("**Timing:** " + tm.headline + " Creator content needs 6–8 weeks from brief to posting."); };
+      if (t) { put(t); return; }
+      var cats = (answers.category || []).filter(function (c) { return typeof c === "string" && c.indexOf("other:") !== 0 && c !== "any"; });
+      queue = queue.then(function () {
+        return api("GET", "/api/timing?c=" + encodeURIComponent(cats.join(",")) + "&m=" + encodeURIComponent(answers.market || "SA") +
+                   (answers.timing ? "&t=" + encodeURIComponent(answers.timing) : "")).then(function (r) { if (r.b && r.b.ok) put(r.b); });
       });
     }
     function scoreSelection(token, answers) {
@@ -2403,27 +2678,59 @@
     growBtn.addEventListener("click", function () { setBig(!root.classList.contains("is-big")); });
     try { if (localStorage.getItem(BIG) === "1") setBig(true); } catch (e) { /* private */ }
 
-    /* -- speak instead of typing: the words land in the box to check, then Send -- */
+    /* -- speak to Helvy: what is heard shows live above the box; when the client stops,
+       it is sent as a normal message. Tap the mic again to stop early. -- */
     if (mic) {
-      var rec = null, base = "";
+      var rec = null, said = "", base = "", hideT = 0;
+      function strip(state, text) {
+        clearTimeout(hideT);
+        heard.hidden = false;
+        heard.className = "hv-heard hv-heard--" + state;
+        heard.textContent = "";
+        heard.appendChild(h("span", { class: "hv-heard__dot", "aria-hidden": "true" }));
+        heard.appendChild(h("span", { class: "hv-heard__k" }, state === "on" ? "Listening · " + VLANG[vlang][1] : state === "err" ? "Voice" : "Heard"));
+        var t = h("span", { class: "hv-heard__t", dir: "auto", lang: vlang.slice(0, 2) }, text || (state === "on" ? "Speak now…" : ""));
+        heard.appendChild(t);
+        if (state !== "on") hideT = setTimeout(function () { heard.hidden = true; }, state === "err" ? 4200 : 1200);
+      }
+      langBtn.addEventListener("click", function () {
+        vlang = vlang === "ar-SA" ? "en-US" : "ar-SA";
+        try { localStorage.setItem("hv-voice-lang", vlang); } catch (e) { /* private */ }
+        paintLang();
+        if (rec) { rec.abort(); }
+      });
       mic.addEventListener("click", function () {
         if (rec) { rec.stop(); return; }
         rec = new Speech();
-        rec.lang = /[\u0600-\u06FF]/.test(ta.value) || /^ar/i.test(document.documentElement.lang || navigator.language || "") ? "ar-SA" : (navigator.language || "en-US");
-        rec.interimResults = true; rec.continuous = false;
-        base = ta.value ? ta.value.replace(/\s*$/, " ") : "";
-        mic.classList.add("is-on"); mic.setAttribute("aria-pressed", "true"); ta.placeholder = "Listening…";
+        rec.lang = vlang;
+        rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
+        said = ""; base = ta.value ? ta.value.replace(/\s*$/, " ") : "";
+        mic.classList.add("is-on"); mic.setAttribute("aria-pressed", "true"); mic.setAttribute("aria-label", "Stop listening");
+        compose.classList.add("is-listening");
+        strip("on", "");
+        var errored = false;
         rec.onresult = function (e) {
-          var said = ""; for (var k = 0; k < e.results.length; k++) said += e.results[k][0].transcript;
-          ta.value = base + said; grow();
-          ta.dispatchEvent(new Event("input"));
+          var fin = "", live = "";
+          for (var k = 0; k < e.results.length; k++) { if (e.results[k].isFinal) fin += e.results[k][0].transcript; else live += e.results[k][0].transcript; }
+          said = fin;
+          strip("on", (fin + " " + live).trim());
         };
-        rec.onend = rec.onerror = function () {
-          mic.classList.remove("is-on"); mic.setAttribute("aria-pressed", "false"); rec = null;
+        rec.onerror = function (e) {
+          errored = true;
+          var why = e && e.error;
+          strip("err", why === "not-allowed" || why === "service-not-allowed" ? "Allow the microphone for this site to speak to Helvy." :
+                why === "no-speech" ? "Didn't catch that. Tap the mic and try again." : why === "aborted" ? "Stopped." : "Voice didn't work this time. You can type instead.");
+        };
+        rec.onend = function () {
+          mic.classList.remove("is-on"); mic.setAttribute("aria-pressed", "false"); mic.setAttribute("aria-label", "Speak your message");
+          compose.classList.remove("is-listening");
+          rec = null;
+          var text = (base + said).replace(/\s+/g, " ").trim();
+          if (said.trim()) { strip("done", said.trim()); ta.value = text; grow(); submit(); }
+          else if (!errored) strip("err", "Didn't catch that. Tap the mic and try again.");
           if (!expecting) ta.placeholder = "Type a message…";
-          ta.focus();
         };
-        try { rec.start(); } catch (e) { rec = null; mic.classList.remove("is-on"); }
+        try { rec.start(); } catch (e) { rec = null; mic.classList.remove("is-on"); compose.classList.remove("is-listening"); strip("err", "Voice didn't start. You can type instead."); }
       });
     }
 
@@ -2517,6 +2824,10 @@
     var start = h("button", { class: "ai-sl__start", type: "button" }, "Start");
     start.insertAdjacentHTML("beforeend", aiSvg('<path d="M5 12h13M13 6l6 6-6 6"/>', 18));
     intro.appendChild(start);
+    // Phase E: or start from a product page or the client's own brief file.
+    var altLink = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("link") + "<span>Product link</span>" });
+    var altFile = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("upload") + "<span>Brief file</span>" });
+    intro.appendChild(h("div", { class: "ai-sl__alt" }, h("span", null, "Or start from a"), altLink, altFile));
     intro.querySelector(".ai-sl__face").appendChild(clip("idle", "ai-sl__hv cx-hd--head"));
 
     // Expanded: the journey.
@@ -2555,7 +2866,7 @@
     card.appendChild(intro); card.appendChild(run);
     host.appendChild(card);
 
-    var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null;
+    var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null, srcRes = null;
     // Tour demo only: skip the six taps and go straight to the director's desk.
     if (window.hvDemo) HV.aiDemo = function (ans, name) { answers = ans || {}; card.classList.add("is-open"); intro.hidden = true; run.hidden = false; go(name); };
 
@@ -2649,7 +2960,29 @@
     function close() {
       card.classList.remove("is-open"); run.hidden = true; intro.hidden = false;
     }
-    start.addEventListener("click", function () { answers = profileAnswers(); open(); });
+    start.addEventListener("click", function () { answers = profileAnswers(); srcRes = null; open(); });
+    // From a link or a file: Helvy fills the six answers, the client lands on the review to check them.
+    function fromSource(which) {
+      card.classList.add("is-open"); intro.hidden = true; run.hidden = false; run.classList.remove("is-staging");
+      shown = 0; setTrack(0); paintPower(false); coachCue("point");
+      loadQuestions().then(function (list) {
+        qs = list; byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
+        var p = h("div", { class: "ai-sl__q ai-sl__src" });
+        p.appendChild(h("p", { class: "ai-sl__ask" }, "Start from what you have"));
+        p.appendChild(h("p", { class: "ai-sl__hint" }, "A product page or your brief. Helvy fills the brief, you check it."));
+        var bs = HV.briefSource({ dark: true, onUse: function (got, res) {
+          answers = Object.assign(profileAnswers(), got); srcRes = res;
+          review();
+        } });
+        p.appendChild(bs);
+        p.appendChild(h("div", { class: "ai-sl__nav" }, h("button", { class: "ai-sl__back", type: "button", onclick: function () { answers = profileAnswers(); srcRes = null; ask(0); } }, "Answer the questions instead")));
+        swap(p);
+        var b = bs.querySelectorAll(".bs__opt")[which === "file" ? 1 : 0];
+        if (b) b.click();
+      });
+    }
+    altLink.addEventListener("click", function () { fromSource("link"); });
+    altFile.addEventListener("click", function () { fromSource("file"); });
     quit.addEventListener("click", close);
 
     function swap(node) {
@@ -2771,6 +3104,13 @@
       p.appendChild(ticket);
       var side = h("div", { class: "ai-sl__go" });
       side.appendChild(h("p", { class: "ai-sl__ask" }, "Ready when you are."));
+      if (srcRes) {
+        (srcRes.flags || []).filter(function (f) { return f.kind !== "licence"; }).slice(0, 1).forEach(function (f) {
+          side.appendChild(h("div", { class: "bs-flag bs-flag--dark bs-flag--slim" }, h("span", { class: "bs-flag__ic", html: icon("flag") }), h("p", null, h("b", null, f.title + ". "), f.text)));
+        });
+        var tls = timingLine(srcRes.timing, { short: true, dark: true });
+        if (tls) side.appendChild(tls);
+      }
       side.appendChild(h("p", { class: "ai-sl__hint" }, "We score every creator on each platform, fit your budget and explain each pick."));
       var build = h("button", { class: "ai-sl__build", type: "button" }, "Build my shortlist");
       build.appendChild(h("small", null, costLine()));
@@ -2903,6 +3243,8 @@
       var txt = h("div", { class: "ai-result__txt" });
       txt.appendChild(h("p", { class: "ai-result__name" }, name));
       txt.appendChild(h("p", { class: "ai-result__sum" }, res.summary || (res.picks.length + " creators match your brief, best fit first.")));
+      var tlb = timingLine(res.timing, { short: true });
+      if (tlb) txt.appendChild(tlb);
       bar.appendChild(txt);
       var acts = h("div", { class: "ai-result__acts" });
       var openSel = h("a", { class: "ai-result__btn ai-result__btn--lime", href: ROOT + "selection/#s=" + encodeURIComponent(res.token) }, "Open as selection");
