@@ -2519,9 +2519,6 @@
     };
     var STATUS_ON = !!(CURATED && CURATED.token && CFG.api && CURATED.status);
     var stFilter = "";               // "", a status, "influencers" or "doctors"
-    var openRepl = {};               // codes whose replacements are shown
-    var replList = {};               // code -> creators Helvy suggested
-    var cooks = {};                  // code -> the "cooking" Helvy shown while a replacement is found
     function stLabel(k) { return { review: "Under review", approved: "Approved", rejected: "Rejected", unavailable: "Unavailable" }[k] || k; }
     function hvIcon(n) { return window.hvPortal && window.hvPortal.icon ? window.hvPortal.icon(n) : ""; }
     function statusOf(code) { return (STATUS_ON && CURATED.status[code]) || { s: "review", by: "", hv: false, at: null, reason: "", note: "", replacements: [] }; }
@@ -2594,18 +2591,6 @@
       // A compact one-line pill: Helvy's face, the action, the cost inline.
       return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '" aria-label="Find a replacement with Helvy, ' + (cost ? cost + " credits" : "free") + '">' +
         helvy + "<span>Find a replacement</span>" + costChip(cost) + "</button>";
-    }
-    function replPanel(code) {
-      var list = replList[code];
-      if (!list) return '<div class="sel-replbox__cook" data-cook="' + esc(code) + '"></div>';
-      if (!list.length) return '<p class="sel-replbox__wait">Helvy found no one close enough. ' + (KAM ? esc(KAM.split(" ")[0]) : "Your account manager") + " can help.</p>";
-      return '<ul class="sel-replbox">' + list.map(function (c) {
-        var inSel = selected.indexOf(c.code) !== -1;
-        return '<li><span class="sel-replbox__ph">' + esc(String(c.code).split("-").pop()) + "</span><span><b>" + esc(c.name) + "</b><small>" +
-          esc(tierLabel(c.tier)) + " · " + esc(short(totalFollowers(c))) + " followers</small></span>" +
-          (inSel ? '<span class="sel-replbox__in">' + hvIcon("check") + " Added</span>"
-                 : '<button type="button" data-st-add="' + esc(c.code) + '">' + hvIcon("plus") + " Add</button>") + "</li>";
-      }).join("") + "</ul>";
     }
     /* -- why a creator was rejected: a "?" beside the status, a small pop-up to answer -- */
     var whyTip = null, whyPop = null, whyBack = null;
@@ -2707,10 +2692,8 @@
           '<button type="button" class="sel-dec sel-dec--no" data-st-set="rejected" data-st-code="' + esc(code) + '">' + hvIcon("x") + " Reject</button></div>";
         if (ROLE === "admin") html += '<button type="button" class="sel-st__change sel-st__off" data-st-set="unavailable" data-st-code="' + esc(code) + '">Mark unavailable (HelloVoice)</button>';
       }
-      if (canDecide && (st.s === "rejected" || st.s === "unavailable")) {
-        html += replButton(code, st);
-        if (openRepl[code]) html += replPanel(code);
-      }
+      // Find a replacement opens Helvy's side panel (connect.js), like Creators like this.
+      if (canDecide && (st.s === "rejected" || st.s === "unavailable")) html += replButton(code, st);
       // "Creators like this" (Helvy look-alikes): on every card the owner has not turned down.
       if (canDecide && st.s !== "rejected" && st.s !== "unavailable") {
         var ac = CURATED.alikeCost != null ? CURATED.alikeCost : 2;
@@ -2723,14 +2706,6 @@
           hvIcon("bulb") + "<span>Content ideas</span></button>";
       }
       box.innerHTML = html;
-      // While Helvy looks for a replacement: the same "cooking" desk as Add more like these.
-      var spot = box.querySelector("[data-cook]");
-      if (spot) {
-        var cook = cooks[code] || (window.hvPortal && window.hvPortal.cooking ? window.hvPortal.cooking({ compact: true,
-          steps: ["Reading why you said no…", "Flipping through creators…", "Scoring fit…", "Picking three for you…"] }) : null);
-        if (cook) { cooks[code] = cook; spot.appendChild(cook); }
-        else spot.textContent = "Helvy is looking…";
-      } else if (cooks[code]) { cooks[code].stop(); delete cooks[code]; }
     }
     // No campaign objective on this selection: nothing is scored (the server sends no scores),
     // and one bar above the creators asks for it. The same free questions as the brief card.
@@ -2836,21 +2811,13 @@
         hideWhyTip();
         if (ROLE === "owner" || ROLE === "admin") openWhyPop(t, code); else showWhyTip(t, code);
       } else if (t.hasAttribute("data-st-repl")) {
-        if (openRepl[code] && replList[code]) { delete openRepl[code]; render(); return; }
-        openRepl[code] = true; render();
-        fetch(CFG.api + "/api/selection/replace", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ token: CURATED.token, code: code }) })
-          .then(function (r) { return r.json().catch(function () { return {}; }); })
-          .then(function (b) {
-            if (!b.ok) { delete openRepl[code]; stToast(b.message || "Helvy couldn't look just now."); render(); return; }
-            replList[code] = b.replacements || [];
-            var st = statusOf(code);
-            st.replacements = replList[code].map(function (c) { return c.code; });
-            CURATED.status[code] = st;
-            if (b.spent) stToast(b.spent + " credits used." + (b.credits != null ? " " + b.credits + " left." : ""));
-            render();
-          })
-          .catch(function () { delete openRepl[code]; stToast("Couldn't reach the server. Please try again."); render(); });
+        if (!(window.hvPortal && window.hvPortal.replaceSheet)) { stToast("Helvy couldn't look just now."); return; }
+        window.hvPortal.replaceSheet(code, function (list) {
+          var st = statusOf(code);
+          st.replacements = (list || []).map(function (c) { return c.code; });
+          CURATED.status[code] = st;
+          render();
+        });
       } else if (t.hasAttribute("data-st-add")) {
         var add = t.getAttribute("data-st-add");
         if (byCode[add] && selected.indexOf(add) === -1) {

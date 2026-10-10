@@ -4597,7 +4597,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return self.send_json(200, {"ok": True, "replacements": [], "message": "Helvy found no one close enough. Your account manager can help."}, self.cors())
             selstatus.set_replacements(sel["id"], code, picks)
         shown = {r["code"]: r for r in self.roster_payload(only=set(picks))}
-        return self.send_json(200, {"ok": True, "replacements": [shown[c] for c in picks if c in shown], "spent": cost,
+        # "Why" for each pick, from card fields only (public data), as in Creators like this.
+        import aimore
+        gone = db.creator(code)
+        rows = {r["code"]: r for r in db.creators_by_codes(picks)}
+        why = {c: ("In %s's place: " % (gone["name"] or code)) + aimore.reason(rows[c], gone)[:1].lower() + aimore.reason(rows[c], gone)[1:]
+               if gone is not None and c in rows else "" for c in picks}
+        return self.send_json(200, {"ok": True, "replacements": [dict(shown[c], why=why.get(c, "")) for c in picks if c in shown], "spent": cost,
+                                    "free": portal.ai_free(reader) is not None,
                                     "credits": portal.balance(reader) if role == "owner" else None}, self.cors())
 
     def api_selection_tags(self):

@@ -450,41 +450,45 @@
       return sec;
     }
 
-    /* -- "Creators like this": the sheet -- */
-    function alikeSheet(code, again) {
+    /* -- One side panel for Helvy's suggestions on a selection: "Creators like this" and, since
+       fix batch 3, "Find a replacement" (which used to open a cramped list inside the rejected
+       card). Photo, name, tier, followers, platform, city, why, View profile, Add. Added creators
+       join the selection as Under review; a replaced creator stays in Rejected. -- */
+    function suggestSheet(o) {
       var S = window.hvSelection;
       if (!S) return;
-      var cr = S.creator(code) || { name: code };
       var prev = document.activeElement;
       var scrim = h("div", { class: "cx-dr__scrim" });
-      var sheet = h("aside", { class: "cx-sheet", role: "dialog", "aria-modal": "true", "aria-labelledby": "cx-al-t" });
+      var sheet = h("aside", { class: "cx-sheet" + (o.kind ? " cx-sheet--" + o.kind : ""), role: "dialog", "aria-modal": "true", "aria-labelledby": "cx-al-t" });
       var x = h("button", { class: "cx-x", type: "button", "aria-label": "Close", html: ic("x") });
       sheet.appendChild(h("header", { class: "cx-sheet__hd" }, clip("point", "cx-hd--head"),
-        h("div", null, h("h2", { id: "cx-al-t" }, "Creators like " + cr.name), h("p", null, "Same audience and content style, matched to " + S.name() + ".")), x));
+        h("div", null, h("h2", { id: "cx-al-t" }, o.title), h("p", null, o.sub)), x));
       var body = h("div", { class: "cx-sheet__body" });
-      var cost = (S.curated() || {}).alikeCost;
-      body.appendChild(h("div", { class: "cx-sheet__ctx" }, h("span", { html: ic("target") + "Like " + cr.name }), costTag(cost)));
+      body.appendChild(h("div", { class: "cx-sheet__ctx" }, h("span", { html: ic(o.ctxIcon || "target") + o.ctx }), costTag(o.cost)));
       var list = h("div", { class: "cx-sugs" });
       body.appendChild(list);
       sheet.appendChild(body);
       var more = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("sparkle") + "<span>Show 3 more</span>" });
-      sheet.appendChild(h("footer", { class: "cx-sheet__ft" }, h("span", null, "Added creators join as ", h("b", null, "Under review"), ". HelloVoice confirms availability."), more));
-      function close() { scrim.remove(); sheet.remove(); document.removeEventListener("keydown", onKey); document.body.classList.remove("pt-lock"); if (prev && prev.focus) prev.focus(); }
+      sheet.appendChild(h("footer", { class: "cx-sheet__ft" }, h("span", null, "Added creators join as ", h("b", null, "Under review"), o.foot || ". HelloVoice confirms availability."), more));
+      function close() { scrim.remove(); sheet.remove(); document.removeEventListener("keydown", onKey); document.body.classList.remove("pt-lock"); if (prev && prev.focus && prev.isConnected) prev.focus(); }
       function onKey(e) { if (e.key === "Escape") close(); }
       x.addEventListener("click", close); scrim.addEventListener("click", close); document.addEventListener("keydown", onKey);
       document.body.appendChild(scrim); document.body.appendChild(sheet); document.body.classList.add("pt-lock"); x.focus();
       function load(againFlag) {
         list.textContent = "";
-        var cook = HV.cooking ? HV.cooking({ steps: ["Reading " + cr.name + "’s profile…", "Flipping through creators…", "Matching audience and style…", "Picking the closest three…"] })
-          : h("div", { class: "cx-sheet__empty" }, "Helvy is looking…");
+        var cook = HV.cooking ? HV.cooking({ steps: o.steps }) : h("div", { class: "cx-sheet__empty" }, "Helvy is looking…");
         list.appendChild(h("div", { class: "cx-sheet__empty cx-sheet__cook" }, cook));
-        api("POST", "/api/selection/alike", { token: S.token(), code: code, again: !!againFlag }).then(function (r) {
+        more.disabled = true;
+        o.fetch(!!againFlag).then(function (r) {
           if (cook.stop) cook.stop();
           list.textContent = "";
+          more.disabled = false;
           if (!r.b || !r.b.ok) { list.appendChild(h("div", { class: "cx-sheet__empty" }, (r.b && r.b.message) || "Helvy couldn’t look just now.")); return; }
           if (r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);
-          if (!r.b.creators.length) { list.appendChild(h("div", { class: "cx-sheet__empty" }, r.b.message || "Helvy found no one else close enough.")); more.disabled = true; return; }
-          r.b.creators.forEach(function (c) {
+          var found = o.pick(r.b) || [];
+          if (o.loaded) o.loaded(found, r.b);
+          if (!found.length) { list.appendChild(h("div", { class: "cx-sheet__empty" }, r.b.message || "Helvy found no one else close enough.")); more.disabled = true; return; }
+          found.forEach(function (c) {
             var ph = h("span", { class: "cx-ph" }, c.photo_url ? "" : initials(c.name));
             if (c.photo_url) ph.style.backgroundImage = 'url("' + String(c.photo_url).replace(/"/g, "%22") + '")';
             var doc = /^hcp/i.test(c.tier || "");
@@ -493,8 +497,12 @@
             var add = h("button", { class: "cx-btn", type: "button", html: ic(inSel ? "check" : "plus") + "<span>" + (inSel ? "Added" : "Add") + "</span>" });
             if (inSel) add.disabled = true;
             add.addEventListener("click", function () {
-              if (S.add([c.code])) { add.disabled = true; add.lastChild.textContent = "Added"; toast(c.name + " added, under review."); }
-              else toast("That creator isn’t in the catalogue right now.");
+              var n = S.add([c.code], { creators: [c] });
+              var done = function (ok) {
+                if (ok) { add.disabled = true; add.innerHTML = ic("check") + "<span>Added</span>"; toast(c.name + " added, under review."); }
+                else toast("That creator isn’t in the catalogue right now.");
+              };
+              if (n && n.then) n.then(done); else done(!!n);
             });
             list.appendChild(h("article", { class: "cx-sug" }, ph,
               h("div", null, h("div", { class: "cx-sug__nm" }, h("h3", null, c.name), tier ? h("span", { class: "cx-sug__tier" + (doc ? " cx-sug__tier--doc" : "") }, doc ? "Doctor" : tier) : null),
@@ -505,8 +513,32 @@
         });
       }
       more.addEventListener("click", function () { load(true); });
-      load(!!again);
+      load(!!o.again);
     }
+    function alikeSheet(code, again) {
+      var S = window.hvSelection;
+      if (!S) return;
+      var cr = S.creator(code) || { name: code };
+      suggestSheet({ kind: "alike", again: again, title: "Creators like " + cr.name, sub: "Same audience and content style, matched to " + S.name() + ".",
+        ctx: "Like " + cr.name, cost: (S.curated() || {}).alikeCost,
+        steps: ["Reading " + cr.name + "’s profile…", "Flipping through creators…", "Matching audience and style…", "Picking the closest three…"],
+        fetch: function (ag) { return api("POST", "/api/selection/alike", { token: S.token(), code: code, again: ag }); },
+        pick: function (b) { return b.creators; } });
+    }
+    // Find a replacement: the same panel. Helvy's three are kept on the rejected creator, so
+    // opening it again is free; "Show 3 more" looks again (and costs again).
+    HV.replaceSheet = function (code, onFound) {
+      var S = window.hvSelection;
+      if (!S) return;
+      var cr = S.creator(code) || { name: code };
+      suggestSheet({ kind: "repl", title: "Replacements for " + cr.name, sub: "Three creators who fit " + S.name() + " in their place.",
+        ctx: "Instead of " + cr.name, ctxIcon: "swap", cost: (S.curated() || {}).replaceCost,
+        foot: ". " + cr.name + " stays in Rejected.",
+        steps: ["Reading why you said no…", "Flipping through creators…", "Scoring fit…", "Picking three for you…"],
+        fetch: function (ag) { return api("POST", "/api/selection/replace", { token: S.token(), code: code, again: ag }); },
+        pick: function (b) { return b.replacements; },
+        loaded: function (list) { if (onFound) onFound(list); } });
+    };
     document.addEventListener("click", function (e) {
       var b = e.target.closest && e.target.closest("[data-alike]");
       if (!b) return;
