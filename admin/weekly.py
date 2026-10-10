@@ -313,7 +313,9 @@ def panel(k):
         row = conn.execute("SELECT data FROM campaign_next WHERE campaign_id = ?", (k["id"],)).fetchone()
     if row is not None:
         return json.loads(row["data"])
-    return next_time(k, notify=True)
+    # Campaigns that ended long before this feature get the panel, quietly: no bell for old news.
+    recent = not k["ends_at"] or db.now() <= k["ends_at"] + NEXT_WINDOW_DAYS * 86400
+    return next_time(k, notify=recent)
 
 
 # --------------------------------------------------------------- the job --

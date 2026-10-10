@@ -178,6 +178,17 @@ class NextTime(unittest.TestCase):
         weekly.tick()
         self.assertEqual(len(bell(u, "camp_next")), 1)
 
+    def test_an_old_campaign_gets_the_panel_without_a_bell(self):
+        u = account("old@brand-g.com")
+        k = campaign(u, "Last year", started_days_ago=120, length=30, status="ended")
+        post(k, "HV-MI-001", 1, 30000, 2000)
+        with db.connect() as conn:
+            conn.execute("DELETE FROM campaign_next WHERE campaign_id = ?", (k,))
+            conn.execute("DELETE FROM notifications WHERE kind = 'camp_next'")
+        weekly.tick()
+        self.assertIsNotNone(weekly.panel(db.campaign(k)))
+        self.assertEqual(bell(u, "camp_next"), [])
+
     def test_no_results_no_panel(self):
         u = account("none@brand-f.com")
         k = campaign(u, "Nothing posted", started_days_ago=40, length=30)
