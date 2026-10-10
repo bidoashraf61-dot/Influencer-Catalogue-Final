@@ -24,6 +24,7 @@ tierRank(), totalFollowers(), Controls.matches/order and initApp's group-by. Kee
 in step.
 """
 
+from array import array
 import hashlib
 import json
 import re
@@ -35,6 +36,7 @@ BATCH = 48
 MAX_LIMIT = 480            # returning to the same spot reloads every batch the page had, in one go
 RESULT_TTL = 60            # seconds an ordered result is reused (licences and analyses can change under it)
 CHECK_EVERY = 1.0          # seconds between roster-version checks; tests set 0
+KEEP_OLD = 900             # seconds the previous version stays for cursors already handed out (it costs a second roster in memory)
 _lock = threading.Lock()
 _state = {"checked": 0.0, "key": None, "versions": [], "results": {}}
 
@@ -242,8 +244,10 @@ def current(key_fn, build_fn):
     with _lock:
         vs = _state["versions"]
         if not vs or vs[-1].version != key:
+            if vs:
+                vs[-1].superseded = time.time()
             vs.append(idx)
-            del vs[:-2]                 # the one before stays, for cursors already handed out
+            del vs[:-2]                 # the one before stays a while, for cursors already handed out
             _state["results"] = {k: v for k, v in _state["results"].items() if any(k[0] == x.tag for x in vs)}
         return vs[-1]
 
@@ -262,7 +266,10 @@ def _tag(idx):
 
 def held(tag):
     with _lock:
-        for x in _state["versions"]:
+        vs = _state["versions"]
+        if len(vs) > 1 and time.time() - getattr(vs[0], "superseded", 0) > KEEP_OLD:
+            del vs[0]
+        for x in vs:
             if _tag(x) == tag:
                 return x
     return None
@@ -327,8 +334,25 @@ def _key(idx, f):
     return (_tag(idx), json.dumps(f, sort_keys=True))
 
 
+class Ordered:
+    """One query's answer, compact: card positions as a C int array (40 KB at 10,000, where a
+    list of tuples took ~0.9 MB), and for a grouped view a group number per entry."""
+    __slots__ = ("at", "gid", "names")
+
+    def __init__(self, at, gid=None, names=None):
+        self.at, self.gid, self.names = at, gid, names
+
+    def __len__(self):
+        return len(self.at)
+
+    def slice(self, start, end):
+        if self.gid is None:
+            return [(i, None) for i in self.at[start:end]]
+        return [(i, self.names[g]) for i, g in zip(self.at[start:end], self.gid[start:end])]
+
+
 def ordered(idx, f, licences=None, discover=None):
-    """[(card index, group or None)] for this query, best first. Cached for RESULT_TTL."""
+    """This query's Ordered answer, best first, and how many creators match. Cached for RESULT_TTL."""
     key = _key(idx, f)
     now = time.time()
     with _lock:
@@ -379,11 +403,11 @@ def ordered(idx, f, licences=None, discover=None):
     if f["group"]:
         out = _grouped(idx, keep, f["group"])
     else:
-        out = [(i, None) for i in keep]
+        out = Ordered(array("i", keep))
     with _lock:
         res = _state["results"]
-        if len(res) > 64:
-            for k in sorted(res, key=lambda k: res[k][0])[:16]:
+        if len(res) >= 32:
+            for k in sorted(res, key=lambda k: res[k][0])[:8]:
                 res.pop(k, None)
         res[key] = (now, out, matched)
     return out, matched
@@ -417,10 +441,12 @@ def _grouped(idx, keep, dim):
         if fixed is not None:
             pos = fixed.index(k) if k in fixed else 99
         return (k == none, pos, -count[k], k.lower())
-    out = []
+    names, at, gid = [], array("i"), array("H")
     for k in sorted(members, key=sort_key):
-        out.extend((i, k) for i in members[k])
-    return out
+        names.append(k)
+        at.extend(members[k])
+        gid.extend([len(names) - 1] * len(members[k]))
+    return Ordered(at, gid, names)
 
 
 def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
@@ -438,7 +464,7 @@ def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
             start = 0
     limit = max(1, min(MAX_LIMIT, int(limit or BATCH)))
     seq, matched = ordered(idx, f, licences, discover)
-    chunk = seq[start:start + limit]
+    chunk = seq.slice(start, start + limit)
     items = []
     for i, g in chunk:
         c = idx.cards[i]
