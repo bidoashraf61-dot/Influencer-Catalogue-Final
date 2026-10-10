@@ -431,10 +431,16 @@
       go.addEventListener("click", function () {
         go.disabled = true; msg.textContent = "";
         // While Helvy works: the director's desk (thinking -> cards -> approve) and the step line.
-        var cook = HV.cooking ? HV.cooking({ dark: true }) : null;
-        if (cook) { card.classList.add("is-cooking"); card.appendChild(cook); }
+        var seeds = S.codes().filter(function (c) { return S.status(c).s === "approved"; }).length;
+        var cook = HV.cooking ? HV.cooking({ dark: true, list: true, title: "Helvy is finding " + count + " more",
+          steps: ["Studying your " + (seeds || "") + " approved creator" + (seeds === 1 ? "" : "s") + "…", "Reading their audience and tone…",
+                  "Flipping through the roster…", "Scoring each match…", "Adding the best " + count + " to Under review…"] }) : null;
+        if (cook) { card.classList.add("is-cooking"); card.appendChild(cook); cook.scrollIntoView({ block: "center", behavior: HV.reduce ? "auto" : "smooth" }); }
         api("POST", "/api/selection/more", { token: S.token(), note: note.value, count: count,
                                               chips: Object.keys(chips).filter(function (k) { return chips[k]; }) }).then(function (r) {
+          var ok = r.b && r.b.ok && (r.b.added || []).length;
+          return (cook && ok && cook.finish ? cook.finish() : Promise.resolve()).then(function () { return r; });
+        }).then(function (r) {
           go.disabled = false;
           if (cook) { cook.stop(); cook.remove(); card.classList.remove("is-cooking"); }
           if (!r.b || !r.b.ok) { msg.textContent = (r.b && r.b.message) || "Helvy couldn’t look just now. Please try again."; return; }

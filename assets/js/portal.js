@@ -116,6 +116,7 @@
   var COOK_STEPS = ["Reading your brief…", "Flipping through creators…", "Scoring fit…", "Approving your picks…"];
   HV.cooking = function (opts) {
     opts = opts || {};
+    if (opts.list) return cookingSteps(opts);
     var steps = opts.steps || COOK_STEPS, i = 0, seen = false;
     var el = document.createElement("div");
     el.className = "cx-cook" + (opts.compact ? " cx-cook--compact" : "") + (opts.dark ? " cx-cook--dark" : "");
@@ -135,6 +136,46 @@
     el.stop = function () { clearInterval(t); };
     return el;
   };
+  // The bigger "cooking" (fix batch 3, Add more like these): the AI shortlist card's wait in
+  // small. Helvy at his desk (thinking -> cards -> approve) beside named steps that light up one
+  // by one, a live line and a bar. The last step holds until the work is done; finish() lights
+  // everything and returns a promise that settles once the client has seen it.
+  function cookingSteps(opts) {
+    var steps = opts.steps || COOK_STEPS, k = 0, seen = false;
+    var el = document.createElement("div");
+    el.className = "cx-cook cx-cook--steps" + (opts.dark ? " cx-cook--dark" : "");
+    el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
+    el.appendChild(clip("thinking", "cx-cook__hv", { seq: ["thinking", "cards", "approve"] }));
+    var tx = document.createElement("div"); tx.className = "cx-cook__tx";
+    if (opts.title) { var t = document.createElement("p"); t.className = "cx-cook__title"; t.textContent = opts.title; tx.appendChild(t); }
+    var list = document.createElement("ol"); list.className = "ai-sl__list cx-cook__list";
+    steps.forEach(function (s) {
+      var li = document.createElement("li"); li.className = "ai-sl__st";
+      li.innerHTML = '<span class="ai-sl__st-dot"></span><span></span>'; li.lastChild.textContent = s;
+      list.appendChild(li);
+    });
+    var bar = document.createElement("div"); bar.className = "ai-sl__bar"; bar.appendChild(document.createElement("i"));
+    tx.appendChild(list); tx.appendChild(bar); el.appendChild(tx);
+    function paint() {
+      [].forEach.call(list.children, function (li, i) { li.className = "ai-sl__st" + (i < k ? " is-done" : i === k ? " is-now" : ""); });
+      bar.firstChild.style.width = Math.max(4, Math.round(Math.min(k, steps.length) / steps.length * 100)) + "%";
+    }
+    paint();
+    var timer = setInterval(function () {
+      if (el.isConnected) seen = true; else if (seen) { clearInterval(timer); return; }
+      if (k < steps.length - 1) { k++; paint(); }
+    }, REDUCE ? 400 : 1400);
+    el.stop = function () { clearInterval(timer); };
+    el.finish = function () {
+      clearInterval(timer);
+      return new Promise(function (res) {
+        (function next() {
+          if (k < steps.length) { k++; paint(); setTimeout(next, REDUCE ? 0 : 260); } else setTimeout(res, REDUCE ? 0 : 450);
+        })();
+      });
+    };
+    return el;
+  }
   HV.reduce = REDUCE;
   HV.root = ROOT; HV.apiBase = API;
   HV.h = function () { return h.apply(null, arguments); };

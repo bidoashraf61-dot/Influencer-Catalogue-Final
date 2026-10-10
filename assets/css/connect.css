@@ -573,6 +573,20 @@
 .cx-cook--compact .cx-cook__now { font-size: 13.5px; }
 .cx-more.is-cooking > .cx-cook { grid-column: 1 / -1; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.12); }
 .cx-more.is-cooking .cx-more__form { opacity: .5; pointer-events: none; }
+/* Add more like these, working (fix batch 3): Helvy at his desk beside the AI card's step list. */
+.cx-cook--steps { --ai-lime: #e8ff76; --ai-ink: #121212; --ai-orange: #ff691e; --ai-ease: cubic-bezier(.2,.8,.2,1);
+  grid-template-columns: 150px minmax(0, 1fr); gap: 22px; align-items: center; }
+.cx-cook--steps .cx-hd { width: 150px; height: 150px; }
+.cx-cook__title, .cx-more .cx-cook__title { margin: 0; font-family: Bebasneue, Arial, sans-serif; font-size: 28px; line-height: 1; letter-spacing: .02em; color: var(--lime); }
+.cx-cook--steps .ai-sl__list { margin-top: 14px; gap: 9px; }
+.cx-cook--steps .ai-sl__st { font-size: 14.5px; }
+.cx-cook--steps .ai-sl__bar { margin-top: 14px; max-width: 420px; height: 6px; }
+@media (max-width: 600px) {
+  .cx-cook--steps { grid-template-columns: 84px minmax(0, 1fr); gap: 12px; align-items: start; }
+  .cx-cook--steps .cx-hd { width: 84px; height: 84px; }
+  .cx-cook__title, .cx-more .cx-cook__title { font-size: 22px; }
+  .cx-cook--steps .ai-sl__st { font-size: 13.5px; }
+}
 .cx-sheet__cook { display: flex; justify-content: center; padding: 26px 22px; }
 @media (prefers-reduced-motion: reduce) { .cx-cook__dots li { transition: none; } .cx-cook__now { animation: none; } }
 
