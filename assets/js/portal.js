@@ -1343,49 +1343,12 @@
     });
   };
 
-  function rememberBrief(id) { if (id) { try { sessionStorage.setItem("hv_brief", String(id)); } catch (e) { /* blocked */ } applyFit(); } }
-  function storedBrief() { try { return sessionStorage.getItem("hv_brief"); } catch (e) { return null; } }
-
-  // Fit badges on the catalogue cards for the last brief, so the whole roster reads against it.
-  var FIT = null, fitObserver = null;
-  function applyFit() {
-    var id = storedBrief();
-    if (!id || !document.querySelector(".cat-card")) { if (id && !fitObserver) watchCards(); return; }
-    var paint = function () {
-      if (!FIT) return;
-      Array.prototype.forEach.call(document.querySelectorAll(".cat-card[data-code]"), function (card) {
-        var v = FIT.scores[card.getAttribute("data-code")];
-        var b = card.querySelector(".pt-fit");
-        // A card that already shows its own % match (selection pages) keeps one number only.
-        if (!v || card.querySelector(".cat-score")) { if (b) b.remove(); card.classList.remove("pt-has-fit"); return; }
-        if (!b) { b = h("span", { class: "pt-fit" }); card.classList.add("pt-has-fit"); card.appendChild(b); }
-        b.className = "pt-fit pt-fit--" + scoreClass(v[1]);
-        b.textContent = (LANG === "ar" ? "ملاءمة " : "Fit ") + v[0] + "%";
-        b.title = v[1] + (v[2] === "roster" ? " · " + T("Estimated") : "");
-      });
-    };
-    if (FIT && FIT.id === id) { paint(); return; }
-    api("GET", "/api/brief/scores?b=" + encodeURIComponent(id)).then(function (r) {
-      if (!r.b.ok) return;
-      FIT = { id: id, scores: r.b.scores };
-      paint(); watchCards(paint); fitChip();
-    });
-  }
-  function watchCards(paint) {
-    if (fitObserver || !("MutationObserver" in window)) return;
-    var app = document.getElementById("cat-app") || document.body, t = null;
-    fitObserver = new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { if (FIT) (paint || applyFit)(); else applyFit(); }, 150); });
-    fitObserver.observe(app, { childList: true, subtree: true });
-  }
-  function fitChip() {
-    var dock = $("pt-dock");
-    if (!dock || $("pt-fitchip")) return;
-    dock.insertBefore(h("button", { id: "pt-fitchip", class: "pt-chip", type: "button", title: "Hide scores", onclick: function () {
-      try { sessionStorage.removeItem("hv_brief"); } catch (e) { /* blocked */ }
-      FIT = null; Array.prototype.forEach.call(document.querySelectorAll(".pt-fit"), function (b) { b.remove(); });
-      var c = $("pt-fitchip"); if (c) c.remove();
-    } }, "Fit scores shown", " ×"), dock.firstChild ? dock.firstChild.nextSibling : null);
-  }
+  // No fit scores on the catalogue (client, 2026-10-10): scoring happens only inside a selection,
+  // once its campaign objective is set, on the round stamp. The catalogue used to paint a
+  // "FIT x%" pill on every card for the last brief (a MutationObserver repainting them on every
+  // DOM change, plus a /api/brief/scores call); all of that is gone. The last brief is still
+  // remembered for the chat and the AI card.
+  function rememberBrief(id) { if (id) { try { sessionStorage.setItem("hv_brief", String(id)); } catch (e) { /* blocked */ } } }
 
   /* ------------------------------------------------------------------ chat */
 
@@ -2828,14 +2791,14 @@
     var intro = h("div", { class: "ai-sl__intro" });
     intro.innerHTML = '<div class="ai-sl__face"></div>' +
       '<div class="ai-sl__copy"><h2 class="ai-sl__title" id="ai-sl-title">Build a shortlist with AI</h2>' +
-      "<p>Six quick taps. We score every creator in the roster against your campaign and pick the best.</p></div>";
+      "<p>Six quick taps, and Helvy picks the creators that fit your campaign best.</p></div>";
     var start = h("button", { class: "ai-sl__start", type: "button" }, "Start");
     start.insertAdjacentHTML("beforeend", aiSvg('<path d="M5 12h13M13 6l6 6-6 6"/>', 18));
     intro.appendChild(start);
     // Phase E: or start from a product page or the client's own brief file.
     var altLink = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("link") + "<span>Product link</span>" });
     var altFile = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("upload") + "<span>Brief file</span>" });
-    intro.appendChild(h("div", { class: "ai-sl__alt" }, h("span", null, "Or start from a"), altLink, altFile));
+    intro.appendChild(h("div", { class: "ai-sl__alt" }, h("span", null, "Or start from"), altLink, altFile));
     intro.querySelector(".ai-sl__face").appendChild(clip("idle", "ai-sl__hv cx-hd--head"));
 
     // Expanded: the journey.
@@ -3367,7 +3330,6 @@
         if (document.body.getAttribute("data-page") === "selection" && /[#&]quote=1/.test(location.hash)) setTimeout(function () {
           var q = document.getElementById("cat-request") || document.getElementById("cat-request-2"); if (q) q.click();
         }, 1600);
-        if (storedBrief()) applyFit();
         return;
       }
       // Only replace the access-code gate once the server can actually send the email.

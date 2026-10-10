@@ -176,13 +176,6 @@ body.pt-lock { overflow: hidden; }
 .pt-toast__t { font-family: var(--heading); font-size: 28px; line-height: 1; text-transform: uppercase; margin: 0 0 8px; }
 .pt-toast__b { font-size: 15px; line-height: 1.5; margin: 0; color: var(--pt-mute); }
 .pt-toast .pt-btn { font-size: 17px; padding: 11px 20px 9px; }
-.cat-card.pt-has-fit { position: relative; }
-.pt-fit { position: absolute; top: 58px; left: 14px; z-index: 3; font-family: var(--heading); font-size: 20px; line-height: 1; letter-spacing: .04em;
-  padding: 8px 12px 6px; border-radius: var(--r-pill); background: var(--white); color: var(--ink); box-shadow: 0 4px 14px rgba(0,0,0,.18); }
-.pt-fit--strong { background: var(--lime); }
-.pt-fit--good { background: var(--white); }
-.pt-fit--possible { background: var(--amber-soft); color: var(--amber-text); }
-.pt-fit--no { background: var(--red-soft); color: var(--red-text); }
 [dir="rtl"] .pt-review b { text-align: left; }
 [dir="rtl"] .pt-opt { text-align: right; }
 
@@ -719,7 +712,6 @@ body.pt-lock { overflow: hidden; }
 
 /* the grid, narrowed */
 .cat-grid.ai-on .cat-card.ai-out { display: none; }
-.ai-mode .pt-fit { display: none; }
 .ai-badges { position: absolute; left: 12px; bottom: 12px; z-index: 4; display: flex; flex-wrap: wrap; gap: 6px; max-width: calc(100% - 90px); }
 .ai-rank {
   display: inline-grid; place-items: center; min-width: 34px; height: 30px; padding: 0 10px; border-radius: 999px;
@@ -893,15 +885,32 @@ body.pt-lock { overflow: hidden; }
 .ai-host > .ai-sl { grid-area: ai; grid-column: auto; grid-row: auto; }
 .ai-host > .ai-sl.is-open { grid-area: open; }
 
-/* The closed AI card is one slim pill: face, title, Start. */
-.ai-sl:not(.is-open) { border-radius: 999px; }
+/* The closed AI card (fix batch 3, 2026-10-10). It was one slim pill; phase E's "Or start from
+   a product link / brief file" row was squeezed into the same pill and crushed it. Now a small
+   ink panel with two rows that each keep their own room:
+     [Helvy on lime]  Build a shortlist with AI            [ Start -> ]
+                      Or start from  (link) Product link  (^) Brief file
+   The second row sits under the title, behind a hairline, and wraps instead of squeezing. */
+.ai-sl:not(.is-open) { border-radius: 24px; }
 .ai-sl:not(.is-open) .ai-sl__intro {
-  grid-template-columns: 40px auto auto; gap: 12px; padding: 5px 5px 5px 6px; align-items: center;
+  grid-template-columns: 56px minmax(0, 1fr) auto; grid-template-areas: "face copy go" "face alt alt";
+  gap: 0 16px; padding: 12px 12px 12px 14px; align-items: center;
 }
-.ai-sl:not(.is-open) .ai-sl__face { width: 44px; height: 44px; }
-.ai-sl:not(.is-open) .ai-sl__title { font-size: 21px; white-space: nowrap; }
+.ai-sl:not(.is-open) .ai-sl__face { grid-area: face; align-self: start; width: 56px; height: 56px; }
+.ai-sl:not(.is-open) .ai-sl__copy { grid-area: copy; min-width: 0; }
+.ai-sl:not(.is-open) .ai-sl__title { font-size: 24px; line-height: 1; white-space: nowrap; }
 .ai-sl:not(.is-open) .ai-sl__copy p { display: none; }
-.ai-sl:not(.is-open) .ai-sl__start { grid-column: auto; min-height: 44px; padding: 0 20px; font-size: 19px; }
+.ai-sl:not(.is-open) .ai-sl__start { grid-area: go; min-height: 44px; padding: 0 22px; font-size: 20px; }
+.ai-sl:not(.is-open) .ai-sl__alt {
+  grid-area: alt; margin: 10px 0 0; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.12);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 8px;
+}
+.ai-sl:not(.is-open) .ai-sl__alt > span { margin-right: 4px; white-space: nowrap; }
+.ai-sl:not(.is-open) .ai-sl__alt-b { min-height: 34px; padding: 0 13px; white-space: nowrap; }
+/* Helvy on a lime circle, on this card only (client, 2026-10-10): his head and shoulders
+   framed in the disc, the cut at the shoulders hidden by its curve. */
+.ai-sl__face { position: relative; border-radius: 50%; background: #d8ff45; overflow: hidden; isolation: isolate; }
+.ai-sl__face .cx-hd--head .hv-clip { transform: scale(1.32); transform-origin: 50% 8%; filter: none; }
 
 /* Licence chips: same quiet outline as the filter chips, one tight row. */
 .lic-filter__label { font-size: 18px; }
@@ -909,8 +918,21 @@ body.pt-lock { overflow: hidden; }
 
 @media (max-width: 900px) {
   .ai-host { grid-template-columns: minmax(0, 1fr); grid-template-areas: "search" "ai" "row" "active" "lic" "open"; }
-  .ai-sl:not(.is-open) .ai-sl__intro { grid-template-columns: 40px 1fr auto; }
-  .ai-sl:not(.is-open) .ai-sl__title { font-size: 19px; white-space: normal; }
+  .ai-sl:not(.is-open) .ai-sl__title { white-space: normal; }
+}
+@media (max-width: 520px) {
+  /* Phone: Helvy and the title on top, Start full width, the two sources side by side. */
+  .ai-sl:not(.is-open) .ai-sl__intro {
+    grid-template-columns: 48px minmax(0, 1fr); grid-template-areas: "face copy" "go go" "alt alt";
+    gap: 0 12px; padding: 12px;
+  }
+  .ai-sl:not(.is-open) .ai-sl__face { width: 48px; height: 48px; align-self: center; }
+  .ai-sl:not(.is-open) .ai-sl__title { font-size: 22px; }
+  .ai-sl:not(.is-open) .ai-sl__copy p { display: block; margin-top: 3px; font-size: 13px; line-height: 1.35; }
+  .ai-sl:not(.is-open) .ai-sl__start { margin-top: 12px; width: 100%; }
+  .ai-sl:not(.is-open) .ai-sl__alt { display: grid; grid-template-columns: 1fr 1fr; }
+  .ai-sl:not(.is-open) .ai-sl__alt > span { grid-column: 1 / -1; }
+  .ai-sl:not(.is-open) .ai-sl__alt-b { justify-content: center; padding: 0 10px; }
 }
 /* Back / Skip / Next sit in the right corner of the question, not under the answers */
 .ai-sl__q { display: flex; flex-direction: column; }

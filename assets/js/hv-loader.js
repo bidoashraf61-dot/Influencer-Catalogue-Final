@@ -18,8 +18,16 @@
  * HVHelvy (window.HVHelvy) is the ONE place Helvy's files are named. The clips
  * are transparent cut-outs, framed waist-up: VP9 with alpha (.webm) for Chrome,
  * Edge and Firefox, HEVC with alpha (.mov, hvc1) for Safari and every browser
- * on iPhone and iPad, and a transparent still for reduced motion and for any
- * browser that refuses to autoplay (never the native play button).
+ * on iPhone and iPad, and a transparent still for reduced motion.
+ *
+ * Autoplay refused is NOT final (fix batch 3, 2026-10-10). Safari refuses every
+ * autoplay in macOS / iOS Low Power Mode (NotAllowedError, readyState 0), and the
+ * old code swapped the clip for the still for good on that first refusal, so a
+ * laptop on battery saw a static Helvy on the sign-in page. Now the still sits
+ * under the waiting clip, play is tried again when the clip can play, when the
+ * tab comes back, and on the visitor's first tap, click or key anywhere (which
+ * every browser accepts as permission); the still is removed the moment the clip
+ * is really playing. Only a clip that cannot be decoded at all stays a still.
  */
 (function () {
   "use strict";
@@ -61,14 +69,48 @@
       im.setAttribute("aria-hidden", "true");
       return im;
     }
-    // Autoplay refused (Low Power Mode, data saver, a strict browser): the still
-    // takes the video's place, so a play button is never on screen.
+    // A clip the browser cannot decode at all: the still takes its place for good.
     function fallback(v) {
       if (!v.parentNode || v.getAttribute("data-fallback")) return;
       v.setAttribute("data-fallback", "1");
+      unwait(v);
       var im = img(v.getAttribute("data-cls"));
       v.parentNode.replaceChild(im, v);
       try { v.removeAttribute("src"); v.load(); } catch (e) { /* gone */ }
+    }
+    // Autoplay refused for now (Low Power Mode, a strict browser): the clip is hidden
+    // (so no native play button ever shows) with the still in its place, and waits.
+    var waiting = [];
+    function wait(v) {
+      if (v.getAttribute("data-wait") || !v.parentNode) return;
+      v.setAttribute("data-wait", "1");
+      var im = img(v.getAttribute("data-cls"));
+      im.setAttribute("data-for-wait", "1");
+      v.parentNode.insertBefore(im, v);
+      v._still = im;
+      waiting.push(v);
+      armGesture();
+    }
+    function unwait(v) {
+      if (!v.getAttribute("data-wait")) return;
+      v.removeAttribute("data-wait");
+      if (v._still && v._still.parentNode) v._still.parentNode.removeChild(v._still);
+      v._still = null;
+      waiting = waiting.filter(function (x) { return x !== v; });
+    }
+    // The visitor's first tap, click or key is the permission every browser accepts.
+    var gestureOn = false;
+    function armGesture() {
+      if (gestureOn) return;
+      gestureOn = true;
+      var go = function () {
+        waiting.slice().forEach(function (v) { if (v.isConnected) play(v, true); });
+        if (!waiting.length) {
+          gestureOn = false;
+          ["pointerdown", "keydown", "touchstart"].forEach(function (t) { document.removeEventListener(t, go, true); });
+        }
+      };
+      ["pointerdown", "keydown", "touchstart"].forEach(function (t) { document.addEventListener(t, go, { capture: true, passive: true }); });
     }
     // Ambient clips (launcher, cards) wait until the page has loaded and settled, so they never
     // compete with the roster and the first photos; "eager" ones (loader, reactions) do not.
@@ -76,15 +118,18 @@
     if (!settled) window.addEventListener("load", function () {
       setTimeout(function () { settled = true; watching.forEach(function (v) { if (!v.getAttribute("data-off")) play(v); }); }, 400);
     });
-    function play(v) {
-      if (!v.isConnected || v.getAttribute("data-fallback") || v.getAttribute("data-off") || document.hidden) return;
-      if (!settled && !v.hasAttribute("data-eager")) return;
+    function play(v, gesture) {
+      if (!v.isConnected || v.getAttribute("data-fallback") || document.hidden) return;
+      // A waiting clip is hidden (its still shows), so the observer calls it "off screen";
+      // it may still be retried.
+      if (v.getAttribute("data-off") && !gesture && !v.getAttribute("data-wait")) return;
+      if (!settled && !v.hasAttribute("data-eager") && !gesture) return;
       if (!v.getAttribute("src")) { v.src = src(v.getAttribute("data-clip")); }
       if (!v.paused) return;
       var p;
-      try { p = v.play(); } catch (e) { return fallback(v); }
+      try { p = v.play(); } catch (e) { return wait(v); }
       if (p && p.catch) p.catch(function (err) {
-        if (err && err.name === "NotAllowedError") fallback(v);
+        if (err && err.name === "NotAllowedError") wait(v);
         // AbortError: the source changed under it (sequence); the next canplay retries.
       });
     }
@@ -103,6 +148,7 @@
     document.addEventListener("visibilitychange", function () {
       watching = watching.filter(function (v) { return v.isConnected || !v.getAttribute("data-gone"); });
       watching.forEach(function (v) { if (document.hidden) { if (!v.paused) v.pause(); } else play(v); });
+      if (!document.hidden) waiting.slice().forEach(function (v) { if (v.isConnected) play(v); });
     });
 
     /* video(name, {once, then, seq, cls, eager}) -> <video> (or the still under reduced motion).
@@ -134,7 +180,10 @@
       });
       v.addEventListener("canplay", function () { play(v); });
       v.addEventListener("loadeddata", function () { play(v); });
-      v.addEventListener("error", function () { fallback(v); });
+      // Really moving: the waiting still (if any) goes.
+      v.addEventListener("playing", function () { unwait(v); });
+      // MEDIA_ERR_DECODE / SRC_NOT_SUPPORTED: this browser cannot show the clip at all.
+      v.addEventListener("error", function () { var e = v.error; if (!e || e.code >= 3) fallback(v); });
       if (o.eager) { v.setAttribute("data-eager", ""); v.src = src(cur); setTimeout(function () { play(v); }, 0); }
       // Off screen it neither downloads nor plays; on screen it plays.
       setTimeout(function () { observe(v); }, 0);
@@ -148,6 +197,8 @@
   css.textContent =
     ".hv-clip::-webkit-media-controls,.hv-clip::-webkit-media-controls-start-playback-button,.hv-clip::-webkit-media-controls-overlay-play-button" +
     "{display:none!important;-webkit-appearance:none;opacity:0!important;}" +
+    // A clip waiting for permission to play takes no room; its still stands in.
+    "video.hv-clip[data-wait]{display:none!important;}" +
     ".hv-loader{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;" +
     "background:#121212;opacity:0;transition:opacity .22s ease;}" +
     ".hv-loader.is-on{opacity:1;}" +
