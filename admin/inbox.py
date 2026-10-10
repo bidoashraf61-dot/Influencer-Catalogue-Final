@@ -44,6 +44,7 @@ KINDS = {
     "sel_feedback": "selections", "sel_shared": "selections", "sel_updated": "selections", "unavailable": "selections",
     "quote_requested": "selections", "quote_ready": "selections", "quote_approved": "selections",
     "camp_live": "campaigns", "camp_report": "campaigns", "camp_final": "campaigns",
+    "camp_shared": "campaigns",
     "camp_weekly": "campaigns", "camp_next": "campaigns",
     "credits_low": "account", "credits_monthly": "account", "credits_added": "account", "colleague": "account",
     "idea": "ideas",

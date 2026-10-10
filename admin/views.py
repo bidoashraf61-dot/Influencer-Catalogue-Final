@@ -2793,7 +2793,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "</div>"
                 + "</div>"
         + "<div class='savebar'><button class='btn lime'>Save changes</button><span class='muted'>Prices, margins and details are saved together.</span></div></form>"
-        + ui.panel("share", link_html + pass_html) + ui.panel("campaign", campaign_html)
+        + ui.panel("share", __import__("assign").selection_card(sel, campaigns) + link_html + pass_html) + ui.panel("campaign", campaign_html)
         + "</div>"
         + "<details class='card' style='margin-top:24px'><summary class='muted'>Delete this selection</summary>"
         + "<form method='post' action='" + u("/selections/delete") + "' data-confirm='Delete this selection? Its link stops working. You can restore it from History.' style='margin-top:12px'>"
@@ -3292,6 +3292,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
           "<a class='btn ghost' href='" + u("/campaigns/report") + "?id=" + str(k["id"]) + "'>See the report</a></div></form>"
         + ("<form id='camp-sync' method='post' action='" + u("/campaigns/sync") + "'><input type='hidden' name='id' value='" + str(k["id"]) + "'></form>"
            if k["selection_id"] else "")
+        + __import__("assign").campaign_card(k, selection)
         + "<form method='post' action='" + u("/campaigns/delete") + "' style='margin-top:24px' "
           "data-confirm-title='Delete this campaign?' data-confirm-what='" + e(k["name"]) + "' data-confirm='Its report and tracking links stop working at once.' data-confirm-ok='Delete campaign'>"
           "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"

@@ -646,3 +646,28 @@ When Helvy cannot do what a client asks he shows "Send this to my account manage
 - **Create campaign** (also on the Campaign tab): four steps pre-filled from the selection and its brief; it only
   creates a **draft**. Complete it on its Setup tab and use **Go live**; the client's chip becomes Campaign live.
 - Emails to the team: `Quote request changed` and `Quote approved` (the Settings notification list).
+
+## Assign to client (branch `assign-to-client`, 2026-10-11)
+
+One step from the admin: **selection page → Share tab → "Assign to client"**, and a smaller card at the
+bottom of a **campaign's Setup page**. Code: `admin/assign.py` (rules and the two cards); routes
+`POST /selections/assign` and `POST /campaigns/assign`.
+
+- The select lists portal accounts first (name, company, email), then plain access codes. Revoked,
+  expired, archived and used-up codes are not listed and are refused server-side.
+- On a selection: its linked campaigns are shown read-only with status chips. **Also move its
+  campaigns** (default on) gives each the same client; a campaign's brand label follows only when it was
+  the old client's name. A typed "for <name>" on the selection that was the old client's name is cleared.
+- **Tell the client (bell)** (default on) rings the in-portal bell: `HelloVoice shared "<selection>" with
+  you` (+ ` and its campaign <name>`) linking to the selection, and one bell per live campaign linking to
+  its report (kind `camp_shared`). Draft campaigns are not announced (clients never see drafts). Never an
+  email. Plain access codes have no account, so no bell. Colleagues on the same company domain get the bell
+  and see the selection read-only, as with any selection.
+- Moving a selection away from another client asks first ("This moves it away from <name>") and the
+  server refuses without `confirmed=1`. Assigning to the client it already has is a no-op: no change, no
+  bell, no History entry.
+- History: one entry per moved selection and per moved campaign (who, when, label with `(was <from>)`,
+  before/after snapshots with the code ids). All are undoable from the Undo toast.
+- Roles: owner, admin and KAM may; viewers get 403 (`team.can`).
+- The existing "Client (access code)" select on the Details tab still works; it stays the manual path.
+- Tests: `python3 admin/tests/e2e_assign.py`.

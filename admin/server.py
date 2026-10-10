@@ -1073,6 +1073,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_selection_save()
         if path == "/selections/delete":
             return self.post_selection_delete()
+        if path in ("/selections/assign", "/campaigns/assign"):
+            import assign
+            return assign.post(self, path)
         if path == "/campaigns/new":
             return self.post_campaign_new()
         if path == "/campaigns/setup":
