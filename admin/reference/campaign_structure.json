@@ -1,0 +1,564 @@
+{
+ "reference": {
+  "id": "campaign_structure",
+  "title": "Campaign structure by creator size and objective",
+  "updated": "2026-10-10",
+  "note": "A reasoned prior built from direction-level evidence. There is no controlled study of the right tier mix per objective, and none for KSA, UAE or Egypt.",
+  "how_to_read": [
+   "Percentages are the share of creators in each size, per objective. The implied share of creator spend uses HelloVoice's default planning prices (nano 650, micro 1,300, mid 3,500, macro 6,500, mega 30,000 SAR).",
+   "Evidence tags: DATA = measured data or peer-reviewed study; PLATFORM = platform-owned guidance or data; OPINION = agency or vendor view without method; REG = regulator rule via a summary; INFER = our inference.",
+   "Confidence: H, M or L. 'Direction' is whether the tier effect points the right way; 'magnitude' is whether the size of the effect is known.",
+   "Sources are CS1 to CS33 (a separate list from S1 to S31)."
+  ],
+  "caveats": [
+   "There is no published, controlled study of the right tier mix per objective, and none for KSA, UAE or Egypt. The percentages are a hypothesis HelloVoice's own tracked data can confirm or overturn.",
+   "Most sources draw tier lines differently (nano under 10K, micro 10K to 50K or 100K), so numbers are never directly transferable.",
+   "Traffic (link clicks) is the least evidenced objective: no source measures click-through by tier.",
+   "Regulatory text (SFDA guide of 20 Oct 2022, Mawthooq) is from a law-firm summary. Verify against the SFDA and GAMR originals or Saudi counsel before relying on it.",
+   "Several sources carry dates that conflict with their content, and some full texts were not retrievable (summaries only). Vendor and agency sources document claims; they do not support parameters."
+  ]
+ },
+ "tier_defs": {
+  "nano": "under 20K followers",
+  "micro": "20K to 100K",
+  "mid": "100K to 500K",
+  "macro": "500K to 1M",
+  "mega": "1M+"
+ },
+ "planning_prices_sar": {
+  "nano": 650,
+  "micro": 1300,
+  "mid": 3500,
+  "macro": 6500,
+  "mega": 30000
+ },
+ "objectives": [
+  {
+   "id": "awareness",
+   "label": "Awareness",
+   "means": "reach, views, recall",
+   "shape": {
+    "mega": "0",
+    "macro": "10",
+    "mid": "25",
+    "micro": "45",
+    "nano": "20"
+   },
+   "note": "Add one mega creator only if the creator budget exceeds about SAR 150K.",
+   "shape_pct": {
+    "mega": 0,
+    "macro": 10,
+    "mid": 25,
+    "micro": 45,
+    "nano": 20
+   },
+   "creators": [
+    12,
+    25
+   ],
+   "posts_each": "2 (spaced over 2 to 3 weeks) for macro, mid and top micro; 1 for nano; amplify the best 2 to 3 posts with paid",
+   "implied_spend": "macro ~29%, mid ~39%, micro ~26%, nano ~6%",
+   "confidence": {
+    "direction": "M",
+    "percentages": "L",
+    "count": "L",
+    "posts": "L-M"
+   },
+   "tag": "INFER",
+   "sources": [
+    "CS1",
+    "CS4",
+    "CS6",
+    "CS7",
+    "CS9",
+    "CS12",
+    "CS13",
+    "CS14",
+    "CS19"
+   ]
+  },
+  {
+   "id": "engagement",
+   "label": "Engagement",
+   "means": "interactions, comments, saves",
+   "shape": {
+    "mega": "0",
+    "macro": "0 to 5",
+    "mid": "20",
+    "micro": "45",
+    "nano": "30 to 35"
+   },
+   "shape_pct": {
+    "mega": 0,
+    "macro": 3,
+    "mid": 20,
+    "micro": 45,
+    "nano": 32
+   },
+   "creators": [
+    15,
+    30
+   ],
+   "posts_each": "1 to 2 (the second post a different angle, not a repeat)",
+   "implied_spend": "mid ~40%, micro ~35%, nano ~12%, macro 0 to 18%",
+   "confidence": {
+    "direction": "M-H",
+    "percentages": "L",
+    "count": "L",
+    "posts": "L"
+   },
+   "tag": "INFER",
+   "sources": [
+    "CS1",
+    "CS2",
+    "CS3",
+    "CS4",
+    "CS8",
+    "CS21"
+   ]
+  },
+  {
+   "id": "traffic",
+   "label": "Traffic",
+   "means": "link clicks",
+   "shape": {
+    "mega": "0",
+    "macro": "0",
+    "mid": "25",
+    "micro": "55",
+    "nano": "20"
+   },
+   "shape_pct": {
+    "mega": 0,
+    "macro": 0,
+    "mid": 25,
+    "micro": 55,
+    "nano": 20
+   },
+   "creators": [
+    8,
+    20
+   ],
+   "posts_each": "2 (a feed post plus a story or link-capable follow-up with a different hook)",
+   "implied_spend": "mid ~50%, micro ~42%, nano ~8%",
+   "confidence": {
+    "direction": "L",
+    "percentages": "L",
+    "count": "L",
+    "posts": "L"
+   },
+   "tag": "INFER",
+   "sources": [
+    "CS4",
+    "CS15",
+    "CS20",
+    "CS23",
+    "CS24"
+   ],
+   "note": "The least evidenced objective. Nothing measures click-through by tier."
+  }
+ ],
+ "budget_scaling": {
+  "tag": "INFER",
+  "confidence": "L",
+  "sources": [
+   "CS16",
+   "CS22"
+  ],
+  "rows": [
+   {
+    "budget": "Under SAR 50K",
+    "creators": "3 to 8",
+    "note": "mostly micro and mid"
+   },
+   {
+    "budget": "SAR 50K to 150K",
+    "creators": "8 to 20",
+    "note": "the range the calculator count hints are built on"
+   },
+   {
+    "budget": "SAR 150K to 400K",
+    "creators": "15 to 35",
+    "note": "one macro anchor for awareness"
+   },
+   {
+    "budget": "SAR 400K and above",
+    "creators": "add a macro or mega anchor",
+    "note": "plus a paid amplification line of 20 to 30%"
+   }
+  ]
+ },
+ "overlays": [
+  {
+   "id": "pharma",
+   "label": "Pharma and regulated health",
+   "creators": "3 to 8",
+   "shape": "micro 60 / mid 40, no nano",
+   "posts_each": "1 to 2 pre-approved posts each",
+   "text": "Credential checks cost the same per creator at any size, so nano is poor value. One reviewed message per creator. Awareness before traffic, because the SFDA redirect rule makes link-click campaigns for non-prescription products fragile.",
+   "tag": "INFER",
+   "confidence": "L",
+   "sources": [
+    "CS15",
+    "CS22",
+    "CS27",
+    "CS28",
+    "CS29"
+   ],
+   "calculator": "Not applied. The calculator uses one shape per goal for every product category (no pharma cap)."
+  },
+  {
+   "id": "beauty_fmcg",
+   "label": "Beauty and FMCG",
+   "creators": "20 to 40",
+   "shape": "mid 15 / micro 45 / nano 40 (engagement-led)",
+   "posts_each": "1 to 2",
+   "text": "Shift 10 to 15 points from mid to nano and micro for seeding-led engagement; a macro anchor only for launches.",
+   "tag": "INFER",
+   "confidence": "L",
+   "sources": [
+    "CS5",
+    "CS21",
+    "CS30"
+   ],
+   "calculator": "Not applied."
+  },
+  {
+   "id": "tech",
+   "label": "Tech and electronics (search goods)",
+   "creators": "as per objective",
+   "shape": "raise mid and macro weight by about 10 points",
+   "posts_each": "as per objective",
+   "text": "The meta-analysis finds larger creators work better for search goods with verifiable claims, and smaller creators for experience goods such as skincare.",
+   "tag": "INFER",
+   "confidence": "M-L",
+   "sources": [
+    "CS4",
+    "CS5"
+   ],
+   "calculator": "Not applied."
+  }
+ ],
+ "tolerance_points": {
+  "value": 10,
+  "text": "A client selection within 10 points per size of the default counts as on structure. The default is shown as a typical structure with an evidence-based direction, never as a truth."
+ },
+ "owner_proposal_check": [
+  {
+   "objective": "Awareness",
+   "proposal": "10% macro / 30% mid / 60% micro",
+   "implied_spend": "macro 26%, mid 42%, micro 31%",
+   "verdict": "Largely agrees on direction. A macro anchor, mid layer and micro base matches 'reach comes from larger creators'. The evidence gives no reason to exclude nano, and the one large dataset ranks mid as the least cost-efficient tier, so a 30% mid weight is not independently supported.",
+   "sources": [
+    "CS1",
+    "CS4",
+    "CS19"
+   ]
+  },
+  {
+   "objective": "Engagement",
+   "proposal": "20% mid / 50% micro / 30% nano",
+   "implied_spend": "mid 45%, micro 42%, nano 13%",
+   "verdict": "Agrees. The best-supported of the three. Caveat: at 20% of creators, mid takes 45% of spend, and the one large dataset shows mid with the worst cost per engagement.",
+   "sources": [
+    "CS1",
+    "CS2",
+    "CS3",
+    "CS4"
+   ]
+  },
+  {
+   "objective": "Traffic",
+   "proposal": "10% mid / 60% micro / 30% nano",
+   "implied_spend": "mid 26%, micro 59%, nano 15%",
+   "verdict": "Evidence is silent, with a mild contradiction: no source measures click-through by tier, and larger creators have more impact on purchase intention. A hypothesis to test, not a finding. The calculator default uses mid 25 / micro 55 / nano 20.",
+   "sources": [
+    "CS1",
+    "CS4",
+    "CS20"
+   ]
+  }
+ ],
+ "findings": [
+  {
+   "n": 1,
+   "title": "Engagement rate falls as follower count rises",
+   "text": "Direction is well supported; magnitudes are not (Instagram nano figures range from 1.7% to 6.2% depending on who measures and how). The largest paid-deliverable sample (n=1,502) shows engagement per view of 4.6% nano, 4.3% micro, 2.9% mid, 2.6% macro, 3.5% mega: falling, then a bounce at mega.",
+   "direction": "H",
+   "magnitude": "L",
+   "evidence": "DATA",
+   "sources": [
+    "CS1",
+    "CS2",
+    "CS3"
+   ]
+  },
+  {
+   "n": 2,
+   "title": "Cheapest engagement sits in micro and nano; cheapest views in macro and mega",
+   "text": "Median cost per engagement: micro $3.05, nano $3.11, macro $4.39, mega $5.00, mid $7.07 (worst). Median cost per view: mega $0.07, macro $0.10, nano $0.13, micro $0.14, mid $0.19 (worst). Single platform, deal prices not rate cards.",
+   "direction": "M",
+   "magnitude": "M",
+   "evidence": "DATA",
+   "sources": [
+    "CS1"
+   ]
+  },
+  {
+   "n": 3,
+   "title": "'Micro always wins' is not supported for purchase-type outcomes",
+   "text": "A meta-analysis of 71 papers (135 experiments, 571 effect sizes, 2025) finds small and medium influencers more effective for engagement, but larger influencers more effective for purchase intention. Larger for 'search' goods with verifiable claims, smaller for 'experience' goods such as skincare. Experimental: intentions, not clicks or sales.",
+   "direction": "M-H",
+   "magnitude": "L",
+   "evidence": "DATA",
+   "sources": [
+    "CS4",
+    "CS5"
+   ]
+  },
+  {
+   "n": 4,
+   "title": "Expertise matters most when the goal is awareness",
+   "text": "Blogger expertise is more effective for awareness than for trial (57 campaigns, 600 blogs, 1,800 posts, plus a replication experiment). Supports credentialed creators in pharma awareness work. Blog data from one agency.",
+   "direction": "M",
+   "magnitude": "L",
+   "evidence": "DATA",
+   "sources": [
+    "CS6"
+   ]
+  },
+  {
+   "n": 5,
+   "title": "Every added creator adds less new reach, but the decay is gentle at small sizes",
+   "text": "The only quantified overlap analysis found (10 travel creators of about 100K each, Twitter, 2016): unique reach 91.8% for 2, 85.7% for 3, 77.1% for 5, 64.8% for 10. Old, one niche, one platform. Saudi audiences are highly concentrated on Snapchat, so overlap is probably higher in KSA (inference).",
+   "direction": "M",
+   "magnitude": "L",
+   "evidence": "DATA + INFER",
+   "sources": [
+    "CS9",
+    "CS10",
+    "CS18"
+   ]
+  },
+  {
+   "n": 6,
+   "title": "One exposure rarely does the job; repetition helps, with diminishing returns",
+   "text": "Lab meta-analysis: attitude peaks around ten exposures, recall still rising at eight. Creator survey (n=539): 60% say meaningful audience action needs 2 to 3 posts; 14% of consumers (n=1,050, US) need 4 to 6 exposures. Self-reported or lab; none for organic creator posts in the Gulf.",
+   "direction": "M",
+   "magnitude": "L",
+   "evidence": "DATA",
+   "sources": [
+    "CS11",
+    "CS12"
+   ]
+  },
+  {
+   "n": 7,
+   "title": "Creator content plus paid amplification beats either alone",
+   "text": "Kantar/Google meta-analysis (40 US campaigns): creator plus brand ads lifted aided awareness 1.6x more than brand ads alone. Google MENA experiments: creator-only ad +53% ROAS and -30% CPA; creator plus brand combined +61% and -33%. Commissioned by Google; not tier-specific. The strongest argument for planning an amplification budget, not just more creators.",
+   "direction": "M",
+   "magnitude": "M",
+   "evidence": "PLATFORM",
+   "sources": [
+    "CS13",
+    "CS14"
+   ]
+  },
+  {
+   "n": 8,
+   "title": "In Saudi pharma, regulation, not marketing theory, sets the creator count",
+   "text": "Per the SFDA guide of 20 Oct 2022 (summarised by CMS, May 2024): prescription medicines cannot be advertised to the public; non-prescription influencer ads need specific SFDA approval (SAR 14,000 per ad, at least 12 hours before posting), a Mawthooq-licensed influencer over 21, the contract submitted to SFDA, and online ads must not redirect to other sites. How SFDA counts 'per ad' across creators is unclear. Verify against the original.",
+   "direction": "H (rule, as summarised)",
+   "magnitude": "L (per-ad counting)",
+   "evidence": "REG via law-firm summary",
+   "sources": [
+    "CS15",
+    "CS32"
+   ]
+  }
+ ],
+ "not_supported": [
+  "Any specific tier percentage.",
+  "Any claim that nano drives traffic or conversion better than micro (vendor assertions only).",
+  "Any KSA, UAE or Egypt tier benchmark.",
+  "Any figure for Snapchat by tier.",
+  "A post-level decay constant (the earlier spec's -8% per extra post has no source; the calculator uses 80% for a second post, an assumption).",
+  "Any evidence that a particular number of creators is optimal."
+ ],
+ "posts_and_counts": [
+  {
+   "question": "Typical roster size",
+   "says": "77% of brands work with 1 to 10 influencers at a time; B2C: 52% use 6 to 10, 23% use 11 to 19 (650 marketers, US/UK/AU).",
+   "tag": "DATA",
+   "confidence": "M (not MENA)",
+   "sources": [
+    "CS16"
+   ]
+  },
+  {
+   "question": "MENA roster size",
+   "says": "71.8% of brands work with fewer than 10 influencers per campaign (a UAE 2023 report as cited by IMH).",
+   "tag": "DATA / trade",
+   "confidence": "L",
+   "sources": [
+    "CS25"
+   ]
+  },
+  {
+   "question": "Optimal number of creators",
+   "says": "Not established anywhere. Marginal creators still add unique reach, so the limit is budget, approval overhead and measurement.",
+   "tag": "Gap",
+   "confidence": "",
+   "sources": [
+    "CS9"
+   ]
+  },
+  {
+   "question": "Posts per creator, fixed campaign",
+   "says": "'2 to 4 posts over the campaign' is the typical guide recommendation; the source itself says there is no documented universal number.",
+   "tag": "OPINION",
+   "confidence": "L",
+   "sources": [
+    "CS26"
+   ]
+  },
+  {
+   "question": "Evidence that multiple posts work",
+   "says": "60% of 539 creators say 2 to 3 posts are needed; attitudes peak near ten exposures in the lab.",
+   "tag": "DATA",
+   "confidence": "M for 'more than one', L for the number",
+   "sources": [
+    "CS11",
+    "CS12"
+   ]
+  },
+  {
+   "question": "Evidence against heavy repetition",
+   "says": "Higher endorsement frequency can reduce engagement with sponsored posts (single experiment, secondary summary); same-hook repetition fatigues faster than varied angles (opinion).",
+   "tag": "DATA / OPINION",
+   "confidence": "L-M",
+   "sources": [
+    "CS12"
+   ]
+  },
+  {
+   "question": "Burst vs always-on",
+   "says": "No controlled comparison found. Agencies recommend always-on for retention and bursts for launches.",
+   "tag": "OPINION",
+   "confidence": "L",
+   "sources": []
+  }
+ ],
+ "platforms": [
+  {
+   "platform": "Instagram",
+   "supports": "Follower-based engagement benchmarks are the most plentiful. Story link stickers give a native traffic path. Partnership ads let a brand run creator posts as ads. Saudi has a much smaller Instagram creator supply than TikTok by IMH's count, so micro and nano supply for Reels may bind before budget does.",
+   "structure": "Standard pyramid; use story plus feed for the two-touch traffic pattern.",
+   "confidence": "M for engagement benchmarks; L for structure",
+   "sources": [
+    "CS2",
+    "CS3",
+    "CS8",
+    "CS13",
+    "CS25"
+   ]
+  },
+  {
+   "platform": "TikTok",
+   "supports": "Reach is distributed by interest graph: the For You page delivers about 85% of views in a 508K-post vendor dataset, so follower count predicts reach weakly and nano and micro creators can out-deliver their size.",
+   "structure": "More creators at lower tiers is cheap and relatively safe; weight toward micro and nano for engagement; judge by views, not followers.",
+   "confidence": "L-M",
+   "sources": [
+    "CS3",
+    "CS12",
+    "CS23"
+   ]
+  },
+  {
+   "platform": "Snapchat",
+   "supports": "Almost nothing public by tier. Platform claims: Snap reaches over 90% of 13 to 34 year olds in KSA (Dentsu MENA / Lumen via Campaign ME). One vendor-published creator case; no tier mix.",
+   "structure": "Fewer, larger-reach creators are enough for reach because audiences are concentrated; treat tier percentages as unvalidated.",
+   "confidence": "L",
+   "sources": [
+    "CS17",
+    "CS18"
+   ]
+  },
+  {
+   "platform": "YouTube",
+   "supports": "Google and Kantar evidence supports pairing creator content with brand or paid placements. Google's MENA article gives no tier guidance.",
+   "structure": "Minor channel for HelloVoice.",
+   "confidence": "L-M",
+   "sources": [
+    "CS13",
+    "CS14"
+   ]
+  }
+ ],
+ "conflicts": [
+  {
+   "conflict": "'Micro always wins' vs 'macro for reach'",
+   "reading": "Both true; the objective determines the tier. A YouTube survey favouring micro on awareness (n=299) measures followers' attitudes, not reach.",
+   "sources": [
+    "CS1",
+    "CS4",
+    "CS7"
+   ]
+  },
+  {
+   "conflict": "Micro for conversion vs larger for purchase intention",
+   "reading": "The meta-analysis (experimental) outweighs vendor CAC tables with no method. Do not encode 'nano or micro convert best' as fact.",
+   "sources": [
+    "CS4",
+    "CS20"
+   ]
+  },
+  {
+   "conflict": "Nano is best vs nano is wasteful",
+   "reading": "Nano is best on cost per engagement but yields about 1,100 views, and briefing and approval overhead is not in the fee. Works for seeding and UGC volume; poor for regulated or traffic-led work.",
+   "sources": [
+    "CS1"
+   ]
+  },
+  {
+   "conflict": "Mid-tier is the sweet spot vs mid-tier is worst value",
+   "reading": "Opinion vs one dataset. Unresolved; mid prices may include agency margin. The single most useful thing to test with our own prices.",
+   "sources": [
+    "CS1",
+    "CS19"
+   ]
+  },
+  {
+   "conflict": "More posts vs fatigue",
+   "reading": "Frequency helps; varied creative helps more. No field threshold.",
+   "sources": [
+    "CS11",
+    "CS12"
+   ]
+  },
+  {
+   "conflict": "Engagement benchmarks",
+   "reading": "Differ by 10x between vendors. Never compare across sources; use our own per-view rates.",
+   "sources": [
+    "CS2",
+    "CS3",
+    "CS8"
+   ]
+  }
+ ],
+ "gaps": [
+  "Tier-by-objective percentages",
+  "KSA, UAE and Egypt tier rates",
+  "Snapchat anything by tier",
+  "Click-through by tier",
+  "Deduplicated reach across many creators at current platform algorithms",
+  "Effect of creator count on outcomes (versus spend)",
+  "Posts-per-creator decay in the field",
+  "Pharma-specific creator-count benchmarks"
+ ],
+ "validation": [
+  "Unit of analysis: the tracked post, with creator size, platform, format, sector, price paid, objective, post index within creator and campaign, link clicks, views, interactions.",
+  "Use medians and show an interval. Require at least 30 posts per size by platform cell before a cell can move a default; below that show the published prior only.",
+  "Record paid vs gifted vs rate-card creators and whether posts were amplified: both change the comparison more than size does."
+ ]
+}

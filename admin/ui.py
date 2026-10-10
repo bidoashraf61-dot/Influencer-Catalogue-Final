@@ -84,10 +84,10 @@ NAV = [
 CHILDREN = {
     "/roster": [("/analysis", "Creator analysis", "an"), ("/licences", "Licences", None)],
     "/clients": [("/portal", "Client portal", None), ("/codes", "Access codes", None)],
-    "/analytics": [("/calculator", "ROI calculator", None)],
+    "/analytics": [("/calculator", "ROI calculator", None), ("/reference", "Reference", None)],
     "/settings": [("/apis", "APIs & keys", None), ("/history", "History & undo", None), ("/team", "Team & security", None)],
 }
-STAFF_ONLY = {"/apis"}          # hidden from KAMs and viewers (the server refuses them anyway)
+STAFF_ONLY = {"/apis", "/reference"}          # hidden from KAMs and viewers (the server refuses them anyway)
 
 import threading as _threading
 _role = _threading.local()

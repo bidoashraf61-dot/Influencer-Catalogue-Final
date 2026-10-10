@@ -57,6 +57,7 @@ docker compose -f /home/ubuntu/influencer-catalogue/docker-compose.yml up -d
 # admin — the code is copied from this repo, the database is created on first run
 mkdir -p /home/ubuntu/influencer-catalogue-admin/{admin,content}
 cp admin/*.py /home/ubuntu/influencer-catalogue-admin/admin/
+cp -r admin/reference /home/ubuntu/influencer-catalogue-admin/admin/   # static JSON behind the admin Reference page
 cp deploy/admin/docker-compose.yml /home/ubuntu/influencer-catalogue-admin/
 docker compose -f /home/ubuntu/influencer-catalogue-admin/docker-compose.yml up -d
 

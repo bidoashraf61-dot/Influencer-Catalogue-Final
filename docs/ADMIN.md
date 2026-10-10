@@ -582,3 +582,48 @@ Held uploads live in `admin/analysis_pending/` (not in git) and are swept after 
 - Source of the shapes: `Portal Programme/CAMPAIGN-STRUCTURE-BEST-PRACTICE-2026-10-10.md`.
 - **How many creators (v4.1)**: the client chooses the number of creators the ideal is planned for (any whole number 1 to 60; default = the selection's, the mix's or the brief's count). The same Settings card holds "How many creators a campaign usually runs" per campaign type (defaults Awareness 12-25, Engagement 15-30, Traffic 8-20, low confidence, `roi.COUNT_RANGES_DEFAULT`, setting `roi_count_ranges`); several types average their lows and highs. It is only a quiet hint beside the control, never a limit or a warning. The chosen number is saved with the estimate.
 
+
+
+## Reference (admin-only research page, branch `admin-reference`, 2026-10-11)
+
+**Insights → Reference** (`/reference`) puts the research collected on 2026-10-10 in one read-only place, so an
+admin can look a number up and see where it came from. Owners and admins only: KAMs, viewers and portal
+clients get 403 or the sign-in page, and the sidebar entry is hidden from them (`team._STAFF_ONLY_GET`,
+`ui.STAFF_ONLY`). Nothing on it can be edited and nothing on it feeds the ROI calculator.
+
+A fixed note sits on every tab: *Reference only. Vendor and published figures are estimates, not verified.
+The calculator uses only measured data (our roster, tracked posts) and the recommended structure.* Each tab
+carries a "How to read" box, the dataset's caveats and a "Last updated 2026-10-10" stamp.
+
+| Tab | What it shows | Data |
+|---|---|---|
+| Market prices | Average, cap and low per sponsored post by market (KSA, UAE, Egypt), platform and size, with kind (published or extrapolation), confidence, number of independent sources and the source chips; UGC per video, doctor and pharmacist rows, agency multiplier, asking vs paid, discounts, surcharges, seasonality, premiums, conflicts and the evidence ledger | `admin/reference/market_prices.json` |
+| International benchmarks | View rate, engagement rate, CPM, CPE, CPC and price per post by market, platform and size, each with kind (published, proxy, extrapolation, no public data) and sources; fair-value CPM ceilings; category adjustments | `admin/reference/benchmarks.json` |
+| Campaign structure | The recommended share of creators by size, creator count and posts per creator for each objective, the evidence behind them (8 findings, what is not supported, overlays, budget scaling, conflicts, gaps). Values the calculator reads are marked **In use by the ROI calculator** and show the LIVE value, so an edit in Settings (`roi_shapes`, `roi_count_ranges`) is visible next to the research value | `admin/reference/campaign_structure.json` and `roi.shapes()` / `roi.count_ranges()` |
+| Our roster | Platform x size cells with n, p25, median and p75 for engagement and view rate; cells with 30 or more creators are flagged "Used by the calculator". Computed when the page opens from `creator_analysis` through `benchmarks.py` (cached ten minutes there). Counts and percentiles only: nothing is stored, and no creator is named | live |
+| Sources | 100 sources (S1 to S31, T1 to T36, CS1 to CS33) with publisher, year, evidence type and link; search by text or exact id. `Cited` is how many figures name it | `admin/reference/sources.json` |
+
+The three research notes are separate id spaces: `S` and `T` are the benchmark and market-price sources,
+`CS` is the campaign-structure list (its S1 to S33, renamed to avoid a clash).
+
+**Public-safe by construction.** The repo is public, so the JSON holds no client or creator data: the named
+Saudi and UAE creators in the evidence ledger are reduced to "three creators" and "one named UAE creator", a
+forum reply is no longer attributed by name, and the HelloVoice rate-card arithmetic (`derived_checks`) was left
+out of `benchmarks.json`. `test_reference.py` fails if any of these names come back.
+
+**Updating the data.** The files are static; replace them from a newer research round and bump the date in each
+file's `reference.updated`. They are read once per process, so restart the admin container after copying.
+
+**Deploy.** `admin/reference/` is a folder, so the usual `cp admin/*.py` does not carry it. Copy it too, then restart:
+
+```bash
+cp -r /home/ubuntu/influencer-catalogue-src/admin/reference /home/ubuntu/influencer-catalogue-admin/admin/
+```
+
+If the folder is missing the page shows a clear error instead of failing. No database change, no new setting.
+
+**Tests.** `admin/tests/test_reference.py` (10 tests): datasets load with the expected structure and every cited
+source exists; no creator names in the shipped data; owner and admin open every tab; KAM, viewer, anonymous and a
+signed-in portal client get no page; the page is read-only; filters; benchmark kinds; the structure tab marks and
+shows the live setting; the roster tab flags 30 or more peers, names nobody and persists nothing; source search.
+The shared e2e harness (`e2e_portal.py`) now also copies `admin/reference/` into its throwaway directory.

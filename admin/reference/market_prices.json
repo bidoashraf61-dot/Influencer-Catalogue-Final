@@ -1,0 +1,2964 @@
+{
+ "meta": {
+  "generated": "2026-10-10",
+  "scope": "Market average and market cap price per sponsored deliverable, KSA / UAE / Egypt, 2025-2026",
+  "fx": {
+   "USD_SAR": 3.75,
+   "USD_AED": 3.6725,
+   "USD_EGP": 50.0,
+   "egp_note": "Interbank ~49.9 on 10 Aug 2026 [S23]; 2025 average ~50 (same band used for T17); Valors Aug 2026 quotes USD and EGP at ~50. All EGP sources converted at 50. SAR/EGP = 0.075; current approx unchanged."
+  },
+  "definitions": {
+   "low": "bottom of the common range, not a bargain outlier",
+   "average": "typical price an agency should expect to pay the CREATOR (creator-side fee) for one organic deliverable under standard usage; sits between transacted contracts (where they exist) and the middle of asking bands",
+   "cap": "top of the common asking range after removing vendor outliers; above this a client is overpaying unless it buys exclusivity, paid usage, or a celebrity premium",
+   "tiers": {
+    "nano": "<20K (sources mostly 1K-10K)",
+    "micro": "20-100K (sources 10K-50K/100K)",
+    "mid": "100-500K",
+    "macro": "500K-1M",
+    "mega": "1M+"
+   }
+  },
+  "confidence_legend": "high = 10+ independent asking figures AND contract-level data; medium = 4+ independent figures that agree within ~3x; low = <4 figures, large conflicts, or extrapolated",
+  "extrapolation_rule": "is_extrapolation=true means no direct published figure; value derived from the Instagram row via a documented ratio",
+  "agency_note": "All figures are CREATOR-SIDE fees. Client price = creator fee x1.18-1.43 (typically x1.25-1.30) before production, usage, boosting."
+ },
+ "markets": {
+  "KSA": {
+   "currency": "SAR",
+   "platforms": {
+    "instagram": {
+     "unit": "per sponsored Reel/feed post (organic, standard usage, creator-side fee)",
+     "tiers": {
+      "nano": {
+       "low": {
+        "SAR": 200,
+        "USD": 53
+       },
+       "average": {
+        "SAR": 600,
+        "USD": 160
+       },
+       "cap": {
+        "SAR": 1500,
+        "USD": 400
+       },
+       "n_independent_sources": 5,
+       "confidence": "medium",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "T3",
+        "T21",
+        "T31"
+       ],
+       "rationale": "Vendor bands span 200-3,000 (median low ~245, median high ~1,500, 7 figures); marketplace listings SAR 190-450. Avg ~0.6x asking midpoint; cap = median of vendor highs."
+      },
+      "micro": {
+       "low": {
+        "SAR": 1000,
+        "USD": 267
+       },
+       "average": {
+        "SAR": 3000,
+        "USD": 800
+       },
+       "cap": {
+        "SAR": 7500,
+        "USD": 2000
+       },
+       "n_independent_sources": 6,
+       "confidence": "medium",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "T2",
+        "T3",
+        "T21",
+        "T1"
+       ],
+       "rationale": "8 vendor bands: median low ~1,360, median high ~7,400. A named Saudi TikTok creator at 45K followers asks 2,500-3,000 [T1]. No KSA contract data; avg ~0.7x asking midpoint (UAE contracts show 0.3-0.6x but skew to expat product-swap deals)."
+      },
+      "mid": {
+       "low": {
+        "SAR": 5000,
+        "USD": 1330
+       },
+       "average": {
+        "SAR": 10000,
+        "USD": 2670
+       },
+       "cap": {
+        "SAR": 25000,
+        "USD": 6670
+       },
+       "n_independent_sources": 5,
+       "confidence": "medium",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "S2",
+        "S3",
+        "S4",
+        "S5",
+        "S6",
+        "T2",
+        "T3"
+       ],
+       "rationale": "7 vendor bands: median low ~7,500, median high ~30,000. Named-creator list prices 1M+ accounts at only 22-31K [T1], so vendor highs of 75K for 100K-1M are not credible for the 100-500K band. Cap 25,000 (Hovi/Elev8or top end)."
+      },
+      "macro": {
+       "low": {
+        "SAR": 12000,
+        "USD": 3200
+       },
+       "average": {
+        "SAR": 25000,
+        "USD": 6670
+       },
+       "cap": {
+        "SAR": 55000,
+        "USD": 14700
+       },
+       "n_independent_sources": 5,
+       "confidence": "low",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "S2",
+        "S4",
+        "S5",
+        "S6",
+        "T2",
+        "T3",
+        "T1",
+        "T28"
+       ],
+       "rationale": "Vendor bands 24,000-100,000 (Starngage up to 100K). Named 1-1.6M-follower accounts ask 22-31K (one at 6-7K) [T1]. Avg 25,000; cap 55,000 (Elev8or health top 58,500, below Hovi 75,000)."
+      },
+      "mega": {
+       "low": {
+        "SAR": 20000,
+        "USD": 5330
+       },
+       "average": {
+        "SAR": 35000,
+        "USD": 9330
+       },
+       "cap": {
+        "SAR": 100000,
+        "USD": 26700
+       },
+       "n_independent_sources": 5,
+       "confidence": "low",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "S2",
+        "S4",
+        "S5",
+        "T3",
+        "T1",
+        "T28",
+        "T31"
+       ],
+       "rationale": "CONFLICT: vendors 75K to 500K+ vs named-creator list 19-31K for 1.4-5.8M followers [T1] and modelled Scrumball SAR ~17-27K at 3M TikTok followers [T28]. Avg/cap are a triangulation, low confidence."
+      }
+     }
+    },
+    "tiktok": {
+     "unit": "per sponsored TikTok video",
+     "tiers": {
+      "nano": {
+       "low": {
+        "SAR": 150,
+        "USD": 40
+       },
+       "average": {
+        "SAR": 400,
+        "USD": 107
+       },
+       "cap": {
+        "SAR": 900,
+        "USD": 240
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "S3",
+        "T21",
+        "T7"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "micro": {
+       "low": {
+        "SAR": 800,
+        "USD": 213
+       },
+       "average": {
+        "SAR": 2200,
+        "USD": 587
+       },
+       "cap": {
+        "SAR": 6000,
+        "USD": 1600
+       },
+       "n_independent_sources": 4,
+       "confidence": "medium",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "S3",
+        "T1",
+        "T21",
+        "T28"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "mid": {
+       "low": {
+        "SAR": 3500,
+        "USD": 933
+       },
+       "average": {
+        "SAR": 7000,
+        "USD": 1870
+       },
+       "cap": {
+        "SAR": 20000,
+        "USD": 5330
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "S2",
+        "T21",
+        "T28"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "macro": {
+       "low": {
+        "SAR": 9000,
+        "USD": 2400
+       },
+       "average": {
+        "SAR": 17000,
+        "USD": 4530
+       },
+       "cap": {
+        "SAR": 45000,
+        "USD": 12000
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "S2",
+        "T1",
+        "T28"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "mega": {
+       "low": {
+        "SAR": 12000,
+        "USD": 3200
+       },
+       "average": {
+        "SAR": 22000,
+        "USD": 5870
+       },
+       "cap": {
+        "SAR": 60000,
+        "USD": 16000
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T1",
+        "T28"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      }
+     }
+    },
+    "snapchat": {
+     "unit": "per single snap / 24h story placement",
+     "tiers": {
+      "nano": {
+       "low": {
+        "SAR": 250,
+        "USD": 67
+       },
+       "average": {
+        "SAR": 700,
+        "USD": 187
+       },
+       "cap": {
+        "SAR": 1500,
+        "USD": 400
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T2",
+        "S2",
+        "S5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "micro": {
+       "low": {
+        "SAR": 900,
+        "USD": 240
+       },
+       "average": {
+        "SAR": 2000,
+        "USD": 533
+       },
+       "cap": {
+        "SAR": 5000,
+        "USD": 1330
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T2",
+        "S2",
+        "S5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "mid": {
+       "low": {
+        "SAR": 3000,
+        "USD": 800
+       },
+       "average": {
+        "SAR": 8000,
+        "USD": 2130
+       },
+       "cap": {
+        "SAR": 20000,
+        "USD": 5330
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T2",
+        "S2",
+        "S5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "macro": {
+       "low": {
+        "SAR": 20000,
+        "USD": 5330
+       },
+       "average": {
+        "SAR": 35000,
+        "USD": 9330
+       },
+       "cap": {
+        "SAR": 90000,
+        "USD": 24000
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T2",
+        "S2",
+        "S5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "mega": {
+       "low": {
+        "SAR": 50000,
+        "USD": 13300
+       },
+       "average": {
+        "SAR": 90000,
+        "USD": 24000
+       },
+       "cap": {
+        "SAR": 200000,
+        "USD": 53300
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T2",
+        "S2",
+        "S5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      }
+     }
+    },
+    "youtube": {
+     "unit": "per 60s integration / Short (dedicated long-form video is ~2-3x)",
+     "tiers": {
+      "nano": {
+       "low": {
+        "SAR": 600,
+        "USD": 160
+       },
+       "average": {
+        "SAR": 1000,
+        "USD": 267
+       },
+       "cap": {
+        "SAR": 2500,
+        "USD": 667
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T1",
+        "T5",
+        "T11",
+        "S25"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "micro": {
+       "low": {
+        "SAR": 2000,
+        "USD": 533
+       },
+       "average": {
+        "SAR": 3500,
+        "USD": 933
+       },
+       "cap": {
+        "SAR": 7500,
+        "USD": 2000
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T1",
+        "T5",
+        "T11",
+        "S25"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "mid": {
+       "low": {
+        "SAR": 6000,
+        "USD": 1600
+       },
+       "average": {
+        "SAR": 10000,
+        "USD": 2670
+       },
+       "cap": {
+        "SAR": 20000,
+        "USD": 5330
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T1",
+        "T5",
+        "T11",
+        "S25"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "macro": {
+       "low": {
+        "SAR": 15000,
+        "USD": 4000
+       },
+       "average": {
+        "SAR": 25000,
+        "USD": 6670
+       },
+       "cap": {
+        "SAR": 50000,
+        "USD": 13300
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T1",
+        "T5",
+        "T11",
+        "S25"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "mega": {
+       "low": {
+        "SAR": 30000,
+        "USD": 8000
+       },
+       "average": {
+        "SAR": 50000,
+        "USD": 13300
+       },
+       "cap": {
+        "SAR": 120000,
+        "USD": 32000
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T1",
+        "T5",
+        "T11",
+        "S25"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      }
+     }
+    }
+   }
+  },
+  "UAE": {
+   "currency": "AED",
+   "platforms": {
+    "instagram": {
+     "unit": "per sponsored Reel/feed post (organic, standard usage, creator-side fee)",
+     "tiers": {
+      "nano": {
+       "low": {
+        "AED": 200,
+        "SAR": 204,
+        "USD": 54
+       },
+       "average": {
+        "AED": 600,
+        "SAR": 613,
+        "USD": 163
+       },
+       "cap": {
+        "AED": 1500,
+        "SAR": 1530,
+        "USD": 408
+       },
+       "n_independent_sources": 12,
+       "confidence": "medium",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T4",
+        "T5",
+        "T6",
+        "T7",
+        "T8",
+        "T9",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "S7",
+        "T21"
+       ],
+       "rationale": "12 asking figures: median low ~400, median high ~2,000; Yamammi contracts median 500 (100-800, n=40). Avg 600 sits just above transacted median; cap 1,500 (top of common band)."
+      },
+      "micro": {
+       "low": {
+        "AED": 800,
+        "SAR": 817,
+        "USD": 218
+       },
+       "average": {
+        "AED": 2000,
+        "SAR": 2040,
+        "USD": 545
+       },
+       "cap": {
+        "AED": 6500,
+        "SAR": 6640,
+        "USD": 1770
+       },
+       "n_independent_sources": 13,
+       "confidence": "high",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T4",
+        "T5",
+        "T6",
+        "T7",
+        "T8",
+        "T9",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "S7",
+        "T16",
+        "T21"
+       ],
+       "rationale": "12 asking bands: median low 1,500, median high ~6,500. Contracts: median 1,000 (800-2,500, n=190 of 350). Avg 2,000 balances contracts (skewed to product-for-post expat creators) and ~0.5x asking midpoint; cap 6,500 = median asking high."
+      },
+      "mid": {
+       "low": {
+        "AED": 2000,
+        "SAR": 2040,
+        "USD": 545
+       },
+       "average": {
+        "AED": 6000,
+        "SAR": 6130,
+        "USD": 1630
+       },
+       "cap": {
+        "AED": 25000,
+        "SAR": 25500,
+        "USD": 6810
+       },
+       "n_independent_sources": 11,
+       "confidence": "medium",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T4",
+        "T5",
+        "T7",
+        "T8",
+        "T9",
+        "T10",
+        "T11",
+        "T12",
+        "T13",
+        "T14",
+        "S7",
+        "T30"
+       ],
+       "rationale": "10 asking bands: median low ~7,500, median high ~30,000 (100K-1M bands inflate highs). Contracts 50-250K: median 2,000 (1,000-4,500, n=80). Avg 6,000 and cap 25,000 chosen between the two; contract gap is 3-4x."
+      },
+      "macro": {
+       "low": {
+        "AED": 5000,
+        "SAR": 5110,
+        "USD": 1360
+       },
+       "average": {
+        "AED": 15000,
+        "SAR": 15300,
+        "USD": 4080
+       },
+       "cap": {
+        "AED": 45000,
+        "SAR": 45900,
+        "USD": 12300
+       },
+       "n_independent_sources": 9,
+       "confidence": "medium",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T4",
+        "T5",
+        "T7",
+        "T9",
+        "T10",
+        "T11",
+        "T13",
+        "T14",
+        "S7",
+        "T26"
+       ],
+       "rationale": "Asking: lows 9-35K, highs 25-100K. Contracts 250K-1M median 2,500 (n=30) look like small-ticket deals; ignored for avg but kept as low. Avg 15,000 = ~0.6x asking midpoint; cap 45,000."
+      },
+      "mega": {
+       "low": {
+        "AED": 10000,
+        "SAR": 10200,
+        "USD": 2720
+       },
+       "average": {
+        "AED": 35000,
+        "SAR": 35700,
+        "USD": 9530
+       },
+       "cap": {
+        "AED": 120000,
+        "SAR": 122500,
+        "USD": 32700
+       },
+       "n_independent_sources": 6,
+       "confidence": "low",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T4",
+        "T9",
+        "T11",
+        "T13",
+        "T14",
+        "T15",
+        "T26"
+       ],
+       "rationale": "Asking 50K-250K+, celebrity 75K-250K. Contracts n=10 median 10,000 (5-20K). Avg 35,000 weights both; cap 120,000. Low confidence (6 figures, thin n)."
+      }
+     }
+    },
+    "tiktok": {
+     "unit": "per sponsored TikTok video",
+     "tiers": {
+      "nano": {
+       "low": {
+        "AED": 150,
+        "SAR": 153,
+        "USD": 41
+       },
+       "average": {
+        "AED": 400,
+        "SAR": 408,
+        "USD": 109
+       },
+       "cap": {
+        "AED": 1200,
+        "SAR": 1230,
+        "USD": 327
+       },
+       "n_independent_sources": 5,
+       "confidence": "medium",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T5",
+        "T6",
+        "T7",
+        "T13",
+        "T11",
+        "T14"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "micro": {
+       "low": {
+        "AED": 600,
+        "SAR": 613,
+        "USD": 163
+       },
+       "average": {
+        "AED": 1400,
+        "SAR": 1430,
+        "USD": 381
+       },
+       "cap": {
+        "AED": 5000,
+        "SAR": 5110,
+        "USD": 1360
+       },
+       "n_independent_sources": 6,
+       "confidence": "medium",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T5",
+        "T6",
+        "T7",
+        "T13",
+        "T11",
+        "S7",
+        "T26"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "mid": {
+       "low": {
+        "AED": 1500,
+        "SAR": 1530,
+        "USD": 408
+       },
+       "average": {
+        "AED": 4200,
+        "SAR": 4290,
+        "USD": 1140
+       },
+       "cap": {
+        "AED": 15000,
+        "SAR": 15300,
+        "USD": 4080
+       },
+       "n_independent_sources": 4,
+       "confidence": "medium",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T5",
+        "T7",
+        "T11",
+        "T13",
+        "S7"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "macro": {
+       "low": {
+        "AED": 3500,
+        "SAR": 3570,
+        "USD": 953
+       },
+       "average": {
+        "AED": 10500,
+        "SAR": 10700,
+        "USD": 2860
+       },
+       "cap": {
+        "AED": 35000,
+        "SAR": 35700,
+        "USD": 9530
+       },
+       "n_independent_sources": 4,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T5",
+        "T7",
+        "T11",
+        "T13",
+        "S7"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "mega": {
+       "low": {
+        "AED": 8000,
+        "SAR": 8170,
+        "USD": 2180
+       },
+       "average": {
+        "AED": 25000,
+        "SAR": 25500,
+        "USD": 6810
+       },
+       "cap": {
+        "AED": 80000,
+        "SAR": 81700,
+        "USD": 21800
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T7",
+        "T13",
+        "T11"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      }
+     }
+    },
+    "snapchat": {
+     "unit": "per single snap / 24h story placement",
+     "tiers": {
+      "nano": {
+       "low": {
+        "AED": 200,
+        "SAR": 204,
+        "USD": 54
+       },
+       "average": {
+        "AED": 400,
+        "SAR": 408,
+        "USD": 109
+       },
+       "cap": {
+        "AED": 1000,
+        "SAR": 1020,
+        "USD": 272
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T6",
+        "T32",
+        "T5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "micro": {
+       "low": {
+        "AED": 400,
+        "SAR": 408,
+        "USD": 109
+       },
+       "average": {
+        "AED": 800,
+        "SAR": 817,
+        "USD": 218
+       },
+       "cap": {
+        "AED": 2500,
+        "SAR": 2550,
+        "USD": 681
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T6",
+        "T32",
+        "T5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "mid": {
+       "low": {
+        "AED": 1500,
+        "SAR": 1530,
+        "USD": 408
+       },
+       "average": {
+        "AED": 3000,
+        "SAR": 3060,
+        "USD": 817
+       },
+       "cap": {
+        "AED": 8000,
+        "SAR": 8170,
+        "USD": 2180
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T6",
+        "T32",
+        "T5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "macro": {
+       "low": {
+        "AED": 4000,
+        "SAR": 4080,
+        "USD": 1090
+       },
+       "average": {
+        "AED": 8000,
+        "SAR": 8170,
+        "USD": 2180
+       },
+       "cap": {
+        "AED": 20000,
+        "SAR": 20400,
+        "USD": 5450
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T6",
+        "T32",
+        "T5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "mega": {
+       "low": {
+        "AED": 10000,
+        "SAR": 10200,
+        "USD": 2720
+       },
+       "average": {
+        "AED": 25000,
+        "SAR": 25500,
+        "USD": 6810
+       },
+       "cap": {
+        "AED": 60000,
+        "SAR": 61300,
+        "USD": 16300
+       },
+       "n_independent_sources": 2,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T6",
+        "T32",
+        "T5"
+       ],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      }
+     }
+    },
+    "youtube": {
+     "unit": "per 60s integration / Short (dedicated long-form video is ~2-3x)",
+     "tiers": {
+      "nano": {
+       "low": {
+        "AED": 200,
+        "SAR": 204,
+        "USD": 54
+       },
+       "average": {
+        "AED": 500,
+        "SAR": 511,
+        "USD": 136
+       },
+       "cap": {
+        "AED": 1000,
+        "SAR": 1020,
+        "USD": 272
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T5",
+        "T6",
+        "T11"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "micro": {
+       "low": {
+        "AED": 1000,
+        "SAR": 1020,
+        "USD": 272
+       },
+       "average": {
+        "AED": 3000,
+        "SAR": 3060,
+        "USD": 817
+       },
+       "cap": {
+        "AED": 6500,
+        "SAR": 6640,
+        "USD": 1770
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T5",
+        "T6",
+        "T11"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "mid": {
+       "low": {
+        "AED": 4000,
+        "SAR": 4080,
+        "USD": 1090
+       },
+       "average": {
+        "AED": 9000,
+        "SAR": 9190,
+        "USD": 2450
+       },
+       "cap": {
+        "AED": 18000,
+        "SAR": 18400,
+        "USD": 4900
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T5",
+        "T6",
+        "T11"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "macro": {
+       "low": {
+        "AED": 10000,
+        "SAR": 10200,
+        "USD": 2720
+       },
+       "average": {
+        "AED": 28000,
+        "SAR": 28600,
+        "USD": 7620
+       },
+       "cap": {
+        "AED": 55000,
+        "SAR": 56200,
+        "USD": 15000
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T5",
+        "T6",
+        "T11"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "mega": {
+       "low": {
+        "AED": 25000,
+        "SAR": 25500,
+        "USD": 6810
+       },
+       "average": {
+        "AED": 70000,
+        "SAR": 71500,
+        "USD": 19100
+       },
+       "cap": {
+        "AED": 150000,
+        "SAR": 153200,
+        "USD": 40800
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T5",
+        "T6",
+        "T11"
+       ],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      }
+     }
+    }
+   }
+  },
+  "Egypt": {
+   "currency": "EGP",
+   "platforms": {
+    "instagram": {
+     "unit": "per sponsored Reel/feed post (organic, standard usage, creator-side fee)",
+     "tiers": {
+      "nano": {
+       "low": {
+        "EGP": 500,
+        "SAR": 38,
+        "USD": 10
+       },
+       "average": {
+        "EGP": 2000,
+        "SAR": 150,
+        "USD": 40
+       },
+       "cap": {
+        "EGP": 5000,
+        "SAR": 375,
+        "USD": 100
+       },
+       "n_independent_sources": 4,
+       "confidence": "medium",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T17",
+        "T18",
+        "T19",
+        "S8",
+        "T21"
+       ],
+       "rationale": "EGP-native sources 500-5,000 (Engaz 1,000-5,000; Brands&Creators 500-2,000); Collabstr Cairo $50 (~EGP 2,500). USD vendors ($50-200 = EGP 2,500-10,000) sit higher. Avg 2,000, cap 5,000."
+      },
+      "micro": {
+       "low": {
+        "EGP": 2000,
+        "SAR": 150,
+        "USD": 40
+       },
+       "average": {
+        "EGP": 8000,
+        "SAR": 600,
+        "USD": 160
+       },
+       "cap": {
+        "EGP": 30000,
+        "SAR": 2250,
+        "USD": 600
+       },
+       "n_independent_sources": 4,
+       "confidence": "medium",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T17",
+        "T18",
+        "T19",
+        "S8",
+        "T21"
+       ],
+       "rationale": "EGP-native 2,000-20,000 (T17 5,000-20,000; T18 2,000-10,000); Collabstr Cairo 27-55K followers $50-100 (EGP 2,500-5,000); Valors $200-800 (EGP 10-40K) and Elev8or (12-134K) far higher. Avg 8,000, cap 30,000 (USD-vendor bottom)."
+      },
+      "mid": {
+       "low": {
+        "EGP": 10000,
+        "SAR": 750,
+        "USD": 200
+       },
+       "average": {
+        "EGP": 25000,
+        "SAR": 1880,
+        "USD": 500
+       },
+       "cap": {
+        "EGP": 90000,
+        "SAR": 6750,
+        "USD": 1800
+       },
+       "n_independent_sources": 4,
+       "confidence": "low",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T17",
+        "T18",
+        "T19",
+        "S8",
+        "T21"
+       ],
+       "rationale": "EGP-native 'macro 100K-1M' 10,000-60,000 [T17,T18]; Valors $800-3,000 (EGP 40-150K); Elev8or 74-445K. Avg 25,000, cap 90,000. Few direct 100-500K observations."
+      },
+      "macro": {
+       "low": {
+        "EGP": 25000,
+        "SAR": 1880,
+        "USD": 500
+       },
+       "average": {
+        "EGP": 60000,
+        "SAR": 4500,
+        "USD": 1200
+       },
+       "cap": {
+        "EGP": 200000,
+        "SAR": 15000,
+        "USD": 4000
+       },
+       "n_independent_sources": 4,
+       "confidence": "low",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T17",
+        "T18",
+        "T19",
+        "S8",
+        "T21"
+       ],
+       "rationale": "EGP-native 20,000-60,000 (T17) / 10,000-50,000+ (T18); Valors $3-10K (EGP 150-500K); Collabstr 666K IG listing $300 (EGP 15,000, a floor). Avg 60,000, cap 200,000."
+      },
+      "mega": {
+       "low": {
+        "EGP": 60000,
+        "SAR": 4500,
+        "USD": 1200
+       },
+       "average": {
+        "EGP": 120000,
+        "SAR": 9000,
+        "USD": 2400
+       },
+       "cap": {
+        "EGP": 500000,
+        "SAR": 37500,
+        "USD": 10000
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "triangulated from published ranges (+ transacted contracts where noted)",
+       "is_extrapolation": false,
+       "sources": [
+        "T17",
+        "T19",
+        "S8"
+       ],
+       "rationale": "T17 50,000-150,000; Valors celebrity $10-40K+ (EGP 500K-2M). Avg 120,000, cap 500,000. No transacted data; low confidence."
+      }
+     }
+    },
+    "tiktok": {
+     "unit": "per sponsored TikTok video",
+     "tiers": {
+      "nano": {
+       "low": {
+        "EGP": 400,
+        "SAR": 30,
+        "USD": 8
+       },
+       "average": {
+        "EGP": 1500,
+        "SAR": 112,
+        "USD": 30
+       },
+       "cap": {
+        "EGP": 4000,
+        "SAR": 300,
+        "USD": 80
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T17",
+        "T18",
+        "T19",
+        "T21"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "micro": {
+       "low": {
+        "EGP": 1500,
+        "SAR": 112,
+        "USD": 30
+       },
+       "average": {
+        "EGP": 6000,
+        "SAR": 450,
+        "USD": 120
+       },
+       "cap": {
+        "EGP": 22000,
+        "SAR": 1650,
+        "USD": 440
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T17",
+        "T18",
+        "T19",
+        "T21"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "mid": {
+       "low": {
+        "EGP": 7500,
+        "SAR": 562,
+        "USD": 150
+       },
+       "average": {
+        "EGP": 19000,
+        "SAR": 1420,
+        "USD": 380
+       },
+       "cap": {
+        "EGP": 68000,
+        "SAR": 5100,
+        "USD": 1360
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T17",
+        "T18",
+        "T19",
+        "T21"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "macro": {
+       "low": {
+        "EGP": 19000,
+        "SAR": 1420,
+        "USD": 380
+       },
+       "average": {
+        "EGP": 45000,
+        "SAR": 3380,
+        "USD": 900
+       },
+       "cap": {
+        "EGP": 150000,
+        "SAR": 11200,
+        "USD": 3000
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T17",
+        "T18",
+        "T19",
+        "T21"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      },
+      "mega": {
+       "low": {
+        "EGP": 45000,
+        "SAR": 3380,
+        "USD": 900
+       },
+       "average": {
+        "EGP": 90000,
+        "SAR": 6750,
+        "USD": 1800
+       },
+       "cap": {
+        "EGP": 375000,
+        "SAR": 28100,
+        "USD": 7500
+       },
+       "n_independent_sources": 3,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [
+        "T17",
+        "T18",
+        "T19",
+        "T21"
+       ],
+       "rationale": "EXTRAPOLATION. TikTok priced 20-40% below Instagram in 5 independent UAE/KSA sources (Starngage nano 0.6x, micro 0.6-0.8x; Yamammi 0.55-0.6x; Al Rwyt 0.8x); one outlier says +15-20% [T12]. Basis: KSA 0.70x / UAE 0.70x / Egypt 0.75x of Instagram average."
+      }
+     }
+    },
+    "snapchat": {
+     "unit": "per single snap / 24h story placement",
+     "tiers": {
+      "nano": {
+       "low": {
+        "EGP": 300,
+        "SAR": 22,
+        "USD": 6
+       },
+       "average": {
+        "EGP": 1200,
+        "SAR": 90,
+        "USD": 24
+       },
+       "cap": {
+        "EGP": 3000,
+        "SAR": 225,
+        "USD": 60
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "micro": {
+       "low": {
+        "EGP": 1200,
+        "SAR": 90,
+        "USD": 24
+       },
+       "average": {
+        "EGP": 4800,
+        "SAR": 360,
+        "USD": 96
+       },
+       "cap": {
+        "EGP": 18000,
+        "SAR": 1350,
+        "USD": 360
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "mid": {
+       "low": {
+        "EGP": 6000,
+        "SAR": 450,
+        "USD": 120
+       },
+       "average": {
+        "EGP": 15000,
+        "SAR": 1120,
+        "USD": 300
+       },
+       "cap": {
+        "EGP": 54000,
+        "SAR": 4050,
+        "USD": 1080
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "macro": {
+       "low": {
+        "EGP": 15000,
+        "SAR": 1120,
+        "USD": 300
+       },
+       "average": {
+        "EGP": 36000,
+        "SAR": 2700,
+        "USD": 720
+       },
+       "cap": {
+        "EGP": 120000,
+        "SAR": 9000,
+        "USD": 2400
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      },
+      "mega": {
+       "low": {
+        "EGP": 36000,
+        "SAR": 2700,
+        "USD": 720
+       },
+       "average": {
+        "EGP": 72000,
+        "SAR": 5400,
+        "USD": 1440
+       },
+       "cap": {
+        "EGP": 300000,
+        "SAR": 22500,
+        "USD": 6000
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. Snapchat KSA taken from Miqwal single-snap bands (10-50K reach 975-3,000; 50-200K 3,000-9,938; 200-500K 9,938-24,938; 500K+ 24,938-99,750+) which conflict with IMH Stories (3-5x lower). UAE from Tikit Snapchat 200-1,000 / 2,000-10,000+. Egypt: no evidence; scaled from Egypt IG. Basis: KSA: Miqwal single-snap bands [T2]; UAE: IG-Story-equivalent [T6,T5]; Egypt 0.6x IG."
+      }
+     }
+    },
+    "youtube": {
+     "unit": "per 60s integration / Short (dedicated long-form video is ~2-3x)",
+     "tiers": {
+      "nano": {
+       "low": {
+        "EGP": 800,
+        "SAR": 60,
+        "USD": 16
+       },
+       "average": {
+        "EGP": 3200,
+        "SAR": 240,
+        "USD": 64
+       },
+       "cap": {
+        "EGP": 7500,
+        "SAR": 562,
+        "USD": 150
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "micro": {
+       "low": {
+        "EGP": 3200,
+        "SAR": 240,
+        "USD": 64
+       },
+       "average": {
+        "EGP": 12800,
+        "SAR": 960,
+        "USD": 256
+       },
+       "cap": {
+        "EGP": 45000,
+        "SAR": 3380,
+        "USD": 900
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "mid": {
+       "low": {
+        "EGP": 16000,
+        "SAR": 1200,
+        "USD": 320
+       },
+       "average": {
+        "EGP": 40000,
+        "SAR": 3000,
+        "USD": 800
+       },
+       "cap": {
+        "EGP": 135000,
+        "SAR": 10100,
+        "USD": 2700
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "macro": {
+       "low": {
+        "EGP": 40000,
+        "SAR": 3000,
+        "USD": 800
+       },
+       "average": {
+        "EGP": 96000,
+        "SAR": 7200,
+        "USD": 1920
+       },
+       "cap": {
+        "EGP": 300000,
+        "SAR": 22500,
+        "USD": 6000
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      },
+      "mega": {
+       "low": {
+        "EGP": 96000,
+        "SAR": 7200,
+        "USD": 1920
+       },
+       "average": {
+        "EGP": 190000,
+        "SAR": 14200,
+        "USD": 3800
+       },
+       "cap": {
+        "EGP": 750000,
+        "SAR": 56200,
+        "USD": 15000
+       },
+       "n_independent_sources": 0,
+       "confidence": "low",
+       "basis": "extrapolation (labelled) from Instagram anchor and/or thin direct evidence",
+       "is_extrapolation": true,
+       "sources": [],
+       "rationale": "EXTRAPOLATION. From Yamammi UAE format ratios and Tikit; KSA anchored by named channels (600K subs asks 14-24.5K; 5.76M subs 19-29K [T1]); Egypt scaled from Egypt IG. Basis: integration/Short ~1.6x IG Reel (Yamammi: Shorts 0.7-0.9x, 60s integration ~1.6x, dedicated ~3x)."
+      }
+     }
+    }
+   }
+  }
+ },
+ "hcp_rows_extrapolated": {
+  "KSA": {
+   "instagram_micro": {
+    "low": {
+     "SAR": 1300,
+     "USD": 347
+    },
+    "average": {
+     "SAR": 4500,
+     "USD": 1200
+    },
+    "cap": {
+     "SAR": 15000,
+     "USD": 4000
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   },
+   "instagram_mid": {
+    "low": {
+     "SAR": 6500,
+     "USD": 1730
+    },
+    "average": {
+     "SAR": 15000,
+     "USD": 4000
+    },
+    "cap": {
+     "SAR": 50000,
+     "USD": 13300
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   },
+   "tiktok_micro": {
+    "low": {
+     "SAR": 1040,
+     "USD": 277
+    },
+    "average": {
+     "SAR": 3300,
+     "USD": 880
+    },
+    "cap": {
+     "SAR": 12000,
+     "USD": 3200
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   },
+   "tiktok_mid": {
+    "low": {
+     "SAR": 4550,
+     "USD": 1210
+    },
+    "average": {
+     "SAR": 10500,
+     "USD": 2800
+    },
+    "cap": {
+     "SAR": 40000,
+     "USD": 10700
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   }
+  },
+  "UAE": {
+   "instagram_micro": {
+    "low": {
+     "AED": 1040,
+     "SAR": 1060,
+     "USD": 283
+    },
+    "average": {
+     "AED": 3000,
+     "SAR": 3060,
+     "USD": 817
+    },
+    "cap": {
+     "AED": 13000,
+     "SAR": 13300,
+     "USD": 3540
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   },
+   "instagram_mid": {
+    "low": {
+     "AED": 2600,
+     "SAR": 2650,
+     "USD": 708
+    },
+    "average": {
+     "AED": 9000,
+     "SAR": 9190,
+     "USD": 2450
+    },
+    "cap": {
+     "AED": 50000,
+     "SAR": 51100,
+     "USD": 13600
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   },
+   "tiktok_micro": {
+    "low": {
+     "AED": 780,
+     "SAR": 796,
+     "USD": 212
+    },
+    "average": {
+     "AED": 2100,
+     "SAR": 2140,
+     "USD": 572
+    },
+    "cap": {
+     "AED": 10000,
+     "SAR": 10200,
+     "USD": 2720
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   },
+   "tiktok_mid": {
+    "low": {
+     "AED": 1950,
+     "SAR": 1990,
+     "USD": 531
+    },
+    "average": {
+     "AED": 6300,
+     "SAR": 6430,
+     "USD": 1720
+    },
+    "cap": {
+     "AED": 30000,
+     "SAR": 30600,
+     "USD": 8170
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   }
+  },
+  "Egypt": {
+   "instagram_micro": {
+    "low": {
+     "EGP": 2600,
+     "SAR": 195,
+     "USD": 52
+    },
+    "average": {
+     "EGP": 12000,
+     "SAR": 900,
+     "USD": 240
+    },
+    "cap": {
+     "EGP": 60000,
+     "SAR": 4500,
+     "USD": 1200
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   },
+   "instagram_mid": {
+    "low": {
+     "EGP": 13000,
+     "SAR": 975,
+     "USD": 260
+    },
+    "average": {
+     "EGP": 37500,
+     "SAR": 2810,
+     "USD": 750
+    },
+    "cap": {
+     "EGP": 180000,
+     "SAR": 13500,
+     "USD": 3600
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   },
+   "tiktok_micro": {
+    "low": {
+     "EGP": 1950,
+     "SAR": 146,
+     "USD": 39
+    },
+    "average": {
+     "EGP": 9000,
+     "SAR": 675,
+     "USD": 180
+    },
+    "cap": {
+     "EGP": 44000,
+     "SAR": 3300,
+     "USD": 880
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   },
+   "tiktok_mid": {
+    "low": {
+     "EGP": 9750,
+     "SAR": 731,
+     "USD": 195
+    },
+    "average": {
+     "EGP": 28500,
+     "SAR": 2140,
+     "USD": 570
+    },
+    "cap": {
+     "EGP": 136000,
+     "SAR": 10200,
+     "USD": 2720
+    },
+    "confidence": "low",
+    "is_extrapolation": true,
+    "sources": [
+     "T25",
+     "S6",
+     "S7",
+     "S8"
+    ],
+    "rationale": "Multiplier on this market's general creator row: 1.3x low (Elev8or health vs lifestyle/entertainment +8% to +30% across Riyadh/UAE/Cairo), 1.5x average (InfluencerFee HCP vs lifestyle ~1.67x US; 'credentialed 30-80%'), 2.0x cap. No MENA doctor price list exists in open sources."
+   }
+  }
+ },
+ "ugc_per_deliverable": {
+  "KSA": {
+   "unit": "SAR per finished UGC video, no organic post on creator's channel, 30-60 days paid-usage licence or Spark code",
+   "low": 150,
+   "average": 600,
+   "cap": 1500,
+   "currency": "SAR",
+   "evidence": [
+    "T22: direct-DM UGC deals SAR 300-1,500 per video (25 Jul 2026)",
+    "T23: platform minimum SAR 150 per video, +15% commission",
+    "T35: freelance briefs from USD 25-50 (SAR ~95-190)",
+    "T21: Collabstr UGC listings Riyadh/Jeddah USD 50, 130, 300 (SAR 190-1,125)",
+    "T24: global UGC median ~USD 175 (SAR ~650), usage +30-50%"
+   ],
+   "n": 5,
+   "confidence": "medium",
+   "low_SAR": 150,
+   "low_USD": 40,
+   "average_SAR": 600,
+   "average_USD": 160,
+   "cap_SAR": 1500,
+   "cap_USD": 400
+  },
+  "UAE": {
+   "unit": "AED per UGC Reel, ad-only (no organic post)",
+   "low": 300,
+   "average": 800,
+   "cap": 2500,
+   "currency": "AED",
+   "evidence": [
+    "T4: 1 UGC Reel, no organic post = AED 800 flat (n=79 contracts)",
+    "T4: Reel + 2-3 Stories with organic post AED 1,000-2,500 (n=169)",
+    "T4: min 4 Stories event-based AED 300-600 (n=62)",
+    "T21: Collabstr Dubai UGC listings USD 100",
+    "T24: global UGC USD 150-300"
+   ],
+   "n": 4,
+   "confidence": "medium",
+   "low_SAR": 306,
+   "low_USD": 82,
+   "average_SAR": 817,
+   "average_USD": 218,
+   "cap_SAR": 2550,
+   "cap_USD": 681
+  },
+  "Egypt": {
+   "unit": "EGP per UGC video, no organic post",
+   "low": 500,
+   "average": 1500,
+   "cap": 5000,
+   "currency": "EGP",
+   "evidence": [
+    "T35: Khamsat Egyptian UGC video from USD 25 (EGP ~1,250)",
+    "T21: Collabstr Cairo UGC USD 50 (EGP ~2,500)",
+    "kfagency (Arabic guide, 2026): simple reel by freelancer EGP 200-800 (production only, via search summary)",
+    "Extrapolation: cap ~USD 100 = EGP 5,000"
+   ],
+   "n": 3,
+   "confidence": "low",
+   "low_SAR": 38,
+   "low_USD": 10,
+   "average_SAR": 112,
+   "average_USD": 30,
+   "cap_SAR": 375,
+   "cap_USD": 100
+  }
+ },
+ "agency_markup": {
+  "creator_to_client_multiplier": {
+   "typical": 1.27,
+   "low": 1.18,
+   "high": 1.43,
+   "logic": "Agency fee stated as 15-30% of total spend (T16, T30) => creator fee = 70-85% of spend => multiplier 1/(1-x) = 1.18-1.43; stated as 15-25% on top (T11, T12, T33) => 1.15-1.25. Midpoint 1.27.",
+   "evidence": [
+    "T11 Dreamize: agency management and negotiation fee 15-25% of campaign spend; agencies 'often mark up creator fees without disclosing'",
+    "T12 Influencer.vip: agency management fee 15-25% on top of base rate; usage-rights agency fee up to +30%",
+    "T16 Yamammi: agency fees 15-30% of total spend or flat project fee",
+    "T30 Boomerang UAE: commission 15-30% of total UAE influencer spend",
+    "T33 Influentials/ainfluencer: 20-30% margin / 15-25% of creator spend (Dubai guide)",
+    "T34 Mad Influence: 25-30% margin on ~USD 100K/month tickets (self-reported, old)",
+    "T23 UGCeer: +15% commission on UGC creator price",
+    "T4 Yamammi: creator fees are 40-60% of all-in campaign budget (all-in includes production, whitelisting, management) => all-in multiplier 1.7-2.5x"
+   ],
+   "confidence": "medium (8 statements, all vendor-side, agree on 15-30%)"
+  },
+  "all_in_multiplier_incl_production_usage": {
+   "typical": 2.0,
+   "low": 1.7,
+   "high": 2.5,
+   "source": "T4"
+  }
+ },
+ "asking_vs_paid": {
+  "uae_contract_vs_rate_card": {
+   "micro_10_50K": "rate cards AED 1,500-8,000 (median band ~1,500-6,500) vs contract median AED 1,000 (800-2,500, n=190) => paid ~0.3x asking mid",
+   "mid_50_250K": "rate cards ~7,500-30,000 vs contract median 2,000 (1,000-4,500, n=80) => ~0.15-0.25x",
+   "macro_250K_1M": "rate cards 15,000-45,000 vs contract median 2,500 (n=30) => ~0.1x (probable small-ticket event/product deals)",
+   "slope": "rate cards imply ~10x fee jump from 20K to 250K followers; contracts show ~2.5x (AED 1,000 to 2,500) [T4]",
+   "source": "T4",
+   "caveat": "vendor dataset, unaudited, 26% MENA-national creators, many product-or-experience-plus-cash deals"
+  },
+  "discount_stack": {
+   "retainer_3_6_months": "15-25% off per-post [T8,T12,T16]",
+   "multi_post_bundle": "15-30% off [T12,T16,T6 20%]",
+   "product_or_experience_in_kind": "30-50% less than cash-only [T4]",
+   "creators_quote_agencies_below_direct": "15-30% below cold brand outreach [T9]",
+   "hybrid": "flat fee + 10-15% performance commission [T12]",
+   "monthly_retainer_cost_per_view": "~1/3 of one-off booking [T4]"
+  },
+  "surcharges": {
+   "paid_usage_whitelisting": "+25-100% (T8 ~2x for 30-90 days; T12 agency fee up to +30%; T5 AED 1,500-2,500 on AED 5,000 Reel; Starngage/Catchers KSA +20-50%; Influee UGC +30-50%)",
+   "exclusivity": "+20-50% (T5, T9, T12, T16; Starngage KSA +30-50%)",
+   "raw_footage": "+30-50% (T12, T24)",
+   "rush": "+25-50% (T16, T24)"
+  },
+  "ksa_note": "No KSA contract dataset exists in open sources. Apply UAE paid/asking ratios as a lower bound only; Mawthooq-licensed Saudi creators with Saudi audiences price above UAE expat micro creators (KSA vendor bands are 1.0-1.9x UAE at micro, one source (Hovi) the reverse)."
+ },
+ "seasonality": {
+  "ramadan_peak": {
+   "uplift_pct": {
+    "low": 20,
+    "typical": 30,
+    "high": 40
+   },
+   "evidence": [
+    "Starngage KSA: +40% in Ramadan and peak seasons [S3 via summary]",
+    "Keepface/IMH + Eyad SA: Ramadan/peak +20-40% [T2]",
+    "DataMySite UAE: Ramadan and Q4 +20-30% above baseline [T9]",
+    "Hovi: paid-social CPMs +30-40% in Ramadan; shopping intent peaks last week before Eid [T3]",
+    "Yamammi: Q4 inflated, Q1 and summer have negotiating room [T16]",
+    "Collabstr (global, search summary): seasonal demand +20-30%"
+   ],
+   "confidence": "medium"
+  },
+  "national_day_eid": "No source isolates Saudi National Day or Eid prices; treat as 'peak season' +20-30% (extrapolation). Eid al-Fitr falls inside the Ramadan window; book 6-8 weeks ahead.",
+  "off_peak": "Q1 (post-Ramadan) and Jun-Aug have 10-20% negotiating room (T16)."
+ },
+ "premiums": {
+  "arabic_first_bilingual": {
+   "pct": "+20-30% (T2, Eyad SA via Keepface, beauty/KSA)",
+   "confidence": "low"
+  },
+  "healthcare_category": {
+   "pct": "+8% to +30% vs lifestyle in modelled marketplace tables (Elev8or Riyadh health micro 1,219-7,313 vs entertainment 938-5,625 = +30%; UAE health 1,193-7,157 vs lifestyle 918-5,505 = +30%; Cairo health vs entertainment +23%)",
+   "confidence": "low (single vendor, modelled)"
+  },
+  "credentialed_hcp": {
+   "pct": "+30-80% vs equivalent lifestyle creators; HCP micro Instagram USD 400-2,500 vs lifestyle 200-1,500 (T25)",
+   "confidence": "low (US-centric vendor)"
+  },
+  "beauty_niche": {
+   "pct": "+20-40% (T2)",
+   "confidence": "low"
+  },
+  "regulatory_cost": {
+   "detail": "UAE Advertiser Permit mandatory from 1 Feb 2026 (S1); Mawthooq SAR 15,000 per 3 years (S1); SFDA approval needed before any medical/pharma ad (SFDA) - adds lead time and approval cost, not a creator-fee line",
+   "confidence": "medium"
+  }
+ },
+ "cpm_crosscheck": {
+  "transacted_creator_cpm_uae": {
+   "range_AED_per_1000_views": "19-145",
+   "range_SAR": "19-148",
+   "examples": {
+    "telecom Instagram Reels, 31 creators, AED 33,900, 687,679 views": "AED 49.3 (SAR ~50)",
+    "telecom TikTok, 7 creators": "AED 123.7 (n small)",
+    "beauty D2C 3-month retainer, 15 creators": "AED 18.8",
+    "hospitality 1-day event, 50 creators": "AED 66.7"
+   },
+   "source": "T4",
+   "reading": "Typical transacted Reel CPM ~SAR 50; supports a fair-value ceiling of SAR 70 (acceptable) and shows asking-price averages imply CPM 3-10x higher unless creators deliver 20K+ views per Reel (T4 telecom case: ~22K views per Reel at ~AED 1,100 each)."
+  }
+ },
+ "conflicts": [
+  {
+   "id": "C1",
+   "topic": "UAE rate cards vs contracts",
+   "detail": "Rate cards for micro AED 1,500-8,000 vs signed contracts median AED 1,000 (n=190).",
+   "trust": "Use contracts for the average, rate cards for the cap. Caveat: Yamammi contracts include product-for-post deals."
+  },
+  {
+   "id": "C2",
+   "topic": "KSA vendor bands vs named-creator asks",
+   "detail": "IMH/Catchers: macro 15,000-75,000, mega 75,000-500,000+. Named Saudi creators with 1.4-5.8M followers ask SAR 19,000-31,000 [T1].",
+   "trust": "Named asks for 'average'; vendor highs only as an outer cap. T1 is dated Jan 2025 and has a 2022 URL; treat as a floor for top Saudi names."
+  },
+  {
+   "id": "C3",
+   "topic": "KSA vs UAE level",
+   "detail": "IMH/Catchers/Starngage make KSA micro 1.0-1.9x UAE; Hovi makes UAE micro (USD 500-2,000 = SAR 1,875-7,500) higher than KSA (SAR 1,000-5,000).",
+   "trust": "Unresolved; the working assumption is KSA 1.4-1.5x UAE at micro because KSA bands are cited by 4 sources vs 1 and Saudi-audience creators price in SAR."
+  },
+  {
+   "id": "C4",
+   "topic": "Egypt EGP-native vs USD vendors",
+   "detail": "Engaz Media/Brands&Creators micro EGP 2,000-20,000; Valors USD 200-800 (EGP 10,000-40,000); Elev8or EGP 12,375-133,650. Collabstr Cairo 27-55K followers asks USD 50-100.",
+   "trust": "EGP-native + Collabstr for the average; Valors as cap (agency quotes to multinationals). Elev8or ignored (same USD formula in all three markets)."
+  },
+  {
+   "id": "C5",
+   "topic": "Snapchat KSA",
+   "detail": "Miqwal single snap 50-200K reach SAR 3,000-9,938 vs IMH Stories micro SAR 900-7,500 vs Starngage 'level with IG Stories'.",
+   "trust": "Miqwal is Snapchat-specialist but one source; use as upper reference, IMH Stories as lower; low confidence."
+  },
+  {
+   "id": "C6",
+   "topic": "TikTok vs Instagram",
+   "detail": "Five sources: TikTok 20-40% cheaper; Influencer.vip says +15-20% dearer; Yamammi telecom campaign TikTok cost per view 2.5x Instagram (n=7 creators).",
+   "trust": "Price ratio 0.7x; but cost per view may not be cheaper: measure."
+  },
+  {
+   "id": "C7",
+   "topic": "Vendor-internal inconsistencies",
+   "detail": "Elev8or table vs FAQ, Yamammi tier tables vs format tables, Tikit TikTok and YouTube blurbs vary by 2x within one page.",
+   "trust": "Use the lower, FAQ-style figure for average; table for cap."
+  },
+  {
+   "id": "C8",
+   "topic": "Mega-tier contracts",
+   "detail": "UAE mega contracts n=10 median AED 10,000 vs rate cards AED 50,000-250,000.",
+   "trust": "Low n; keep average between (AED 35,000), cap at AED 120,000."
+  }
+ ],
+ "evidence_rows": [
+  {
+   "market": "KSA",
+   "platform": "Instagram",
+   "scope": "named: 1M+ followers (three creators, about 1.4M followers each)",
+   "figure": "SAR 22,000-31,000",
+   "unit": "per ad, from-home / outside-home",
+   "type": "asking (named creators)",
+   "source": "T1",
+   "date": "Jan 2025",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "Instagram",
+   "scope": "named: chef 1.6M followers",
+   "figure": "SAR 6,000-7,000",
+   "unit": "per ad",
+   "type": "asking (named)",
+   "source": "T1",
+   "date": "Jan 2025",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "TikTok",
+   "scope": "named: ~45K followers; ~50K post reach",
+   "figure": "SAR 2,500-3,000; 3,500-4,500",
+   "unit": "per ad",
+   "type": "asking (named)",
+   "source": "T1",
+   "date": "Jan 2025",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "TikTok",
+   "scope": "named: avg 1M-1.5M views",
+   "figure": "SAR 7,500-27,500",
+   "unit": "per ad",
+   "type": "asking (named)",
+   "source": "T1",
+   "date": "Jan 2025",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "YouTube",
+   "scope": "named: 600K subs; 5.76M subs",
+   "figure": "SAR 14,000-24,500; 19,000-29,000",
+   "unit": "per ad",
+   "type": "asking (named)",
+   "source": "T1",
+   "date": "Jan 2025",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "Instagram",
+   "scope": "Reel nano / micro / macro / mega",
+   "figure": "SAR 500-1,500 / 1,500-7,500 / 7,500-30,000 / 30,000-120,000+",
+   "unit": "per Reel",
+   "type": "vendor quoted range",
+   "source": "S3",
+   "date": "Jun 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "TikTok",
+   "scope": "nano / micro branded integration",
+   "figure": "SAR 300-900 / 900-6,000",
+   "unit": "per video",
+   "type": "vendor quoted range",
+   "source": "S3",
+   "date": "Jun 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "Instagram",
+   "scope": "tier page: nano/micro/mid/macro/mega",
+   "figure": "SAR 200-1,500 / 1,500-8,000 / 8,000-35,000 / 35,000-100,000 / 100,000-500,000+",
+   "unit": "per post",
+   "type": "vendor quoted range",
+   "source": "S2",
+   "date": "Jun 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "Instagram",
+   "scope": "IMH Reels: nano/micro/macro/mega",
+   "figure": "SAR 900-4,500 / 3,600-22,500 / 18,000-112,500 / 90,000-450,000+",
+   "unit": "per Reel (1.2-1.5x feed)",
+   "type": "vendor-derived (based on Starngage)",
+   "source": "T2",
+   "date": "May 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "Snapchat",
+   "scope": "single snap by reach: 10-50K / 50-200K / 200-500K / 500K+",
+   "figure": "SAR 975-3,000 / 3,000-9,938 / 9,938-24,938 / 24,938-99,750+",
+   "unit": "per single snap",
+   "type": "vendor quoted (Miqwal)",
+   "source": "T2",
+   "date": "2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "Snapchat",
+   "scope": "weekly campaign package, same reach bands",
+   "figure": "SAR 15,000+ / 37,500-112,500 / 187,500-375,000 / 375,000-499,875+",
+   "unit": "per week package",
+   "type": "vendor quoted (Miqwal)",
+   "source": "T2",
+   "date": "2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "All (IG)",
+   "scope": "nano / micro / mid / macro / mega",
+   "figure": "SAR 200-1,000 / 1,000-5,000 / 5,000-25,000 / 25,000-75,000 / 75,000+",
+   "unit": "per post",
+   "type": "agency guide range",
+   "source": "T3",
+   "date": "Mar 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "All",
+   "scope": "nano / micro / macro / mega",
+   "figure": "SAR 500-2,500 / 2,500-15,000 / 15,000-75,000 / 75,000-500,000+",
+   "unit": "per post",
+   "type": "agency guide range",
+   "source": "S5",
+   "date": "24 Jun 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "All",
+   "scope": "nano to mega",
+   "figure": "SAR 1,000 to 50,000+",
+   "unit": "per post",
+   "type": "agency FAQ",
+   "source": "T31",
+   "date": "Sep 2025",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "Instagram",
+   "scope": "Riyadh health: nano/micro/mid/macro",
+   "figure": "SAR 244-1,219 / 1,219-7,313 / 7,313-24,375 / 24,375-58,500",
+   "unit": "per post",
+   "type": "modelled marketplace estimate",
+   "source": "S6/T-Elev8or",
+   "date": "2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "IG/TikTok/YT",
+   "scope": "Collabstr Riyadh+Jeddah listings: IG 7K-61K followers; TikTok 54K-205K; YT 44K",
+   "figure": "USD 50-120 (IG); 50-800 (TikTok: 54K $50, 76K $700, 136K $800, 191K $150, 205K $200); 99 (YT)",
+   "unit": "per post, starting price",
+   "type": "creator-set listing",
+   "source": "T21",
+   "date": "10 Oct 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "UGC",
+   "scope": "direct-DM UGC videos",
+   "figure": "SAR 300-1,500; platform min SAR 150 (+15% commission)",
+   "unit": "per video",
+   "type": "creator-side/platform terms",
+   "source": "T22,T23",
+   "date": "Jul 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "KSA",
+   "platform": "TikTok",
+   "scope": "modelled estimate per profile: 3M followers; 10.7M",
+   "figure": "USD 4.7-7.1K; 17.1-25.7K",
+   "unit": "per profile",
+   "type": "modelled",
+   "source": "T28",
+   "date": "2026",
+   "confidence": "low"
+  },
+  {
+   "market": "UAE",
+   "platform": "Instagram",
+   "scope": "contracts nano / micro / mid / macro / mega",
+   "figure": "AED 100-800 (median 500, n=40) / 800-2,500 (1,000, n=190) / 1,000-4,500 (2,000, n=80) / 1,000-5,000 (2,500, n=30) / 5,000-20,000 (10,000, n=10)",
+   "unit": "per deliverable",
+   "type": "TRANSACTED (signed contracts)",
+   "source": "T4",
+   "date": "Aug 2025-Aug 2026",
+   "confidence": "medium"
+  },
+  {
+   "market": "UAE",
+   "platform": "Instagram",
+   "scope": "UGC Reel no organic post; Reel+2-3 Stories organic",
+   "figure": "AED 800 (n=79); 1,000-2,500 (n=169)",
+   "unit": "per deliverable",
+   "type": "TRANSACTED",
+   "source": "T4",
+   "date": "2026",
+   "confidence": "medium"
+  },
+  {
+   "market": "UAE",
+   "platform": "Instagram",
+   "scope": "rate card micro (12 sources)",
+   "figure": "AED 1,000-12,000; median band ~1,500-6,500",
+   "unit": "per post/Reel",
+   "type": "asking",
+   "source": "T5-T16,S7",
+   "date": "Jan 2025-Aug 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "UAE",
+   "platform": "Instagram",
+   "scope": "Yamammi Reel by tier nano/micro/mid/macro",
+   "figure": "AED 300-1,500 / 1,500-5,000 / 5,000-15,000 / 15,000-45,000",
+   "unit": "per Reel",
+   "type": "asking (agency says from contracts)",
+   "source": "T5",
+   "date": "16 Aug 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "UAE",
+   "platform": "TikTok",
+   "scope": "Yamammi nano/micro/mid/macro",
+   "figure": "AED 200-800 / 800-3,000 / 3,000-10,000 / 10,000-35,000",
+   "unit": "per video",
+   "type": "asking",
+   "source": "T5",
+   "date": "16 Aug 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "UAE",
+   "platform": "TikTok",
+   "scope": "Al Rwyt nano/micro/macro/mega",
+   "figure": "AED 400-2,000 / 2,000-9,000 / 9,000-25,000 / 25,000-100,000",
+   "unit": "per video",
+   "type": "asking",
+   "source": "T7",
+   "date": "28 Jan 2025",
+   "confidence": "low"
+  },
+  {
+   "market": "UAE",
+   "platform": "Snapchat",
+   "scope": "Tikit nano / micro / macro; Spotlight",
+   "figure": "AED 200-1,000 / 200-1,000 / 2,000-10,000+ (multi-day); Spotlight 500-900",
+   "unit": "per story/campaign",
+   "type": "asking",
+   "source": "T6,T32",
+   "date": "Mar-May 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "UAE",
+   "platform": "YouTube",
+   "scope": "Yamammi Shorts / 60s integration / dedicated: micro",
+   "figure": "AED 1,000-3,000 / 3,000-8,000 / 5,000-15,000",
+   "unit": "per asset",
+   "type": "asking",
+   "source": "T5",
+   "date": "16 Aug 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "UAE",
+   "platform": "TikTok",
+   "scope": "Gulf News: UAE TikTok creators",
+   "figure": "AED 700-70,000",
+   "unit": "per post",
+   "type": "reported range",
+   "source": "T26",
+   "date": "30 May 2025",
+   "confidence": "medium"
+  },
+  {
+   "market": "UAE",
+   "platform": "Instagram",
+   "scope": "Gulf News: one named UAE creator",
+   "figure": "AED 20,000+",
+   "unit": "per campaign",
+   "type": "reported (named)",
+   "source": "T26",
+   "date": "30 May 2025",
+   "confidence": "medium"
+  },
+  {
+   "market": "UAE",
+   "platform": "Instagram",
+   "scope": "Arab News 2016: typical UAE post",
+   "figure": "USD 1,000-5,000",
+   "unit": "per post",
+   "type": "reported (old)",
+   "source": "T27",
+   "date": "Dec 2016",
+   "confidence": "low"
+  },
+  {
+   "market": "UAE",
+   "platform": "Instagram",
+   "scope": "Collabstr Dubai: 6.7K-166K followers",
+   "figure": "USD 75-500 (166K = $500; 23.5K = $300; 6.7K = $75); UGC USD 100",
+   "unit": "per post, starting",
+   "type": "creator-set listing",
+   "source": "T21",
+   "date": "10 Oct 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "Egypt",
+   "platform": "All",
+   "scope": "Engaz Media: nano / micro / macro (100K-1M) / mega",
+   "figure": "EGP 1,000-5,000 / 5,000-20,000 / 20,000-60,000 / 50,000-150,000",
+   "unit": "per post/video",
+   "type": "agency blog asking (2025)",
+   "source": "T17",
+   "date": "2025",
+   "confidence": "low"
+  },
+  {
+   "market": "Egypt",
+   "platform": "All",
+   "scope": "Brands & Creators: nano / micro / macro",
+   "figure": "EGP 500-2,000 / 2,000-10,000 / 10,000-50,000+",
+   "unit": "per post",
+   "type": "agency blog asking",
+   "source": "T18",
+   "date": "2026",
+   "confidence": "low"
+  },
+  {
+   "market": "Egypt",
+   "platform": "All",
+   "scope": "Valors: nano / micro / mid / macro / celebrity",
+   "figure": "USD 50-200 / 200-800 / 800-3,000 / 3,000-10,000 / 10,000-40,000+ (EGP 2,500-10,000 / 10,000-40,000 / 40,000-150,000 / 150,000-500,000 / 500,000-2M at 50)",
+   "unit": "per post",
+   "type": "agency blog asking",
+   "source": "T19",
+   "date": "1 Aug 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "Egypt",
+   "platform": "Instagram",
+   "scope": "Elev8or Cairo ecommerce nano / micro / mid / macro",
+   "figure": "EGP 2,475-22,275 / 12,375-133,650 / 74,250-445,500 / 247,500-1,069,200",
+   "unit": "per post",
+   "type": "modelled",
+   "source": "S8",
+   "date": "2026",
+   "confidence": "low"
+  },
+  {
+   "market": "Egypt",
+   "platform": "Instagram",
+   "scope": "Collabstr Cairo: 4.7K-54.5K followers; 666.5K",
+   "figure": "USD 50-100; USD 300 (EGP 2,500-5,000; 15,000)",
+   "unit": "per post, starting",
+   "type": "creator-set listing",
+   "source": "T21",
+   "date": "10 Oct 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "Egypt",
+   "platform": "TikTok",
+   "scope": "Collabstr Cairo: 100K followers",
+   "figure": "USD 100 (EGP 5,000)",
+   "unit": "per post, starting",
+   "type": "creator-set listing",
+   "source": "T21",
+   "date": "10 Oct 2026",
+   "confidence": "low"
+  },
+  {
+   "market": "Egypt",
+   "platform": "Package",
+   "scope": "3 influencers, agency campaign",
+   "figure": "EGP 297,500 (about USD 5,750 at source)",
+   "unit": "per package",
+   "type": "agency package list",
+   "source": "T20",
+   "date": "2026",
+   "confidence": "low"
+  },
+  {
+   "market": "Egypt",
+   "platform": "UGC",
+   "scope": "Egyptian freelance UGC video",
+   "figure": "from USD 25 (EGP ~1,250); Collabstr USD 50",
+   "unit": "per video",
+   "type": "creator-side listing",
+   "source": "T35,T21",
+   "date": "2026",
+   "confidence": "low"
+  },
+  {
+   "market": "Global",
+   "platform": "Instagram",
+   "scope": "Lumanu 2025 transacted averages",
+   "figure": "IG avg per payment USD 1,429 (Reels 3,618, posts 1,013, stories 1,333); TikTok 2,049; per-100K-followers IG 1,250, TikTok 1,050",
+   "unit": "per payment",
+   "type": "TRANSACTED, global/US-heavy",
+   "source": "T29",
+   "date": "2025",
+   "confidence": "medium"
+  }
+ ],
+ "sources": {
+  "T1": {
+   "title": "mhtwyat.com - named Saudi celebrity/creator ad price list (page says updated 8 Jan 2025; URL slug says 2022)",
+   "url": "https://mhtwyat.com/?p=314803",
+   "nature": "named-creator asking prices, SAR, from-home / outside-home; no method",
+   "credibility": "low"
+  },
+  "T2": {
+   "title": "Keepface blog (28 May 2026) quoting IMH Instagram bands and Miqwal Snapchat bands",
+   "url": "https://keepface.com/site/en/beauty-lifestyle-influencers-saudi-arabia-snapchat-instagram-2026/",
+   "nature": "vendor-quoted ranges incl. Reels, Stories, Snapchat single-snap by reach; modifiers",
+   "credibility": "low"
+  },
+  "T3": {
+   "title": "Hovi, Social Media Marketing in GCC & MENA guide (12 Mar 2026, reviewed Oct 2026)",
+   "url": "https://thehovi.com/blog/industry-guides/social-media-marketing-gcc-mena-guide-2026",
+   "nature": "agency guide; KSA SAR / UAE USD per post by tier; paid-social CPMs",
+   "credibility": "low"
+  },
+  "T4": {
+   "title": "Yamammi UAE Influencer Rate Report, Mid-Year 2026 (350 signed contracts, Aug 2025-Aug 2026)",
+   "url": "https://yamammi.com/receipts/dubai-influencer-rate-report",
+   "nature": "agency contract/payment records (vendor dataset, unaudited); AED per deliverable, CPM",
+   "credibility": "medium"
+  },
+  "T5": {
+   "title": "Yamammi, Influencer Rates UAE (updated 16 Aug 2026)",
+   "url": "https://yamammi.com/blog/influencer-rates-uae",
+   "nature": "agency-stated 'rates from contracts signed in 2026'; AED by tier/platform/format",
+   "credibility": "low"
+  },
+  "T6": {
+   "title": "Tikit, Influencer Marketing Cost in UAE (updated May 2026)",
+   "url": "https://tikit.ae/en/blogs/influencer-marketing-cost-in-uae-2026-real-aed-rates-by-platform-tikit",
+   "nature": "agency blog; AED by platform and tier incl. Snapchat",
+   "credibility": "low"
+  },
+  "T7": {
+   "title": "Al Rwyt Alwash, Influencer Cost UAE (28 Jan 2025)",
+   "url": "https://alrwytalwash.com/influencercost-dubai-2025/",
+   "nature": "agency blog; AED by tier, Instagram and TikTok",
+   "credibility": "low"
+  },
+  "T8": {
+   "title": "Positively Adam, How Much Do Influencers Charge in Dubai (3 Aug 2026)",
+   "url": "https://positivelyadam.com/blog/influencer-marketing-cost-dubai-2026.html",
+   "nature": "blog; AED per post by tier; retainers, usage rights",
+   "credibility": "low"
+  },
+  "T9": {
+   "title": "DataMySite, Influencer Marketing Cost in Dubai 2026 (14 Aug 2026)",
+   "url": "https://datamysite.com/influencer-marketing-cost-in-dubai-2026-rates-by-tier",
+   "nature": "agency blog; AED by tier; Ramadan/Q4 +20-30%",
+   "credibility": "low"
+  },
+  "T10": {
+   "title": "The Rare Private, Influencer Marketing Costs Dubai 2026 (Apr 2026)",
+   "url": "https://www.therare-private.com/blog/influencer-marketing-cost-dubai-2026.html",
+   "nature": "agency blog; AED by tier",
+   "credibility": "low"
+  },
+  "T11": {
+   "title": "Dreamize Group, Influencer Marketing Cost Dubai (2026, undated)",
+   "url": "https://dreamizegroup.com/influencer-marketing-cost/",
+   "nature": "agency blog; AED by tier and format (post/Reel/story/TikTok/YouTube); agency fee 15-25%",
+   "credibility": "low"
+  },
+  "T12": {
+   "title": "Influencer.vip, How Much to Pay Influencers in Dubai (14 Apr 2026)",
+   "url": "https://influencer.vip/blogs/how-much-to-pay-influencers-in-dubai-the-definitive-2026-rate-guide",
+   "nature": "agency blog; AED by tier; discounts; agency fee 15-25%",
+   "credibility": "low"
+  },
+  "T13": {
+   "title": "Right Media, How Much Do Influencers Charge in the UAE (2026, undated)",
+   "url": "https://rightmedia.ae/blog/how-much-do-influencers-charge-in-the-uae-in-2025/",
+   "nature": "agency blog; AED Instagram vs TikTok by tier",
+   "credibility": "low"
+  },
+  "T14": {
+   "title": "Snippet, UAE influencer rates (June 2026)",
+   "url": "https://usesnippet.app/tools/influencer-rates/location/uae",
+   "nature": "tool; modelled AED sponsored-post and video rates",
+   "credibility": "low"
+  },
+  "T15": {
+   "title": "Digital Agencies UAE forum thread (10 Feb 2023, one reply)",
+   "url": "https://www.digitalagencies.ae/topics/influencer-promotion-fees-on-instagram-account",
+   "nature": "practitioner opinion; AED by tier (older)",
+   "credibility": "low"
+  },
+  "T16": {
+   "title": "Yamammi, Dubai influencer cost: where brands overpay (16 Aug 2026)",
+   "url": "https://yamammi.com/blog/influencer-marketing-cost-dubai",
+   "nature": "agency blog; AED by tier; retainer/bundle/usage discounts; agency fee 15-30%",
+   "credibility": "low"
+  },
+  "T17": {
+   "title": "Engaz Media (Arabic), Influencer marketing in Egypt 2025: methods and average prices",
+   "url": "https://engazmedia.com/%D8%AA%D8%B3%D9%88%D9%8A%D9%82-%D8%A7%D9%84%D9%85%D9%86%D8%AA%D8%AC%D8%A7%D8%AA-%D8%B9%D8%A8%D8%B1-%D8%A7%D9%84%D9%85%D8%A4%D8%AB%D8%B1%D9%8A%D9%86-%D8%A7%D9%84%D8%A5%D9%86%D9%81%D9%84%D9%88%D9%86/",
+   "nature": "Egyptian agency blog, EGP per post by tier (2025)",
+   "credibility": "low"
+  },
+  "T18": {
+   "title": "Brands & Creators, Influencer Marketing Cost in Egypt 2026",
+   "url": "https://brandsncreators.com/influencer-marketing-cost-in-egypt-full-breakdown-2026/",
+   "nature": "agency blog, EGP per post by tier (2026, undated)",
+   "credibility": "low"
+  },
+  "T19": {
+   "title": "Valors Agency, Influencer Marketing Cost Egypt (1 Aug 2026)",
+   "url": "https://valors.agency/influencer-marketing-cost-egypt",
+   "nature": "agency blog, USD per post by tier; contracts in EGP with USD-equivalent caps",
+   "credibility": "low"
+  },
+  "T20": {
+   "title": "Green Mind Agency, influencer campaign package price list",
+   "url": "https://greenmindagency.com/price-list/influencer-marketing-prices/",
+   "nature": "agency package price: up to 3 influencers EGP 297,500 (fees may be extra)",
+   "credibility": "low"
+  },
+  "T21": {
+   "title": "Collabstr city marketplace pages (Riyadh, Jeddah, Dubai, Cairo), fetched 10 Oct 2026",
+   "url": "https://collabstr.com/influencer-marketing/riyadh-saudi-arabia",
+   "nature": "creator-set listing ('starting') prices in USD, 4 listings per page; small n",
+   "credibility": "low"
+  },
+  "T22": {
+   "title": "MabrookUGC, How to become a UGC creator in Saudi Arabia (25 Jul 2026)",
+   "url": "https://www.mabrookugc.com/blog/how-to-become-ugc-creator",
+   "nature": "creator-side guide: direct-DM UGC deals SAR 300-1,500 per video",
+   "credibility": "low"
+  },
+  "T23": {
+   "title": "UGCeer (KSA/UAE UGC marketplace) - minimum SAR 150 per video, +15% platform commission (search snippet; page not fetched)",
+   "url": "https://ugceer.com/en/land/",
+   "nature": "platform terms",
+   "credibility": "low"
+  },
+  "T24": {
+   "title": "Influee, UGC Rates 2026 (dated 18 Apr 2025)",
+   "url": "https://influee.co/blog/ugc-price",
+   "nature": "global (US/UK) UGC rates and usage-right add-ons",
+   "credibility": "low"
+  },
+  "T25": {
+   "title": "InfluencerFee, influencer marketing for pharmaceutical brands (reviewed 10 Oct 2026)",
+   "url": "https://influencerfee.com/blog/influencer-marketing-for-pharmaceutical-brands/",
+   "nature": "vendor rate calculator; USD HCP vs lifestyle; premium 30-80%; not MENA-specific",
+   "credibility": "low"
+  },
+  "T26": {
+   "title": "Gulf News, How UAE influencers make up to Dh100,000 in a week (30 May 2025)",
+   "url": "https://gulfnews.com/lifestyle/community/revealed-how-uae-influencers-make-up-to-dh100000-in-just-one-week-1.500144912",
+   "nature": "news article: TikTok per post Dh700-70,000; one named UAE creator Dh20,000+ per campaign",
+   "credibility": "medium"
+  },
+  "T27": {
+   "title": "Arab News, $50k for a few hours work? Backlash against Gulf influencers (13 Dec 2016)",
+   "url": "https://www.arabnews.com/node/1023356",
+   "nature": "news, 2016: typical UAE $1,000-5,000 per post; one quote Dh175,000 for event+6 posts. Old.",
+   "credibility": "low"
+  },
+  "T28": {
+   "title": "Scrumball, top TikTok influencers in Saudi Arabia (USD est. pricing per profile)",
+   "url": "https://www.scrumball.com/ranking/top-tiktok-influencers-in-saudi-arabia",
+   "nature": "modelled estimate (about $1.6-2.4 per 1,000 followers at 3M+); not transacted",
+   "credibility": "low"
+  },
+  "T29": {
+   "title": "Lumanu, 2025 influencer compensation insights (255K payouts, global/US-heavy)",
+   "url": "https://www.lumanu.com/blog/breaking-down-1-billion-in-creator-payouts-2025-influencer-compensation-insights",
+   "nature": "transacted payout averages, global",
+   "credibility": "medium"
+  },
+  "T30": {
+   "title": "Boomerang UAE, influencer budgets in the Gulf (16 Sep 2025)",
+   "url": "https://www.boomerang.ae/post/a-strategic-guide-to-influencer-marketing-budgets-in-the-gulf",
+   "nature": "agency blog; agency commission 15-30% of spend; Dubai 50-500K package AED 3,500-10,000",
+   "credibility": "low"
+  },
+  "T31": {
+   "title": "Afia Digital, Influencer marketing Saudi Arabia (20 Sep 2025)",
+   "url": "https://afiadigital.com/influencer-marketing-saudi-arabia/",
+   "nature": "agency FAQ: SAR 1,000 (nano) to 50,000+ (mega)",
+   "credibility": "low"
+  },
+  "T32": {
+   "title": "Hypebox, best influencer agencies in Saudi Arabia (Sep/Oct 2026)",
+   "url": "https://hypebox.me/blog/articles/best-influencer-marketing-agencies-in-saudi-arabia-(2026-comparison)",
+   "nature": "agency listicle; budget items; UAE nano Reel+2-3 stories AED 1,500 (no SAR rates)",
+   "credibility": "low"
+  },
+  "T33": {
+   "title": "Influentials / ainfluencer / Filmdaily / Crexora (non-Gulf and Dubai agency margin statements, via search results)",
+   "url": "https://www.influentials.com/en-us/faq/what-are-typical-pricing-and-margin-models-for-influencer-and-ugc-services",
+   "nature": "agency margin 10-30%; Dubai guide 15-25%",
+   "credibility": "low"
+  },
+  "T34": {
+   "title": "Mad Influence (Dubai) founder interview, YourStory: 25-30% margin on ~$100K monthly tickets (undated, via search summary)",
+   "url": "https://yourstory.com/",
+   "nature": "self-reported agency margin",
+   "credibility": "low"
+  },
+  "T35": {
+   "title": "Khamsat / Mostaql freelance UGC listings (Arabic marketplaces)",
+   "url": "https://khamsat.com/video-design/ugc-videos/",
+   "nature": "freelance UGC video from USD 25; KSA-targeted brief budget USD 25-50",
+   "credibility": "low"
+  },
+  "T36": {
+   "title": "Frontiers in Communication 2026 (Saudi influencer marketing survey; no fee data)",
+   "url": "https://www.frontiersin.org/journals/communication/articles/10.3389/fcomm.2026.1723356/full",
+   "nature": "academic; n=38 consumers + experts; no fees",
+   "credibility": "medium"
+  },
+  "S2": {
+   "title": "Starngage, Saudi Arabia influencer rates by tier (Jun 2026; read via search summary, page returned 403)",
+   "url": "https://starngage.com/plus/de/blog/saudi-arabia-influencer-rates-by-tier-nano-to-mega-pricing-guide",
+   "note": "from BENCHMARKS-RESEARCH-2026-10-10"
+  },
+  "S25": {
+   "title": "OwlClaw, YouTube Shorts benchmarks (vendor)",
+   "url": "https://owlclaw.com/benchmarks/youtube-shorts-benchmarks",
+   "note": "from BENCHMARKS-RESEARCH-2026-10-10"
+  },
+  "S3": {
+   "title": "Starngage, Saudi creator rates by platform (2026; search summary only)",
+   "url": "https://starngage.com/plus/hi/blog/saudi-arabia-creator-rates-by-platform-instagram-tiktok-youtube",
+   "note": "from BENCHMARKS-RESEARCH-2026-10-10"
+  },
+  "S4": {
+   "title": "Influencer Marketing Hub, Influencer Marketing in Saudi Arabia 2026 guide (1 May 2026)",
+   "url": "https://influencermarketinghub.com/influencer-marketing-in-saudi-arabia-guide/",
+   "note": "from BENCHMARKS-RESEARCH-2026-10-10"
+  },
+  "S5": {
+   "title": "Catchers Agency, Influencer marketing cost in Saudi Arabia (24 Jun 2026)",
+   "url": "https://catchers.agency/blog/influencer-marketing-cost-in-saudi-arabia/",
+   "note": "from BENCHMARKS-RESEARCH-2026-10-10"
+  },
+  "S6": {
+   "title": "Elev8or, Skincare influencers in Saudi Arabia (modeled estimates, 2026)",
+   "url": "https://www.elev8or.io/find/skincare-influencers-in-saudi-arabia",
+   "note": "from BENCHMARKS-RESEARCH-2026-10-10"
+  },
+  "S7": {
+   "title": "Elev8or, Wellness / fashion / beauty influencers in the UAE (modeled estimates, 2026)",
+   "url": "https://www.elev8or.io/find/wellness-influencers-in-united-arab-emirates",
+   "note": "from BENCHMARKS-RESEARCH-2026-10-10"
+  },
+  "S8": {
+   "title": "Elev8or, Health / ecommerce / lifestyle influencers in Cairo (modeled estimates, 2026)",
+   "url": "https://www.elev8or.io/find/health-influencers-in-cairo",
+   "note": "from BENCHMARKS-RESEARCH-2026-10-10"
+  }
+ },
+ "reference": {
+  "id": "market_prices",
+  "title": "Market prices per sponsored post, KSA / UAE / Egypt",
+  "updated": "2026-10-10",
+  "note": "Creator-side fee for one organic deliverable under standard usage, ex-VAT, ex-agency fee. Asking prices and vendor estimates, not audited market data.",
+  "how_to_read": [
+   "Low / Average / Cap: the bottom of the common range, the typical creator fee an agency should expect to pay, and the top of the common asking range.",
+   "Client price is roughly creator fee x 1.27 (range 1.18 to 1.43) before production, usage and boosting.",
+   "Confidence: high = 10+ independent asking figures and contract-level data; medium = 4+ figures that agree within about 3x; low = fewer than 4, large conflicts, or extrapolated.",
+   "A row marked extrapolation has no direct published figure; it is derived from the Instagram row by a documented ratio."
+  ],
+  "caveats": [
+   "Every price is a vendor or agency estimate. None comes from an audited market sample.",
+   "There is no KSA or Egypt contract dataset. The only transacted data is one UAE agency (350 signed contracts, Aug 2025 to Aug 2026), unaudited and skewed to product-for-post micro creators.",
+   "Asking prices are far above what is paid: UAE contracts sit at about 0.3x the rate-card midpoint at micro and 0.15 to 0.25x at mid and macro. Use contracts or averages for budgeting, rate cards only for the cap.",
+   "Only UAE Instagram micro has high confidence. KSA macro and mega are triangulations between conflicting sources. TikTok, Snapchat and YouTube rows are mostly extrapolations.",
+   "Several vendors re-publish one another (IMH quotes Starngage; Keepface quotes IMH and Miqwal; Elev8or uses one USD formula for all three markets). They are counted once.",
+   "Healthcare and HCP premiums come from one modelled vendor table and one US vendor. SFDA and Mawthooq rules are from law-firm summaries and need checking against the original text."
+  ]
+ },
+ "method": [
+  "Collected every figure per cell, normalised to a per-deliverable creator fee, dropped package and monthly prices, and removed vendors that re-publish one another.",
+  "Low = median of asking-band lows (or the transacted low if lower). Cap = median of asking-band highs after removing blended 100K to 1M bands for mid.",
+  "Average = between the transacted median (where one exists) and about 0.5 to 0.7x the asking midpoint; for KSA and Egypt, with no contracts, 0.6 to 0.75x the asking midpoint, cross-checked against named-creator asks and marketplace listings.",
+  "Platforms other than Instagram are labelled extrapolations unless 3 or more direct sources exist."
+ ]
+}
