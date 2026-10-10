@@ -547,8 +547,15 @@
       var list = h("div", { class: "cx-sugs" });
       body.appendChild(list);
       sheet.appendChild(body);
-      var more = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("sparkle") + "<span>Show 3 more</span>" });
-      sheet.appendChild(h("footer", { class: "cx-sheet__ft" }, h("span", null, "Added creators join as ", h("b", null, "Under review"), o.foot || ". HelloVoice confirms availability."), more));
+      // Looking again asks Helvy's AI again, so the button says what it costs (or that it is free).
+      var free = aiFree() || !o.cost;
+      var more = h("button", { class: "cx-btn cx-btn--ink cx-more-btn", type: "button", html: ic("sparkle") + "<span>Show 3 more</span>" });
+      more.appendChild(h("span", { class: "hv-cost" + (free ? " hv-cost--free" : ""), html: free ? "Free" : ic("coin") + o.cost + " credit" + (o.cost === 1 ? "" : "s") }));
+      sheet.appendChild(h("footer", { class: "cx-sheet__ft" },
+        h("div", { class: "cx-sheet__fn" },
+          h("span", null, "Added creators join as ", h("b", null, "Under review"), o.foot || ". HelloVoice confirms availability."),
+          h("small", null, free ? "Looking again is free with your active campaign." : "Looking again uses Helvy’s AI: " + o.cost + " credit" + (o.cost === 1 ? "" : "s") + ".")),
+        more));
       function close() { scrim.remove(); sheet.remove(); document.removeEventListener("keydown", onKey); document.body.classList.remove("pt-lock"); if (prev && prev.focus && prev.isConnected) prev.focus(); }
       function onKey(e) { if (e.key === "Escape") close(); }
       x.addEventListener("click", close); scrim.addEventListener("click", close); document.addEventListener("keydown", onKey);
