@@ -381,19 +381,16 @@
 /* ======================================================== AI ON SELECTIONS (D) */
 .cx-selact { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
 .cx-selact .cx-btn { min-height: 48px; }
-/* Selection header: the ROI Calculator sits in the section's top-right corner as a lime primary
-   button, and "Full catalogue" beside the title is a solid white one (both were faint outlines). */
-.cat-hero--cover .cat-selhead { position: relative; }
-.cat-hero--cover .cat-selhead__lock { padding-right: 280px; }
-.cat-hero--cover .cat-selhead .cx-selact { position: absolute; top: 0; right: 0; margin: 0; }
+/* Selection header: the ROI Calculator sits at the right end of the header's bottom row as a lime
+   primary button, and "Full catalogue" (top bar and beside the title) is a solid white one. */
+.cat-hero--cover .cat-selhead__foot .cx-selact { margin: 0 0 0 auto; }
 .cx-selact .cx-btn--roi { min-height: 56px; padding: 0 30px; font-size: 22px; box-shadow: 0 0 0 4px rgba(232,255,118,.22), 0 10px 26px rgba(0,0,0,.35); }
 .cx-selact .cx-btn--roi:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
-.cat-hero--cover .cat-back { background: var(--white); color: var(--ink); border-color: var(--white); font-weight: 700; box-shadow: 0 8px 22px rgba(0,0,0,.3); }
-.cat-hero--cover .cat-back:hover { background: var(--lime); color: var(--ink); border-color: var(--lime); }
-@media (max-width: 760px) {
-  .cat-hero--cover .cat-selhead__lock { padding-right: 0; }
-  .cat-hero--cover .cat-selhead .cx-selact { position: static; margin-top: 16px; }
-}
+.cat-hero--cover .cat-back, .cat-hero--cover .cat-track--cat { background: var(--white); color: var(--ink); border-color: var(--white); font-weight: 700; box-shadow: 0 8px 22px rgba(0,0,0,.3); }
+.cat-hero--cover .cat-back:hover, .cat-hero--cover .cat-track--cat:hover { background: var(--lime); color: var(--ink); border-color: var(--lime); }
+.cat-brand a { display: inline-block; line-height: 0; border-radius: 8px; }
+.cat-brand a:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; }
+@media (max-width: 760px) { .cat-hero--cover .cat-selhead__foot .cx-selact { margin: 0; } }
 .cx-selact .cx-btn--line { color: var(--white); border-color: rgba(255,255,255,.5); }
 .cx-selact .cx-btn--line:hover { border-color: var(--lime); color: var(--lime); background: transparent; }
 .cx-moresec { padding: 28px 0 6px; }

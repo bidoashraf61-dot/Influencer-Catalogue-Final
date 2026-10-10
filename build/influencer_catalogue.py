@@ -935,11 +935,14 @@ def build():
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
         <div class="cat-brand">
-          <img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c4"
+          <a href="/catalogue/" aria-label="HELVY Connect: back to the full catalogue"><img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c4"
                srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c4 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c4 2x"
-               alt="HELVY Connect" width="320" height="160"/>
+               alt="HELVY Connect" width="320" height="160"/></a>
         </div>
-        <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
+        <div class="cat-topbar__links"><a class="cat-track cat-track--cat" href="/catalogue/">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          Full catalogue
+        </a><a class="cat-track" href="/campaign/dashboard/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
           Campaign tracking
         </a>

@@ -412,8 +412,8 @@
     function mountSelection() {
       var S = window.hvSelection;
       if (!S || !S.token() || document.getElementById("cx-selact")) return;
-      // Top-right corner of the selection header (CSS), a lime primary button.
-      var foot = document.querySelector(".cat-selhead") || document.querySelector(".cat-selhead__foot");
+      // Bottom row of the selection header, pushed to its right end (CSS), a lime primary button.
+      var foot = document.querySelector(".cat-selhead__foot") || document.querySelector(".cat-selhead");
       if (foot) {
         var b = h("button", { class: "cx-btn cx-btn--roi", type: "button", html: ic("calc") + "<span>ROI Calculator</span>", onclick: roiForSelection });
         foot.appendChild(h("div", { class: "cx-selact", id: "cx-selact" }, b));
