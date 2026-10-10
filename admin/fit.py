@@ -21,7 +21,7 @@ import re
 
 FITS = ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
 ROLES = ["Awareness", "Engagement", "Conversion", "UGC content"]
-OBJECTIVES = ["Balanced", "Awareness", "Engagement", "Conversion"]
+OBJECTIVES = ["Balanced", "Awareness", "Engagement", "Traffic", "Conversion"]
 MARKET = "SA"                                 # the audience that matters for most of our work
 MARKET_NAME = "KSA"
 
@@ -30,17 +30,20 @@ WEIGHTS = {
     "Balanced":   {"engagement": 1.5, "credibility": 1.5, "market": 1.5, "reach": 1.5, "record": 1.5},
     "Awareness":  {"engagement": 1.0, "credibility": 1.0, "market": 1.0, "reach": 3.0, "record": 1.0},
     "Engagement": {"engagement": 3.0, "credibility": 1.0, "market": 1.0, "reach": 0.5, "record": 1.0},
+    # Traffic (fix batch 4): link clicks come from an engaged audience in the right market, with
+    # enough reach for the clicks to add up; our own campaign record shows who drives them.
+    "Traffic":    {"engagement": 2.5, "credibility": 1.5, "market": 2.0, "reach": 1.0, "record": 2.0},
     "Conversion": {"engagement": 2.0, "credibility": 2.0, "market": 3.0, "reach": 0.5, "record": 2.0},
 }
 # The objective names campaigns use -> the ones shown here.
-FROM_CAMPAIGN = {"balanced": "Balanced", "awareness": "Awareness", "engagement": "Engagement", "traffic": "Conversion"}
+FROM_CAMPAIGN = {"balanced": "Balanced", "awareness": "Awareness", "engagement": "Engagement", "traffic": "Traffic"}
 
 
 # More than one goal (fix batch 3: the selection objective takes several, e.g. awareness AND
 # engagement). Stored as "Awareness+Engagement"; scored with the average of those goals'
 # weights, so each one counts and none is dropped. "Balanced" alongside others adds nothing.
 def objective_of(goals):
-    """A list of goal names (Awareness, Engagement, Conversion, Balanced) -> one stored objective."""
+    """A list of goal names (Awareness, Engagement, Traffic, Conversion, Balanced) -> one stored objective."""
     names = [g for g in dict.fromkeys(goals or []) if g in OBJECTIVES]
     named = [g for g in OBJECTIVES if g in names and g != "Balanced"]
     if not named:
@@ -304,11 +307,20 @@ ASSUMED_AUDIENCE = 0.8           # no measured audience: assume a good match (80
 # can only nudge the score: measured 1.0, worked out from other numbers 0.5, assumed 0.2.
 TRUST = {"measured": 1.0, "estimated": 0.5, "assumed": 0.2}
 WEIGHTS_BASIC = {
-    "Balanced":   {"engagement": 1.5, "reach": 1.5, "views": 1.5, "market": 1.5},
-    "Awareness":  {"engagement": 1.0, "reach": 3.0, "views": 3.0, "market": 1.0},
-    "Engagement": {"engagement": 3.0, "reach": 0.5, "views": 1.0, "market": 1.0},
-    "Conversion": {"engagement": 2.0, "reach": 0.5, "views": 2.0, "market": 3.0},
+    "Balanced":   {"engagement": 1.5, "reach": 1.5, "views": 1.5, "market": 1.5, "link": 0.0},
+    "Awareness":  {"engagement": 1.0, "reach": 3.0, "views": 3.0, "market": 1.0, "link": 0.0},
+    "Engagement": {"engagement": 3.0, "reach": 0.5, "views": 1.0, "market": 1.0, "link": 0.0},
+    # Traffic (fix batch 4): clicks on a tracking link. Engagement leads (people who interact are
+    # the ones who tap), then views and the right market, and the platform's own link route:
+    # a Snapchat swipe-up or an Instagram story link sticker beats a caption on TikTok.
+    "Traffic":    {"engagement": 2.5, "reach": 1.0, "views": 2.0, "market": 2.0, "link": 1.5},
+    "Conversion": {"engagement": 2.0, "reach": 0.5, "views": 2.0, "market": 3.0, "link": 0.0},
 }
+# How directly a platform turns a viewer into a click on a tracking link (Traffic only).
+LINK_ROUTE = {"Snapchat": (1.0, "Snapchat swipe-up links take viewers straight to the page"),
+              "Instagram": (0.85, "Instagram story link stickers send viewers to the page"),
+              "YouTube": (0.7, "YouTube description links carry clicks"),
+              "TikTok": (0.6, "TikTok links sit in the bio, so fewer viewers click through")}
 PLACE_WORDS = {
     "SA": ["riyadh", "jeddah", "jedda", "dammam", "khobar", "al khobar", "dhahran", "taif", "makkah", "mecca", "madinah", "medina",
            "abha", "tabuk", "jazan", "jizan", "hail", "qassim", "buraidah", "al ahsa", "hofuf", "jubail", "yanbu", "ksa",
@@ -458,11 +470,16 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         wmul["market"] = TRUST["assumed"]
         add("market", "Audience (assumed 80%)", ASSUMED_AUDIENCE, None, None)
 
+    # Traffic: the platform's own route to a link (swipe-up, story sticker, description, bio).
+    if w.get("link") and platform in LINK_ROUTE:
+        ls, why = LINK_ROUTE[platform]
+        add("link", "Link clicks", ls, why, why)
+
     def wt(k):
         return w.get(k, 1.0) * wmul.get(k, 1.0)
 
     out["parts"] = [{"key": k, "label": lab, "s": round(s, 2), "w": round(wt(k), 2)} for k, lab, s, _, _ in parts]
-    if len(parts) < min_parts:
+    if len([p for p in parts if p[0] != "link"]) < min_parts:
         out["note"] = "Not enough public data to score."
         return out
     tw = sum(wt(k) for k, _, _, _, _ in parts)

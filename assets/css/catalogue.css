@@ -86,6 +86,7 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 .cat-btn--lime:hover { background: var(--ink); color: var(--lime); }
 .cat-btn--ghost { background: transparent; color: var(--white); border-color: rgba(255,255,255,.35); }
 .cat-btn--ghost:hover { border-color: var(--lime); color: var(--lime); }
+a.cat-btn { text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 
 /* ------------------------------------------------------------------- gate */
 
@@ -648,7 +649,7 @@ a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-off
    with the same action stated plainly. */
 .cat-close {
   background: var(--ink); color: var(--white);
-  padding: 80px 0 88px; text-align: center;
+  padding: 80px 0 56px; text-align: center;
 }
 .cat-close__title {
   font-family: var(--heading); font-weight: 400; line-height: 1;
@@ -663,6 +664,12 @@ a.cat-card__platform:focus-visible { outline: 3px solid var(--lime); outline-off
 .cat-close__copied {
   color: var(--lime); font-size: 14px; margin: 18px 0 0; min-height: 20px;
 }
+/* Fix batch 4: the close and the footer are both ink, so their two paddings plus the empty
+   "copied" line read as a dead black band. The line takes room only when it says something,
+   and the footer that follows starts on a hairline instead of another 56px of ink. */
+.cat-close__copied:empty { display: none; }
+.cat-close + .cat-footer { padding-top: 0; }
+.cat-close + .cat-footer .cat-footer__top { padding-top: 40px; border-top: 1px solid rgba(255,255,255,.12); }
 
 /* ---------------------------------------------------------------- footer */
 

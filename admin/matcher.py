@@ -25,9 +25,12 @@ import metrics
 # type: "one" | "many" | "text". Option values are what is stored and scored.
 
 QUESTIONS = [
+    # Fix batch 4: the goals match the ROI Calculator (Awareness, Engagement, Traffic) plus Conversion
+    # (scored as the old "Sales"); "Balanced" is no longer offered but old briefs that hold it still read.
     {"id": "goal", "type": "one", "multi_ok": True, "label": "What is the main goal of the campaign?", "required": True,
      "options": [("awareness", "Awareness"), ("engagement", "Engagement"),
-                 ("conversion", "Sales"), ("balanced", "Balanced")]},
+                 ("traffic", "Traffic"), ("conversion", "Conversion")],
+     "legacy": [("balanced", "Balanced")]},
     {"id": "platforms", "type": "many", "label": "Where should the content run?", "required": True,
      "options": [("Instagram", "Instagram"), ("TikTok", "TikTok"), ("Snapchat", "Snapchat"),
                  ("YouTube", "YouTube"), ("any", "No preference")]},
@@ -57,7 +60,8 @@ QUESTIONS = [
     {"id": "notes", "type": "text", "label": "Anything else we should know?", "required": False, "max": 600},
 ]
 _BY_ID = {q["id"]: q for q in QUESTIONS}
-OBJECTIVE_OF = {"awareness": "Awareness", "engagement": "Engagement", "conversion": "Conversion", "balanced": "Balanced"}
+OBJECTIVE_OF = {"awareness": "Awareness", "engagement": "Engagement", "traffic": "Traffic", "conversion": "Conversion",
+                "balanced": "Balanced"}
 
 
 def objective_for(goal):
@@ -91,11 +95,11 @@ def answer_label(qid, v):
     t = other_text(v)
     if t is not None:
         return t
-    return next((l for o, l in _BY_ID[qid].get("options", []) if o == v), v)
+    return next((l for o, l in _BY_ID[qid].get("options", []) + _BY_ID[qid].get("legacy", []) if o == v), v)
 
 
 def public_questions():
-    return [dict(q, options=[{"value": v, "label": l} for v, l in q.get("options", [])],
+    return [dict({k: v for k, v in q.items() if k != "legacy"}, options=[{"value": v, "label": l} for v, l in q.get("options", [])],
                  other=q["type"] != "text") for q in QUESTIONS]
 
 
@@ -110,7 +114,7 @@ def clean_answers(raw):
             if v:
                 out[q["id"]] = v
             continue
-        allowed = {o[0] for o in q["options"]}
+        allowed = {o[0] for o in q["options"] + q.get("legacy", [])}
         if q["type"] == "many":
             vals = v if isinstance(v, list) else ([v] if v else [])
             keep, typed = [], None
@@ -125,6 +129,9 @@ def clean_answers(raw):
         elif q.get("multi_ok") and isinstance(v, list):
             # The goal may be several (fix batch 3: "Awareness" AND "Engagement" for a selection).
             keep = [x for x in dict.fromkeys(str(x) for x in v) if x in allowed][:3]
+            typed = next((_clean_other(x) for x in v if isinstance(x, str) and x.startswith(OTHER) and _clean_other(x)), None)
+            if typed:                                   # "Other" picked beside the listed goals (fix batch 4)
+                keep.append(typed)
             if len(keep) == 1:
                 out[q["id"]] = keep[0]
             elif keep:
@@ -187,7 +194,7 @@ def resolve(answers):
             continue
         typed.append("%s: %s" % (q["label"].rstrip("?"), own[0]))
         got = _from_other(q["id"], own[0])
-        if q["type"] == "many":
+        if q["type"] == "many" or (q.get("multi_ok") and isinstance(v, list)):
             keep = [x for x in vals if other_text(x) is None]
             for g in (got if isinstance(got, list) else [got] if got else []):
                 if g not in keep:
@@ -248,8 +255,9 @@ def describe(answers):
 # credits. The chat uses it to skip the questions the client already answered.
 
 _GOAL_WORDS = {
-    "conversion": ["sale", "sales", "sell", "conversion", "convert", "traffic", "sign up", "signup", "download", "orders",
-                   "visit", "footfall", "leads", "مبيعات", "زيارات"],
+    "conversion": ["sale", "sales", "sell", "conversion", "convert", "sign up", "signup", "download", "orders",
+                   "footfall", "leads", "purchase", "مبيعات", "شراء"],
+    "traffic": ["traffic", "clicks", "click", "visit", "website", "landing page", "link", "swipe up", "swipe-up", "زيارات", "زوار"],
     "engagement": ["engagement", "engage", "interact", "community", "comments", "تفاعل"],
     "awareness": ["awareness", "reach", "visibility", "launch", "known", "انتشار", "وعي", "اطلاق", "إطلاق"],
 }

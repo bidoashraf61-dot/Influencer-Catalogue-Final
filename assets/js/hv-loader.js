@@ -28,6 +28,13 @@
  * tab comes back, and on the visitor's first tap, click or key anywhere (which
  * every browser accepts as permission); the still is removed the moment the clip
  * is really playing. Only a clip that cannot be decoded at all stays a still.
+ *
+ * Two sets (fix batch 4, 2026-10-10). "helvy" is the transparent cut-out above. "voice" is
+ * Helvy head-and-shoulders on lime (assets/brand/voice/, opaque H.264 .mp4 for Safari and
+ * WebKit, VP9 .webm elsewhere): short, expressive reactions (point, thumbs, cheer), a think
+ * and a camera "scan" loop, made for the lime circles of the AI shortlist card and the
+ * selection's "Add more like these". Opaque H.264 needs no alpha decoding, so it plays in
+ * every browser. video(name, {set: "voice"}) picks it; everything else is shared.
  */
 (function () {
   "use strict";
@@ -59,13 +66,19 @@
       (/Safari\//.test(ua) && !/Chrome\/|Chromium|CriOS|Edg\/|OPR\/|Firefox\/|Android/.test(ua));
     var still = dir + "helvy-still.webp" + "?v=t3";
     var watching = [], io = null;
+    var vdir = base + "assets/brand/voice/";
+    var VOICE = { loop: 1, "point-act": 1, point: 1, think: 1, "think-act": 1, "thumbs-act": 1, thumbs: 1, "cheer-act": 1, cheer: 1, scan: 1 };
+    var vstill = vdir + "voice-loop-poster.webp?v=t3";
 
     // VER changes whenever the files are replaced: /assets/ is cached for 30 days as immutable.
     var VER = "?v=t3";
-    function src(name) { return dir + "helvy-" + (CLIPS[name] ? name : "idle") + (apple ? ".mov" : ".webm") + VER; }
-    function img(cls) {
+    function src(name, set) {
+      if (set === "voice") return vdir + "voice-" + (VOICE[name] ? name : "loop") + (apple ? ".mp4" : ".webm") + VER;
+      return dir + "helvy-" + (CLIPS[name] ? name : "idle") + (apple ? ".mov" : ".webm") + VER;
+    }
+    function img(cls, set) {
       var im = document.createElement("img");
-      im.className = "hv-clip hv-clip--still" + (cls ? " " + cls : ""); im.alt = ""; im.decoding = "async"; im.src = still;
+      im.className = "hv-clip hv-clip--still" + (cls ? " " + cls : ""); im.alt = ""; im.decoding = "async"; im.src = set === "voice" ? vstill : still;
       im.setAttribute("aria-hidden", "true");
       return im;
     }
@@ -74,7 +87,7 @@
       if (!v.parentNode || v.getAttribute("data-fallback")) return;
       v.setAttribute("data-fallback", "1");
       unwait(v);
-      var im = img(v.getAttribute("data-cls"));
+      var im = img(v.getAttribute("data-cls"), v.getAttribute("data-set"));
       v.parentNode.replaceChild(im, v);
       try { v.removeAttribute("src"); v.load(); } catch (e) { /* gone */ }
     }
@@ -84,7 +97,7 @@
     function wait(v) {
       if (v.getAttribute("data-wait") || !v.parentNode) return;
       v.setAttribute("data-wait", "1");
-      var im = img(v.getAttribute("data-cls"));
+      var im = img(v.getAttribute("data-cls"), v.getAttribute("data-set"));
       im.setAttribute("data-for-wait", "1");
       v.parentNode.insertBefore(im, v);
       v._still = im;
@@ -124,7 +137,7 @@
       // it may still be retried.
       if (v.getAttribute("data-off") && !gesture && !v.getAttribute("data-wait")) return;
       if (!settled && !v.hasAttribute("data-eager") && !gesture) return;
-      if (!v.getAttribute("src")) { v.src = src(v.getAttribute("data-clip")); }
+      if (!v.getAttribute("src")) { v.src = src(v.getAttribute("data-clip"), v.getAttribute("data-set")); }
       if (!v.paused) return;
       var p;
       try { p = v.play(); } catch (e) { return wait(v); }
@@ -151,12 +164,13 @@
       if (!document.hidden) waiting.slice().forEach(function (v) { if (v.isConnected) play(v); });
     });
 
-    /* video(name, {once, then, seq, cls, eager}) -> <video> (or the still under reduced motion).
+    /* video(name, {once, then, seq, cls, eager, set}) -> <video> (or the still under reduced motion).
        once + then: play `name` once, then loop `then` (hello -> idle).
        seq: a list played one after another, round and round (the "cooking" desk). */
     function video(name, o) {
       o = o || {};
-      if (reduce) return img(o.cls);
+      var set = o.set === "voice" ? "voice" : "";
+      if (reduce) return img(o.cls, set);
       var list = o.seq && o.seq.length ? o.seq.slice() : null;
       var v = document.createElement("video");
       // Every attribute that lets a browser autoplay goes on BEFORE the source.
@@ -165,7 +179,8 @@
       v.setAttribute("autoplay", ""); v.autoplay = true;
       v.setAttribute("disablepictureinpicture", ""); v.setAttribute("disableremoteplayback", "");
       v.setAttribute("aria-hidden", "true"); v.setAttribute("tabindex", "-1");
-      v.controls = false; v.preload = "auto"; v.poster = still;
+      v.controls = false; v.preload = "auto"; v.poster = set ? vstill : still;
+      if (set) v.setAttribute("data-set", set);
       v.className = "hv-clip" + (o.cls ? " " + o.cls : "");
       if (o.cls) v.setAttribute("data-cls", o.cls);
       var loopOne = !list && !o.once;
@@ -176,7 +191,7 @@
         if (list) { i = (i + 1) % list.length; cur = list[i]; }
         else if (o.once && o.then) { cur = o.then; v.loop = true; v.setAttribute("loop", ""); }
         else return;
-        v.setAttribute("data-clip", cur); v.src = src(cur); play(v);
+        v.setAttribute("data-clip", cur); v.src = src(cur, set); play(v);
       });
       v.addEventListener("canplay", function () { play(v); });
       v.addEventListener("loadeddata", function () { play(v); });
@@ -184,12 +199,12 @@
       v.addEventListener("playing", function () { unwait(v); });
       // MEDIA_ERR_DECODE / SRC_NOT_SUPPORTED: this browser cannot show the clip at all.
       v.addEventListener("error", function () { var e = v.error; if (!e || e.code >= 3) fallback(v); });
-      if (o.eager) { v.setAttribute("data-eager", ""); v.src = src(cur); setTimeout(function () { play(v); }, 0); }
+      if (o.eager) { v.setAttribute("data-eager", ""); v.src = src(cur, set); setTimeout(function () { play(v); }, 0); }
       // Off screen it neither downloads nor plays; on screen it plays.
       setTimeout(function () { observe(v); }, 0);
       return v;
     }
-    return { dir: dir, still: still, head: base + "assets/brand/helvy.webp?v=c2", apple: apple, src: src, video: video, play: play, img: img };
+    return { dir: dir, still: still, vstill: vstill, head: base + "assets/brand/helvy.webp?v=c2", apple: apple, src: src, video: video, play: play, img: img };
   })();
 
   /* =============================================================== loader */

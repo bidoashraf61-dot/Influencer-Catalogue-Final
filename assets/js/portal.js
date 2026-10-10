@@ -109,6 +109,64 @@
     return box;
   }
   HV.clip = clip;
+  // lime(kind, cls) -> Helvy head-and-shoulders on a lime disc, from the "voice" set (fix batch 4).
+  // Used where he reacts to what the client does: the AI shortlist card, its "Building" stage and
+  // the selection's "Add more like these". Expressive, short clips instead of the cut-out's slow
+  // idle, and opaque H.264 / VP9, so they play in Safari and Chrome alike.
+  //   frame.loop(kind)          loop one clip (no-op when it already loops)
+  //   frame.react(kind, then)   play a reaction once, then loop `then` ON THE SAME <video>: an
+  //                             element a tap has started stays allowed to play in Safari's Low
+  //                             Power Mode, so the loop after a reaction never freezes there
+  //   onEnd                     optional callback when the reaction has played
+  // A new clip is laid over the old one, which goes once the new one draws (a source swap on a
+  // visible element flashed blank frames in Chrome). Reduced motion: the lime still.
+  var LIME = { loop: "loop", wave: "loop", idle: "loop", point: "point-act", think: "think", thumbs: "thumbs-act",
+               cheer: "cheer-act", celebrate: "cheer", scan: "scan" };
+  function lime(kind, cls, opts) {
+    opts = opts || {};
+    var frame = document.createElement("span");
+    frame.className = "hv-lime" + (cls ? " " + cls : "");
+    frame.setAttribute("aria-hidden", "true");
+    if (!HVH || REDUCE) {
+      var im = document.createElement("img");
+      im.className = "hv-clip hv-clip--still"; im.alt = ""; im.decoding = "async";
+      im.src = HVH ? HVH.vstill : ROOT + "assets/brand/voice/voice-loop-poster.webp";
+      frame.appendChild(im);
+      frame.loop = frame.react = function (k, t, cb) { if (typeof t === "function") cb = t; if (cb) setTimeout(cb, 0); };
+      frame.reset = function () {};
+      return frame;
+    }
+    var now = null, looping = false;
+    function put(name, o) {
+      var v = HVH.video(LIME[name] || name, { set: "voice", once: o.once, then: o.then ? (LIME[o.then] || o.then) : null, eager: true });
+      var old = [].slice.call(frame.querySelectorAll("video, img"));
+      var gone = false;
+      var drop = function () { if (gone) return; gone = true; old.forEach(function (x) { if (x.pause) try { x.pause(); } catch (e) { /* gone */ } x.remove(); }); };
+      v.addEventListener("playing", drop, { once: true });
+      setTimeout(drop, 900);
+      frame.appendChild(v);
+      HVH.play(v);                              // inside the tap that asked for it, when there is one
+      return v;
+    }
+    frame.loop = function (name) {
+      if (looping && now === (LIME[name] || name)) return;
+      now = LIME[name] || name; looping = true;
+      put(name, {});
+    };
+    frame.react = function (name, then, onEnd) {
+      if (typeof then === "function") { onEnd = then; then = null; }
+      then = then || "loop";
+      now = LIME[then] || then; looping = true;      // what the same element loops once the reaction ends
+      var v = put(name, { once: true, then: then }), fired = false;
+      var fin = function () { if (fired) return; fired = true; if (onEnd) onEnd(); };
+      v.addEventListener("ended", fin, { once: true });
+      setTimeout(fin, 3600);                       // a reaction that never started still hands over
+    };
+    frame.reset = function () { looping = false; now = null; };   // paused by the page: the next loop() starts afresh
+    if (kind) frame.loop(kind);
+    return frame;
+  }
+  HV.lime = lime;
   // "Cooking": Helvy at the director's desk while the AI works (thinking -> flipping through
   // creator cards -> pressing a green check on a card, round and round) with a rotating step line. Used by
   // Add more like these, Creators like this and Find a replacement; the AI shortlist card has
@@ -144,9 +202,10 @@
   function cookingSteps(opts) {
     var steps = opts.steps || COOK_STEPS, k = 0, seen = false;
     var el = document.createElement("div");
-    el.className = "cx-cook cx-cook--steps" + (opts.dark ? " cx-cook--dark" : "");
+    el.className = "cx-cook cx-cook--steps" + (opts.dark ? " cx-cook--dark" : "") + (opts.helvy === false ? " cx-cook--bare" : "");
     el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
-    el.appendChild(clip("thinking", "cx-cook__hv", { seq: COOK_SEQ }));
+    // helvy: false when the caller's own Helvy acts out the work beside it (Add more like these).
+    if (opts.helvy !== false) el.appendChild(clip("thinking", "cx-cook__hv", { seq: COOK_SEQ }));
     var tx = document.createElement("div"); tx.className = "cx-cook__tx";
     if (opts.title) { var t = document.createElement("p"); t.className = "cx-cook__title"; t.textContent = opts.title; tx.appendChild(t); }
     var list = document.createElement("ol"); list.className = "ai-sl__list cx-cook__list";
@@ -293,7 +352,7 @@
   function T(s) { return LANG === "ar" && AR[s] ? AR[s] : s; }
   // Question and option labels from the server, by id and value.
   var QAR = {
-    goal: ["ما الهدف الرئيسي من الحملة؟", { awareness: "الوصول لأكبر عدد من الناس", engagement: "زيادة التفاعل", conversion: "زيادة المبيعات أو الزيارات أو التسجيلات", balanced: "مزيج متوازن" }],
+    goal: ["ما الهدف الرئيسي من الحملة؟", { awareness: "الوصول لأكبر عدد من الناس", engagement: "زيادة التفاعل", traffic: "زيارات ونقرات على الرابط", conversion: "زيادة المبيعات أو التسجيلات", balanced: "مزيج متوازن" }],
     platforms: ["أين سيُنشر المحتوى؟", { any: "لا تفضيل" }],
     market: ["في أي دولة الجمهور؟", { SA: "السعودية", AE: "الإمارات", EG: "مصر", KW: "الكويت", QA: "قطر", BH: "البحرين", OM: "عُمان", JO: "الأردن" }],
     gender: ["من الجمهور؟", { Any: "الجميع", Women: "غالباً نساء", Men: "غالباً رجال" }],
@@ -406,10 +465,17 @@
   // first-time name, company, job title. There is no team door; HelloVoice reaches the admin by
   // its own address. A selection or campaign link that still needs its access code shows
   // "Opened a shared link?" under the card, and ?access=code brings the same form up.
-  var LOGOS = [["avalon-pharma", "Avalon Pharma"], ["alpha-plus", "Alpha Plus"], ["penduline", "Penduline"], ["parkville", "Parkville"],
-               ["svr", "SVR"], ["ivatherm", "Ivatherm"], ["l-oreal-dermatological-beauty", "L'Oréal Dermatological Beauty"], ["abbott", "Abbott"], ["biotech-cigalah", "Biotech Cigalah"],
-               ["nahdi", "Nahdi"], ["whites", "Whites"], ["la-roche-posay", "La Roche-Posay"], ["vichy", "Vichy"], ["cerave", "CeraVe"], ["uriage", "Uriage"],
-               ["skinceuticals", "SkinCeuticals"], ["jamjoom-pharma", "Jamjoom Pharma"], ["spc", "SPC"], ["orchidia", "Orchidia"]];
+  // The sign-in "Trusted by" strip. The third number is each logo's drawn height in px (fix batch 4):
+  // the same optical size for every logo, worked out once from the files in assets/clients/:
+  // equal ink AREA (height = sqrt(2200 / aspect)), nudged by how dense the mark is (a solid
+  // block like CeraVe draws smaller, a hairline wordmark like SkinCeuticals larger), kept
+  // between 16 and 32 px. A wide wordmark and a square monogram now read at the same weight.
+  var LOGOS = [["avalon-pharma", "Avalon Pharma", 18], ["alpha-plus", "Alpha Plus", 28], ["penduline", "Penduline", 31],
+               ["parkville", "Parkville", 18], ["svr", "SVR", 32], ["ivatherm", "Ivatherm", 20],
+               ["l-oreal-dermatological-beauty", "L'Oréal Dermatological Beauty", 32], ["abbott", "Abbott", 22],
+               ["biotech-cigalah", "Biotech Cigalah", 32], ["nahdi", "Nahdi", 32], ["whites", "Whites", 19], ["la-roche-posay", "La Roche-Posay", 32],
+               ["vichy", "Vichy", 28], ["cerave", "CeraVe", 24], ["uriage", "Uriage", 28], ["skinceuticals", "SkinCeuticals", 21],
+               ["jamjoom-pharma", "Jamjoom Pharma", 22], ["spc", "SPC", 32], ["orchidia", "Orchidia", 26]];
   var PERSONAL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|aol|proton|protonmail|gmx|yandex|mail|zoho)\.[a-z.]+$/i;
 
   function enhanceGate() {
@@ -455,7 +521,8 @@
     var track = h("div", { class: "cx-logos__track" });
     [0, 1].forEach(function (copy) {
       LOGOS.forEach(function (l) {
-        var img = h("img", { src: ROOT + "assets/clients/" + l[0] + ".webp?v=c3", srcset: ROOT + "assets/clients/" + l[0] + "@2x.webp?v=c3 2x", alt: copy ? "" : l[1], loading: "lazy", decoding: "async", height: "22" });
+        var img = h("img", { src: ROOT + "assets/clients/" + l[0] + ".webp?v=c3", srcset: ROOT + "assets/clients/" + l[0] + "@2x.webp?v=c3 2x", alt: copy ? "" : l[1], loading: "lazy", decoding: "async", height: String(l[2] || 22) });
+        img.style.setProperty("--h", (l[2] || 22) + "px");
         if (copy) img.setAttribute("aria-hidden", "true");
         track.appendChild(img);
       });
@@ -2020,7 +2087,18 @@
     var panel = h("section", { id: "hv-panel", class: "hv-panel", role: "dialog", "aria-modal": "false", "aria-labelledby": "hv-name", hidden: "" });
     var head = h("header", { class: "hv-head" });
     head.classList.add("cx-chathead");
-    head.appendChild(clip("idle", "hv-head__helvy"));
+    // Helvy in the header: idle at rest; while he works on an answer (thinking, then the words
+    // streaming in) he sits at his desk (thinking -> cards -> approve) so he never reads as a still.
+    var headHelvy = clip("idle", "hv-head__helvy");
+    head.appendChild(headHelvy);
+    function headWorking(on) {
+      if (!!on === !!headHelvy._busy) return;
+      var nx = on ? clip("thinking", "hv-head__helvy", { seq: COOK_SEQ }) : clip("idle", "hv-head__helvy");
+      nx._busy = !!on;
+      if (headHelvy.parentNode) headHelvy.parentNode.replaceChild(nx, headHelvy);
+      headHelvy = nx;
+      var v = nx.querySelector("video"); if (v && HVH) HVH.play(v);
+    }
     head.insertAdjacentHTML("beforeend", '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">Helvy</h2>' +
       '<p class="hv-head__role"><span class="hv-head__on"><i aria-hidden="true"></i>Your AI assistant · online</span></p></div>');
     var freshBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Start a new chat", title: "New chat" });
@@ -2837,7 +2915,8 @@
       // Until the server names its steps, the line rotates every 1.4 s; each real step then ticks.
       var now = h("p", { class: "cx-think__now" }, "Reading your message…");
       var steps = h("ol", { class: "cx-think__steps" });
-      var work = h("div", { class: "hv-msg hv-msg--ai cx-think", role: "status", "aria-label": "Helvy is working on it" }, clip("thinking"), h("div", null, now, steps));
+      var work = h("div", { class: "hv-msg hv-msg--ai cx-think", role: "status", "aria-label": "Helvy is working on it" }, clip("thinking", null, { seq: COOK_SEQ }), h("div", null, now, steps));
+      headWorking(true);
       var workRow = row("ai", work), out = null, ty = null, acc = "", ended = false, real = false;
       var ROT = ["Reading your message…", "Checking the catalogue…", "Thinking it through…", "Writing your answer…"], ri = 0;
       var rot = setInterval(function () { if (!real) { ri = (ri + 1) % ROT.length; now.textContent = ROT[ri]; } }, 1400);
@@ -2862,6 +2941,7 @@
           if (ev.credits != null) { setCredits(ev.credits); refreshFoot(); }
           // Cards and next steps follow once the answer has finished typing.
           ty.end(ev.reply, function () {
+            headWorking(false);                    // he keeps working until the last word is typed
             if (ev.roi && HV.roiCard) { row("ai", HV.roiCard(ev.roi)); msgs.push({ from: "roi", roi: ev.roi }); save(); }
             if (ev.breakdown && ev.breakdown.rows && ev.breakdown.rows.length) breakdown(ev.breakdown);
             (ev.actions || []).forEach(actionCard);
@@ -2871,13 +2951,13 @@
           return;
         }
         if (ev.t === "error") {
-          stop(); workRow.remove();
+          stop(); workRow.remove(); headWorking(false);
           if (out && ty) ty.end(acc);
           if (ev.reason === "no_credits") { say(ev.message || "You're out of AI credits."); chips([{ label: "Talk to a person", go: flowHuman }]); return; }
           say(ev.status === 429 ? "One moment, that was quick. Try again in a few seconds." : (ev.message || "That didn't work, and you weren't charged."));
           if (ev.credits != null) { setCredits(ev.credits); refreshFoot(); }
         }
-      }).then(function () { if (!ended) { stop(); if (!out) workRow.remove(); } });
+      }).then(function () { if (!ended) { stop(); headWorking(false); if (!out) workRow.remove(); } });
     }
     function grow() { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 120) + "px"; }
     ta.addEventListener("input", grow);
@@ -3051,7 +3131,7 @@
   ];
   var AI_SHORT = { Instagram: "IG", TikTok: "TT", Snapchat: "SC", YouTube: "YT" };
   var AI_MARKET = { SA: "KSA", AE: "UAE", EG: "Egypt", KW: "Kuwait", QA: "Qatar", BH: "Bahrain", OM: "Oman", JO: "Jordan" };
-  var AI_GOAL = { awareness: "Reach", engagement: "Engagement", conversion: "Sales", balanced: "Balanced" };
+  var AI_GOAL = { awareness: "Awareness", engagement: "Engagement", traffic: "Traffic", conversion: "Conversion", balanced: "Balanced" };
   function aiSvg(path, size) {
     return '<svg viewBox="0 0 24 24" width="' + (size || 20) + '" height="' + (size || 20) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + "</svg>";
   }
@@ -3091,9 +3171,8 @@
     host.classList.add("ai-host");
     var card = h("section", { id: "ai-sl", class: "ai-sl", "aria-labelledby": "ai-sl-title" });
     var roster = document.querySelectorAll(".cat-card").length;
-    // Helvy's 2026-10-09 transparent set (hv-loader.js names the files). The wait is the
-    // "director's desk": thinking -> flipping through creator cards -> pressing a green check on the pick, round and round.
-    function loop(name, seq) { return clip(name, "ai-sl__hv", seq ? { seq: seq } : null); }
+    // Helvy on lime (fix batch 4): the "voice" set's expressive clips, as this card had before the
+    // transparent cut-out replaced them (his idle and think barely move, so he read as a still).
 
     // Collapsed: the invitation.
     var intro = h("div", { class: "ai-sl__intro" });
@@ -3107,7 +3186,7 @@
     var altLink = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("link") + "<span>Product link</span>" });
     var altFile = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("upload") + "<span>Brief file</span>" });
     intro.appendChild(h("div", { class: "ai-sl__alt" }, h("span", null, "Or start from"), altLink, altFile));
-    intro.querySelector(".ai-sl__face").appendChild(clip("idle", "ai-sl__hv cx-hd--head"));
+    intro.querySelector(".ai-sl__face").appendChild(lime("loop"));
 
     // Expanded: the journey.
     var run = h("div", { class: "ai-sl__run", hidden: "" });
@@ -3128,12 +3207,13 @@
     // The coach: the character reacts to every step (points at a new question, thinks
     // while you choose, thumbs-up on an answer, cheers at the end), over a power meter.
     var coach = h("div", { class: "ai-sl__coach", "aria-hidden": "true" });
-    // Each reaction is a fresh video element laid over the last one, which is removed once the
-    // new one is drawing. Re-using one element (swapping its source, or hiding and showing
-    // several) left blank or half-painted frames in Chrome.
+    // The lime frame (HV.lime) lays each new clip over the last and plays a reaction's follow-up
+    // loop on the same element, so it keeps moving in Safari too.
     var cring = h("div", { class: "ai-sl__cring" });
+    var cframe = lime(null, "ai-sl__cframe");
+    cring.appendChild(cframe);
     // Trimmed to the action itself, so a reaction starts the instant the client taps.
-    var CLIP = { point: "point", think: "thinking", thumbs: "approve", cheer: "celebrate", wave: "idle" };
+    var CLIP = { point: "point", think: "think", thumbs: "thumbs", cheer: "cheer", wave: "loop" };
     var IDLE = { think: 1, wave: 1 };
     var power = h("div", { class: "ai-sl__power" });
     power.innerHTML = '<p class="ai-sl__pw-h">Campaign power</p><p class="ai-sl__pw-n"><b>0</b><small> / ' + 1000 + '</small></p>' +
@@ -3153,16 +3233,9 @@
     // The coach: idle poses loop; reactions (thumbs, cheer, point) play once, in full, then hand
     // over to whatever is waiting, so a tap is always answered before the next pose.
     var coachTimer = null, reacting = false, queued = null;
-    function coachShow(kind, loop, onEnd) {
-      if (!window.HVHelvy) return;
-      var v = window.HVHelvy.video(CLIP[kind], { once: !loop, cls: "ai-sl__cvid", eager: true });
-      var old = [].slice.call(cring.querySelectorAll("video"));
-      var swap = function () { old.forEach(function (o) { o.remove(); }); };
-      v.addEventListener("playing", swap, { once: true });
-      setTimeout(swap, 900);
-      if (onEnd) { v.addEventListener("ended", onEnd, { once: true }); coachTimer = setTimeout(onEnd, 5400); }
-      cring.appendChild(v);
-      window.HVHelvy.play(v);
+    function coachShow(kind, loop, onEnd, then) {
+      if (loop) cframe.loop(CLIP[kind]);
+      else cframe.react(CLIP[kind], CLIP[then] || "think", onEnd);
     }
     function coachPlay(kind, then) {
       if (reduce) return;
@@ -3176,7 +3249,7 @@
         reacting = false;
         var next = queued; queued = null;
         if (next === "point") coachPlay("point", "think"); else coachPlay(next || "think");
-      });
+      }, IDLE[queued] ? queued : "think");
     }
     // A new question asks for a point, unless the coach is still celebrating: then it waits its turn.
     function coachCue(kind) { if (reacting) queued = kind; else coachPlay(kind, "think"); }
@@ -3276,11 +3349,15 @@
       coachCue("point");
       var id = AI_STEPS[i][0], q = byId[id];
       if (!q) return i + 1 < AI_STEPS.length ? ask(i + 1) : review();
-      var many = q.type === "many";
-      var picked = Array.isArray(answers[id]) ? answers[id].slice() : [];
+      // The goal takes several (fix batch 4, as the selection objective does): stored as a list,
+      // scored on the server as "Awareness+Engagement".
+      var multiGoal = !!q.multi_ok;
+      var many = q.type === "many" || multiGoal;
+      if (multiGoal && q.type !== "many") q = Object.assign({}, q, { type: "many" });
+      var picked = Array.isArray(answers[id]) ? answers[id].slice() : answers[id] ? [answers[id]] : [];
       var p = h("div", { class: "ai-sl__q" });
-      p.appendChild(h("p", { class: "ai-sl__ask" }, q.label));
-      p.appendChild(h("p", { class: "ai-sl__hint" }, many ? "Pick any, then Next" : "Tap one"));
+      p.appendChild(h("p", { class: "ai-sl__ask" }, multiGoal ? "What are the campaign’s goals?" : q.label));
+      p.appendChild(h("p", { class: "ai-sl__hint" }, multiGoal ? "Pick one or more, then Next" : many ? "Pick any, then Next" : "Tap one"));
       var opts = h("div", { class: "ai-sl__opts" + (q.options.length > 6 ? " ai-sl__opts--many" : "") });
       q.options.forEach(function (o) {
         var on = many ? picked.indexOf(o.value) > -1 : answers[id] === o.value;
@@ -3351,7 +3428,8 @@
     }
     function nameFor() {
       var cat = Array.isArray(answers.category) && answers.category[0] && answers.category[0] !== "any" ? optionLabel(byId.category, answers.category[0]).split(/ [&\/] /)[0] : "Creators";
-      return [cat, AI_MARKET[answers.market] || "", AI_GOAL[answers.goal] || ""].filter(Boolean).join(" · ");
+      var goals = (Array.isArray(answers.goal) ? answers.goal : [answers.goal]).map(function (g) { return AI_GOAL[g]; }).filter(Boolean);
+      return [cat, AI_MARKET[answers.market] || "", goals.join(" + ")].filter(Boolean).join(" · ");
     }
     function costLine() {
       var c = (ME && ME.costs) || { brief: 5, search: 0 };
@@ -3410,6 +3488,7 @@
       busy = true;
       run.classList.add("is-staging"); clearTimeout(coachTimer);
       [].slice.call(cring.querySelectorAll("video")).forEach(function (o) { try { o.pause(); } catch (e) { /* none */ } });
+      cframe.reset();
       var p = h("div", { class: "ai-sl__wait", role: "status", "aria-live": "polite" });
       var scene = h("div", { class: "ai-sl__scene", "aria-hidden": "true" });
       scene.innerHTML = '<div class="ai-sl__orbit ai-sl__orbit--a"><i></i><i></i><i></i></div>' +
@@ -3420,7 +3499,9 @@
         }).join("") + "</div>" +
         '<div class="ai-sl__lens"></div>' +
         '<span class="ai-sl__spark ai-sl__spark--1"></span><span class="ai-sl__spark ai-sl__spark--2"></span><span class="ai-sl__spark ai-sl__spark--3"></span>';
-      scene.querySelector(".ai-sl__lens").appendChild(loop("thinking", ["thinking", "cards", "approve"]));
+      // Helvy scouts with his camera while the steps tick off (the scan clip, looping). Created in
+      // the Build tap, so the browser lets it play.
+      scene.querySelector(".ai-sl__lens").appendChild(lime("scan"));
       p.appendChild(scene);
       var side = h("div", { class: "ai-sl__steps" });
       side.appendChild(h("p", { class: "ai-sl__ask" }, "Building “" + name + "”"));
@@ -3472,7 +3553,7 @@
       var burst = h("div", { class: "ai-sl__burst", "aria-hidden": "true" });
       for (var i = 0; i < 18; i++) { var c = h("i"); c.style.setProperty("--a", (i * 20) + "deg"); c.style.setProperty("--d", (60 + (i % 3) * 26) + "px"); burst.appendChild(c); }
       p.appendChild(burst);
-      if (!reduce) p.appendChild(h("div", { class: "ai-sl__cheer" }, clip("celebrate", "ai-sl__hv", { once: true, then: "idle" })));
+      if (!reduce) { var cheer = lime(null); p.appendChild(h("div", { class: "ai-sl__cheer" }, cheer)); cheer.react("celebrate", "loop"); }
       p.appendChild(h("p", { class: "ai-sl__big" }, h("b", null, String(res.picks.length)), " creators picked"));
       p.appendChild(h("p", { class: "ai-sl__hint" }, "Best fit first, scored per platform. They're ticked in your tray: add or remove anyone, then save."));
       swap(p);

@@ -125,9 +125,9 @@ def line(name, start, end, today):
 
 
 def advise(categories=(), market="SA", timing=None, launch="", today=None, limit=3):
-    """The launch windows that suit a brief, best first. Sector-specific occasions (a
-    dermatology congress for skincare) come before ones that suit everyone; a launch date
-    pulls the windows around it forward. ``{"windows": [...], "headline": str or None}``."""
+    """The launch windows that suit a brief, best first: every sector-specific occasion (a
+    dermatology congress for skincare) before any that suits everyone, then the soonest. With a
+    launch date, the windows within 45 days of it lead, ranked the same way by closeness. ``{"windows": [...], "headline": str or None}``."""
     today = today or _dt.date.today()
     sectors = {SECTOR_OF.get(c) for c in (categories or []) if SECTOR_OF.get(c)}
     target = None
@@ -154,11 +154,14 @@ def advise(categories=(), market="SA", timing=None, launch="", today=None, limit
         st = status(s, e, today)
         if st == "late":
             continue
-        rank = (0 if own else 1) + (0 if kind in ("congress", "religious", "season", "retail") else 0.5)
+        # Order (Bido, 2026-10-10): the brief's own sector first, then the soonest window. With a
+        # launch date, the windows around it (within 45 days) come first, then the same rule,
+        # closest to the launch first.
         if target:
-            rank += min(3.0, abs((s - target).days) / 21.0)
+            off = abs((s - target).days)
+            rank = (0 if off <= 45 else 1, 0 if own else 1, off)
         else:
-            rank += (s - today).days / 120.0
+            rank = (0, 0 if own else 1, (s - today).days)
         picks.append((rank, {"name": name, "kind": kind, "starts": start, "ends": end, "status": st,
                              "weeks_away": max(0, (s - today).days // 7), "message": line(name, s, e, today),
                              "dates": {"approx": "approximate (moon-sighted)", "confirm": "organiser to confirm"}.get(flag, "fixed"),

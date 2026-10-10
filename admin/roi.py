@@ -22,11 +22,17 @@ number and is only used to divide by.
 
 Verdict words match the campaign report's grades: good / moderate / low.
 
+What the client sees (fix batch 4, Bido 2026-10-10): every figure as a RANGE around
+the point estimate (counts and rates +/-20 %, costs the matching inverse band),
+rounded to two significant figures; no sources or method text and no advice line
+are sent at all. The page says only that this is an estimate, not a result.
+
     estimate(goal, budget, platforms, market, creators=None, mix=None)
     creators_of(selection, which)     a selection's creators as the calculator needs them
     save(...) / latest_for(sel_id)    an estimate kept with a selection
     versus(campaign)                  saved estimate against the live report
 """
+import re as _re
 import json
 
 import db
@@ -168,14 +174,36 @@ def _posts_from_mix(mix, platforms):
     return posts
 
 
+# Arabic-Indic (U+0660-0669) and Persian / Urdu (U+06F0-06F9) digits as ASCII, and the
+# Arabic thousands (U+066C) and decimal (U+066B) separators as "," and "." (fix batch 4: a
+# budget typed on an Arabic keyboard used to vanish).
+_DIGITS = {**{0x0660 + i: str(i) for i in range(10)}, **{0x06F0 + i: str(i) for i in range(10)},
+           0x066C: ",", 0x066B: ".", 0x060C: ","}
+
+
+def ascii_digits(text):
+    return str(text if text is not None else "").translate(_DIGITS)
+
+
+def parse_budget(value):
+    """The client's budget as a number: ASCII, Arabic-Indic or Persian digits, with or
+    without thousands separators or spaces. 0 when there is no usable number."""
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        n = float(value)
+    else:
+        t = _re.sub(r"[\s,\u00a0\u202f'’]", "", ascii_digits(value))
+        try:
+            n = float(t) if t else 0.0
+        except ValueError:
+            return 0.0
+    return max(0.0, min(n, 1e9)) if n == n else 0.0
+
+
 def estimate(goal, budget, platforms, market="SA", creators=None, mix=None):
     goal = goal if goal in GOALS else "awareness"
     platforms = [p for p in PLATFORMS if p in (platforms or [])] or ["Instagram"]
     market = market if market in MARKETS else "SA"
-    try:
-        budget = max(0.0, min(float(str(budget or 0).replace(",", "")), 1e9))
-    except ValueError:
-        budget = 0.0
+    budget = parse_budget(budget)
     lib = plans.library()
     house = plans.house_benchmarks()
     R, house_posts = _rates(lib, house)
@@ -254,7 +282,7 @@ def estimate(goal, budget, platforms, market="SA", creators=None, mix=None):
     order = {"awareness": ["reach", "views", "impressions", "frequency", "cpm"],
              "engagement": ["interactions", "er", "cpe"],
              "traffic": ["clicks", "ctr", "landing", "cpc"]}[goal]
-    figures = [dict(F[k], key=k, value=_r(k, F[k]["value"])) for k in order if F[k]["value"] is not None]
+    figures = [dict(F[k], key=k, value=_r(k, F[k]["value"]), range=band_of(k, F[k]["value"])) for k in order if F[k]["value"] is not None]
     cost_key = {"awareness": "cpm", "engagement": "cpe", "traffic": "cpc"}[goal]
     cost_val = {"cpm": cpm, "cpe": cpe, "cpc": cpc}[cost_key]
     band = bands[cost_key]
@@ -262,9 +290,9 @@ def estimate(goal, budget, platforms, market="SA", creators=None, mix=None):
     cost = None
     if cost_val is not None:
         good, acc = band[1], band[0]
-        lo, hi = good * 0.5, acc * 1.15
-        hi = max(hi, cost_val * 1.1)
-        cost = {"key": cost_key, "label": cost_key.upper(), "value": _r(cost_key, cost_val), "fair": [_r(cost_key, good), _r(cost_key, acc)],
+        rng = band_of(cost_key, cost_val)
+        lo, hi = min(good * 0.5, rng[0] * 0.9), max(acc * 1.15, rng[1] * 1.08)   # the whole range stays on the scale
+        cost = {"key": cost_key, "label": cost_key.upper(), "value": _r(cost_key, cost_val), "range": rng, "fair": [_r(cost_key, good), _r(cost_key, acc)],
                 "scale": [_r(cost_key, lo), _r(cost_key, hi)], "sig": _sig(grade if cost_val is not None else None)}
     split = None
     if goal == "engagement" and measured_split and likes + comments > 0:
@@ -275,8 +303,6 @@ def estimate(goal, budget, platforms, market="SA", creators=None, mix=None):
         "creators": n_creators, "posts": len(posts), "skipped": skipped, "measured_posts": measured,
         "figures": figures, "cost": cost, "split": split,
         "verdict": _sig(grade) or {"grade": None, "label": "Add a budget"},
-        "advice": advice(goal, grade, platforms, market, by_tier, views, n_creators),
-        "sources": sources(platforms, house_posts, measured),
         "totals": {k: _r(k, v) for k, v in (("views", views), ("reach", reach), ("impressions", imps), ("engagement", eng),
                                               ("er", er), ("clicks", clicks), ("landing", landing), ("ctr", ctr)) if v is not None},
         "summary": "%s · %s · %s" % (GOAL_LABEL[goal], " and ".join(platforms),
@@ -297,37 +323,36 @@ def _r(key, v):
     return plans._round(key, v) or 0
 
 
-def advice(goal, grade, platforms, market, by_tier, views, n):
-    """Helvy's one line: practical, never a price."""
-    if not views:
-        return "Add creators or a tier mix and I'll show what the budget can reach."
-    big = (by_tier.get("macro", 0) + by_tier.get("mega", 0)) / views if views else 0
-    small = (by_tier.get("micro", 0) + by_tier.get("nano", 0)) / views if views else 0
-    if goal == "awareness":
-        if grade in ("moderate", "low") and big > 0.6:
-            return "Most of the reach rides on the biggest creators. Spreading the budget across more mid and micro creators usually brings the CPM down."
-        if "TikTok" not in platforms and grade != "good":
-            return "Adding TikTok usually lowers the cost per view in KSA; one post moved there is worth testing."
-        return "Strong reach for this mix. Ask for Reels and TikToks rather than photos to keep the views up."
-    if goal == "engagement":
-        lead = "Micro creators do most of the work here. " if small > 0.4 else ""
-        if market == "SA":
-            return lead + "Arabic-first content usually lifts engagement in KSA, so ask for it in the brief."
-        return lead + "Comments and saves come from content people can use: routines, how-tos and honest reviews."
-    if "Snapchat" not in platforms:
-        return "Clicks come from links people can tap. A swipe-up on Snapchat would add more, and every creator should put the link in the caption too."
-    return "Ask every creator for the tracking link in the caption, not only in stories: stories alone lose most of the clicks."
+# How wide the shown range is around the point estimate. Counts and rates: -20 % / +20 %.
+# A cost is the budget divided by a count, so its band is the inverse one (/1.2 .. /0.8).
+SPREAD = 0.2
 
 
-def sources(platforms, house_posts, measured):
-    out = ["Industry benchmarks by platform and creator size (Favikon, Qoruz, Metricool × HypeAuditor, Emplicit, Upgrowth, "
-           "Kolsquare MENA 2026, IQFluence, Influencer Marketing Hub Saudi 2026)"]
-    if measured:
-        out.append("the creators' own measured averages for %d post%s" % (measured, "" if measured == 1 else "s"))
-    if house_posts:
-        out.append("blended with HelloVoice campaign results (%d tracked posts)" % house_posts)
-    out.append("HelloVoice planning assumptions for impressions and landing visits")
-    return out
+def _sig2(v, up):
+    """v rounded down (up=False) or up to two significant figures: 4,312 -> 4,300 / 4,400."""
+    import math
+    if not v or v <= 0:
+        return 0
+    e = math.floor(math.log10(v)) - 1
+    q = 10 ** e
+    n = (math.ceil(v / q - 1e-9) if up else math.floor(v / q + 1e-9)) * q
+    return int(n) if e >= 0 else round(n, -e)
+
+
+def band_of(key, v):
+    """[low, high] shown to the client instead of the single estimate."""
+    if v is None:
+        return None
+    if key in ("cpm", "cpc", "cpe"):
+        lo, hi = v / (1 + SPREAD), v / (1 - SPREAD)
+    elif key == "frequency":
+        lo, hi = v * 0.85, v * 1.15
+    else:
+        lo, hi = v * (1 - SPREAD), v * (1 + SPREAD)
+    if key in ("er", "ctr", "frequency"):
+        d = 2 if hi < 1 else 1
+        return [round(lo, d), round(hi, d)]
+    return [_sig2(lo, False), _sig2(hi, True)]
 
 
 # --------------------------------------------------------- selection input --
@@ -398,8 +423,11 @@ def latest_for(sel_id, before=None):
 def row_view(r):
     if r is None:
         return None
+    res = json.loads(r["result"] or "{}")
+    for k in ("advice", "sources"):          # estimates saved before fix batch 4 still carry these
+        res.pop(k, None)
     return {"id": r["id"], "goal": r["goal"], "at": r["created_at"], "input": json.loads(r["input"] or "{}"),
-            "result": json.loads(r["result"] or "{}")}
+            "result": res}
 
 
 # ------------------------------------------------------ estimate vs actual --
@@ -447,7 +475,6 @@ def versus(k):
 
 # --------------------------------------------------------------- in the chat --
 
-import re as _re
 
 _AMOUNT = _re.compile(r"(?:sar|sr|riyals?|ريال)\s*(\d[\d,\.]*)\s*(k|m|thousand|million|ألف)?|(\d[\d,\.]*)\s*(k|m|thousand|million|ألف)?\s*(?:sar|sr|riyals?|ريال)", _re.I)
 _ASK = _re.compile(r"\b(reach|budget|what can|how (many|much) (views|reach|people|clicks)|get me|buy|roi)\b|ميزانية|ميزانيتي", _re.I)
@@ -456,13 +483,13 @@ _ASK = _re.compile(r"\b(reach|budget|what can|how (many|much) (views|reach|peopl
 def from_text(text):
     """A typed "what can SAR 60,000 do on TikTok if we want clicks?" answered at once with a
     calculator card: free, no AI call. None when the message is not that question."""
-    t = " ".join(str(text or "").split())
+    t = " ".join(ascii_digits(text).split())
     m = _AMOUNT.search(t)
     if not m or not _ASK.search(t):
         return None
     num, unit = (m.group(1), m.group(2)) if m.group(1) else (m.group(3), m.group(4))
     try:
-        v = float(num.replace(",", ""))
+        v = float(num.replace(",", "").rstrip("."))
     except ValueError:
         return None
     unit = (unit or "").lower()

@@ -40,7 +40,14 @@
       return String(Math.round(n));
     }
     function money(n) { return Math.round(Number(n) || 0).toLocaleString("en-US"); }
+    function sar(n) { return n >= 1000 ? money(n) : String(n); }
+    // Fix batch 4 (Bido): the client sees every figure as a range around the estimate
+    // ("160K–250K"), never one exact-looking number.
     function fig(f) {
+      if (f.range && f.range.length === 2 && f.range[0] !== f.range[1]) {
+        var one = function (x) { return f.unit === "SAR" ? (x >= 1000 ? money(x) : String(x)) : f.unit === "%" || f.unit === "×" ? String(x) : big(x); };
+        return one(f.range[0]) + "–" + one(f.range[1]);
+      }
       if (f.value == null) return "–";
       if (f.unit === "SAR") return String(f.value);
       if (f.unit === "%") return String(f.value);
@@ -100,12 +107,30 @@
     function budgetBox(state, onChange) {
       var inp = h("input", { type: "text", inputmode: "numeric", autocomplete: "off", "aria-label": "Your budget in SAR", placeholder: "e.g. 120,000",
         value: state.budget ? money(state.budget) : "" });
-      inp.addEventListener("input", function () {
-        var n = inp.value.replace(/[^\d]/g, "").slice(0, 10);
+      // Arabic-Indic (٠-٩) and Persian (۰-۹) digits count as digits (fix batch 4): the field used
+      // to strip everything but 0-9, so a budget typed on an Arabic keyboard vanished. The caret
+      // keeps its place among the digits when the grouping commas are redrawn, and nothing is
+      // rewritten while an input method is still composing.
+      function ascii(s) {
+        return String(s).replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); })
+                        .replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); });
+      }
+      function tidy() {
+        var raw = ascii(inp.value), caret = inp.selectionStart == null ? raw.length : inp.selectionStart;
+        var before = raw.slice(0, caret).replace(/[^0-9]/g, "").length;
+        var n = raw.replace(/[^0-9]/g, "").replace(/^0+(?=\d)/, "").slice(0, 10);
         state.budget = n ? Number(n) : 0;
-        inp.value = n ? money(n) : "";
+        var out = n ? money(n) : "";
+        if (inp.value !== out) {
+          inp.value = out;
+          var pos = 0, seen = 0;
+          while (pos < out.length && seen < Math.min(before, n.length)) { if (/[0-9]/.test(out[pos])) seen++; pos++; }
+          if (document.activeElement === inp) { try { inp.setSelectionRange(pos, pos); } catch (e) { /* not a text field */ } }
+        }
         onChange();
-      });
+      }
+      inp.addEventListener("input", function (e) { if (!e.isComposing) tidy(); });
+      inp.addEventListener("compositionend", tidy);
       return h("label", { class: "cx-money" }, h("span", null, "SAR"), inp, h("em", null, "excl. VAT"));
     }
     function mixBox(state, onChange) {
@@ -122,6 +147,7 @@
     }
     function q(label, node, aside) { return h("div", { class: "cx-q" }, h("span", { class: "cx-label" }, label, aside || null), node); }
 
+    var ESTIMATE_LINE = "Estimate, not a result. Real results depend on the content, the timing and the audience.";
     function resultPanel(res, opts) {
       opts = opts || {};
       var box = h("section", { class: "cx-res", "aria-live": "polite" });
@@ -151,19 +177,16 @@
         var lo = c.scale[0], hi = c.scale[1], span = (hi - lo) || 1;
         var pct = function (x) { return Math.max(0, Math.min(100, (x - lo) / span * 100)); };
         var fair = h("span", { class: "cx-band__fair" }); fair.style.left = pct(c.fair[0]) + "%"; fair.style.width = (pct(c.fair[1]) - pct(c.fair[0])) + "%";
-        var you = h("span", { class: "cx-band__you" }, h("span", null, "SAR " + c.value)); you.style.left = pct(c.value) + "%";
+        var cr = c.range && c.range[0] !== c.range[1] ? c.range : [c.value, c.value];
+        var you = h("span", { class: "cx-band__you" }, h("span", null, "SAR " + (cr[0] === cr[1] ? sar(cr[0]) : sar(cr[0]) + "–" + sar(cr[1]))));
+        you.style.left = pct(cr[0]) + "%"; you.style.width = Math.max(0, pct(cr[1]) - pct(cr[0])) + "%";
         box.appendChild(h("div", { class: "cx-band" },
           h("div", { class: "cx-band__hd" }, h("b", null, "Your " + c.label + " against a fair range"), h("span", null, (res.market_label || "KSA") + ", " + res.platforms.join(" and "))),
           h("div", { class: "cx-band__track" }, fair, you),
-          h("div", { class: "cx-band__k" }, h("span", null, "SAR " + c.scale[0]), h("span", null, "Fair: SAR " + c.fair[0] + "–" + c.fair[1]), h("span", null, "SAR " + c.scale[1]))));
+          h("div", { class: "cx-band__k" }, h("span", null, "SAR " + sar(c.scale[0])), h("span", null, "Fair: SAR " + sar(c.fair[0]) + "–" + sar(c.fair[1])), h("span", null, "SAR " + sar(c.scale[1])))));
       }
       if (res.skipped && res.skipped.length) box.appendChild(h("p", { class: "cx-skipped" }, "Not on these platforms, so left out: " + res.skipped.slice(0, 6).join(", ") + (res.skipped.length > 6 ? "…" : "") + "."));
-      if (!opts.compact) {
-        var face = h("span", { class: "cx-hd" }); face.appendChild(h("img", { class: "hv-clip", src: HV.helvy, alt: "" }));
-        box.appendChild(h("div", { class: "cx-advice" }, face, h("p", { class: "cx-advice__b" }, h("b", null, "Helvy"), res.advice)));
-        box.appendChild(h("p", { class: "cx-srcs" }, h("span", { class: "cx-tag cx-tag--est", html: ic("info") + "Estimate" }),
-          h("span", null, (res.sources || []).join("; ") + ". Costs use your budget only. Not a forecast of sales.")));
-      }
+      if (!opts.compact) box.appendChild(h("p", { class: "cx-srcs" }, ESTIMATE_LINE + " After the campaign, your report shows estimate vs actual."));
       return box;
     }
 
@@ -185,13 +208,12 @@
         ".hd{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #121212;padding-bottom:12px}" +
         ".hd img{width:150px}.v{display:inline-block;margin:18px 0 6px;padding:10px 26px 8px;border-radius:999px;color:#fff;background:" + col + ";font:400 34px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;letter-spacing:.04em}" +
         ".muted{color:#4a4a4a}table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:9px 6px;border-bottom:1px solid #ddd}td.n{font-weight:700;text-align:right}" +
-        ".adv{margin-top:18px;padding:14px 16px;background:#f6f3ee;border-radius:12px}.fine{margin-top:22px;font-size:11.5px;color:#4a4a4a}</style></head><body>" +
+        ".fine{margin-top:22px;font-size:11.5px;color:#4a4a4a}</style></head><body>" +
         "<div class='hd'><img src='" + esc(ROOT) + "assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c4' alt='HELVY Connect'><span class='muted'>" + esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + "</span></div>" +
         "<div class='v'>" + esc(v.label || "Estimate") + "</div><div class='muted'>Against the benchmark for this mix</div>" +
         "<h1>ROI estimate" + (ctx && ctx.name ? " · " + esc(ctx.name) : "") + "</h1><p class='muted'>" + esc(res.summary) + (res.budget ? " · budget SAR " + esc(money(res.budget)) + " excl. VAT" : "") + "</p>" +
-        "<table>" + figs + "</table>" + (res.cost ? "<p class='muted'>Your " + esc(res.cost.label) + " SAR " + esc(res.cost.value) + " · fair range SAR " + esc(res.cost.fair[0]) + "–" + esc(res.cost.fair[1]) + "</p>" : "") +
-        "<div class='adv'><b>Helvy</b><br>" + esc(res.advice) + "</div>" +
-        "<p class='fine'>Estimate. " + esc((res.sources || []).join("; ")) + ". Costs use your own budget only; this is not a forecast of sales and not a quote. " +
+        "<table>" + figs + "</table>" + (res.cost ? "<p class='muted'>Your " + esc(res.cost.label) + " SAR " + esc(res.cost.range ? res.cost.range.join("–") : res.cost.value) + " · fair range SAR " + esc(res.cost.fair[0]) + "–" + esc(res.cost.fair[1]) + "</p>" : "") +
+        "<p class='fine'>" + esc(ESTIMATE_LINE) + " Costs use your own budget only; this is not a quote. " +
         "Powered by HelloVoice · A BlueHolding Company.</p><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>";
       w.document.open(); w.document.write(html); w.document.close();
     }
@@ -273,7 +295,7 @@
       });
       card.appendChild(dl);
       var v = res.verdict || {};
-      card.appendChild(h("div", { class: "cx-rcard__v" }, h("span", { class: "cx-verdict cx-verdict--" + (v.grade || "none") }, h("b", null, v.label || "Estimate")), h("span", null, res.advice)));
+      card.appendChild(h("div", { class: "cx-rcard__v" }, h("span", { class: "cx-verdict cx-verdict--" + (v.grade || "none") }, h("b", null, v.label || "Estimate")), h("span", null, "against the benchmark")));
       var open = h("button", { class: "cx-btn", type: "button" }, "Open calculator");
       open.addEventListener("click", function () {
         try { sessionStorage.setItem("cx-roi-seed", JSON.stringify({ goal: res.goal, budget: res.budget, platforms: res.platforms, mix: res.mix || null })); } catch (e) { /* blocked */ }
@@ -282,7 +304,7 @@
       var save = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("save") + "<span>Save</span>" });
       save.addEventListener("click", function () { open.click(); });
       card.appendChild(h("div", { class: "cx-rcard__go" }, open, save));
-      card.appendChild(h("p", { class: "cx-rcard__fine" }, "From your budget and industry benchmarks. For creator prices, your account manager prepares a quote."));
+      card.appendChild(h("p", { class: "cx-rcard__fine" }, ESTIMATE_LINE + " For creator prices, your account manager prepares a quote."));
       return card;
     };
 
@@ -410,14 +432,21 @@
       var from = h("div", { class: "cx-more__from" });
       approved.slice(0, 5).forEach(function (c) { var cr = S.creator(c); from.appendChild(h("span", { class: "cx-ph" }, initials(cr ? cr.name : c))); });
       from.appendChild(h("span", null, approved.length ? "Based on your " + approved.length + " approved creator" + (approved.length === 1 ? "" : "s") : "Approve a few creators first, so Helvy knows what you like"));
-      card.appendChild(clip("idle"));
+      // Helvy on his lime disc (fix batch 4), the AI shortlist card's clips: an easy loop at rest,
+      // a thumbs-up when a quick pick is tapped, the camera scan while he works, a cheer when the
+      // creators land.
+      var face = HV.lime ? HV.lime("loop", "cx-more__face") : clip("idle");
+      card.appendChild(face);
       card.appendChild(h("div", null, h("h2", { id: "cx-more-t" }, "Add more like these", costTag(cur.moreCost)),
         h("p", null, "Helvy studies the creators you approved, their audience, tone and platforms, and adds more that match to ", h("b", null, "Under review"), " for you to decide."), from));
       var note = h("input", { class: "cx-briefin", type: "text", maxlength: "160", placeholder: "Anything to add? e.g. Jeddah-based, Arabic-first", "aria-label": "Anything to add for Helvy" });
       var quick = h("div", { class: "cx-quick", role: "group", "aria-label": "Quick picks" });
       [["doctors", "More doctors"], ["tiktok", "TikTok first"], ["under100k", "Under 100K followers"], ["women2534", "Women 25–34"]].forEach(function (c) {
         var b = h("button", { type: "button", "aria-pressed": "false" }, c[1]);
-        b.addEventListener("click", function () { chips[c[0]] = !chips[c[0]]; b.setAttribute("aria-pressed", String(!!chips[c[0]])); });
+        b.addEventListener("click", function () {
+          chips[c[0]] = !chips[c[0]]; b.setAttribute("aria-pressed", String(!!chips[c[0]]));
+          if (chips[c[0]] && face.react && !card.classList.contains("is-cooking")) face.react("thumbs", "loop");
+        });
         quick.appendChild(b);
       });
       var out = h("output", { "aria-live": "polite" }, "5");
@@ -432,7 +461,8 @@
         go.disabled = true; msg.textContent = "";
         // While Helvy works: the director's desk (thinking -> cards -> approve) and the step line.
         var seeds = S.codes().filter(function (c) { return S.status(c).s === "approved"; }).length;
-        var cook = HV.cooking ? HV.cooking({ dark: true, list: true, title: "Helvy is finding " + count + " more",
+        if (face.loop) face.loop("scan");
+        var cook = HV.cooking ? HV.cooking({ dark: true, list: true, helvy: !face.loop, title: "Helvy is finding " + count + " more",
           steps: ["Studying your " + (seeds || "") + " approved creator" + (seeds === 1 ? "" : "s") + "…", "Reading their audience and tone…",
                   "Flipping through the roster…", "Scoring each match…", "Adding the best " + count + " to Under review…"] }) : null;
         if (cook) { card.classList.add("is-cooking"); card.appendChild(cook); cook.scrollIntoView({ block: "center", behavior: HV.reduce ? "auto" : "smooth" }); }
@@ -443,9 +473,10 @@
         }).then(function (r) {
           go.disabled = false;
           if (cook) { cook.stop(); cook.remove(); card.classList.remove("is-cooking"); }
-          if (!r.b || !r.b.ok) { msg.textContent = (r.b && r.b.message) || "Helvy couldn’t look just now. Please try again."; return; }
+          if (!r.b || !r.b.ok) { if (face.loop) face.loop("think"); msg.textContent = (r.b && r.b.message) || "Helvy couldn’t look just now. Please try again."; return; }
           var codes = (r.b.added || []).map(function (c) { return c.code; });
-          if (!codes.length) { msg.textContent = r.b.message || "Helvy found no one close enough."; return; }
+          if (!codes.length) { if (face.loop) face.loop("think"); msg.textContent = r.b.message || "Helvy found no one close enough."; return; }
+          if (face.react) face.react("cheer", "loop");
           S.add(codes);
           if (r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);
           msg.textContent = "Added " + codes.length + " creator" + (codes.length === 1 ? "" : "s") + " to Under review" + (r.b.spent ? " · " + r.b.spent + " credits used." : ".");

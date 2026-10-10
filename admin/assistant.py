@@ -117,7 +117,7 @@ def t_get_creator(ctx, code):
 
 
 def t_suggest_shortlist(ctx, goal="balanced", category=None, market="SA", platforms=None, budget_max_sar=0, count=8, notes=""):
-    ans = {"goal": goal if goal in ("awareness", "engagement", "conversion", "balanced") else "balanced",
+    ans = {"goal": goal if goal in ("awareness", "engagement", "traffic", "conversion") else "balanced",
            "market": market, "platforms": platforms or ["any"], "category": category or [],
            "count": str(count) if str(count) in matcher.COUNT_OF else "8"}
     answers, _ = matcher.clean_answers(ans)
@@ -147,9 +147,10 @@ def _roi_tool(ctx, goal, budget, platforms, mix, market):
     res = roi.estimate(goal, budget, platforms or ["Instagram"], market if market in roi.MARKETS else "SA", mix=mix)
     ctx["roi"] = dict(res, mix=mix)
     return {"summary": res["summary"], "verdict": res["verdict"]["label"],
-            "figures": {f["label"]: f["value"] for f in res["figures"]}, "advice": res["advice"],
-            "note": "A calculator card with these figures is shown to the client. Mention the verdict and one figure; "
-                    "say it is an estimate. Never state creator or HelloVoice prices."}
+            "figures": {f["label"]: "%s to %s" % tuple(f["range"]) if f.get("range") else f["value"] for f in res["figures"]},
+            "note": "A calculator card with these figures is shown to the client. Mention the verdict and one figure as a range "
+                    "(e.g. 4K-6K); say it is an estimate, not a result. Do not name benchmark sources or explain the method. "
+                    "Never state creator or HelloVoice prices."}
 
 
 def t_price_bands(ctx):
@@ -805,7 +806,7 @@ CLIENT_TOOLS = {
         {"code": S}, ["code"])),
     "suggest_shortlist": (t_suggest_shortlist, _decl("suggest_shortlist",
         "Build a scored, budget-aware shortlist of creators for a campaign. Use when the client describes a campaign.",
-        {"goal": {"type": "STRING", "enum": ["awareness", "engagement", "conversion", "balanced"]}, "category": SA,
+        {"goal": {"type": "STRING", "enum": ["awareness", "engagement", "traffic", "conversion"]}, "category": SA,
          "market": {"type": "STRING", "enum": [o[0] for o in matcher._BY_ID["market"]["options"]]},
          "platforms": SA, "budget_max_sar": I, "count": I})),
     "selection_stats": (t_selection_stats, _decl("selection_stats",

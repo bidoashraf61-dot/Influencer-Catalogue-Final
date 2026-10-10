@@ -260,7 +260,7 @@
       replace_cost: 2, more_cost: 3, alike_cost: 2, ai_free: null, credits: 30 };
   }
   var QUESTIONS = [
-    { id: "goal", type: "one", label: "What is the main goal of the campaign?", required: true, options: [{ value: "awareness", label: "Awareness" }, { value: "engagement", label: "Engagement" }, { value: "conversion", label: "Sales" }, { value: "balanced", label: "Balanced" }] },
+    { id: "goal", type: "one", label: "What is the main goal of the campaign?", required: true, multi_ok: true, options: [{ value: "awareness", label: "Awareness" }, { value: "engagement", label: "Engagement" }, { value: "traffic", label: "Traffic" }, { value: "conversion", label: "Conversion" }] },
     { id: "platforms", type: "many", label: "Where should the content run?", required: true, options: [{ value: "Instagram", label: "Instagram" }, { value: "TikTok", label: "TikTok" }, { value: "Snapchat", label: "Snapchat" }, { value: "YouTube", label: "YouTube" }] },
     { id: "market", type: "one", label: "Which market?", required: true, options: [{ value: "SA", label: "Saudi Arabia" }, { value: "AE", label: "UAE" }] },
     { id: "category", type: "many", label: "Which space?", required: false, options: [{ value: "skincare", label: "Skincare" }, { value: "health", label: "Health" }] },
@@ -279,10 +279,10 @@
     var roi = /sar|riyal|budget|reach\?/i.test(text);
     var events = roi ? [
       [500, { t: "step", text: "Reading your budget" }], [900, { t: "step", text: "Checking Saudi market benchmarks" }], [900, { t: "step", text: "Working out the reach" }],
-      [500, { t: "done", thread: "demo", reply: "With **SAR 50,000** on Instagram and TikTok in Saudi Arabia, a mix of 1 macro, 3 mid-tier and 6 micro creators could reach about **1.4M people**. It's an estimate from your own budget and market benchmarks.",
+      [500, { t: "done", thread: "demo", reply: "With **SAR 50,000** on Instagram and TikTok in Saudi Arabia, a mix of 1 macro, 3 mid-tier and 6 micro creators could reach about **1.1M–1.7M people**. It's an estimate, not a result.",
         roi: { goal: "awareness", budget: 50000, platforms: ["Instagram", "TikTok"], summary: "Awareness · 1 macro, 3 mid, 6 micro · Saudi Arabia",
-          figures: [{ label: "People reached", value: 1400000 }, { label: "Views", value: 2100000 }, { label: "Engagement rate", value: 4.2, unit: "%" }, { label: "Cost per 1,000 views", value: 24, unit: "SAR" }],
-          verdict: { grade: "good", label: "Good value" }, advice: "Arabic-first content usually earns 35–50% more engagement in KSA." },
+          figures: [{ label: "People reached", value: 1400000, range: [1100000, 1700000] }, { label: "Views", value: 2100000, range: [1700000, 2600000] }, { label: "Engagement rate", value: 4.2, unit: "%", range: [3.4, 5] }, { label: "Cost per 1,000 views", value: 24, unit: "SAR", range: [20, 30] }],
+          verdict: { grade: "good", label: "Good value" } },
         next: ["Find creators within my budget", "Talk to a person"] }]]
       : [
       [500, { t: "step", text: "Reading your brief" }], [1000, { t: "step", text: "Scanning the catalogue" }], [1100, { t: "step", text: "Scoring fit for Ramadan skincare" }], [900, { t: "step", text: "Picking the best five" }],

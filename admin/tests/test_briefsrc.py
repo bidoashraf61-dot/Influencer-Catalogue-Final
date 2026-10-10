@@ -304,6 +304,15 @@ class Timing(unittest.TestCase):
         b = occasions.advise(["food"], "AE", None, "2027-02", today=datetime.date(2026, 10, 9))
         self.assertNotIn("Saudi Founding Day", [w["name"] for w in b["windows"]])
 
+    def test_sector_first_then_soonest(self):
+        a = occasions.advise(["skincare"], "SA", None, "", today=datetime.date(2026, 10, 9), limit=10)
+        own = [occasions.SECTOR_OF["skincare"] in dict((c[0], c[5]) for c in occasions.CALENDAR)[w["name"]].split() for w in a["windows"]]
+        self.assertEqual(own, sorted(own, reverse=True))           # every sector match before any general one
+        k = own.count(True)
+        for part in (a["windows"][:k], a["windows"][k:]):
+            starts = [w["starts"] for w in part]
+            self.assertEqual(starts, sorted(starts))                  # then the soonest first
+
     def test_too_close_is_left_out(self):
         a = occasions.advise(["health care"], "SA", None, "", today=datetime.date(2026, 11, 5))
         self.assertNotIn("World Diabetes Day", [w["name"] for w in a["windows"]])

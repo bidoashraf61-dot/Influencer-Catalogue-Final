@@ -661,7 +661,8 @@ body.pt-lock { overflow: hidden; }
 /* the wait */
 .ai-sl__wait { display: grid; grid-template-columns: 280px 1fr; gap: 34px; align-items: center; }
 .ai-sl__scene { position: relative; width: 280px; height: 280px; display: grid; place-items: center; }
-.ai-sl__lens { position: relative; z-index: 2; width: 196px; height: 196px; }
+.ai-sl__lens { position: relative; z-index: 2; width: 196px; height: 196px; border-radius: 50%;
+  box-shadow: 0 0 0 6px rgba(232,255,118,.18), 0 0 0 14px rgba(232,255,118,.07); }
 .ai-sl__orbit { position: absolute; inset: 0; border-radius: 50%; animation: ai-spin 9s linear infinite; }
 .ai-sl__orbit--a { inset: 22px; border: 1.5px dashed rgba(255,255,255,.18); }
 .ai-sl__orbit--b { inset: 4px; border: 1px solid rgba(232,255,118,.16); animation-duration: 14s; animation-direction: reverse; }
@@ -788,12 +789,13 @@ body.pt-lock { overflow: hidden; }
 .ai-sl__run.is-staging .ai-sl__coach { display: none; }
 .ai-sl__main { min-width: 0; }
 .ai-sl__coach { position: sticky; top: 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 4px; }
-/* the coach: Helvy stands on the meter below him (transparent clip, soft shadow, faded waist) */
-.ai-sl__cring { position: relative; width: 176px; height: 176px; }
+/* the coach: Helvy on his lime disc above the meter, reacting to every answer */
+.ai-sl__cring { position: relative; width: 176px; height: 176px; border-radius: 50%; box-shadow: 0 0 0 6px rgba(232,255,118,.16); }
 .ai-sl__cring.is-bump { animation: ai-bump .5s var(--ai-ease); }
 @keyframes ai-bump { 40% { transform: translateY(-6px); } }
-.ai-sl__cvid { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; display: block;
-  filter: drop-shadow(0 10px 12px rgba(0,0,0,.3)); -webkit-mask-image: linear-gradient(180deg, #000 78%, transparent); mask-image: linear-gradient(180deg, #000 78%, transparent); }
+/* HV.lime: a lime disc holding a "voice" clip, filled edge to edge. */
+.hv-lime { position: relative; display: block; width: 100%; height: 100%; border-radius: 50%; overflow: hidden; background: #e8ff76; isolation: isolate; }
+.hv-lime .hv-clip { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; display: block; }
 .ai-sl__power { position: relative; width: 100%; padding: 14px 16px 12px; border-radius: 18px; background: rgba(255,255,255,.06); box-shadow: inset 0 0 0 1px rgba(255,255,255,.1); text-align: center; }
 .ai-sl__pw-h { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.6); }
 .ai-sl__pw-n { margin: 4px 0 8px; color: rgba(255,255,255,.5); }
@@ -908,9 +910,9 @@ body.pt-lock { overflow: hidden; }
 .ai-sl:not(.is-open) .ai-sl__alt > span { margin-right: 4px; white-space: nowrap; }
 .ai-sl:not(.is-open) .ai-sl__alt-b { min-height: 34px; padding: 0 13px; white-space: nowrap; }
 /* Helvy on a lime circle, on this card only (client, 2026-10-10): his head and shoulders
-   framed in the disc, the cut at the shoulders hidden by its curve. */
-.ai-sl__face { position: relative; border-radius: 50%; background: #d8ff45; overflow: hidden; isolation: isolate; }
-.ai-sl__face .cx-hd--head .hv-clip { transform: scale(1.32); transform-origin: 50% 8%; filter: none; }
+   framed in the disc. Since fix batch 4 the disc holds the lime "voice" clips (HV.lime), whose
+   own background is this same lime, so the clip and the disc read as one. */
+.ai-sl__face { position: relative; border-radius: 50%; background: var(--ai-lime); overflow: hidden; isolation: isolate; }
 
 /* Licence chips: same quiet outline as the filter chips, one tight row. */
 .lic-filter__label { font-size: 18px; }

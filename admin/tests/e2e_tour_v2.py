@@ -170,7 +170,9 @@ class TourV2(unittest.TestCase):
         self.assertIn("cards: 1, approve: 1 }", self.loader)
         every = "".join(read("assets/js/" + f) for f in ("portal.js", "connect.js", "tour.js", "catalogue.js", "account.js", "hv-loader.js"))
         self.assertNotIn('"stamp"', every)
-        self.assertEqual(every.count('["thinking", "cards", "approve"]'), 2)   # HV.cooking + the AI shortlist card
+        self.assertEqual(every.count('["thinking", "cards", "approve"]'), 1)   # HV.cooking (COOK_SEQ), the one definition
+        # fix batch 4: the AI shortlist card's wait is Helvy's camera scan on lime again
+        self.assertIn('appendChild(lime("scan"))', every)
         self.assertIn("Approving your picks…", every)
         # the admin copilot launcher: the same HVHelvy config, Helvy only, no old clips
         self.assertIn('data-helvy-only', ui._VOICE_LAUNCHER)

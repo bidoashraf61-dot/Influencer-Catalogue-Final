@@ -122,7 +122,9 @@
 .cx-logos__row { flex: 1; min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); }
 .cx-logos__track { display: flex; align-items: center; gap: 34px; width: max-content; padding-right: 34px; animation: cx-marquee 55s linear infinite; }
 .cx-logos__row:hover .cx-logos__track { animation-play-state: paused; }
-.cx-logos__track img { flex: none; height: 22px; width: auto; max-width: 128px; object-fit: contain; filter: brightness(0) invert(1); opacity: .5; }
+/* Each logo's height comes from portal.js (--h, equal optical area); one tone for all: white at 62%. */
+.cx-logos__track { min-height: 34px; }
+.cx-logos__track img { flex: none; height: var(--h, 22px); width: auto; max-width: none; object-fit: contain; filter: brightness(0) invert(1); opacity: .62; }
 @keyframes cx-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .cx-logos__track { animation: none; } .cx-logos__row { overflow-x: auto; } }
 
@@ -302,15 +304,15 @@
 .cx-band__hd b { font-weight: 700; }
 .cx-band__track { position: relative; height: 26px; border-radius: 8px; background: var(--white); margin: 42px 0 6px; }
 .cx-band__fair { position: absolute; top: 0; bottom: 0; border-radius: 8px; background: var(--go-soft); box-shadow: inset 0 0 0 1px rgba(20,136,74,.35); }
-.cx-band__you { position: absolute; top: -8px; bottom: -8px; width: 3px; border-radius: 2px; background: var(--ink); }
+/* The client's own cost is a range now (fix batch 4): an ink bar from low to high, never thinner than a tick. */
+.cx-band__you { position: absolute; top: -6px; bottom: -6px; width: 3px; min-width: 3px; border-radius: 4px; background: var(--ink); }
 .cx-band__you span { position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-family: var(--heading); font-size: 18px; letter-spacing: .03em; padding: 3px 9px 1px; border-radius: 999px; background: var(--ink); color: var(--lime); }
 .cx-band__k { display: flex; justify-content: space-between; font-size: 12px; color: var(--cx-mute); gap: 8px; }
 .cx-advice { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: start; margin-top: 18px; }
 .cx-advice .cx-hd { width: 52px; height: 52px; }
 .cx-advice__b { background: var(--white); border-radius: 18px 18px 18px 6px; padding: 12px 16px; font-size: 14.5px; line-height: 1.5; }
 .cx-advice__b b { display: block; font-size: 12px; letter-spacing: .02em; color: var(--cx-mute); font-weight: 600; margin-bottom: 2px; }
-.cx-srcs { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid rgba(18,18,18,.12); font-size: 12.5px; line-height: 1.5; color: var(--cx-mute); display: flex; gap: 10px; align-items: flex-start; }
-.cx-srcs .cx-tag { flex: none; }
+.cx-srcs { margin: 16px 0 0; padding-top: 12px; border-top: 1px solid rgba(18,18,18,.12); font-size: 13px; line-height: 1.5; color: var(--cx-mute); }
 .cx-mixbar { display: flex; height: 22px; border-radius: 999px; overflow: hidden; margin-top: 16px; gap: 2px; }
 .cx-mixbar i { display: block; }
 .cx-mixkey { display: flex; flex-wrap: wrap; gap: 6px 16px; margin-top: 8px; font-size: 12.5px; }
@@ -377,6 +379,10 @@
 .cx-more::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-radial-gradient(circle at 4% 120%, transparent 0 22px, rgba(255,255,255,.03) 22px 23px); }
 .cx-more > * { position: relative; z-index: 1; }
 .cx-more .cx-hd { width: 96px; height: 96px; }
+/* Helvy's lime disc (fix batch 4); a soft lime halo while he works. */
+.cx-more__face.hv-lime { width: 96px; height: 96px; align-self: start; box-shadow: 0 0 0 5px rgba(232,255,118,.14); transition: box-shadow .4s ease; }
+.cx-more.is-cooking .cx-more__face.hv-lime { box-shadow: 0 0 0 5px rgba(232,255,118,.32), 0 0 0 12px rgba(232,255,118,.1); }
+.cx-cook--steps.cx-cook--bare { grid-template-columns: minmax(0, 1fr); }
 .cx-more h2 { margin: 0; font-family: var(--heading); font-weight: 400; font-size: 36px; line-height: .95; letter-spacing: .02em; color: var(--lime); display: flex; align-items: center; gap: 12px; flex-wrap: wrap; text-transform: none; }
 .cx-more p { margin: 6px 0 0; font-size: 14.5px; line-height: 1.5; color: rgba(255,255,255,.8); max-width: 58ch; }
 .cx-more p b { color: var(--white); }
@@ -462,7 +468,7 @@
   .cx-door__helvy .cx-hd { width: 134px; height: 134px; }
   .cx-door__say { right: 162px; top: 46px; font-size: 20px; }
   .cx-more { grid-template-columns: 80px minmax(0, 1fr); }
-  .cx-more .cx-hd { width: 80px; height: 80px; }
+  .cx-more .cx-hd, .cx-more__face.hv-lime { width: 80px; height: 80px; }
   .cx-more__form { grid-column: 1 / -1; }
   .cx-roipg { grid-template-columns: 1fr; }
   .cx-roipg__out { position: static; }
@@ -483,7 +489,7 @@
   .cx-logos .cx-wrap { gap: 14px; }
   .cx-logos p { display: none; }
   .cx-logos__track { gap: 24px; padding-right: 24px; animation-duration: 45s; }
-  .cx-logos__track img { height: 18px; max-width: 96px; }
+  .cx-logos__track img { height: calc(var(--h, 22px) * .8); }
   .cx-scene__foot .cx-wrap { justify-content: center; text-align: center; }
 
   .cx-offer { left: 10px; right: 10px; top: auto; bottom: 10px; width: auto; max-width: none; transform: none; padding: 26px 18px 16px; border-radius: 24px;
@@ -510,7 +516,7 @@
   .cx-eva__row { grid-template-columns: 1fr auto; }
   .cx-eva__bars { grid-column: 1 / -1; grid-row: 2; }
   .cx-more { padding: 18px; grid-template-columns: 64px 1fr; gap: 14px; }
-  .cx-more .cx-hd { width: 64px; height: 64px; }
+  .cx-more .cx-hd, .cx-more__face.hv-lime { width: 64px; height: 64px; }
   .cx-more h2 { font-size: 30px; }
   .cx-sheet { width: 100vw; }
   .cx-sheet__hd { grid-template-columns: 52px 1fr auto; padding: 14px 16px; }
@@ -528,15 +534,18 @@
 }
 
 /* ---- Helvy in the live chat widget (portal.js): launcher, header, avatars, nudge */
-/* the launcher: Helvy rises out of a lime disc (client, 2026-10-10: the launcher only; every
-   other Helvy stays a transparent cut-out), his cut hidden by the disc's curve. Open, the disc
-   turns ink behind the close cross. */
+/* the launcher: Helvy on a lime disc (client, 2026-10-10: the launcher only). Fix batch 4: the
+   whole character sits INSIDE the disc, beanie to waist, with air above his head; he used to
+   rise out of the top, which cut his head on the frame and his hands on the curve. The clip is
+   inset (padding, contain, bottom-aligned) and the disc's circle clips only the waist. Open, the
+   disc turns ink behind the close cross. */
 .cx-launch .hv-launch__disc { background: #d8ff45; box-shadow: 0 0 0 2px var(--white), 0 14px 30px rgba(18,18,18,.28); }
 .is-open .cx-launch .hv-launch__disc { background: var(--ink); }
 .cx-launch::after { display: none; }
-.cx-launch .hv-launch__vid { position: absolute; inset: auto 0 0 0; width: 76px; height: 100px; border-radius: 0; object-fit: cover; object-position: 50% 0; opacity: 1; transform: none;
-  clip-path: inset(0 0 0 0 round 0 0 38px 38px); transition: opacity .2s ease, transform .25s var(--cx-ease); pointer-events: none; }
-.cx-launch:hover .hv-launch__vid { transform: translateY(-4px); }
+.cx-launch .hv-launch__vid { position: absolute; inset: 0; width: 100%; height: 100%; box-sizing: border-box; padding: 9px 4px 0;
+  border-radius: 50%; object-fit: contain; object-position: 50% 100%; opacity: 1; transform: none; -webkit-mask-image: none; mask-image: none;
+  clip-path: circle(50% at 50% 50%); transition: opacity .2s ease, transform .25s var(--cx-ease); pointer-events: none; }
+.cx-launch:hover .hv-launch__vid { transform: scale(1.06); }
 .is-open .cx-launch .hv-launch__vid { opacity: 0; transform: translateY(16px) scale(.8); }
 .cx-chathead { min-height: 96px; padding-left: 108px; }
 .cx-chathead .hv-head__helvy { position: absolute; left: 14px; bottom: 0; width: 84px; height: 84px; }
@@ -547,7 +556,7 @@
   padding: 0 3px; background: linear-gradient(transparent 55%, var(--lime) 55%, var(--lime) 92%, transparent 92%); }
 .hv-msg.cx-think { padding: 10px 14px 10px 10px; }
 .hv-msg .cx-rcard, .cx-rcard { max-width: 100%; }
-@media (max-width: 700px) { .cx-launch .hv-launch__vid { width: 64px; height: 84px; clip-path: inset(0 0 0 0 round 0 0 32px 32px); } }
+@media (max-width: 700px) { .cx-launch .hv-launch__vid { padding: 7px 3px 0; } }
 .hc-out { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 /* Privacy and Terms links in the page footers */
 .cat-footer__legal, .hc-foot__legal { margin: 0; font-size: 13px; color: rgba(255,255,255,.7); }

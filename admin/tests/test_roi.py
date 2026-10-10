@@ -49,6 +49,57 @@ class ChatBudget(unittest.TestCase):
             self.assertIsNone(roi.from_text(text), text)
 
 
+class ArabicDigits(unittest.TestCase):
+    """Fix batch 4, item 24: a budget typed with Arabic-Indic or Persian digits."""
+    def test_parse_budget(self):
+        cases = {"١٢٠٠٠٠": 120000, "١٢٠٬٠٠٠": 120000, "۱۲۰,۰۰۰": 120000, "120,000": 120000, "12 000": 12000,
+                 "٧٥٠٠٠٫٥": 75000.5, 90000: 90000, "": 0, None: 0, "abc": 0, "-5": 0, "9" * 12: 1e9}
+        for raw, want in cases.items():
+            self.assertEqual(roi.parse_budget(raw), want, raw)
+
+    def test_ascii_digits_leaves_other_text(self):
+        self.assertEqual(roi.ascii_digits("SAR ٦٠٬٠٠٠ on TikTok"), "SAR 60,000 on TikTok")
+
+    def test_estimate_and_chat_read_arabic_digits(self):
+        import plans
+        plans.house_benchmarks = lambda: {}
+        roi.db.setting = lambda key, default=None: default
+        a = roi.estimate("awareness", "١٢٠٬٠٠٠", ["Instagram"], "SA", mix={"micro": 4})
+        b = roi.estimate("awareness", 120000, ["Instagram"], "SA", mix={"micro": 4})
+        self.assertEqual(a["budget"], 120000)
+        self.assertEqual(a["figures"], b["figures"])
+        r = roi.from_text("وش ممكن توصل ميزانية ٦٠٬٠٠٠ ريال على تيك توك")
+        self.assertIsNotNone(r)
+        self.assertEqual(r["budget"], 60000)
+
+
+class Ranges(unittest.TestCase):
+    """Fix batch 4: figures shown as a range, no advice or sources sent."""
+    def test_band_brackets_the_estimate_and_rounds(self):
+        self.assertEqual(roi.band_of("interactions", 5000), [4000, 6000])
+        self.assertEqual(roi.band_of("views", 208123), [160000, 250000])
+        self.assertEqual(roi.band_of("er", 3.8), [3.0, 4.6])
+        self.assertEqual(roi.band_of("ctr", 0.46), [0.37, 0.55])
+        lo, hi = roi.band_of("cpe", 15.2)
+        self.assertTrue(lo <= 15.2 <= hi)
+        self.assertIsNone(roi.band_of("cpm", None))
+
+    def test_estimate_has_ranges_and_no_advice_or_sources(self):
+        import plans
+        plans.house_benchmarks = lambda: {}
+        roi.db.setting = lambda key, default=None: default
+        for goal in roi.GOALS:
+            r = roi.estimate(goal, 90000, ["Instagram", "TikTok"], "SA", mix={"mid": 2, "micro": 6})
+            self.assertNotIn("advice", r)
+            self.assertNotIn("sources", r)
+            for f in r["figures"]:
+                self.assertTrue(f["range"][0] <= f["value"] <= f["range"][1], (goal, f))
+            self.assertTrue(r["cost"]["range"][0] <= r["cost"]["value"] <= r["cost"]["range"][1])
+
+    def test_calculator_goals_have_no_conversion(self):
+        self.assertEqual(list(roi.GOALS), ["awareness", "engagement", "traffic"])
+
+
 class Calendar(unittest.TestCase):
     def test_upcoming_is_sorted_with_brief_dates(self):
         up = occasions.upcoming(today=datetime.date(2027, 1, 20), months=2)

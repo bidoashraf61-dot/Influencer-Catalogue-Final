@@ -145,8 +145,13 @@ class CD(unittest.TestCase):
         self.assertIn(r["verdict"]["grade"], ("good", "moderate", "low"))
         self.assertEqual([f["key"] for f in r["figures"]], ["reach", "views", "impressions", "frequency", "cpm"])
         self.assertEqual(r["posts"], 18)                                            # 9 creators x 2 platforms
-        self.assertTrue(r["advice"])
-        self.assertTrue(any("Kolsquare" in s for s in r["sources"]))
+        # fix batch 4: every figure as a range around the estimate; no advice line, no sources sent
+        for f in r["figures"]:
+            self.assertLessEqual(f["range"][0], f["value"])
+            self.assertGreaterEqual(f["range"][1], f["value"])
+        self.assertNotIn("advice", r)
+        self.assertNotIn("sources", r)
+        self.assertNotIn("Kolsquare", json.dumps(r))
         # the verdict follows the client's budget: a tiny budget is good value, a huge one is not
         cheap = roi.estimate("engagement", 1000, ["Instagram"], mix={"micro": 10})
         dear = roi.estimate("engagement", 5000000, ["Instagram"], mix={"micro": 10})
