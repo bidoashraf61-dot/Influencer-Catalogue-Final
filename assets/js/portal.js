@@ -1320,26 +1320,279 @@
       if (!r.b.ok || r.b.brief) return;
       var box = h("div", { class: "pt-toast", role: "dialog", "aria-label": "Score this selection" },
         h("p", { class: "pt-toast__t" }, "Score this selection"),
-        h("p", { class: "pt-toast__b" }, "Answer a few quick questions about the campaign and we'll score every creator in it. Free."));
+        h("p", { class: "pt-toast__b" }, "Six quick questions about the campaign, and Helvy scores the creators already in this selection. It doesn't add anyone. Free."));
       if (LANG === "ar") box.setAttribute("dir", "rtl");
       var later = h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { box.remove(); } }, "Not now");
       var go = h("button", { class: "pt-btn pt-btn--lime", type: "button", onclick: function () {
         // Scoring needs only who the audience is and what the product is: six questions, not eleven.
-        box.remove(); loadQuestions().then(function (qs) {
-          wizard(qs.filter(function (q) { return q.required || q.id === "gender" || q.id === "age"; }), {}, 0, null, { attach: token });
-        });
+        box.remove(); objectiveStudio(token, {});
       } }, "Answer questions");
       box.appendChild(h("div", { class: "pt-actions", style: "margin-top:12px" }, later, go));
       document.body.appendChild(box);
     });
   }
   window.addEventListener("hv:selection-saved", function (e) { offerBrief(e.detail && e.detail.token); });
-  // The selection page's "Add your campaign objective" action: the same free questions.
-  HV.scoreBrief = function (token) {
+  // The selection page's "Add your campaign objective" (and its Edit): the objective studio,
+  // fix batch 3. Same world as the AI shortlist card (ink, lime, Helvy reacting to every
+  // answer over a campaign-power meter), but it only SCORES the creators already in this
+  // selection: nothing is added, removed or rebuilt. The goal takes several answers. On the
+  // last answer the meter hits full power, Helvy works through named steps, and the page
+  // comes back with the round score stamps on the cards.
+  var OB_STEPS = {
+    goal: ["Goal", '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/>'],
+    platforms: ["Platforms", '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/>'],
+    market: ["Country", '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17"/>'],
+    gender: ["Audience", '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.6-3.8 3.3-6 7-6s6.4 2.2 7 6"/>'],
+    age: ["Age", '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>'],
+    category: ["Space", '<path d="M3.5 12.5l8-8h7v7l-8 8z"/><circle cx="15" cy="9" r="1.3"/>']
+  };
+  var OB_HINT = {
+    goal: "Pick one or more. Each one counts in every creator’s score.",
+    platforms: "Pick every platform the content runs on.",
+    market: "Where the people you want to reach live.",
+    gender: "Leave it if the product is for everyone.",
+    age: "Leave it if every age group matters.",
+    category: "Pick one or more."
+  };
+  function obPoints(q) { return q.required ? 200 : 100; }
+  function objectiveStudio(token, start) {
+    start = start || {};
+    var S = window.hvSelection;
+    var selName = S && S.name ? S.name() : "this selection";
+    var nIn = S && S.codes ? S.codes().length : 0;
+    loadQuestions().then(function (all) {
+      var qs = all.filter(function (q) { return q.required || q.id === "gender" || q.id === "age"; });
+      var answers = {};
+      Object.keys(start.answers || {}).forEach(function (k) { if (qs.some(function (q) { return q.id === k; })) answers[k] = start.answers[k]; });
+      if (typeof answers.goal === "string") answers.goal = [answers.goal];
+      var step = 0, busy = false;
+      var reduce = REDUCE;
+      var card = h("div", { class: "ai-sl is-open ob", role: "dialog", "aria-modal": "true", "aria-labelledby": "ob-t" });
+      var x = h("button", { class: "ai-sl__quit ob__x", type: "button", "aria-label": "Close" });
+      x.innerHTML = aiSvg('<path d="M6 6l12 12M18 6L6 18"/>', 18);
+      card.appendChild(h("header", { class: "ob__hd" },
+        h("div", null, h("h2", { class: "ai-sl__title", id: "ob-t" }, start.edit ? "Edit this selection’s objective" : "Score this selection"),
+          h("p", { class: "ob__lead" }, "Helvy scores the " + (nIn ? nIn + " creator" + (nIn === 1 ? "" : "s") + " already in " : "creators already in ") + "“" + selName +
+            "” against your campaign. Nothing is added, removed or changed. Free.")), x));
+      var run = h("div", { class: "ai-sl__run ob__run" });
+      var coach = h("div", { class: "ai-sl__coach", "aria-hidden": "true" });
+      var cring = h("div", { class: "ai-sl__cring" });
+      var power = h("div", { class: "ai-sl__power" });
+      power.innerHTML = '<p class="ai-sl__pw-h">Campaign power</p><p class="ai-sl__pw-n"><b>0</b><small> / 1000</small></p>' +
+        '<div class="ai-sl__pw-bar"><i></i></div><p class="ai-sl__pw-lvl">Draft</p>';
+      coach.appendChild(cring); coach.appendChild(power);
+      var main = h("div", { class: "ai-sl__main" });
+      var head = h("div", { class: "ai-sl__head ob__head" });
+      var track = h("ol", { class: "ai-sl__track ob__track", "aria-label": "Objective progress" });
+      track.style.gridTemplateColumns = "repeat(" + qs.length + ", 1fr)";
+      qs.forEach(function (q, i) {
+        var d = OB_STEPS[q.id] || [q.id, ""];
+        var li = h("li", { class: "ai-sl__node", "data-i": String(i) });
+        li.innerHTML = '<span class="ai-sl__dot">' + aiSvg(d[1], 18) + '<i class="ai-sl__tick">' + aiSvg('<path d="M5 12.5l4.2 4.2L19 7"/>', 16) + '</i></span><span class="ai-sl__lbl">' + d[0] + "</span>";
+        li.addEventListener("click", function () { if (!busy && (i <= step || answered(qs[i - 1] || q))) show(i); });
+        track.appendChild(li);
+      });
+      var fill = h("span", { class: "ai-sl__fill", "aria-hidden": "true" });
+      track.appendChild(fill);
+      head.appendChild(track);
+      var stage = h("div", { class: "ai-sl__stage ob__stage" });
+      main.appendChild(head); main.appendChild(stage);
+      run.appendChild(coach); run.appendChild(main);
+      card.appendChild(run);
+      var close = layer(card);
+      x.addEventListener("click", function () { close(); });
+
+      /* -- Helvy: a reaction plays once, then he waits (thinking) -- */
+      var CLIPS = { point: "point", think: "thinking", yes: "approve", cheer: "celebrate", idle: "idle" };
+      function react(kind, loop, seq) {
+        if (reduce || !HVH) { if (!cring.firstChild) cring.appendChild(clip("idle", "ob__still", { still: true })); return; }
+        var v = HVH.video(CLIPS[kind] || "idle", { once: !loop && !seq, then: !loop && !seq ? "thinking" : null, seq: seq, cls: "ai-sl__cvid", eager: true });
+        var old = [].slice.call(cring.querySelectorAll("video, img"));
+        var swap = function () { old.forEach(function (o) { o.remove(); }); };
+        v.addEventListener("playing", swap, { once: true });
+        setTimeout(swap, 900);
+        cring.appendChild(v);
+        HVH.play(v);
+        cring.classList.remove("is-bump"); void cring.offsetWidth; cring.classList.add("is-bump");
+      }
+      function say(text) {
+        if (reduce) return;
+        var old = coach.querySelector(".ai-sl__say"); if (old) old.remove();
+        coach.appendChild(h("span", { class: "ai-sl__say" }, text));
+      }
+
+      /* -- campaign power: every answered question fills the meter -- */
+      function answered(q) { var v = answers[q.id]; return Array.isArray(v) ? v.length > 0 : !!v; }
+      var shown = 0;
+      function score() { return qs.reduce(function (t, q) { return t + (answered(q) ? obPoints(q) : 0); }, 0); }
+      function paintPower(gain) {
+        var n = Math.min(1000, score() + (qs.some(function (q) { return !q.required; }) ? 0 : 200));
+        var lvl = n >= 1000 ? "Full power" : n >= 600 ? "Strong" : n >= 300 ? "Good" : "Draft";
+        var b = power.querySelector("b");
+        if (gain && n > shown) { power.classList.remove("is-gain"); void power.offsetWidth; power.classList.add("is-gain"); }
+        shown = n; b.textContent = String(n);
+        power.querySelector("i").style.width = (n / 10) + "%";
+        power.querySelector(".ai-sl__pw-lvl").textContent = lvl;
+        power.classList.toggle("is-full", n >= 1000);
+        [].forEach.call(track.querySelectorAll(".ai-sl__node"), function (li, i) {
+          li.classList.toggle("is-done", answered(qs[i]) && i !== step);
+          li.classList.toggle("is-now", i === step);
+        });
+        fill.style.setProperty("--p", (qs.length > 1 ? Math.min(100, step / (qs.length - 1) * 100) : 100) + "%");
+      }
+      function plus(btn, pts) {
+        if (reduce || !btn) return;
+        var s2 = h("span", { class: "ai-sl__plus", "aria-hidden": "true" }, "+" + pts);
+        btn.appendChild(s2); setTimeout(function () { s2.remove(); }, 800);
+      }
+
+      /* -- one question -- */
+      function show(i) {
+        step = Math.max(0, Math.min(i, qs.length - 1));
+        var q = qs[step], many = q.type === "many" || q.id === "goal";
+        stage.textContent = "";
+        var panel = h("div", { class: "ai-sl__panel ai-sl__q" });
+        panel.appendChild(h("p", { class: "ob__count" }, "Question " + (step + 1) + " of " + qs.length + (q.required ? "" : " · optional")));
+        panel.appendChild(h("h3", { class: "ai-sl__ask", id: "ob-q" }, q.id === "goal" ? "What are the campaign’s goals?" : q.label));
+        panel.appendChild(h("p", { class: "ai-sl__hint" }, OB_HINT[q.id] || ""));
+        var opts = h("div", { class: "ai-sl__opts", role: many ? "group" : "radiogroup", "aria-labelledby": "ob-q" });
+        var cur = function () { var v = answers[q.id]; return Array.isArray(v) ? v : v ? [v] : []; };
+        q.options.forEach(function (o) {
+          var b = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(cur().indexOf(o.value) > -1) }, o.label);
+          if (!many) b.setAttribute("role", "radio"), b.setAttribute("aria-checked", String(cur().indexOf(o.value) > -1));
+          b.addEventListener("click", function () {
+            var was = answered(q);
+            if (many) {
+              var list = cur().slice(), k = list.indexOf(o.value);
+              if (o.value === "any") list = k > -1 ? [] : ["any"];
+              else { list = list.filter(function (v) { return v !== "any"; }); if (k > -1) list.splice(k, 1); else list.push(o.value); }
+              if (q.id === "goal" && o.value === "balanced" && k === -1) list = ["balanced"];
+              else if (q.id === "goal") list = list.filter(function (v) { return v !== "balanced" || list.length === 1; });
+              if (list.length) answers[q.id] = list; else delete answers[q.id];
+              [].forEach.call(opts.children, function (bb, bi) { bb.setAttribute("aria-pressed", String(cur().indexOf(q.options[bi].value) > -1)); });
+              next.disabled = q.required && !answered(q);
+            } else {
+              answers[q.id] = o.value;
+              [].forEach.call(opts.children, function (bb, bi) { var on = q.options[bi].value === o.value; bb.setAttribute("aria-pressed", String(on)); bb.setAttribute("aria-checked", String(on)); });
+            }
+            if (!was && answered(q)) { plus(b, obPoints(q)); react("yes"); say(["Nice", "Got it", "Good one", "Noted"][step % 4]); }
+            paintPower(true);
+            if (!many) setTimeout(function () { if (step === qs.indexOf(q)) advance(); }, 260);
+          });
+          opts.appendChild(b);
+        });
+        panel.appendChild(opts);
+        var nav = h("div", { class: "ai-sl__nav" });
+        var back = h("button", { class: "ai-sl__back", type: "button" }, "Back");
+        back.addEventListener("click", function () { show(step - 1); react("point"); });
+        if (step === 0) back.hidden = true;
+        var last = step === qs.length - 1;
+        var next = h("button", { class: "ai-sl__next", type: "button" }, last ? "Score this selection" : q.required ? "Next" : "Next / skip");
+        next.disabled = q.required && !answered(q);
+        next.addEventListener("click", advance);
+        nav.appendChild(back); nav.appendChild(next);
+        panel.appendChild(nav);
+        if (step === 0 && HV.briefSource) {
+          // Phase E: answer from a product page or the client's own brief file (costs credits).
+          var srcBox = h("div", { class: "ob__src", hidden: "" });
+          var srcBtn = h("button", { class: "ob__srcb", type: "button", "aria-expanded": "false", html: icon("link") + "<span>Fill these from a product page or brief</span>" });
+          srcBtn.addEventListener("click", function () {
+            var open = srcBox.hidden; srcBox.hidden = !open; srcBtn.setAttribute("aria-expanded", String(open));
+            if (open && !srcBox.firstChild) srcBox.appendChild(HV.briefSource({ dark: true, onUse: function (got) {
+              qs.forEach(function (qq) { if (got[qq.id] != null && got[qq.id] !== "") answers[qq.id] = qq.id === "goal" && !Array.isArray(got.goal) ? [got.goal] : got[qq.id]; });
+              react("yes"); say("Filled in"); paintPower(true);
+              var miss = qs.filter(function (qq) { return qq.required && !answered(qq); })[0];
+              show(miss ? qs.indexOf(miss) : qs.length - 1);
+            } }));
+          });
+          panel.appendChild(h("div", { class: "ob__srcrow" }, srcBtn));
+          panel.appendChild(srcBox);
+        }
+        stage.appendChild(panel);
+        paintPower(false);
+        var first = opts.querySelector('[aria-pressed="true"]') || opts.firstChild;
+        if (first) first.focus({ preventScroll: true });
+      }
+      function advance() {
+        var q = qs[step];
+        if (q.required && !answered(q)) return;
+        if (step < qs.length - 1) { show(step + 1); react("point"); return; }
+        finish();
+      }
+
+      /* -- full power: Helvy scores the selection -- */
+      function finish() {
+        var miss = qs.filter(function (q) { return q.required && !answered(q); })[0];
+        if (miss) { show(qs.indexOf(miss)); return; }
+        busy = true;
+        qs.forEach(function (q) { if (!answered(q) && !q.required) answers[q.id] = q.id === "gender" || q.id === "age" ? "Any" : answers[q.id]; });
+        shown = 0; paintPower(true);
+        power.querySelector("b").textContent = "1000"; power.querySelector("i").style.width = "100%";
+        power.querySelector(".ai-sl__pw-lvl").textContent = "Full power"; power.classList.add("is-full");
+        [].forEach.call(track.querySelectorAll(".ai-sl__node"), function (li) { li.classList.add("is-done"); li.classList.remove("is-now"); });
+        fill.style.setProperty("--p", "100%");
+        x.disabled = true;
+        react("think", false, ["thinking", "cards", "approve"]);
+        say("Full power");
+        var goals = (answers.goal || []).map(function (g) { return optionLabel(qs[0], g); });
+        var STEPS = ["Reading your " + (goals.length > 1 ? "goals" : "goal") + "…", "Checking audiences…", "Scoring each creator…", "Putting the scores on your cards…"];
+        stage.textContent = "";
+        var list = h("ol", { class: "ai-sl__list ob__steps", "aria-live": "polite" });
+        STEPS.forEach(function (t) { list.appendChild(h("li", { class: "ai-sl__st" }, h("span", { class: "ai-sl__st-dot" }), h("span", null, t))); });
+        var bar = h("div", { class: "ai-sl__bar" }, h("i"));
+        stage.appendChild(h("div", { class: "ai-sl__panel ob__wait", role: "status" },
+          h("h3", { class: "ai-sl__ask" }, "Scoring " + (nIn ? nIn + " creator" + (nIn === 1 ? "" : "s") : "your selection")),
+          h("p", { class: "ai-sl__hint" }, "For " + (goals.join(" and ") || "your campaign").toLowerCase() + ". Only the creators already in “" + selName + "”."), list, bar));
+        var k = 0, t0 = Date.now(), res = null, done = false;
+        function light() {
+          [].forEach.call(list.children, function (li, i) { li.className = "ai-sl__st" + (i < k ? " is-done" : i === k ? " is-now" : ""); });
+          bar.firstChild.style.width = Math.max(4, Math.round(k / STEPS.length * 100)) + "%";
+        }
+        light();
+        var tick = setInterval(function () {
+          if (k < STEPS.length - 1) { k++; light(); }
+          else if (res) { clearInterval(tick); k = STEPS.length; light(); end(); }
+        }, reduce ? 300 : 850);
+        api("POST", "/api/brief/attach", { token: token, answers: answers }).then(function (r) { res = r; if (!r.b || !r.b.ok) { clearInterval(tick); fail(r); } });
+        function fail(r) {
+          busy = false; x.disabled = false;
+          stage.textContent = "";
+          var again = h("button", { class: "ai-sl__next", type: "button" }, "Try again");
+          again.addEventListener("click", finish);
+          stage.appendChild(h("div", { class: "ai-sl__panel" }, h("h3", { class: "ai-sl__ask" }, "That didn’t go through"),
+            h("p", { class: "ai-sl__hint" }, (r.b && r.b.message) || (r.s === 429 ? "Too many tries. Please wait a few minutes." : "Nothing was changed. Please try again.")),
+            h("div", { class: "ai-sl__nav" }, again)));
+          react("idle", true);
+        }
+        function end() {
+          if (done) return; done = true;
+          if (res.b.brief_id) rememberBrief(res.b.brief_id);
+          react("cheer"); say("Scored!");
+          stage.appendChild(h("p", { class: "ob__done" }, icon("check"), "Scores are on your cards."));
+          var refresh = S && S.refresh ? S.refresh() : Promise.resolve();
+          Promise.resolve(refresh).then(function () {
+            setTimeout(function () {
+              close();
+              if (S && S.toast) S.toast("Objective added. Each creator now shows their score for it.");
+              if (!(S && S.refresh)) location.reload();
+            }, reduce ? 200 : 1300);
+          });
+        }
+      }
+
+      react("point"); say(start.edit ? "Let’s tweak it" : "Let’s score it");
+      // Edit opens on the first question, answers filled in, the meter already up.
+      show(0);
+    });
+  }
+  // The selection page's "Add your campaign objective" action, and Edit on its done state.
+  HV.scoreBrief = function (token, o) {
     if (!token) return;
     offered[token] = 1;
-    loadQuestions().then(function (qs) {
-      wizard(qs.filter(function (q) { return q.required || q.id === "gender" || q.id === "age"; }), {}, 0, null, { attach: token });
+    o = o || {};
+    if (!o.edit) { objectiveStudio(token, {}); return; }
+    api("GET", "/api/brief/for?s=" + encodeURIComponent(token)).then(function (r) {
+      objectiveStudio(token, { edit: true, answers: (r.b && r.b.brief && r.b.brief.answers) || {} });
     });
   };
 

@@ -2707,26 +2707,39 @@
       }
       box.innerHTML = html;
     }
-    // No campaign objective on this selection: nothing is scored (the server sends no scores),
-    // and one bar above the creators asks for it. The same free questions as the brief card.
+    // The selection's campaign objective, in one bar above the creators. Without one nothing is
+    // scored (the server sends no scores) and the bar asks for it: Helvy's objective studio
+    // (portal.js) scores THIS selection only, it never builds a new shortlist. With one, the bar
+    // shrinks to a done line (Objective added ✓ · Awareness, Engagement · Edit).
+    function objectiveWords(o) { return String(o || "").split("+").filter(Boolean).join(", "); }
     function renderObjective() {
       var host = $("sel-objective");
       var need = !!(CURATED && CURATED.needsObjective && selected.length);
-      if (!need) { if (host) host.remove(); return; }
+      var have = !!(CURATED && !CURATED.needsObjective && CURATED.brief && CURATED.brief.objective && CURATED.token && selected.length);
+      if (!need && !have) { if (host) host.remove(); return; }
       if (!host) {
         host = document.createElement("section");
-        host.id = "sel-objective"; host.className = "sel-obj"; host.setAttribute("aria-label", "Campaign objective");
+        host.id = "sel-objective"; host.setAttribute("aria-label", "Campaign objective");
         var anchor = document.querySelector(".cat-grid-section");
         anchor.parentNode.insertBefore(host, anchor);
         host.addEventListener("click", function (e) {
-          if (!e.target.closest(".sel-obj__go")) return;
-          if (window.hvPortal && window.hvPortal.scoreBrief) window.hvPortal.scoreBrief(CURATED.token);
+          var go = e.target.closest(".sel-obj__go, .sel-obj__edit");
+          if (!go) return;
+          if (window.hvPortal && window.hvPortal.scoreBrief) window.hvPortal.scoreBrief(CURATED.token, { edit: go.classList.contains("sel-obj__edit") });
         });
       }
       var canAct = ROLE === "owner" || ROLE === "admin";
+      host.className = "sel-obj" + (have ? " sel-obj--done" : "");
+      if (have) {
+        host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic sel-obj__ic--done">' + hvIcon("check") + "</span>" +
+          '<p class="sel-obj__tx"><b>Objective added</b><span class="sel-obj__what">' + esc(objectiveWords(CURATED.brief.objective)) + "</span>" +
+          '<span class="sel-obj__note">Each creator here is scored for it.</span></p>' +
+          (canAct ? '<button type="button" class="sel-obj__edit">Edit</button>' : "") + "</div></div>";
+        return;
+      }
       host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic">' + hvIcon("target") + "</span>" +
         '<p class="sel-obj__tx"><b>Add your campaign objective to score these creators</b>' +
-        "<span>" + (canAct ? "Six quick questions: the goal and who you want to reach. Free. Until then, no creator here is scored."
+        "<span>" + (canAct ? "Six quick questions. Helvy scores the creators already in this selection: it doesn’t build a new shortlist or change who is in it. Free."
                            : "Scores appear once the selection’s owner adds the campaign objective.") + "</span></p>" +
         (canAct ? '<button type="button" class="sel-obj__go">Add objective' + hvIcon("arrow") + "</button>" : "") + "</div></div>";
     }
@@ -2787,7 +2800,22 @@
         return n;
       },
       toast: function (t) { stToast(t); },
-      rerender: function () { render(); }
+      rerender: function () { render(); },
+      // After the objective studio: the selection's scores, objective and statuses again, then
+      // one redraw of its cards (no page reload).
+      refresh: function () {
+        if (!CURATED || !CURATED.token) return Promise.resolve();
+        return fetch(CFG.api + "/api/selection?s=" + encodeURIComponent(CURATED.token), { credentials: "include", cache: "no-store" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (b) {
+            if (!b || !b.ok) return;
+            CURATED.scores = b.scores || {}; CURATED.brief = b.brief || null; CURATED.verdicts = b.verdicts || CURATED.verdicts;
+            CURATED.needsObjective = !!b.needs_objective;
+            if (b.status) CURATED.status = b.status;
+            render();
+          })
+          .catch(function () { /* the old view stays */ });
+      }
     };
     try { document.dispatchEvent(new CustomEvent("hv:selection")); } catch (e) { /* old browser */ }
     if (STATUS_ON) {

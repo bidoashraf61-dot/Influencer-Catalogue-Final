@@ -1285,6 +1285,51 @@ a.hv-note:hover { background: #efede8; }
 .sel-obj__go .hv-i { width: 18px; height: 18px; }
 .sel-obj__go:hover { transform: translateY(-1px); }
 .sel-obj__go:focus-visible { outline: 3px solid var(--white); outline-offset: 2px; }
+/* Done: one quiet line on linen instead of the ink call to action (fix batch 3). */
+.sel-obj--done { background: var(--linen); color: var(--ink); }
+.sel-obj--done .sel-obj__in { padding: 10px 0; gap: 10px 14px; }
+.sel-obj__ic--done { width: 32px; height: 32px; background: var(--go-green, #14884a); color: var(--white); }
+.sel-obj__ic--done .hv-i { width: 18px; height: 18px; }
+.sel-obj--done .sel-obj__tx { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; color: var(--graphite, #383838); }
+.sel-obj--done .sel-obj__tx b { display: inline; font-size: 22px; color: var(--ink); margin: 0; }
+.sel-obj__what { font-weight: 700; color: var(--ink); }
+.sel-obj__what::before { content: "·"; margin-right: 10px; color: rgba(18,18,18,.4); font-weight: 400; }
+.sel-obj__note { font-size: 13px; }
+.sel-obj__edit { min-height: 40px; padding: 0 18px; border-radius: var(--r-pill); border: 1.5px solid var(--ink); background: transparent; color: var(--ink);
+  font-family: var(--heading); font-size: 18px; letter-spacing: .05em; cursor: pointer; transition: background .2s ease, color .2s ease; }
+.sel-obj__edit:hover { background: var(--ink); color: var(--lime); }
+.sel-obj__edit:focus-visible { outline: 3px solid var(--vivid-red, #ee1515); outline-offset: 2px; }
+
+/* The objective studio (portal.js objectiveStudio): the AI shortlist card's world in a dialog.
+   It borrows every .ai-sl__ piece (track, coach, power meter, options, step list). */
+.ai-sl.ob { width: min(1040px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; margin: auto;
+  box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+.ob__hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 24px 26px 0; }
+.ob__hd .ai-sl__title { font-size: clamp(30px, 2vw + 18px, 42px); }
+.ob__lead { margin: 8px 0 0; max-width: 62ch; font-size: 15px; line-height: 1.5; color: rgba(255,255,255,.78); }
+.ob__x { flex: none; }
+.ob__run { padding-top: 22px; }
+.ob__head { grid-template-columns: minmax(0, 1fr); }
+.ob__track .ai-sl__node { cursor: pointer; }
+.ob__count { margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.55); }
+.ob__srcrow { margin-top: 26px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,.12); }
+.ob__srcb { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px; border-radius: 999px; cursor: pointer;
+  background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.28); font: 700 14px/1 "DM Sans", Arial, sans-serif; }
+.ob__srcb .hv-i { width: 16px; height: 16px; }
+.ob__srcb:hover, .ob__srcb[aria-expanded="true"] { border-color: var(--ai-lime); color: var(--ai-lime); }
+.ob__src .bs { margin-top: 14px; }
+.ob__wait .ai-sl__list { max-width: 460px; }
+.ob__done { display: flex; align-items: center; gap: 10px; margin: 18px 0 0; font-family: Bebasneue, Arial, sans-serif; font-size: 26px; letter-spacing: .03em; color: var(--ai-lime);
+  animation: ai-in .36s var(--ai-ease); }
+.ob__done .hv-i { width: 26px; height: 26px; padding: 3px; border-radius: 50%; background: var(--ai-lime); color: var(--ai-ink); }
+.ai-sl__power.is-full { box-shadow: inset 0 0 0 1.5px var(--ai-lime), 0 0 26px rgba(232,255,118,.22); }
+.ai-sl__power.is-full .ai-sl__pw-lvl { color: var(--ai-lime); }
+@media (max-width: 640px) {
+  .ob__hd { padding: 18px 16px 0; }
+  .ob__lead { font-size: 14px; }
+  .ob__run { padding-top: 14px; }
+  .ai-sl.ob { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 22px; }
+}
 .sel-st__by { font-size: 12.5px; color: var(--gray); line-height: 1.4; margin: 6px 0 0; }
 .sel-st__by b { color: var(--ink); font-weight: 600; }
 .sel-st__acts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; }
