@@ -368,7 +368,10 @@ def sample(code, platform=None):
 
 # ------------------------------------------------------------ fit scores --
 
-_LOCKED_WORDS = ("audience", "fake", "real follower", "aged", "women", "men ", "credib")
+# Evidence drawn from the locked part of an analysis. "works in the … space" is the measured
+# niche line (fit.score_core reads it off the audience and creator interests of a full analysis).
+_LOCKED_WORDS = ("audience", "fake", "real follower", "real people", "aged", "women", "men ", "credib",
+                 "works in the", "brand affinity", "interest")
 
 
 def _locked_text(t):
@@ -376,14 +379,24 @@ def _locked_text(t):
     return any(w in t for w in _LOCKED_WORDS)
 
 
+def _locked_part(p):
+    """A score part measured from the locked analysis ("Audience (measured)"); the assumed
+    audience part says nothing about the creator and stays."""
+    lab = str((p or {}).get("label") or "").lower()
+    return "measured" in lab or (_locked_text(lab) and "assumed" not in lab)
+
+
 def redact_score(sc):
-    """A fit score with the locked figures taken out (audience shares, fake
-    followers): the number stays, the evidence waits for the full analysis."""
+    """A fit score with the locked evidence taken out (audience shares, fake followers, the
+    measured audience part and its strengths and watch-outs): the number and its stamp stay,
+    the evidence waits for the full analysis. Engagement, reach and views are free."""
     if not isinstance(sc, dict):
         return sc
     out = dict(sc)
     out["checks"] = [c for c in (sc.get("checks") or [])
                      if not _locked_text(c.get("label")) and not _locked_text(c.get("text"))]
+    if "parts" in sc:
+        out["parts"] = [p for p in (sc.get("parts") or []) if not _locked_part(p)]
     out["strengths"] = [x for x in (sc.get("strengths") or []) if not _locked_text(x)]
     out["watchouts"] = [x for x in (sc.get("watchouts") or []) if not _locked_text(x)]
     if "conclusion" in sc:
