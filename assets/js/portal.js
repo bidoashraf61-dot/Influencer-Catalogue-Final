@@ -3077,6 +3077,7 @@
     function costLine() {
       var c = (ME && ME.costs) || { brief: 5, search: 0 };
       if (ME && ME.kind === "admin") return "Admin preview · free";
+      if (ME && ME.ai_free) return "Free with your active campaign · includes AI reasons";
       if (ME && ME.ai && c.brief && (ME.credits == null || ME.credits >= c.brief)) return c.brief + " credits · includes AI reasons";
       return c.search ? c.search + " credits" : "Free";
     }
