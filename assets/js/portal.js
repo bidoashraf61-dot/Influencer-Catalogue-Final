@@ -122,7 +122,7 @@
   // visible element flashed blank frames in Chrome). Reduced motion: the lime still.
   // The resting loop is the energetic toothy smile ("hi"), the same clip as the chat launcher.
   var LIME = { loop: "hi", wave: "hi", idle: "hi", point: "point-act", think: "think", thumbs: "thumbs-act",
-               cheer: "cheer-act", celebrate: "cheer", scan: "scan" };
+               cheer: "cheer-act", celebrate: "cheer", scan: "up" };   // building: thumbs-up and wink, grinning
   function lime(kind, cls, opts) {
     opts = opts || {};
     var frame = document.createElement("span");

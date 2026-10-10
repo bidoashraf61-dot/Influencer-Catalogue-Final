@@ -69,7 +69,7 @@
     var still = dir + "helvy-still.webp" + "?v=t3";
     var watching = [], io = null;
     var vdir = base + "assets/brand/voice/";
-    var VOICE = { loop: 1, wave: 1, hi: 1, "point-act": 1, point: 1, think: 1, "think-act": 1, "thumbs-act": 1, thumbs: 1, "cheer-act": 1, cheer: 1, scan: 1 };
+    var VOICE = { loop: 1, wave: 1, hi: 1, up: 1, "point-act": 1, point: 1, think: 1, "think-act": 1, "thumbs-act": 1, thumbs: 1, "cheer-act": 1, cheer: 1, scan: 1 };
     var vstill = vdir + "voice-hi-poster.webp?v=t5";      // the smiling frame, not the flat first frame of the old loop
 
     // VER changes whenever the files are replaced: /assets/ is cached for 30 days as immutable.
