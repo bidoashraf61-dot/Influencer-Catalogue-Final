@@ -3935,7 +3935,11 @@ def clients_page(overview, origin, archived=False, n_archived=0, page_no=1, tota
             + "</span></div><div class='muted' style='font-size:var(--t-sm,13px)'>"
             + (str(len(open_reqs)) + " open quote request(s) · " if open_reqs else "")
             + (str(o["analysis_requests"]) + " analysis request(s)" if o["analysis_requests"] else "")
-            + " " + archive_button("client", c["id"], archived) + "</div></div>"
+            + " " + archive_button("client", c["id"], archived)
+            + "<form method='post' action='" + u("/clients/preview") + "' style='display:inline;margin-left:6px'>"
+              "<input type='hidden' name='id' value='" + str(c["id"]) + "'>"
+              "<button class='btn tiny' title='Open the portal as this client, read-only'>Preview as client</button></form>"
+            + "</div></div>"
             + "<div class='grid2' style='margin-top:12px'><div><label>Selections → campaigns</label><ul class='chain-list'>"
             + (sels or "<li class='muted'>No selections yet.</li>") + "</ul></div>"
             + "<div><label>All campaigns</label><ul class='chain-list'>" + (camps or "<li class='muted'>None yet.</li>")

@@ -198,6 +198,12 @@ body.pt-lock { overflow: hidden; }
 /* the roster keeps a clear gutter on the right so the launcher never sits on a card */
 .has-voice .cat-grid-section .cat-pad, .has-voice .cat-close .cat-pad { padding-right: max(var(--pad, 5%), 112px); }
 
+/* admin "Preview as client": a slim bar across the top, read-only */
+.hv-previewbar { position: fixed; top: 0; left: 0; right: 0; z-index: 2147482000; display: flex; gap: 16px; justify-content: center; align-items: center;
+  min-height: 36px; padding: 6px 16px; background: var(--hv-lime, #e8ff76); color: #121212; font: 600 14px/1.3 "DM Sans", Arial, sans-serif; }
+.hv-previewbar a { color: #121212; text-decoration: underline; font-weight: 700; }
+body.has-previewbar { padding-top: 36px; }
+
 /* launcher */
 .hv-launch {
   position: relative; display: block; width: 76px; height: 76px; padding: 0; border: 0;

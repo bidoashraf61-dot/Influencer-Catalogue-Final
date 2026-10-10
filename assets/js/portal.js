@@ -3757,10 +3757,22 @@
 
   /* ------------------------------------------------------------------ boot */
 
+  // An admin looking at the portal as a client (Clients > Preview as client): a bar says so, it is
+  // read-only (the server refuses writes), and one link leaves.
+  function mountPreviewBar() {
+    if (!ME || !ME.preview || document.getElementById("hv-previewbar")) return;
+    var who = (ME.user && (ME.user.company || ME.user.name)) || "this client";
+    var bar = h("div", { id: "hv-previewbar", class: "hv-previewbar", role: "status" },
+      h("span", null, "Previewing as ", h("b", null, who), " · read-only"),
+      h("a", { href: API + "/clients/preview/exit" }, "Exit preview"));
+    document.body.insertBefore(bar, document.body.firstChild);
+    document.body.classList.add("has-previewbar");
+  }
+
   function boot() {
     api("GET", "/api/me").then(function (r) {
       if (r.b && r.b.signed_in) {
-        ME = r.b; HV.me = ME; mountDock(); mountVoice(); mountAiCard(); mountLicences();
+        ME = r.b; HV.me = ME; mountDock(); mountVoice(); mountAiCard(); mountLicences(); mountPreviewBar();
         try { document.dispatchEvent(new CustomEvent("hv:me", { detail: ME })); } catch (e) { /* old browser */ }
         var m = /[#&]s=([^&]+)/.exec(location.hash || "");
         // (The selection page asks for a missing objective in its own bar: catalogue.js renderObjective.)

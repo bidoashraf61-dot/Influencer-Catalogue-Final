@@ -128,6 +128,11 @@ LOGO = HERE.parent / "site" / "assets" / "helv" / "logo-knockout.webp"
 STATIC = HERE / "static"
 ADMIN_COOKIE = "hv_admin"
 VIEWER_COOKIE = "hv_view"
+# Set with a client's pass by "Preview as client" in the admin: read-only, for an admin only.
+PREVIEW_COOKIE = "hv_preview"
+PREVIEW_TTL = 3600
+# The only POSTs a preview may still make (a calculation and analytics; nothing is saved or charged).
+PREVIEW_POSTS = ("/api/event", "/api/roi/estimate", "/api/me/ping")
 # Every shared link (a selection, a campaign report, the catalogue itself)
 # remembers the access code that opened it, in this browser: each new link
 # asks for its own code once, and links of different clients open side by side.
@@ -317,7 +322,29 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         cid = self.viewer_cookie_id()
         if cid is None and self.admin():
             cid = db.admin_code_id()
+        elif cid is not None and self.staff_viewer(cid):
+            cid = db.admin_code_id()           # a person with admin access sees everything unlocked
         return cid
+
+    def staff_viewer(self, cid=None):
+        """True when this browser is signed in to the portal as someone who ALSO has admin access
+        (their email is an admin account). Signing in by email code proves they own the address,
+        so they get the admin preview's view: nothing is locked, nothing is charged."""
+        cid = cid if cid is not None else self.viewer_cookie_id()
+        if cid is None or cid == db.admin_code_id():
+            return False
+        u = portal.user_for_code(cid)
+        return bool(u and u["email"] and db.admin_by_email(u["email"]))
+
+    def admin_like(self):
+        """HelloVoice admin session, or a portal sign-in by a person who has admin access: the
+        checks that mean "nothing is locked for this reader"."""
+        return bool(self.admin()) or self.staff_viewer()
+
+    def preview_mode(self):
+        """An admin looking at the portal AS a client (read-only): the preview cookie plus a live
+        admin session. Without the admin session the cookie means nothing."""
+        return self.cookies().get(PREVIEW_COOKIE, "") == "1" and bool(self.admin())
 
     # ------------------------------------------------- per-link access codes --
 
@@ -351,7 +378,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def selection_viewer(self, token):
         """Who acts on a selection page: the admin, else the code typed for that
         link, else this browser's general pass."""
-        if self.admin():
+        if self.admin() or self.staff_viewer():
             return db.admin_code_id()
         return (self.link_code("s:" + token) if token else None) or self.viewer_code_id()
 
@@ -748,6 +775,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                              [("Content-Disposition", 'attachment; filename="report-%s.xlsx"'
                                % db.campaign_slug(k))])
+        if path == "/clients/preview/exit":
+            gone = "; Path=/; HttpOnly; Max-Age=0; SameSite=Lax"
+            return self.redirect("/clients", [("Set-Cookie", VIEWER_COOKIE + "=" + gone),
+                                              ("Set-Cookie", PREVIEW_COOKIE + "=" + gone)])
         if path == "/clients":
             arch = query.get("archived") == "1"
             every = db.client_overview()
@@ -918,6 +949,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path.startswith("/api/"):
             guard.limiter.hit(f"api:{self.client_ip()}")
 
+        if path.startswith("/api/") and path not in PREVIEW_POSTS and self.preview_mode():
+            return self.send_json(403, {"ok": False, "reason": "preview",
+                                        "message": "You are previewing as a client: this is read-only. Exit the preview to make changes."},
+                                  self.cors())
         if path.startswith("/api/") and self.portal_post(path):
             return
         if path == "/api/unlock":
@@ -974,6 +1009,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.portal_admin_post(path, who)
         if path == "/history/undo":
             return self.post_history_undo()
+        if path == "/clients/preview":
+            return self.post_client_preview()
         if path == "/archive":
             f = self.form_body()
             kind = f.get("kind")
@@ -2228,6 +2265,24 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return (sorted(ALLOWED_ORIGINS)[0] if ALLOWED_ORIGINS
                 else "https://" + (self.headers.get("Host") or "")).rstrip("/")
 
+    def post_client_preview(self):
+        """Clients page button: open the portal as this client (read-only). Sets the client's pass for
+        an hour plus the preview marker, then lands on the client's own page."""
+        f = self.form_body()
+        rid = (f.get("id") or "").strip()
+        row = db.get_code(int(rid)) if rid.isdigit() else None
+        if row is None or row["id"] == db.admin_code_id():
+            return self.redirect("/clients")
+        expiry = db.now() + PREVIEW_TTL
+        ticket = auth.sign("%d:%d" % (row["id"], expiry), SECRET)
+        policy = "SameSite=None; Secure" if ALLOWED_ORIGINS else "SameSite=Lax"
+        base = "; Path=/; HttpOnly; %s; Max-Age=%d" % (policy, PREVIEW_TTL)
+        db.log("preview", row["id"], self.client_ip(), self.headers.get("User-Agent"), "admin preview of " + (row["label"] or "")[:60])
+        target = self.site_origin() + ("/account/" if portal.user_for_code(row["id"]) else "/")
+        self.send(303, b"", "text/plain", [("Location", target),
+                                           ("Set-Cookie", VIEWER_COOKIE + "=" + ticket + base),
+                                           ("Set-Cookie", PREVIEW_COOKIE + "=1" + base)])
+
     def post_selection_new(self):
         """Re-price a selection a client already has: one they sent as a quote
         request, or one whose link was pasted in. Asking twice for the same
@@ -2982,7 +3037,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def api_campaigns(self):
         """The campaigns this passcode may see. Drafts are never listed."""
-        code_id = (db.admin_code_id() if self.admin() else None) or self.link_code("c:list") or self.signed_in_client()
+        code_id = (db.admin_code_id() if self.admin_like() else None) or self.link_code("c:list") or self.signed_in_client()
         if code_id is None:
             return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         team = sorted(portal.team_codes(code_id))
@@ -3001,7 +3056,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def viewer_campaign(self, token):
         k = db.campaign(token=token) if token else None
-        if k is not None and self.admin():
+        if k is not None and self.admin_like():
             return k, 200                       # admins open any report, drafts included
         # The code typed for this report, or for the client's campaign list it was opened from.
         code_id = self.link_code("c:" + token) if token else None
@@ -4050,7 +4105,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "band": metrics.band_of(r["followers"])}
         # Analysis gating: the headline numbers are free; the rest is for a client the team
         # has unlocked it for. Anyone else gets sample data drawn here, never the real values.
-        gate = {"state": "unlocked"} if self.admin() else gating.state(code_id, code)
+        gate = {"state": "unlocked"} if self.admin_like() else gating.state(code_id, code)
         gate["headline"] = gating.headline(card, every)
         if gate["state"] != "unlocked":
             gate["sample"] = gating.sample(code, plats[0] if plats else None)
@@ -4072,7 +4127,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if viewer is None:
             return self.send(401, b"", "text/plain")
         # Post covers and brand logos are part of the locked analysis.
-        if not self.admin() and not gating.unlocked(viewer, str(code or "").strip().upper()):
+        if not self.admin_like() and not gating.unlocked(viewer, str(code or "").strip().upper()):
             return self.send(403, b"", "text/plain")
         f = analysis.media_path(code, name)
         if f is None:
@@ -4121,11 +4176,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         viewer = self.viewer_code_id()
         if token:
             # A selection its client deleted is "unknown" to clients; HelloVoice still opens it.
-            sel = db.selection(token=token, deleted=bool(self.admin()))
+            sel = db.selection(token=token, deleted=bool(self.admin_like()))
             # Prices agreed with one client are for that client. The token is
             # in a link, and a link travels; the code typed FOR THIS LINK is what
             # identifies who is reading it. Admins signed in open any link.
-            if sel is not None and not self.admin():
+            if sel is not None and not self.admin_like():
                 cid = self.link_code("s:" + token) or self.signed_in_client()
                 if cid is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(int(cid))
                                    and int(cid) != db.admin_code_id()):
@@ -4190,7 +4245,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         reader = self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.
-        open_ = None if self.admin() else gating.unlocked_set(reader, codes)
+        open_ = None if self.admin_like() else gating.unlocked_set(reader, codes)
         if open_ is not None:
             out["scores"] = {k: (v if k in open_ else gating.redact_score(v)) for k, v in out["scores"].items()}
         out.update(self.selection_status_payload(sel, codes, reader, by))
@@ -4199,7 +4254,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def selection_role(self, sel, reader):
         """admin (HelloVoice: any status), owner (the client it belongs to: approve and
         reject) or viewer (a colleague or a link holder: look only)."""
-        if self.admin() or (reader is not None and int(reader) == db.admin_code_id()):
+        if self.admin_like() or (reader is not None and int(reader) == db.admin_code_id()):
             return "admin"
         if reader is not None and sel["code_id"] is not None and portal.owns(int(reader), sel["code_id"]):
             return "owner"
@@ -4306,7 +4361,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not self.viewer_code_id():
             return "locked"
         # A page that names its link asks for that link's own code once.
-        if link and not self.admin() and not self.signed_in_client() and self.link_code(link) is None:
+        if link and not self.admin_like() and not self.signed_in_client() and self.link_code(link) is None:
             return "link"
         return None
 
@@ -4406,7 +4461,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # brands, likes…) would answer "does this creator's audience pass X?" one code at a time,
         # so only the free headline figures (engagement, average views) filter, and the facets
         # list none of the locked options.
-        free = not self.admin()
+        free = not self.admin_like()
         if job == "facets":
             return self.send_json(200, {"ok": True, "facets": discover.facets(free_only=free)}, self.cors())
         b = self.json_body()

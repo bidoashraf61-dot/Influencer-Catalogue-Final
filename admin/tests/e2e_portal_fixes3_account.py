@@ -32,6 +32,10 @@ ANSWERS = {"goal": "engagement", "platforms": ["Instagram"], "market": "SA", "ca
            "gender": "Women", "age": "25-34"}
 
 
+def Client_anon(base_url):
+    return base.Client(base_url)
+
+
 class Fixes3Account(unittest.TestCase):
     signup = base.Portal.signup
     admin = base.Portal.admin
@@ -169,6 +173,39 @@ class Fixes3Account(unittest.TestCase):
         self.assertEqual(s, 200, b)
         self.assertNotEqual(b["token"], token)                                   # their own copy
         self.assertEqual(json.loads(db.selection(token=token)["codes"]), ["HV-MI-001", "HV-MI-002"])
+
+    def test_02c_admin_access_opens_everything_and_preview_is_read_only(self):
+        import auth as _auth
+        # a person with admin access, signed in to the portal by email, sees nothing locked
+        db.create_admin("staff@acme-staff.com", _auth.hash_password("a-long-passphrase-here"))
+        st, b = self.signup("staff@acme-staff.com")
+        self.assertEqual(st.get("/api/me")[1]["kind"], "admin")
+        owner, _ = self.signup("owner@elsewhere-staff.com")
+        tok = self.sel(owner, "Not theirs", ["HV-MI-001"])
+        s, g, _ = st.get("/api/selection?s=" + tok)
+        self.assertEqual((s, g["role"]), (200, "admin"))
+        g = st.get("/api/ideas?c=HV-MI-001&s=" + tok)[1]
+        self.assertFalse(g.get("locked"))                                        # no campaign needed
+        # an ordinary client is untouched
+        self.assertEqual(owner.get("/api/me")[1]["kind"], "user")
+        self.assertTrue(owner.get("/api/ideas?c=HV-MI-001&s=" + tok)[1]["locked"])
+        # Clients > Preview as client: the client's own pass, read-only, admin session required
+        a = self.admin()
+        cid = portal.user_by_email("owner@elsewhere-staff.com")["code_id"]
+        s, _, r = a.post("/clients/preview", form={"id": str(cid)})
+        self.assertEqual(s, 303)
+        cookies = {c.split("=")[0]: c.split(";")[0].split("=", 1)[1] for c in r.headers.get_all("Set-Cookie")}
+        self.assertIn("hv_view", cookies); self.assertEqual(cookies["hv_preview"], "1")
+        hdr = "; ".join("%s=%s" % (c.name, c.value) for c in a.jar if c.name not in ("hv_view", "hv_preview"))
+        hdr += "; hv_view=%s; hv_preview=1" % cookies["hv_view"]
+        s, me, _ = a.get("/api/me", headers={"Cookie": hdr})
+        self.assertEqual((s, me["preview"], me["kind"]), (200, True, "user"))
+        s, b, _ = a.post("/api/selection", {"name": "x", "codes": ["HV-MI-001"]}, headers={"Cookie": hdr})
+        self.assertEqual((s, b["reason"]), (403, "preview"))
+        # the preview cookie alone, with no admin session, is nothing
+        s, b, _ = Client_anon(self.base).post("/api/selection", {"name": "x", "codes": ["HV-MI-001"]},
+                                              headers={"Cookie": "hv_preview=1"})
+        self.assertNotEqual(b.get("reason") if isinstance(b, dict) else None, "preview")
 
     def test_03_helloVoice_selection_cannot_be_deleted_by_the_client(self):
         c, _ = self.signup("noor@hv-del.com")

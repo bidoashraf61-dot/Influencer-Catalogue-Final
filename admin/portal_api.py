@@ -99,6 +99,7 @@ class PortalMixin(connect_api.ConnectMixin):
         if kind == "user":
             portal.monthly_refill(cid)
         out = {"signed_in": True, "kind": kind, "credits": portal.balance(cid) if kind != "admin" else None,
+               "preview": bool(self.preview_mode()),
                "costs": portal.costs(), "ai": gemini.configured(),
                # AI is free while the client has an active campaign (start date to end date + 30 days).
                "ai_free": portal.ai_free(cid) if kind != "admin" else None,
@@ -928,7 +929,7 @@ class PortalMixin(connect_api.ConnectMixin):
         sel = db.selection(token=str(token or "")) if token else None
         if sel is None:
             return None
-        if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not self.admin():
+        if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not self.admin_like():
             return None
         with db.connect() as conn:
             br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",
