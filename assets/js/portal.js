@@ -120,7 +120,8 @@
   //   onEnd                     optional callback when the reaction has played
   // A new clip is laid over the old one, which goes once the new one draws (a source swap on a
   // visible element flashed blank frames in Chrome). Reduced motion: the lime still.
-  var LIME = { loop: "loop", wave: "loop", idle: "loop", point: "point-act", think: "think", thumbs: "thumbs-act",
+  // The resting loop is the energetic toothy smile ("hi"), the same clip as the chat launcher.
+  var LIME = { loop: "hi", wave: "hi", idle: "hi", point: "point-act", think: "think", thumbs: "thumbs-act",
                cheer: "cheer-act", celebrate: "cheer", scan: "scan" };
   function lime(kind, cls, opts) {
     opts = opts || {};
@@ -130,7 +131,7 @@
     if (!HVH || REDUCE) {
       var im = document.createElement("img");
       im.className = "hv-clip hv-clip--still"; im.alt = ""; im.decoding = "async";
-      im.src = HVH ? HVH.vstill : ROOT + "assets/brand/voice/voice-loop-poster.webp";
+      im.src = HVH ? HVH.vstill : ROOT + "assets/brand/voice/voice-hi-poster.webp?v=t5";
       frame.appendChild(im);
       frame.loop = frame.react = function (k, t, cb) { if (typeof t === "function") cb = t; if (cb) setTimeout(cb, 0); };
       frame.reset = function () {};
