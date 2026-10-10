@@ -2802,7 +2802,7 @@
     var ST_LABEL = { review: "Under review", approved: "Approved", rejected: "Rejected", unavailable: "Unavailable" };
     var ST_KEY = { "Under review": "review", "Approved": "approved", "Rejected": "rejected", "Unavailable": "unavailable" };
     var ST_SIG = { review: "wait", approved: "ok", rejected: "no", unavailable: "off" };
-    var REASONS = [["price", "Price"], ["audience", "Audience"], ["style", "Content style"], ["competitor", "Worked with a competitor"], ["other", "Other"]];
+    var REASONS = [["price", "Price"], ["audience", "Audience"], ["style", "Content style"], ["competitor", "Worked with a competitor"], ["unavailable", "Creator unavailable"], ["other", "Other"]];
     var ST_ICON = { review: "clock", approved: "check", rejected: "x", unavailable: "ban" };
     var justRejected = {};           // codes rejected in this visit: their "?" pulses once
     function reasonText(st) {
@@ -2892,8 +2892,10 @@
     function replButton(code, st) {
       var have = (st.replacements || []).length;
       var cost = CURATED && CURATED.replaceCost != null ? CURATED.replaceCost : 2;
-      if (have) return '<button type="button" class="sel-repl sel-repl--ink" data-st-repl="' + esc(code) + '">' + hvIcon("swap") + " See " + have + " replacement" + (have === 1 ? "" : "s") + " from Helvy</button>";
       var helvy = window.hvPortal && window.hvPortal.helvy ? '<img src="' + esc(window.hvPortal.helvy) + '" alt="" aria-hidden="true">' : "";
+      // Already found: the same lime pill with Helvy's face as "Find a replacement"; opening them is free.
+      if (have) return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '" aria-label="See the ' + have + ' replacement' + (have === 1 ? "" : "s") + ' Helvy found">' +
+        helvy + "<span>See " + have + " replacement" + (have === 1 ? "" : "s") + "</span>" + costChip(0) + "</button>";
       // A compact one-line pill: Helvy's face, the action, the cost inline.
       return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '" aria-label="Find a replacement with Helvy, ' + (cost ? cost + " credits" : "free") + '">' +
         helvy + "<span>Find a replacement</span>" + costChip(cost) + "</button>";
@@ -2996,7 +2998,7 @@
       if (canDecide && st.s === "review") {
         html += '<div class="sel-st__acts"><button type="button" class="sel-dec sel-dec--yes" data-st-set="approved" data-st-code="' + esc(code) + '">' + hvIcon("check") + " Approve</button>" +
           '<button type="button" class="sel-dec sel-dec--no" data-st-set="rejected" data-st-code="' + esc(code) + '">' + hvIcon("x") + " Reject</button></div>";
-        if (ROLE === "admin") html += '<button type="button" class="sel-st__change sel-st__off" data-st-set="unavailable" data-st-code="' + esc(code) + '">Mark unavailable (HelloVoice)</button>';
+        // "Unavailable" is now one of the reasons under Reject (no separate HelloVoice link).
       }
       // Find a replacement opens Helvy's side panel (connect.js), like Creators like this.
       if (canDecide && (st.s === "rejected" || st.s === "unavailable")) html += replButton(code, st);

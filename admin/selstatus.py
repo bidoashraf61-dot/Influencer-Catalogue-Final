@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS selection_status (
 STATUSES = ("review", "approved", "rejected", "unavailable")
 LABEL = {"review": "Under review", "approved": "Approved", "rejected": "Rejected", "unavailable": "Unavailable"}
 REASONS = {"price": "Price", "audience": "Audience", "style": "Content style", "competitor": "Worked with a competitor",
-           "other": "Other"}
+           "unavailable": "Creator unavailable", "other": "Other"}
 EMAIL_DELAY = 300              # seconds a client's changes are gathered before one email goes
 
 
