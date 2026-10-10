@@ -137,6 +137,44 @@ DEFAULT_GUEST_CREDITS = 10
 DEFAULT_SIGNUP_CREDITS = 50
 
 
+
+# ------------------------------------------------------- per-request memo --
+# One selection request asked "which team is this?" and "is a campaign active?" up to six
+# times each (prices, costs, credits), each a fresh SQLite connection. Inside one HTTP request
+# (server.Handler opens and closes the memo) the answers cannot change in a way that matters,
+# so they are worked out once. Outside a request (tests, jobs) nothing is cached.
+import threading as _threading
+_memo = _threading.local()
+
+
+def memo_begin():
+    _memo.d = {}
+
+
+def memo_end():
+    _memo.d = None
+
+
+def memo_drop():
+    """A write that changes teams, users or campaigns inside a request: forget what was read."""
+    if getattr(_memo, "d", None) is not None:
+        _memo.d = {}
+
+
+def _memoized(fn):
+    def wrap(*a):
+        d = getattr(_memo, "d", None)
+        if d is None:
+            return fn(*a)
+        key = (fn.__name__,) + a
+        if key not in d:
+            d[key] = fn(*a)
+        v = d[key]
+        return set(v) if isinstance(v, set) else v
+    wrap.__name__ = fn.__name__
+    wrap.__doc__ = fn.__doc__
+    return wrap
+
 def init():
     with db.connect() as conn:
         conn.executescript(SCHEMA)
@@ -312,6 +350,7 @@ def user_by_id(uid):
         return conn.execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone()
 
 
+@_memoized
 def user_for_code(code_id):
     with db.connect() as conn:
         return conn.execute("SELECT * FROM users WHERE code_id = ?", (code_id,)).fetchone()
@@ -506,6 +545,7 @@ def _ring_low(code_id, left):
                href="account/#credits", ref="low:" + inbox.today(), once=True)
 
 
+@_memoized
 def active_campaign(code_id):
     """The campaign that makes AI free for this viewer, or None: one of their (team's) campaigns,
     not a draft, from its start date until 30 days after its end date. A live campaign with no
@@ -663,6 +703,7 @@ def read_ticket(secret, ticket):
 
 # -------------------------------------------------------------------- teams --
 
+@_memoized
 def team_codes(code_id):
     """The access-code ids whose selections and campaigns this viewer may see: their own, plus
     colleagues on the same company domain when team sharing is on. Personal domains (only possible

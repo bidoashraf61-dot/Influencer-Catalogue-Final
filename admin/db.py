@@ -1628,6 +1628,24 @@ def list_creators(active_only=False, search=None, added_from=None, added_to=None
         return conn.execute(q, args).fetchall()
 
 
+def creators_by_codes(codes, active_only=False):
+    """Just the named creators, in roster order: a selection page needs a handful of rows,
+    not all 2,000+ (list_creators read the whole table twice per selection request)."""
+    codes = [c for c in dict.fromkeys(codes or []) if c]
+    if not codes:
+        return []
+    out = []
+    with connect() as conn:
+        for i in range(0, len(codes), 500):
+            part = codes[i:i + 500]
+            q = "SELECT * FROM creators WHERE code IN (%s)" % ",".join("?" * len(part))
+            if active_only:
+                q += " AND active = 1"
+            out += conn.execute(q, part).fetchall()
+    out.sort(key=lambda r: (r["sort"] or 0, r["code"]))
+    return out
+
+
 def creator(code, conn=None):
     if conn is None:
         with connect() as own:

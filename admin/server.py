@@ -416,7 +416,19 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             path = path[len(BASE):] or "/"
         return path
 
+    # Reads that ask the same team / campaign question several times share one answer per
+    # request (portal.memo_*). GETs only change nothing that matters; of the POSTs only the
+    # selection decisions, which never touch users, teams or campaigns.
+    MEMO_POSTS = ("/api/selection/status", "/api/selection/reason", "/api/selection/tags", "/api/selection/platform")
+
     def do_GET(self):
+        portal.memo_begin()
+        try:
+            return self._do_get()
+        finally:
+            portal.memo_end()
+
+    def _do_get(self):
         path = self.route(urllib.parse.urlparse(self.path).path)
         query = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query))
 
@@ -880,6 +892,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                          "text/plain; charset=utf-8", h)
 
     def do_POST(self):
+        if self.route(urllib.parse.urlparse(self.path).path) in self.MEMO_POSTS:
+            portal.memo_begin()
+        try:
+            return self._do_post()
+        finally:
+            portal.memo_end()
+
+    def _do_post(self):
         path = self.route(urllib.parse.urlparse(self.path).path)
         history.start_request()
 
@@ -3633,7 +3653,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             assign = json.loads((sel["platforms"] if "platforms" in sel.keys() else None) or "{}")
         except ValueError:
             assign = {}
-        rows = {c["code"]: c for c in db.list_creators() if c["code"] in set(codes)}
+        rows = {c["code"]: c for c in db.creators_by_codes(codes)}
         every = db.analyses_for(codes)
         records, typical = metrics.track_records()
         bench = metrics.benchmarks()
@@ -4091,8 +4111,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         bands = db.tier_prices()
-        by = {c["code"]: c for c in db.list_creators(active_only=True)}
-        codes = [c for c in json.loads(sel["codes"] or "[]") if c in by]
+        listed = json.loads(sel["codes"] or "[]")
+        by = {c["code"]: c for c in db.creators_by_codes(listed, active_only=True)}
+        codes = [c for c in listed if c in by]
         own = json.loads(sel["prices"] or "{}")
         platform = sel["platform"] if "platform" in sel.keys() else None
         prices = {}
@@ -4157,7 +4178,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         what this reader may do, and the price of a replacement search."""
         st = {k: v for k, v in selstatus.of(sel["id"]).items() if k in codes}
         if by is None:
-            by = {c["code"]: c for c in db.list_creators(active_only=True)}
+            by = {c["code"]: c for c in db.creators_by_codes(codes, active_only=True)}
         tiers = {c: by[c]["tier"] for c in codes if c in by}
         owner = portal.user_for_code(sel["code_id"]) if sel["code_id"] else None
         role = self.selection_role(sel, reader)
