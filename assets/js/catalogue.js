@@ -2654,11 +2654,14 @@
       }).join("");
       tip.innerHTML = '<div class="cst-head"><b class="' + bandOf(sc.score) + '">' + sc.score + '%</b><div><strong>' + esc(sc.tag) +
         '</strong><small>' + (sc.basic ? "Screening score · " : "") + 'Match for ' + esc((sc.objective || "").toLowerCase()) + (sc.platform ? " · on " + esc(sc.platform) : "") + "</small>" +
-        (audienceEstimated(sc) ? "<small>Audience estimated: no audience report yet, so it counts lightly</small>" : "") +
+        (sc.confidence ? '<small class="cst-conf cst-conf--' + esc(sc.confidence.level) + '">' + (sc.confidence.level === "high" ? "High" : sc.confidence.level === "medium" ? "Medium" : "Low") + " confidence" +
+          (sc.confidence.posts ? " · " + sc.confidence.posts + " posts" : "") + (sc.confidence.source === "global" ? " · global estimate" : "") + "</small>" : "") +
+        (sc.limited_data ? "<small>Limited data: read it as a first look</small>" : "") +
+        (sc.reach_followers ? "<small>Reach " + (sc.reach_followers >= 1e6 ? (Math.round(sc.reach_followers / 1e5) / 10) + "M" : sc.reach_followers >= 1e3 ? Math.round(sc.reach_followers / 1e3) + "K" : sc.reach_followers) + " followers, shown beside the score, not part of it</small>" : "") +
         (sc.others && sc.others.length ? "<small>Also: " + sc.others.map(function (o) { return esc(o.platform) + " " + o.score; }).join(", ") + "</small>" : "") + "</div></div>" +
         (sc.strengths && sc.strengths.length ? '<p class="cst-h">Strengths</p><ul class="cst-g">' + sc.strengths.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
         (sc.watchouts && sc.watchouts.length ? '<p class="cst-h">Watch-outs</p><ul class="cst-w">' + sc.watchouts.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
-        '<p class="cst-h">How it adds up</p>' + bars +
+        '<p class="cst-h">How it adds up (against creators of the same size)</p>' + bars +
         (sc.checks && sc.checks.length ? '<p class="cst-h">Verified by the full analysis</p><ul class="cst-c">' + sc.checks.map(function (c) {
           return '<li class="' + esc(c.level) + '">' + esc(c.text) + "</li>"; }).join("") + "</ul>" : "") +
         (sc.basic ? '<p class="cst-basic' + (sc.score >= 60 ? " cst-basic--warn" : "") + '"><b>Screening score, not proof.</b> It uses public numbers only, so fake followers and the real audience are not checked. Request the full analysis before booking.</p>' : "");
@@ -3128,6 +3131,16 @@
           if (n < want.length) stToast(want.length - n === 1 ? "One creator isn't in the catalogue right now." : (want.length - n) + " creators aren't in the catalogue right now.");
         });
         return want.length;
+      },
+      // The ROI Calculator's "remove these": takes creators out of the selection (never the last one).
+      remove: function (codes) {
+        var n = 0;
+        (codes || []).forEach(function (c) {
+          var i = selected.indexOf(c);
+          if (i > -1 && selected.length > 1) { selected.splice(i, 1); n++; }
+        });
+        if (n) { render(); saveShortlist(); }
+        return n;
       },
       toast: function (t) { stToast(t); },
       rerender: function () { render(); },

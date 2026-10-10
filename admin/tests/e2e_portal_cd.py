@@ -142,8 +142,11 @@ class CD(unittest.TestCase):
         r = c.post("/api/roi/estimate", {"goal": "awareness", "budget": 120000, "platforms": ["Instagram", "TikTok"],
                                          "mix": {"mid": 3, "micro": 6}})[1]["result"]
         self.assertTrue(r["estimate"])
-        self.assertIn(r["verdict"]["grade"], ("good", "moderate", "low"))
-        self.assertEqual([f["key"] for f in r["figures"]], ["reach", "views", "impressions", "frequency", "cpm"])
+        self.assertNotIn("verdict", r)                                              # fix batch 6: no market verdict
+        self.assertNotIn("cost", r)
+        self.assertEqual([f["key"] for f in r["figures"]], ["views", "reach"])
+        self.assertIn("Estimate, not a result", r["note"])
+        self.assertTrue(r["trust"]["line"].startswith("Based on"))
         self.assertEqual(r["posts"], 18)                                            # 9 creators x 2 platforms
         # fix batch 4: every figure as a range around the estimate; no advice line, no sources sent
         for f in r["figures"]:
@@ -152,12 +155,13 @@ class CD(unittest.TestCase):
         self.assertNotIn("advice", r)
         self.assertNotIn("sources", r)
         self.assertNotIn("Kolsquare", json.dumps(r))
-        # the verdict follows the client's budget: a tiny budget is good value, a huge one is not
-        cheap = roi.estimate("engagement", 1000, ["Instagram"], mix={"micro": 10})
-        dear = roi.estimate("engagement", 5000000, ["Instagram"], mix={"micro": 10})
-        self.assertEqual((cheap["verdict"]["grade"], dear["verdict"]["grade"]), ("good", "low"))
+        # the budget no longer changes what the creators deliver; it feeds the planner (advice) only
+        a = roi.estimate("engagement", 1000, ["Instagram"], mix={"micro": 10})
+        b = roi.estimate("engagement", 5000000, ["Instagram"], mix={"micro": 10})
+        self.assertEqual(a["figures"], b["figures"])
         t = roi.estimate("traffic", 60000, ["TikTok"], mix={"mid": 2, "micro": 6})
-        self.assertEqual([f["key"] for f in t["figures"]], ["clicks", "ctr", "landing", "cpc"])
+        self.assertEqual([f["key"] for f in t["figures"]], ["clicks", "views"])
+        self.assertTrue(r["plan"]["mix"])                                           # the planner answered the budget
         # a selection: its own creators, one post per platform they are on
         tok = self.sel(c, "Derm launch", ["HV-MI-001", "HV-MD-003", "HV-MI-002"])
         self.approve(c, tok, "HV-MI-001")
@@ -181,6 +185,8 @@ class CD(unittest.TestCase):
         self.assertEqual(len(items), 1)
         self.assertEqual(items[0]["campaign"], "Derm launch live")
         self.assertTrue(all(row["sig"]["grade"] in ("good", "moderate", "low") for row in items[0]["rows"]))
+        self.assertTrue(all(row["position"] in ("above", "within", "below") and len(row["range"]) == 2 for row in items[0]["rows"]))
+        self.assertNotIn("reach", [row["key"] for row in items[0]["rows"]])         # views, interactions and clicks only
         self.assertEqual(o.get("/api/roi/vs")[1]["items"], [])
 
     # ------------------------------------------------------- AI on selections --

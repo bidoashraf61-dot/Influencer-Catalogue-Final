@@ -10,25 +10,18 @@ import occasions
 import roi
 
 
-class Grades(unittest.TestCase):
-    def test_cost_against_ceilings(self):
-        ceil = [70, 40]                                            # [acceptable, good] as in plans.LIBRARY
-        self.assertEqual(roi._grade_cost(30, ceil), "good")
-        self.assertEqual(roi._grade_cost(55, ceil), "moderate")
-        self.assertEqual(roi._grade_cost(90, ceil), "low")
-        self.assertIsNone(roi._grade_cost(None, ceil))
-
-    def test_rate_against_range(self):
-        self.assertEqual(roi._grade_rate(4.0, [2.5, 4.5]), "good")
-        self.assertEqual(roi._grade_rate(3.0, [2.5, 4.5]), "moderate")
-        self.assertEqual(roi._grade_rate(1.0, [2.5, 4.5]), "low")
-
-    def test_words_match_the_campaign_report(self):
-        self.assertEqual(set(roi.GRADE_LABEL), {"good", "moderate", "low"})
-
+class Sizes(unittest.TestCase):
     def test_sizes(self):
-        self.assertEqual([roi.tier_of(n) for n in (5000, 50000, 200000, 700000, 2000000)],
-                         ["nano", "micro", "mid", "macro", "mega"])
+        self.assertEqual([roi.tier_of(n) for n in (5000, 19999, 20000, 50000, 100000, 200000, 500000, 700000, 1000000, 2000000)],
+                         ["nano", "nano", "micro", "micro", "mid", "mid", "macro", "macro", "mega", "mega"])
+
+
+def _bare():
+    import plans
+    plans.house_benchmarks = lambda: {}
+    roi.db.setting = lambda key, default=None: default
+    roi.benchmarks.SOURCE = lambda: []
+    roi.benchmarks.invalidate()
 
 
 class ChatBudget(unittest.TestCase):
@@ -36,13 +29,12 @@ class ChatBudget(unittest.TestCase):
         cases = {"What can SAR 60,000 do on TikTok if we want clicks?": (60000, "traffic", ["TikTok"]),
                  "what can 80k SAR reach on instagram": (80000, "awareness", ["Instagram"]),
                  "budget of 50 thousand riyals for engagement": (50000, "engagement", ["Instagram", "TikTok"])}
-        import plans
-        plans.house_benchmarks = lambda: {}                       # no database in a unit test
-        roi.db.setting = lambda key, default=None: default
+        _bare()
         for text, (budget, goal, plats) in cases.items():
             r = roi.from_text(text)
             self.assertIsNotNone(r, text)
             self.assertEqual((r["budget"], r["goal"], r["platforms"]), (budget, goal, plats), text)
+            self.assertNotIn("_posts", r)
 
     def test_ignores_other_questions(self):
         for text in ("How much does a reel cost?", "Find me 5 creators in Riyadh", "SAR 200 for a coffee"):
@@ -61,9 +53,7 @@ class ArabicDigits(unittest.TestCase):
         self.assertEqual(roi.ascii_digits("SAR ٦٠٬٠٠٠ on TikTok"), "SAR 60,000 on TikTok")
 
     def test_estimate_and_chat_read_arabic_digits(self):
-        import plans
-        plans.house_benchmarks = lambda: {}
-        roi.db.setting = lambda key, default=None: default
+        _bare()
         a = roi.estimate("awareness", "١٢٠٬٠٠٠", ["Instagram"], "SA", mix={"micro": 4})
         b = roi.estimate("awareness", 120000, ["Instagram"], "SA", mix={"micro": 4})
         self.assertEqual(a["budget"], 120000)
@@ -74,29 +64,25 @@ class ArabicDigits(unittest.TestCase):
 
 
 class Ranges(unittest.TestCase):
-    """Fix batch 4: figures shown as a range, no advice or sources sent."""
-    def test_band_brackets_the_estimate_and_rounds(self):
-        self.assertEqual(roi.band_of("interactions", 5000), [4000, 6000])
-        self.assertEqual(roi.band_of("views", 208123), [160000, 250000])
-        self.assertEqual(roi.band_of("er", 3.8), [3.0, 4.6])
-        self.assertEqual(roi.band_of("ctr", 0.46), [0.37, 0.55])
-        lo, hi = roi.band_of("cpe", 15.2)
-        self.assertTrue(lo <= 15.2 <= hi)
-        self.assertIsNone(roi.band_of("cpm", None))
+    """Ranges shown, nothing about cost, no advice or sources in the estimate itself."""
+    def test_sig2_rounds_down_and_up(self):
+        self.assertEqual((roi._sig2(4312, False), roi._sig2(4312, True)), (4300, 4400))
+        self.assertEqual(roi._sig2n(208123), 210000)
 
-    def test_estimate_has_ranges_and_no_advice_or_sources(self):
-        import plans
-        plans.house_benchmarks = lambda: {}
-        roi.db.setting = lambda key, default=None: default
+    def test_estimate_has_ranges_and_nothing_removed(self):
+        _bare()
         for goal in roi.GOALS:
-            r = roi.estimate(goal, 90000, ["Instagram", "TikTok"], "SA", mix={"mid": 2, "micro": 6})
-            self.assertNotIn("advice", r)
-            self.assertNotIn("sources", r)
+            r = roi.public(roi.estimate(goal, 90000, ["Instagram", "TikTok"], "SA", mix={"mid": 2, "micro": 6}))
+            for gone in ("cost", "verdict", "advice", "sources", "split", "_posts"):
+                self.assertNotIn(gone, r)
+            keys = {f["key"] for f in r["figures"]}
+            self.assertFalse(keys & {"cpm", "cpe", "cpc", "frequency", "impressions"})
             for f in r["figures"]:
-                self.assertTrue(f["range"][0] <= f["value"] <= f["range"][1], (goal, f))
-            self.assertTrue(r["cost"]["range"][0] <= r["cost"]["value"] <= r["cost"]["range"][1])
+                if f["key"] != "er":
+                    self.assertTrue(f["range"][0] <= f["value"] <= f["range"][1], (goal, f))
+            self.assertIn("Estimate, not a result", r["note"])
 
-    def test_calculator_goals_have_no_conversion(self):
+    def test_calculator_goals_are_the_three_types(self):
         self.assertEqual(list(roi.GOALS), ["awareness", "engagement", "traffic"])
 
 

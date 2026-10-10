@@ -4,10 +4,11 @@
  *    once after the first sign-in and replayable from Help and the profile. The tour
  *    itself (tour.js / tour.css, loaded on start) plays the real pages on demo data;
  *    finishing pays +5 credits once (server-enforced).
- *  - The ROI Calculator: a drawer inside a selection (its creators' own numbers),
- *    a page in the profile (a tier mix), a compact card in Helvy's chat, the
- *    "Download PDF" (verdict first) and estimate vs actual on the campaign report.
- *    Only ever the client's own budget; never a creator or HelloVoice price.
+ *  - The ROI Calculator (v3): a drawer inside a selection (its creators' own numbers),
+ *    a page in the profile (a mix of sizes), a compact card in Helvy's chat, the
+ *    "Download PDF" and estimate vs actual on the campaign report. Results are RANGES
+ *    with a line saying how sure we are and up to three ranked "Ways to improve"; no
+ *    cost per result, no verdict against the market, never a creator or HelloVoice price.
  *  - AI on selections: "Add more like these" and "Creators like this".
  *
  * Needs portal.js (window.hvPortal: h, api, icon, clip). Everything the server or
@@ -69,19 +70,26 @@
     function aiFree() { var m = me(); return m && m.ai_free; }
 
     /* ================================================================ ROI */
-    var GOALS = [["awareness", "Awareness", "Reach, views, CPM"], ["engagement", "Engagement", "Interactions, ER, CPE"],
-                 ["traffic", "Traffic", "Tracking-link clicks, CPC"]];
+    var GOALS = [["awareness", "Awareness", "Views and reach"], ["engagement", "Engagement", "Interactions"],
+                 ["traffic", "Traffic", "Clicks on your link"]];
     var PLATS = [["Instagram", "ig", "pm--ig"], ["TikTok", "tt", "pm--tt"], ["Snapchat", "sc", "pm--sc"], ["YouTube", "yt", "pm--yt"]];
     var TIERS = [["mega", "Mega", "1M+ followers"], ["macro", "Macro", "500K–1M"], ["mid", "Mid", "100K–500K"], ["micro", "Micro", "20K–100K"], ["nano", "Nano", "Under 20K"]];
-    var TITLE = { awareness: "What your budget can reach", engagement: "What your budget can earn", traffic: "What your budget can drive" };
+    var TITLE = { awareness: "What you can reach", engagement: "What you can earn", traffic: "What you can drive" };
+    function titleOf(res) { var g = res.goals || [res.goal]; return g.length > 1 ? "What you can achieve" : TITLE[g[0]] || TITLE.awareness; }
 
+    // One or several campaign types at once (Awareness, Engagement, Traffic), at least one.
     function seg(state, key, onChange) {
-      var box = h("div", { class: "cx-seg", role: "radiogroup", "aria-label": "Goal" });
+      var box = h("div", { class: "cx-seg", role: "group", "aria-label": "Campaign type, pick one or more" });
+      if (!state.goals || !state.goals.length) state.goals = [state.goal || "awareness"];
       GOALS.forEach(function (g) {
-        var b = h("button", { type: "button", role: "radio", "aria-checked": String(state.goal === g[0]) }, h("b", null, g[1]), h("small", null, g[2]));
+        var b = h("button", { type: "button", "aria-pressed": String(state.goals.indexOf(g[0]) > -1) }, h("b", null, g[1]), h("small", null, g[2]));
         b.addEventListener("click", function () {
-          state.goal = g[0];
-          [].forEach.call(box.children, function (x) { x.setAttribute("aria-checked", String(x === b)); });
+          var i = state.goals.indexOf(g[0]);
+          if (i > -1 && state.goals.length === 1) return;           // at least one
+          if (i > -1) state.goals.splice(i, 1); else state.goals.push(g[0]);
+          state.goals = GOALS.map(function (x) { return x[0]; }).filter(function (x) { return state.goals.indexOf(x) > -1; });
+          state.goal = state.goals[0];
+          [].forEach.call(box.children, function (x, n) { x.setAttribute("aria-pressed", String(state.goals.indexOf(GOALS[n][0]) > -1)); });
           onChange();
         });
         box.appendChild(b);
@@ -91,17 +99,19 @@
     function platToggles(state, onChange) {
       var box = h("div", { class: "cx-tgls" });
       PLATS.forEach(function (p) {
-        var b = h("button", { type: "button", class: "cx-tgl", "aria-pressed": String(state.platforms.indexOf(p[0]) > -1) },
+        var b = h("button", { type: "button", class: "cx-tgl", "data-plat": p[0], "aria-pressed": String(state.platforms.indexOf(p[0]) > -1) },
           h("span", { class: "cx-pm cx-" + p[2], html: ic(p[1]) }), p[0]);
         b.addEventListener("click", function () {
           var i = state.platforms.indexOf(p[0]);
           if (i > -1 && state.platforms.length === 1) return;            // at least one
           if (i > -1) state.platforms.splice(i, 1); else state.platforms.push(p[0]);
+          state.mixP = null;                                              // a suggested per-platform mix no longer fits
           b.setAttribute("aria-pressed", String(i === -1));
           onChange();
         });
         box.appendChild(b);
       });
+      box.sync = function () { [].forEach.call(box.children, function (b) { b.setAttribute("aria-pressed", String(state.platforms.indexOf(b.getAttribute("data-plat")) > -1)); }); };
       return box;
     }
     function budgetBox(state, onChange) {
@@ -137,7 +147,7 @@
       var box = h("div", { class: "cx-mix" });
       TIERS.forEach(function (t) {
         var out = h("output", { "aria-live": "polite" }, String(state.mix[t[0]] || 0));
-        function set(d) { state.mix[t[0]] = Math.max(0, Math.min(50, (state.mix[t[0]] || 0) + d)); out.textContent = String(state.mix[t[0]]); onChange(); }
+        function set(d) { state.mixP = null; state.mix[t[0]] = Math.max(0, Math.min(50, (state.mix[t[0]] || 0) + d)); out.textContent = String(state.mix[t[0]]); onChange(); }
         box.appendChild(h("div", null, h("div", null, h("b", null, t[1]), h("small", null, t[2])),
           h("div", { class: "cx-step" },
             h("button", { type: "button", "aria-label": "Fewer " + t[1] + " creators", html: ic("minus"), onclick: function () { set(-1); } }), out,
@@ -148,83 +158,86 @@
     function q(label, node, aside) { return h("div", { class: "cx-q" }, h("span", { class: "cx-label" }, label, aside || null), node); }
 
     var ESTIMATE_LINE = "Estimate, not a result. Real results depend on the content, the timing and the audience.";
+    var WAY_BUTTON = {
+      remove: function (a) { return "Remove " + a.codes.length; },
+      add: function (a) { return "Add " + a.codes.length; },
+      second_post: function () { return "Count second posts"; },
+      add_platform: function (a) { return "Add " + a.platform; },
+      use_mix: function () { return "Use this mix"; }
+    };
+    // The results: ranges (never one exact-looking number), how sure we are, and up to three ranked
+    // ways to improve, each with one button. opts.onWay(action) runs a way; without it none is shown.
     function resultPanel(res, opts) {
       opts = opts || {};
       var box = h("section", { class: "cx-res", "aria-live": "polite" });
-      var v = res.verdict || {};
+      var t = res.trust || {};
       box.appendChild(h("div", { class: "cx-res__top" },
-        h("div", null, h("h3", null, TITLE[res.goal] || TITLE.awareness), h("p", null, res.summary + (res.posts ? " · " + res.posts + " post" + (res.posts === 1 ? "" : "s") : ""))),
-        h("div", { class: "cx-verdict cx-verdict--" + (v.grade || "none") }, h("b", null, v.label || "Add a budget"), h("small", null, "against the benchmark"))));
+        h("div", null, h("h3", null, titleOf(res)), h("p", null, res.summary + (res.posts ? " · " + res.posts + " post" + (res.posts === 1 ? "" : "s") : ""))),
+        t.line ? h("div", { class: "cx-sure", title: t.line },
+          h("b", null, t.of ? t.measured + " of " + t.of : "Peers"), h("small", null, t.of ? "creators measured" : "similar creators")) : null));
       var dl = h("dl", { class: "cx-figs" });
       (res.figures || []).forEach(function (f) {
         var n = h("span", { class: "cx-n" }, h("span", { class: "cx-v" }, fig(f)));
-        if (f.unit) n.appendChild(h("small", null, f.unit === "×" ? "×" : f.unit === "%" ? "%" : " " + f.unit));
-        dl.appendChild(h("div", null, h("dt", null, f.label), h("dd", null, n, f.sig ? h("div", null, sig(f.sig)) : null)));
+        if (f.unit) n.appendChild(h("small", null, f.unit === "%" ? "%" : " " + f.unit));
+        var about = f.value != null && f.range && f.range[0] !== f.range[1] ? h("div", { class: "cx-about" }, "about " + (f.unit === "%" ? f.value + "%" : big(f.value))) : null;
+        dl.appendChild(h("div", null, h("dt", null, f.label), h("dd", null, n, about)));
       });
       box.appendChild(dl);
-      if (res.split && res.split.length) {
-        var tot = res.split.reduce(function (s, x) { return s + x.value; }, 0) || 1, cols = ["var(--go)", "var(--vivid-orange)", "#b9d400", "#8a7a68"];
-        var bar = h("div", { class: "cx-mixbar", role: "img", "aria-label": res.split.map(function (x) { return x.label + " " + big(x.value); }).join(", ") });
-        var key = h("div", { class: "cx-mixkey" });
-        res.split.forEach(function (x, i) {
-          var seg_ = h("i"); seg_.style.width = (x.value / tot * 100) + "%"; seg_.style.background = cols[i]; bar.appendChild(seg_);
-          var k = h("span", null, x.label + " ", h("b", null, big(x.value))); k.style.setProperty("--c", cols[i]); key.appendChild(k);
-        });
-        box.appendChild(bar); box.appendChild(key);
-      }
-      var c = res.cost;
-      if (c) {
-        var lo = c.scale[0], hi = c.scale[1], span = (hi - lo) || 1;
-        var pct = function (x) { return Math.max(0, Math.min(100, (x - lo) / span * 100)); };
-        var fair = h("span", { class: "cx-band__fair" }); fair.style.left = pct(c.fair[0]) + "%"; fair.style.width = (pct(c.fair[1]) - pct(c.fair[0])) + "%";
-        var cr = c.range && c.range[0] !== c.range[1] ? c.range : [c.value, c.value];
-        var yours = "SAR " + (cr[0] === cr[1] ? sar(cr[0]) : sar(cr[0]) + "–" + sar(cr[1]));
-        var you = h("span", { class: "cx-band__you" });
-        you.style.left = pct(cr[0]) + "%"; you.style.width = Math.max(0, pct(cr[1]) - pct(cr[0])) + "%";
-        var fairTxt = "SAR " + sar(c.fair[0]) + "–" + sar(c.fair[1]);
-        var band = h("div", { class: "cx-band", "data-grade": (res.verdict && res.verdict.grade) || "none" },
-          h("div", { class: "cx-band__hd" }, h("b", null, "Your " + c.label + " against a fair range"), h("span", null, (res.market_label || "KSA") + ", " + res.platforms.join(" and "))),
-          h("div", { class: "cx-band__track" }, fair, you),
-          h("div", { class: "cx-band__k" }, h("span", null, "SAR " + sar(c.scale[0])), h("span", null, "SAR " + sar(c.scale[1]))),
-          h("ul", { class: "cx-band__lg" },
-            h("li", { class: "is-fair" }, h("i"), h("span", null, "Fair range"), h("b", null, fairTxt)),
-            h("li", { class: "is-you" }, h("i"), h("span", null, "Your " + c.label), h("b", null, yours))));
-        box.appendChild(band);
-      }
       if (res.skipped && res.skipped.length) box.appendChild(h("p", { class: "cx-skipped" }, "Not on these platforms, so left out: " + res.skipped.slice(0, 6).join(", ") + (res.skipped.length > 6 ? "…" : "") + "."));
-      if (!opts.compact) box.appendChild(h("p", { class: "cx-srcs" }, ESTIMATE_LINE + " After the campaign, your report shows estimate vs actual."));
+      var ways = (res.ways || []).slice(0, 3);
+      if (opts.onWay && ways.length) {
+        var ol = h("ol", { class: "cx-ways" });
+        ways.forEach(function (w, i) {
+          var label = (WAY_BUTTON[w.action && w.action.type] || function () { return "Apply"; })(w.action || {});
+          var b = h("button", { class: "cx-btn cx-btn--line", type: "button" }, label);
+          b.addEventListener("click", function () { b.disabled = true; opts.onWay(w.action, w); });
+          ol.appendChild(h("li", null, h("span", { class: "cx-ways__n", "aria-hidden": "true" }, String(i + 1)), h("p", null, w.text), b));
+        });
+        box.appendChild(h("div", { class: "cx-waysbox" }, h("h4", null, "Ways to improve"), ol));
+      }
+      if (!opts.compact) {
+        if (res.plan && res.plan.text && res.budget)
+          box.appendChild(h("p", { class: "cx-plan" }, h("b", null, "A mix that suits your goals and budget: "), res.plan.text + "."));
+        box.appendChild(h("p", { class: "cx-srcs" }, (t.line ? t.line + " " : "") + ESTIMATE_LINE + " After the campaign, your report compares it with what happened."));
+      }
       return box;
     }
 
     function estimate(body) { return api("POST", "/api/roi/estimate", body).then(function (r) { return r.b && r.b.ok ? r.b.result : null; }); }
     function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
 
-    /* -- the PDF: a print-ready page, verdict first, saved as PDF from the print dialog -- */
+    /* -- the PDF: a print-ready page, ranges first, saved as PDF from the print dialog -- */
     function printPdf(res, ctx) {
       var w = window.open("", "_blank");
       if (!w) { toast("Allow pop-ups to download the PDF."); return; }
       var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
-      var v = res.verdict || {}, col = { good: "#14884a", moderate: "#e2780f", low: "#ee1515" }[v.grade] || "#383838";
       var figs = (res.figures || []).map(function (f) {
-        return "<tr><td>" + esc(f.label) + "</td><td class='n'>" + esc(fig(f)) + (f.unit ? " " + esc(f.unit) : "") + "</td><td>" + esc(f.sig ? f.sig.label : "") + "</td></tr>";
+        return "<tr><td>" + esc(f.label) + "</td><td class='n'>" + esc(fig(f)) + (f.unit === "%" ? " %" : "") + "</td></tr>";
       }).join("");
       var html = "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><title>ROI estimate · HELVY Connect</title>" +
         "<style>@page{size:A4;margin:18mm}body{font:14px/1.55 'DM Sans',Arial,sans-serif;color:#121212;margin:0}" +
         "h1{font:400 40px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;margin:18px 0 4px;letter-spacing:.01em}" +
         ".hd{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #121212;padding-bottom:12px}" +
-        ".hd img{width:150px}.v{display:inline-block;margin:18px 0 6px;padding:10px 26px 8px;border-radius:999px;color:#fff;background:" + col + ";font:400 34px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;letter-spacing:.04em}" +
-        ".muted{color:#4a4a4a}table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:9px 6px;border-bottom:1px solid #ddd}td.n{font-weight:700;text-align:right}" +
+        ".hd img{width:150px}.muted{color:#4a4a4a}table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:9px 6px;border-bottom:1px solid #ddd}td.n{font-weight:700;text-align:right;font-size:18px}" +
         ".fine{margin-top:22px;font-size:11.5px;color:#4a4a4a}</style></head><body>" +
         "<div class='hd'><img src='" + esc(ROOT) + "assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c4' alt='HELVY Connect'><span class='muted'>" + esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + "</span></div>" +
-        "<div class='v'>" + esc(v.label || "Estimate") + "</div><div class='muted'>Against the benchmark for this mix</div>" +
-        "<h1>ROI estimate" + (ctx && ctx.name ? " · " + esc(ctx.name) : "") + "</h1><p class='muted'>" + esc(res.summary) + (res.budget ? " · budget SAR " + esc(money(res.budget)) + " excl. VAT" : "") + "</p>" +
-        "<table>" + figs + "</table>" + (res.cost ? "<p class='muted'>Your " + esc(res.cost.label) + " SAR " + esc(res.cost.range ? res.cost.range.join("–") : res.cost.value) + " · fair range SAR " + esc(res.cost.fair[0]) + "–" + esc(res.cost.fair[1]) + "</p>" : "") +
-        "<p class='fine'>" + esc(ESTIMATE_LINE) + " Costs use your own budget only; this is not a quote. " +
+        "<h1>ROI estimate" + (ctx && ctx.name ? " · " + esc(ctx.name) : "") + "</h1><p class='muted'>" + esc(res.summary) + "</p>" +
+        "<table>" + figs + "</table>" +
+        "<p class='muted'>" + esc((res.trust && res.trust.line) || "") + "</p>" +
+        "<p class='fine'>" + esc(ESTIMATE_LINE) + " Ranges show what is likely, not a promise; this is not a quote. " +
         "Powered by HelloVoice · A BlueHolding Company.</p><script>window.onload=function(){setTimeout(function(){window.print()},300)}<\/script></body></html>";
       w.document.open(); w.document.write(html); w.document.close();
     }
 
     /* -- the drawer inside a selection: seeded from the estimate saved with it, if any -- */
+    function mixSentence(mix) {
+      var W = { mega: "mega", macro: "macro", mid: "mid-size", micro: "micro", nano: "nano" }, out = [];
+      Object.keys(mix || {}).forEach(function (p) {
+        var bits = ["mega", "macro", "mid", "micro", "nano"].filter(function (t) { return mix[p][t]; }).map(function (t) { return mix[p][t] + " " + W[t]; });
+        if (bits.length) out.push(bits.join(", ") + " on " + p);
+      });
+      return out.join("; ");
+    }
     function buildDrawer(S, state, pool, approved, prev) {
       var scrim = h("div", { class: "cx-dr__scrim" });
       var dr = h("aside", { class: "cx-dr", role: "dialog", "aria-modal": "true", "aria-labelledby": "cx-roi-t" });
@@ -233,25 +246,57 @@
         h("span", { class: "cx-tag cx-tag--est", html: ic("info") + "Estimate" }), x));
       var body = h("div", { class: "cx-dr__body" });
       var outBox = h("div");
-      var last = null;
+      var last = null, platBox = null, mixNote = h("p", { class: "cx-fine cx-mixnote", hidden: true });
+      function request() {
+        var b = { goal: state.goals[0], goals: state.goals, budget: state.budget, platforms: state.platforms, market: state.market };
+        if (state.second && state.second.length) b.second_posts = state.second;
+        if (state.src === "mix") b.mix = state.mixP || state.mix; else { b.token = S.token(); b.which = state.which; }
+        return b;
+      }
+      function way(a) {
+        if (!a) return;
+        if (a.type === "remove") {
+          var n = S.remove ? S.remove(a.codes) : 0;
+          toast(n ? "Removed " + n + " creator" + (n === 1 ? "" : "s") + " from " + S.name() + "." : "Those creators could not be removed.");
+        } else if (a.type === "add") {
+          state.which = "all";                                           // the new ones are under review: count them
+          S.add(a.codes);
+          toast("Added to " + S.name() + ", under review.");
+        } else if (a.type === "second_post") {
+          state.second = (state.second || []).concat(a.codes.filter(function (c) { return (state.second || []).indexOf(c) === -1; }));
+          toast("Counted a second post for " + a.codes.length + " creator" + (a.codes.length === 1 ? "" : "s") + " in this estimate.");
+        } else if (a.type === "add_platform") {
+          if (state.platforms.indexOf(a.platform) === -1) state.platforms.push(a.platform);
+          state.mixP = null;
+          if (platBox) platBox.sync();
+        } else if (a.type === "use_mix") {
+          state.mixP = a.mix;
+          mixNote.hidden = false; mixNote.textContent = "Suggested mix: " + mixSentence(a.mix) + ".";
+          state.platforms = Object.keys(a.mix);
+          if (platBox) platBox.sync();
+        }
+        run(true);
+      }
       var run = debounce(function () {
         outBox.classList.add("cx-busy");
-        var b = { goal: state.goal, budget: state.budget, platforms: state.platforms, market: state.market };
-        if (state.src === "mix") b.mix = state.mix; else b.token = S.token();
-        estimate(b).then(function (res) { outBox.classList.remove("cx-busy"); if (res) { outBox.textContent = ""; outBox.appendChild(resultPanel(res)); last = res; } });
+        estimate(request()).then(function (res) {
+          outBox.classList.remove("cx-busy");
+          if (res) { outBox.textContent = ""; outBox.appendChild(resultPanel(res, { onWay: way })); last = res; }
+        });
       }, 260);
-      var mixWrap = h("div", { hidden: true }, mixBox(state, run));
+      var mixWrap = h("div", { hidden: true }, mixBox(state, run), mixNote);
       var faces = h("span", { class: "cx-faces" });
       pool.slice(0, 6).forEach(function (c) { var cr = S.creator(c); faces.appendChild(h("span", { class: "cx-ph" }, initials(cr ? cr.name : c))); });
       var srcBox = h("div", { class: "cx-src" },
         h("label", null, h("input", { type: "radio", name: "cx-src", checked: true, onchange: function () { state.src = "sel"; mixWrap.hidden = true; run(); } }),
           h("span", null, h("b", null, approved.length ? "This selection’s " + approved.length + " approved creator" + (approved.length === 1 ? "" : "s") : "This selection’s " + pool.length + " creators"),
-            h("small", null, "Uses their real followers and engagement. 1 post per creator per platform."), faces)),
+            h("small", null, "Uses their own numbers. 1 post per creator per platform."), faces)),
         h("label", null, h("input", { type: "radio", name: "cx-src", onchange: function () { state.src = "mix"; mixWrap.hidden = false; run(); } }),
-          h("span", null, h("b", null, "A tier mix instead"), h("small", null, "Try a different mix of creator sizes before you choose."))));
+          h("span", null, h("b", null, "A mix of sizes instead"), h("small", null, "Try a different mix of creator sizes before you choose."))));
+      platBox = platToggles(state, run);
       body.appendChild(h("div", { class: "cx-inp" },
-        q("Your budget", h("div", null, h("p", { class: "cx-fine", style: "margin:0 0 8px" }, (state.seeded ? "Pre-filled from this selection’s brief; change anything. " : "") + "Your own number. We use it only to work out cost per result."), budgetBox(state, run))),
-        q("Goal", seg(state, "goal", run)), q("Platforms", platToggles(state, run)), q("Creators", h("div", { class: "cx-src" }, srcBox, mixWrap))));
+        q("Your budget", h("div", null, h("p", { class: "cx-fine", style: "margin:0 0 8px" }, (state.seeded ? "Pre-filled from this selection’s brief; change anything. " : "") + "Your total budget. It does not change the estimate: it helps us suggest the right mix of creators."), budgetBox(state, run))),
+        q("Campaign type", seg(state, "goal", run), h("em", null, "pick one or more")), q("Platforms", platBox), q("Creators", h("div", { class: "cx-src" }, srcBox, mixWrap))));
       body.appendChild(outBox);
       dr.appendChild(body);
       var saveB = h("button", { class: "cx-btn", type: "button", html: ic("save") + "<span>Save to selection</span>" });
@@ -260,8 +305,8 @@
       var mayEditSel = !S.role || ["owner", "admin"].indexOf(S.role()) > -1;
       dr.appendChild(h("footer", { class: "cx-dr__ft" }, mayEditSel ? saveB : document.createTextNode(""), pdfB));
       saveB.addEventListener("click", function () {
-        var b = { token: S.token(), goal: state.goal, budget: state.budget, platforms: state.platforms, market: state.market };
-        if (state.src === "mix") b.mix = state.mix;
+        var b = request();
+        b.token = S.token();
         saveB.disabled = true;
         api("POST", "/api/roi/save", b).then(function (r) { saveB.disabled = false; toast(r.b && r.b.ok ? "Estimate saved with " + S.name() + ". After the campaign, the report compares it with the results." : "That didn’t save. Please try again."); });
       });
@@ -285,9 +330,10 @@
         if (seeded) sv = r.b.seed;
         var approved = S.codes().filter(function (c) { return S.status(c).s === "approved"; });
         var pool = approved.length ? approved : S.codes().filter(function (c) { var s = S.status(c).s; return s !== "rejected" && s !== "unavailable"; });
-        var state = { goal: (sv && sv.goal) || "awareness", budget: (sv && Number(sv.budget)) || 0,
+        var goals = (sv && sv.goals && sv.goals.length ? sv.goals : sv && sv.goal ? [sv.goal] : ["awareness"]).filter(function (g) { return g !== "conversion"; });
+        var state = { goals: goals.length ? goals : ["traffic"], goal: (goals[0] || "traffic"), budget: (sv && Number(sv.budget)) || 0,
                       platforms: (sv && sv.platforms && sv.platforms.length ? sv.platforms : ["Instagram", "TikTok"]).slice(),
-                      mix: { mid: 2, micro: 6 }, src: "sel", market: (sv && sv.market) || "SA", seeded: !!seeded };
+                      mix: { mid: 2, micro: 6 }, mixP: null, second: [], which: "approved", src: "sel", market: (sv && sv.market) || "SA", seeded: !!seeded };
         buildDrawer(S, state, pool, approved, prev);
       });
     }
@@ -297,19 +343,22 @@
     HV.roiCard = function (res) {
       var card = h("div", { class: "hv-msg hv-msg--ai cx-rcard" });
       card.appendChild(h("div", { class: "cx-rcard__hd" }, h("b", { html: ic("calc") + "ROI Calculator" }), h("span", { class: "cx-tag cx-tag--est" }, "Estimate")));
-      card.appendChild(h("p", null, res.summary + (res.budget ? " · SAR " + money(res.budget) : "")));
+      card.appendChild(h("p", null, res.summary || ""));
       var dl = h("dl", { class: "cx-figs" });
-      (res.figures || []).slice(0, 4).forEach(function (f) {
+      (res.figures || []).filter(function (f) { return ["cpm", "cpe", "cpc", "frequency"].indexOf(f.key) === -1 && !/^cost|^cpm|^cpe|^cpc/i.test(f.label || ""); }).slice(0, 4).forEach(function (f) {
         var n = h("span", { class: "cx-n" }, h("span", { class: "cx-v" }, fig(f)));
-        if (f.unit) n.appendChild(h("small", null, f.unit === "SAR" ? " SAR" : f.unit));
+        if (f.unit === "%") n.appendChild(h("small", null, "%"));
         dl.appendChild(h("div", null, h("dt", null, f.label), h("dd", null, n)));
       });
       card.appendChild(dl);
-      var v = res.verdict || {};
-      card.appendChild(h("div", { class: "cx-rcard__v" }, h("span", { class: "cx-verdict cx-verdict--" + (v.grade || "none") }, h("b", null, v.label || "Estimate")), h("span", null, "against the benchmark")));
+      if (res.plan && res.plan.text) card.appendChild(h("p", { class: "cx-rcard__plan" }, "Suggested mix: " + res.plan.text + "."));
+      else if (res.mix && typeof res.mix === "object") {
+        var flat = Object.keys(res.mix).some(function (k) { return typeof res.mix[k] === "object"; });
+        if (flat) card.appendChild(h("p", { class: "cx-rcard__plan" }, "Suggested mix: " + mixSentence(res.mix) + "."));
+      }
       var open = h("button", { class: "cx-btn", type: "button" }, "Open calculator");
       open.addEventListener("click", function () {
-        try { sessionStorage.setItem("cx-roi-seed", JSON.stringify({ goal: res.goal, budget: res.budget, platforms: res.platforms, mix: res.mix || null })); } catch (e) { /* blocked */ }
+        try { sessionStorage.setItem("cx-roi-seed", JSON.stringify({ goal: res.goal, goals: res.goals || [res.goal], budget: res.budget, platforms: res.platforms, mix: res.mix || null })); } catch (e) { /* blocked */ }
         if (PAGE === "selection" && window.hvSelection && window.hvSelection.token()) roiForSelection(); else location.href = ROOT + "account/#roi";
       });
       var save = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("save") + "<span>Save</span>" });
@@ -319,7 +368,7 @@
       return card;
     };
 
-    /* -- estimate vs actual -- */
+    /* -- estimate vs actual: the saved RANGE against what happened -- */
     function versusBlock(v, withLink) {
       var box = h("section", { class: "cx-eva", "aria-label": "Estimate vs actual" });
       var when = new Date(v.saved_at * 1000).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
@@ -327,16 +376,19 @@
         h("div", null, h("h2", null, v.campaign + " · estimate vs actual"), h("p", null, "Saved estimate from " + when + " against the live report." + (v.ended ? " Campaign ended." : " Campaign running."))),
         withLink ? h("a", { href: ROOT + "campaign/#t=" + encodeURIComponent(v.token) }, "Open the report") : null));
       var rows = h("div", { class: "cx-eva__rows" });
-      v.rows.forEach(function (r) {
-        var mx = Math.max(r.estimate, r.actual) || 1;
-        var fmt = function (x) { return r.key === "er" ? x + "%" : big(x); };
-        var e = h("i"), a = h("i"), ee = h("em"), ae = h("em");
-        ee.style.width = (r.estimate / mx * 100) + "%"; ae.style.width = (r.actual / mx * 100) + "%";
-        e.appendChild(ee); a.appendChild(ae);
+      (v.rows || []).filter(function (r) { return r.key !== "er" && r.key !== "reach"; }).forEach(function (r) {
+        var rng = r.range && r.range.length === 2 ? r.range : [r.estimate * 0.8, r.estimate * 1.2];
+        var mx = Math.max(rng[1], r.actual) * 1.05 || 1;
+        var track = h("i", { class: "cx-eva__track", role: "img", "aria-label": "Estimated range " + big(rng[0]) + " to " + big(rng[1]) + ", actual " + big(r.actual) });
+        var band = h("em", { class: "cx-eva__band" }); band.style.left = (rng[0] / mx * 100) + "%"; band.style.width = ((rng[1] - rng[0]) / mx * 100) + "%";
+        var dot = h("u", { class: "cx-eva__dot" }); dot.style.left = (r.actual / mx * 100) + "%";
+        track.appendChild(band); track.appendChild(dot);
         rows.appendChild(h("div", { class: "cx-eva__row" }, h("b", null, r.label),
-          h("div", { class: "cx-eva__bars" }, h("span", { class: "cx-e" }, "Estimate", e, h("strong", null, fmt(r.estimate))),
-                                               h("span", { class: "cx-a" }, "Actual", a, h("strong", null, fmt(r.actual)))),
-          h("span", { class: "cx-sig cx-sig--" + r.sig.grade }, r.sig.label + " · " + r.delta)));
+          h("div", { class: "cx-eva__bars" },
+            h("span", { class: "cx-e" }, "Estimated", h("strong", null, big(rng[0]) + "–" + big(rng[1]))),
+            track,
+            h("span", { class: "cx-a" }, "Actual", h("strong", null, big(r.actual)))),
+          r.sig ? h("span", { class: "cx-sig cx-sig--" + r.sig.grade }, r.sig.label) : null));
       });
       box.appendChild(rows);
       if (v.helvy) {
@@ -350,28 +402,31 @@
     HV.roiPage = function (p) {
       var seed = null;
       try { seed = JSON.parse(sessionStorage.getItem("cx-roi-seed") || "null"); sessionStorage.removeItem("cx-roi-seed"); } catch (e) { seed = null; }
-      var state = { goal: (seed && seed.goal) || "engagement", budget: (seed && seed.budget) || 0,
-                    platforms: (seed && seed.platforms) || ["Instagram", "TikTok"], mix: (seed && seed.mix) || { macro: 1, mid: 3, micro: 6 }, market: "SA" };
+      var flatSeed = seed && seed.mix && Object.keys(seed.mix).every(function (k) { return typeof seed.mix[k] !== "object"; });
+      var goals = (seed && seed.goals && seed.goals.length ? seed.goals : seed && seed.goal ? [seed.goal] : ["engagement"]).filter(function (g) { return g !== "conversion"; });
+      var state = { goals: goals.length ? goals : ["traffic"], goal: goals[0] || "traffic", budget: (seed && seed.budget) || 0,
+                    platforms: (seed && seed.platforms) || ["Instagram", "TikTok"], mix: (flatSeed && seed.mix) || { macro: 1, mid: 3, micro: 6 },
+                    mixP: seed && seed.mix && !flatSeed ? seed.mix : null, second: [], market: "SA" };
       p.appendChild(h("h1", { class: "cx-roipg__h1" }, "ROI Calculator"));
-      p.appendChild(h("p", { class: "cx-roipg__lead" }, "See what your own budget can reach before you brief HelloVoice: reach, interactions or tracking-link clicks, judged against the market."));
-      var outBox = h("div"), last = null;
+      p.appendChild(h("p", { class: "cx-roipg__lead" }, "See what a mix of creators can deliver before you brief HelloVoice: views, reach, interactions or tracking-link clicks, as honest ranges. Add your total budget to get a suggested mix."));
+      var outBox = h("div"), last = null, platBox = null;
+      function way(a) {
+        if (!a) return;
+        if (a.type === "use_mix") { state.mixP = a.mix; state.platforms = Object.keys(a.mix); if (platBox) platBox.sync(); }
+        run();
+      }
       var run = debounce(function () {
         outBox.classList.add("cx-busy");
-        estimate({ goal: state.goal, budget: state.budget, platforms: state.platforms, market: state.market, mix: state.mix }).then(function (res) {
-          outBox.classList.remove("cx-busy"); if (!res) return; last = res; outBox.textContent = ""; outBox.appendChild(resultPanel(res)); outBox.appendChild(acts);
+        estimate({ goal: state.goals[0], goals: state.goals, budget: state.budget, platforms: state.platforms, market: state.market, mix: state.mixP || state.mix }).then(function (res) {
+          outBox.classList.remove("cx-busy"); if (!res) return; last = res; outBox.textContent = ""; outBox.appendChild(resultPanel(res, { onWay: way })); outBox.appendChild(acts);
         });
       }, 260);
-      var markets = h("div", { class: "cx-tgls" });
-      [["SA", "Saudi Arabia"], ["AE", "UAE"], ["EG", "Egypt"]].forEach(function (m) {
-        var b = h("button", { type: "button", class: "cx-tgl cx-tgl--plain", "aria-pressed": String(state.market === m[0]) }, m[1]);
-        b.addEventListener("click", function () { state.market = m[0]; [].forEach.call(markets.children, function (x) { x.setAttribute("aria-pressed", String(x === b)); }); run(); });
-        markets.appendChild(b);
-      });
       var useSel = h("button", { type: "button", class: "cx-link" }, "use a selection");
+      platBox = platToggles(state, run);
       var inBox = h("div", { class: "cx-roipg__in" }, h("div", { class: "cx-inp" },
-        q("Your budget", h("div", null, h("p", { class: "cx-fine", style: "margin:0 0 8px" }, "Your own number, used only for cost per result"), budgetBox(state, run))),
-        q("Goal", seg(state, "goal", run)), q("Platforms", platToggles(state, run)),
-        q("Creators", mixBox(state, run), h("em", null, "or ", useSel)), q("Market", markets)));
+        q("Your budget", h("div", null, h("p", { class: "cx-fine", style: "margin:0 0 8px" }, "Your total budget. It does not change the estimate: it helps us suggest a mix."), budgetBox(state, run))),
+        q("Campaign type", seg(state, "goal", run), h("em", null, "pick one or more")), q("Platforms", platBox),
+        q("Creators", mixBox(state, run), h("em", null, "or ", useSel))));
       var pick = h("select", { class: "cx-pick", "aria-label": "Selection to save to" });
       var saveB = h("button", { class: "cx-btn", type: "button", html: ic("save") + "<span>Save</span>" });
       var pdfB = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("dl") + "<span>PDF</span>" });
@@ -386,7 +441,7 @@
       saveB.addEventListener("click", function () {
         if (!pick.value) return;
         saveB.disabled = true;
-        api("POST", "/api/roi/save", { token: pick.value, goal: state.goal, budget: state.budget, platforms: state.platforms, market: state.market, mix: state.mix })
+        api("POST", "/api/roi/save", { token: pick.value, goal: state.goals[0], goals: state.goals, budget: state.budget, platforms: state.platforms, market: state.market, mix: state.mixP || state.mix })
           .then(function (r) { saveB.disabled = false; note.className = "cx-note" + (r.b && r.b.ok ? "" : " cx-note--bad");
             note.textContent = r.b && r.b.ok ? "Saved with " + r.b.selection + "." : "That didn’t save. Please try again."; });
       });

@@ -1843,3 +1843,8 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
   font-size: 13px; line-height: 1.4; font-weight: 400; color: rgba(255,255,255,.62);
 }
 .cat-selhead__note svg { flex: none; }
+/* scoring v2: how sure the score is */
+.cst-conf { font-weight: 700; }
+.cst-conf--high { color: #8fe3b0; }
+.cst-conf--medium { color: #ffd08a; }
+.cst-conf--low { color: #ffb4a8; }

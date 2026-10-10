@@ -346,7 +346,7 @@ def report(campaign, internal=False, raw=False):
            "history": db.content_history(cid), "clicks": clicks,
            "emv_set": bool(rates), "visibility": vis, "factors": f,
            "benchmarks": bm, "targets": targets, "progress": progress, "verdict": verdict,
-           "objective": {"key": objective, "label": OBJECTIVES[objective][0], "kpis": OBJECTIVE_KPIS[objective],
+           "objective": {"key": objective, "label": objective_info(objective)[0], "kpis": objective_info(objective)[2],
                          "weights": dict(zip(("exposure", "engagement", "er", "clicks"), w)), "links": links_on},
            "gaps": data_gaps(camp),
            "updated_at": max([p["metrics_at"] or 0 for p in posts] + [0]) or None}
@@ -392,10 +392,62 @@ OBJECTIVES = {
     "balanced": ("Balanced", (0.45, 0.35, 0.0, 0.20)),
     "awareness": ("Awareness", (0.70, 0.20, 0.0, 0.10)),
     "engagement": ("Engagement", (0.20, 0.70, 0.0, 0.10)),
-    "traffic": ("Conversion", (0.20, 0.20, 0.0, 0.60)),
+    "traffic": ("Traffic", (0.20, 0.20, 0.0, 0.60)),
     # Not a template: weights the admin typed for this one campaign.
     "custom": ("Custom", (0.45, 0.35, 0.0, 0.20)),
 }
+# A campaign's type is Awareness, Engagement and/or Traffic. Several can be chosen at once: the key
+# is then "awareness+traffic" and the weights are the average of the chosen types' rows (as
+# fit.blend does for creator scores). "balanced" and "custom" stay for the admin only; the old
+# "conversion" key reads as "traffic".
+GOAL_KEYS = ("awareness", "engagement", "traffic")
+BLEND_ORDER = {k: i for i, k in enumerate(GOAL_KEYS)}
+
+
+def blend_key(parts):
+    """["traffic", "awareness"] -> "awareness+traffic"; None when nothing valid is named."""
+    names = [("traffic" if p == "conversion" else p) for p in parts]
+    names = sorted({p for p in names if p in GOAL_KEYS}, key=BLEND_ORDER.get)
+    return "+".join(names) if names else None
+
+
+def valid_objective(key):
+    """A key a campaign may hold: a listed objective or a blend of the three goals."""
+    if key in OBJECTIVES:
+        return True
+    return bool(key) and "+" in str(key) and blend_key(str(key).split("+")) == str(key)
+
+
+def objective_info(key):
+    """(label, weights, kpis) for an objective key, single or blended."""
+    if key in OBJECTIVES:
+        return OBJECTIVES[key][0], OBJECTIVES[key][1], OBJECTIVE_KPIS[key]
+    parts = [p for p in str(key).split("+") if p in GOAL_KEYS] or ["awareness"]
+    w = tuple(sum(OBJECTIVES[p][1][i] for p in parts) / len(parts) for i in range(4))
+    kpis = list(dict.fromkeys(k for p in parts for k in OBJECTIVE_KPIS[p]))
+    return " + ".join(OBJECTIVES[p][0] for p in parts), w, kpis
+
+
+def brief_goals(selection_id):
+    """The goals of the brief behind a selection (its live brief, else the selection's own objective),
+    as keys: ["awareness", "traffic"]. Empty when nothing is recorded."""
+    if not selection_id:
+        return []
+    with db.connect() as conn:
+        r = conn.execute("SELECT objective FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",
+                         (selection_id,)).fetchone()
+        raw = r["objective"] if r and r["objective"] else None
+        if not raw:
+            s = conn.execute("SELECT objective FROM selections WHERE id = ?", (selection_id,)).fetchone()
+            raw = s["objective"] if s and s["objective"] else None
+    if not raw:
+        return []
+    low = [p.strip().lower() for p in str(raw).split("+")]
+    if low == ["balanced"]:
+        return list(GOAL_KEYS)
+    return [p for p in (blend_key(low) or "").split("+") if p]
+
+
 # The ready-made starting points offered in the campaign setup.
 TEMPLATES = [(k, v) for k, v in OBJECTIVES.items() if k != "custom"]
 TEMPLATE_NOTES = {"balanced": "Views, engagement and clicks all count",
@@ -471,8 +523,9 @@ def recommend_targets(campaign):
     if not campaign["destination"]:
         out["notes"].append("No affiliate destination, so no click target.")
     key = objective_of(campaign)
-    out["objective"] = OBJECTIVES[key][0]
-    out["primary"] = [k for k in OBJECTIVE_KPIS[key] if k in out["safe"]]
+    label, _, kpis = objective_info(key)
+    out["objective"] = label
+    out["primary"] = [k for k in kpis if k in out["safe"]]
     return out
 
 
@@ -481,7 +534,7 @@ def weights_for(objective, has_links, custom=None):
     has no clicks to score, so that part is dropped and the other three are
     scaled up to still make 100 — nobody is marked on a metric that does not
     exist in their campaign."""
-    w = list(custom if (objective == "custom" and custom) else OBJECTIVES[objective][1])
+    w = list(custom if (objective == "custom" and custom) else objective_info(objective)[1])
     if not has_links:
         rest = sum(w[:3])
         w = [x / rest for x in w[:3]] + [0.0]
@@ -528,17 +581,28 @@ def weights_from_percents(vals):
     return tuple(x / t for x in out) if t > 0 else None
 
 
-def objective_for(weights):
-    """The template these weights are (to the nearest half point), else "custom"."""
-    for key, (_, w) in TEMPLATES:
+def objective_for(weights, prefer=None):
+    """The template these weights are (to the nearest half point), else "custom". ``prefer`` is
+    a blended key the admin picked: it is kept when the weights are still that blend's."""
+    cands = [(prefer, objective_info(prefer)[1])] if prefer and valid_objective(prefer) and prefer not in ("custom",) else []
+    for key, w in cands + [(k, v) for k, (_, v) in TEMPLATES]:
         if all(abs(a - b) < 0.005 for a, b in zip(weights, w)):
             return key
     return "custom"
 
 
 def objective_of(campaign):
-    key = campaign["objective"] if "objective" in campaign.keys() else None
-    return key if key in OBJECTIVES else "balanced"
+    """The campaign's objective key. A stored one is kept (the old "conversion" reads as "traffic");
+    an unknown or missing one is taken from the goals of the brief behind its selection, a blend
+    when it named several, and only then falls back to "balanced"."""
+    keys = campaign.keys()
+    key = campaign["objective"] if "objective" in keys else None
+    if key == "conversion":
+        return "traffic"
+    if valid_objective(key):
+        return key
+    goals = brief_goals(campaign["selection_id"] if "selection_id" in keys else None)
+    return blend_key(goals) or "balanced"
 
 
 def scoreboard(creators, bm, weights=None):

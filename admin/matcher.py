@@ -25,12 +25,11 @@ import metrics
 # type: "one" | "many" | "text". Option values are what is stored and scored.
 
 QUESTIONS = [
-    # Fix batch 4: the goals match the ROI Calculator (Awareness, Engagement, Traffic) plus Conversion
-    # (scored as the old "Sales"); "Balanced" is no longer offered but old briefs that hold it still read.
+    # Fix batch 6: three campaign types only, as in the ROI Calculator (Awareness, Engagement, Traffic).
+    # Old briefs still read: "Balanced" as an equal blend of the three, "Conversion" as Traffic.
     {"id": "goal", "type": "one", "multi_ok": True, "label": "What is the main goal of the campaign?", "required": True,
-     "options": [("awareness", "Awareness"), ("engagement", "Engagement"),
-                 ("traffic", "Traffic"), ("conversion", "Conversion")],
-     "legacy": [("balanced", "Balanced")]},
+     "options": [("awareness", "Awareness"), ("engagement", "Engagement"), ("traffic", "Traffic")],
+     "legacy": [("balanced", "Balanced"), ("conversion", "Traffic")]},
     {"id": "platforms", "type": "many", "label": "Where should the content run?", "required": True,
      "options": [("Instagram", "Instagram"), ("TikTok", "TikTok"), ("Snapchat", "Snapchat"),
                  ("YouTube", "YouTube"), ("any", "No preference")]},
@@ -62,7 +61,7 @@ QUESTIONS = [
     {"id": "notes", "type": "text", "label": "Anything else we should know?", "required": False, "max": 600},
 ]
 _BY_ID = {q["id"]: q for q in QUESTIONS}
-OBJECTIVE_OF = {"awareness": "Awareness", "engagement": "Engagement", "traffic": "Traffic", "conversion": "Conversion",
+OBJECTIVE_OF = {"awareness": "Awareness", "engagement": "Engagement", "traffic": "Traffic", "conversion": "Traffic",
                 "balanced": "Balanced"}
 
 
@@ -108,6 +107,11 @@ def public_questions():
 def clean_answers(raw):
     """Keep only values the questions allow. Returns ``(answers, missing_required)``."""
     raw = raw if isinstance(raw, dict) else {}
+    if raw.get("goal") is not None:
+        # a goal saved as "conversion" before it was withdrawn reads as Traffic
+        g = raw["goal"]
+        g = ["traffic" if x == "conversion" else x for x in g] if isinstance(g, list) else ("traffic" if g == "conversion" else g)
+        raw = dict(raw, goal=list(dict.fromkeys(g)) if isinstance(g, list) else g)
     out, missing = {}, []
     for q in QUESTIONS:
         v = raw.get(q["id"])
@@ -244,15 +248,18 @@ def _values(v, allowed):
 def roi_seed(answers):
     """The ROI Calculator's starting values from a brief's answers: ``{goal, platforms, market,
     budget}`` (budget only when the brief has one). The calculator takes one goal and one market:
-    the first goal named (Conversion reads as Traffic, the link-click goal; Balanced as Awareness)
-    and the first country it covers. Nothing here changes the calculator itself."""
+    the first goal named (an old brief's Conversion reads as Traffic; Balanced as Awareness) and the
+    first country it covers. Nothing here changes the calculator itself."""
     import roi
     b = to_brief(answers)
     first = str(b["objective"]).split("+")[0].lower()
-    goal = first if first in roi.GOALS else "traffic" if first == "conversion" else "awareness"
+    goal = first if first in roi.GOALS else "awareness"
     plats = [p for p in b["platforms"] if p in roi.PLATFORMS]
     market = next((m for m in fit.target_list(b["target"]["country"]) if m in roi.MARKETS), "SA")
-    out = {"goal": goal, "platforms": plats or ["Instagram", "TikTok"], "market": market, "platforms_from_brief": bool(plats)}
+    parts = [g.lower() for g in fit.parts_of(b["objective"])]
+    goals = [g for g in (parts if parts != ["balanced"] else list(roi.GOALS)) if g in roi.GOALS]
+    out = {"goal": goal, "goals": goals or [goal], "platforms": plats or ["Instagram", "TikTok"], "market": market,
+           "platforms_from_brief": bool(plats)}
     if isinstance(b.get("budget_max"), (int, float)) and b["budget_max"] > 0:
         out["budget"] = int(b["budget_max"])
     return out
@@ -295,9 +302,10 @@ def describe(answers):
 # credits. The chat uses it to skip the questions the client already answered.
 
 _GOAL_WORDS = {
-    "conversion": ["sale", "sales", "sell", "conversion", "convert", "sign up", "signup", "download", "orders",
-                   "footfall", "leads", "purchase", "مبيعات", "شراء"],
-    "traffic": ["traffic", "clicks", "click", "visit", "website", "landing page", "link", "swipe up", "swipe-up", "زيارات", "زوار"],
+    # sales and sign-ups are read as Traffic: link clicks are what we can track up to the tracking link
+    "traffic": ["sale", "sales", "sell", "conversion", "convert", "sign up", "signup", "download", "orders",
+                "footfall", "leads", "purchase", "مبيعات", "شراء",
+                "traffic", "clicks", "click", "visit", "website", "landing page", "link", "swipe up", "swipe-up", "زيارات", "زوار"],
     "engagement": ["engagement", "engage", "interact", "community", "comments", "تفاعل"],
     "awareness": ["awareness", "reach", "visibility", "launch", "known", "انتشار", "وعي", "اطلاق", "إطلاق"],
 }
@@ -413,8 +421,8 @@ def _roster_estimate(c, objective, target, platform):
     bench = metrics.benchmarks()
     followers = c["followers"] or 0
     # The same formula every creator is scored with (fit.score_core), fed only what the roster holds.
-    return fit.score_core({"followers": followers, "basic": True}, platform, followers, objective, target,
-                          metrics.band_of(followers), bench, c, None, 2)
+    return fit.score_core({"followers": followers, "basic": True, "roster_only": True}, platform, followers, objective, target,
+                          metrics.band_of(followers), bench, c, None, 1)
 
 
 # ---------------------------------------------------------------- shortlist --

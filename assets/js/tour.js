@@ -260,7 +260,7 @@
       replace_cost: 2, more_cost: 3, alike_cost: 2, ai_free: null, credits: 30 };
   }
   var QUESTIONS = [
-    { id: "goal", type: "one", label: "What is the main goal of the campaign?", required: true, multi_ok: true, options: [{ value: "awareness", label: "Awareness" }, { value: "engagement", label: "Engagement" }, { value: "traffic", label: "Traffic" }, { value: "conversion", label: "Conversion" }] },
+    { id: "goal", type: "one", label: "What is the main goal of the campaign?", required: true, multi_ok: true, options: [{ value: "awareness", label: "Awareness" }, { value: "engagement", label: "Engagement" }, { value: "traffic", label: "Traffic" }] },
     { id: "platforms", type: "many", label: "Where should the content run?", required: true, options: [{ value: "Instagram", label: "Instagram" }, { value: "TikTok", label: "TikTok" }, { value: "Snapchat", label: "Snapchat" }, { value: "YouTube", label: "YouTube" }] },
     { id: "market", type: "one", label: "Which market?", required: true, options: [{ value: "SA", label: "Saudi Arabia" }, { value: "AE", label: "UAE" }] },
     { id: "category", type: "many", label: "Which space?", required: false, options: [{ value: "skincare", label: "Skincare" }, { value: "health", label: "Health" }] },
@@ -281,8 +281,9 @@
       [500, { t: "step", text: "Reading your budget" }], [900, { t: "step", text: "Checking Saudi market benchmarks" }], [900, { t: "step", text: "Working out the reach" }],
       [500, { t: "done", thread: "demo", reply: "With **SAR 50,000** on Instagram and TikTok in Saudi Arabia, a mix of 1 macro, 3 mid-tier and 6 micro creators could reach about **1.1M–1.7M people**. It's an estimate, not a result.",
         roi: { goal: "awareness", budget: 50000, platforms: ["Instagram", "TikTok"], summary: "Awareness · 1 macro, 3 mid, 6 micro · Saudi Arabia",
-          figures: [{ label: "People reached", value: 1400000, range: [1100000, 1700000] }, { label: "Views", value: 2100000, range: [1700000, 2600000] }, { label: "Engagement rate", value: 4.2, unit: "%", range: [3.4, 5] }, { label: "Cost per 1,000 views", value: 24, unit: "SAR", range: [20, 30] }],
-          verdict: { grade: "good", label: "Good value" } },
+          figures: [{ key: "reach", label: "Reach", value: 1400000, range: [1100000, 1700000] }, { key: "views", label: "Views", value: 2100000, range: [1700000, 2600000] }, { key: "interactions", label: "Interactions", value: 88000, range: [70000, 110000] }],
+          trust: { line: "Based on what similar creators of each size deliver; no individual creator measured.", measured: 0, of: 0 },
+          plan: { text: "1 macro, 3 mid-size, 6 micro on Instagram and TikTok" } },
         next: ["Find creators within my budget", "Talk to a person"] }]]
       : [
       [500, { t: "step", text: "Reading your brief" }], [1000, { t: "step", text: "Scanning the catalogue" }], [1100, { t: "step", text: "Scoring fit for Ramadan skincare" }], [900, { t: "step", text: "Picking the best five" }],
@@ -396,11 +397,10 @@
     if (p === "/api/campaigns") return Promise.resolve(json(win, { ok: true, campaigns: [{ token: CAMP, name: CAMPAIGN, client: BRAND, status: "live", phase: "Publishing", starts_at: NOW - 12 * DAY, ends_at: NOW + 18 * DAY, logos: [] }] }));
     if (p === "/api/campaign") return Promise.resolve(json(win, campaignBody()));
     if (p === "/api/roi/vs") return Promise.resolve(json(win, { ok: true, items: [{ campaign: CAMPAIGN, token: CAMP, saved_at: NOW - 20 * DAY, ended: false, rows: [
-      { key: "views", label: "Views", estimate: 1900000, actual: 2310000, sig: { grade: "good", label: "Ahead" }, delta: "+22%" },
-      { key: "engagement", label: "Interactions", estimate: 88000, actual: 101000, sig: { grade: "good", label: "Ahead" }, delta: "+15%" },
-      { key: "er", label: "Engagement rate", estimate: 4.2, actual: 4.6, sig: { grade: "good", label: "Ahead" }, delta: "+0.4 pts" },
-      { key: "clicks", label: "Link clicks", estimate: 14000, actual: 11800, sig: { grade: "moderate", label: "Behind" }, delta: "−16%" }],
-      helvy: "Views and engagement are ahead of the estimate. Clicks trail: a swipe-up story in week 3 would help." }] }));
+      { key: "views", label: "Views", estimate: 1900000, range: [1500000, 2300000], actual: 2310000, position: "above", sig: { grade: "good", label: "Above the range" }, delta: "+22%" },
+      { key: "engagement", label: "Interactions", estimate: 88000, range: [70000, 110000], actual: 101000, position: "within", sig: { grade: "good", label: "Within the range" }, delta: "+15%" },
+      { key: "clicks", label: "Link clicks", estimate: 14000, range: [11000, 17000], actual: 9800, position: "below", sig: { grade: "low", label: "Below the range" }, delta: "−30%" }],
+      helvy: "Views came in above the estimated range. Link clicks fell below it: a swipe-up story in week 3 would help." }] }));
     if (p === "/api/chat/stream") return Promise.resolve(chatStream(win, body.message || ""));
     if (p === "/api/chat/history") return Promise.resolve(json(win, { ok: true, messages: [] }));
     if (p === "/api/request") return later(700, function () { return json(win, { ok: true, id: "demo" }); });

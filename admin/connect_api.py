@@ -109,12 +109,24 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
             return None
 
     def _roi_input(self, b):
-        goal = b.get("goal") if b.get("goal") in roi.GOALS else "awareness"
+        raw_goals = b.get("goals") if isinstance(b.get("goals"), list) else [b.get("goal")]
+        goals = [("traffic" if g == "conversion" else g) for g in raw_goals]       # an old client may still send it
+        goals = list(dict.fromkeys(g for g in goals if g in roi.GOALS)) or ["awareness"]
+        goal = goals[0]
         plats = [p for p in (b.get("platforms") or []) if p in roi.PLATFORMS][:4] or ["Instagram"]
         market = b.get("market") if b.get("market") in roi.MARKETS else "SA"
-        mix = {t: max(0, min(self._int((b.get("mix") or {}).get(t)), 200)) for t in roi.TIER_ORDER} if isinstance(b.get("mix"), dict) else None
+        mix = None
+        if isinstance(b.get("mix"), dict):
+            m = b["mix"]
+            if any(isinstance(v, dict) for v in m.values()):          # a suggested mix: {platform: {size: n}}
+                mix = {p: {t: max(0, min(self._int((m.get(p) or {}).get(t)), 200)) for t in roi.TIER_ORDER}
+                       for p in plats if isinstance(m.get(p), dict)}
+            else:
+                mix = {t: max(0, min(self._int(m.get(t)), 200)) for t in roi.TIER_ORDER}
         which = "all" if b.get("which") == "all" else "approved"
-        return {"goal": goal, "budget": b.get("budget"), "platforms": plats, "market": market, "mix": mix, "which": which}
+        second = [str(c).strip().upper()[:24] for c in (b.get("second_posts") or []) if isinstance(c, str)][:20]
+        return {"goal": goal, "goals": goals, "budget": b.get("budget"), "platforms": plats, "market": market, "mix": mix,
+                "which": which, "second_posts": second}
 
     def api_roi_estimate(self):
         who = self._need_viewer()
@@ -124,14 +136,16 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
             return
         b = self.json_body()
         inp = self._roi_input(b)
-        creators = None
+        creators, sel = None, None
         if b.get("token") and not inp["mix"]:
             got = self._roi_selection(b.get("token"))
             if not got:
                 return
-            creators = roi.creators_of(got[0], inp["which"])
-        res = roi.estimate(inp["goal"], inp["budget"], inp["platforms"], inp["market"], creators=creators,
-                           mix=inp["mix"] if creators is None else None)
+            sel = got[0]
+            creators = roi.creators_of(sel, inp["which"], goals=inp["goals"])
+        res = roi.full(inp["goal"], inp["budget"], inp["platforms"], inp["market"], creators=creators,
+                       mix=inp["mix"] if creators is None else None, goals=inp["goals"],
+                       second_posts=inp["second_posts"], sel=sel)
         return self.send_json(200, {"ok": True, "result": res}, self.cors())
 
     def api_roi_save(self):
@@ -145,8 +159,9 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
         if self._throttled("roisave:%d" % reader, 60, 600):
             return
         inp = self._roi_input(b)
-        creators = None if inp["mix"] else roi.creators_of(sel, inp["which"])
-        res = roi.estimate(inp["goal"], inp["budget"], inp["platforms"], inp["market"], creators=creators, mix=inp["mix"])
+        creators = None if inp["mix"] else roi.creators_of(sel, inp["which"], goals=inp["goals"])
+        res = roi.full(inp["goal"], inp["budget"], inp["platforms"], inp["market"], creators=creators, mix=inp["mix"],
+                       goals=inp["goals"], second_posts=inp["second_posts"], sel=sel, with_advice=False)
         u = portal.user_for_code(reader)
         rid = roi.save(reader, sel["id"], inp["goal"], {k: v for k, v in inp.items() if v is not None}, res,
                        by=(u["name"] if u is not None and u["name"] else "HelloVoice" if reader == db.admin_code_id() else "Client"))

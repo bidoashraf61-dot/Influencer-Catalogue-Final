@@ -1,0 +1,308 @@
+[
+ {
+  "code": "C01",
+  "followers": 21100,
+  "views": 3971,
+  "likes": null,
+  "comments": 22,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 20987,
+   "avg_likes": 35.7,
+   "avg_comments": 12.4,
+   "er": 0.229,
+   "posts_per_week": 2.85,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C02",
+  "followers": 24207,
+  "views": 1864,
+  "likes": 26,
+  "comments": 13,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 24130,
+   "avg_likes": 60.2,
+   "avg_comments": 3.1,
+   "er": 0.262,
+   "posts_per_week": 0.04,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C03",
+  "followers": 83600,
+  "views": 37663,
+  "likes": 390,
+  "comments": 14,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 80059,
+   "avg_likes": 106.8,
+   "avg_comments": 12.0,
+   "er": 0.148,
+   "posts_per_week": 0.11,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C04",
+  "followers": 171426,
+  "views": 114681,
+  "likes": 1055,
+  "comments": 134,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 167948,
+   "avg_likes": 8312.5,
+   "avg_comments": 152.5,
+   "er": 5.04,
+   "posts_per_week": 0.07,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C05",
+  "followers": 19700,
+  "views": 2014,
+  "likes": 33,
+  "comments": 10,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 19748,
+   "avg_likes": 35.1,
+   "avg_comments": 2.7,
+   "er": 0.191,
+   "posts_per_week": 1.07,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C06",
+  "followers": 107000,
+  "views": 40729,
+  "likes": null,
+  "comments": 147,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 106777,
+   "avg_likes": 204.8,
+   "avg_comments": 39.7,
+   "er": 0.229,
+   "posts_per_week": 0.03,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C07",
+  "followers": 1200000,
+  "views": 12629,
+  "likes": 88,
+  "comments": 21,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 1281662,
+   "avg_likes": 4355.9,
+   "avg_comments": 98.3,
+   "er": 0.348,
+   "posts_per_week": 1.79,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C08",
+  "followers": 646000,
+  "views": 161997,
+  "likes": null,
+  "comments": 76,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 638216,
+   "avg_likes": 2090.3,
+   "avg_comments": 80.5,
+   "er": 0.34,
+   "posts_per_week": 0.48,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C09",
+  "followers": 32100,
+  "views": 19649,
+  "likes": 514,
+  "comments": 5,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 26600,
+   "avg_likes": 190.9,
+   "avg_comments": 12.2,
+   "er": 0.764,
+   "posts_per_week": 0.45,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C04",
+  "followers": 171426,
+  "views": 52642,
+  "likes": 665,
+  "comments": 149,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 167948,
+   "avg_likes": 8312.5,
+   "avg_comments": 152.5,
+   "er": 5.04,
+   "posts_per_week": 0.07,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C10",
+  "followers": 16100,
+  "views": 1350,
+  "likes": 22,
+  "comments": 7,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 15088,
+   "avg_likes": 77.4,
+   "avg_comments": 15.3,
+   "er": 0.614,
+   "posts_per_week": 0.94,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C03",
+  "followers": 83600,
+  "views": 34684,
+  "likes": 595,
+  "comments": 9,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 80059,
+   "avg_likes": 106.8,
+   "avg_comments": 12.0,
+   "er": 0.148,
+   "posts_per_week": 0.11,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C08",
+  "followers": 646000,
+  "views": 72510,
+  "likes": 475,
+  "comments": 84,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 638216,
+   "avg_likes": 2090.3,
+   "avg_comments": 80.5,
+   "er": 0.34,
+   "posts_per_week": 0.48,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C01",
+  "followers": 21100,
+  "views": 1407,
+  "likes": null,
+  "comments": 5,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 20987,
+   "avg_likes": 35.7,
+   "avg_comments": 12.4,
+   "er": 0.229,
+   "posts_per_week": 2.85,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C02",
+  "followers": 24207,
+  "views": 1201,
+  "likes": 17,
+  "comments": 1,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 24130,
+   "avg_likes": 60.2,
+   "avg_comments": 3.1,
+   "er": 0.262,
+   "posts_per_week": 0.04,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C05",
+  "followers": 19700,
+  "views": 900,
+  "likes": 19,
+  "comments": 1,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 19748,
+   "avg_likes": 35.1,
+   "avg_comments": 2.7,
+   "er": 0.191,
+   "posts_per_week": 1.07,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C06",
+  "followers": 107000,
+  "views": 16051,
+  "likes": null,
+  "comments": 104,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 106777,
+   "avg_likes": 204.8,
+   "avg_comments": 39.7,
+   "er": 0.229,
+   "posts_per_week": 0.03,
+   "sample_posts": 12
+  }
+ },
+ {
+  "code": "C09",
+  "followers": 32100,
+  "views": 1666,
+  "likes": 29,
+  "comments": 2,
+  "doc": {
+   "basic": true,
+   "platform": "Instagram",
+   "followers": 26600,
+   "avg_likes": 190.9,
+   "avg_comments": 12.2,
+   "er": 0.764,
+   "posts_per_week": 0.45,
+   "sample_posts": 12
+  }
+ }
+]

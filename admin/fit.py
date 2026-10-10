@@ -3,7 +3,7 @@
 A client reading a creator's analysis has to decide for themselves whether
 the creator suits the campaign. The admin makes that call once, per creator in
 a selection, with ready-made words: how well they fit, and the part they play
-(awareness, engagement, conversion, UGC). `suggest` proposes both and shows
+(awareness, engagement, UGC content). `suggest` proposes both and shows
 its working, so the admin confirms or changes it rather than starting from
 nothing. It weighs, for the campaign's objective:
 
@@ -21,51 +21,69 @@ import re
 
 FITS = ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
 ROLES = ["Awareness", "Engagement", "Conversion", "UGC content"]
-OBJECTIVES = ["Balanced", "Awareness", "Engagement", "Traffic", "Conversion"]
-MARKET = "SA"                                 # the audience that matters for most of our work
-MARKET_NAME = "KSA"
-
-# How much each thing counts for each objective. Higher = matters more.
+# Campaign types (owner decision 2026-10-10): Awareness, Engagement and Traffic, one or several at
+# once. "Conversion" is no longer offered; a stored "Conversion" reads as Traffic (the link-click
+# goal) and a stored "Balanced" reads as an equal blend of the three.
+OBJECTIVES = ["Balanced", "Awareness", "Engagement", "Traffic"]
+CAMPAIGN_TYPES = ["Awareness", "Engagement", "Traffic"]
+LEGACY_OBJECTIVE = {"Conversion": "Traffic"}
+# How much each thing counts for each type. Higher = matters more. (Used by `suggest`, the
+# admin's fit suggestion; the number on a creator card comes from WEIGHTS_V2 below.)
 WEIGHTS = {
-    "Balanced":   {"engagement": 1.5, "credibility": 1.5, "market": 1.5, "reach": 1.5, "record": 1.5},
     "Awareness":  {"engagement": 1.0, "credibility": 1.0, "market": 1.0, "reach": 3.0, "record": 1.0},
     "Engagement": {"engagement": 3.0, "credibility": 1.0, "market": 1.0, "reach": 0.5, "record": 1.0},
-    # Traffic (fix batch 4): link clicks come from an engaged audience in the right market, with
-    # enough reach for the clicks to add up; our own campaign record shows who drives them.
+    # link clicks come from an engaged audience in the right market, with enough reach for the
+    # clicks to add up; our own campaign record shows who drives them.
     "Traffic":    {"engagement": 2.5, "credibility": 1.5, "market": 2.0, "reach": 1.0, "record": 2.0},
-    "Conversion": {"engagement": 2.0, "credibility": 2.0, "market": 3.0, "reach": 0.5, "record": 2.0},
 }
 # The objective names campaigns use -> the ones shown here.
-FROM_CAMPAIGN = {"balanced": "Balanced", "awareness": "Awareness", "engagement": "Engagement", "traffic": "Traffic"}
+FROM_CAMPAIGN = {"balanced": "Balanced", "awareness": "Awareness", "engagement": "Engagement", "traffic": "Traffic",
+                 "conversion": "Traffic"}
 
 
 # More than one goal (fix batch 3: the selection objective takes several, e.g. awareness AND
 # engagement). Stored as "Awareness+Engagement"; scored with the average of those goals'
-# weights, so each one counts and none is dropped. "Balanced" alongside others adds nothing.
+# weights, so each one counts and none is dropped.
+def _norm(name):
+    return LEGACY_OBJECTIVE.get(name, name)
+
+
 def objective_of(goals):
-    """A list of goal names (Awareness, Engagement, Traffic, Conversion, Balanced) -> one stored objective."""
-    names = [g for g in dict.fromkeys(goals or []) if g in OBJECTIVES]
-    named = [g for g in OBJECTIVES if g in names and g != "Balanced"]
+    """A list of goal names (Awareness, Engagement, Traffic; Balanced and the old Conversion are
+    still read) -> one stored objective: "Awareness+Traffic". Nothing named = "Balanced"."""
+    names = [_norm(g) for g in dict.fromkeys(goals or [])]
+    named = [g for g in CAMPAIGN_TYPES if g in names]
     if not named:
         return "Balanced"
     return "+".join(named)
 
 
 def parts_of(objective):
-    """'Awareness+Engagement' -> ['Awareness', 'Engagement']; anything unknown -> ['Balanced']."""
-    names = [p for p in str(objective or "").split("+") if p in OBJECTIVES]
+    """'Awareness+Engagement' -> ['Awareness', 'Engagement']; the old 'Conversion' -> ['Traffic'];
+    'Balanced' (or anything unknown) -> ['Balanced'], which blend() reads as the three together."""
+    names = [_norm(p) for p in str(objective or "").split("+")]
+    names = [p for p in dict.fromkeys(names) if p in CAMPAIGN_TYPES]
     return names or ["Balanced"]
 
 
+def canonical(objective):
+    """The stored form of an objective: legacy Conversion read as Traffic, order fixed, unknown = Balanced."""
+    parts = parts_of(objective)
+    return "Balanced" if parts == ["Balanced"] else "+".join(parts)
+
+
 def known_objective(objective):
-    """True for one of OBJECTIVES or a "+" combination of them."""
-    return bool(objective) and all(p in OBJECTIVES for p in str(objective).split("+"))
+    """True for one of OBJECTIVES, the legacy Conversion, or a "+" combination of them."""
+    return bool(objective) and all(_norm(p) in OBJECTIVES for p in str(objective).split("+"))
 
 
 def blend(table, objective):
-    """The weights for an objective from ``table`` (WEIGHTS or WEIGHTS_BASIC), averaged over its goals."""
+    """The weights for an objective from ``table`` (WEIGHTS or WEIGHTS_V2), averaged over its
+    goals. Balanced is the average of all three."""
     parts = parts_of(objective)
-    keys = table["Balanced"].keys()
+    if parts == ["Balanced"]:
+        parts = CAMPAIGN_TYPES
+    keys = table["Awareness"].keys()
     return {k: sum(table[p][k] for p in parts) / float(len(parts)) for k in keys}
 
 
@@ -101,7 +119,7 @@ def suggest(doc, platform, followers=None, objective="Balanced", band="mid", ben
     if not doc:
         return {"note": "No %s analysis on file yet — nothing to suggest from." % (platform or "platform")}
     bench = bench or {}
-    objective = objective if known_objective(objective) else "Balanced"
+    objective = canonical(objective) if known_objective(objective) else "Balanced"
     w = blend(WEIGHTS, objective)
     f = doc.get("followers") or followers
     er = doc.get("er")
@@ -320,43 +338,48 @@ def _niche(category, doc, creator_interest):
 
 
 def score(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
-          record=None, creator_interest=None, min_parts=3, creator=None):
+          record=None, creator_interest=None, min_parts=1, creator=None):
     """The matching score for one creator. Everyone is scored on the SAME parameters, whatever
     data they have (see score_core); a full analysis adds verified checks beside the number."""
     if not doc:
         return {"score": None, "tag": "", "parts": [], "strengths": [], "watchouts": [], "conclusion": "",
-                "objective": objective, "platform": platform, "note": "No analysis on file.", "checks": []}
+                "objective": objective, "platform": platform, "note": "No analysis on file.", "checks": [],
+                "confidence": {"level": "low", "posts": 0, "peers_n": 0, "source": "peers"},
+                "reach_followers": followers or None, "limited_data": True}
     return score_core(doc, platform, followers, objective, target, band, bench, creator, record, min_parts)
 
 
-# ------------------------------------------------- scoring on basic (public) data --
+# ------------------------------------------------------- scoring, version 2 --
 #
-# Most creators have only the public numbers (followers, engagement, average
-# likes and comments, views on TikTok, bio, hashtags) and no audience report.
-# They are scored on what that record can show, and the stamp says so. Real
-# audience (fake followers) cannot be judged from it and is left out; audience
-# match is estimated from the roster (city, nationality, interest) and the bio
-# and hashtags instead of a measured audience split.
+# Fix batch 6 (Bido, 2026-10-10). A creator is scored against creators of the SAME
+# PLATFORM and the SAME SIZE from our own roster (benchmarks.py), on four things only:
+#
+#   engagement   how well their audience reacts      (percentile among same-size peers)
+#   views        how far a typical video travels     (median views / followers, vs peers)
+#   consistency  how steady those views are          (lower swing is better; needs a series)
+#   interest     how much of their content is in the brief's product space
+#
+# Size is not a part of the score: a nano and a mega creator who are both at the top of their
+# own size score the same. The creator's reach is shown beside the score (reach_followers).
+# Audience (country, gender, age) is not scored; a measured audience stays a check beside it.
+# A bought audience caps the number, and our own record with the creator nudges it only
+# once they have 5 or more posts with us.
+#
+# Where a peer cell holds fewer than benchmarks.MIN_PEERS creators the part falls back to the
+# global estimate in Settings (and counts for half), or is left out; the score then says
+# "limited data". Every part's weight is scaled by how far its data can be trusted, so an
+# estimate can only nudge the score: measured 1.0, estimated 0.5, assumed 0.2.
 
-ASSUMED_AUDIENCE = 0.8           # no measured audience: assume a good match (80%)...
-# ...but every part's weight is scaled by how far its data can be trusted, so a guess
-# can only nudge the score: measured 1.0, worked out from other numbers 0.5, assumed 0.2.
 TRUST = {"measured": 1.0, "estimated": 0.5, "assumed": 0.2}
-WEIGHTS_BASIC = {
-    "Balanced":   {"engagement": 1.5, "reach": 1.5, "views": 1.5, "market": 1.5, "link": 0.0},
-    "Awareness":  {"engagement": 1.0, "reach": 3.0, "views": 3.0, "market": 1.0, "link": 0.0},
-    "Engagement": {"engagement": 3.0, "reach": 0.5, "views": 1.0, "market": 1.0, "link": 0.0},
-    # Traffic (fix batch 4): clicks on a tracking link. Engagement leads (people who interact are
-    # the ones who tap), then views and the right market, and the platform's own link route:
-    # a Snapchat swipe-up or an Instagram story link sticker beats a caption on TikTok.
-    "Traffic":    {"engagement": 2.5, "reach": 1.0, "views": 2.0, "market": 2.0, "link": 1.5},
-    "Conversion": {"engagement": 2.0, "reach": 0.5, "views": 2.0, "market": 3.0, "link": 0.0},
-}
-# How directly a platform turns a viewer into a click on a tracking link (Traffic only).
-LINK_ROUTE = {"Snapchat": (1.0, "Snapchat swipe-up links take viewers straight to the page"),
-              "Instagram": (0.85, "Instagram story link stickers send viewers to the page"),
-              "YouTube": (0.7, "YouTube description links carry clicks"),
-              "TikTok": (0.6, "TikTok links sit in the bio, so fewer viewers click through")}
+WEIGHTS_V2 = {
+    "Awareness":  {"engagement": 1.5, "views": 3.0, "consistency": 1.0, "interest": 1.5},
+    "Engagement": {"engagement": 3.0, "views": 1.0, "consistency": 1.0, "interest": 1.5},
+    "Traffic":    {"engagement": 2.5, "views": 2.0, "consistency": 1.0, "interest": 2.0},
+}   # Balanced = the average of the three rows; a stored Conversion reads as Traffic
+WEIGHTS_BASIC = WEIGHTS_V2          # the name older code and tests use
+RECORD_MIN_POSTS = 5                # our own campaign record moves the number from this many posts
+RECORD_NUDGE = 5                    # points, up or down
+FAKE_CAP = 39                       # a bought audience cannot score above "Not recommended"
 PLACE_WORDS = {
     "SA": ["riyadh", "jeddah", "jedda", "dammam", "khobar", "al khobar", "dhahran", "taif", "makkah", "mecca", "madinah", "medina",
            "abha", "tabuk", "jazan", "jizan", "hail", "qassim", "buraidah", "al ahsa", "hofuf", "jubail", "yanbu", "ksa",
@@ -403,134 +426,193 @@ def typical_views(doc):
     return None, None
 
 
+
+
+def _bar_score(v, good, ok):
+    """A value against a global [good, ok] bar pair: 1 at good, 0.6 at ok, falling to 0."""
+    if v >= good:
+        return 1.0
+    if v >= ok and good > ok:
+        return 0.6 + 0.4 * (v - ok) / (good - ok)
+    return 0.6 * v / ok if ok else 0.0
+
+
+def _interest_words(cat):
+    return CATEGORY_WORDS.get(cat) or [w for w in cat.replace("&", " ").split() if len(w) >= 4] or [cat]
+
+
+def interest_share(doc, creator, cats):
+    """(share 0..1, measured, why) of the creator's content that sits in the asked-for product
+    space(s), or None when none is asked for.
+
+    A future analysis field ``interest_shares`` ({category: percent}) is taken as measured.
+    Until it exists the share is read from the keywords: the share of the creator's roster
+    interest tags, and of their hashtags, that name the space; a bio that names it counts at
+    least 0.3. That is an estimate and is weighted as one."""
+    cats = [c.strip().lower() for c in (cats or []) if c and c.strip().lower() != "any"]
+    if not cats:
+        return None
+    shares = doc.get("interest_shares")
+    if isinstance(shares, dict) and shares:
+        low = {str(k).lower(): v for k, v in shares.items() if isinstance(v, (int, float))}
+        got = [low[c] for c in cats if c in low]
+        if got:
+            sh = min(1.0, sum(got) / 100.0)
+            return sh, True, "%s of their content is %s" % (_pct(sum(got)), ", ".join(cats))
+
+    def hit(text):
+        t = str(text or "").lower()
+        return any(c in t or any(has_word(t, w) for w in _interest_words(c)) for c in cats)
+    interest = str(creator["interest"] if creator is not None and "interest" in creator.keys() else "")
+    tags = [t.strip() for t in re.split(r"[,/|;&]|\band\b", interest) if t.strip()]
+    tags += [str(x) for x in (doc.get("creator_interests") or [])]
+    tag_share = (sum(1 for t in tags if hit(t)) / float(len(tags))) if tags else 0.0
+    hashtags = [str((h.get("tag") if isinstance(h, dict) else h) or "") for h in (doc.get("hashtags") or [])]
+    hash_share = (sum(1 for t in hashtags if hit(t)) / float(len(hashtags))) if len(hashtags) >= 3 else 0.0
+    bio = 0.3 if hit(doc.get("bio")) else 0.0
+    share = max(tag_share, hash_share, bio)
+    return share, False, ("Content tagged for %s" % ", ".join(cats)) if share >= 0.5 else (
+        "Some %s content" % ", ".join(cats) if share > 0 else "")
+
+
 def score_core(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
-               creator=None, record=None, min_parts=3):
-    """The one scoring formula, used for every creator. It needs only what a public profile shows
-    (engagement, reach, views, and an audience estimate from the roster and the bio). When the
-    creator also has a full analysis, `checks` carries what it adds (fake followers, the measured
-    audience, our own record) as warnings beside the number; the only thing that moves the number
-    is a bought audience, which caps it."""
+               creator=None, record=None, min_parts=1):
+    """The one scoring formula, used for every creator (scoring v2, see the header above).
+
+    Returns the same shape as before (score, tag, parts, strengths, watchouts, checks, conclusion,
+    objective, platform, basic) plus ``confidence`` ({"level": high|medium|low, "posts", "peers_n",
+    "source": peers|global}), ``reach_followers`` and ``limited_data``."""
+    import benchmarks
     verified = not doc.get("basic")
     out = {"score": None, "tag": "", "parts": [], "strengths": [], "watchouts": [], "conclusion": "",
-           "objective": objective, "platform": platform, "basic": not verified, "checks": []}
+           "objective": objective, "platform": platform, "basic": not verified, "checks": [],
+           "confidence": {"level": "low", "posts": 0, "peers_n": 0, "source": "peers"},
+           "reach_followers": None, "limited_data": True}
     bench = bench or {}
     target = dict(DEFAULT_TARGET, **{k: v for k, v in (target or {}).items() if v})
     target["gender"] = one_gender(target["gender"])
-    objective = objective if known_objective(objective) else "Balanced"
-    w = blend(WEIGHTS_BASIC, objective)
+    objective = canonical(objective) if known_objective(objective) else "Balanced"
+    w = blend(WEIGHTS_V2, objective)
     f = doc.get("followers") or followers
-    er = doc.get("er")
-    feed = platform in (None, "Instagram", "Facebook", "X")
-    views_in = doc.get("avg_views")
-    if doc.get("er_basis") == "views":
-        video = True                                  # a rate per view, as the collector measures it
-    elif feed:
-        video = False                                 # a rate per follower
-    elif doc.get("er_note"):
-        # a video account's rate the importer worked out from likes: per view if views are known
-        if views_in:
-            er = ((doc.get("avg_likes") or 0) + (doc.get("avg_comments") or 0)) / float(views_in) * 100
-            video = True
+    out["reach_followers"] = int(f) if f else None
+    size = benchmarks.size_of(f)
+    plat = platform or "Instagram"
+    feed = plat in benchmarks.FEED
+    parts = []                      # (key, label, s, strength, watch, mult, src, n)
+
+    def add(key, label, s, strength, watch, mult=1.0, src=None, n=0):
+        parts.append((key, label, _clamp(s), strength, watch, mult, src, n))
+
+    sample = benchmarks.sample_of(plat, dict(doc, followers=f)) if f else {}
+    name = "%s %s creators" % (benchmarks.SIZE_LABEL[size].split(" (")[0].lower(), plat)
+
+    # -- engagement
+    er_val, er_metric, est = None, None, False
+    if "er_med" in sample:
+        er_val, er_metric = sample["er_med"], "er_med"
+    elif "er" in sample:
+        er_val, er_metric = sample["er"], "er"
+    elif not feed and doc.get("avg_views") and doc.get("avg_likes") is not None:
+        # a video account's rate the importer only had likes for: per view, estimated
+        er_val = ((doc.get("avg_likes") or 0) + (doc.get("avg_comments") or 0)) / float(doc["avg_views"]) * 100
+        er_metric, est = "er", True
+    elif doc.get("er") is not None and not doc.get("likes_hidden"):
+        er_val, er_metric, est = float(doc["er"]), "er", bool(doc.get("er_note"))
+    if er_val is not None:
+        per_view = (not feed) or doc.get("er_basis") == "views"
+        pc = None
+        for m in dict.fromkeys([er_metric, "er"]):
+            pc = benchmarks.percentile(plat, size, m, er_val)
+            if pc:
+                break
+        unit = " per view" if per_view else ""
+        if pc:
+            s, src, n = pc["pct"], "peers", pc["n"]
+            txt = "Engagement %s%s, ahead of %d%% of %s" % (_pct(er_val), unit, int(round(s * 100)), name)
+            wtxt = "Engagement %s%s, behind %d%% of %s" % (_pct(er_val), unit, int(round((1 - s) * 100)), name)
         else:
-            video = False
-    else:
-        video = True                                  # a TikTok/YouTube report's own rate is per view
-    bars = bench.get("video_er") if video else (bench.get("er") or {}).get(band)
-    good, ok = bars if bars else ((4.5, 3.0) if video else (3.0, 1.5))
-    parts = []
-    wmul = {}
-
-    def add(key, label, s, strength, watch):
-        parts.append((key, label, _clamp(s), strength, watch))
-
-    if er is not None:
-        s = 1.0 if er >= good else (0.6 + 0.4 * (er - ok) / (good - ok) if er >= ok and good > ok else 0.6 * er / ok if ok else 0.0)
-        est = bool(doc.get("er_note"))           # a rate the importer worked out: counts, but never as full marks
+            bars = bench.get("video_er") if per_view else (bench.get("er") or {}).get(band)
+            good, ok = bars if bars else ((4.5, 3.0) if per_view else (3.0, 1.5))
+            s, src, n = _bar_score(er_val, good, ok), "global", 0
+            txt = "Engagement %s%s, above the %s global estimate" % (_pct(er_val), unit, _pct(good))
+            wtxt = "Engagement %s%s, below the %s global estimate" % (_pct(er_val), unit, _pct(ok))
+        mult = TRUST["estimated"] if (est or src == "global") else TRUST["measured"]
         if est:
             s = min(s, 0.7)
-            wmul["engagement"] = TRUST["estimated"]
-        lab = "Engagement about %s (estimated from average likes)" if est else "Engagement %s"
-        add("engagement", "Engagement", s,
-            (lab % _pct(er)) + (" per view" if video else "") + ", " + (("above the %s benchmark" % _pct(good)) if er >= good else ("within the healthy range (%s and over)" % _pct(ok))),
-            (lab % _pct(er)) + (" per view" if video else "") + ", below the %s benchmark" % _pct(ok))
-    if f:
-        import math
-        add("reach", "Reach", (math.log10(max(f, 1)) - 3.7) / 2.0, "Reach of %s followers" % _k(f), "Small reach (%s followers)" % _k(f))
-    typ, how = typical_views(doc) if platform not in (None, "Instagram", "Facebook", "X") else (None, None)
-    if typ:
-        import math
-        s = (math.log10(max(typ, 1)) - 3.0) / 2.0               # 1K -> 0, 10K -> 0.5, 100K -> 1
-        tag = " (estimated)" if how == "estimated" else ""
-        if how == "estimated":
-            wmul["views"] = TRUST["estimated"]
-        add("views", "Typical views", s, "A typical video gets about %s views%s" % (_k(typ), tag),
-            "A typical video gets only about %s views%s" % (_k(typ), tag))
-    # audience match, estimated from the roster and the profile text
-    subs = []
-    pm, hits = _place_mark(creator, target["country"])
-    tcs = target_list(target["country"]) or [DEFAULT_TARGET["country"]]
-    cname = country_names(tcs)
-    if hits:
-        subs.append((pm, "Based in %s" % cname, "Based outside %s" % cname))
+        add("engagement", "Engagement vs similar creators" if src == "peers" else "Engagement (global estimate)",
+            s, txt, wtxt, mult, src, n)
+
+    # -- views
+    vr_val, vr_metric = None, None
+    if "view_rate_med" in sample:
+        vr_val, vr_metric = sample["view_rate_med"], "view_rate_med"
+    elif "view_rate" in sample:
+        vr_val, vr_metric = sample["view_rate"], "view_rate"
+    if vr_val is not None:
+        pc = None
+        for m in dict.fromkeys([vr_metric, "view_rate"]):
+            pc = benchmarks.percentile(plat, size, m, vr_val)
+            if pc:
+                break
+        if pc:
+            s, src, n = pc["pct"], "peers", pc["n"]
+            txt = "A typical video reaches %s of followers, ahead of %d%% of %s" % (_pct(vr_val), int(round(s * 100)), name)
+            wtxt = "A typical video reaches %s of followers, behind %d%% of %s" % (_pct(vr_val), int(round((1 - s) * 100)), name)
+        else:
+            good, ok = bench.get("view_rate") or (30.0, 10.0)
+            s, src, n = _bar_score(vr_val, good, ok), "global", 0
+            txt = "A typical video reaches %s of followers, above the %s global estimate" % (_pct(vr_val), _pct(good))
+            wtxt = "A typical video reaches %s of followers, below the %s global estimate" % (_pct(vr_val), _pct(ok))
+        add("views", "Views vs similar creators" if src == "peers" else "Views (global estimate)", s, txt, wtxt,
+            TRUST["measured"] if src == "peers" else TRUST["estimated"], src, n)
+
+    # -- consistency (needs the spread of the sampled posts; peers only: there is no global bar)
+    if "spread" in sample and (doc.get("sample_posts") or len(doc.get("views_series") or [])) >= 10:
+        pc = benchmarks.percentile(plat, size, "spread", sample["spread"])
+        if pc:
+            s = 1.0 - pc["pct"]
+            add("consistency", "Steady views", s, "Views hold steady from post to post (steadier than %d%% of %s)" % (int(round(s * 100)), name),
+                "Views swing a lot from post to post (steadier than only %d%% of %s)" % (int(round(s * 100)), name),
+                TRUST["measured"], "peers", pc["n"])
+
+    # -- interest
     cats = [c for c in str(target["category"]).split("|") if c.strip() and c.strip().lower() != "any"]
-    if cats:
-        text = " ".join(filter(None, [str(creator["interest"] if creator is not None else ""), str(doc.get("bio") or ""),
-                                      " ".join(str((h.get("tag") if isinstance(h, dict) else h) or "") for h in (doc.get("hashtags") or []))]))
-        fake_doc = {"creator_interests": [text], "audience": {}}
-        nic = _niche("|".join(cats), fake_doc, creator["interest"] if creator is not None else "")
-        names = ", ".join(c.strip().lower() for c in cats)
-        subs.append((nic, "Works in the %s space" % names, "Little sign of %s content in their profile" % names))
-    au = doc.get("audience") or {}
-    measured = []
-    if verified and (au.get("countries") or au.get("gender") or au.get("ages")):
-        # a full analysis: the audience as it was measured
-        if au.get("countries"):
-            home = sum((c.get("pct") or 0) for c in au["countries"] if str(c.get("code", "")).upper() in tcs)
-            measured.append((home / 60.0, "%s of the audience is in %s" % (_pct(home), cname), "Only %s of the audience is in %s" % (_pct(home), cname)))
-        if target["gender"] in ("Women", "Men") and au.get("gender"):
-            share = au["gender"].get("female" if target["gender"] == "Women" else "male") or 0
-            measured.append((share / 60.0, "%s of the audience are %s" % (_pct(share), target["gender"].lower()),
-                             "Only %s of the audience are %s" % (_pct(share), target["gender"].lower())))
-        if target_list(target["age"]) and au.get("ages"):
-            share = _age_share(au["ages"], target["age"])
-            if share is not None:
-                need = age_need(len(target_list(target["age"])))
-                measured.append((share / need, "%s of the audience is aged %s" % (_pct(share), age_text(target["age"])),
-                                 "Only %s of the audience is aged %s" % (_pct(share), age_text(target["age"]))))
-        if cats:
-            nm = _niche("|".join(cats), doc, creator["interest"] if creator is not None else "")
-            names = ", ".join(c.strip().lower() for c in cats)
-            measured.append((nm, "Works in the %s space" % names, "Little sign of %s content or audience interest" % names))
-    if measured:
-        add("market", "Audience (measured)", sum(_clamp(x[0]) for x in measured) / len(measured),
-            "; ".join(x[1] for x in measured if _clamp(x[0]) >= 0.75) or None, "; ".join(x[2] for x in measured if _clamp(x[0]) <= 0.45) or None)
-    else:
-        # no audience report: assume a good match rather than guess from the roster
-        wmul["market"] = TRUST["assumed"]
-        add("market", "Audience (assumed 80%)", ASSUMED_AUDIENCE, None, None)
+    got = interest_share(doc, creator, cats)
+    if got is not None:
+        share, measured, why = got
+        add("interest", "Product-space match", min(1.0, share / 0.5) if not measured else min(1.0, share / 0.5),
+            why or "Works in the %s space" % ", ".join(c.lower() for c in cats),
+            "Little sign of %s content" % ", ".join(c.lower() for c in cats),
+            TRUST["measured"] if measured else TRUST["estimated"], "doc" if measured else "keywords", 0)
 
-    # Traffic: the platform's own route to a link (swipe-up, story sticker, description, bio).
-    if w.get("link") and platform in LINK_ROUTE:
-        ls, why = LINK_ROUTE[platform]
-        add("link", "Link clicks", ls, why, why)
-
-    def wt(k):
-        return w.get(k, 1.0) * wmul.get(k, 1.0)
-
-    out["parts"] = [{"key": k, "label": lab, "s": round(s, 2), "w": round(wt(k), 2)} for k, lab, s, _, _ in parts]
-    if len([p for p in parts if p[0] != "link"]) < min_parts:
+    data_keys = [p[0] for p in parts if p[0] in ("engagement", "views", "consistency")]
+    if not data_keys and doc.get("roster_only"):
+        # nobody has measured this creator: a neutral prior, so a tagged creator can still be
+        # listed but never outranks one with numbers
+        add("prior", "No numbers on file yet", 0.5, None, None, TRUST["assumed"], None, 0)
+    if len(parts) < max(min_parts, 1):
         out["note"] = "Not enough public data to score."
         return out
-    tw = sum(wt(k) for k, _, _, _, _ in parts)
-    val = int(round(100.0 * sum(wt(k) * s for k, _, s, _, _ in parts) / tw))
+
+    def wt(p):
+        return w.get(p[0], 1.0) * p[5]
+    out["parts"] = [{"key": p[0], "label": p[1], "s": round(p[2], 2), "w": round(wt(p), 2), "src": p[6], "n": p[7]} for p in parts]
+    tw = sum(wt(p) for p in parts)
+    if tw <= 0:
+        out["note"] = "Not enough public data to score."
+        return out
+    val = int(round(100.0 * sum(wt(p) * p[2] for p in parts) / tw))
+
+    # -- checks beside the number (never in it)
+    au = doc.get("audience") or {}
+    tcs = target_list(target["country"]) or [DEFAULT_TARGET["country"]]
+    cname = country_names(tcs)
     extra_watch = []
     if verified:
-        au = doc.get("audience") or {}
         countries = au.get("countries") or []
         if countries:
             home = sum((c.get("pct") or 0) for c in countries if str(c.get("code", "")).upper() in tcs)
-            cn = cname
-            out["checks"].append({"label": "Measured audience", "text": "%s of the measured audience is in %s" % (_pct(home), cn),
+            out["checks"].append({"label": "Measured audience", "text": "%s of the measured audience is in %s" % (_pct(home), cname),
                                   "level": "ok" if home >= 60 else "warn" if home >= 30 else "bad"})
         if target["gender"] in ("Women", "Men") and au.get("gender"):
             share = au["gender"].get("female" if target["gender"] == "Women" else "male") or 0
@@ -542,21 +624,57 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
                 need = age_need(len(target_list(target["age"])))
                 out["checks"].append({"label": "Age", "text": "%s of the audience is aged %s" % (_pct(share), age_text(target["age"])),
                                       "level": "ok" if share >= need else "warn" if share >= need / 2 else "bad"})
-        if record and record.get("posts", 0) >= 2 and record.get("er") is not None and record.get("typical_er"):
-            r = record["er"] / record["typical_er"]
-            out["checks"].append({"label": "Our campaigns", "text": "%s engagement per view in %d of our campaign%s (typical %s)" % (
-                _pct(record["er"]), record["campaigns"], "" if record["campaigns"] == 1 else "s", _pct(record["typical_er"])),
-                "level": "ok" if r >= 1.2 else "bad" if r <= 0.7 else "warn"})
+    fake = doc.get("fake_followers_pct")
+    if fake is None and doc.get("credibility_pct") is not None:
+        fake = round(100 - doc["credibility_pct"], 1)
+    fk_good, fk_bad = bench.get("fake_followers") or (15.0, 30.0)
+    capped = False
+    if fake is not None:
+        out["checks"].append({"label": "Fake followers", "text": "%s of followers look fake" % _pct(fake),
+                              "level": "ok" if fake <= fk_good else "bad" if fake >= fk_bad else "warn"})
+        if fake >= fk_bad:
+            capped = True
+            extra_watch.append("%s fake followers: the score is capped" % _pct(fake))
+    if record and record.get("posts", 0) >= 2 and record.get("er") is not None and record.get("typical_er"):
+        r = record["er"] / record["typical_er"]
+        out["checks"].append({"label": "Our campaigns", "text": "%s engagement per view in %d of our campaign%s (typical %s)" % (
+            _pct(record["er"]), record["campaigns"], "" if record["campaigns"] == 1 else "s", _pct(record["typical_er"])),
+            "level": "ok" if r >= 1.2 else "bad" if r <= 0.7 else "warn"})
+        if record["posts"] >= RECORD_MIN_POSTS and (r >= 1.2 or r <= 0.7):
+            val = max(0, min(100, val + (RECORD_NUDGE if r >= 1.2 else -RECORD_NUDGE)))
+            (out["strengths"] if r >= 1.2 else extra_watch).append(
+                "Our record with them (%d posts) is %s our typical" % (record["posts"], "above" if r >= 1.2 else "below"))
+    if capped:
+        val = min(val, FAKE_CAP)
+
+    # -- confidence
+    posts = int(doc.get("sample_posts") or (12 if verified else 0))
+    peer_parts = [p for p in parts if p[6] == "peers"]
+    glob = [p for p in parts if p[6] == "global"]
+    eng = next((p for p in parts if p[0] == "engagement"), None)
+    peers_n = min([p[7] for p in peer_parts]) if peer_parts else 0
+    if not data_keys or posts < 6 or not peer_parts:
+        level = "low"
+    elif posts >= 20 and len(peer_parts) >= 2 and eng is not None and eng[6] == "peers":
+        level = "high"
+    else:
+        level = "medium"
+    out["confidence"] = {"level": level, "posts": posts, "peers_n": peers_n,
+                         "source": "global" if (glob and (not eng or eng[6] == "global")) else "peers"}
+    out["limited_data"] = level == "low" or len(data_keys) < 2
+
     out["score"], out["tag"] = val, band_for(val)
-    order = sorted(parts, key=lambda p: -wt(p[0]))
-    out["strengths"] = [st for _, _, s, st, _ in order if st and s >= 0.75][:4]
-    out["watchouts"] = extra_watch + [wo for _, _, s, _, wo in order if wo and s <= 0.45][:3 - len(extra_watch)]
+    order = sorted(parts, key=lambda p: -wt(p))
+    out["strengths"] += [p[3] for p in order if p[3] and p[2] >= 0.75 and p[0] != "prior"][:4]
+    out["watchouts"] = extra_watch + [p[4] for p in order if p[4] and p[2] <= 0.45 and p[0] != "prior"][:3 - len(extra_watch)]
     lead = "" if objective == "Balanced" else " for " + objective_label(objective).lower()
     txt = "%s%s (%d/100)%s." % (out["tag"], lead, val, ", from public numbers only" if not verified else "")
     if out["strengths"]:
         txt += " Strengths: " + "; ".join(out["strengths"][:2]) + "."
     if out["watchouts"]:
         txt += " Watch: " + "; ".join(out["watchouts"][:2]) + "."
+    if out["limited_data"]:
+        txt += " Limited data: read it as a first look."
     out["conclusion"] = txt
     out["objective"] = objective
     return out

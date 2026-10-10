@@ -89,8 +89,8 @@ class Multi(unittest.TestCase):
 
     def test_roi_seed_reads_the_brief(self):
         a, _ = clean(market=["KW", "AE"], goal=["engagement", "traffic"], platforms=["TikTok"], budget="150")
-        self.assertEqual(matcher.roi_seed(a), {"goal": "engagement", "platforms": ["TikTok"], "market": "AE",
-                                               "platforms_from_brief": True, "budget": 150000})
+        self.assertEqual(matcher.roi_seed(a), {"goal": "engagement", "goals": ["engagement", "traffic"], "platforms": ["TikTok"],
+                                               "market": "AE", "platforms_from_brief": True, "budget": 150000})
         a, _ = clean(market="SA", goal="conversion", budget="open")
         seed = matcher.roi_seed(a)
         self.assertEqual((seed["goal"], seed["market"]), ("traffic", "SA"))
@@ -109,28 +109,34 @@ class Scoring(unittest.TestCase):
                         "gender": {"female": 66, "male": 34},
                         "ages": [{"name": "18-24", "pct": 30}, {"name": "25-34", "pct": 35}, {"name": "35-44", "pct": 15}]}}
 
-    def part(self, **target):
-        r = fit.score(self.DOC, "Instagram", 60000, objective="Awareness", target=dict({"country": "SA"}, **target))
-        return next(p for p in r["parts"] if p["key"] == "market")["s"], r
+    def scored(self, **target):
+        return fit.score(self.DOC, "Instagram", 60000, objective="Awareness", target=dict({"country": "SA"}, **target))
+
+    def check(self, r, label):
+        return next(c for c in r["checks"] if c["label"] == label)
+
+    def test_audience_is_a_check_beside_the_score_not_a_part_of_it(self):
+        # fix batch 6: the audience (country, gender, age) is no longer scored; it stays visible
+        a, b = self.scored(country="SA"), self.scored(country="EG")
+        self.assertNotIn("market", [p["key"] for p in a["parts"]])
+        self.assertEqual(a["score"], b["score"])
+        self.assertTrue(self.check(a, "Measured audience")["level"] in ("ok", "warn", "bad"))
 
     def test_audience_share_is_summed_across_countries(self):
-        sa, _ = self.part(country="SA")
-        both, r = self.part(country="SA|AE")
-        self.assertAlmostEqual(sa, 40 / 60.0, places=2)
-        self.assertEqual(both, 1.0)                               # 70% of the audience is in KSA + UAE
-        self.assertIn("70%", " ".join(r["checks"][0]["text"].split()))
-        self.assertIn("Saudi Arabia and UAE", r["checks"][0]["text"])
-        eg, _ = self.part(country="EG")
-        self.assertLess(eg, sa)
+        sa, both = self.scored(country="SA"), self.scored(country="SA|AE")
+        self.assertIn("40%", sa["checks"][0]["text"])
+        self.assertIn("70%", " ".join(both["checks"][0]["text"].split()))      # KSA + UAE
+        self.assertIn("Saudi Arabia and UAE", both["checks"][0]["text"])
+        self.assertEqual(self.check(both, "Measured audience")["level"], "ok")
+        self.assertEqual(self.check(sa, "Measured audience")["level"], "warn")
 
     def test_audience_share_is_summed_across_age_bands(self):
-        one, _ = self.part(country="SA", age="25-34")
-        two, r = self.part(country="SA", age="18-24|25-34")
-        self.assertGreater(two, one)
-        age = next(c for c in r["checks"] if c["label"] == "Age")
+        r = self.scored(country="SA", age="18-24|25-34")
+        age = self.check(r, "Age")
         self.assertIn("65%", age["text"])
         self.assertIn("18-24 and 25-34", age["text"])
         self.assertEqual(age["level"], "ok")
+        self.assertIn("35%", self.check(self.scored(country="SA", age="25-34"), "Age")["text"])
 
     def test_age_bands_are_counted_once(self):
         # a report band that overlaps both asked-for bands is not added twice
