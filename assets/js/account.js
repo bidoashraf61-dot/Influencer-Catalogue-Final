@@ -161,7 +161,7 @@
   function toast(n, text) {
     var t = $("hc-toast");
     t.textContent = "";
-    t.appendChild(h("span", { class: "hc-reward" }, "+" + n));
+    if (n) t.appendChild(h("span", { class: "hc-reward" }, "+" + n));       // 0 = a plain message (e.g. "Selection deleted.")
     t.appendChild(h("span", null, text));
     t.hidden = false;
     t.style.animation = "none"; void t.offsetWidth; t.style.animation = "";
@@ -312,6 +312,95 @@
   function head(title, lead, side) {
     return h("div", { class: "hc-head" }, h("div", null, h("h1", { class: "hc-h1" }, title), lead ? h("p", null, lead) : null), side || null);
   }
+  /* ------------------------------------------------- delete, with a confirm */
+
+  // The bin, drawn like the portal's icons (portal.js has none to borrow).
+  var BIN = '<svg class="hv-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" ' +
+    'stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 6.5h15M9.5 6.5V4.5h5v2M6.5 6.5l1 13h9l1-13M10.5 10.5v6M13.5 10.5v6"/></svg>';
+  // Ask before deleting: a real modal (focus kept inside, Escape or Cancel closes, focus goes back
+  // to the button that opened it). Cancel has the first focus so Enter never deletes by accident.
+  function confirmDelete(opts, opener) {
+    var back = h("div", { class: "hc-dlg-back" });
+    var msg = h("p", { class: "hc-dlg__err", role: "alert", hidden: true });
+    var cancel = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button" }, "Cancel");
+    var go = h("button", { class: "hc-btn hc-btn--sm hc-btn--danger", type: "button" }, h("span", { class: "hc-icw", "aria-hidden": "true", html: BIN }), opts.action);
+    var box = h("div", { class: "hc-dlg", role: "dialog", "aria-modal": "true", "aria-labelledby": "hc-dlg-t", "aria-describedby": "hc-dlg-d" },
+      h("h2", { class: "hc-dlg__t", id: "hc-dlg-t" }, opts.title),
+      h("p", { id: "hc-dlg-d" }, opts.body), msg,
+      h("div", { class: "hc-dlg__go" }, cancel, go));
+    back.appendChild(box);
+    function close() {
+      document.removeEventListener("keydown", key, true);
+      back.remove();
+      document.body.classList.remove("hc-dlg-open");
+      if (opener && document.contains(opener)) opener.focus();
+    }
+    function key(e) {
+      if (e.key === "Escape") { e.preventDefault(); close(); return; }
+      if (e.key !== "Tab") return;
+      var f = [cancel, go].filter(function (b) { return !b.disabled; });
+      var i = f.indexOf(document.activeElement);
+      if (e.shiftKey ? i <= 0 : i === f.length - 1) { e.preventDefault(); f[e.shiftKey ? f.length - 1 : 0].focus(); }
+    }
+    back.addEventListener("click", function (e) { if (e.target === back) close(); });
+    cancel.addEventListener("click", close);
+    go.addEventListener("click", function () {
+      go.disabled = cancel.disabled = true;
+      msg.hidden = true;
+      opts.run().then(function (err) {
+        if (!err) { opener = null; close(); return; }
+        go.disabled = cancel.disabled = false;
+        msg.textContent = err; msg.hidden = false; cancel.focus();
+      });
+    });
+    document.addEventListener("keydown", key, true);
+    document.body.classList.add("hc-dlg-open");
+    document.body.appendChild(back);
+    cancel.focus();
+  }
+  function delBtn(label, onclick) {
+    return h("button", { class: "hc-del", type: "button", "aria-label": label, title: label, onclick: onclick },
+      h("span", { class: "hc-icw", "aria-hidden": "true", html: BIN }), h("span", { class: "hc-del__t" }, "Delete"));
+  }
+  // After a delete the list re-renders: the focus lands on the section heading, the result is said once.
+  function afterDelete(text) {
+    renderSide(); renderSection();
+    var h1 = document.querySelector("#hc-body .hc-h1");
+    if (h1) { h1.setAttribute("tabindex", "-1"); h1.focus(); }
+    toast(0, text);
+  }
+  function deleteSelection(s, btn) {
+    confirmDelete({ title: "Delete “" + s.name + "”?", action: "Delete selection",
+      body: "It leaves your profile and its link stops opening, for you and your colleagues. Your approvals and notes on it go too. HelloVoice keeps a copy for your account manager.",
+      run: function () {
+        return api("POST", "/api/selection/delete", { token: s.token }).then(function (r) {
+          if (!r.b.ok) return r.s === 403 ? "Only selections you made can be deleted." : "Couldn't delete it. Please try again.";
+          DATA.selections = DATA.selections.filter(function (x) { return x.token !== s.token; });
+          DATA.briefs.forEach(function (b) { if (b.selection === s.token) { b.selection = null; b.selection_name = null; } });
+          afterDelete("Selection deleted.");
+          return null;
+        });
+      } }, btn);
+  }
+  function deleteBrief(b, btn) {
+    confirmDelete({ title: "Delete this brief?", action: "Delete brief",
+      body: b.selection ? "Its selection stays, but its creators are no longer scored until you give it a campaign objective again." : "It leaves your profile. HelloVoice keeps a copy for your account manager.",
+      run: function () {
+        return api("POST", "/api/brief/delete", { id: b.id }).then(function (r) {
+          if (!r.b.ok) return r.s === 403 ? "Only briefs you wrote can be deleted." : "Couldn't delete it. Please try again.";
+          DATA.briefs = DATA.briefs.filter(function (x) { return x.id !== b.id; });
+          afterDelete("Brief deleted.");
+          return null;
+        });
+      } }, btn);
+  }
+  // A row that opens something and may also carry a Delete button: the link covers the row
+  // (stretched), the button sits above it, so neither is nested in the other.
+  function actRow(href, body, go, del) {
+    var link = href ? h("a", { class: "hc-row__go hc-row__link", href: href }, go) : (go ? h("span", { class: "hc-row__go" }, go) : null);
+    return h("div", { class: "hc-row hc-row--act" + (href ? " is-link" : "") }, body, h("span", { class: "hc-row__acts" }, del || null, link));
+  }
+
   function renderSelections(p) {
     add(p, head("Selections", "Approve the creators you want and reject the ones you don't. Your account manager sees every change and quotes the approved list.",
       h("a", { class: "hc-btn hc-btn--line hc-btn--sm", href: ROOT + "#cat-roster" }, "Browse creators")));
@@ -324,12 +413,14 @@
     var list = h("ul", { class: "hc-list" });
     DATA.selections.forEach(function (s) {
       var c = s.counts;
-      list.appendChild(h("li", null, h("a", { class: "hc-row", href: ROOT + "selection/#s=" + encodeURIComponent(s.token) },
+      // Delete only on the client's own selections: never a colleague's or one HelloVoice shared.
+      var del = s.can_delete ? delBtn("Delete " + s.name, function () { deleteSelection(s, this); }) : null;
+      list.appendChild(h("li", null, actRow(ROOT + "selection/#s=" + encodeURIComponent(s.token),
         h("div", null, h("span", { class: "hc-row__name" }, s.name),
           h("div", { class: "hc-row__meta" },
             h("span", null, plural(c.creators, "creator") + (c.doctors ? " · " + plural(c.doctors, "doctor") : "")),
             statusSigs(c), h("span", null, (s.owner ? s.owner + "'s · " : "") + "updated " + ago(s.updated_at)))),
-        h("span", { class: "hc-row__go" }, s.mine && c.review ? "Review" : "Open", " ", icon("arrow")))));
+        [s.mine && c.review ? "Review" : "Open", h("span", { class: "hc-sr" }, " " + s.name), " ", icon("arrow")], del)));
     });
     add(p, list);
   }
@@ -436,12 +527,12 @@
     }
     var list = h("ul", { class: "hc-list" });
     DATA.briefs.forEach(function (b) {
-      var inner = [h("div", null, h("span", { class: "hc-row__name" }, b.selection_name || (b.objective ? b.objective + " brief" : "Brief")),
-        h("div", { class: "hc-row__meta" }, h("span", null, b.summary || ""), h("span", null, day(b.at)))),
-        b.selection ? h("span", { class: "hc-row__go" }, "Open selection ", icon("arrow")) : null];
-      list.appendChild(h("li", null, b.selection
-        ? h("a", { class: "hc-row", href: ROOT + "selection/#s=" + encodeURIComponent(b.selection) }, inner)
-        : h("div", { class: "hc-row" }, inner)));
+      var title = b.selection_name || (b.objective ? b.objective + " brief" : "Brief");
+      var del = b.can_delete ? delBtn("Delete brief " + title, function () { deleteBrief(b, this); }) : null;
+      list.appendChild(h("li", null, actRow(b.selection ? ROOT + "selection/#s=" + encodeURIComponent(b.selection) : null,
+        h("div", null, h("span", { class: "hc-row__name" }, title),
+          h("div", { class: "hc-row__meta" }, h("span", null, b.summary || ""), h("span", null, day(b.at)))),
+        b.selection ? ["Open selection", h("span", { class: "hc-sr" }, " " + title), " ", icon("arrow")] : null, del)));
     });
     add(p, list);
   }
