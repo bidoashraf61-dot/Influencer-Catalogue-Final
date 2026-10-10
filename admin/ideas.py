@@ -19,7 +19,7 @@ an active campaign (portal.charge).
 
     context(code, code_id, sel=None)       the facts the model may use
     generate(ctx, code_id, credits)        -> [{"format","hook_en","hook_ar","concept_en","concept_ar"}]
-    kept(scope, code) / keep(scope, code, ideas, brief_key)
+    kept(scope, code, full) / keep(scope, code, ideas, brief_key)
 """
 import json
 import re
@@ -50,10 +50,20 @@ def scope_of(sel, code_id):
     return ("s:%d" % sel["id"]) if sel is not None else ("c:%d" % int(code_id or 0))
 
 
-def kept(scope, code):
+def _used_style(key):
+    """Whether a kept batch was written from the creator's locked analysis (brief_key: the style
+    flag leads; older keys carried it last)."""
+    k = str(key or "")
+    return k.startswith("[true") or k.endswith(", true]")
+
+
+def kept(scope, code, full=True):
+    """The kept batch, or None. ``full`` False (a viewer the analysis is not unlocked for) skips a
+    batch written from the locked analysis: a selection's ideas are shared by everyone who opens
+    it, HelloVoice included, and the analysis must not reach the client through them."""
     with db.connect() as conn:
         r = conn.execute("SELECT ideas, brief_key, at FROM content_ideas WHERE scope = ? AND code = ?", (scope, code)).fetchone()
-    if r is None:
+    if r is None or (not full and _used_style(r["brief_key"])):
         return None
     try:
         return {"ideas": json.loads(r["ideas"]), "brief_key": r["brief_key"], "at": r["at"]}
@@ -133,7 +143,7 @@ def context(code, code_id, sel=None, profile=None):
 
 def brief_key(ctx):
     b = ctx.get("brief") or {}
-    return json.dumps([b.get("summary"), b.get("objective"), b.get("notes"), bool(ctx.get("style"))], ensure_ascii=False)[:500]
+    return json.dumps([bool(ctx.get("style")), b.get("summary"), b.get("objective"), b.get("notes")], ensure_ascii=False)[:500]
 
 
 SYSTEM = (

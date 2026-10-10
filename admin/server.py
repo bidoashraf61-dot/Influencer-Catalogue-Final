@@ -4022,7 +4022,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         gate = {"state": "unlocked"} if self.admin() else gating.state(code_id, code)
         gate["headline"] = gating.headline(card, every)
         if gate["state"] != "unlocked":
-            gate["sample"] = gating.sample(code)
+            gate["sample"] = gating.sample(code, plats[0] if plats else None)
             return self.send_json(200, {"ok": True, "creator": card, "platforms": plats, "analyses": {},
                                         "requested": [], "gate": gate, "benchmarks": metrics.benchmarks()},
                                   self.cors() + [("Cache-Control", "no-store")])
@@ -4308,15 +4308,20 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not self.viewer_code_id():
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         import discover
+        # Analysis gating: for a client, filtering on a locked figure (audience, fake followers,
+        # brands, likes…) would answer "does this creator's audience pass X?" one code at a time,
+        # so only the free headline figures (engagement, average views) filter, and the facets
+        # list none of the locked options.
+        free = not self.admin()
         if job == "facets":
-            return self.send_json(200, {"ok": True, "facets": discover.facets()}, self.cors())
+            return self.send_json(200, {"ok": True, "facets": discover.facets(free_only=free)}, self.cors())
         b = self.json_body()
         if job == "like":
             return self.send_json(200, {"ok": True, "codes": discover.like(str(b.get("code") or "")[:40])}, self.cors())
         if job == "parse":
             return self.send_json(200, {"ok": True, "filters": discover.parse(str(b.get("text") or "")[:400])}, self.cors())
         plat = b.get("platform") if b.get("platform") in ("Instagram", "TikTok", "Snapchat", "YouTube", "X", "Facebook") else None
-        return self.send_json(200, {"ok": True, "codes": discover.match(b.get("filters"), plat)}, self.cors())
+        return self.send_json(200, {"ok": True, "codes": discover.match(b.get("filters"), plat, free_only=free)}, self.cors())
 
     def tier_payload(self):
         """Sent with the roster so the page totals a selection at today's

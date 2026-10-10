@@ -172,7 +172,7 @@ class PhaseEMixin:
         sels = gating.selections_with(reader, code) if reader != db.admin_code_id() else []
         if sel is None and sels:
             sel = db.selection(token=sels[0]["token"])
-        hit = ideas.kept(ideas.scope_of(sel, reader), code)
+        hit = ideas.kept(ideas.scope_of(sel, reader), code, gating.unlocked(reader, code))
         return self.send_json(200, {"ok": True, "code": code, "ideas": (hit or {}).get("ideas") or [], "at": (hit or {}).get("at"),
                                     "selection": {"name": sel["name"], "token": sel["token"]} if sel is not None else None,
                                     "selections": sels[:12], "cost": portal.price_of(reader, "ideas"),
@@ -190,7 +190,7 @@ class PhaseEMixin:
             if sels:
                 sel = db.selection(token=sels[0]["token"])
         scope = ideas.scope_of(sel, reader)
-        hit = ideas.kept(scope, code)
+        hit = ideas.kept(scope, code, gating.unlocked(reader, code))
         if hit and hit.get("ideas") and not b.get("again"):
             return self.send_json(200, {"ok": True, "ideas": hit["ideas"], "kept": True, "spent": 0,
                                         "credits": portal.balance(reader) if reader != db.admin_code_id() else None}, self.cors())

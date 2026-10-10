@@ -207,10 +207,11 @@ METRICS = {
 ER_CEILING = 20.0
 # Analysis gating (gating.py): these come from the locked part of an analysis. A client gets
 # them only for creators HelloVoice has unlocked for them; the free numbers are the others.
+# Free = the creator page's headline only: followers, platforms, average views, engagement rate.
 LOCKED_METRICS = {"fake_followers_pct", "audience_countries", "audience_gender", "audience_ages", "audience_interests",
-                  "audience_share_in_country_pct"}
-LOCKED_NOTE = ("locked: the full analysis (audience, growth, fake-follower check, brand history, best posts, pricing) is not "
-               "unlocked for this client yet")
+                  "audience_share_in_country_pct", "avg_likes", "avg_comments"}
+LOCKED_NOTE = ("locked: the full analysis (popular posts, likes and comments, real and fake followers, growth, content "
+               "performance, brand affinity, audience data, hashtags) is not unlocked for this client yet")
 
 
 def _locked(ctx, code):
@@ -1221,8 +1222,8 @@ def system_prompt(scope, ctx):
         "asked, straight away: one to three short sentences, or at most five short bullets when listing. No greeting, no restating the "
         "question, no background they did not ask for, no closing offer or question unless a choice is genuinely needed to continue. "
         "Reply in the language the client writes in. (6) Refer to creators as 'Name (CODE)'. "
-        "(7) A creator's full analysis (audience age, gender and countries, growth, fake-follower check, brand history, best posts, "
-        "pricing benchmark) is locked until HelloVoice unlocks it for this client; tools mark it 'locked'. When asked for any of it, say "
+        "(7) A creator's full analysis (popular posts, average likes and comments, real and fake followers, growth, content "
+        "performance, brand affinity, audience age, gender, countries and cities, hashtags) is locked until HelloVoice unlocks it for this client; tools mark it 'locked'. When asked for any of it, say "
         "it isn't available yet and offer to request it: call request_analysis (free, ready within 1 working day), which works only "
         "for creators in one of their selections; for anyone else, tell them to add the creator to a selection first. Never guess "
         "locked figures. Followers, platforms, average views and engagement rate are always free. "

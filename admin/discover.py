@@ -7,8 +7,8 @@ filters it wants, and gets back only the codes that pass. No number from an
 analysis leaves this module.
 
 Three jobs:
-  facets()       the options the sidebar offers (names only, never counts)
-  match(f)       codes whose analysis passes every filter in ``f``
+  facets()       the options the sidebar offers (names only, never counts; none locked for a client)
+  match(f)       codes whose analysis passes every filter in ``f`` (only free filters for a client)
   like(code)     creators most like one creator, best first
   parse(text)    a sentence turned into sidebar filters (keyword reading, free)
 
@@ -125,9 +125,21 @@ def _load():
     return docs
 
 
-def facets():
+# What a client may filter on: the free headline figures of a creator page (gating.headline).
+FREE_KEYS = {"er_min", "er_max", "views_min"}
+
+
+def facets(free_only=False):
     """What the Audience and Performance groups offer, most common first.
-    Names only: how many creators carry each one is commercial information."""
+    Names only: how many creators carry each one is commercial information.
+    ``free_only`` (a client): the locked groups come back empty."""
+    out = _facets()
+    if free_only:
+        out = {k: ([] if isinstance(v, list) else v) for k, v in out.items()}
+    return out
+
+
+def _facets():
     docs = _load()
     if _cache["facets"] is not None:
         return _cache["facets"]
@@ -239,9 +251,12 @@ def clean(raw):
     return f
 
 
-def match(raw, platform=None):
-    """Codes with at least one analysis passing every filter."""
+def match(raw, platform=None, free_only=False):
+    """Codes with at least one analysis passing every filter. ``free_only`` (a client) drops
+    every filter on a locked figure (see FREE_KEYS)."""
     f = clean(raw)
+    if free_only:
+        f = {k: v for k, v in f.items() if k in FREE_KEYS}
     docs = _load()
     out = []
     for code, lst in docs.items():
