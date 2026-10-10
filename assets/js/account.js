@@ -425,10 +425,10 @@
       // Delete only on the client's own selections: never a colleague's or one HelloVoice shared.
       var del = s.can_delete ? delBtn("Delete " + s.name, function () { deleteSelection(s, this); }) : null;
       list.appendChild(h("li", null, actRow(ROOT + "selection/#s=" + encodeURIComponent(s.token),
-        h("div", null, h("span", { class: "hc-row__name" }, s.name),
+        h("div", null, h("span", { class: "hc-row__name" }, s.name), " ", qchip(s.quote),
           h("div", { class: "hc-row__meta" },
             h("span", null, plural(c.creators, "creator") + (c.doctors ? " · " + plural(c.doctors, "doctor") : "")),
-            qchip(s.quote), statusSigs(c), h("span", null, (s.owner ? s.owner + "'s · " : "") + "updated " + ago(s.updated_at)))),
+            statusSigs(c), h("span", null, (s.owner ? s.owner + "'s · " : "") + "updated " + ago(s.updated_at)))),
         [s.mine && c.review ? "Review" : "Open", h("span", { class: "hc-sr" }, " " + s.name), " ", icon("arrow")], del)));
     });
     add(p, list);

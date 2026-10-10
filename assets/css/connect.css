@@ -979,3 +979,11 @@
   @keyframes lc-ring { 0%, 100% { box-shadow: 0 0 0 4px var(--lime); } 50% { box-shadow: 0 0 0 7px rgba(232,255,118,.45); } }
 }
 @media print { .cx-lc { display: none; } }
+
+/* Quote status card: compact by default, the dated timeline opens on demand (2026-10-11). */
+.cx-lc__card { padding: 16px 22px; }
+.cx-lc__top { margin-bottom: 8px; }
+.cx-lc__hint { margin: 0 0 6px; }
+.cx-lc__tg { background: none; border: 0; padding: 4px 0; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.cx-lc__tl { margin-top: 12px; }
+.cx-lc__tl[hidden] { display: none; }

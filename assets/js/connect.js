@@ -1129,8 +1129,18 @@
           lh("b", null, st.label),
           lh("small", null, who || (st.state === "current" ? "Now" : "")));
       }));
-      var kids = [lh("div", { class: "cx-lc__top" }, lh("h2", { class: "cx-lc__t" }, "Quote status"), lcChip(lc)), steps,
-                  lh("p", { class: "cx-lc__hint" }, lc.hint)];
+      // The timeline stays folded: the status tag says where the selection is, and the dated steps
+      // open on demand (Bido, 2026-10-11: no timeline open on every selection).
+      var tl = lh("div", { class: "cx-lc__tl", id: "cx-lc-tl", hidden: "" }, steps);
+      var tg = lh("button", { type: "button", class: "cx-lc__tg", "aria-expanded": "false", "aria-controls": "cx-lc-tl" }, "Show timeline");
+      tg.addEventListener("click", function () {
+        var open = tl.hasAttribute("hidden");
+        if (open) tl.removeAttribute("hidden"); else tl.setAttribute("hidden", "");
+        tg.setAttribute("aria-expanded", open ? "true" : "false");
+        tg.textContent = open ? "Hide timeline" : "Show timeline";
+      });
+      var kids = [lh("div", { class: "cx-lc__top" }, lh("h2", { class: "cx-lc__t" }, "Quote status"), lcChip(lc)),
+                  lh("p", { class: "cx-lc__hint" }, lc.hint), tg, tl];
       if (lc.note || lc.link) {
         kids.push(lh("div", { class: "cx-lc__note" },
           lh("b", null, "From your account manager"),
