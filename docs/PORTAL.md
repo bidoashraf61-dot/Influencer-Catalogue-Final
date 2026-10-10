@@ -297,3 +297,19 @@ browser at 1440 and 390 wide.
 Also: `connect.js` now runs once even when `portal.js` has injected it before the page's own tag (the look-alike sheet used to open twice).
 
 Tests: `python3 admin/tests/test_briefsrc.py` (URL safety incl. SSRF, extraction, claims, timing), `python3 admin/tests/test_weekly.py` (weekly idempotency, next-time logic), `python3 admin/tests/e2e_portal_phase_e.py` (routes, credits, refunds, privacy, stubbed Gemini).
+
+## Fix batch 3 (branch `portal-fixes-3`, 2026-10-10)
+
+| Piece | Where | Notes |
+|---|---|---|
+| Helvy autoplay | `hv-loader.js` (`HVHelvy`) | A refused autoplay (Safari in macOS/iOS Low Power Mode refuses every one) no longer swaps the clip for the still for good: the still stands in while the clip waits (hidden, no play button), and play is retried on canplay, on returning to the tab and on the first tap/click/key anywhere. Only a clip the browser cannot decode stays a still. |
+| Chat launcher | `connect.css` | Helvy on a lime disc (#d8ff45); ink behind the close cross when open. Every other Helvy stays a transparent cut-out. |
+| AI shortlist card | `portal.css`, `portal.js` | Closed card is a two-row ink panel: Helvy on a lime circle, title, Start; then "Or start from" + Product link / Brief file on their own row. Phone: Start full width, the two sources side by side. |
+| No catalogue fit scores | `portal.js` | The brief "FIT x%" pills, their MutationObserver, the `/api/brief/scores` call and the "Fit scores shown" chip are gone from the catalogue. Scores exist only in a selection with an objective, on the round `.cat-score` stamp (number + %, BASIC/MATCH label). |
+| Replacement panel | `connect.js` (`HV.replaceSheet`, shared `suggestSheet`), `catalogue.js`, `server.py` | Find a replacement opens the same side panel as Creators like this. `/api/selection/replace` items now carry `why` ("In X's place: …", card fields only). Kept three free on reopen, Show 3 more costs again; added creators join Under review, the rejected creator stays rejected. |
+| Objective studio | `portal.js` (`objectiveStudio`, `HV.scoreBrief(token, {edit})`), `catalogue.js` (`renderObjective`, `hvSelection.refresh`) | The selection's "Add objective": AI-card world in a dialog (Helvy reacts, campaign-power meter, six-step track, optional link/file fill). Goals multi-select. Scores only the creators already in the selection. Full-power wait with named steps, then the page refetches `/api/selection` and redraws (no reload). Done state: "Objective added · Awareness, Engagement · Edit"; Edit reopens the answers from `/api/brief/for` (now returns `answers`). |
+| Several goals | `matcher.py` (`objective_for`, goal `multi_ok`), `fit.py` (`objective_of`, `blend`, `known_objective`, `objective_label`) | Stored as `Awareness+Engagement`; weights are the average of the goals' weights; "Balanced" next to a real goal adds nothing. Single-goal answers and every other caller are unchanged. |
+| Add more like these | `portal.js` (`HV.cooking({list:true})`), `connect.js` | Helvy's desk sequence beside named steps that light up one by one with a bar; the steps finish before the creators land. |
+| Speed | `catalogue.js` (selection `render`), `db.creators_by_codes`, `portal.memo_*`, `server.py` | Selection page keeps only its own cards on the page and redraws only them; decisions are optimistic (rolled back on a failed save); the page tells the loader it is ready once its cards are drawn. `/api/selection` reads only the selection's creators and asks the team / active-campaign questions once per request (memo on GETs and the selection-decision POSTs only). |
+
+Tests: `python3 admin/tests/e2e_portal_fixes3.py` (objective, replacement, payload, memo), `e2e_portal_fixes3_account.py` (selection / brief delete), `e2e_portal_fixes3_gating.py` (what an un-granted client receives).
