@@ -1335,6 +1335,20 @@ class PortalMixin(connect_api.ConnectMixin):
                 bad = ["%s: %s" % (roi.GOAL_LABEL[g], m) for g, m in errors.items()]
                 same = all(have[g] == {t: float(v) for t, v in roi.SHAPES_DEFAULT[g].items()} for g in roi.GOALS)
                 db.set_setting("roi_shapes", None if same else {g: {t: round(v, 1) for t, v in have[g].items()} for g in roi.GOALS})
+            if any(k.startswith("roi_count_") for k in f):
+                import roi
+                raw = {}
+                for g in roi.GOALS:
+                    try:
+                        raw[g] = (float(str(f.get("roi_count_%s_lo" % g, "")).strip()), float(str(f.get("roi_count_%s_hi" % g, "")).strip()))
+                    except ValueError:
+                        raw[g] = ("x", "x")
+                clean, errors = roi.validate_count_ranges(raw)
+                have = roi.count_ranges()
+                have.update(clean)
+                bad += ["%s creators: %s" % (roi.GOAL_LABEL[g], m) for g, m in errors.items()]
+                same = all(tuple(have[g]) == tuple(roi.COUNT_RANGES_DEFAULT[g]) for g in roi.GOALS)
+                db.set_setting("roi_count_ranges", None if same else {g: list(have[g]) for g in roi.GOALS})
             if bad:
                 return done("Settings saved, except the recommended structure: " + "; ".join(bad), False)
         return done("Settings saved.")

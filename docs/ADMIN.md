@@ -580,3 +580,5 @@ Held uploads live in `admin/analysis_pending/` (not in git) and are swept after 
 - **Defaults**: Awareness macro 10 / mid 25 / micro 45 / nano 20. Engagement macro 3 / mid 20 / micro 45 / nano 32. Traffic mid 25 / micro 55 / nano 20. One post per creator; one shape per goal for every product category (no pharma cap).
 - **Nothing to migrate**: old saved estimates read as before (budget and market are stripped on read); old `roi_creator_share` / `roi_planning_prices` are ignored.
 - Source of the shapes: `Portal Programme/CAMPAIGN-STRUCTURE-BEST-PRACTICE-2026-10-10.md`.
+- **How many creators (v4.1)**: the client chooses the number of creators the ideal is planned for (any whole number 1 to 60; default = the selection's, the mix's or the brief's count). The same Settings card holds "How many creators a campaign usually runs" per campaign type (defaults Awareness 12-25, Engagement 15-30, Traffic 8-20, low confidence, `roi.COUNT_RANGES_DEFAULT`, setting `roi_count_ranges`); several types average their lows and highs. It is only a quiet hint beside the control, never a limit or a warning. The chosen number is saved with the estimate.
+

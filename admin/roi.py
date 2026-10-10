@@ -66,6 +66,11 @@ SHAPES_DEFAULT = {
     "engagement": {"macro": 3, "mid": 20, "micro": 45, "nano": 32},
     "traffic": {"mid": 25, "micro": 55, "nano": 20},
 }
+# How many creators a campaign of each type usually runs (low, high): a hint beside the "How many
+# creators?" control, never a limit or a verdict. Research-based starting point, low confidence
+# (CAMPAIGN-STRUCTURE-BEST-PRACTICE-2026-10-10.md, mid-size budgets). Setting ``roi_count_ranges``.
+COUNT_RANGES_DEFAULT = {"awareness": (12, 25), "engagement": (15, 30), "traffic": (8, 20)}
+COUNT_MIN, COUNT_MAX = 1, 60      # any whole number in this span is accepted
 ON_STRUCTURE_POINTS = 10          # a tier within +/- 10 points of its recommended share counts as on structure
 
 # HelloVoice planning assumptions (not in the industry guide). Editable as the "roi_assumptions" setting.
@@ -189,6 +194,52 @@ def shapes():
         clean, _ = validate_shapes(got)
         out.update(clean)
     return out
+
+
+def validate_count_ranges(raw):
+    """(clean {goal: (low, high)}, errors {goal: message}) for submitted ranges: whole numbers
+    from COUNT_MIN to COUNT_MAX with low <= high."""
+    clean, errors = {}, {}
+    for g in GOALS:
+        if g not in (raw or {}):
+            continue
+        v = raw[g]
+        try:
+            lo, hi = v
+            ok = all(isinstance(x, (int, float)) and not isinstance(x, bool) and x == int(x) for x in (lo, hi))
+        except (TypeError, ValueError):
+            ok = False
+        if not ok:
+            errors[g] = "Use whole numbers."
+            continue
+        lo, hi = int(lo), int(hi)
+        if not (COUNT_MIN <= lo <= hi <= COUNT_MAX):
+            errors[g] = "Use whole numbers from %d to %d, low not above high." % (COUNT_MIN, COUNT_MAX)
+            continue
+        clean[g] = (lo, hi)
+    return clean, errors
+
+
+def count_ranges():
+    """{goal: (low, high)}: the setting ``roi_count_ranges`` where valid, else COUNT_RANGES_DEFAULT."""
+    out = dict(COUNT_RANGES_DEFAULT)
+    try:
+        got = db.setting("roi_count_ranges")
+    except Exception:
+        got = None
+    if isinstance(got, dict):
+        clean, _ = validate_count_ranges(got)
+        out.update(clean)
+    return out
+
+
+def count_range_for(goals):
+    """(low, high) for one goal, or for several: the average of the lows and of the highs, rounded."""
+    gl = _goal_list(None, goals)
+    table = count_ranges()
+    lo = int(round(sum(table[g][0] for g in gl) / float(len(gl))))
+    hi = int(round(sum(table[g][1] for g in gl) / float(len(gl))))
+    return lo, max(lo, hi)
 
 
 def shape_for(goals, table=None):
@@ -524,6 +575,21 @@ def _quality(sel, ideal, gl):
             "by_goal": {g: r5(r) for g, r in ratios.items()}, "_q": q}
 
 
+def _list_sizes(c):
+    bits = ["%d %s" % (c[t], t) for t in TIER_ORDER if c.get(t)]
+    return ", ".join(bits) if bits else "none"
+
+
+def _compare_line(ideal_c, sel_c, n_ideal, n_sel, goal_label):
+    """What the recommended structure has at this number of creators and what the selection has."""
+    line = "The ideal for %d creator%s has %s" % (n_ideal, "" if n_ideal == 1 else "s", _list_sizes(ideal_c))
+    if n_sel:
+        line += "; you have %s." % _list_sizes(sel_c)
+    else:
+        line += "."
+    return line
+
+
 def _word(n):
     return {1: "One", 2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six"}.get(n, str(n))
 
@@ -597,8 +663,19 @@ def estimate(goal, platforms, creators=None, mix=None, goals=None, second_posts=
                 p[k] *= SECOND_POST
     first_posts = [p for p in posts if not p.get("second")]
 
-    # -- the recommended structure: the same number of creators and posts
-    if first_posts:
+    # -- the recommended structure: the same number of creators and posts, or the number the client
+    # chose (any whole number COUNT_MIN..COUNT_MAX; outside the usual range is fine): one post per
+    # creator per chosen platform
+    try:
+        chosen = int(count) if count else 0
+    except (TypeError, ValueError):
+        chosen = 0
+    chosen = max(COUNT_MIN, min(chosen, COUNT_MAX)) if chosen else 0
+    default_n = n_creators
+    if chosen:
+        n_ideal = chosen
+        per_platform = {p: n_ideal for p in platforms}
+    elif first_posts:
         if creators is not None:
             ideal_per = _even(len(first_posts), len(platforms))
             per_platform = {p: c for p, c in zip(platforms, ideal_per)}
@@ -606,8 +683,8 @@ def estimate(goal, platforms, creators=None, mix=None, goals=None, second_posts=
             per_platform = {p: sum(1 for x in first_posts if x["platform"] == p) for p in platforms}
         n_ideal = n_creators
     else:
-        n_ideal = int(count or 0)
-        per_platform = {p: n_ideal for p in platforms}
+        n_ideal = 0
+        per_platform = {p: 0 for p in platforms}
     n_ideal = max(0, min(n_ideal, 400))
     counts = ideal_counts(gl, n_ideal, platforms, table, per_platform_posts=per_platform) if n_ideal else {p: {} for p in platforms}
     ideal_posts = _ideal_posts(counts, lib)
@@ -620,6 +697,7 @@ def estimate(goal, platforms, creators=None, mix=None, goals=None, second_posts=
     ideal["_posts"] = ideal_posts
     ideal["score"] = 50 if ideal_posts else None          # typical creators: the peer-median score
     quality = _quality(sel, ideal, gl) if first_posts and ideal_posts else None
+    c_lo, c_hi = count_range_for(gl)
 
     measured_c = len({p.get("code") for p in first_posts if p.get("measured") and p.get("code")}) if creators is not None else 0
     if creators is not None and first_posts:
@@ -645,6 +723,9 @@ def estimate(goal, platforms, creators=None, mix=None, goals=None, second_posts=
                       mix=counts, name=STRUCTURE_NAME),
         "quality": ({k: v for k, v in quality.items() if not k.startswith("_")} if quality else None),
         "gap": gap, "ways": [],
+        "count": n_ideal, "ideal_count": n_ideal, "count_default": default_n,
+        "count_range": {"low": c_lo, "high": c_hi, "text": "%d–%d" % (c_lo, c_hi), "min": COUNT_MIN, "max": COUNT_MAX},
+        "compare_line": _compare_line(counts.get(lead) or {}, sel_by_size, n_ideal, n_creators, goal_label) if n_ideal else "",
         "trust": {"line": trust, "measured": measured_c, "of": n_creators if creators is not None and first_posts else 0},
         "note": ESTIMATE_LINE,
         "summary": "%s · %s · %s" % (goal_label, plat_line,
@@ -710,7 +791,7 @@ def advise(res, gl, creators=None, candidates=None, max_items=3, platforms=None,
         return items
 
     def quality_of(cs, plats=None, sec=None):
-        r = estimate(gl[0], plats or platforms, creators=cs, goals=gl, second_posts=sec if sec is not None else second)
+        r = estimate(gl[0], plats or platforms, creators=cs, goals=gl, second_posts=sec if sec is not None else second, count=count)
         return r.get("_q")
 
     contrib = _creator_contrib(res, gl)
@@ -917,7 +998,7 @@ def full(goal, platforms, creators=None, mix=None, goals=None, second_posts=None
                                            objective_for_selection(sel, gl) if sel is not None else None)
             except Exception:
                 cands = None
-        res["ways"] = advise(res, gl, creators=creators, candidates=cands, second=second_posts)
+        res["ways"] = advise(res, gl, creators=creators, candidates=cands, second=second_posts, count=count)
     return public(res)
 
 
@@ -1026,7 +1107,7 @@ def from_text(text):
     if not m or not _ASK.search(t):
         return None
     n = int(m.group(1))
-    if n < 1 or n > 100:
+    if n < COUNT_MIN or n > COUNT_MAX:
         return None
     low = t.lower()
     goal = "traffic" if _re.search(r"click|traffic|visit|site|link|landing|زيارات", low) else \

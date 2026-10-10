@@ -282,7 +282,7 @@
       [500, { t: "done", thread: "demo", reply: "For **10 creators** on Instagram and TikTok, HelloVoice's recommended structure for awareness is 1 macro, 3 mid-tier and 6 micro creators, and could reach about **2.1M–3.2M views**. It's an estimate, not a result.",
         roi: { goal: "awareness", goals: ["awareness"], platforms: ["Instagram", "TikTok"], count: 10, ideal_only: true, creators: 0,
           summary: "Ideal for Awareness with 10 creators · Instagram and TikTok",
-          ideal: { title: "Ideal for Awareness with 10 creators" },
+          ideal: { title: "Ideal for Awareness with 10 creators" }, goal_label: "Awareness", count_range: { text: "12–25", low: 12, high: 25 },
           mix: { Instagram: { macro: 1, mid: 3, micro: 6 }, TikTok: { macro: 1, mid: 3, micro: 6 } },
           figures: [{ key: "views", label: "Views", value: 2600000, range: [2100000, 3200000] }, { key: "interactions", label: "Interactions", value: 88000, range: [70000, 110000] }],
           trust: { line: "Based on what similar creators of each size deliver; no individual creator measured.", measured: 0, of: 0 } },

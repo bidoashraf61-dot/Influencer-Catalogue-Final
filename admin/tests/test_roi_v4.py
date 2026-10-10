@@ -412,6 +412,87 @@ class Advice(Base):
         self.assertTrue(all(w["points"] >= 1 for w in ways))
 
 
+class Count(Base):
+    """Fix batch 7.1: the client chooses how many creators the ideal is planned for."""
+
+    def cs(self, n):
+        return [creator("C%02d" % i, 40000, "TikTok") for i in range(n)]
+
+    def test_default_ranges_and_averaging_for_several_goals(self):
+        for g in roi.GOALS:
+            lo, hi = roi.count_range_for([g])
+            self.assertEqual((lo, hi), roi.COUNT_RANGES_DEFAULT[g])
+        lo, hi = roi.count_range_for(["awareness", "traffic"])
+        d = roi.COUNT_RANGES_DEFAULT
+        self.assertEqual(lo, int(round((d["awareness"][0] + d["traffic"][0]) / 2.0)))
+        self.assertEqual(hi, int(round((d["awareness"][1] + d["traffic"][1]) / 2.0)))
+        lo, hi = roi.count_range_for(["awareness", "engagement", "traffic"])
+        self.assertEqual((lo, hi), (int(round(sum(v[0] for v in d.values()) / 3.0)), int(round(sum(v[1] for v in d.values()) / 3.0))))
+        self.assertEqual(roi.count_range_for(["conversion"]), d["traffic"])           # legacy reads as traffic
+
+    def test_the_setting_is_validated_and_used(self):
+        clean, err = roi.validate_count_ranges({"awareness": (10, 30), "engagement": (0, 5), "traffic": (20, 8)})
+        self.assertEqual(clean, {"awareness": (10, 30)})
+        self.assertEqual(set(err), {"engagement", "traffic"})
+        self.assertIn("awareness", roi.validate_count_ranges({"awareness": (1.5, 3)})[1] or {"awareness": 1})
+        self.assertEqual(roi.validate_count_ranges({"awareness": (1, 61)})[0], {})
+        roi.db.setting = lambda key, default=None: {"roi_count_ranges": {"awareness": [10, 30], "traffic": [50, 2]}}.get(key, default)
+        self.assertEqual(roi.count_range_for(["awareness"]), (10, 30))
+        self.assertEqual(roi.count_range_for(["traffic"]), roi.COUNT_RANGES_DEFAULT["traffic"])      # invalid: default
+
+    def test_count_replans_the_ideal_at_that_number(self):
+        cs = self.cs(6)
+        base = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"])
+        self.assertEqual((base["count"], base["ideal_count"], base["count_default"]), (6, 6, 6))
+        r = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"], count=15)
+        self.assertEqual((r["count"], r["ideal_count"], r["count_default"]), (15, 15, 6))
+        self.assertEqual(r["ideal"]["creators"], 15)
+        self.assertEqual(r["ideal"]["posts"], 15)                                  # 1 post per creator per chosen platform
+        self.assertEqual(r["ideal"]["mix"]["TikTok"], roi.largest_remainder(roi.SHAPES_DEFAULT["awareness"], 15))
+        self.assertIn("The ideal for 15 creators has", r["compare_line"])
+        self.assertIn("you have 6 micro", r["compare_line"])
+        self.assertEqual(r["ideal"]["title"], "Ideal for Awareness with 15 creators")
+        self.assertLess(r["_q"], base["_q"])                                       # a bigger ideal asks more of the same selection
+        two = roi.estimate("awareness", ["TikTok", "Instagram"], creators=[dict(c, followers={"TikTok": 40000, "Instagram": 40000}) for c in cs],
+                           goals=["awareness"], count=15)
+        self.assertEqual(two["ideal"]["posts"], 30)
+
+    def test_any_whole_number_is_accepted_outside_the_range_only_the_hint_changes(self):
+        cs = self.cs(4)
+        for n, want in ((1, 1), (3, 3), (40, 40), (60, 60), (200, 60)):
+            r = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"], count=n)
+            self.assertEqual(r["ideal_count"], want, n)
+            self.assertEqual(r["count_range"]["text"], "12–25")
+            self.assertNotIn("warning", json.dumps(r).lower())
+            self.assertNotIn("too few", json.dumps(r).lower())
+            self.assertNotIn("too many", json.dumps(r).lower())
+        self.assertEqual(roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"], count="bad")["ideal_count"], 4)
+
+    def test_a_mix_and_an_empty_selection_use_the_chosen_count(self):
+        r = roi.estimate("engagement", ["Instagram"], mix={"micro": 3}, goals=["engagement"], count=20)
+        self.assertEqual(r["ideal_count"], 20)
+        self.assertEqual(r["count_default"], 3)
+        self.assertEqual(r["ideal"]["mix"]["Instagram"], roi.largest_remainder(roi.SHAPES_DEFAULT["engagement"], 20))
+        e = roi.estimate("traffic", ["Instagram"], creators=[], goals=["traffic"], count=9)
+        self.assertEqual((e["ideal_count"], e["creators"]), (9, 0))
+        self.assertTrue(e["compare_line"].endswith("."))
+        self.assertNotIn("you have", e["compare_line"])
+
+    def test_advice_keeps_the_chosen_count(self):
+        cs = [creator("N%02d" % i, 8000, "TikTok", None, 50) for i in range(6)]
+        roster = [{"code": "MID%d" % i, "name": "Mid %d" % i, "platform": "TikTok", "size": "mid", "followers": 220000, "score": 80} for i in range(3)]
+        res = roi.estimate("awareness", ["TikTok"], creators=cs, goals=["awareness"], count=12)
+        ways = roi.advise(res, ["awareness"], creators=cs, candidates=roster, count=12)
+        for w in ways:
+            if w["action"]["type"] in ("add", "replace"):
+                codes = w["action"].get("add") or w["action"].get("codes")
+                extra = [{"code": e["code"], "name": e["name"], "followers": {"TikTok": e["followers"]}, "docs": {}, "scores": {"TikTok": e["score"]}}
+                         for e in roster if e["code"] in codes]
+                after = [c for c in cs if c["code"] not in w["action"].get("remove", [])] + extra
+                q1 = roi.estimate("awareness", ["TikTok"], creators=after, goals=["awareness"], count=12)["_q"]
+                self.assertAlmostEqual(q1 - res["_q"], w["gain"], places=6)
+
+
 class NothingRemoved(Base):
     def test_no_budget_price_cost_or_market_anywhere_in_public_output(self):
         cs = [creator("A", 40000, "TikTok"), creator("B", 9000, "TikTok")]

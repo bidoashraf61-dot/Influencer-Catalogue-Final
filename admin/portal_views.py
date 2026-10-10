@@ -410,6 +410,11 @@ def roi_card():
             "<td><input type='number' min='0' max='100' step='1' name='roi_shape_%s_%s' value='%g' style='width:74px'></td>"
             % (g, t, cur[g].get(t, 0)) for t in roi.TIER_ORDER)
         rows += "<tr><th style='text-align:left'>%s</th>%s<td class='muted'>must add up to 100</td></tr>" % (e(roi.GOAL_LABEL[g]), cells)
+    cr = roi.count_ranges()
+    crows = "".join(
+        "<div><label>%s: low and high</label><input type='number' min='1' max='60' step='1' name='roi_count_%s_lo' value='%d' style='width:84px'> "
+        "<input type='number' min='1' max='60' step='1' name='roi_count_%s_hi' value='%d' style='width:84px'></div>"
+        % (e(roi.GOAL_LABEL[g]), g, cr[g][0], g, cr[g][1]) for g in roi.GOALS)
     head = "".join("<th>%s<br><small>%s</small></th>" % (e(roi.TIER_NAME[t][0]), e(roi.TIER_NAME[t][1])) for t in roi.TIER_ORDER)
     return ("<div class='card'><h2>Recommended structure (ROI Calculator)</h2>"
             "<p class='sec-desc'><b>Research-based starting point, low confidence on the exact percentages; not an industry benchmark.</b> "
@@ -419,7 +424,11 @@ def roi_card():
             "&ldquo;HelloVoice&rsquo;s recommended structure&rdquo;; no budget and no prices are involved. Replace the numbers here as HelloVoice's own "
             "tracked campaigns confirm or overturn them.</p>"
             "<div style='overflow-x:auto'><table><thead><tr><th></th>" + head + "<th></th></tr></thead><tbody>" + rows + "</tbody></table></div>"
-            "<div class='price-hint'>Percent of creators. A row that does not add up to 100 is not saved. Empty means 0.</div></div>")
+            "<div class='price-hint'>Percent of creators. A row that does not add up to 100 is not saved. Empty means 0.</div>"
+            "<h3 style='margin:18px 0 6px'>How many creators a campaign usually runs</h3>"
+            "<p class='sec-desc'>Shown to clients as a quiet hint beside &ldquo;How many creators?&rdquo; (low confidence, mid-size budgets). "
+            "Never a limit: clients can choose any whole number from 1 to 60. Several campaign types average their lows and their highs.</p>"
+            "<div class='fgrid'>" + crows + "</div></div>")
 
 
 def graph_card():

@@ -132,7 +132,7 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
                 mix = {t: max(0, min(self._int(m.get(t)), 200)) for t in roi.TIER_ORDER}
         which = "all" if b.get("which") == "all" else "approved"
         second = [str(c).strip().upper()[:24] for c in (b.get("second_posts") or []) if isinstance(c, str)][:20]
-        count = max(0, min(self._int(b.get("count")), 100)) or None
+        count = max(0, min(self._int(b.get("count")), roi.COUNT_MAX)) or None      # how many creators the ideal is planned for
         # no budget and no market: the calculator compares structure and performance only
         return {"goal": goal, "goals": goals, "platforms": plats, "mix": mix,
                 "which": which, "second_posts": second, "count": count}

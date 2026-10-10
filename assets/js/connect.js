@@ -128,6 +128,39 @@
       });
       return box;
     }
+    // "How many creators?": any whole number 1-60. The usual range for the goal is a quiet hint, never a
+    // warning; a number outside it is simply planned for. state.count 0 = the default (the selection's
+    // creators, the mix's, or the brief's), shown once a result has said what that is.
+    function countBox(state, onChange) {
+      var MIN = 1, MAX = 60;
+      var inp = h("input", { type: "text", inputmode: "numeric", autocomplete: "off", class: "cx-count__in", "aria-label": "How many creators" });
+      var hint = h("p", { class: "cx-fine cx-count__hint", "aria-live": "polite" });
+      function ascii(v) {
+        return String(v).replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); }).replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); });
+      }
+      function commit(n) {
+        n = Math.max(MIN, Math.min(MAX, Math.round(Number(n) || 0)));
+        if (!n) return;
+        state.count = n; inp.value = String(n); onChange();
+      }
+      var minus = h("button", { type: "button", "aria-label": "Fewer creators", html: ic("minus"), onclick: function () { commit((state.count || Number(inp.value) || MIN) - 1); } });
+      var plus = h("button", { type: "button", "aria-label": "More creators", html: ic("plus"), onclick: function () { commit((state.count || Number(inp.value) || 0) + 1); } });
+      inp.addEventListener("input", function (e) {
+        if (e.isComposing) return;
+        var d = ascii(inp.value).replace(/[^0-9]/g, "").slice(0, 2);
+        if (inp.value !== d) inp.value = d;
+      });
+      inp.addEventListener("change", function () { var d = ascii(inp.value).replace(/[^0-9]/g, ""); if (d) commit(Number(d)); else { state.count = 0; onChange(); } });
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); inp.blur(); } });
+      var box = h("div", { class: "cx-count" }, h("div", { class: "cx-count__row" }, minus, inp, plus), hint);
+      // after every result: the hint for the goal and the number in play
+      box.setFrom = function (res) {
+        var r = res.count_range;
+        hint.textContent = r ? (res.goal_label || "Campaigns") + " campaigns usually run " + r.text + " creators." : "";
+        if (document.activeElement !== inp) inp.value = String(state.count || res.count || "");
+      };
+      return box;
+    }
     function q(label, node, aside) { return h("div", { class: "cx-q" }, h("span", { class: "cx-label" }, label, aside || null), node); }
 
     var ESTIMATE_LINE = "Estimate, not a result. Real results depend on the content, the timing and the audience.";
@@ -209,6 +242,7 @@
         qualityChip(q)));
       if (q) {
         var gap = res.gap || [];
+        if (res.compare_line) box.appendChild(h("p", { class: "cx-gap" }, res.compare_line));
         box.appendChild(h("p", { class: "cx-gap" }, gap.length ? h("span", null, h("b", null, "The gap: "), gap.join("; ") + ".")
           : "Your selection is close to HelloVoice’s recommended structure."));
       } else if (!res.creators) {
@@ -251,6 +285,7 @@
       var head = q ? "<p class='q'><b>" + esc(qTxt) + "</b> Selection quality: your selection’s expected result as a share of HelloVoice’s recommended structure for the same number of creators.</p>" +
         ((res.gap || []).length ? "<p><b>The gap:</b> " + esc(res.gap.join("; ")) + ".</p>" : "") : "";
       var ways = (res.ways || []).slice(0, 3).map(function (w) { return "<li>" + esc(w.text) + "</li>"; }).join("");
+      if (res.compare_line) head += "<p>" + esc(res.compare_line) + "</p>";
       var html = "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><title>ROI estimate · HELVY Connect</title>" +
         "<style>@page{size:A4;margin:18mm}body{font:14px/1.55 'DM Sans',Arial,sans-serif;color:#121212;margin:0}" +
         "h1{font:400 40px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;margin:18px 0 4px;letter-spacing:.01em}" +
@@ -325,7 +360,7 @@
         outBox.classList.add("cx-busy");
         estimate(request()).then(function (res) {
           outBox.classList.remove("cx-busy");
-          if (res) { outBox.textContent = ""; outBox.appendChild(resultPanel(res, { onWay: way })); last = res; }
+          if (res) { outBox.textContent = ""; outBox.appendChild(resultPanel(res, { onWay: way })); last = res; countB.setFrom(res); }
         });
       }, 260);
       var mixWrap = h("div", { hidden: true }, mixBox(state, run), mixNote);
@@ -338,9 +373,10 @@
         h("label", null, h("input", { type: "radio", name: "cx-src", onchange: function () { state.src = "mix"; mixWrap.hidden = false; run(); } }),
           h("span", null, h("b", null, "A mix of sizes instead"), h("small", null, "Try a different mix of creator sizes before you choose."))));
       platBox = platToggles(state, run);
+      var countB = countBox(state, run);
       body.appendChild(h("div", { class: "cx-inp" },
         state.seeded ? h("p", { class: "cx-fine", style: "margin:0" }, "Pre-filled from this selection’s brief; change anything.") : null,
-        q("Campaign type", seg(state, "goal", run), h("em", null, "pick one or more")), q("Platforms", platBox), q("Creators", h("div", { class: "cx-src" }, srcBox, mixWrap))));
+        q("Campaign type", seg(state, "goal", run), h("em", null, "pick one or more")), q("Platforms", platBox), q("Creators", h("div", { class: "cx-src" }, srcBox, mixWrap)), q("How many creators?", countB)));
       body.appendChild(outBox);
       dr.appendChild(body);
       var saveB = h("button", { class: "cx-btn", type: "button", html: ic("save") + "<span>Save to selection</span>" });
@@ -386,27 +422,57 @@
     /* -- the compact card in Helvy's chat -- */
     HV.roiCard = function (res) {
       var card = h("div", { class: "hv-msg hv-msg--ai cx-rcard" });
-      card.appendChild(h("div", { class: "cx-rcard__hd" }, h("b", { html: ic("calc") + "ROI Calculator" }),
-        res.quality ? qualityChip(res.quality) : null, h("span", { class: "cx-tag cx-tag--est" }, "Estimate")));
-      var I = res.ideal || {};
-      card.appendChild(h("p", null, res.ideal_only ? (I.title || res.summary || "") : (res.summary || "")));
-      var dl = h("dl", { class: "cx-figs" });
-      (res.figures || []).filter(function (f) { return ["cpm", "cpe", "cpc", "frequency", "reach", "er"].indexOf(f.key) === -1; }).slice(0, 4).forEach(function (f) {
-        var n = h("span", { class: "cx-n" }, h("span", { class: "cx-v" }, fig(f)));
-        dl.appendChild(h("div", null, h("dt", null, (res.ideal_only ? "Recommended " : "") + f.label.toLowerCase()), h("dd", null, n)));
-      });
-      card.appendChild(dl);
-      var gap = (res.gap || []).slice(0, 2).join("; ");
-      var top = res.ways && res.ways[0];
-      if (res.quality && gap) card.appendChild(h("p", { class: "cx-rcard__plan" }, h("b", null, "Gap: "), gap + "."));
-      if (top) card.appendChild(h("p", { class: "cx-rcard__plan" }, h("b", null, "Best next step: "), top.text));
-      if (res.ideal_only && res.mix) {
-        var txt = mixSentence(res.mix);
-        if (txt) card.appendChild(h("p", { class: "cx-rcard__plan" }, "HelloVoice’s recommended structure: " + txt + "."));
+      var head = h("div", { class: "cx-rcard__hd" });
+      var body = h("div");
+      var cur = res;
+      var state = { count: res.ideal_only ? (res.count || 0) : 0, goals: res.goals || [res.goal], platforms: res.platforms || ["Instagram"] };
+      var cb = null;
+      function render(r) {
+        cur = r;
+        head.textContent = "";
+        head.appendChild(h("b", { html: ic("calc") + "ROI Calculator" }));
+        if (r.quality) head.appendChild(qualityChip(r.quality));
+        head.appendChild(h("span", { class: "cx-tag cx-tag--est" }, "Estimate"));
+        body.textContent = "";
+        var I = r.ideal || {};
+        body.appendChild(h("p", { class: "cx-rcard__lead" }, r.ideal_only ? (I.title || r.summary || "") : (r.summary || "")));
+        var dl = h("dl", { class: "cx-figs" });
+        var figs = r.ideal_only ? (I.figures || r.figures || []) : (r.figures || []);
+        figs.filter(function (f) { return ["cpm", "cpe", "cpc", "frequency", "reach", "er"].indexOf(f.key) === -1; }).slice(0, 4).forEach(function (f) {
+          var n = h("span", { class: "cx-n" }, h("span", { class: "cx-v" }, fig(f)));
+          dl.appendChild(h("div", null, h("dt", null, (r.ideal_only ? "Recommended " : "") + f.label.toLowerCase()), h("dd", null, n)));
+        });
+        body.appendChild(dl);
+        var gap = (r.gap || []).slice(0, 2).join("; ");
+        var top = r.ways && r.ways[0];
+        if (r.quality && r.compare_line) body.appendChild(h("p", { class: "cx-rcard__plan" }, r.compare_line));
+        if (r.quality && gap) body.appendChild(h("p", { class: "cx-rcard__plan" }, h("b", null, "Gap: "), gap + "."));
+        if (top) body.appendChild(h("p", { class: "cx-rcard__plan" }, h("b", null, "Best next step: "), top.text));
+        if (r.ideal_only) {
+          var mix = r.mix || I.mix;
+          var txt = mixSentence(mix);
+          if (txt) body.appendChild(h("p", { class: "cx-rcard__plan" }, "HelloVoice’s recommended structure: " + txt + "."));
+        }
+        if (cb) cb.setFrom(r);
       }
+      if (res.ideal_only) {
+        cb = countBox(state, function () {
+          card.classList.add("cx-busy");
+          estimate({ goals: state.goals, goal: state.goals[0], platforms: state.platforms, count: state.count || undefined }).then(function (r) {
+            card.classList.remove("cx-busy");
+            if (!r) return;
+            r.ideal_only = true; r.mix = r.ideal && r.ideal.mix;
+            render(r);
+          });
+        });
+      }
+      card.appendChild(head);
+      if (cb) { card.appendChild(h("p", { class: "cx-rcard__q" }, "How many creators?")); card.appendChild(cb); }
+      card.appendChild(body);
+      render(res);
       var open = h("button", { class: "cx-btn", type: "button" }, "Open calculator");
       open.addEventListener("click", function () {
-        try { sessionStorage.setItem("cx-roi-seed", JSON.stringify({ goal: res.goal, goals: res.goals || [res.goal], platforms: res.platforms, mix: res.ideal_only ? null : (res.mix || null), count: res.count || 0 })); } catch (e) { /* blocked */ }
+        try { sessionStorage.setItem("cx-roi-seed", JSON.stringify({ goal: cur.goal, goals: cur.goals || [cur.goal], platforms: cur.platforms, mix: cur.ideal_only ? null : (cur.mix || null), count: cur.count || 0 })); } catch (e) { /* blocked */ }
         if (PAGE === "selection" && window.hvSelection && window.hvSelection.token()) roiForSelection(); else location.href = ROOT + "account/#roi";
       });
       card.appendChild(h("div", { class: "cx-rcard__go" }, open));
@@ -452,7 +518,7 @@
       var goals = (seed && seed.goals && seed.goals.length ? seed.goals : seed && seed.goal ? [seed.goal] : ["engagement"]).filter(function (g) { return g !== "conversion"; });
       var state = { goals: goals.length ? goals : ["traffic"], goal: goals[0] || "traffic",
                     platforms: (seed && seed.platforms) || ["Instagram", "TikTok"], mix: (flatSeed && seed.mix) || { macro: 1, mid: 3, micro: 6 },
-                    mixP: seed && seed.mix && !flatSeed ? seed.mix : null, second: [] };
+                    mixP: seed && seed.mix && !flatSeed ? seed.mix : null, second: [], count: (seed && Number(seed.count)) || 0 };
       p.appendChild(h("h1", { class: "cx-roipg__h1" }, "ROI Calculator"));
       p.appendChild(h("p", { class: "cx-roipg__lead" }, "Try a mix of creator sizes before you brief HelloVoice and see how it compares with HelloVoice’s recommended structure for the same number of creators: views, interactions and tracking-link clicks, as honest ranges."));
       var outBox = h("div"), last = null, platBox = null;
@@ -463,15 +529,16 @@
       }
       var run = debounce(function () {
         outBox.classList.add("cx-busy");
-        estimate({ goal: state.goals[0], goals: state.goals, platforms: state.platforms, mix: state.mixP || state.mix }).then(function (res) {
-          outBox.classList.remove("cx-busy"); if (!res) return; last = res; outBox.textContent = ""; outBox.appendChild(resultPanel(res, { onWay: way })); outBox.appendChild(acts);
+        estimate({ goal: state.goals[0], goals: state.goals, platforms: state.platforms, mix: state.mixP || state.mix, count: state.count || undefined }).then(function (res) {
+          outBox.classList.remove("cx-busy"); if (!res) return; last = res; countB.setFrom(res); outBox.textContent = ""; outBox.appendChild(resultPanel(res, { onWay: way })); outBox.appendChild(acts);
         });
       }, 260);
       var useSel = h("button", { type: "button", class: "cx-link" }, "use a selection");
       platBox = platToggles(state, run);
+      var countB = countBox(state, run);
       var inBox = h("div", { class: "cx-roipg__in" }, h("div", { class: "cx-inp" },
         q("Campaign type", seg(state, "goal", run), h("em", null, "pick one or more")), q("Platforms", platBox),
-        q("Creators", mixBox(state, run), h("em", null, "or ", useSel))));
+        q("Creators", mixBox(state, run), h("em", null, "or ", useSel)), q("How many creators?", countB)));
       var pick = h("select", { class: "cx-pick", "aria-label": "Selection to save to" });
       var saveB = h("button", { class: "cx-btn", type: "button", html: ic("save") + "<span>Save</span>" });
       var pdfB = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("dl") + "<span>PDF</span>" });
@@ -486,7 +553,7 @@
       saveB.addEventListener("click", function () {
         if (!pick.value) return;
         saveB.disabled = true;
-        api("POST", "/api/roi/save", { token: pick.value, goal: state.goals[0], goals: state.goals, platforms: state.platforms, mix: state.mixP || state.mix })
+        api("POST", "/api/roi/save", { token: pick.value, goal: state.goals[0], goals: state.goals, platforms: state.platforms, mix: state.mixP || state.mix, count: state.count || undefined })
           .then(function (r) { saveB.disabled = false; note.className = "cx-note" + (r.b && r.b.ok ? "" : " cx-note--bad");
             note.textContent = r.b && r.b.ok ? "Saved with " + r.b.selection + "." : "That didn’t save. Please try again."; });
       });

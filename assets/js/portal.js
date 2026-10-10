@@ -2386,10 +2386,25 @@
     // "What is the ideal creator mix?": how many creators, answered with the ROI card (free): HelloVoice's
     // recommended structure for that number of creators and the goal. No budget, no prices.
     function flowIdeal() {
-      askFor("How many creators, and what matters most: views, engagement or clicks?", "e.g. 10 creators for clicks on TikTok", function (text) {
-        var n = /(\d{1,3})/.exec(text.replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); }));
-        if (!n) { say("I need a number of creators, like 10."); flowIdeal(); return; }
-        submit("What can " + n[1] + " creators do " + text.replace(n[0], "").replace(/creators?/i, "").trim(), true);
+      var GOALS = [["awareness", "Awareness (views)"], ["engagement", "Engagement"], ["traffic", "Traffic (clicks)"]];
+      say("What matters most for this campaign?", function () {
+        chips(GOALS.map(function (g) {
+          return { label: g[1], go: function () {
+            // the usual number of creators for the goal comes from the calculator, as a hint only
+            api("POST", "/api/roi/estimate", { goals: [g[0]], platforms: ["Instagram"] }).then(function (r) {
+              var rng = r.b && r.b.result && r.b.result.count_range;
+              var hint = rng ? " " + g[0].charAt(0).toUpperCase() + g[0].slice(1) + " campaigns usually run " + rng.text + "." : "";
+              function askCount(first) {
+                askFor(first ? "How many creators do you want?" + hint : "I need a number of creators, like 15.", "e.g. 15", function (text) {
+                  var n = /(\d{1,2})/.exec(text.replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); }));
+                  if (!n || +n[1] < 1) { askCount(false); return; }
+                  submit("What can " + n[1] + " creators do for " + g[0], true);
+                });
+              }
+              askCount(true);
+            });
+          } };
+        }), { hint: "Tap one" });
       });
     }
     function greet() {

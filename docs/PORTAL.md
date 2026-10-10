@@ -360,3 +360,16 @@ Tests: `test_benchmarks.py`, `test_scoring_v2.py`, `test_roi_v3.py`, `test_pendu
 | Estimate vs actual | `roi.versus` | Compares views, interactions and clicks ranges only. |
 
 Tests: `test_roi_v4.py` (replaces `test_roi_v3.py`), `e2e_portal_fixes7.py`, `test_penduline_backtest.py` (v4 table); changed: `test_roi.py`, `test_matcher_multi.py`, `e2e_portal_cd.py`, `e2e_portal_fixes4.py`, `e2e_portal_fixes5.py`, `e2e_portal_fixes6.py`.
+
+### ROI v4.1 (2026-10-11): the client chooses how many creators
+
+| Item | Where | How it works |
+|---|---|---|
+| Count | `roi.estimate(count=)`, `connect_api._roi_input` | `count` (whole number 1 to 60; 0, nonsense = default) sets the creators the ideal is planned for: the shape by largest remainder, one post per creator per chosen platform. The selection side is unchanged, so quality and the gap are at that number. Saved with the estimate (`input.count`); older estimates have none. |
+| Output | `roi.estimate` | `count`, `ideal_count`, `count_default` (what the selection / mix has), `count_range` {low, high, text, min, max}, `compare_line` ("The ideal for 15 creators has 1 macro, 4 mid, 7 micro, 3 nano; you have 6 micro."). |
+| Ranges | `roi.COUNT_RANGES_DEFAULT`, `count_ranges`, `count_range_for`, `validate_count_ranges`, setting `roi_count_ranges` | Awareness 12-25, Engagement 15-30, Traffic 8-20; several goals average the lows and the highs, rounded. A hint only: a number outside it is planned for without a warning. |
+| UI | `connect.js` (`countBox`), `connect.css` (`.cx-count*`), `portal.js` (`flowIdeal`) | A stepper with the hint in the drawer, on the profile page and on the chat card (which recomputes at once, free); the chat asks goal first, then "How many creators do you want? Awareness campaigns usually run 12-25." |
+| Helvy | `assistant._roi_compare_tool` | `roi_compare` takes `creators` (the count); with no selection and no number it returns the question to put to the client. |
+
+Tests: `test_roi_v4.py` (`Count`), `e2e_portal_fixes7.py` (`test_04b`, `test_04c`, tools).
+

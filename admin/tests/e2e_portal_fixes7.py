@@ -54,6 +54,8 @@ class Fixes7(unittest.TestCase):
         shutil.rmtree(base.TMP, ignore_errors=True)
 
     def setUp(self):
+        db.set_setting("signups_per_ip_day", 1000)          # the settings-card tests post the form, which resets it
+        db.set_setting("signup_mode", "open")
         guard.limiter._hits.clear()
         mailer.OUTBOX.clear()
 
@@ -153,6 +155,57 @@ class Fixes7(unittest.TestCase):
         self.assertIsNone(db.setting("roi_shapes"))
         self.assertEqual(roi.shapes()["awareness"], {t: float(v) for t, v in roi.SHAPES_DEFAULT["awareness"].items()})
 
+    def test_04b_count_through_the_api_saved_and_legacy(self):
+        c, _ = self.signup("count7@glowderma.com")
+        tok = self.selection(c, "Count", ["HV-MI-001", "HV-MI-002", "HV-MD-004"])
+        s, r, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness"], "platforms": ["Instagram"]})
+        base_res = r["result"]
+        self.assertEqual(base_res["ideal_count"], base_res["creators"])
+        self.assertEqual(base_res["count_range"]["text"], "%d–%d" % roi.COUNT_RANGES_DEFAULT["awareness"])
+        s, r, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness"], "platforms": ["Instagram"], "count": 40})
+        res = r["result"]
+        self.assertEqual((res["count"], res["ideal_count"], res["count_default"]), (40, 40, base_res["creators"]))
+        self.assertEqual(res["ideal"]["posts"], 40)
+        self.assertIn("The ideal for 40 creators has", res["compare_line"])
+        self.assertNotEqual(res["quality"], base_res["quality"])
+        # an out-of-range number is accepted; 0 or nonsense falls back to the default
+        for bad, want in ((1, 1), (999, roi.COUNT_MAX), (0, base_res["creators"]), ("x", base_res["creators"])):
+            s, r, _ = c.post("/api/roi/estimate", {"token": tok, "goals": ["awareness"], "platforms": ["Instagram"], "count": bad})
+            self.assertEqual(r["result"]["ideal_count"], want, bad)
+        # saved with the estimate, read back with it
+        s, b, _ = c.post("/api/roi/save", {"token": tok, "goals": ["awareness"], "platforms": ["Instagram"], "count": 18})
+        self.assertTrue(b["ok"], b)
+        saved = c.get("/api/roi/saved?s=" + tok)[1]["saved"]
+        self.assertEqual(saved["input"]["count"], 18)
+        self.assertEqual(saved["result"]["ideal_count"], 18)
+        # a legacy estimate saved before counts existed has no count and reads fine
+        sel = db.selection(token=tok)
+        roi.save(1, sel["id"], "awareness", {"goals": ["awareness"], "platforms": ["Instagram"]},
+                 {"goal": "awareness", "figures": [], "totals": {"views": 10}}, by="old")
+        old = c.get("/api/roi/saved?s=" + tok)[1]["saved"]
+        self.assertNotIn("count", old["input"])
+        self.assertEqual(old["result"]["totals"], {"views": 10})
+        # a mix input too
+        s, r, _ = c.post("/api/roi/estimate", {"goals": ["traffic"], "platforms": ["TikTok"], "mix": {"micro": 2}, "count": 12})
+        self.assertEqual(r["result"]["ideal_count"], 12)
+        self.assertEqual(r["result"]["count_range"]["text"], "%d–%d" % roi.COUNT_RANGES_DEFAULT["traffic"])
+
+    def test_04c_count_ranges_settings(self):
+        a = self.admin()
+        s, body, _ = a.get("/portal?tab=settings")
+        self.assertIn("roi_count_awareness_lo", body)
+        form = {"signup_mode": "open", "back": "/portal?tab=settings"}
+        for g in roi.GOALS:
+            form["roi_count_%s_lo" % g] = str(roi.COUNT_RANGES_DEFAULT[g][0])
+            form["roi_count_%s_hi" % g] = str(roi.COUNT_RANGES_DEFAULT[g][1])
+        a.req("POST", "/portal/settings", form=dict(form, roi_count_awareness_lo="10", roi_count_awareness_hi="30"))
+        self.assertEqual(roi.count_range_for(["awareness"]), (10, 30))
+        a.req("POST", "/portal/settings", form=dict(form, roi_count_awareness_lo="40", roi_count_awareness_hi="30", roi_count_traffic_hi="99"))
+        self.assertEqual(roi.count_range_for(["awareness"]), (10, 30))                    # refused, keeps the old one
+        self.assertEqual(roi.count_range_for(["traffic"]), roi.COUNT_RANGES_DEFAULT["traffic"])
+        a.req("POST", "/portal/settings", form=form)
+        self.assertIsNone(db.setting("roi_count_ranges"))
+
     def test_05_helvy_tools(self):
         self.assertIn("roi_compare", assistant.CLIENT_TOOLS)
         self.assertNotIn("roi_plan", assistant.CLIENT_TOOLS)
@@ -162,6 +215,12 @@ class Fixes7(unittest.TestCase):
         ctx = {"code_id": 1, "kind": "client"}
         out = assistant._roi_tool(ctx, "awareness", ["Instagram"], {"nano": 6})
         self.assertIn("quality_of_the_mix", out)
+        # no selection and no number: Helvy is told to ask, with the usual range as a hint
+        ask = assistant._roi_compare_tool({"code_id": 1}, ["awareness"], ["Instagram"], 0)
+        self.assertEqual(ask["ask"], "How many creators do you want? Awareness campaigns usually run %d-%d." % roi.COUNT_RANGES_DEFAULT["awareness"])
+        got = assistant._roi_compare_tool({"code_id": 1}, ["awareness"], ["Instagram"], 40)
+        self.assertIn("recommended_structure", got)
+        self.assertIn("40 creators", got["recommended_structure"]["title"])
         self.assertEqual(ctx["roi"]["ideal"]["creators"], 6)
         text = json.dumps({k: v for k, v in out.items() if k != "note"}).lower()
         for w in FORBIDDEN + ("sar",):

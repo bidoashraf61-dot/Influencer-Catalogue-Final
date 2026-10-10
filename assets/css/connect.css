@@ -906,3 +906,16 @@
 .cx-cmp thead th { overflow-wrap: normal; word-break: normal; hyphens: manual; }
 .cx-cmp__head th { padding-top: 14px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--cx-mute); border-bottom: 0; }
 @media (max-width: 560px) { .cx-cmp thead th { letter-spacing: .04em; font-size: 10.5px; } }
+
+/* ROI v4.1: "How many creators?" stepper with the usual range as a quiet hint (never a warning) */
+.cx-count__row { display: inline-flex; align-items: center; gap: 10px; }
+.cx-count__row button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--cx-rule); background: var(--white); display: grid; place-items: center; cursor: pointer; color: var(--ink); }
+.cx-count__row button:hover { border-color: var(--ink); }
+.cx-count__in { width: 76px; height: 44px; border: 1.5px solid rgba(18,18,18,.22); border-radius: 14px; text-align: center; font-family: var(--heading); font-size: 28px; line-height: 1; color: var(--ink); background: var(--white); padding: 4px 0 0; box-sizing: border-box; }
+.cx-count__in:focus { outline: none; border-color: var(--ink); box-shadow: 0 0 0 4px rgba(232,255,118,.9); }
+.cx-count__hint { margin: 8px 0 0; }
+.cx-rcard__q { margin: 10px 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--cx-mute); }
+.cx-rcard .cx-count__row button { width: 40px; height: 40px; }
+.cx-rcard .cx-count__in { height: 40px; width: 64px; font-size: 24px; }
+.cx-rcard.cx-busy .cx-figs { opacity: .55; transition: opacity .15s; }
+.cx-rcard__lead { margin: 10px 0 0; font-size: 13px; color: var(--cx-mute); }

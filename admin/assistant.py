@@ -171,8 +171,17 @@ def _roi_compare_tool(ctx, goals, platforms, count=0):
     platforms = [p for p in (platforms or []) if p in roi.PLATFORMS] or ["Instagram"]
     sel_ctx = ctx.get("selection")
     sel = db.selection(token=sel_ctx["token"]) if sel_ctx else None
+    try:
+        chosen = max(0, min(int(count or 0), roi.COUNT_MAX))
+    except (TypeError, ValueError):
+        chosen = 0
+    lo, hi = roi.count_range_for(gl)
     if sel is None:
-        n = max(1, min(int(count or 8), 100))
+        if not chosen:
+            return {"ask": "How many creators do you want? %s campaigns usually run %d-%d." % (" + ".join(roi.GOAL_LABEL[g] for g in gl), lo, hi),
+                    "count_range": "%d-%d" % (lo, hi),
+                    "note": "Ask the client how many creators they want, quoting the usual range as a hint only; any whole number from 1 to 60 is fine."}
+        n = chosen
         res = roi.full(gl[0], platforms, creators=[], goals=gl, count=n)
         ctx["roi"] = dict(res, mix=res["ideal"]["mix"], ideal_only=True, figures=res["ideal"]["figures"])
         return {"recommended_structure": {"title": res["ideal"]["title"], "creators_by_size": roi.mix_text(res["ideal"]["mix"])},
@@ -180,10 +189,11 @@ def _roi_compare_tool(ctx, goals, platforms, count=0):
                 "how_sure": res["trust"]["line"],
                 "note": "No selection is open, so this is the recommended structure only. Offer to compare once they open a selection."}
     creators = roi.creators_of(sel, "approved", goals=gl)
-    res = roi.full(gl[0], platforms, creators=creators, goals=gl, sel=sel)
+    res = roi.full(gl[0], platforms, creators=creators, goals=gl, sel=sel, count=chosen or None)
     ctx["roi"] = dict(res, mix=res["ideal"]["mix"])
     q = res.get("quality") or {}
-    return {"selection_quality": q.get("text"), "ideal": res["ideal"]["title"],
+    return {"selection_quality": q.get("text"), "ideal": res["ideal"]["title"], "compare": res.get("compare_line"),
+            "usual_range": "%d-%d creators" % (lo, hi),
             "recommended_structure": roi.mix_text(res["ideal"]["mix"]),
             "gap": res.get("gap"),
             "selection": {f["label"]: "%s to %s" % tuple(f["range"]) for f in res["figures"] if f.get("range")},
@@ -892,8 +902,9 @@ CLIENT_TOOLS = {
         "ROI Calculator, structure vs performance: compares the open selection with HelloVoice's recommended structure for the same "
         "number of creators and returns the Selection quality (a rounded percentage), the gap in plain words and up to three ways to "
         "improve, each with an action (add, remove or replace creator codes, a second post, another platform) you can offer; apply "
-        "add/remove only through add_creators / remove_creators. With no selection open, give the number of creators and it returns the "
-        "recommended structure. Advice only: no budget, no prices, no costs.",
+        "add/remove only through add_creators / remove_creators. 'creators' is the number of creators the ideal is planned for (any whole "
+        "number 1-60; default = the selection's). With no selection open and no number, it returns a question to put to the client: "
+        "'How many creators do you want? Awareness campaigns usually run 12-25.' The range is only a hint. Advice only: no budget, no prices, no costs.",
         {"goals": {"type": "ARRAY", "items": {"type": "STRING", "enum": ["awareness", "engagement", "traffic"]}},
          "platforms": SA, "creators": I}, ["goals"])),
     "company_info": (t_company_info, _decl("company_info", "About HelloVoice: services, contact, how quotes work.")),
