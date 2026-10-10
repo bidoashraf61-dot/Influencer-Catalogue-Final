@@ -1,6 +1,7 @@
 /* HELVY Connect: the client's profile (/account/). Catalogue world on a white
    bar: side nav (tabs on a phone), Helvy's ink greeting band, linen scorelines,
-   lime for the action and for credits earned, green / amber / red only for a
+   lime for the action, the orange coin chip (connect.css --hv-credit) for every credit
+   amount, green / amber / red only for a
    verdict or a status. Campaigns keep the report's own scorebug (verdict stamp,
    red LIVE dot, linen scoreline), so account and report read as one product.
    Approved design: .impeccable/mockups/portal-v3/ (2026-10-09). */
@@ -304,7 +305,7 @@ p.ac-muted { margin: 6px 0 0; max-width: 64ch; }
 .hc-empty p { margin: 6px 0 16px; color: var(--gray); max-width: 56ch; font-size: 15px; }
 .hc-empty p:last-child { margin-bottom: 0; }
 .hc-reward { font-family: var(--heading); font-size: 22px; letter-spacing: .04em; line-height: 1; padding: 6px 12px 5px; border-radius: var(--r-pill);
-  background: var(--ink); color: var(--lime); white-space: nowrap; transform: rotate(-3deg); display: inline-block; }
+  background: var(--hv-credit); color: var(--hv-credit-text); box-shadow: var(--hv-credit-ring); white-space: nowrap; transform: rotate(-3deg); display: inline-block; }
 
 /* -------------------------------------------------------------- Overview */
 .hc-greet { position: relative; background: var(--ink); color: var(--white); border-radius: var(--r-lg); padding: 30px 36px 30px 30px;
@@ -349,7 +350,7 @@ p.ac-muted { margin: 6px 0 0; max-width: 64ch; }
 .hc-ring__in b { font-family: var(--heading); font-weight: 400; font-size: 46px; line-height: .9; }
 .hc-ring__in small { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--gray); }
 .hc-done__lead { margin: 6px 0 0; font-size: 15px; }
-.hc-done__lead mark { background: var(--lime); color: var(--ink); font-weight: 700; padding: 1px 6px; border-radius: 6px; }
+.hc-done__lead mark { background: var(--hv-credit); color: var(--hv-credit-text); font-weight: 700; padding: 1px 6px; border-radius: 6px; }
 .hc-steps { list-style: none; margin: 18px 0 0; padding: 0; display: grid; gap: 8px; }
 .hc-step { display: grid; grid-template-columns: 38px 1fr auto; gap: 12px; align-items: center; padding: 12px; border-radius: 16px; background: #f7f4ef;
   text-decoration: none; color: var(--ink); width: 100%; border: 0; text-align: left; font: inherit; cursor: pointer; transition: background .2s ease; }
@@ -360,16 +361,17 @@ button.hc-step:hover { background: var(--stone); }
 .hc-step small { display: block; font-size: 13px; color: var(--gray); line-height: 1.35; margin-top: 2px; }
 .hc-step small em { font-style: normal; font-weight: 700; color: var(--ink); }
 .hc-step--bonus { background: transparent; border: 1px dashed rgba(18,18,18,.3); cursor: default; }
-.hc-step--bonus .hc-reward { background: var(--lime); color: var(--ink); }
+.hc-step--bonus .hc-reward { background: var(--hv-credit); color: var(--hv-credit-text); }
 .hc-got { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 0; padding: 0; list-style: none; }
-.hc-got li { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 4px 10px 4px 6px; border-radius: var(--r-pill); background: var(--go-soft); color: #0e6b39; }
+.hc-got li { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; padding: 4px 10px 4px 6px; border-radius: var(--r-pill); background: var(--hv-credit-soft); color: var(--hv-credit-deep); }
 .hc-got .hv-i { width: 14px; height: 14px; }
 
 .hc-invite { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px 28px; align-items: center; background: var(--lime); border-radius: var(--r-md); padding: 24px 28px; }
 .hc-invite p { margin: 6px 0 0; font-size: 14.5px; max-width: 62ch; }
 .hc-invite__fine { font-size: 12.5px !important; color: #2b2b2b; }
 .hc-invite__act { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
-.hc-invite__big { font-family: var(--heading); font-size: 64px; line-height: .85; letter-spacing: .01em; transform: rotate(-3deg); display: inline-block; }
+.hc-invite__big { font-family: var(--heading); font-size: 64px; line-height: .85; letter-spacing: .01em; transform: rotate(-3deg); display: inline-block;
+  background: var(--hv-credit); color: var(--hv-credit-text); padding: 8px 16px 2px; border-radius: 18px; box-shadow: var(--hv-credit-ring); }
 .hc-invite .hc-btn--ink:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
 
 /* ------------------------------------------------------ Selections, lists */
@@ -452,11 +454,15 @@ a.hc-row:hover { border-color: var(--ink); box-shadow: 0 10px 28px rgba(18,18,18
 /* --------------------------------------------------------------- Credits */
 .hc-bal { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 24px; align-items: end; background: var(--linen); border-radius: var(--r-lg); padding: 30px 32px; }
 .hc-bal__fig { font-family: var(--heading); font-size: clamp(6rem, 4rem + 6vw, 9rem); line-height: .82; letter-spacing: -.01em; }
+.hc-bal__fig .hv-credit-num { padding: .08em .14em 0; border-radius: .16em; }
+.hc-score__fig .hv-credit-num { padding: .08em .16em 0; border-radius: .18em; }
+.hc-bubble p b.hc-credit { background: var(--hv-credit); color: var(--hv-credit-text); padding: 1px 7px; border-radius: 6px; white-space: nowrap; }
+.hc-nav .n--credit, .hc-nav a[aria-current="page"] .n--credit { background: var(--hv-credit); color: var(--hv-credit-text); }
 .hc-bal__fig small { font-size: .28em; letter-spacing: .04em; color: var(--gray); margin-left: 8px; }
 .hc-meter { display: flex; gap: 3px; margin-top: 18px; max-width: 520px; }
 .hc-meter i { flex: 1; height: 14px; border-radius: 3px; background: rgba(18,18,18,.12); }
-.hc-meter i.on { background: var(--ink); }
-.hc-meter i.extra { background: var(--lime-dark); }
+.hc-meter i.on { background: var(--hv-credit); }
+.hc-meter i.extra { background: var(--hv-credit-deep); }
 .hc-bal__meta { margin: 10px 0 0; font-size: 14px; color: var(--gray); }
 .hc-bal__meta b { color: var(--ink); }
 .hc-bal__ask { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; text-align: right; }
@@ -469,7 +475,9 @@ a.hc-row:hover { border-color: var(--ink); box-shadow: 0 10px 28px rgba(18,18,18
 .hc-price td { padding: 16px 0; border-bottom: 1px solid var(--rule-soft); vertical-align: middle; }
 .hc-price td b { display: block; font-size: 15px; }
 .hc-price td small { display: block; font-size: 13px; color: var(--gray); margin-top: 2px; }
-.hc-price__c { font-family: var(--heading); font-size: 34px; line-height: 1; white-space: nowrap; }
+.hc-price__c { font-family: var(--heading); font-size: 30px; line-height: 1; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 14px 3px 10px; border-radius: var(--r-pill); background: var(--hv-credit); color: var(--hv-credit-text); box-shadow: var(--hv-credit-ring); }
+.hc-price__c .hv-i { width: 20px; height: 20px; margin-top: -3px; }
 .hc-price__c small { display: inline !important; font-family: var(--body); font-size: 12px !important; margin-left: 4px; }
 .hc-price__free { font-family: var(--heading); font-size: 26px; color: var(--go); }
 .hc-earn { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -489,7 +497,8 @@ a.hc-row:hover { border-color: var(--ink); box-shadow: 0 10px 28px rgba(18,18,18
 .hc-ledger { width: 100%; border-collapse: collapse; font-size: 14px; }
 .hc-ledger td { padding: 10px 0; border-bottom: 1px solid var(--rule-soft); }
 .hc-ledger td:nth-child(2), .hc-ledger td:nth-child(3) { text-align: right; white-space: nowrap; font-weight: 600; }
-.hc-ledger .up { color: #0e6b39; }
+.hc-ledger .hc-delta { display: inline-block; padding: 2px 9px; border-radius: var(--r-pill); }
+.hc-ledger .hc-delta.up { background: var(--hv-credit); color: var(--hv-credit-text); box-shadow: var(--hv-credit-ring); }
 .hc-ledger small { color: var(--gray); display: block; }
 
 /* --------------------------------------------------------------- Account */
@@ -501,8 +510,8 @@ a.hc-row:hover { border-color: var(--ink); box-shadow: 0 10px 28px rgba(18,18,18
 .hc-mk button:hover { border-color: var(--ink); }
 .hc-mk button[aria-pressed="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }
 .hc-mk button:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
-.hc-earnhint { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--ink); background: var(--lime); border-radius: var(--r-pill); padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
-.hc-earnhint.is-paid { background: var(--go-soft); color: #0e6b39; }
+.hc-earnhint { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--hv-credit-text); background: var(--hv-credit); border-radius: var(--r-pill); padding: 2px 8px; margin-left: 8px; vertical-align: middle; }
+.hc-earnhint.is-paid { background: var(--hv-credit-soft); color: var(--hv-credit-deep); }
 .ac-field select.ac-input { padding-right: 34px; }
 .ac-field--wide { grid-column: 1 / -1; }
 .hc-linkbox { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
@@ -512,7 +521,7 @@ a.hc-row:hover { border-color: var(--ink); box-shadow: 0 10px 28px rgba(18,18,18
 .hc-toast { position: fixed; left: 50%; bottom: 28px; z-index: 95; transform: translateX(-50%); display: flex; align-items: center; gap: 12px;
   background: var(--ink); color: var(--white); border-radius: var(--r-pill); padding: 10px 20px 10px 10px; box-shadow: 0 16px 40px rgba(18,18,18,.3);
   font-size: 14.5px; max-width: calc(100vw - 32px); animation: hc-toast-in .45s cubic-bezier(.2,.8,.2,1) both; }
-.hc-toast .hc-reward { background: var(--lime); color: var(--ink); transform: rotate(-3deg); }
+.hc-toast .hc-reward { background: var(--hv-credit); color: var(--hv-credit-text); transform: rotate(-3deg); }
 @keyframes hc-toast-in { from { opacity: 0; transform: translate(-50%, 16px); } }
 
 /* footer: HELVY Connect, powered by HelloVoice, a BlueHolding company */

@@ -130,7 +130,7 @@
       if (it[0] === "hr") { nav.appendChild(h("hr")); return; }
       var n = countFor(it[0]);
       var a = h("a", { href: "#" + it[0], "aria-current": it[0] === SECTION ? "page" : null, "data-nav": it[0] }, icon(it[2]), it[1]);
-      if (n != null) a.appendChild(h("span", { class: "n" + (it[0] === "notifications" ? " n--new" : ""), "data-count": it[0] }, String(n)));
+      if (n != null) a.appendChild(h("span", { class: "n" + (it[0] === "notifications" ? " n--new" : it[0] === "credits" ? " n--credit" : ""), "data-count": it[0] }, String(n)));
       nav.appendChild(a);
     });
     side.appendChild(nav);
@@ -185,7 +185,7 @@
   function greet() {
     var u = DATA.user, nx = DATA.next;
     var hi = h("h1", { class: "hc-greet__hi" }, greeting() + ", ", h("span", null, first(u.name) || "there"));
-    var p = h("p", null, nx.lead, h("b", null, nx.strong), nx.tail);
+    var p = h("p", null, nx.lead, h("b", { class: nx.kind === "profile" ? "hc-credit" : null }, nx.strong), nx.tail);
     var later = "hc-later:" + nx.kind + ":" + nx.href;
     var go = h("div", { class: "hc-bubble__go" });
     if (store(later)) {
@@ -218,7 +218,7 @@
         mine ? [h("b", null, String(mine)), " waiting for your review"] : "Nothing waiting for you", "Open selections", "#selections"),
       cell("Analyses pending", String(pend.length),
         pend.length ? ["Ready by ", h("b", null, shortDay(soon))] : "Free for creators in your selections", "Track requests", "#analyses"),
-      cell("Credits left", [String(DATA.credits), monthly && DATA.credits <= monthly ? h("small", null, "of " + monthly) : null],
+      cell("Credits left", [h("span", { class: "hv-credit-num" }, String(DATA.credits)), monthly && DATA.credits <= monthly ? h("small", null, "of " + monthly) : null],
         monthly ? ["Tops up to " + monthly + " on ", h("b", null, dm(DATA.next_refill))] : "Ask your account manager for more", "See credits", "#credits"));
   }
   function latest() {
@@ -239,7 +239,7 @@
   function ring(pct) {
     var r = 58, c = 2 * Math.PI * r;
     var svg = '<svg viewBox="0 0 136 136" aria-hidden="true"><circle cx="68" cy="68" r="' + r + '" fill="none" stroke="#efede8" stroke-width="12"/>' +
-      '<circle cx="68" cy="68" r="' + r + '" fill="none" stroke="#121212" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + c.toFixed(1) +
+      '<circle cx="68" cy="68" r="' + r + '" fill="none" stroke="#ff691e" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + c.toFixed(1) +
       '" stroke-dashoffset="' + (c * (1 - pct / 100)).toFixed(1) + '"/></svg>';
     return h("div", { class: "hc-ring", role: "img", "aria-label": pct + "% of your profile is complete" },
       h("span", { html: svg }), h("div", { class: "hc-ring__in" }, h("b", null, pct + "%"), h("small", null, "Complete")));
@@ -633,7 +633,7 @@
     ask.appendChild(amt); ask.appendChild(why); ask.appendChild(send);
     var reqBtn = h("button", { class: "hc-btn", type: "button", onclick: function () { ask.hidden = !ask.hidden; if (!ask.hidden) amt.focus(); } }, "Request more credits");
     add(p, h("section", { class: "hc-bal", "aria-label": "Your balance" },
-      h("div", null, h("div", { class: "hc-bal__fig" }, String(bal), h("small", null, "Credits left")), meter,
+      h("div", null, h("div", { class: "hc-bal__fig" }, h("span", { class: "hv-credit-num" }, String(bal)), h("small", null, "Credits left")), meter,
         h("p", { class: "hc-bal__meta" }, monthly ? ["Tops up to ", h("b", null, monthly + " on " + dm(DATA.next_refill)), ". Credits you earn from your profile and invites come on top."]
                                                    : "Credits you earn from your profile and invites are added straight away.")),
       h("div", { class: "hc-bal__ask" }, reqBtn, ask, h("p", null, (kam ? kam + ", your account manager," : "Your HelloVoice team") + " tops you up. Usually the same working day."), msg)));
@@ -645,7 +645,7 @@
     var tb = h("tbody");
     rows.forEach(function (r) {
       tb.appendChild(h("tr", null, h("td", null, h("b", null, r[0]), h("small", null, r[1])),
-        h("td", null, r[2] ? h("span", { class: "hc-price__c" }, String(r[2]), h("small", null, r[2] === 1 ? "credit" : "credits")) : h("span", { class: "hc-price__free" }, "Free"))));
+        h("td", null, r[2] ? h("span", { class: "hc-price__c" }, icon("coin"), String(r[2]), h("small", null, r[2] === 1 ? "credit" : "credits")) : h("span", { class: "hc-price__free" }, "Free"))));
     });
     add(p, h("section", { "aria-labelledby": "hc-buy" }, h("h2", { class: "hc-h2", id: "hc-buy", style: "margin-bottom:14px" }, "What credits buy"),
       h("table", { class: "hc-price" }, h("thead", null, h("tr", null, h("th", null, "With Helvy"), h("th", null, "Cost"))), tb)));
@@ -664,7 +664,7 @@
     var lt = h("tbody");
     DATA.ledger.forEach(function (l) {
       lt.appendChild(h("tr", null, h("td", null, l.reason, h("small", null, day(l.at))),
-        h("td", { class: l.delta > 0 ? "up" : null }, (l.delta > 0 ? "+" : "") + l.delta), h("td", null, String(l.balance))));
+        h("td", null, h("span", { class: l.delta > 0 ? "hc-delta up" : "hc-delta" }, (l.delta > 0 ? "+" : "") + l.delta)), h("td", null, String(l.balance))));
     });
     add(p, h("details", { class: "hc-hist" },
       h("summary", null, "History", h("small", null, DATA.ledger.length ? " · " + plural(DATA.ledger.length, "entry", "entries") + (since ? " since " + since : "") : " · nothing yet"), icon("down")),
