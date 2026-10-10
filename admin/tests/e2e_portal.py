@@ -24,6 +24,8 @@ TMP = Path(tempfile.mkdtemp(prefix="hv-e2e-"))
 for f in SRC.glob("*.py"):
     shutil.copy(f, TMP / f.name)
 shutil.copytree(SRC / "static", TMP / "static", dirs_exist_ok=True)
+if (SRC / "reference").is_dir():          # the static datasets behind the admin Reference page
+    shutil.copytree(SRC / "reference", TMP / "reference", dirs_exist_ok=True)
 sys.path.insert(0, str(TMP))
 
 import auth, db, gemini, guard, history, mailer, portal, server, team, views  # noqa: E402

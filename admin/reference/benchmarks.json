@@ -1,0 +1,4064 @@
+{
+ "meta": {
+  "generated": "2026-10-10",
+  "fx": {
+   "SAR_per_USD": 3.75,
+   "AED_per_USD": 3.6725,
+   "EGP_per_USD": 50.0,
+   "EGP_note": "Aug 2026 interbank ~49.9 (S23); 2026 range 46.60-54.85, avg 50.49 (S24). Elev8or Cairo tables imply ~53.6. Update before use: EGP moved ~16 (2022) to >47 (Mar 2024)."
+  },
+  "kind_legend": {
+   "published_vendor": "price/rate published by a vendor or agency (not audited market data)",
+   "published_global_proxy": "published metric but global/not market-specific; applied as proxy",
+   "extrapolation": "my arithmetic or reasoning; see basis",
+   "no_public_data": "nothing found"
+  },
+  "confidence_legend": {
+   "high": "primary data with method",
+   "medium": "agency blog/estimate",
+   "low": "anecdotal, modeled or extrapolated"
+  },
+  "tier_defs": {
+   "nano": "<20K (most sources use 1-10K)",
+   "micro": "20-100K (sources use 10-100K)",
+   "mid": "100-500K",
+   "macro": "500K-1M (some sources: 100K-1M)",
+   "mega": "1M+"
+  },
+  "note": "Behavioural metrics (view_rate, eng_rate, CPM, CPE) are GLOBAL proxies: no market-specific published data exists for KSA/UAE/Egypt by platform and tier. Only prices carry any market-specific information, and all price sources are vendor/agency estimates (confidence low-medium)."
+ },
+ "sources": {
+  "S1": {
+   "title": "Kolsquare, Influencer marketing in the Middle East in 2026 (30 Apr 2026)",
+   "url": "https://www.kolsquare.com/en/blog/influencer-marketing-in-the-middle-east-in-2026-high-stakes-high-spend-and-the-arabic-first-imperative"
+  },
+  "S2": {
+   "title": "Starngage, Saudi Arabia influencer rates by tier (Jun 2026; read via search summary, page returned 403)",
+   "url": "https://starngage.com/plus/de/blog/saudi-arabia-influencer-rates-by-tier-nano-to-mega-pricing-guide"
+  },
+  "S3": {
+   "title": "Starngage, Saudi creator rates by platform (2026; search summary only)",
+   "url": "https://starngage.com/plus/hi/blog/saudi-arabia-creator-rates-by-platform-instagram-tiktok-youtube"
+  },
+  "S4": {
+   "title": "Influencer Marketing Hub, Influencer Marketing in Saudi Arabia 2026 guide (1 May 2026)",
+   "url": "https://influencermarketinghub.com/influencer-marketing-in-saudi-arabia-guide/"
+  },
+  "S5": {
+   "title": "Catchers Agency, Influencer marketing cost in Saudi Arabia (24 Jun 2026)",
+   "url": "https://catchers.agency/blog/influencer-marketing-cost-in-saudi-arabia/"
+  },
+  "S6": {
+   "title": "Elev8or, Skincare influencers in Saudi Arabia (modeled estimates, 2026)",
+   "url": "https://www.elev8or.io/find/skincare-influencers-in-saudi-arabia"
+  },
+  "S7": {
+   "title": "Elev8or, Wellness / fashion / beauty influencers in the UAE (modeled estimates, 2026)",
+   "url": "https://www.elev8or.io/find/wellness-influencers-in-united-arab-emirates"
+  },
+  "S8": {
+   "title": "Elev8or, Health / ecommerce / lifestyle influencers in Cairo (modeled estimates, 2026)",
+   "url": "https://www.elev8or.io/find/health-influencers-in-cairo"
+  },
+  "S9": {
+   "title": "Modash, Using CPM in influencer marketing (12 Mar 2026; anecdotal, US/UK-based)",
+   "url": "https://www.modash.io/blog/influencer-marketing-cpm"
+  },
+  "S10": {
+   "title": "Socialinsider, Instagram benchmarks (35M posts, 447,613 pages, 2025)",
+   "url": "https://www.socialinsider.io/social-media-benchmarks/instagram"
+  },
+  "S11": {
+   "title": "Influencer Marketing Hub, Instagram Reels statistics 2026 (Socialinsider reach-rate data, Jan-Jun 2026)",
+   "url": "https://influencermarketinghub.com/Instagram-reels-stats"
+  },
+  "S12": {
+   "title": "Socialinsider, TikTok benchmarks (about 2M videos, 214,507 profiles, 2024-2025; published 22 Apr 2026)",
+   "url": "https://www.socialinsider.io/social-media-benchmarks/tiktok"
+  },
+  "S13": {
+   "title": "Dash Social, TikTok benchmark report 2025 H2",
+   "url": "https://pages.dashsocial.com/hubfs/social-media-benchmark/2025/H2/tiktok.pdf"
+  },
+  "S14": {
+   "title": "Emplicit, TikTok engagement rate benchmarks 2025 (cites Influencer Marketing Factory)",
+   "url": "https://emplicit.co/tiktok-engagement-rate-benchmarks-2025/"
+  },
+  "S15": {
+   "title": "Qoruz, Engagement rate benchmarks 2025",
+   "url": "https://qoruz.com/blog/engagement-rate/"
+  },
+  "S16": {
+   "title": "Metricool x HypeAuditor, Instagram Content Playbook 2025 (700M posts, 28M accounts, Jan-Jun 2025)",
+   "url": "https://metricool.com/press-release-instagram-content-playbook/"
+  },
+  "S17": {
+   "title": "Communicate Online, Why GCC CPG brands may need to rethink the mega-influencer premium (5 Sep 2026; cites Hovi)",
+   "url": "https://communicateonline.me/insights/why-gcc-cpg-brands-may-need-to-rethink-the-mega-influencer-premium/"
+  },
+  "S18": {
+   "title": "Communicate Online, MMA MENA standardized influencer marketing guide (23 May 2026)",
+   "url": "https://communicateonline.me/news/mma-mena-launches-first-standardized-influencer-marketing-guide-for-mena-region/"
+  },
+  "S19": {
+   "title": "Influencer Marketing Hub, Influencer Marketing in MENA report (20 Aug 2026)",
+   "url": "https://influencermarketinghub.com/mena-influencer-marketing-report/"
+  },
+  "S20": {
+   "title": "UAE Free Zone Finder, UAE influencer creator economy guide (Aug 2026)",
+   "url": "https://uaefreezonefinder.com/uae-influencer-creator-economy-guide-2026/"
+  },
+  "S21": {
+   "title": "impact.com, 2025 influencer rate guide (US rate cards)",
+   "url": "https://impact.com/?p=35983"
+  },
+  "S22": {
+   "title": "Campaign ME / Vamp, Saudi report 2021 Local Heroes",
+   "url": "https://campaignme.com/saudi-report-2021-local-heroes-by-vamps-tariq-shalabi/"
+  },
+  "S23": {
+   "title": "Amwal Al Ghad, Egyptian pound midday 10 Aug 2026 (49.87 buy / 49.97 sell)",
+   "url": "https://en.amwalalghad.com/?p=230053"
+  },
+  "S24": {
+   "title": "PoundSterlingLive, USD-EGP history 2026 (range 46.60-54.85, avg 50.49)",
+   "url": "https://www.poundsterlinglive.com/history/USD-EGP-2026"
+  },
+  "S25": {
+   "title": "OwlClaw, YouTube Shorts benchmarks (vendor)",
+   "url": "https://owlclaw.com/benchmarks/youtube-shorts-benchmarks"
+  },
+  "S26": {
+   "title": "Gulf News, UAE influencers per-post earnings (2018)",
+   "url": "https://gulfnews.com/business/revealed-how-much-money-uae-influencers-make-per-instagram-twitter-or-youtube-post-1.1545564614719"
+  },
+  "S27": {
+   "title": "Business Monthly Egypt, Egyptian brands moving from billboards to influencers (Jul 2025)",
+   "url": "https://businessmonthlyeg.com/?p=17910"
+  },
+  "S28": {
+   "title": "Collabstr, Influencer costs 2025 (search summary only, page 403)",
+   "url": "https://collabstr.com/blog/influencer-costs-2025"
+  },
+  "S29": {
+   "title": "Influee / Triple Whale, TikTok ads benchmarks 2026 (paid ads CPM, not influencer)",
+   "url": "https://influee.co/blog/tiktok-ads-benchmarks"
+  },
+  "S30": {
+   "title": "CreatorIQ, How much to pay for influencer marketing (CPE ranges; search summary)",
+   "url": "https://www.creatoriq.com/blog/how-much-to-pay-for-influencer-marketing"
+  },
+  "S31": {
+   "title": "Ken Research, Egypt digital advertising and influencer economy",
+   "url": "https://www.kenresearch.com/industry-reports/egypt-digital-advertising-and-influencer-economy-market.md"
+  },
+  "X": {
+   "title": "Own extrapolation (see basis field)",
+   "url": ""
+  }
+ },
+ "markets": {
+  "KSA": {
+   "instagram_reels": {
+    "nano": {
+     "view_rate": {
+      "low": 10,
+      "high": 20,
+      "kind": "published_global_proxy",
+      "basis": "Socialinsider Reels view rate by brand-page followers 1-10K, 2023-24 (5-10K 10.2%, 1-5K ~20%); 2025 avg views / midpoint gives 13-19%. Business pages, global.",
+      "sources": [
+       "S10"
+      ]
+     },
+     "eng_rate": {
+      "low": 3,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 3-6% micro (likes+comments / followers); nano assumed at least this. Influencer accounts, global, medium-low confidence.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "Envelope across 4 sources (S2 200-1,500; S5 500-2,500; S4 750-3,000; S6 225-1,125). Overlap of all four: 750-1,125 SAR. Tier boundary 1-10K, not <20K.",
+      "sources": [
+       "S2",
+       "S4",
+       "S5",
+       "S6"
+      ],
+      "local_currency": "SAR",
+      "local_low": 200,
+      "local_high": 3000,
+      "usd_low": 53.3,
+      "usd_high": 800.0,
+      "sar_low": 200,
+      "sar_high": 3000
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S6",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": 5,
+      "high": 8,
+      "kind": "published_global_proxy",
+      "basis": "Socialinsider 10-50K ~8%, 50-100K ~5% (2023-24); 2025 avg views / bucket midpoint = 8.1-8.2%. Business pages, global.",
+      "sources": [
+       "S10"
+      ]
+     },
+     "eng_rate": {
+      "low": 3,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 3-6% for micro. Global.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "Envelope (S6 1,125-6,750; S2 1,500-8,000; S5 2,500-15,000; S4 3,000-15,000). Overlap of all four: 3,000-6,750 SAR. Boundary 10-100K.",
+      "sources": [
+       "S2",
+       "S4",
+       "S5",
+       "S6"
+      ],
+      "local_currency": "SAR",
+      "local_low": 1125,
+      "local_high": 15000,
+      "usd_low": 300.0,
+      "usd_high": 4000.0,
+      "sar_low": 1125,
+      "sar_high": 15000
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S6",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": 3,
+      "high": 5,
+      "kind": "published_global_proxy",
+      "basis": "Socialinsider 100K-1M bucket ~4% (2023-24); 2025 avg 16,035 views / 400K = 4.0%. Bucket also covers macro.",
+      "sources": [
+       "S10"
+      ]
+     },
+     "eng_rate": {
+      "low": 1,
+      "high": 3,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 1-3% for larger accounts. Global.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "S2 8,000-35,000; S6 6,750-22,500. S4/S5 do not split mid (100K-1M macro 15,000-75,000). Overlap 8,000-22,500 SAR.",
+      "sources": [
+       "S2",
+       "S6"
+      ],
+      "local_currency": "SAR",
+      "local_low": 6750,
+      "local_high": 35000,
+      "usd_low": 1800.0,
+      "usd_high": 9333.3,
+      "sar_low": 6750,
+      "sar_high": 35000
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S6",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": 2.5,
+      "high": 4,
+      "kind": "extrapolation",
+      "basis": "Same 100K-1M bucket, shaded down for the upper half of the bucket. My extrapolation.",
+      "sources": [
+       "S10",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 1,
+      "high": 3,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 1-3% for larger accounts. Global.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "S2 35,000-100,000 (500K-1M); S6 22,500-54,000 (500K+); S4/S5 100K-1M 15,000-75,000. Overlap S2/S6: 35,000-54,000 SAR.",
+      "sources": [
+       "S2",
+       "S4",
+       "S5",
+       "S6"
+      ],
+      "local_currency": "SAR",
+      "local_low": 15000,
+      "local_high": 100000,
+      "usd_low": 4000.0,
+      "usd_high": 26666.7,
+      "sar_low": 15000,
+      "sar_high": 100000
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S6",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "No public view-rate data for 1M+; likely 1-3% (my extrapolation, not used).",
+      "sources": []
+     },
+     "eng_rate": {
+      "low": 1,
+      "high": 3,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025 (larger accounts); Elev8or typical 1-5% across KSA/UAE/Cairo niches (modeled).",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "S2 100,000-500,000+; S5 75,000-500,000+; S4 75,000-300,000+. Open-ended top.",
+      "sources": [
+       "S2",
+       "S4",
+       "S5"
+      ],
+      "local_currency": "SAR",
+      "local_low": 75000,
+      "local_high": 500000,
+      "usd_low": 20000.0,
+      "usd_high": 133333.3,
+      "sar_low": 75000,
+      "sar_high": 500000
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S4",
+      "S5",
+      "S6",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    }
+   },
+   "tiktok": {
+    "nano": {
+     "view_rate": {
+      "low": 11,
+      "high": 19,
+      "kind": "extrapolation",
+      "basis": "Derived: Socialinsider 2025 avg views per video (350 at 1-5K, 945 at 5-10K) / bucket midpoint. Business-heavy sample.",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4.0,
+      "high": 4.4,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments+shares+saves / views, 1-10K, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage (S2/S3): TikTok rates 10-20% below Instagram; Elev8or UAE TikTok bands are ~15% below IG (S7). Applied x0.85 to the IG envelope. My extrapolation.",
+      "sources": [
+       "S2",
+       "S7",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 170,
+      "local_high": 2550,
+      "usd_low": 45.3,
+      "usd_high": 680.0,
+      "sar_low": 170,
+      "sar_high": 2550
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": 10,
+      "high": 13,
+      "kind": "extrapolation",
+      "basis": "Derived: 3,240 avg views at 10-50K (/30K = 10.8%); 9,900 at 50-100K (/75K = 13.2%).",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 3.75,
+      "high": 3.9,
+      "kind": "published_global_proxy",
+      "basis": "Same formula, 10-100K, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage (S2/S3): TikTok rates 10-20% below Instagram; Elev8or UAE TikTok bands are ~15% below IG (S7). Applied x0.85 to the IG envelope. My extrapolation.",
+      "sources": [
+       "S2",
+       "S7",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 956,
+      "local_high": 12750,
+      "usd_low": 255.0,
+      "usd_high": 3400.0,
+      "sar_low": 956,
+      "sar_high": 12750
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": 8,
+      "high": 12,
+      "kind": "extrapolation",
+      "basis": "Derived: 34,900 avg views in 100K-1M bucket / 300-400K = 8.7-11.6%.",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 3.95,
+      "high": 3.95,
+      "kind": "published_global_proxy",
+      "basis": "Same formula, 100K-1M bucket, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage (S2/S3): TikTok rates 10-20% below Instagram; Elev8or UAE TikTok bands are ~15% below IG (S7). Applied x0.85 to the IG envelope. My extrapolation.",
+      "sources": [
+       "S2",
+       "S7",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 5738,
+      "local_high": 29750,
+      "usd_low": 1530.0,
+      "usd_high": 7933.3,
+      "sar_low": 5738,
+      "sar_high": 29750
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": 5,
+      "high": 9,
+      "kind": "extrapolation",
+      "basis": "Same bucket shaded down for upper half. My extrapolation.",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 3.95,
+      "high": 3.95,
+      "kind": "published_global_proxy",
+      "basis": "Same formula, 100K-1M bucket, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage (S2/S3): TikTok rates 10-20% below Instagram; Elev8or UAE TikTok bands are ~15% below IG (S7). Applied x0.85 to the IG envelope. My extrapolation.",
+      "sources": [
+       "S2",
+       "S7",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 12750,
+      "local_high": 85000,
+      "usd_low": 3400.0,
+      "usd_high": 22666.7,
+      "sar_low": 12750,
+      "sar_high": 85000
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": 2.9,
+      "high": 3.8,
+      "kind": "published_global_proxy",
+      "basis": "Influencer Marketing Factory via Emplicit: 1M-5M 3.76%, 10M+ 2.88%; method unstated; low confidence.",
+      "sources": [
+       "S14"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage (S2/S3): TikTok rates 10-20% below Instagram; Elev8or UAE TikTok bands are ~15% below IG (S7). Applied x0.85 to the IG envelope. My extrapolation.",
+      "sources": [
+       "S2",
+       "S7",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 63750,
+      "local_high": 425000,
+      "usd_low": 17000.0,
+      "usd_high": 113333.3,
+      "sar_low": 63750,
+      "sar_high": 425000
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    }
+   },
+   "snapchat": {
+    "nano": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage S2: Snapchat roughly level with Instagram Stories (itself below feed/Reels); Catchers S5 says a Snapchat story often costs MORE than an Instagram post. Sources conflict; IG envelope shown as placeholder only.",
+      "sources": [
+       "S2",
+       "S5",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 200,
+      "local_high": 3000,
+      "usd_low": 53.3,
+      "usd_high": 800.0,
+      "sar_low": 200,
+      "sar_high": 3000
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S5"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage S2: Snapchat roughly level with Instagram Stories (itself below feed/Reels); Catchers S5 says a Snapchat story often costs MORE than an Instagram post. Sources conflict; IG envelope shown as placeholder only.",
+      "sources": [
+       "S2",
+       "S5",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 1125,
+      "local_high": 15000,
+      "usd_low": 300.0,
+      "usd_high": 4000.0,
+      "sar_low": 1125,
+      "sar_high": 15000
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S5"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage S2: Snapchat roughly level with Instagram Stories (itself below feed/Reels); Catchers S5 says a Snapchat story often costs MORE than an Instagram post. Sources conflict; IG envelope shown as placeholder only.",
+      "sources": [
+       "S2",
+       "S5",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 6750,
+      "local_high": 35000,
+      "usd_low": 1800.0,
+      "usd_high": 9333.3,
+      "sar_low": 6750,
+      "sar_high": 35000
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S5"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage S2: Snapchat roughly level with Instagram Stories (itself below feed/Reels); Catchers S5 says a Snapchat story often costs MORE than an Instagram post. Sources conflict; IG envelope shown as placeholder only.",
+      "sources": [
+       "S2",
+       "S5",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 15000,
+      "local_high": 100000,
+      "usd_low": 4000.0,
+      "usd_high": 26666.7,
+      "sar_low": 15000,
+      "sar_high": 100000
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S5"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Starngage S2: Snapchat roughly level with Instagram Stories (itself below feed/Reels); Catchers S5 says a Snapchat story often costs MORE than an Instagram post. Sources conflict; IG envelope shown as placeholder only.",
+      "sources": [
+       "S2",
+       "S5",
+       "X"
+      ],
+      "local_currency": "SAR",
+      "local_low": 75000,
+      "local_high": 500000,
+      "usd_low": 20000.0,
+      "usd_high": 133333.3,
+      "sar_low": 75000,
+      "sar_high": 500000
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S5"
+     ],
+     "confidence": "low"
+    }
+   },
+   "youtube_shorts": {
+    "nano": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "Premium to IG per Starngage; no figures.",
+      "sources": [
+       "S2"
+      ],
+      "local_currency": "SAR",
+      "local_low": null,
+      "local_high": null,
+      "usd_low": null,
+      "usd_high": null,
+      "sar_low": null,
+      "sar_high": null
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "Premium to IG per Starngage; no figures.",
+      "sources": [
+       "S2"
+      ],
+      "local_currency": "SAR",
+      "local_low": null,
+      "local_high": null,
+      "usd_low": null,
+      "usd_high": null,
+      "sar_low": null,
+      "sar_high": null
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "Premium to IG per Starngage; no figures.",
+      "sources": [
+       "S2"
+      ],
+      "local_currency": "SAR",
+      "local_low": null,
+      "local_high": null,
+      "usd_low": null,
+      "usd_high": null,
+      "sar_low": null,
+      "sar_high": null
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "Premium to IG per Starngage; no figures.",
+      "sources": [
+       "S2"
+      ],
+      "local_currency": "SAR",
+      "local_low": null,
+      "local_high": null,
+      "usd_low": null,
+      "usd_high": null,
+      "sar_low": null,
+      "sar_high": null
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "Premium to IG per Starngage; no figures.",
+      "sources": [
+       "S2"
+      ],
+      "local_currency": "SAR",
+      "local_low": null,
+      "local_high": null,
+      "usd_low": null,
+      "usd_high": null,
+      "sar_low": null,
+      "sar_high": null
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S2",
+      "S25"
+     ],
+     "confidence": "low"
+    }
+   }
+  },
+  "UAE": {
+   "instagram_reels": {
+    "nano": {
+     "view_rate": {
+      "low": 10,
+      "high": 20,
+      "kind": "published_global_proxy",
+      "basis": "Socialinsider Reels view rate by brand-page followers 1-10K, 2023-24 (5-10K 10.2%, 1-5K ~20%); 2025 avg views / midpoint gives 13-19%. Business pages, global.",
+      "sources": [
+       "S10"
+      ]
+     },
+     "eng_rate": {
+      "low": 3,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 3-6% micro (likes+comments / followers); nano assumed at least this. Influencer accounts, global, medium-low confidence.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "Elev8or modeled: lifestyle 184-918; fashion/beauty/travel 220-1,101; wellness 239-1,193; luxury 349-1,743. Single vendor.",
+      "sources": [
+       "S7"
+      ],
+      "local_currency": "AED",
+      "local_low": 184,
+      "local_high": 1193,
+      "usd_low": 50.1,
+      "usd_high": 324.8,
+      "sar_low": 188,
+      "sar_high": 1218
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S20",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": 5,
+      "high": 8,
+      "kind": "published_global_proxy",
+      "basis": "Socialinsider 10-50K ~8%, 50-100K ~5% (2023-24); 2025 avg views / bucket midpoint = 8.1-8.2%. Business pages, global.",
+      "sources": [
+       "S10"
+      ]
+     },
+     "eng_rate": {
+      "low": 3,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 3-6% for micro. Global.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "Elev8or: lifestyle 918-5,505; fashion 1,101-6,606; wellness 1,193-7,157; luxury 1,743-10,460.",
+      "sources": [
+       "S7"
+      ],
+      "local_currency": "AED",
+      "local_low": 918,
+      "local_high": 7157,
+      "usd_low": 250.0,
+      "usd_high": 1948.8,
+      "sar_low": 937,
+      "sar_high": 7308
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S20",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": 3,
+      "high": 5,
+      "kind": "published_global_proxy",
+      "basis": "Socialinsider 100K-1M bucket ~4% (2023-24); 2025 avg 16,035 views / 400K = 4.0%. Bucket also covers macro.",
+      "sources": [
+       "S10"
+      ]
+     },
+     "eng_rate": {
+      "low": 1,
+      "high": 3,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 1-3% for larger accounts. Global.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "Elev8or: lifestyle 5,505-18,350; fashion 6,606-22,020; wellness 7,157-23,855; luxury 10,460-34,865.",
+      "sources": [
+       "S7"
+      ],
+      "local_currency": "AED",
+      "local_low": 5505,
+      "local_high": 23855,
+      "usd_low": 1499.0,
+      "usd_high": 6495.6,
+      "sar_low": 5621,
+      "sar_high": 24358
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S20",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": 2.5,
+      "high": 4,
+      "kind": "extrapolation",
+      "basis": "Same 100K-1M bucket, shaded down for the upper half of the bucket. My extrapolation.",
+      "sources": [
+       "S10",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 1,
+      "high": 3,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 1-3% for larger accounts. Global.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "Elev8or: 18,350-57,252 (luxury to 83,676). S20 (Aug 2026, no method): macro Reels AED 20,000-80,000.",
+      "sources": [
+       "S7",
+       "S20"
+      ],
+      "local_currency": "AED",
+      "local_low": 18350,
+      "local_high": 57252,
+      "usd_low": 4996.6,
+      "usd_high": 15589.4,
+      "sar_low": 18737,
+      "sar_high": 58460
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S20",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "No public view-rate data for 1M+; likely 1-3% (my extrapolation, not used).",
+      "sources": []
+     },
+     "eng_rate": {
+      "low": 1,
+      "high": 3,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025 (larger accounts); Elev8or typical 1-5% across KSA/UAE/Cairo niches (modeled).",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "No public UAE mega rate card found. (S26, 2018: UAE influencers avg $1,000-5,000 per post, no tier split.)",
+      "sources": [],
+      "local_currency": "AED",
+      "local_low": null,
+      "local_high": null,
+      "usd_low": null,
+      "usd_high": null,
+      "sar_low": null,
+      "sar_high": null
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S20",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    }
+   },
+   "tiktok": {
+    "nano": {
+     "view_rate": {
+      "low": 11,
+      "high": 19,
+      "kind": "extrapolation",
+      "basis": "Derived: Socialinsider 2025 avg views per video (350 at 1-5K, 945 at 5-10K) / bucket midpoint. Business-heavy sample.",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4.0,
+      "high": 4.4,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments+shares+saves / views, 1-10K, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Elev8or UAE TikTok bands for fashion/beauty/travel are ~15% below Instagram (micro 936-5,615; mid 5,615-18,717; macro 18,717-44,921 AED). Nano is my extrapolation at x0.85.",
+      "sources": [
+       "S7",
+       "X"
+      ],
+      "local_currency": "AED",
+      "local_low": 156,
+      "local_high": 1014,
+      "usd_low": 42.6,
+      "usd_high": 276.1,
+      "sar_low": 160,
+      "sar_high": 1035
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": 10,
+      "high": 13,
+      "kind": "extrapolation",
+      "basis": "Derived: 3,240 avg views at 10-50K (/30K = 10.8%); 9,900 at 50-100K (/75K = 13.2%).",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 3.75,
+      "high": 3.9,
+      "kind": "published_global_proxy",
+      "basis": "Same formula, 10-100K, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Elev8or UAE TikTok bands for fashion/beauty/travel are ~15% below Instagram (micro 936-5,615; mid 5,615-18,717; macro 18,717-44,921 AED). Nano is my extrapolation at x0.85.",
+      "sources": [
+       "S7",
+       "X"
+      ],
+      "local_currency": "AED",
+      "local_low": 780,
+      "local_high": 6083,
+      "usd_low": 212.5,
+      "usd_high": 1656.5,
+      "sar_low": 796,
+      "sar_high": 6212
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": 8,
+      "high": 12,
+      "kind": "extrapolation",
+      "basis": "Derived: 34,900 avg views in 100K-1M bucket / 300-400K = 8.7-11.6%.",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 3.95,
+      "high": 3.95,
+      "kind": "published_global_proxy",
+      "basis": "Same formula, 100K-1M bucket, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Elev8or UAE TikTok bands for fashion/beauty/travel are ~15% below Instagram (micro 936-5,615; mid 5,615-18,717; macro 18,717-44,921 AED). Nano is my extrapolation at x0.85.",
+      "sources": [
+       "S7",
+       "X"
+      ],
+      "local_currency": "AED",
+      "local_low": 4679,
+      "local_high": 20277,
+      "usd_low": 1274.1,
+      "usd_high": 5521.3,
+      "sar_low": 4778,
+      "sar_high": 20704
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": 5,
+      "high": 9,
+      "kind": "extrapolation",
+      "basis": "Same bucket shaded down for upper half. My extrapolation.",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 3.95,
+      "high": 3.95,
+      "kind": "published_global_proxy",
+      "basis": "Same formula, 100K-1M bucket, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "Elev8or UAE TikTok bands for fashion/beauty/travel are ~15% below Instagram (micro 936-5,615; mid 5,615-18,717; macro 18,717-44,921 AED). Nano is my extrapolation at x0.85.",
+      "sources": [
+       "S7",
+       "X"
+      ],
+      "local_currency": "AED",
+      "local_low": 15598,
+      "local_high": 48664,
+      "usd_low": 4247.1,
+      "usd_high": 13251.0,
+      "sar_low": 15926,
+      "sar_high": 49691
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": 2.9,
+      "high": 3.8,
+      "kind": "published_global_proxy",
+      "basis": "Influencer Marketing Factory via Emplicit: 1M-5M 3.76%, 10M+ 2.88%; method unstated; low confidence.",
+      "sources": [
+       "S14"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "No public UAE mega rate card found. (S26, 2018: UAE influencers avg $1,000-5,000 per post, no tier split.)",
+      "sources": [],
+      "local_currency": "AED",
+      "local_low": null,
+      "local_high": null,
+      "usd_low": null,
+      "usd_high": null,
+      "sar_low": null,
+      "sar_high": null
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S7",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    }
+   },
+   "snapchat": {
+    "nano": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    }
+   },
+   "youtube_shorts": {
+    "nano": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    }
+   }
+  },
+  "Egypt": {
+   "instagram_reels": {
+    "nano": {
+     "view_rate": {
+      "low": 10,
+      "high": 20,
+      "kind": "published_global_proxy",
+      "basis": "Socialinsider Reels view rate by brand-page followers 1-10K, 2023-24 (5-10K 10.2%, 1-5K ~20%); 2025 avg views / midpoint gives 13-19%. Business pages, global.",
+      "sources": [
+       "S10"
+      ]
+     },
+     "eng_rate": {
+      "low": 3,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 3-6% micro (likes+comments / followers); nano assumed at least this. Influencer accounts, global, medium-low confidence.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "Elev8or Cairo modeled, 2026: lifestyle 2,475-12,375; health 3,218-16,088; ecommerce 4,455-22,275. Converted at 50 EGP/USD (Elev8or itself implies ~53.6).",
+      "sources": [
+       "S8"
+      ],
+      "local_currency": "EGP",
+      "local_low": 2475,
+      "local_high": 22275,
+      "usd_low": 49.5,
+      "usd_high": 445.5,
+      "sar_low": 186,
+      "sar_high": 1671
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": 5,
+      "high": 8,
+      "kind": "published_global_proxy",
+      "basis": "Socialinsider 10-50K ~8%, 50-100K ~5% (2023-24); 2025 avg views / bucket midpoint = 8.1-8.2%. Business pages, global.",
+      "sources": [
+       "S10"
+      ]
+     },
+     "eng_rate": {
+      "low": 3,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 3-6% for micro. Global.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "lifestyle 12,375-74,250; health 16,088-96,525; ecommerce 22,275-133,650. FAQ on same pages quotes lower micro ranges (e.g. 8,366-34,299 EGP): internal conflict.",
+      "sources": [
+       "S8"
+      ],
+      "local_currency": "EGP",
+      "local_low": 12375,
+      "local_high": 133650,
+      "usd_low": 247.5,
+      "usd_high": 2673.0,
+      "sar_low": 928,
+      "sar_high": 10024
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": 3,
+      "high": 5,
+      "kind": "published_global_proxy",
+      "basis": "Socialinsider 100K-1M bucket ~4% (2023-24); 2025 avg 16,035 views / 400K = 4.0%. Bucket also covers macro.",
+      "sources": [
+       "S10"
+      ]
+     },
+     "eng_rate": {
+      "low": 1,
+      "high": 3,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 1-3% for larger accounts. Global.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "lifestyle 74,250-247,500; health 96,525-321,750; ecommerce 133,650-445,500.",
+      "sources": [
+       "S8"
+      ],
+      "local_currency": "EGP",
+      "local_low": 74250,
+      "local_high": 445500,
+      "usd_low": 1485.0,
+      "usd_high": 8910.0,
+      "sar_low": 5569,
+      "sar_high": 33412
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": 2.5,
+      "high": 4,
+      "kind": "extrapolation",
+      "basis": "Same 100K-1M bucket, shaded down for the upper half of the bucket. My extrapolation.",
+      "sources": [
+       "S10",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 1,
+      "high": 3,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025: 1-3% for larger accounts. Global.",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "published_vendor",
+      "basis": "lifestyle 247,500-594,000; health 321,750-772,200; ecommerce 445,500-1,069,200.",
+      "sources": [
+       "S8"
+      ],
+      "local_currency": "EGP",
+      "local_low": 247500,
+      "local_high": 1069200,
+      "usd_low": 4950.0,
+      "usd_high": 21384.0,
+      "sar_low": 18562,
+      "sar_high": 80190
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "No public view-rate data for 1M+; likely 1-3% (my extrapolation, not used).",
+      "sources": []
+     },
+     "eng_rate": {
+      "low": 1,
+      "high": 3,
+      "kind": "published_global_proxy",
+      "basis": "Qoruz 2025 (larger accounts); Elev8or typical 1-5% across KSA/UAE/Cairo niches (modeled).",
+      "sources": [
+       "S15"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "No public Egyptian mega rate card. Scrumball shows a ~993K-follower IG account at $4-6.5K (estimate, low).",
+      "sources": [],
+      "local_currency": "EGP",
+      "local_low": null,
+      "local_high": null,
+      "usd_low": null,
+      "usd_high": null,
+      "sar_low": null,
+      "sar_high": null
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 45,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, Instagram Reels, per 1,000 impressions; anecdotal, US/UK-based. (Stories $20-50.)",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.59,
+      "high": 0.95,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ per-engagement range for Instagram; vendor blog, method unstated. Other vendor figures range $1.5-2.65 (S30 summary).",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S10",
+      "S15",
+      "S9"
+     ],
+     "confidence": "low"
+    }
+   },
+   "tiktok": {
+    "nano": {
+     "view_rate": {
+      "low": 11,
+      "high": 19,
+      "kind": "extrapolation",
+      "basis": "Derived: Socialinsider 2025 avg views per video (350 at 1-5K, 945 at 5-10K) / bucket midpoint. Business-heavy sample.",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4.0,
+      "high": 4.4,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments+shares+saves / views, 1-10K, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "No Egypt TikTok-specific data. KSA/UAE sources put TikTok 10-20% below IG; x0.85 applied. My extrapolation.",
+      "sources": [
+       "S8",
+       "S2",
+       "X"
+      ],
+      "local_currency": "EGP",
+      "local_low": 2104,
+      "local_high": 18934,
+      "usd_low": 42.1,
+      "usd_high": 378.7,
+      "sar_low": 158,
+      "sar_high": 1420
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": 10,
+      "high": 13,
+      "kind": "extrapolation",
+      "basis": "Derived: 3,240 avg views at 10-50K (/30K = 10.8%); 9,900 at 50-100K (/75K = 13.2%).",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 3.75,
+      "high": 3.9,
+      "kind": "published_global_proxy",
+      "basis": "Same formula, 10-100K, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "No Egypt TikTok-specific data. KSA/UAE sources put TikTok 10-20% below IG; x0.85 applied. My extrapolation.",
+      "sources": [
+       "S8",
+       "S2",
+       "X"
+      ],
+      "local_currency": "EGP",
+      "local_low": 10519,
+      "local_high": 113602,
+      "usd_low": 210.4,
+      "usd_high": 2272.0,
+      "sar_low": 789,
+      "sar_high": 8520
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": 8,
+      "high": 12,
+      "kind": "extrapolation",
+      "basis": "Derived: 34,900 avg views in 100K-1M bucket / 300-400K = 8.7-11.6%.",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 3.95,
+      "high": 3.95,
+      "kind": "published_global_proxy",
+      "basis": "Same formula, 100K-1M bucket, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "No Egypt TikTok-specific data. KSA/UAE sources put TikTok 10-20% below IG; x0.85 applied. My extrapolation.",
+      "sources": [
+       "S8",
+       "S2",
+       "X"
+      ],
+      "local_currency": "EGP",
+      "local_low": 63112,
+      "local_high": 378675,
+      "usd_low": 1262.2,
+      "usd_high": 7573.5,
+      "sar_low": 4734,
+      "sar_high": 28400
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": 5,
+      "high": 9,
+      "kind": "extrapolation",
+      "basis": "Same bucket shaded down for upper half. My extrapolation.",
+      "sources": [
+       "S12",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 3.95,
+      "high": 3.95,
+      "kind": "published_global_proxy",
+      "basis": "Same formula, 100K-1M bucket, 2025.",
+      "sources": [
+       "S12"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "extrapolation",
+      "basis": "No Egypt TikTok-specific data. KSA/UAE sources put TikTok 10-20% below IG; x0.85 applied. My extrapolation.",
+      "sources": [
+       "S8",
+       "S2",
+       "X"
+      ],
+      "local_currency": "EGP",
+      "local_low": 210375,
+      "local_high": 908820,
+      "usd_low": 4207.5,
+      "usd_high": 18176.4,
+      "sar_low": 15778,
+      "sar_high": 68162
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": 2.9,
+      "high": 3.8,
+      "kind": "published_global_proxy",
+      "basis": "Influencer Marketing Factory via Emplicit: 1M-5M 3.76%, 10M+ 2.88%; method unstated; low confidence.",
+      "sources": [
+       "S14"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": "No public Egyptian mega rate card. Scrumball shows a ~993K-follower IG account at $4-6.5K (estimate, low).",
+      "sources": [],
+      "local_currency": "EGP",
+      "local_low": null,
+      "local_high": null,
+      "usd_low": null,
+      "usd_high": null,
+      "sar_low": null,
+      "sar_high": null
+     },
+     "cpm_usd": {
+      "low": 7,
+      "high": 25,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026, TikTok videos; anecdotal, US/UK-based. Paid-ads CPM for TikTok 2025 = $13.26 (S29) is not influencer CPM.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": 0.06,
+      "high": 2.0,
+      "kind": "published_global_proxy",
+      "basis": "CreatorIQ range for TikTok; extremely wide; low confidence.",
+      "sources": [
+       "S30"
+      ]
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S8",
+      "S12",
+      "S9"
+     ],
+     "confidence": "low"
+    }
+   },
+   "snapchat": {
+    "nano": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "eng_rate": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [],
+     "confidence": "low"
+    }
+   },
+   "youtube_shorts": {
+    "nano": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "micro": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "mid": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "macro": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    },
+    "mega": {
+     "view_rate": {
+      "low": 2,
+      "high": 15,
+      "kind": "extrapolation",
+      "basis": "Vendor: a 100K-subscriber channel gets 2,000-15,000 Shorts views, i.e. 2-15% of subscribers. Vendor cites VidIQ/Creator Insider; unverified.",
+      "sources": [
+       "S25",
+       "X"
+      ]
+     },
+     "eng_rate": {
+      "low": 4,
+      "high": 6,
+      "kind": "published_global_proxy",
+      "basis": "Likes+comments / views, Shorts. Single vendor estimate.",
+      "sources": [
+       "S25"
+      ]
+     },
+     "price_per_post_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpm_usd": {
+      "low": 15,
+      "high": 35,
+      "kind": "published_global_proxy",
+      "basis": "Modash Mar 2026: YouTube integrations $15-35; dedicated videos $50-75+. Not Shorts-specific.",
+      "sources": [
+       "S9"
+      ]
+     },
+     "cpe_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "cpc_usd": {
+      "low": null,
+      "high": null,
+      "kind": "no_public_data",
+      "basis": null,
+      "sources": []
+     },
+     "sources": [
+      "S25"
+     ],
+     "confidence": "low"
+    }
+   }
+  }
+ },
+ "category_adjustments": {
+  "healthcare_pharma": {
+   "published": "No public pharma/healthcare creator rate premium found. Elev8or modeled: Cairo health nano 3,218 EGP vs lifestyle 2,475 (+30%) vs ecommerce 4,455 (-28%); UAE wellness nano 239 AED vs lifestyle 184 (+30%) vs fashion 220 (+9%). YouGov (via S17): 77% of UAE consumers notice influencer endorsements for healthcare/supplements, the highest of 17 markets.",
+   "sources": [
+    "S7",
+    "S8",
+    "S17"
+   ],
+   "confidence": "low"
+  },
+  "beauty_skincare": {
+   "published": "Elev8or KSA skincare/makeup = travel baseline (nano 225-1,125 SAR); typical ER 1-4%. Luxury UAE ~+58% vs fashion at micro. YouGov (via S17): 72% of UAE consumers notice beauty endorsements.",
+   "sources": [
+    "S6",
+    "S7",
+    "S17"
+   ],
+   "confidence": "low"
+  },
+  "fmcg": {
+   "published": "No FMCG-specific figure. Elev8or entertainment is ~17% below skincare baseline in KSA; finance +83%, SaaS +108% (illustrates niche multipliers are vendor-set).",
+   "sources": [
+    "S6"
+   ],
+   "confidence": "low"
+  },
+  "usage_rights_whitelisting": {
+   "published": "Whitelisting/boosting adds 20-50% (Catchers, KSA). Usage rights up to +39% (Collabstr 2025, global, via summary).",
+   "sources": [
+    "S5",
+    "S28"
+   ],
+   "confidence": "low"
+  }
+ },
+ "market_specifics": {
+  "arabic_first_uplift": {
+   "published": "Arabic-first content: 35-50% higher engagement than translated English content, GCC-wide (Boomerang.ae via Kolsquare and IMH). Primary study not located.",
+   "sources": [
+    "S1",
+    "S4"
+   ],
+   "confidence": "low"
+  },
+  "ramadan_seasonality": {
+   "published": "Starngage: rate spike ~40% (another Starngage guide: 20-40%) during Ramadan and National Day; bundle discount ~30%. Collabstr global seasonal +20-30%. No Ramadan CPM series found anywhere. Purchases +40.6% across 14 Muslim-majority countries in Ramadan 2024 (CampaignMe via Kolsquare).",
+   "sources": [
+    "S2",
+    "S28",
+    "S1"
+   ],
+   "confidence": "low"
+  },
+  "ksa_licence": {
+   "published": "Mawthooq in force since 1 Oct 2022; SAR 15,000 for 3 years. Kolsquare active KOL base (5K+ IG followers) fell 35%: 60,824 to 39,377 since 2022. Saudi = ~40% of GCC influencer spend.",
+   "sources": [
+    "S1"
+   ],
+   "confidence": "medium"
+  },
+  "uae_licence": {
+   "published": "Advertiser Permit mandatory from 1 Feb 2026; fines up to AED 1M (2M repeat). 59% of UAE brands spend up to AED 250K/yr on influencers.",
+   "sources": [
+    "S1",
+    "S19"
+   ],
+   "confidence": "medium"
+  },
+  "egypt_currency": {
+   "published": "EGP ~16/USD (2022) to >47 after March 2024 devaluation (blog, low), ~49.9 in Aug 2026 (S23). No source ties devaluation to creator fee changes. Licence EGP 50,000 for accounts >5,000 followers (Kolsquare). Active KOL base +7.5% to 64,248.",
+   "sources": [
+    "S1",
+    "S23",
+    "S24"
+   ],
+   "confidence": "medium"
+  },
+  "tier_effect": {
+   "published": "Micro-influencers show 3.5x the engagement of mega in MENA (Hovi via S17, no data shown); Starngage says 3-5x. Micro = 45% of GCC market share (MMA); 60% of MENA spend goes to macro/mega (IMH).",
+   "sources": [
+    "S17",
+    "S18",
+    "S19",
+    "S1"
+   ],
+   "confidence": "low"
+  },
+  "ksa_vs_uae_engagement": {
+   "published": "Older (2021) Vamp/Campaign ME: KSA influencer engagement slightly below average but impression/reach rates above UAE; KSA influencers' audiences 50-60% local vs 20-30% UAE.",
+   "sources": [
+    "S22"
+   ],
+   "confidence": "low"
+  }
+ },
+ "fair_value_cpm_ceiling_per_1000_views": {
+  "note": "No published KSA/UAE/Egypt influencer CPM exists. Ceilings below are my extrapolation anchored on Modash global anecdotal ranges (S9). Same ceiling proposed for all three markets because no evidence supports a per-market split; the exception is Egypt where local purchasing power argues lower but is unevidenced.",
+  "acceptable_ceiling_usd": {
+   "instagram_reels": 19,
+   "tiktok": 13,
+   "snapchat": 13,
+   "youtube_shorts": 16
+  },
+  "good_target_usd": {
+   "instagram_reels": 11,
+   "tiktok": 7,
+   "snapchat": 8,
+   "youtube_shorts": 9
+  },
+  "acceptable_ceiling_sar": {
+   "instagram_reels": 70,
+   "tiktok": 50,
+   "snapchat": 50,
+   "youtube_shorts": 60
+  },
+  "good_target_sar": {
+   "instagram_reels": 40,
+   "tiktok": 25,
+   "snapchat": 30,
+   "youtube_shorts": 35
+  },
+  "confidence": "low (extrapolation)",
+  "published_global_anchor_usd": {
+   "instagram_reels": [
+    15,
+    45
+   ],
+   "tiktok": [
+    7,
+    25
+   ],
+   "youtube_integration": [
+    15,
+    35
+   ],
+   "youtube_dedicated": [
+    50,
+    75
+   ]
+  },
+  "ksa_blended_cpm": "no public data. Global anecdotal blend $7-45 (SAR 26-169); my extrapolated central planning value $15-25 (SAR 56-94) per 1,000 views."
+ },
+ "reference": {
+  "id": "benchmarks",
+  "title": "International benchmarks: view rate, engagement rate, CPM / CPE / CPC",
+  "updated": "2026-10-10",
+  "note": "Behavioural figures are global proxies. No market-specific published data exists for KSA, UAE or Egypt by platform and tier.",
+  "how_to_read": [
+   "Kind: published (PUB, a vendor or agency figure), proxy (PROXY, published but global or not market-specific, used as a stand-in), extrapolation (XTR, reasoning shown in the basis), none (no public data).",
+   "View rate = views / followers. Engagement rate is on followers for Instagram and on views for TikTok and YouTube, so the two are not comparable across platforms.",
+   "CPM = cost per 1,000 views, CPE = cost per engagement, CPC = cost per click, all in USD.",
+   "Every row shows its sources (S1 to S31). Open the Sources tab to see the publisher, year and link."
+  ],
+  "caveats": [
+   "Behavioural benchmarks with a stated method exist only at global level (Socialinsider: 35M Instagram posts, about 2M TikTok videos), and they come from brand pages, not creators.",
+   "No published view rate, engagement rate, CPM, CPE or CPC exists for KSA, UAE or Egypt by platform and tier. The MMA MENA guide is said to contain one but is not public.",
+   "No Snapchat view rate, price or CPM exists anywhere. No YouTube Shorts market data. No pharma or healthcare premium. No Ramadan CPM series.",
+   "Published KSA sticker prices and CPM benchmarks do not reconcile: the overlap of vendor bands for a KSA micro creator implies SAR 375 to 844 per 1,000 views against a global anecdotal 56 to 169.",
+   "Engagement benchmarks differ by about 10x between vendors because of different populations and denominators. Never compare across sources.",
+   "Regulatory points (Mawthooq, UAE advertiser permit, Egypt licence) come from Kolsquare and need checking against the original text."
+  ]
+ }
+}

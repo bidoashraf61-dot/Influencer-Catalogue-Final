@@ -73,7 +73,7 @@ _KAM_DENY_POST = ("/settings", "/apis", "/portal/settings", "/portal/keys", "/ti
                   "/roster/merge", "/roster/photos", "/team", "/planner/library", "/codes/delete",
                   "/portal/user/delete")
 # Pages only owners and admins may open (GET). Prefix match; /portal?tab=settings handled separately.
-_STAFF_ONLY_GET = ("/apis", "/settings")
+_STAFF_ONLY_GET = ("/apis", "/settings", "/reference")
 # What a viewer may still POST: their own account and the read-only copilot chat.
 _VIEWER_POST = ("/password", "/account/", "/ai/chat", "/reauth")
 

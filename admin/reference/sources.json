@@ -1,0 +1,1096 @@
+{
+ "reference": {
+  "id": "sources",
+  "title": "Sources",
+  "updated": "2026-10-10",
+  "note": "Every source cited by the three datasets, with publisher, year and evidence type.",
+  "how_to_read": [
+   "S1 to S31 and T1 to T36 are the benchmark and market-price sources; CS1 to CS33 are the campaign-structure sources.",
+   "'Credibility' is the researcher's rating of the page, not of the figure."
+  ],
+  "caveats": []
+ },
+ "sources": [
+  {
+   "id": "S1",
+   "set": "benchmarks",
+   "title": "Kolsquare, Influencer marketing in the Middle East in 2026 (30 Apr 2026)",
+   "publisher": "Kolsquare",
+   "year": "2026",
+   "evidence_type": "Industry report (agency research)",
+   "url": "https://www.kolsquare.com/en/blog/influencer-marketing-in-the-middle-east-in-2026-high-stakes-high-spend-and-the-arabic-first-imperative",
+   "credibility": ""
+  },
+  {
+   "id": "S2",
+   "set": "benchmarks",
+   "title": "Starngage, Saudi Arabia influencer rates by tier (Jun 2026; read via search summary, page returned 403)",
+   "publisher": "Starngage",
+   "year": "2026",
+   "evidence_type": "Vendor price guide (read via search summary)",
+   "url": "https://starngage.com/plus/de/blog/saudi-arabia-influencer-rates-by-tier-nano-to-mega-pricing-guide",
+   "credibility": ""
+  },
+  {
+   "id": "S3",
+   "set": "benchmarks",
+   "title": "Starngage, Saudi creator rates by platform (2026; search summary only)",
+   "publisher": "Starngage",
+   "year": "2026",
+   "evidence_type": "Vendor price guide (search summary only)",
+   "url": "https://starngage.com/plus/hi/blog/saudi-arabia-creator-rates-by-platform-instagram-tiktok-youtube",
+   "credibility": ""
+  },
+  {
+   "id": "S4",
+   "set": "benchmarks",
+   "title": "Influencer Marketing Hub, Influencer Marketing in Saudi Arabia 2026 guide (1 May 2026)",
+   "publisher": "Influencer Marketing Hub",
+   "year": "2026",
+   "evidence_type": "Trade guide, re-quotes Starngage",
+   "url": "https://influencermarketinghub.com/influencer-marketing-in-saudi-arabia-guide/",
+   "credibility": ""
+  },
+  {
+   "id": "S5",
+   "set": "benchmarks",
+   "title": "Catchers Agency, Influencer marketing cost in Saudi Arabia (24 Jun 2026)",
+   "publisher": "Catchers Agency",
+   "year": "2026",
+   "evidence_type": "Agency price guide",
+   "url": "https://catchers.agency/blog/influencer-marketing-cost-in-saudi-arabia/",
+   "credibility": ""
+  },
+  {
+   "id": "S6",
+   "set": "benchmarks",
+   "title": "Elev8or, Skincare influencers in Saudi Arabia (modeled estimates, 2026)",
+   "publisher": "Elev8or",
+   "year": "2026",
+   "evidence_type": "Modelled estimates (marketplace vendor)",
+   "url": "https://www.elev8or.io/find/skincare-influencers-in-saudi-arabia",
+   "credibility": ""
+  },
+  {
+   "id": "S7",
+   "set": "benchmarks",
+   "title": "Elev8or, Wellness / fashion / beauty influencers in the UAE (modeled estimates, 2026)",
+   "publisher": "Elev8or",
+   "year": "2026",
+   "evidence_type": "Modelled estimates (marketplace vendor)",
+   "url": "https://www.elev8or.io/find/wellness-influencers-in-united-arab-emirates",
+   "credibility": ""
+  },
+  {
+   "id": "S8",
+   "set": "benchmarks",
+   "title": "Elev8or, Health / ecommerce / lifestyle influencers in Cairo (modeled estimates, 2026)",
+   "publisher": "Elev8or",
+   "year": "2026",
+   "evidence_type": "Modelled estimates (marketplace vendor)",
+   "url": "https://www.elev8or.io/find/health-influencers-in-cairo",
+   "credibility": ""
+  },
+  {
+   "id": "S9",
+   "set": "benchmarks",
+   "title": "Modash, Using CPM in influencer marketing (12 Mar 2026; anecdotal, US/UK-based)",
+   "publisher": "Modash",
+   "year": "2026",
+   "evidence_type": "Vendor blog, anecdotal, US/UK-based",
+   "url": "https://www.modash.io/blog/influencer-marketing-cpm",
+   "credibility": ""
+  },
+  {
+   "id": "S10",
+   "set": "benchmarks",
+   "title": "Socialinsider, Instagram benchmarks (35M posts, 447,613 pages, 2025)",
+   "publisher": "Socialinsider",
+   "year": "2025",
+   "evidence_type": "Measured benchmark: brand pages, global",
+   "url": "https://www.socialinsider.io/social-media-benchmarks/instagram",
+   "credibility": ""
+  },
+  {
+   "id": "S11",
+   "set": "benchmarks",
+   "title": "Influencer Marketing Hub, Instagram Reels statistics 2026 (Socialinsider reach-rate data, Jan-Jun 2026)",
+   "publisher": "Influencer Marketing Hub",
+   "year": "2026",
+   "evidence_type": "Trade press citing measured reach data",
+   "url": "https://influencermarketinghub.com/Instagram-reels-stats",
+   "credibility": ""
+  },
+  {
+   "id": "S12",
+   "set": "benchmarks",
+   "title": "Socialinsider, TikTok benchmarks (about 2M videos, 214,507 profiles, 2024-2025; published 22 Apr 2026)",
+   "publisher": "Socialinsider",
+   "year": "2026",
+   "evidence_type": "Measured benchmark: brand pages, global",
+   "url": "https://www.socialinsider.io/social-media-benchmarks/tiktok",
+   "credibility": ""
+  },
+  {
+   "id": "S13",
+   "set": "benchmarks",
+   "title": "Dash Social, TikTok benchmark report 2025 H2",
+   "publisher": "Dash Social",
+   "year": "2025",
+   "evidence_type": "Vendor benchmark report, global",
+   "url": "https://pages.dashsocial.com/hubfs/social-media-benchmark/2025/H2/tiktok.pdf",
+   "credibility": ""
+  },
+  {
+   "id": "S14",
+   "set": "benchmarks",
+   "title": "Emplicit, TikTok engagement rate benchmarks 2025 (cites Influencer Marketing Factory)",
+   "publisher": "Emplicit",
+   "year": "2025",
+   "evidence_type": "Vendor blog citing a third party",
+   "url": "https://emplicit.co/tiktok-engagement-rate-benchmarks-2025/",
+   "credibility": ""
+  },
+  {
+   "id": "S15",
+   "set": "benchmarks",
+   "title": "Qoruz, Engagement rate benchmarks 2025",
+   "publisher": "Qoruz",
+   "year": "2025",
+   "evidence_type": "Vendor benchmark blog, method unstated",
+   "url": "https://qoruz.com/blog/engagement-rate/",
+   "credibility": ""
+  },
+  {
+   "id": "S16",
+   "set": "benchmarks",
+   "title": "Metricool x HypeAuditor, Instagram Content Playbook 2025 (700M posts, 28M accounts, Jan-Jun 2025)",
+   "publisher": "Metricool x HypeAuditor",
+   "year": "2025",
+   "evidence_type": "Measured benchmark: vendor study, global",
+   "url": "https://metricool.com/press-release-instagram-content-playbook/",
+   "credibility": ""
+  },
+  {
+   "id": "S17",
+   "set": "benchmarks",
+   "title": "Communicate Online, Why GCC CPG brands may need to rethink the mega-influencer premium (5 Sep 2026; cites Hovi)",
+   "publisher": "Communicate Online",
+   "year": "2026",
+   "evidence_type": "Trade press citing unlinked data",
+   "url": "https://communicateonline.me/insights/why-gcc-cpg-brands-may-need-to-rethink-the-mega-influencer-premium/",
+   "credibility": ""
+  },
+  {
+   "id": "S18",
+   "set": "benchmarks",
+   "title": "Communicate Online, MMA MENA standardized influencer marketing guide (23 May 2026)",
+   "publisher": "Communicate Online",
+   "year": "2026",
+   "evidence_type": "Trade press on an industry guide (guide not public)",
+   "url": "https://communicateonline.me/news/mma-mena-launches-first-standardized-influencer-marketing-guide-for-mena-region/",
+   "credibility": ""
+  },
+  {
+   "id": "S19",
+   "set": "benchmarks",
+   "title": "Influencer Marketing Hub, Influencer Marketing in MENA report (20 Aug 2026)",
+   "publisher": "Influencer Marketing Hub",
+   "year": "2026",
+   "evidence_type": "Trade report, partly undated figures",
+   "url": "https://influencermarketinghub.com/mena-influencer-marketing-report/",
+   "credibility": ""
+  },
+  {
+   "id": "S20",
+   "set": "benchmarks",
+   "title": "UAE Free Zone Finder, UAE influencer creator economy guide (Aug 2026)",
+   "publisher": "UAE Free Zone Finder",
+   "year": "2026",
+   "evidence_type": "Guide (vendor)",
+   "url": "https://uaefreezonefinder.com/uae-influencer-creator-economy-guide-2026/",
+   "credibility": ""
+  },
+  {
+   "id": "S21",
+   "set": "benchmarks",
+   "title": "impact.com, 2025 influencer rate guide (US rate cards)",
+   "publisher": "impact.com",
+   "year": "2025",
+   "evidence_type": "US rate guide (not used for MENA)",
+   "url": "https://impact.com/?p=35983",
+   "credibility": ""
+  },
+  {
+   "id": "S22",
+   "set": "benchmarks",
+   "title": "Campaign ME / Vamp, Saudi report 2021 Local Heroes",
+   "publisher": "Campaign ME / Vamp",
+   "year": "2021",
+   "evidence_type": "Trade report (2021, old)",
+   "url": "https://campaignme.com/saudi-report-2021-local-heroes-by-vamps-tariq-shalabi/",
+   "credibility": ""
+  },
+  {
+   "id": "S23",
+   "set": "benchmarks",
+   "title": "Amwal Al Ghad, Egyptian pound midday 10 Aug 2026 (49.87 buy / 49.97 sell)",
+   "publisher": "Amwal Al Ghad",
+   "year": "2026",
+   "evidence_type": "Exchange-rate reference",
+   "url": "https://en.amwalalghad.com/?p=230053",
+   "credibility": ""
+  },
+  {
+   "id": "S24",
+   "set": "benchmarks",
+   "title": "PoundSterlingLive, USD-EGP history 2026 (range 46.60-54.85, avg 50.49)",
+   "publisher": "PoundSterlingLive",
+   "year": "2026",
+   "evidence_type": "Exchange-rate reference",
+   "url": "https://www.poundsterlinglive.com/history/USD-EGP-2026",
+   "credibility": ""
+  },
+  {
+   "id": "S25",
+   "set": "benchmarks",
+   "title": "OwlClaw, YouTube Shorts benchmarks (vendor)",
+   "publisher": "OwlClaw",
+   "year": "",
+   "evidence_type": "Vendor benchmark",
+   "url": "https://owlclaw.com/benchmarks/youtube-shorts-benchmarks",
+   "credibility": ""
+  },
+  {
+   "id": "S26",
+   "set": "benchmarks",
+   "title": "Gulf News, UAE influencers per-post earnings (2018)",
+   "publisher": "Gulf News",
+   "year": "2018",
+   "evidence_type": "News article (2018, old)",
+   "url": "https://gulfnews.com/business/revealed-how-much-money-uae-influencers-make-per-instagram-twitter-or-youtube-post-1.1545564614719",
+   "credibility": ""
+  },
+  {
+   "id": "S27",
+   "set": "benchmarks",
+   "title": "Business Monthly Egypt, Egyptian brands moving from billboards to influencers (Jul 2025)",
+   "publisher": "Business Monthly Egypt",
+   "year": "2025",
+   "evidence_type": "News article",
+   "url": "https://businessmonthlyeg.com/?p=17910",
+   "credibility": ""
+  },
+  {
+   "id": "S28",
+   "set": "benchmarks",
+   "title": "Collabstr, Influencer costs 2025 (search summary only, page 403)",
+   "publisher": "Collabstr",
+   "year": "2025",
+   "evidence_type": "Vendor blog (search summary only)",
+   "url": "https://collabstr.com/blog/influencer-costs-2025",
+   "credibility": ""
+  },
+  {
+   "id": "S29",
+   "set": "benchmarks",
+   "title": "Influee / Triple Whale, TikTok ads benchmarks 2026 (paid ads CPM, not influencer)",
+   "publisher": "Influee / Triple Whale",
+   "year": "2026",
+   "evidence_type": "Paid-ads benchmark (not influencer)",
+   "url": "https://influee.co/blog/tiktok-ads-benchmarks",
+   "credibility": ""
+  },
+  {
+   "id": "S30",
+   "set": "benchmarks",
+   "title": "CreatorIQ, How much to pay for influencer marketing (CPE ranges; search summary)",
+   "publisher": "CreatorIQ",
+   "year": "",
+   "evidence_type": "Vendor blog, CPE ranges (summary only)",
+   "url": "https://www.creatoriq.com/blog/how-much-to-pay-for-influencer-marketing",
+   "credibility": ""
+  },
+  {
+   "id": "S31",
+   "set": "benchmarks",
+   "title": "Ken Research, Egypt digital advertising and influencer economy",
+   "publisher": "Ken Research",
+   "year": "",
+   "evidence_type": "Market research report (summary)",
+   "url": "https://www.kenresearch.com/industry-reports/egypt-digital-advertising-and-influencer-economy-market.md",
+   "credibility": ""
+  },
+  {
+   "id": "T1",
+   "set": "market_prices",
+   "title": "mhtwyat.com - named Saudi celebrity/creator ad price list (page says updated 8 Jan 2025; URL slug says 2022)",
+   "publisher": "mhtwyat.com",
+   "year": "2022",
+   "evidence_type": "named-creator asking prices, SAR, from-home / outside-home; no method",
+   "url": "https://mhtwyat.com/?p=314803",
+   "credibility": "low"
+  },
+  {
+   "id": "T2",
+   "set": "market_prices",
+   "title": "Keepface blog (28 May 2026) quoting IMH Instagram bands and Miqwal Snapchat bands",
+   "publisher": "Keepface blog (28 May 2026) quoting IMH Instagram bands and Miqwal Snapchat bands",
+   "year": "2026",
+   "evidence_type": "vendor-quoted ranges incl. Reels, Stories, Snapchat single-snap by reach; modifiers",
+   "url": "https://keepface.com/site/en/beauty-lifestyle-influencers-saudi-arabia-snapchat-instagram-2026/",
+   "credibility": "low"
+  },
+  {
+   "id": "T3",
+   "set": "market_prices",
+   "title": "Hovi, Social Media Marketing in GCC & MENA guide (12 Mar 2026, reviewed Oct 2026)",
+   "publisher": "Hovi",
+   "year": "2026",
+   "evidence_type": "agency guide; KSA SAR / UAE USD per post by tier; paid-social CPMs",
+   "url": "https://thehovi.com/blog/industry-guides/social-media-marketing-gcc-mena-guide-2026",
+   "credibility": "low"
+  },
+  {
+   "id": "T4",
+   "set": "market_prices",
+   "title": "Yamammi UAE Influencer Rate Report, Mid-Year 2026 (350 signed contracts, Aug 2025-Aug 2026)",
+   "publisher": "Yamammi UAE Influencer Rate Report",
+   "year": "2026",
+   "evidence_type": "agency contract/payment records (vendor dataset, unaudited); AED per deliverable, CPM",
+   "url": "https://yamammi.com/receipts/dubai-influencer-rate-report",
+   "credibility": "medium"
+  },
+  {
+   "id": "T5",
+   "set": "market_prices",
+   "title": "Yamammi, Influencer Rates UAE (updated 16 Aug 2026)",
+   "publisher": "Yamammi",
+   "year": "2026",
+   "evidence_type": "agency-stated 'rates from contracts signed in 2026'; AED by tier/platform/format",
+   "url": "https://yamammi.com/blog/influencer-rates-uae",
+   "credibility": "low"
+  },
+  {
+   "id": "T6",
+   "set": "market_prices",
+   "title": "Tikit, Influencer Marketing Cost in UAE (updated May 2026)",
+   "publisher": "Tikit",
+   "year": "2026",
+   "evidence_type": "agency blog; AED by platform and tier incl. Snapchat",
+   "url": "https://tikit.ae/en/blogs/influencer-marketing-cost-in-uae-2026-real-aed-rates-by-platform-tikit",
+   "credibility": "low"
+  },
+  {
+   "id": "T7",
+   "set": "market_prices",
+   "title": "Al Rwyt Alwash, Influencer Cost UAE (28 Jan 2025)",
+   "publisher": "Al Rwyt Alwash",
+   "year": "2025",
+   "evidence_type": "agency blog; AED by tier, Instagram and TikTok",
+   "url": "https://alrwytalwash.com/influencercost-dubai-2025/",
+   "credibility": "low"
+  },
+  {
+   "id": "T8",
+   "set": "market_prices",
+   "title": "Positively Adam, How Much Do Influencers Charge in Dubai (3 Aug 2026)",
+   "publisher": "Positively Adam",
+   "year": "2026",
+   "evidence_type": "blog; AED per post by tier; retainers, usage rights",
+   "url": "https://positivelyadam.com/blog/influencer-marketing-cost-dubai-2026.html",
+   "credibility": "low"
+  },
+  {
+   "id": "T9",
+   "set": "market_prices",
+   "title": "DataMySite, Influencer Marketing Cost in Dubai 2026 (14 Aug 2026)",
+   "publisher": "DataMySite",
+   "year": "2026",
+   "evidence_type": "agency blog; AED by tier; Ramadan/Q4 +20-30%",
+   "url": "https://datamysite.com/influencer-marketing-cost-in-dubai-2026-rates-by-tier",
+   "credibility": "low"
+  },
+  {
+   "id": "T10",
+   "set": "market_prices",
+   "title": "The Rare Private, Influencer Marketing Costs Dubai 2026 (Apr 2026)",
+   "publisher": "The Rare Private",
+   "year": "2026",
+   "evidence_type": "agency blog; AED by tier",
+   "url": "https://www.therare-private.com/blog/influencer-marketing-cost-dubai-2026.html",
+   "credibility": "low"
+  },
+  {
+   "id": "T11",
+   "set": "market_prices",
+   "title": "Dreamize Group, Influencer Marketing Cost Dubai (2026, undated)",
+   "publisher": "Dreamize Group",
+   "year": "2026",
+   "evidence_type": "agency blog; AED by tier and format (post/Reel/story/TikTok/YouTube); agency fee 15-25%",
+   "url": "https://dreamizegroup.com/influencer-marketing-cost/",
+   "credibility": "low"
+  },
+  {
+   "id": "T12",
+   "set": "market_prices",
+   "title": "Influencer.vip, How Much to Pay Influencers in Dubai (14 Apr 2026)",
+   "publisher": "Influencer.vip",
+   "year": "2026",
+   "evidence_type": "agency blog; AED by tier; discounts; agency fee 15-25%",
+   "url": "https://influencer.vip/blogs/how-much-to-pay-influencers-in-dubai-the-definitive-2026-rate-guide",
+   "credibility": "low"
+  },
+  {
+   "id": "T13",
+   "set": "market_prices",
+   "title": "Right Media, How Much Do Influencers Charge in the UAE (2026, undated)",
+   "publisher": "Right Media",
+   "year": "2026",
+   "evidence_type": "agency blog; AED Instagram vs TikTok by tier",
+   "url": "https://rightmedia.ae/blog/how-much-do-influencers-charge-in-the-uae-in-2025/",
+   "credibility": "low"
+  },
+  {
+   "id": "T14",
+   "set": "market_prices",
+   "title": "Snippet, UAE influencer rates (June 2026)",
+   "publisher": "Snippet",
+   "year": "2026",
+   "evidence_type": "tool; modelled AED sponsored-post and video rates",
+   "url": "https://usesnippet.app/tools/influencer-rates/location/uae",
+   "credibility": "low"
+  },
+  {
+   "id": "T15",
+   "set": "market_prices",
+   "title": "Digital Agencies UAE forum thread (10 Feb 2023, one reply)",
+   "publisher": "Digital Agencies UAE forum thread (10 Feb 2023",
+   "year": "2023",
+   "evidence_type": "practitioner opinion; AED by tier (older)",
+   "url": "https://www.digitalagencies.ae/topics/influencer-promotion-fees-on-instagram-account",
+   "credibility": "low"
+  },
+  {
+   "id": "T16",
+   "set": "market_prices",
+   "title": "Yamammi, Dubai influencer cost: where brands overpay (16 Aug 2026)",
+   "publisher": "Yamammi",
+   "year": "2026",
+   "evidence_type": "agency blog; AED by tier; retainer/bundle/usage discounts; agency fee 15-30%",
+   "url": "https://yamammi.com/blog/influencer-marketing-cost-dubai",
+   "credibility": "low"
+  },
+  {
+   "id": "T17",
+   "set": "market_prices",
+   "title": "Engaz Media (Arabic), Influencer marketing in Egypt 2025: methods and average prices",
+   "publisher": "Engaz Media (Arabic)",
+   "year": "2025",
+   "evidence_type": "Egyptian agency blog, EGP per post by tier (2025)",
+   "url": "https://engazmedia.com/%D8%AA%D8%B3%D9%88%D9%8A%D9%82-%D8%A7%D9%84%D9%85%D9%86%D8%AA%D8%AC%D8%A7%D8%AA-%D8%B9%D8%A8%D8%B1-%D8%A7%D9%84%D9%85%D8%A4%D8%AB%D8%B1%D9%8A%D9%86-%D8%A7%D9%84%D8%A5%D9%86%D9%81%D9%84%D9%88%D9%86/",
+   "credibility": "low"
+  },
+  {
+   "id": "T18",
+   "set": "market_prices",
+   "title": "Brands & Creators, Influencer Marketing Cost in Egypt 2026",
+   "publisher": "Brands & Creators",
+   "year": "2026",
+   "evidence_type": "agency blog, EGP per post by tier (2026, undated)",
+   "url": "https://brandsncreators.com/influencer-marketing-cost-in-egypt-full-breakdown-2026/",
+   "credibility": "low"
+  },
+  {
+   "id": "T19",
+   "set": "market_prices",
+   "title": "Valors Agency, Influencer Marketing Cost Egypt (1 Aug 2026)",
+   "publisher": "Valors Agency",
+   "year": "2026",
+   "evidence_type": "agency blog, USD per post by tier; contracts in EGP with USD-equivalent caps",
+   "url": "https://valors.agency/influencer-marketing-cost-egypt",
+   "credibility": "low"
+  },
+  {
+   "id": "T20",
+   "set": "market_prices",
+   "title": "Green Mind Agency, influencer campaign package price list",
+   "publisher": "Green Mind Agency",
+   "year": "",
+   "evidence_type": "agency package price: up to 3 influencers EGP 297,500 (fees may be extra)",
+   "url": "https://greenmindagency.com/price-list/influencer-marketing-prices/",
+   "credibility": "low"
+  },
+  {
+   "id": "T21",
+   "set": "market_prices",
+   "title": "Collabstr city marketplace pages (Riyadh, Jeddah, Dubai, Cairo), fetched 10 Oct 2026",
+   "publisher": "Collabstr city marketplace pages (Riyadh",
+   "year": "2026",
+   "evidence_type": "creator-set listing ('starting') prices in USD, 4 listings per page; small n",
+   "url": "https://collabstr.com/influencer-marketing/riyadh-saudi-arabia",
+   "credibility": "low"
+  },
+  {
+   "id": "T22",
+   "set": "market_prices",
+   "title": "MabrookUGC, How to become a UGC creator in Saudi Arabia (25 Jul 2026)",
+   "publisher": "MabrookUGC",
+   "year": "2026",
+   "evidence_type": "creator-side guide: direct-DM UGC deals SAR 300-1,500 per video",
+   "url": "https://www.mabrookugc.com/blog/how-to-become-ugc-creator",
+   "credibility": "low"
+  },
+  {
+   "id": "T23",
+   "set": "market_prices",
+   "title": "UGCeer (KSA/UAE UGC marketplace) - minimum SAR 150 per video, +15% platform commission (search snippet; page not fetched)",
+   "publisher": "UGCeer (KSA/UAE UGC marketplace)",
+   "year": "",
+   "evidence_type": "platform terms",
+   "url": "https://ugceer.com/en/land/",
+   "credibility": "low"
+  },
+  {
+   "id": "T24",
+   "set": "market_prices",
+   "title": "Influee, UGC Rates 2026 (dated 18 Apr 2025)",
+   "publisher": "Influee",
+   "year": "2025",
+   "evidence_type": "global (US/UK) UGC rates and usage-right add-ons",
+   "url": "https://influee.co/blog/ugc-price",
+   "credibility": "low"
+  },
+  {
+   "id": "T25",
+   "set": "market_prices",
+   "title": "InfluencerFee, influencer marketing for pharmaceutical brands (reviewed 10 Oct 2026)",
+   "publisher": "InfluencerFee",
+   "year": "2026",
+   "evidence_type": "vendor rate calculator; USD HCP vs lifestyle; premium 30-80%; not MENA-specific",
+   "url": "https://influencerfee.com/blog/influencer-marketing-for-pharmaceutical-brands/",
+   "credibility": "low"
+  },
+  {
+   "id": "T26",
+   "set": "market_prices",
+   "title": "Gulf News, How UAE influencers make up to Dh100,000 in a week (30 May 2025)",
+   "publisher": "Gulf News",
+   "year": "2025",
+   "evidence_type": "news article: TikTok per post Dh700-70,000; one named UAE creator Dh20,000+ per campaign",
+   "url": "https://gulfnews.com/lifestyle/community/revealed-how-uae-influencers-make-up-to-dh100000-in-just-one-week-1.500144912",
+   "credibility": "medium"
+  },
+  {
+   "id": "T27",
+   "set": "market_prices",
+   "title": "Arab News, $50k for a few hours work? Backlash against Gulf influencers (13 Dec 2016)",
+   "publisher": "Arab News",
+   "year": "2016",
+   "evidence_type": "news, 2016: typical UAE $1,000-5,000 per post; one quote Dh175,000 for event+6 posts. Old.",
+   "url": "https://www.arabnews.com/node/1023356",
+   "credibility": "low"
+  },
+  {
+   "id": "T28",
+   "set": "market_prices",
+   "title": "Scrumball, top TikTok influencers in Saudi Arabia (USD est. pricing per profile)",
+   "publisher": "Scrumball",
+   "year": "",
+   "evidence_type": "modelled estimate (about $1.6-2.4 per 1,000 followers at 3M+); not transacted",
+   "url": "https://www.scrumball.com/ranking/top-tiktok-influencers-in-saudi-arabia",
+   "credibility": "low"
+  },
+  {
+   "id": "T29",
+   "set": "market_prices",
+   "title": "Lumanu, 2025 influencer compensation insights (255K payouts, global/US-heavy)",
+   "publisher": "Lumanu",
+   "year": "2025",
+   "evidence_type": "transacted payout averages, global",
+   "url": "https://www.lumanu.com/blog/breaking-down-1-billion-in-creator-payouts-2025-influencer-compensation-insights",
+   "credibility": "medium"
+  },
+  {
+   "id": "T30",
+   "set": "market_prices",
+   "title": "Boomerang UAE, influencer budgets in the Gulf (16 Sep 2025)",
+   "publisher": "Boomerang UAE",
+   "year": "2025",
+   "evidence_type": "agency blog; agency commission 15-30% of spend; Dubai 50-500K package AED 3,500-10,000",
+   "url": "https://www.boomerang.ae/post/a-strategic-guide-to-influencer-marketing-budgets-in-the-gulf",
+   "credibility": "low"
+  },
+  {
+   "id": "T31",
+   "set": "market_prices",
+   "title": "Afia Digital, Influencer marketing Saudi Arabia (20 Sep 2025)",
+   "publisher": "Afia Digital",
+   "year": "2025",
+   "evidence_type": "agency FAQ: SAR 1,000 (nano) to 50,000+ (mega)",
+   "url": "https://afiadigital.com/influencer-marketing-saudi-arabia/",
+   "credibility": "low"
+  },
+  {
+   "id": "T32",
+   "set": "market_prices",
+   "title": "Hypebox, best influencer agencies in Saudi Arabia (Sep/Oct 2026)",
+   "publisher": "Hypebox",
+   "year": "2026",
+   "evidence_type": "agency listicle; budget items; UAE nano Reel+2-3 stories AED 1,500 (no SAR rates)",
+   "url": "https://hypebox.me/blog/articles/best-influencer-marketing-agencies-in-saudi-arabia-(2026-comparison)",
+   "credibility": "low"
+  },
+  {
+   "id": "T33",
+   "set": "market_prices",
+   "title": "Influentials / ainfluencer / Filmdaily / Crexora (non-Gulf and Dubai agency margin statements, via search results)",
+   "publisher": "Influentials / ainfluencer / Filmdaily / Crexora (non-Gulf and Dubai agency margin statements",
+   "year": "",
+   "evidence_type": "agency margin 10-30%; Dubai guide 15-25%",
+   "url": "https://www.influentials.com/en-us/faq/what-are-typical-pricing-and-margin-models-for-influencer-and-ugc-services",
+   "credibility": "low"
+  },
+  {
+   "id": "T34",
+   "set": "market_prices",
+   "title": "Mad Influence (Dubai) founder interview, YourStory: 25-30% margin on ~$100K monthly tickets (undated, via search summary)",
+   "publisher": "Mad Influence (Dubai) founder interview",
+   "year": "",
+   "evidence_type": "self-reported agency margin",
+   "url": "https://yourstory.com/",
+   "credibility": "low"
+  },
+  {
+   "id": "T35",
+   "set": "market_prices",
+   "title": "Khamsat / Mostaql freelance UGC listings (Arabic marketplaces)",
+   "publisher": "Khamsat / Mostaql freelance UGC listings (Arabic marketplaces)",
+   "year": "",
+   "evidence_type": "freelance UGC video from USD 25; KSA-targeted brief budget USD 25-50",
+   "url": "https://khamsat.com/video-design/ugc-videos/",
+   "credibility": "low"
+  },
+  {
+   "id": "T36",
+   "set": "market_prices",
+   "title": "Frontiers in Communication 2026 (Saudi influencer marketing survey; no fee data)",
+   "publisher": "Frontiers in Communication 2026 (Saudi influencer marketing survey; no fee data)",
+   "year": "2026",
+   "evidence_type": "academic; n=38 consumers + experts; no fees",
+   "url": "https://www.frontiersin.org/journals/communication/articles/10.3389/fcomm.2026.1723356/full",
+   "credibility": "medium"
+  },
+  {
+   "id": "CS1",
+   "set": "campaign_structure",
+   "title": "Nano vs Micro vs Mega influencer pricing (2026 data)",
+   "publisher": "OpenSponsorship",
+   "year": "2026",
+   "date": "Data Jan 2025-Jun 2026, pulled Jul 2026",
+   "evidence_type": "DATA: 1,527 paid deliverables (1,502 by tier), medians, own platform",
+   "url": "https://opensponsorship.com/blog/nano-micro-mega-influencer-pricing-data",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS2",
+   "set": "campaign_structure",
+   "title": "Engagement rate benchmarks 2025 (Qoruz) and Stack Influence average engagement rate",
+   "publisher": "Qoruz; Stack Influence",
+   "year": "2025",
+   "date": "2025",
+   "evidence_type": "OPINION/vendor benchmarks, differing definitions",
+   "url": "https://qoruz.com/blog/engagement-rate-benchmarks-to-aim-for-in-2025/",
+   "more_urls": [
+    "https://stackinfluence.com/blog/the-average-influencer-engagement-rate"
+   ],
+   "credibility": ""
+  },
+  {
+   "id": "CS3",
+   "set": "campaign_structure",
+   "title": "Comparing Instagram engagement rates: micro vs mega",
+   "publisher": "HypeAuditor blog",
+   "year": "2026",
+   "date": "Created 2018, updated 2026",
+   "evidence_type": "DATA: 36,000+ influencers, tier chart not in text",
+   "url": "https://blog.hypeauditor.com/how-do-micro-influencers-and-mega-influencers-compare-in-instagram-engagement-rates",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS4",
+   "set": "campaign_structure",
+   "title": "A meta-analysis of the effectiveness of social media influencers (Barari, Eisend, Jain), J. Academy of Marketing Science",
+   "publisher": "Springer; CBS repository",
+   "year": "2025",
+   "date": "Online 21 May 2025",
+   "evidence_type": "DATA: meta-analysis, 71 papers, 135 experiments, 571 effect sizes",
+   "url": "https://link.springer.com/article/10.1007/s11747-025-01107-3",
+   "more_urls": [
+    "https://research.cbs.dk/en/publications/a-meta-analysis-of-the-effectiveness-of-social-media-influencers-/"
+   ],
+   "credibility": ""
+  },
+  {
+   "id": "CS5",
+   "set": "campaign_structure",
+   "title": "Research note on the same study (follower size vs product type)",
+   "publisher": "Foster School of Business, University of Washington",
+   "year": "2026",
+   "date": "25 Mar 2026",
+   "evidence_type": "Secondary summary",
+   "url": "https://foster.uw.edu/news/research-shailendra-pratap-jain-influencer-marketing/",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS6",
+   "set": "campaign_structure",
+   "title": "Driving brand engagement through online social influencers (Hughes, Swaminathan, Brooks), J. Marketing 83(5)",
+   "publisher": "AMA / Journal of Marketing",
+   "year": "2019",
+   "date": "2019",
+   "evidence_type": "DATA: 57 campaigns, 600 blogs, 1,800 posts + experiment",
+   "url": "https://journals.sagepub.com/doi/10.1177/0022242919854374",
+   "more_urls": [
+    "https://ama.org/2019/08/07/how-to-drive-better-engagement-from-sponsored-blogging"
+   ],
+   "credibility": ""
+  },
+  {
+   "id": "CS7",
+   "set": "campaign_structure",
+   "title": "How is influencer follower size related to brand responses? (van Reijmersdal et al.), J. Advertising Research 64(4)",
+   "publisher": "ARF / WARC",
+   "year": "2024",
+   "date": "1 Nov 2024",
+   "evidence_type": "DATA: survey of followers, N=299",
+   "url": "https://thearf.org/category/ua_resource/who-is-more-persuasive-to-an-audience-micro-macro-or-mega-influencers",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS8",
+   "set": "campaign_structure",
+   "title": "Instagram engagement benchmarks (Buffer 27M posts / 273K accounts; Socialinsider 35M posts / 447,613 accounts, via secondary pages)",
+   "publisher": "Buffer; Socialinsider",
+   "year": "2026",
+   "date": "2025-2026",
+   "evidence_type": "DATA (chart not readable; secondary for Socialinsider)",
+   "url": "https://buffer.com/library/instagram-engagement/",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS9",
+   "set": "campaign_structure",
+   "title": "Are top travel influencers all influencing the exact same people? (Ryan Solutions)",
+   "publisher": "Hotel Online",
+   "year": "2016",
+   "date": "29 Mar 2016",
+   "evidence_type": "DATA: 10 Twitter accounts, unique-reach calculation; old and narrow",
+   "url": "https://www.hotel-online.com/news/are-top-travel-influencers-all-influencing-the-exact-same-people",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS10",
+   "set": "campaign_structure",
+   "title": "Follower overlap and influencer incremental profit (Douyin live-stream commerce)",
+   "publisher": "ICIS 2025 (AIS eLibrary)",
+   "year": "2025",
+   "date": "2025",
+   "evidence_type": "DATA: academic paper",
+   "url": "https://aisel.aisnet.org/icis2025/da_bus/da_bus/2",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS11",
+   "set": "campaign_structure",
+   "title": "Advertising repetition: a meta-analysis on effective frequency (Schmidt & Eisend), J. Advertising",
+   "publisher": "Journal of Advertising (summaries via Scinapse, WARC)",
+   "year": "2015",
+   "date": "2015",
+   "evidence_type": "DATA: meta-analysis, lab/experimental",
+   "url": "https://www.scinapse.io/papers/1997972528",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS12",
+   "set": "campaign_structure",
+   "title": "Why one-off creator campaigns fall short (cites NeoReach Creator Impact Report 2026; TikTok Brand Basics)",
+   "publisher": "Viral Nation",
+   "year": "2026",
+   "date": "2 Oct 2026",
+   "evidence_type": "DATA: surveys n=1,050 consumers and n=539 creators (Jan-Mar 2026), self-reported; TikTok paid-ad analysis",
+   "url": "https://www.viralnation.com/blog/one-off-vs-multi-post-creator-campaigns",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS13",
+   "set": "campaign_structure",
+   "title": "Driving brand growth with YouTube creators (Kantar, commissioned by Google)",
+   "publisher": "Kantar",
+   "year": "2026",
+   "date": "2025 data, page 2026",
+   "evidence_type": "PLATFORM-commissioned DATA: 40 US campaigns, 11 verticals",
+   "url": "https://www.kantar.com/Industries/Media/Driving-Brand-Growth-with-YouTube-Creators",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS14",
+   "set": "campaign_structure",
+   "title": "MENA brands: unlock creator power in video ads (Ali Cheikhali)",
+   "publisher": "Think with Google (Google MENA)",
+   "year": "2024",
+   "date": "Mar 2024",
+   "evidence_type": "PLATFORM case experiments: 11 creators, 8 verticals, 6 countries",
+   "url": "https://business.google.com/en-all/think/search-and-video/mena-brands-tap-creator-power-for-video-ads/",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS15",
+   "set": "campaign_structure",
+   "title": "Pharmaceutical and medical device advertising in Saudi Arabia (summarising SFDA guide of 20 Oct 2022)",
+   "publisher": "CMS expert guide",
+   "year": "2024",
+   "date": "Updated 8 May 2024",
+   "evidence_type": "REG via law-firm summary",
+   "url": "https://cms.law/en/int/expert-guides/cms-expert-guide-to-advertising-of-medicines-and-medical-devices/saudi-arabia",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS16",
+   "set": "campaign_structure",
+   "title": "Influencer marketing statistics (Sprout Social Q1 2025 Pulse Survey)",
+   "publisher": "Sprout Social",
+   "year": "2025",
+   "date": "2025",
+   "evidence_type": "DATA: 650 marketers US/UK/AU",
+   "url": "https://sproutsocial.com/insights/influencer-marketing-statistics/",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS17",
+   "set": "campaign_structure",
+   "title": "Case studies: 6thStreet Snapchat Creator Ads; Kingdom's Lenscape AR",
+   "publisher": "casestudies.com (Snap); thebrandberries",
+   "year": "2026",
+   "date": "2024-2026",
+   "evidence_type": "PLATFORM/vendor cases",
+   "url": "https://www.casestudies.com/company/snapchat/case-study/6thstreet-boosts-app-installs-58-with-snapchat",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS18",
+   "set": "campaign_structure",
+   "title": "Does Snap hold attention, boost recall, lift brand choice in Saudi Arabia (Dentsu MENA / Lumen); Snap KSA creator hub coverage",
+   "publisher": "Campaign Middle East; AGBI",
+   "year": "2026",
+   "date": "2024-2026",
+   "evidence_type": "PLATFORM-related, undated study",
+   "url": "https://campaignme.com/does-snap-hold-attention-boost-recall-lift-brand-choice-in-saudi-arabia/",
+   "more_urls": [
+    "https://agbi.com/analysis/media/2024/12/snap-snapchat-saudi-arabia-office-creator-hub-mena-social-media"
+   ],
+   "credibility": ""
+  },
+  {
+   "id": "CS19",
+   "set": "campaign_structure",
+   "title": "Nano, micro, macro or mega influencers; Trackier guide; Indixital; Kofluence",
+   "publisher": "Make Influence; Trackier; Indixital; Kofluence",
+   "year": "2026",
+   "date": "2025-2026",
+   "evidence_type": "OPINION",
+   "url": "https://www.makeinfluence.com/en/academy/nano-micro-macro-or-mega-influencers",
+   "more_urls": [
+    "https://trackier.com/guide-to-influencer-tier-nano-creators-to-megastars/",
+    "https://indixital.com/blog/how-to-choose-the-right-influencer-marketing-mix/"
+   ],
+   "credibility": ""
+  },
+  {
+   "id": "CS20",
+   "set": "campaign_structure",
+   "title": "Micro vs macro ROI for DTC brands; micro vs macro sourcing guides",
+   "publisher": "ATTN Agency; Jem Social; others",
+   "year": "2026",
+   "date": "2025-2026",
+   "evidence_type": "OPINION/vendor, no method",
+   "url": "https://www.attnagency.com/blog/micro-influencer-vs-macro-influencer-roi-comparison-dtc-brands",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS21",
+   "set": "campaign_structure",
+   "title": "Why GCC CPG brands may need to rethink the mega-influencer premium (cites The Hovi, P&S Intelligence, YouGov)",
+   "publisher": "Communicate Online",
+   "year": "2026",
+   "date": "5 Sep 2026",
+   "evidence_type": "Trade press citing unpublished or unlinked data",
+   "url": "https://communicateonline.me/insights/why-gcc-cpg-brands-may-need-to-rethink-the-mega-influencer-premium/",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS22",
+   "set": "campaign_structure",
+   "title": "Healthcare professional influencers (Inbeat)",
+   "publisher": "Inbeat",
+   "year": "2026",
+   "date": "6 Oct 2026",
+   "evidence_type": "OPINION (agency)",
+   "url": "https://inbeat.agency/blog/healthcare-professional-influencers",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS23",
+   "set": "campaign_structure",
+   "title": "What 508,000 posts reveal about TikTok performance",
+   "publisher": "quso.ai",
+   "year": "",
+   "date": "undated",
+   "evidence_type": "DATA, vendor",
+   "url": "https://quso.ai/research/tiktok-data-findings",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS24",
+   "set": "campaign_structure",
+   "title": "(How) does the number of followers impact the success of influencer marketing? A construal level perspective (Cowan, Marder, Lavertu, Li), J. Advertising Research 66(1)",
+   "publisher": "Taylor & Francis / Strathclyde",
+   "year": "2025",
+   "date": "Online 18 Apr 2025",
+   "evidence_type": "DATA: secondary data + 3 experiments (abstract only)",
+   "url": "https://strathprints.strath.ac.uk/id/eprint/92703",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS25",
+   "set": "campaign_structure",
+   "title": "Influencer marketing in MENA: redefining brand engagement; ExchangeWire MENA micro-influencer piece",
+   "publisher": "Influencer Marketing Hub; ExchangeWire",
+   "year": "2025",
+   "date": "Aug 2026; 3 Dec 2025",
+   "evidence_type": "Trade/vendor, figures partly undated or unsourced",
+   "url": "https://influencermarketinghub.com/mena-influencer-marketing-report/",
+   "more_urls": [
+    "https://www.exchangewire.com/blog/2025/12/03/mena-the-middle-east-is-witnessing-the-rise-of-the-micro-influencer/"
+   ],
+   "credibility": ""
+  },
+  {
+   "id": "CS26",
+   "set": "campaign_structure",
+   "title": "How often should the same influencer post for your brand",
+   "publisher": "Make Influence",
+   "year": "",
+   "date": "undated",
+   "evidence_type": "OPINION (states no universal number)",
+   "url": "https://www.makeinfluence.com/en/academy/how-often-should-the-same-influencer-post-for-your-brand",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS27",
+   "set": "campaign_structure",
+   "title": "Influencer marketing for pharmaceutical brands: compliance-first",
+   "publisher": "HireInfluence; Linqia; netinfluencer",
+   "year": "2026",
+   "date": "2025-2026",
+   "evidence_type": "OPINION (agency)",
+   "url": "https://hireinfluence.com/blog/influencer-marketing-agency-for-pharmaceutical-brands-compliance-first-enterprise-campaigns/",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS28",
+   "set": "campaign_structure",
+   "title": "Healthcare influencer marketing: a results playbook for regulated brands (Alana Willis)",
+   "publisher": "Later",
+   "year": "2026",
+   "date": "5 Aug 2026",
+   "evidence_type": "OPINION + vendor case (217 micro creators, US CPG)",
+   "url": "https://later.com/blog/healthcare-influencer-marketing-a-results-playbook-for-regulated-brands/",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS29",
+   "set": "campaign_structure",
+   "title": "Sermo/LiveWorld KOL & DOL survey; Sermo physician trust blog",
+   "publisher": "Sermo",
+   "year": "2024",
+   "date": "Sep 2024",
+   "evidence_type": "DATA: 317 US physicians, commercial sponsor",
+   "url": "https://www.sermo.com/press-releases/sermo-and-liveworld-survey-kols-dols-genuinely-influence-hcps-on-social-channels/",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS30",
+   "set": "campaign_structure",
+   "title": "DeFacto (vendor page); L'Oreal Paris Ramadan (Amazon Ads)",
+   "publisher": "ainfluencer; Amazon Advertising",
+   "year": "",
+   "date": "undated",
+   "evidence_type": "Vendor/platform cases",
+   "url": "https://ainfluencer.com/case-studies/defacto/",
+   "more_urls": [
+    "https://advertising.amazon.com/library/case-studies/loreal-paris-ramadan-campaign"
+   ],
+   "credibility": ""
+  },
+  {
+   "id": "CS31",
+   "set": "campaign_structure",
+   "title": "YAAP Middle East 2023 UAE report",
+   "publisher": "NetInfluencer; Arabian Marketer; Campaign ME",
+   "year": "2023",
+   "date": "2023",
+   "evidence_type": "DATA: survey 150+ corporations (trade summary)",
+   "url": "https://www.netinfluencer.com/yaap-middle-east-2023-uae-report/",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS32",
+   "set": "campaign_structure",
+   "title": "Mawthooq licensing",
+   "publisher": "Clyde & Co; Gulf News; Everything PR",
+   "year": "2024",
+   "date": "2022-2024",
+   "evidence_type": "REG/trade",
+   "url": "https://www.clydeco.com/en/insights/2022/09/new-social-media-requirements-for-saudi-arabia",
+   "more_urls": [],
+   "credibility": ""
+  },
+  {
+   "id": "CS33",
+   "set": "campaign_structure",
+   "title": "MMA MENA publishes standardised influencer marketing guide",
+   "publisher": "Campaign Middle East",
+   "year": "2026",
+   "date": "22 May 2026",
+   "evidence_type": "Industry body guide (not public)",
+   "url": "https://campaignme.com/mma-mena-publishes-a-standardised-influencer-marketing-guide/",
+   "more_urls": [],
+   "credibility": ""
+  }
+ ]
+}
