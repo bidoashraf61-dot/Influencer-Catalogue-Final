@@ -431,7 +431,7 @@
     /* -- the name and one line -- */
     var pitch = h("section", { class: "cx-pitch", "aria-label": "About HELVY Connect" });
     pitch.appendChild(h("h1", { class: "cx-vh" }, "HELVY Connect"));
-    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c3", alt: "HELVY Connect", width: "440", height: "220", fetchpriority: "high" }));
+    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c4", alt: "HELVY Connect", width: "440", height: "220", fetchpriority: "high" }));
     pitch.appendChild(h("p", { class: "cx-pitch__tag" }, "Connecting Brands with the Right Voices"));
 
     /* -- the card, Helvy standing on it -- */

@@ -327,8 +327,8 @@ def _send_smtp(c, to, subject, text, html=None, reply_to=None):
 # Client emails are drawn from images on the catalogue host: absolute https URLs
 # (mail clients cannot reach relative paths) and PNG, because Outlook shows no WebP.
 SITE = "https://influencer-catalogue.hellovoice.co.uk"
-EMAIL_LOGO = SITE + "/assets/brand/helvy-connect/helvy-connect-email-480.png"        # on white
-EMAIL_LOGO_INK = SITE + "/assets/brand/email/helvy-connect-on-ink-480.png"            # on the ink header
+EMAIL_LOGO = SITE + "/assets/brand/helvy-connect/helvy-connect-email-480.png?v=c4"        # on white
+EMAIL_LOGO_INK = SITE + "/assets/brand/email/helvy-connect-on-ink-480.png?v=c4"            # on the ink header
 EMAIL_HELVY = SITE + "/assets/brand/email/helvy-still-192.png"                        # smile, transparent cut-out (no disc)
 EMAIL_HV = SITE + "/assets/brand/email/hellovoice-white-240.png"                      # Powered by
 
