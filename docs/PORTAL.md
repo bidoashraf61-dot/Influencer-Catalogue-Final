@@ -207,7 +207,7 @@ The e2e suite uses a stubbed Gemini and captured mail, and never touches
 | Piece | File | Notes |
 |---|---|---|
 | Bell (in-portal notifications) | `inbox.py` | Table `notifications`, per account. Groups: analysis, selections, campaigns, account, ideas (off by default). Toggles only filter the bell; history keeps everything. Never emailed. |
-| Analysis gating | `gating.py` | Table `analysis_grants`. Free headline; locked sections are sample data made on the server. Requests only for creators in the client's (team's) selections. Admin **Fulfil** on Creator analysis, or an upload, unlocks for the client's team and rings the bell. Past handled requests became grants on first start. Fit-score evidence and assistant tools hide locked figures. |
+| Analysis gating | `gating.py` | Table `analysis_grants`. Free headline only (followers, platforms, average views, engagement, data date). The locked page is the real analysis page (same sections, cards and tabs) drawn from `gating.sample(code, platform)`, a whole analysis made from the code alone, blurred under Sample data + Locked. Requests only for creators in the client's (team's) selections. Admin **Fulfil** on Creator analysis, or an upload, unlocks for the client's team and rings the bell. Past handled requests became grants on first start. Fit-score evidence (measured audience part, its strengths and watch-outs, audience checks) and assistant tools (incl. average likes and comments) hide locked figures; discovery filters only on engagement and views for a client; content ideas drafted from the analysis are not served to a client it is locked for. |
 | Selection status | `selstatus.py` | Table `selection_status`. Owner approves / rejects (optional reason); HelloVoice sets anything incl. Unavailable (admin selection page → **Client status** tab, or the client page). HelloVoice changes ring the bell; client changes email the KAM once per 5-minute burst (`notify` event `status`). **Find a replacement**: 2 credits (`costs.replace`), three similar creators kept on the row, reopening is free. |
 | Rewards and invites | `rewards.py` | Profile rewards (30 in all, once, non-blank) as ledger lines `Profile reward: …` with ref `reward:<step>`; invites table; +20 to the inviter on the colleague's first sign-in (same domain, max 5). |
 | Profile page | `account/index.html`, `assets/js/account.js`, `assets/css/account.css` | Overview, Selections, Analyses, Campaigns, Briefs, Notifications, Credits, Account. New profile fields: brands, industry, markets, language (pre-fill briefs). Helvy's picture is ONE file: `assets/brand/helvy.webp`. |
@@ -216,7 +216,7 @@ The e2e suite uses a stubbed Gemini and captured mail, and never touches
 New client routes: `GET /api/notifications`, `POST /api/notifications/read`, `POST /api/selection/status`, `/api/selection/reason`,
 `/api/selection/replace`. Admin: `POST /analysis/fulfil`, `POST /selections/status`. All tables are created by `portal.init()`.
 
-Tests: `python3 admin/tests/e2e_portal_v3.py` (includes a check that locked figures never appear in `/api/creator` or `/api/selection`).
+Tests: `python3 admin/tests/e2e_portal_v3.py` and `e2e_portal_fixes3_gating.py` (locked figures never appear in `/api/creator`, selection scores, look-alikes, more, replacements, the AI shortlist, ideas, Helvy's tools or discovery; a granted client gets them all).
 
 ## Phases C + D: HELVY Connect (branch `portal-cd`)
 
