@@ -1127,7 +1127,8 @@
       Array.prototype.forEach.call(document.querySelectorAll(".cat-card[data-code]"), function (card) {
         var v = FIT.scores[card.getAttribute("data-code")];
         var b = card.querySelector(".pt-fit");
-        if (!v) { if (b) b.remove(); return; }
+        // A card that already shows its own % match (selection pages) keeps one number only.
+        if (!v || card.querySelector(".cat-score")) { if (b) b.remove(); card.classList.remove("pt-has-fit"); return; }
         if (!b) { b = h("span", { class: "pt-fit" }); card.classList.add("pt-has-fit"); card.appendChild(b); }
         b.className = "pt-fit pt-fit--" + scoreClass(v[1]);
         b.textContent = (LANG === "ar" ? "ملاءمة " : "Fit ") + v[0] + "%";
