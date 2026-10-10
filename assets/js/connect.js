@@ -157,7 +157,7 @@
         h("div", { class: "cx-verdict cx-verdict--" + (v.grade || "none") }, h("b", null, v.label || "Add a budget"), h("small", null, "against the benchmark"))));
       var dl = h("dl", { class: "cx-figs" });
       (res.figures || []).forEach(function (f) {
-        var n = h("span", { class: "cx-n" }, fig(f));
+        var n = h("span", { class: "cx-n" }, h("span", { class: "cx-v" }, fig(f)));
         if (f.unit) n.appendChild(h("small", null, f.unit === "×" ? "×" : f.unit === "%" ? "%" : " " + f.unit));
         dl.appendChild(h("div", null, h("dt", null, f.label), h("dd", null, n, f.sig ? h("div", null, sig(f.sig)) : null)));
       });
@@ -178,12 +178,18 @@
         var pct = function (x) { return Math.max(0, Math.min(100, (x - lo) / span * 100)); };
         var fair = h("span", { class: "cx-band__fair" }); fair.style.left = pct(c.fair[0]) + "%"; fair.style.width = (pct(c.fair[1]) - pct(c.fair[0])) + "%";
         var cr = c.range && c.range[0] !== c.range[1] ? c.range : [c.value, c.value];
-        var you = h("span", { class: "cx-band__you" }, h("span", null, "SAR " + (cr[0] === cr[1] ? sar(cr[0]) : sar(cr[0]) + "–" + sar(cr[1]))));
+        var yours = "SAR " + (cr[0] === cr[1] ? sar(cr[0]) : sar(cr[0]) + "–" + sar(cr[1]));
+        var you = h("span", { class: "cx-band__you" });
         you.style.left = pct(cr[0]) + "%"; you.style.width = Math.max(0, pct(cr[1]) - pct(cr[0])) + "%";
-        box.appendChild(h("div", { class: "cx-band" },
+        var fairTxt = "SAR " + sar(c.fair[0]) + "–" + sar(c.fair[1]);
+        var band = h("div", { class: "cx-band", "data-grade": (res.verdict && res.verdict.grade) || "none" },
           h("div", { class: "cx-band__hd" }, h("b", null, "Your " + c.label + " against a fair range"), h("span", null, (res.market_label || "KSA") + ", " + res.platforms.join(" and "))),
           h("div", { class: "cx-band__track" }, fair, you),
-          h("div", { class: "cx-band__k" }, h("span", null, "SAR " + sar(c.scale[0])), h("span", null, "Fair: SAR " + sar(c.fair[0]) + "–" + sar(c.fair[1])), h("span", null, "SAR " + sar(c.scale[1])))));
+          h("div", { class: "cx-band__k" }, h("span", null, "SAR " + sar(c.scale[0])), h("span", null, "SAR " + sar(c.scale[1]))),
+          h("ul", { class: "cx-band__lg" },
+            h("li", { class: "is-fair" }, h("i"), h("span", null, "Fair range"), h("b", null, fairTxt)),
+            h("li", { class: "is-you" }, h("i"), h("span", null, "Your " + c.label), h("b", null, yours))));
+        box.appendChild(band);
       }
       if (res.skipped && res.skipped.length) box.appendChild(h("p", { class: "cx-skipped" }, "Not on these platforms, so left out: " + res.skipped.slice(0, 6).join(", ") + (res.skipped.length > 6 ? "…" : "") + "."));
       if (!opts.compact) box.appendChild(h("p", { class: "cx-srcs" }, ESTIMATE_LINE + " After the campaign, your report shows estimate vs actual."));
@@ -289,7 +295,7 @@
       card.appendChild(h("p", null, res.summary + (res.budget ? " · SAR " + money(res.budget) : "")));
       var dl = h("dl", { class: "cx-figs" });
       (res.figures || []).slice(0, 4).forEach(function (f) {
-        var n = h("span", { class: "cx-n" }, fig(f));
+        var n = h("span", { class: "cx-n" }, h("span", { class: "cx-v" }, fig(f)));
         if (f.unit) n.appendChild(h("small", null, f.unit === "SAR" ? " SAR" : f.unit));
         dl.appendChild(h("div", null, h("dt", null, f.label), h("dd", null, n)));
       });

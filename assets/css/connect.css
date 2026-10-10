@@ -291,23 +291,32 @@
 .cx-verdict--low b { background: var(--vivid-red); }
 .cx-verdict--none b { background: var(--cx-stone-2); color: var(--ink); }
 .cx-verdict small { margin-top: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--cx-mute); }
-.cx-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); margin: 18px 0 0; border-top: 1px solid rgba(18,18,18,.12); }
+.cx-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 18px 0 0; border-top: 1px solid rgba(18,18,18,.12); }
 .cx-figs > div { padding: 14px 14px 12px 0; min-width: 0; border-bottom: 1px solid rgba(18,18,18,.12); }
 .cx-figs dt { font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--cx-mute); }
 .cx-figs dd { margin: 6px 0 0; }
-.cx-figs .cx-n { display: block; font-family: var(--heading); font-size: clamp(2.1rem, 1.6rem + 1vw, 2.6rem); line-height: .95; white-space: nowrap; }
+.cx-figs .cx-n { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: 6px; font-family: var(--heading); font-size: clamp(1.75rem, 1.4rem + .75vw, 2.2rem); line-height: .95; }
+.cx-figs .cx-v { white-space: nowrap; }
 .cx-figs .cx-n small { font-size: .5em; color: var(--cx-mute); letter-spacing: .04em; }
 .cx-figs .cx-sig { margin-top: 7px; }
 .cx-figs > div:first-child .cx-n { color: var(--go); }
 .cx-band { margin-top: 20px; }
 .cx-band__hd { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; flex-wrap: wrap; }
 .cx-band__hd b { font-weight: 700; }
-.cx-band__track { position: relative; height: 26px; border-radius: 8px; background: var(--white); margin: 42px 0 6px; }
-.cx-band__fair { position: absolute; top: 0; bottom: 0; border-radius: 8px; background: var(--go-soft); box-shadow: inset 0 0 0 1px rgba(20,136,74,.35); }
-/* The client's own cost is a range now (fix batch 4): an ink bar from low to high, never thinner than a tick. */
-.cx-band__you { position: absolute; top: -6px; bottom: -6px; width: 3px; min-width: 3px; border-radius: 4px; background: var(--ink); }
-.cx-band__you span { position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); white-space: nowrap; font-family: var(--heading); font-size: 18px; letter-spacing: .03em; padding: 3px 9px 1px; border-radius: 999px; background: var(--ink); color: var(--lime); }
+.cx-band__track { position: relative; height: 14px; border-radius: 999px; background: var(--white); margin: 16px 0 8px; box-shadow: inset 0 0 0 1px rgba(18,18,18,.1); }
+.cx-band__fair { position: absolute; top: 0; bottom: 0; border-radius: 999px; background: var(--go-soft); box-shadow: inset 0 0 0 1px rgba(20,136,74,.45); }
+/* The client's own cost is a range: a rounded bar from low to high in the verdict's colour, never thinner than a dot. */
+.cx-band__you { position: absolute; top: -4px; bottom: -4px; min-width: 14px; border-radius: 999px; background: var(--ink); box-shadow: 0 0 0 2px var(--cx-card, #e8ddd0); }
+.cx-band[data-grade="good"] .cx-band__you, .cx-band[data-grade="good"] .is-you i { background: #14884a; }
+.cx-band[data-grade="moderate"] .cx-band__you, .cx-band[data-grade="moderate"] .is-you i { background: #e2780f; }
+.cx-band[data-grade="low"] .cx-band__you, .cx-band[data-grade="low"] .is-you i { background: #d9261c; }
 .cx-band__k { display: flex; justify-content: space-between; font-size: 12px; color: var(--cx-mute); gap: 8px; }
+.cx-band__lg { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 6px; font-size: 13.5px; }
+.cx-band__lg li { display: grid; grid-template-columns: 14px 1fr auto; align-items: center; gap: 10px; }
+.cx-band__lg i { width: 14px; height: 14px; border-radius: 999px; background: var(--ink); }
+.cx-band__lg .is-fair i { background: var(--go-soft); box-shadow: inset 0 0 0 1px rgba(20,136,74,.55); }
+.cx-band__lg span { color: var(--cx-mute); }
+.cx-band__lg b { font-weight: 700; font-variant-numeric: tabular-nums; }
 .cx-advice { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: start; margin-top: 18px; }
 .cx-advice .cx-hd { width: 52px; height: 52px; }
 .cx-advice__b { background: var(--white); border-radius: 18px 18px 18px 6px; padding: 12px 16px; font-size: 14.5px; line-height: 1.5; }
