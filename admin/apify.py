@@ -45,7 +45,7 @@ PRESETS = {
                     "input": '{"profiles": "{{handles}}", "maxResults": "{{count}}"}'},
     "tt_analytics": {"label": "TikTok · engagement analytics", "platform": "TikTok", "kind": "analysis",
                      "actor": "maximedupre/tiktok-creator-analytics", "est": 0.0001,
-                     "input": '{"target": "handles", "creatorHandles": "{{handles}}", "postSampleSize": 20}'},
+                     "input": '{"target": "handles", "creatorHandles": "{{handles}}", "postSampleSize": 100}'},
     "tt_audience": {"label": "TikTok · audience demographics (one run per creator)", "platform": "TikTok",
                     "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 1.70,
                     "input": '{"influencerHandle": "{{handle}}", "platform": "tiktok"}'},
@@ -54,6 +54,9 @@ PRESETS = {
 }
 
 MAX_PARALLEL = 5                       # per-creator runs in flight at once
+# TikTok analytics samples the last 100 posts (the actor charges $0.00001 per creator at any size,
+# 1-100); a creator with fewer posts is covered whole. Fix batch 6, Bido 2026-10-10.
+TIKTOK_SAMPLE = 100
 # Actors that run out of memory on a long list are sent a few creators at a time.
 CHUNK = {"maximedupre/tiktok-creator-analytics": 25}
 
@@ -147,6 +150,11 @@ def init():
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(api_jobs)")}
         if "est_each" not in cols:
             conn.execute("ALTER TABLE api_jobs ADD COLUMN est_each REAL NOT NULL DEFAULT 0.01")
+        # Fix batch 6: TikTok analytics jobs saved with the old 20-post sample take 100 (same price).
+        for r in conn.execute("SELECT id, input FROM api_jobs WHERE actor = ?", ("maximedupre/tiktok-creator-analytics",)).fetchall():
+            fixed = re.sub(r'("postSampleSize"\s*:\s*)(\d+)', lambda m: m.group(1) + str(TIKTOK_SAMPLE) if int(m.group(2)) < TIKTOK_SAMPLE else m.group(0), r["input"])
+            if fixed != r["input"]:
+                conn.execute("UPDATE api_jobs SET input = ? WHERE id = ?", (fixed, r["id"]))
 
 
 # -------------------------------------------------------------------- token --
@@ -667,6 +675,57 @@ def derive_instagram(it):
     return out
 
 
+def _median(v):
+    v = sorted(v)
+    n = len(v)
+    return None if not n else (v[n // 2] if n % 2 else (v[n // 2 - 1] + v[n // 2]) / 2.0)
+
+
+def _pctile(v, q):
+    v = sorted(v)
+    return None if not v else v[int(round(q * (len(v) - 1)))]
+
+
+def post_stats(posts, rp=None):
+    """What the sampled posts say about a typical post: the MEDIAN views, likes and comments (an
+    average is lifted by viral posts), the middle half of views, how much views swing (spread over
+    the average), and how many posts the sample holds. A creator with fewer posts than were asked
+    for is covered whole: `sample_posts` is how many were really used."""
+    views = [p["views"] for p in posts if isinstance(p.get("views"), (int, float)) and p["views"] >= 0]
+    likes = [p["likes"] for p in posts if isinstance(p.get("likes"), (int, float)) and p["likes"] >= 0]
+    coms = [p["comments"] for p in posts if isinstance(p.get("comments"), (int, float)) and p["comments"] >= 0]
+    shares = [p["shares"] for p in posts if isinstance(p.get("shares"), (int, float)) and p["shares"] >= 0]
+    out = {"sample_posts": len(posts)}
+    if views:
+        mean = sum(views) / float(len(views))
+        out.update(median_views=round(_median(views)), views_p25=round(_pctile(views, .25)), views_p75=round(_pctile(views, .75)),
+                   views_spread=round((sum((x - mean) ** 2 for x in views) / len(views)) ** 0.5 / mean, 2) if mean else None,
+                   views_series=[int(x) for x in views[:TIKTOK_SAMPLE]])
+    if likes:
+        out["median_likes"] = round(_median(likes), 1)
+    if coms:
+        out["median_comments"] = round(_median(coms), 1)
+    if shares:
+        out["median_shares"] = round(_median(shares), 1)
+    if views and likes and len(likes) == len(views):
+        per = [(l + (c or 0) + (s or 0)) * 100.0 / v for l, c, s, v in
+               zip(likes, coms if len(coms) == len(views) else [0] * len(views), shares if len(shares) == len(views) else [0] * len(views), views) if v > 0]
+        if per:
+            out["median_er_on_views"] = round(_median(per), 2)
+    return out
+
+
+def trim_posts(it):
+    """The analytics result with each post cut to its numbers (no caption text), so a 100-post
+    sample fits the raw store whole instead of being replaced by an "[omitted]" note."""
+    rp = it.get("recentPosts")
+    if not isinstance(rp, dict) or not isinstance(rp.get("posts"), list):
+        return it
+    slim = [{k: p.get(k) for k in ("url", "publishedAt", "views", "likes", "comments", "shares") if p.get(k) is not None}
+            for p in rp["posts"] if isinstance(p, dict)]
+    return dict(it, recentPosts=dict(rp, posts=slim))
+
+
 def derive_tiktok_analytics(it):
     """Basic numbers from the TikTok creator analytics result: the profile's own
     counts and averages over the latest posts (engagement here is measured
@@ -684,6 +743,7 @@ def derive_tiktok_analytics(it):
            "er_pct": round(eng["ratePercent"], 3) if isinstance(eng.get("ratePercent"), (int, float)) else None,
            "er_basis": "views", "posts_per_week": None, "last_post": stamps[-1] if stamps else None,
            "sample_posts": _num(rp.get("usedCount")) or len(posts), "bio": cr.get("bio") or ""}
+    out.update(post_stats(posts, rp))
     top = sorted((p for p in posts if p.get("url")), key=lambda p: p.get("views") or 0, reverse=True)
     out["top_posts"] = [{"url": p["url"], "likes": p.get("likes"), "comments": p.get("comments"), "views": p.get("views"),
                          "date": str(p.get("publishedAt") or "")[:10] or None} for p in top[:6]]
@@ -731,6 +791,10 @@ def save_basic(conn, code, plat, handle, it, m, run_id):
             data[k] = m[k]
     if m.get("avg_views") is not None:
         data["avg_views"] = m["avg_views"]
+    for k in ("median_views", "views_p25", "views_p75", "views_spread", "views_series",
+              "median_likes", "median_comments", "median_shares", "median_er_on_views"):
+        if m.get(k) not in (None, [], ""):
+            data[k] = m[k]
     if m.get("er_basis"):
         data["er_basis"] = m["er_basis"]
     db.save_analysis(code, data, "Apify basic", conn, plat)
@@ -749,7 +813,8 @@ def ingest(run, job, items):
                 continue
             h = _match(it, hmap)
             code = hmap.get(h) if h else None
-            small = it if len(json.dumps(it, default=str)) <= 20000 else _compact(it)
+            raw = trim_posts(it) if isinstance(it.get("recentPosts"), dict) else it
+            small = raw if len(json.dumps(raw, default=str)) <= 60000 else _compact(raw)
             conn.execute("INSERT INTO profile_raw (run_id, code, platform, actor, at, data) VALUES (?,?,?,?,?,?)",
                          (run["id"], code or "", plat, job["actor"] if job else "", db.now(),
                           json.dumps(small, default=str)))

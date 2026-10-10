@@ -352,7 +352,7 @@
   function T(s) { return LANG === "ar" && AR[s] ? AR[s] : s; }
   // Question and option labels from the server, by id and value.
   var QAR = {
-    goal: ["ما الهدف الرئيسي من الحملة؟", { awareness: "الوصول لأكبر عدد من الناس", engagement: "زيادة التفاعل", traffic: "زيارات ونقرات على الرابط", conversion: "زيادة المبيعات أو التسجيلات", balanced: "مزيج متوازن" }],
+    goal: ["ما الهدف الرئيسي من الحملة؟", { awareness: "الوصول لأكبر عدد من الناس", engagement: "زيادة التفاعل", traffic: "زيارات ونقرات على الرابط", balanced: "مزيج متوازن" }],
     platforms: ["أين سيُنشر المحتوى؟", { any: "لا تفضيل" }],
     market: ["في أي دول الجمهور؟", { SA: "السعودية", AE: "الإمارات", EG: "مصر", KW: "الكويت", QA: "قطر", BH: "البحرين", OM: "عُمان", JO: "الأردن" }],
     gender: ["من الجمهور؟", { Any: "الجميع", Women: "غالباً نساء", Men: "غالباً رجال" }],
@@ -3176,7 +3176,7 @@
   ];
   var AI_SHORT = { Instagram: "IG", TikTok: "TT", Snapchat: "SC", YouTube: "YT" };
   var AI_MARKET = { SA: "KSA", AE: "UAE", EG: "Egypt", KW: "Kuwait", QA: "Qatar", BH: "Bahrain", OM: "Oman", JO: "Jordan" };
-  var AI_GOAL = { awareness: "Awareness", engagement: "Engagement", traffic: "Traffic", conversion: "Conversion", balanced: "Balanced" };
+  var AI_GOAL = { awareness: "Awareness", engagement: "Engagement", traffic: "Traffic", conversion: "Traffic", balanced: "Balanced" };
   function aiSvg(path, size) {
     return '<svg viewBox="0 0 24 24" width="' + (size || 20) + '" height="' + (size || 20) + '" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + "</svg>";
   }

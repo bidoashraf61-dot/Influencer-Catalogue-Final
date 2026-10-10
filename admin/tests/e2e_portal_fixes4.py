@@ -1,6 +1,6 @@
 """End-to-end tests for the HELVY Connect fix batch 4 (2026-10-10, branch portal-fixes-4):
 
-- the AI shortlist goals are Awareness, Engagement, Traffic and Conversion (Balanced and
+- the AI shortlist goals were Awareness, Engagement, Traffic and Conversion (Conversion withdrawn in fix batch 6) (Balanced and
   Sales retired), several at once, scored as a combined objective;
 - the ROI Calculator reads a budget typed in Arabic-Indic or Persian digits, shows every
   figure as a range, and sends no sources and no advice line to the client;
@@ -59,8 +59,8 @@ class Fixes4(unittest.TestCase):
         c, _ = self.signup("goals@glowderma.com")
         s, q, _ = c.get("/api/brief/questions")
         goal = next(x for x in q["questions"] if x["id"] == "goal")
-        self.assertEqual([o["value"] for o in goal["options"]], ["awareness", "engagement", "traffic", "conversion"])
-        self.assertEqual([o["label"] for o in goal["options"]], ["Awareness", "Engagement", "Traffic", "Conversion"])
+        self.assertEqual([o["value"] for o in goal["options"]], ["awareness", "engagement", "traffic"])
+        self.assertEqual([o["label"] for o in goal["options"]], ["Awareness", "Engagement", "Traffic"])
         self.assertTrue(goal["multi_ok"])
         self.assertNotIn("legacy", goal)
 
@@ -74,7 +74,7 @@ class Fixes4(unittest.TestCase):
         s, b2, _ = c.post("/api/brief/run", {"answers": dict(ANS, goal="conversion")})
         self.assertEqual(s, 200, b2)
         s, sel2, _ = c.get("/api/selection?s=" + b2["token"])
-        self.assertEqual(sel2["brief"]["objective"], "Conversion")
+        self.assertEqual(sel2["brief"]["objective"], "Traffic")           # a saved "conversion" reads as Traffic
 
     # ---------------------------------------------------------- ROI Calculator --
     def test_03_roi_reads_arabic_digits_and_shows_ranges_only(self):
@@ -86,7 +86,7 @@ class Fixes4(unittest.TestCase):
         self.assertEqual(a["figures"], b["figures"])
         for f in a["figures"]:
             self.assertTrue(f["range"][0] <= f["value"] <= f["range"][1], f)
-        self.assertTrue(a["cost"]["scale"][0] <= a["cost"]["range"][0] and a["cost"]["range"][1] <= a["cost"]["scale"][1])
+        self.assertNotIn("cost", a)
         text = json.dumps(a)
         for gone in ("advice", "sources", "Kolsquare", "planning assumptions", "forecast of sales"):
             self.assertNotIn(gone, text)

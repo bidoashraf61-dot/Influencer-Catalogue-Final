@@ -115,7 +115,9 @@ class Fixes5(unittest.TestCase):
         self.assertEqual(sel["brief"]["target"]["gender"], "Any")
         # HV-MI-001 has 52% of the audience in KSA and 22% in UAE: far more of it is in the target
         # when both countries count, so its score rises (shares are summed, not compared one by one)
-        self.assertGreater(sel["scores"]["HV-MI-001"]["score"], legacy_scores["HV-MI-001"])
+        # Fix batch 6: the audience is no longer scored, so the NUMBER does not move with the countries (the
+        # measured audience is a check beside it, summed over the countries; locked until the analysis is unlocked)
+        self.assertEqual(sel["scores"]["HV-MI-001"]["score"], legacy_scores["HV-MI-001"])
         # budget, count and timing are one value: a list is ignored, not half-kept
         s, att, _ = c.post("/api/brief/attach", {"token": token, "answers": dict(legacy, budget=["50", "150"])})
         self.assertTrue(att["ok"], att)

@@ -82,9 +82,10 @@ class Fixes3(unittest.TestCase):
         s, f, _ = c.get("/api/brief/for?s=" + token)
         self.assertEqual(f["brief"]["answers"]["goal"], ["awareness", "engagement"])
         # one goal again: back to a single objective
+        # fix batch 6: a stored "conversion" reads as Traffic (the goal is no longer offered)
         s, att, _ = c.post("/api/brief/attach", {"token": token, "answers": dict(TWO, goal=["conversion"])})
         s, b, _ = c.get("/api/selection?s=" + token)
-        self.assertEqual(b["brief"]["objective"], "Conversion")
+        self.assertEqual(b["brief"]["objective"], "Traffic")
 
     def test_02_goal_cleaning_and_blended_weights(self):
         a, missing = matcher.clean_answers(dict(TWO, goal=["awareness", "nonsense", "engagement", "awareness"]))

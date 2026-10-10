@@ -368,6 +368,7 @@ def _settings_tab():
         + "<div><label>Monthly credits per client</label><input type='number' min='0' name='monthly_credits' value='%s'>"
           "<div class='price-hint'>Each month a client is topped back up to this. 0 = off. A client's own page can override it.</div></div>"
           % e(db.setting("monthly_credits", 0) or 0) + "</div></div>"
+        + roi_card()
         + "<div class='card'><h2>AI &amp; email</h2><div class='fgrid'>"
           "<div><label>Gemini model</label><input name='gemini_model' value='%s'><div class='price-hint'>Default %s. If a model is retired the next one in line is tried automatically.</div></div>" % (e(gemini.model()), e(gemini.DEFAULT_MODEL))
         + "<div><label>Monthly token ceiling</label><input type='number' min='10000' name='ai_monthly_tokens' value='%d'>"
@@ -396,6 +397,20 @@ def _settings_tab():
             + graph_card() + smtp_card() + key_card("mail", "Email (Resend) API key — alternative", mailer,
                                      "Only needed if you do not use a company mailbox above."))
     return form + "<div style='margin-top:20px'>" + keys + "</div>"
+
+
+def roi_card():
+    """ROI planner settings: internal only, never sent to a client or named in the calculator."""
+    import roi
+    share, prices = roi.settings()
+    names = {"nano": "Nano (under 20K)", "micro": "Micro (20K–100K)", "mid": "Mid (100K–500K)", "macro": "Macro (500K–1M)", "mega": "Mega (1M+)"}
+    return ("<div class='card'><h2>ROI planner (internal)</h2><p class='sec-desc'>Used only to suggest a mix of creator sizes for a client's total budget "
+            "and to advise on a selection. Never shown to clients, never part of an estimate.</p><div class='fgrid'>"
+            "<div><label>Creators' share of the client's budget (%%)</label><input type='number' min='10' max='100' step='1' name='roi_creator_share' value='%g'>"
+            "<div class='price-hint'>The rest covers production, agency fee and boosting. Default 60.</div></div>" % round(share * 100, 1)
+            + "".join("<div><label>Planning price per post, %s (SAR)</label><input type='number' min='1' step='50' name='roi_price_%s' value='%g'></div>"
+                      % (e(names[t]), t, prices[t]) for t in ("nano", "micro", "mid", "macro", "mega"))
+            + "</div><div class='price-hint'>Defaults are the middle of each tier's catalogue price band. These steer advice only.</div></div>")
 
 
 def graph_card():

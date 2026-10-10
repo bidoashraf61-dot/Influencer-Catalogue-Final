@@ -2752,11 +2752,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # The objective is a template that fills four percentages the admin can
         # then change. What is saved is the percentages: when they are one of
         # the templates the campaign keeps that name, otherwise it is "Custom".
-        tpl = f.get("objective") if f.get("objective") in metrics.OBJECTIVES else "balanced"
+        tpl = f.get("objective") if metrics.valid_objective(f.get("objective")) else "balanced"
         typed = metrics.weights_from_percents([f.get("w_reach"), f.get("w_eng"), f.get("w_er"), f.get("w_clicks")]) \
             if any((f.get(x) or "").strip() for x in ("w_reach", "w_eng", "w_er", "w_clicks")) else None
         if typed is not None:
-            objective = metrics.objective_for(typed)
+            objective = metrics.objective_for(typed, prefer=tpl)
             weights = [round(x, 4) for x in typed] if objective == "custom" else None
         else:
             objective, weights = (tpl if tpl != "custom" else "balanced"), None
@@ -3518,7 +3518,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                           "estimate", "floor", "target", "benchmark", "roi", "brief", "template")}
         keep["agreed"] = targets
         keep["saved_at"] = db.now()
-        obj = f.get("objective") if f.get("objective") in metrics.OBJECTIVES else metrics.objective_of(k)
+        obj = f.get("objective") if metrics.valid_objective(f.get("objective")) else metrics.objective_of(k)
         db.save_campaign(k["id"], targets=targets, objective=obj, plan=keep)
         return self.redirect("/planner?id=%d&ok=%s" % (k["id"], urllib.parse.quote(
             "Goals saved — the client's report now shows these targets and the benchmark.")))
@@ -3533,8 +3533,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         k = db.campaign(int(cid)) if cid.isdigit() else None
         if k is None:
             return self.redirect("/calculator")
-        typ = f.get("type") if f.get("type") in ("awareness", "engagement", "conversion") else "awareness"
-        objective = {"awareness": "awareness", "engagement": "engagement", "conversion": "traffic"}[typ]
+        typ = "traffic" if f.get("type") == "conversion" else f.get("type")        # old form value
+        typ = typ if typ in ("awareness", "engagement", "traffic") else "awareness"
+        objective = typ
         platform = f.get("platform") if f.get("platform") in plans.PLATFORMS else "Instagram"
         category = f.get("category") if f.get("category") in plans.CATEGORIES else "other"
         raw_budget = "".join(ch for ch in (f.get("budget") or "") if ch.isdigit() or ch == ".")
@@ -3546,7 +3547,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 v = float(raw)
                 targets[key] = round(v, 2) if key == "er" else int(v)
         p = plans.calculate({"platform": platform, "objective": objective, "category": category, "budget": budget,
-                             "tracked_links": typ == "conversion"}, plans.mix_from_campaign(k))
+                             "tracked_links": typ == "traffic"}, plans.mix_from_campaign(k))
         keep = {x: p.get(x) for x in ("platform", "objective", "category", "budget", "links", "posts",
                                        "estimate", "floor", "target", "benchmark", "roi")}
         keep["brief"] = {"type": typ, "platform": platform, "category": category, "budget": str(int(budget)) if budget else "", "source": "campaign"}
@@ -3703,7 +3704,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         import fit as fit_mod
         keys = sel.keys()
         got = (sel["objective"] if "objective" in keys else None) or fit_mod.FROM_CAMPAIGN.get(db.selection_campaign_objective(sel["id"]) or "", "Balanced")
-        return got if fit_mod.known_objective(got) else "Balanced"
+        return fit_mod.canonical(got) if fit_mod.known_objective(got) else "Balanced"
 
     def selection_target(self, sel):
         import fit as fit_mod
@@ -4231,12 +4232,16 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                                    "parts": [{"label": p["label"], "s": p["s"]} for p in v["parts"]],
                                                    "platform": v["platform"], "objective": v["objective"],
                                                    "basic": bool(v.get("basic")), "checks": v.get("checks") or [],
+                                                   "confidence": v.get("confidence"), "reach_followers": v.get("reach_followers"),
+                                                   "limited_data": bool(v.get("limited_data")),
                                                    "assigned": v.get("assigned") or "Auto", "available": v.get("available") or [],
                                                    "platforms": {pl: {"score": x["score"], "tag": x["tag"], "strengths": x["strengths"],
                                                                       "watchouts": x["watchouts"], "conclusion": x["conclusion"],
                                                                       "parts": [{"label": p["label"], "s": p["s"]} for p in x["parts"]],
                                                                       "platform": x["platform"], "objective": x["objective"],
-                                                                      "basic": bool(x.get("basic")), "checks": x.get("checks") or []}
+                                                                      "basic": bool(x.get("basic")), "checks": x.get("checks") or [],
+                                                                      "confidence": x.get("confidence"), "reach_followers": x.get("reach_followers"),
+                                                                      "limited_data": bool(x.get("limited_data"))}
                                                                  for pl, x in (v.get("platforms") or {}).items()}}
                                                for k, v in self.selection_scores(sel).items()},
                                     "client_tags": {k: v for k, v in json.loads((sel["client_tags"] if "client_tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},

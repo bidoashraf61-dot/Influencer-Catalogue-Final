@@ -157,7 +157,7 @@ TEMPLATES = {
     "launch-mixed": {"label": "Product launch — Instagram + TikTok", "objective": "balanced", "platform": "Instagram",
                      "category": "fmcg", "mix": {"micro": 10, "mid": 5, "macro": 1},
                      "why": "A burst in launch week: views first, then engagement."},
-    "traffic-affiliate": {"label": "Conversion — tracked links", "objective": "traffic", "platform": "Instagram",
+    "traffic-affiliate": {"label": "Traffic — tracked links", "objective": "traffic", "platform": "Instagram",
                           "category": "retail", "mix": {"micro": 15, "mid": 3},
                           "why": "Every creator has their own link; judged on clicks and cost per click."},
     "snap-stories": {"label": "Awareness — Snapchat stories", "objective": "awareness", "platform": "Snapchat",
@@ -498,5 +498,5 @@ def sources():
                       "budget": budget, "budgetFrom": from_, "creators": members,
                       "targets": db.campaign_targets(k), "adjusted": db.campaign_overrides(k),
                       "measured": _measured(k), "starts": k["starts_at"], "ends": k["ends_at"], "objective": (k["objective"] if "objective" in k.keys() else None),
-                      "type": (((plan_of(k) or {}).get("brief") or {}).get("type")), "category": (plan_of(k) or {}).get("category")})
+                      "type": {"conversion": "traffic"}.get(((plan_of(k) or {}).get("brief") or {}).get("type"), ((plan_of(k) or {}).get("brief") or {}).get("type")), "category": (plan_of(k) or {}).get("category")})
     return {"selections": sels, "campaigns": camps}

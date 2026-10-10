@@ -1314,6 +1314,21 @@ class PortalMixin(connect_api.ConnectMixin):
             db.set_setting("case_study_campaigns", sorted({int(x) for x in (f.get("case_study_campaigns") or "").replace(",", " ").split() if x.isdigit()}))
             kb = (f.get("kb_text") or "").strip()
             db.set_setting("kb_text", kb[:4000] if kb else None)
+            # ROI planner (internal, never shown to a client): the creators' share of a client's total
+            # budget and the planning price per post by size. Left alone when the card was not posted.
+            if "roi_creator_share" in f:
+                import roi
+                share = money("roi_creator_share", roi.SHARE_DEFAULT * 100, 100) / 100.0
+                db.set_setting("roi_creator_share", round(max(0.1, min(1.0, share)), 3))
+                prices = {}
+                for t in roi.PRICES_DEFAULT:
+                    try:
+                        v = float(str(f.get("roi_price_" + t, "")).replace(",", ""))
+                    except ValueError:
+                        v = 0
+                    if v > 0:
+                        prices[t] = min(v, 1000000)
+                db.set_setting("roi_planning_prices", prices or None)
         return done("Settings saved.")
 
     def portal_keys(self, f, done):

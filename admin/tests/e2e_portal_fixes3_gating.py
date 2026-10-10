@@ -148,7 +148,7 @@ class Fixes3Gating(unittest.TestCase):
         open_ = c.get("/api/selection?s=" + tok)[1]["scores"]["HV-MD-004"]
         self.assertEqual(open_["score"], sc["score"])
         self.assertFalse(open_.get("locked"))
-        self.assertIn("(measured)", json.dumps(open_))
+        self.assertIn("Measured audience", json.dumps(open_))               # fix batch 6: a check beside the number, not a part of it
         self.assertIn("of the audience", json.dumps(open_))
         # the redaction itself: measured part and its lines go, free lines stay
         red = gating.redact_score({"score": 70, "tag": "Good fit", "conclusion": "x",

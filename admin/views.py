@@ -2403,6 +2403,7 @@ def selection_fit_panel(sel, creators, scores=None, interests=()):
     except (ValueError, AttributeError):
         target_now = dict(_fit.DEFAULT_TARGET)
     obj_now = (sel["objective"] if "objective" in keys else None) or _fit.FROM_CAMPAIGN.get(_db2.selection_campaign_objective(sel["id"]) or "", "Balanced")
+    obj_now = _fit.canonical(obj_now) if _fit.known_objective(obj_now) else "Balanced"      # an old "Conversion" reads as Traffic
     cards = "".join(_fit_card(
         code, by[code], ("<img class='thumb sm' src='" + e(links.thumb(by[code]["photo"])) + "' alt='' width='44' height='44' loading='lazy'>"
                          if by[code]["photo"] else "<span class='thumb sm none'>—</span>"),
@@ -2617,6 +2618,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         target_now = dict(_fit.DEFAULT_TARGET)
     import db as _db2
     obj_now = (sel["objective"] if "objective" in keys else None) or _fit.FROM_CAMPAIGN.get(_db2.selection_campaign_objective(sel["id"]) or "", "Balanced")
+    obj_now = _fit.canonical(obj_now) if _fit.known_objective(obj_now) else "Balanced"      # an old "Conversion" reads as Traffic
     margin = sel["margin"] if "margin" in keys else None
     margin_txt = "" if margin is None else ("%g" % margin)
     mmax = sel["margin_max"] if "margin_max" in keys else None
@@ -3150,12 +3152,18 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         for x in chosen_logos if x.startswith("upload/"))
     obj_now = metrics.objective_of(k)
     w_now = metrics.campaign_weights(k) if obj_now == "custom" else None
-    w_now = w_now or metrics.OBJECTIVES[obj_now][1]
+    w_now = w_now or metrics.objective_info(obj_now)[1]
+    # the listed objectives, plus the blend this campaign holds (taken from its selection's brief
+    # when it has none of its own): several goals at once average their weights
+    opts_all = list(metrics.OBJECTIVES.items())
+    if obj_now not in metrics.OBJECTIVES:
+        lab, bw, _ = metrics.objective_info(obj_now)
+        opts_all.insert(0, (obj_now, (lab, bw)))
     obj_opts = "".join(
         "<option value='" + key + "'" + (" selected" if key == obj_now else "") + ">" + e(label)
-        + (" — " + e(metrics.TEMPLATE_NOTES.get(key, "")) if key != "custom" else " — set the four percentages yourself")
-        + "</option>" for key, (label, w) in metrics.OBJECTIVES.items())
-    obj_json = json.dumps({key: [round(x * 100, 1) for x in w] for key, (label, w) in metrics.OBJECTIVES.items() if key != "custom"})
+        + (" — " + e(metrics.TEMPLATE_NOTES.get(key, "the chosen goals, averaged") if key != "custom" else "set the four percentages yourself"))
+        + "</option>" for key, (label, w) in opts_all)
+    obj_json = json.dumps({key: [round(x * 100, 1) for x in w] for key, (label, w) in opts_all if key != "custom"})
     pct_in = lambda name, label, val, hint: ("<div><label>" + label + "</label><div class='margin-box'><input name='" + name
                                               + "' class='w-pct' inputmode='decimal' value='" + ("%g" % round(val * 100, 1)) + "'><span class='suffix'>%</span></div>"
                                               "<div class='price-hint'>" + hint + "</div></div>")
@@ -4311,7 +4319,7 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
                                      + e(l) + "</option>" for v, l in items)
     tpl_opts = "<option value=''>— none —</option>" + opt([(key, t["label"]) for key, t in plans.TEMPLATES.items()],
                                                           brief.get("template") or "")
-    obj_opts = opt([("awareness", "Awareness"), ("engagement", "Engagement"), ("traffic", "Conversion (visits and sales)"),
+    obj_opts = opt([("awareness", "Awareness"), ("engagement", "Engagement"), ("traffic", "Traffic (visits and clicks)"),
                     ("balanced", "Balanced")], plan["objective"])
     plat_opts = opt([(p, p) for p in plans.PLATFORMS], plan["platform"])
     cat_opts = opt([(key, v[0]) for key, v in plans.CATEGORIES.items()], plan["category"])
@@ -4687,7 +4695,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
   var TYPES = {
     awareness: {name: 'Awareness', sub: 'Many people see the brand', main: 'views', also: 'reactions'},
     engagement: {name: 'Engagement', sub: 'People like, comment and trust', main: 'reactions', also: 'views'},
-    conversion: {name: 'Conversion', sub: 'Visits and sales', main: 'clicks', also: 'views'}
+    traffic: {name: 'Traffic', sub: 'Visits and clicks on a link', main: 'clicks', also: 'views'}
   };
   var TYPE_KEYS = Object.keys(TYPES);
   var PLATS = ['Instagram', 'TikTok', 'Snapchat', 'YouTube'];
@@ -4916,7 +4924,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     var box = $('cal-goals'); S.vals = null;
     if (!chk || !chk.campaign) { box.innerHTML = chk ? '<div class="card"><h2 style="margin-top:0">Campaign goals</h2><p class="price-hint">This selection is not linked to a campaign yet. Link it on the campaign\\'s setup page (Selection it came from) to save goals.</p></div>' : ''; return; }
     var p = f.p, a = chk.all, camp = SRC.campaigns.filter(function(x){ return x.id === chk.campaign; })[0] || {};
-    var cat = S.cat || camp.category || 'other', links = f.t === 'conversion', vals = {};
+    var cat = S.cat || camp.category || 'other', links = f.t === 'traffic', vals = {};
     if (budget) {
       var vf = budget / ceil(p, 'views')[0], v = Math.min(vf, a.views[0] || vf);
       vals.posts = chk.posts; vals.views = rnd(v); vals.reach = rnd(v * LIB[p].reach_per_view);
@@ -4941,7 +4949,7 @@ table.cal-c input{width:58px;padding:5px 6px;text-align:center}
     var box = $('cal-results');
     if (!chk || !chk.campaign) { box.innerHTML = ''; return; }
     var p = f.p, a = chk.all, camp = SRC.campaigns.filter(function(x){ return x.id === chk.campaign; })[0] || {};
-    var links = f.t === 'conversion', measured = camp.measured || {}, adj = camp.adjusted || {};
+    var links = f.t === 'traffic', measured = camp.measured || {}, adj = camp.adjusted || {};
     function setFrom(views, eng, clicks, posts){
       var o = {posts: posts};
       o.views = rnd(views); o.reach = rnd(views * LIB[p].reach_per_view);
