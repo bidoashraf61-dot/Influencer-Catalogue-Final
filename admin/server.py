@@ -4692,6 +4692,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if sel is None or (sel["code_id"] is not None and int(viewer) != db.admin_code_id()
                            and sel["code_id"] not in portal.team_codes(int(viewer))):
             return self.send_json(404, {"ok": False}, self.cors())
+        if not portal.may_edit(int(viewer), sel, db.admin_code_id()):
+            return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only the person who owns this selection can change it. Colleagues on the same company can view it."}, self.cors())
         code = str(b.get("code") or "").strip().upper()
         if code not in json.loads(sel["codes"] or "[]"):
             return self.send_json(404, {"ok": False}, self.cors())
@@ -4724,8 +4726,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
         token = (str(b.get("token") or "")).strip()
         sel = db.selection(token=token) if token else None
-        if sel is not None and sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(viewer):
-            sel = None                      # another client's selection: never touched (colleagues share)
+        if sel is not None and not portal.may_edit(viewer, sel, db.admin_code_id()):
+            sel = None                      # not theirs (another client, or a colleague's): never touched
         if sel is None:
             sel = db.selection_for_link(name, codes, viewer)
         if sel is None:

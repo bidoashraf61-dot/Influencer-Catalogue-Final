@@ -551,6 +551,8 @@ class PortalMixin(connect_api.ConnectMixin):
         sel = db.selection(token=str(b.get("token") or "")) if b.get("token") else None
         if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id()):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        if not portal.may_edit(cid, sel, db.admin_code_id()):
+            return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only the person who owns this selection can change it. Colleagues on the same company can view it."}, self.cors())
         answers, missing = matcher.clean_answers(b.get("answers"))
         if missing:
             return self.send_json(400, {"ok": False, "reason": "missing", "missing": missing}, self.cors())

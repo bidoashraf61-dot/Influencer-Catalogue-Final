@@ -773,6 +773,19 @@ def owns(reader, code_id):
     return int(code_id) in codelinks.linked_for({int(reader)})
 
 
+def may_edit(reader, sel, admin_code_id=None):
+    """True when ``reader`` may CHANGE the selection ``sel``: HelloVoice (admin), or its owner (the
+    account it is filed under, or a shared code HelloVoice linked to that account). A colleague on
+    the same company domain may look (``team_codes``) but never edit."""
+    if reader is None or sel is None:
+        return False
+    if admin_code_id is not None and int(reader) == int(admin_code_id):
+        return True
+    if sel["code_id"] is None:
+        return True              # an unfiled selection has no owner to protect
+    return owns(reader, sel["code_id"])
+
+
 def teammates(code_id):
     me = user_for_code(code_id)
     if not me:

@@ -12,6 +12,7 @@ mail, a scripted Gemini), so it never touches catalogue.db or the network.
 
     python3 admin/tests/e2e_portal_fixes3_account.py
 """
+import json
 import shutil
 import sys
 import threading
@@ -140,6 +141,25 @@ class Fixes3Account(unittest.TestCase):
         out, _ = self.signup("x@elsewhere-del.com")
         s, b, _ = out.post("/api/selection/delete", {"token": token})
         self.assertEqual(s, 404)
+
+    def test_02b_colleague_can_look_but_never_edit(self):
+        """Same company is not shared editing: only the selection's owner may tag, re-save,
+        set the objective or save an ROI estimate on it. A colleague's re-save is their own copy."""
+        c, _ = self.signup("owner@only-own.com")
+        token = self.sel(c, "Owner list", ["HV-MI-001", "HV-MI-002"])
+        col, _ = self.signup("peer@only-own.com")
+        self.assertEqual(col.get("/api/selection?s=" + token)[0], 200)          # looks: fine
+        s, b, _ = col.post("/api/selection/tags", {"token": token, "code": "HV-MI-001", "tags": ["Mine"]})
+        self.assertEqual((s, b.get("reason")), (403, "not_owner"))
+        s, b, _ = c.post("/api/selection/tags", {"token": token, "code": "HV-MI-001", "tags": ["Keep"]})
+        self.assertEqual((s, b.get("ok")), (200, True), b)                       # the owner: fine
+        s, b, _ = col.post("/api/brief/attach", {"token": token, "answers": {"objective": ["Awareness"]}})
+        self.assertEqual((s, b.get("reason")), (403, "not_owner"))
+        # a colleague re-saving the same token must not change the owner's creators
+        s, b, _ = col.post("/api/selection", {"token": token, "name": "Owner list", "codes": ["HV-MI-001"]})
+        self.assertEqual(s, 200, b)
+        self.assertNotEqual(b["token"], token)                                   # their own copy
+        self.assertEqual(json.loads(db.selection(token=token)["codes"]), ["HV-MI-001", "HV-MI-002"])
 
     def test_03_helloVoice_selection_cannot_be_deleted_by_the_client(self):
         c, _ = self.signup("noor@hv-del.com")

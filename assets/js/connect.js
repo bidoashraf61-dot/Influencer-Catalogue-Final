@@ -256,7 +256,9 @@
       dr.appendChild(body);
       var saveB = h("button", { class: "cx-btn", type: "button", html: ic("save") + "<span>Save to selection</span>" });
       var pdfB = h("button", { class: "cx-btn cx-btn--line", type: "button", html: ic("dl") + "<span>Download PDF</span>" });
-      dr.appendChild(h("footer", { class: "cx-dr__ft" }, saveB, pdfB));
+      // Colleagues can run the estimate and download it; saving it to the selection is the owner's.
+      var mayEditSel = !S.role || ["owner", "admin"].indexOf(S.role()) > -1;
+      dr.appendChild(h("footer", { class: "cx-dr__ft" }, mayEditSel ? saveB : document.createTextNode(""), pdfB));
       saveB.addEventListener("click", function () {
         var b = { token: S.token(), goal: state.goal, budget: state.budget, platforms: state.platforms, market: state.market };
         if (state.src === "mix") b.mix = state.mix;

@@ -126,6 +126,8 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
         if not got:
             return
         sel, reader = got
+        if not portal.may_edit(reader, sel, db.admin_code_id()):
+            return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only the person who owns this selection can change it. Colleagues on the same company can view it."}, self.cors())
         if self._throttled("roisave:%d" % reader, 60, 600):
             return
         inp = self._roi_input(b)

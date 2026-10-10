@@ -911,8 +911,8 @@ def _open_sel(ctx):
 
 
 def _own(sel, cid):
-    if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id():
-        raise ValueError("That selection is not yours.")
+    if not portal.may_edit(cid, sel, db.admin_code_id()):
+        raise ValueError("That selection is not yours to change: only its owner can edit it.")
 
 
 def _names(codes):

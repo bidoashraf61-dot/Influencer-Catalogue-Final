@@ -97,8 +97,12 @@ def unlocked_set(code_id, codes=None):
     return got if codes is None else got & set(codes)
 
 
-def selections_with(code_id, code):
-    team = _team(code_id)
+def selections_with(code_id, code, own_only=False):
+    if own_only and code_id is not None:
+        import codelinks
+        team = {code_id} | codelinks.linked_for({code_id})
+    else:
+        team = _team(code_id)
     if not team:
         return []
     with db.connect() as conn:
@@ -143,7 +147,7 @@ def request(code_id, code, platform=None):
         return False, "admin"
     if unlocked(code_id, code):
         return False, "unlocked"
-    if not selections_with(code_id, code):
+    if not selections_with(code_id, code, own_only=True):
         return False, "outside"
     if open_request(code_id, code) is not None:
         return True, "already"

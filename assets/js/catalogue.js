@@ -2726,7 +2726,7 @@
         body.insertBefore(box, body.firstChild);
       }
       box.innerHTML = '<span class="cat-plat__label">Score on</span>' + have.concat(["Both"]).map(function (pl) {
-        return '<button type="button" data-plat="' + esc(pl) + '" aria-pressed="' + (pl === shown) + '">' + esc(pl) + "</button>";
+        return '<button type="button" data-plat="' + esc(pl) + '" aria-pressed="' + (pl === shown) + '"' + (mayEdit() ? "" : ' disabled title="Only the selection’s owner can change this"') + ">" + esc(pl) + "</button>";
       }).join("");
     }
     window.addEventListener("scroll", hideTip, { passive: true });
@@ -2737,6 +2737,9 @@
       for (var i = 0; i < t.length; i++) h = (h * 31 + t.charCodeAt(i)) % 6;
       return h;
     }
+    // Colleagues on the same company see a selection but never change it: tags, the "score on"
+    // platform and the objective belong to its owner (and HelloVoice). Unsaved local lists are theirs.
+    function mayEdit() { return !(CURATED && CURATED.token) || CURATED.role === "owner" || CURATED.role === "admin"; }
     function renderTags() {
       var back = (CURATED && CURATED.platform) ? "&p=" + encodeURIComponent(CURATED.platform) : "";
       selCards().forEach(function (c) {
@@ -2778,9 +2781,9 @@
           tbox.innerHTML = '<span class="cat-tags__label">Tags</span>' + mine.map(function (t) {
             return '<span class="cat-tag cat-tag--t' + tone(t) + '"><i></i>' + esc(t) + "</span>";
           }).join("") + mt.map(function (t) {
-            return '<span class="cat-tag cat-tag--mine cat-tag--t' + tone(t) + '"><i></i>' + esc(t) + '<button type="button" data-tag-x="' + esc(t) +
-              '" aria-label="Remove tag ' + esc(t) + '">&times;</button></span>';
-          }).join("") + (mt.length < 8 ? '<button type="button" class="cat-tag cat-tag--add" data-tag-add>+ Tag</button>' : "");
+            return '<span class="cat-tag cat-tag--mine cat-tag--t' + tone(t) + '"><i></i>' + esc(t) + (mayEdit() ? '<button type="button" data-tag-x="' + esc(t) +
+              '" aria-label="Remove tag ' + esc(t) + '">&times;</button>' : "") + "</span>";
+          }).join("") + (mt.length < 8 && mayEdit() ? '<button type="button" class="cat-tag cat-tag--add" data-tag-add>+ Tag</button>' : "");
         }
       });
       if (controls) controls.refresh();
@@ -3185,6 +3188,7 @@
       var pb = e.target.closest && e.target.closest("[data-plat]");
       if (pb) {
         e.preventDefault(); e.stopPropagation();
+        if (!mayEdit()) return;
         savePlatform(pb.closest(".cat-card").dataset.code, pb.getAttribute("data-plat"));
         return;
       }
