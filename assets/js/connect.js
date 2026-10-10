@@ -186,7 +186,7 @@
         ".hd img{width:150px}.v{display:inline-block;margin:18px 0 6px;padding:10px 26px 8px;border-radius:999px;color:#fff;background:" + col + ";font:400 34px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;letter-spacing:.04em}" +
         ".muted{color:#4a4a4a}table{width:100%;border-collapse:collapse;margin-top:16px}td{padding:9px 6px;border-bottom:1px solid #ddd}td.n{font-weight:700;text-align:right}" +
         ".adv{margin-top:18px;padding:14px 16px;background:#f6f3ee;border-radius:12px}.fine{margin-top:22px;font-size:11.5px;color:#4a4a4a}</style></head><body>" +
-        "<div class='hd'><img src='" + esc(ROOT) + "assets/brand/helvy-connect/helvy-connect-light-640.webp' alt='HELVY Connect'><span class='muted'>" + esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + "</span></div>" +
+        "<div class='hd'><img src='" + esc(ROOT) + "assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c4' alt='HELVY Connect'><span class='muted'>" + esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + "</span></div>" +
         "<div class='v'>" + esc(v.label || "Estimate") + "</div><div class='muted'>Against the benchmark for this mix</div>" +
         "<h1>ROI estimate" + (ctx && ctx.name ? " · " + esc(ctx.name) : "") + "</h1><p class='muted'>" + esc(res.summary) + (res.budget ? " · budget SAR " + esc(money(res.budget)) + " excl. VAT" : "") + "</p>" +
         "<table>" + figs + "</table>" + (res.cost ? "<p class='muted'>Your " + esc(res.cost.label) + " SAR " + esc(res.cost.value) + " · fair range SAR " + esc(res.cost.fair[0]) + "–" + esc(res.cost.fair[1]) + "</p>" : "") +
