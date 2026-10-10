@@ -89,7 +89,7 @@
   // Helvy's files are named in ONE place: window.HVHelvy in hv-loader.js (every page loads it first).
   // Transparent cut-outs framed waist-up; HV.helvy is the transparent head still (small avatars).
   var HVH = window.HVHelvy || null;
-  HV.helvy = HVH ? HVH.head : ROOT + "assets/brand/helvy.webp?v=c2";
+  HV.helvy = HVH ? HVH.head : ROOT + "assets/brand/helvy-head.webp?v=c3";
   var REDUCE = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   // clip(name, cls, {once, then, seq, still}) -> a frame holding Helvy. Autoplay and loop are
   // forced (muted, playsinline, set before the source) and a refused autoplay shows the still.

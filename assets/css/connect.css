@@ -550,7 +550,7 @@
 .cx-chathead { min-height: 96px; padding-left: 108px; }
 .cx-chathead .hv-head__helvy { position: absolute; left: 14px; bottom: 0; width: 84px; height: 84px; }
 .cx-chathead .hv-head__helvy .hv-clip { -webkit-mask-image: none; mask-image: none; }
-.hv-row__ava.cx-ava { background-color: transparent; background-size: 118%; background-position: 50% 10%; background-repeat: no-repeat; box-shadow: none; }
+.hv-row__ava.cx-ava { background-color: transparent; background-size: 100% 100%; background-position: 50% 50%; background-repeat: no-repeat; box-shadow: none; }
 /* the nudge's title: ink on white (lime on white was unreadable), on a lime marker stroke */
 .hv-nudge b { display: block; width: max-content; font-family: var(--heading); font-weight: 400; font-size: 20px; letter-spacing: .04em; line-height: 1; color: var(--ink); margin-bottom: 6px;
   padding: 0 3px; background: linear-gradient(transparent 55%, var(--lime) 55%, var(--lime) 92%, transparent 92%); }

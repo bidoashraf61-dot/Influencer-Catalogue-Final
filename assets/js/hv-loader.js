@@ -204,7 +204,7 @@
       setTimeout(function () { observe(v); }, 0);
       return v;
     }
-    return { dir: dir, still: still, vstill: vstill, head: base + "assets/brand/helvy.webp?v=c2", apple: apple, src: src, video: video, play: play, img: img };
+    return { dir: dir, still: still, vstill: vstill, head: base + "assets/brand/helvy-head.webp?v=c3", apple: apple, src: src, video: video, play: play, img: img };
   })();
 
   /* =============================================================== loader */
