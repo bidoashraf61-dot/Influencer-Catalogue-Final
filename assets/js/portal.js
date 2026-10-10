@@ -407,7 +407,7 @@
   // its own address. A selection or campaign link that still needs its access code shows
   // "Opened a shared link?" under the card, and ?access=code brings the same form up.
   var LOGOS = [["avalon-pharma", "Avalon Pharma"], ["alpha-plus", "Alpha Plus"], ["penduline", "Penduline"], ["parkville", "Parkville"],
-               ["svr", "SVR"], ["l-oreal-dermatological-beauty", "L'Oréal Dermatological Beauty"], ["abbott", "Abbott"], ["biotech-cigalah", "Biotech Cigalah"],
+               ["svr", "SVR"], ["ivatherm", "Ivatherm"], ["l-oreal-dermatological-beauty", "L'Oréal Dermatological Beauty"], ["abbott", "Abbott"], ["biotech-cigalah", "Biotech Cigalah"],
                ["nahdi", "Nahdi"], ["whites", "Whites"], ["la-roche-posay", "La Roche-Posay"], ["vichy", "Vichy"], ["cerave", "CeraVe"], ["uriage", "Uriage"],
                ["skinceuticals", "SkinCeuticals"], ["jamjoom-pharma", "Jamjoom Pharma"], ["spc", "SPC"], ["orchidia", "Orchidia"]];
   var PERSONAL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|aol|proton|protonmail|gmx|yandex|mail|zoho)\.[a-z.]+$/i;
