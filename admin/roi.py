@@ -657,7 +657,8 @@ def full(goal, budget, platforms, market, creators=None, mix=None, goals=None, s
         cands = None
         if creators is not None:
             try:
-                cands = candidates_from_db([c["code"] for c in creators], res["platforms"], gl,
+                inside = json.loads(sel["codes"] or "[]") if sel is not None else []
+                cands = candidates_from_db([c["code"] for c in creators] + inside, res["platforms"], gl,
                                            objective_for_selection(sel, gl) if sel is not None else None)
             except Exception:
                 cands = None

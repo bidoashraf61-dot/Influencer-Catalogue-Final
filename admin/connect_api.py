@@ -100,6 +100,14 @@ class ConnectMixin(phase_e_api.PhaseEMixin):
         (goal, platforms, market, and the budget when the brief has one). None without a brief."""
         br = portal.live_brief_for_selection(sel["id"])
         if br is None:
+            # no brief, but the selection may carry an objective (the admin's, or its campaign's)
+            import fit
+            obj = sel["objective"] if "objective" in sel.keys() else None
+            if obj and fit.known_objective(obj):
+                parts = fit.parts_of(obj)
+                goals = [p.lower() for p in (parts if parts != ["Balanced"] else fit.CAMPAIGN_TYPES)]
+                return {"goal": goals[0], "goals": goals, "platforms": ["Instagram", "TikTok"], "market": "SA",
+                        "platforms_from_brief": False, "summary": ""}
             return None
         try:
             import matcher

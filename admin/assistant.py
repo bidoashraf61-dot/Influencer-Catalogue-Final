@@ -180,7 +180,8 @@ def _roi_plan_tool(ctx, goals, budget, platforms, market="SA"):
         res = roi.estimate(gl[0], budget, platforms, market, creators=creators, goals=gl)
         cands = None
         try:
-            cands = roi.candidates_from_db([c["code"] for c in creators], platforms, gl, roi.objective_for_selection(sel, gl))
+            cands = roi.candidates_from_db([c["code"] for c in creators] + json.loads(sel["codes"] or "[]"), platforms, gl,
+                                           roi.objective_for_selection(sel, gl))
         except Exception:
             cands = None
         cov = roi.coverage(res, planned, gl)
