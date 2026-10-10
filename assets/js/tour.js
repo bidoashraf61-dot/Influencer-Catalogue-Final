@@ -304,6 +304,48 @@
     });
     return new win.Response(body, { status: 200, headers: { "Content-Type": "application/x-ndjson" } });
   }
+  var DEMO_PLACE = { Riyadh: "Saudi Arabia|Riyadh", Jeddah: "Saudi Arabia|Jeddah", Dammam: "Saudi Arabia|Dammam" };
+  function demoFacets() {
+    var rows = PEOPLE.map(rosterRow);
+    function order(fn) {
+      var n = {}, keys = [];
+      rows.forEach(function (r) { fn(r).forEach(function (v) { if (!n[v]) { n[v] = 0; keys.push(v); } n[v]++; }); });
+      return keys.sort(function (a, b) { return n[b] - n[a]; });
+    }
+    return { tier: order(function (r) { return [r.tier]; }), platform: order(function (r) { return r.platform.split(", "); }),
+             place: order(function (r) { return [DEMO_PLACE[r.city]]; }), interest: order(function (r) { return [r.interest]; }) };
+  }
+  function demoPage(q) {
+    var rows = PEOPLE.map(rosterRow), any = false;
+    var total = function (r) { return r.profiles.reduce(function (t, x) { return t + x.followers; }, 0); };
+    [["tier", function (r) { return [r.tier]; }], ["platform", function (r) { return r.platform.split(", "); }],
+     ["place", function (r) { return [DEMO_PLACE[r.city]]; }], ["interest", function (r) { return [r.interest]; }]].forEach(function (d) {
+      var want = q.getAll(d[0]);
+      if (!want.length) return;
+      any = true;
+      rows = rows.filter(function (r) { return d[1](r).some(function (v) { return want.indexOf(v) !== -1; }); });
+    });
+    var lic = q.getAll("lic");
+    if (lic.length) { any = true; rows = rows.filter(function (r) { return BY[r.code][9].some(function (c) { return lic.indexOf(c) !== -1; }); }); }
+    var text = (q.get("q") || "").toLowerCase();
+    if (text) { any = true; rows = rows.filter(function (r) { return (r.name + " " + r.code).toLowerCase().indexOf(text) !== -1; }); }
+    var lo = +q.get("fmin") || 0, hi = +q.get("fmax") || 0;
+    if (lo || hi) { any = true; rows = rows.filter(function (r) { var f = total(r); return (!lo || f >= lo) && (!hi || f <= hi); }); }
+    var sort = q.has("sort") ? q.get("sort") : "followers-desc";
+    if (sort === "followers-desc") rows.sort(function (a, b) { return total(b) - total(a); });
+    if (sort === "followers-asc") rows.sort(function (a, b) { return total(a) - total(b); });
+    if (sort === "name") rows.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    var g = q.get("group");
+    if (g) {
+      var gk = function (r) { return g === "tier" ? r.tier : g === "platform" ? r.platform.split(", ")[0] : g === "country" ? "Saudi Arabia" : r.interest; };
+      rows = rows.map(function (r) { return Object.assign({}, r, { g: gk(r) }); });
+      rows.sort(function (a, b) { return a.g < b.g ? -1 : a.g > b.g ? 1 : 0; });
+    }
+    var out = { ok: true, items: rows, has_more: false, cursor: null, v: "demo" };
+    if (any) out.match = rows.length;
+    if (!q.get("cursor")) { out.tiers = TIERS; out.fx = { SAR: 1.0, AED: 0.9793, USD: 0.2667 }; out.exp = NOW + DAY; }
+    return out;
+  }
   function route(win, url, init) {
     var u = new URL(url, win.location.href), p = u.pathname.replace(/^.*?\/api\//, "/api/"), q = u.searchParams, m = (init.method || "GET").toUpperCase();
     var body = {};
@@ -311,6 +353,13 @@
     var user = Demo.user;
     if (p === "/api/me") return Promise.resolve(json(win, me(user)));
     if (p === "/api/roster") return Promise.resolve(json(win, { ok: true, roster: PEOPLE.map(rosterRow), tiers: TIERS, fx: { SAR: 1.0, AED: 0.9793, USD: 0.2667 }, exp: NOW + DAY }));
+    // The catalogue in batches (fix batch 3): the demo roster is one batch, filtered and sorted here.
+    if (p === "/api/roster/facets") return Promise.resolve(json(win, { ok: true, v: "demo", facets: demoFacets() }));
+    if (p === "/api/roster/cards") {
+      var want = (q.get("codes") || "").split(",").filter(function (c) { return BY[c]; });
+      return Promise.resolve(json(win, { ok: true, cards: want.map(function (c) { return rosterRow(BY[c]); }), tiers: TIERS, fx: { SAR: 1.0, AED: 0.9793, USD: 0.2667 }, exp: NOW + DAY }));
+    }
+    if (p === "/api/roster/page") return Promise.resolve(json(win, demoPage(q)));
     if (p === "/api/licences") {
       var lic = {};
       PEOPLE.forEach(function (x) { if (x[9].length) lic[x[0]] = x[9].map(function (c) { return { country: c, name: c === "SA" ? "Mawthooq" : "UAE Advertiser Permit", number: "" }; }); });

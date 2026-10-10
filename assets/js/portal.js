@@ -1694,7 +1694,8 @@
         if (bar) out.filters = Array.prototype.map.call(bar.querySelectorAll("input[data-dim]:checked"), function (box) {
           var l = box.closest("label"); return ((l && l.textContent) || box.value).replace(/\s+/g, " ").trim().slice(0, 40);
         }).filter(Boolean).slice(0, 15);
-        out.shown = Array.prototype.filter.call(document.querySelectorAll(".cat-card"), function (c) { return !c.hidden && !c.classList.contains("cat-card--copy"); }).length;
+        if ((window.hvCatalogue && window.hvCatalogue.server)) { if (window.hvCatalogue.matched() != null) out.shown = window.hvCatalogue.matched(); }   // only while filtered
+        else out.shown = Array.prototype.filter.call(document.querySelectorAll(".cat-card"), function (c) { return !c.hidden && !c.classList.contains("cat-card--copy"); }).length;
       }
       return out;
     }
@@ -2215,11 +2216,15 @@
           var p = (r.b && r.b.filters) || {};
           var done = applyFilters(p);
           if (!done.length) { say("I couldn't pick out filters from that. Try naming a platform, city, size or topic."); chips([{ label: "Try again", go: flowShow }, { label: "Back to the menu", ghost: true, go: function () { menu("What would you like to do?"); } }]); return; }
-          var shown = Array.prototype.filter.call(document.querySelectorAll(".cat-card"), function (c) { return !c.hidden && !c.classList.contains("cat-card--copy"); }).length;
+          // The catalogue counts on the server: wait for the filtered batch, then read its match count.
+          ((window.hvCatalogue && window.hvCatalogue.server) ? window.hvCatalogue.settled() : Promise.resolve()).then(function () {
+          var shown = (window.hvCatalogue && window.hvCatalogue.server) ? (window.hvCatalogue.matched() || 0)
+            : Array.prototype.filter.call(document.querySelectorAll(".cat-card"), function (c) { return !c.hidden && !c.classList.contains("cat-card--copy"); }).length;
           say("Done. The page now shows " + done.join(", ") + ". " + (shown ? shown + " creator" + (shown === 1 ? "" : "s") + " match." : "Nobody matches all of that yet, so try loosening one filter."));
           chips([{ label: "Clear the filters", go: function () { clearFilters(); nextUp("Filters cleared. You're seeing the whole roster again."); } },
                  { label: "Build a scored shortlist instead", go: function () { flowFind(text); } },
                  { label: "Close chat", ghost: true, echo: false, go: function () { toggle(false); } }]);
+          });
         });
     }
     function fold(t) { return String(t || "").toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").trim(); }
@@ -2255,10 +2260,15 @@
     }
 
     /* -- 3. work on my selection -- */
-    var ROSTER = null;
-    function roster() {
-      if (ROSTER) return Promise.resolve(ROSTER);
-      return api("GET", "/api/roster").then(function (r) { ROSTER = (r.b && r.b.roster) || []; return ROSTER; });
+    // The roster is never downloaded whole any more: the creators a flow names are fetched by
+    // code (/api/roster/cards), and typed names are searched on the server (/api/roster/page?q=).
+    function roster(codes, words) {
+      var calls = [];
+      if (codes && codes.length) calls.push(api("GET", "/api/roster/cards?codes=" + encodeURIComponent(codes.slice(0, 200).join(","))).then(function (r) { return (r.b && r.b.cards) || []; }));
+      (words || []).slice(0, 12).forEach(function (w) {
+        calls.push(api("GET", "/api/roster/page?limit=20&sort=name&q=" + encodeURIComponent(w)).then(function (r) { return (r.b && r.b.items) || []; }));
+      });
+      return Promise.all(calls).then(function (lists) { return [].concat.apply([], lists); });
     }
     function byCode(list, code) { return list.filter(function (c) { return c.code === code; })[0]; }
     function flowSelection() {
@@ -2297,8 +2307,8 @@
     }
     function selAdd(s) {
       askFor("Type the creators' names or codes, separated by commas.", "e.g. Sara A., HV-MI-014", function (text) {
-        roster().then(function (list) {
-          var want = text.split(/[,،\n]+/).map(fold).filter(Boolean), found = [], miss = [];
+        var want = text.split(/[,،\n]+/).map(fold).filter(Boolean), found = [], miss = [];
+        roster(null, want).then(function (list) {
           want.forEach(function (w) {
             var c = list.filter(function (x) { return fold(x.code) === w || fold(x.name) === w; })[0] ||
                     list.filter(function (x) { return fold(x.name).indexOf(w) === 0; })[0];
@@ -2313,7 +2323,7 @@
       });
     }
     function selRemove(s) {
-      roster().then(function (list) {
+      roster(s.codes).then(function (list) {
         var drop = [];
         say("Tap the creators to remove, then confirm.");
         chips(s.codes.map(function (code) {
@@ -2341,7 +2351,7 @@
       });
     }
     function selCompare(s) {
-      roster().then(function (list) {
+      roster(s.codes).then(function (list) {
         var two = [];
         say("Tap two creators to compare.");
         chips(s.codes.map(function (code) {
@@ -3174,9 +3184,11 @@
 
     /* -- the grid, narrowed to the picks -- */
     function bandOf(n) { return n >= 80 ? "g" : n >= 60 ? "l" : n >= 40 ? "a" : "r"; }
-    function clearResult() {
+    function clearResult(keep) {
       var grid = $("cat-grid");
       if (grid) grid.classList.remove("ai-on");
+      // The catalogue served in batches showed only the picks: back to the reader's own view.
+      if (keep !== true && window.hvCatalogue && window.hvCatalogue.server) window.hvCatalogue.unpin();
       Array.prototype.forEach.call(document.querySelectorAll(".cat-card.ai-pick, .cat-card.ai-out"), function (c) {
         c.classList.remove("ai-pick", "ai-out"); c.style.order = "";
         var x = c.querySelector(".ai-badges"); if (x) x.remove();
@@ -3185,8 +3197,18 @@
       document.body.classList.remove("ai-mode");
       var sub = $("results-sub"); if (sub) sub.textContent = "Every creator that matches your filters. Tick the ones you want.";
     }
+    // The catalogue is served in batches, so the picks may not be on the page yet: it is asked
+    // to show exactly them (fetched by code, in rank order), then they are marked as before.
     function showResult(res, name) {
-      clearResult();
+      if (window.hvCatalogue && window.hvCatalogue.server) {
+        clearResult(true);
+        window.hvCatalogue.pin(codesOf(res.picks)).then(function () { paintResult(res, name); });
+        return;
+      }
+      paintResult(res, name);
+    }
+    function paintResult(res, name) {
+      clearResult(true);
       var grid = $("cat-grid");
       if (!grid) return;
       var rank = {}, why = {};
@@ -3278,6 +3300,8 @@
     return list.some(function (l) { return licWant.indexOf(l.country) !== -1; });
   }
   function applyLicFilter() {
+    // The catalogue served in batches filters on the server; the selection page holds all its cards.
+    if ((window.hvCatalogue && window.hvCatalogue.server)) { window.hvCatalogue.filter("lic", licWant.slice()); return; }
     Array.prototype.forEach.call(document.querySelectorAll(".cat-card[data-code]"), function (card) {
       card.classList.toggle("lic-out", !licMatch(card.getAttribute("data-code")));
     });
@@ -3287,10 +3311,11 @@
     var bar = document.querySelector(".cat-controls .cat-bar");
     // The licences can arrive before the catalogue has drawn its filter bar: wait for it.
     if (!bar) { if ((tries || 0) < 80) setTimeout(function () { mountLicFilter((tries || 0) + 1); }, 250); return; }
+    if ((window.hvCatalogue && window.hvCatalogue.server)) licWant = (window.hvCatalogue.get("lic") || []).slice();     // the view the reader came back to
     var box = h("div", { id: "lic-filter", class: "lic-filter", role: "group", "aria-label": "License" });
     box.appendChild(h("span", { class: "lic-filter__label" }, "License"));
     [["SA", "Mawthooq license"], ["AE", "UAE license"]].forEach(function (o) {
-      var chip = h("button", { class: "lic-chip", type: "button", "aria-pressed": "false", "data-lic": o[0] }, o[1]);
+      var chip = h("button", { class: "lic-chip", type: "button", "aria-pressed": String(licWant.indexOf(o[0]) !== -1), "data-lic": o[0] }, o[1]);
       chip.addEventListener("click", function () {
         var i = licWant.indexOf(o[0]);
         if (i === -1) licWant.push(o[0]); else licWant.splice(i, 1);
@@ -3311,7 +3336,7 @@
       mountLicFilter();
       if (!licObserver && "MutationObserver" in window) {
         var t = null, app = document.getElementById("cat-grid") || document.body;
-        licObserver = new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { paintLicences(); if (licWant.length) applyLicFilter(); }, 150); });
+        licObserver = new MutationObserver(function () { clearTimeout(t); t = setTimeout(function () { paintLicences(); if (licWant.length && !(window.hvCatalogue && window.hvCatalogue.server)) applyLicFilter(); }, 150); });
         licObserver.observe(app, { childList: true, subtree: true });
       }
     });
