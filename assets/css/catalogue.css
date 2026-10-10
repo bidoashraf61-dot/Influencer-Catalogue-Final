@@ -367,7 +367,7 @@ img { -webkit-user-drag: none; user-drag: none; pointer-events: none; }
 @keyframes cat-more-dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
 @media (prefers-reduced-motion: reduce) { .cat-more__txt::after, .cat-more__dot { animation: none; } .cat-grid.is-loading { transition: none; } }
 @media screen and (max-width: 767px) {
-  .cat-more__skel .cat-skel:nth-child(n+3) { display: none; }
+  .cat-more__skel .cat-skel:nth-child(n+2) { display: none; }
   .cat-more__helvy { width: 60px; height: 60px; }
 }
 /* Every photo fills the whole square, small sources included. Drawing a small
