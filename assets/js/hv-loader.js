@@ -3,7 +3,7 @@
  * Loader rule (client-approved 2026-10-09, replaces the old "no time limit"):
  *   - the page draws its own shell straight away (header, skeleton cards);
  *     nothing covers it while it is quick;
- *   - the Helvy loader appears only if the page is not ready after 0.6 s,
+ *   - the loader (the HELVY Connect logo, breathing) appears only if the page is not ready after 0.6 s,
  *     and it is gone 1.5 s after the page started, ready or not. The page's
  *     skeleton carries on from there;
  *   - "ready" = the window has loaded and none of the page's own requests has
@@ -41,7 +41,9 @@
   var me = document.currentScript;
   var tone = (me && me.getAttribute("data-tone")) === "light" ? "light" : "dark";
   var base = me && me.src ? me.src.replace(/assets\/js\/hv-loader\.js.*$/, "") : "/";
-  var logo = base + (tone === "light" ? "assets/brand/logo.png" : "assets/brand/logo-knockout.webp");
+  // The loader is the HELVY Connect logo alone, breathing (client, 2026-10-10): coloured on light
+  // pages, white on ink. "dark" is the file drawn for dark backgrounds.
+  var logo = base + "assets/brand/helvy-connect/helvy-connect-" + (tone === "light" ? "light" : "dark") + "-640.webp?v=c4";
   var reduce = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   var T0 = Date.now();
   var SHOW_AFTER = 600, GONE_BY = 1500;
@@ -218,18 +220,9 @@
     "background:#121212;opacity:0;transition:opacity .22s ease;}" +
     ".hv-loader.is-on{opacity:1;}" +
     ".hv-loader--light{background:#fff;}" +
-    ".hv-loader__in{display:flex;flex-direction:column;align-items:center;gap:22px;}" +
-    ".hv-loader__pair{display:flex;align-items:flex-end;gap:28px;}" +
-    ".hv-loader__logo{width:150px;height:auto;align-self:center;" + (reduce ? "" : "animation:hv-breathe 1.4s ease-in-out infinite;") + "}" +
-    ".hv-loader__line{align-self:center;width:1px;height:64px;background:rgba(255,255,255,.18);}" +
-    ".hv-loader--light .hv-loader__line{background:rgba(18,18,18,.14);}" +
-    ".hv-loader__helvy{position:relative;width:150px;height:150px;}" +
-    ".hv-loader__helvy .hv-clip{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;object-position:50% 100%;" +
-    "filter:drop-shadow(0 10px 14px rgba(0,0,0,.28));-webkit-mask-image:linear-gradient(#000 80%,transparent);mask-image:linear-gradient(#000 80%,transparent);}" +
-    ".hv-loader p{margin:0;font:14px/1.4 'DM Sans',Arial,sans-serif;letter-spacing:.02em;color:rgba(255,255,255,.7);}" +
-    ".hv-loader--light p{color:#383838;}" +
-    "@media (max-width:600px){.hv-loader__pair{flex-direction:column;align-items:center;gap:16px;}.hv-loader__line{width:64px;height:1px;}}" +
-    "@keyframes hv-breathe{50%{opacity:.35}}" +
+    ".hv-loader__logo{display:block;width:min(260px,62vw);height:auto;" +
+      (reduce ? "" : "animation:hv-breathe 2.4s ease-in-out infinite;will-change:transform,opacity;") + "}" +
+    "@keyframes hv-breathe{0%,100%{transform:scale(.94);opacity:.55}50%{transform:scale(1.04);opacity:1}}" +
     "html.hv-loading,html.hv-loading body{overflow:hidden;}";
   (document.head || document.documentElement).appendChild(css);
 
@@ -244,21 +237,9 @@
     cover.setAttribute("role", "status");
     cover.setAttribute("aria-label", "Loading");
     var img = document.createElement("img");
-    img.src = logo; img.alt = "HelloVoice"; img.className = "hv-loader__logo";
-    var pair = document.createElement("div");
-    pair.className = "hv-loader__pair";
-    var line = document.createElement("span");
-    line.className = "hv-loader__line"; line.setAttribute("aria-hidden", "true");
-    var spot = document.createElement("span");
-    spot.className = "hv-loader__helvy"; spot.setAttribute("aria-hidden", "true");
-    spot.appendChild(HELVY.video("loader", { eager: true }));
-    pair.appendChild(img); pair.appendChild(line); pair.appendChild(spot);
-    var words = document.createElement("p");
-    words.textContent = "Getting your creators ready";
-    var holder = document.createElement("div");
-    holder.className = "hv-loader__in";
-    holder.appendChild(pair); holder.appendChild(words);
-    cover.appendChild(holder);
+    img.src = logo; img.alt = "HELVY Connect"; img.className = "hv-loader__logo";
+    img.width = 320; img.height = 160; img.decoding = "async";
+    cover.appendChild(img);
   }
   function show() {
     if (shown) return;
@@ -268,7 +249,6 @@
     cover.style.display = "";
     document.documentElement.classList.add("hv-loading");
     requestAnimationFrame(function () { if (shown) cover.classList.add("is-on"); });
-    var v = cover.querySelector("video"); if (v) { v.removeAttribute("data-off"); HELVY.play(v); }
   }
   function hide() {
     clearTimeout(timer); clearTimeout(capTimer);
