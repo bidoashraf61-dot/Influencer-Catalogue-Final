@@ -2828,14 +2828,14 @@
     var intro = h("div", { class: "ai-sl__intro" });
     intro.innerHTML = '<div class="ai-sl__face"></div>' +
       '<div class="ai-sl__copy"><h2 class="ai-sl__title" id="ai-sl-title">Build a shortlist with AI</h2>' +
-      "<p>Six quick taps. We score every creator in the roster against your campaign and pick the best.</p></div>";
+      "<p>Six quick taps, and Helvy picks the creators that fit your campaign best.</p></div>";
     var start = h("button", { class: "ai-sl__start", type: "button" }, "Start");
     start.insertAdjacentHTML("beforeend", aiSvg('<path d="M5 12h13M13 6l6 6-6 6"/>', 18));
     intro.appendChild(start);
     // Phase E: or start from a product page or the client's own brief file.
     var altLink = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("link") + "<span>Product link</span>" });
     var altFile = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("upload") + "<span>Brief file</span>" });
-    intro.appendChild(h("div", { class: "ai-sl__alt" }, h("span", null, "Or start from a"), altLink, altFile));
+    intro.appendChild(h("div", { class: "ai-sl__alt" }, h("span", null, "Or start from"), altLink, altFile));
     intro.querySelector(".ai-sl__face").appendChild(clip("idle", "ai-sl__hv cx-hd--head"));
 
     // Expanded: the journey.
