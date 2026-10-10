@@ -920,6 +920,27 @@ body.has-previewbar { padding-top: 36px; }
    own background is this same lime, so the clip and the disc read as one. */
 .ai-sl__face { position: relative; border-radius: 50%; background: var(--ai-lime); overflow: hidden; isolation: isolate; }
 
+/* Bigger AI card, closer shot (client, 2026-10-10). The closed card was a slim 56px strip; it now has
+   room: a 104px lime face framed tighter (head and shoulders, a medium-close shot: the clip is scaled
+   up inside the circle), a larger title and Start button, roomier source row. */
+.ai-sl .hv-lime .hv-clip { transform: scale(1.34); transform-origin: 50% 40%; }
+.ai-sl:not(.is-open) { border-radius: 30px; }
+.ai-sl:not(.is-open) .ai-sl__intro { grid-template-columns: 104px minmax(0, 1fr) auto; gap: 0 22px; padding: 22px 24px 22px 22px; }
+.ai-sl:not(.is-open) .ai-sl__face { width: 104px; height: 104px; align-self: center; box-shadow: 0 0 0 4px rgba(232,255,118,.18); }
+.ai-sl:not(.is-open) .ai-sl__title { font-size: 38px; }
+.ai-sl:not(.is-open) .ai-sl__start { min-height: 56px; padding: 0 30px; font-size: 24px; }
+.ai-sl:not(.is-open) .ai-sl__alt { margin-top: 16px; padding-top: 16px; gap: 10px; font-size: 15px; }
+.ai-sl:not(.is-open) .ai-sl__alt-b { min-height: 42px; padding: 0 18px; font-size: 15px; }
+@media (max-width: 900px) {
+  .ai-sl:not(.is-open) .ai-sl__title { font-size: 34px; }
+}
+@media (max-width: 520px) {
+  .ai-sl:not(.is-open) .ai-sl__intro { grid-template-columns: 76px minmax(0, 1fr); gap: 0 14px; padding: 16px; }
+  .ai-sl:not(.is-open) .ai-sl__face { width: 76px; height: 76px; }
+  .ai-sl:not(.is-open) .ai-sl__title { font-size: 28px; }
+  .ai-sl:not(.is-open) .ai-sl__start { min-height: 52px; font-size: 22px; }
+}
+
 /* Licence chips: same quiet outline as the filter chips, one tight row. */
 .lic-filter__label { font-size: 18px; }
 .lic-chip { min-height: 36px; padding: 6px 14px; font-size: 13px; border-width: 1px; }
