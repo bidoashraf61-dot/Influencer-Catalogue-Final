@@ -24,6 +24,7 @@ tierRank(), totalFollowers(), Controls.matches/order and initApp's group-by. Kee
 in step.
 """
 
+import hashlib
 import json
 import re
 import threading
@@ -157,6 +158,8 @@ class Index:
 
     def __init__(self, version, cards, tiers):
         self.version = version
+        # The short name cursors and cached results carry.
+        self.tag = hashlib.sha1(json.dumps(version, sort_keys=True, default=str).encode()).hexdigest()[:10]
         self.cards = cards
         self.at = {c["code"]: i for i, c in enumerate(cards)}
         table = [t["name"] for t in tiers]
@@ -254,9 +257,6 @@ def invalidate():
 
 
 def _tag(idx):
-    if not hasattr(idx, "tag"):
-        import hashlib
-        idx.tag = hashlib.sha1(json.dumps(idx.version, sort_keys=True, default=str).encode()).hexdigest()[:10]
     return idx.tag
 
 
