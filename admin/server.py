@@ -452,6 +452,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_campaign_csv(query.get("t") or "")
         if path.startswith("/api/capture/"):
             return self.capture_get(path[len("/api/capture/"):], query)
+        if path in ("/api/roster/page", "/api/roster/facets", "/api/roster/cards"):
+            return self.api_roster_paged(path.rsplit("/", 1)[1],
+                                         urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query, keep_blank_values=True))
         if path.startswith("/api/") and self.portal_get(path, query):
             return
         if path == "/api/roster":
@@ -4268,13 +4271,20 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                               self.cors() + [("Set-Cookie", cookie),
                                              ("Set-Cookie", dev_cookie)] + extra)
 
-    def api_roster(self, link=""):
-        code_id = self.viewer_code_id()
-        if not code_id:
-            return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
+    def roster_refusal(self, link=""):
+        """None when this browser may read the roster (and cards from it); else the reason.
+        /api/roster and the paged answers below are gated by this one rule."""
+        if not self.viewer_code_id():
+            return "locked"
         # A page that names its link asks for that link's own code once.
         if link and not self.admin() and not self.signed_in_client() and self.link_code(link) is None:
-            return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
+            return "link"
+        return None
+
+    def api_roster(self, link=""):
+        why = self.roster_refusal(link)
+        if why:
+            return self.send_json(401, {"ok": False, "reason": why}, self.cors())
         raw, gz, tag, stamp = self.roster_body()
         head = self.cors() + [("ETag", tag), ("Cache-Control", "private, no-cache"),
                               ("Last-Modified", formatdate(stamp, usegmt=True)), ("Vary", "Cookie")]
@@ -4301,6 +4311,61 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         _ROSTER_BODY.clear()
         _ROSTER_BODY["v"] = (key, out)
         return out
+
+    def roster_index(self):
+        """The paged roster's in-memory index (admin/paging.py), rebuilt only when the
+        roster version /api/roster's ETag follows changes."""
+        import paging
+
+        def key():
+            return (links.expires_at(), self._roster_fingerprint(),
+                    json.dumps(self.tier_payload(), sort_keys=True), json.dumps(fx.rates(), sort_keys=True))
+        return paging.current(key, lambda: (self.roster_payload(), self.tier_payload()))
+
+    def api_roster_paged(self, job, q):
+        """The catalogue one batch at a time (see admin/paging.py).
+
+        GET /api/roster/page?link=&q=&tier=&platform=&place=&interest=&fmin=&fmax=&lic=&disc=&dplat=
+                            &sort=&group=&cursor=&limit=
+            -> {ok, items: [card], has_more, cursor, v, match?}; the first batch (no cursor)
+               also carries tiers, fx and exp, so the page needs nothing else to draw.
+               "match" only while a filter or a search is on: never the roster's size.
+        GET /api/roster/facets?link=   -> {ok, facets: {tier, platform, place, interest}, v}
+               option values, most common first, no counts.
+        GET /api/roster/cards?link=&codes=A,B   -> {ok, cards, tiers, fx, exp}
+               the named creators that are on the roster (max 200), in that order.
+        Same gate as /api/roster: a locked browser, or a link this browser has no code
+        for, gets a 401 and nothing else."""
+        import paging
+        one = lambda k: (q.get(k) or [""])[0]
+        why = self.roster_refusal(one("link").strip()[:80])
+        if why:
+            return self.send_json(401, {"ok": False, "reason": why}, self.cors())
+        idx = self.roster_index()
+        head = self.cors() + [("Cache-Control", "private, no-cache"), ("Vary", "Cookie")]
+        if job == "facets":
+            return self.send_json(200, {"ok": True, "facets": idx.facets(), "v": paging._tag(idx)}, head)
+        if job == "cards":
+            codes = [c.strip().upper() for c in ",".join(q.get("codes") or []).split(",") if c.strip()][:200]
+            return self.send_json(200, {"ok": True, "cards": paging.cards(idx, codes), "tiers": self.tier_payload(),
+                                        "fx": fx.rates(), "exp": links.expires_at()}, head)
+        f = paging.clean_query(q)
+        try:
+            limit = int(one("limit") or paging.BATCH)
+        except ValueError:
+            limit = paging.BATCH
+
+        def lic():
+            import licence
+            return licence.for_roster()
+
+        def disc(filters, plat):
+            import discover
+            return discover.match(filters, plat)
+        out = paging.page(idx, f, one("cursor")[:80] or None, limit, lic, disc)
+        if not one("cursor"):
+            out.update(tiers=self.tier_payload(), fx=fx.rates(), exp=links.expires_at())
+        return self.send_json(200, out, head)
 
     def api_discover(self, job):
         """The catalogue's Audience and Performance filters, lookalikes and
@@ -4399,6 +4464,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         cls._widths = {}
         _ROSTER_CACHE.clear()        # a new photo changes photo_url and lowres
         _ROSTER_BODY.clear()
+        import paging
+        paging.invalidate()
 
     def is_lowres(self, photo):
         if not photo:
