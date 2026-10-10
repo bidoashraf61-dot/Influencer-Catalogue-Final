@@ -777,6 +777,8 @@
     var menu = h("div", { class: "pt-menu", id: "pt-menu", role: "menu", "aria-labelledby": "pt-avatar", hidden: true });
     var head = h("div", { class: "pt-menu__head" }, h("b", { class: "pt-menu__name" }, name));
     var sub = u ? [u.job_title, u.company].filter(Boolean).join(" · ") || u.email : ME.kind === "admin" ? "Administrator" : "Signed in with an access code";
+    // A person with admin access is just a label on their own account: same profile, same data.
+    if (ME.staff) sub = "Administrator" + (sub ? " · " + sub : "");
     if (sub) head.appendChild(h("span", { class: "pt-menu__sub" }, sub));
     menu.appendChild(head);
     function item(label, act, extra, cls) {

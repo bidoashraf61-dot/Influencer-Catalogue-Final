@@ -185,6 +185,8 @@
   function greet() {
     var u = DATA.user, nx = DATA.next;
     var hi = h("h1", { class: "hc-greet__hi" }, greeting() + ", ", h("span", null, first(u.name) || "there"));
+    // Admin access is only a label on this account (the switch for locked data is in the menu).
+    if (HV().me && HV().me.staff) hi.appendChild(h("small", { class: "hc-admintag" }, "Administrator"));
     var p = h("p", null, nx.lead, h("b", { class: nx.kind === "profile" ? "hc-credit" : null }, nx.strong), nx.tail);
     var later = "hc-later:" + nx.kind + ":" + nx.href;
     var go = h("div", { class: "hc-bubble__go" });

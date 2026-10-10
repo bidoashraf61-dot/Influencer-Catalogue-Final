@@ -245,6 +245,8 @@ p.ac-muted { margin: 6px 0 0; max-width: 64ch; }
   border: 1px solid var(--rule); color: var(--ink); background: var(--white); transition: border-color .2s ease;
 }
 .hc-link:hover { border-color: var(--ink); }
+.hc-admintag { display: inline-block; vertical-align: middle; margin-left: 12px; padding: 4px 12px; border-radius: 999px; background: #e8ff76; color: #121212;
+  font: 700 12px/1.2 "DM Sans", Arial, sans-serif; letter-spacing: .08em; text-transform: uppercase; }
 .hc-bar .cat-track { min-height: 48px; padding: 0 22px; }
 .hc-bar .pt-dock { flex-wrap: nowrap; }
 
