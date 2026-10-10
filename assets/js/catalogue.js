@@ -2439,7 +2439,7 @@
     }
     function renderTags() {
       var back = (CURATED && CURATED.platform) ? "&p=" + encodeURIComponent(CURATED.platform) : "";
-      cards.forEach(function (c) {
+      selCards().forEach(function (c) {
         var body = c.querySelector(".cat-card__body");
         if (!body) return;
         var link = c.querySelector("a.cat-card__analysis");
@@ -2543,16 +2543,36 @@
       if (stFilter === "influencers") return !isDoctor(code);
       return statusOf(code).s === stFilter;
     }
+    // A decision shows at once (fix batch 3): the card is redrawn before the server answers, and
+    // put back if the save fails. Before, every Approve / Reject / Undo waited a full round trip
+    // to the server (Riyadh -> the server and back) before anything moved.
     function stSave(code, body, then) {
       body.token = CURATED.token; body.code = code;
+      var prev = CURATED.status[code], optimistic = body.status !== undefined;
+      if (optimistic) {
+        var was = statusOf(code);
+        CURATED.status[code] = { s: body.status, by: was.by && was.s === body.status ? was.by : "You", hv: ROLE === "admin", at: Math.floor(Date.now() / 1000),
+                                 reason: body.status === "rejected" ? was.reason || "" : "", note: "", replacements: was.replacements || [] };
+        if (then) then({ ok: true, status: CURATED.status[code], pending: true });
+        render();
+      }
+      var undo = function (text) {
+        if (optimistic) { if (prev === undefined) delete CURATED.status[code]; else CURATED.status[code] = prev; render(); }
+        stToast(text);
+      };
       return fetch(CFG.api + (body.reason !== undefined && body.status === undefined ? "/api/selection/reason" : "/api/selection/status"),
         { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (b) {
-          if (b && b.ok) { CURATED.status[code] = b.status; if (then) then(b); render(); }
-          else stToast((b && b.message) || "That didn't save. Please try again.");
+          if (b && b.ok) {
+            var keepRepl = (CURATED.status[code] || {}).replacements;
+            CURATED.status[code] = b.status;
+            if (keepRepl && keepRepl.length && !(b.status.replacements || []).length) b.status.replacements = keepRepl;
+            if (then && !optimistic) then(b);
+            render();
+          } else undo((b && b.message) || "That didn't save. Please try again.");
         })
-        .catch(function () { stToast("Couldn't reach the server. Please try again."); });
+        .catch(function () { undo("Couldn't reach the server. Please try again."); });
     }
     var toastEl = null;
     function stToast(text) {
@@ -2923,21 +2943,30 @@
       }
     }, true);
 
+    // Only the selection's own cards are on the page (fix batch 3). The page used to keep every
+    // roster card in the grid, hidden, and every render (each Approve, Reject, tag, add) walked,
+    // restyled and re-appended all ~2,000 of them: 150-190 ms of main-thread work per click on a
+    // fast laptop. Cards outside the selection now wait off the page until they are added.
+    function selCards() { return selected.map(function (code) { return byCode[code]; }).filter(Boolean); }
     function render() {
+      var grid = $("cat-grid");
+      var keep = {};
+      selected.forEach(function (code) { keep[code] = 1; });
+      cards.forEach(function (c) { if (!keep[c.dataset.code] && c.parentNode) c.parentNode.removeChild(c); });
+      var inOrder = selCards();
+      inOrder.forEach(addRemove);
       renderTags();
       var shown = 0;
-      cards.forEach(function (c) {
-        var ok = selected.indexOf(c.dataset.code) !== -1 && (!controls || controls.matches(c)) && stMatches(c.dataset.code);
+      inOrder.forEach(function (c) {
+        var ok = (!controls || controls.matches(c)) && stMatches(c.dataset.code);
         c.hidden = !ok;
         if (ok) shown++;
       });
 
       // Order the visible cards the way the link lists them, or by the sort
       // the client picked.
-      var grid = $("cat-grid");
-      var inOrder = selected.map(function (code) { return byCode[code]; }).filter(Boolean);
       var ordered = controls ? controls.order(inOrder) : inOrder;
-      cards.forEach(function (card) { grid.appendChild(card); });   // back out of any sections first
+      inOrder.forEach(function (card) { grid.appendChild(card); });   // back out of any sections first
       ordered.forEach(function (card) { grid.appendChild(card); });
       layoutGroups(grid, ordered);
 
@@ -3036,8 +3065,11 @@
     }
 
     // A remove control per card, added here rather than in the markup so the
-    // catalogue and the selection page can share one card template.
-    cards.forEach(function (card) {
+    // catalogue and the selection page can share one card template. Added when
+    // a card joins the page (render), not to every roster card up front.
+    function addRemove(card) {
+      if (card.getAttribute("data-rm")) return;
+      card.setAttribute("data-rm", "1");
       var btn = document.createElement("button");
       btn.type = "button";
       btn.className = "cat-card__remove";
@@ -3054,7 +3086,7 @@
       card.removeAttribute("tabindex");
       card.removeAttribute("role");
       card.removeAttribute("aria-pressed");
-    });
+    }
 
     // Back to the catalogue carrying this shortlist, so a client who forgot
     // someone can add them and save the same selection again.
