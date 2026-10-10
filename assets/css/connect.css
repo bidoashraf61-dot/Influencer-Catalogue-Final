@@ -398,6 +398,12 @@
 .cat-brand a:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; }
 .cx-selact .cx-btn--line { color: var(--white); border-color: rgba(255,255,255,.5); }
 .cx-selact .cx-btn--line:hover { border-color: var(--lime); color: var(--lime); background: transparent; }
+.cx-ideas__lock { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; border-radius: 16px; background: rgba(18,18,18,.06); margin-bottom: 14px; }
+.cx-ideas__lockic { flex: none; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; background: var(--ink); color: var(--lime); }
+.cx-ideas__lock b { display: block; font-size: 16px; margin-bottom: 4px; }
+.cx-ideas__lock p { margin: 0; font-size: 14px; line-height: 1.5; opacity: .8; }
+.cx-idea--sample { opacity: .78; border-style: dashed; }
+.cx-idea--sample .cx-idea__n { width: auto; padding: 0 10px; border-radius: 999px; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
 .cx-moresec { padding: 28px 0 6px; }
 .cx-viewer { display: flex; align-items: center; justify-content: space-between; gap: 18px 28px; flex-wrap: wrap; background: var(--ink); color: var(--white); border-radius: 24px; padding: 22px 26px; }
 .cx-viewer__tx { flex: 1 1 380px; min-width: 0; }

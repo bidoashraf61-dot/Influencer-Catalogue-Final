@@ -170,6 +170,10 @@ class PhaseEMixin:
         if not got:
             return
         code, sel, reader = got
+        if not ideas.started(reader, code):
+            return self.send_json(200, {"ok": True, "locked": True, "code": code, "ideas": [], "sample": ideas.SAMPLE,
+                                        "message": "Content ideas open once your quote is released and approved and the campaign has started."},
+                                  self.cors())
         sels = gating.selections_with(reader, code) if reader != db.admin_code_id() else []
         if sel is None and sels:
             sel = db.selection(token=sels[0]["token"])
@@ -186,6 +190,10 @@ class PhaseEMixin:
         if not got:
             return
         code, sel, reader = got
+        if not ideas.started(reader, code):
+            return self.send_json(403, {"ok": False, "reason": "locked", "sample": ideas.SAMPLE,
+                                        "message": "Content ideas open once your quote is released and approved and the campaign has started."},
+                                  self.cors())
         if sel is None and reader != db.admin_code_id():
             sels = gating.selections_with(reader, code)
             if sels:

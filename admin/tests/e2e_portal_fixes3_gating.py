@@ -192,6 +192,7 @@ class Fixes3Gating(unittest.TestCase):
         c, _ = self.signup("idea@lockco4.com")
         cid = portal.user_by_email("idea@lockco4.com")["code_id"]
         tok = self.selection(c, "Ideas", ["HV-MD-004"])
+        db.save_campaign(db.create_campaign("Live", client="T", code_id=cid, codes=["HV-MD-004"]), status="live")
         sel = db.selection(token=tok)
         ctx = ideas.context("HV-MD-004", cid, sel)
         self.assertIsNone(ctx["style"])

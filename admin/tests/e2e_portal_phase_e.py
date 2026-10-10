@@ -227,10 +227,31 @@ class PhaseE(unittest.TestCase):
         self.assertEqual(Client_get_anon(self.base, "/api/timing?c=skincare")[0], 401)
 
     # ---------------------------------------------------- content ideas --
+    @staticmethod
+    def _start_campaign(email, codes):
+        """HelloVoice releases the quote and sets a campaign live for this client."""
+        import portal as _portal
+        cid = _portal.user_by_email(email)["code_id"]
+        kid = db.create_campaign("Live", client="Test", code_id=cid, codes=codes)
+        db.save_campaign(kid, status="ended")        # started and over: ideas open, credits still apply
+
     def test_06_content_ideas(self):
         c, _ = self.signup("ideas@glow-f.com")
         s, sel, _ = c.post("/api/selection", {"name": "SPF creators", "codes": ["HV-MI-001", "HV-MI-002"]})
         tok = sel["token"]
+        # locked until a campaign with this creator has started: a dummy example, no writing, no charge
+        s, g, _ = c.get("/api/ideas?c=HV-MI-001&s=" + tok)
+        self.assertEqual((s, g["locked"], g["ideas"]), (200, True, []))
+        self.assertTrue(g["sample"] and g["sample"][0]["hook_en"] and g["sample"][0]["hook_ar"])
+        self.assertNotIn("cost", g)
+        before0 = self.credits(c)
+        s, b, _ = c.post("/api/ideas", {"code": "HV-MI-001", "token": tok})
+        self.assertEqual((s, b["reason"]), (403, "locked"))
+        self.assertEqual(self.credits(c), before0)
+        self._start_campaign("ideas@glow-f.com", ["HV-MI-001"])
+        self.assertFalse(c.get("/api/ideas?c=HV-MI-001&s=" + tok)[1].get("locked"))
+        self.assertTrue(c.get("/api/ideas?c=HV-MI-002&s=" + tok)[1]["locked"])      # not in a started campaign
+        self._start_campaign("ideas@glow-f.com", ["HV-MI-002"])
         c.post("/api/brief/attach", {"token": tok, "answers": {"goal": "awareness", "platforms": ["Instagram"], "market": "SA", "category": ["skincare"]}})
         s, g, _ = c.get("/api/ideas?c=HV-MI-001&s=" + tok)
         self.assertEqual((s, g["ideas"], g["cost"]), (200, [], 2))
@@ -253,6 +274,7 @@ class PhaseE(unittest.TestCase):
         # not in this selection, or someone else's selection
         self.assertEqual(c.post("/api/ideas", {"code": "HV-MD-003", "token": tok})[0], 404)
         o, _ = self.signup("other@rival-test.com")
+        self._start_campaign("other@rival-test.com", ["HV-MI-005"])
         self.assertEqual(o.post("/api/ideas", {"code": "HV-MI-001", "token": tok})[0], 404)
         self.assertEqual(o.get("/api/ideas?c=HV-MI-001&s=" + tok)[0], 404)
         # the creator page without a selection: the client's own scope
@@ -270,6 +292,7 @@ class PhaseE(unittest.TestCase):
                          platform="Instagram")
         c, _ = self.signup("spy@glow-g.com")
         s, sel, _ = c.post("/api/selection", {"name": "Spy", "codes": ["HV-MI-002"]})
+        self._start_campaign("spy@glow-g.com", ["HV-MI-002"])
         c.post("/api/ideas", {"code": "HV-MI-002", "token": sel["token"]})
         prompt = seen[-1]
         self.assertNotIn("SECRET-CAPTION", prompt)                                # locked analysis is not used

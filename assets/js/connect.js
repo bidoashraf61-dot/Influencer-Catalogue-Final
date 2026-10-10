@@ -692,6 +692,21 @@
         if (chip) chip.remove();
         if (cost) again.appendChild(h("span", { class: "hv-cost", html: ic("coin") + cost + " credits" }));
       }
+      // Before the campaign starts: a lock and one dummy example of what Helvy will write.
+      function lockedView(sample) {
+        list.textContent = ""; ctxRow.textContent = ""; again.hidden = true;
+        list.appendChild(h("div", { class: "cx-ideas__lock" },
+          h("span", { class: "cx-ideas__lockic", html: ic("lock") }),
+          h("div", null, h("b", null, "Content ideas unlock when your campaign starts"),
+            h("p", null, "They open once your quote is released and approved and HelloVoice sets the campaign live. Until then, this is an example of what Helvy writes for each creator."))));
+        sample.forEach(function (it) {
+          list.appendChild(h("article", { class: "cx-idea cx-idea--sample" },
+            h("div", { class: "cx-idea__top" }, h("span", { class: "cx-idea__n" }, "Example"), h("span", { class: "cx-idea__fmt" }, it.format)),
+            h("div", { class: "cx-idea__cols" },
+              h("div", { class: "cx-idea__en", lang: "en" }, h("p", { class: "cx-idea__hook" }, "“" + it.hook_en + "”"), h("p", { class: "cx-idea__con" }, it.concept_en)),
+              h("div", { class: "cx-idea__ar", lang: "ar", dir: "rtl" }, h("p", { class: "cx-idea__hook" }, it.hook_ar), h("p", { class: "cx-idea__con" }, it.concept_ar)))));
+        });
+      }
       function intro() {
         list.textContent = "";
         var write = h("button", { class: "cx-btn", type: "button", html: ic("bulb") + "<span>Write ideas</span>" });
@@ -721,6 +736,7 @@
         list.appendChild(h("div", { class: "cx-sheet__empty" }, "Opening…"));
         api("GET", "/api/ideas?c=" + encodeURIComponent(code) + (token ? "&s=" + encodeURIComponent(token) : "")).then(function (r) {
           if (!r.b || !r.b.ok) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, "These ideas aren’t available here.")); return; }
+          if (r.b.locked) { lockedView(r.b.sample || []); return; }
           setCtx(r.b);
           if (r.b.selection && !token) token = r.b.selection.token;
           if (!r.b.ai && !(r.b.ideas || []).length) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, "Helvy can’t write ideas right now. Please try again later.")); return; }
@@ -748,7 +764,7 @@
         if (!fields || !m || fields.querySelector(".cx-ideabtn")) return;
         var nm = fields.querySelector(".pp-name");
         var b = h("button", { class: "cx-btn cx-btn--line cx-ideabtn", type: "button", "data-ideas": decodeURIComponent(m[1]).toUpperCase(),
-                              "data-name": nm ? nm.textContent.trim() : "", html: ic("bulb") + "<span>Content ideas</span>" });
+                              "data-name": nm ? nm.textContent.trim() : "", html: ic("lock") + "<span>Content ideas</span>" });
         var key = fields.querySelector(".pp-key");
         if (key && key.nextSibling) fields.insertBefore(b, key.nextSibling); else fields.appendChild(b);
       };

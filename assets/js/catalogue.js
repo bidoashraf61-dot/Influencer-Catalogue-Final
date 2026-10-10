@@ -3008,8 +3008,8 @@
       }
       // Phase E: Helvy's content ideas for this creator (hooks and concepts, AR + EN), for anyone who can open the selection.
       if (st.s !== "rejected" && st.s !== "unavailable") {
-        html += '<button type="button" class="sel-ideas" data-ideas="' + esc(code) + '" title="Helvy drafts hooks and concepts for this creator, in English and Arabic">' +
-          hvIcon("bulb") + "<span>Content ideas</span></button>";
+        html += '<button type="button" class="sel-ideas" data-ideas="' + esc(code) + '" title="Opens once your campaign has started; see an example">' +
+          hvIcon("lock") + "<span>Content ideas</span></button>";
       }
       box.innerHTML = html;
     }

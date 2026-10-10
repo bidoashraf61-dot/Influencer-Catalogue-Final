@@ -41,6 +41,48 @@ FORMATS = ["Reel", "TikTok", "Story", "Snap", "Short", "Carousel", "Live", "UGC"
 _MONEY = re.compile(r"(\bSAR\b|\bAED\b|\bUSD\b|\$|£|€|ريال|درهم|\bprice\b|\bfee\b|\bcost\b|\bdiscount\b|سعر|خصم|\d+\s?%\s?off)", re.I)
 
 
+# What a locked client sees instead of their own ideas: one fixed, clearly labelled sample that is
+# not about any real creator (no names, no claims, no prices).
+SAMPLE = [{
+    "format": "Reel",
+    "hook_en": "I tried it for seven days so you don't have to guess.",
+    "concept_en": "A day-by-day reel in the creator's own voice: the routine, one honest moment, and a calm close "
+                  "that points to the brand. Natural light, no scripts read to camera.",
+    "hook_ar": "جرّبته سبعة أيام عشان تعرفون النتيجة بنفسكم.",
+    "concept_ar": "ريل يومي بصوت المبدعة: الروتين، لحظة صادقة، وخاتمة هادية تشير للعلامة. إضاءة طبيعية وبدون نص محفوظ.",
+}]
+
+
+def started(code_id, code):
+    """True when ``code`` is in a campaign of this client's team that has started (live, or it ran
+    and ended). Content ideas open only then: the quote is released and approved, HelloVoice has
+    built the campaign and set it live. HelloVoice itself (the admin) is never locked."""
+    import json as _json
+    import portal
+    if code_id is None:
+        return False
+    if int(code_id) == db.admin_code_id():
+        return True
+    team = sorted(portal.team_codes(int(code_id)) | {int(code_id)})
+    if not team:
+        return False
+    with db.connect() as conn:
+        rows = conn.execute("SELECT id, selection_id FROM campaigns WHERE status IN ('live', 'ended') AND code_id IN (%s)"
+                            % ",".join("?" * len(team)), team).fetchall()
+        for k in rows:
+            if conn.execute("SELECT 1 FROM campaign_creators WHERE campaign_id = ? AND code = ? LIMIT 1",
+                            (k["id"], code)).fetchone():
+                return True
+            if k["selection_id"]:
+                s = conn.execute("SELECT codes FROM selections WHERE id = ?", (k["selection_id"],)).fetchone()
+                try:
+                    if s and code in _json.loads(s["codes"] or "[]"):
+                        return True
+                except ValueError:
+                    pass
+    return False
+
+
 def init():
     with db.connect() as conn:
         conn.executescript(SCHEMA)
