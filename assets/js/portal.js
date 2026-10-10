@@ -364,8 +364,10 @@
   // first-time name, company, job title. There is no team door; HelloVoice reaches the admin by
   // its own address. A selection or campaign link that still needs its access code shows
   // "Opened a shared link?" under the card, and ?access=code brings the same form up.
-  var LOGOS = [["bayer", "Bayer"], ["abbott", "Abbott"], ["pfizer", "Pfizer"], ["astrazeneca", "AstraZeneca"], ["molnlycke", "Mölnlycke"],
-               ["menarini-group", "Menarini"], ["whites", "Whites"], ["nahdi", "Nahdi"], ["biotech-cigalah", "Biotech Cigalah"]];
+  var LOGOS = [["avalon-pharma", "Avalon Pharma"], ["alpha-plus", "Alpha Plus"], ["penduline", "Penduline"], ["parkville", "Parkville"],
+               ["svr", "SVR"], ["l-oreal-dermatological-beauty", "L'Oréal Dermatological Beauty"], ["abbott", "Abbott"], ["biotech-cigalah", "Biotech Cigalah"],
+               ["nahdi", "Nahdi"], ["whites", "Whites"], ["la-roche-posay", "La Roche-Posay"], ["vichy", "Vichy"], ["cerave", "CeraVe"], ["uriage", "Uriage"],
+               ["skinceuticals", "SkinCeuticals"], ["jamjoom-pharma", "Jamjoom Pharma"], ["spc", "SPC"], ["orchidia", "Orchidia"]];
   var PERSONAL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|aol|proton|protonmail|gmx|yandex|mail|zoho)\.[a-z.]+$/i;
 
   function enhanceGate() {
@@ -407,10 +409,16 @@
     scene.appendChild(wrap);
 
     /* -- one quiet row of client logos -- */
-    var logos = h("div", { class: "cx-logos__row" });
-    LOGOS.forEach(function (l) {
-      logos.appendChild(h("img", { src: ROOT + "assets/clients/" + l[0] + ".webp?v=c2", srcset: ROOT + "assets/clients/" + l[0] + "@2x.webp?v=c2 2x", alt: l[1], loading: "lazy", decoding: "async", height: "22" }));
+    // A slow marquee: the list is drawn twice and slides by half its width, so it loops seamlessly.
+    var track = h("div", { class: "cx-logos__track" });
+    [0, 1].forEach(function (copy) {
+      LOGOS.forEach(function (l) {
+        var img = h("img", { src: ROOT + "assets/clients/" + l[0] + ".webp?v=c3", srcset: ROOT + "assets/clients/" + l[0] + "@2x.webp?v=c3 2x", alt: copy ? "" : l[1], loading: "lazy", decoding: "async", height: "22" });
+        if (copy) img.setAttribute("aria-hidden", "true");
+        track.appendChild(img);
+      });
     });
+    var logos = h("div", { class: "cx-logos__row" }, track);
     scene.appendChild(h("div", { class: "cx-logos" }, h("div", { class: "cx-wrap" }, h("p", null, "Trusted by"), logos)));
 
     var foot = h("footer", { class: "cx-scene__foot" });
