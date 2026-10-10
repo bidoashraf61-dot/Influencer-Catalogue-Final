@@ -3017,6 +3017,21 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             except ValueError:
                 pass
         db.set_setting("benchmarks", bm)
+        import intl_benchmarks as ib
+        if any(k.startswith("ib_") for k in f):
+            over = {}
+            for platform, entry in ib.TABLE.items():
+                for band in ib.BANDS:
+                    d_lo, d_hi = entry["bands"][band]
+                    try:
+                        lo = float(f.get("ib_%s_%s_low" % (platform, band)) or d_lo)
+                        hi = float(f.get("ib_%s_%s_high" % (platform, band)) or d_hi)
+                    except ValueError:
+                        continue
+                    if lo > 0 and hi >= lo and (lo, hi) != (float(d_lo), float(d_hi)):
+                        over.setdefault(platform, {})[band] = [lo, hi]
+            db.set_setting("intl_benchmarks", over)
+            ib._overrides(fresh=True)
         return self.redirect("/settings?ok=" + urllib.parse.quote("Settings saved."))
 
     def post_settings_token(self):
@@ -4227,7 +4242,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                     "group_by": (sel["group_by"] if "group_by" in sel.keys() else None) or "",
                                     "brief": {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
                                               "client": self.selection_client(sel)},
-                                    "scores": {k: {"score": v["score"], "tag": v["tag"], "strengths": v["strengths"],
+                                    "scores": {k: {"score": v["score"], "tag": v["tag"], "score_range": v.get("score_range"),
+                                                   "tag_range": v.get("tag_range"), "strengths": v["strengths"],
                                                    "watchouts": v["watchouts"], "conclusion": v["conclusion"],
                                                    "parts": [{"label": p["label"], "s": p["s"]} for p in v["parts"]],
                                                    "platform": v["platform"], "objective": v["objective"],
@@ -4235,7 +4251,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                                    "confidence": v.get("confidence"), "reach_followers": v.get("reach_followers"),
                                                    "limited_data": bool(v.get("limited_data")),
                                                    "assigned": v.get("assigned") or "Auto", "available": v.get("available") or [],
-                                                   "platforms": {pl: {"score": x["score"], "tag": x["tag"], "strengths": x["strengths"],
+                                                   "platforms": {pl: {"score": x["score"], "tag": x["tag"], "score_range": x.get("score_range"),
+                                                                      "tag_range": x.get("tag_range"), "strengths": x["strengths"],
                                                                       "watchouts": x["watchouts"], "conclusion": x["conclusion"],
                                                                       "parts": [{"label": p["label"], "s": p["s"]} for p in x["parts"]],
                                                                       "platform": x["platform"], "objective": x["objective"],

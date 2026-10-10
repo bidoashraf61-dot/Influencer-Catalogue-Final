@@ -3703,6 +3703,7 @@ def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, erro
           "Post reach = engagement × the first figure, never more than the creator's followers; "
           "story reach = followers × the second; impressions = reach × the third (stories: = reach). "
           "Video reach = its views.</p></div>"
+        + intl_benchmarks_card()
         + benchmarks_card(bm)
         + "<button class='btn'>Save settings</button></form>"
         + "<h2>Capture job</h2><div class='card'>"
@@ -3860,6 +3861,33 @@ def insights_upload_page(row, posts, sent, ok=None, error=None):
         + "<button>Send · إرسال</button></form>"
         + ("<p style='margin-top:24px;font-size:var(--t-sm,13px)'>Uploaded so far: " + str(sent) + "</p>" if sent else "")
         + "</main></body></html>")
+
+
+def intl_benchmarks_card():
+    """The benchmarks creator scores are measured against: a low-high range per platform and
+    size band, with where each figure came from. The campaign-report guides below are separate."""
+    import intl_benchmarks as ib
+    rows = ib.table()
+    body = ""
+    for r in rows:
+        key = "ib_%s_%s_" % (r["platform"], r["band"])
+        changed = (r["low"], r["high"]) != (float(r["default"][0]), float(r["default"][1]))
+        body += ("<tr><td>" + e(r["platform"]) + "</td><td>" + e(r["label"]) + "</td>"
+                 "<td><input name='" + key + "low' value='" + ("%g" % r["low"]) + "' inputmode='decimal'></td>"
+                 "<td><input name='" + key + "high' value='" + ("%g" % r["high"]) + "' inputmode='decimal'></td>"
+                 "<td class='muted'>" + ("edited, table says %g-%g" % (r["default"][0], r["default"][1]) if changed else "as researched") + "</td></tr>")
+    srcs = "".join("<p class='price-hint'><b>" + e(p) + ":</b> " + e(en["metric"]) + ". " + e(en["rule"]) + ".<br>"
+                   + "<br>".join(e(x) for x in en["sources"]) + "</p>" for p, en in ib.TABLE.items())
+    return ("<h2>Creator score benchmarks (international)</h2><div class='card'>"
+            "<p class='sub'>Every creator's score compares their engagement with these ranges, never with our own roster "
+            "(version " + e(ib.VERSION) + "). Score = 100 &times; min(1, engagement &divide; benchmark &divide; 2), worked out at "
+            "the high end (harsh) and the low end (generous): the number shown is the middle and the range is kept beside it. "
+            "At the benchmark a creator scores 50; at 1.6&times; 80.</p>"
+            "<table><thead><tr><th>Platform</th><th>Size band</th><th>Low % (lowest source)</th><th>High % (middle source)</th><th></th></tr></thead><tbody>"
+            + body + "</tbody></table>" + srcs
+            + "<p class='price-hint'>Not scored: YouTube, Snapchat, Facebook, X (no agreed benchmark), and views, consistency "
+              "and interest. Audience, fake followers and our own record are shown beside the score, never inside it. "
+              "The benchmark guides below are separate: they grade campaign reports.</p></div>")
 
 
 def benchmarks_card(bm):
