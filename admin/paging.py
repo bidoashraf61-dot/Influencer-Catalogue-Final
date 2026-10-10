@@ -237,6 +237,8 @@ def current(key_fn, build_fn):
     with _lock:
         vs = _state["versions"]
         _state["checked"] = time.time()
+        if len(vs) > 1 and time.time() - getattr(vs[0], "superseded", 0) > KEEP_OLD:
+            del vs[0]
         if vs and vs[-1].version == key:
             return vs[-1]
     cards, tiers = build_fn()
