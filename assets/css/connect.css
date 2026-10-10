@@ -383,14 +383,21 @@
 .cx-selact .cx-btn { min-height: 48px; }
 /* Selection header: the ROI Calculator sits at the right end of the header's bottom row as a lime
    primary button, and "Full catalogue" (top bar and beside the title) is a solid white one. */
-.cat-hero--cover .cat-selhead__foot .cx-selact { margin: 0 0 0 auto; }
-.cx-selact .cx-btn--roi { min-height: 56px; padding: 0 30px; font-size: 22px; box-shadow: 0 0 0 4px rgba(232,255,118,.22), 0 10px 26px rgba(0,0,0,.35); }
+/* One row, one centre line: Full catalogue, the objective pill, the facts and the ROI button all
+   share the line under the rule (the brief dissolves into the row); the score note drops to its
+   own line below. The ROI button follows the facts rather than the far right edge, where the
+   header's card illustration sits. */
+.cat-hero--cover .cat-selhead__foot { position: relative; z-index: 2; align-items: center; }
+.cat-hero--cover .cat-selhead__foot .cat-selhead__brief { display: contents; }
+.cat-hero--cover .cat-selhead__foot .cat-selhead__brief[hidden] { display: none; }
+.cat-hero--cover .cat-selhead__foot .cat-selhead__note { order: 2; flex-basis: 100%; margin-top: -4px; }
+.cat-hero--cover .cat-selhead__foot .cx-selact { order: 1; margin: 0; }
+.cx-selact .cx-btn--roi { min-height: 52px; padding: 0 30px; font-size: 22px; box-shadow: 0 0 0 4px rgba(232,255,118,.22), 0 10px 26px rgba(0,0,0,.35); }
 .cx-selact .cx-btn--roi:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
 .cat-hero--cover .cat-back, .cat-hero--cover .cat-track--cat { background: var(--white); color: var(--ink); border-color: var(--white); font-weight: 700; box-shadow: 0 8px 22px rgba(0,0,0,.3); }
 .cat-hero--cover .cat-back:hover, .cat-hero--cover .cat-track--cat:hover { background: var(--lime); color: var(--ink); border-color: var(--lime); }
 .cat-brand a { display: inline-block; line-height: 0; border-radius: 8px; }
 .cat-brand a:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; }
-@media (max-width: 760px) { .cat-hero--cover .cat-selhead__foot .cx-selact { margin: 0; } }
 .cx-selact .cx-btn--line { color: var(--white); border-color: rgba(255,255,255,.5); }
 .cx-selact .cx-btn--line:hover { border-color: var(--lime); color: var(--lime); background: transparent; }
 .cx-moresec { padding: 28px 0 6px; }
