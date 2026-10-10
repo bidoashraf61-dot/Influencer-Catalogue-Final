@@ -4493,6 +4493,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         selection = b.get("selection") or []
         if not isinstance(selection, list) or not selection:
             return self.send_json(400, {"ok": False, "reason": "empty selection"}, self.cors())
+        # A saved selection: only its owner (or HelloVoice) may ask for its quote. A colleague on the
+        # same company sees the selection but cannot send it. No token = the sender's own unsaved list.
+        tok = str(b.get("token") or "").strip()[:80]
+        if tok:
+            sel = db.selection(token=tok)
+            if sel is None or (sel["code_id"] is not None and int(code_id) != db.admin_code_id()
+                               and sel["code_id"] not in portal.team_codes(int(code_id))):
+                return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+            if not portal.may_edit(int(code_id), sel, db.admin_code_id()):
+                return self.send_json(403, {"ok": False, "reason": "not_owner",
+                                            "message": "Only the person who owns this selection can request its quote."}, self.cors())
         rid = db.create_request(
             code_id, b.get("name"), b.get("company"), b.get("email"), b.get("phone"),
             b.get("selection_name"), [str(c)[:40] for c in selection[:200]],

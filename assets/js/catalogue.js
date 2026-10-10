@@ -1979,6 +1979,8 @@
           name: data.get("name"), company: data.get("company"),
           email: data.get("email"), phone: data.get("phone"),
           selection_name: selectionName || null,
+          // The saved selection this quote is for: the server checks the sender owns it.
+          token: (CURATED && CURATED.token) || null,
           selection: selected.slice()
         })
       })
@@ -3267,6 +3269,7 @@
     }
     function selCards() { return selected.map(function (code) { return byCode[code]; }).filter(Boolean); }
     function render() {
+      if (window.hvGateQuote) window.hvGateQuote();
       var grid = $("cat-grid");
       var keep = {};
       selected.forEach(function (code) { keep[code] = 1; });
@@ -3415,7 +3418,15 @@
         if (a.classList.contains("cat-btn")) a.textContent = "Add more creators";
       });
 
+    // A colleague on the same company can view a selection but not ask for its quote: that is the
+    // owner's call (the server checks it too). Local, unsaved lists are always the sender's own.
+    function gateQuote() {
+      if (!(CURATED && CURATED.token) || mayEdit()) return;
+      ["cat-request", "cat-request-2", "sel-head-quote"].forEach(function (id) { var b = $(id); if (b) b.hidden = true; });
+    }
+    window.hvGateQuote = gateQuote;
     wireQuoteForm(function () { selected = []; render(); });
+    gateQuote();
     var second = $("cat-request-2");
     if (second) second.addEventListener("click", function () { $("cat-request").click(); });
     var hq = $("sel-head-quote"); if (hq) hq.addEventListener("click", function () { $("cat-request").click(); });

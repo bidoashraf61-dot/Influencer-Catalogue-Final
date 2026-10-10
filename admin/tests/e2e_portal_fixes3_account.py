@@ -153,6 +153,15 @@ class Fixes3Account(unittest.TestCase):
         self.assertEqual((s, b.get("reason")), (403, "not_owner"))
         s, b, _ = c.post("/api/selection/tags", {"token": token, "code": "HV-MI-001", "tags": ["Keep"]})
         self.assertEqual((s, b.get("ok")), (200, True), b)                       # the owner: fine
+        # the quote request: the owner may, a colleague may not, an unsaved list (no token) is the sender's own
+        q = {"name": "P", "company": "Own", "email": "p@only-own.com", "phone": "1", "selection_name": "Owner list",
+             "selection": ["HV-MI-001"]}
+        s, b, _ = col.post("/api/request", dict(q, token=token))
+        self.assertEqual((s, b.get("reason")), (403, "not_owner"))
+        s, b, _ = c.post("/api/request", dict(q, token=token))
+        self.assertEqual((s, b.get("ok")), (200, True), b)
+        s, b, _ = col.post("/api/request", q)
+        self.assertEqual((s, b.get("ok")), (200, True), b)
         s, b, _ = col.post("/api/brief/attach", {"token": token, "answers": {"objective": ["Awareness"]}})
         self.assertEqual((s, b.get("reason")), (403, "not_owner"))
         # a colleague re-saving the same token must not change the owner's creators
