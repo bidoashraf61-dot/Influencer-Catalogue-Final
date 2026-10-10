@@ -148,11 +148,12 @@
       rows.push(["Posts", String(I.posts || 0), String(S.posts || 0), "n"]);
       var sizes = {}; (S.by_size || []).forEach(function (x) { sizes[x.size] = x; });
       var st = S.on_structure || {};
+      if ((I.by_size || []).some(function (x) { return x.n || (sizes[x.size] && sizes[x.size].n); })) rows.push(["Creators by size (share of creators)", "", "", "n", "head"]);
       (I.by_size || []).forEach(function (x) {
         var m = sizes[x.size] || { n: 0, pct: 0 };
         if (!x.n && !m.n) return;
         var mark = S.posts ? (st[x.size] === "short" ? "short" : st[x.size] === "over" ? "over" : "n") : "n";
-        rows.push([x.label + " · % of creators", x.n + " (" + x.pct + "%)", S.creators ? m.n + " (" + m.pct + "%)" : "–", mark, "size"]);
+        rows.push([x.label, x.n + " (" + x.pct + "%)", S.creators ? m.n + " (" + m.pct + "%)" : "–", mark, "size"]);
       });
       var plats = res.platforms || [];
       if (plats.length > 1) {
@@ -182,6 +183,10 @@
         h("th", { scope: "col" }, "Your selection", h("small", null, res.creators ? res.creators + " creator" + (res.creators === 1 ? "" : "s") : "nothing chosen yet")))));
       var tb = h("tbody");
       compareRows(res).forEach(function (r) {
+        if (r[4] === "head") {
+          tb.appendChild(h("tr", { class: "cx-cmp__head" }, h("th", { scope: "rowgroup", colspan: "3" }, r[0])));
+          return;
+        }
         var tr = h("tr", { class: (r[3] === "goal" ? "cx-cmp__goal " : "") + (r[4] === "size" ? "cx-cmp__size" : "") });
         tr.appendChild(h("th", { scope: "row" }, r[0]));
         tr.appendChild(h("td", null, r[1]));
@@ -199,7 +204,7 @@
       var t = res.trust || {};
       var q = res.quality;
       box.appendChild(h("div", { class: "cx-res__top" },
-        h("div", null, h("h3", null, q ? "Selection quality" : "Recommended structure"),
+        h("div", null, h("h3", null, q ? (t.of ? "Selection quality" : "Quality of your mix") : "Recommended structure"),
           h("p", null, res.summary + (res.posts ? " · " + res.posts + " post" + (res.posts === 1 ? "" : "s") : ""))),
         qualityChip(q)));
       if (q) {
@@ -239,6 +244,7 @@
       var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
       var q = res.quality;
       var rows = compareRows(res).map(function (r) {
+        if (r[4] === "head") return "<tr><th colspan='3' style='padding-top:14px;font-size:12px;color:#4a4a4a'>" + esc(r[0]) + "</th></tr>";
         return "<tr><th>" + esc(r[0]) + "</th><td>" + esc(r[1]) + "</td><td>" + esc(r[2]) + "</td></tr>";
       }).join("");
       var qTxt = q ? (q.band ? q.low + "–" + q.high + "%" : q.pct + "%") : "";

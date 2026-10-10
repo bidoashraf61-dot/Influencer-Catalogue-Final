@@ -903,3 +903,6 @@
   .cx-quality b { font-size: 30px; }
 }
 .cx-cmpnote { margin: 8px 0 0; font-size: 12.5px; color: var(--cx-mute); }
+.cx-cmp thead th { overflow-wrap: normal; word-break: normal; hyphens: manual; }
+.cx-cmp__head th { padding-top: 14px; font-size: 11.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--cx-mute); border-bottom: 0; }
+@media (max-width: 560px) { .cx-cmp thead th { letter-spacing: .04em; font-size: 10.5px; } }

@@ -702,7 +702,7 @@ def advise(res, gl, creators=None, candidates=None, max_items=3, platforms=None,
         ideal = res.get("ideal") or {}
         if q0 is not None and q0 < 0.9 and ideal.get("mix"):
             items.append({"id": "use_mix", "gain": 1.0 - q0, "points": int(round((1.0 - q0) * 100)),
-                          "text": "Your mix reaches about %d%% of the recommended structure. It is %s." % (
+                          "text": "Your mix reaches about %d%% of the recommended structure, which is %s." % (
                               int(5 * round(q0 * 20)), mix_text(ideal["mix"])),
                           "action": {"type": "use_mix", "mix": ideal["mix"]}})
         return items[:max_items]
