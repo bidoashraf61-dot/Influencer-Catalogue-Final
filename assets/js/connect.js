@@ -590,6 +590,7 @@
         : h("span", { class: "cx-tag cx-tag--cost", html: ic("coin") + cost + " credits" });
     }
     function mountSelection() {
+      mountLifecycle();
       var S = window.hvSelection;
       if (!S || !S.token() || document.getElementById("cx-selact")) return;
       // Bottom row of the selection header, pushed to its right end (CSS), a lime primary button.
@@ -1078,6 +1079,131 @@
       document.addEventListener("keydown", onKey, true);
       document.body.appendChild(scrim); document.body.appendChild(box);
       start.focus({ preventScroll: true, focusVisible: false });
+    }
+
+    /* ================================================== quote lifecycle (fix batch 9, #42)
+     * One chip says where a selection stands: Draft, Quote requested, Quote ready, Approved,
+     * Campaign live, Completed. On the selection page it sits in the header and opens into a small
+     * timeline with dates and who did it. The owner approves a ready quote here; colleagues look.
+     * The server decides everything (/api/selection -> lifecycle); this only draws it. */
+    // portal.js's h() takes children one by one; the timeline passes lists, so flatten here.
+    function lh(tag, props) {
+      var el = h(tag, props), kids = [].slice.call(arguments, 2);
+      (function put(list) {
+        list.forEach(function (x) {
+          if (x == null || x === false) return;
+          if (Array.isArray(x)) { put(x); return; }
+          el.appendChild(typeof x === "string" || typeof x === "number" ? document.createTextNode(String(x)) : x);
+        });
+      })(kids);
+      return el;
+    }
+    function lcDay(ts) {
+      if (!ts) return "";
+      var d = new Date(ts * 1000), y = new Date().getFullYear() !== d.getFullYear();
+      return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: y ? "numeric" : undefined });
+    }
+    function lcChip(lc, extra) {
+      if (!lc || !lc.key) return null;
+      return lh("span", { class: "lc-chip lc-chip--" + lc.key + (extra ? " " + extra : ""), title: lc.hint || "" },
+        lh("i", { "aria-hidden": "true" }), lc.label);
+    }
+    HV.lifecycleChip = lcChip;
+    var lcBound = false;
+    function lcRender(cur) {
+      var lc = cur.lifecycle, S = window.hvSelection;
+      var old = document.getElementById("cx-lc"), oldChip = document.getElementById("cx-lc-chip");
+      if (oldChip) oldChip.remove();
+      if (!lc) { if (old) old.remove(); return; }
+      // The chip sits under the selection's title, in the header (both header builds: the cover
+      // header's .cat-selhead__lock and the older .cat-hero__head).
+      var title = document.getElementById("sel-title"), host = title && title.parentNode;
+      if (host) {
+        var chip = lcChip(lc, "lc-chip--hero"); chip.id = "cx-lc-chip";
+        host.appendChild(chip);
+      }
+      var steps = lh("ol", { class: "cx-lc__steps", "aria-label": "Quote progress" }, lc.steps.map(function (st) {
+        var who = [lcDay(st.at), st.at && st.by ? st.by : ""].filter(Boolean).join(" · ");
+        return lh("li", { class: "is-" + st.state, "aria-current": st.state === "current" ? "step" : null },
+          lh("span", { class: "cx-lc__dot", "aria-hidden": "true" }),
+          lh("b", null, st.label),
+          lh("small", null, who || (st.state === "current" ? "Now" : "")));
+      }));
+      var kids = [lh("div", { class: "cx-lc__top" }, lh("h2", { class: "cx-lc__t" }, "Quote status"), lcChip(lc)), steps,
+                  lh("p", { class: "cx-lc__hint" }, lc.hint)];
+      if (lc.note || lc.link) {
+        kids.push(lh("div", { class: "cx-lc__note" },
+          lh("b", null, "From your account manager"),
+          lc.note ? lh("p", null, lc.note) : null,
+          lc.link ? lh("a", { class: "cx-btn cx-btn--line cx-lc__open", href: lc.link, target: "_blank", rel: "noopener noreferrer" }, icEl("arrow"), "Open the quote") : null));
+      }
+      if (lc.can_approve) {
+        var box = lh("div", { class: "cx-lc__act" });
+        var ask = function () {
+          box.textContent = "";
+          var yes = lh("button", { type: "button", class: "cx-btn" }, "Yes, approve");
+          var no = lh("button", { type: "button", class: "cx-btn cx-btn--line" }, "Not yet");
+          box.appendChild(lh("p", { class: "cx-lc__ask", role: "alert" }, "Approve this quote? Your account manager is told and sets up the campaign."));
+          box.appendChild(yes); box.appendChild(no);
+          yes.focus({ preventScroll: true });
+          no.addEventListener("click", rest);
+          yes.addEventListener("click", function () {
+            yes.disabled = no.disabled = true;
+            api("POST", "/api/selection/quote/approve", { token: cur.token }).then(function (r) {
+              if (r.b && r.b.ok) { cur.lifecycle = r.b.lifecycle; toast("Quote approved. HelloVoice is setting up the campaign."); lcRender(cur); return; }
+              yes.disabled = no.disabled = false;
+              toast((r.b && r.b.message) || "Couldn't approve it. Please try again.");
+            });
+          });
+        };
+        var rest = function () {
+          box.textContent = "";
+          var b = lh("button", { type: "button", class: "cx-btn" }, icEl("check"), "Approve quote");
+          b.addEventListener("click", ask);
+          box.appendChild(b);
+        };
+        rest();
+        kids.push(box);
+      } else if (lc.key === "draft" && lc.role === "owner" && document.getElementById("cat-request")) {
+        var rq = lh("button", { type: "button", class: "cx-btn cx-btn--line" }, "Request a quote");
+        rq.addEventListener("click", function () { document.getElementById("cat-request").click(); });
+        kids.push(lh("div", { class: "cx-lc__act" }, rq));
+      }
+      if (lc.warn) {
+        kids.push(lh("p", { class: "cx-lc__warn" }, icEl("info"), lh("span", null, lh("b", null, lc.warn + ". "),
+          "You can keep changing creators; your account manager is told.")));
+      }
+      if (lc.changes && lc.changes.length) {
+        kids.push(lh("ul", { class: "cx-lc__chg" }, lc.changes.map(function (c) {
+          var bits = [c.added ? "+" + c.added + " added" : "", c.removed ? c.removed + " removed" : ""].filter(Boolean).join(", ");
+          return lh("li", null, (c.by || "The creators") + " changed the creators on " + lcDay(c.at) + (bits ? " (" + bits + ")" : ""));
+        })));
+      }
+      if (lc.campaign && (lc.key === "live" || lc.key === "completed")) {
+        kids.push(lh("a", { class: "cx-btn", href: ROOT + "campaign/#t=" + encodeURIComponent(lc.campaign.token) },
+          lc.key === "live" ? "Open the live report" : "Open the final report"));
+      }
+      if (lc.role === "viewer") kids.push(lh("p", { class: "cx-lc__ro" }, "You can follow this. " + (lc.owner || "The owner") + " requests and approves the quote."));
+      var sec = lh("section", { id: "cx-lc", class: "cx-lc cx-lc--" + lc.key, "aria-label": "Quote status" },
+        lh("div", { class: "cat-pad" }, lh("div", { class: "cat-container" }, lh("div", { class: "cx-lc__card" }, kids))));
+      if (old) { old.replaceWith(sec); return; }
+      var anchor = document.querySelector(".cat-summary");
+      if (anchor) anchor.insertAdjacentElement("afterend", sec);
+    }
+    function mountLifecycle() {
+      var S = window.hvSelection, cur = S && S.curated && S.curated();
+      if (!cur || !cur.token) return;
+      lcRender(cur);
+      if (lcBound) return;
+      lcBound = true;
+      // A save that touched a live quote: the server says so; show the new timeline and tell them once.
+      window.addEventListener("hv:selection-saved", function (ev) {
+        var d = ev.detail || {}, c = S.curated && S.curated();
+        if (!c || !d.lifecycle) return;
+        c.lifecycle = d.lifecycle;
+        lcRender(c);
+        if (d.lifecycle.warn) toast(d.lifecycle.warn + ". Your account manager has been told.");
+      });
     }
 
     /* ================================================================ boot */

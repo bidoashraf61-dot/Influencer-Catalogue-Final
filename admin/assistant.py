@@ -1303,11 +1303,16 @@ def _clean_codes(codes, active=True):
     return [c for c in dict.fromkeys(want) if c in known]
 
 
-def _save_codes(sel, codes, name=None):
+def _save_codes(sel, codes, name=None, ctx=None):
     prices = {k: v for k, v in json.loads(sel["prices"] or "{}").items() if k in codes}
-    same = sorted(json.loads(sel["codes"] or "[]")) == sorted(codes)
+    before = json.loads(sel["codes"] or "[]")
+    same = sorted(before) == sorted(codes)
     db.save_selection(sel["id"], name or sel["name"], codes, prices,
                       sel["total_from"] if same else None, sel["total_to"] if same else None)
+    if not same and ctx is not None:
+        import lifecycle                       # a quote may exist: record it and tell the account manager
+        import portal as _p
+        lifecycle.on_client_edit(sel, before, codes, _p.user_for_code(ctx.get("code_id")))
 
 
 def d_sel_add(a, ctx):
@@ -1322,7 +1327,7 @@ def d_sel_add(a, ctx):
 def x_sel_add(a, ctx):
     sel = _open_sel(ctx); _own(sel, ctx["code_id"]); have = json.loads(sel["codes"] or "[]")
     new = [c for c in _clean_codes(a.get("codes")) if c not in have]
-    _save_codes(sel, have + new)
+    _save_codes(sel, have + new, ctx=ctx)
     return {"ok": True, "message": "Added %d creator%s to “%s”." % (len(new), "" if len(new) == 1 else "s", sel["name"]), "reload": True}
 
 
@@ -1343,7 +1348,7 @@ def x_sel_remove(a, ctx):
     keep = [c for c in have if c not in drop]
     if not keep:
         raise ValueError("A selection needs at least one creator.")
-    _save_codes(sel, keep)
+    _save_codes(sel, keep, ctx=ctx)
     return {"ok": True, "message": "Removed %d creator%s from “%s”." % (len(have) - len(keep), "" if len(have) - len(keep) == 1 else "s", sel["name"]), "reload": True}
 
 
@@ -1408,7 +1413,9 @@ def x_quote(a, ctx):
     import notify
     sel = _open_sel(ctx); _own(sel, ctx["code_id"]); u = ctx.get("user") or {}
     codes = json.loads(sel["codes"] or "[]")
-    db.create_request(ctx["code_id"], u.get("name"), u.get("company"), u.get("email"), u.get("phone"), sel["name"], codes)
+    rid = db.create_request(ctx["code_id"], u.get("name"), u.get("company"), u.get("email"), u.get("phone"), sel["name"], codes)
+    import lifecycle
+    lifecycle.mark_requested(sel, rid, u.get("name"), u.get("id"))
     notify.send("quote", ["%s asked for a quote on “%s” (%d creators) from the assistant." % (u.get("company") or u.get("email") or "A client", sel["name"], len(codes)),
                           "Note: %s" % (a.get("note") or "—")], kam=u.get("kam"))
     return {"ok": True, "message": "Quote request sent. Your account manager usually replies within one working day."}
@@ -1661,6 +1668,8 @@ def _selection_note(sel):
         return ""
     out = ("\n\nThe client has their selection \u201c%s\u201d open (%d creators). Questions about 'this selection', 'these creators' "
            "or 'my brief' mean this one." % (sel["name"], sel["count"]))
+    if sel.get("quote"):
+        out += " " + sel["quote"]
     if sel.get("brief"):
         out += (" Its brief is on file; use it and never ask for it again:\n" +
                 "\n".join("- %s %s" % (r["q"], r["a"]) for r in sel["brief"]["answers"]))

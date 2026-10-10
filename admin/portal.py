@@ -213,6 +213,7 @@ def init():
     import rewards
     import roi
     import selstatus
+    import lifecycle
     account.init()
     codelinks.init()
     roi.init()
@@ -220,6 +221,7 @@ def init():
     rewards.init()
     inbox.init()
     selstatus.init()
+    lifecycle.init()
     gating.init()
     # Phase E: content ideas per creator; weekly campaign updates and "next time" (tables + hooks).
     import weekly

@@ -2087,6 +2087,11 @@ def requests_page(requests, creators, tiers=None):
             contact.append("<a href=\"tel:" + e(tel) + "\">" + e(r["phone"]) + "</a>")
 
         flag = "<span class='pill'>handled</span> " if handled else ""
+        import db as _dbq
+        import lifecycle_ui as _lcu
+        _sel = _dbq.selection_for_request(r["id"]) or _dbq.selection_for_link(
+            r["selection_name"] or "", [c for c in picks if isinstance(c, str)], r["code_id"])
+        strip = _lcu.request_strip(_sel, "/requests")
         return (
             "<div class='req" + (" done" if handled else "") + "'><div class='req-head'>"
             + "<div class='req-who'><h3>" + e(r["company"] or "—") + "</h3>"
@@ -2100,7 +2105,7 @@ def requests_page(requests, creators, tiers=None):
             + "<div><b>" + total + "</b><span>indicative range</span></div>"
             + "<div><b>" + e(r["selection_name"] or "—") + "</b><span>selection</span></div>"
             + "<div><b>" + split_txt + "</b><span>tier split</span></div>"
-            + "</div><div class='picks'>"
+            + "</div>" + strip + "<div class='picks'>"
             + "".join(pick_card(code) for code in picks) + "</div></div>"
         )
 
@@ -2708,9 +2713,13 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
     status_map = _ss.of(sel["id"])
     status_counts = _ss.counts([c for c in codes if c in by], status_map, {c: by[c]["tier"] for c in codes if c in by})
     status_html = selection_status_panel(sel, [by[c] for c in codes if c in by], status_map, status_counts)
+    import lifecycle_ui as _lcu
+    status_html = _lcu.quote_card(sel, "/selections/edit?id=%d#st=status" % sel["id"]) + status_html
+    import lifecycle as _lc
+    _lc_key = _lc.state_of(sel)["key"]
     body = (
         roster_list
-        + ui.header(sel["name"], "A priced shortlist for one client: " + str(n_cr) + " creator" + ("" if n_cr == 1 else "s") + ". " + client_pill,
+        + ui.header(sel["name"], "A priced shortlist for one client: " + str(n_cr) + " creator" + ("" if n_cr == 1 else "s") + ". " + client_pill + " " + _lcu.chip(_lc_key),
                     crumbs=[("Selections", u("/selections")), (sel["name"], None)],
                     actions=open_link("selection", sel["token"], "Open client link", "btn ghost")
                     + " <button type='button' class='btn lime' data-go-tab='st:share'>" + ui.icon("send", 16) + " Share</button>")
@@ -2972,7 +2981,8 @@ def campaign_start_card(sel, campaigns):
         + "<form method='post' action='" + u("/campaigns/new") + "'>"
         + "<input type='hidden' name='selection' value='" + str(sel["id"]) + "'>"
         + "<button class='btn small'>" + ("Start another campaign" if made else "Start campaign")
-        + "</button></form></div>")
+        + "</button> <a class='btn small lime' href='" + u("/campaigns/setup") + "?selection=" + str(sel["id"]) + "'>"
+        + "Create campaign (guided, pre-filled)</a></form></div>")
 
 
 def status_button(k):

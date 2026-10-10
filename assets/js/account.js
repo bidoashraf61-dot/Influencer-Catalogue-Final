@@ -403,6 +403,13 @@
     return h("div", { class: "hc-row hc-row--act" + (href ? " is-link" : "") }, body, h("span", { class: "hc-row__acts" }, del || null, link));
   }
 
+  // The quote lifecycle chip (connect.js draws it once for every page; this is the fallback if
+  // that file has not loaded yet).
+  function qchip(q) {
+    if (!q || !q.key) return null;
+    var f = HV().lifecycleChip;
+    return f ? f(q) : h("span", { class: "lc-chip lc-chip--" + q.key }, h("i", { "aria-hidden": "true" }), q.label);
+  }
   function renderSelections(p) {
     add(p, head("Selections", "Approve the creators you want and reject the ones you don't. Your account manager sees every change and quotes the approved list.",
       h("a", { class: "hc-btn hc-btn--line hc-btn--sm", href: ROOT + "#cat-roster" }, "Browse creators")));
@@ -421,7 +428,7 @@
         h("div", null, h("span", { class: "hc-row__name" }, s.name),
           h("div", { class: "hc-row__meta" },
             h("span", null, plural(c.creators, "creator") + (c.doctors ? " · " + plural(c.doctors, "doctor") : "")),
-            statusSigs(c), h("span", null, (s.owner ? s.owner + "'s · " : "") + "updated " + ago(s.updated_at)))),
+            qchip(s.quote), statusSigs(c), h("span", null, (s.owner ? s.owner + "'s · " : "") + "updated " + ago(s.updated_at)))),
         [s.mine && c.review ? "Review" : "Open", h("span", { class: "hc-sr" }, " " + s.name), " ", icon("arrow")], del)));
     });
     add(p, list);
@@ -492,6 +499,7 @@
     return h("a", { class: "ac-item ac-item--camp", href: ROOT + "campaign/#t=" + encodeURIComponent(c.token) },
       h("div", { class: "ac-item__top" },
         c.status === "live" ? h("span", { class: "ac-live" }, "Live") : h("span", { class: "ac-status" }, c.status === "ended" ? "Ended" : c.status),
+        qchip(c.quote),
         h("span", { class: "ac-item__verdict ac-item__verdict--" + (c.verdict.grade || "none") }, c.verdict.label || "Getting started")),
       h("b", { class: "ac-item__name" }, c.name),
       h("span", { class: "ac-muted" }, [day(c.starts_at), day(c.ends_at)].filter(Boolean).join(" – ")),

@@ -389,3 +389,35 @@ Tests: `test_roi_v4.py` (`Count`), `e2e_portal_fixes7.py` (`test_04b`, `test_04c
 Credits: every new tool is read-only and free inside the chat message's own charge. No tool returns a price, fee, rate, cost or budget field (tests scan each result).
 
 Tests: `e2e_portal_fixes8.py` (anonymisation, only the configured creator, gating unchanged, off switch, settings card, each tool on a toy roster with 40 peers, locked redaction, campaign scope, hand-off event and forgery, step labels).
+
+## Fix batch 9 (branch `portal-fixes-9`): quote lifecycle chip and admin Create campaign
+
+### #42 Quote lifecycle chip
+
+One chip says where a selection stands: **Draft → Quote requested → Quote ready → Approved → Campaign live → Completed**.
+It sits under the title on the selection page (with a small timeline: dates and who did it), in the selections list and
+the Campaigns list of the profile, and in Helvy's context (`lifecycle.summary_line`).
+
+| Piece | Where | Notes |
+|---|---|---|
+| State and timeline | `admin/lifecycle.py` | Derived from existing data: a request for the selection (`selections.request_id`, else the newest request from the same client with the same name) = Quote requested; a linked campaign live / ended = Campaign live / Completed. Added: table `selection_quote` (`ready_*`, `approved_*`, `live_at`, `ended_at`) and `quote_changes`; both `CREATE IF NOT EXISTS`, so the migration is idempotent and legacy selections read correctly with no backfill. |
+| Client routes | `lifecycle_api.py`, `server.py` | `/api/selection` carries `lifecycle` (role-aware); `POST /api/selection/quote/approve {token}` is owner only (`selection_role == owner`): a colleague gets 403 `not_owner`, an admin is not the owner, a quote that is not ready gets 409. Requesting a quote is owner-only too (`/api/request`, already). |
+| Edit after the request | `api_selection_save`, `assistant._save_codes` | The selection stays editable. Changing the creators while a quote exists records a change (shown in the timeline), the response carries `lifecycle.warn` = "This updates your quote request", and the account manager gets the `quote_changed` email (one per burst, `lifecycle.NOTIFY_DELAY`). A rename is not a change. The state does not regress; the admin sees "changed after the quote was marked ready". |
+| Bell only | `inbox.py` | New kinds `quote_requested`, `quote_ready`, `quote_approved` (group Selections). The client is never emailed. The team gets `quote_changed` and `quote_approved` through `notify` (account manager and team addresses). |
+| Client UI | `assets/js/connect.js` (`mountLifecycle`), `assets/css/connect.css` (`lc-*`, `cx-lc*`), `catalogue.js` (carries `lifecycle`), `account.js` | The owner sees Approve (two-step, inline); colleagues see "You can follow this. <owner> requests and approves the quote." A note and a link from the account manager show under "From your account manager". |
+| Admin | Requests inbox, selection → Client status | Each request shows the selection's state with **Mark quote ready** (optional note up to 500 characters and an optional https link, e.g. a PDF on SharePoint). **Take back** is possible until approval. No price comes from this flow unless the account manager writes it in the note. |
+
+Tests: `python3 admin/tests/e2e_portal_fixes9.py` (every transition, owner-only approve, colleague read-only, bell events,
+edit-after-request warning and notify, no client email, legacy states, link validation).
+
+### #43 Create campaign from a selection (admin only)
+
+On a selection with a quote requested or later: **Create campaign** (Client status tab, Campaign tab, or Requests inbox →
+Open selection). `GET /campaigns/setup?selection=<id>` is a four-step form (Basics, Creators, Tracking, Dates and review)
+pre-filled by `lifecycle_ui.setup_defaults`: name, client (selection client name, else the owner's company, else the
+code label), platforms from the brief, goals from the brief (`metrics.brief_goals`; several become a blend via
+`metrics.blend_key`, e.g. `awareness+traffic`), creators (the client's approved ones, else everyone not rejected or
+unavailable), carried costs, default capture rules (`#<client>`; disclosure `#ad #إعلان`), dates blank, destination optional.
+`POST /campaigns/setup` calls the existing `db.create_campaign` (creators, costs, tracking links) and `db.save_campaign`:
+the result is a **draft** linked to the selection. Going live and ending are the existing actions; the chip follows them
+and the owner's bell rings (`camp_live` / `camp_final`). There is no client-side create button.

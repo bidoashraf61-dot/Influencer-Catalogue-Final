@@ -186,10 +186,11 @@ def summary(user, code_id, secret=b""):
     import inbox
     import rewards
     import selstatus
+    import lifecycle
     team = sorted(portal.team_codes(code_id))
     with db.connect() as conn:
         sels = conn.execute(
-            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, u.name owner FROM selections s "
+            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, s.request_id, s.created_at, u.name owner FROM selections s "
             "LEFT JOIN users u ON u.code_id = s.code_id "
             "WHERE s.code_id IN (%s) AND s.archived_at IS NULL ORDER BY s.updated_at DESC LIMIT 60" % ",".join("?" * len(team)),
             team).fetchall()
@@ -213,7 +214,8 @@ def summary(user, code_id, secret=b""):
                            # Only the client's own work can be deleted: not a colleague's, not HelloVoice's.
                            "can_delete": (s["origin"] or "admin") == "client" and code_id != db.admin_code_id()
                                          and portal.owns(code_id, s["code_id"]),
-                           "counts": selstatus.counts(codes, st, tiers)})
+                           "counts": selstatus.counts(codes, st, tiers),
+                           "quote": lifecycle.chip(s)})
 
     campaigns, grades = [], []
     agg = {"exposure": 0, "reach": 0, "views": 0, "delivered": 0, "planned": 0}
@@ -230,7 +232,8 @@ def summary(user, code_id, secret=b""):
                "exposure": t.get("exposure") or 0, "reach": t.get("reach") or 0, "views": t.get("views") or 0,
                "er": t.get("er"), "er_grade": t.get("er_grade"),
                "delivered": t.get("delivered") or 0, "planned": t.get("planned") or 0,
-               "updated_at": rep["updated_at"] if rep else None}
+               "updated_at": rep["updated_at"] if rep else None,
+               "quote": (lifecycle.chip(db.selection(k["selection_id"])) if k["selection_id"] and db.selection(k["selection_id"]) is not None else None)}
         campaigns.append(row)
         if k["status"] == "live":
             for key in ("exposure", "reach", "views", "delivered", "planned"):

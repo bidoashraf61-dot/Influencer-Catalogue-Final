@@ -635,3 +635,14 @@ Client portal → Settings → "Sample full analysis": the creator code (default
 ## Helvy's hand-off (fix batch 8)
 
 When Helvy cannot do what a client asks he shows "Send this to my account manager". After the client confirms, the KAM and the "Email the team about" list get one email "Account manager request" with the client, the reason, the open selection (name and link) and the last turns of the chat. It follows the "Quote requests" switch if the event list was saved before this existed. Nothing is created in the requests table; reply to the client by email or phone as usual.
+
+## Quote status and Create campaign (fix batch 9)
+
+- **Quote requests** inbox: every request shows the selection's quote status (the chip the client sees). Open the
+  disclosure **Mark quote ready** to add a note and an optional https link (PDF on SharePoint or similar); the client's
+  bell rings, nobody is emailed. **Take back** reverts "Quote ready" until the client approves.
+- **Selections → a selection → Client status** starts with the **Quote** card: timeline with dates and who, the same
+  form, and **Create campaign**. A warning appears when the client changed creators after the quote was marked ready.
+- **Create campaign** (also on the Campaign tab): four steps pre-filled from the selection and its brief; it only
+  creates a **draft**. Complete it on its Setup tab and use **Go live**; the client's chip becomes Campaign live.
+- Emails to the team: `Quote request changed` and `Quote approved` (the Settings notification list).

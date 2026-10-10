@@ -1013,7 +1013,9 @@ class PortalMixin(connect_api.ConnectMixin):
                     details[c] = {k: v.get(k) for k in ("score", "tag", "parts", "confidence", "platform", "limited_data", "basic", "note")}
         except Exception:
             details = {}
+        import lifecycle
         return {"token": sel["token"], "name": sel["name"], "count": len(codes), "brief": brief,
+                "quote": lifecycle.summary_line(sel),
                 "objective": (sel["objective"] if "objective" in keys else None) or None,
                 "scores": scored[:40], "details": details}
 

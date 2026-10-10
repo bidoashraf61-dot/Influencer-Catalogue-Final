@@ -11,7 +11,8 @@ import db
 import mailer
 
 EVENTS = {"signup": "New client", "brief": "New brief", "quote": "Quote request", "credits": "Credits requested",
-          "status": "Selection feedback", "analysis": "Analysis requested", "handoff": "Account manager request"}
+          "status": "Selection feedback", "analysis": "Analysis requested", "handoff": "Account manager request",
+          "quote_changed": "Quote request changed", "quote_approved": "Quote approved"}
 
 
 def recipients(kam=None):

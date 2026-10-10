@@ -68,7 +68,7 @@
       .then(function (b) {
         var t = (b && b.ok && b.token) || "";
         // Tell the portal layer (portal.js) a shortlist was saved, so it can offer the brief questions.
-        if (t) { try { window.dispatchEvent(new CustomEvent("hv:selection-saved", { detail: { token: t, name: name, codes: codes } })); } catch (e) { /* old browser */ } }
+        if (t) { try { window.dispatchEvent(new CustomEvent("hv:selection-saved", { detail: { token: t, name: name, codes: codes, lifecycle: (b && b.lifecycle) || null } })); } catch (e) { /* old browser */ } }
         return t;
       })
       .catch(function () { return ""; });
@@ -2129,7 +2129,7 @@
                         segments: b.segments || {}, groupBy: b.group_by || "",
                         platform: b.platform || "",
                         status: b.status || {}, statusCounts: b.status_counts || null, role: b.role || "viewer",
-                        owner: b.owner || "", kam: b.kam || "", credits: b.credits,
+                        owner: b.owner || "", kam: b.kam || "", credits: b.credits, lifecycle: b.lifecycle || null,
                         // 0 while AI is free (active campaign); null only on an old server.
                         replaceCost: b.replace_cost != null ? b.replace_cost : 2, moreCost: b.more_cost != null ? b.more_cost : 3,
                         alikeCost: b.alike_cost != null ? b.alike_cost : 2, aiFree: b.ai_free || null,
@@ -3155,6 +3155,7 @@
             CURATED.scores = b.scores || {}; CURATED.brief = b.brief || null; CURATED.verdicts = b.verdicts || CURATED.verdicts;
             CURATED.needsObjective = !!b.needs_objective;
             if (b.status) CURATED.status = b.status;
+            if (b.lifecycle) CURATED.lifecycle = b.lifecycle;
             render();
           })
           .catch(function () { /* the old view stays */ });

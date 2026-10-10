@@ -750,6 +750,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if sel is None:
                 return self.send(404, "<p class='err'>That selection no longer exists.</p>")
             return self.send(200, views.selection_fit_panel(sel, db.list_creators(), self.selection_scores(sel), db.known_interests()))
+        if path == "/campaigns/setup":
+            return self.get_campaign_setup(query)
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
                 db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok"),
@@ -1073,6 +1075,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_selection_delete()
         if path == "/campaigns/new":
             return self.post_campaign_new()
+        if path == "/campaigns/setup":
+            return self.post_campaign_setup()
+        if path == "/quote/ready":
+            return self.post_quote_ready()
+        if path == "/quote/withdraw":
+            return self.post_quote_withdraw()
         if path == "/campaigns/save":
             return self.post_campaign_save()
         if path == "/campaigns/status":
@@ -4289,7 +4297,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         tiers = {c: by[c]["tier"] for c in codes if c in by}
         owner = portal.user_for_code(sel["code_id"]) if sel["code_id"] else None
         role = self.selection_role(sel, reader)
+        import lifecycle
         return {"status": st, "status_counts": selstatus.counts(codes, st, tiers), "role": role,
+                "lifecycle": lifecycle.client_payload(sel, role),
                 "owner": (owner["name"] if owner is not None else None),
                 "kam": ((owner["kam"] or "").split("<")[0].strip() if owner is not None and owner["kam"] else None),
                 "replace_cost": portal.price_of(int(reader), "replace") if reader is not None else portal.costs().get("replace", 2),
@@ -4599,6 +4609,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # A saved selection: only its owner (or HelloVoice) may ask for its quote. A colleague on the
         # same company sees the selection but cannot send it. No token = the sender's own unsaved list.
         tok = str(b.get("token") or "").strip()[:80]
+        sel = None
         if tok:
             sel = db.selection(token=tok)
             if sel is None or (sel["code_id"] is not None and int(code_id) != db.admin_code_id()
@@ -4612,6 +4623,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             b.get("selection_name"), [str(c)[:40] for c in selection[:200]],
         )
         db.log("request", code_id, self.client_ip(), self.headers.get("User-Agent"), str(rid))
+        if tok and sel is not None:
+            import lifecycle
+            _u = portal.user_for_code(code_id)
+            lifecycle.mark_requested(sel, rid, (_u["name"] if _u is not None and _u["name"] else b.get("name")),
+                                     _u["id"] if _u is not None else None)
         # The browser still mails the quote through the form service; this is the server's own copy to
         # the client's KAM and the team, which does not depend on that service accepting it.
         import notify
@@ -4861,7 +4877,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # single-platform mark the shortlist was saved with stays as it was.
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to,
                           platform=sel["platform"] if same else None)
-        return self.send_json(200, {"ok": True, "token": sel["token"]}, self.cors())
+        out = {"ok": True, "token": sel["token"]}
+        if not same and int(viewer) != db.admin_code_id():
+            # A quote may already exist: the change is recorded, the account manager told, the page warns.
+            import lifecycle
+            if lifecycle.on_client_edit(sel, stored, codes, portal.user_for_code(viewer),
+                                        link=self.site_origin() + BASE + "/selections/edit?id=%d" % sel["id"]):
+                out["lifecycle"] = lifecycle.client_payload(db.selection(sel["id"]), "owner")
+        return self.send_json(200, out, self.cors())
 
     def api_event(self):
         code_id = self.viewer_code_id()
@@ -4894,6 +4917,7 @@ TRACKED = {
     "/selections/save": ("selection", "id", "Saved selection"),
     "/selections/delete": ("selection", "id", "Deleted selection"),
     "/campaigns/new": ("campaign", None, "Created campaign"),
+    "/campaigns/setup": ("campaign", None, "Created campaign from a selection"),
     "/campaigns/save": ("campaign", "id", "Saved campaign"),
     "/campaigns/delete": ("campaign", "id", "Deleted campaign"),
     "/campaigns/status": ("campaign", "id", "Changed status of campaign"),
