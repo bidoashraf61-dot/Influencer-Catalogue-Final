@@ -583,6 +583,18 @@
 .cx-chathead .hv-head__helvy .hv-clip { -webkit-mask-image: none; mask-image: none; }
 .hv-row__ava.cx-ava { background-color: transparent; background-size: 100% 100%; background-position: 50% 50%; background-repeat: no-repeat; box-shadow: none; }
 /* the nudge's title: ink on white (lime on white was unreadable), on a lime marker stroke */
+/* The page tip speaks FROM Helvy's circle: it sits right above the launcher with a tail pointing
+   at it, and pops out of the circle (grows from the tail's tip with a small overshoot). */
+.hv-nudge { right: 6px; bottom: 92px; border-radius: 22px; transform: translateY(14px) scale(.2);
+  transform-origin: calc(100% - 23px) calc(100% + 30px); transition: opacity .16s ease, transform .45s cubic-bezier(.34,1.56,.64,1); }
+.hv-nudge.is-in { transform: none; }
+.hv-nudge::after { content: ""; position: absolute; right: 23px; bottom: -8px; width: 18px; height: 18px; background: var(--white, #fff);
+  border-radius: 0 0 6px 0; transform: rotate(45deg); }
+@media (max-width: 560px) {
+  .hv-nudge { bottom: 78px; transform-origin: calc(100% - 17px) calc(100% + 28px); }
+  .hv-nudge::after { right: 17px; }
+}
+@media (prefers-reduced-motion: reduce) { .hv-nudge { transform: none; transition: opacity .16s ease; } }
 .hv-nudge b { display: block; width: max-content; font-family: var(--heading); font-weight: 400; font-size: 20px; letter-spacing: .04em; line-height: 1; color: var(--ink); margin-bottom: 6px;
   padding: 0 3px; background: linear-gradient(transparent 55%, var(--lime) 55%, var(--lime) 92%, transparent 92%); }
 .hv-msg.cx-think { padding: 10px 14px 10px 10px; }

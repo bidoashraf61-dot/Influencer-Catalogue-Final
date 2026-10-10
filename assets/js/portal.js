@@ -3115,18 +3115,23 @@
     var tip = TIPS[page], tipSeen = false;
     try { tipSeen = sessionStorage.getItem(tipKey) === "1"; } catch (e) { /* private */ }
     if (tip && !tipSeen) {
-      nudgeText.innerHTML = "<b></b>";
-      nudgeText.querySelector("b").textContent = tip[0];
-      nudgeText.appendChild(document.createTextNode(tip[1]));
       setTimeout(function () {
         if (root.classList.contains("is-open")) return;
+        // The campaign page with no campaign to read says something else (its own empty state is up).
+        var useTip = tip, empty = document.getElementById("db-empty");
+        if (page === "campaign" && empty && !empty.hidden) {
+          useTip = ["No campaign yet?", "When your first campaign goes live its results appear here. Ask me how tracking works."];
+        }
+        nudgeText.innerHTML = "<b></b>";
+        nudgeText.querySelector("b").textContent = useTip[0];
+        nudgeText.appendChild(document.createTextNode(useTip[1]));
         nudge.hidden = false;
         requestAnimationFrame(function () { nudge.classList.add("is-in"); launch.classList.add("is-waving"); });
         setTimeout(function () { launch.classList.remove("is-waving"); }, 1600);
         // The tip counts as seen once it has shown, so a quick page change does not repeat it.
         try { sessionStorage.setItem(tipKey, "1"); } catch (e) { /* private */ }
         setTimeout(function () { if (!root.classList.contains("is-open")) hideNudge(true); }, 8000);
-      }, 1800);
+      }, page === "campaign" ? 2800 : 1800);
     }
   }
 
