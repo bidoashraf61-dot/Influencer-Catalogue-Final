@@ -64,6 +64,16 @@ class V4(unittest.TestCase):
         for want in ("Engagement", "View rate", "Interest", "Consistency", "Posts analysed", "Reach"):
             self.assertIn(want, labels)
 
+    def test_implausible_engagement_is_flagged_not_scored(self):
+        r = score(doc(er=37.8))
+        self.assertNotIn("engagement", [p["key"] for p in r["parts"]])
+        self.assertTrue(any(m["label"] == "Engagement" and m["level"] == "bad" for m in r["metrics"]))
+
+    def test_feed_creator_without_views_cannot_read_strong(self):
+        r = score(doc(er=6.0, median_views=None, views_series=None, avg_views=None, hashtags=[{"tag": "#skincare", "count": 100.0}]))
+        self.assertLessEqual(r["score"], sm.FEED_CAP)
+        self.assertTrue(r["limited_data"])
+
     def test_scale_either_direction(self):
         self.assertEqual(sm.scale(0.5, 2.0, 0.5), 1.0)
         self.assertEqual(sm.scale(2.5, 2.0, 0.5), 0.0)

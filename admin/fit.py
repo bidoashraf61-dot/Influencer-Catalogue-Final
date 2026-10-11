@@ -584,6 +584,9 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
 
     # -- engagement
     er_val = sample.get("er_med") if sample.get("er_med") is not None else sample.get("er")
+    er_bad = None
+    if er_val is not None and er_val > sm.ENGAGEMENT_IMPLAUSIBLE:
+        er_bad, er_val = er_val, None          # a bad scrape or hidden likes: shown, never scored
     if er_val is not None:
         (z, fl), bsrc, btier = sm.band_for("engagement", group, plat, f)
         s = sm.scale(er_val, z, fl)
@@ -634,6 +637,9 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         got["interest"]["src"] = pi["src"]
         got["interest"]["n"] = pi["posts"]
 
+    if er_bad is not None:
+        out.setdefault("_flags", []).append({"label": "Engagement", "value": "%s%s" % (_pct(er_bad), unit_er),
+                                              "note": "looks wrong for %s, left out of the score: verify the handle" % plat, "level": "bad"})
     if not any(k in got for k in ("engagement", "view_rate", "consistency")):
         out["note"] = "No post numbers on file for %s, so it is not scored." % plat
         return out
@@ -696,10 +702,10 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     # -- confidence: how many posts the engagement figure rests on
     level = "low" if posts < 6 else "high" if posts >= 20 else "medium"
     out["confidence"] = {"level": level, "posts": posts, "peers_n": 0, "source": "posts"}
-    out["limited_data"] = posts < 10
+    out["limited_data"] = posts < 10 or bool(feed and ("view_rate" not in got or "engagement" not in got))
 
     # -- every metric behind the number, in the order the hover reads them
-    metrics = [got[k]["row"] for k in sm.PARAMS if k in got]
+    metrics = [got[k]["row"] for k in sm.PARAMS if k in got] + out.pop("_flags", [])
     metrics.append({"label": "Posts analysed", "value": str(posts) if posts else "none on file",
                     "note": "the 100% base for the interest match" if posts else "score is from public numbers",
                     "level": "ok" if posts >= 20 else "warn" if posts >= 10 else "bad"})
@@ -710,11 +716,20 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
             metrics.append({"label": c["label"], "value": c["text"], "note": "", "level": c["level"]})
     out["metrics"] = metrics
 
+    capped = None
+    if feed and ("view_rate" not in got or "engagement" not in got) and val > sm.FEED_CAP:
+        miss = [n for n, k in (("view counts", "view_rate"), ("an engagement figure", "engagement")) if k not in got]
+        capped = "Capped at %s: no %s on file for %s" % (band_for(sm.FEED_CAP), " or ".join(miss), plat)
+        val = sm.FEED_CAP
+        out["score_range"] = [min(x, sm.FEED_CAP) for x in out["score_range"]]
     out["score"], out["tag"] = val, band_for(val)
     lo_s, hi_s = out["score_range"]
     out["tag_range"] = [band_for(lo_s), band_for(hi_s)]
     out["strengths"] = [got[k]["good"] for k in sm.PARAMS if k in got and got[k]["mid"] >= 0.6]
     out["watchouts"] = extra_watch + [got[k]["bad"] for k in sm.PARAMS if k in got and got[k]["mid"] < 0.3]
+    if capped:
+        out["watchouts"].insert(0, capped)
+        out["metrics"].append({"label": "Cap", "value": "max %d (%s)" % (sm.FEED_CAP, band_for(sm.FEED_CAP)), "note": capped, "level": "warn"})
     lead = "" if objective == "Balanced" else " for " + objective_label(objective).lower()
     txt = "%s%s (%d/100)%s." % (out["tag"], lead, val, ", from public numbers only" if not verified else "")
     if lo_s != hi_s:

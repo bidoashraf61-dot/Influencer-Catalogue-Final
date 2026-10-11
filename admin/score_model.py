@@ -15,7 +15,9 @@ import time
 PARAMS = ("engagement", "view_rate", "interest", "consistency")
 LABEL = {"engagement": "Engagement", "view_rate": "View rate", "interest": "Interest", "consistency": "Consistency"}
 OBJECTIVES = ("Awareness", "Engagement", "Traffic")
-VERSION = "2026-10-11.4"
+VERSION = "2026-10-11.5"
+ENGAGEMENT_IMPLAUSIBLE = 10.0   # % : above this the figure is read as a bad scrape, not a result
+FEED_CAP = 79                   # a feed creator without views or an engagement figure cannot read Strong
 
 WEIGHTS = {
     "Awareness":  {"engagement": 20, "view_rate": 45, "interest": 20, "consistency": 15},
@@ -119,12 +121,12 @@ def research_range(metric, platform, followers):
 
 def band_for(metric, group, platform, followers):
     """([zero_at, full_at], source, tier): a value set in Settings wins; then the research tier
-    (0 at half the low end, 100 at the high end); then the flat default."""
+    (0 at the low end, 100 at twice the high end); then the flat default."""
     edited = ((_overrides().get("bands") or {}).get(metric) or {}).get(group)
     if isinstance(edited, (list, tuple)) and len(edited) == 2:
         return band(metric, group), "settings", None
     r = research_range(metric, platform, followers)
     if r:
         (lo, hi), tier = r
-        return [lo / 2.0, hi], "research", tier
+        return [lo, hi * 2.0], "research", tier
     return band(metric, group), "default", None
