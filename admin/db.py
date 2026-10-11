@@ -1894,6 +1894,16 @@ def analyses_for(codes):
             part = codes[i:i + 400]
             for r in conn.execute("SELECT * FROM creator_analysis WHERE code IN (%s)" % ",".join("?" * len(part)), part):
                 out.setdefault(r["code"], {})[r["platform"]] = _analysis_row(r)
+        # The latest post scan lies over each analysis: post numbers refresh, the audience stays.
+        try:
+            import postscan
+            for (code, plat), over in postscan.overlay_rows(conn, codes).items():
+                row = (out.get(code) or {}).get(plat)
+                if row is not None and isinstance(row.get("data"), dict):
+                    row["data"] = dict(row["data"], **over)
+                    row["data"]["post_scan"] = True
+        except Exception:
+            pass
     return out
 
 
@@ -2450,7 +2460,19 @@ def analysis(code, platform=None):
                                 (code,)).fetchall()
             main = platforms_of(code)[0] if rows else None
             row = next((r for r in rows if r["platform"] == main), rows[0] if rows else None)
-    return _analysis_row(row) if row is not None else None
+    if row is None:
+        return None
+    res = _analysis_row(row)
+    try:        # the latest post scan lies over the analysis (see postscan.py)
+        import postscan
+        with connect() as conn:
+            over = postscan.overlay_rows(conn, [code]).get((code, res["platform"]))
+        if over and isinstance(res.get("data"), dict):
+            res["data"] = dict(res["data"], **over)
+            res["data"]["post_scan"] = True
+    except Exception:
+        pass
+    return res
 
 
 def analyses(code):
