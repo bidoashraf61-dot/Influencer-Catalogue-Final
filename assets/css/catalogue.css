@@ -1848,3 +1848,14 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 .cst-conf--high { color: #8fe3b0; }
 .cst-conf--medium { color: #ffd08a; }
 .cst-conf--low { color: #ffb4a8; }
+
+/* The hover on the fit badge: every metric behind the score, one row each. */
+.cst-m { width: 100%; border-collapse: collapse; margin: 0; font-size: 12px; }
+.cst-m th { text-align: left; font-weight: 600; padding: 5px 8px 5px 0; vertical-align: top; width: 34%; opacity: .75; white-space: nowrap; }
+.cst-m td { padding: 5px 0; vertical-align: top; }
+.cst-m td b { display: block; font-size: 13px; }
+.cst-m td small { display: block; opacity: .65; line-height: 1.35; }
+.cst-m tr + tr th, .cst-m tr + tr td { border-top: 1px solid rgba(255,255,255,.1); }
+.cst-m tr.ok td b::before, .cst-m tr.warn td b::before, .cst-m tr.bad td b::before { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; content: ""; }
+.cst-m tr.ok td b::before { background: #4cd98a; } .cst-m tr.warn td b::before { background: #ffb74d; } .cst-m tr.bad td b::before { background: #ff6b6b; }
+.cat-fit--tip { cursor: help; }

@@ -475,6 +475,72 @@ def interest_share(doc, creator, cats):
         "Some %s content" % ", ".join(cats) if share > 0 else "")
 
 
+INTEREST_WEIGHT = 0.5      # the product-space match carries up to a third of the number (1 : 0.5 with engagement)
+INTEREST_FULL_POSTS = 12   # posts needed before the match counts at full weight
+INTEREST_FULL_SHARE = 0.5  # half of the posts in the space is full marks
+
+
+def post_interest(doc, creator, cats):
+    """How much of what the creator actually posts sits in the brief's product space, read from
+    the posts we hold, or None when the brief names no space.
+
+    Returns {"lo", "hi" (score 0..1 at each end), "share_lo", "share_hi", "posts" (posts the
+    reading rests on), "matched_lo", "matched_hi" (posts naming the space), "evidence" (0..1, how
+    far to trust it), "src": doc|posts|keywords, "why", "watch"}.
+
+    A measured ``interest_shares`` field wins. Otherwise the creator's hashtags are read: each
+    carries the share of the analysed posts that used it, so the posts naming the space are
+    between the busiest matching tag (nobody doubled up) and the sum of them (no post names two).
+    The number of posts available is the reference: 12 or more counts in full, fewer count in
+    proportion. With no hashtags the roster interest tags and bio give a keyword estimate that
+    counts at 0.3."""
+    cats = [c.strip().lower() for c in (cats or []) if c and c.strip().lower() != "any"]
+    if not cats:
+        return None
+    space = ", ".join(cats)
+    n = int(doc.get("sample_posts") or 0)
+    shares = doc.get("interest_shares")
+    if isinstance(shares, dict) and shares:
+        low = {str(k).lower(): v for k, v in shares.items() if isinstance(v, (int, float))}
+        got = [low[c] for c in cats if c in low]
+        if got:
+            sh = min(1.0, sum(got) / 100.0)
+            s = min(1.0, sh / INTEREST_FULL_SHARE)
+            return {"lo": s, "hi": s, "share_lo": sh, "share_hi": sh, "posts": n, "matched_lo": None, "matched_hi": None,
+                    "evidence": 1.0, "src": "doc", "why": "%s of their content is %s" % (_pct(sum(got)), space),
+                    "watch": "Little %s content" % space}
+
+    def hit(text):
+        t = str(text or "").lower()
+        return any(c in t or any(has_word(t, w) for w in _interest_words(c)) for c in cats)
+    tags = [(str((h.get("tag") if isinstance(h, dict) else h) or ""), (h.get("count") if isinstance(h, dict) else None))
+            for h in (doc.get("hashtags") or [])]
+    tags = [(t, c) for t, c in tags if t.startswith("#") or c is not None]
+    tags = [(t, c) for t, c in tags if not t.startswith("@")]
+    if n >= 3 and tags and any(isinstance(c, (int, float)) for _, c in tags):
+        def tag_hit(t):     # a hashtag is run-together words (#skincare), so a keyword may sit inside it
+            t = t.lower().lstrip("#")
+            return any(c in t or any(len(w) >= 4 and w in t for w in _interest_words(c)) for c in cats)
+        pcts = [min(100.0, float(c)) for t, c in tags if isinstance(c, (int, float)) and tag_hit(t)]
+        sh_lo = (max(pcts) / 100.0) if pcts else 0.0
+        sh_hi = min(1.0, sum(pcts) / 100.0) if pcts else 0.0
+        m_lo, m_hi = int(round(sh_lo * n)), int(round(sh_hi * n))
+        s_lo, s_hi = min(1.0, sh_lo / INTEREST_FULL_SHARE), min(1.0, sh_hi / INTEREST_FULL_SHARE)
+        ev = min(1.0, n / float(INTEREST_FULL_POSTS))
+        mt = "%d" % m_lo if m_lo == m_hi else "%d-%d" % (m_lo, m_hi)
+        return {"lo": s_lo, "hi": s_hi, "share_lo": sh_lo, "share_hi": sh_hi, "posts": n, "matched_lo": m_lo, "matched_hi": m_hi,
+                "evidence": ev, "src": "posts",
+                "why": "%s of their %d analysed posts name %s" % (mt, n, space),
+                "watch": "Only %s of their %d analysed posts name %s" % (mt, n, space)}
+    got = interest_share(doc, creator, cats)
+    sh = got[0] if got else 0.0
+    s = min(1.0, sh / INTEREST_FULL_SHARE)
+    return {"lo": s, "hi": s, "share_lo": sh, "share_hi": sh, "posts": n, "matched_lo": None, "matched_hi": None,
+            "evidence": 0.3, "src": "keywords",
+            "why": (got[2] if got and got[2] else "Works in the %s space" % space),
+            "watch": "Little sign of %s content in what we hold (profile tags only)" % space}
+
+
 def score_core(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
                creator=None, record=None, min_parts=1):
     """The one scoring formula, used for every creator (scoring v3, 2026-10-11).
@@ -516,6 +582,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     er_val = sample.get("er") if sample.get("er") is not None else sample.get("er_med")
     ref = intl_benchmarks.reference(plat, f)
     parts = []
+    eng = None
     if plat not in intl_benchmarks.TABLE:
         out["note"] = "No international benchmark for %s yet, so it is not scored." % plat
     elif er_val is None or ref is None:
@@ -536,13 +603,30 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         out["checks"].append({"label": "International benchmark", "level": "ok" if verdict == "above" else "bad" if verdict == "below" else "warn",
                               "text": "%s engagement%s against %s (%s, %s): %s the range" % (
                                   _pct(er_val), unit, rng, intl_benchmarks.BAND_LABEL[ref["band"]], plat, verdict)})
-        out["score_range"] = [int(round(100 * s_lo)), int(round(100 * s_hi))]
+        eng = {"val": er_val, "lo_b": lo_b, "hi_b": hi_b, "band": ref["band"], "unit": unit, "rng": rng, "verdict": verdict,
+               "ratio": er_val / ((lo_b + hi_b) / 2.0), "name": what}
 
     if len(parts) < max(min_parts, 1):
         out.setdefault("note", "Not enough public data to score.")
         return out
-    out["parts"] = [{"key": p[0], "label": p[1], "s": round(p[2], 2), "w": p[5], "src": p[6], "n": p[7]} for p in parts]
-    val = int(round(100.0 * parts[0][2]))
+
+    # -- interest in the brief's product space, read from the posts we hold (weighted by how many)
+    cats = [c for c in str(target["category"]).split("|") if c.strip() and c.strip().lower() != "any"]
+    pi = post_interest(doc, creator, cats)
+    w_i = 0.0
+    if pi is not None:
+        w_i = INTEREST_WEIGHT * pi["evidence"]
+        i_mid = (pi["lo"] + pi["hi"]) / 2.0
+        parts.append(("interest", "Product-space match", i_mid, pi["why"], pi["watch"], w_i, pi["src"], pi["posts"]))
+    e_lo, e_hi = s_lo, s_hi
+    if pi is not None and w_i > 0:
+        lo_v = (e_lo + w_i * pi["lo"]) / (1.0 + w_i)
+        hi_v = (e_hi + w_i * pi["hi"]) / (1.0 + w_i)
+    else:
+        lo_v, hi_v = e_lo, e_hi
+    out["score_range"] = [int(round(100 * lo_v)), int(round(100 * hi_v))]
+    out["parts"] = [{"key": p[0], "label": p[1], "s": round(p[2], 2), "w": round(p[5], 2), "src": p[6], "n": p[7]} for p in parts]
+    val = int(round(100.0 * (lo_v + hi_v) / 2.0))
 
     # -- checks beside the number (never in it)
     au = doc.get("audience") or {}
@@ -586,12 +670,47 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     out["confidence"] = {"level": level, "posts": posts, "peers_n": 0, "source": "international"}
     out["limited_data"] = level == "low"
 
+    # -- every metric behind the number, in the order the hover reads them
+    metrics = []
+    if eng:
+        metrics.append({"label": "Engagement", "value": "%s%s" % (_pct(eng["val"]), eng["unit"]),
+                        "note": "%.1fx the %s international range (%s)" % (eng["ratio"], eng["rng"], eng["name"]),
+                        "level": "ok" if eng["verdict"] == "above" else "bad" if eng["verdict"] == "below" else "warn"})
+    if pi is not None:
+        i_mid = (pi["lo"] + pi["hi"]) / 2.0
+        if pi["src"] == "posts":
+            mt = "%d" % pi["matched_lo"] if pi["matched_lo"] == pi["matched_hi"] else "%d-%d" % (pi["matched_lo"], pi["matched_hi"])
+            val_t, note_t = "%s of %d posts" % (mt, pi["posts"]), "name %s; counts %d%% of the number" % (
+                ", ".join(c.lower() for c in cats), int(round(100 * w_i / (1.0 + w_i))))
+        elif pi["src"] == "doc":
+            val_t, note_t = _pct(100 * pi["share_lo"]) + " of content", "measured in the analysis"
+        else:
+            val_t, note_t = ("~%s of tags" % _pct(100 * pi["share_lo"])) if pi["share_lo"] else "no match", "profile tags only, no post data (counts at 30%)"
+        metrics.append({"label": "Product space", "value": val_t, "note": note_t,
+                        "level": "ok" if i_mid >= 0.6 else "warn" if i_mid >= 0.3 else "bad"})
+    posts_n = int(doc.get("sample_posts") or (12 if verified else 0))
+    metrics.append({"label": "Posts analysed", "value": str(posts_n) if posts_n else "none on file",
+                    "note": ("full weight from %d posts" % INTEREST_FULL_POSTS) if posts_n else "score is from public numbers",
+                    "level": "ok" if posts_n >= 20 else "warn" if posts_n >= 6 else "bad"})
+    if out["reach_followers"]:
+        metrics.append({"label": "Reach", "value": _k(out["reach_followers"]), "note": "followers on %s" % plat, "level": "info"})
+    for c in out["checks"]:
+        if c["label"] in ("Measured audience", "Gender", "Age", "Fake followers", "Our campaigns"):
+            metrics.append({"label": c["label"], "value": c["text"], "note": "", "level": c["level"]})
+    out["metrics"] = metrics
+
     out["score"], out["tag"] = val, band_for(val)
     lo_s, hi_s = out["score_range"]
     out["tag_range"] = [band_for(lo_s), band_for(hi_s)]
     p = parts[0]
     out["strengths"] = [p[3]] if verdict == "above" else []
     out["watchouts"] = extra_watch + ([p[4]] if verdict == "below" else [])
+    if pi is not None and w_i > 0:
+        i_mid = (pi["lo"] + pi["hi"]) / 2.0
+        if i_mid >= 0.6:
+            out["strengths"].append(pi["why"])
+        elif i_mid < 0.3:
+            out["watchouts"].append(pi["watch"])
     lead = "" if objective == "Balanced" else " for " + objective_label(objective).lower()
     txt = "%s%s (%d/100)%s." % (out["tag"], lead, val, ", from public numbers only" if not verified else "")
     if lo_s != hi_s:
