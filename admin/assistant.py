@@ -279,6 +279,11 @@ def _explain(ctx, code):
     c = db.creator(str(code).strip().upper())
     if c is None or not c["active"]:
         return {"code": str(code), "error": "No such creator."}
+    if db.setting("selections_unscored") == "all":
+        # Scores are paused on every selection while the scoring logic is reworked (owner, 2026-10-11).
+        return {"code": c["code"], "name": c["name"], "score": None, "paused": True,
+                "note": "Scores are paused for now while HelloVoice finalises the scoring; selections show a fit label "
+                        "only. Say so plainly; never give or estimate a number."}
     sc, goals, locked = _score_of(ctx, c["code"])
     if not sc or sc.get("score") is None:
         return {"code": c["code"], "name": c["name"], "score": None,

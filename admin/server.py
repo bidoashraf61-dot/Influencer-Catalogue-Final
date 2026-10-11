@@ -3765,6 +3765,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             t = {}
         return dict(fit_mod.DEFAULT_TARGET, **{k: v for k, v in t.items() if v})
 
+    def selection_scoring_off(self, sel):
+        """True when a selection shows no scores (setting selections_unscored: a list of
+        selection ids, or "all" while the scoring logic is being reworked, 2026-10-11)."""
+        raw = db.setting("selections_unscored")
+        if raw == "all":
+            return True
+        try:
+            return int(sel["id"]) in set(int(x) for x in (raw or []))
+        except (TypeError, ValueError):
+            return False
+
     def selection_scores(self, sel, objective=None, target=None):
         """{code: score} for every creator of a selection, worked out now from
         their analyses: one number against the selection's objective and target.
@@ -4312,16 +4323,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             out["scores"] = {}
             out["needs_objective"] = True
             out["brief"]["objective"] = None
-        try:
-            unscored = set(int(x) for x in (db.setting("selections_unscored") or []))
-        except (TypeError, ValueError):
-            unscored = set()
-        if sel["id"] in unscored:
+        if self.selection_scoring_off(sel):
             # Unscored on purpose (owner decision 2026-10-11): the page shows the editorial
-            # fit tag only, never a score, and does not ask for an objective.
+            # fit tag only, never a score, and does not ask for an objective. A creator with
+            # no fit tag of the admin's reads "Matching".
             out["scores"] = {}
             out["needs_objective"] = False
             out["scoring_off"] = True
+            out["verdicts"] = {k: dict(out["verdicts"].get(k) or {}) for k in set(out["verdicts"]) | set(codes)}
+            for v in out["verdicts"].values():
+                if not v.get("fit"):
+                    v["fit"] = "Matching"
         reader = self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.
