@@ -407,6 +407,9 @@ def redact_score(sc):
                      if not _locked_text(c.get("label")) and not _locked_text(c.get("text"))]
     if "parts" in sc:
         out["parts"] = [p for p in (sc.get("parts") or []) if not _locked_part(p)]
+    if "metrics" in sc:
+        out["metrics"] = [m for m in (sc.get("metrics") or [])
+                          if not _locked_text(m.get("label")) and not _locked_text(m.get("value"))]
     out["strengths"] = [x for x in (sc.get("strengths") or []) if not _locked_text(x)]
     out["watchouts"] = [x for x in (sc.get("watchouts") or []) if not _locked_text(x)]
     if "conclusion" in sc:

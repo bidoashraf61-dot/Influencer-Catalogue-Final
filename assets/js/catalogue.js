@@ -2653,16 +2653,20 @@
         return '<div class="cst-bar"><span>' + esc(p.label) + '</span><i><b class="' + bandOf(p.s * 100) + '" style="width:' + Math.round(p.s * 100) + '%"></b></i></div>';
       }).join("");
       tip.innerHTML = '<div class="cst-head"><b class="' + bandOf(sc.score) + '">' + sc.score + '%</b><div><strong>' + esc(sc.tag) +
-        '</strong><small>' + (sc.basic ? "Screening score · " : "") + 'Match for ' + esc((sc.objective || "").toLowerCase()) + (sc.platform ? " · on " + esc(sc.platform) : "") + "</small>" +
+        '</strong>' + (sc.score_range && sc.score_range[0] !== sc.score_range[1] ? '<small>Range ' + sc.score_range[0] + "-" + sc.score_range[1] + " (" + esc(sc.tag_range && sc.tag_range[0] === sc.tag_range[1] ? sc.tag_range[0] : (sc.tag_range || []).join(" to ")) + ")</small>" : "") + '<small>' + (sc.basic ? "Screening score · " : "") + 'Match for ' + esc((sc.objective || "").toLowerCase()) + (sc.platform ? " · on " + esc(sc.platform) : "") + "</small>" +
         (sc.confidence ? '<small class="cst-conf cst-conf--' + esc(sc.confidence.level) + '">' + (sc.confidence.level === "high" ? "High" : sc.confidence.level === "medium" ? "Medium" : "Low") + " confidence" +
           (sc.confidence.posts ? " · " + sc.confidence.posts + " posts" : "") + (sc.confidence.source === "global" ? " · global estimate" : "") + "</small>" : "") +
         (sc.limited_data ? "<small>Limited data: read it as a first look</small>" : "") +
         (sc.reach_followers ? "<small>Reach " + (sc.reach_followers >= 1e6 ? (Math.round(sc.reach_followers / 1e5) / 10) + "M" : sc.reach_followers >= 1e3 ? Math.round(sc.reach_followers / 1e3) + "K" : sc.reach_followers) + " followers, shown beside the score, not part of it</small>" : "") +
         (sc.others && sc.others.length ? "<small>Also: " + sc.others.map(function (o) { return esc(o.platform) + " " + o.score; }).join(", ") + "</small>" : "") + "</div></div>" +
+        (sc.metrics && sc.metrics.length ? '<p class="cst-h">All metrics</p><table class="cst-m"><tbody>' + sc.metrics.map(function (m) {
+          return '<tr class="' + esc(m.level || "info") + '"><th>' + esc(m.label) + '</th><td><b>' + esc(m.value) + "</b>" + (m.note ? "<small>" + esc(m.note) + "</small>" : "") + "</td></tr>";
+        }).join("") + "</tbody></table>" : (
         (sc.strengths && sc.strengths.length ? '<p class="cst-h">Strengths</p><ul class="cst-g">' + sc.strengths.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
         (sc.watchouts && sc.watchouts.length ? '<p class="cst-h">Watch-outs</p><ul class="cst-w">' + sc.watchouts.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
-        '<p class="cst-h">How it adds up (against creators of the same size)</p>' + bars +
-        (sc.checks && sc.checks.length ? '<p class="cst-h">Verified by the full analysis</p><ul class="cst-c">' + sc.checks.map(function (c) {
+        '<p class="cst-h">How it adds up</p>' + bars)) +
+        (sc.metrics && sc.metrics.length && sc.watchouts && sc.watchouts.length ? '<p class="cst-h">Watch-outs</p><ul class="cst-w">' + sc.watchouts.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") +
+        (!(sc.metrics && sc.metrics.length) && sc.checks && sc.checks.length ? '<p class="cst-h">Verified by the full analysis</p><ul class="cst-c">' + sc.checks.map(function (c) {
           return '<li class="' + esc(c.level) + '">' + esc(c.text) + "</li>"; }).join("") + "</ul>" : "") +
         (sc.basic ? '<p class="cst-basic' + (sc.score >= 60 ? " cst-basic--warn" : "") + '"><b>Screening score, not proof.</b> It uses public numbers only, so fake followers and the real audience are not checked. Request the full analysis before booking.</p>' : "");
       tip.hidden = false;
@@ -2771,6 +2775,12 @@
             (fitNow ? '<span class="cat-fit cat-fit--' + (FIT_CLASS[fitNow] || "maybe") + '">' + esc(fitNow) + "</span>" : "") +
             ((v && v.roles) || []).map(function (r) { return '<span class="cat-role">' + esc(r) + "</span>"; }).join("") + "</div>" +
             (why ? '<p class="cat-verdict__why">' + esc(why) + "</p>" : "");
+        }
+        var pill = box && box.querySelector(".cat-fit");
+        if (pill && sc && sc.score != null) {
+          pill.tabIndex = 0; pill.setAttribute("data-noselect", ""); pill.classList.add("cat-fit--tip");
+          pill.onmouseenter = pill.onfocus = function () { showTip(pill, scoreOf(c.dataset.code)); };
+          pill.onmouseleave = pill.onblur = hideTip;
         }
         var tbox = c.querySelector(".cat-tags");
         var mt = mineOf(c.dataset.code);
