@@ -416,6 +416,12 @@ def create_user(email, name, company, job_title="", phone="", ip=None):
                 (email, clean(name, 120), clean(company, 160), clean(job_title, 120), clean(phone, 40),
                  email.rsplit("@", 1)[1], code_id, status, db.now(), ip))
             uid = cur.lastrowid
+            # domain_kam (owner, 2026-10-11): {domain: account manager email}; a new account on that
+            # company domain gets its key account manager at once, e.g. polygonpharma.com -> Mariam.
+            kam = {str(k).strip().lower(): v for k, v in (db.setting("domain_kam") or {}).items()}.get(
+                email.rsplit("@", 1)[1].lower())
+            if kam:
+                conn.execute("UPDATE users SET kam = ? WHERE id = ?", (str(kam).strip(), uid))
     except sqlite3.IntegrityError:
         return user_by_email(email)
     if status == "active":
