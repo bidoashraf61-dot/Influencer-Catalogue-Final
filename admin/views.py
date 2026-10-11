@@ -3714,6 +3714,7 @@ def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, erro
           "Post reach = engagement × the first figure, never more than the creator's followers; "
           "story reach = followers × the second; impressions = reach × the third (stories: = reach). "
           "Video reach = its views.</p></div>"
+        + score_model_card()
         + intl_benchmarks_card()
         + benchmarks_card(bm)
         + "<button class='btn'>Save settings</button></form>"
@@ -3874,6 +3875,38 @@ def insights_upload_page(row, posts, sent, ok=None, error=None):
         + "</main></body></html>")
 
 
+def score_model_card():
+    """The creator score model: the weight of each parameter per campaign objective, and the two
+    points each parameter is scaled between (the value that scores 0 and the value that scores 100)."""
+    import score_model as sm
+    w = sm.weights(fresh=True)
+    head = "".join("<th>" + e(sm.LABEL[p]) + "</th>" for p in sm.PARAMS)
+    wrows = ""
+    for o in sm.OBJECTIVES:
+        wrows += "<tr><td>" + e(o) + "</td>" + "".join(
+            "<td><input name='sm_w_%s_%s' value='%g' inputmode='decimal'></td>" % (o, p, w[o][p]) for p in sm.PARAMS) + "</tr>"
+    brows = ""
+    for m in ("engagement", "view_rate", "consistency"):
+        for g in ("feed", "video"):
+            z, f = sm.band(m, g, fresh=True)
+            dz, df = sm.BANDS[m][g]
+            note = "as set" if (z, f) == (float(dz), float(df)) else "edited, default %g / %g" % (dz, df)
+            brows += ("<tr><td>" + e(sm.LABEL[m]) + "</td><td>" + ("Instagram, Facebook, X" if g == "feed" else "TikTok, YouTube, Snapchat") + "</td>"
+                      "<td><input name='sm_b_%s_%s_zero' value='%g' inputmode='decimal'></td>"
+                      "<td><input name='sm_b_%s_%s_full' value='%g' inputmode='decimal'></td><td class='muted'>%s</td></tr>"
+                      % (m, g, z, m, g, f, note))
+    return ("<h2>Creator score model</h2><div class='card'>"
+            "<p class='sub'>The score reads four things from the posts we hold: engagement, view rate, interest (posts naming the "
+            "brief's space / posts available) and consistency of views. Each is scaled between two points and weighted by the "
+            "campaign objective (version " + e(sm.VERSION) + "). A parameter with no data hands its weight to the others.</p>"
+            "<table><thead><tr><th>Objective</th>" + head + "</tr></thead><tbody>" + wrows + "</tbody></table>"
+            "<p class='price-hint'>Weights are shares: they are normalised over what is available, so only their proportions matter.</p>"
+            "<table><thead><tr><th>Parameter</th><th>Platforms</th><th>Scores 0 at</th><th>Scores 100 at</th><th></th></tr></thead><tbody>"
+            + brows + "</tbody></table>"
+            "<p class='price-hint'>Engagement and view rate are percentages. Consistency is the swing of views "
+            "(std &divide; mean): lower is steadier, so its 0 point is the larger number.</p></div>")
+
+
 def intl_benchmarks_card():
     """The benchmarks creator scores are measured against: a low-high range per platform and
     size band, with where each figure came from. The campaign-report guides below are separate."""
@@ -3890,14 +3923,11 @@ def intl_benchmarks_card():
     srcs = "".join("<p class='price-hint'><b>" + e(p) + ":</b> " + e(en["metric"]) + ". " + e(en["rule"]) + ".<br>"
                    + "<br>".join(e(x) for x in en["sources"]) + "</p>" for p, en in ib.TABLE.items())
     return ("<h2>Creator score benchmarks (international)</h2><div class='card'>"
-            "<p class='sub'>Every creator's score compares their engagement with these ranges, never with our own roster "
-            "(version " + e(ib.VERSION) + "). Score = 100 &times; min(1, engagement &divide; benchmark &divide; 2), worked out at "
-            "the high end (harsh) and the low end (generous): the number shown is the middle and the range is kept beside it. "
-            "At the benchmark a creator scores 50; at 1.6&times; 80.</p>"
+            "<p class='sub'>Reference only: these ranges are quoted beside a creator's engagement in the hover, they do not "
+            "move the score (version " + e(ib.VERSION) + ").</p>"
             "<table><thead><tr><th>Platform</th><th>Size band</th><th>Low % (lowest source)</th><th>High % (middle source)</th><th></th></tr></thead><tbody>"
             + body + "</tbody></table>" + srcs
-            + "<p class='price-hint'>Not scored: YouTube, Snapchat, Facebook, X (no agreed benchmark), and views, consistency "
-              "and interest. Audience, fake followers and our own record are shown beside the score, never inside it. "
+            + "<p class='price-hint'>Audience, fake followers and our own record are shown beside the score, never inside it. "
               "The benchmark guides below are separate: they grade campaign reports.</p></div>")
 
 

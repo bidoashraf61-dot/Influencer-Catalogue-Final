@@ -3031,6 +3031,28 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             except ValueError:
                 pass
         db.set_setting("benchmarks", bm)
+        import score_model as sm
+        if any(k.startswith("sm_") for k in f):
+            wover, bover = {}, {}
+            for o, row in sm.WEIGHTS.items():
+                for p, d in row.items():
+                    try:
+                        x = float(f.get("sm_w_%s_%s" % (o, p)) or d)
+                    except ValueError:
+                        continue
+                    if x >= 0 and x != float(d):
+                        wover.setdefault(o, {})[p] = x
+            for m, groups in sm.BANDS.items():
+                for g, (dz, df) in groups.items():
+                    try:
+                        z = float(f.get("sm_b_%s_%s_zero" % (m, g)) or dz)
+                        fu = float(f.get("sm_b_%s_%s_full" % (m, g)) or df)
+                    except ValueError:
+                        continue
+                    if z >= 0 and fu >= 0 and z != fu and (z, fu) != (float(dz), float(df)):
+                        bover.setdefault(m, {})[g] = [z, fu]
+            db.set_setting("score_model", {"weights": wover, "bands": bover})
+            sm._overrides(fresh=True)
         import intl_benchmarks as ib
         if any(k.startswith("ib_") for k in f):
             over = {}

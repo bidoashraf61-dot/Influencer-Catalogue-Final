@@ -1,59 +1,38 @@
-# Creator score (scoring v3, ranges, 2026-10-11)
+# Creator score (scoring v4, 2026-10-11)
 
-A creator's score compares their **engagement** with **international benchmarks**. It never
-compares them with our own roster. Source of truth: `admin/intl_benchmarks.py`; formula:
-`fit.score_core` in `admin/fit.py`.
+Four parameters, all read from the posts we hold, scaled between two editable points and
+weighted by the campaign objective. Source of truth: `admin/score_model.py`; formula:
+`fit.score_core` in `admin/fit.py`. Editable in Admin > Settings > "Creator score model".
 
-```
-ratio = creator's engagement / benchmark for their platform and size band
-score = 100 x min(1, ratio / 2)
-```
+| Parameter | Read as | Scores 0 at | Scores 100 at |
+|---|---|--:|--:|
+| Engagement | median (likes + comments) / followers; per view on video platforms | 0.3% (feed) / 1.5% (video) | 3.5% / 7.0% |
+| View rate | median views / followers | 3% | 50% |
+| Interest | posts naming the brief's space / posts available (the posts are the 100%) | 0 posts | all posts |
+| Consistency | std / mean of views over the posts (lower is steadier) | 2.0 | 0.5 |
 
-A benchmark is a range (low to high), so the score is worked out at both ends and kept as a
-range: the number shown is the midpoint, and `score_range` / `tag_range` carry the ends (a
-creator can read "Possible fit to Strong fit").
+Feed = Instagram, Facebook, X (per follower). Video = TikTok, YouTube, Snapchat (per view).
+Linear between the two points. Consistency needs 10 or more posts.
 
-| ratio (at the midpoint) | score | tag |
-|---|---|---|
-| 0.8x or less | 40 or less | Not recommended (below 40) |
-| 1.0x (at benchmark) | 50 | Possible fit |
-| 1.2x | 60 | Good fit |
-| 1.6x | 80 | Strong fit |
-| 2x or more | 100 | Strong fit |
+## Weights by campaign objective (shares, normalised over what is available)
 
-## Benchmarks: low = lowest source, high = middle source (version 2026-10-11.2)
+| Objective | Engagement | View rate | Interest | Consistency |
+|---|--:|--:|--:|--:|
+| Awareness | 20 | 45 | 20 | 15 |
+| Engagement | 45 | 15 | 25 | 15 |
+| Traffic | 30 | 25 | 30 | 15 |
+| Balanced / several goals | the average of the goals chosen | | | |
 
-| Band (followers) | Instagram: (likes+comments) / followers | TikTok: interactions / views |
-|---|--:|--:|
-| Nano under 20K | 1.0 - 3.75% | 3.4 - 3.8% |
-| Micro 20K-100K | 0.8 - 2.75% | 3.4 - 3.6% |
-| Mid 100K-500K | 0.9 - 2.25% | 3.4 - 3.7% |
-| Macro 500K-1M | 0.9 - 1.5% | 3.4 - 3.7% |
-| Mega 1M+ | 0.7 - 1.5% | 3.4% (one source) |
+A parameter with no data hands its weight to the others. Interest only exists when the brief
+names a category. Interest read from profile tags only (no post data) counts at 30%.
 
-Instagram: low = IQFluence (Sep 2026, 30.1M creators, median by tier); high = HypeAuditor
-(2025, the middle of IQFluence / HypeAuditor / Buffer). TikTok: low = Rival IQ (2025, median
-brand account by view); high = the average of Rival IQ and Socialinsider (2025, 2M videos),
-because only two sources exist. TikTok engagement here is (likes + comments + shares) / views;
-the benchmark also counts saves, which the scrape does not return, so our figure is slightly
-conservative.
+## Bands
 
-Editable in Admin > Settings > "Creator score benchmarks (international)"; saved as the
-`intl_benchmarks` setting, {platform: {band: [low, high]}}; cached 60 s. A figure equal to the
-table's default is not stored.
+80+ Strong fit, 60-79 Good fit, 40-59 Possible fit, under 40 Not recommended.
+`score_range` carries the interest range (hashtag overlap makes the matched posts a range).
 
-## Not scored
+## Checks beside the score (never inside it)
 
-* YouTube, Snapchat, Facebook, X: no agreed benchmark, shown as "not scored".
-* Views, consistency, interest: no international benchmark, not in the number.
-* Audience country/gender/age, fake followers, our own campaign record: shown as checks beside
-  the score, never inside it.
-* The objective (Awareness / Engagement / Traffic) does not change the number.
-* The shortlist's country and product-space markdowns (`matcher.apply_rules`) still apply
-  after scoring and scale the range with the number.
-
-## Interest: the posts we hold are the 100%
-
-When the brief names a category, interest = posts naming it / posts analysed (5 of 12 = 42
-points, 12 of 12 = 100). It enters at weight 0.5 against engagement's 1.0. Without post data
-the roster tags give a keyword estimate at weight 0.15. No threshold of posts is needed.
+Audience country/gender/age, fake followers, our own campaign record, reach, posts analysed.
+"Limited data" shows under 10 posts. The international benchmark is a reference line beside
+engagement in the hover (`admin/intl_benchmarks.py`); it does not move the number.

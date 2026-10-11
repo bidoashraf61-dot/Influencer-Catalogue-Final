@@ -542,30 +542,25 @@ def post_interest(doc, creator, cats):
 
 def score_core(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
                creator=None, record=None, min_parts=1):
-    """The one scoring formula, used for every creator (scoring v3, 2026-10-11).
+    """The one scoring formula, used for every creator (scoring v4, 2026-10-11).
 
-    A creator's engagement is compared with the international benchmark for their platform and
-    size (intl_benchmarks.py), never with our own roster:
-
-        ratio = creator's engagement / benchmark       score = 100 x min(1, ratio / 2)
-
-    so a creator exactly at the benchmark scores 50, at 1.2x about 60 ("Good fit"), at 1.6x
-    80 ("Strong fit"), and 2x or more 100. A benchmark is a range (low = lowest source, high =
-    the middle source), so the result is a range too: the score is its midpoint and
-    score_range / tag_range carry the ends. Engagement is the only part: views,
-    consistency and interest have no international benchmark and are not scored. The objective does not
-    change the number. Audience, fake followers and our own record are shown as checks beside
-    it and never move it.
+    Four parameters read from the posts we hold (score_model.py): engagement, view rate, interest
+    (posts naming the brief's space / posts available) and consistency of views. Each is scaled
+    between two editable points and the campaign objective sets the weights (Awareness leans on
+    view rate, Engagement on engagement, Traffic on interest). A parameter with no data hands its
+    weight to the others. Audience, fake followers and our own record are shown as checks beside
+    the number and never move it. The international benchmark is a reference line in the hover.
 
     Returns the same shape as before (score, tag, parts, strengths, watchouts, checks, conclusion,
-    objective, platform, basic) plus ``confidence`` ({"level", "posts", "peers_n", "source"}),
-    ``reach_followers`` and ``limited_data``."""
+    objective, platform, basic) plus ``metrics`` (the hover rows), ``confidence``,
+    ``reach_followers``, ``limited_data`` and ``score_range`` / ``tag_range``."""
     import benchmarks
     import intl_benchmarks
+    import score_model as sm
     verified = not doc.get("basic")
     out = {"score": None, "tag": "", "parts": [], "strengths": [], "watchouts": [], "conclusion": "",
            "objective": objective, "platform": platform, "basic": not verified, "checks": [],
-           "confidence": {"level": "low", "posts": 0, "peers_n": 0, "source": "international"},
+           "confidence": {"level": "low", "posts": 0, "peers_n": 0, "source": "posts"},
            "reach_followers": None, "limited_data": True, "score_range": None, "tag_range": None}
     target = dict(DEFAULT_TARGET, **{k: v for k, v in (target or {}).items() if v})
     target["gender"] = one_gender(target["gender"])
@@ -575,57 +570,92 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     out["reach_followers"] = int(f) if f else None
     plat = platform or "Instagram"
     bench = bench or {}
-
-    # -- engagement against the international benchmark
+    feed = plat in benchmarks.FEED
+    group = "feed" if feed else "video"
     sample = benchmarks.sample_of(plat, dict(doc, followers=f)) if f else {}
-    er_val = sample.get("er") if sample.get("er") is not None else sample.get("er_med")
-    ref = intl_benchmarks.reference(plat, f)
-    parts = []
-    eng = None
-    if plat not in intl_benchmarks.TABLE:
-        out["note"] = "No international benchmark for %s yet, so it is not scored." % plat
-    elif er_val is None or ref is None:
-        out["note"] = "No engagement numbers on file for %s." % plat
-    else:
-        lo_b, hi_b = ref["low"], ref["high"]
-        s_hi = _clamp(er_val / lo_b / 2.0)       # against the low end of the range: the generous reading
-        s_lo = _clamp(er_val / hi_b / 2.0)       # against the high end: the harsh reading
-        s = (s_lo + s_hi) / 2.0
-        per_view = intl_benchmarks.TABLE[plat]["basis"] == "views"
-        unit = " per view" if per_view else ""
-        what = "%s %s creators" % (intl_benchmarks.BAND_LABEL[ref["band"]].split(" (")[0], plat)
-        rng = ("%g%%" % lo_b) if hi_b - lo_b < 0.05 else ("%g-%g%%" % (lo_b, hi_b))
-        verdict = "above" if er_val >= hi_b else "below" if er_val < lo_b else "within"
-        txt = "Engagement %s%s, above the %s international range for %s" % (_pct(er_val), unit, rng, what)
-        wtxt = "Engagement %s%s, below the %s international range for %s" % (_pct(er_val), unit, rng, what)
-        parts.append(("engagement", "Engagement vs international benchmark", s, txt, wtxt, 1.0, "international", 0))
-        out["checks"].append({"label": "International benchmark", "level": "ok" if verdict == "above" else "bad" if verdict == "below" else "warn",
-                              "text": "%s engagement%s against %s (%s, %s): %s the range" % (
-                                  _pct(er_val), unit, rng, intl_benchmarks.BAND_LABEL[ref["band"]], plat, verdict)})
-        eng = {"val": er_val, "lo_b": lo_b, "hi_b": hi_b, "band": ref["band"], "unit": unit, "rng": rng, "verdict": verdict,
-               "ratio": er_val / ((lo_b + hi_b) / 2.0), "name": what}
+    posts = int(doc.get("sample_posts") or (12 if verified else 0))
+    unit_er = "" if feed and doc.get("er_basis") != "views" else " per view"
 
-    if len(parts) < max(min_parts, 1):
+    # name -> (score 0..1 mid, lo, hi, text-good, text-bad, metric row)
+    got = {}
+
+    def put(key, s_lo, s_hi, good, bad, row):
+        got[key] = {"lo": s_lo, "hi": s_hi, "mid": (s_lo + s_hi) / 2.0, "good": good, "bad": bad, "row": row}
+
+    # -- engagement
+    er_val = sample.get("er_med") if sample.get("er_med") is not None else sample.get("er")
+    if er_val is not None:
+        z, fl = sm.band("engagement", group)
+        s = sm.scale(er_val, z, fl)
+        ref = intl_benchmarks.reference(plat, f)
+        refnote = (" · international reference %s" % (("%g%%" % ref["low"]) if ref["high"] - ref["low"] < 0.05
+                                                     else "%g-%g%%" % (ref["low"], ref["high"]))) if ref else ""
+        put("engagement", s, s, "Engagement %s%s" % (_pct(er_val), unit_er), "Engagement %s%s" % (_pct(er_val), unit_er),
+            {"label": "Engagement", "value": "%s%s" % (_pct(er_val), unit_er),
+             "note": "scores 0 at %g%%, 100 at %g%%%s" % (z, fl, refnote),
+             "level": "ok" if s >= 0.6 else "warn" if s >= 0.3 else "bad"})
+
+    # -- view rate
+    vr = sample.get("view_rate_med") if sample.get("view_rate_med") is not None else sample.get("view_rate")
+    if vr is not None:
+        z, fl = sm.band("view_rate", group)
+        s = sm.scale(vr, z, fl)
+        put("view_rate", s, s, "A typical post reaches %s of followers" % _pct(vr),
+            "A typical post reaches only %s of followers" % _pct(vr),
+            {"label": "View rate", "value": "%s of followers" % _pct(vr), "note": "median views / followers; 0 at %g%%, 100 at %g%%" % (z, fl),
+             "level": "ok" if s >= 0.6 else "warn" if s >= 0.3 else "bad"})
+
+    # -- consistency (needs the spread of at least 10 posts)
+    spread = sample.get("spread")
+    if spread is not None and posts >= 10:
+        z, fl = sm.band("consistency", group)
+        s = sm.scale(spread, z, fl)
+        put("consistency", s, s, "Views hold steady from post to post", "Views swing a lot from post to post",
+            {"label": "Consistency", "value": "swing %.2f" % spread, "note": "std / mean of views; 100 at %g or less, 0 at %g or more" % (fl, z),
+             "level": "ok" if s >= 0.6 else "warn" if s >= 0.3 else "bad"})
+
+    # -- interest: the posts we hold are the 100%
+    cats = [c for c in str(target["category"]).split("|") if c.strip() and c.strip().lower() != "any"]
+    pi = post_interest(doc, creator, cats)
+    if pi is not None:
+        space = ", ".join(c.lower() for c in cats)
+        if pi["src"] == "posts":
+            mt = "%d" % pi["matched_lo"] if pi["matched_lo"] == pi["matched_hi"] else "%d-%d" % (pi["matched_lo"], pi["matched_hi"])
+            val_t, note_t = "%s of %d posts" % (mt, pi["posts"]), "name %s; the posts we hold are the 100%%" % space
+        elif pi["src"] == "doc":
+            val_t, note_t = _pct(100 * pi["share_lo"]) + " of content", "measured in the analysis"
+        else:
+            val_t = ("~%s of tags" % _pct(100 * pi["share_lo"])) if pi["share_lo"] else "no match"
+            note_t = "profile tags only, no post data (counts at 30%)"
+        i_mid = (pi["lo"] + pi["hi"]) / 2.0
+        put("interest", pi["lo"], pi["hi"], pi["why"], pi["watch"],
+            {"label": "Interest", "value": val_t, "note": note_t, "level": "ok" if i_mid >= 0.6 else "warn" if i_mid >= 0.3 else "bad"})
+        got["interest"]["ev"] = pi["evidence"]
+        got["interest"]["src"] = pi["src"]
+        got["interest"]["n"] = pi["posts"]
+
+    if not any(k in got for k in ("engagement", "view_rate", "consistency")):
+        out["note"] = "No post numbers on file for %s, so it is not scored." % plat
+        return out
+    if len([k for k in got]) < max(min_parts, 1):
         out.setdefault("note", "Not enough public data to score.")
         return out
 
-    # -- interest in the brief's product space, read from the posts we hold (weighted by how many)
-    cats = [c for c in str(target["category"]).split("|") if c.strip() and c.strip().lower() != "any"]
-    pi = post_interest(doc, creator, cats)
-    w_i = 0.0
-    if pi is not None:
-        w_i = INTEREST_WEIGHT * pi["evidence"]
-        i_mid = (pi["lo"] + pi["hi"]) / 2.0
-        parts.append(("interest", "Product-space match", i_mid, pi["why"], pi["watch"], w_i, pi["src"], pi["posts"]))
-    e_lo, e_hi = s_lo, s_hi
-    if pi is not None and w_i > 0:
-        lo_v = (e_lo + w_i * pi["lo"]) / (1.0 + w_i)
-        hi_v = (e_hi + w_i * pi["hi"]) / (1.0 + w_i)
-    else:
-        lo_v, hi_v = e_lo, e_hi
+    # -- weights by the campaign objective, over what is available
+    table = sm.weights()
+    w = blend(table, objective)
+    ev = {k: (got[k].get("ev", 1.0)) for k in got}
+    wt = {k: w[k] * ev[k] for k in got}
+    tw = sum(wt.values())
+    lo_v = sum(wt[k] * got[k]["lo"] for k in got) / tw
+    hi_v = sum(wt[k] * got[k]["hi"] for k in got) / tw
+    out["parts"] = [{"key": k, "label": sm.LABEL[k], "s": round(got[k]["mid"], 2), "w": round(100.0 * wt[k] / tw, 1),
+                     "src": got[k].get("src", "posts"), "n": got[k].get("n", 0)} for k in sm.PARAMS if k in got]
     out["score_range"] = [int(round(100 * lo_v)), int(round(100 * hi_v))]
-    out["parts"] = [{"key": p[0], "label": p[1], "s": round(p[2], 2), "w": round(p[5], 2), "src": p[6], "n": p[7]} for p in parts]
     val = int(round(100.0 * (lo_v + hi_v) / 2.0))
+    for k in sm.PARAMS:
+        if k in got:
+            got[k]["row"]["note"] += " · weight %d%%" % int(round(100.0 * wt[k] / tw))
 
     # -- checks beside the number (never in it)
     au = doc.get("audience") or {}
@@ -664,33 +694,15 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
             "level": "ok" if r >= 1.2 else "bad" if r <= 0.7 else "warn"})
 
     # -- confidence: how many posts the engagement figure rests on
-    posts = int(doc.get("sample_posts") or (12 if verified else 0))
     level = "low" if posts < 6 else "high" if posts >= 20 else "medium"
-    out["confidence"] = {"level": level, "posts": posts, "peers_n": 0, "source": "international"}
-    out["limited_data"] = level == "low"
+    out["confidence"] = {"level": level, "posts": posts, "peers_n": 0, "source": "posts"}
+    out["limited_data"] = posts < 10
 
     # -- every metric behind the number, in the order the hover reads them
-    metrics = []
-    if eng:
-        metrics.append({"label": "Engagement", "value": "%s%s" % (_pct(eng["val"]), eng["unit"]),
-                        "note": "%.1fx the %s international range (%s)" % (eng["ratio"], eng["rng"], eng["name"]),
-                        "level": "ok" if eng["verdict"] == "above" else "bad" if eng["verdict"] == "below" else "warn"})
-    if pi is not None:
-        i_mid = (pi["lo"] + pi["hi"]) / 2.0
-        if pi["src"] == "posts":
-            mt = "%d" % pi["matched_lo"] if pi["matched_lo"] == pi["matched_hi"] else "%d-%d" % (pi["matched_lo"], pi["matched_hi"])
-            val_t, note_t = "%s of %d posts" % (mt, pi["posts"]), "name %s; counts %d%% of the number" % (
-                ", ".join(c.lower() for c in cats), int(round(100 * w_i / (1.0 + w_i))))
-        elif pi["src"] == "doc":
-            val_t, note_t = _pct(100 * pi["share_lo"]) + " of content", "measured in the analysis"
-        else:
-            val_t, note_t = ("~%s of tags" % _pct(100 * pi["share_lo"])) if pi["share_lo"] else "no match", "profile tags only, no post data (counts at 30%)"
-        metrics.append({"label": "Product space", "value": val_t, "note": note_t,
-                        "level": "ok" if i_mid >= 0.6 else "warn" if i_mid >= 0.3 else "bad"})
-    posts_n = int(doc.get("sample_posts") or (12 if verified else 0))
-    metrics.append({"label": "Posts analysed", "value": str(posts_n) if posts_n else "none on file",
-                    "note": "the 100% base for the product-space match" if posts_n else "score is from public numbers",
-                    "level": "ok" if posts_n >= 20 else "warn" if posts_n >= 6 else "bad"})
+    metrics = [got[k]["row"] for k in sm.PARAMS if k in got]
+    metrics.append({"label": "Posts analysed", "value": str(posts) if posts else "none on file",
+                    "note": "the 100% base for the interest match" if posts else "score is from public numbers",
+                    "level": "ok" if posts >= 20 else "warn" if posts >= 10 else "bad"})
     if out["reach_followers"]:
         metrics.append({"label": "Reach", "value": _k(out["reach_followers"]), "note": "followers on %s" % plat, "level": "info"})
     for c in out["checks"]:
@@ -701,15 +713,8 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     out["score"], out["tag"] = val, band_for(val)
     lo_s, hi_s = out["score_range"]
     out["tag_range"] = [band_for(lo_s), band_for(hi_s)]
-    p = parts[0]
-    out["strengths"] = [p[3]] if verdict == "above" else []
-    out["watchouts"] = extra_watch + ([p[4]] if verdict == "below" else [])
-    if pi is not None and w_i > 0:
-        i_mid = (pi["lo"] + pi["hi"]) / 2.0
-        if i_mid >= 0.6:
-            out["strengths"].append(pi["why"])
-        elif i_mid < 0.3:
-            out["watchouts"].append(pi["watch"])
+    out["strengths"] = [got[k]["good"] for k in sm.PARAMS if k in got and got[k]["mid"] >= 0.6]
+    out["watchouts"] = extra_watch + [got[k]["bad"] for k in sm.PARAMS if k in got and got[k]["mid"] < 0.3]
     lead = "" if objective == "Balanced" else " for " + objective_label(objective).lower()
     txt = "%s%s (%d/100)%s." % (out["tag"], lead, val, ", from public numbers only" if not verified else "")
     if lo_s != hi_s:
