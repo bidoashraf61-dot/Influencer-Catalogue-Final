@@ -172,60 +172,6 @@
     return frame;
   }
   HV.lime = lime;
-  // fig(kind, cls) -> Helvy as the WHOLE waist-up figure (the transparent "helvy" set: idle, hello, point,
-  // thinking, cards, approve, celebrate), shown at its own frame with no crop, no zoom and no disc.
-  // Same API as lime(): loop(kind) and react(kind, then, onEnd). A reaction plays once and hands over to
-  // `then` ON THE SAME <video> (Safari keeps it moving). Used by the AI shortlist card (2026-10-11).
-  var FIG = { loop: "idle", wave: "idle", idle: "idle", hi: "idle", hello: "hello", point: "point", think: "thinking", thinking: "thinking",
-              thumbs: "approve", up: "approve", approve: "approve", cheer: "celebrate", celebrate: "celebrate", cards: "cards", scan: "thinking" };
-  function fig(kind, cls) {
-    var frame = document.createElement("span");
-    frame.className = "hv-fig" + (cls ? " " + cls : "");
-    frame.setAttribute("aria-hidden", "true");
-    var now = null, looping = false;
-    function still() {
-      var im = document.createElement("img");
-      im.className = "hv-clip hv-clip--still"; im.alt = ""; im.decoding = "async";
-      im.src = HVH ? HVH.still : ROOT + "assets/brand/helvy/helvy-still.webp";
-      frame.appendChild(im);
-    }
-    if (!HVH || REDUCE) {
-      still();
-      frame.loop = frame.react = function (k, t, cb) { if (typeof t === "function") cb = t; if (cb) setTimeout(cb, 0); };
-      frame.reset = function () {};
-      return frame;
-    }
-    function put(name, o) {
-      var v = HVH.video(FIG[name] || name, { once: o.once, then: o.then ? (FIG[o.then] || o.then) : null, eager: true });
-      var old = [].slice.call(frame.querySelectorAll("video, img"));
-      var gone = false;
-      var drop = function () { if (gone) return; gone = true; old.forEach(function (x) { if (x.pause) try { x.pause(); } catch (e) { /* gone */ } x.remove(); }); };
-      v.addEventListener("playing", drop, { once: true });
-      setTimeout(drop, 900);
-      frame.appendChild(v);
-      HVH.play(v);
-      return v;
-    }
-    frame.loop = function (name) {
-      var key = FIG[name] || name;
-      if (looping && now === key) return;
-      now = key; looping = true;
-      put(name, {});
-    };
-    frame.react = function (name, then, onEnd) {
-      if (typeof then === "function") { onEnd = then; then = null; }
-      then = then || "loop";
-      now = FIG[then] || then; looping = true;
-      var v = put(name, { once: true, then: then }), fired = false;
-      var fin = function () { if (fired) return; fired = true; if (onEnd) onEnd(); };
-      v.addEventListener("ended", fin, { once: true });
-      setTimeout(fin, 4200);
-    };
-    frame.reset = function () { looping = false; now = null; };
-    if (kind) frame.loop(kind);
-    return frame;
-  }
-  HV.fig = fig;
   // "Cooking": Helvy at the director's desk while the AI works (thinking -> flipping through
   // creator cards -> pressing a green check on a card, round and round) with a rotating step line. Used by
   // Add more like these, Creators like this and Find a replacement; the AI shortlist card has
@@ -3384,7 +3330,7 @@
     var altLink = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("link") + "<span>Product link</span>" });
     var altFile = h("button", { class: "ai-sl__alt-b", type: "button", html: icon("upload") + "<span>Brief file</span>" });
     intro.appendChild(h("div", { class: "ai-sl__alt" }, h("span", null, "Or start from"), altLink, altFile));
-    intro.querySelector(".ai-sl__face").appendChild(fig("loop"));
+    intro.querySelector(".ai-sl__face").appendChild(lime("loop"));
 
     // Expanded: the journey.
     var run = h("div", { class: "ai-sl__run", hidden: "" });
@@ -3408,7 +3354,7 @@
     // The lime frame (HV.lime) lays each new clip over the last and plays a reaction's follow-up
     // loop on the same element, so it keeps moving in Safari too.
     var cring = h("div", { class: "ai-sl__cring" });
-    var cframe = fig(null, "ai-sl__cframe");
+    var cframe = lime(null, "ai-sl__cframe");
     cring.appendChild(cframe);
     // Trimmed to the action itself, so a reaction starts the instant the client taps.
     var CLIP = { point: "point", think: "think", thumbs: "thumbs", cheer: "cheer", wave: "loop" };
@@ -3713,11 +3659,7 @@
         '<span class="ai-sl__spark ai-sl__spark--1"></span><span class="ai-sl__spark ai-sl__spark--2"></span><span class="ai-sl__spark ai-sl__spark--3"></span>';
       // Helvy scouts with his camera while the steps tick off (the scan clip, looping). Created in
       // the Build tap, so the browser lets it play.
-      // the director's desk, whole figure: thinking -> flipping through creator cards -> pressing approve
-      var desk = HVH && !reduce ? HVH.video("thinking", { seq: COOK_SEQ, eager: true }) : fig("loop");
-      desk.classList.add("hv-fig__v");
-      scene.querySelector(".ai-sl__lens").appendChild(h("span", { class: "hv-fig" }, desk));
-      if (desk.play) HVH.play(desk);
+      scene.querySelector(".ai-sl__lens").appendChild(lime("scan"));
       p.appendChild(scene);
       var side = h("div", { class: "ai-sl__steps" });
       side.appendChild(h("p", { class: "ai-sl__ask" }, "Building “" + name + "”"));
@@ -3769,7 +3711,7 @@
       var burst = h("div", { class: "ai-sl__burst", "aria-hidden": "true" });
       for (var i = 0; i < 18; i++) { var c = h("i"); c.style.setProperty("--a", (i * 20) + "deg"); c.style.setProperty("--d", (60 + (i % 3) * 26) + "px"); burst.appendChild(c); }
       p.appendChild(burst);
-      if (!reduce) { var cheer = fig(null); p.appendChild(h("div", { class: "ai-sl__cheer" }, cheer)); cheer.react("celebrate", "loop"); }
+      if (!reduce) { var cheer = lime(null); p.appendChild(h("div", { class: "ai-sl__cheer" }, cheer)); cheer.react("celebrate", "loop"); }
       p.appendChild(h("p", { class: "ai-sl__big" }, h("b", null, String(res.picks.length)), " creators picked"));
       p.appendChild(h("p", { class: "ai-sl__hint" }, "Best fit first, scored per platform. They're ticked in your tray: add or remove anyone, then save."));
       swap(p);
