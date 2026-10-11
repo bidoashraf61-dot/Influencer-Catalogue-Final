@@ -190,6 +190,32 @@ class Fixes8(unittest.TestCase):
         self.assertTrue(c.get("/api/creator?c=" + SAMPLE)[1]["gate"]["sample_full"])
         self.assertEqual(base.Client(self.base).get("/api/analysis/sample")[0], 401)
 
+    def test_04b_blurred_covers_are_served_never_originals(self):
+        c, _ = self.signup("s4b@glowderma.com")
+        d = sample_analysis.COVERS / SAMPLE
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "cover-0.jpg").write_bytes(b"\xff\xd8\xff\xe0BLURRED")
+        try:
+            s, raw, _ = c.get("/api/analysis/sample")
+            post = raw["analyses"]["Instagram"]["top_posts"][0]
+            self.assertEqual(post["thumb"], "api/analysis/sample/cover?i=0")
+            self.assertEqual(post["er"], round((50000 + 900) * 100.0 / 1340000, 2))      # (likes + comments) / followers
+            s, body, h = c.get("/api/analysis/sample/cover?i=0")
+            self.assertEqual(s, 200)
+            self.assertIn("image/jpeg", h.headers.get("Content-Type", ""))
+            # no file for another index, an out-of-range index, or a name instead of a number
+            self.assertEqual(c.get("/api/analysis/sample/cover?i=1")[0], 404)
+            self.assertEqual(c.get("/api/analysis/sample/cover?i=99")[0], 404)
+            self.assertEqual(c.get("/api/analysis/sample/cover?i=../post-1")[0], 404)
+            # a cover is only served for the configured creator, and nothing when the sample is off
+            db.set_setting("sample_analysis_code", "HV-MI-001")
+            self.assertEqual(c.get("/api/analysis/sample/cover?i=0")[0], 404)
+            db.set_setting("sample_analysis_code", SAMPLE)
+            db.set_setting("sample_analysis_on", False)
+            self.assertEqual(c.get("/api/analysis/sample/cover?i=0")[0], 404)
+        finally:
+            (d / "cover-0.jpg").unlink()
+
     def test_05_settings_card(self):
         a = self.admin()
         s, body, _ = a.get("/portal?tab=settings")

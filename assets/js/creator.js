@@ -641,13 +641,13 @@
   function postGrid(list, sponsored) {
     return '<div class="pp-posts">' + list.map(function (p, i) {
       return '<a class="pp-post" href="' + esc(p.url) + '" target="_blank" rel="noopener" aria-label="Play post ' + (i + 1) + '" data-post="' + i + '"' + (sponsored ? ' data-sp="1"' : "") + ">"
-        + '<span class="pp-post__media"' + (p.thumb ? ' style="background-image:url(\'' + esc(p.thumb) + '\')"' : "") + ">"
+        + '<span class="pp-post__media"' + (p.thumb ? ' style="background-image:url(\'' + esc(/^(https?:|\/)/.test(p.thumb) ? p.thumb : API + "/" + p.thumb) + '\')"' : "") + ">"
         + (p.thumb ? "" : '<span class="pp-post__none">' + esc(PLAT || "Instagram") + " post</span>")
         + '<span class="pp-post__play">' + I_PLAY + "</span>"
         + (sponsored && p.brand ? '<span class="pp-post__brand">' + esc(p.brand) + "</span>" : "")
         + '<span class="pp-post__nums">' + (p.likes != null ? "<span>" + I_LIKE + num(p.likes) + "</span>" : "") + (p.comments != null ? "<span>" + I_COMMENT + num(p.comments) + "</span>" : "")
         + (p.views != null ? "<span>" + ico('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>') + num(p.views) + "</span>" : "") + "</span></span>"
-        + (p.date ? '<span class="pp-post__date">' + esc(day(p.date)) + "</span>" : "") + "</a>";
+        + (p.er != null ? '<span class="pp-post__date">' + esc(p.er + "% engagement") + "</span>" : (p.date ? '<span class="pp-post__date">' + esc(day(p.date)) + "</span>" : "")) + "</a>";
     }).join("") + "</div>";
   }
   function renderPosts(a) {

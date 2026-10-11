@@ -18,6 +18,7 @@ import re
 
 import db
 import metrics
+from pathlib import Path
 
 DEFAULT_CODE = "HV-HCPG-003"
 LABEL = "Sample · anonymised creator"
@@ -32,6 +33,24 @@ NUMBERS = ("followers", "following", "posts_count", "er", "avg_likes", "avg_comm
 SECTIONS = ("countries", "cities", "gender", "ages", "ages_female", "ages_male", "languages", "interests",
             "brand_affinity", "reachability")
 _BAD = re.compile(r"[@#]|https?:|www\.|\.(com|net|org|co|sa|ae)\b", re.I)
+
+
+# Heavily blurred copies of the sample creator's popular-post covers (tools/make_sample_covers.py),
+# kept beside the analysis media but in their own folder: <analysis_media>/_sample/<CODE>/cover-<i>.jpg.
+# The original covers are never served through the sample.
+COVERS = Path(__file__).resolve().parent / "analysis_media" / "_sample"
+
+
+def cover_file(code, i):
+    code = re.sub(r"[^A-Z0-9-]", "", str(code or "").upper())
+    try:
+        i = int(i)
+    except (TypeError, ValueError):
+        return None
+    if not code or not 0 <= i < 12:
+        return None
+    f = COVERS / code / ("cover-%d.jpg" % i)
+    return f if f.is_file() else None
 
 
 def config():
@@ -170,6 +189,14 @@ def payload():
         return None
     c, every = got
     analyses = {p: anonymise(a["data"], p) for p, a in every.items()}
+    _on, code = config()
+    for p, doc in analyses.items():
+        fol = doc.get("followers") or 0
+        for i, post in enumerate(doc.get("top_posts") or []):
+            if cover_file(code, i):
+                post["thumb"] = "api/analysis/sample/cover?i=%d" % i      # relative: the page adds its API base
+            if fol and post.get("likes") is not None:
+                post["er"] = round((post["likes"] + (post.get("comments") or 0)) * 100.0 / fol, 2)
     plats = list(analyses)
     main = analyses[plats[0]]
     followers = int(sum(a.get("followers") or 0 for a in analyses.values()) or c["followers"] or 0)

@@ -352,6 +352,18 @@ class PortalMixin(connect_api.ConnectMixin):
                 else:
                     self.send_json(200, got, self.cors() + [("Cache-Control", "private, max-age=300")])
             return True
+        if path == "/api/analysis/sample/cover":
+            # One blurred popular-post cover of the configured sample creator (never an original).
+            who = self._need_viewer()
+            if who:
+                import sample_analysis
+                on, code = sample_analysis.config()
+                f = sample_analysis.cover_file(code, query.get("i")) if on else None
+                if f is None:
+                    self.send_json(404, {"ok": False}, self.cors())
+                else:
+                    self.send(200, f.read_bytes(), "image/jpeg", self.cors() + [("Cache-Control", "private, max-age=3600")])
+            return True
         if path == "/api/chat/history":
             who = self._need_viewer()
             if who:
