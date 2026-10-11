@@ -130,7 +130,7 @@
   // until they are regenerated in the wide framing they are not used: rest = hi, thumbs/cheer = up,
   // building = scan. The tight clips stay in assets/brand/voice for the day they are re-shot.
   var LIME = { loop: "hi", wave: "hi", idle: "hi", hi: "hi", up: "up", point: "hi", think: "hi", thumbs: "up",
-               cheer: "up", celebrate: "up", scan: "scan" };
+               cheer: "cheer-act", celebrate: "cheer-act", scan: "scan" };
   function lime(kind, cls, opts) {
     opts = opts || {};
     var frame = document.createElement("span");
@@ -1370,8 +1370,6 @@
     list = list.filter(function (v) { return !isAny(v); });
     if (k > -1) list.splice(list.indexOf(value), 1); else list.push(value);
     if (q.id === "goal") list = value === "balanced" && k === -1 ? ["balanced"] : list.filter(function (v) { return v !== "balanced" || list.length === 1; });
-    var max = q.multi_max || 3;
-    if (list.length > max) list = list.slice(list.length - max);
     if (q.id === "gender" && list.indexOf("Women") > -1 && list.indexOf("Men") > -1) return ["Any"];
     return list;
   }
@@ -1554,6 +1552,7 @@
       var cframe = lime(null, "ai-sl__cframe");
       cring.appendChild(cframe);
       var CLIPS = { point: "point", think: "think", yes: "thumbs", cheer: "celebrate", idle: "idle" };
+      var celebrating = false;
       function react(kind, loop, seq) {
         if (reduce || !HVH) return;
         if (seq) { cframe.loop("scan"); }                      // the working stage: the camera
@@ -1617,7 +1616,7 @@
               answers[q.id] = o.value;
               [].forEach.call(opts.children, function (bb, bi) { var on = q.options[bi].value === o.value; bb.setAttribute("aria-pressed", String(on)); bb.setAttribute("aria-checked", String(on)); });
             }
-            if (!was && answered(q)) { plus(b, obPoints(q)); react("yes"); say(["Nice", "Got it", "Good one", "Noted"][step % 4]); }
+            if (!was && answered(q)) { plus(b, obPoints(q)); react("cheer"); celebrating = true; setTimeout(function () { celebrating = false; }, 2000); say(["Nice", "Got it", "Good one", "Noted"][step % 4]); }
             paintPower(true);
             if (!many) setTimeout(function () { if (step === qs.indexOf(q)) advance(); }, 260);
           });
@@ -1658,7 +1657,7 @@
       function advance() {
         var q = qs[step];
         if (q.required && !answered(q)) return;
-        if (step < qs.length - 1) { show(step + 1); react("point"); return; }
+        if (step < qs.length - 1) { show(step + 1); if (!celebrating) react("point"); return; }
         finish();
       }
 
@@ -3455,7 +3454,7 @@
     function reward(pts) {
       var leveled = paintPower(true);
       coachSay(leveled ? "Level up!" : "+" + pts);
-      coachPlay(leveled ? "cheer" : "thumbs", "think");
+      coachPlay("cheer", "think");
     }
 
     function setTrack(at, done) {

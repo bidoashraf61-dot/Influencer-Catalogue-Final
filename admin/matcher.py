@@ -35,12 +35,12 @@ QUESTIONS = [
                  ("YouTube", "YouTube"), ("any", "No preference")]},
     # Fix batch 5: market, gender and age take several answers too (stored as a list, as the goal is).
     # Budget, number of creators and timing are one value by nature and stay single choice.
-    {"id": "market", "type": "one", "multi_ok": True, "multi_max": 4, "label": "Which countries is the audience in?", "required": True,
+    {"id": "market", "type": "one", "multi_ok": True, "label": "Which countries is the audience in?", "required": True,
      "options": [("SA", "Saudi Arabia"), ("AE", "UAE"), ("EG", "Egypt"), ("KW", "Kuwait"), ("QA", "Qatar"),
                  ("BH", "Bahrain"), ("OM", "Oman"), ("JO", "Jordan")]},
-    {"id": "gender", "type": "one", "multi_ok": True, "multi_max": 2, "label": "Who is the audience?", "required": False,
+    {"id": "gender", "type": "one", "multi_ok": True, "label": "Who is the audience?", "required": False,
      "options": [("Any", "Everyone"), ("Women", "Mostly women"), ("Men", "Mostly men")]},
-    {"id": "age", "type": "one", "multi_ok": True, "multi_max": 4, "label": "Main age groups", "required": False,
+    {"id": "age", "type": "one", "multi_ok": True, "label": "Main age groups", "required": False,
      "options": [("Any", "All ages"), ("18-24", "18–24"), ("25-34", "25–34"), ("35-44", "35–44"), ("45-54", "45+")]},
     {"id": "category", "type": "many", "label": "Which space is the product in?", "required": True,
      "options": [("health care", "Healthcare / pharma"), ("skincare", "Skincare & dermatology"), ("beauty", "Beauty"),
@@ -129,12 +129,12 @@ def clean_answers(raw):
                     keep.append(x)
                 elif typed is None and x.startswith(OTHER):
                     typed = _clean_other(x)
-            vals = keep[:6] + ([typed] if typed else [])
+            vals = keep + ([typed] if typed else [])
             if vals:
                 out[q["id"]] = vals
         elif q.get("multi_ok") and isinstance(v, list):
             # The goal, the countries, the gender and the age groups may be several (fix batches 3 and 5).
-            keep = [x for x in dict.fromkeys(str(x) for x in v) if x in allowed][:q.get("multi_max", 3)]
+            keep = [x for x in dict.fromkeys(str(x) for x in v) if x in allowed]
             typed = next((_clean_other(x) for x in v if isinstance(x, str) and x.startswith(OTHER) and _clean_other(x)), None)
             if "Any" in keep or (q["id"] == "gender" and {"Women", "Men"} <= set(keep)):
                 keep = ["Any"]                              # "Everyone", or Women and Men together
