@@ -476,7 +476,7 @@ def interest_share(doc, creator, cats):
 
 
 INTEREST_WEIGHT = 0.5      # the product-space match carries up to a third of the number (1 : 0.5 with engagement)
-INTEREST_FULL_SHARE = 1.0  # the posts we hold are the 100%: matched posts / available posts is the score
+INTEREST_FULL_SHARE = 0.5  # the posts we hold are the base: half of them in the space is full marks
 
 
 def post_interest(doc, creator, cats):
@@ -490,7 +490,7 @@ def post_interest(doc, creator, cats):
     A measured ``interest_shares`` field wins. Otherwise the creator's hashtags are read: each
     carries the share of the analysed posts that used it, so the posts naming the space are
     between the busiest matching tag (nobody doubled up) and the sum of them (no post names two).
-    The number of posts available is the 100%: 5 of 12 posts is 42 points, 12 of 12 is 100.
+    The number of posts available is the base: 3 of 12 posts is 50 points, 6 of 12 (half) is 100.
     With no hashtags the roster interest tags and bio give a keyword estimate that
     counts at 0.3."""
     cats = [c.strip().lower() for c in (cats or []) if c and c.strip().lower() != "any"]

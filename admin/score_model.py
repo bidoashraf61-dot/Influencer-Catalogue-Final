@@ -128,5 +128,5 @@ def band_for(metric, group, platform, followers):
     r = research_range(metric, platform, followers)
     if r:
         (lo, hi), tier = r
-        return [lo, hi * 2.0], "research", tier
+        return [lo / 2.0, hi * 2.0], "research", tier
     return band(metric, group), "default", None

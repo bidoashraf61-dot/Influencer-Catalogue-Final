@@ -6,9 +6,9 @@ weighted by the campaign objective. Source of truth: `admin/score_model.py`; for
 
 | Parameter | Read as | Scores 0 at | Scores 100 at |
 |---|---|--:|--:|
-| Engagement | median (likes + comments) / followers; per view on video platforms | 0.3% (feed) / 1.5% (video) | 3.5% / 7.0% |
-| View rate | median views / followers | 3% | 50% |
-| Interest | posts naming the brief's space / posts available (the posts are the 100%) | 0 posts | all posts |
+| Engagement | median (likes + comments) / followers; per view on video platforms | half the low end of the research tier for the platform and size (flat default 0.3% / 1.5%) | twice the high end (flat default 3.5% / 7.0%) |
+| View rate | median views / followers | half the low end of the research tier (flat default 3%) | twice the high end (flat default 50%) |
+| Interest | posts naming the brief's space / posts available | 0 posts | half of the posts |
 | Consistency | std / mean of views over the posts (lower is steadier) | 2.0 | 0.5 |
 
 Feed = Instagram, Facebook, X (per follower). Video = TikTok, YouTube, Snapchat (per view).
@@ -36,3 +36,11 @@ names a category. Interest read from profile tags only (no post data) counts at 
 Audience country/gender/age, fake followers, our own campaign record, reach, posts analysed.
 "Limited data" shows under 10 posts. The international benchmark is a reference line beside
 engagement in the hover (`admin/intl_benchmarks.py`); it does not move the number.
+
+## Guards (2026-10-11)
+
+* Engagement above 10% is read as a bad scrape: shown in the hover, left out of the score.
+* A feed creator (Instagram, Facebook, X) with no view counts or no engagement figure is capped at
+  79 (Good fit) and marked "limited data".
+* Research tiers: `admin/reference/benchmarks.json`, KSA block (global proxies). A value saved in
+  Settings applies to every size and wins over the tier.

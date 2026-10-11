@@ -37,10 +37,10 @@ class V4(unittest.TestCase):
         self.assertGreater(part(aw, "view_rate")["w"], part(en, "view_rate")["w"])
         self.assertGreater(part(en, "engagement")["w"], part(aw, "engagement")["w"])
 
-    def test_available_posts_are_the_100_percent(self):
+    def test_half_the_available_posts_is_full_marks(self):
         s = lambda c: part(score(doc(hashtags=[{"tag": "#skincare", "count": c}])), "interest")["s"]
-        self.assertAlmostEqual(s(100.0), 1.0, places=2)
-        self.assertAlmostEqual(s(25.0), 0.25, places=2)
+        self.assertAlmostEqual(s(50.0), 1.0, places=2)
+        self.assertAlmostEqual(s(25.0), 0.5, places=2)
 
     def test_missing_data_hands_its_weight_over(self):
         r = score(doc(median_views=None, views_series=None, avg_views=None))
