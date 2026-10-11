@@ -838,6 +838,9 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
                 continue
             kids = [k for k in CHILDREN.get(href, []) if (staff or k[0] not in STAFF_ONLY) and not _kam_hides(k[0])]
             in_family = open_parent == href
+            if not staff and href == "/settings":
+                # KAMs and viewers only reach their own sign-in security there, not the settings.
+                label, kids = "My security", []
             links += '<a class="nav-item" href="%s"%s title="%s">%s<span class="t">%s</span>%s</a>' % (
                 u(href if staff or href != "/settings" else "/team"), ' aria-current="page"' if href == a_href else (' aria-current="true"' if in_family and kids else ""),
                 e(label), icon(ic, 19), e(label), badge(bk) if not (kids and not in_family) else
