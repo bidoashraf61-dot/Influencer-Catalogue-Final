@@ -85,7 +85,8 @@ CHILDREN = {
     "/roster": [("/analysis", "Creator analysis", "an"), ("/licences", "Licences", None)],
     "/clients": [("/portal", "Client portal", None), ("/codes", "Access codes", None)],
     "/analytics": [("/calculator", "ROI calculator", None), ("/reference", "Reference", None)],
-    "/settings": [("/apis", "APIs & keys", None), ("/history", "History & undo", None), ("/team", "Team & security", None)],
+    "/settings": [("/settings#kams", "Key account managers", None), ("/apis", "APIs & keys", None), ("/history", "History & undo", None),
+                  ("/team", "Team & security", None)],
 }
 STAFF_ONLY = {"/apis", "/reference"}          # hidden from KAMs and viewers (the server refuses them anyway)
 # Pages that read across every client: a key account manager (kam_scope) is refused them, so the
