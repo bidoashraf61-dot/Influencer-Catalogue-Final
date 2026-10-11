@@ -2755,7 +2755,6 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
           "<ul class='ta-list' id='sel-add-list' role='listbox' hidden></ul></div>"
           "<div class='price-hint'>They join when you save.</div></div>"
         + "</div>" + _SEL_DRAWER + "</div>"
-        + "<div class='panel' data-panel='status' hidden>" + status_html + "</div>"
         + "<div class='panel' data-panel='fit' hidden data-lazy='" + u("/selections/fit") + "?id=" + str(sel["id"]) + "'>"
           "<div class='card lazy-wait' aria-busy='true'><div class='sk'></div><div class='sk'></div><div class='sk short'></div></div></div>"
         + "<div class='panel' data-panel='details' hidden><div class='card'><div class='hd'><h2>Details</h2></div>"
@@ -2793,6 +2792,9 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         + "</div>"
                 + "</div>"
         + "<div class='savebar'><button class='btn lime'>Save changes</button><span class='muted'>Prices, margins and details are saved together.</span></div></form>"
+        # The status panel holds forms of its own (quote ready / take back). Inside the save form
+        # their </form> closed it early and left "Save changes" outside, so it sits here.
+        + ui.panel("status", status_html)
         + ui.panel("share", __import__("assign").selection_card(sel, campaigns) + link_html + pass_html) + ui.panel("campaign", campaign_html)
         + "</div>"
         + "<details class='card' style='margin-top:24px'><summary class='muted'>Delete this selection</summary>"
