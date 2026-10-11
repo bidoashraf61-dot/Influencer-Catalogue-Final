@@ -2157,6 +2157,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                     if drop in dct:
                         v = dct.pop(drop)
                         dct.setdefault(keep, v)
+                if db.zero_priced(sel["id"]):
+                    prices = db.zero_prices(new)
                 with db.connect() as conn:
                     conn.execute("UPDATE selections SET codes=?, prices=?, costs=?, updated_at=? WHERE id=?",
                                  (json.dumps(new), json.dumps(prices), json.dumps(costs), db.now(), sel["id"]))
@@ -4276,7 +4278,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         listed = json.loads(sel["codes"] or "[]")
         by = {c["code"]: c for c in db.creators_by_codes(listed, active_only=True)}
         codes = [c for c in listed if c in by]
-        own = json.loads(sel["prices"] or "{}")
+        own = db.zero_prices(json.loads(sel["codes"] or "[]")) if db.zero_priced(sel["id"]) else json.loads(sel["prices"] or "{}")
         platform = sel["platform"] if "platform" in sel.keys() else None
         prices = {}
         for c in codes:

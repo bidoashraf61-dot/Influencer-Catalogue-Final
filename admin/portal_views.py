@@ -147,7 +147,7 @@ def quote_page(sel, origin):
     """A printable quotation from a selection and its brief (the browser's Print → Save as PDF)."""
     import fx
     codes = json.loads(sel["codes"] or "[]")
-    own = json.loads(sel["prices"] or "{}")
+    own = db.zero_prices(json.loads(sel["codes"] or "[]")) if db.zero_priced(sel["id"]) else json.loads(sel["prices"] or "{}")
     bands = db.tier_prices()
     rows = {c["code"]: c for c in db.list_creators() if c["code"] in set(codes)}
     with db.connect() as conn:

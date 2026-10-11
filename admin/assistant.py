@@ -1104,7 +1104,7 @@ def t_selection_stats(ctx, metric="engagement_rate_pct", platform="", country="S
     rows = {c["code"]: c for c in db.list_creators(active_only=True) if c["code"] in set(codes)}
     plat = analysis.canon_platform(platform) if platform else None
     every = db.analyses_for(list(rows)) if metric != "client_price_sar" else {}
-    own = json.loads(sel["prices"] or "{}")
+    own = db.zero_prices(json.loads(sel["codes"] or "[]")) if db.zero_priced(sel["id"]) else json.loads(sel["prices"] or "{}")
     bands = _bands()
     got, missing, locked = [], [], []
     for code in codes:

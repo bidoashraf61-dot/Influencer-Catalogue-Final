@@ -452,7 +452,7 @@ def sources():
             continue
         try:
             codes = json.loads(sel["codes"] or "[]")
-            own = json.loads(sel["prices"] or "{}")
+            own = db.zero_prices(json.loads(sel["codes"] or "[]")) if db.zero_priced(sel["id"]) else json.loads(sel["prices"] or "{}")
         except ValueError:
             continue
         rows, lo, hi = [], 0, 0

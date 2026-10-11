@@ -1797,6 +1797,19 @@ def selection(sid=None, token=None, deleted=False):
         return conn.execute("SELECT * FROM selections WHERE id = ?", (sid,)).fetchone()
 
 
+def zero_priced(sid):
+    """True for a selection the owner priced at zero (setting selections_zero_price: a list
+    of selection ids, 2026-10-11). Every creator in it, including ones added later, is 0."""
+    try:
+        return sid is not None and int(sid) in set(int(x) for x in (setting("selections_zero_price") or []))
+    except (TypeError, ValueError):
+        return False
+
+
+def zero_prices(codes):
+    return {c: [0, 0] for c in codes}
+
+
 def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
                    code_id=None, platform=None, margin=None, costs=None, margin_max=False,
                    tags=None, verdicts=None, platforms=None, segments=None, origin="admin"):
@@ -1819,6 +1832,8 @@ def save_selection(sid, name, codes, prices, total_from, total_to, request_id=No
                  json.dumps(costs or {}), now(), now(),
                  None if margin_max is False else margin_max, "client" if origin == "client" else "admin"))
             return cur.lastrowid
+        if zero_priced(sid):
+            prices, total_from, total_to = zero_prices(codes), 0, 0
         conn.execute(
             "UPDATE selections SET name=?, codes=?, prices=?, total_from=?, total_to=?, "
             "platform=?, updated_at=? WHERE id=?",
