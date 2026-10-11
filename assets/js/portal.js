@@ -835,7 +835,8 @@
       if (credits) item("AI credits", { go: openAccount }, credits);
       rule();
     }
-    item("Sign out", { go: function () { (function () { try { sessionStorage.removeItem("hv-roster"); } catch (e) { /* blocked */ } })(), api("POST", "/api/auth/logout", {}).then(function () { location.href = ROOT; }); } }, null, "pt-menu__item--quiet");
+    if (ME.kind === "admin") item("Sign out of admin", { go: adminOut }, null, "pt-menu__item--quiet");
+    else item("Sign out", { go: function () { signOut().then(function () { location.href = ROOT; }); } }, null, "pt-menu__item--quiet");
 
     function toggle(open) {
       menu.hidden = !open;
@@ -2045,7 +2046,7 @@
       } }, "Delete my account"));
     }
     body.appendChild(h("div", { class: "pt-actions" }, extra, h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () {
-      (function () { try { sessionStorage.removeItem("hv-roster"); } catch (e) { /* blocked */ } })(), api("POST", "/api/auth/logout", {}).then(function () { location.reload(); });
+      signOut().then(function () { location.reload(); });
     } }, "Sign out")));
     close = layer(modal);
   }
@@ -3904,10 +3905,36 @@
     document.body.classList.add("has-previewbar");
   }
 
+  // Sign out of the client account. A browser also signed in to the admin stays HelloVoice
+  // ("HV") on the catalogue, so the next page explains that instead of looking stuck.
+  function signOut() {
+    try { sessionStorage.removeItem("hv-roster"); } catch (e) { /* blocked */ }
+    return api("POST", "/api/auth/logout", {}).then(function (r) {
+      if (r.b && r.b.admin_session) { try { sessionStorage.setItem("hv-admin-still", "1"); } catch (e) { /* blocked */ } }
+      return r;
+    });
+  }
+  function adminOut() {
+    return fetch(API + "/logout", { credentials: "include" }).catch(function () { return null; })
+      .then(function () { try { sessionStorage.removeItem("hv-admin-still"); } catch (e) { /* blocked */ } location.href = ROOT; });
+  }
+  function mountAdminStillNote() {
+    var flag = null;
+    try { flag = sessionStorage.getItem("hv-admin-still"); sessionStorage.removeItem("hv-admin-still"); } catch (e) { /* blocked */ }
+    if (!flag || !ME || ME.kind !== "admin") return;
+    var box = h("div", { class: "pt-toast", role: "status" },
+      h("p", { class: "pt-toast__t" }, "Signed out"),
+      h("p", { class: "pt-toast__b" }, "You're out of your client account. This browser is still signed in to the admin, so the catalogue shows you as HelloVoice."),
+      h("div", { class: "pt-actions", style: "margin-top:14px;display:flex;gap:10px;flex-wrap:wrap" },
+        h("button", { class: "pt-btn", type: "button", onclick: adminOut }, "Sign out of admin too"),
+        h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { box.remove(); } }, "Stay")));
+    document.body.appendChild(box);
+  }
+
   function boot() {
     api("GET", "/api/me").then(function (r) {
       if (r.b && r.b.signed_in) {
-        ME = r.b; HV.me = ME; mountDock(); mountVoice(); mountAiCard(); mountLicences(); mountPreviewBar();
+        ME = r.b; HV.me = ME; mountDock(); mountVoice(); mountAiCard(); mountLicences(); mountPreviewBar(); mountAdminStillNote();
         try { document.dispatchEvent(new CustomEvent("hv:me", { detail: ME })); } catch (e) { /* old browser */ }
         var m = /[#&]s=([^&]+)/.exec(location.hash || "");
         // (The selection page asks for a missing objective in its own bar: catalogue.js renderObjective.)

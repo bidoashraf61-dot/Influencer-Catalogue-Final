@@ -509,7 +509,9 @@ class PortalMixin(connect_api.ConnectMixin):
     def api_auth_logout(self):
         srv = self._srv()
         policy = "SameSite=None; Secure" if srv.ALLOWED_ORIGINS else "SameSite=Lax"
-        return self.send_json(200, {"ok": True}, self.cors() + [
+        # admin_session: this browser is still signed in to the admin, so the catalogue keeps
+        # showing it as HelloVoice ("HV"); the page says so instead of looking stuck.
+        return self.send_json(200, {"ok": True, "admin_session": bool(self.admin())}, self.cors() + [
             ("Set-Cookie", f"{srv.VIEWER_COOKIE}=; Path=/; HttpOnly; {policy}; Max-Age=0")])
 
     def api_me_unlock(self):

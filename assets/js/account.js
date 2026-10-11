@@ -141,7 +141,7 @@
     var cur = nav.querySelector('[aria-current="page"]');
     if (cur && window.matchMedia("(max-width: 1100px)").matches) cur.scrollIntoView({ block: "nearest", inline: "center" });
   }
-  function signOut() { (function () { try { sessionStorage.removeItem("hv-roster"); } catch (e) { /* blocked */ } })(), api("POST", "/api/auth/logout", {}).then(function () { location.href = ROOT; }); }
+  function signOut() { (function () { try { sessionStorage.removeItem("hv-roster"); } catch (e) { /* blocked */ } })(), api("POST", "/api/auth/logout", {}).then(function (r) { if (r.b && r.b.admin_session) { try { sessionStorage.setItem("hv-admin-still", "1"); } catch (e) { /* blocked */ } } location.href = ROOT; }); }
 
   // Credits count up when a reward lands, so the reward is seen as well as said.
   function countUp(from, to) {
