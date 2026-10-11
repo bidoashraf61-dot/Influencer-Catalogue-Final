@@ -619,7 +619,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
 
     # -- interest: the posts we hold are the 100%
     cats = [c for c in str(target["category"]).split("|") if c.strip() and c.strip().lower() != "any"]
-    pi = post_interest(doc, creator, cats)
+    pi = post_interest(doc, creator, cats) if sm.interest_on() else None
     if pi is not None:
         space = ", ".join(c.lower() for c in cats)
         if pi["src"] == "posts":

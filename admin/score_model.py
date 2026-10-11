@@ -26,7 +26,7 @@ WEIGHTS = {
 }
 # metric -> group -> [zero_at, full_at]; "feed" = Instagram, Facebook, X (per follower), "video" = per view
 BANDS = {
-    "engagement":  {"feed": [0.3, 3.5], "video": [1.5, 7.0]},
+    "engagement":  {"feed": [0.1, 3.0], "video": [1.5, 7.0]},
     "view_rate":   {"feed": [3.0, 50.0], "video": [3.0, 50.0]},
     "consistency": {"feed": [2.0, 0.5], "video": [2.0, 0.5]},
 }
@@ -125,8 +125,24 @@ def band_for(metric, group, platform, followers):
     edited = ((_overrides().get("bands") or {}).get(metric) or {}).get(group)
     if isinstance(edited, (list, tuple)) and len(edited) == 2:
         return band(metric, group), "settings", None
-    r = research_range(metric, platform, followers)
+    r = research_range(metric, platform, followers) if metric == "view_rate" else None
     if r:
         (lo, hi), tier = r
         return [lo / 2.0, hi * 2.0], "research", tier
     return band(metric, group), "default", None
+
+
+# -- switches (2026-10-11): the score runs on the analysis data we already held ---------------------
+# Interest and the 25-post scan are held back for now. Turn them on from the setting
+# ``score_model`` {"interest_on": true, "post_scan_on": true}.
+def flag(name, default=False):
+    got = _overrides().get(name)
+    return bool(got) if got is not None else default
+
+
+def interest_on():
+    return flag("interest_on")
+
+
+def post_scan_on():
+    return flag("post_scan_on")

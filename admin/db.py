@@ -1897,6 +1897,9 @@ def analyses_for(codes):
         # The latest post scan lies over each analysis: post numbers refresh, the audience stays.
         try:
             import postscan
+            import score_model as _sm
+            if not _sm.post_scan_on():
+                raise RuntimeError("post scan held back")
             for (code, plat), over in postscan.overlay_rows(conn, codes).items():
                 row = (out.get(code) or {}).get(plat)
                 if row is not None and isinstance(row.get("data"), dict):
@@ -2465,6 +2468,9 @@ def analysis(code, platform=None):
     res = _analysis_row(row)
     try:        # the latest post scan lies over the analysis (see postscan.py)
         import postscan
+        import score_model as _sm
+        if not _sm.post_scan_on():
+            return res
         with connect() as conn:
             over = postscan.overlay_rows(conn, [code]).get((code, res["platform"]))
         if over and isinstance(res.get("data"), dict):

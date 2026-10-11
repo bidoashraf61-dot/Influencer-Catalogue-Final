@@ -44,3 +44,11 @@ engagement in the hover (`admin/intl_benchmarks.py`); it does not move the numbe
   79 (Good fit) and marked "limited data".
 * Research tiers: `admin/reference/benchmarks.json`, KSA block (global proxies). A value saved in
   Settings applies to every size and wins over the tier.
+
+## Held back for now (2026-10-11)
+
+Interest and the 25-post scan are switched off: the score runs on the analysis data we already
+held (engagement and view rate). The scan is stored in `post_samples` (`admin/postscan.py`) and is
+laid over the analysis only when the setting `score_model` has `post_scan_on: true`; interest
+counts only with `interest_on: true`. Instagram engagement: 0 at 0.1%, 100 at 3.0% (the roster's
+real spread); TikTok 1.5%-7%.

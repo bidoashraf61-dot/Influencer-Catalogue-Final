@@ -8,6 +8,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 import fit  # noqa: E402
 import score_model as sm  # noqa: E402
 
+sm._cache.update(at=1e18, over={"interest_on": True, "post_scan_on": True})   # the full model
+
 SERIES = [9000, 6000, 12000, 7000, 8000, 7500, 9500, 6500, 7000, 8200, 7900, 8100]
 
 
