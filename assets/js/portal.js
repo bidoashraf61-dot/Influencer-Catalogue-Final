@@ -125,8 +125,12 @@
   // building, and every reaction keeps its own clip (point, think, thumbs, cheer). The newer clips
   // are ADDED to that flow, not instead of it: "hi" (the energetic smile) is the resting face and
   // "up" (the grinning double thumbs-up) is a second thumbs-up reaction the coach alternates with the old one.
-  var LIME = { loop: "hi", wave: "loop", idle: "hi", hi: "hi", up: "up", point: "point-act", think: "think", thumbs: "thumbs-act",
-               cheer: "cheer-act", celebrate: "cheer", scan: "scan" };
+  // 2026-10-11 (Bido): ONE framing. The wider clips (hi, up, scan) share a composition; the six older
+  // reaction clips (loop/point/think/thumbs/cheer) are tight close-ups and jump in size beside them, so
+  // until they are regenerated in the wide framing they are not used: rest = hi, thumbs/cheer = up,
+  // building = scan. The tight clips stay in assets/brand/voice for the day they are re-shot.
+  var LIME = { loop: "hi", wave: "hi", idle: "hi", hi: "hi", up: "up", point: "hi", think: "hi", thumbs: "up",
+               cheer: "up", celebrate: "up", scan: "scan" };
   function lime(kind, cls, opts) {
     opts = opts || {};
     var frame = document.createElement("span");
