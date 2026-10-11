@@ -4312,6 +4312,16 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             out["scores"] = {}
             out["needs_objective"] = True
             out["brief"]["objective"] = None
+        try:
+            unscored = set(int(x) for x in (db.setting("selections_unscored") or []))
+        except (TypeError, ValueError):
+            unscored = set()
+        if sel["id"] in unscored:
+            # Unscored on purpose (owner decision 2026-10-11): the page shows the editorial
+            # fit tag only, never a score, and does not ask for an objective.
+            out["scores"] = {}
+            out["needs_objective"] = False
+            out["scoring_off"] = True
         reader = self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.

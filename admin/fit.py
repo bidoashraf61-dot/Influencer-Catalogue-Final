@@ -19,7 +19,7 @@ Nothing reaches a client until the admin saves, and every field stays editable.
 
 import re
 
-FITS = ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
+FITS = ["Strong fit", "Good fit", "Possible fit", "Not recommended", "Matching"]   # Matching: a plain editorial tag, no score
 ROLES = ["Awareness", "Engagement", "Conversion", "UGC content"]
 # Campaign types (owner decision 2026-10-10): Awareness, Engagement and Traffic, one or several at
 # once. "Conversion" is no longer offered; a stored "Conversion" reads as Traffic (the link-click

@@ -2542,7 +2542,7 @@
     // What the admin said about each creator of this selection: how well they
     // fit, the part they play, why, and any labels of their own. All of it
     // belongs to the selection, so it shows here and nowhere else.
-    var FIT_CLASS = { "Strong fit": "strong", "Good fit": "good", "Possible fit": "maybe", "Not recommended": "no" };
+    var FIT_CLASS = { "Strong fit": "strong", "Good fit": "good", "Possible fit": "maybe", "Not recommended": "no", "Matching": "good" };
     function tagsOf(code) {
       var t = CURATED && CURATED.tags && CURATED.tags[code];
       return t && t.length ? t : [];
