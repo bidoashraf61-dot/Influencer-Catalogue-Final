@@ -568,6 +568,8 @@ LOCKED_NOTE = ("locked: the full analysis (popular posts, likes and comments, re
 
 def _locked(ctx, code):
     import gating
+    if (ctx or {}).get("kam_creators") is not None:
+        return str(code or "").upper() not in ctx["kam_creators"]     # a key account manager's copilot
     cid = (ctx or {}).get("code_id")
     return cid is not None and not gating.unlocked(cid, code)
 NUMERIC = ["engagement_rate_pct", "followers", "avg_views", "avg_likes", "avg_comments", "fake_followers_pct",
@@ -666,7 +668,8 @@ def t_stats(ctx, days=30):
 
 def t_client_overview(ctx, email=""):
     u = portal.user_by_email((email or "").lower())
-    if not u:
+    import kam_scope
+    if not u or not kam_scope.allows(u["code_id"]):
         return {"error": "No client with that email."}
     cid = u["code_id"]
     with db.connect() as conn:
@@ -729,9 +732,10 @@ def t_list_selections(ctx, limit=15):
 
 def t_list_campaigns(ctx, limit=15):
     with db.connect() as conn:
-        rows = conn.execute("SELECT id, name, client, status, platform FROM campaigns ORDER BY id DESC LIMIT ?",
-                            (max(1, min(int(limit), 50)),)).fetchall()
-    return [dict(r) for r in rows]
+        rows = conn.execute("SELECT id, name, client, status, platform, code_id FROM campaigns ORDER BY id DESC").fetchall()
+    import kam_scope
+    rows = [r for r in rows if kam_scope.allows(r["code_id"] if r["code_id"] is not None else kam_scope.campaign_code(r["id"])[1])]
+    return [{k: r[k] for k in ("id", "name", "client", "status", "platform")} for r in rows[:max(1, min(int(limit), 50))]]
 
 
 # Tables the SQL tool may read. Secrets live in admins, sessions, codes (code_plain), otp, settings and
@@ -1064,7 +1068,8 @@ def a_set_tier_price(args, who):
 
 def t_get_campaign(ctx, id):
     c = db.campaign(int(id))
-    if c is None:
+    import kam_scope
+    if c is None or not kam_scope.allows(kam_scope.campaign_code(c["id"])[1]):
         return {"error": "No campaign with that id."}
     people = db.campaign_creators(c["id"])
     return {"id": c["id"], "name": c["name"], "client": c["client"], "status": c["status"], "platform": c["platform"],
@@ -1486,12 +1491,19 @@ def dismiss_client(token, code_id):
             return True
     return False
 
-def declarations(scope):
+# A key account manager's copilot (kam_scope): reads over her own clients only, no writes (she
+# cannot confirm them) and none of the tools that read across every client.
+KAM_HIDDEN = {"stats", "sql_query", "demand_gap"}
+
+
+def declarations(scope, kam=False):
     d = [v[1] for k, v in CLIENT_TOOLS.items() if not (scope == "admin" and k == "handoff_to_manager")]
     if scope == "client":
         d += [v[2] for v in CLIENT_WRITE.values()]
     if scope == "admin":
-        d += [v[1] for v in ADMIN_READ.values()] + [v[2] for v in ADMIN_WRITE.values()]
+        d += [v[1] for k, v in ADMIN_READ.items() if not (kam and k in KAM_HIDDEN)]
+        if not kam:
+            d += [v[2] for v in ADMIN_WRITE.values()]
     return d
 
 
@@ -1504,6 +1516,8 @@ UNTRUSTED_READS = {"client_overview", "list_clients", "sql_query", "list_selecti
 def run_tool(scope, name, args, ctx):
     """Execute one tool call. Writes are queued, not run."""
     args = args if isinstance(args, dict) else {}
+    if scope == "admin" and ctx.get("kam_creators") is not None and (name in KAM_HIDDEN or name in ADMIN_WRITE):
+        return {"error": "Not available to a key account manager."}
     if name in UNTRUSTED_READS:
         ctx["tainted"] = True
     if name in ADMIN_WRITE and ctx.get("tainted"):
@@ -1713,7 +1727,7 @@ def converse(scope, ctx, history_msgs, text, code_id=None, kind="chat", credits=
     tool runs and ``on_event("delta", text)`` as the answer is written."""
     contents = [{"role": "model" if r == "model" else "user", "parts": [{"text": c}]} for r, c in history_msgs if c]
     contents.append({"role": "user", "parts": [{"text": text}]})
-    tools = declarations(scope)
+    tools = declarations(scope, kam=(ctx or {}).get("kam_creators") is not None)
     cards = []
     for step in range(MAX_STEPS):
         last = step == MAX_STEPS - 1

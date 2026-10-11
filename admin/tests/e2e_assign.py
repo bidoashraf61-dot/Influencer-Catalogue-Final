@@ -181,8 +181,17 @@ class Assign(unittest.TestCase):
         self.assertEqual(v.req("POST", "/campaigns/assign", form={"id": "1", "client": str(cid)})[0], 403)
         self.assertIsNone(db.selection(sid)["code_id"])
         k, s, _ = self.member("kam-assign@hellovoice.co.uk", "kam")
-        self.assertEqual(k.req("POST", "/selections/assign", form={"id": str(sid), "client": str(cid), "confirmed": "1"})[0], 303)
-        self.assertEqual(db.selection(sid)["code_id"], cid)
+        # KAM scoped access (2026-10-11): a key account manager assigns within her own clients only.
+        # The unfiled selection is nobody's client, so it is refused ("Not your client")...
+        self.assertEqual(k.req("POST", "/selections/assign", form={"id": str(sid), "client": str(cid), "confirmed": "1"})[0], 403)
+        self.assertIsNone(db.selection(sid)["code_id"])
+        # ...and once roleco.com is hers, moving a selection between her clients works.
+        db.set_setting("domain_kam", {"roleco.com": "kam-assign@hellovoice.co.uk"})
+        self.signup("role2@roleco.com")
+        mine, _ = self.make("Roles mine", owner=self.cid("role2@roleco.com"), campaigns=1)
+        self.assertEqual(k.req("POST", "/selections/assign", form={"id": str(mine), "client": str(cid), "confirmed": "1"})[0], 303)
+        self.assertEqual(db.selection(mine)["code_id"], cid)
+        db.set_setting("domain_kam", {})
 
     def test_06_away_from_another_client_needs_confirmation_and_history_records_it(self):
         o, _ = self.signup("o@ownerco.com")

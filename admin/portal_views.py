@@ -24,7 +24,10 @@ def _banner(ok, err):
 
 
 def _tabs(current):
-    return [(u("/portal?tab=" + k), label, None, k == current) for k, label in TABS]
+    import kam_scope
+    kam = kam_scope.current() is not None        # a key account manager: her clients' tabs only
+    return [(u("/portal?tab=" + k), label, None, k == current) for k, label in TABS
+            if not kam or k in kam_scope._PORTAL_TABS]
 
 
 def _stat(label, value, sub=""):
@@ -98,6 +101,9 @@ def _accounts_tab():
     table = ("<table><thead><tr><th>Client</th><th>KAM</th><th>Status</th><th>Credits</th><th>AI cost (month)</th><th>Selections</th><th>Briefs</th><th>Last in</th><th></th></tr></thead><tbody>"
              + ("".join(rows) or "<tr><td colspan='9'>" + ui.empty("users", "No sign-ups yet",
                 "Clients appear here when they sign in with a company email on the catalogue.") + "</td></tr>") + "</tbody></table>")
+    import kam_scope
+    if kam_scope.current() is not None:
+        funnel = ""                 # the funnel counts every client; a key account manager sees her own only
     return stats + req_html + funnel + "<div class='card'>" + table + "</div>"
 
 

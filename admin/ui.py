@@ -88,6 +88,9 @@ CHILDREN = {
     "/settings": [("/apis", "APIs & keys", None), ("/history", "History & undo", None), ("/team", "Team & security", None)],
 }
 STAFF_ONLY = {"/apis", "/reference"}          # hidden from KAMs and viewers (the server refuses them anyway)
+# Pages that read across every client: a key account manager (kam_scope) is refused them, so the
+# sidebar does not offer them either.
+KAM_HIDDEN = {"/analytics", "/history"}
 
 import threading as _threading
 _role = _threading.local()
@@ -100,6 +103,10 @@ def set_role(role):
 
 def _staff():
     return getattr(_role, "value", "owner") in ("owner", "admin")
+
+
+def _kam_hides(href):
+    return getattr(_role, "value", "owner") == "kam" and href in KAM_HIDDEN
 PARENT = {c[0]: p for p, kids in CHILDREN.items() for c in kids}
 
 # Which sidebar item a page belongs under, so sub-pages keep it highlighted.
@@ -827,7 +834,9 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
     for gname, items in NAV:
         links = ""
         for href, label, ic, bk in items:
-            kids = [k for k in CHILDREN.get(href, []) if staff or k[0] not in STAFF_ONLY]
+            if _kam_hides(href):
+                continue
+            kids = [k for k in CHILDREN.get(href, []) if (staff or k[0] not in STAFF_ONLY) and not _kam_hides(k[0])]
             in_family = open_parent == href
             links += '<a class="nav-item" href="%s"%s title="%s">%s<span class="t">%s</span>%s</a>' % (
                 u(href if staff or href != "/settings" else "/team"), ' aria-current="page"' if href == a_href else (' aria-current="true"' if in_family and kids else ""),
@@ -836,11 +845,13 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
             if kids and in_family:
                 links += "".join('<a class="nav-item nav-sub" href="%s"%s>%s<span class="t">%s</span>%s</a>' % (
                     u(ch), ' aria-current="page"' if ch == a_href else "", "", e(cl), badge(cb)) for ch, cl, cb in kids)
-        nav += '<div class="nav-group">%s%s</div>' % ('<div class="nav-title">%s</div>' % e(gname) if gname else "", links)
+        if links:
+            nav += '<div class="nav-group">%s%s</div>' % ('<div class="nav-title">%s</div>' % e(gname) if gname else "", links)
 
     bell_n = pulse.get("open", 0) + pulse.get("a_open", 0)
-    pages_js = json.dumps([{"href": u(h), "label": l, "hint": g or "Home", "kw": ""} for g, its in NAV for h, l, _i, _b in its]
-                          + [{"href": u(c[0]), "label": c[1], "hint": "Go to", "kw": ""} for kids in CHILDREN.values() for c in kids if staff or c[0] not in STAFF_ONLY]
+    pages_js = json.dumps([{"href": u(h), "label": l, "hint": g or "Home", "kw": ""} for g, its in NAV for h, l, _i, _b in its if not _kam_hides(h)]
+                          + [{"href": u(c[0]), "label": c[1], "hint": "Go to", "kw": ""} for kids in CHILDREN.values() for c in kids
+                             if (staff or c[0] not in STAFF_ONLY) and not _kam_hides(c[0])]
                           + [{"href": u("/selections"), "label": "New selection", "hint": "Create", "kw": "quote create add"},
                              {"href": u("/campaigns"), "label": "New campaign", "hint": "Create", "kw": "start create add"},
                              {"href": u("/roster"), "label": "Add a creator", "hint": "Create", "kw": "new influencer"},

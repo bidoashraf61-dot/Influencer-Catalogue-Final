@@ -1,7 +1,8 @@
 /* HELVY Connect: the client's profile (/account/), drawn from /api/account.
  *
  * Sections by hash: #overview (default), #selections, #analyses, #campaigns,
- * #briefs, #notifications, #credits, #account. A side nav on a desktop, a strip
+ * #briefs, #notifications, #credits, #account, and for a key account manager
+ * #clients (My clients, from /api/account/clients). A side nav on a desktop, a strip
  * of tabs on a phone.
  *
  * Overview leads with Helvy and ONE next step, then the status line, the latest
@@ -118,7 +119,13 @@
     if (key === "campaigns") return DATA.insights.live_campaigns || null;
     if (key === "notifications") return DATA.notifications.unread || null;
     if (key === "credits") return DATA.credits != null ? DATA.credits : null;
+    if (key === "clients") return CLIENTS ? CLIENTS.clients.length || null : null;
     return null;
+  }
+  function navItems() {
+    if (!DATA.is_kam) return NAV;
+    // A key account manager: her clients sit right under her own overview.
+    return [NAV[0], ["clients", "My clients", "users"]].concat(NAV.slice(1));
   }
   function renderSide() {
     var u = DATA.user, side = $("hc-side");
@@ -126,7 +133,7 @@
     side.appendChild(h("div", { class: "hc-me" }, face(u),
       h("div", null, h("b", null, u.name || u.email), h("small", null, [u.job_title, u.company].filter(Boolean).join(" · ") || u.email))));
     var nav = h("nav", { class: "hc-nav", "aria-label": "Your profile" });
-    NAV.forEach(function (it) {
+    navItems().forEach(function (it) {
       if (it[0] === "hr") { nav.appendChild(h("hr")); return; }
       var n = countFor(it[0]);
       var a = h("a", { href: "#" + it[0], "aria-current": it[0] === SECTION ? "page" : null, "data-nav": it[0] }, icon(it[2]), it[1]);
@@ -917,14 +924,156 @@
     add(p, privacySection());
   }
 
+  /* ------------------------------------------------------------ My clients */
+  // Key account managers only (KAM scoped access, 2026-10-11). One card per client account: its
+  // selections with the quote stage, campaigns with live results, analysis requests, and activity.
+  // Each item opens the way the client sees it; "Open in admin" goes to the account in the admin.
+  // Nothing priced is sent here: costs, margins and prices stay in the admin.
+
+  var CLIENTS = null, CLIENTS_ERR = null, KFILTER = "all";
+
+  function needsYou(c) {
+    return c.selections.some(function (s) { return s.quote && s.quote.key === "requested"; }) ||
+      c.analyses.waiting > 0 || c.handoffs > 0 && c.last_login_at && (Date.now() / 1000 - c.last_login_at) < 86400 * 14;
+  }
+  function loadClients() {
+    return api("GET", "/api/account/clients").then(function (r) {
+      if (r.b && r.b.ok) { CLIENTS = r.b; CLIENTS_ERR = null; }
+      else CLIENTS_ERR = r.s === 403 ? "My clients is for key account managers." : "Your clients couldn't be loaded. Please try again shortly.";
+      if (SECTION === "clients") { renderSide(); renderSection(); }
+    });
+  }
+  function kStat(term, fig, sub) {
+    return h("div", null, h("dt", null, term), h("dd", { class: "hc-score__fig" }, fig), h("dd", { class: "hc-score__sub" }, sub));
+  }
+  function kRow(href, name, side, meta) {
+    return h("li", null, h("a", { class: "kc-row", href: href },
+      h("span", { class: "kc-row__top" }, h("span", { class: "kc-row__name" }, name), side || null),
+      meta ? h("span", { class: "kc-row__meta" }, meta) : null));
+  }
+  function kCol(id, title, n, body, empty) {
+    return h("section", { class: "kc__col", "aria-labelledby": id },
+      h("h3", { class: "kc__h", id: id }, title, n ? h("span", { class: "kc__n" }, String(n)) : null),
+      body && body.children.length ? body : h("p", { class: "kc__none" }, empty));
+  }
+  function campStatus(k) {
+    if (k.status === "live") return h("span", { class: "ac-live kc-live" }, "Live");
+    return h("span", { class: "ac-status" }, k.status === "ended" ? "Ended" : k.status === "draft" ? "Draft" : k.status);
+  }
+  function clientCard(c, i) {
+    var id = "kc" + i;
+    var title = c.company || c.name || c.email;
+    var who = [c.company ? c.name : null, c.email].filter(Boolean).join(" · ");
+    var attn = needsYou(c);
+
+    var sels = h("ul", { class: "kc__rows" });
+    c.selections.forEach(function (s) {
+      var n = s.counts, meta = [];
+      if (n.approved) meta.push(h("span", { class: "hc-sig hc-sig--ok" }, n.approved + " approved"));
+      if (n.rejected) meta.push(h("span", { class: "hc-sig hc-sig--no" }, n.rejected + " rejected"));
+      if (n.review) meta.push(h("span", null, n.review + " to review"));
+      if (!n.creators) meta.push(h("span", null, "No creators yet"));
+      sels.appendChild(kRow(ROOT + "selection/#s=" + encodeURIComponent(s.token), s.name, qchip(s.quote), meta));
+    });
+    var camps = h("ul", { class: "kc__rows" });
+    c.campaigns.forEach(function (k) {
+      var meta = [h("span", null, h("b", null, k.posts + (k.planned ? "/" + k.planned : "")), (k.planned || k.posts) === 1 ? " post captured" : " posts captured"),
+                  h("span", null, h("b", null, big(k.views)), " views")];
+      camps.appendChild(kRow(ROOT + "campaign/#t=" + encodeURIComponent(k.token), k.name, campStatus(k), meta));
+    });
+    var a = c.analyses;
+    var trio = h("dl", { class: "kc__trio" },
+      h("div", null, h("dt", null, "Requested"), h("dd", null, String(a.requested))),
+      h("div", null, h("dt", null, "Delivered"), h("dd", null, String(a.delivered))),
+      h("div", { class: a.late ? "is-late" : null }, h("dt", null, "Waiting"), h("dd", null, String(a.waiting))));
+    var open = h("ul", { class: "kc__rows" });
+    a.items.filter(function (x) { return x.state !== "delivered"; }).forEach(function (x) {
+      open.appendChild(kRow(ROOT + "creator/#c=" + encodeURIComponent(x.code), x.name,
+        x.state === "late" ? h("span", { class: "hc-sig hc-sig--no" }, "Late") : h("span", { class: "hc-sig hc-sig--wait" }, "Due " + shortDay(x.due)),
+        [h("span", null, x.code + (x.platform ? " · " + x.platform : "")), h("span", null, "asked " + ago(x.at))]));
+    });
+    var anCol = h("section", { class: "kc__col", "aria-labelledby": id + "-a" },
+      h("h3", { class: "kc__h", id: id + "-a" }, "Analysis requests"),
+      a.requested ? trio : null,
+      open.children.length ? open : h("p", { class: "kc__none" }, a.requested ? "Nothing waiting. Every request is delivered." : "No analysis requested yet."));
+
+    var act = h("dl", { class: "kc__act" },
+      h("div", null, h("dt", null, "Last sign-in"), h("dd", null, c.last_login_at ? ago(c.last_login_at) : "Never")),
+      h("div", null, h("dt", null, "Credits left"), h("dd", null, h("span", { class: "hv-credit-num" }, String(c.credits)))),
+      h("div", null, h("dt", null, "Helvy chats"), h("dd", null, String(c.chats))),
+      h("div", { class: c.handoffs ? "is-attn" : null }, h("dt", null, "Hand-offs"), h("dd", null, String(c.handoffs))));
+
+    return h("li", null, h("article", { class: "kc", "aria-labelledby": id },
+      h("header", { class: "kc__hd" },
+        h("div", { class: "kc__id" },
+          h("h2", { class: "kc__name", id: id }, title, attn ? h("span", { class: "kc__attn" }, "Needs you") : null,
+            c.status !== "active" ? h("span", { class: "ac-status" }, c.status) : null),
+          h("p", { class: "kc__who" }, who)),
+        h("a", { class: "hc-more", href: c.admin, target: "_blank", rel: "noopener" }, "Open in admin", h("span", { class: "hc-sr" }, " for " + title), " ", icon("arrow"))),
+      act,
+      h("div", { class: "kc__cols" },
+        kCol(id + "-s", "Selections", c.selections.length, sels, "No selections yet."),
+        kCol(id + "-c", "Campaigns", c.campaigns.length, camps, "No campaigns yet."),
+        anCol)));
+  }
+  function renderClients(p) {
+    var doms = CLIENTS && CLIENTS.domains.length ? CLIENTS.domains.join(", ") : null;
+    add(p, head("My clients", (doms ? "Your accounts on " + doms + ". " : "Your accounts. ") +
+      "Open any selection or report exactly as your client sees it. Pricing and margins stay in the admin.",
+      CLIENTS ? h("a", { class: "hc-btn hc-btn--line hc-btn--sm", href: CLIENTS.admin, target: "_blank", rel: "noopener" }, "Open admin ", icon("arrow")) : null));
+    if (CLIENTS_ERR) { add(p, h("div", { class: "hc-empty" }, h("b", null, "My clients"), h("p", null, CLIENTS_ERR))); return; }
+    if (!CLIENTS) {
+      add(p, h("div", { class: "kc-skel", "aria-hidden": "true" }, h("i"), h("i"), h("i")));
+      add(p, h("p", { class: "hc-sr", role: "status" }, "Loading your clients"));
+      loadClients();
+      return;
+    }
+    var all = CLIENTS.clients;
+    if (!all.length) {
+      add(p, h("div", { class: "hc-empty" }, h("b", null, "No clients yet"),
+        h("p", null, "A client is yours when an owner maps their company domain to you in the admin's Settings. Every new sign-up on that domain then appears here.")));
+      return;
+    }
+    var quotes = 0, waiting = 0, late = 0, live = 0, recent = 0;
+    all.forEach(function (c) {
+      quotes += c.selections.filter(function (s) { return s.quote && s.quote.key === "requested"; }).length;
+      waiting += c.analyses.waiting; late += c.analyses.late;
+      live += c.campaigns.filter(function (k) { return k.status === "live"; }).length;
+      if (c.last_login_at && Date.now() / 1000 - c.last_login_at < 7 * 86400) recent++;
+    });
+    add(p, h("dl", { class: "hc-score hc-score--4" },
+      kStat("Clients", String(all.length), recent ? [h("b", null, String(recent)), " signed in this week"] : "None signed in this week"),
+      kStat("Quotes to prepare", String(quotes), quotes ? "Requested, waiting on you" : "Nothing requested"),
+      kStat("Analyses waiting", String(waiting), late ? [h("b", { class: "kc-late" }, late + " late"), " past 1 working day"] : (waiting ? "All on time" : "Nothing to deliver")),
+      kStat("Live campaigns", String(live), live ? "Results refresh every 24 hours" : "None live")));
+    var need = all.filter(needsYou);
+    var bar = h("div", { class: "kc-filter", role: "group", "aria-label": "Show" });
+    [["all", "All clients", all.length], ["need", "Needs you", need.length]].forEach(function (f) {
+      bar.appendChild(h("button", { class: "kc-chip", type: "button", "aria-pressed": KFILTER === f[0] ? "true" : "false",
+        onclick: function () { KFILTER = f[0]; renderSection(); } }, f[1], h("span", null, String(f[2]))));
+    });
+    add(p, bar);
+    var shown = KFILTER === "need" ? need : all;
+    // Clients that need something first, then by last sign-in.
+    shown = shown.slice().sort(function (x, y) {
+      return (needsYou(y) - needsYou(x)) || ((y.last_login_at || 0) - (x.last_login_at || 0));
+    });
+    var list = h("ul", { class: "kc-list" });
+    shown.forEach(function (c, i) { list.appendChild(clientCard(c, i)); });
+    add(p, shown.length ? list : h("div", { class: "hc-empty" }, h("b", null, "Nothing needs you"),
+      h("p", null, "No quote is waiting, every analysis is delivered and no client handed a chat over. "),
+      h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button", onclick: function () { KFILTER = "all"; renderSection(); } }, "Show all clients")));
+  }
+
   /* ---------------------------------------------------------------- routing */
 
   var RENDER = { overview: renderOverview, selections: renderSelections, analyses: renderAnalyses, campaigns: renderCampaigns,
                  briefs: renderBriefs, notifications: renderNotifications, credits: renderCredits, account: renderAccount,
+                 clients: function (p) { if (DATA.is_kam) renderClients(p); else renderOverview(p); },
                  // ROI Calculator: drawn by assets/js/connect.js (tier mix, save to a selection, estimate vs actual).
                  roi: function (p) { if (HV().roiPage) HV().roiPage(p); else setTimeout(function () { if (SECTION === "roi") renderSection(); }, 200); } };
   var TITLES = { overview: "My profile", selections: "Selections", analyses: "Analyses", campaigns: "Campaigns", briefs: "Briefs",
-                 roi: "ROI Calculator", notifications: "Notifications", credits: "Credits", account: "Account" };
+                 roi: "ROI Calculator", notifications: "Notifications", credits: "Credits", account: "Account", clients: "My clients" };
   function renderSection() {
     var p = $("hc-body");
     p.textContent = "";
@@ -984,6 +1133,7 @@
       };
       hv.onReadAll = function () { if (DATA) { DATA.notifications.items.forEach(function (x) { x.unread = false; }); if (SECTION === "notifications" || SECTION === "overview") renderSection(); } };
       route(false);
+      if (DATA.is_kam) loadClients();          // the side nav's count, and the page if it is open
     });
   }
 

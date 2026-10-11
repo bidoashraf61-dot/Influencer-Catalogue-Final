@@ -49,6 +49,7 @@ import mailer
 import matcher
 import notify
 import portal
+import kam_scope
 import portal_views
 import rewards
 
@@ -101,7 +102,10 @@ class PortalMixin(connect_api.ConnectMixin):
         out = {"signed_in": True, "kind": kind, "credits": portal.balance(cid) if kind != "admin" else None,
                "preview": bool(self.preview_mode()),
                # A person with admin access: their own account, plus a switch that reveals locked data.
-               "staff": bool(self.staff_viewer(cid)), "unlock": bool(self.staff_unlocked()),
+               "staff": bool(self.staff_viewer(cid)),
+               "unlock": bool(self.staff_unlocked() or (self.kam_clients() is not None and self.cookies().get(self.UNLOCK_COOKIE, "") == "1")),
+               # A key account manager: the menu offers "My clients" (account/#clients).
+               "kam": bool(kind == "user" and self.kam_clients() is not None),
                "costs": portal.costs(), "ai": gemini.configured(),
                # AI is free while the client has an active campaign (start date to end date + 30 days).
                "ai_free": portal.ai_free(cid) if kind != "admin" else None,
@@ -219,8 +223,26 @@ class PortalMixin(connect_api.ConnectMixin):
             who = self._need_account()
             if who:
                 cid, user = who
-                self.send_json(200, dict(account.summary(user, cid, self._srv().SECRET), ok=True),
+                a = kam_scope.admin_for_email(user["email"])
+                self.send_json(200, dict(account.summary(user, cid, self._srv().SECRET), ok=True,
+                                         is_kam=bool(a is not None and kam_scope.is_kam(a) and not a["disabled_at"])),
                                self.cors() + [("Cache-Control", "no-store")])
+            return True
+        if path == "/api/account/clients":
+            # "My clients" (KAM scoped access, 2026-10-11): only for a key account manager's own account.
+            who = self._need_account()
+            if who:
+                cid, user = who
+                a = kam_scope.admin_for_email(user["email"])
+                if a is None or not kam_scope.is_kam(a) or a["disabled_at"]:
+                    self.send_json(403, {"ok": False, "reason": "not_kam"}, self.cors())
+                else:
+                    base = self.site_origin() + (self._srv().BASE or "")
+                    self.send_json(200, {"ok": True, "kam": {"name": a["name"] or "", "email": a["email"]},
+                                         "domains": sorted(d for d, k in kam_scope.domain_map().items() if k == a["email"].lower()),
+                                         "admin": base + "/",
+                                         "clients": kam_scope.my_clients(a["email"], a["name"], base)},
+                                   self.cors() + [("Cache-Control", "no-store")])
             return True
         if path == "/api/notifications":
             who = self._need_account()
@@ -593,7 +615,7 @@ class PortalMixin(connect_api.ConnectMixin):
         cid, user, kind = who
         b = self.json_body()
         sel = db.selection(token=str(b.get("token") or "")) if b.get("token") else None
-        if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not portal.unlock_all()):
+        if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"])):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         if not portal.may_edit(cid, sel, db.admin_code_id()):
             return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only the person who owns this selection can change it. Colleagues on the same company can view it."}, self.cors())
@@ -988,7 +1010,7 @@ class PortalMixin(connect_api.ConnectMixin):
         sel = db.selection(token=str(token or "")) if token else None
         if sel is None:
             return None
-        if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not portal.unlock_all() and not self.admin_like():
+        if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"]) and not self.admin_like_for(sel["code_id"]):
             return None
         with db.connect() as conn:
             br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",
@@ -1226,6 +1248,8 @@ class PortalMixin(connect_api.ConnectMixin):
         th = portal.thread(None, "admin", email, tid=self._int(b.get("thread")) or None)
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 16)]
         ctx = {"who": email, "code_id": db.admin_code_id()}
+        if kam_scope.current() is not None:
+            ctx["kam_creators"] = kam_scope.current_creators()      # her clients' creators only
         try:
             res = assistant.converse("admin", ctx, past, text, code_id=None, kind="copilot")
         except gemini.AIError as exc:
@@ -1269,8 +1293,11 @@ class PortalMixin(connect_api.ConnectMixin):
             u = user_of(f)
             if not u:
                 return done("Unknown client.", False)
+            import kam_scope
+            # The account manager is set by owners and admins (and the domain mapping); a KAM keeps it.
+            kam_val = (u["kam"] or "") if kam_scope.current() is not None else (f.get("kam") or "")
             portal.update_profile(u["id"], name=f.get("name"), company=f.get("company"), job_title=f.get("job_title"),
-                                  phone=f.get("phone"), notes=f.get("notes"), kam=f.get("kam") or "",
+                                  phone=f.get("phone"), notes=f.get("notes"), kam=kam_val,
                                   monthly_credits=f.get("monthly_credits", ""))
             return done("Saved.")
         if path == "/portal/user/delete":

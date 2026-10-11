@@ -150,13 +150,45 @@ _memo = _threading.local()
 _unlock = _threading.local()
 
 
-def unlock_begin(on):
-    """Per request: this reader is a person with admin access who switched "Show locked data" on."""
+def unlock_begin(on, scope=None):
+    """Per request: this reader is a person with admin access who switched "Show locked data" on.
+    ``scope`` is set for a key account manager (kam_scope): her unlock reaches her own clients'
+    selections and the creators in them, never everything."""
     _unlock.on = bool(on)
+    _unlock.scope = scope
+    _unlock.creators = None
 
 
 def unlock_all():
-    return bool(getattr(_unlock, "on", False))
+    """Everything is unlocked: an owner or admin with the switch on. Never a key account manager."""
+    return bool(getattr(_unlock, "on", False)) and getattr(_unlock, "scope", None) is None
+
+
+def unlock_client(code_id):
+    """Things filed under this client are unlocked for this reader (unlock_all, or a KAM's own client)."""
+    if not getattr(_unlock, "on", False):
+        return False
+    sc = getattr(_unlock, "scope", None)
+    if sc is None:
+        return True
+    try:
+        return code_id is not None and int(code_id) in sc
+    except (TypeError, ValueError):
+        return False
+
+
+def unlock_creator(code):
+    """This creator's full analysis is unlocked for this reader (unlock_all, or a creator in a
+    KAM's clients' selections or campaigns)."""
+    if not getattr(_unlock, "on", False):
+        return False
+    sc = getattr(_unlock, "scope", None)
+    if sc is None:
+        return True
+    if getattr(_unlock, "creators", None) is None:
+        import kam_scope
+        _unlock.creators = kam_scope.creators(sc)
+    return str(code or "").strip().upper() in _unlock.creators
 
 
 def memo_begin():
@@ -377,13 +409,15 @@ def user_for_code(code_id):
 
 def list_users():
     with db.connect() as conn:
-        return conn.execute(
+        rows = conn.execute(
             "SELECT u.*, "
             " (SELECT balance_after FROM credit_ledger l WHERE l.code_id = u.code_id ORDER BY l.id DESC LIMIT 1) AS credits, "
             " (SELECT COUNT(*) FROM selections s WHERE s.code_id = u.code_id) AS selections, "
             " (SELECT COUNT(*) FROM campaigns c WHERE c.code_id = u.code_id) AS campaigns, "
             " (SELECT COUNT(*) FROM briefs b WHERE b.code_id = u.code_id) AS briefs "
             "FROM users u WHERE u.deleted_at IS NULL ORDER BY u.created_at DESC").fetchall()
+    import kam_scope
+    return kam_scope.keep(rows)
 
 
 def create_user(email, name, company, job_title="", phone="", ip=None):
@@ -649,6 +683,9 @@ def briefs_for(code_id=None, limit=50, deleted=False):
     Every brief (code_id None) is the admin's list, deleted ones included."""
     with db.connect() as conn:
         if code_id is None:
+            import kam_scope
+            if kam_scope.current() is not None:
+                return kam_scope.keep(conn.execute("SELECT * FROM briefs ORDER BY id DESC").fetchall())[:limit]
             return conn.execute("SELECT * FROM briefs ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return conn.execute("SELECT * FROM briefs WHERE code_id = ?" + ("" if deleted else " AND deleted_at IS NULL") +
                             " ORDER BY id DESC LIMIT ?", (code_id, limit)).fetchall()
@@ -724,6 +761,10 @@ def threads(code_id=None, scope="client", limit=100):
          "(SELECT MAX(at) FROM chat_messages m WHERE m.thread_id = t.id) last, "
          "(SELECT content FROM chat_messages m WHERE m.thread_id = t.id AND role = 'user' ORDER BY id LIMIT 1) first "
          "FROM chat_threads t WHERE scope = ?" + (" AND code_id = ?" if code_id is not None else "") + " ORDER BY last DESC LIMIT ?")
+    import kam_scope
+    if code_id is None and scope == "client" and kam_scope.current() is not None:
+        with db.connect() as conn:
+            return kam_scope.keep(conn.execute(q, (scope, -1)).fetchall())[:limit]
     with db.connect() as conn:
         return conn.execute(q, ((scope, code_id, limit) if code_id is not None else (scope, limit))).fetchall()
 
@@ -803,7 +844,7 @@ def may_edit(reader, sel, admin_code_id=None):
     the same company domain may look (``team_codes``) but never edit."""
     if reader is None or sel is None:
         return False
-    if unlock_all():
+    if unlock_all() or unlock_client(sel["code_id"]):
         return True
     if admin_code_id is not None and int(reader) == int(admin_code_id):
         return True
@@ -883,8 +924,9 @@ def request_credits(code_id, amount, note):
 def open_credit_requests(code_id=None):
     with db.connect() as conn:
         if code_id is None:
-            return conn.execute("SELECT r.*, u.email, u.company, u.id user_id FROM credit_requests r "
-                                "LEFT JOIN users u ON u.code_id = r.code_id WHERE r.handled_at IS NULL ORDER BY r.id").fetchall()
+            import kam_scope
+            return kam_scope.keep(conn.execute("SELECT r.*, u.email, u.company, u.id user_id FROM credit_requests r "
+                                               "LEFT JOIN users u ON u.code_id = r.code_id WHERE r.handled_at IS NULL ORDER BY r.id").fetchall())
         return conn.execute("SELECT * FROM credit_requests WHERE code_id = ? ORDER BY id DESC LIMIT 20", (code_id,)).fetchall()
 
 

@@ -723,9 +723,22 @@ def code_by_hash(code_hash):
         return conn.execute("SELECT * FROM codes WHERE code_hash = ?", (code_hash,)).fetchone()
 
 
+def _scope():
+    """The key account manager's clients for this admin request, or None (kam_scope.begin)."""
+    import kam_scope
+    return kam_scope.current()
+
+
+def _scoped(rows, key="code_id"):
+    if _scope() is None:
+        return rows
+    import kam_scope
+    return kam_scope.keep(rows, key)
+
+
 def list_codes():
     with connect() as conn:
-        return conn.execute(
+        rows = conn.execute(
             "SELECT c.*, "
             " (SELECT MAX(at) FROM events e WHERE e.code_id = c.id AND e.kind='unlock_ok') last_used, "
             " (SELECT COUNT(*) FROM code_devices d WHERE d.code_id = c.id) devices, "
@@ -733,6 +746,7 @@ def list_codes():
             " (SELECT COUNT(*) FROM campaigns k WHERE k.code_id = c.id) n_campaigns "
             "FROM codes c WHERE c.label != '" + ADMIN_LABEL + "' ORDER BY c.created_at DESC"
         ).fetchall()
+    return _scoped(rows, "id")
 
 
 def code_attached(code_id):
@@ -938,12 +952,13 @@ def log(kind, code_id=None, ip=None, user_agent=None, detail=None):
 
 def recent_events(limit=200):
     with connect() as conn:
-        return conn.execute(
+        rows = conn.execute(
             "SELECT e.*, c.label, c.hint FROM events e "
             "LEFT JOIN codes c ON c.id = e.code_id "
             "ORDER BY e.at DESC LIMIT ?",
-            (limit,),
+            (limit if _scope() is None else limit * 20,),
         ).fetchall()
+    return _scoped(rows)[:limit]
 
 
 def day_bounds(text, fallback):
@@ -1689,11 +1704,12 @@ def create_request(code_id, name, company, email, phone, selection_name, selecti
 
 def list_requests(limit=200):
     with connect() as conn:
-        return conn.execute(
+        rows = conn.execute(
             "SELECT r.*, c.label code_label FROM requests r "
             "LEFT JOIN codes c ON c.id = r.code_id ORDER BY r.at DESC LIMIT ?",
-            (limit,),
+            (limit if _scope() is None else -1,),
         ).fetchall()
+    return _scoped(rows)[:limit]
 
 
 def request(rid):
@@ -1782,9 +1798,10 @@ def price_of(creator, bands):
 
 def list_selections():
     with connect() as conn:
-        return conn.execute(
+        rows = conn.execute(
             "SELECT s.*, c.label code_label FROM selections s "
             "LEFT JOIN codes c ON c.id = s.code_id ORDER BY s.updated_at DESC").fetchall()
+    return _scoped(rows)
 
 
 def selection(sid=None, token=None, deleted=False):
@@ -2071,12 +2088,16 @@ def rules_of(campaign):
 
 def list_campaigns():
     with connect() as conn:
-        return conn.execute(
-            "SELECT k.*, c.label code_label, s.name selection_name, "
+        rows = conn.execute(
+            "SELECT k.*, c.label code_label, s.name selection_name, s.code_id sel_code_id, "
             " (SELECT COUNT(*) FROM campaign_creators x WHERE x.campaign_id = k.id) creators "
             "FROM campaigns k LEFT JOIN codes c ON c.id = k.code_id "
             "LEFT JOIN selections s ON s.id = k.selection_id "
             "ORDER BY k.updated_at DESC").fetchall()
+    if _scope() is None:
+        return rows
+    import kam_scope
+    return [r for r in rows if kam_scope.allows(r["code_id"] if r["code_id"] is not None else r["sel_code_id"])]
 
 
 def campaign(cid=None, token=None):
@@ -2586,10 +2607,11 @@ def open_requests(code, code_id):
 
 def analysis_requests(open_only=False):
     with connect() as conn:
-        return conn.execute(
+        rows = conn.execute(
             "SELECT a.*, r.name creator_name, c.label code_label FROM analysis_requests a "
             "LEFT JOIN creators r ON r.code = a.code LEFT JOIN codes c ON c.id = a.code_id"
             + (" WHERE a.handled_at IS NULL" if open_only else "") + " ORDER BY a.at DESC").fetchall()
+    return _scoped(rows)
 
 
 def handle_analysis_request(rid):
@@ -2615,7 +2637,7 @@ def client_overview():
         areqs = conn.execute("SELECT code_id, COUNT(*) n FROM analysis_requests "
                              "WHERE handled_at IS NULL GROUP BY code_id").fetchall()
     out = []
-    for c in codes:
+    for c in _scoped(codes, "id"):
         out.append({"code": c,
                     "selections": [s for s in sels if s["code_id"] == c["id"]],
                     "campaigns": [k for k in camps if k["code_id"] == c["id"]],
@@ -2930,6 +2952,15 @@ def capture_runs(limit=20):
 def request_pulse():
     """What the dashboard header needs: how many requests nobody has handled,
     and the newest id, so a page can tell a new one from one it already saw."""
+    if _scope() is not None:
+        # A key account manager: the same answer over her own clients only.
+        reqs, areqs = list_requests(100000), analysis_requests()
+        last, alast = (reqs[0] if reqs else None), (areqs[0] if areqs else None)
+        return {"open": sum(1 for r in reqs if not r["handled_at"]), "latest": max([r["id"] for r in reqs] or [0]),
+                "company": (last["company"] or last["name"] or "") if last else "",
+                "count": len(json.loads(last["selection"] or "[]")) if last else 0,
+                "a_open": sum(1 for a in areqs if not a["handled_at"]), "a_latest": max([a["id"] for a in areqs] or [0]),
+                "a_creator": (alast["creator_name"] or "") if alast else "", "a_client": (alast["code_label"] or "") if alast else ""}
     with connect() as conn:
         r = conn.execute(
             "SELECT (SELECT COUNT(*) FROM requests WHERE handled_at IS NULL) open, "

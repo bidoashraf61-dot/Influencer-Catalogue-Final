@@ -29,6 +29,7 @@
   // One drawn set (24px grid, 1.8 stroke) for the bell, the profile page, selection
   // statuses and the analysis lock, so every page speaks the same marks.
   var UI_PATHS = {
+    users: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.3c1.7.6 2.8 2.2 3 4.7"/>',
     bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.6 2H4.4z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
     check: '<path d="M4.5 12.5l5 5 10-11"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
     lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><path d="M12 14.5v2.5"/>',
@@ -816,6 +817,8 @@
     if (u) {
       // Account holders: their own space, then help, then out.
       item("My profile", { href: ACC + "#overview" });
+      // A key account manager (KAM scoped access): her clients, one card each.
+      if (ME.kam) item("My clients", { href: ACC + "#clients" });
       item("Selections", { href: ACC + "#selections" });
       item("Analyses", { href: ACC + "#analyses" });
       item("Campaigns", { href: ACC + "#campaigns" });

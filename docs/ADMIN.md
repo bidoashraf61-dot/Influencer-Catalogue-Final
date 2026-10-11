@@ -671,3 +671,27 @@ bottom of a **campaign's Setup page**. Code: `admin/assign.py` (rules and the tw
 - Roles: owner, admin and KAM may; viewers get 403 (`team.can`).
 - The existing "Client (access code)" select on the Details tab still works; it stays the manual path.
 - Tests: `python3 admin/tests/e2e_assign.py`.
+
+## Key account managers: scoped access (2026-10-11, programme item 82)
+
+A team member with the **Key account manager** role works on her own clients only.
+
+- **Who is hers** (`admin/kam_scope.py`, `clients(who)`): accounts whose company domain maps to her in
+  Settings → Key account managers (`domain_kam`, one manager per domain), plus accounts whose
+  `users.kam` names her on a domain not mapped to someone else, plus shared access codes linked onto
+  those accounts. Owners, admins and viewers are unscoped.
+- **Lists** are filtered at the source for the request (`kam_scope.begin`): selections, campaigns,
+  access codes, clients, quote requests, analysis requests, the request pulse, portal accounts,
+  briefs, chats, credit requests, search (⌘K), the planner/calculator sources and the copilot.
+- **Routes**: `kam_scope.check` is an allow list. Any page or POST outside it, or naming another
+  client's selection, campaign, account, code, request, analysis request, chat or credit request,
+  answers 403 "Not your client". Refused outright: Analytics, History, Settings, APIs, Reference,
+  the portal's codes/usage/settings tabs, roster import/merge/delete, analysis uploads, new access
+  codes, code links. Inside scope she has full rights (prices, costs, margins, quote ready, campaigns,
+  assign between her clients, deliver analyses). She cannot change an account's manager.
+- **Portal**: signed in to the admin or with her own portal account, she opens her clients'
+  selections and reports as HelloVoice would; "Show locked data" opens only her clients' creators.
+  Her admin session no longer makes the catalogue "HelloVoice, everything".
+- **My clients**: `/account/#clients` (circle menu "My clients"), from `GET /api/account/clients`.
+  No prices, costs or margins in that payload.
+- Tests: `python3 admin/tests/e2e_kam_scope.py`.

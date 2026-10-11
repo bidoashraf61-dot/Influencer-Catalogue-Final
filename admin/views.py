@@ -619,15 +619,17 @@ def _my_accounts(who):
     """For a key account manager: the portal clients assigned to them, with credits and open quotes."""
     import db
     import portal
-    keys = [k.strip().lower() for k in (who["email"], who["name"] if "name" in who.keys() else "") if k and k.strip()]
-    if not keys:
-        return ""
+    import kam_scope
+    # The same rule as every scoped list: the KAM's company domains, plus accounts naming her.
+    users = kam_scope.user_rows(who["email"], who["name"] if "name" in who.keys() else None)
     with db.connect() as conn:
-        rows = conn.execute(
-            "SELECT u.id, u.email, u.name, u.company, u.code_id, u.last_login_at, "
-            "(SELECT COUNT(*) FROM requests r WHERE r.code_id = u.code_id AND r.handled_at IS NULL) AS open_q "
-            "FROM users u WHERE u.deleted_at IS NULL AND LOWER(TRIM(COALESCE(u.kam, ''))) IN (%s) "
-            "ORDER BY open_q DESC, u.last_login_at DESC LIMIT 40" % ",".join("?" * len(keys)), keys).fetchall()
+        rows = []
+        for x in users:
+            n = conn.execute("SELECT COUNT(*) FROM requests WHERE code_id = ? AND handled_at IS NULL", (x["code_id"],)).fetchone()[0]
+            rows.append({"id": x["id"], "email": x["email"], "name": x["name"], "company": x["company"],
+                         "code_id": x["code_id"], "last_login_at": x["last_login_at"], "open_q": n})
+    rows.sort(key=lambda r: (-r["open_q"], -(r["last_login_at"] or 0)))
+    rows = rows[:40]
     if not rows:
         body = ui.empty("building", "No accounts assigned yet",
                         "An owner or admin sets the key account manager on each client's page.",
@@ -3732,8 +3734,49 @@ def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, erro
         + "<h2>Country lookup</h2><div class='card'><p>" + ("Installed." if has_geo else
           "Not installed — tracking-link countries read Unknown. See docs/ADMIN.md §5b.") + "</p></div>"
         + fx_card(fx_rates or {})
+        + domain_kam_card()
     )
     return page("Settings", body, "/settings")
+
+
+def domain_kam_card():
+    """Settings: company domain -> key account manager (domain_kam). One manager per domain; saving
+    also sets the manager on every account already on that domain."""
+    import db
+    import kam_scope
+    import team
+    kams = [a for a in team.list_admins() if team.role_of(a) == "kam" and not a["disabled_at"]]
+    current = kam_scope.domain_map()
+    with db.connect() as conn:
+        counts = {r[0]: r[1] for r in conn.execute(
+            "SELECT LOWER(domain), COUNT(*) FROM users WHERE deleted_at IS NULL GROUP BY LOWER(domain)")}
+    known = {a["email"].lower() for a in kams}
+
+    def pick(i, chosen):
+        opts = "<option value=''>Choose a manager</option>" + "".join(
+            "<option value='%s'%s>%s</option>" % (e(a["email"]), " selected" if a["email"].lower() == chosen else "",
+                                                 e((a["name"] or a["email"]) + (" · " + a["email"] if a["name"] else "")))
+            for a in kams)
+        if chosen and chosen not in known:
+            opts += "<option value='%s' selected>%s (not a KAM login)</option>" % (e(chosen), e(chosen))
+        return "<select name='kam_%d' aria-label='Key account manager'>%s</select>" % (i, opts)
+
+    rows = list(sorted(current.items())) + [("", "")] * 3
+    body = "".join(
+        "<tr><td><input name='domain_%d' value='%s' placeholder='company.com' aria-label='Company domain' "
+        "autocomplete='off' spellcheck='false'></td><td>%s</td><td class='right muted'>%s</td></tr>"
+        % (i, e(d), pick(i, k), ("%d account%s" % (counts.get(d, 0), "" if counts.get(d, 0) == 1 else "s")) if d else "")
+        for i, (d, k) in enumerate(rows))
+    none = ("" if kams else "<p class='err'>No one on the team has the Key account manager role yet. "
+            "Invite them from <a href='" + u("/team") + "'>Team &amp; security</a> first.</p>")
+    return ("<h2 id='kams'>Key account managers</h2><div class='card'>"
+            "<p>Each company domain belongs to one key account manager. She sees and works on those clients only "
+            "(selections, campaigns, quotes, analyses, credits), and every new sign-up on the domain becomes hers. "
+            "Saving also sets her on the accounts already on that domain. Clear a domain to remove it.</p>" + none
+            + "<form method='post' action='" + u("/settings/domain-kam") + "'><table><thead><tr><th>Company domain</th>"
+              "<th>Key account manager</th><th class='right'>Accounts today</th></tr></thead><tbody>" + body
+            + "</tbody></table><input type='hidden' name='rows' value='%d'>" % len(rows)
+            + "<button class='btn' style='margin-top:12px'>Save domains</button></form></div>")
 
 
 def fx_card(rates):
@@ -5204,3 +5247,107 @@ EDITOR_VER = __import__("hashlib").sha256(EDITOR_JS.encode()).hexdigest()[:10]
 
 # Page-independent scripts join the cached /shell.js (round 4 follow-up).
 ui.add_shell_js(PULSE_JS, SCROLL_JS.replace("<script>", "").replace("</script>", ""))
+
+
+# ------------------------------------------------- key account managers --
+# KAM scoped access (owner, 2026-10-11): a key account manager's own home, and the state she
+# meets anywhere outside her clients. Design: impeccable (Broadcast Desk world, admin register).
+
+KAM_CSS = (
+    "<style>"
+    ".nyc{max-width:760px;margin:28px auto 0;background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg,22px);"
+    "padding:clamp(26px,4vw,44px);display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 30px;align-items:start}"
+    ".nyc__stamp{grid-row:span 3;display:inline-grid;place-items:center;width:132px;height:132px;border-radius:50%;"
+    "border:3px solid var(--ink);box-shadow:inset 0 0 0 5px var(--white),inset 0 0 0 7px var(--ink);transform:rotate(-8deg);"
+    "font:400 23px/.95 'Bebas Neue',Arial,sans-serif;letter-spacing:.06em;text-align:center;color:var(--ink);background:var(--lime)}"
+    ".nyc h1{font:400 clamp(40px,3.4vw,56px)/.95 'Bebas Neue',Arial,sans-serif;letter-spacing:.01em;margin:4px 0 6px}"
+    ".nyc__why{margin:0;font-size:16px;line-height:1.55;color:var(--ink);max-width:56ch}"
+    ".nyc__scope{margin:16px 0 0;padding:14px 16px;border-radius:var(--r-md,14px);background:var(--paper);font-size:14px;color:var(--gray)}"
+    ".nyc__scope b{color:var(--ink)}"
+    ".nyc__doms{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}"
+    ".nyc__doms span{font-weight:600;font-size:13px;color:var(--ink);background:var(--white);border:1px solid var(--line);border-radius:999px;padding:3px 11px}"
+    ".nyc__go{grid-column:2;display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}"
+    ".nyc__fine{grid-column:2;margin:14px 0 0;font-size:13px;color:var(--gray)}"
+    "@media (max-width:640px){.nyc{grid-template-columns:1fr;text-align:left}.nyc__stamp{grid-row:auto;width:104px;height:104px;font-size:19px}"
+    ".nyc__go,.nyc__fine{grid-column:1}}"
+    ".kam-hd{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}"
+    ".kam-doms{display:flex;flex-wrap:wrap;gap:6px}"
+    ".kam-doms span{font-weight:600;font-size:12.5px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:3px 10px}"
+    "</style>")
+
+_NYC_WHAT = (("/selections", "selection"), ("/quote", "selection"), ("/campaigns", "campaign"), ("/planner", "campaign"),
+             ("/calculator", "campaign"), ("/portal/user", "client account"), ("/portal/chat", "conversation"),
+             ("/portal/credit", "credit request"), ("/portal/code", "client"), ("/codes", "client"), ("/clients", "client"),
+             ("/archive", "client"), ("/requests", "quote request"), ("/analysis", "analysis"))
+
+
+def _kam_domains():
+    import kam_scope
+    me = (getattr(_user, "email", "") or "").lower()
+    return sorted(d for d, k in kam_scope.domain_map().items() if k == me)
+
+
+def not_your_client_page(path):
+    """403 for a key account manager: something that belongs to another manager's client, or a page
+    that reads across every client."""
+    what = next((w for p, w in _NYC_WHAT if path.startswith(p)), None)
+    if what:
+        why = ("This %s belongs to a client another account manager looks after. As a key account manager "
+               "you open, edit and quote your own clients only." % what)
+    else:
+        why = ("This page reads across every client, so it is kept for owners and admins. "
+               "Everything for your own clients is in Selections, Campaigns, Clients and Quote requests.")
+    doms = _kam_domains()
+    scope = ("<div class='nyc__scope'><b>Your clients</b> are the accounts on %s.%s</div>" % (
+        "these company domains" if len(doms) != 1 else "this company domain",
+        "<div class='nyc__doms'>" + "".join("<span>%s</span>" % e(d) for d in doms) + "</div>") if doms else
+             "<div class='nyc__scope'><b>Your clients</b> are the accounts an owner assigned to you.</div>")
+    body = (KAM_CSS + "<section class='nyc' aria-labelledby='nyc-h'>"
+            "<span class='nyc__stamp' aria-hidden='true'>Not your<br>client</span>"
+            "<div><h1 id='nyc-h'>Not your client</h1><p class='nyc__why'>" + e(why) + "</p>" + scope + "</div>"
+            "<div class='nyc__go'><a class='btn lime' href='" + u("/") + "'>Back to my clients</a>"
+            "<a class='btn ghost' href='" + u("/selections") + "'>My selections</a></div>"
+            "<p class='nyc__fine'>Should this client be yours? An owner maps the company domain to you in "
+            "Settings &rarr; Key account managers.</p></section>")
+    return page("Not your client", body, "/")
+
+
+def kam_dashboard(who, scope, message=None, error=None):
+    """Home for a key account manager: her clients, what is waiting on them, nothing else."""
+    import db
+    import lifecycle
+    banner = ("<div class='ok'>" + e(message) + "</div>" if message else "") + ("<div class='err'>" + e(error) + "</div>" if error else "")
+    sels = [s for s in db.list_selections() if not s["archived_at"] and not s["deleted_at"]]
+    camps = db.list_campaigns()
+    reqs = [r for r in db.list_requests() if not r["handled_at"]]
+    areqs = [a for a in db.analysis_requests(open_only=True)]
+    waiting_quote = [s for s in sels if lifecycle.chip(s)["key"] == "requested"]
+    live = [k for k in camps if k["status"] == "live"]
+    tiles = "".join("<a class='kpi' href='%s'><span>%s</span><b>%d</b><em>%s</em></a>" % (u(h), e(l), n, e(sub)) for l, n, sub, h in (
+        ("Quotes to prepare", len(waiting_quote), "requested by your clients", "/selections"),
+        ("Open quote requests", len(reqs), "from the catalogue", "/requests"),
+        ("Analyses to deliver", len(areqs), "promised in 1 working day", "/analysis"),
+        ("Live campaigns", len(live), "%d in total" % len(camps), "/campaigns")))
+    def row_sel(s):
+        c = lifecycle.chip(s)
+        return ("<tr><td><a href='%s'>%s</a></td><td>%s</td><td><span class='pill'>%s</span></td><td class='muted'>%s</td></tr>"
+                % (u("/selections/edit?id=%d" % s["id"]), e(s["name"]), e(s["code_label"] or ""), e(c["label"]), e(ago(s["updated_at"]))))
+    sel_html = ("<table class='list'><thead><tr><th>Selection</th><th>Client</th><th>Stage</th><th>Updated</th></tr></thead><tbody>"
+                + "".join(row_sel(s) for s in sels[:12]) + "</tbody></table>") if sels else ui.empty(
+        "list", "No selections yet", "Build one for a client from the Selections page.",
+        "<a class='btn small' href='" + u("/selections") + "#new'>Prepare a selection</a>")
+    doms = _kam_domains()
+    body = (KAM_CSS
+            + ui.header("My clients", "%d client account%s. Everything here is yours to quote, run and report." % (
+                len(scope), "" if len(scope) == 1 else "s"),
+                actions="<a class='btn lime' href='" + u("/open-catalogue") + "' target='_blank' rel='noopener'>Open catalogue " + ui.icon("arrow", 16) + "</a>")
+            + banner
+            + "<section class='card' aria-labelledby='h-kwait'><div class='hd'><h2 id='h-kwait'>Waiting on you</h2>"
+              "<span class='muted'>Your clients only</span></div><div class='kpi-row'>" + tiles + "</div></section>"
+            + _my_accounts(who)
+            + "<section class='card' aria-labelledby='h-ksel'><div class='hd kam-hd'><h2 id='h-ksel'>Latest selections</h2>"
+              "<a href='" + u("/selections") + "'>All selections</a></div>" + sel_html + "</section>"
+            + ("<section class='card'><div class='hd kam-hd'><h2>Your company domains</h2><div class='kam-doms'>"
+               + "".join("<span>%s</span>" % e(d) for d in doms) + "</div></div><p class='muted'>New sign-ups on these domains "
+               "become your clients automatically.</p></section>" if doms else ""))
+    return page("Home", body, "/")

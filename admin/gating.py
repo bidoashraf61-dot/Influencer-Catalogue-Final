@@ -84,6 +84,9 @@ def unlocked(code_id, code):
         return False
     if code_id == db.admin_code_id() or _unlock_all():
         return True
+    import portal
+    if portal.unlock_creator(code):
+        return True                                    # a key account manager: creators of her clients
     team = _team(code_id)
     with db.connect() as conn:
         return bool(conn.execute("SELECT 1 FROM analysis_grants WHERE code = ? AND code_id IN (%s) LIMIT 1"
@@ -100,6 +103,9 @@ def unlocked_set(code_id, codes=None):
     with db.connect() as conn:
         rows = conn.execute("SELECT code FROM analysis_grants WHERE code_id IN (%s)" % ",".join("?" * len(team)), list(team)).fetchall()
     got = {r["code"] for r in rows}
+    import portal
+    if codes is not None:
+        got |= {c for c in codes if portal.unlock_creator(c)}   # a key account manager's own clients
     return got if codes is None else got & set(codes)
 
 

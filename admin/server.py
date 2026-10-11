@@ -69,6 +69,7 @@ import guard  # noqa: E402
 import portal  # noqa: E402
 import portal_api  # noqa: E402
 import team  # noqa: E402
+import kam_scope  # noqa: E402
 import team_views  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
@@ -309,6 +310,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             self._admin_token = token
         return row
 
+    def not_your_client(self, path):
+        """403 for a key account manager outside her clients: a page in the admin, JSON for the API."""
+        if path.startswith("/api/") or path.startswith("/ai/"):
+            return self.send_json(403, {"ok": False, "reason": "not_your_client", "message": kam_scope.NOT_YOURS + "."})
+        return self.send(403, views.not_your_client_page(path))
+
     def require_admin(self):
         who = self.admin()
         if not who:
@@ -322,6 +329,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         so the admin never needs a passcode."""
         cid = self.viewer_cookie_id()
         if cid is None and self.admin():
+            if self.kam_clients() is not None:
+                # A key account manager is never "HelloVoice, sees everything" in the catalogue:
+                # she is her own portal account (if she has one), opening her clients' work by scope.
+                u = portal.user_by_email(self.admin()["email"]) if self.admin()["email"] else None
+                return u["code_id"] if u is not None and u["status"] == "active" else None
             cid = db.admin_code_id()
         return cid
 
@@ -338,13 +350,53 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     UNLOCK_COOKIE = "hv_unlock"
 
     def staff_unlocked(self):
-        """A person with admin access who has switched "Show locked data" on."""
-        return self.cookies().get(self.UNLOCK_COOKIE, "") == "1" and self.staff_viewer()
+        """A person with admin access who has switched "Show locked data" on. A key account
+        manager's switch never unlocks everything: see kam_unlocked()."""
+        return (self.cookies().get(self.UNLOCK_COOKIE, "") == "1" and self.staff_viewer()
+                and self.kam_clients() is None)
+
+    def kam_clients(self):
+        """None, or (for a key account manager signed in to the admin, or to the portal with an
+        email that is a KAM's admin login) the frozenset of her clients' code ids. Once per request."""
+        memo = getattr(self, "_kam_memo", None)
+        if memo is not None and memo[0] == self.path:
+            return memo[1]
+        sc = None
+        who = self.admin()
+        if who is not None:
+            sc = kam_scope.clients(who)
+        else:
+            cid = self.viewer_cookie_id()
+            u = portal.user_for_code(cid) if cid is not None and cid != db.admin_code_id() else None
+            a = kam_scope.admin_for_email(u["email"]) if u is not None and u["email"] else None
+            if a is not None and not a["disabled_at"]:
+                sc = kam_scope.clients(a)
+        self._kam_memo = (self.path, sc)
+        return sc
+
+    def kam_unlocked(self):
+        """A key account manager whose locked data is open (her admin session, or her switch):
+        reaches only her own clients (portal.unlock_client / unlock_creator)."""
+        if self.kam_clients() is None:
+            return False
+        return bool(self.admin()) or (self.cookies().get(self.UNLOCK_COOKIE, "") == "1" and self.staff_viewer())
 
     def admin_like(self):
         """HelloVoice admin session, or admin access with the unlock switch on: the checks that
-        mean "nothing is locked for this reader"."""
-        return bool(self.admin()) or self.staff_unlocked()
+        mean "nothing is locked for this reader". Never true for a key account manager: her
+        clients' work opens through admin_like_for()."""
+        return (bool(self.admin()) and self.kam_clients() is None) or self.staff_unlocked()
+
+    def admin_like_for(self, code_id):
+        """admin_like() for one thing filed under ``code_id``: also true for a key account manager
+        when it is one of her clients."""
+        if self.admin_like():
+            return True
+        sc = self.kam_clients()
+        try:
+            return sc is not None and code_id is not None and int(code_id) in sc
+        except (TypeError, ValueError):
+            return False
 
     def preview_mode(self):
         """An admin looking at the portal AS a client (read-only): the preview cookie plus a live
@@ -383,8 +435,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def selection_viewer(self, token):
         """Who acts on a selection page: the admin, else the code typed for that
         link, else this browser's general pass."""
-        if self.admin() or self.staff_unlocked():
+        if self.admin_like():
             return db.admin_code_id()
+        if token and self.kam_clients() is not None:
+            sel = db.selection(token=token, deleted=True)
+            if sel is not None and self.admin_like_for(sel["code_id"]):
+                return db.admin_code_id()          # a key account manager on her own client's selection
         return (self.link_code("s:" + token) if token else None) or self.viewer_code_id()
 
     def signed_in_client(self):
@@ -454,13 +510,23 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     # selection decisions, which never touch users, teams or campaigns.
     MEMO_POSTS = ("/api/selection/status", "/api/selection/reason", "/api/selection/tags", "/api/selection/platform")
 
+    def _unlock_begin(self):
+        self._kam_memo = None
+        kam_scope.end()
+        sc = self.kam_clients()
+        if sc is None:
+            portal.unlock_begin(self.staff_unlocked())
+        else:
+            portal.unlock_begin(self.kam_unlocked(), scope=sc)
+
     def do_GET(self):
         portal.memo_begin()
-        portal.unlock_begin(self.staff_unlocked())
+        self._unlock_begin()
         try:
             return self._do_get()
         finally:
             portal.unlock_begin(False)
+            kam_scope.end()
             portal.memo_end()
 
     def _do_get(self):
@@ -595,6 +661,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # Roles, and a password re-check for exports.
         if not team.can(who, "GET", path, query):
             return self.send(403, team_views.forbidden_page(team.role_of(who)))
+        # Key account managers: their own clients only (kam_scope). Lists filter at the source.
+        scope = kam_scope.clients(who)
+        kam_scope.begin(scope)
+        if kam_scope.check(scope, "GET", path, query):
+            return self.not_your_client(path)
         if team.needs_step_up("GET", path) and not team.fresh(who):
             raw_q = urllib.parse.urlparse(self.path).query
             return self.redirect("/reauth?next=" + urllib.parse.quote(path + ("?" + raw_q if raw_q else "")))
@@ -616,6 +687,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/api/search":
             return self.api_search((query.get("q") or "").strip())
         if path == "/":
+            if scope is not None:
+                return self.send(200, views.kam_dashboard(who, scope, message=query.get("ok"), error=query.get("e")))
             return self.send(200, views.dashboard(db.stats(), db.recent_events(12), who,
                                                   message=query.get("ok"), error=query.get("e")))
         if path == "/history":
@@ -940,11 +1013,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def do_POST(self):
         if self.route(urllib.parse.urlparse(self.path).path) in self.MEMO_POSTS:
             portal.memo_begin()
-        portal.unlock_begin(self.staff_unlocked())
+        self._unlock_begin()
         try:
             return self._do_post()
         finally:
             portal.unlock_begin(False)
+            kam_scope.end()
             portal.memo_end()
 
     def _do_post(self):
@@ -1007,6 +1081,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         ui.set_role(team.role_of(who))
         if not team.can(who, "POST", path):
             return self.send(403, team_views.forbidden_page(team.role_of(who)))
+        scope = kam_scope.clients(who)
+        kam_scope.begin(scope)
+        if kam_scope.check(scope, "POST", path, None, self.form_body() if not self.headers.get("Content-Type", "").startswith("application/json") else {}):
+            return self.not_your_client(path)
         if team.needs_step_up("POST", path) and not team.fresh(who):
             ref = urllib.parse.urlparse(self.headers.get("Referer") or "").path or "/"
             if BASE and ref.startswith(BASE):
@@ -1147,6 +1225,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_selection_status_admin()
         if path == "/settings/fx":
             return self.post_settings_fx()
+        if path == "/settings/domain-kam":
+            return self.post_domain_kam()
         if path == "/planner/apply":
             return self.post_planner_apply()
         if path == "/calculator/save":
@@ -2990,6 +3070,27 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             db.add_snapshot(item["id"], self.counts_from(f), "manual")
         return self.redirect(back + "&ok=" + urllib.parse.quote("Saved."))
 
+    def post_domain_kam(self):
+        """Settings card: company domain -> key account manager (owners and admins only: /settings
+        is refused to a KAM by team.can)."""
+        f = self.form_body()
+        try:
+            n = max(0, min(200, int(f.get("rows") or 0)))
+        except ValueError:
+            n = 0
+        mapping = {}
+        for i in range(n):
+            d, k = (f.get("domain_%d" % i) or "").strip(), (f.get("kam_%d" % i) or "").strip()
+            if d and k:
+                mapping[d] = k
+        with history.tracked("settings", "*", "Changed key account manager domains"):
+            saved, changed = kam_scope.set_domain_map(mapping)
+        who = self.admin()
+        team.log("domain_kam", who["email"] if who is not None else "", ", ".join("%s=%s" % kv for kv in sorted(saved.items()))[:300], self.client_ip())
+        return self.redirect("/settings?ok=" + urllib.parse.quote(
+            "Saved %d domain%s. %d existing account%s now show their key account manager." % (
+                len(saved), "" if len(saved) == 1 else "s", changed, "" if changed == 1 else "s")) + "#kams")
+
     def post_settings_fx(self):
         """Fixed exchange rates: 1 SAR = x of each currency. Empty switches a
         currency off."""
@@ -3117,8 +3218,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def viewer_campaign(self, token):
         k = db.campaign(token=token) if token else None
-        if k is not None and self.admin_like():
-            return k, 200                       # admins open any report, drafts included
+        if k is not None and self.admin_like_for(k["code_id"] if k["code_id"] is not None else kam_scope.campaign_code(k["id"])[1]):
+            return k, 200                       # admins (and a KAM, her clients') open any report, drafts included
         # The code typed for this report, or for the client's campaign list it was opened from.
         code_id = self.link_code("c:" + token) if token else None
         if code_id is None:
@@ -4178,11 +4279,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "band": metrics.band_of(r["followers"])}
         # Analysis gating: the headline numbers are free; the rest is for a client the team
         # has unlocked it for. Anyone else gets sample data drawn here, never the real values.
-        gate = {"state": "unlocked"} if self.admin_like() else gating.state(code_id, code)
+        staff = self.admin_like() or (self.kam_unlocked() and portal.unlock_creator(code))
+        gate = {"state": "unlocked"} if staff else gating.state(code_id, code)
         gate["headline"] = gating.headline(card, every)
         import sample_analysis                       # item 39: is "See a sample full analysis" on?
         gate["sample_full"] = sample_analysis.available()
-        if self.admin_like():
+        if staff:
             gate["admin"] = True
         if gate["state"] != "unlocked":
             gate["sample"] = gating.sample(code, plats[0] if plats else None)
@@ -4253,11 +4355,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         viewer = self.viewer_code_id()
         if token:
             # A selection its client deleted is "unknown" to clients; HelloVoice still opens it.
-            sel = db.selection(token=token, deleted=bool(self.admin_like()))
+            sel = db.selection(token=token, deleted=bool(self.admin_like() or self.kam_clients() is not None))
+            staff = sel is not None and self.admin_like_for(sel["code_id"])
+            if sel is not None and sel["deleted_at"] and not staff:
+                sel = None                      # a KAM opens deleted selections of her own clients only
             # Prices agreed with one client are for that client. The token is
             # in a link, and a link travels; the code typed FOR THIS LINK is what
             # identifies who is reading it. Admins signed in open any link.
-            if sel is not None and not self.admin_like():
+            if sel is not None and not staff:
                 cid = self.link_code("s:" + token) or self.signed_in_client()
                 if cid is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(int(cid))
                                    and int(cid) != db.admin_code_id()):
@@ -4339,7 +4444,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         reader = self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.
-        open_ = None if self.admin_like() else gating.unlocked_set(reader, codes)
+        open_ = None if self.admin_like() or (self.kam_unlocked() and self.admin_like_for(sel["code_id"])) else gating.unlocked_set(reader, codes)
         if open_ is not None:
             out["scores"] = {k: (v if k in open_ else gating.redact_score(v)) for k, v in out["scores"].items()}
         out.update(self.selection_status_payload(sel, codes, reader, by))
