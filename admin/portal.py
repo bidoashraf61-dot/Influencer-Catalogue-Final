@@ -764,7 +764,11 @@ def team_codes(code_id):
     me = user_for_code(code_id)
     if not me:
         return {code_id}
-    if not db.setting("team_sharing", True) or guard._matches(me["domain"] or "", guard.FREE_DOMAINS):
+    # team_sharing_off_domains (owner, 2026-10-11): companies whose selections stay with the one
+    # account they are assigned to (plus HelloVoice), e.g. polygonpharma.com.
+    private = {str(d).strip().lower() for d in (db.setting("team_sharing_off_domains") or [])}
+    if (not db.setting("team_sharing", True) or guard._matches(me["domain"] or "", guard.FREE_DOMAINS)
+            or (me["domain"] or "").lower() in private):
         return {code_id} | codelinks.linked_for({code_id})
     with db.connect() as conn:
         rows = conn.execute("SELECT code_id FROM users WHERE domain = ? AND status = 'active' AND deleted_at IS NULL",
