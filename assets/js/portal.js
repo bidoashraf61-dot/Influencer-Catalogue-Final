@@ -1710,7 +1710,10 @@
           if (done) return; done = true;
           if (res.b.brief_id) rememberBrief(res.b.brief_id);
           react("cheer"); say("Scored!");
-          stage.appendChild(h("p", { class: "ob__done" }, icon("check"), "Scores are on your cards."));
+          var doneP = h("p", { class: "ob__done" });          // icon() returns SVG markup, never a node: set it as HTML
+          doneP.insertAdjacentHTML("beforeend", icon("check") + " ");
+          doneP.appendChild(document.createTextNode("Scores are on your cards."));
+          stage.appendChild(doneP);
           var refresh = S && S.refresh ? S.refresh() : Promise.resolve();
           Promise.resolve(refresh).then(function () {
             setTimeout(function () {
