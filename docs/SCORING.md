@@ -51,3 +51,9 @@ table's default is not stored.
 * The objective (Awareness / Engagement / Traffic) does not change the number.
 * The shortlist's country and product-space markdowns (`matcher.apply_rules`) still apply
   after scoring and scale the range with the number.
+
+## Interest: the posts we hold are the 100%
+
+When the brief names a category, interest = posts naming it / posts analysed (5 of 12 = 42
+points, 12 of 12 = 100). It enters at weight 0.5 against engagement's 1.0. Without post data
+the roster tags give a keyword estimate at weight 0.15. No threshold of posts is needed.

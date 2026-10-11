@@ -33,10 +33,11 @@ class V3(unittest.TestCase):
         m = {x["label"]: x for x in hit["metrics"]}
         self.assertEqual(m["Product space"]["value"], "5 of 12 posts")
 
-    def test_few_posts_count_for_less(self):
-        full = [p for p in score(doc(), "Beauty")["parts"] if p["key"] == "interest"][0]["w"]
-        few = [p for p in score(doc(sample_posts=4), "Beauty")["parts"] if p["key"] == "interest"][0]["w"]
-        self.assertLess(few, full)
+    def test_available_posts_are_the_100_percent(self):
+        def interest(d):
+            return [p for p in score(d, "Beauty")["parts"] if p["key"] == "interest"][0]["s"]
+        self.assertAlmostEqual(interest(doc(hashtags=[{"tag": "#skincare", "count": 100.0}])), 1.0, places=2)
+        self.assertAlmostEqual(interest(doc(hashtags=[{"tag": "#skincare", "count": 25.0}])), 0.25, places=2)
 
     def test_keywords_only_counts_at_a_third(self):
         p = [p for p in score(doc(hashtags=[], sample_posts=0), "Beauty")["parts"] if p["key"] == "interest"][0]

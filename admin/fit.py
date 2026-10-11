@@ -476,8 +476,7 @@ def interest_share(doc, creator, cats):
 
 
 INTEREST_WEIGHT = 0.5      # the product-space match carries up to a third of the number (1 : 0.5 with engagement)
-INTEREST_FULL_POSTS = 12   # posts needed before the match counts at full weight
-INTEREST_FULL_SHARE = 0.5  # half of the posts in the space is full marks
+INTEREST_FULL_SHARE = 1.0  # the posts we hold are the 100%: matched posts / available posts is the score
 
 
 def post_interest(doc, creator, cats):
@@ -491,8 +490,8 @@ def post_interest(doc, creator, cats):
     A measured ``interest_shares`` field wins. Otherwise the creator's hashtags are read: each
     carries the share of the analysed posts that used it, so the posts naming the space are
     between the busiest matching tag (nobody doubled up) and the sum of them (no post names two).
-    The number of posts available is the reference: 12 or more counts in full, fewer count in
-    proportion. With no hashtags the roster interest tags and bio give a keyword estimate that
+    The number of posts available is the 100%: 5 of 12 posts is 42 points, 12 of 12 is 100.
+    With no hashtags the roster interest tags and bio give a keyword estimate that
     counts at 0.3."""
     cats = [c.strip().lower() for c in (cats or []) if c and c.strip().lower() != "any"]
     if not cats:
@@ -526,7 +525,7 @@ def post_interest(doc, creator, cats):
         sh_hi = min(1.0, sum(pcts) / 100.0) if pcts else 0.0
         m_lo, m_hi = int(round(sh_lo * n)), int(round(sh_hi * n))
         s_lo, s_hi = min(1.0, sh_lo / INTEREST_FULL_SHARE), min(1.0, sh_hi / INTEREST_FULL_SHARE)
-        ev = min(1.0, n / float(INTEREST_FULL_POSTS))
+        ev = 1.0
         mt = "%d" % m_lo if m_lo == m_hi else "%d-%d" % (m_lo, m_hi)
         return {"lo": s_lo, "hi": s_hi, "share_lo": sh_lo, "share_hi": sh_hi, "posts": n, "matched_lo": m_lo, "matched_hi": m_hi,
                 "evidence": ev, "src": "posts",
@@ -690,7 +689,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
                         "level": "ok" if i_mid >= 0.6 else "warn" if i_mid >= 0.3 else "bad"})
     posts_n = int(doc.get("sample_posts") or (12 if verified else 0))
     metrics.append({"label": "Posts analysed", "value": str(posts_n) if posts_n else "none on file",
-                    "note": ("full weight from %d posts" % INTEREST_FULL_POSTS) if posts_n else "score is from public numbers",
+                    "note": "the 100% base for the product-space match" if posts_n else "score is from public numbers",
                     "level": "ok" if posts_n >= 20 else "warn" if posts_n >= 6 else "bad"})
     if out["reach_followers"]:
         metrics.append({"label": "Reach", "value": _k(out["reach_followers"]), "note": "followers on %s" % plat, "level": "info"})
