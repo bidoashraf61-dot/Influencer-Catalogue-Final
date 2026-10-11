@@ -3903,8 +3903,9 @@ def score_model_card():
             "<p class='price-hint'>Weights are shares: they are normalised over what is available, so only their proportions matter.</p>"
             "<table><thead><tr><th>Parameter</th><th>Platforms</th><th>Scores 0 at</th><th>Scores 100 at</th><th></th></tr></thead><tbody>"
             + brows + "</tbody></table>"
-            "<p class='price-hint'>Engagement and view rate are percentages. Consistency is the swing of views "
-            "(std &divide; mean): lower is steadier, so its 0 point is the larger number.</p></div>")
+            "<p class='price-hint'>Engagement and view rate use the research tier for the creator's platform and size "
+            "(0 at half the low end, 100 at the high end) unless you set a value here, which then applies to every size. "
+            "Consistency is the swing of views (std &divide; mean): lower is steadier, so its 0 point is the larger number.</p></div>")
 
 
 def intl_benchmarks_card():

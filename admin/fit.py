@@ -585,24 +585,24 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     # -- engagement
     er_val = sample.get("er_med") if sample.get("er_med") is not None else sample.get("er")
     if er_val is not None:
-        z, fl = sm.band("engagement", group)
+        (z, fl), bsrc, btier = sm.band_for("engagement", group, plat, f)
         s = sm.scale(er_val, z, fl)
         ref = intl_benchmarks.reference(plat, f)
         refnote = (" · international reference %s" % (("%g%%" % ref["low"]) if ref["high"] - ref["low"] < 0.05
                                                      else "%g-%g%%" % (ref["low"], ref["high"]))) if ref else ""
         put("engagement", s, s, "Engagement %s%s" % (_pct(er_val), unit_er), "Engagement %s%s" % (_pct(er_val), unit_er),
             {"label": "Engagement", "value": "%s%s" % (_pct(er_val), unit_er),
-             "note": "scores 0 at %g%%, 100 at %g%%%s" % (z, fl, refnote),
+             "note": "scores 0 at %g%%, 100 at %g%%%s%s" % (z, fl, (" (%s tier, research)" % btier) if btier else "", refnote),
              "level": "ok" if s >= 0.6 else "warn" if s >= 0.3 else "bad"})
 
     # -- view rate
     vr = sample.get("view_rate_med") if sample.get("view_rate_med") is not None else sample.get("view_rate")
     if vr is not None:
-        z, fl = sm.band("view_rate", group)
+        (z, fl), bsrc, btier = sm.band_for("view_rate", group, plat, f)
         s = sm.scale(vr, z, fl)
         put("view_rate", s, s, "A typical post reaches %s of followers" % _pct(vr),
             "A typical post reaches only %s of followers" % _pct(vr),
-            {"label": "View rate", "value": "%s of followers" % _pct(vr), "note": "median views / followers; 0 at %g%%, 100 at %g%%" % (z, fl),
+            {"label": "View rate", "value": "%s of followers" % _pct(vr), "note": "median views / followers; 0 at %g%%, 100 at %g%%%s" % (z, fl, (" (%s tier, research)" % btier) if btier else ""),
              "level": "ok" if s >= 0.6 else "warn" if s >= 0.3 else "bad"})
 
     # -- consistency (needs the spread of at least 10 posts)

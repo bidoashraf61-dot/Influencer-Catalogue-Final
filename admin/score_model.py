@@ -75,3 +75,56 @@ def scale(v, zero_at, full_at):
     if zero_at == full_at:
         return 0.0
     return max(0.0, min(1.0, (v - zero_at) / float(full_at - zero_at)))
+
+
+# -- the research tiers (admin/reference/benchmarks.json, KSA block = global proxies) --------------
+_PLAT_KEY = {"Instagram": "instagram_reels", "TikTok": "tiktok", "Snapchat": "snapchat", "YouTube": "youtube_shorts"}
+_METRIC_KEY = {"engagement": "eng_rate", "view_rate": "view_rate"}
+_TIERS = ("nano", "micro", "mid", "macro", "mega")
+_ref = {"data": None}
+
+
+def tier_of(followers):
+    f = followers or 0
+    return "nano" if f < 20000 else "micro" if f < 100000 else "mid" if f < 500000 else "macro" if f < 1000000 else "mega"
+
+
+def _reference():
+    if _ref["data"] is None:
+        try:
+            import json
+            import os
+            with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "reference", "benchmarks.json")) as fh:
+                _ref["data"] = json.load(fh).get("markets", {}).get("KSA", {})
+        except Exception:
+            _ref["data"] = {}
+    return _ref["data"]
+
+
+def research_range(metric, platform, followers):
+    """([low, high], tier) from the research for a metric, platform and size, or None. A tier with no
+    figure (mega view rate) borrows the next smaller tier that has one."""
+    key = _METRIC_KEY.get(metric)
+    plat = _reference().get(_PLAT_KEY.get(platform) or "instagram_reels") or {}
+    if not key or not plat:
+        return None
+    i = _TIERS.index(tier_of(followers))
+    for t in reversed(_TIERS[:i + 1]):
+        x = (plat.get(t) or {}).get(key) or {}
+        lo, hi = _pos(x.get("low")), _pos(x.get("high"))
+        if lo and hi:
+            return [lo, hi], t
+    return None
+
+
+def band_for(metric, group, platform, followers):
+    """([zero_at, full_at], source, tier): a value set in Settings wins; then the research tier
+    (0 at half the low end, 100 at the high end); then the flat default."""
+    edited = ((_overrides().get("bands") or {}).get(metric) or {}).get(group)
+    if isinstance(edited, (list, tuple)) and len(edited) == 2:
+        return band(metric, group), "settings", None
+    r = research_range(metric, platform, followers)
+    if r:
+        (lo, hi), tier = r
+        return [lo / 2.0, hi], "research", tier
+    return band(metric, group), "default", None
