@@ -26,11 +26,11 @@ class V3(unittest.TestCase):
         self.assertEqual([p["key"] for p in r["parts"]], ["engagement"])
         self.assertTrue(r["score_range"][0] <= r["score"] <= r["score_range"][1])
 
-    def test_posts_naming_the_space_lift_the_score(self):
-        base = score(doc(hashtags=[]), "Beauty")["score"]
-        hit = score(doc(), "Beauty")
-        self.assertGreater(hit["score"], base)
-        m = {x["label"]: x for x in hit["metrics"]}
+    def test_more_posts_naming_the_space_score_higher(self):
+        low = score(doc(hashtags=[{"tag": "#skincare", "count": 10.0}]), "Beauty")["score"]
+        high = score(doc(hashtags=[{"tag": "#skincare", "count": 80.0}]), "Beauty")["score"]
+        self.assertGreater(high, low)
+        m = {x["label"]: x for x in score(doc(), "Beauty")["metrics"]}
         self.assertEqual(m["Product space"]["value"], "5 of 12 posts")
 
     def test_available_posts_are_the_100_percent(self):
