@@ -1432,3 +1432,13 @@ a.hv-note:hover { background: #efede8; }
 .ai-sl__cring, .ai-sl__cring .hv-lime, .ai-sl__face, .ai-sl__face .hv-lime,
 .ai-sl__lens, .ai-sl__lens .hv-lime, .ai-sl__cheer, .ai-sl__cheer .hv-lime { border-radius: 24%; }
 .ai-sl .hv-lime .hv-clip { object-fit: contain; object-position: 50% 50%; transform: none; }
+
+/* AI shortlist card (2026-10-11, Bido: "use the old videos without any cropping or zooming"): Helvy is the
+   whole waist-up figure at its own frame, on the dark card, with no disc, no ring and no mask. */
+.hv-fig { position: relative; display: block; width: 100%; height: 100%; overflow: visible; background: none; }
+.hv-fig .hv-clip, .hv-fig__v { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: 50% 100%; transform: none; background: none; }
+.ai-sl__cring, .ai-sl__face, .ai-sl__lens, .ai-sl__cheer { border-radius: 0; background: none; box-shadow: none; overflow: visible; }
+.ai-sl__cring { width: 224px; height: 240px; }
+.ai-sl__lens { width: 256px; height: 256px; }
+.ai-sl:not(.is-open) .ai-sl__face { width: 112px; height: 112px; box-shadow: none; }
+@media (max-width: 760px) { .ai-sl__cring { width: 120px; height: 132px; } .ai-sl__lens { width: 168px; height: 168px; } }
