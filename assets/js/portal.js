@@ -1548,16 +1548,17 @@
       x.addEventListener("click", function () { close(); });
 
       /* -- Helvy: a reaction plays once, then he waits (thinking) -- */
-      var CLIPS = { point: "point", think: "thinking", yes: "approve", cheer: "celebrate", idle: "idle" };
+      // The same lime clips as the AI shortlist card (one framing, no still): a reaction plays once and the
+      // coach goes back to the smile; while it works he scouts with the camera. (Fix batch 3's transparent
+      // clips lost their sizing rule in batch 4 and rendered huge and blank: 2026-10-11.)
+      var cframe = lime(null, "ai-sl__cframe");
+      cring.appendChild(cframe);
+      var CLIPS = { point: "point", think: "think", yes: "thumbs", cheer: "celebrate", idle: "idle" };
       function react(kind, loop, seq) {
-        if (reduce || !HVH) { if (!cring.firstChild) cring.appendChild(clip("idle", "ob__still", { still: true })); return; }
-        var v = HVH.video(CLIPS[kind] || "idle", { once: !loop && !seq, then: !loop && !seq ? "thinking" : null, seq: seq, cls: "ai-sl__cvid", eager: true });
-        var old = [].slice.call(cring.querySelectorAll("video, img"));
-        var swap = function () { old.forEach(function (o) { o.remove(); }); };
-        v.addEventListener("playing", swap, { once: true });
-        setTimeout(swap, 900);
-        cring.appendChild(v);
-        HVH.play(v);
+        if (reduce || !HVH) return;
+        if (seq) { cframe.loop("scan"); }                      // the working stage: the camera
+        else if (loop) { cframe.loop(CLIPS[kind] || "idle"); }
+        else { cframe.react(CLIPS[kind] || "idle", "idle"); }
         cring.classList.remove("is-bump"); void cring.offsetWidth; cring.classList.add("is-bump");
       }
       function say(text) {

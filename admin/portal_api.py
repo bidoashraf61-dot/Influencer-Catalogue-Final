@@ -591,7 +591,7 @@ class PortalMixin(connect_api.ConnectMixin):
         cid, user, kind = who
         b = self.json_body()
         sel = db.selection(token=str(b.get("token") or "")) if b.get("token") else None
-        if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id()):
+        if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not portal.unlock_all()):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         if not portal.may_edit(cid, sel, db.admin_code_id()):
             return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only the person who owns this selection can change it. Colleagues on the same company can view it."}, self.cors())
@@ -986,7 +986,7 @@ class PortalMixin(connect_api.ConnectMixin):
         sel = db.selection(token=str(token or "")) if token else None
         if sel is None:
             return None
-        if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not self.admin_like():
+        if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not portal.unlock_all() and not self.admin_like():
             return None
         with db.connect() as conn:
             br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",
