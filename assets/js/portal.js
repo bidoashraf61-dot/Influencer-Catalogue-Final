@@ -121,8 +121,12 @@
   // A new clip is laid over the old one, which goes once the new one draws (a source swap on a
   // visible element flashed blank frames in Chrome). Reduced motion: the lime still.
   // The resting loop is the energetic toothy smile ("hi"), the same clip as the chat launcher.
-  var LIME = { loop: "hi", wave: "hi", idle: "hi", point: "point-act", think: "think", thumbs: "thumbs-act",
-               cheer: "cheer-act", celebrate: "cheer", scan: "up" };   // building: thumbs-up and wink, grinning
+  // 2026-10-11 (Bido): the past flow is back. The camera "scan" clip plays while he is cooking /
+  // building, and every reaction keeps its own clip (point, think, thumbs, cheer). The newer clips
+  // are ADDED to that flow, not instead of it: "hi" (the energetic smile) is the resting face and
+  // "up" (the grinning double thumbs-up) is a second thumbs-up reaction the coach alternates with the old one.
+  var LIME = { loop: "hi", wave: "loop", idle: "hi", hi: "hi", up: "up", point: "point-act", think: "think", thumbs: "thumbs-act",
+               cheer: "cheer-act", celebrate: "cheer", scan: "scan" };
   function lime(kind, cls, opts) {
     opts = opts || {};
     var frame = document.createElement("span");
@@ -3373,9 +3377,13 @@
     // The coach: idle poses loop; reactions (thumbs, cheer, point) play once, in full, then hand
     // over to whatever is waiting, so a tap is always answered before the next pose.
     var coachTimer = null, reacting = false, queued = null;
+    var thumbFlip = false;
     function coachShow(kind, loop, onEnd, then) {
-      if (loop) cframe.loop(CLIP[kind]);
-      else cframe.react(CLIP[kind], CLIP[then] || "think", onEnd);
+      var key = CLIP[kind];
+      // thumbs-up reactions alternate between the original clip and the newer grinning double thumbs-up
+      if (kind === "thumbs" && !loop) { thumbFlip = !thumbFlip; key = thumbFlip ? "up" : "thumbs"; }
+      if (loop) cframe.loop(key);
+      else cframe.react(key, CLIP[then] || "think", onEnd);
     }
     function coachPlay(kind, then) {
       if (reduce) return;
