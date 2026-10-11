@@ -405,7 +405,8 @@
     }[g.state] || ["lock", "Full analysis", "", ""];
     box.innerHTML = '<span class="pp-req__lock">' + hvi(st[0]) + '</span><div><h2 class="pp-req__h">' + st[1] + "</h2><p>" + st[2] + '</p><p class="pp-req__err" role="alert" hidden></p></div><div class="pp-req__side">' + st[3] + "</div>" +
       (g.state === "requested" ? '<div class="pp-req__track"><span class="on">Requested · ' + esc(when(g.requested_at)) + '</span><span class="now">Being prepared</span><span>Ready by ' + esc(when(g.ready_by)) + "</span></div>" : "");
-    if (g.sample_full && g.state !== "unlocked" || (g.sample_full && g.admin)) {
+    // A sample only helps while this creator's own full analysis is closed (owner, 2026-10-12).
+    if (g.sample_full && g.state !== "unlocked") {
       box.querySelector(".pp-req__side").appendChild(sampleButton());
     }
     var ask = box.querySelector("#pp-ask-full");
