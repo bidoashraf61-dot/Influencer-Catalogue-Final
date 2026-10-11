@@ -41,9 +41,9 @@ class Multi(unittest.TestCase):
         a, missing = clean(market=["XX"])
         self.assertIn("market", missing)
 
-    def test_countries_are_capped_and_cleaned(self):
+    def test_countries_are_open_and_cleaned(self):
         a, _ = clean(market=["SA", "AE", "EG", "KW", "QA", "SA", "nonsense"])
-        self.assertEqual(a["market"], ["SA", "AE", "EG", "KW"])
+        self.assertEqual(a["market"], ["SA", "AE", "EG", "KW", "QA"])
 
     def test_age_groups(self):
         a, _ = clean(market="SA", age=["18-24", "25-34"])
