@@ -1,0 +1,1397 @@
+{
+ "version": "t3a",
+ "brand": "Northwind Pharma",
+ "campaign": "Ramadan Skincare",
+ "invented_names": [
+  "Lulwa R.",
+  "Dr. Adel K.",
+  "Maha S.",
+  "Tariq B.",
+  "Nada H.",
+  "Dr. Ghada M.",
+  "Yousef O.",
+  "Rana A."
+ ],
+ "brands": [
+  "Velora Skin",
+  "Sahar Beauty",
+  "Dune Café",
+  "Oasis Pharmacy",
+  "Mira Home",
+  "Nimbus Gym",
+  "Zaha Kids",
+  "Qamar Wear"
+ ],
+ "people": [
+  {
+   "code": "DEMO-01",
+   "name": "Lulwa R.",
+   "handle": "lulwa.r.glow27",
+   "tier": "Macro",
+   "city": "Riyadh",
+   "interest": "Beauty & skincare",
+   "photo": 1,
+   "nationality": "Saudi",
+   "platforms": [
+    {
+     "platform": "Instagram",
+     "followers": 611880,
+     "er": 4.1,
+     "avg_views": 137112,
+     "median_views": 102121,
+     "posts": 24
+    },
+    {
+     "platform": "TikTok",
+     "followers": 240884,
+     "er": 6.4,
+     "avg_views": 107405,
+     "median_views": 89298,
+     "posts": 24
+    }
+   ],
+   "licences": [
+    "SA"
+   ],
+   "price": [
+    6500,
+    9000
+   ],
+   "score": {
+    "overall": 91,
+    "parts": {
+     "engagement": 0.88,
+     "reach": 0.95,
+     "audience": 0.92
+    },
+    "confidence": {
+     "level": "high",
+     "posts": 24,
+     "peers_n": 40,
+     "source": "peers"
+    },
+    "limited_data": false,
+    "strengths": [
+     "4.1% engagement, above the typical for creators this size",
+     "71% of the measured audience are women",
+     "Works in the skincare space"
+    ],
+    "watchouts": [],
+    "checks": [
+     {
+      "label": "Measured audience",
+      "text": "78% of the measured audience is in Saudi Arabia",
+      "level": "ok"
+     },
+     {
+      "label": "Gender",
+      "text": "71% of the audience are women",
+      "level": "ok"
+     }
+    ]
+   },
+   "audience": {
+    "female": 71,
+    "male": 29,
+    "ages": [
+     {
+      "name": "13-17",
+      "pct": 2.3
+     },
+     {
+      "name": "18-24",
+      "pct": 30.6
+     },
+     {
+      "name": "25-34",
+      "pct": 42.1
+     },
+     {
+      "name": "35-44",
+      "pct": 19.3
+     },
+     {
+      "name": "45-64",
+      "pct": 5.7
+     }
+    ],
+    "countries": [
+     {
+      "code": "SA",
+      "pct": 78.0
+     },
+     {
+      "code": "AE",
+      "pct": 8.4
+     },
+     {
+      "code": "KW",
+      "pct": 5.1
+     },
+     {
+      "code": "EG",
+      "pct": 4.1
+     },
+     {
+      "code": "BH",
+      "pct": 2.4
+     },
+     {
+      "code": "QA",
+      "pct": 2.0
+     }
+    ],
+    "cities": [
+     {
+      "name": "Riyadh",
+      "pct": 30.3
+     },
+     {
+      "name": "Jeddah",
+      "pct": 19.3
+     },
+     {
+      "name": "Dammam",
+      "pct": 7.0
+     },
+     {
+      "name": "Mecca",
+      "pct": 3.4
+     },
+     {
+      "name": "Medina",
+      "pct": 3.8
+     }
+    ],
+    "languages": [
+     {
+      "name": "Arabic",
+      "pct": 74.5
+     },
+     {
+      "name": "English",
+      "pct": 22.8
+     },
+     {
+      "name": "Other",
+      "pct": 2.7
+     }
+    ]
+   },
+   "authenticity": {
+    "fake_followers_pct": 3.7,
+    "fake_likers_pct": 2.8,
+    "real_people_pct": 90.4,
+    "mass_followers_pct": 11.3,
+    "suspicious_pct": 3.7,
+    "notable_followers_pct": 2.5
+   },
+   "growth_pct": 1.2,
+   "posts_per_week": 3.9,
+   "brands": [
+    "Sahar Beauty",
+    "Dune Café",
+    "Oasis Pharmacy"
+   ]
+  },
+  {
+   "code": "DEMO-02",
+   "name": "Dr. Adel K.",
+   "handle": "dr.adel.k.clinic",
+   "tier": "HCP - Mid-Tier",
+   "city": "Jeddah",
+   "interest": "Health",
+   "photo": 2,
+   "nationality": "Saudi",
+   "platforms": [
+    {
+     "platform": "Instagram",
+     "followers": 187629,
+     "er": 5.2,
+     "avg_views": 48183,
+     "median_views": 37416,
+     "posts": 22
+    },
+    {
+     "platform": "Snapchat",
+     "followers": 64537,
+     "er": 3.4,
+     "avg_views": 10909,
+     "median_views": 8975,
+     "posts": 22
+    }
+   ],
+   "licences": [
+    "SA"
+   ],
+   "price": [
+    5000,
+    7000
+   ],
+   "score": {
+    "overall": 79,
+    "parts": {
+     "engagement": 0.9,
+     "reach": 0.7,
+     "audience": 0.74
+    },
+    "confidence": {
+     "level": "high",
+     "posts": 22,
+     "peers_n": 40,
+     "source": "peers"
+    },
+    "limited_data": false,
+    "strengths": [
+     "5.2% engagement, above the typical for creators this size",
+     "A doctor: a trusted voice for health claims"
+    ],
+    "watchouts": [
+     "Audience is 52% men"
+    ],
+    "checks": [
+     {
+      "label": "Measured audience",
+      "text": "81% of the measured audience is in Saudi Arabia",
+      "level": "ok"
+     },
+     {
+      "label": "Gender",
+      "text": "48% of the audience are women",
+      "level": "warn"
+     }
+    ]
+   },
+   "audience": {
+    "female": 48,
+    "male": 52,
+    "ages": [
+     {
+      "name": "13-17",
+      "pct": 1.8
+     },
+     {
+      "name": "18-24",
+      "pct": 32.9
+     },
+     {
+      "name": "25-34",
+      "pct": 43.0
+     },
+     {
+      "name": "35-44",
+      "pct": 17.1
+     },
+     {
+      "name": "45-64",
+      "pct": 5.3
+     }
+    ],
+    "countries": [
+     {
+      "code": "SA",
+      "pct": 81.0
+     },
+     {
+      "code": "AE",
+      "pct": 7.3
+     },
+     {
+      "code": "KW",
+      "pct": 4.4
+     },
+     {
+      "code": "EG",
+      "pct": 3.5
+     },
+     {
+      "code": "BH",
+      "pct": 2.0
+     },
+     {
+      "code": "QA",
+      "pct": 1.7
+     }
+    ],
+    "cities": [
+     {
+      "name": "Jeddah",
+      "pct": 36.1
+     },
+     {
+      "name": "Riyadh",
+      "pct": 15.3
+     },
+     {
+      "name": "Dammam",
+      "pct": 6.5
+     },
+     {
+      "name": "Mecca",
+      "pct": 3.5
+     },
+     {
+      "name": "Medina",
+      "pct": 3.2
+     }
+    ],
+    "languages": [
+     {
+      "name": "Arabic",
+      "pct": 74.5
+     },
+     {
+      "name": "English",
+      "pct": 22.8
+     },
+     {
+      "name": "Other",
+      "pct": 2.7
+     }
+    ]
+   },
+   "authenticity": {
+    "fake_followers_pct": 8.7,
+    "fake_likers_pct": 6.5,
+    "real_people_pct": 77.4,
+    "mass_followers_pct": 8.5,
+    "suspicious_pct": 8.7,
+    "notable_followers_pct": 3.0
+   },
+   "growth_pct": 1.7,
+   "posts_per_week": 5.7,
+   "brands": [
+    "Dune Café",
+    "Oasis Pharmacy",
+    "Mira Home"
+   ]
+  },
+  {
+   "code": "DEMO-03",
+   "name": "Maha S.",
+   "handle": "maha.s.sips44",
+   "tier": "Mid-Tier",
+   "city": "Riyadh",
+   "interest": "Food & cafés",
+   "photo": 3,
+   "nationality": "Saudi",
+   "platforms": [
+    {
+     "platform": "TikTok",
+     "followers": 203031,
+     "er": 3.6,
+     "avg_views": 86809,
+     "median_views": 72588,
+     "posts": 7
+    },
+    {
+     "platform": "Snapchat",
+     "followers": 119183,
+     "er": 2.9,
+     "avg_views": 18307,
+     "median_views": 14846,
+     "posts": 7
+    }
+   ],
+   "licences": [
+    "SA"
+   ],
+   "price": [
+    3000,
+    4500
+   ],
+   "score": {
+    "overall": 70,
+    "parts": {
+     "engagement": 0.74,
+     "reach": 0.74,
+     "audience": 0.64
+    },
+    "confidence": {
+     "level": "low",
+     "posts": 7,
+     "peers_n": 9,
+     "source": "global"
+    },
+    "limited_data": true,
+    "strengths": [
+     "3.6% engagement, above the typical for creators this size"
+    ],
+    "watchouts": [
+     "Little sign of skincare content or audience interest",
+     "Only 7 recent posts to read: treat the numbers as a first look"
+    ],
+    "checks": [
+     {
+      "label": "Measured audience",
+      "text": "74% of the measured audience is in Saudi Arabia",
+      "level": "ok"
+     },
+     {
+      "label": "Gender",
+      "text": "64% of the audience are women",
+      "level": "ok"
+     }
+    ]
+   },
+   "audience": {
+    "female": 64,
+    "male": 36,
+    "ages": [
+     {
+      "name": "13-17",
+      "pct": 4.1
+     },
+     {
+      "name": "18-24",
+      "pct": 25.2
+     },
+     {
+      "name": "25-34",
+      "pct": 47.6
+     },
+     {
+      "name": "35-44",
+      "pct": 18.4
+     },
+     {
+      "name": "45-64",
+      "pct": 4.7
+     }
+    ],
+    "countries": [
+     {
+      "code": "SA",
+      "pct": 74.0
+     },
+     {
+      "code": "AE",
+      "pct": 10.0
+     },
+     {
+      "code": "KW",
+      "pct": 6.1
+     },
+     {
+      "code": "EG",
+      "pct": 4.8
+     },
+     {
+      "code": "BH",
+      "pct": 2.8
+     },
+     {
+      "code": "QA",
+      "pct": 2.3
+     }
+    ],
+    "cities": [
+     {
+      "name": "Riyadh",
+      "pct": 34.1
+     },
+     {
+      "name": "Jeddah",
+      "pct": 17.1
+     },
+     {
+      "name": "Dammam",
+      "pct": 9.7
+     },
+     {
+      "name": "Mecca",
+      "pct": 4.5
+     },
+     {
+      "name": "Medina",
+      "pct": 3.4
+     }
+    ],
+    "languages": [
+     {
+      "name": "Arabic",
+      "pct": 74.5
+     },
+     {
+      "name": "English",
+      "pct": 22.8
+     },
+     {
+      "name": "Other",
+      "pct": 2.7
+     }
+    ]
+   },
+   "authenticity": {
+    "fake_followers_pct": 9.1,
+    "fake_likers_pct": 6.8,
+    "real_people_pct": 76.3,
+    "mass_followers_pct": 8.6,
+    "suspicious_pct": 9.1,
+    "notable_followers_pct": 3.2
+   },
+   "growth_pct": 2.9,
+   "posts_per_week": 3.5,
+   "brands": [
+    "Oasis Pharmacy",
+    "Mira Home",
+    "Nimbus Gym"
+   ]
+  },
+  {
+   "code": "DEMO-04",
+   "name": "Tariq B.",
+   "handle": "tariq.b.move19",
+   "tier": "Nano",
+   "city": "Dammam",
+   "interest": "Fitness",
+   "photo": 4,
+   "nationality": "Saudi",
+   "platforms": [
+    {
+     "platform": "Instagram",
+     "followers": 14885,
+     "er": 7.9,
+     "avg_views": 3697,
+     "median_views": 3140,
+     "posts": 21
+    },
+    {
+     "platform": "TikTok",
+     "followers": 9460,
+     "er": 6.1,
+     "avg_views": 4151,
+     "median_views": 3076,
+     "posts": 21
+    }
+   ],
+   "licences": [],
+   "price": [
+    600,
+    900
+   ],
+   "score": {
+    "overall": 66,
+    "parts": {
+     "engagement": 0.93,
+     "reach": 0.5,
+     "audience": 0.46
+    },
+    "confidence": {
+     "level": "high",
+     "posts": 21,
+     "peers_n": 40,
+     "source": "peers"
+    },
+    "limited_data": false,
+    "strengths": [
+     "7.9% engagement, above the typical for creators this size"
+    ],
+    "watchouts": [
+     "Audience is 62% men",
+     "Little sign of skincare content or audience interest"
+    ],
+    "checks": [
+     {
+      "label": "Measured audience",
+      "text": "83% of the measured audience is in Saudi Arabia",
+      "level": "ok"
+     },
+     {
+      "label": "Gender",
+      "text": "38% of the audience are women",
+      "level": "bad"
+     }
+    ]
+   },
+   "audience": {
+    "female": 38,
+    "male": 62,
+    "ages": [
+     {
+      "name": "13-17",
+      "pct": 3.7
+     },
+     {
+      "name": "18-24",
+      "pct": 23.6
+     },
+     {
+      "name": "25-34",
+      "pct": 47.0
+     },
+     {
+      "name": "35-44",
+      "pct": 19.9
+     },
+     {
+      "name": "45-64",
+      "pct": 5.8
+     }
+    ],
+    "countries": [
+     {
+      "code": "SA",
+      "pct": 83.0
+     },
+     {
+      "code": "AE",
+      "pct": 6.5
+     },
+     {
+      "code": "KW",
+      "pct": 4.0
+     },
+     {
+      "code": "EG",
+      "pct": 3.2
+     },
+     {
+      "code": "BH",
+      "pct": 1.8
+     },
+     {
+      "code": "QA",
+      "pct": 1.5
+     }
+    ],
+    "cities": [
+     {
+      "name": "Dammam",
+      "pct": 37.8
+     },
+     {
+      "name": "Jeddah",
+      "pct": 18.5
+     },
+     {
+      "name": "Dammam",
+      "pct": 7.8
+     },
+     {
+      "name": "Mecca",
+      "pct": 3.6
+     },
+     {
+      "name": "Medina",
+      "pct": 3.0
+     }
+    ],
+    "languages": [
+     {
+      "name": "Arabic",
+      "pct": 74.5
+     },
+     {
+      "name": "English",
+      "pct": 22.8
+     },
+     {
+      "name": "Other",
+      "pct": 2.7
+     }
+    ]
+   },
+   "authenticity": {
+    "fake_followers_pct": 5.7,
+    "fake_likers_pct": 4.3,
+    "real_people_pct": 85.2,
+    "mass_followers_pct": 10.2,
+    "suspicious_pct": 5.7,
+    "notable_followers_pct": 2.8
+   },
+   "growth_pct": 2.5,
+   "posts_per_week": 5.6,
+   "brands": [
+    "Mira Home",
+    "Nimbus Gym",
+    "Zaha Kids"
+   ]
+  },
+  {
+   "code": "DEMO-05",
+   "name": "Nada H.",
+   "handle": "nada.h.noor08",
+   "tier": "Mid-Tier",
+   "city": "Riyadh",
+   "interest": "Parenting",
+   "photo": 5,
+   "nationality": "Saudi",
+   "platforms": [
+    {
+     "platform": "Instagram",
+     "followers": 151303,
+     "er": 4.5,
+     "avg_views": 34777,
+     "median_views": 29837,
+     "posts": 19
+    },
+    {
+     "platform": "Snapchat",
+     "followers": 87160,
+     "er": 3.1,
+     "avg_views": 14892,
+     "median_views": 12079,
+     "posts": 19
+    }
+   ],
+   "licences": [
+    "SA",
+    "AE"
+   ],
+   "price": [
+    3500,
+    5000
+   ],
+   "score": {
+    "overall": 79,
+    "parts": {
+     "engagement": 0.82,
+     "reach": 0.72,
+     "audience": 0.8
+    },
+    "confidence": {
+     "level": "medium",
+     "posts": 19,
+     "peers_n": 40,
+     "source": "peers"
+    },
+    "limited_data": false,
+    "strengths": [
+     "4.5% engagement, above the typical for creators this size",
+     "68% of the measured audience are women"
+    ],
+    "watchouts": [],
+    "checks": [
+     {
+      "label": "Measured audience",
+      "text": "70% of the measured audience is in Saudi Arabia",
+      "level": "ok"
+     },
+     {
+      "label": "Gender",
+      "text": "68% of the audience are women",
+      "level": "ok"
+     }
+    ]
+   },
+   "audience": {
+    "female": 68,
+    "male": 32,
+    "ages": [
+     {
+      "name": "13-17",
+      "pct": 1.7
+     },
+     {
+      "name": "18-24",
+      "pct": 28.9
+     },
+     {
+      "name": "25-34",
+      "pct": 46.2
+     },
+     {
+      "name": "35-44",
+      "pct": 15.2
+     },
+     {
+      "name": "45-64",
+      "pct": 8.1
+     }
+    ],
+    "countries": [
+     {
+      "code": "SA",
+      "pct": 70.0
+     },
+     {
+      "code": "AE",
+      "pct": 11.5
+     },
+     {
+      "code": "KW",
+      "pct": 7.0
+     },
+     {
+      "code": "EG",
+      "pct": 5.6
+     },
+     {
+      "code": "BH",
+      "pct": 3.2
+     },
+     {
+      "code": "QA",
+      "pct": 2.7
+     }
+    ],
+    "cities": [
+     {
+      "name": "Riyadh",
+      "pct": 31.0
+     },
+     {
+      "name": "Jeddah",
+      "pct": 17.8
+     },
+     {
+      "name": "Dammam",
+      "pct": 6.1
+     },
+     {
+      "name": "Mecca",
+      "pct": 3.4
+     },
+     {
+      "name": "Medina",
+      "pct": 2.0
+     }
+    ],
+    "languages": [
+     {
+      "name": "Arabic",
+      "pct": 74.5
+     },
+     {
+      "name": "English",
+      "pct": 22.8
+     },
+     {
+      "name": "Other",
+      "pct": 2.7
+     }
+    ]
+   },
+   "authenticity": {
+    "fake_followers_pct": 8.9,
+    "fake_likers_pct": 6.7,
+    "real_people_pct": 76.9,
+    "mass_followers_pct": 12.3,
+    "suspicious_pct": 8.9,
+    "notable_followers_pct": 1.5
+   },
+   "growth_pct": 3.3,
+   "posts_per_week": 4.1,
+   "brands": [
+    "Nimbus Gym",
+    "Zaha Kids",
+    "Qamar Wear"
+   ]
+  },
+  {
+   "code": "DEMO-06",
+   "name": "Dr. Ghada M.",
+   "handle": "dr.ghada.m.derm",
+   "tier": "HCP - Mid-Tier",
+   "city": "Riyadh",
+   "interest": "Dermatology",
+   "photo": 6,
+   "nationality": "Saudi",
+   "platforms": [
+    {
+     "platform": "Instagram",
+     "followers": 271942,
+     "er": 5.5,
+     "avg_views": 62400,
+     "median_views": 50532,
+     "posts": 26
+    },
+    {
+     "platform": "TikTok",
+     "followers": 95946,
+     "er": 4.9,
+     "avg_views": 45266,
+     "median_views": 34208,
+     "posts": 26
+    }
+   ],
+   "licences": [
+    "SA"
+   ],
+   "price": [
+    6000,
+    8000
+   ],
+   "score": {
+    "overall": 88,
+    "parts": {
+     "engagement": 0.9,
+     "reach": 0.78,
+     "audience": 0.93
+    },
+    "confidence": {
+     "level": "high",
+     "posts": 26,
+     "peers_n": 40,
+     "source": "peers"
+    },
+    "limited_data": false,
+    "strengths": [
+     "5.5% engagement, above the typical for creators this size",
+     "74% of the measured audience are women",
+     "A doctor: a trusted voice for health claims"
+    ],
+    "watchouts": [],
+    "checks": [
+     {
+      "label": "Measured audience",
+      "text": "83% of the measured audience is in Saudi Arabia",
+      "level": "ok"
+     },
+     {
+      "label": "Gender",
+      "text": "74% of the audience are women",
+      "level": "ok"
+     }
+    ]
+   },
+   "audience": {
+    "female": 74,
+    "male": 26,
+    "ages": [
+     {
+      "name": "13-17",
+      "pct": 3.5
+     },
+     {
+      "name": "18-24",
+      "pct": 26.5
+     },
+     {
+      "name": "25-34",
+      "pct": 46.2
+     },
+     {
+      "name": "35-44",
+      "pct": 18.5
+     },
+     {
+      "name": "45-64",
+      "pct": 5.3
+     }
+    ],
+    "countries": [
+     {
+      "code": "SA",
+      "pct": 83.0
+     },
+     {
+      "code": "AE",
+      "pct": 6.5
+     },
+     {
+      "code": "KW",
+      "pct": 4.0
+     },
+     {
+      "code": "EG",
+      "pct": 3.2
+     },
+     {
+      "code": "BH",
+      "pct": 1.8
+     },
+     {
+      "code": "QA",
+      "pct": 1.5
+     }
+    ],
+    "cities": [
+     {
+      "name": "Riyadh",
+      "pct": 37.9
+     },
+     {
+      "name": "Jeddah",
+      "pct": 19.3
+     },
+     {
+      "name": "Dammam",
+      "pct": 8.2
+     },
+     {
+      "name": "Mecca",
+      "pct": 4.2
+     },
+     {
+      "name": "Medina",
+      "pct": 3.8
+     }
+    ],
+    "languages": [
+     {
+      "name": "Arabic",
+      "pct": 74.5
+     },
+     {
+      "name": "English",
+      "pct": 22.8
+     },
+     {
+      "name": "Other",
+      "pct": 2.7
+     }
+    ]
+   },
+   "authenticity": {
+    "fake_followers_pct": 7.4,
+    "fake_likers_pct": 5.6,
+    "real_people_pct": 80.8,
+    "mass_followers_pct": 11.1,
+    "suspicious_pct": 7.4,
+    "notable_followers_pct": 2.4
+   },
+   "growth_pct": 2.6,
+   "posts_per_week": 4.7,
+   "brands": [
+    "Zaha Kids",
+    "Qamar Wear",
+    "Velora Skin"
+   ]
+  },
+  {
+   "code": "DEMO-07",
+   "name": "Yousef O.",
+   "handle": "yousef.o.drive31",
+   "tier": "Macro",
+   "city": "Riyadh",
+   "interest": "Cars",
+   "photo": 7,
+   "nationality": "Saudi",
+   "platforms": [
+    {
+     "platform": "Snapchat",
+     "followers": 536348,
+     "er": 3.0,
+     "avg_views": 82394,
+     "median_views": 67338,
+     "posts": 18
+    },
+    {
+     "platform": "YouTube",
+     "followers": 209783,
+     "er": 2.1,
+     "avg_views": 16527,
+     "median_views": 13040,
+     "posts": 18
+    }
+   ],
+   "licences": [
+    "SA"
+   ],
+   "price": [
+    7000,
+    10000
+   ],
+   "score": {
+    "overall": 52,
+    "parts": {
+     "engagement": 0.55,
+     "reach": 0.96,
+     "audience": 0.18
+    },
+    "confidence": {
+     "level": "medium",
+     "posts": 18,
+     "peers_n": 40,
+     "source": "peers"
+    },
+    "limited_data": false,
+    "strengths": [
+     "3.0% engagement, near the typical for creators this size"
+    ],
+    "watchouts": [
+     "Audience is 78% men",
+     "Little sign of skincare content or audience interest"
+    ],
+    "checks": [
+     {
+      "label": "Measured audience",
+      "text": "76% of the measured audience is in Saudi Arabia",
+      "level": "ok"
+     },
+     {
+      "label": "Gender",
+      "text": "22% of the audience are women",
+      "level": "bad"
+     }
+    ]
+   },
+   "audience": {
+    "female": 22,
+    "male": 78,
+    "ages": [
+     {
+      "name": "13-17",
+      "pct": 3.1
+     },
+     {
+      "name": "18-24",
+      "pct": 28.3
+     },
+     {
+      "name": "25-34",
+      "pct": 44.7
+     },
+     {
+      "name": "35-44",
+      "pct": 16.1
+     },
+     {
+      "name": "45-64",
+      "pct": 7.8
+     }
+    ],
+    "countries": [
+     {
+      "code": "SA",
+      "pct": 76.0
+     },
+     {
+      "code": "AE",
+      "pct": 9.2
+     },
+     {
+      "code": "KW",
+      "pct": 5.6
+     },
+     {
+      "code": "EG",
+      "pct": 4.5
+     },
+     {
+      "code": "BH",
+      "pct": 2.6
+     },
+     {
+      "code": "QA",
+      "pct": 2.2
+     }
+    ],
+    "cities": [
+     {
+      "name": "Riyadh",
+      "pct": 35.5
+     },
+     {
+      "name": "Jeddah",
+      "pct": 19.2
+     },
+     {
+      "name": "Dammam",
+      "pct": 9.3
+     },
+     {
+      "name": "Mecca",
+      "pct": 4.7
+     },
+     {
+      "name": "Medina",
+      "pct": 2.3
+     }
+    ],
+    "languages": [
+     {
+      "name": "Arabic",
+      "pct": 74.5
+     },
+     {
+      "name": "English",
+      "pct": 22.8
+     },
+     {
+      "name": "Other",
+      "pct": 2.7
+     }
+    ]
+   },
+   "authenticity": {
+    "fake_followers_pct": 4.9,
+    "fake_likers_pct": 3.7,
+    "real_people_pct": 87.3,
+    "mass_followers_pct": 10.7,
+    "suspicious_pct": 4.9,
+    "notable_followers_pct": 1.7
+   },
+   "growth_pct": 2.0,
+   "posts_per_week": 5.6,
+   "brands": [
+    "Qamar Wear",
+    "Velora Skin",
+    "Sahar Beauty"
+   ]
+  },
+  {
+   "code": "DEMO-08",
+   "name": "Rana A.",
+   "handle": "rana.a.palette52",
+   "tier": "Micro",
+   "city": "Jeddah",
+   "interest": "Makeup",
+   "photo": 8,
+   "nationality": "Saudi",
+   "platforms": [
+    {
+     "platform": "Instagram",
+     "followers": 39239,
+     "er": 8.0,
+     "avg_views": 10341,
+     "median_views": 7986,
+     "posts": 6
+    },
+    {
+     "platform": "TikTok",
+     "followers": 51997,
+     "er": 6.7,
+     "avg_views": 21844,
+     "median_views": 17732,
+     "posts": 6
+    }
+   ],
+   "licences": [],
+   "price": [
+    1000,
+    1600
+   ],
+   "score": {
+    "overall": 79,
+    "parts": {
+     "engagement": 0.88,
+     "reach": 0.62,
+     "audience": 0.8
+    },
+    "confidence": {
+     "level": "low",
+     "posts": 6,
+     "peers_n": 9,
+     "source": "global"
+    },
+    "limited_data": true,
+    "strengths": [
+     "8.0% engagement, above the typical for creators this size",
+     "83% of the measured audience are women",
+     "Works in the skincare space"
+    ],
+    "watchouts": [
+     "Only 6 recent posts to read: treat the numbers as a first look"
+    ],
+    "checks": [
+     {
+      "label": "Measured audience",
+      "text": "72% of the measured audience is in Saudi Arabia",
+      "level": "ok"
+     },
+     {
+      "label": "Gender",
+      "text": "83% of the audience are women",
+      "level": "ok"
+     }
+    ]
+   },
+   "audience": {
+    "female": 83,
+    "male": 17,
+    "ages": [
+     {
+      "name": "13-17",
+      "pct": 3.9
+     },
+     {
+      "name": "18-24",
+      "pct": 29.0
+     },
+     {
+      "name": "25-34",
+      "pct": 42.3
+     },
+     {
+      "name": "35-44",
+      "pct": 15.6
+     },
+     {
+      "name": "45-64",
+      "pct": 9.2
+     }
+    ],
+    "countries": [
+     {
+      "code": "SA",
+      "pct": 72.0
+     },
+     {
+      "code": "AE",
+      "pct": 10.7
+     },
+     {
+      "code": "KW",
+      "pct": 6.5
+     },
+     {
+      "code": "EG",
+      "pct": 5.2
+     },
+     {
+      "code": "BH",
+      "pct": 3.0
+     },
+     {
+      "code": "QA",
+      "pct": 2.5
+     }
+    ],
+    "cities": [
+     {
+      "name": "Jeddah",
+      "pct": 29.9
+     },
+     {
+      "name": "Riyadh",
+      "pct": 16.0
+     },
+     {
+      "name": "Dammam",
+      "pct": 7.9
+     },
+     {
+      "name": "Mecca",
+      "pct": 3.5
+     },
+     {
+      "name": "Medina",
+      "pct": 3.9
+     }
+    ],
+    "languages": [
+     {
+      "name": "Arabic",
+      "pct": 74.5
+     },
+     {
+      "name": "English",
+      "pct": 22.8
+     },
+     {
+      "name": "Other",
+      "pct": 2.7
+     }
+    ]
+   },
+   "authenticity": {
+    "fake_followers_pct": 5.2,
+    "fake_likers_pct": 3.9,
+    "real_people_pct": 86.5,
+    "mass_followers_pct": 11.1,
+    "suspicious_pct": 5.2,
+    "notable_followers_pct": 2.0
+   },
+   "growth_pct": 3.0,
+   "posts_per_week": 4.6,
+   "brands": [
+    "Velora Skin",
+    "Sahar Beauty",
+    "Dune Café"
+   ]
+  }
+ ]
+}

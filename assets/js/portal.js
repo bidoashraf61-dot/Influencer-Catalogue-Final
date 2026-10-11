@@ -3371,7 +3371,17 @@
 
     var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null, srcRes = null;
     // Tour demo only: skip the six taps and go straight to the director's desk.
-    if (window.hvDemo) HV.aiDemo = function (ans, name) { answers = ans || {}; card.classList.add("is-open"); intro.hidden = true; run.hidden = false; go(name); };
+    // opts.ask = n opens the card on question n with the answers already ticked (tour v3 shows the
+    // multi-goal and multi-country questions); without it the card goes straight to the build.
+    if (window.hvDemo) HV.aiDemo = function (ans, name, opts) {
+      answers = ans || {}; card.classList.add("is-open"); intro.hidden = true; run.hidden = false; run.classList.remove("is-staging");
+      if (opts && opts.ask != null) {
+        shown = 0;
+        loadQuestions().then(function (list) { qs = list; byId = {}; qs.forEach(function (q) { byId[q.id] = q; }); ask(opts.ask); });
+        return;
+      }
+      go(name);
+    };
 
     /* -- the game layer: coach animations and campaign power -- */
     // The coach: idle poses loop; reactions (thumbs, cheer, point) play once, in full, then hand

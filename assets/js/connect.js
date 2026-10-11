@@ -1004,9 +1004,9 @@
     }
 
     /* ================================================================ TOUR */
-    // Tour v2 lives in tour.js + tour.css, fetched only when the client starts it (the demo
-    // photos load with the demo pages). Here: the opener card and the loader.
-    var TOUR_JS = "assets/js/tour.js?v=t2a", TOUR_CSS = "assets/css/tour.css?v=t2a";
+    // Tour v3 lives in tour.js + tour.css, fetched only when the client starts it (the demo
+    // photos and the invented roster load with the demo pages). Here: the opener card and the loader.
+    var TOUR_JS = "assets/js/tour.js?v=t3a", TOUR_CSS = "assets/css/tour.css?v=t3a";
     var tourLoad = null;
     function loadTour() {
       if (window.hvTour) return Promise.resolve(window.hvTour);
@@ -1025,10 +1025,14 @@
       loadTour().then(function (t) { if (t) t.start(typeof chapter === "number" ? chapter : null); })
         .catch(function () { toast("The tour didn't load. Please try again."); });
     };
-    var CHAPTERS = [["chat", "Brief Helvy", "Describe your campaign, get a shortlist"],
-                    ["list", "Build your shortlist", "Filter, compare, approve or replace"],
-                    ["shield", "Check & book", "The full analysis, then a quote"],
-                    ["chart", "Track results", "Live posts, clicks and the verdict"]];
+    // One client's first campaign, from brief to results: the opener lists the seven chapters (jump to any).
+    var CHAPTERS = [["chat", "Brief", "Tell Helvy the goals and countries"],
+                    ["list", "Shortlist", "Scored picks, and how much data stands behind them"],
+                    ["shield", "Check a creator", "What is open, what is locked, a sample analysis"],
+                    ["calc", "Plan", "The ROI calculator: structure, quality, the gap"],
+                    ["sparkle", "Ask Helvy", "Explain a score, compare, hand off to a person"],
+                    ["mail", "Quote", "Request it, approve it, go live"],
+                    ["chart", "Follow", "The verdict, estimate vs actual, your profile"]];
 
     function offerTour() {
       var m = me();
@@ -1062,7 +1066,7 @@
         h("div", { class: "cx-offer__helvy" }, clip("hello", "cx-hd--edge", { once: true, then: "idle" })),
         h("div", { class: "cx-offer__in" },
           h("h2", { id: "cx-of-t" }, "Take the ", h("span", { class: "cx-nowrap" }, "3-minute"), " tour?"),
-          h("p", { id: "cx-of-p", class: "cx-offer__lead" }, (first ? "Welcome, " + first + ". " : "") + "Four short chapters on a sample brand. Nothing you do in it is saved."),
+          h("p", { id: "cx-of-p", class: "cx-offer__lead" }, (first ? "Welcome, " + first + ". " : "") + "One sample campaign, brief to results, in seven short chapters. Nothing you do in it is saved."),
           list,
           h("div", { class: "cx-offer__go" }, start, no),
           h("p", { class: "cx-offer__fine" }, "Replay it any time from Help or your profile.")));

@@ -209,6 +209,12 @@
 .cx-offer__chap small { display: block; margin-top: 2px; font-size: 13.5px; line-height: 1.35; color: rgba(255,255,255,.7); }
 .cx-offer__go-i { width: 18px !important; height: 18px !important; color: var(--lime); opacity: 0; transform: translateX(-6px); transition: opacity .2s ease, transform .2s var(--cx-ease); }
 .cx-offer__chap:hover .cx-offer__go-i, .cx-offer__chap:focus-visible .cx-offer__go-i { opacity: 1; transform: none; }
+/* seven chapters on a short screen (a laptop at 768, a small phone): names only, so the card always fits */
+@media (max-height: 820px) {
+  .cx-offer__chaps { margin-top: 14px; }
+  .cx-offer__chap { min-height: 48px; padding-top: 6px; padding-bottom: 6px; }
+  .cx-offer__chap small { display: none; }
+}
 .cx-offer__go { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
 .cx-offer__go .cx-btn:first-child { flex: 1 1 220px; }
 .cx-btn .cx-cost--prize { background: var(--hv-credit, #ff691e); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(18,18,18,.18); padding: 4px 10px; }
