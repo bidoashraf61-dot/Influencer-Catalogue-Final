@@ -1426,3 +1426,9 @@ a.hv-note:hover { background: #efede8; }
 .hv-hand__btn:focus-visible { outline: 3px solid var(--hv-red); outline-offset: 2px; }
 .hv-hand .hv-act__yes, .hv-hand .hv-act__no { min-height: 44px; }
 @media (prefers-reduced-motion: reduce) { .hv-hand__btn { transition: none; } }
+
+/* The AI shortlist's Helvy shows the WHOLE clip (Bido, 2026-10-11: "the video is cropped"): the clips are
+   square 1:1 frames, and a circle cut their corners and the shoulders. A rounded square keeps the frame. */
+.ai-sl__cring, .ai-sl__cring .hv-lime, .ai-sl__face, .ai-sl__face .hv-lime,
+.ai-sl__lens, .ai-sl__lens .hv-lime, .ai-sl__cheer, .ai-sl__cheer .hv-lime { border-radius: 24%; }
+.ai-sl .hv-lime .hv-clip { object-fit: contain; object-position: 50% 50%; transform: none; }
