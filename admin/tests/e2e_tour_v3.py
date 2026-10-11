@@ -362,7 +362,15 @@ class TourV3(unittest.TestCase):
             self.assertLessEqual(set(a), allowed)
             for sec in ("top_posts", "sponsored_posts"):
                 for post in a[sec]:
-                    self.assertIsNone(post["thumb"]); self.assertEqual(post["url"], "#demo-post")
+                    # as the server serves it: no original cover (blurred copies only), no link, engagement per post
+                    self.assertLessEqual(set(post), {"url", "thumb", "likes", "comments", "views", "date", "brand", "er"})
+                    self.assertEqual(post["url"], "#demo-post")
+                    if post["thumb"]:
+                        self.assertRegex(post["thumb"], r"^/assets/demo/sample-cover-\d\.webp$")
+            self.assertTrue(all("er" in post for post in a["top_posts"]))
+        for i in range(6):
+            cover = REPO / "assets" / "demo" / ("sample-cover-%d.webp" % i)
+            self.assertTrue(cover.is_file()); self.assertLess(cover.stat().st_size, 20_000)
             self.assertNotRegex(json.dumps(a), r"\bhandle\b|\bbio\b|photo_url|DEMO-0|Velora|Sahar|Dune|Oasis")
         # the locked profile offers the sample button and keeps its sections locked
         locked = d["creatorLocked"]

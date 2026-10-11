@@ -164,7 +164,13 @@
       }),
       fake_followers_dist: { buckets: [{ label: ">30%", h: 18 }, { label: "25%", h: 26 }, { label: "20%", h: 38 }, { label: "15%", h: 55 }, { label: "12%", h: 74 }, { label: "9%", h: 100 }, { label: "7%", h: 81 }, { label: "<5%", h: 42 }], creator: 6, median: 4 },
       er_dist: { buckets: [{ label: "<0.5%", h: 34 }, { label: "1%", h: 62 }, { label: "1.5%", h: 100 }, { label: "2%", h: 77 }, { label: "3%", h: 48 }, { label: "4%", h: 30 }, { label: "5%", h: 18 }, { label: ">6%", h: 9 }], creator: 5, median: 2 },
-      top_posts: top.map(function (n, i) { return { url: "#demo-post", thumb: anon ? null : photo(n), likes: Math.round(f * (0.06 - i * 0.006)), comments: Math.round(f * 0.002 * (6 - i)), views: Math.round(f * (0.9 - i * 0.1)), date: iso(NOW - (6 + i * 9) * DAY) }; }),
+      // the sample's covers are blurred copies (never originals) and each post says its engagement
+      top_posts: top.map(function (n, i) {
+        var likes = Math.round(f * (0.06 - i * 0.006)), comments = Math.round(f * 0.002 * (6 - i));
+        var post = { url: "#demo-post", thumb: anon ? ROOT + "assets/demo/sample-cover-" + i + ".webp" : photo(n), likes: likes, comments: comments, views: Math.round(f * (0.9 - i * 0.1)), date: iso(NOW - (6 + i * 9) * DAY) };
+        if (anon) post.er = Math.round((likes + comments) * 10000 / f) / 100;
+        return post;
+      }),
       sponsored_posts: p.brands.map(function (b, i) { return { url: "#demo-post", thumb: anon ? null : photo([1, 8, 6][i] || 1), likes: Math.round(f * (0.04 - i * 0.005)), comments: Math.round(f * 0.0016), views: Math.round(f * (0.62 - i * 0.08)), date: iso(NOW - (20 + i * 30) * DAY), brand: mkBrand(b, i) }; }),
       hashtags: ["#skincare", "#routine", "#ramadanglow", "#spf", "#riyadh"].map(function (t, i) { return { tag: anon ? "#hashtag" + (i + 1) : t, count: [31.2, 22.6, 14.8, 9.7, 6.5][i] }; }),
       brands: p.brands.map(function (b, i) { return { name: mkBrand(b, i), count: 4 - i, logo: null }; }),
@@ -1357,9 +1363,18 @@
   }
   function pushLifecycle(w) {
     if (!w) return;
-    var lc = Demo.lifecycle();
-    lc.warn = "";                       // the demo says nothing about "updating" a quote it has just sent
+    var lc = Demo.lifecycle(), S = w.hvSelection, was = S && S.toast;
+    // the page toasts "This updates your quote request" when a save touches a live quote: true for an
+    // edit, not for the demo's own steps, so the toast is muted for this one event
+    if (S) S.toast = function () { /* quiet */ };
     try { w.dispatchEvent(new w.CustomEvent("hv:selection-saved", { detail: { token: SEL, name: SEL_NAME, codes: STATE.codes.slice(), lifecycle: lc } })); } catch (e) { /* none */ }
+    if (S && was) S.toast = was;
+  }
+  // The quote card keeps its dated timeline folded (a "Show timeline" button); the tour opens it.
+  function openTimeline(d, then) {
+    var tg = d.querySelector("#cx-lc .cx-lc__tg");
+    if (!tg) { if (then) then(); return; }
+    press(tg, function (x) { if (x && x.getAttribute("aria-expanded") !== "true") x.click(); if (then) later_(then, 250); }, 250);
   }
 
   /* -- what a beat does in the frame, then where the light goes -- */
@@ -1539,9 +1554,14 @@
           var dn = d.getElementById("cat-done");
           if (dn && !dn.hidden) {
             helvyTo("approve");
-            // Close the panel here: the page's own close would also empty the shortlist.
-            later_(function () { var m2 = d.getElementById("cat-modal"); if (m2) { m2.hidden = true; m2.classList.remove("is-done"); }
-              Demo.setLc("requested"); pushLifecycle(w); later_(function () { light(Object.assign({}, b, { target: "#cx-lc" })); }, 400); }, 1300);
+            // Close the panel here: the page's own close would also empty the shortlist. The status
+            // tag under the selection's name then says "Quote requested", which is where the light goes.
+            later_(function () {
+              var m2 = d.getElementById("cat-modal"); if (m2) { m2.hidden = true; m2.classList.remove("is-done"); }
+              Demo.setLc("requested"); pushLifecycle(w); w.scrollTo(0, 0);
+              later_(function () { light(Object.assign({}, b, { target: "#cx-lc-chip", pad: 12 })); }, 400);
+              later_(function () { light(Object.assign({}, b, { target: "#cx-lc-chip", pad: 12 }), true); }, 1200);
+            }, 1300);
             return;
           }
           if (n++ < 30) later_(sent, 250);
@@ -1555,7 +1575,7 @@
       if (P.setUnread) P.setUnread(STATE.notes.filter(function (n) { return n.unread; }).length);
       pushLifecycle(w);
       later_(function () { var c0 = d.getElementById("cx-lc"); if (c0) c0.scrollIntoView({ block: "center" }); light(b); }, 500);
-      later_(function () { light(b, true); }, 1300);
+      later_(function () { openTimeline(d, function () { light(b, true); }); }, 1700);
       return;
     }
     if (run === "lcApprove") {
@@ -1570,8 +1590,11 @@
               if (!yes) return;
               yes.click();
               helvyTo("approve");
-              // HelloVoice sets the campaign up: the chip moves on to "Campaign live".
-              later_(function () { Demo.setLc("live"); pushLifecycle(w); light(b, true); helvyTo("celebrate"); }, 2200);
+              // HelloVoice sets the campaign up: the chip moves on to "Campaign live", and the timeline opens to show it.
+              later_(function () {
+                Demo.setLc("live"); pushLifecycle(w); helvyTo("celebrate");
+                later_(function () { light(b, true); openTimeline(d, function () { light(b, true); }); }, 500);
+              }, 2200);
             }, 200);
           }, 500);
         }, 200);
