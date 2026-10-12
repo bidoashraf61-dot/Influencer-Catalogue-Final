@@ -1864,5 +1864,11 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 .cat-probable { grid-column: 1 / -1; margin: 28px 0 4px; padding: 18px 0 0; border-top: 1px solid var(--rule, rgba(18,18,18,.12)); }
 .cat-probable__name { margin: 0; font-family: "Bebasneue", Arial, sans-serif; font-weight: 400; font-size: clamp(1.6rem, 1.2rem + 1vw, 2.2rem); line-height: 1; letter-spacing: .02em; }
 .cat-probable__note { margin: 6px 0 0; font-size: 14px; color: #5a5249; max-width: 62ch; }
-.cat-dd--sub[hidden] { display: none; }
-.cat-dd__group[hidden] { display: none; }
+.cat-dd__group[hidden], .cat-ind__subs[hidden] { display: none; }
+
+/* One Industry control: a ticked industry opens its niches underneath, across the full width of the panel. */
+.cat-dd__group--ind { align-items: start; }
+.cat-ind.is-open { grid-column: 1 / -1; padding: 6px 0 10px; border-top: 1px solid var(--rule-soft, rgba(18,18,18,.07)); border-bottom: 1px solid var(--rule-soft, rgba(18,18,18,.07)); background: var(--table-head, #faf8f4); border-radius: 12px; padding-inline: 10px; }
+.cat-ind__subs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; margin: 6px 0 2px 30px; }
+.cat-ind__lead { grid-column: 1 / -1; margin: 4px 0 2px; font-size: 12px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: #5a5249; }
+@media (max-width: 560px) { .cat-ind__subs { grid-template-columns: 1fr; margin-left: 24px; } }

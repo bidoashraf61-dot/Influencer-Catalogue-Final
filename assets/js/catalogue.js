@@ -794,15 +794,17 @@
 
     // Industry: the creator's one main field, then (once an industry is picked) its sub-niches. Only in the
     // catalogue served by the service, which knows each creator's call and how sure it is. Counts are never shown.
-    if (facets && facets.industry && facets.industry.length > 1) {
-      html += dropdown("industry", "Industry", '<div class="cat-dd__group cat-dd__group--cols">' +
-        facets.industry.map(function (v) { return option("industry", v, v); }).join("") + "</div>", facets.industry.length > 8);
+    var oneIndustry = !!(facets && facets.industry && facets.industry.length > 1);
+    if (oneIndustry) {
+      // One control: an industry, and under it (once ticked) the niches inside that industry.
       var subBy = facets.sub || {};
-      var subBody = facets.industry.filter(function (v) { return (subBy[v] || []).length; }).map(function (v) {
-        return '<div class="cat-dd__group" data-ind="' + esc(v) + '" hidden><p class="cat-dd__title">' + esc(v) + "</p>" +
-          subBy[v].map(function (x) { return option("sub", x, x); }).join("") + "</div>";
-      }).join("");
-      html += dropdown("sub", "Sub-niche", subBody, true, "cat-dd--sub");
+      var indBody = '<div class="cat-dd__group cat-dd__group--cols cat-dd__group--ind">' + facets.industry.map(function (v) {
+        var subs = subBy[v] || [];
+        return '<div class="cat-ind" data-ind="' + esc(v) + '">' + option("industry", v, v) +
+          (subs.length ? '<div class="cat-ind__subs" hidden><p class="cat-ind__lead">Narrow to a niche</p>' +
+            subs.map(function (x) { return option("sub", x, x); }).join("") + "</div>" : "") + "</div>";
+      }).join("") + "</div>";
+      html += dropdown("industry", "Industry", indBody, true);
     }
 
     // Tier: follower bands first, healthcare professionals as their own group.
@@ -883,7 +885,7 @@
     // is a claim, not a filter.
     var ints = tally("interest");
     var intKeys = Object.keys(ints).sort(function (a, b) { return ints[b] - ints[a]; });
-    if (intKeys.length > 1) {
+    if (intKeys.length > 1 && !oneIndustry) {
       html += dropdown("interest", "Interest", '<div class="cat-dd__group cat-dd__group--cols">' +
         intKeys.map(function (v) { return option("interest", v, v, ints[v]); }).join("") + "</div>",
         intKeys.length > 8);
@@ -946,16 +948,15 @@
     }
 
     function subSync() {
-      // The Sub-niche dropdown exists only while an industry is picked, and offers just those industries'.
-      var dd = bar.querySelector('.cat-dd[data-dim="sub"]');
+      // A ticked industry opens its niches right under it; an unticked one closes them and drops their picks.
+      var dd = bar.querySelector('.cat-dd[data-dim="industry"]');
       if (!dd) return;
-      var picked = state.industry;
-      dd.hidden = !picked.length;
       var keep = [];
-      all(".cat-dd__group[data-ind]", dd).forEach(function (g) {
-        var on = picked.indexOf(g.dataset.ind) !== -1;
-        g.hidden = !on;
-        if (on) all('input[data-dim="sub"]', g).forEach(function (b) { keep.push(b.value); });
+      all(".cat-ind", dd).forEach(function (g) {
+        var on = state.industry.indexOf(g.dataset.ind) !== -1, subs = g.querySelector(".cat-ind__subs");
+        g.classList.toggle("is-open", on && !!subs);
+        if (subs) subs.hidden = !on;
+        if (on) all('input[data-dim="sub"]', g).forEach(function (box) { keep.push(box.value); });
       });
       state.sub = state.sub.filter(function (v) { return keep.indexOf(v) !== -1; });
     }
@@ -979,7 +980,7 @@
         box.indeterminate = on > 0 && on < cities.length;
       });
       ddList().forEach(function (dd) {
-        var n = state[dd.dataset.dim].length;
+        var n = state[dd.dataset.dim].length + (dd.dataset.dim === "industry" ? state.sub.length : 0);
         dd.classList.toggle("has-value", n > 0);
         // How many options are picked, inside the button: "Tier 2".
         var btn = dd.querySelector(".cat-dd__btn"), badge = btn && btn.querySelector(".cat-dd__n");
@@ -1028,7 +1029,9 @@
       }
       if (e.target.closest(".cat-dd__done, .cat-dd__close")) { close(e.target.closest(".cat-dd")); return; }
       if (e.target.closest(".cat-dd__clear")) {
-        state[e.target.closest(".cat-dd").dataset.dim] = [];
+        var cdim = e.target.closest(".cat-dd").dataset.dim;
+        state[cdim] = [];
+        if (cdim === "industry") state.sub = [];
         changed(); return;
       }
       var preset = e.target.closest(".cat-range__preset");
