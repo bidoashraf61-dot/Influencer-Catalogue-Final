@@ -544,6 +544,13 @@ def migrate(conn):
         # The creator's own rate to us, remembered so the next selection
         # starts from it. Internal, like rating: never sent to a client.
         conn.execute("ALTER TABLE creators ADD COLUMN cost INTEGER")
+    if "industry" not in creator_cols:
+        # The creator's single MAIN industry (owner, 2026-10-13), with the sub-niches and other industries
+        # they also cover, how sure we are (tier + estimated %), and where it came from. Written by the
+        # classification run (Claude, two independent passes for the uncertain ones); the filter reads these.
+        for col, kind in (("industry", "TEXT"), ("sub_niches", "TEXT"), ("also_industries", "TEXT"),
+                          ("industry_tier", "TEXT"), ("industry_conf", "INTEGER"), ("industry_source", "TEXT")):
+            conn.execute("ALTER TABLE creators ADD COLUMN %s %s" % (col, kind))
 
     camp_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaigns)")}
     if "emv" not in camp_cols:
