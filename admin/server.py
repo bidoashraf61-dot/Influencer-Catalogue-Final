@@ -5219,6 +5219,18 @@ def main():
     if db.admin_count() == 0:
         print("No admin yet. Create one:\n  python3 admin/seed.py --email you@example.com")
 
+    # The full roster takes about a minute to build cold at 14,000 creators (it measures every photo). Build it now,
+    # in the background, so the first client after a restart does not wait for it.
+    def _warm():
+        try:
+            h = Handler.__new__(Handler)
+            h.roster_index()
+            h.roster_payload()
+            print("roster warmed")
+        except Exception as e:      # a failed warm-up only means the first visitor builds it
+            print("roster warm-up skipped:", repr(e)[:120])
+    __import__("threading").Thread(target=_warm, daemon=True, name="roster-warm").start()
+
     srv = ThreadingHTTPServer((args.host, args.port), Handler)
     print(f"admin  http://{args.host}:{args.port}{BASE or ''}")
     print(f"origins allowed: {', '.join(ALLOWED_ORIGINS) or '(any — set --origin in production)'}")
