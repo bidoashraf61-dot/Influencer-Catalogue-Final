@@ -118,9 +118,7 @@
       unlocked();
       var list = b.campaigns || [];
       $("mx-all").hidden = true;
-      // A single campaign opens straight away — but only on arrival, never
-      // when the client asked for the list.
-      if (list.length === 1 && location.hash !== "#list") { location.replace("#t=" + list[0].token); return; }
+      // The list always shows, even for one campaign: list, then dashboard, then report.
       showList(list);
     }).catch(function (err) { if (err && err.locked) lock(); else empty("Could not load your campaigns. Please try again."); });
   }
@@ -221,7 +219,7 @@
       render(t);
       show("report");
       if (!same) window.scrollTo(0, 0);
-      get("/api/campaigns").then(function (x) { $("mx-all").hidden = (x.campaigns || []).length < 2; }).catch(function () {});
+      get("/api/campaigns").then(function (x) { $("mx-all").hidden = !(x.campaigns || []).length; }).catch(function () {});
     }).catch(function (err) {
       if (err && err.locked) return lock();
       unlocked(); empty("This report is not available with your access code.");

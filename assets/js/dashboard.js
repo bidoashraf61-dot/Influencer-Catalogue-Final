@@ -75,9 +75,8 @@
     // "My campaigns" list, whose cards come back here.
     var go = TOKEN ? Promise.resolve(TOKEN) : get("/api/campaigns").then(function (b) {
       var l = b.campaigns || [];
-      if (l.length !== 1) { location.replace("../#list"); throw { moved: true }; }
-      location.replace("#t=" + l[0].token); return l[0].token; });
-    get("/api/campaigns").then(function (b) { $("db-all").hidden = (b.campaigns || []).length < 2; }).catch(function () {});
+      location.replace("../#list"); throw { moved: true }; });
+    get("/api/campaigns").then(function (b) { $("db-all").hidden = !(b.campaigns || []).length; }).catch(function () {});
     go.then(function (t) { TOKEN = t; return get("/api/campaign?t=" + encodeURIComponent(t)); })
       .then(function (b) {
         R = b.report;

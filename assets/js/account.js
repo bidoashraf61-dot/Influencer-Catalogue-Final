@@ -503,7 +503,7 @@
   }
   function campaignCard(c) {
     var p = pace(c);
-    return h("a", { class: "ac-item ac-item--camp", href: ROOT + "campaign/#t=" + encodeURIComponent(c.token) },
+    return h("a", { class: "ac-item ac-item--camp", href: ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) },
       h("div", { class: "ac-item__top" },
         c.status === "live" ? h("span", { class: "ac-live" }, "Live") : h("span", { class: "ac-status" }, c.status === "ended" ? "Ended" : c.status),
         qchip(c.quote),
@@ -979,7 +979,7 @@
     c.campaigns.forEach(function (k) {
       var meta = [h("span", null, h("b", null, k.posts + (k.planned ? "/" + k.planned : "")), (k.planned || k.posts) === 1 ? " post captured" : " posts captured"),
                   h("span", null, h("b", null, big(k.views)), " views")];
-      camps.appendChild(kRow(ROOT + "campaign/#t=" + encodeURIComponent(k.token), k.name, campStatus(k), meta));
+      camps.appendChild(kRow(ROOT + "campaign/dashboard/#t=" + encodeURIComponent(k.token), k.name, campStatus(k), meta));
     });
     var a = c.analyses;
     var trio = h("dl", { class: "kc__trio" },
