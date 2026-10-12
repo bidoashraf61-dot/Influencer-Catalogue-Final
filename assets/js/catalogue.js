@@ -854,7 +854,7 @@
         return '<div class="cat-dd__group cat-dd__group--country">' +
           '<label class="cat-opt cat-opt--country"><input type="checkbox" data-country="' +
           esc(country) + '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
-          '<span class="cat-opt__label">' + esc(country === "Other" ? "Other locations" : country) +
+          '<span class="cat-opt__label">' + esc(country === "Other" ? "Location not set" : country) +
           "</span></label>" +
           '<div class="cat-dd__cities">' +
           keys.map(function (k) { return option("place", k, k.split("|")[1], places[k]); }).join("") +
@@ -966,7 +966,7 @@
             if (cities.length < 2) return;
             shown = shown.filter(function (v) { return cities.indexOf(v) === -1; });
             pills.push('<button type="button" class="cat-pill-x" data-country="' + esc(box.dataset.country) +
-              '">' + esc(box.dataset.country === "Other" ? "Other locations" : box.dataset.country) +
+              '">' + esc(box.dataset.country === "Other" ? "Location not set" : box.dataset.country) +
               CROSS + "</button>");
           });
         }
@@ -2532,7 +2532,7 @@
             return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
           });
           return '<li><p class="cat-places__country">' + flagOf(name) + "<span>" +
-            esc(name === "Other" ? "Other locations" : name) + "</span><b>" + c.n + "</b></p>" +
+            esc(name === "Other" ? "Location not set" : name) + "</span><b>" + c.n + "</b></p>" +
             '<div class="cat-places__bar">' + shareBar(c.n, selected.length) + "</div>" +
             (cities.length ? '<ul class="cat-places__cities">' + cities.map(function (city) {
               return "<li>" + esc(city) + " <b>" + c.cities[city] + "</b></li>";

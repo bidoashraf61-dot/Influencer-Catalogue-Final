@@ -4749,8 +4749,21 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "profiles": db.split_profiles(r["profiles"]),
             }
             for r in db.list_creators(active_only=True)
-            if only is None or r["code"] in only
+            if (only is not None and r["code"] in only) or (only is None and self._in_markets(r))
         ]
+
+    def _in_markets(self, r):
+        """portal_countries (owner, 2026-10-12): the portal browses Saudi Arabia, UAE and Egypt only.
+        A creator whose city names another country is hidden from browsing (still in the admin and on
+        selections already made); a city not set yet stays, since the country is unknown."""
+        import paging
+        land = db.setting("portal_countries", ["Saudi Arabia", "UAE", "Egypt"])
+        if not land:
+            return True
+        country, label, _key = paging.place(r["city"])
+        if country in land:
+            return True
+        return country == "Other" and str(r["city"] or "").strip().lower() in ("", "unspecified", "other", "unknown")
 
     # Measuring 154 files on every unlock would be wasteful and they rarely
     # change, so the widths are read once and dropped whenever a photo is
