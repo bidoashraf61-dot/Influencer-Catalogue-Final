@@ -4356,7 +4356,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if token:
             # A selection its client deleted is "unknown" to clients; HelloVoice still opens it.
             sel = db.selection(token=token, deleted=bool(self.admin_like() or self.kam_clients() is not None))
-            staff = sel is not None and self.admin_like_for(sel["code_id"])
+            # An admin opens every selection, whether signed in to the admin or to the portal with an admin email.
+            staff = sel is not None and (self.admin_like_for(sel["code_id"])
+                                         or (self.staff_viewer() and self.kam_clients() is None))
             if sel is not None and sel["deleted_at"] and not staff:
                 sel = None                      # a KAM opens deleted selections of her own clients only
             # Prices agreed with one client are for that client. The token is
