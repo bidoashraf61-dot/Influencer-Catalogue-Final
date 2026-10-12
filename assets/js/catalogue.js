@@ -2107,6 +2107,14 @@
     return CURATED.total;
   }
 
+  // The server refused this selection link (401): it belongs to another account than the one
+  // signed in here. Say so, rather than showing an empty selection.
+  var REFUSED = false;
+  function refusedText() {
+    return "You do not have access to this selection with the account used in this browser. " +
+      "Sign out and open the link again with the right account, or ask HelloVoice for access.";
+  }
+
   function initSelection() {
     var frag = readFragment();
     var token = frag.token;
@@ -2117,7 +2125,7 @@
       var ask = token ? "s=" + encodeURIComponent(token)
         : "n=" + encodeURIComponent(frag.name) + "&c=" + encodeURIComponent(frag.codes.join(","));
       fetch(CFG.api + "/api/selection?" + ask, { credentials: "include" })
-        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (r) { if (token && r.status === 401) REFUSED = true; return r.ok ? r.json() : null; })
         .then(function (b) {
           if (b && b.ok) {
             token = b.token || token;
@@ -3336,7 +3344,7 @@
 
       $("sel-title").textContent = selectionName;
       document.title = selectionName + " — HELVY Connect";
-      $("cat-empty").textContent = selected.length
+      $("cat-empty").textContent = REFUSED && !selected.length ? refusedText() : selected.length
         ? (stFilter ? "No creators in this selection are " + (ST_LABEL[stFilter] || stFilter).toLowerCase() + " right now." : "No creators in this selection match those filters.")
         : "This link does not name any creators.";
       $("cat-empty").hidden = shown !== 0;
