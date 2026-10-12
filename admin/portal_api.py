@@ -982,6 +982,7 @@ class PortalMixin(connect_api.ConnectMixin):
         th = portal.thread(cid, "client", "", tid=tid)
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
+        ctx["staff"] = bool(user and (dict(user).get("domain") or "").lower() in portal.SAMPLE_DOMAINS)
         if b.get("selection"):
             ctx["selection"] = self._selection_context(b.get("selection"), cid)
         brief, _ = matcher.clean_answers(b.get("brief")) if isinstance(b.get("brief"), dict) else ({}, [])
@@ -1167,6 +1168,7 @@ class PortalMixin(connect_api.ConnectMixin):
             return
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
+        ctx["staff"] = bool(user and (dict(user).get("domain") or "").lower() in portal.SAMPLE_DOMAINS)
         if b.get("selection"):
             ctx["selection"] = self._selection_context(b.get("selection"), cid)       # the page they are on
         ctx["page"] = self._page_context(b, cid)
