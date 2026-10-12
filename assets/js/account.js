@@ -102,6 +102,8 @@
 
   /* -------------------------------------------------------------- side nav */
 
+  // The ROI Calculator is switched off for now (Bido, 2026-10-12). Set false here and in connect.js to bring it back.
+  var ROI_LOCKED = true;
   var NAV = [["overview", "Overview", "home"], ["selections", "Selections", "list"], ["analyses", "Analyses", "scan"],
              ["campaigns", "Campaigns", "mega"], ["briefs", "Briefs", "brief"], ["roi", "ROI Calculator", "calc"], ["notifications", "Notifications", "bell"],
              ["credits", "Credits", "coin"], ["hr"], ["account", "Account", "user"]];
@@ -136,7 +138,11 @@
     navItems().forEach(function (it) {
       if (it[0] === "hr") { nav.appendChild(h("hr")); return; }
       var n = countFor(it[0]);
-      var a = h("a", { href: "#" + it[0], "aria-current": it[0] === SECTION ? "page" : null, "data-nav": it[0] }, icon(it[2]), it[1]);
+      var lockd = it[0] === "roi" && ROI_LOCKED;
+      var a = h("a", { href: lockd ? null : "#" + it[0], "aria-current": it[0] === SECTION ? "page" : null, "data-nav": it[0], class: lockd ? "is-locked" : null,
+                       "aria-disabled": lockd ? "true" : null, title: lockd ? "Coming soon: the ROI Calculator is being improved." : null },
+                  icon(lockd ? "lock" : it[2]), it[1]);
+      if (lockd) a.appendChild(h("span", { class: "n", style: "font-size:11px" }, "Soon"));
       if (n != null) a.appendChild(h("span", { class: "n" + (it[0] === "notifications" ? " n--new" : it[0] === "credits" ? " n--credit" : ""), "data-count": it[0] }, String(n)));
       nav.appendChild(a);
     });
@@ -1096,6 +1102,7 @@
     var want = (location.hash || "#overview").slice(1).split("/")[0];
     // Old links: #home and #settings became Overview and Account.
     want = { home: "overview", settings: "account" }[want] || want;
+    if (want === "roi" && ROI_LOCKED) want = "overview";
     SECTION = RENDER[want] ? want : "overview";
     renderSide();
     renderSection();

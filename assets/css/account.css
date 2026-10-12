@@ -680,3 +680,7 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
   .kc-skel i { animation: none; }
   .kc-chip, .kc-row__name { transition: none; }
 }
+
+/* ROI Calculator switched off for now */
+.hc-nav a.is-locked { opacity: .55; cursor: not-allowed; }
+.hc-nav a.is-locked:hover { background: transparent; }

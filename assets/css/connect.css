@@ -993,3 +993,8 @@
 .cx-lc__tg { background: none; border: 0; padding: 4px 0; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
 .cx-lc__tl { margin-top: 12px; }
 .cx-lc__tl[hidden] { display: none; }
+
+/* ROI Calculator switched off for now */
+.cx-btn--roi.is-locked, .cx-selact .cx-btn--roi.is-locked { opacity: .6; cursor: not-allowed; box-shadow: none; display: inline-flex; align-items: center; gap: 8px; }
+.cx-btn--roi.is-locked small { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; opacity: .8; }
+.cx-selact .cx-btn--roi.is-locked:hover { background: inherit; color: inherit; border-color: inherit; }

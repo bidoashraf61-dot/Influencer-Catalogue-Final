@@ -407,6 +407,8 @@
       run(); x.focus();
       return close;
     }
+    var ROI_LOCKED = true;
+    window.hvRoiLocked = ROI_LOCKED;
     function roiForSelection() {
       var S = window.hvSelection;
       if (!S || !S.token()) return;
@@ -596,7 +598,11 @@
       // Bottom row of the selection header, pushed to its right end (CSS), a lime primary button.
       var foot = document.querySelector(".cat-selhead__foot") || document.querySelector(".cat-selhead");
       if (foot) {
-        var b = h("button", { class: "cx-btn cx-btn--roi", type: "button", html: ic("calc") + "<span>ROI Calculator</span>", onclick: roiForSelection });
+        // ROI_LOCKED: the calculator is switched off for now (Bido, 2026-10-12) until it is fixed. Set false to bring it back.
+        var b = h("button", { class: "cx-btn cx-btn--roi" + (ROI_LOCKED ? " is-locked" : ""), type: "button",
+                              html: ic(ROI_LOCKED ? "lock" : "calc") + "<span>ROI Calculator</span>" + (ROI_LOCKED ? "<small>Coming soon</small>" : ""),
+                              onclick: ROI_LOCKED ? null : roiForSelection });
+        if (ROI_LOCKED) { b.setAttribute("aria-disabled", "true"); b.title = "Coming soon: the ROI Calculator is being improved."; }
         foot.appendChild(h("div", { class: "cx-selact", id: "cx-selact" }, b));
       }
       var role = S.role();
