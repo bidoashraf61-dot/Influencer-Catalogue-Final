@@ -1859,3 +1859,10 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 .cst-m tr.ok td b::before, .cst-m tr.warn td b::before, .cst-m tr.bad td b::before { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; content: ""; }
 .cst-m tr.ok td b::before { background: #4cd98a; } .cst-m tr.warn td b::before { background: #ffb74d; } .cst-m tr.bad td b::before { background: #ff6b6b; }
 .cat-fit--tip { cursor: help; }
+
+/* Industry search: the probable matches sit under their own heading, never mixed in with the confirmed ones. */
+.cat-probable { grid-column: 1 / -1; margin: 28px 0 4px; padding: 18px 0 0; border-top: 1px solid var(--rule, rgba(18,18,18,.12)); }
+.cat-probable__name { margin: 0; font-family: "Bebasneue", Arial, sans-serif; font-weight: 400; font-size: clamp(1.6rem, 1.2rem + 1vw, 2.2rem); line-height: 1; letter-spacing: .02em; }
+.cat-probable__note { margin: 6px 0 0; font-size: 14px; color: #5a5249; max-width: 62ch; }
+.cat-dd--sub[hidden] { display: none; }
+.cat-dd__group[hidden] { display: none; }

@@ -436,7 +436,10 @@
     }
     // Nationality is held back from the cards until the roster's values have
     // been checked in the dashboard. The data still arrives; it is not drawn.
-    rows.push("<li><span>City</span><strong>" + esc(c.city || "Unspecified") +
+    // "Saudi Arabia Not Specified yet" is how the roster files a creator whose country is known and city is
+    // not; a card shows the country, never that note.
+    var where = String(c.city || "Unspecified").replace(/\s+not specified yet\s*$/i, "") || "Unspecified";
+    rows.push("<li><span>" + (where === String(c.city || "") ? "City" : "Location") + "</span><strong>" + esc(where) +
               "</strong></li>");
     rows.push("<li><span>Tier</span><strong>" + esc(label) + "</strong></li>");
     return rows.join("");
@@ -740,7 +743,7 @@
     // The catalogue opens most-followed first (all platforms added up); a selection keeps
     // the order its link gives. "Recommended" is still there to pick.
     var DEFAULT_SORT = extras ? "" : "followers-desc";
-    var state = { tier: [], platform: [], place: [], interest: [], followers: [], sort: DEFAULT_SORT, q: "" };
+    var state = { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], followers: [], sort: DEFAULT_SORT, q: "" };
     // `extras` (the selection page): more filters of the same kind, in their own colour (fit,
     // role, tags), and the matching score to sort on.
     var xdims = extras ? extras.dims : [];
@@ -788,6 +791,19 @@
     }
 
     var html = "";
+
+    // Industry: the creator's one main field, then (once an industry is picked) its sub-niches. Only in the
+    // catalogue served by the service, which knows each creator's call and how sure it is. Counts are never shown.
+    if (facets && facets.industry && facets.industry.length > 1) {
+      html += dropdown("industry", "Industry", '<div class="cat-dd__group cat-dd__group--cols">' +
+        facets.industry.map(function (v) { return option("industry", v, v); }).join("") + "</div>", facets.industry.length > 8);
+      var subBy = facets.sub || {};
+      var subBody = facets.industry.filter(function (v) { return (subBy[v] || []).length; }).map(function (v) {
+        return '<div class="cat-dd__group" data-ind="' + esc(v) + '" hidden><p class="cat-dd__title">' + esc(v) + "</p>" +
+          subBy[v].map(function (x) { return option("sub", x, x); }).join("") + "</div>";
+      }).join("");
+      html += dropdown("sub", "Sub-niche", subBody, true, "cat-dd--sub");
+    }
 
     // Tier: follower bands first, healthcare professionals as their own group.
     var tiers = tally("tier");
@@ -929,7 +945,23 @@
       return v;
     }
 
+    function subSync() {
+      // The Sub-niche dropdown exists only while an industry is picked, and offers just those industries'.
+      var dd = bar.querySelector('.cat-dd[data-dim="sub"]');
+      if (!dd) return;
+      var picked = state.industry;
+      dd.hidden = !picked.length;
+      var keep = [];
+      all(".cat-dd__group[data-ind]", dd).forEach(function (g) {
+        var on = picked.indexOf(g.dataset.ind) !== -1;
+        g.hidden = !on;
+        if (on) all('input[data-dim="sub"]', g).forEach(function (b) { keep.push(b.value); });
+      });
+      state.sub = state.sub.filter(function (v) { return keep.indexOf(v) !== -1; });
+    }
+
     function sync() {
+      subSync();
       // The range boxes, unless someone is typing in them.
       all("input[data-range]", bar).forEach(function (box) {
         if (box === document.activeElement) return;
@@ -955,7 +987,7 @@
         if (badge) { badge.textContent = n ? String(n) : ""; badge.hidden = !n; }
       });
       var pills = [];
-      ["tier", "platform", "place", "interest"].concat(xdims).forEach(function (dim) {
+      ["industry", "sub", "tier", "platform", "place", "interest"].concat(xdims).forEach(function (dim) {
         // A whole country picked reads as the country, not ten cities.
         var shown = state[dim].slice();
         if (dim === "place") {
@@ -1020,7 +1052,7 @@
         changed(); return;
       }
       if (e.target.closest(".cat-active__clear")) {
-        state.tier = []; state.platform = []; state.place = []; state.interest = [];
+        state.industry = []; state.sub = []; state.tier = []; state.platform = []; state.place = []; state.interest = [];
         state.followers = []; xdims.forEach(function (d) { state[d] = []; });
         state.q = "";
         var sbox = bar.querySelector(".cat-search__input");
@@ -1099,7 +1131,7 @@
         });
       },
       filtering: function () {
-        return !!(state.tier.length || state.platform.length || state.place.length ||
+        return !!(state.industry.length || state.sub.length || state.tier.length || state.platform.length || state.place.length ||
                   state.interest.length || state.followers.length || !!state.q ||
                   xdims.some(function (d) { return state[d].length; }));
       },
@@ -1157,12 +1189,12 @@
       sorted: function () { return !!state.sort; },
       // The catalogue's server mode: the state to send, and to put back on return.
       query: function () {
-        return { tier: state.tier.slice(), platform: state.platform.slice(), place: state.place.slice(),
+        return { industry: state.industry.slice(), sub: state.sub.slice(), tier: state.tier.slice(), platform: state.platform.slice(), place: state.place.slice(),
                  interest: state.interest.slice(), followers: state.followers.slice(), sort: state.sort, q: state.q,
                  text: (bar.querySelector(".cat-search__input") || {}).value || "" };
       },
       restore: function (st) {
-        ["tier", "platform", "place", "interest", "followers"].forEach(function (d) { if (st && Array.isArray(st[d])) state[d] = st[d].slice(); });
+        ["industry", "sub", "tier", "platform", "place", "interest", "followers"].forEach(function (d) { if (st && Array.isArray(st[d])) state[d] = st[d].slice(); });
         if (st && typeof st.sort === "string") state.sort = st.sort;
         if (st && typeof st.q === "string") state.q = st.q;
         var sbox = bar.querySelector(".cat-search__input");
@@ -1287,10 +1319,10 @@
     var EXTRA = { lic: [], disc: null, dplat: null };
     var VIEW = "hv-cat-view", VIEW_TTL = 30 * 60 * 1000;
     function feedParams() {
-      var st = controls ? controls.query() : { tier: [], platform: [], place: [], interest: [], followers: [], sort: "followers-desc", q: "" };
+      var st = controls ? controls.query() : { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], followers: [], sort: "followers-desc", q: "" };
       var p = new URLSearchParams();
       p.set("link", LINK);
-      ["tier", "platform", "place", "interest"].forEach(function (d) { st[d].forEach(function (v) { p.append(d, v); }); });
+      ["industry", "sub", "tier", "platform", "place", "interest"].forEach(function (d) { (st[d] || []).forEach(function (v) { p.append(d, v); }); });
       if (st.q) p.set("q", st.q);
       if (st.followers[0]) p.set("fmin", st.followers[0]);
       if (st.followers[1]) p.set("fmax", st.followers[1]);
@@ -1332,6 +1364,13 @@
         html = [];
       };
       items.forEach(function (c) {
+        // An industry or sub-niche search: confirmed matches first, then a labelled group of probable ones.
+        if (c.pm && !gBy && !feed.probable) {
+          feed.probable = true;
+          flush();
+          grid.insertAdjacentHTML("beforeend", '<div class="cat-probable" role="separator"><h2 class="cat-probable__name">Probable matches</h2>' +
+            '<p class="cat-probable__note">Likely a fit, but we are less sure of their main field. Worth a look.</p></div>');
+        }
         if (gBy && c.g !== feed.lastG) {
           flush();
           feed.lastG = c.g;
@@ -1368,7 +1407,7 @@
       opts = opts || {};
       var gen = ++feed.gen;
       feed.pinned = null;
-      feed.cursor = null; feed.more = false; feed.busy = true; feed.n = 0; feed.seen = {}; feed.lastG = null; feed.lastInner = null;
+      feed.cursor = null; feed.more = false; feed.busy = true; feed.n = 0; feed.seen = {}; feed.lastG = null; feed.lastInner = null; feed.probable = false;
       grid.classList.toggle("is-grouped", !!gBy);
       var draw = function (b) {
         if (gen !== feed.gen) return;

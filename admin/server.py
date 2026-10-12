@@ -183,6 +183,15 @@ def ts(value):
     return datetime.fromtimestamp(value, timezone.utc).strftime("%d %b %Y, %H:%M")
 
 
+def _json_list(raw):
+    """A JSON list stored as text -> a list; anything else -> []."""
+    try:
+        v = json.loads(raw) if raw else []
+        return v if isinstance(v, list) else []
+    except (TypeError, ValueError):
+        return []
+
+
 class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     server_version = "hv-catalogue"
 
@@ -4747,6 +4756,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 # tier's band otherwise. The page prices a selection from this.
                 "price": list(db.price_for(r, bands, platform) or []) or None,
                 "profiles": db.split_profiles(r["profiles"]),
+                # The creator's single main industry and what they also cover (owner, 2026-10-13). The
+                # tier (Confirmed / Probable / Review) says how sure we are; the estimated % stays internal.
+                "ind": r["industry"], "sub": _json_list(r["sub_niches"]), "also": _json_list(r["also_industries"]),
+                "itier": r["industry_tier"],
             }
             for r in db.list_creators(active_only=True)
             if (only is not None and r["code"] in only) or (only is None and self._in_markets(r))

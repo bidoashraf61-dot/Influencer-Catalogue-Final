@@ -42,6 +42,8 @@ _state = {"checked": 0.0, "key": None, "versions": [], "results": {}}
 
 SORTS = ("", "followers-desc", "followers-asc", "tier-desc", "tier-asc", "name")
 GROUPS = ("tier", "platform", "country", "interest")
+# Labels the classification can return that are not an industry a client would book by.
+NOT_AN_INDUSTRY = ("General Lifestyle", "Unclassifiable")
 G_NONE = {"tier": "No tier", "platform": "No platform", "country": "Location not specified",
           "interest": "No interest listed"}
 
@@ -176,6 +178,10 @@ class Index:
         self.countries = [None] * n
         self.rank = [0] * n
         self.name = [""] * n
+        self.ind = [None] * n        # main industry
+        self.sub = [None] * n        # sub-niches (list)
+        self.also = [None] * n       # other industries the creator also covers
+        self.itier = [""] * n        # Confirmed / Probable / Review ("" = not classified)
         for i, c in enumerate(cards):
             total = sum(_int(p.get("followers")) for p in (c.get("profiles") or []))
             self.followers[i] = total or _int(c.get("followers"))
@@ -195,6 +201,10 @@ class Index:
             self.countries[i] = lands
             self.rank[i] = tier_rank(self.tier[i], table)
             self.name[i] = (c.get("name") or "").lower()
+            self.ind[i] = c.get("ind") or None
+            self.sub[i] = c.get("sub") or []
+            self.also[i] = c.get("also") or []
+            self.itier[i] = c.get("itier") or ""
         self._facets = None
 
     # -- the filter bar's options --
@@ -212,6 +222,18 @@ class Index:
                 "place": order(self.places),
                 "interest": order(self.interests),
             }
+            # Industry filter: only real industries (a catch-all is not one), most Confirmed creators first;
+            # the sub-niches of each, most common first. No counts are sent.
+            inds, subs = {}, {}
+            for i in range(len(self.cards)):
+                if self.itier[i] == "Confirmed" and self.ind[i] and self.ind[i] not in NOT_AN_INDUSTRY:
+                    inds[self.ind[i]] = inds.get(self.ind[i], 0) + 1
+                if self.itier[i] in ("Confirmed", "Probable") and self.ind[i]:
+                    for sn in self.sub[i]:
+                        d = subs.setdefault(self.ind[i], {})
+                        d[sn] = d.get(sn, 0) + 1
+            self._facets["industry"] = [k for k, _ in sorted(inds.items(), key=lambda kv: -kv[1])]
+            self._facets["sub"] = {k: [x for x, _ in sorted(v.items(), key=lambda kv: -kv[1])] for k, v in subs.items() if k in inds}
         return self._facets
 
 
@@ -306,6 +328,7 @@ def clean_query(q):
     out = {
         "q": fold(one("q", 120)),
         "tier": many("tier"), "platform": many("platform"), "place": many("place", 200), "interest": many("interest"),
+        "industry": many("industry"), "sub": many("sub", 80),
         "fmin": num("fmin"), "fmax": num("fmax"),
         "lic": [v for v in many("lic") if v in ("SA", "AE", "EG")],
         "sort": sort if sort in SORTS else "followers-desc",
@@ -328,7 +351,7 @@ def clean_query(q):
 
 def filtering(f):
     """True when the reader has narrowed the roster: only then is a "match" count sent."""
-    return bool(f["q"] or f["tier"] or f["platform"] or f["place"] or f["interest"] or f["fmin"] or f["fmax"]
+    return bool(f["q"] or f["tier"] or f["platform"] or f["place"] or f["interest"] or f["industry"] or f["sub"] or f["fmin"] or f["fmax"]
                 or f["lic"] or f["disc"])
 
 
@@ -339,18 +362,45 @@ def _key(idx, f):
 class Ordered:
     """One query's answer, compact: card positions as a C int array (40 KB at 10,000, where a
     list of tuples took ~0.9 MB), and for a grouped view a group number per entry."""
-    __slots__ = ("at", "gid", "names")
+    __slots__ = ("at", "gid", "names", "pm")
 
-    def __init__(self, at, gid=None, names=None):
-        self.at, self.gid, self.names = at, gid, names
+    def __init__(self, at, gid=None, names=None, pm=None):
+        # pm: for an industry search, 1 where the creator is a probable match (listed after the confirmed ones)
+        self.at, self.gid, self.names, self.pm = at, gid, names, pm
 
     def __len__(self):
         return len(self.at)
 
     def slice(self, start, end):
         if self.gid is None:
-            return [(i, None) for i in self.at[start:end]]
-        return [(i, self.names[g]) for i, g in zip(self.at[start:end], self.gid[start:end])]
+            if self.pm is not None:
+                return [(i, None, p) for i, p in zip(self.at[start:end], self.pm[start:end])]
+            return [(i, None, 0) for i in self.at[start:end]]
+        return [(i, self.names[g], 0) for i, g in zip(self.at[start:end], self.gid[start:end])]
+
+
+def _industry_level(idx, i, inds, subs):
+    """0 = not a match, 1 = confirmed match, 2 = probable match. A creator whose industry call is "Review"
+    is never in an industry or sub-niche result. Industry and sub-niche both asked: the weaker one decides."""
+    tier = idx.itier[i]
+    if tier not in ("Confirmed", "Probable") or not idx.ind[i]:
+        return 0
+    level = 1
+    if inds:
+        if idx.ind[i] in inds:
+            lv = 1 if tier == "Confirmed" else 2
+        elif any(a in inds for a in idx.also[i]):
+            lv = 2
+        else:
+            return 0
+        level = max(level, lv)
+    if subs:
+        if any(s in subs for s in idx.sub[i]):
+            lv = 1 if tier == "Confirmed" else 2
+        else:
+            return 0
+        level = max(level, lv)
+    return level
 
 
 def ordered(idx, f, licences=None, discover=None):
@@ -369,6 +419,8 @@ def ordered(idx, f, licences=None, discover=None):
         codes = set(discover(f["disc"], f["dplat"]) if discover else [])
         allow = codes if allow is None else (allow & codes)
     sets = {d: set(f[d]) for d in ("tier", "platform", "place", "interest") if f[d]}
+    ind_set, sub_set = set(f["industry"]), set(f["sub"])
+    level = {}          # card position -> 1 confirmed match, 2 probable match (industry / sub-niche search only)
     keep = []
     cards, q = idx.cards, f["q"]
     for i in range(len(cards)):
@@ -386,6 +438,11 @@ def ordered(idx, f, licences=None, discover=None):
             continue
         if "interest" in sets and not any(v in sets["interest"] for v in idx.interests[i]):
             continue
+        if ind_set or sub_set:
+            lv = _industry_level(idx, i, ind_set, sub_set)
+            if not lv:
+                continue
+            level[i] = lv
         if allow is not None and cards[i]["code"] not in allow:
             continue
         keep.append(i)
@@ -401,9 +458,13 @@ def ordered(idx, f, licences=None, discover=None):
         keep.sort(key=lambda i: (rank[i], -fol[i]))
     elif s == "name":
         keep.sort(key=lambda i: idx.name[i])
+    if level:                       # confirmed matches first, probable ones after; the chosen order holds inside each
+        keep.sort(key=lambda i: level[i])
     matched = len(keep)
     if f["group"]:
         out = _grouped(idx, keep, f["group"])
+    elif level:
+        out = Ordered(array("i", keep), pm=array("b", [1 if level[i] == 2 else 0 for i in keep]))
     else:
         out = Ordered(array("i", keep))
     with _lock:
@@ -468,9 +529,13 @@ def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
     seq, matched = ordered(idx, f, licences, discover)
     chunk = seq.slice(start, start + limit)
     items = []
-    for i, g in chunk:
+    for i, g, pm in chunk:
         c = idx.cards[i]
-        items.append(dict(c, g=g) if g is not None else c)
+        if g is not None:
+            c = dict(c, g=g)
+        if pm:
+            c = dict(c, pm=1)
+        items.append(c)
     end = start + len(chunk)
     more = end < len(seq)
     out = {"ok": True, "items": items, "has_more": more,
