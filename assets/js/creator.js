@@ -649,7 +649,7 @@
         + '<span class="pp-post__media"' + (p.thumb ? ' style="background-image:url(\'' + esc(/^(https?:|\/)/.test(p.thumb) ? p.thumb : API + "/" + p.thumb) + '\')"' : "") + ">"
         + (p.thumb ? "" : '<span class="pp-post__none">' + esc(PLAT || "Instagram") + " post</span>")
         + '<span class="pp-post__play">' + I_PLAY + "</span>"
-        + (sponsored && p.brand ? '<span class="pp-post__brand">' + esc(p.brand) + "</span>" : "")
+        + (sponsored && p.brand && BRANDLOGO[String(p.brand).toLowerCase()] ? '<span class="pp-post__brand pp-post__brand--logo" role="img" aria-label="' + esc(p.brand) + '" style="background-image:url(\'' + logoSrc(BRANDLOGO[String(p.brand).toLowerCase()].src) + '\');background-size:' + logoSize(BRANDLOGO[String(p.brand).toLowerCase()].w) + '"></span>' : "")
         + '<span class="pp-post__nums">' + (p.likes != null ? "<span>" + I_LIKE + num(p.likes) + "</span>" : "") + (p.comments != null ? "<span>" + I_COMMENT + num(p.comments) + "</span>" : "")
         + (p.views != null ? "<span>" + ico('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>') + num(p.views) + "</span>" : "") + "</span></span>"
         + (p.er != null ? '<span class="pp-post__date">' + esc(p.er + "% engagement") + "</span>" : (p.date ? '<span class="pp-post__date">' + esc(day(p.date)) + "</span>" : "")) + "</a>";
@@ -669,24 +669,26 @@
       e.preventDefault(); openPost(p.url, sc);
     };
   }
-  /* what we know of their brand collaborations: counts, and when they last worked with a brand */
+  /* the brands they have worked with: logos only, never names or numbers; a brand with no logo is not shown */
+  var BRANDLOGO = {};
+  function brandLogos(a) {
+    BRANDLOGO = {};
+    (a.brands || []).forEach(function (b) { if (b && b.logo && b.name) BRANDLOGO[String(b.name).toLowerCase()] = { src: b.logo, w: b.logo_w }; });
+  }
+  // A logo is never drawn larger than its own pixels: a small one sits at its size, a big one fits the tile.
+  function logoSize(w) { return w && w < 56 ? w + "px" : "contain"; }
+  function logoSrc(u) { return esc(/^(https?:|\/)/.test(u) ? u : API + "/" + u); }
   function renderCollab(a) {
-    var c = a.collab_summary, sec = $("pp-collab-sec");
+    var sec = $("pp-collab-sec");
     if (!sec) return;
-    var tiles = [];
-    if (c) {
-      if (c.posts != null) tiles.push(["Collaboration posts found", num(c.posts)]);
-      if (c.paid != null) tiles.push(["Marked paid", num(c.paid)]);
-      if (c.gifted != null) tiles.push(["Marked gifted", num(c.gifted)]);
-      if (c.undisclosed != null) tiles.push(["Possible undisclosed ads", num(c.undisclosed)]);
-      if (c.last_date) tiles.push(["Latest collaboration", day(c.last_date)]);
-    }
-    sec.hidden = !tiles.length;
-    if (!tiles.length) return;
-    $("pp-collab").innerHTML = '<div class="pp-tiles">' + tiles.map(function (t) { return '<div class="pp-tile"><span>' + t[0] + "</span><b>" + t[1] + "</b></div>"; }).join("") + "</div>"
-      + '<p class="pp-rows__key">Found by Modash in the creator\'s recent posts. "Marked paid" and "gifted" are the labels creators gave; "possible undisclosed ads" is Modash\'s estimate of sponsored posts not marked as such.</p>';
+    var list = (a.brands || []).filter(function (b) { return b && b.logo; }).slice(0, 36);
+    sec.hidden = !list.length;
+    if (!list.length) return;
+    $("pp-collab").innerHTML = '<div class="pp-logos">' + list.map(function (b) {
+      return '<span class="pp-logo pp-logo--wall" role="img" aria-label="' + esc(b.name) + '" style="background-image:url(\'' + logoSrc(b.logo) + '\');background-size:' + logoSize(b.logo_w) + '"></span>'; }).join("") + "</div>";
   }
   function renderPosts(a) {
+    brandLogos(a);
     var top = a.top_posts || [], sp = a.sponsored_posts || [];
     $("pp-posts-sec").hidden = false;
     $("pp-posts").innerHTML = (top.length || sp.length)
@@ -825,9 +827,9 @@
   /* creator brand affinity as logos, creator interests */
   function renderNetwork(a) {
     var out = "", brands = a.brands || [], ci = a.creator_interests || [], langs = a.content_languages || [];
-    if (brands.length) out += '<div class="pp-card"><h3 class="pp-h3">Creator brand affinity</h3><div class="pp-brands">' + brands.map(function (b) {
-      return '<div class="pp-brand">' + (b.logo ? '<span class="pp-logo" role="img" aria-label="' + esc(b.name) + '" style="background-image:url(\'' + esc(b.logo) + '\')"></span>' : "")
-        + "<b>" + esc(b.name) + "</b>" + (b.count ? "<small>" + b.count + (b.count === 1 ? " post" : " posts") + "</small>" : "") + "</div>";
+    brands = brands.filter(function (b) { return b && b.logo; });
+    if (brands.length) out += '<div class="pp-card"><h3 class="pp-h3">Creator brand affinity</h3><div class="pp-logos">' + brands.map(function (b) {
+      return '<span class="pp-logo pp-logo--wall" role="img" aria-label="' + esc(b.name) + '" style="background-image:url(\'' + esc(b.logo) + '\');background-size:' + logoSize(b.logo_w) + '"></span>';
     }).join("") + "</div></div>";
     if (ci.length) out += '<div class="pp-card"><h3 class="pp-h3">Creator interests</h3><div class="pp-chips">' + ci.map(function (x) { return '<span class="pp-chip">' + esc(x) + "</span>"; }).join("") + "</div></div>";
     if (langs.length) out += '<div class="pp-card"><h3 class="pp-h3">Content languages</h3><div class="pp-chips">' + langs.map(function (x) { return '<span class="pp-chip">' + esc(x) + "</span>"; }).join("") + "</div></div>";

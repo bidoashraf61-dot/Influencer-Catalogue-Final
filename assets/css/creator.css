@@ -466,3 +466,8 @@ body.pp-modal-on { overflow: hidden; }
 /* Modash's description of a creator is an AI summary, and says so. */
 .pp-bio__tag { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
 .pp-bio__tag small { font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #5a5249; margin-left: 6px; }
+
+/* Brands are shown as logos, never as names or numbers. */
+.pp-logos { display: flex; flex-wrap: wrap; gap: 14px; }
+.pp-logo--wall { width: 76px; max-width: none; height: 76px; border: 1px solid var(--rule, rgba(18,18,18,.12)); background-origin: content-box; padding: 8px; box-sizing: border-box; }
+.pp-post__brand--logo { width: 48px; height: 48px; padding: 6px; border-radius: 12px; background: var(--white) no-repeat center / contain; background-origin: content-box; box-sizing: border-box; }
