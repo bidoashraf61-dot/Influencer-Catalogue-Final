@@ -1419,6 +1419,7 @@
         if (!b || !b.ok) { feed.match = null; settleWaiters(); return; }
         grid.innerHTML = "";
         feed.match = b.match != null ? b.match : null;
+        if (b.plus) feed.plus = b.plus;
         feedTake(b, gen);
         $("cat-empty").hidden = !!(b.items && b.items.length);
         if (opts.then) opts.then();
@@ -1526,6 +1527,7 @@
       filter: function (key, value) { EXTRA[key] = value; feedApply(); },
       get: function (key) { return EXTRA[key]; },
       matched: function () { return feed.match; },
+      plus: function () { return feed.plus || null; },
       loaded: function () { return feed.n; },
       settled: function () { return new Promise(function (ok) { if (!feed.busy && !feedTimer) ok(); else feed.waiters.push(ok); }); },
       cards: cardsByCode,
@@ -3827,11 +3829,17 @@
     var paged = window.hvCatalogue && window.hvCatalogue.server;
     if (paged) {
       // Served in batches: the server says how many match, and only while a filter or a search is on.
-      var m = window.hvCatalogue.matched();
-      num.parentNode.hidden = m == null;
-      num.textContent = fmt(m || 0);
-      of.textContent = ""; of.hidden = true;
-      lab.textContent = m === 1 ? "creator matches" : "creators match";
+      var m = window.hvCatalogue.matched(), plus = window.hvCatalogue.plus && window.hvCatalogue.plus();
+      // Nothing filtered: the roster's size, rounded down, "14,000+ creators". Filtered: how many match.
+      if (m == null && plus) {
+        num.parentNode.hidden = false;
+        num.textContent = fmt(plus) + "+";
+        of.textContent = ""; of.hidden = true;
+        lab.textContent = "creators";
+        return;
+      }
+      // Filtering: no number at all (only the roster's rounded size is ever shown).
+      num.parentNode.hidden = true;
       return;
     }
     // What is actually on screen: the catalogue's own filters hide cards with
@@ -3845,8 +3853,8 @@
     }
     // The size of the roster is never shown (Bido, 2026-10-08): only how many a filter leaves,
     // and nothing at all while nothing is filtered.
-    var tally = num.parentNode, filtered = n < cards.length;
-    tally.hidden = !filtered;
+    var tally = num.parentNode;
+    tally.hidden = true;
     num.textContent = fmt(n);
     of.textContent = ""; of.hidden = true;
     lab.textContent = n === 1 ? "creator matches" : "creators match";

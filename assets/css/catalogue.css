@@ -1833,8 +1833,9 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
   .cat-hero .cat-topbar .pt-dock { top: 0; }   /* the brand row is 44px tall now */
 }
 
-/* No creator numbers on the page at all, filtered or not (Bido, 2026-10-08). */
-.cat-tally { display: none !important; }
+/* The only creator number on the page is the roster size, rounded down with a plus ("14,000+"), shown while
+   nothing is filtered; no match counts (Bido, 2026-10-13, replacing the no-numbers rule of 2026-10-08). */
+.cat-tally[hidden] { display: none; }
 .cat-bar__side .cat-bar__order { border-left: 0; padding-left: 0; }
 
 /* The one-line explanation of the fit scores, under the campaign objective. */

@@ -542,6 +542,9 @@ def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
            "cursor": ("%s.%d" % (_tag(idx), end)) if more else None, "v": _tag(idx)}
     if filtering(f):
         out["match"] = matched
+    # The roster's size, rounded DOWN to the thousand and shown as "14,000+" (owner, 2026-10-13): the exact
+    # number is never sent.
+    out["plus"] = (len(idx.cards) // 1000) * 1000
     return out
 
 
