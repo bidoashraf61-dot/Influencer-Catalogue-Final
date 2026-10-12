@@ -3872,6 +3872,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         """True when a selection shows no scores (setting selections_unscored: a list of
         selection ids, or "all" while the scoring logic is being reworked, 2026-10-11)."""
         raw = db.setting("selections_unscored")
+        # selections_scored: ids that keep their scores while the rest are paused (the sample campaign's selection).
+        try:
+            if int(sel["id"]) in set(int(x) for x in (db.setting("selections_scored") or [])):
+                return False
+        except (TypeError, ValueError):
+            pass
         if raw == "all":
             return True
         try:
