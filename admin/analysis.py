@@ -510,7 +510,10 @@ def parse_workbook(data, resolver, picks=None):
 # an analysis is pasted back as JSON.
 REPORT_EXTRA = {"bio", "location", "followers_change_pct", "avg_likes_change_pct", "likes_hidden",
                 "er_note", "reels_er_note", "notable_followers_pct", "creator_interests",
-                "fake_followers_dist", "er_dist", "photo"}
+                "fake_followers_dist", "er_dist", "photo",
+                # Modash, Oct 2026: the description is an AI summary, not the creator's own words; the posts they
+                # made most recently; what we know of their brand collaborations; the languages they post in.
+                "bio_ai", "recent_posts", "collab_summary", "content_languages"}
 
 
 def media_path(code, name):
@@ -536,7 +539,7 @@ def with_media_urls(data, code, base):
         return ref
     if d.get("photo"):
         d["photo_url"] = url(d.pop("photo"))
-    for key in ("top_posts", "sponsored_posts"):
+    for key in ("top_posts", "sponsored_posts", "recent_posts"):
         for p in d.get(key) or []:
             p["thumb"] = url(p.get("thumb"))
     for b in d.get("brands") or []:

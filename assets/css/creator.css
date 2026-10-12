@@ -462,3 +462,7 @@ body.pp-modal-on { overflow: hidden; }
 .pp-gbtn--back:focus-visible { outline: 3px solid var(--vivid-red); }
 @media (prefers-reduced-motion: reduce) { .pp-sample__card { animation: none; } }
 @media (max-width: 640px) { .pp-sample { justify-content: stretch; } .pp-sample .pp-gbtn--sample { width: 100%; } }
+
+/* Modash's description of a creator is an AI summary, and says so. */
+.pp-bio__tag { margin: 0 0 6px; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--ink); }
+.pp-bio__tag small { font-size: 12px; font-weight: 400; letter-spacing: 0; text-transform: none; color: #5a5249; margin-left: 6px; }

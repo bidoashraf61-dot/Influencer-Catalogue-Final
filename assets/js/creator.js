@@ -273,6 +273,8 @@
     $("pp-posts-sec").after($("pp-real-sec"));
     $("pp-h-real").textContent = "Followers";
     renderPosts(a);
+    renderRecent(a);
+    renderCollab(a);
     renderReal(a);
     renderPerf(a);
     renderNetwork(a);
@@ -322,6 +324,8 @@
     ["pp-posts-sec", "pp-net-sec", "pp-aud-sec", "pp-tags-sec"].forEach(function (id) { $(id).hidden = false; });
     var pend = ["Audience countries, age and gender", "real versus fake followers", "brand affinity"];
     if (a.top_posts && a.top_posts.length) renderPosts(a);
+    renderRecent(a);
+    renderCollab(a);
     if (a.hashtags && a.hashtags.length) renderTags(a);
     if (a.avg_likes != null || a.avg_views != null) renderBasicPerf(a);
     var c = D.creator, asked = (D.requested || []).indexOf(PLAT) !== -1;
@@ -359,7 +363,7 @@
     ] : [["Followers", num(c.followers), ""], ["Tier", c.tier || BANDS[c.band] || "—", ""], ["Based in", c.city || "—", ""]];
     // The photo at its own size: never stretched past its pixels, never cropped.
     var src = (a && a.photo_url) || c.photo_url;
-    var bio = a && a.bio ? '<div class="pp-bio">' + String(a.bio).split("\n").map(function (l) { return "<p" + arDir(l) + ">" + esc(l) + "</p>"; }).join("") + "</div>" : "";
+    var bio = a && a.bio ? '<div class="pp-bio">' + (a.bio_ai ? '<p class="pp-bio__tag">AI summary <small>written from the creator\'s content, not their own words</small></p>' : "") + String(a.bio).split("\n").map(function (l) { return "<p" + arDir(l) + ">" + esc(l) + "</p>"; }).join("") + "</div>" : "";
     $("pp-id").innerHTML = '<div class="pp-photo">' + (src ? '<img src="' + esc(src) + '" alt="' + esc(c.name) + '">'
       : '<span class="pp-photo__none">' + esc(c.code.split("-").pop()) + "</span>") + "</div>"
       + '<div class="pp-fields">'
@@ -639,9 +643,9 @@
 
   /* popular posts: the post's own cover; a tap plays it from Instagram */
   function shortcode(u) { var m = /instagram\.com\/(?:[^\/]+\/)?(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/.exec(u || ""); return m ? m[1] : null; }
-  function postGrid(list, sponsored) {
+  function postGrid(list, sponsored, recent) {
     return '<div class="pp-posts">' + list.map(function (p, i) {
-      return '<a class="pp-post" href="' + esc(p.url) + '" target="_blank" rel="noopener" aria-label="Play post ' + (i + 1) + '" data-post="' + i + '"' + (sponsored ? ' data-sp="1"' : "") + ">"
+      return '<a class="pp-post" href="' + esc(p.url) + '" target="_blank" rel="noopener" aria-label="Play post ' + (i + 1) + '" data-post="' + i + '"' + (sponsored ? ' data-sp="1"' : "") + (recent ? ' data-rc="1"' : "") + ">"
         + '<span class="pp-post__media"' + (p.thumb ? ' style="background-image:url(\'' + esc(/^(https?:|\/)/.test(p.thumb) ? p.thumb : API + "/" + p.thumb) + '\')"' : "") + ">"
         + (p.thumb ? "" : '<span class="pp-post__none">' + esc(PLAT || "Instagram") + " post</span>")
         + '<span class="pp-post__play">' + I_PLAY + "</span>"
@@ -650,6 +654,37 @@
         + (p.views != null ? "<span>" + ico('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>') + num(p.views) + "</span>" : "") + "</span></span>"
         + (p.er != null ? '<span class="pp-post__date">' + esc(p.er + "% engagement") + "</span>" : (p.date ? '<span class="pp-post__date">' + esc(day(p.date)) + "</span>" : "")) + "</a>";
     }).join("") + "</div>";
+  }
+  /* the posts they made most recently */
+  function renderRecent(a) {
+    var rec = a.recent_posts || [], sec = $("pp-recent-sec");
+    if (!sec) return;
+    sec.hidden = !rec.length;
+    if (!rec.length) return;
+    $("pp-recent").innerHTML = postGrid(rec, false, true);
+    $("pp-recent").onclick = function (e) {
+      var el = e.target.closest("[data-post]"); if (!el) return;
+      var p = rec[+el.getAttribute("data-post")], sc = p && shortcode(p.url);
+      if (!sc) return;
+      e.preventDefault(); openPost(p.url, sc);
+    };
+  }
+  /* what we know of their brand collaborations: counts, and when they last worked with a brand */
+  function renderCollab(a) {
+    var c = a.collab_summary, sec = $("pp-collab-sec");
+    if (!sec) return;
+    var tiles = [];
+    if (c) {
+      if (c.posts != null) tiles.push(["Collaboration posts found", num(c.posts)]);
+      if (c.paid != null) tiles.push(["Marked paid", num(c.paid)]);
+      if (c.gifted != null) tiles.push(["Marked gifted", num(c.gifted)]);
+      if (c.undisclosed != null) tiles.push(["Possible undisclosed ads", num(c.undisclosed)]);
+      if (c.last_date) tiles.push(["Latest collaboration", day(c.last_date)]);
+    }
+    sec.hidden = !tiles.length;
+    if (!tiles.length) return;
+    $("pp-collab").innerHTML = '<div class="pp-tiles">' + tiles.map(function (t) { return '<div class="pp-tile"><span>' + t[0] + "</span><b>" + t[1] + "</b></div>"; }).join("") + "</div>"
+      + '<p class="pp-rows__key">Found by Modash in the creator\'s recent posts. "Marked paid" and "gifted" are the labels creators gave; "possible undisclosed ads" is Modash\'s estimate of sponsored posts not marked as such.</p>';
   }
   function renderPosts(a) {
     var top = a.top_posts || [], sp = a.sponsored_posts || [];
@@ -789,12 +824,13 @@
 
   /* creator brand affinity as logos, creator interests */
   function renderNetwork(a) {
-    var out = "", brands = a.brands || [], ci = a.creator_interests || [];
+    var out = "", brands = a.brands || [], ci = a.creator_interests || [], langs = a.content_languages || [];
     if (brands.length) out += '<div class="pp-card"><h3 class="pp-h3">Creator brand affinity</h3><div class="pp-brands">' + brands.map(function (b) {
       return '<div class="pp-brand">' + (b.logo ? '<span class="pp-logo" role="img" aria-label="' + esc(b.name) + '" style="background-image:url(\'' + esc(b.logo) + '\')"></span>' : "")
         + "<b>" + esc(b.name) + "</b>" + (b.count ? "<small>" + b.count + (b.count === 1 ? " post" : " posts") + "</small>" : "") + "</div>";
     }).join("") + "</div></div>";
     if (ci.length) out += '<div class="pp-card"><h3 class="pp-h3">Creator interests</h3><div class="pp-chips">' + ci.map(function (x) { return '<span class="pp-chip">' + esc(x) + "</span>"; }).join("") + "</div></div>";
+    if (langs.length) out += '<div class="pp-card"><h3 class="pp-h3">Content languages</h3><div class="pp-chips">' + langs.map(function (x) { return '<span class="pp-chip">' + esc(x) + "</span>"; }).join("") + "</div></div>";
     if (out) out = '<div class="pp-two">' + out + "</div>";
     $("pp-net-sec").hidden = !out;
     $("pp-net").innerHTML = out;
