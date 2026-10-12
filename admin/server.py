@@ -4452,7 +4452,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         reader = self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.
-        open_ = None if self.admin_like() or (self.kam_unlocked() and self.admin_like_for(sel["code_id"])) else gating.unlocked_set(reader, codes)
+        open_ = None if self.admin_like() or portal.sample_member(reader, sel) or (self.kam_unlocked() and self.admin_like_for(sel["code_id"])) else gating.unlocked_set(reader, codes)
         if open_ is not None:
             out["scores"] = {k: (v if k in open_ else gating.redact_score(v)) for k, v in out["scores"].items()}
         out.update(self.selection_status_payload(sel, codes, reader, by))
@@ -4463,6 +4463,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         reject) or viewer (a colleague or a link holder: look only)."""
         if self.admin_like() or (reader is not None and int(reader) == db.admin_code_id()):
             return "admin"
+        if portal.sample_member(reader, sel):
+            return "admin"           # the sample selection: every control on for BlueHolding and HelloVoice accounts
         if reader is not None and sel["code_id"] is not None and portal.owns(int(reader), sel["code_id"]):
             return "owner"
         return "viewer"
@@ -4850,7 +4852,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not viewer:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         sel = db.selection(token=str(b.get("token") or ""))
-        if sel is None or (sel["code_id"] is not None and int(viewer) != db.admin_code_id() and not portal.owns(int(viewer), sel["code_id"])):
+        if sel is None or (sel["code_id"] is not None and int(viewer) != db.admin_code_id() and not portal.owns(int(viewer), sel["code_id"]) and not portal.sample_member(viewer, sel)):
             return self.send_json(404, {"ok": False}, self.cors())
         code = str(b.get("code") or "").strip().upper()
         if code not in json.loads(sel["codes"] or "[]"):

@@ -838,6 +838,23 @@ def owns(reader, code_id):
     return int(code_id) in codelinks.linked_for({int(reader)})
 
 
+SAMPLE_DOMAINS = ("blueholding.co.uk", "hellovoice.co.uk")
+
+
+def sample_member(reader, sel):
+    """True for the sample selections (setting sample_selections: ids) when ``reader`` is signed in
+    with a BlueHolding or HelloVoice work email: they get every control on the sample, like an admin."""
+    if reader is None or sel is None:
+        return False
+    try:
+        if int(sel["id"]) not in set(int(x) for x in (db.setting("sample_selections") or [])):
+            return False
+    except (TypeError, ValueError):
+        return False
+    me = user_for_code(int(reader))
+    return bool(me and (me["domain"] or "").lower() in SAMPLE_DOMAINS)
+
+
 def may_edit(reader, sel, admin_code_id=None):
     """True when ``reader`` may CHANGE the selection ``sel``: HelloVoice (admin), or its owner (the
     account it is filed under, or a shared code HelloVoice linked to that account). A colleague on
@@ -847,6 +864,8 @@ def may_edit(reader, sel, admin_code_id=None):
     if unlock_all() or unlock_client(sel["code_id"]):
         return True
     if admin_code_id is not None and int(reader) == int(admin_code_id):
+        return True
+    if sample_member(reader, sel):
         return True
     if sel["code_id"] is None:
         return True              # an unfiled selection has no owner to protect
