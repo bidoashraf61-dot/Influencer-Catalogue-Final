@@ -197,11 +197,21 @@ def payload():
                 post["thumb"] = "api/analysis/sample/cover?i=%d" % i      # relative: the page adds its API base
             if fol and post.get("likes") is not None:
                 post["er"] = round((post["likes"] + (post.get("comments") or 0)) * 100.0 / fol, 2)
+    # Dummy pictures (assets/sample/, drawn for this): the sample shows a profile photo, a cover on every post and
+    # brand marks, none of them anyone's. A real cover file configured for the sample creator still wins.
+    for p, doc in analyses.items():
+        for kind in ("top_posts", "sponsored_posts"):
+            for i, post in enumerate(doc.get(kind) or []):
+                if not post.get("thumb"):
+                    post["thumb"] = "/assets/sample/post-%d.jpg" % (i % 8 + 1)
+        for i, b in enumerate(doc.get("brands") or []):
+            b["logo"] = "/assets/sample/brand-%d.png" % (i % 6 + 1)
+            b["logo_w"] = 256
     plats = list(analyses)
     main = analyses[plats[0]]
     followers = int(sum(a.get("followers") or 0 for a in analyses.values()) or c["followers"] or 0)
     card = {"code": "SAMPLE", "name": "Sample creator", "tier": c["tier"], "city": None, "nationality": None,
-            "interest": None, "followers": followers, "photo_url": None,
+            "interest": None, "followers": followers, "photo_url": "/assets/sample/profile.jpg",
             "profiles": [{"platform": p, "url": None, "followers": analyses[p].get("followers")} for p in plats],
             "band": metrics.band_of(followers or main.get("followers"))}
     return {"ok": True, "sample": True, "label": LABEL, "creator": card, "platforms": plats, "analyses": analyses,
