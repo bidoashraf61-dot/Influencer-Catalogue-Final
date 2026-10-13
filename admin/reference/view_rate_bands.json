@@ -1,0 +1,70 @@
+{
+ "version": "2026-10-14",
+ "note": "view rate = views as % of followers; middle half of our creators per size",
+ "platforms": {
+  "Instagram": {
+   "nano": {
+    "n": 1316,
+    "low": 20.07,
+    "median": 46.15,
+    "high": 95.79
+   },
+   "micro": {
+    "n": 1911,
+    "low": 8.64,
+    "median": 25.87,
+    "high": 68.23
+   },
+   "mid": {
+    "n": 1180,
+    "low": 8.6,
+    "median": 26.84,
+    "high": 59.86
+   },
+   "macro": {
+    "n": 487,
+    "low": 8.11,
+    "median": 22.25,
+    "high": 50.37
+   },
+   "mega": {
+    "n": 330,
+    "low": 6.51,
+    "median": 19.28,
+    "high": 42.0
+   }
+  },
+  "TikTok": {
+   "nano": {
+    "n": 792,
+    "low": 4.32,
+    "median": 9.91,
+    "high": 31.13
+   },
+   "micro": {
+    "n": 1380,
+    "low": 2.43,
+    "median": 9.9,
+    "high": 33.82
+   },
+   "mid": {
+    "n": 1217,
+    "low": 2.04,
+    "median": 10.28,
+    "high": 30.35
+   },
+   "macro": {
+    "n": 596,
+    "low": 1.57,
+    "median": 5.88,
+    "high": 20.3
+   },
+   "mega": {
+    "n": 365,
+    "low": 2.56,
+    "median": 7.31,
+    "high": 19.46
+   }
+  }
+ }
+}

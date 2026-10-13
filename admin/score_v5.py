@@ -84,13 +84,33 @@ def weights_for(objective):
 
 
 # -- benchmarks -------------------------------------------------------------------------------------
+def _roster_bands():
+    """Our own view-rate bands (admin/reference/view_rate_bands.json, from tools/view_rate_bands.py).
+    The published view-rate figures did not match our creators (median 20-48% of followers against 3-8%)."""
+    import json, os
+    f = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reference", "view_rate_bands.json")
+    try:
+        with open(f) as fh:
+            return json.load(fh).get("platforms", {})
+    except (OSError, ValueError):
+        return {}
+
+
+ROSTER_BANDS = _roster_bands()
+
+
 def _range(kind, platform, followers):
     if kind == "engagement":
         ref = intl_benchmarks.reference(platform, followers)
         rng = [ref["low"], ref["high"]] if ref else None
     else:
-        got = score_model.research_range("view_rate", platform, followers)
-        rng = list(got[0]) if got else None
+        band = intl_benchmarks.band_of(followers) if followers else None
+        mine = (ROSTER_BANDS.get(platform) or {}).get(band) if band else None
+        if mine:
+            rng = [mine["low"], mine["high"]]
+        else:
+            got = score_model.research_range("view_rate", platform, followers)
+            rng = list(got[0]) if got else None
     if rng and rng[1] <= rng[0]:
         rng[1] = rng[0] * 1.25
     return rng

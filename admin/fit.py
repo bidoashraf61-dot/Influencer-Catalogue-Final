@@ -806,6 +806,14 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         out["score_range"] = [min(x, sm.FEED_CAP) for x in out["score_range"]]
     # Fake followers over the client's limit (their brief's, else 30%) cap the score at the Weak band
     # (shown as "Not recommended"). Unknown fake share: no cap, but it is listed as a check.
+    # Rule 1 (owner-approved 2026-10-14): views more than three times the typical top for their size are
+    # "check" and cannot score above 80, because such numbers are usually bought or inflated.
+    if use_v5 and v5r and v5r.get("metrics", {}).get("reach"):
+        rv = v5r["metrics"]["reach"]
+        top = (rv.get("benchmark") or {}).get("high") or 0
+        if top and rv.get("value", 0) > 3 * top:
+            val = min(val, 80)
+            out.setdefault("watchouts", []).append("views are %.0f times the typical top: check the posts before booking" % (rv["value"] / top))
     fake_lim = (target or {}).get("max_fake") or 30
     fake_now = doc.get("fake_followers_pct")
     if isinstance(fake_now, (int, float)) and fake_now > fake_lim:
