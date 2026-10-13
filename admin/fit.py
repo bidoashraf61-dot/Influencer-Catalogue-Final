@@ -581,7 +581,12 @@ def _v5_row(label, e, unit):
     row = {"label": label, "value": "%s · %d%% of benchmark" % (shown, e["pct_of_benchmark"]),
            "note": "%s (%s tier) · %s · trust %d%%" % (where, b["band"], src, int(round(e["confidence"] * 100))),
            "level": "ok" if s >= 0.6 and e["source"] == "stored" else "warn" if s >= 0.3 or e["source"] != "stored" else "bad"}
-    return "%s %s, %s" % (label, shown, where), "%s %s, %s" % (label, shown, where), row
+    top = b["high"] or 0
+    if top and e["value"] > top * 1.5:
+        typical = "%.0f times the typical top of %g-%g%%" % (e["value"] / top, b["low"], b["high"])
+    else:
+        typical = "typical %g-%g%%" % (b["low"], b["high"])
+    return "%s %s (%s)" % (label, shown, typical), "%s %s (%s)" % (label, shown, typical), row
 
 
 def score_core(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
@@ -757,7 +762,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         out["checks"].append({"label": "Fake followers", "text": "%s of followers look fake" % _pct(fake),
                               "level": "ok" if fake <= fk_good else "bad" if fake >= fk_bad else "warn"})
         if fake >= fk_bad:
-            extra_watch.append("%s fake followers (not in the score)" % _pct(fake))
+            extra_watch.append("fake followers %s, not counted in this score" % _pct(fake))
     if record and record.get("posts", 0) >= 2 and record.get("er") is not None and record.get("typical_er"):
         r = record["er"] / record["typical_er"]
         out["checks"].append({"label": "Our campaigns", "text": "%s engagement per view in %d of our campaign%s (typical %s)" % (
@@ -808,15 +813,16 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         out["watchouts"].insert(0, capped)
         out["metrics"].append({"label": "Cap", "value": "max %d (%s)" % (sm.FEED_CAP, band_for(sm.FEED_CAP)), "note": capped, "level": "warn"})
     lead = "" if objective == "Balanced" else " for " + objective_label(objective).lower()
-    txt = "%s%s (%d/100)%s." % (out["tag"], lead, val, ", from public numbers only" if not verified else "")
-    if lo_s != hi_s:
-        txt += " Range %d-%d (%s)." % (lo_s, hi_s, out["tag_range"][0] if out["tag_range"][0] == out["tag_range"][1]
-                                       else "%s to %s" % (out["tag_range"][0], out["tag_range"][1]))
+    measured = [sm.LABEL[k].lower() for k in sm.PARAMS if k in got]
+    txt = "Score %d out of 100 (%s)%s." % (val, out["tag"], lead)
+    txt += " Based on %d of 4 measures: %s." % (len(measured), ", ".join(measured))
+    if not verified:
+        txt += " Public numbers only."
     if out["strengths"]:
-        txt += " Strengths: " + "; ".join(out["strengths"][:2]) + "."
+        txt += " Good: %s." % "; ".join(out["strengths"][:2])
     if out["watchouts"]:
-        txt += " Watch: " + "; ".join(out["watchouts"][:2]) + "."
+        txt += " Check: %s." % "; ".join(out["watchouts"][:2])
     if out["limited_data"]:
-        txt += " Limited data: read it as a first look."
+        txt += " Limited data: a first look only."
     out["conclusion"] = txt
     return out
