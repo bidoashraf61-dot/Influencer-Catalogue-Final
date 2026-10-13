@@ -5206,6 +5206,24 @@ def main():
     account.init()
     team.init()
     apify.start_scheduler()
+    # Post thumbnails (2026-10-13): two resumable jobs fetched from the post links (scripts in /app/admin/jobs/).
+    # This keeps them running: if one is not running it is started again, so a restart of this service does not
+    # need anyone to relaunch them. Nothing starts while the job is already running.
+    def _thumb_supervisor():
+        import subprocess as _sp
+        jobs = {"Instagram": "post_thumbs_ig", "TikTok": "post_thumbs_tt"}
+        while True:
+            for plat, name in jobs.items():
+                try:
+                    running = _sp.run(["pgrep", "-f", "jobs/post_thumbs.py %s" % plat], capture_output=True).returncode == 0
+                    if not running:
+                        logf = open("/tmp/thumbs_%s.log" % plat.lower()[:2], "a")
+                        _sp.Popen([sys.executable, "-u", str(HERE / "jobs" / "post_thumbs.py"), plat], stdout=logf, stderr=logf)
+                        print("thumbs job started:", plat, flush=True)
+                except Exception as e:
+                    print("thumbs supervisor:", repr(e)[:120], flush=True)
+            time.sleep(60)
+    __import__("threading").Thread(target=_thumb_supervisor, daemon=True, name="thumb-supervisor").start()
     profile_thumbs.start()
     # Phase E: weekly campaign updates + "what to do next time" (on start, then hourly; idempotent).
     import weekly
