@@ -540,6 +540,50 @@ def post_interest(doc, creator, cats):
             "watch": "Little sign of %s content in what we hold (profile tags only)" % space}
 
 
+def score_engine():
+    """Which formula scores creators: "v5" (score_v5.py, 2026-10-13) or "v4" (score_model.py). Setting
+    ``score_engine``; anything but "v4" reads as v5, so v4 is one setting away if v5 ever has to be backed out."""
+    try:
+        import db
+        return "v4" if db.setting("score_engine") == "v4" else "v5"
+    except Exception:
+        return "v5"
+
+
+def _v5_names(objective):
+    """The goals scored: Balanced reads as the three together, like blend()."""
+    parts = parts_of(objective)
+    return CAMPAIGN_TYPES if parts == ["Balanced"] else parts
+
+
+def _v5_run(doc, plat, f, objective):
+    """score_v5 for one analysis doc. The audience and fake-follower checks stay with the checks below
+    (they never move the number), so no target country goes in here."""
+    import score_v5
+    creator = {"platform": plat, "followers": f, "er_pct": doc.get("er"), "avg_likes": doc.get("avg_likes"),
+               "avg_comments": doc.get("avg_comments"), "avg_views": doc.get("avg_views"),
+               "avg_plays": doc.get("avg_reel_plays"), "fake_pct": doc.get("fake_followers_pct"),
+               "recent_posts": doc.get("recent_posts")}
+    return score_v5.score(creator, "+".join(_v5_names(objective)), None)
+
+
+_V5_SOURCE = {"stored": "stored figure", "recent_posts": "worked out from recent posts", "unsupported": "rate only, nothing to verify it",
+              "derived": "derived, rough"}
+
+
+def _v5_row(label, e, unit):
+    """(good text, bad text, hover row) for one scored v5 metric."""
+    b = e["benchmark"]
+    where = "%s the published %g-%g%% range" % (e["label"], b["low"], b["high"])
+    shown = "%s%s" % (_pct(e["value"]), unit)
+    src = _V5_SOURCE.get(e["source"], e["source"]) + (" (%s)" % e["note"] if e.get("note") and e["source"] == "recent_posts" else "")
+    s = e["score"] / 100.0
+    row = {"label": label, "value": "%s · %d%% of benchmark" % (shown, e["pct_of_benchmark"]),
+           "note": "%s (%s tier) · %s · trust %d%%" % (where, b["band"], src, int(round(e["confidence"] * 100))),
+           "level": "ok" if s >= 0.6 and e["source"] == "stored" else "warn" if s >= 0.3 or e["source"] != "stored" else "bad"}
+    return "%s %s, %s" % (label, shown, where), "%s %s, %s" % (label, shown, where), row
+
+
 def score_core(doc, platform, followers=None, objective="Balanced", target=None, band="mid", bench=None,
                creator=None, record=None, min_parts=1):
     """The one scoring formula, used for every creator (scoring v4, 2026-10-11).
@@ -582,12 +626,14 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     def put(key, s_lo, s_hi, good, bad, row):
         got[key] = {"lo": s_lo, "hi": s_hi, "mid": (s_lo + s_hi) / 2.0, "good": good, "bad": bad, "row": row}
 
+    use_v5 = score_engine() == "v5"     # score_v5.py: engagement and view rate against published ranges, see its docstring
+
     # -- engagement
     er_val = sample.get("er_med") if sample.get("er_med") is not None else sample.get("er")
     er_bad = None
     if er_val is not None and er_val > sm.ENGAGEMENT_IMPLAUSIBLE:
         er_bad, er_val = er_val, None          # a bad scrape or hidden likes: shown, never scored
-    if er_val is not None:
+    if er_val is not None and not use_v5:
         (z, fl), bsrc, btier = sm.band_for("engagement", group, plat, f)
         s = sm.scale(er_val, z, fl)
         ref = intl_benchmarks.reference(plat, f)
@@ -600,7 +646,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
 
     # -- view rate
     vr = sample.get("view_rate_med") if sample.get("view_rate_med") is not None else sample.get("view_rate")
-    if vr is not None:
+    if vr is not None and not use_v5:
         (z, fl), bsrc, btier = sm.band_for("view_rate", group, plat, f)
         s = sm.scale(vr, z, fl)
         put("view_rate", s, s, "A typical post reaches %s of followers" % _pct(vr),
@@ -610,7 +656,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
 
     # -- consistency (needs the spread of at least 10 posts)
     spread = sample.get("spread")
-    if spread is not None and posts >= 10:
+    if spread is not None and posts >= 10 and not use_v5:
         z, fl = sm.band("consistency", group)
         s = sm.scale(spread, z, fl)
         put("consistency", s, s, "Views hold steady from post to post", "Views swing a lot from post to post",
@@ -619,7 +665,7 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
 
     # -- interest: the posts we hold are the 100%
     cats = [c for c in str(target["category"]).split("|") if c.strip() and c.strip().lower() != "any"]
-    pi = post_interest(doc, creator, cats) if sm.interest_on() else None
+    pi = post_interest(doc, creator, cats) if sm.interest_on() and not use_v5 else None
     if pi is not None:
         space = ", ".join(c.lower() for c in cats)
         if pi["src"] == "posts":
@@ -637,9 +683,23 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         got["interest"]["src"] = pi["src"]
         got["interest"]["n"] = pi["posts"]
 
-    if er_bad is not None:
+    if er_bad is not None and not use_v5:
         out.setdefault("_flags", []).append({"label": "Engagement", "value": "%s%s" % (_pct(er_bad), unit_er),
                                               "note": "looks wrong for %s, left out of the score: verify the handle" % plat, "level": "bad"})
+    v5r = None
+    if use_v5:
+        v5r = _v5_run(doc, plat, f, objective)
+        if v5r.get("unscored"):
+            out["note"] = "%s Not scored." % v5r["reason"]
+            out["metrics"] = [{"label": "Check by hand", "value": c["metric"].replace("_", " ") + " missing", "note": c["fix"], "level": "info"}
+                              for c in v5r.get("check_manually", []) if c["scored"]]
+            return out
+        for k5, kfit, label, unit in (("engagement", "engagement", "Engagement", unit_er), ("reach", "view_rate", "View rate", " of followers")):
+            e = v5r["metrics"].get(k5)
+            if e:
+                good, bad, row = _v5_row(label, e, unit)
+                put(kfit, e["score"] / 100.0, e["score"] / 100.0, good, bad, row)
+                got[kfit]["ev"] = e["confidence"]
     if not any(k in got for k in ("engagement", "view_rate", "consistency")):
         out["note"] = "No post numbers on file for %s, so it is not scored." % plat
         return out
@@ -648,8 +708,13 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         return out
 
     # -- weights by the campaign objective, over what is available
-    table = sm.weights()
-    w = blend(table, objective)
+    if use_v5:
+        import score_v5
+        v5w = score_v5.weights_for("+".join(_v5_names(objective)))
+        w = {"engagement": v5w["engagement"], "view_rate": v5w["reach"], "interest": 0.0, "consistency": 0.0}
+    else:
+        table = sm.weights()
+        w = blend(table, objective)
     ev = {k: (got[k].get("ev", 1.0)) for k in got}
     wt = {k: w[k] * ev[k] for k in got}
     tw = sum(wt.values())
@@ -703,6 +768,9 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     level = "low" if posts < 6 else "high" if posts >= 20 else "medium"
     out["confidence"] = {"level": level, "posts": posts, "peers_n": 0, "source": "posts"}
     out["limited_data"] = posts < 10 or bool(feed and ("view_rate" not in got or "engagement" not in got))
+    if use_v5:
+        out["confidence"] = {"level": v5r["confidence"].lower(), "posts": posts, "peers_n": 0, "source": "v5", "pct": v5r["confidence_pct"]}
+        out["limited_data"] = v5r["confidence"] != "High" or bool(v5r["estimated"])
 
     # -- every metric behind the number, in the order the hover reads them
     metrics = [got[k]["row"] for k in sm.PARAMS if k in got] + out.pop("_flags", [])
@@ -714,10 +782,19 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     for c in out["checks"]:
         if c["label"] in ("Measured audience", "Gender", "Age", "Fake followers", "Our campaigns"):
             metrics.append({"label": c["label"], "value": c["text"], "note": "", "level": c["level"]})
+    if use_v5:
+        conf_level = "ok" if v5r["confidence"] == "High" else "warn" if v5r["confidence"] == "Medium" else "bad"
+        est = [m.replace("_", " ") for m in v5r["estimated"]]
+        metrics.append({"label": "Confidence", "value": "%s (%d%%)" % (v5r["confidence"], v5r["confidence_pct"]),
+                        "note": "how much of the best possible evidence is behind the number" + ("; estimated: " + ", ".join(est) if est else ""),
+                        "level": conf_level})
+        for c in v5r["check_manually"]:
+            if c["scored"] or (c["metric"] == "authenticity" and plat != "TikTok"):
+                metrics.append({"label": "Check by hand", "value": c["metric"].replace("_", " ") + " missing", "note": c["fix"] + " Not in the score.", "level": "info"})
     out["metrics"] = metrics
 
     capped = None
-    if feed and ("view_rate" not in got or "engagement" not in got) and val > sm.FEED_CAP:
+    if not use_v5 and feed and ("view_rate" not in got or "engagement" not in got) and val > sm.FEED_CAP:
         miss = [n for n, k in (("view counts", "view_rate"), ("an engagement figure", "engagement")) if k not in got]
         capped = "Capped at %s: no %s on file for %s" % (band_for(sm.FEED_CAP), " or ".join(miss), plat)
         val = sm.FEED_CAP
