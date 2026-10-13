@@ -724,16 +724,40 @@ def track_records():
     return out, typical
 
 
+_AUD_CACHE = {"at": 0.0, "v": None}
+AUD_TTL = 3600
+
+
 def catalogue_audience():
     """The average audience of every creator profile that has an uploaded
     analysis: for each country, its mean share across those profiles (a profile
-    that does not list the country counts as 0). Returns (rows, profiles)."""
+    that does not list the country counts as 0). Returns (rows, profiles).
+
+    One query for the whole roster, not four per creator (at 14,000 creators the old loop made 57,000
+    queries and took 40 s, and the campaign report waited for it); kept for an hour."""
+    import time as _time
+    import json as _json
+    import analysis as _an
+    if _AUD_CACHE["v"] is not None and _time.time() - _AUD_CACHE["at"] < AUD_TTL:
+        return _AUD_CACHE["v"]
+    with db.connect() as conn:
+        crow = {r["code"]: r for r in conn.execute("SELECT code, platform, profiles FROM creators")}
+        rows = conn.execute("SELECT code, platform, json_extract(data, '$.audience.countries') AS c "
+                            "FROM creator_analysis ORDER BY updated_at DESC").fetchall()
+    by = {}
+    for r in rows:
+        by.setdefault(r["code"], []).append(r)
     sums, n = {}, 0
-    for code in db.analysis_codes():
-        a = db.analysis(code)
-        countries = ((a or {}).get("data") or {}).get("audience", {}).get("countries") or []
+    for code, lst in by.items():
+        cr = crow.get(code)
+        main = _an.creator_platforms(cr)[0] if cr else "Instagram"
+        pick = next((r for r in lst if r["platform"] == main), lst[0])
+        try:
+            countries = _json.loads(pick["c"]) if pick["c"] else []
+        except ValueError:
+            countries = []
         got = {}
-        for row in countries:
+        for row in countries or []:
             cc, pct_ = (row.get("code") or "").upper(), row.get("pct")
             if len(cc) == 2 and isinstance(pct_, (int, float)):
                 got[cc] = got.get(cc, 0.0) + pct_
@@ -742,7 +766,9 @@ def catalogue_audience():
         n += 1
         for cc, v in got.items():
             sums[cc] = sums.get(cc, 0.0) + v
-    return ({cc: v / n for cc, v in sums.items()} if n else {}), n
+    out = ({cc: v / n for cc, v in sums.items()} if n else {}), n
+    _AUD_CACHE["v"], _AUD_CACHE["at"] = out, _time.time()
+    return out
 
 
 def audience_mix(creators, reach_by_code):
