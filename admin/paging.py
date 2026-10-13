@@ -38,6 +38,7 @@ RESULT_TTL = 60            # seconds an ordered result is reused (licences and a
 CHECK_EVERY = 1.0          # seconds between roster-version checks; tests set 0
 KEEP_OLD = 900             # seconds the previous version stays for cursors already handed out (it costs a second roster in memory)
 _lock = threading.Lock()
+_build_lock = threading.Lock()     # held for a whole index build (minutes at 14,000+ creators); _lock never is
 _state = {"checked": 0.0, "key": None, "versions": [], "results": {}}
 
 SORTS = ("", "followers-desc", "followers-asc", "tier-desc", "tier-asc", "name")
@@ -263,8 +264,13 @@ def current(key_fn, build_fn):
             del vs[0]
         if vs and vs[-1].version == key:
             return vs[-1]
-    cards, tiers = build_fn()
-    idx = Index(key, cards, tiers)
+    with _build_lock:                   # one build at a time: a cold cache must not start one build per request
+        with _lock:
+            vs = _state["versions"]
+            if vs and vs[-1].version == key:
+                return vs[-1]
+        cards, tiers = build_fn()
+        idx = Index(key, cards, tiers)
     with _lock:
         vs = _state["versions"]
         if not vs or vs[-1].version != key:

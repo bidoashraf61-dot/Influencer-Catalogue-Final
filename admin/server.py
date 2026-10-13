@@ -96,6 +96,7 @@ import ui  # noqa: E402
 SECRET = auth.load_secret(HERE / ".secret")
 _GZIP_TYPES = {"application/json", "text/html", "text/plain", "text/css", "application/javascript", "text/javascript", "image/svg+xml"}
 _ROSTER_CACHE = {}
+_ROSTER_BUILD_LOCK = __import__("threading").Lock()   # one roster build at a time (see roster_payload)
 # The /api/roster answer itself, serialised and gzipped once per roster version, with its
 # ETag: a repeat visit costs an empty 304 and nobody pays the ~0.8 s build or the 1.7 MB
 # json.dumps + gzip again until a creator, an analysis, a tier, a rate or the day's photo
@@ -4712,10 +4713,16 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         hit = _ROSTER_CACHE.get(key)
         if hit and time.time() - hit[0] < ROSTER_SAFETY_S:
             return hit[1]
-        out = self._roster_build(platform, None)
-        _ROSTER_CACHE.clear()
-        _ROSTER_CACHE[key] = (time.time(), out)
-        return out
+        # One build at a time (2026-10-14): at 14,000+ creators several requests arriving on a cold cache each
+        # built the whole roster in parallel, multiplying CPU and memory until the container was OOM-killed.
+        with _ROSTER_BUILD_LOCK:
+            hit = _ROSTER_CACHE.get(key)
+            if hit and time.time() - hit[0] < ROSTER_SAFETY_S:
+                return hit[1]
+            out = self._roster_build(platform, None)
+            _ROSTER_CACHE.clear()
+            _ROSTER_CACHE[key] = (time.time(), out)
+            return out
 
     def _roster_fingerprint(self):
         with db.connect() as conn:
@@ -4725,6 +4732,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 " (SELECT group_concat(name || ':' || coalesce(price_from, '') || ':' || coalesce(price_to, '')) FROM tiers)").fetchone())
 
     def _roster_build(self, platform=None, only=None):
+        land = db.setting("portal_countries", ["Saudi Arabia", "UAE", "Egypt"]) if only is None else None
         bands = db.tier_prices()
         analysed = db.analysis_codes()
         def accounts(r):
@@ -4762,15 +4770,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "itier": r["industry_tier"],
             }
             for r in db.list_creators(active_only=True)
-            if (only is not None and r["code"] in only) or (only is None and self._in_markets(r))
+            if (only is not None and r["code"] in only) or (only is None and self._in_markets(r, land))
         ]
 
-    def _in_markets(self, r):
+    def _in_markets(self, r, land=None):
         """portal_countries (owner, 2026-10-12): the portal browses Saudi Arabia, UAE and Egypt only.
         A creator whose city names another country is hidden from browsing (still in the admin and on
-        selections already made); a city not set yet stays, since the country is unknown."""
+        selections already made); a city not set yet stays, since the country is unknown.
+        ``land`` is the setting read once by the caller (a build checks 14,000+ creators)."""
         import paging
-        land = db.setting("portal_countries", ["Saudi Arabia", "UAE", "Egypt"])
+        if land is None:
+            land = db.setting("portal_countries", ["Saudi Arabia", "UAE", "Egypt"])
         if not land:
             return True
         country, label, _key = paging.place(r["city"])
