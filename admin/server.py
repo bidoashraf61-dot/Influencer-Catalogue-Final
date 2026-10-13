@@ -5211,7 +5211,8 @@ def main():
     # need anyone to relaunch them. Nothing starts while the job is already running.
     def _thumb_supervisor():
         import subprocess as _sp
-        jobs = {"Instagram": "post_thumbs_ig", "TikTok": "post_thumbs_tt"}
+        jobs = {}      # paused 2026-10-13: the platform links now load live in the viewer's browser; stored copies are kept
+        if False: jobs = {"Instagram": "post_thumbs_ig", "TikTok": "post_thumbs_tt"}
         while True:
             for plat, name in jobs.items():
                 try:
