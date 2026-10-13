@@ -3934,8 +3934,18 @@
     document.body.appendChild(box);
   }
 
+  // The page asks the server who is signed in and whether email sign-in is on. If the server is busy or just
+  // restarted (status 0 or a 5xx) ask again a few times before settling, so a visitor is never left on the
+  // plain access-code form because of a slow moment.
+  function me(tries) {
+    return api("GET", "/api/me").then(function (r) {
+      if ((r.s === 0 || r.s >= 500) && tries > 0) return new Promise(function (ok) { setTimeout(ok, 3000); }).then(function () { return me(tries - 1); });
+      return r;
+    });
+  }
+
   function boot() {
-    api("GET", "/api/me").then(function (r) {
+    me(6).then(function (r) {
       if (r.b && r.b.signed_in) {
         ME = r.b; HV.me = ME; mountDock(); mountVoice(); mountAiCard(); mountLicences(); mountPreviewBar(); mountAdminStillNote();
         try { document.dispatchEvent(new CustomEvent("hv:me", { detail: ME })); } catch (e) { /* old browser */ }
