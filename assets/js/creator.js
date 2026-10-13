@@ -643,11 +643,17 @@
 
   /* popular posts: the post's own cover; a tap plays it from Instagram */
   function shortcode(u) { var m = /instagram\.com\/(?:[^\/]+\/)?(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/.exec(u || ""); return m ? m[1] : null; }
+  // The picture for a post card: the stored copy when there is one (a file we keep), else the platform's own
+  // picture, loaded by the viewer's browser from Instagram or TikTok (nothing is kept on our side).
+  function live(p) {
+    if (p.thumb) return /^(https?:|\/)/.test(p.thumb) ? p.thumb : API + "/" + p.thumb;
+    return p.live || null;
+  }
   function postGrid(list, sponsored, recent) {
     return '<div class="pp-posts">' + list.map(function (p, i) {
       return '<a class="pp-post" href="' + esc(p.url) + '" target="_blank" rel="noopener" aria-label="Play post ' + (i + 1) + '" data-post="' + i + '"' + (sponsored ? ' data-sp="1"' : "") + (recent ? ' data-rc="1"' : "") + ">"
-        + '<span class="pp-post__media"' + (p.thumb ? ' style="background-image:url(\'' + esc(/^(https?:|\/)/.test(p.thumb) ? p.thumb : API + "/" + p.thumb) + '\')"' : "") + ">"
-        + (p.thumb ? "" : '<span class="pp-post__none">' + esc(PLAT || "Instagram") + " post</span>")
+        + '<span class="pp-post__media"' + (live(p) ? ' style="background-image:url(\'' + esc(live(p)) + '\')"' : "") + ">"
+        + (live(p) ? "" : '<span class="pp-post__none">' + esc(PLAT || "Instagram") + " post</span>")
         + '<span class="pp-post__play">' + I_PLAY + "</span>"
         + (sponsored && p.brand && BRANDLOGO[String(p.brand).toLowerCase()] ? '<span class="pp-post__brand pp-post__brand--logo" role="img" aria-label="' + esc(p.brand) + '" style="background-image:url(\'' + logoSrc(BRANDLOGO[String(p.brand).toLowerCase()].src) + '\');background-size:' + logoSize(BRANDLOGO[String(p.brand).toLowerCase()].w) + '"></span>' : "")
         + '<span class="pp-post__nums">' + (p.likes != null ? "<span>" + I_LIKE + num(p.likes) + "</span>" : "") + (p.comments != null ? "<span>" + I_COMMENT + num(p.comments) + "</span>" : "")
@@ -698,12 +704,15 @@
       var el = e.target.closest("[data-post]"); if (!el) return;
       if (D && D.sample) { e.preventDefault(); return; }          // the sample has no posts to open
       var list = el.getAttribute("data-sp") ? sp : top, p = list[+el.getAttribute("data-post")], sc = p && shortcode(p.url);
-      if (!sc) return;            // not an Instagram post: let the link open it
+      if (!sc && !/tiktok\.com\/@[^\/]+\/video\//.test(p.url || "")) return;      // neither platform: let the link open it
       e.preventDefault(); openPost(p.url, sc);
     };
   }
   function openPost(url, sc) {
-    $("pp-modal-frame").innerHTML = '<iframe src="https://www.instagram.com/p/' + encodeURIComponent(sc) + '/embed/captioned/" title="Instagram post" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="eager"></iframe>';
+    var tt = /tiktok\.com\/@[^\/]+\/video\/(\d+)/.exec(url || ""), src = tt
+      ? "https://www.tiktok.com/player/v1/" + tt[1] + "?music_info=1&description=1&controls=1"
+      : "https://www.instagram.com/p/" + encodeURIComponent(sc) + "/embed/captioned/";
+    $("pp-modal-frame").innerHTML = '<iframe src="' + esc(src) + '" title="' + (tt ? "TikTok" : "Instagram") + ' post" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="eager"></iframe>';
     $("pp-modal-open").href = url;
     $("pp-modal").hidden = false; document.body.classList.add("pp-modal-on");
     $("pp-modal-close").focus();

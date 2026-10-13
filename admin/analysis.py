@@ -15,6 +15,7 @@ so a whole batch is one upload.
 import copy
 import json
 import re
+import time
 import urllib.parse
 from pathlib import Path
 
@@ -526,6 +527,35 @@ def media_path(code, name):
     return f if f.is_file() else None
 
 
+_TT_LIVE = {}      # TikTok picture links, kept a day: the lookup is about a second per post
+
+
+def live_picture(post_url):
+    """The platform's own picture for a post, as a link the viewer's browser loads: Instagram's /media/ address
+    for a post or reel, TikTok's thumbnail from its public lookup. None when the link is not one of ours."""
+    u = str(post_url or "")
+    m = re.search(r"instagram\.com/(?:[^/]+/)?(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)", u)
+    if m:
+        return "https://www.instagram.com/p/%s/media/?size=m" % m.group(1)
+    if re.search(r"tiktok\.com/@[^/]+/video/\d+", u):
+        hit = _TT_LIVE.get(u)
+        if hit and time.time() - hit[0] < 86400:
+            return hit[1]
+        try:
+            import json as _j
+            import urllib.parse as _up
+            import urllib.request as _ur
+            link = re.sub(r"^https?://(www\.)?tiktok\.com", "https://www.tiktok.com", u)
+            raw = _ur.urlopen(_ur.Request("https://www.tiktok.com/oembed?url=" + _up.quote(link, safe=""),
+                                          headers={"User-Agent": "Mozilla/5.0"}), timeout=8).read()
+            pic = _j.loads(raw).get("thumbnail_url") or None
+        except Exception:
+            return None                      # not cached: the next view tries again
+        _TT_LIVE[u] = (time.time(), pic)
+        return pic
+    return None
+
+
 def with_media_urls(data, code, base):
     """A copy of the analysis with every "media:" reference turned into a link
     the viewer's browser can load from this service."""
@@ -542,6 +572,9 @@ def with_media_urls(data, code, base):
     for key in ("top_posts", "sponsored_posts", "recent_posts"):
         for p in d.get(key) or []:
             p["thumb"] = url(p.get("thumb"))
+            # No stored copy: the viewer's browser loads the platform's own picture (nothing is kept on our side).
+            if not p["thumb"]:
+                p["live"] = live_picture(p.get("url"))
     for b in d.get("brands") or []:
         b["logo"] = url(b.get("logo"))
     return d
