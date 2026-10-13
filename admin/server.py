@@ -5229,6 +5229,9 @@ def main():
     # Phase E: weekly campaign updates + "what to do next time" (on start, then hourly; idempotent).
     import weekly
     weekly.start()
+    # Prediction log (2026-10-13): freezes each campaign creator's score so it can be tested against the results.
+    import scorelog
+    scorelog.start()
     db.purge_expired_sessions()
     ALLOWED_ORIGINS.update(args.origin)
     global BASE

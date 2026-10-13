@@ -317,6 +317,30 @@ CREATE TABLE IF NOT EXISTS capture_runs (
   insights INTEGER,
   errors   TEXT
 );
+
+-- The prediction log (scorelog.py): the score every campaign creator was given the first time the log saw
+-- them, frozen (UNIQUE) so it can be set against what they delivered. late = 1 when the campaign already had
+-- captured numbers, so the row is not a real prediction.
+CREATE TABLE IF NOT EXISTS score_log (
+  id             INTEGER PRIMARY KEY,
+  campaign_id    INTEGER NOT NULL,
+  code           TEXT NOT NULL,
+  platform       TEXT,
+  objective      TEXT,
+  target         TEXT,                  -- JSON
+  engine         TEXT,                  -- v5 | v4
+  score          INTEGER,               -- NULL = could not be scored at the time
+  tag            TEXT,
+  confidence     TEXT,                  -- high | medium | low
+  confidence_pct INTEGER,
+  pred_view_rate REAL,                  -- predicted view rate, % of followers
+  pred_engagement REAL,                 -- predicted engagement rate, %
+  followers      INTEGER,
+  inputs         TEXT,                  -- JSON: parts, metrics, checks, conclusion
+  late           INTEGER NOT NULL DEFAULT 0,
+  at             INTEGER NOT NULL,
+  UNIQUE (campaign_id, code)
+);
 """
 
 
