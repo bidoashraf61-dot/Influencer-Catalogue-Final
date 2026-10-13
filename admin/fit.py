@@ -804,7 +804,18 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         capped = "Capped at %s: no %s on file for %s" % (band_for(sm.FEED_CAP), " or ".join(miss), plat)
         val = sm.FEED_CAP
         out["score_range"] = [min(x, sm.FEED_CAP) for x in out["score_range"]]
+    # Fake followers over the client's limit (their brief's, else 30%) cap the score at the Weak band
+    # (shown as "Not recommended"). Unknown fake share: no cap, but it is listed as a check.
+    fake_lim = (target or {}).get("max_fake") or 30
+    fake_now = doc.get("fake_followers_pct")
+    if isinstance(fake_now, (int, float)) and fake_now > fake_lim:
+        val = min(val, 39)
+        fake_note = "Fake followers %s is over the limit of %d%%: score capped at the Weak band" % (_pct(fake_now), fake_lim)
+        out["watchouts"] = out.get("watchouts", [])
+        out.setdefault("_fake_cap", fake_note)
     out["score"], out["tag"] = val, band_for(val)
+    if out.get("_fake_cap"):
+        out["watchouts"] = [out.pop("_fake_cap")] + out["watchouts"]
     lo_s, hi_s = out["score_range"]
     out["tag_range"] = [band_for(lo_s), band_for(hi_s)]
     out["strengths"] = [got[k]["good"] for k in sm.PARAMS if k in got and got[k]["mid"] >= 0.6]

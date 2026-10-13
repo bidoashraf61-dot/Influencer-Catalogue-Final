@@ -1037,7 +1037,8 @@
         q.options.forEach(function (o) {
           var cur = answers[q.id];
           var on = many ? asList(cur).indexOf(o.value) > -1 : cur === o.value;
-          var btn = h("button", { class: "pt-opt", type: "button", "aria-pressed": on ? "true" : "false" }, h("span", { class: "pt-tick" }), o.label);
+          var btn = h("button", { class: "pt-opt", type: "button", "aria-pressed": on ? "true" : "false" }, h("span", { class: "pt-tick" }), o.label,
+            o.hint ? h("span", { class: "pt-opt__hint" }, o.hint) : null);
           btn.addEventListener("click", function () {
             if (many) {
               var list = toggleMulti(q, answers[q.id], o.value);

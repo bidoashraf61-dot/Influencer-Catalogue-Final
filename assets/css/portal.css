@@ -1432,3 +1432,6 @@ a.hv-note:hover { background: #efede8; }
 .ai-sl__cring, .ai-sl__cring .hv-lime, .ai-sl__face, .ai-sl__face .hv-lime,
 .ai-sl__lens, .ai-sl__lens .hv-lime, .ai-sl__cheer, .ai-sl__cheer .hv-lime { border-radius: 6%; }   /* almost square: the whole 1:1 frame, nothing cut (2026-10-11) */
 .ai-sl .hv-lime .hv-clip { object-fit: contain; object-position: 50% 50%; transform: none; }
+
+/* One line under a brief option: what it means for the score (refined brief, 2026-10-13). */
+.pt-opt__hint { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; line-height: 1.35; opacity: .72; }

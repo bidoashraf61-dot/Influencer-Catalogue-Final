@@ -25,16 +25,14 @@ import metrics
 # type: "one" | "many" | "text". Option values are what is stored and scored.
 
 QUESTIONS = [
-    # Fix batch 6: three campaign types only, as in the ROI Calculator (Awareness, Engagement, Traffic).
-    # Old briefs still read: "Balanced" as an equal blend of the three, "Conversion" as Traffic.
+    # Refined 2026-10-13 (owner-approved). Values are what is stored and scored; labels are what the client reads.
+    # Old briefs still read: "Balanced" as an equal blend, "Conversion" as Traffic, the legacy budget (below).
     {"id": "goal", "type": "one", "multi_ok": True, "label": "What is the main goal of the campaign?", "required": True,
      "options": [("awareness", "Awareness"), ("engagement", "Engagement"), ("traffic", "Traffic")],
      "legacy": [("balanced", "Balanced"), ("conversion", "Traffic")]},
     {"id": "platforms", "type": "many", "label": "Where should the content run?", "required": True,
      "options": [("Instagram", "Instagram"), ("TikTok", "TikTok"), ("Snapchat", "Snapchat"),
                  ("YouTube", "YouTube"), ("any", "No preference")]},
-    # Fix batch 5: market, gender and age take several answers too (stored as a list, as the goal is).
-    # Budget, number of creators and timing are one value by nature and stay single choice.
     {"id": "market", "type": "one", "multi_ok": True, "label": "Which countries is the audience in?", "required": True,
      "options": [("SA", "Saudi Arabia"), ("AE", "UAE"), ("EG", "Egypt"), ("KW", "Kuwait"), ("QA", "Qatar"),
                  ("BH", "Bahrain"), ("OM", "Oman"), ("JO", "Jordan")]},
@@ -43,24 +41,36 @@ QUESTIONS = [
     {"id": "age", "type": "one", "multi_ok": True, "label": "Main age groups", "required": False,
      "options": [("Any", "All ages"), ("18-24", "18–24"), ("25-34", "25–34"), ("35-44", "35–44"), ("45-54", "45+")]},
     {"id": "category", "type": "many", "label": "Which space is the product in?", "required": True,
-     "options": [("health care", "Healthcare / pharma"), ("skincare", "Skincare & dermatology"), ("beauty", "Beauty"),
-                 ("hair care", "Hair care"), ("fragrance", "Fragrance"), ("mother & baby", "Mother & baby"),
-                 ("food", "Food & drink"), ("fitness", "Fitness & wellness"), ("fashion", "Fashion"),
+     # "beauty" is kept as the stored value of Makeup, so briefs saved before this change still read.
+     "options": [("health care", "Healthcare / pharma"), ("skincare", "Skincare and dermatology"), ("beauty", "Makeup"),
+                 ("hair care", "Hair care"), ("fragrance", "Fragrance"), ("mother & baby", "Mother and baby"),
+                 ("food", "Food and drink"), ("fitness", "Fitness and wellness"), ("fashion", "Fashion"),
                  ("lifestyle", "Lifestyle"), ("technology", "Technology"), ("automotive", "Automotive"),
                  ("travel", "Travel"), ("finance", "Finance"), ("gaming", "Gaming")]},
-    {"id": "budget", "type": "one", "label": "Budget for creators (SAR, before VAT)", "required": False,
-     "options": [("50", "Under 50,000"), ("150", "50,000 – 150,000"), ("400", "150,000 – 400,000"),
-                 ("400+", "Over 400,000"), ("open", "Not decided yet")]},
+    {"id": "creator_size", "type": "many", "label": "Which creator sizes?", "required": False,
+     "options": [("nano", "Nano: under 20k"), ("micro", "Micro: 20k to 100k"), ("mid", "Mid: 100k to 500k"),
+                 ("macro", "Macro: 500k to 1M"), ("mega", "Mega: 1M and over")]},
     {"id": "count", "type": "one", "label": "How many creators?", "required": False,
      "options": [("5", "3 – 5"), ("8", "6 – 10"), ("15", "11 – 20"), ("25", "20 or more")]},
-    {"id": "deliverable", "type": "many", "label": "What should they make?", "required": False,
-     "options": [("reels", "Reels / short videos"), ("ugc", "UGC content for our own channels"),
+    {"id": "deliverable", "type": "many", "label": "What content should they make?", "required": False,
+     "options": [("reels", "Reels or short video"), ("ugc", "UGC for our own channels"),
                  ("stories", "Stories"), ("event", "Event or store attendance"), ("review", "Product reviews")]},
+    {"id": "max_fake", "type": "one", "label": "Highest share of fake followers we accept", "required": False,
+     "options": [("15", "15% or less"), ("30", "30% or less"), ("50", "50% or less"), ("none", "No limit")]},
+    {"id": "min_engagement", "type": "one", "label": "Minimum engagement", "required": False,
+     "options": [("none", "No minimum"), ("above_benchmark", "Above the benchmark for their size"),
+                 ("top25", "Top 25% of creators their size")]},
     {"id": "timing", "type": "one", "label": "When does it start?", "required": False,
      "options": [("asap", "Within 2 weeks"), ("month", "Within 6 weeks"), ("quarter", "Next quarter"), ("later", "Just exploring")]},
     {"id": "notes", "type": "text", "label": "Anything else we should know?", "required": False, "max": 600},
 ]
-_BY_ID = {q["id"]: q for q in QUESTIONS}
+# Kept out of the form (budget was removed from the brief on 2026-10-13) so briefs saved with it still read.
+LEGACY_QUESTIONS = [
+    {"id": "budget", "type": "one", "label": "Budget for creators (SAR, before VAT)", "required": False,
+     "options": [("50", "Under 50,000"), ("150", "50,000 – 150,000"), ("400", "150,000 – 400,000"),
+                 ("400+", "Over 400,000"), ("open", "Not decided yet")]},
+]
+_BY_ID = {q["id"]: q for q in QUESTIONS + LEGACY_QUESTIONS}
 OBJECTIVE_OF = {"awareness": "Awareness", "engagement": "Engagement", "traffic": "Traffic", "conversion": "Traffic",
                 "balanced": "Balanced"}
 
@@ -99,9 +109,31 @@ def answer_label(qid, v):
     return next((l for o, l in _BY_ID[qid].get("options", []) + _BY_ID[qid].get("legacy", []) if o == v), v)
 
 
+# One line under an option in the form, saying what it means for the score. The labels stay short.
+HINTS = {
+    ("goal", "awareness"): "Reach and views",
+    ("goal", "engagement"): "Likes, comments and saves",
+    ("goal", "traffic"): "Clicks and sales",
+    ("creator_size", "nano"): "Under 20k followers",
+    ("creator_size", "micro"): "20k to 100k",
+    ("creator_size", "mid"): "100k to 500k",
+    ("creator_size", "macro"): "500k to 1M",
+    ("creator_size", "mega"): "1M and over",
+    ("max_fake", "15"): "Strictest: most audiences are real",
+    ("max_fake", "30"): "Typical for public accounts",
+    ("max_fake", "50"): "Allows heavily bought audiences",
+    ("max_fake", "none"): "Do not filter on fake followers",
+    ("min_engagement", "above_benchmark"): "At or above the typical rate for their platform and size",
+    ("min_engagement", "top25"): "Best quarter of creators their size",
+}
+
+
 def public_questions():
-    return [dict({k: v for k, v in q.items() if k != "legacy"}, options=[{"value": v, "label": l} for v, l in q.get("options", [])],
-                 other=q["type"] != "text") for q in QUESTIONS]
+    out = []
+    for q in QUESTIONS:
+        opts = [{"value": v, "label": l, "hint": HINTS.get((q["id"], v), "")} for v, l in q.get("options", [])]
+        out.append(dict({k: v for k, v in q.items() if k != "legacy"}, options=opts, other=q["type"] != "text"))
+    return out
 
 
 def clean_answers(raw):
@@ -113,7 +145,7 @@ def clean_answers(raw):
         g = ["traffic" if x == "conversion" else x for x in g] if isinstance(g, list) else ("traffic" if g == "conversion" else g)
         raw = dict(raw, goal=list(dict.fromkeys(g)) if isinstance(g, list) else g)
     out, missing = {}, []
-    for q in QUESTIONS:
+    for q in QUESTIONS + LEGACY_QUESTIONS:
         v = raw.get(q["id"])
         if q["type"] == "text":
             v = " ".join(str(v or "").split())[: q.get("max", 500)]
@@ -191,7 +223,7 @@ def resolve(answers):
     """Answers with every "Other" read into option values where it can be. Also returns the
     client's own words, question by question, for the notes."""
     out, typed = {}, []
-    for q in QUESTIONS:
+    for q in QUESTIONS + LEGACY_QUESTIONS:
         v = answers.get(q["id"])
         if v is None:
             continue
@@ -230,11 +262,17 @@ def to_brief(answers):
         "target": {"country": "|".join(_values(answers.get("market"), _enum("market"))) or "SA",
                    "gender": fit.one_gender(answers.get("gender")),
                    "age": "|".join(_values(answers.get("age"), [a for a in _enum("age") if a != "Any"])) or "Any",
-                   "category": "|".join(cats) if cats else "Any"},
+                   "category": "|".join(cats) if cats else "Any",
+                   "max_fake": int(answers["max_fake"]) if answers.get("max_fake") in ("15", "30", "50") else None},
         "platforms": plats,
         "budget_max": budget if isinstance(budget, (int, float)) else BUDGET_MAX.get(budget),
         "count": count,
         "notes": notes,
+        # Refined 2026-10-13: which sizes, the highest fake-follower share accepted (None = no limit),
+        # and the minimum engagement (None = none). Briefs saved before carry none of these.
+        "size": _values(answers.get("creator_size"), ["nano", "micro", "mid", "macro", "mega"]),
+        "max_fake": int(answers["max_fake"]) if answers.get("max_fake") in ("15", "30", "50") else None,
+        "min_engagement": answers.get("min_engagement") if answers.get("min_engagement") in ("above_benchmark", "top25") else None,
     }
 
 
@@ -478,6 +516,50 @@ def apply_rules(c, s, val, basis, target):
     return val, factor, s
 
 
+def _client_limits(brief, items):
+    """The client's hard limits, applied to the scored creators (refined brief, 2026-10-13).
+
+    max_fake: a creator whose stored fake-follower share is above the limit is removed. A creator
+    with no figure stays in, and is marked "fake share not known" so the client can check it.
+    min_engagement: "above_benchmark" keeps creators at or above the typical rate for their platform and
+    size (intl_benchmarks); "top25" keeps the best quarter of the candidates by engagement rate. A creator
+    with no engagement rate cannot show it meets the minimum, so is removed."""
+    limit = brief.get("max_fake")
+    rule = brief.get("min_engagement")
+    if limit is None and rule is None or not items:
+        return items
+    import intl_benchmarks
+    every = db.analyses_for([i["code"] for i in items])
+
+    def doc_of(it):
+        return ((every.get(it["code"]) or {}).get(it["platform"]) or {}).get("data") or {}
+    rates = sorted(doc_of(i).get("er") for i in items if isinstance(doc_of(i).get("er"), (int, float)))
+    top_cut = rates[int(len(rates) * 0.75)] if rates and rule == "top25" else None
+    kept = []
+    for it in items:
+        d = doc_of(it)
+        fake = d.get("fake_followers_pct")
+        if limit is not None and isinstance(fake, (int, float)) and fake > limit:
+            continue
+        if isinstance(fake, (int, float)):
+            it["fake_pct"] = round(float(fake), 1)
+        else:
+            it["fake_pct"] = None
+            it.setdefault("watchouts", []).append("fake share not known")
+        if rule is not None:
+            er = d.get("er")
+            if not isinstance(er, (int, float)):
+                continue
+            if rule == "above_benchmark":
+                ref = intl_benchmarks.reference(it["platform"], it["followers"])
+                if not ref or er < ref["high"]:
+                    continue
+            elif rule == "top25" and er < top_cut:
+                continue
+        kept.append(it)
+    return kept
+
+
 def score_all(brief, exclude=(), only=None):
     """Every active creator scored against the brief, best first (no cut for count or budget)."""
     objective, target = brief["objective"], brief["target"]
@@ -486,6 +568,8 @@ def score_all(brief, exclude=(), only=None):
                 and (only is None or c["code"] in only)]
     if wanted:
         creators = [c for c in creators if set(analysis.creator_platforms(c)) & set(wanted)]
+    if brief.get("size"):
+        creators = [c for c in creators if metrics.band_of(c["followers"]) in brief["size"]]
     single = wanted[0] if len(wanted) == 1 else None
     scored = score_codes([c["code"] for c in creators], objective, target, single)
     bands = db.tier_prices()
@@ -520,6 +604,7 @@ def score_all(brief, exclude=(), only=None):
             "strengths": (s.get("strengths") or [])[:3], "watchouts": (s.get("watchouts") or [])[:2],
             "followers": c["followers"] or 0,
         })
+    items = _client_limits(brief, items)
     # Equal scores are common on public data; break the tie the way the goal would: reach for
     # awareness, the smaller (cheaper, closer) account otherwise.
     big_first = "Awareness" in str(objective).split("+")

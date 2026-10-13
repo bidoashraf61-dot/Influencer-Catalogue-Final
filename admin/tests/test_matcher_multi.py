@@ -25,7 +25,8 @@ class Multi(unittest.TestCase):
         by = {q["id"]: q for q in matcher.public_questions()}
         for qid in ("goal", "market", "gender", "age"):
             self.assertTrue(by[qid].get("multi_ok"), qid)
-        for qid in ("budget", "count", "timing"):
+        self.assertNotIn("budget", by)          # removed from the brief on 2026-10-13
+        for qid in ("count", "timing"):
             self.assertFalse(by[qid].get("multi_ok"), qid)
             self.assertEqual(by[qid]["type"], "one", qid)
 
