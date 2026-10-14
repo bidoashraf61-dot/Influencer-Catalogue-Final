@@ -765,6 +765,154 @@ def dashboard(s, events, who, message=None, error=None):
     return page("Home", body, "/")
 
 
+def live_campaigns_section(d):
+    """Live campaign progress (moved from Home to the Campaigns page, 2026-10-14)."""
+    if not d["live"]:
+        return ""
+    items = ""
+    for c in d["live"]:
+        pct_t = int(round((c["elapsed"] or 0) * 100))
+        pct_p = int(round(c["posts"] / float(c["planned"]) * 100)) if c["planned"] else 0
+        items += (
+            "<a class='lc' href='%s'><div><b>%s</b><span class='muted'>%s</span></div>"
+            "<div class='lc-bars'><span>Time</span><span class='track'><i style='width:%d%%;background:var(--ink)'></i></span><em>%d%%</em>"
+            "<span>Posts</span><span class='track'><i style='width:%d%%;background:var(--green)'></i></span><em>%d/%d</em></div></a>" % (
+                u("/campaigns/report") + "?id=%d" % c["id"], e(c["name"]), e(c["client"] or ""), pct_t, pct_t, pct_p, c["posts"], c["planned"] or c["posts"]))
+    return ("<section class='card' aria-labelledby='h-live'><div class='hd'><h2 id='h-live'>Live now</h2>"
+            "<span class='muted'>Time passed and posts live, per campaign</span></div>" + items + "</section>")
+
+
+def activity_section(d):
+    """Catalogue activity, last 14 days (moved from Home to Analytics, 2026-10-14)."""
+    nice = {"unlock_ok": "opened the catalogue", "view": "viewed a page", "shortlist": "shortlisted creators", "unlock_fail": "entered a wrong code",
+            "request": "sent a quote request", "select": "shortlisted creators", "unlock": "opened the catalogue"}
+    feed = "".join("<li><span>%s <b>%s</b></span><em>%s</em></li>" % (e(ev["label"] or "Someone"), e(nice.get(ev["kind"], ev["kind"])), ago(ev["at"]))
+                   for ev in d["feed"]) or "<li class='muted'>Nothing yet.</li>"
+    return ("<section class='card' aria-labelledby='h-act'><div class='hd'><h2 id='h-act'>Catalogue activity</h2><span class='muted'>Last 14 days</span></div>"
+            + ui.column_chart(d["series"], d["labels"], 110) + "<ul class='feed'>" + feed + "</ul></section>")
+
+
+_CC_ICONS = {
+    "creators": "users", "clients": "building", "work": "flag", "scoring": "target", "settings": "gear", "people": "key",
+}
+
+
+def control_centre(who, message=None, error=None):
+    """The Control Centre (item 101, step 2): what needs you, then six tiles, each with one live number and its links."""
+    import overview
+    d = overview.home()
+    c = overview.control_counts()
+    q = d["queue"]
+    banner = ("<div class='ok'>" + e(message) + "</div>" if message else "") + ("<div class='err'>" + e(error) + "</div>" if error else "")
+    first = (who["name"] if "name" in who.keys() and who["name"] else (who["email"] or "").split("@")[0].split(".")[0]).split(" ")[0].capitalize()
+    hour = time.gmtime(now() + 3 * 3600).tm_hour               # Riyadh time
+    hello = "Good morning" if hour < 12 else "Good afternoon" if hour < 18 else "Good evening"
+    n = len(q)
+    sub = ("%s, %s. %d thing%s need%s you. Everything else is running." % (hello, e(first), n, "" if n == 1 else "s", "s" if n == 1 else "")) if n \
+        else "%s, %s. Nothing is waiting for you." % (hello, e(first))
+
+    if q:
+        lis = "".join("<li><a href='%s'><i class='cc-dot%s'></i><div><b>%s</b><small>%s</small></div><span class='cc-go'>%s →</span></a></li>" % (
+            u(href), "" if t == "alert" else " warn", e(title), e(detail), e(label)) for ic, title, detail, href, label, t in q[:8])
+        needs = ("<section class='cc-needs' aria-labelledby='cc-n'><h2 id='cc-n'>Needs you <span>%d</span></h2><ul>%s</ul></section>" % (n, lis))
+    else:
+        needs = ("<section class='cc-needs calm' aria-labelledby='cc-n'><h2 id='cc-n'>All clear</h2>"
+                 "<p>Nothing is waiting for you. A good moment to add creators or prepare the next selection.</p></section>")
+
+    def fmt(v):
+        return "{:,}".format(int(v))
+
+    def tile(key, title, fig, fig_label, flag, flag_ok, links, extra=""):
+        acts = "".join(("<a class='soon' aria-disabled='true'>%s<span>Soon</span></a>" % e(lab)) if href is None else
+                       "<a href='%s'>%s<span>%s</span></a>" % (u(href), e(lab), e(str(side)) if side not in (None, "") else "→")
+                       for lab, href, side in links)
+        return ("<div class='cc-tile'><a class='cc-t-top' href='%s'><span class='cc-ic'>%s</span><h3>%s</h3></a>%s%s%s<div class='cc-acts'>%s</div></div>" % (
+            u(links[0][1] or "/"), ui.icon(_CC_ICONS[key], 21), e(title),
+            ("<div class='cc-fig'><b>%s</b><span>%s</span></div>" % (e(fig), e(fig_label))) if fig is not None else "",
+            extra, ("<span class='cc-flag%s'>%s</span>" % (" ok" if flag_ok else "", e(flag))) if flag else "", acts))
+
+    review = c["review"]
+    tiles = [
+        tile("creators", "Creators", fmt(c["creators"]), "active creators",
+             ("%s need an industry check" % fmt(review)) if review else "Every creator has an industry", not review,
+             [("Find or edit a creator", "/roster", None), ("Add or import creators", "/roster#add", None),
+              ("Creator analysis", "/analysis", c["analysis_open"] or None)]),
+        tile("clients", "Clients and codes", fmt(c["clients"]), "client accounts",
+             ("%d waiting for approval" % c["pending"]) if c["pending"] else "No one waiting for approval", not c["pending"],
+             [("Approve or hold clients", "/portal", c["pending"] or None), ("Access codes", "/codes", None),
+              ("Credits and requests", "/portal", c["credit_reqs"] or None)]),
+        tile("work", "Selections and campaigns", fmt(c["live"]), "campaign%s live now" % ("" if c["live"] == 1 else "s"),
+             ("%d quote request%s" % (c["quotes"], "" if c["quotes"] == 1 else "s")) if c["quotes"] else "No quote requests waiting", not c["quotes"],
+             [("Selections", "/selections", None), ("Campaigns and reports", "/campaigns", None), ("ROI calculator", "/calculator", None)]),
+        tile("scoring", "Scoring rules", "%d%%" % c["fake_limit"], "fake-follower limit",
+             "Views over 3× typical are checked", True,
+             [("Benchmarks", "/reference", None), ("Change the rules", None, None)]),
+        tile("settings", "Settings and keys", None, "", "Markets: " + ", ".join(c["markets"]), True,
+             [("Prices and currencies", "/settings", None), ("Keys and data jobs", "/apis", None), ("Portal settings", "/portal?tab=settings", None)],
+             extra="<div class='cc-keys'>" + "".join("<i class='%s'>%s %s</i>" % ("" if on else "off", e(lab), "on" if on else "off")
+                                                       for lab, on in c["keys"]) + "</div>"),
+        tile("people", "People and access", fmt(c["people"]), "people · %d owner%s" % (c["owners"], "" if c["owners"] == 1 else "s"),
+             "Everyone can sign in by email code", True,
+             [("Invite someone", "/team#invite", None), ("History and undo", "/history", None), ("Activity", "/team", None)]),
+    ]
+    more = ("<div class='cc-more'><span>Also here:</span><a href='%s'>Analytics</a><a href='%s'>AI copilot</a><a href='%s'>Licences</a>"
+            "<a href='%s'>Quote requests</a></div>" % (u("/analytics"), u("/ai"), u("/licences"), u("/requests")))
+    head = ("<div class='cc-hello'><div><h1>Control Centre</h1><p>" + sub + "</p></div>"
+            "<a class='btn lime' href='" + u("/open-catalogue") + "' target='_blank' rel='noopener'>Open the catalogue " + ui.icon("arrow", 16) + "</a></div>"
+            "<button type='button' class='cc-search' data-open-search>"
+            + ui.icon("search", 20) + "<span>Find anything: a creator, client, selection, campaign or page</span><kbd>⌘K</kbd></button>")
+    account = ("<details class='card' id='account' style='margin-top:22px'><summary><b>Your account</b> <span class='muted'>· " + e(who["email"]) + " · change password</span></summary>"
+               "<form method='post' action='" + u("/password") + "' style='margin-top:14px'><div class='row'>"
+               "<div><label>Current password</label><input name='current' type='password' required></div>"
+               "<div><label>New password</label><input name='new' type='password' required></div>"
+               "</div><button class='btn'>Update password</button></form></details>")
+    return page("Control Centre", CC_CSS + head + banner + needs + "<div class='cc-grid'>" + "".join(tiles) + "</div>" + more + account, "/")
+
+
+CC_CSS = ("<style>"
+          ".cc-hello{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap}"
+          ".cc-hello h1{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:clamp(42px,5vw,62px);line-height:.9;margin:0}"
+          ".cc-hello p{margin:8px 0 0;color:var(--gray)}"
+          ".cc-search{display:flex;align-items:center;gap:12px;width:100%;margin:22px 0 24px;background:var(--white);border:1px solid var(--line-strong);"
+          "border-radius:16px;padding:0 18px;min-height:56px;font:inherit;font-size:15.5px;color:var(--muted);cursor:pointer;text-align:left}"
+          ".cc-search:hover{border-color:var(--ink)}.cc-search span{flex:1}"
+          ".cc-search kbd{font:600 12px 'DM Sans',sans-serif;border:1px solid var(--line-strong);border-radius:6px;padding:2px 6px}"
+          ".cc-needs{background:var(--ink);color:#fff;border-radius:18px;padding:18px 20px;margin-bottom:24px}"
+          ".cc-needs h2{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:26px;line-height:1;margin:0 0 12px;display:flex;align-items:center;gap:10px;color:#fff}"
+          ".cc-needs h2 span{font:700 13px 'DM Sans',sans-serif;background:var(--lime);color:var(--ink);border-radius:999px;padding:2px 10px}"
+          ".cc-needs.calm p{margin:0;color:rgba(255,255,255,.75)}"
+          ".cc-needs ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}"
+          ".cc-needs li a{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--ink-3);text-decoration:none;color:#fff;height:100%}"
+          ".cc-needs li a:hover{background:#353535}.cc-needs li b{font-weight:600}"
+          ".cc-needs li small{display:block;color:rgba(255,255,255,.66);font-size:12.5px;line-height:1.35}"
+          ".cc-go{margin-left:auto;color:var(--lime);font-weight:700;white-space:nowrap;font-size:13px}"
+          ".cc-dot{width:10px;height:10px;border-radius:50%;flex:none;background:var(--lime)}.cc-dot.warn{background:#ffb15e}"
+          ".cc-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}"
+          ".cc-tile{background:var(--white);border:1px solid var(--line);border-radius:18px;padding:20px;display:flex;flex-direction:column;min-height:250px;transition:border-color .15s,box-shadow .15s}"
+          ".cc-tile:hover{border-color:var(--ink);box-shadow:0 16px 34px -22px rgba(18,18,18,.45)}"
+          ".cc-t-top{display:flex;align-items:center;gap:12px;text-decoration:none;color:var(--ink)}"
+          ".cc-ic{width:42px;height:42px;border-radius:12px;background:var(--linen);display:grid;place-items:center;flex:none}"
+          ".cc-tile h3{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:27px;line-height:1;margin:0}"
+          ".cc-fig{margin:16px 0 6px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}"
+          ".cc-fig b{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:46px;line-height:.9;font-variant-numeric:tabular-nums}"
+          ".cc-fig span{color:var(--gray);font-size:13.5px}"
+          ".cc-flag{display:inline-flex;font-size:12.5px;font-weight:600;border-radius:999px;padding:3px 10px;background:var(--amber-soft);color:var(--amber);align-self:flex-start}"
+          ".cc-flag.ok{background:var(--green-soft);color:var(--green)}"
+          ".cc-keys{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 8px}"
+          ".cc-keys i{font-style:normal;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--green-soft);color:var(--green)}"
+          ".cc-keys i.off{background:var(--red-soft);color:var(--red)}"
+          ".cc-acts{margin-top:auto;padding-top:16px;display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--line)}"
+          ".cc-acts a{display:flex;justify-content:space-between;align-items:center;padding:8px 2px;font-weight:500;border-radius:8px;text-decoration:none;color:var(--ink);transition:padding .15s,background .15s}"
+          ".cc-acts a:hover{background:rgba(232,255,118,.45);padding-left:8px}"
+          ".cc-acts a span{color:var(--muted);font-size:12.5px}"
+          ".cc-acts a.soon{color:var(--muted);pointer-events:none}.cc-acts a.soon span{background:rgba(18,18,18,.07);color:var(--ink);border-radius:999px;padding:1px 8px;font-weight:600}"
+          ".cc-more{margin-top:22px;display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}.cc-more a{color:var(--ink)}"
+          "@media (max-width:1100px){.cc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}"
+          "@media (max-width:760px){.cc-grid,.cc-needs ul{grid-template-columns:1fr}.cc-tile{min-height:0}.cc-search kbd{display:none}}"
+          "@media (prefers-reduced-motion:reduce){.cc-tile,.cc-acts a{transition:none}}"
+          "</style>")
+
+
 def copyable(text, extra=""):
     """A code shown in full with a one-click copy.
 
@@ -1296,6 +1444,12 @@ def analytics_page(s, events):
         + ui.tabset("an", [("overview", "Overview", None), ("clients", "Clients", None), ("creators", "Creators", None),
                            ("security", "Refused & log", None)], panels)
     )
+    try:
+        import overview
+        d = overview.home()
+        body = body + _kpi_strip(d.get("kpis") or []) + activity_section(d)
+    except Exception:
+        pass
     return page("Analytics", body, "/analytics")
 
 
@@ -3036,6 +3190,12 @@ def status_button(k):
 
 def campaigns_page(camps, codes, error=None, message=None, selections=()):
     note = _notes(error, message)
+    try:
+        import overview
+        mine = {k["id"] for k in camps}                 # a key account manager's list is already hers only
+        note += live_campaigns_section({"live": [c for c in overview.live_campaigns() if c["id"] in mine]})
+    except Exception:
+        pass
     n_live = sum(1 for k in camps if k["status"] == "live")
     n_draft = sum(1 for k in camps if k["status"] == "draft")
     rows = []
@@ -3078,7 +3238,7 @@ def campaigns_page(camps, codes, error=None, message=None, selections=()):
     body = (
         ui.header("Campaigns", "Creators booked for a client, the dates they post in and the rules that decide which posts count. "
                   "The client only views the report.",
-                  crumbs=[("Work", None), ("Campaigns", None)],
+                  crumbs=[("Selections and campaigns", None), ("Campaigns", None)],
                   actions="<a class='btn ghost' href='" + u("/planner") + "'>ROI planner</a>")
         + note + table + start)
     return page("Campaigns", body, "/campaigns")
@@ -3731,7 +3891,7 @@ def settings_page(rates, factors, token_set, runs, has_geo, new_token=None, erro
         token_box = ("<div class='ok'>New capture token — copy it now, it is not shown again:"
                      + copyable(new_token) + "</div>")
     body = (
-        ui.header("Settings", "Rates and keys that apply to the whole workspace: how earned media value is worked out, currencies and the capture token.", crumbs=[("System", None), ("Settings", None)])
+        ui.header("Settings", "Rates and keys that apply to the whole workspace: how earned media value is worked out, currencies and the capture token.", crumbs=[("Settings and keys", None), ("Settings", None)])
         + _notes(error, message) + token_box
         + "<form method='post' action='" + u("/settings/save") + "'>"
         + "<h2>EMV rates</h2><div class='card'><div class='row'>" + inputs + "</div>"
@@ -4200,7 +4360,7 @@ def analysis_review_page(kind, token, items, matched, creators, res, error=None,
     n = len(items)
     body = (ui.header("Who is this?", lead + "%d %s%s can't be matched on its own. Pick the creator, or leave it empty to skip."
                       % (n, what, "" if n == 1 else "s"),
-                      crumbs=[("Library", None), ("Creator analysis", "/analysis"), ("Review", None)])
+                      crumbs=[("Creators", None), ("Creator analysis", "/analysis"), ("Review", None)])
             + _notes(error, message)
             + "<form method='post' action='" + u("/analysis/review") + "' class='card'>"
               "<input type='hidden' name='t' value='" + e(token) + "'>"
@@ -4292,7 +4452,7 @@ def analysis_page(creators, have, requests, origin, q="", error=None, message=No
                      "<input type='hidden' name='code' value='" + e(c["code"]) + "'><input type='hidden' name='platform' value='" + e(cur) + "'>"
                      "<button class='btn small danger'>Remove " + e(cur) + " analysis</button></form>" if cur in mine else ""))
     body = (
-        ui.header("Creator analysis", "Full profile analyses clients open from the catalogue and reports — one per platform. A platform without one shows a locked tab with Request analysis; requests land below.", crumbs=[("Library", None), ("Creator analysis", None)])
+        ui.header("Creator analysis", "Full profile analyses clients open from the catalogue and reports — one per platform. A platform without one shows a locked tab with Request analysis; requests land below.", crumbs=[("Creators", None), ("Creator analysis", None)])
         + _notes(error, message)
         + "<div class='card' id='requests'><div class='hd'><h2>Full-analysis requests" + (" <span class='pill warn'>" + str(len(queue)) + " open</span>" if queue else "")
         + "</h2></div><p class='sec-desc'>Clients only see a creator's full analysis (audience, growth, fake-follower check, brand history, best posts, pricing) "
@@ -4429,7 +4589,7 @@ def history_page(rows, later, kind=None, q=None, message=None, error=None, page_
                    + e(r["who"] or "") + "</span></td><td class='right'>" + btn + "</td></tr>")
     table = "".join(out) or "<tr><td colspan='4' class='muted'>Nothing here yet.</td></tr>"
     body = (
-        ui.header("History & undo", "Every change made in the admin, newest first, kept for 90 days. Undo puts an item back exactly as it was before the change. An undo is listed too, so it can be taken back (redo).", crumbs=[("System", None), ("History & undo", None)])
+        ui.header("History & undo", "Every change made in the admin, newest first, kept for 90 days. Undo puts an item back exactly as it was before the change. An undo is listed too, so it can be taken back (redo).", crumbs=[("People and access", None), ("History & undo", None)])
         + note + "<div class='row' style='gap:8px;flex-wrap:wrap;margin:6px 0 14px'>" + tabs + "</div>"
         + "<form class='rsearch' method='get' action='" + u("/history") + "'>"
         + ("<input type='hidden' name='kind' value='" + e(kind) + "'>" if kind else "")
@@ -4570,7 +4730,7 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
         apply = "<form id='apply'></form><p class='price-hint'>Open the planner from a campaign to save these as its goals.</p>"
     notes = "".join("<li>" + e(n) + "</li>" for n in plan["notes"])
     lib_json = json.dumps(lib, indent=1, ensure_ascii=False)
-    body = ((_head(k, "plan", error, message) if k else ui.header("ROI planner", "Price a pitch from a budget before a campaign exists.", crumbs=[("Insights", None), ("ROI planner", None)]) + _notes(error, message))
+    body = ((_head(k, "plan", error, message) if k else ui.header("ROI planner", "Price a pitch from a budget before a campaign exists.", crumbs=[("Selections and campaigns", None), ("ROI planner", None)]) + _notes(error, message))
             + "<div class='card' style='background:#fff8ec;border-color:#f3d9a8'><strong>The ROI calculator is the main tool now.</strong> "
               "It does everything on this page and also measures real selections and campaigns. "
               "<a href='" + u("/calculator") + ("?id=" + str(k["id"]) if k else "") + "'>Open the calculator</a>. "
@@ -4653,7 +4813,7 @@ def calculator_page(lib, sources=None, initial=None, ok=None, error=None):
                        "categories": {k: v[0] for k, v in plans.CATEGORIES.items()}},
                       ensure_ascii=False).replace("</", "<\\/")
     body = """
-""" + _notes(error, ok) + ui.header("ROI calculator", "Pick campaign types and platforms, type what the client pays, and read the result to accept. Numbers come from the benchmark library.", crumbs=[("Insights", None), ("ROI calculator", None)], actions="<a class='btn ghost' href='" + u("/planner") + "#library'>Benchmark library</a>") + objective_weights_card() + benchmark_refs() + """
+""" + _notes(error, ok) + ui.header("ROI calculator", "Pick campaign types and platforms, type what the client pays, and read the result to accept. Numbers come from the benchmark library.", crumbs=[("Selections and campaigns", None), ("ROI calculator", None)], actions="<a class='btn ghost' href='" + u("/planner") + "#library'>Benchmark library</a>") + objective_weights_card() + benchmark_refs() + """
 <style>
 .cal-pills{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .cal-pills button{font:inherit;font-weight:600;border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 18px;cursor:pointer;display:inline-flex;align-items:center;gap:8px}

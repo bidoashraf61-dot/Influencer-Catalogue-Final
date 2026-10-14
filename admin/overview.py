@@ -129,3 +129,45 @@ def _kpis(now):
         for label, sql, href in rows:
             out.append({"label": label, "now": _count(conn, sql, (m0, now + 1)), "before": _count(conn, sql, (p0, p1)), "href": href})
     return out
+
+
+def live_campaigns():
+    """Live campaigns with time passed and posts live (the Campaigns page shows these at the top)."""
+    return home()["live"]
+
+
+def control_counts():
+    """The one live number per Control Centre tile. Every figure falls back to 0 rather than breaking the page."""
+    out = {"creators": 0, "review": 0, "analysis_open": 0, "clients": 0, "pending": 0, "credit_reqs": 0, "quotes": 0, "live": 0,
+           "fake_limit": 30, "markets": ["Saudi Arabia", "UAE", "Egypt"], "keys": [], "people": 0, "owners": 0}
+    with db.connect() as conn:
+        out["creators"] = _count(conn, "SELECT COUNT(*) FROM creators WHERE active = 1")
+        out["review"] = _count(conn, "SELECT COUNT(*) FROM creators WHERE active = 1 AND industry_tier = 'Review'")
+        out["clients"] = _count(conn, "SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND status != 'pending'")
+        out["pending"] = _count(conn, "SELECT COUNT(*) FROM users WHERE deleted_at IS NULL AND status = 'pending'")
+        out["live"] = _count(conn, "SELECT COUNT(*) FROM campaigns WHERE status = 'live'")
+        out["people"] = _count(conn, "SELECT COUNT(*) FROM admins WHERE disabled_at IS NULL")
+        out["owners"] = _count(conn, "SELECT COUNT(*) FROM admins WHERE disabled_at IS NULL AND COALESCE(role, 'owner') = 'owner'")
+    try:
+        pulse = db.request_pulse()
+        out["quotes"], out["analysis_open"] = pulse.get("open", 0), pulse.get("a_open", 0)
+    except Exception:
+        pass
+    try:
+        import portal
+        out["credit_reqs"] = len(portal.open_credit_requests())
+    except Exception:
+        pass
+    try:
+        out["markets"] = list(db.setting("portal_countries", out["markets"]) or out["markets"])
+    except Exception:
+        pass
+    keys = []
+    for label, mod, fn in (("Email", "mailer", "configured"), ("AI", "gemini", "configured"), ("Data jobs", "apify", "token_hint")):
+        try:
+            m = __import__(mod)
+            keys.append((label, bool(getattr(m, fn)())))
+        except Exception:
+            keys.append((label, False))
+    out["keys"] = keys
+    return out

@@ -301,7 +301,7 @@ def apis_page(error=None, message=None, tab="overview", q="", query=None):
     tabs.append((u("/apis?tab=data"), "Collected data", None, tab == "data"))
     inner = (apify_tab(query) if tab == "apify" else keys[tab]["body"]()) if tab in keys else (data_tab(q) if tab == "data" else overview_tab())
     body = (ui.header("APIs", "Connect outside services and run them from here.",
-                      crumbs=[("System", None), ("APIs", None)], tabs=tabs)
+                      crumbs=[("Settings and keys", None), ("APIs", None)], tabs=tabs)
             + V._notes(error, message) + inner)
     return V.page("APIs", body, "/apis")
 

@@ -717,7 +717,8 @@ class Portal(unittest.TestCase):
         self.assertIn("HV-MI-001", csv_text)
         self.assertNotIn("HV-MD-004", csv_text)
         s, home, _ = a.get("/")
-        self.assertIn("This month so far", home)
+        self.assertIn("Control Centre", home)
+        self.assertIn("This month so far", a.get("/analytics")[1])          # the monthly strip moved to Analytics
         self.assertIn("nav-sub", a.get("/codes")[1])                       # sub-pages open under their parent
 
     # ------------------------------------------------------------------- admin

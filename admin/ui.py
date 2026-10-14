@@ -23,6 +23,7 @@ def e(v):
 # --------------------------------------------------------------------- icons --
 # One stroke style: 24px grid, 1.75px stroke, round caps and joins.
 _ICONS = {
+    "grid": '<rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/>',
     "home": '<path d="M3.5 11.2 12 4l8.5 7.2"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/>',
     "list": '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 13h8M8 17h5"/>',
     "flag": '<path d="M5 21V4"/><path d="M5 5h11l-2 3.5L16 12H5"/>',
@@ -71,24 +72,24 @@ def icon(name, size=18, cls=""):
 # Nine top-level destinations, grouped by job (2026-10 revamp). Related pages sit one level down and
 # open under their parent when you are in that section; every old URL still works.
 NAV = [
-    ("", [("/", "Home", "home", None)]),
-    ("Work", [("/requests", "Quote requests", "inbox", "req"),
-              ("/selections", "Selections", "list", None),
-              ("/campaigns", "Campaigns", "flag", None)]),
-    ("Library", [("/roster", "Creators", "users", None)]),
-    ("Clients", [("/clients", "Clients", "building", None)]),
-    ("Insights", [("/analytics", "Analytics", "bars", None),
-                  ("/ai", "AI copilot", "star", None)]),
-    ("System", [("/settings", "Settings", "gear", None)]),
+    ("", [("/", "Control Centre", "grid", None)]),
+    ("Control", [("/roster", "Creators", "users", None),
+                 ("/clients", "Clients and codes", "building", None),
+                 ("/selections", "Selections and campaigns", "flag", None),
+                 ("/reference", "Scoring rules", "target", None),
+                 ("/settings", "Settings and keys", "gear", None),
+                 ("/team", "People and access", "key", None)]),
+    ("More", [("/analytics", "Analytics", "bars", None),
+              ("/ai", "AI copilot", "star", None)]),
 ]
 CHILDREN = {
     "/roster": [("/analysis", "Creator analysis", "an"), ("/licences", "Licences", None)],
     "/clients": [("/portal", "Client portal", None), ("/codes", "Access codes", None)],
-    "/analytics": [("/calculator", "ROI calculator", None), ("/reference", "Reference", None)],
-    "/settings": [("/settings#kams", "Key account managers", None), ("/apis", "APIs & keys", None), ("/history", "History & undo", None),
-                  ("/team", "People and access", None)],
+    "/selections": [("/requests", "Quote requests", "req"), ("/campaigns", "Campaigns", None), ("/calculator", "ROI calculator", None)],
+    "/settings": [("/settings#kams", "Key account managers", None), ("/apis", "APIs & keys", None)],
+    "/team": [("/history", "History & undo", None)],
 }
-STAFF_ONLY = {"/apis", "/reference"}          # hidden from KAMs and viewers (the server refuses them anyway)
+STAFF_ONLY = {"/apis", "/reference", "/settings"}          # hidden from KAMs and viewers (the server refuses them anyway)
 # Pages that read across every client: a key account manager (kam_scope) is refused them, so the
 # sidebar does not offer them either.
 KAM_HIDDEN = {"/analytics", "/history"}
@@ -839,11 +840,12 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
                 continue
             kids = [k for k in CHILDREN.get(href, []) if (staff or k[0] not in STAFF_ONLY) and not _kam_hides(k[0])]
             in_family = open_parent == href
-            if not staff and href == "/settings":
-                # KAMs and viewers only reach their own sign-in security there, not the settings.
-                label, kids = "My security", []
+            if not staff and href in STAFF_ONLY:
+                continue                                   # settings, keys and scoring rules: owners and admins only
+            if not staff and href == "/team":
+                label, kids = "My security", []            # KAMs and viewers: their own sign-in only
             links += '<a class="nav-item" href="%s"%s title="%s">%s<span class="t">%s</span>%s</a>' % (
-                u(href if staff or href != "/settings" else "/team"), ' aria-current="page"' if href == a_href else (' aria-current="true"' if in_family and kids else ""),
+                u(href), ' aria-current="page"' if href == a_href else (' aria-current="true"' if in_family and kids else ""),
                 e(label), icon(ic, 19), e(label), badge(bk) if not (kids and not in_family) else
                 "".join(badge(k[2]) for k in kids if k[2]) + badge(bk))
             if kids and in_family:
@@ -861,7 +863,7 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
                              {"href": u("/roster"), "label": "Add a creator", "hint": "Create", "kw": "new influencer"},
                              {"href": u("/analysis"), "label": "Import an analysis report", "hint": "Create", "kw": "pdf upload modash"},
                              {"href": u("/roster") + "?tab=duplicates", "label": "Merge duplicate creators", "hint": "Fix", "kw": "dedupe"}])
-    crumb = ('<nav class="crumbs" aria-label="Breadcrumb"><a href="%s">Home</a>%s</nav>' % (
+    crumb = ('<nav class="crumbs" aria-label="Breadcrumb"><a href="%s">Control Centre</a>%s</nav>' % (
         u("/"), (' <i>/</i> <span>%s</span> <i>/</i> <b>%s</b>' % (e(group), e(a_label)) if group and a_label else
                  (' <i>/</i> <b>%s</b>' % e(a_label) if a_label and a_href != "/" else ""))))
     return (

@@ -607,6 +607,6 @@ def reference_page(query=None):
     except MissingData as exc:
         inner = ("<div class='err'><strong>The reference data could not be read.</strong> " + e(str(exc))
                  + " The files live in admin/reference/ and are copied with the admin code.</div>")
-    body = (STYLE + ui.header("Reference", "The research behind the numbers: where each figure comes from.", crumbs=[("Insights", None), ("Reference", None)], tabs=tabs)
+    body = (STYLE + ui.header("Reference", "The research behind the numbers: where each figure comes from.", crumbs=[("Scoring rules", None), ("Reference", None)], tabs=tabs)
             + "<div class='rf-note' role='note'>" + ui.icon("info", 18) + "<span>" + e(NOTE) + "</span></div>" + inner)
     return V.page("Reference", body, "/reference")

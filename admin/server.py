@@ -703,8 +703,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/":
             if scope is not None:
                 return self.send(200, views.kam_dashboard(who, scope, message=query.get("ok"), error=query.get("e")))
-            return self.send(200, views.dashboard(db.stats(), db.recent_events(12), who,
-                                                  message=query.get("ok"), error=query.get("e")))
+            return self.send(200, views.control_centre(who, message=query.get("ok"), error=query.get("e")))
         if path == "/history":
             kind = (query.get("kind") or "").strip() or None
             q = (query.get("q") or "").strip() or None
