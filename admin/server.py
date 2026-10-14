@@ -1142,6 +1142,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_platform()
         if path == "/api/evidence/add":
             return self.api_evidence_add()
+        if path == "/api/evidence/request":
+            return self.api_evidence_request()
         if path == "/api/selection/status":
             return self.api_selection_status()
         if path == "/api/selection/reason":
@@ -4644,7 +4646,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "band": metrics.band_of(r["followers"])}
         # Analysis gating: the headline numbers are free; the rest is for a client the team
         # has unlocked it for. Anyone else gets sample data drawn here, never the real values.
-        staff = self.admin_like() or (self.kam_unlocked() and portal.unlock_creator(code))
+        # Never locked for anyone on the HelloVoice team (owner, 2026-10-15): an admin session, or a portal
+        # sign-in with an admin email, sees every analysis without the "Show locked data" switch.
+        staff = (self.admin_like() or bool(self.admin()) or self.staff_viewer()
+                 or (self.kam_unlocked() and portal.unlock_creator(code)))
         gate = {"state": "unlocked"} if staff else gating.state(code_id, code)
         gate["headline"] = gating.headline(card, every)
         import sample_analysis                       # item 39: is "See a sample full analysis" on?
@@ -4795,6 +4800,43 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(404, {"ok": False, "reason": "not_on_roster"}, self.cors())
         return self.send_json(200, {"ok": True, "code": code}, self.cors())
 
+    def api_evidence_request(self):
+        """Market Intelligence: ask HelloVoice for a creator the client cannot pick, either one marked
+        Unavailable on the selection or a competitor's creator who is not on the roster yet. Anyone who
+        may open the selection can ask; it reaches the account manager and the notify list."""
+        b = self.json_body()
+        token = str(b.get("token") or "")
+        sel = db.selection(token=token) if token else None
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        staff = self.admin_like_for(sel["code_id"]) or (self.staff_viewer() and self.kam_clients() is None)
+        cid = None
+        if not staff:
+            cid = self.link_code("s:" + token) or self.signed_in_client()
+            if cid is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(int(cid))
+                               and int(cid) != db.admin_code_id()):
+                return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
+        pk = evidence.for_selection(sel["id"], client_only=not staff)
+        if pk is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        handle = str(b.get("handle") or "").lower().lstrip("@")[:60]
+        kind = "unavailable" if b.get("kind") == "unavailable" else "roster"
+        with evidence._conn() as conn:
+            r = conn.execute("SELECT name, code FROM evidence_posts WHERE pack_id = ? AND handle = ? LIMIT 1", (pk["id"], handle)).fetchone()
+        if r is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        db.log("shortlist", cid, self.client_ip(), self.headers.get("User-Agent"), "creator request:%s:%s" % (kind, handle))
+        if not staff:
+            u = portal.user_for_code(int(cid)) if cid is not None else None
+            who = ((u["name"] or u["email"]) + ", " + (u["company"] or "")) if u else "An access-code client"
+            what = ("is marked Unavailable on the selection; they ask you to check again" if kind == "unavailable"
+                    else "is not on the roster yet; they ask you to sign them")
+            import notify
+            notify.send("creator_request", ["%s asked for %s (@%s) from Market Intelligence." % (who, r["name"] or handle, handle),
+                                            "The creator %s." % what, "Selection: %s" % sel["name"]],
+                        kam=u["kam"] if u is not None else None)
+        return self.send_json(200, {"ok": True}, self.cors())
+
     def api_evidence(self, token, creator=None, thumb_post=None, as_map=False):
         """The competitor evidence filed under a selection, for its client page — only when an admin
         switched it on for the client, and behind the same link check as /api/selection. With
@@ -4816,8 +4858,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         codes = json.loads(sel["codes"] or "[]")
         if as_map:
             import selstatus
-            removed = {c for c, st in selstatus.of(sel["id"]).items() if st["s"] in ("rejected", "unavailable")}
-            out = evidence.map_payload(pk, codes, self.selection_objective(sel), removed)
+            status = selstatus.of(sel["id"])
+            removed = {c for c, st in status.items() if st["s"] == "rejected"}
+            locked = {c for c, st in status.items() if st["s"] == "unavailable"}
+            out = evidence.map_payload(pk, codes, self.selection_objective(sel), removed, locked)
             reader = self.selection_viewer(sel["token"])
             out["can_add"] = bool(staff or (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())))
             out["preview"] = bool(staff and not pk["client_visible"])
@@ -4837,6 +4881,41 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         out = evidence.client_payload(pk, codes)
         out["preview"] = bool(staff and not pk["client_visible"])
         return self.send_json(200, {"ok": True, "evidence": out}, self.cors())
+
+    @staticmethod
+    def selection_reach(codes, by, platform=None):
+        """Projected views per creator for the selection's reach range (owner, 2026-10-15): minimum = their
+        typical (median) views, best case = their best recent post (top of the last 25), capped at the larger of
+        their followers and twice their typical views. A creator with no view numbers falls back to 5-15% of followers and is marked estimated.
+        {code: [low, high, estimated]}; the page adds up the creators still in play."""
+        docs = db.analyses_for(codes)
+        out = {}
+        for c in codes:
+            best = None
+            for plat, row in (docs.get(c) or {}).items():
+                if platform and str(plat).lower() != str(platform).lower():
+                    continue
+                d = row.get("data") if isinstance(row, dict) else None
+                if not isinstance(d, dict):
+                    continue
+                lo = d.get("median_views") or d.get("avg_reel_plays") or d.get("avg_views")
+                if not isinstance(lo, (int, float)) or lo <= 0:
+                    continue
+                series = [v for v in (d.get("views_series") or []) if isinstance(v, (int, float))]
+                hi = max(series) if series else (d.get("views_p75") or lo) * 1.5
+                fol = d.get("followers") or 0
+                if fol:
+                    hi = min(hi, max(fol, 2 * lo))     # a reel can out-reach the follower count, never wildly
+                hi = max(hi, lo)
+                if best is None or lo > best[0]:
+                    best = [int(lo), int(hi), False]
+            if best is None:
+                fol = int((by.get(c) or {})["followers"] or 0) if by.get(c) is not None and "followers" in by[c].keys() else 0
+                if fol:
+                    best = [int(fol * 0.05), int(fol * 0.15), True]
+            if best:
+                out[c] = best
+        return out
 
     def api_selection(self, token, name=None, codes=None):
         """A priced selection, for the client's page — by its token, or by the
@@ -4929,6 +5008,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             out["scores"] = {}
             out["needs_objective"] = False
             out["scoring_off"] = True
+        try:
+            out["reach"] = self.selection_reach(codes, by, platform)
+        except Exception:
+            out["reach"] = {}
             out["verdicts"] = {k: dict(out["verdicts"].get(k) or {}) for k in set(out["verdicts"]) | set(codes)}
             for v in out["verdicts"].values():
                 if not v.get("fit"):

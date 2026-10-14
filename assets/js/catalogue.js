@@ -454,6 +454,20 @@
     return sum || Number(c.followers) || 0;
   }
 
+  // HelloVoice's own team never sees an analysis as locked (owner, 2026-10-15): the card reads
+  // "Profile analysis" for them whether or not one is uploaded, and the page opens unlocked.
+  function teamViewer() {
+    var me = window.hvPortal && window.hvPortal.me;
+    return !!((me && (me.staff || me.kind === "admin")) || (CURATED && CURATED.role === "admin"));
+  }
+  var ANALYSIS_ICON = ' <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-4M11 16V9M15 16v-6M19 16V6"/><path d="M5 9l5-4 4 3 6-5"/></svg>';
+  function unlockAnalysisLinks() {
+    if (!teamViewer()) return;
+    all("a.cat-card__analysis:not(.is-ready)").forEach(function (a) { a.classList.add("is-ready"); a.innerHTML = "Profile analysis" + ANALYSIS_ICON; });
+  }
+  document.addEventListener("hv:me", unlockAnalysisLinks);
+
   function cardMarkup(c, i) {
     var label = tierLabel(c.tier);
     if (CURATED && CURATED.platform) {
@@ -500,7 +514,9 @@
           esc(name) + '">' + (ICONS[name] || ICON_LINK) + "</span>";
       });
     }
-    var mark = '<div class="cat-card__platform">' +
+    // data-n lets the marks re-flow by count: a row up to two, a compact two-wide stack from three, so
+    // five platforms never run into the score stamps on the left (owner, 2026-10-15).
+    var mark = '<div class="cat-card__platform" data-n="' + Math.min(marks.length, 6) + '">' +
       (list.length ? '<span class="cat-card__platform-hint">Visit profile</span>' : "") +
       '<div class="cat-card__marks">' + marks.join("") + "</div></div>";
 
@@ -524,12 +540,10 @@
       // The creator's passport: their full analysis, or a locked page that
       // lets the client ask for one. Only where the server is behind the page
       // — the static build has no passport to open.
-      (CFG.api ? '<a class="cat-card__analysis' + (c.analysis ? " is-ready" : "") + '" href="' +
+      (CFG.api ? '<a class="cat-card__analysis' + (c.analysis || teamViewer() ? " is-ready" : "") + '" href="' +
         (document.body.getAttribute("data-page") === "selection" ? "../" : "") + "creator/#c=" +
         encodeURIComponent(c.code) + '" data-noselect data-analysis="' + esc(c.code) + '" data-name="' + esc(c.name) + '">' +
-        (c.analysis ? "Profile analysis" : "Analysis — request") +
-        ' <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" ' +
-        'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-4M11 16V9M15 16v-6M19 16V6"/><path d="M5 9l5-4 4 3 6-5"/></svg></a>' : "") +
+        (c.analysis || teamViewer() ? "Profile analysis" : "Analysis — request") + ANALYSIS_ICON + "</a>" : "") +
       "</div></article>";
   }
 
@@ -601,9 +615,16 @@
     "Creators": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.8" cy="9.5" r="2.5"/><path d="M15.6 14.2c2.4-.3 4.3 1.2 4.9 4"/></svg>',
     "Indicative range": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8a1.5 1.5 0 0 1 0 2.1l-6.9 6.9a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.5"/></svg>',
     "Quoted for": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M10.5 18h3"/></svg>',
+    "Projected reach": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>',
     "Not in this roster": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.4v.1"/></svg>'
   };
 
+  function compact(v) {
+    v = Number(v) || 0;
+    if (v >= 1e6) return (v >= 1e7 ? Math.round(v / 1e6) : Math.round(v / 1e5) / 10) + "M";
+    if (v >= 1e3) return Math.round(v / 1e3) + "K";
+    return String(Math.round(v));
+  }
   function shareBar(n, total) {
     var pct = total ? Math.round(100 * n / total) : 0;
     return '<span class="cat-meter" role="img" aria-label="' + pct + '% of the selection"><i style="width:' + pct + '%"></i></span>' +
@@ -2178,7 +2199,7 @@
             CURATED = { token: token, name: b.name, codes: b.codes || [],
                         prices: b.prices || {}, total: b.total,
                         tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null, clientPlatforms: b.client_platforms || {},
-                        segments: b.segments || {}, groupBy: b.group_by || "",
+                        segments: b.segments || {}, groupBy: b.group_by || "", reach: b.reach || {},
                         platform: b.platform || "",
                         status: b.status || {}, statusCounts: b.status_counts || null, role: b.role || "viewer",
                         owner: b.owner || "", kam: b.kam || "", credits: b.credits, lifecycle: b.lifecycle || null,
@@ -2854,6 +2875,7 @@
           }).join("") + (mt.length < 8 && mayEdit() ? '<button type="button" class="cat-tag cat-tag--add" data-tag-add>+ Tag</button>' : "");
         }
       });
+      unlockAnalysisLinks();
       if (controls) controls.refresh();
     }
 
@@ -3407,6 +3429,18 @@
         ["Creators", String(selected.length)],
         ["Indicative range", selected.length ? priceText([lo, hi]) : "—"]
       ];
+      // Projected reach (owner, 2026-10-15): typical views (minimum) to best recent post (best case),
+      // over the creators still in play. Creators with no view numbers count at 5-15% of followers.
+      if (CURATED && CURATED.reach) {
+        var rLo = 0, rHi = 0, rEst = 0, rN = 0;
+        selected.forEach(function (code) {
+          var r = CURATED.reach[code], st = CURATED.status && CURATED.status[code];
+          if (!r || (st && (st.s === "rejected" || st.s === "unavailable"))) return;
+          rLo += r[0]; rHi += r[1]; rN++; if (r[2]) rEst++;
+        });
+        if (rN) rows.push(["Projected reach", '<span class="cat-reach">' + compact(rLo) + "<i>to</i>" + compact(rHi) + "</span>" +
+          '<small class="cat-reach__note">views · minimum to best case' + (rEst ? " · " + rEst + " estimated" : "") + "</small>"]);
+      }
       if (CURATED && CURATED.platform) rows.splice(1, 0, ["Quoted for", CURATED.platform]);
       if (dropped) rows.push(["Not in this roster", String(dropped)]);
       $("sel-summary").innerHTML = rows.map(function (r) {

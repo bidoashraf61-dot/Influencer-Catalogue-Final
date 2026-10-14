@@ -133,18 +133,11 @@
 .ev-map__hub circle { fill: var(--lime); stroke: var(--ink); stroke-width: 2; }
 .ev-map__hub text { font: 400 30px Bebasneue, "Bebas Neue", sans-serif; fill: var(--ink); }
 .ev-map__comp { cursor: pointer; }
-.ev-map__comp > circle { fill: var(--white); stroke: var(--ink); stroke-width: 2.5; }
-.ev-map__comp:hover > circle, .ev-map__comp:focus > circle { stroke-width: 4; }
-.ev-map__comp--hub > circle { fill: var(--white); stroke: var(--lime); stroke-width: 8; }
-.ev-map__comp--hub-dark > circle { stroke: var(--ink); }
 .ev-map__cname { font-family: Bebasneue, "Bebas Neue", sans-serif; font-weight: 400; fill: var(--ink); }
 .ev-map__cnum { font: 700 11px "DM Sans", sans-serif; fill: #383838; paint-order: stroke; stroke: #faf8f4; stroke-width: 4px; }
 .ev-map__dot { cursor: pointer; }
-.ev-map__bg { fill: #e9dcd2; }
-.ev-map__ring { fill: none; stroke-width: 3; }
 .ev-map__ini { font: 700 10px "DM Sans", sans-serif; fill: var(--ink); pointer-events: none; }
 .ev-map__badge { fill: #ff691e; stroke: #fff; stroke-width: 1.5; }
-.ev-map__dot:hover .ev-map__ring, .ev-map__dot:focus .ev-map__ring { stroke-width: 5; }
 .ev-map__dot--paid { opacity: .55; }
 .ev-map__more { cursor: pointer; }
 .ev-map__more circle { fill: var(--white); stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 3 2; }
@@ -238,3 +231,116 @@
 .ev-dpost__stats b { font-family: Bebasneue, "Bebas Neue", sans-serif; font-size: 22px; font-weight: 400; }
 .ev-more { display: block; margin: 14px auto 0; }
 @media (max-width: 1000px) { .ev-mi__layout { grid-template-columns: 1fr; } .ev-rank { max-height: none; } }
+
+/* 2026-10-15 owner feedback: one posts panel, readable brand chips, a calmer and livelier map */
+.ev-ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.ev-act { display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--ink); text-decoration: none; }
+.ev-act .ev-ic { width: 17px; height: 17px; }
+.ev-act:not(:disabled):hover { background: var(--ink); color: var(--lime); }
+.ev-act--ask { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.ev-act--ask:not(:disabled):hover { background: var(--lime); color: var(--ink); }
+.ev-act.is-done { background: var(--go-soft, #e7f7ed); color: var(--go, #14884a); border-color: transparent; opacity: 1; }
+.ev-chip--off { background: #efede8; color: #5c5246; }
+.ev-tr__ic { width: 16px; height: 16px; }
+.ev-zoom { display: inline-grid; place-items: center; color: var(--ink); }
+.ev-zoom .ev-ic { width: 18px; height: 18px; }
+.ev-post__play .ev-ic { width: 18px; height: 18px; stroke: none; margin-left: 2px; }
+.ev-kv--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 0; }
+@media (max-width: 640px) { .ev-kv--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Brand chips above the posts: big enough to aim at, the logo always on white, an All brands way back */
+.ev-pn__brands { gap: 10px; margin: 18px 0 6px; }
+.ev-pn__brands .ev-brand { min-height: 52px; padding: 8px 12px 8px 16px; gap: 12px; border: 1.5px solid rgba(18, 18, 18, .14); background: var(--white); color: var(--ink);
+  border-radius: 14px; transition: border-color .2s ease, box-shadow .2s ease, opacity .2s ease, transform .2s cubic-bezier(.16, 1, .3, 1); }
+.ev-pn__brands .ev-brand:hover { border-color: var(--ink); transform: translateY(-1px); }
+.ev-pn__brands .ev-logo--chip { height: 26px; max-width: 120px; }
+.ev-brand--all { font: 700 14px "DM Sans", sans-serif; }
+.ev-brand__n { min-width: 26px; height: 26px; padding: 0 7px; border-radius: 999px; background: #efece6; display: inline-grid; place-items: center;
+  font: 700 12.5px "DM Sans", sans-serif; font-variant-numeric: tabular-nums; color: var(--ink); }
+.ev-pn__brands .ev-brand[aria-pressed="true"] { background: var(--white); color: var(--ink); border-color: var(--ink); box-shadow: 0 0 0 4px var(--lime); }
+.ev-pn__brands .ev-brand[aria-pressed="true"] .ev-brand__n { background: var(--ink); color: var(--lime); }
+.ev-pn__brands.is-picked .ev-brand[aria-pressed="false"] { opacity: .55; }
+.ev-pn__brands.is-picked .ev-brand[aria-pressed="false"]:hover { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .ev-pn__brands .ev-brand { transition: none; } .ev-pn__brands .ev-brand:hover { transform: none; } }
+
+/* Panel header: photo on a white ring with a soft lift; doctors carry the green cross */
+.ev-cp__ph { position: relative; overflow: visible; border: 4px solid var(--white); box-shadow: 0 6px 18px -6px rgba(18, 18, 18, .35); }
+.ev-cp__ph img { border-radius: 50%; }
+.ev-cp__ph.is-locked img { filter: grayscale(1); opacity: .8; }
+.ev-cp__ini, .ev-rank__ph .ev-cp__ini, .ev-out__ph .ev-cp__ini { display: grid; place-items: center; width: 100%; height: 100%; border-radius: 50%; background: var(--linen);
+  font: 400 26px Bebasneue, "Bebas Neue", sans-serif; letter-spacing: .04em; color: var(--ink); }
+.ev-cp__ph.is-hcp::after, .ev-rank__ph.is-hcp::after, .ev-out__ph.is-hcp::after, .ev-legend__hcp {
+  content: ""; position: absolute; right: -3px; bottom: -3px; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--white);
+  background: linear-gradient(var(--white), var(--white)) center / 10px 2.5px no-repeat, linear-gradient(var(--white), var(--white)) center / 2.5px 10px no-repeat, #14884a; }
+.ev-cp__acts { gap: 10px; }
+
+/* Map: brand discs lift off the paper instead of sitting in a black outline */
+.ev-map__disc { fill: var(--white); stroke: rgba(18, 18, 18, .06); stroke-width: 1; }
+.ev-map__halo { fill: none; stroke: var(--lime); stroke-width: 7; }
+.ev-map__focus { fill: none; stroke: transparent; stroke-width: 4; transition: stroke .2s ease; }
+.ev-map__comp { transition: transform .45s cubic-bezier(.16, 1, .3, 1); transform-box: fill-box; transform-origin: center; }
+.ev-map__comp:not(.ev-map__comp--hub):hover, .ev-map__comp:not(.ev-map__comp--hub):focus-visible { transform: scale(1.06); outline: none; }
+.ev-map__comp:not(.ev-map__comp--hub):hover .ev-map__focus, .ev-map__comp:focus-visible .ev-map__focus { stroke: var(--ink); }
+.ev-map__spoke { transition: stroke .25s ease, stroke-width .25s ease; }
+.ev-map__spoke.is-hot { stroke: rgba(18, 18, 18, .5); stroke-width: 3; }
+
+/* Creators: white ring and a soft shadow for everyone; the meaning lives in the badges */
+.ev-map__bg { fill: var(--white); }
+.ev-map__inibg { fill: var(--linen); }
+.ev-map__ini { font-family: Bebasneue, "Bebas Neue", sans-serif; font-weight: 400; letter-spacing: .04em; fill: var(--ink); }
+.ev-map__ring { fill: none; stroke: var(--white); stroke-width: 3; }
+.ev-map__hcp circle { fill: #14884a; stroke: var(--white); stroke-width: 2; }
+.ev-map__hcp path { stroke: var(--white); stroke-width: 2.4; stroke-linecap: round; fill: none; }
+.ev-map__lock circle { fill: var(--ink); stroke: var(--white); stroke-width: 2; }
+.ev-map__lock path { fill: none; stroke: var(--lime); stroke-width: 1.6; stroke-linejoin: round; }
+.ev-map__dot { transition: transform .5s cubic-bezier(.16, 1, .3, 1), opacity .3s ease; }
+.ev-map__dot.is-locked { opacity: .78; }
+.ev-map__dot:hover, .ev-map__dot.is-near, .ev-map__dot:focus-visible { transform: scale(1.18); outline: none; }
+.ev-map__dot:focus-visible .ev-map__ring { stroke: var(--vivid-red); }
+.ev-mi__stage.is-point .ev-map__dot:not(.is-near), .ev-mi__stage.is-spot .ev-map__dot:not(.is-hot) { opacity: .28; }
+.ev-mi__stage.is-spot .ev-map__dot.is-hot { transform: scale(1.08); }
+.ev-mi__stage.is-intro .ev-map__dot { animation: ev-pop .8s cubic-bezier(.16, 1, .3, 1) both; animation-delay: var(--d, 0ms); }
+.ev-mi__stage.is-intro .ev-map__comp:not(.ev-map__comp--hub) { animation: ev-pop .7s cubic-bezier(.16, 1, .3, 1) both; }
+@keyframes ev-pop { from { opacity: 0; transform: scale(.55); } }
+@media (prefers-reduced-motion: reduce) {
+  .ev-map__dot, .ev-map__comp { transition: none; }
+  .ev-map__dot:hover, .ev-map__dot.is-near, .ev-mi__stage.is-spot .ev-map__dot.is-hot, .ev-map__comp:hover { transform: none; }
+  .ev-mi__stage.is-intro .ev-map__dot, .ev-mi__stage.is-intro .ev-map__comp { animation: none; }
+}
+.ev-tip__lock { color: var(--lime) !important; font-weight: 700; margin-top: 2px; }
+
+/* Header scope line and legend */
+.ev-mi__scope { margin: 6px 0 0; max-width: 80ch; font-size: 14px; line-height: 1.45; color: #4a4a4a; }
+.ev-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-left: auto; font-size: 13px; color: var(--ink); }
+.ev-legend__item, .ev-legend__size { display: inline-flex; align-items: center; gap: 8px; }
+.ev-legend__hcp { position: relative; right: auto; bottom: auto; display: inline-block; flex: none; }
+.ev-legend__lock { width: 22px; height: 22px; border-radius: 50%; background: var(--ink); color: var(--lime); display: inline-grid; place-items: center; }
+.ev-legend__lock .ev-ic { width: 13px; height: 13px; stroke-width: 2; }
+.ev-legend__dot { fill: #d9cabd; stroke: var(--white); stroke-width: 2; }
+.ev-brand--txt[aria-pressed="true"] { background: var(--ink); color: var(--lime); }
+
+/* Ranking list: same white ring + badge language as the map */
+.ev-rank__ph { position: relative; overflow: visible; border: 3px solid var(--white); box-shadow: 0 3px 8px -3px rgba(18, 18, 18, .35); }
+.ev-rank__ph img { border-radius: 50%; }
+.ev-rank__ph.is-hcp::after { width: 16px; height: 16px; right: -4px; bottom: -4px; background-size: 8px 2px, 2px 8px, auto; }
+.ev-rank__ph .ev-cp__ini { font-size: 15px; }
+.ev-rank__row.is-locked img { filter: grayscale(1); opacity: .75; }
+
+/* Not on our roster yet: a request, never an add */
+.ev-out { margin-top: 28px; padding-top: 22px; border-top: 1px solid rgba(18, 18, 18, .1); }
+.ev-out__hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; margin-bottom: 14px; }
+.ev-out__t { font-family: Bebasneue, "Bebas Neue", sans-serif; font-weight: 400; font-size: clamp(1.8rem, 1.3rem + 1.2vw, 2.4rem); line-height: 1; margin: 0; }
+.ev-out__hd .ev-mut { margin: 0; font-size: 13.5px; max-width: 70ch; }
+.ev-out__row { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.ev-out__card { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: #faf8f4; border: 1px solid rgba(18, 18, 18, .08); }
+.ev-out__top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.ev-out__ph { position: relative; width: 46px; height: 46px; flex: none; border-radius: 50%; border: 3px solid var(--white); box-shadow: 0 3px 8px -3px rgba(18, 18, 18, .3); }
+.ev-out__ph .ev-cp__ini { font-size: 18px; }
+.ev-out__ph.is-hcp::after { width: 16px; height: 16px; right: -4px; bottom: -4px; background-size: 8px 2px, 2px 8px, auto; }
+.ev-out__who { min-width: 0; display: grid; }
+.ev-out__who b { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-out__who .ev-mut { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-out__logos { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ev-out__v { margin: 0; font-size: 13px; color: #4a4a4a; font-variant-numeric: tabular-nums; }
+.ev-out__card .ev-act { margin-top: auto; align-self: flex-start; min-height: 40px; }
+.ev-mi__title { flex: 1; min-width: 240px; }
