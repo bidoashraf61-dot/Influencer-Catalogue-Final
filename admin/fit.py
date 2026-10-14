@@ -742,10 +742,12 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         countries = au.get("countries") or []
         if countries:
             home = sum((c.get("pct") or 0) for c in countries if str(c.get("code", "")).upper() in tcs)
+            out["aud_home"] = home                 # used to order a shortlist, never the score
             out["checks"].append({"label": "Measured audience", "text": "%s of the measured audience is in %s" % (_pct(home), cname),
                                   "level": "ok" if home >= 60 else "warn" if home >= 30 else "bad"})
         if target["gender"] in ("Women", "Men") and au.get("gender"):
             share = au["gender"].get("female" if target["gender"] == "Women" else "male") or 0
+            out["aud_gender"] = share
             out["checks"].append({"label": "Gender", "text": "%s of the audience are %s" % (_pct(share), target["gender"].lower()),
                                   "level": "ok" if share >= 60 else "warn" if share >= 40 else "bad"})
         if target_list(target["age"]) and au.get("ages"):
@@ -813,15 +815,13 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         rv = v5r["metrics"]["reach"]
         top = (rv.get("benchmark") or {}).get("high") or 0
         if top and rv.get("value", 0) > 3 * top:
-            val = min(val, 80)
-            rule_notes.append("Views are %.0f times the typical top: score capped at 80, check the posts before booking" % (rv["value"] / top))
+            rule_notes.append("Views are %.0f times the typical top: unusually high, check the posts before booking" % (rv["value"] / top))
     # Rule 1b (owner-approved 2026-10-14): the same for engagement more than three times the typical top for their size.
     if use_v5 and v5r and v5r.get("metrics", {}).get("engagement"):
         ev = v5r["metrics"]["engagement"]
         top = (ev.get("benchmark") or {}).get("high") or 0
         if top and ev.get("value", 0) > 3 * top:
-            val = min(val, 80)
-            rule_notes.append("Engagement is %.0f times the typical top: score capped at 80, check the posts before booking" % (ev["value"] / top))
+            rule_notes.append("Engagement is %.0f times the typical top: unusually high, check the posts before booking" % (ev["value"] / top))
     fake_lim = (target or {}).get("max_fake") or 30
     fake_now = doc.get("fake_followers_pct")
     if isinstance(fake_now, (int, float)) and fake_now > fake_lim:

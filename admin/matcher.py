@@ -560,6 +560,10 @@ def _client_limits(brief, items):
     return kept
 
 
+AUD_COUNTRY_MIN = 50       # % of the measured audience in the brief's country (owner, 2026-10-14)
+AUD_GENDER_MIN = 60        # % of the asked gender
+
+
 def score_all(brief, exclude=(), only=None):
     """Every active creator scored against the brief, best first (no cut for count or budget)."""
     objective, target = brief["objective"], brief["target"]
@@ -597,18 +601,31 @@ def score_all(brief, exclude=(), only=None):
         if any(x in ("health care", "health") for x in cats) and str(c["tier"] or "").upper().startswith("HCP"):
             rank_score *= HCP_BOOST
             s = dict(s, strengths=["Healthcare professional"] + list(s.get("strengths") or []))
+        # Audience fit orders the shortlist (owner-approved 2026-10-14), never the score: a measured audience under
+        # 50% in the brief's country, or under 60% of the asked gender, puts the creator after those who match.
+        # Not measured sits in between: it is not counted against them.
+        aud_lvl, aud_note = 1, None
+        home, gshare = s.get("aud_home"), s.get("aud_gender")
+        if home is not None or gshare is not None:
+            miss = []
+            if home is not None and home < AUD_COUNTRY_MIN:
+                miss.append("%d%% of the audience in %s (the brief needs %d%%)" % (round(home), fit.country_names(fit.target_list(target.get("country")) or ["SA"]), AUD_COUNTRY_MIN))
+            if gshare is not None and str(target.get("gender")) in ("Women", "Men") and gshare < AUD_GENDER_MIN:
+                miss.append("%d%% %s (the brief needs %d%%)" % (round(gshare), str(target.get("gender")).lower(), AUD_GENDER_MIN))
+            aud_lvl = 0 if not miss else 2 + (len(miss) > 1)
+            aud_note = ("Audience: " + "; ".join(miss)) if miss else None
         price = db.price_for(c, bands, single or (wanted[0] if wanted else None))
         items.append({
             "code": code, "score": val, "rank_score": round(rank_score, 1), "tag": s.get("tag") or fit.band_for(val),
             "basis": basis, "platform": s.get("platform") or single, "price": list(price) if price else None,
-            "strengths": (s.get("strengths") or [])[:3], "watchouts": (s.get("watchouts") or [])[:2],
-            "followers": c["followers"] or 0,
+            "strengths": (s.get("strengths") or [])[:3], "watchouts": ([aud_note] if aud_note else []) + (s.get("watchouts") or [])[:2],
+            "followers": c["followers"] or 0, "audience_level": aud_lvl,
         })
     items = _client_limits(brief, items)
     # Equal scores are common on public data; break the tie the way the goal would: reach for
     # awareness, the smaller (cheaper, closer) account otherwise.
     big_first = "Awareness" in str(objective).split("+")
-    items.sort(key=lambda i: (-i["rank_score"], -i["followers"] if big_first else i["followers"], i["code"]))
+    items.sort(key=lambda i: (i.get("audience_level", 1), -i["rank_score"], -i["followers"] if big_first else i["followers"], i["code"]))
     return items
 
 

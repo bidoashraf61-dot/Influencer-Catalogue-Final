@@ -23,7 +23,8 @@ class V5(unittest.TestCase):
         m = lambda er: s.score(dict(IG, er_pct=er), "Engagement", KSA)["metrics"]["engagement"]
         self.assertAlmostEqual(m(ref["low"])["score"], 40.0, 1)
         self.assertAlmostEqual(m(ref["high"])["score"], 75.0, 1)
-        self.assertEqual(m(ref["high"] * 2)["score"], 100.0)
+        self.assertAlmostEqual(m(ref["high"] * 2)["score"], 85.0, 1)      # each step above the range adds less (2026-10-14)
+        self.assertAlmostEqual(m(ref["high"] * 3)["score"], 90.0, 1)      # the best score
         self.assertEqual((m(0.3)["label"], m(1.5)["label"], m(4.0)["label"]), ("below", "within", "above"))
 
     def test_view_rate_has_headroom(self):
@@ -31,7 +32,9 @@ class V5(unittest.TestCase):
         m = lambda vr: s.score(dict(IG, avg_views=vr / 100.0 * 50000), "Awareness", KSA)["metrics"]["reach"]["score"]
         self.assertAlmostEqual(m(rng[1]), 75.0, 1)
         self.assertLess(m(rng[1] * 2), 95)                     # no longer 100 at twice the high end
-        self.assertEqual(m(rng[1] * 5), 100.0)
+        self.assertAlmostEqual(m(rng[1] * 3), 90.0, 1)                # the peak: no cliff at 3x any more (2026-10-14)
+        self.assertLess(m(rng[1] * 5), m(rng[1] * 3))                 # far out it eases down: often bought or a bad scrape
+        self.assertGreater(m(rng[1] * 5), 80)
         self.assertLess(m(24.0), 100)                          # a typical Instagram view rate is not saturated
         self.assertLess(m(17.0), m(24.0))
 

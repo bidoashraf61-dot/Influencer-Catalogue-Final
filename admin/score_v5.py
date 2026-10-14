@@ -137,8 +137,13 @@ def _range(kind, platform, followers):
 
 
 def _grade(kind, value, rng):
+    """At the low end of the range 40, at the high end 75, then each extra step adds less: 2x the high end 85,
+    3x 90 (the best), then it eases down because figures that far out are often bought or a scrape error:
+    6x 80, 12x 65 (owner-approved 2026-10-14). The old curve rose to 100 and a hard cap at 3x knocked the
+    score back to 80, so every shortlist filled up with creators sitting just under 3x."""
     low, high = rng
-    return max(0.0, min(100.0, _interp([(0.0, 0.0), (low, 40.0), (high, 75.0), (TOP[kind] * high, 100.0)], value)))
+    return max(0.0, min(100.0, _interp([(0.0, 0.0), (low, 40.0), (high, 75.0), (2 * high, 85.0), (3 * high, 90.0),
+                                         (6 * high, 80.0), (12 * high, 65.0)], value)))
 
 
 def _graded(kind, value, creator, source, conf, note=None):
