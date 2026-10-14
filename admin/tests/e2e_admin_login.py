@@ -121,6 +121,34 @@ class AdminLogin(unittest.TestCase):
         self.assertEqual(r.headers["Location"], "/team")
         self.assertEqual(c.get("/team")[0], 200)
 
+    def test_10_portal_sign_in_opens_the_admin_without_a_second_code(self):
+        import e2e_portal
+        db.set_setting("signup_mode", "open")
+        signup = e2e_portal.Portal.signup
+        class T:                                       # borrow the portal test's sign-up helper
+            base = self.base
+            assertEqual = self.assertEqual
+        c, _ = signup(T, "boss@hellovoice.co.uk")
+        mailer.OUTBOX.clear()
+        s, _, r = c.get("/")
+        self.assertEqual(s, 303)
+        self.assertNotIn("/login", r.headers["Location"])   # straight in: no second code
+        self.assertEqual(mailer.OUTBOX, [])
+        self.assertEqual(c.get("/")[0], 200)
+        s, _, r = c.get("/clients?show=waiting")             # the page asked for is kept
+        self.assertEqual(s, 200)
+
+    def test_11_a_client_portal_account_gets_no_admin(self):
+        import e2e_portal
+        signup = e2e_portal.Portal.signup
+        class T:
+            base = self.base
+            assertEqual = self.assertEqual
+        c, _ = signup(T, "buyer@pfizer.com")
+        s, _, r = c.get("/")
+        self.assertEqual(s, 303)
+        self.assertIn("/login", r.headers["Location"])
+
     def test_9_deleting_a_creator_asks_for_confirmation(self):
         self.assertTrue(team.needs_step_up("POST", "/roster/delete"))
         self.assertTrue(team.needs_step_up("POST", "/portal/user/credits"))

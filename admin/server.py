@@ -332,9 +332,34 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def require_admin(self):
         who = self.admin()
         if not who:
+            if self.command == "GET" and self.portal_sso():
+                return None
             self.redirect("/login")
             return None
         return who
+
+    def portal_sso(self):
+        """One sign-in (owner, 2026-10-14): a team member already signed in to the portal with their email code
+        opens the admin without a second code. Their portal pass names their own account; when that account's
+        email is an active admin, an admin session starts here (two-step sign-in still asked when it is on).
+        Returns True when it answered the request."""
+        cid = self.viewer_cookie_id()
+        if cid is None or cid == db.admin_code_id():
+            return False
+        u = portal.user_for_code(cid)
+        if not u or u["status"] != "active" or not u["email"]:
+            return False
+        row = db.admin_by_email(u["email"])
+        if row is None or row["disabled_at"]:
+            return False
+        if row["totp_on"] or team.must_use_2fa(row):
+            pend = auth.sign("2fa:%d:%d" % (row["id"], db.now() + 300), SECRET)
+            self.redirect("/login/2fa", [("Set-Cookie", "hv_2fa=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=300%s" % (pend, self.secure_flag()))])
+            return True
+        raw = urllib.parse.urlparse(self.path)
+        here = self.route(raw.path) + ("?" + raw.query if raw.query else "")
+        self.start_session(row, to=here if here.startswith("/") and not here.startswith("//") else "/")
+        return True
 
     def viewer_code_id(self):
         """Who is looking at the catalogue: the client's passcode pass, or —
@@ -1460,7 +1485,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect("/login/2fa", [("Set-Cookie", "hv_2fa=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=300%s" % (pend, self.secure_flag()))])
         return self.start_session(row)
 
-    def start_session(self, row, extra_cookies=()):
+    def start_session(self, row, extra_cookies=(), to="/"):
         db.touch_admin_login(row["id"])
         token = db.create_session(row["id"], ADMIN_TTL)
         with db.connect() as conn:
@@ -1468,7 +1493,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         team.log("login", row["email"], "", self.client_ip())
         cookie = (f"{ADMIN_COOKIE}={auth.sign(token, SECRET)}; Path=/; HttpOnly; "
                   f"SameSite=Lax; Max-Age={ADMIN_TTL}{self.secure_flag()}")
-        return self.redirect("/", [("Set-Cookie", cookie)] + list(extra_cookies))
+        return self.redirect(to or "/", [("Set-Cookie", cookie)] + list(extra_cookies))
 
     def pending_2fa(self):
         raw = auth.unsign(self.cookies().get("hv_2fa", ""), SECRET)
