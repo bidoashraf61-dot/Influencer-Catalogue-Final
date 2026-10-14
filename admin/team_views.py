@@ -40,15 +40,23 @@ def two_step_page(email, setup_secret=None, error=None):
     return _standalone("Two-step sign-in", inner)
 
 
-def reauth_page(nxt, totp_on, again=False, error=None):
-    body = (ui.header("Confirm it is you", "For keys, exports and team changes we ask for your password again (once every 10 minutes).")
+def reauth_page(nxt, totp_on, again=False, error=None, mailed=False):
+    totp = ("<label for='re-otp' style='margin-top:12px'>Code from your authenticator app</label>"
+            "<input id='re-otp' name='code' inputmode='numeric' autocomplete='one-time-code' maxlength='6' required>" if totp_on else "")
+    body = (ui.header("Confirm it is you", "For keys, deletes, credits and team changes we ask you to confirm again (once every 10 minutes).")
             + (("<div class='err'>" + e(error) + "</div>") if error else "")
             + ("<div class='note'>After confirming, press the button you pressed again; the change was not made yet.</div>" if again else "")
-            + "<div class='card' style='max-width:460px'><form method='post' action='" + u("/reauth") + "'>"
+            + "<div class='card' style='max-width:460px'>"
+            "<form method='post' action='" + u("/reauth") + "'><input type='hidden' name='next' value='" + e(nxt) + "'>"
+            "<input type='hidden' name='send_code' value='1'><button class='btn' type='submit'>Email me a code</button></form>"
+            "<form method='post' action='" + u("/reauth") + "' style='margin-top:14px'>"
             "<input type='hidden' name='next' value='" + e(nxt) + "'>"
-            "<label for='re-pw'>Password</label><input id='re-pw' name='password' type='password' autocomplete='current-password' required autofocus>"
-            + ("<label for='re-otp' style='margin-top:12px'>Code from your authenticator app</label>"
-               "<input id='re-otp' name='code' inputmode='numeric' autocomplete='one-time-code' maxlength='6' required>" if totp_on else "")
+            + ("<div class='note'>Code sent to your email.</div>" if mailed else "")
+            + "<label for='re-mail'>6-digit code from your email</label>"
+            "<input id='re-mail' name='mailcode' inputmode='numeric' autocomplete='one-time-code' maxlength='6'" + (" autofocus" if mailed else "") + ">"
+            "<details style='margin-top:12px'><summary class='muted'>Use my password instead</summary>"
+            "<label for='re-pw' style='margin-top:8px'>Password</label><input id='re-pw' name='password' type='password' autocomplete='current-password'></details>"
+            + totp
             + "<button class='btn lime' style='margin-top:14px'>Confirm</button></form></div>")
     return page("Confirm it is you", body, "/team")
 

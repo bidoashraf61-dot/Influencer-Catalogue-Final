@@ -66,6 +66,7 @@ sys.path.insert(0, str(HERE))
 
 import auth  # noqa: E402
 import guard  # noqa: E402
+import mailer  # noqa: E402
 import portal  # noqa: E402
 import portal_api  # noqa: E402
 import team  # noqa: E402
@@ -644,6 +645,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send(404, b"", "text/plain")
         if path == "/login":
             return self.send(200, views.login_page(query.get("e"), BASE))
+        if path == "/login/email":
+            em = (query.get("email") or "").strip().lower()
+            return self.send(200, views.login_code_page(em, "That code is not right or has expired." if query.get("e") else None, BASE)) if em else self.redirect("/login")
         if path == "/login/2fa":
             row = self.pending_2fa()
             if row is None:
@@ -691,7 +695,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/reauth":
             nxt = query.get("next") or "/"
             return self.send(200, team_views.reauth_page(nxt if nxt.startswith("/") and not nxt.startswith("//") else "/",
-                                                         bool(who["totp_on"]), bool(query.get("again")), "That is not right." if query.get("e") else None))
+                                                         bool(who["totp_on"]), bool(query.get("again")), "That is not right." if query.get("e") else None, bool(query.get("mailed"))))
         if path in ("/ai", "/ai/history", "/portal", "/portal/user", "/portal/usage.csv", "/portal/chat", "/portal/quote"):
             return self.portal_admin_get(path, query, who)
         if path == "/api/search":
@@ -1082,6 +1086,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_login()
         if path == "/login/2fa":
             return self.post_login_2fa()
+        if path == "/login/email":
+            return self.post_login_email()
+        if path == "/login/email/verify":
+            return self.post_login_email_verify()
 
         who = self.require_admin()
         if not who:
@@ -1389,6 +1397,49 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect("/login/2fa", [("Set-Cookie", "hv_2fa=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=300%s" % (pend, self.secure_flag()))])
         return self.start_session(row)
 
+    def post_login_email(self):
+        """Step one of the email sign-in. The answer is the same whether or not the address has access."""
+        email = (self.form_body().get("email") or "").strip().lower()[:120]
+        ip = self.client_ip()
+        for key, limit in ((f"alogin:ip:{ip}", 12), (f"alogin:em:{email}", 6)):
+            if not guard.limiter.allow(key, limit, 3600):
+                return self.too_many(guard.limiter.retry_after(key, limit, 3600))
+            guard.limiter.hit(key)
+        row = db.admin_by_email(email) if "@" in email else None
+        if row is not None and not row["disabled_at"] and mailer.configured():
+            code, wait = portal.new_otp(email, ip)
+            if code:
+                try:
+                    subject, text, html = mailer.otp_message(code, portal.OTP_MINUTES, to=email)
+                    mailer.send(email, subject.replace("HELVY Connect", "HELVY Connect admin"), text, html)
+                    team.log("login_code", email, "", ip)
+                except mailer.MailError:
+                    db.log("otp_mail_fail", None, ip, self.headers.get("User-Agent"), "admin")
+        elif row is None or row["disabled_at"]:
+            time.sleep(0.4)
+        return self.redirect("/login/email?email=" + urllib.parse.quote(email))
+
+    def post_login_email_verify(self):
+        f = self.form_body()
+        email = (f.get("email") or "").strip().lower()[:120]
+        ip = self.client_ip()
+        for key, limit in ((f"alogin:v:ip:{ip}", 20), (f"alogin:v:em:{email}", 8)):
+            if not guard.limiter.allow(key, limit, 900):
+                return self.too_many(guard.limiter.retry_after(key, limit, 900))
+        row = db.admin_by_email(email) if "@" in email else None
+        ok = False
+        if row is not None and not row["disabled_at"]:
+            ok, _why = portal.check_otp(email, f.get("code"))
+        if not ok:
+            guard.limiter.hit(f"alogin:v:ip:{ip}")
+            guard.limiter.hit(f"alogin:v:em:{email}")
+            team.log("login_fail", email[:80], "email code", ip)
+            return self.redirect("/login/email?e=1&email=" + urllib.parse.quote(email))
+        if row["totp_on"] or team.must_use_2fa(row):
+            pend = auth.sign("2fa:%d:%d" % (row["id"], db.now() + 300), SECRET)
+            return self.redirect("/login/2fa", [("Set-Cookie", "hv_2fa=%s; Path=/; HttpOnly; SameSite=Lax; Max-Age=300%s" % (pend, self.secure_flag()))])
+        return self.start_session(row)
+
     def start_session(self, row, extra_cookies=()):
         db.touch_admin_login(row["id"])
         token = db.create_session(row["id"], ADMIN_TTL)
@@ -1435,7 +1486,19 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not guard.limiter.allow(key, 5, 600):
             return self.too_many(guard.limiter.retry_after(key, 5, 600))
         a = team.admin_by_id(who["admin_id"])
-        ok = auth.verify_password(f.get("password") or "", a["password_hash"])
+        if f.get("send_code"):
+            code, _w = portal.new_otp(a["email"], self.client_ip())
+            if code and mailer.configured():
+                try:
+                    subject, text, html = mailer.otp_message(code, portal.OTP_MINUTES, to=a["email"])
+                    mailer.send(a["email"], subject, text, html)
+                except mailer.MailError:
+                    pass
+            return self.redirect("/reauth?mailed=1&next=" + urllib.parse.quote(nxt))
+        if (f.get("mailcode") or "").strip():
+            ok, _why = portal.check_otp(a["email"].strip().lower(), f.get("mailcode"))
+        else:
+            ok = auth.verify_password(f.get("password") or "", a["password_hash"])
         step = None
         if ok and a["totp_on"]:
             step = team.totp_matches(a["totp_secret"], f.get("code"), a["totp_last"])
@@ -1487,10 +1550,19 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             aid = int(f.get("id") or 0)
             target = team.admin_by_id(aid) if aid else None
             if path == "/team/invite":
-                pw = team.invite(f.get("email"), f.get("name"), f.get("role"))
+                team.invite(f.get("email"), f.get("name"), f.get("role"))
                 team.log("invite", me, "%s as %s" % (f.get("email"), f.get("role")), ip)
-                return self.redirect("/team?ok=" + urllib.parse.quote("Added.") + "&new=" + urllib.parse.quote(f.get("email").strip().lower())
-                                     + "&pw=" + urllib.parse.quote(pw))
+                note = ""
+                if mailer.configured():
+                    try:
+                        site = "https://influencer-catalogue.hellovoice.co.uk" + BASE + "/login"
+                        mailer.send(f.get("email").strip().lower(), "You now have HELVY Connect admin access",
+                                    "You have been given %s access to HELVY Connect admin.\n\nSign in with your work email at %s. "
+                                    "We email you a 6-digit code, so there is no password to remember.\n\nHELVY Connect · Powered by HelloVoice"
+                                    % (team.ROLE_LABEL.get(f.get("role"), f.get("role")), site))
+                    except mailer.MailError:
+                        note = " The invitation email could not be sent; tell them to sign in at the admin page."
+                return self.redirect("/team?ok=" + urllib.parse.quote("Added. They sign in with an email code." + note))
             if target is None:
                 return back("No such person.", False)
             if path == "/team/role":

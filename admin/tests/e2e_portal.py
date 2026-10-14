@@ -873,7 +873,8 @@ class Portal(unittest.TestCase):
         a = self.admin()
         self.assertEqual(a.get("/team")[0], 200)
         s, _, r = a.req("POST", "/team/invite", form={"email": "new.kam@hellovoice.co.uk", "name": "New", "role": "kam"})
-        self.assertIn("pw=HV-", r.headers["Location"])
+        self.assertNotIn("pw=", r.headers["Location"])            # no password is handed out: they sign in by email code
+        self.assertIsNotNone(db.admin_by_email("new.kam@hellovoice.co.uk"))
         boss = db.admin_by_email("boss@hellovoice.co.uk")
         for other in team.list_admins():                                 # make boss the only owner
             if other["id"] != boss["id"] and team.role_of(other) == "owner":

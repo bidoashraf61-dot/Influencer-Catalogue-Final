@@ -105,7 +105,8 @@ def can(who, method, path, query=None):
 
 
 # Actions that need the password typed again within the last 10 minutes.
-STEP_UP_POST = ("/portal/keys", "/apis/token", "/settings/token", "/team/")
+STEP_UP_POST = ("/portal/keys", "/apis/token", "/settings/token", "/team/", "/roster/delete", "/portal/user/credits",
+                "/portal/code/credits", "/portal/user/delete", "/codes/delete", "/tiers/")
 STEP_UP_GET = ("/roster/export", "/portal/usage.csv")
 
 

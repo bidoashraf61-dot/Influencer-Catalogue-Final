@@ -584,12 +584,40 @@ def login_page(error=None, base=None):
         + "<h1>" + e(NAME) + "</h1>"
         + "<p class='sub'>Selections, campaigns, creators and clients, in one place.</p>"
         + err
-        + "<form method='post' action='" + u("/login") + "' class='card'>"
-        + "<div style='margin-bottom:14px'><label for='login-email'>Email</label>"
+        + "<form method='post' action='" + u("/login/email") + "' class='card'>"
+        + "<div style='margin-bottom:18px'><label for='login-email'>Work email</label>"
         + "<input id='login-email' name='email' type='email' required autofocus autocomplete='username'></div>"
+        + "<button class='btn' style='width:100%'>Email me a sign-in code</button></form>"
+        + "<details class='card' style='margin-top:14px'" + (" open" if error else "") + "><summary class='muted'>Use a password instead</summary>"
+        + "<form method='post' action='" + u("/login") + "' style='margin-top:12px'>"
+        + "<div style='margin-bottom:14px'><label for='login-email2'>Email</label>"
+        + "<input id='login-email2' name='email' type='email' required autocomplete='username'></div>"
         + "<div style='margin-bottom:18px'><label for='login-password'>Password</label>"
         + "<input id='login-password' name='password' type='password' required autocomplete='current-password'></div>"
-        + "<button class='btn' style='width:100%'>Sign in</button></form>"
+        + "<button class='btn' style='width:100%'>Sign in</button></form></details>"
+        + "</main></body></html>"
+    )
+
+
+def login_code_page(email, error=None, base=None):
+    """Step two of the email sign-in: the six digits that were mailed."""
+    if base is not None:
+        set_base(base)
+    return (
+        HEAD
+        + "<title>Enter your code — " + e(NAME) + "</title>"
+        + '<link rel="stylesheet" href="' + u("/static/admin.css") + '"></head><body>'
+        + '<main class="wrap login" style="max-width:400px;margin:12vh auto 0;padding:0 20px">'
+        + '<img src="' + u("/static/logo.webp") + '" alt="HelloVoice" height="30" style="margin-bottom:22px">'
+        + "<h1>Check your email</h1>"
+        + "<p class='sub'>If " + e(email) + " has access, a 6-digit code is on its way. It works for 10 minutes.</p>"
+        + (("<div class='err'>" + e(error) + "</div>") if error else "")
+        + "<form method='post' action='" + u("/login/email/verify") + "' class='card'>"
+        + "<input type='hidden' name='email' value='" + e(email) + "'>"
+        + "<label for='login-code'>6-digit code</label>"
+        + "<input id='login-code' name='code' inputmode='numeric' autocomplete='one-time-code' maxlength='6' pattern='[0-9]*' required autofocus>"
+        + "<button class='btn' style='width:100%;margin-top:14px'>Sign in</button></form>"
+        + "<p class='muted' style='margin-top:14px'><a href='" + u("/login") + "'>Use a different email</a></p>"
         + "</main></body></html>"
     )
 
