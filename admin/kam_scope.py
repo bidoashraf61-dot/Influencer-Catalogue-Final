@@ -220,6 +220,12 @@ def campaign_code(cid):
     return True, None
 
 
+def evidence_code(pid):
+    """(found, code_id) for a competitor evidence pack."""
+    import evidence
+    return evidence.pack_code(pid)
+
+
 def user_code(uid):
     if uid is None:
         return False, None
@@ -255,7 +261,7 @@ _GET_FREE = {"/", "/reauth", "/selections", "/campaigns", "/clients", "/clients/
              "/api/pulse", "/api/search", "/codes", "/open-catalogue", "/roster", "/roster/export",
              "/roster/template.xlsx", "/roster/template", "/licences", "/analysis", "/analysis/find",
              "/analysis/template.xlsx", "/campaigns/thumb", "/campaigns/logo", "/calculator", "/ai",
-             "/ai/history", "/selections/suggest", "/team"}
+             "/ai/history", "/selections/suggest", "/team", "/evidence"}
 _GET_SELECTION = {"/selections/edit": "id", "/selections/fit": "id", "/campaigns/setup": "selection", "/portal/quote": "sel"}
 _GET_CAMPAIGN = {"/campaigns/content", "/campaigns/report", "/campaigns/insights", "/campaigns/export.xlsx",
                  "/campaigns/export.csv", "/campaigns/insight-file", "/campaigns/links", "/campaigns/clicks.csv",
@@ -307,6 +313,8 @@ def check(scope, method, path, query=None, form=None):
             return None if source_ok(query.get("source"), scope) else NOT_YOURS
         if path == "/portal/user":
             return None if code_ok(user_code(_int(query.get("id")))) else NOT_YOURS
+        if path == "/evidence/view":
+            return None if code_ok(evidence_code(_int(query.get("id")))) else NOT_YOURS
         if path == "/portal/chat":
             return None if code_ok(_row_code("chat_threads", _int(query.get("id")))) else NOT_YOURS
         if path == "/analysis/json":
@@ -367,6 +375,18 @@ def check(scope, method, path, query=None, form=None):
     if path in ("/selections/assign", "/campaigns/assign"):
         found = selection_code(_int(form.get("id"))) if path == "/selections/assign" else campaign_code(_int(form.get("id")))
         if not code_ok(found) or not allows(_int(form.get("client")), scope):
+            return NOT_YOURS
+        return None
+    if path.startswith("/evidence/"):
+        # Competitor evidence: a pack of her client's, filed (if at all) under that client's selection.
+        pid = _int(form.get("pack_id") or form.get("id"))
+        if pid is not None:
+            if not code_ok(evidence_code(pid)):
+                return NOT_YOURS
+        elif path != "/evidence/import" or not allows(_int(form.get("code_id")), scope):
+            return NOT_YOURS
+        sid = _int(form.get("selection_id"))
+        if sid is not None and not code_ok(selection_code(sid)):
             return NOT_YOURS
         return None
     if path in ("/analysis/fulfil", "/analysis/handled"):

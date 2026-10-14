@@ -86,7 +86,7 @@ CHILDREN = {
     "/roster": [("/analysis", "Creator analysis", "an"), ("/licences", "Licences", None)],
     "/clients": [("/portal", "Client accounts (detail)", None), ("/codes", "Access codes", None), ("/clients/by-code", "By access code", None)],
     "/work": [("/selections", "Selections list", None), ("/requests", "Quote requests", "req"), ("/campaigns", "Campaigns", None),
-              ("/calculator", "ROI calculator", None)],
+              ("/evidence", "Competitor evidence", None), ("/calculator", "ROI calculator", None)],
     "/settings": [("/settings#kams", "Key account managers", None), ("/apis", "APIs & keys", None)],
     "/team": [("/history", "History & undo", None)],
 }
