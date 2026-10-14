@@ -243,10 +243,33 @@ class Evidence(unittest.TestCase):
         self.assertEqual(c["followers"], 260000)
         self.assertEqual(c["tier"], db.tier_for_reach(260000))
         self.assertEqual((live / (code + ".jpg")).read_bytes(), hd)
-        self.assertEqual(len(fetched), 1)                                              # only the evidence creator
+        self.assertEqual(len(fetched), 2)               # noha is in the study with no photo: photo only (2026-10-14)
         after = db.creator("HV-MI-001")
-        self.assertEqual((after["followers"], after["photo"]), (before["followers"], before["photo"]))
+        self.assertEqual((after["followers"], after["tier"]), (before["followers"], before["tier"]))
         shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_665_gaps_target_and_photo_only_upgrade_for_existing_creators(self):
+        import tempfile, apify
+        from pathlib import Path
+        pid = self.pack_id()
+        live = Path(tempfile.mkdtemp())
+        evidence.PHOTO_DIR = live
+        gaps = evidence.gap_codes(pid, live)
+        self.assertIn("HV-MI-001", gaps)                       # noha: on the roster before, no photo file here
+        before = db.creator("HV-MI-001")
+        hd = b"\xff\xd8\xff\xc0\x00\x11\x08\x01\x40\x01\x40" + b"\x00" * 400
+        evidence._fetch_pic = lambda url: hd
+        apify.init()
+        apify.ingest({"id": 9, "handle_map": json.dumps({"noha": "HV-MI-001"})},
+                     {"kind": "profiles", "platform": "Instagram", "actor": "apify/instagram-profile-scraper"},
+                     [{"username": "noha", "followersCount": 1234567, "profilePicUrlHD": "https://scontent.cdninstagram.com/z.jpg"}])
+        after = db.creator("HV-MI-001")
+        self.assertEqual((live / "HV-MI-001.jpg").read_bytes(), hd)          # photo upgraded
+        self.assertEqual((after["followers"], after["tier"]), (before["followers"], before["tier"]))   # numbers kept
+        self.assertNotIn("HV-MI-001", evidence.gap_codes(pid, live))         # gap closed (has analysis + HD photo now)
+        job = {"platform": "Instagram", "source": "evidence-gaps:%d" % pid, "max_handles": 100}
+        self.assertNotIn("HV-MI-001", [c for c, _ in apify.build_handles(job)])
+        shutil.rmtree(live, ignore_errors=True)
 
     def test_67_picture_fetch_only_from_instagram_hosts(self):
         import importlib

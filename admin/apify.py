@@ -348,6 +348,9 @@ def build_handles(job):
             allowed = set(json.loads(r["codes"] or "[]")) if r else set()
         elif src.startswith("creator:"):
             allowed = {src[8:].strip().upper()}
+        elif src.startswith("evidence-gaps:") and src[14:].isdigit():
+            import evidence
+            allowed = evidence.gap_codes(int(src[14:]))
         elif src == "evidence" or (src.startswith("evidence:") and src[9:].isdigit()):
             # Creators a competitor evidence pack added to the roster. They are hidden until reviewed,
             # and analysing them is the point of the mark, so hidden ones count here.

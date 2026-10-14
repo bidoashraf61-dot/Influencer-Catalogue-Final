@@ -291,6 +291,18 @@ def add_to_roster(pk, by="", handles=None):
     return added, notes
 
 
+def gap_codes(pack_id, photo_dir=None):
+    """Roster creators a pack names who have no analysis at all, or no photo / a photo under 320px:
+    the cheap Apify profile run fills both ("evidence-gaps:<pack id>")."""
+    from pathlib import Path
+    photo_dir = Path(photo_dir or PHOTO_DIR) if (photo_dir or PHOTO_DIR) else None
+    with _conn() as conn:
+        rows = conn.execute("SELECT * FROM creators WHERE code IN (SELECT DISTINCT code FROM evidence_posts "
+                            "WHERE pack_id = ? AND code IS NOT NULL)", (pack_id,)).fetchall()
+        have = {r[0] for r in conn.execute("SELECT DISTINCT code FROM creator_analysis")}
+    return {r["code"] for r in rows if r["code"] not in have or (photo_dir is not None and _needs_photo(r, photo_dir))}
+
+
 def roster_codes(pack_id=None):
     """Roster codes a pack added (every pack when None), for Apify targets."""
     with _conn() as conn:
@@ -377,10 +389,19 @@ def on_profile(conn, code, platform, followers, item):
     Creators the roster had before are never touched here. Returns True when it updated one."""
     if not conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'evidence_roster'").fetchone():
         return False
-    if not conn.execute("SELECT 1 FROM evidence_roster WHERE code = ?", (code,)).fetchone():
-        return False
     row = conn.execute("SELECT * FROM creators WHERE code = ?", (code,)).fetchone()
     if row is None:
+        return False
+    if not conn.execute("SELECT 1 FROM evidence_roster WHERE code = ?", (code,)).fetchone():
+        # A creator the roster had before a study named them: only a missing or low-res photo is
+        # replaced (owner decision 2026-10-14); their numbers and tier stay as the roster keeps them.
+        if (platform == "Instagram" and PHOTO_DIR is not None and isinstance(item, dict)
+                and conn.execute("SELECT 1 FROM evidence_posts WHERE code = ? LIMIT 1", (code,)).fetchone()):
+            from pathlib import Path
+            if _needs_photo(row, Path(PHOTO_DIR)):
+                data = _fetch_pic(item.get("profilePicUrlHD") or item.get("profilePicUrl"))
+                if data:
+                    return _put_photo(conn, code, data, Path(PHOTO_DIR))
         return False
     profiles = db.split_profiles(row["profiles"])
     if followers is not None:
