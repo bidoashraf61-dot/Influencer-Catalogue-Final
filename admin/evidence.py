@@ -71,6 +71,7 @@ CREATE TABLE IF NOT EXISTS evidence_roster (
 );
 """
 
+ACCEPT = ".xlsx,.json,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 FIT_LABEL = {"direct": "Direct competitor", "partial": "Partly the same product", "off-product": "Different product"}
 REL_LABEL = {"match": "Same category", "unspecified": "Product not named", "other": "Other product"}
 POST_COLS = ("brand", "competitor", "platform", "url", "handle", "alt_handle", "save_rate", "code", "name", "creator_type", "city", "followers",
@@ -137,7 +138,11 @@ def handle_index(conn):
 
 
 def parse_pack(raw):
-    """The evidence-pack JSON -> (brands meta, posts). Raises ValueError with a readable reason."""
+    """The evidence-pack JSON, or the filled Excel template (evidence_xlsx) -> (brands meta, posts, meta).
+    Raises ValueError with a readable reason."""
+    import evidence_xlsx
+    if evidence_xlsx.is_xlsx(raw):
+        return evidence_xlsx.parse(raw)
     try:
         data = json.loads(raw.decode("utf-8-sig") if isinstance(raw, bytes) else raw)
     except Exception:
@@ -196,6 +201,9 @@ def import_pack(raw, title, code_id, selection_id=None, by="", pack_id=None):
     """Create a pack (or add a platform's posts to an existing one, e.g. TikTok after Instagram).
     Returns (pack id, posts saved, posts matched to the roster)."""
     brands, posts, meta = parse_pack(raw)
+    # A filled template is the whole truth for the brands and platforms it covers (owner, 2026-10-15):
+    # uploading it again updates the pack in place, and a post taken off the sheet leaves the pack.
+    sheet = meta.get("source") == "Excel template"
     t = db.now()
     with _conn() as conn:
         idx = handle_index(conn)
@@ -217,13 +225,22 @@ def import_pack(raw, title, code_id, selection_id=None, by="", pack_id=None):
             for b in brands:
                 if b["brand"] in old:
                     old[b["brand"]]["fit"].update(b["fit"])
-                    old[b["brand"]]["product"] = old[b["brand"]]["product"] or b["product"]
+                    old[b["brand"]]["product"] = (b["product"] or old[b["brand"]]["product"]) if sheet else (old[b["brand"]]["product"] or b["product"])
+                    if b.get("match_tags"):
+                        old[b["brand"]]["match_tags"] = b["match_tags"]
                 else:
                     old[b["brand"]] = b
             plats = sorted(set(json.loads(row["platforms"] or "[]")) | set(meta["platforms"]))
-            src = "; ".join(x for x in (row["source"], meta["source"]) if x)
+            src = "; ".join(dict.fromkeys(x for x in (row["source"], meta["source"]) if x))
             conn.execute("UPDATE evidence_packs SET brands = ?, platforms = ?, source = ?, updated_at = ? WHERE id = ?",
                          (json.dumps(list(old.values()), ensure_ascii=False), json.dumps(plats), src, t, pack_id))
+        if sheet:
+            keep = {(p["brand"], p["url"]) for p in posts}
+            for brand, plat in {(p["brand"], p["platform"]) for p in posts}:
+                for r in conn.execute("SELECT id, url FROM evidence_posts WHERE pack_id = ? AND brand = ? AND platform = ?",
+                                      (pack_id, brand, plat)).fetchall():
+                    if (brand, r["url"]) not in keep:
+                        conn.execute("DELETE FROM evidence_posts WHERE id = ?", (r["id"],))
         matched = 0
         for p in posts:
             p["code"] = idx.get(p["handle"]) or (idx.get(p["alt_handle"]) if p.get("alt_handle") else None)
@@ -995,15 +1012,18 @@ def list_page(scope, clients, selections, ok=None, err=None):
     else:
         body.append("<p class='ev-sub'>No packs yet.</p>")
     body.append("</div>")
-    body.append("<div class='ev-card'><h2>Import a study</h2><p class='ev-sub'>The evidence-pack JSON from "
-                "<code>build_evidence_pack.py</code>. Handles are matched to the roster as it imports.</p>"
+    body.append("<div class='ev-card'><h2>Import a study</h2><p class='ev-sub'>Download the Excel template, fill the "
+                "Brands and Posts sheets, and upload it here. The portal works out relevance, engagement and the best "
+                "creators, and matches handles to the roster. Uploading the same file again updates its pack. "
+                "The evidence-pack JSON from the old scripts still works.</p>"
+                "<p><a class='btn ghost' href='%s' download>Download template (.xlsx)</a></p>"
                 "<form method='post' action='%s' enctype='multipart/form-data'><div class='ev-form'>"
-                "<label>File (.json)<input type='file' name='file' accept='.json,application/json' required></label>"
+                "<label>File (.xlsx or .json)<input type='file' name='file' accept='%s' required></label>"
                 "<label>Title<input name='title' placeholder='Avalon Pharma — Instagram competitors' required></label>"
                 "<label>Client<select name='code_id' required><option value=''>Choose…</option>%s</select></label>"
                 "<label>Selection (optional)<select name='selection_id'><option value=''>None yet</option>%s</select></label>"
                 "</div><div class='ev-bar'><button class='btn' type='submit'>Import</button></div></form></div>"
-                % (e(u("/evidence/import")),
+                % (e(u("/evidence/template")), e(u("/evidence/import")), ACCEPT,
                    "".join("<option value='%d'>%s</option>" % (c["id"], e(c["label"])) for c in clients),
                    "".join("<option value='%d'>%s</option>" % (s["id"], e(s["name"])) for s in selections)))
     return page("Competitor evidence", "".join(body), "/evidence")
@@ -1076,14 +1096,17 @@ def view_page(pk, brand, selections, ok=None, err=None, creator=None):
                 "<button class='btn' type='submit'>Delete pack</button></form></div>"
                 "<p class='ev-mut'>Add another platform's study (e.g. TikTok) to this same pack:</p>"
                 "<form method='post' action='%s' enctype='multipart/form-data'><input type='hidden' name='pack_id' value='%d'>"
-                "<div class='ev-bar'><input type='file' name='file' accept='.json,application/json' required>"
-                "<button class='btn' type='submit'>Add to pack</button></div></form></div>" % (
+                "<div class='ev-bar'><input type='file' name='file' accept='%s' required>"
+                "<button class='btn' type='submit'>Upload to this pack</button>"
+                "<a class='btn ghost' href='%s' download>Download template</a></div>"
+                "<p class='ev-sub'>An Excel template updates the brands and platforms it covers: changed rows are updated, "
+                "rows taken off the sheet leave the pack. A JSON file adds its posts.</p></form></div>" % (
                     e(u("/evidence/save")), pk["id"], e(pk["title"]),
                     "".join("<option value='%d'%s>%s</option>" % (s["id"], " selected" if s["id"] == pk["selection_id"] else "", e(s["name"]))
                             for s in selections),
                     " checked" if pk["client_visible"] else "",
                     e(u("/evidence/rematch")), pk["id"], e(u("/evidence/delete")), pk["id"],
-                    e(u("/evidence/import")), pk["id"]))
+                    e(u("/evidence/import")), pk["id"], ACCEPT, e(u("/evidence/template"))))
     if cur is None:
         return page(pk["title"], "".join(body) + "<p>No posts in this pack.</p>", "/evidence")
     body.append("<nav class='ev-tabs'>%s</nav>" % "".join(

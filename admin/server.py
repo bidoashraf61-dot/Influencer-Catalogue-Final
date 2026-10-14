@@ -931,6 +931,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/evidence":
             return self.send(200, evidence.list_page(kam_scope.clients(who), db.list_codes(), db.list_selections(),
                                                      query.get("ok"), query.get("e")))
+        if path == "/evidence/template":
+            import evidence_xlsx
+            return self.send(200, evidence_xlsx.template(),
+                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             [("Content-Disposition", 'attachment; filename="competitor-evidence-template.xlsx"'),
+                              ("Cache-Control", "no-store")])
         if path == "/evidence/view":
             pk = evidence.pack(kam_scope._int(query.get("id")))
             if pk is None:
@@ -4738,7 +4744,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/evidence/import":
             part = f.get("file")
             if not isinstance(part, dict) or not part.get("data"):
-                return go("e", "Choose the evidence-pack JSON file.")
+                return go("e", "Choose the filled Excel template (or an evidence-pack JSON file).")
             try:
                 if pk is not None:
                     _, n, m = evidence.import_pack(part["data"], None, pk["code_id"], pack_id=pk["id"], by=who["email"])
@@ -4748,7 +4754,15 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                     return go("e", "Choose the client this pack is for.")
                 if not sel_ok(sid, code_id):
                     return go("e", "That selection belongs to another client.")
-                new, n, m = evidence.import_pack(part["data"], one("title").strip()[:120], code_id, sid, by=who["email"])
+                title = one("title").strip()[:120]
+                # The same client, selection and title again is the same pack: update it, never a second copy.
+                same = [r for r in evidence.list_packs() if r["code_id"] == code_id and r["selection_id"] == sid
+                        and (r["title"] or "").strip().lower() == title.lower()]
+                if same:
+                    _, n, m = evidence.import_pack(part["data"], None, code_id, pack_id=same[0]["id"], by=who["email"])
+                    return self.redirect("/evidence/view?id=%d&ok=%s" % (same[0]["id"], urllib.parse.quote(
+                        "Updated the existing pack: %d posts; %d matched to roster creators." % (n, m))))
+                new, n, m = evidence.import_pack(part["data"], title, code_id, sid, by=who["email"])
             except ValueError as ex:
                 return go("e", str(ex))
             return self.redirect("/evidence/view?id=%d&ok=%s" % (new, urllib.parse.quote(
