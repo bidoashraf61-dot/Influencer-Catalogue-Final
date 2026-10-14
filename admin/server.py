@@ -883,7 +883,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             gone = "; Path=/; HttpOnly; Max-Age=0; SameSite=Lax"
             return self.redirect("/clients", [("Set-Cookie", VIEWER_COOKIE + "=" + gone),
                                               ("Set-Cookie", PREVIEW_COOKIE + "=" + gone)])
-        if path == "/clients":
+        if path == "/clients" and not (query.get("archived") or query.get("page")):
+            import hub_views
+            return self.send(200, hub_views.clients_page(query.get("show") or "all", query.get("open"), query.get("ok"), query.get("e")))
+        if path == "/work":
+            import hub_views
+            return self.send(200, hub_views.board_page(query.get("ok"), query.get("e"), query.get("team") == "1"))
+        if path in ("/clients", "/clients/by-code"):
             arch = query.get("archived") == "1"
             every = db.client_overview()
             n_arch = sum(1 for o in every if o["code"]["archived_at"])

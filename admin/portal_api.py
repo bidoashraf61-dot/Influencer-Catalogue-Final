@@ -1264,7 +1264,7 @@ class PortalMixin(connect_api.ConnectMixin):
         f = self.form_body()
         back = f.get("back") or "/portal"
         # Only our own pages; no backslashes or control characters (a browser reads /\\x as //x).
-        if (not back.startswith(("/portal", "/codes")) or "\\" in back or any(ord(c) < 32 or c == "\x7f" for c in back)):
+        if (not back.startswith(("/portal", "/codes", "/clients")) or "\\" in back or any(ord(c) < 32 or c == "\x7f" for c in back)):
             back = "/portal"
         sep = "&" if "?" in back else "?"
 

@@ -948,7 +948,7 @@ class Portal(unittest.TestCase):
         self.assertEqual(a.get("/api/selection?s=" + sa2)[1]["name"], "Alpha two")
         self.assertEqual(a.get("/api/campaign?t=" + kb["token"])[0], 200)
         # and every admin page that lists them offers the client's view
-        for path in ("/selections", "/campaigns", "/clients", "/campaigns/edit?id=%d" % kb["id"],
+        for path in ("/selections", "/campaigns", "/clients/by-code", "/campaigns/edit?id=%d" % kb["id"],
                      "/selections/edit?id=%d" % db.selection(token=sa)["id"]):
             s, page, _ = a.get(path)
             self.assertEqual(s, 200, path)
