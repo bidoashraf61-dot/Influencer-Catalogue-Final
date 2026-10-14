@@ -679,7 +679,7 @@ def set_logo(name, data, ext, source="", credit="", approved=True):
         raise ValueError("Logos must be SVG, PNG, WebP or JPG.")
     if ext == "svg":
         text = data.decode("utf-8", "replace")
-        if _re.search(r"<script|on\w+\s*=|javascript:|<foreignObject|xlink:href\s*=\s*[\"']https?:|href\s*=\s*[\"']https?:", text, _re.I):
+        if _re.search(r"<script|[\s\"']on[a-z]+\s*=|javascript:|<foreignObject|xlink:href\s*=\s*[\"']https?:|href\s*=\s*[\"']https?:", text, _re.I):
             raise ValueError("That SVG has scripts or outside links in it.")
         # Without a viewBox an SVG drawn inside another one stretches instead of keeping its shape.
         m = _re.search(r"<svg\b[^>]*>", text)

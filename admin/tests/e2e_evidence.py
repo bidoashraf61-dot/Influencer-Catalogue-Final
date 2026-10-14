@@ -215,6 +215,7 @@ class Evidence(unittest.TestCase):
         with self.assertRaises(ValueError):
             evidence.set_logo("Evil", b'<svg onload="alert(1)"></svg>', "svg")
         evidence.set_logo("Pending", svg_ok, "svg", approved=False)
+        evidence.set_logo("Declared", b'<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg"/>', "svg")  # not an event attribute
         r = self.client.op.open(urllib.request.Request(self.base + "/api/brand-logo?n=RivalSkin"))
         self.assertEqual((r.status, r.headers["Content-Type"]), (200, "image/svg+xml"))
         self.assertEqual(self.client.get("/api/brand-logo?n=Pending")[0], 404)       # not approved: not served
