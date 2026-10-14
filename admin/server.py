@@ -2194,6 +2194,16 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if sel is None or not kam_scope.allows(sel["code_id"]):
                 return no("That selection is not here any more.")
             key = lifecycle.state_of(sel)["key"]
+            if to == "requested" and key == "draft":
+                if not sel["code_id"]:
+                    return no("Assign a client to this selection first.")
+                with history.tracked("selection", sel["id"], "Marked %s as quote requested (board)" % sel["name"]):
+                    lifecycle.mark_requested(sel, by_name="%s for the client" % actor)
+                return self.send_json(200, {"ok": True, "message": "Marked as Quote requested."})
+            if to == "approved" and key == "ready":
+                with history.tracked("selection", sel["id"], "Approved %s for the client (board)" % sel["name"]):
+                    _k, err = lifecycle.approve(sel, None, "%s, for the client" % actor)
+                return self.send_json(200, {"ok": True, "message": "Approved. Next: start the campaign."}) if not err else no("Only a ready quote can be approved.")
             if to == "ready" and key in ("draft", "requested"):
                 with history.tracked("selection", sel["id"], "Marked the quote ready for %s (board)" % sel["name"]):
                     _k, err = lifecycle.set_ready(sel, b.get("note") or "", "", actor)
@@ -2214,6 +2224,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return no("That campaign is not here any more.")
             if to == "live" and k["status"] in ("draft", "ended"):
                 return self.send_json(200, go_live(k))
+            if to == "approved" and k["status"] == "live":
+                with history.tracked("campaign", k["id"], "Took %s offline from the board" % k["name"]):
+                    db.save_campaign(k["id"], status="draft")
+                return self.send_json(200, {"ok": True, "message": "%s is offline: the client no longer sees it." % k["name"]})
             if to == "completed" and k["status"] == "live":
                 with history.tracked("campaign", k["id"], "Ended %s from the board" % k["name"]):
                     db.save_campaign(k["id"], status="ended")

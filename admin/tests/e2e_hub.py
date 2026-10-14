@@ -97,11 +97,17 @@ class Hub(unittest.TestCase):
         self.assertEqual(lifecycle.state_of(db.selection(sel["id"]))["key"], "ready")
         s, b, _ = a.post("/api/admin/board/move", {"kind": "sel", "id": sel["id"], "to": "requested"})
         self.assertNotEqual(lifecycle.state_of(db.selection(sel["id"]))["key"], "ready")
+        a.post("/api/admin/board/move", {"kind": "sel", "id": sel["id"], "to": "ready"})
         s, b, _ = a.post("/api/admin/board/move", {"kind": "sel", "id": sel["id"], "to": "approved"})
-        self.assertEqual(s, 400)                                  # approving is the client's step
+        self.assertEqual(lifecycle.state_of(db.selection(sel["id"]))["key"], "approved")   # approved for the client
+        s, b, _ = a.post("/api/admin/board/move", {"kind": "sel", "id": sel["id"], "to": "requested"})
+        self.assertEqual(s, 400)                                  # an approved quote is not taken back from here
         cid = db.create_campaign("Board camp", code_id=sel["code_id"])
         s, b, _ = a.post("/api/admin/board/move", {"kind": "camp", "id": cid, "to": "live"})
         self.assertIn("/campaigns/edit", b.get("go", ""))         # no dates yet: sent to set them up
+        db.save_campaign(cid, status="live")
+        s, b, _ = a.post("/api/admin/board/move", {"kind": "camp", "id": cid, "to": "approved"})
+        self.assertEqual(db.campaign(cid)["status"], "draft")       # taken offline
         db.save_campaign(cid, status="live")
         s, b, _ = a.post("/api/admin/board/move", {"kind": "camp", "id": cid, "to": "completed"})
         self.assertEqual(db.campaign(cid)["status"], "ended")

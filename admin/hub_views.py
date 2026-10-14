@@ -271,8 +271,12 @@ def board_cards(team=False):
                 price = "%d of %d posts" % (p["posts"], p["planned"] or p["posts"])
             else:
                 nxt, tone = "Report", "go" if k == "live" else "calm"
+        cid_ = None
+        if k in ("live", "completed") and camp:
+            cid_ = next((c["id"] for c in st["campaigns"] if c["token"] == camp["token"]), None)
         cards[k].append({"name": s["name"], "client": client, "n": n, "price": price, "next": nxt, "tone": tone, "href": href,
-                         "when": when or 0, "find": (s["name"] + " " + client).lower(), "kind": "sel", "id": s["id"]})
+                         "when": when or 0, "find": (s["name"] + " " + client).lower(),
+                         "kind": "camp" if cid_ else "sel", "id": cid_ or s["id"]})
     for c in db.list_campaigns():
         if c["id"] in linked or ("archived_at" in c.keys() and c["archived_at"]):
             continue
@@ -340,9 +344,9 @@ def board_page(ok=None, err=None, team=False):
            "<a href='" + u("/work") + "?team=1'" + (" aria-current='true'" if team else "") + ">Include the team's tests</a></nav>"
            "<a class='btn ghost' href='" + u("/campaigns") + "'>All campaigns</a></div>")
     banner = (("<div class='ok'>" + e(ok) + "</div>") if ok else "") + (("<div class='err'>" + e(err) + "</div>") if err else "")
-    legend = ("<p class='hb-legend'>Drag a card to move it: to <b>Quote ready</b> (tells the client), back to <b>Quote requested</b>, "
-              "from <b>Approved</b> to <b>Campaign live</b> (sets up or starts the campaign), and between <b>Campaign live</b> and "
-              "<b>Completed</b>. Every move asks you first and can be undone in History. <b>Approved</b> is the client's own step.</p>")
+    legend = ("<p class='hb-legend'>Drag a card to move it. Forward: Draft → Quote requested → Quote ready (tells the client) → Approved "
+              "(when the client approved outside the portal) → Campaign live (sets up or starts the campaign) → Completed. Back: take a quote "
+              "back, take a campaign offline, or reopen a completed one. Every move asks you first and is recorded in History.</p>")
     return page("Selections and campaigns", CSS + DND_CSS + head + banner + bar + "<div class='hb-board'>" + cols + "</div>" + legend + _FIND_JS
                 + DND_JS % json.dumps(u("/api/admin/board/move")), "/work")
 
@@ -355,12 +359,16 @@ DND_CSS = ("<style>.hb-card[draggable=true]{cursor:grab}.hb-card.dragging{opacit
 # Which moves a card may make, by kind and from-column. Everything else is refused before asking.
 DND_JS = """<script>(function(){
 var URL=%s;
-var MOVES={sel:{draft:['ready'],requested:['ready'],ready:['requested'],approved:['live']},
-           camp:{approved:['live'],live:['completed'],completed:['live']}};
-var ASK={ready:'Mark this quote ready? The client is told in their portal and can approve it.',
-         requested:'Take the quote back? The selection reads Quote requested again.',
+var MOVES={sel:{draft:['requested','ready'],requested:['ready'],ready:['requested','approved'],approved:['live']},
+           camp:{approved:['live'],live:['completed','approved'],completed:['live']}};
+var ASK={requested:'Mark this as Quote requested? Use this when the client asked by phone, email or WhatsApp.',
+         ready:'Mark this quote ready? The client is told in their portal and can approve it.',
+         approved:'Mark it Approved for the client? Use this when the client approved outside the portal. The team is told.',
          live:'Start this campaign? The client sees its report.',
          completed:'End this campaign? Its report is kept as it is now.'};
+function ask(c,to){if(c.dataset.kind==='sel'&&to==='requested'&&c.dataset.from==='ready')return 'Take the quote back? The selection reads Quote requested again.';
+  if(c.dataset.kind==='camp'&&to==='approved')return 'Take this campaign offline? The client no longer sees its report until you start it again.';
+  return ASK[to]||'Move this card?';}
 var drag=null;
 function allowed(c,to){var m=MOVES[c.dataset.kind]||{};return (m[c.dataset.from]||[]).indexOf(to)>=0;}
 document.querySelectorAll('.hb-card[draggable=true]').forEach(function(c){
@@ -376,7 +384,7 @@ document.querySelectorAll('.hb-col').forEach(function(col){
   col.addEventListener('drop',function(ev){ev.preventDefault();var c=drag,to=col.dataset.col;if(!c||!allowed(c,to))return;
     var note='';
     if(to==='ready'){note=window.prompt(ASK.ready+'\n\nA short note for the client (optional):','');if(note===null)return;}
-    else if(!window.confirm(ASK[to]||'Move this card?'))return;
+    else if(!window.confirm(ask(c,to)))return;
     fetch(URL,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({kind:c.dataset.kind,id:Number(c.dataset.id),to:to,note:note})})
      .then(function(r){return r.json().catch(function(){return {};}).then(function(b){return {s:r.status,b:b};});})
