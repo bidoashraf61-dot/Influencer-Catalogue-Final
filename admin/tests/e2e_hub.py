@@ -113,6 +113,17 @@ class Hub(unittest.TestCase):
         self.assertEqual(db.campaign(cid)["status"], "ended")
         self.assertEqual(Client(self.base).post("/api/admin/board/move", {"kind": "camp", "id": cid, "to": "live"})[0], 403)
 
+    def test_7_board_script_compiles(self):
+        import subprocess, tempfile, hub_views
+        js = (hub_views.DND_JS % '"/x"').replace("<script>", "").replace("</script>", "")
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as fh:
+            fh.write(js)
+        try:
+            r = subprocess.run(["node", "--check", fh.name], capture_output=True, text=True)
+        except FileNotFoundError:
+            self.skipTest("node not installed")
+        self.assertEqual(r.returncode, 0, r.stderr)
+
     def test_5_old_pages_still_open(self):
         a = self.admin()
         for p in ("/clients/by-code", "/clients?archived=1", "/selections", "/portal", "/codes"):

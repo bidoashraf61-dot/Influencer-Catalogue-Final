@@ -383,7 +383,7 @@ document.querySelectorAll('.hb-col').forEach(function(col){
   col.addEventListener('dragover',function(ev){if(drag&&allowed(drag,col.dataset.col)){ev.preventDefault();ev.dataTransfer.dropEffect='move';}});
   col.addEventListener('drop',function(ev){ev.preventDefault();var c=drag,to=col.dataset.col;if(!c||!allowed(c,to))return;
     var note='';
-    if(to==='ready'){note=window.prompt(ASK.ready+'\n\nA short note for the client (optional):','');if(note===null)return;}
+    if(to==='ready'){note=window.prompt(ASK.ready+' A short note for the client (optional):','');if(note===null)return;}
     else if(!window.confirm(ask(c,to)))return;
     fetch(URL,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({kind:c.dataset.kind,id:Number(c.dataset.id),to:to,note:note})})
