@@ -902,8 +902,8 @@ CC_CSS = ("<style>"
           ".cc-keys i{font-style:normal;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--green-soft);color:var(--green)}"
           ".cc-keys i.off{background:var(--red-soft);color:var(--red)}"
           ".cc-acts{margin-top:auto;padding-top:16px;display:flex;flex-direction:column;gap:2px;border-top:1px solid var(--line)}"
-          ".cc-acts a{display:flex;justify-content:space-between;align-items:center;padding:8px 2px;font-weight:500;border-radius:8px;text-decoration:none;color:var(--ink);transition:padding .15s,background .15s}"
-          ".cc-acts a:hover{background:rgba(232,255,118,.45);padding-left:8px}"
+          ".cc-acts a{display:flex;justify-content:space-between;align-items:center;padding:8px;margin:0 -6px;font-weight:500;border-radius:8px;text-decoration:none;color:var(--ink);transition:background .15s}"
+          ".cc-acts a:hover{background:rgba(232,255,118,.45)}"
           ".cc-acts a span{color:var(--muted);font-size:12.5px}"
           ".cc-acts a.soon{color:var(--muted);pointer-events:none}.cc-acts a.soon span{background:rgba(18,18,18,.07);color:var(--ink);border-radius:999px;padding:1px 8px;font-weight:600}"
           ".cc-more{margin-top:22px;display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted)}.cc-more a{color:var(--ink)}"
@@ -2277,7 +2277,7 @@ def requests_page(requests, creators, tiers=None):
             r["selection_name"] or "", [c for c in picks if isinstance(c, str)], r["code_id"])
         strip = _lcu.request_strip(_sel, "/requests")
         return (
-            "<div class='req" + (" done" if handled else "") + "'><div class='req-head'>"
+            "<div class='req" + (" done" if handled else "") + "' id='req-" + str(r["id"]) + "'><div class='req-head'>"
             + "<div class='req-who'><h3>" + e(r["company"] or "—") + "</h3>"
             + "<div class='muted'>" + e(r["name"] or "") + "</div>"
             + "<div>" + " · ".join(contact) + "</div></div>"
@@ -4151,7 +4151,10 @@ def score_model_card():
                       "<td><input name='sm_b_%s_%s_zero' value='%g' inputmode='decimal'></td>"
                       "<td><input name='sm_b_%s_%s_full' value='%g' inputmode='decimal'></td><td class='muted'>%s</td></tr>"
                       % (m, g, z, m, g, f, note))
-    return ("<h2>Creator score model</h2><div class='card'>"
+    return ("<h2>Creator score model (previous version)</h2><div class='card'>"
+            "<div class='note'>Not in use: scores are worked out by the newer model (v5) since 13 Oct 2026. Awareness scores the "
+            "view rate, Engagement the engagement rate, Traffic 70% engagement and 30% view rate, each against our own roster's "
+            "range for the creator's platform and size. These settings stay here for reference until the Scoring rules page replaces them.</div>"
             "<p class='sub'>The score reads four things from the posts we hold: engagement, view rate, interest (posts naming the "
             "brief's space / posts available) and consistency of views. Each is scaled between two points and weighted by the "
             "campaign objective (version " + e(sm.VERSION) + "). A parameter with no data hands its weight to the others.</p>"

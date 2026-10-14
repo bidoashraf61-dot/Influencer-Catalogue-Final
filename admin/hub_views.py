@@ -20,7 +20,7 @@ CSS = ("<style>"
        ".hb-top p{margin:8px 0 0;color:var(--gray);max-width:64ch}.hb-btns{display:flex;gap:8px;flex-wrap:wrap}"
        ".hb-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px}"
        ".hb-seg{display:inline-flex;background:var(--white);border:1px solid var(--line-strong);border-radius:999px;padding:3px;gap:2px;flex-wrap:wrap}"
-       ".hb-seg a{border-radius:999px;padding:7px 14px;font-weight:600;font-size:13px;text-decoration:none;color:var(--ink)}"
+       ".hb-seg a{display:inline-flex;align-items:center;min-height:36px;border-radius:999px;padding:0 14px;font-weight:600;font-size:13px;text-decoration:none;color:var(--ink)}"
        ".hb-seg a[aria-current=true]{background:var(--ink)!important;color:var(--lime)!important;opacity:1}.hb-seg a b{margin-left:6px;opacity:.7}"
        ".hb-find{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;background:var(--white);border:1px solid var(--line-strong);border-radius:999px;padding:0 16px;min-height:44px}"
        ".hb-find input{border:0;outline:0;flex:1;font:15px 'DM Sans',sans-serif;background:transparent;min-height:40px;padding:0}"
@@ -53,7 +53,7 @@ CSS = ("<style>"
        ".hb-col.hot{background:var(--ink)}.hb-col.hot h3{color:#fff}.hb-col.hot h3 i{background:var(--lime)}"
        ".hb-card{background:var(--white);border-radius:12px;padding:12px;margin-bottom:8px;border:1px solid transparent;display:block;text-decoration:none;color:var(--ink)}"
        ".hb-card:hover{border-color:var(--ink)}.hb-card b{display:block;font-size:14px;line-height:1.3}"
-       ".hb-card .c{font-size:12.5px;color:var(--muted);margin:2px 0 8px}.hb-card .r{display:flex;justify-content:space-between;gap:8px;font-size:12.5px}"
+       ".hb-card .c{font-size:12.5px;color:var(--muted);margin:2px 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hb-card .r{display:flex;justify-content:space-between;gap:8px;font-size:12.5px}"
        ".hb-card .r em{font-style:normal;font-weight:700}.hb-card .nx{margin-top:8px;font-size:12px;font-weight:700;color:var(--amber)}.hb-card .nx.go{color:var(--green)}"
        ".hb-card .nx.calm{color:var(--muted);font-weight:600}.hb-more{display:block;text-align:center;font-size:13px;margin-top:6px}"
        ".hb-empty{font-size:13px;color:var(--muted);margin:6px}.hb-legend{font-size:13px;color:var(--muted);margin:10px 2px 0}"
@@ -292,6 +292,22 @@ def board_cards(team=False):
         href = u("/campaigns/edit") + "?id=%d" % c["id"] if k == "approved" else u("/campaigns/report") + "?id=%d" % c["id"]
         cards[k].append({"name": c["name"], "client": client, "n": c["creators"] or 0, "price": info or "Campaign", "next": nxt, "tone": tone,
                          "href": href, "when": c["updated_at"] or 0, "find": (c["name"] + " " + client).lower()})
+    # Quote requests the client sent from the catalogue that no selection carries yet: they wait in the black column too,
+    # so the board and the "quote requests waiting" count agree.
+    shown = {(c["find"]) for c in cards["requested"]}
+    for r in db.list_requests(500):
+        if r["handled_at"]:
+            continue
+        name = r["selection_name"] or "Quote request"
+        client = r["company"] or r["name"] or _clean_label(r["code_label"]) or "A client"
+        key = (name + " " + client).lower()
+        if key in shown or any(name.lower() in f for f in shown):
+            continue
+        if not team and _team_label(r["code_label"]):
+            continue
+        n = len(json.loads(r["selection"] or "[]"))
+        cards["requested"].append({"name": name, "client": client, "n": n, "price": "Not priced", "next": "Price and send the quote", "tone": "",
+                                   "href": u("/requests") + "#req-%d" % r["id"], "when": r["at"], "find": key})
     for k in cards:
         cards[k].sort(key=lambda x: -(x["when"] or 0))
     return cards

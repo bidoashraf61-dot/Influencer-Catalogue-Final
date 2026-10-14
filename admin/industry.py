@@ -160,5 +160,5 @@ def review_card(row, base=""):
                 if pic and len(posts) < 4:
                     posts.append({"pic": pic, "url": p.get("url")})
     return {"code": row["code"], "name": row["name"], "handle": row["handle"], "platform": row["platform"], "followers": row["followers"],
-            "city": row["city"], "nationality": row["nationality"], "photo": links.photo(row["photo"], base) if row["photo"] else None,
+            "city": row["city"], "nationality": row["nationality"], "photo": links.photo(row["photo"]) if row["photo"] else None,
             "bio": str(bio)[:400], "posts": posts, "ai": cur, "why": why_unsure(cur["source"])}
