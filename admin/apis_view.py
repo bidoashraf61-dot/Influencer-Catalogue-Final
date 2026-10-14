@@ -23,6 +23,7 @@ def _sources(current):
         opts.append(("evidence", "Evidence: every creator added from competitor evidence (hidden ones too)"))
     for p in packs:
         opts.append(("evidence:%d" % p["id"], "Evidence: " + (p["title"] or "Untitled")))
+        opts.append(("evidence-noviews:%d" % p["id"], "Evidence, no reel views yet: " + (p["title"] or "Untitled")))
         opts.append(("evidence-gaps:%d" % p["id"], "Evidence gaps (no analysis or low-res photo): " + (p["title"] or "Untitled")))
     for s in db.list_selections():
         opts.append(("selection:%d" % s["id"], "Selection: " + (s["name"] or "Untitled")))

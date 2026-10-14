@@ -303,6 +303,28 @@ def gap_codes(pack_id, photo_dir=None):
     return {r["code"] for r in rows if r["code"] not in have or (photo_dir is not None and _needs_photo(r, photo_dir))}
 
 
+def noviews_codes(pack_id):
+    """Roster creators a pack names with no view numbers anywhere (analysis or post sample): the
+    reel-views run's target ("evidence-noviews:<pack id>")."""
+    with _conn() as conn:
+        codes = [r[0] for r in conn.execute("SELECT DISTINCT code FROM evidence_posts WHERE pack_id = ? AND code IS NOT NULL", (pack_id,))]
+        seen = set()
+        for i in range(0, len(codes), 400):
+            part = codes[i:i + 400]
+            q = ",".join("?" * len(part))
+            for code, data in conn.execute("SELECT code, data FROM creator_analysis WHERE code IN (%s)" % q, part):
+                d = json.loads(data or "{}")
+                if d.get("median_views") is not None or d.get("avg_reel_plays") or d.get("avg_views"):
+                    seen.add(code)
+            try:
+                for code, data in conn.execute("SELECT code, data FROM post_samples WHERE code IN (%s)" % q, part):
+                    if json.loads(data or "{}").get("median_views") is not None:
+                        seen.add(code)
+            except Exception:
+                pass
+    return set(codes) - seen
+
+
 def roster_codes(pack_id=None):
     """Roster codes a pack added (every pack when None), for Apify targets."""
     with _conn() as conn:

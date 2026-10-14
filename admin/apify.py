@@ -49,6 +49,9 @@ PRESETS = {
     "tt_audience": {"label": "TikTok · audience demographics (one run per creator)", "platform": "TikTok",
                     "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 1.70,
                     "input": '{"influencerHandle": "{{handle}}", "platform": "tiktok"}'},
+    "ig_reels": {"label": "Instagram · reel views (12 latest reels)", "platform": "Instagram", "kind": "posts",
+                 "actor": "apify/instagram-reel-scraper", "est": 0.032,
+                 "input": '{"username": "{{handles}}", "resultsLimit": 12, "skipPinnedPosts": true}'},
     "custom": {"label": "Another actor", "platform": "", "kind": "other", "actor": "", "est": 0.01,
                "input": '{"profiles": "{{handles}}"}'},
 }
@@ -348,6 +351,9 @@ def build_handles(job):
             allowed = set(json.loads(r["codes"] or "[]")) if r else set()
         elif src.startswith("creator:"):
             allowed = {src[8:].strip().upper()}
+        elif src.startswith("evidence-noviews:") and src[17:].isdigit():
+            import evidence
+            allowed = evidence.noviews_codes(int(src[17:]))
         elif src.startswith("evidence-gaps:") and src[14:].isdigit():
             import evidence
             allowed = evidence.gap_codes(int(src[14:]))
@@ -589,7 +595,7 @@ def _num(v):
         return None
 
 
-_HANDLE_KEYS = ("username", "uniqueId", "handle", "influencerHandle", "userName", "profileName", "nickname_id")
+_HANDLE_KEYS = ("username", "ownerUsername", "uniqueId", "handle", "influencerHandle", "userName", "profileName", "nickname_id")
 
 
 def _match(item, hmap):
@@ -863,6 +869,50 @@ def ingest(run, job, items, store_raw=True):
     return saved
 
 
+REEL_ACTOR = "apify/instagram-reel-scraper"
+
+
+def reels_rollup(run_id):
+    """Reel views per creator from a reel-scraper run (2026-10-14): the reels are one result each, so
+    they are summed up once the whole run is read. The views numbers (median, middle half, spread,
+    series, average plays, engagement on views) are merged into the creator's post sample; what the
+    25-post scan found (likes, hashtags, posting rhythm) stays. Returns how many creators got views."""
+    import postscan
+    with db.connect() as conn:
+        run = conn.execute("SELECT * FROM api_runs WHERE id = ?", (run_id,)).fetchone()
+        hmap = json.loads(run["handle_map"] or "{}") if run is not None else {}
+        rows = conn.execute("SELECT code, data FROM profile_raw WHERE run_id = ?", (run_id,)).fetchall()
+        postscan.init(conn)
+    by = {}
+    for r in rows:
+        try:
+            it = json.loads(r["data"])
+        except ValueError:
+            continue
+        code = r["code"] or hmap.get(str(it.get("ownerUsername") or "").lower())
+        plays = it.get("videoPlayCount") if isinstance(it.get("videoPlayCount"), (int, float)) else it.get("videoViewCount")
+        if not code or not isinstance(plays, (int, float)) or plays <= 0:
+            continue
+        by.setdefault(code, []).append({"views": plays, "likes": it.get("likesCount"), "comments": it.get("commentsCount"),
+                                        "at": str(it.get("timestamp") or "")})
+    n = 0
+    for code, reels in by.items():
+        reels.sort(key=lambda x: x["at"], reverse=True)
+        st = post_stats(reels)
+        views = [x["views"] for x in reels]
+        add = {k: st[k] for k in ("median_views", "views_p25", "views_p75", "views_spread", "views_series", "median_er_on_views")
+               if st.get(k) not in (None, [], "")}
+        if not add:
+            continue
+        add["avg_reel_plays"] = round(sum(views) / float(len(views)))
+        with db.connect() as conn:
+            cur = conn.execute("SELECT handle, data FROM post_samples WHERE code = ? AND platform = 'Instagram'", (code,)).fetchone()
+        old = json.loads(cur["data"]) if cur is not None else {}
+        handle = cur["handle"] if cur is not None else next((h for h, c in hmap.items() if c == code), "")
+        n += postscan.save(code, "Instagram", handle, dict(old, **add), "reels:%s" % run_id)
+    return n
+
+
 def reingest_run(run_id):
     """Read a finished run's kept results again (after a reader fix), without asking Apify or paying
     again. Returns how many creators' numbers were saved."""
@@ -930,6 +980,13 @@ def refresh_run(run):
             note = "Results kept, but no follower count was recognised in them."
     except ApifyError as ex:
         note = "Run finished but the results could not be read: " + str(ex)
+    if job and job["actor"] == REEL_ACTOR:
+        try:
+            saved = reels_rollup(run["id"])
+            if total and not saved:
+                note = "Reels kept, but no play counts were in them."
+        except Exception as ex:
+            note = "Reels kept, but they could not be summed up: " + repr(ex)[:120]
     _finish(run, "SUCCEEDED", total, saved, cost, note)
 
 
