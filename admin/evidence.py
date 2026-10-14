@@ -313,7 +313,11 @@ def roster_codes(pack_id=None):
 
 # ------------------------------------------------------------------ photos --
 
-PHOTO_DIR = None          # set by server.py: <root>/site/assets/catalogue, the live photo folder
+# The live photo folder, <root>/site/assets/catalogue (server.py sets the same path). Known here too, so a
+# job started outside the server process (a script, the shell) still sees photo gaps.
+from pathlib import Path as _Path
+_DEFAULT_PHOTOS = _Path(__file__).resolve().parent.parent / "site" / "assets" / "catalogue"
+PHOTO_DIR = _DEFAULT_PHOTOS if _DEFAULT_PHOTOS.is_dir() else None
 GOOD_PHOTO = 320          # tools/photo_audit.py: under this the card draws the small soft circle
 _PIC_HOSTS = ("cdninstagram.com", "fbcdn.net")
 
