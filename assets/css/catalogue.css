@@ -288,17 +288,83 @@ a.cat-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 }
 .cat-card__platform[data-n="5"] .cat-card__platform-hint, .cat-card__platform[data-n="6"] .cat-card__platform-hint { font-size: 11px; }
 
-/* Selection cards in masonry (owner, 2026-10-15): every card keeps its natural height, so nothing
-   stretches and no white space pools under the tags. assets/js/catalogue.js (selMasonry) gives each
-   card a column (the shortest so far, in reading order, so the list still reads left to right and
-   top to bottom) and a row span on a 4px track (the card plus the grid's own gap); dense flow
-   stacks each column. The DOM order is
-   untouched, so keyboard and screen-reader order stay the list's order. Without the script the grid
-   is the plain equal-height grid. */
-body.sel-masonry .cat-grid { grid-auto-rows: 4px; row-gap: 0; grid-auto-flow: dense; align-items: start; }
-body.sel-masonry .cat-grid > .cat-card { align-self: start; }
-body.sel-masonry .cat-card__analysis { margin-top: 0; }
-body.sel-masonry .cat-card__body > :last-child { margin-bottom: 0; }
+/* Selection cards with fixed slots (owner, 2026-10-15; replaces the masonry of 027daaa). Every slot has a
+   set height and nothing on the front can grow, so every card is the same height, nothing stretches and
+   Profile analysis sits in the same place on every card. What does not fit lives in the Details layer
+   (.sel-more), which opens over the card. Built by arrange() in catalogue.js. */
+.cat-card.sel-fx { position: relative; }
+.sel-fx .cat-card__platform, .sel-fx .cat-verdict__why { display: none; }
+.sel-fx .cat-card__body { padding: 12px 18px 18px; }
+.sel-fx .cat-card__body > * { flex: none; }
+.sel-fx .sel-strip { order: 1; height: 44px; display: flex; align-items: center; gap: 6px; position: relative; z-index: 4; }
+.sel-fx .cat-verdict, .sel-fx .sel-fitph { order: 2; height: 30px; margin: 0; overflow: hidden; }
+.sel-fx .cat-verdict__chips { flex-wrap: nowrap; overflow: hidden; }
+.sel-fx .cat-verdict__chips > * { flex: none; white-space: nowrap; }
+.sel-fx .cat-card__code { order: 3; height: 16px; margin: 6px 0 4px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sel-fx .cat-card__name { order: 4; font-size: 25px; line-height: 1.06; height: 2.12em; margin: 0 0 10px;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+.sel-fx .sel-stats { order: 5; height: 54px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.sel-stats > div { background: #f5f2ed; border-radius: 10px; padding: 7px 9px; min-width: 0; }
+.sel-stats b { display: block; font-family: var(--heading); font-weight: 400; font-size: 21px; line-height: 1; letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sel-stats span { display: block; margin-top: 3px; font-size: 11.5px; font-weight: 600; letter-spacing: 0; color: var(--gray); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sel-fx .sel-tagrow { order: 6; height: 30px; margin-top: 10px; display: flex; align-items: center; gap: 5px; overflow: hidden; }
+.sel-tagrow .cat-tag { min-height: 26px; padding: 0 9px; gap: 0; flex: 0 1 auto; min-width: 0; max-width: 100%; }
+.sel-tagrow .cat-tag > i { display: none; }
+.sel-tagrow .cat-tag > span { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sel-tagmore, .sel-tagadd, .sel-pmore__b { flex: none; min-height: 26px; padding: 0 9px; border-radius: 999px; border: 1px dashed var(--ink); background: transparent;
+  font: 700 12px var(--body); color: var(--ink); cursor: pointer; }
+.sel-tagmore:hover, .sel-tagadd:hover, .sel-pmore__b:hover, .sel-pmore__b[aria-expanded="true"] { background: var(--lime); border-style: solid; }
+.sel-muted { font-size: 12.5px; color: var(--gray); }
+.sel-fx .sel-stline { order: 7; height: 36px; margin-top: 10px; padding-top: 8px; border-top: 1px solid rgba(18,18,18,.1);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sel-stline__acts { display: inline-flex; gap: 6px; }
+.sel-stline .sel-dec { width: 34px; height: 34px; min-height: 0; padding: 0; border-radius: 50%; display: inline-grid; place-items: center; }
+.sel-stline .sel-dec .hv-i { width: 16px; height: 16px; margin: 0; }
+.sel-fx .sel-foot { order: 8; margin-top: auto; padding-top: 12px; display: flex; align-items: center; gap: 8px; }
+.sel-fx .sel-foot .cat-card__analysis { margin: 0; }
+.sel-detbtn { min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.25); background: var(--white);
+  font: 600 14px var(--body); color: var(--ink); cursor: pointer; }
+.sel-detbtn:hover { border-color: var(--ink); }
+.sel-detbtn:focus-visible, .sel-tagmore:focus-visible, .sel-tagadd:focus-visible, .sel-pmore__b:focus-visible, .sel-pchip:focus-visible, .sel-more__x:focus-visible {
+  outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+
+/* Platform strip: icon + that platform's score, at most three, the rest behind +N (hover or tap). */
+.sel-pchip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 3px 9px 3px 3px; border-radius: 999px;
+  border: 1px solid rgba(18,18,18,.14); background: var(--white); color: var(--ink); text-decoration: none; flex: none; }
+a.sel-pchip:hover { border-color: var(--ink); }
+.sel-pchip svg { width: 14px; height: 14px; padding: 6px; border-radius: 50%; box-sizing: content-box; display: block; flex: none; }
+:where(.sel-pchip) svg { background: var(--ink); color: var(--white); }
+.sel-pchip__sc { font: 800 12.5px var(--body); font-variant-numeric: tabular-nums; }
+.sel-pchip__sc--g { color: #14884a; } .sel-pchip__sc--l { color: #5f6d00; } .sel-pchip__sc--a { color: #9a6a00; } .sel-pchip__sc--r { color: #c01010; }
+.sel-pchip__name { font-size: 12.5px; font-weight: 600; }
+.sel-pmore { position: relative; display: inline-flex; flex: none; }
+.sel-ppop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 6; display: grid; gap: 6px; padding: 8px; min-width: 170px;
+  background: var(--white); border-radius: 14px; box-shadow: 0 12px 30px -10px rgba(18,18,18,.35), 0 0 0 1px rgba(18,18,18,.08); }
+.sel-ppop[hidden] { display: none; }
+.sel-ppop .sel-pchip { justify-content: flex-start; }
+
+/* Details layer: over the card, scrolls inside it. */
+.sel-more { position: absolute; inset: 0; z-index: 8; display: flex; flex-direction: column; background: var(--white); border-radius: inherit;
+  animation: sel-more-in .18s cubic-bezier(.16, 1, .3, 1); }
+.sel-more[hidden] { display: none; }
+@keyframes sel-more-in { from { opacity: 0; transform: translateY(8px); } }
+.sel-more__hd { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px 18px; border-bottom: 1px solid rgba(18,18,18,.1); }
+.sel-more__t { flex: 1; min-width: 0; font-family: var(--heading); font-size: 22px; line-height: 1.05; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sel-more__x { width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(18,18,18,.2); background: var(--white); font-size: 20px; line-height: 1; cursor: pointer; flex: none; }
+.sel-more__list { flex: 1; overflow: auto; padding: 12px 18px 18px; overscroll-behavior: contain; }
+.sel-more__list > * { margin-top: 0; }
+.sel-more__list > * + * { margin-top: 14px; }
+.sel-more__why { font-size: 13.5px; line-height: 1.5; color: #3d3d3d; margin-bottom: 0; }
+.sel-more__list .cat-card__meta { margin-bottom: 0; }
+.sel-more__list .cat-tags { margin: 14px 0 0; }
+.sel-more__list .ev-tr { margin: 14px 0 0; }
+.sel-more__list .sel-st { margin-top: 14px; }
+@media (prefers-reduced-motion: reduce) { .sel-more { animation: none; } }
+@media screen and (max-width: 767px) {
+  .sel-fx .cat-card__body { padding: 10px 14px 14px; }
+  .sel-fx .cat-card__name { font-size: 22px; }
+  .sel-stats b { font-size: 18px; }
+}
 
 /* Projected reach: a range in the summary, minimum to best case */
 .cat-reach { display: inline-flex; align-items: baseline; gap: 10px; }

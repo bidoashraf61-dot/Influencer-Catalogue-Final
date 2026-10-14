@@ -454,65 +454,6 @@
     return sum || Number(c.followers) || 0;
   }
 
-  /* Selection masonry (owner, 2026-10-15): cards keep their natural height. Each card gets a column, the
-     shortest so far taken in list order (ties go left), and a row span on the grid's 4px track; CSS dense
-     flow stacks each column (catalogue.css, body.sel-masonry). Columns are dealt only when the set of cards
-     or the number of columns changes (filters, sort, paging, groups, resize). A card that grows or shrinks
-     afterwards only changes its own span, so the cards below it move down and nothing swaps columns. */
-  function selMasonry() {
-    if (PAGE !== "selection" || !window.ResizeObserver || !window.MutationObserver) return;
-    var root = $("cat-grid");
-    if (!root) return;
-    var ROW = 4, queued = false, lastKey = "";
-    document.body.classList.add("sel-masonry");
-    function gapOf(g) { return parseFloat(getComputedStyle(g).columnGap) || 0; }
-    function span(card) {
-      var g = card.parentNode;
-      if (!g || !card.__col) return;
-      var s = Math.max(1, Math.ceil((card.getBoundingClientRect().height + gapOf(g)) / ROW));
-      if (card.__span !== s) { card.__span = s; card.style.gridRowEnd = "span " + s; }
-    }
-    var ro = new ResizeObserver(function (list) { list.forEach(function (en) { span(en.target); }); });
-    function deal(g) {
-      var cols = getComputedStyle(g).gridTemplateColumns.split(" ").filter(Boolean).length || 1;
-      var gap = gapOf(g), h = [];
-      for (var i = 0; i < cols; i++) h.push(0);
-      [].forEach.call(g.children, function (card) {
-        if (!card.classList || !card.classList.contains("cat-card")) return;
-        if (card.hidden || getComputedStyle(card).display === "none") {
-          if (card.__col) { card.__col = 0; card.style.gridColumnStart = ""; card.style.gridRowEnd = ""; ro.unobserve(card); }
-          return;
-        }
-        var c = 0;
-        for (var k = 1; k < cols; k++) if (h[k] < h[c] - 1) c = k;
-        var s = Math.max(1, Math.ceil((card.getBoundingClientRect().height + gap) / ROW));
-        card.__col = c + 1; card.__span = s;
-        card.style.gridColumnStart = String(c + 1); card.style.gridRowEnd = "span " + s;
-        h[c] += s;
-        ro.observe(card);
-      });
-    }
-    function layout() {
-      queued = false;
-      [root].concat([].slice.call(root.querySelectorAll(".cat-grid"))).forEach(deal);
-      lastKey = cols() + ":" + root.clientWidth;
-    }
-    function cols() { return getComputedStyle(root).gridTemplateColumns.split(" ").length; }
-    // A timer, not requestAnimationFrame: a tab opened in the background still lays out before it is shown.
-    function soon() { if (!queued) { queued = true; setTimeout(layout, 30); } }
-    new MutationObserver(function (ms) {
-      // Only changes to which cards are where: cards added, moved, removed or hidden. Changes inside a card
-      // are the ResizeObserver's job (its span only).
-      if (ms.some(function (m) {
-        return m.type === "childList" ? (m.target === root || (m.target.classList && m.target.classList.contains("cat-grid")) ||
-                                         [].some.call(m.addedNodes, function (n) { return n.classList && (n.classList.contains("cat-group") || n.classList.contains("cat-card")); }))
-          : (m.target.classList && m.target.classList.contains("cat-card") && m.target.parentNode && m.target.parentNode.classList.contains("cat-grid"));
-      })) soon();
-    }).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
-    window.addEventListener("resize", function () { if (cols() + ":" + root.clientWidth !== lastKey) soon(); }, { passive: true });
-    soon();
-  }
-
   // HelloVoice's own team never sees an analysis as locked (owner, 2026-10-15): the card reads
   // "Profile analysis" for them whether or not one is uploaded, and the page opens unlocked.
   function teamViewer() {
@@ -2240,7 +2181,6 @@
   }
 
   function initSelection() {
-    selMasonry();
     var frag = readFragment();
     var token = frag.token;
     // Ask whether this selection has been priced for the client — by token,
@@ -2816,12 +2756,14 @@
       tip.style.bottom = "auto";
     }
     function hideTip() { if (tip) tip.hidden = true; }
-    function stampItem(code, i) { var both = bothOf(code); return both ? both[i] : scoreOf(code); }
+    function stampItem(code) { return scoreOf(code); }
     function renderStamp(card, sc) {
       var media = card.querySelector(".cat-card__media");
       if (!media) return;
       var code = card.dataset.code;
-      var list = bothOf(code) || (sc ? [sc] : []);
+      // One ring on the photo (owner, 2026-10-15): the score the card is ranked by. Each platform's own
+      // score sits beside its icon in the platform strip under the photo.
+      var list = sc ? [sc] : [];
       var have = [].slice.call(media.querySelectorAll(".cat-score"));
       for (var k = list.length; k < have.length; k++) have[k].remove();
       list.forEach(function (item, i) {
@@ -2934,7 +2876,10 @@
               '" aria-label="Remove tag ' + esc(t) + '">&times;</button>' : "") + "</span>";
           }).join("") + (mt.length < 8 && mayEdit() ? '<button type="button" class="cat-tag cat-tag--add" data-tag-add>+ Tag</button>' : "");
         }
+        arrange(c);
       });
+      // Cards are measured once they are on screen: deal the tags again after this render settles.
+      clearTimeout(refit); refit = setTimeout(function () { selCards().forEach(arrange); }, 60);
       unlockAnalysisLinks();
       if (controls) controls.refresh();
     }
@@ -3176,7 +3121,177 @@
           hvIcon("lock") + "<span>Content ideas</span></button>";
       }
       box.innerHTML = html;
+      arrange(card);
     }
+
+    /* ---- fixed-slot cards (owner, 2026-10-15) ---------------------------
+       Every selection card has the same slots at the same heights: photo with the score ring, a platform
+       strip (3 icons with their scores, then +N), fit, code and name (two lines), three figures, up to three
+       tags (+N), the status line, and Profile analysis + Details at the bottom. Nothing on the front can
+       grow, so cards never stretch and the button is in the same place on every card. Everything cut for
+       space (city, every account, why, the Score-on switch, all tags and tag editing, Track record, the full
+       status block) is in the Details layer, which opens over the card itself so every click handler on
+       the grid keeps working. */
+    var refit = null;
+    function platScore(code, pl) {
+      var base = rawScore(code);
+      if (!base || base.score == null && !base.platforms) return null;
+      if (base.platforms && base.platforms[pl] && base.platforms[pl].score != null) return base.platforms[pl].score;
+      return base.platform === pl ? base.score : null;
+    }
+    function chipHtml(code, m, withName) {
+      var pl = m.getAttribute("title") || "", href = m.getAttribute("href"), sc = platScore(code, pl);
+      var inner = m.innerHTML + (withName ? '<span class="sel-pchip__name">' + esc(pl) + "</span>" : "") +
+        (sc != null ? '<b class="sel-pchip__sc sel-pchip__sc--' + bandOf(sc) + '">' + sc + "%</b>" : "");
+      var cls = "sel-pchip " + (m.className.replace(/\bcat-card__mark\b/, "").trim());
+      var label = "Visit " + esc(pl) + " profile" + (sc != null ? ", " + sc + "% match on " + esc(pl) : "");
+      return href ? '<a class="' + cls + '" href="' + esc(href) + '" target="_blank" rel="noopener noreferrer nofollow" data-noselect aria-label="' + label + '" title="' + label + '">' + inner + "</a>"
+        : '<span class="' + cls + '" title="' + esc(pl) + '">' + inner + "</span>";
+    }
+    function slot(body, cls, tag) {
+      var n = body.querySelector(":scope > ." + cls);
+      if (!n) { n = document.createElement(tag || "div"); n.className = cls; n.setAttribute("data-noselect", ""); body.appendChild(n); }
+      return n;
+    }
+    function arrange(card) {
+      var body = card && card.querySelector(".cat-card__body");
+      if (!body || PAGE !== "selection") return;
+      var code = card.dataset.code, name = (card.dataset.name || code);
+      card.classList.add("sel-fx");
+      var more = card.querySelector(".sel-more");
+      if (!more) {
+        more = document.createElement("div");
+        more.className = "sel-more"; more.hidden = true; more.setAttribute("data-noselect", "");
+        more.setAttribute("role", "dialog"); more.setAttribute("aria-label", "Details for " + name);
+        more.innerHTML = '<div class="sel-more__hd"><span class="sel-more__t"></span>' +
+          '<button type="button" class="sel-more__x" aria-label="Close details">&times;</button></div><div class="sel-more__list"></div>';
+        card.appendChild(more);
+      }
+      more.querySelector(".sel-more__t").textContent = name;
+      var list = more.querySelector(".sel-more__list");
+
+      // Platform strip: three accounts (scored ones first), the rest behind +N.
+      var marks = [].slice.call(card.querySelectorAll(".cat-card__marks > *"));
+      marks.sort(function (x, y) { return (platScore(code, y.getAttribute("title")) != null) - (platScore(code, x.getAttribute("title")) != null); });
+      var strip = slot(body, "sel-strip");
+      var shown = marks.slice(0, 3), rest = marks.slice(3);
+      strip.innerHTML = shown.map(function (m) { return chipHtml(code, m); }).join("") +
+        (rest.length ? '<span class="sel-pmore"><button type="button" class="sel-pmore__b" aria-expanded="false" aria-label="' + rest.length +
+          ' more platforms">+' + rest.length + '</button><span class="sel-ppop" hidden>' + rest.map(function (m) { return chipHtml(code, m, true); }).join("") + "</span></span>" : "") +
+        (marks.length ? "" : '<span class="sel-muted">No profile links yet</span>');
+
+      // Fit: always the same slot, empty when there is no fit yet.
+      var fit = card.querySelector(".cat-verdict"), ph = body.querySelector(":scope > .sel-fitph");
+      if (fit && ph) ph.remove();
+      if (!fit && !ph) slot(body, "sel-fitph");
+
+      // Three figures: followers across accounts, typical views (the selection's reach basis), tier.
+      var r = CURATED && CURATED.reach ? CURATED.reach[code] : null;
+      var tierEl = card.querySelector(".cat-card__tier");
+      slot(body, "sel-stats").innerHTML =
+        '<div><b>' + compact(card.dataset.followers) + '</b><span>Followers</span></div>' +
+        '<div title="' + (r ? (r[2] ? "Reach per post, estimated from followers (no view numbers yet)" : "Reach per post: typical views; best recent post " + compact(r[1])) : "Reach per post: no view numbers yet") + '"><b>' +
+          (r ? (r[2] ? "~" : "") + compact(r[0]) : "\u2014") + '</b><span>Reach</span></div>' +
+        '<div><b>' + esc(tierEl ? tierEl.textContent : "") + '</b><span>Tier</span></div>';
+
+      // Tags: three, then +N; adding and removing happens in Details.
+      // Up to three, and only as many as fit whole: a tag that would be cut goes behind +N instead.
+      var tags = allTagsOf(code);
+      var trow = slot(body, "sel-tagrow");
+      var drawTags = function (n) {
+        trow.innerHTML = tags.slice(0, n).map(function (t) { return '<span class="cat-tag cat-tag--t' + tone(t) + '" title="' + esc(t) + '"><i></i><span>' + esc(t) + "</span></span>"; }).join("") +
+          (tags.length > n ? '<button type="button" class="sel-more-open sel-tagmore" data-more-at="tags" aria-label="All ' + tags.length + ' tags">+' + (tags.length - n) + "</button>" : "") +
+          (!tags.length ? (mayEdit() ? '<button type="button" class="sel-more-open sel-tagadd" data-more-at="add">+ Tag</button>' : '<span class="sel-muted">No tags</span>') : "");
+      };
+      var n = Math.min(3, tags.length);
+      drawTags(n);
+      if (trow.clientWidth) {
+        var cut = function () { return [].some.call(trow.querySelectorAll(".cat-tag > span"), function (x) { return x.scrollWidth > x.clientWidth + 1; }) || trow.scrollWidth > trow.clientWidth + 1; };
+        while (n > 1 && cut()) drawTags(--n);
+      }
+
+      // Status: the signal and, while it waits, Approve / Reject; the rest of the block is in Details.
+      var st = statusOf(code), canDecide = ROLE === "owner" || ROLE === "admin";
+      var line = slot(body, "sel-stline");
+      line.innerHTML = STATUS_ON ? '<span class="sel-sig sel-sig--' + ST_SIG[st.s] + '">' + hvIcon(ST_ICON[st.s]) + ST_LABEL[st.s] + "</span>" +
+        (canDecide && st.s === "review" ? '<span class="sel-stline__acts"><button type="button" class="sel-dec sel-dec--yes" data-st-set="approved" data-st-code="' + esc(code) +
+          '" aria-label="Approve ' + esc(name) + '">' + hvIcon("check") + '</button><button type="button" class="sel-dec sel-dec--no" data-st-set="rejected" data-st-code="' + esc(code) +
+          '" aria-label="Reject ' + esc(name) + '">' + hvIcon("x") + "</button></span>" : "") : "";
+
+      // Footer: Profile analysis + Details, always at the bottom.
+      var foot = slot(body, "sel-foot");
+      var lk = card.querySelector("a.cat-card__analysis");
+      if (lk && lk.parentNode !== foot) foot.insertBefore(lk, foot.firstChild);
+      if (!foot.querySelector(".sel-more-open")) {
+        var d = document.createElement("button");
+        d.type = "button"; d.className = "sel-more-open sel-detbtn"; d.setAttribute("aria-haspopup", "dialog");
+        d.textContent = "Details"; foot.appendChild(d);
+      }
+
+      // Details: why, every account and the city, Score on, all tags (editable), Track record, full status.
+      var why = card.querySelector(".cat-verdict__why"), wbox = list.querySelector(".sel-more__why");
+      if (why && why.textContent.trim()) {
+        if (!wbox) { wbox = document.createElement("p"); wbox.className = "sel-more__why"; }
+        wbox.textContent = why.textContent; list.appendChild(wbox);
+      } else if (wbox) wbox.remove();
+      [".cat-plat", ".cat-card__meta", ".cat-tags", ".ev-tr", ".sel-st"].forEach(function (sel) {
+        var n = card.querySelector(sel);
+        if (n) list.appendChild(n);          // in this order, every time: a re-render may have recreated one
+      });
+    }
+    function openMore(card, at, from) {
+      var more = card.querySelector(".sel-more");
+      if (!more) return;
+      all(".sel-more:not([hidden])").forEach(function (m) { if (m !== more) closeMore(m); });
+      more.hidden = false; card.classList.add("is-more");
+      more.__from = from || null;
+      if (at === "tags" || at === "add") {
+        var tb = more.querySelector(".cat-tags");
+        if (tb) tb.scrollIntoView({ block: "nearest" });
+        var add = at === "add" && more.querySelector("[data-tag-add]");
+        if (add) { add.click(); return; }
+      }
+      more.querySelector(".sel-more__x").focus();
+    }
+    function closeMore(more) {
+      if (!more || more.hidden) return;
+      more.hidden = true;
+      var card = more.closest(".cat-card"); if (card) card.classList.remove("is-more");
+      if (more.__from && more.__from.focus) more.__from.focus();
+    }
+    function popFor(wrap, open) {
+      var b = wrap.querySelector(".sel-pmore__b"), pop = wrap.querySelector(".sel-ppop");
+      if (!b || !pop) return;
+      pop.hidden = !open; b.setAttribute("aria-expanded", String(open));
+    }
+    $("cat-grid").addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest(".sel-more-open, .sel-more__x, .sel-pmore__b");
+      if (!t) return;
+      e.preventDefault(); e.stopPropagation();
+      if (t.classList.contains("sel-more__x")) return closeMore(t.closest(".sel-more"));
+      if (t.classList.contains("sel-pmore__b")) { var w = t.parentNode; return popFor(w, w.querySelector(".sel-ppop").hidden); }
+      openMore(t.closest(".cat-card"), t.getAttribute("data-more-at"), t);
+    });
+    $("cat-grid").addEventListener("mouseover", function (e) {
+      var w = e.target.closest && e.target.closest(".sel-pmore");
+      if (w) popFor(w, true);
+    });
+    $("cat-grid").addEventListener("mouseout", function (e) {
+      var w = e.target.closest && e.target.closest(".sel-pmore");
+      if (w && !w.contains(e.relatedTarget)) popFor(w, false);
+    });
+    $("cat-grid").addEventListener("focusout", function (e) {
+      var w = e.target.closest && e.target.closest(".sel-pmore");
+      if (w && !w.contains(e.relatedTarget)) popFor(w, false);
+    });
+    // A new width can fit more or fewer whole tags: re-deal them once the resize settles.
+    window.addEventListener("resize", function () { clearTimeout(refit); refit = setTimeout(function () { selCards().forEach(arrange); }, 150); }, { passive: true });
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      all(".sel-ppop:not([hidden])").forEach(function (p) { popFor(p.parentNode, false); });
+      all(".sel-more:not([hidden])").forEach(closeMore);
+    });
+
     // The selection's campaign objective, in one bar above the creators. Without one nothing is
     // scored (the server sends no scores) and the bar asks for it: Helvy's objective studio
     // (portal.js) scores THIS selection only, it never builds a new shortlist. With one, the bar

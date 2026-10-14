@@ -161,9 +161,10 @@
       b.appendChild(el("span", "", "Track record"));
       b.appendChild(el("span", "ev-tr__n", info.brands + (info.brands === 1 ? " brand" : " brands")));
       b.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); openPanel(code, b); });
-      var body = card.querySelector(".cat-card__body"), st = body && body.querySelector(".sel-st");
-      if (!body) return;
-      if (st) body.insertBefore(b, st); else body.appendChild(b);
+      // Selection cards keep Track record in their Details layer (catalogue.js arrange), just above the status.
+      var host = card.querySelector(".sel-more__list") || card.querySelector(".cat-card__body"), st = card.querySelector(".sel-st");
+      if (!host) return;
+      if (st && st.parentNode === host) host.insertBefore(b, st); else host.appendChild(b);
     });
   }
 
