@@ -804,6 +804,22 @@
     function rule() { menu.appendChild(h("div", { class: "pt-menu__rule", role: "separator" })); }
     // Admin access, one switch: reveal locked data (analysis, ideas, owner-only tools). Off by default;
     // everything else stays as it is, including this account.
+    // Admin mode: the Control Centre, one tap away, for team members only. Clients never see it.
+    var isTeam = ME.staff || ME.kind === "admin";
+    if (isTeam) {
+      btn.classList.add("pt-avatar--admin");
+      btn.appendChild(h("i", { class: "pt-avatar__admin", "aria-hidden": "true" }, "Admin"));
+      btn.setAttribute("aria-label", "Account menu, admin");
+      var cc = h("a", { class: "pt-cc", role: "menuitem", href: API + "/" });
+      cc.appendChild(h("span", { class: "pt-cc__ico", "aria-hidden": "true", html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>' }));
+      cc.appendChild(h("span", { class: "pt-cc__txt" }, h("b", null, "Control Centre"), h("small", null, "Creators, clients, campaigns, settings")));
+      cc.appendChild(h("span", { class: "pt-cc__arr", "aria-hidden": "true" }, "\u2192"));
+      cc.addEventListener("click", function () { toggle(false); });
+      menu.appendChild(cc);
+      var soon = item("Edit on this page", {}, h("span", { class: "pt-menu__badge" }, "Soon"), "pt-menu__item--quiet");
+      soon.setAttribute("aria-disabled", "true");
+      soon.title = "Edit buttons on creators, right here in the catalogue. Coming next.";
+    }
     if (ME.staff) {
       var on = !!ME.unlock;
       var sw = item("Show locked data", { go: function () {
@@ -828,10 +844,9 @@
       item("Help", { go: function () { if (HV.talk) HV.talk(); else location.href = ACC + "#overview"; } });
       item("Take the tour", { go: function () { if (HV.tour) HV.tour(true); } });
     } else if (ME.kind === "admin") {
+      rule();
       item("Preview as client", { go: openAccount });
       item("My campaigns", { href: ROOT + "campaign/dashboard/" });
-      rule();
-      item("Open admin", { href: API + "/" });
     } else {
       // Access-code guests: no profile for now, just their campaigns and credits.
       item("My campaigns", { href: ROOT + "campaign/dashboard/" });

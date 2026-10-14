@@ -63,7 +63,7 @@ def reauth_page(nxt, totp_on, again=False, error=None, mailed=False):
 
 def forbidden_page(role):
     body = (ui.header("Not available for your role", "You are signed in as <b>%s</b>. %s" % (e(team.ROLE_LABEL.get(role, role)), e(team.ROLE_HELP.get(role, ""))))
-            + ui.empty("key", "Ask an owner if you need this", "An owner can change your role on the Team & security page.",
+            + ui.empty("key", "Ask an owner if you need this", "An owner can change your role on the People and access page.",
                        "<a class='btn small' href='" + u("/") + "'>Back to Home</a>"))
     return page("Not available", body, "/")
 
@@ -94,40 +94,114 @@ def team_page(who, ok=None, err=None, setup_secret=None, new_member=None):
     if not is_owner:
         return page("My account", ui.header("My account", "Your sign-in and security.") + _banner(ok, err) + account, "/team")
 
-    # ---- team (owners)
+    # ---- People and access (owners): one list, one Invite button, actions behind "..."
+    LEVEL_HELP = {"owner": "Everything, including who has access.", "admin": "Everything except people and access.",
+                  "kam": "Their own clients' selections, quotes and campaigns.", "viewer": "Can look at everything. Changes nothing."}
+    LEVEL_SHORT = {"owner": "Owner", "admin": "Admin", "kam": "KAM", "viewer": "Viewer"}
+    people = team.list_admins()
     rows = ""
-    for a in team.list_admins():
+    for a in people:
         r = team.role_of(a)
-        role_sel = ("<form method='post' action='" + u("/team/role") + "' class='inline'>" + hid("id", a["id"])
-                    + "<select name='role' aria-label='Role for " + e(a["email"]) + "' onchange='this.form.submit()'>"
-                    + "".join("<option value='%s'%s>%s</option>" % (k, " selected" if k == r else "", e(team.ROLE_LABEL[k])) for k in team.ROLES)
-                    + "</select></form>")
-        actions = ""
-        if a["id"] != who["admin_id"]:
+        nm = a["name"] or a["email"].split("@")[0].split(".")[0].capitalize()
+        ini = "".join(w[0] for w in nm.split()[:2]).upper() or "?"
+        mine = a["id"] == who["admin_id"]
+        seen = a["active_at"] or a["last_login_at"]
+        flag = ""
+        if a["disabled_at"]:
+            flag = "<em class='pa-flag dead'>Access removed</em>"
+        elif not (a["last_login_at"] or a["active_at"]):
+            flag = "<em class='pa-flag'>Invited · not signed in yet</em>"
+        if mine:
+            lvl = "<span class='pa-tag'>" + e(LEVEL_SHORT[r]) + " · you</span>"
+        elif a["disabled_at"]:
+            lvl = "<span class='pa-muted'>" + e(LEVEL_SHORT[r]) + "</span>"
+        else:
+            lvl = ("<form method='post' action='" + u("/team/role") + "'>" + hid("id", a["id"])
+                   + "<select class='pa-level' name='role' aria-label='Level for " + e(a["email"]) + "' onchange='this.form.submit()'>"
+                   + "".join("<option value='%s'%s>%s</option>" % (k, " selected" if k == r else "", e(LEVEL_SHORT[k])) for k in team.ROLES)
+                   + "</select></form>")
+        acts = ""
+        if not mine:
+            def act(path, label, confirm=None, cls=""):
+                return ("<form method='post' action='" + u(path) + "'" + (" data-confirm='" + e(confirm) + "'" if confirm else "") + ">"
+                        + hid("id", a["id"]) + "<button class='" + cls + "'>" + e(label) + "</button></form>")
             if a["disabled_at"]:
-                actions += ("<form method='post' action='" + u("/team/enable") + "' class='inline'>" + hid("id", a["id"]) + "<button class='btn small'>Re-enable</button></form>")
+                acts = act("/team/enable", "Give access back")
             else:
-                actions += ("<form method='post' action='" + u("/team/disable") + "' class='inline' data-confirm='Remove " + e(a["email"])
-                            + " from the admin? They are signed out at once.'>" + hid("id", a["id"]) + "<button class='btn small danger'>Remove access</button></form>")
-            if a["totp_on"]:
-                actions += (" <form method='post' action='" + u("/team/reset2fa") + "' class='inline' data-confirm='Reset two-step sign-in for "
-                            + e(a["email"]) + "? They set it up again at their next sign-in.'>" + hid("id", a["id"]) + "<button class='btn small ghost'>Reset two-step</button></form>")
-        rows += ("<tr><td><strong>%s</strong><br><span class='muted'>%s</span></td><td>%s</td><td>%s</td><td class='muted'>%s</td><td class='right'>%s</td></tr>" % (
-            e(a["name"] or a["email"].split("@")[0]), e(a["email"]), role_sel if a["id"] != who["admin_id"] else e(team.ROLE_LABEL[r]) + " (you)",
-            ("<span class='pill live'>On</span>" if a["totp_on"] else "<span class='pill warn'>Off</span>") + (" <span class='pill dead'>removed</span>" if a["disabled_at"] else ""),
-            e(ago(a["active_at"] or a["last_login_at"]) if (a["active_at"] or a["last_login_at"]) else "never"), actions))
-    invited = ("<div class='note'><strong>" + e(new_member[0]) + " can now sign in.</strong> Give them this one-time password and ask them to change it "
-               "(Home → Your account): <code>" + e(new_member[1]) + "</code></div>") if new_member else ""
-    team_card = ("<div class='card'><h2>Team</h2>" + invited
-                 + "<table><thead><tr><th>Person</th><th>Role</th><th>Two-step</th><th>Last active</th><th></th></tr></thead><tbody>" + rows + "</tbody></table>"
-                 "<details style='margin-top:14px'><summary class='btn small'>Add a team member</summary><form method='post' action='" + u("/team/invite") + "' class='row' style='margin-top:12px'>"
-                 "<div><label for='in-email'>Email</label><input id='in-email' name='email' type='email' required></div>"
-                 "<div><label for='in-name'>Name</label><input id='in-name' name='name'></div>"
-                 "<div><label for='in-role'>Role</label><select id='in-role' name='role'>" + "".join(
-                     "<option value='%s'%s>%s</option>" % (k, " selected" if k == "kam" else "", e(team.ROLE_LABEL[k])) for k in team.ROLES) + "</select></div>"
-                 "<div><button class='btn lime'>Add</button></div></form></details>"
-                 "<dl class='roles' style='margin-top:16px;font-size:var(--t-sm,13px)'>" + "".join(
-                     "<dt><b>%s</b></dt><dd class='muted' style='margin:0 0 6px'>%s</dd>" % (e(team.ROLE_LABEL[k]), e(team.ROLE_HELP[k])) for k in team.ROLES) + "</dl></div>")
+                if not (a["last_login_at"] or a["active_at"]):
+                    acts += act("/team/reinvite", "Send the invite again")
+                else:
+                    if a["totp_on"]:
+                        acts += act("/team/reset2fa", "Reset two-step sign-in", "Reset two-step sign-in for %s? They set it up again next time." % a["email"])
+                    acts += act("/team/signout", "Sign them out everywhere")
+                acts += act("/team/disable", "Remove access", "Remove %s? They are signed out at once." % a["email"], "danger")
+        more = ("<details class='pa-more'><summary aria-label='More for " + e(nm) + "'><svg viewBox='0 0 24 24' fill='currentColor' aria-hidden='true'>"
+                "<circle cx='5' cy='12' r='1.8'/><circle cx='12' cy='12' r='1.8'/><circle cx='19' cy='12' r='1.8'/></svg></summary>"
+                "<div class='pa-pop'>" + acts + "</div></details>") if acts else ""
+        rows += ("<div class='pa-p" + (" off" if a["disabled_at"] else "") + "'><div class='pa-av" + (" own" if r == "owner" else "") + "'>" + e(ini) + "</div>"
+                 "<div class='pa-who'><b>" + e(nm) + "</b><span>" + e(a["email"]) + "</span>" + flag + "</div>"
+                 "<div class='pa-lvl'>" + lvl + "</div><div class='pa-seen'>" + ("Active now" if mine else e(ago(seen)) if seen else "Never") + "</div>"
+                 "<div class='pa-m'>" + more + "</div></div>")
+    invite = ("<details class='pa-inv' id='invite'" + (" open" if err else "") + "><summary class='btn lime'>"
+              "<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' aria-hidden='true'><path d='M12 5v14M5 12h14'/></svg>Invite someone</summary>"
+              "<form method='post' action='" + u("/team/invite") + "' class='pa-card'><h2>Invite someone</h2>"
+              "<div class='pa-two'><div><label for='in-email'>Work email</label><input id='in-email' name='email' type='email' required placeholder='name@blueholding.co.uk'></div>"
+              "<div><label for='in-name'>Name <span class='muted'>(optional)</span></label><input id='in-name' name='name'></div></div>"
+              "<label style='margin-top:14px'>What can they do?</label><div class='pa-levels' role='radiogroup'>"
+              + "".join("<label class='pa-lv'><input type='radio' name='role' value='%s'%s><b>%s</b><span>%s</span></label>"
+                        % (k, " checked" if k == "kam" else "", e(LEVEL_SHORT[k]), e(LEVEL_HELP[k])) for k in team.ROLES)
+              + "</div><div class='pa-foot'><p>They get an email with a link to sign in. You can change their level any time.</p>"
+              "<button class='btn'>Send invite</button></div></form></details>")
+    n = len([a for a in people if not a["disabled_at"]])
+    team_card = ("<div class='pa-list'><div class='pa-lh'><h2>Team</h2><small>%d %s</small></div>%s</div>" % (n, "person" if n == 1 else "people", rows))
+    PA_CSS = ("<style>.pa-top{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}"
+              ".pa-top h1{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:clamp(38px,4.6vw,54px);line-height:.92;margin:0}"
+              ".pa-top p{margin:8px 0 0;color:var(--gray);max-width:52ch}"
+              ".pa-inv>summary{list-style:none;display:inline-flex;align-items:center;gap:8px;cursor:pointer}.pa-inv>summary::-webkit-details-marker{display:none}"
+              ".pa-inv>summary svg{width:18px;height:18px}.pa-inv[open]>summary{display:none}"
+              ".pa-card{background:var(--white);border:1px solid var(--ink);border-radius:var(--r-lg);padding:22px;margin:0 0 20px;box-shadow:0 14px 34px -18px rgba(18,18,18,.35)}"
+              ".pa-card h2{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:26px;margin:0 0 14px}"
+              ".pa-two{display:grid;grid-template-columns:2fr 1fr;gap:12px}"
+              ".pa-levels{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:6px}"
+              ".pa-lv{position:relative;border:1px solid var(--line-strong);border-radius:12px;padding:12px;cursor:pointer;background:#fff;margin:0;font-weight:400}"
+              ".pa-lv input{position:absolute;opacity:0}.pa-lv b{display:block}.pa-lv span{display:block;font-size:12.5px;color:var(--muted);line-height:1.4;margin-top:3px}"
+              ".pa-lv:has(input:checked){border-color:var(--ink);background:var(--lime)}.pa-lv:has(input:checked) span{color:#3d4500}"
+              ".pa-lv:has(input:focus-visible){outline:2px solid var(--ink);outline-offset:2px}"
+              ".pa-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:16px}.pa-foot p{margin:0;font-size:13px;color:var(--muted)}"
+              ".pa-head-row{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}"
+              ".pa-list{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);margin-bottom:18px}"
+              ".pa-lh{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line)}"
+              ".pa-lh h2{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:24px;margin:0}.pa-lh small{color:var(--muted);font-size:13px}"
+              ".pa-p{display:grid;grid-template-columns:44px minmax(0,1fr) 150px 110px 40px;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line)}"
+              ".pa-p:last-child{border-bottom:0}.pa-p.off{opacity:.6}"
+              ".pa-av{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;font-family:'Bebas Neue',sans-serif;font-size:18px;background:var(--linen)}"
+              ".pa-av.own{background:var(--lime);box-shadow:inset 0 0 0 1.5px var(--ink)}"
+              ".pa-who b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+              ".pa-who span{display:block;font-size:13px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}"
+              ".pa-flag{font-style:normal;font-size:12px;color:var(--amber);background:var(--amber-soft);border-radius:999px;padding:1px 8px;display:inline-block;margin-top:3px}"
+              ".pa-flag.dead{color:var(--red);background:var(--red-soft)}"
+              ".pa-level{font-weight:600;font-size:13.5px;border-radius:999px;min-height:38px;width:100%;margin:0}"
+              ".pa-tag{display:inline-flex;font-weight:600;font-size:13.5px;padding:8px 12px;border-radius:999px;background:var(--ink);color:var(--lime)}"
+              ".pa-muted,.pa-seen{font-size:13px;color:var(--muted)}"
+              ".pa-more{position:relative}.pa-more>summary{list-style:none;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;cursor:pointer;border:1px solid transparent}"
+              ".pa-more>summary::-webkit-details-marker{display:none}.pa-more>summary svg{width:18px;height:18px}"
+              ".pa-more>summary:hover,.pa-more[open]>summary{border-color:var(--line-strong);background:var(--paper)}"
+              ".pa-pop{position:absolute;right:0;top:44px;background:#fff;border:1px solid var(--line-strong);border-radius:12px;min-width:220px;padding:6px;"
+              "box-shadow:0 18px 40px -16px rgba(18,18,18,.35);z-index:6}.pa-pop form{margin:0}"
+              ".pa-pop button{display:block;width:100%;text-align:left;font:500 14px 'DM Sans',sans-serif;padding:10px 12px;border:0;background:transparent;border-radius:8px;cursor:pointer;color:var(--ink)}"
+              ".pa-pop button:hover{background:rgba(232,255,118,.5)}.pa-pop button.danger{color:var(--red)}.pa-pop button.danger:hover{background:var(--red-soft)}"
+              ".pa-fold{background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);margin-bottom:12px}"
+              ".pa-fold>summary{list-style:none;cursor:pointer;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;gap:12px}"
+              ".pa-fold>summary::-webkit-details-marker{display:none}.pa-fold>summary b{font-family:'Bebas Neue',sans-serif;font-weight:400;font-size:22px}"
+              ".pa-fold>summary span{font-size:13px;color:var(--muted)}.pa-fold>div{padding:0 20px 16px}.pa-fold .card{border:0;padding:0;box-shadow:none;margin:0 0 14px}"
+              ".pa-note{font-size:13px;color:var(--muted);margin:6px 2px 0}"
+              "@media (max-width:760px){.pa-levels{grid-template-columns:1fr 1fr}.pa-two{grid-template-columns:1fr}"
+              ".pa-p{grid-template-columns:40px minmax(0,1fr) 40px;grid-template-areas:'av who m' 'av lvl lvl';row-gap:10px}"
+              ".pa-av{grid-area:av;align-self:start}.pa-who{grid-area:who}.pa-lvl{grid-area:lvl}.pa-seen{display:none}.pa-m{grid-area:m}}</style>"
+              "<script>document.addEventListener('click',function(ev){document.querySelectorAll('.pa-more[open]').forEach(function(d){if(!d.contains(ev.target))d.removeAttribute('open')})});"
+              "document.addEventListener('keydown',function(ev){if(ev.key==='Escape')document.querySelectorAll('.pa-more[open]').forEach(function(d){d.removeAttribute('open')})});</script>")
+    header = ("<div class='pa-top'><div><h1>People and access</h1><p>Who can control HELVY Connect. Everyone signs in with a code sent to their work email, "
+              "so there are no passwords to share.</p></div></div>")
     req = team.required_roles()
     policy = ("<div class='card'><h2>Sign-in rules</h2><form method='post' action='" + u("/team/policy") + "'>"
               "<p class='muted'>Two-step sign-in is required for:</p><div style='display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px'>" + "".join(
@@ -137,14 +211,19 @@ def team_page(who, ok=None, err=None, setup_secret=None, new_member=None):
               "<input id='idle' name='idle' type='number' min='5' max='1440' value='" + str(team.idle_minutes()) + "' style='max-width:140px'>"
               "<div style='margin-top:14px'><button class='btn lime'>Save rules</button></div></form>"
               "<p class='muted' style='font-size:var(--t-sm,13px);margin-top:10px'>People without two-step sign-in in a required role set it up at their next sign-in.</p></div>")
-    labels = {"login": "Signed in", "login_fail": "Wrong password", "2fa_fail": "Wrong two-step code", "2fa_on": "Turned on two-step sign-in",
+    labels = {"login": "Signed in", "login_code": "Asked for a sign-in code", "login_fail": "Failed sign-in", "signout": "Signed someone out", "reinvite": "Sent an invite again", "2fa_fail": "Wrong two-step code", "2fa_on": "Turned on two-step sign-in",
               "2fa_off": "Turned off two-step sign-in", "2fa_reset": "Reset two-step sign-in", "role": "Changed a role", "invite": "Added a team member",
               "disable": "Removed access", "enable": "Re-enabled access", "key": "Saved or removed a key", "export": "Exported data",
               "policy": "Changed sign-in rules", "reauth_fail": "Wrong password at re-check", "idle": "Signed out for inactivity"}
     log_rows = "".join("<tr><td class='muted'>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td></tr>" % (
         e(ts(r["at"])), e(r["actor"]), e(labels.get(r["kind"], r["kind"])), e(r["detail"] or "")) for r in team.recent_log(150))
-    log_card = ("<div class='card'><h2>Security log</h2><p class='sec-desc'>Sign-ins, failures, two-step changes, roles, keys and exports. Nothing here can be edited or deleted.</p>"
-                "<table><thead><tr><th>When</th><th>Who</th><th>What</th><th>Detail</th></tr></thead><tbody>"
-                + (log_rows or "<tr><td colspan='4' class='muted'>Nothing yet.</td></tr>") + "</tbody></table></div>")
-    return page("Team & security", ui.header("Team & security", "Who can use the admin, what each role may do, and how sign-in is protected.")
-                + _banner(ok, err) + account + team_card + policy + log_card, "/team")
+    log_list = "".join("<tr><td class='muted'>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td></tr>" % (
+        e(ts(r["at"])), e(r["actor"]), e(labels.get(r["kind"], r["kind"])), e(r["detail"] or "")) for r in team.recent_log(150))
+    activity = ("<details class='pa-fold'><summary><b>Activity</b><span>Sign-ins and access changes · show</span></summary><div>"
+                "<p class='muted' style='margin-top:0'>Nothing here can be edited or deleted.</p><table><thead><tr><th>When</th><th>Who</th><th>What</th><th>Detail</th></tr></thead><tbody>"
+                + (log_list or "<tr><td colspan='4' class='muted'>Nothing yet.</td></tr>") + "</tbody></table></div></details>")
+    rules = ("<details class='pa-fold'><summary><b>Sign-in rules and your two-step</b><span>Optional extra protection · show</span></summary><div>"
+             + account + policy + "</div></details>")
+    return page("People and access", PA_CSS + header + _banner(ok, err)
+                + "<div class='pa-head-row'>" + invite + "</div>" + team_card + activity + rules
+                + "<p class='pa-note'>Changing a level or removing someone asks you to confirm with an emailed code. There is always at least one Owner.</p>", "/team")

@@ -1574,6 +1574,22 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 team.set_disabled(aid, path.endswith("disable"))
                 team.log(path.rsplit("/", 1)[1], me, target["email"], ip)
                 return back("Access removed." if path.endswith("disable") else "Access restored.")
+            if path == "/team/signout":
+                team.end_sessions(aid)
+                team.log("signout", me, target["email"], ip)
+                return back("%s is signed out everywhere." % target["email"])
+            if path == "/team/reinvite":
+                if mailer.configured():
+                    try:
+                        site = "https://influencer-catalogue.hellovoice.co.uk" + BASE + "/login"
+                        mailer.send(target["email"], "You have HELVY Connect admin access",
+                                    "You have %s access to HELVY Connect admin.\n\nSign in with your work email at %s. "
+                                    "We email you a 6-digit code, so there is no password to remember.\n\nHELVY Connect · Powered by HelloVoice"
+                                    % (team.ROLE_LABEL.get(team.role_of(target), ""), site))
+                    except mailer.MailError:
+                        return back("The email could not be sent. Try again shortly.", False)
+                team.log("reinvite", me, target["email"], ip)
+                return back("Invite sent again to %s." % target["email"])
             if path == "/team/reset2fa":
                 team.set_totp(aid, None, False)
                 team.end_sessions(aid)
