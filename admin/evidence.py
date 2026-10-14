@@ -73,11 +73,11 @@ CREATE TABLE IF NOT EXISTS evidence_roster (
 
 FIT_LABEL = {"direct": "Direct competitor", "partial": "Partly the same product", "off-product": "Different product"}
 REL_LABEL = {"match": "Same category", "unspecified": "Product not named", "other": "Other product"}
-POST_COLS = ("brand", "competitor", "platform", "url", "handle", "code", "name", "creator_type", "city", "followers",
+POST_COLS = ("brand", "competitor", "platform", "url", "handle", "alt_handle", "save_rate", "code", "name", "creator_type", "city", "followers",
              "posted_at", "collab_type", "posted_on", "content_type", "product_tags", "relevance", "views", "likes",
              "comments", "shares", "saves", "er_views", "views_per_follower", "x_brand_avg", "rating",
              "likely_paid_boost", "likes_hidden", "note")
-COLLAB_LABEL = {"co_author": "Co-author", "co_author_paid": "Co-author + paid", "creator_post_tag": "Own post, tagged",
+COLLAB_LABEL = {"tiktok_summary": "Best video \u00B7 median figures", "co_author": "Co-author", "co_author_paid": "Co-author + paid", "creator_post_tag": "Own post, tagged",
                 "creator_post_tag_paid": "Own post + paid", "brand_page": "On brand page"}
 
 
@@ -97,6 +97,11 @@ def init():
         cols = {r[1] for r in conn.execute("PRAGMA table_info(evidence_packs)")}
         if "creators" not in cols:     # handle -> {name, followers, city, type, links}
             conn.execute("ALTER TABLE evidence_packs ADD COLUMN creators TEXT")
+        pcols = {r[1] for r in conn.execute("PRAGMA table_info(evidence_posts)")}
+        if "alt_handle" not in pcols:  # the same creator's handle on the other platform (roster matching)
+            conn.execute("ALTER TABLE evidence_posts ADD COLUMN alt_handle TEXT")
+        if "save_rate" not in pcols:
+            conn.execute("ALTER TABLE evidence_posts ADD COLUMN save_rate REAL")
         # Studies imported before 2026-10-14 tagged some creators "ugc"; they are influencers.
         conn.execute("UPDATE evidence_posts SET creator_type = 'influencer' WHERE creator_type = 'ugc'")
     _ready = True
@@ -169,6 +174,8 @@ def parse_pack(raw):
                     "rating": p.get("rating"), "likely_paid_boost": 1 if p.get("likely_paid_boost") else 0,
                     "likes_hidden": 1 if p.get("likes_hidden") or p.get("likes") is None else 0,
                     "note": p.get("performance_read"),
+                    "alt_handle": (str((p.get("also_handles") or [""])[0] or "").lower().lstrip("@").strip() or None),
+                    "save_rate": _num(p.get("save_rate")),
                 })
         brands.append({"brand": name, "product": b.get("product") or "", "fit": fit})
     if not posts:
@@ -219,7 +226,7 @@ def import_pack(raw, title, code_id, selection_id=None, by="", pack_id=None):
                          (json.dumps(list(old.values()), ensure_ascii=False), json.dumps(plats), src, t, pack_id))
         matched = 0
         for p in posts:
-            p["code"] = idx.get(p["handle"])
+            p["code"] = idx.get(p["handle"]) or (idx.get(p["alt_handle"]) if p.get("alt_handle") else None)
             matched += bool(p["code"])
             conn.execute("INSERT OR REPLACE INTO evidence_posts (pack_id, %s) VALUES (?, %s)"
                          % (", ".join(POST_COLS), ", ".join("?" * len(POST_COLS))),
@@ -232,8 +239,8 @@ def rematch(pack_id):
     with _conn() as conn:
         idx = handle_index(conn)
         n = 0
-        for r in conn.execute("SELECT id, handle FROM evidence_posts WHERE pack_id = ?", (pack_id,)).fetchall():
-            code = idx.get(r["handle"] or "")
+        for r in conn.execute("SELECT id, handle, alt_handle FROM evidence_posts WHERE pack_id = ?", (pack_id,)).fetchall():
+            code = idx.get(r["handle"] or "") or idx.get(r["alt_handle"] or "")
             n += bool(code)
             conn.execute("UPDATE evidence_posts SET code = ? WHERE id = ?", (code, r["id"]))
     return n
@@ -358,7 +365,7 @@ from pathlib import Path as _Path
 _DEFAULT_PHOTOS = _Path(__file__).resolve().parent.parent / "site" / "assets" / "catalogue"
 PHOTO_DIR = _DEFAULT_PHOTOS if _DEFAULT_PHOTOS.is_dir() else None
 GOOD_PHOTO = 320          # tools/photo_audit.py: under this the card draws the small soft circle
-_PIC_HOSTS = ("cdninstagram.com", "fbcdn.net")
+_PIC_HOSTS = ("cdninstagram.com", "fbcdn.net", "tiktokcdn.com", "tiktokcdn-us.com", "tiktokcdn-eu.com", "ibyteimg.com")
 
 
 def _short_side(path):
@@ -438,11 +445,11 @@ def on_profile(conn, code, platform, followers, item):
     if not conn.execute("SELECT 1 FROM evidence_roster WHERE code = ?", (code,)).fetchone():
         # A creator the roster had before a study named them: only a missing or low-res photo is
         # replaced (owner decision 2026-10-14); their numbers and tier stay as the roster keeps them.
-        if (platform == "Instagram" and PHOTO_DIR is not None and isinstance(item, dict)
+        if (PHOTO_DIR is not None and isinstance(item, dict)
                 and conn.execute("SELECT 1 FROM evidence_posts WHERE code = ? LIMIT 1", (code,)).fetchone()):
             from pathlib import Path
             if _needs_photo(row, Path(PHOTO_DIR)):
-                data = _fetch_pic(item.get("profilePicUrlHD") or item.get("profilePicUrl"))
+                data = _fetch_pic(_pic_url(platform, item))
                 if data:
                     return _put_photo(conn, code, data, Path(PHOTO_DIR))
         return False
@@ -455,13 +462,25 @@ def on_profile(conn, code, platform, followers, item):
     tier = db.tier_for_reach(best) or row["tier"]
     conn.execute("UPDATE creators SET profiles = ?, followers = ?, tier = ?, updated_at = ? WHERE code = ?",
                  (db.join_profiles(profiles), best, tier, db.now(), code))
-    if platform == "Instagram" and PHOTO_DIR is not None and isinstance(item, dict):
+    if PHOTO_DIR is not None and isinstance(item, dict):
         from pathlib import Path
         if _needs_photo(row, Path(PHOTO_DIR)):
-            data = _fetch_pic(item.get("profilePicUrlHD") or item.get("profilePicUrl"))
+            data = _fetch_pic(_pic_url(platform, item))
             if data:
                 _put_photo(conn, code, data, Path(PHOTO_DIR))
     return True
+
+
+def _pic_url(platform, item):
+    """The profile picture in an Apify result: Instagram's HD picture, or TikTok's avatar (a TikTok-only
+    creator has no other photo)."""
+    if platform == "Instagram":
+        return item.get("profilePicUrlHD") or item.get("profilePicUrl")
+    if platform == "TikTok":
+        cr = item.get("creator") if isinstance(item.get("creator"), dict) else {}
+        am = item.get("authorMeta") if isinstance(item.get("authorMeta"), dict) else {}
+        return item.get("avatar_url") or item.get("avatarLarger") or cr.get("avatarUrl") or am.get("avatar")
+    return None
 
 
 # ------------------------------------------------------------------- reads --
@@ -781,7 +800,8 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
         c["posts"] += 1
         c["views"] += r["views"] or 0
         c["creators"].add(r["handle"])
-        p = people.setdefault(r["handle"], {"handle": r["handle"], "name": r["name"], "type": r["creator_type"],
+        # One person per roster creator (their Instagram and TikTok handles can differ), else per handle.
+        p = people.setdefault(r["code"] or r["handle"], {"handle": r["handle"], "name": r["name"], "type": r["creator_type"],
                                              "followers": r["followers"], "code": r["code"] if r["code"] in inset else None,
                                              "platforms": set(), "competitors": {}, "posts": []})
         p["platforms"].add(r["platform"])
@@ -797,6 +817,8 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
     for r in rows:
         if r["code"]:
             by_handle_code.setdefault(r["handle"], r["code"])
+            if r["alt_handle"]:
+                by_handle_code.setdefault(r["alt_handle"], r["code"])
     import links
     out = []
     for p in people.values():
@@ -817,7 +839,8 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
                     "posts": [{"id": r["id"], "url": r["url"], "date": r["posted_at"], "competitor": r["competitor"], "platform": r["platform"],
                                "collab": COLLAB_LABEL.get(r["collab_type"], r["collab_type"] or ""), "views": r["views"], "likes": r["likes"],
                                "comments": r["comments"], "er": r["er_views"], "paid_boost": bool(r["likely_paid_boost"]),
-                               "same_category": r["relevance"] == "match"} for r in ps]})
+                               "same_category": r["relevance"] == "match", "save_rate": r["save_rate"] if "save_rate" in r.keys() else None,
+                               "summary": r["collab_type"] == "tiktok_summary"} for r in ps]})
     out.sort(key=lambda p: -(p["rank_value"] or 0))
     # The competitors' creators HelloVoice does not have yet: a request, never an add.
     comp_names = {r["competitor"] for r in rows} or {r["competitor"] for r in every}
@@ -878,6 +901,7 @@ def creator_payload(pk, code):
                  "median_er": _med([r["er_views"] for r in organic]), "last": max(r["posted_at"] or "" for r in rows),
                  "likes_hidden": any(r["likes_hidden"] for r in rows)},
         "posts": [{"id": r["id"], "url": r["url"], "date": r["posted_at"], "competitor": r["competitor"], "platform": r["platform"],
+                   "summary": r["collab_type"] == "tiktok_summary", "save_rate": r["save_rate"] if "save_rate" in r.keys() else None,
                    "collab": COLLAB_LABEL.get(r["collab_type"], r["collab_type"] or ""), "views": r["views"], "likes": r["likes"],
                    "comments": r["comments"], "er": r["er_views"], "same_category": r["relevance"] == "match",
                    "paid_boost": bool(r["likely_paid_boost"])} for r in rows[:60]],

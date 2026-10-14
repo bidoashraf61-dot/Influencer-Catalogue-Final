@@ -924,7 +924,10 @@
     b2.appendChild(el("span", "", (q.platform === "tiktok" ? "TikTok" : "Instagram") + " · " + (q.date || "")));
     card.appendChild(b2);
     var st = el("div", "ev-dpost__stats");
-    [["Views", num(q.views)], ["Likes", q.likes == null ? "Hidden" : num(q.likes)], ["Comments", num(q.comments)], ["Eng. rate", q.er == null ? "n/a" : pct(q.er)]]
+    // TikTok study entries carry the creator's MEDIAN figures across competitor videos, not this video's.
+    (q.summary
+      ? [["Median views", num(q.views)], ["Eng. rate (median)", q.er == null ? "n/a" : pct(q.er)], ["Save rate", q.save_rate == null ? "n/a" : pct(q.save_rate)], ["Platform", "TikTok"]]
+      : [["Views", num(q.views)], ["Likes", q.likes == null ? "Hidden" : num(q.likes)], ["Comments", num(q.comments)], ["Eng. rate", q.er == null ? "n/a" : pct(q.er)]])
       .forEach(function (s2) { var dv = el("div"); dv.appendChild(el("small", "", s2[0])); dv.appendChild(el("b", "", s2[1])); st.appendChild(dv); });
     card.appendChild(st);
     return card;
