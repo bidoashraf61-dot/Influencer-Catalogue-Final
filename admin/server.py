@@ -613,6 +613,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_discover("facets")
         if path == "/api/evidence":
             return self.api_evidence(query.get("s") or "")
+        if path == "/api/evidence/thumb":
+            return self.api_evidence(query.get("s") or "", None, kam_scope._int(query.get("p")))
+        if path == "/api/evidence/creator":
+            return self.api_evidence(query.get("s") or "", (query.get("c") or "").strip().upper())
         if path == "/api/selection":
             return self.api_selection(
                 query.get("s") or "", query.get("n") or "",
@@ -924,7 +928,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if pk is None:
                 return self.redirect("/evidence?e=" + urllib.parse.quote("That pack is gone."))
             sels = [s for s in db.list_selections() if pk["code_id"] is None or s["code_id"] == pk["code_id"]]
-            return self.send(200, evidence.view_page(pk, query.get("brand"), sels, query.get("ok"), query.get("e")))
+            return self.send(200, evidence.view_page(pk, query.get("brand"), sels, query.get("ok"), query.get("e"),
+                                                     (query.get("c") or "").strip().upper() or None))
         if path == "/work":
             import hub_views
             return self.send(200, hub_views.board_page(query.get("ok"), query.get("e"), query.get("team") == "1"))
@@ -4759,9 +4764,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect("/evidence?ok=" + urllib.parse.quote("Pack deleted."))
         return self.send(404, "Not found", "text/plain; charset=utf-8")
 
-    def api_evidence(self, token):
+    def api_evidence(self, token, creator=None, thumb_post=None):
         """The competitor evidence filed under a selection, for its client page — only when an admin
-        switched it on for the client, and behind the same link check as /api/selection."""
+        switched it on for the client, and behind the same link check as /api/selection. With
+        ``creator`` (a code in the selection): that creator's Track record."""
         sel = db.selection(token=token) if token else None
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
@@ -4773,8 +4779,23 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         pk = evidence.for_selection(sel["id"], client_only=not staff)
         if pk is None:
+            if creator is not None or thumb_post is not None:
+                return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
             return self.send_json(200, {"ok": True, "evidence": None}, self.cors())
-        out = evidence.client_payload(pk, json.loads(sel["codes"] or "[]"))
+        codes = json.loads(sel["codes"] or "[]")
+        if thumb_post is not None:
+            url = evidence.post_for_thumb(pk["id"], thumb_post)
+            got = evidence.thumb(url) if url else None
+            if not got:
+                return self.send(404, b"", "text/plain")
+            return self.send(200, got[0], "image/" + ("jpeg" if got[1] == "jpg" else got[1]),
+                             [("Cache-Control", "private, max-age=604800")])
+        if creator is not None:
+            tr = evidence.creator_payload(pk, creator) if creator in codes else None
+            if tr is None:
+                return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+            return self.send_json(200, {"ok": True, "creator": tr, "preview": bool(staff and not pk["client_visible"])}, self.cors())
+        out = evidence.client_payload(pk, codes)
         out["preview"] = bool(staff and not pk["client_visible"])
         return self.send_json(200, {"ok": True, "evidence": out}, self.cors())
 

@@ -573,8 +573,135 @@ def client_payload(pk, selection_codes=()):
                          for r in c["rows"] if r["relevance"] != "other"][:40],
             })
         brands.append({"brand": b["brand"], "product": b["product"], "competitors": comps})
+    # Per-card "Track record" counts, only for creators already in this selection (their codes are on
+    # the cards anyway); no other roster code leaves the server.
+    by_code = {}
+    for r in posts(pk["id"]):
+        if r["code"] and r["code"] in inset and r["relevance"] != "other":
+            d = by_code.setdefault(r["code"], {"brands": set(), "posts": 0})
+            d["brands"].add(r["competitor"])
+            d["posts"] += 1
+    by_code = {c: {"brands": len(d["brands"]), "posts": d["posts"]} for c, d in by_code.items()}
     return {"title": pk["title"], "objective": pk["objective"], "platforms": json.loads(pk["platforms"] or "[]"),
-            "updated": pk["updated_at"], "brands": brands}
+            "updated": pk["updated_at"], "brands": brands, "by_code": by_code}
+
+
+def _reach(code):
+    """A creator's normal reach: median and average views on their own posts, per platform, from the
+    analysis and the latest post scan / reel run."""
+    out = {}
+    docs = db.analyses_for([code]).get(code) or {}
+    for plat, row in docs.items():
+        d = row.get("data") if isinstance(row, dict) else None
+        if isinstance(d, dict):
+            m = {k: d.get(k) for k in ("median_views", "avg_reel_plays", "avg_views", "er", "followers") if d.get(k) is not None}
+            if m:
+                out[plat] = m
+    with _conn() as conn:
+        try:
+            for plat, data in conn.execute("SELECT platform, data FROM post_samples WHERE code = ?", (code,)):
+                d = json.loads(data or "{}")
+                cur = out.setdefault(plat, {})
+                for k in ("median_views", "avg_reel_plays"):
+                    if d.get(k) is not None:
+                        cur[k] = d[k]
+        except Exception:
+            pass
+    return out
+
+
+import hashlib as _hashlib
+import threading as _threading
+_thumb_locks = {}
+_thumb_guard = _threading.Lock()
+_thumb_miss = {}                      # file name -> when a fetch last failed (retried after an hour)
+
+
+def thumb_file(url):
+    """Where a post's picture is kept: thumbs.DIR/ev-<hash of the post link>, shared by every pack."""
+    import thumbs
+    return thumbs.DIR / ("ev-%s.img" % _hashlib.sha1((url or "").encode()).hexdigest()[:20])
+
+
+def thumb(url):
+    """The stored picture of a competitor post, fetched once on the server and kept (Instagram and TikTok
+    refuse their CDN pictures to other sites). Returns (bytes, kind) or None."""
+    import thumbs
+    import uploads
+    f = thumb_file(url)
+    if f.is_file():
+        data = f.read_bytes()
+        return (data, uploads.image_kind(data[:16]) or "jpg") if data else None
+    with _thumb_guard:
+        lock = _thumb_locks.setdefault(f.name, _threading.Lock())
+    import time as _time
+    if _time.time() - _thumb_miss.get(f.name, 0) < 3600:
+        return None
+    with lock:
+        if f.is_file():
+            data = f.read_bytes()
+            return (data, uploads.image_kind(data[:16]) or "jpg") if data else None
+        for cand in thumbs.candidates(url, "tiktok" if "tiktok.com" in (url or "") else "instagram"):
+            got = thumbs._image(cand)
+            if got:
+                thumbs.DIR.mkdir(exist_ok=True)
+                f.write_bytes(got[0])
+                return got
+        _thumb_miss[f.name] = _time.time()
+    return None
+
+
+def post_for_thumb(pack_id, post_id):
+    """The post's link when ``post_id`` is a post of this pack that may be shown (not an "other product" one)."""
+    with _conn() as conn:
+        r = conn.execute("SELECT url FROM evidence_posts WHERE id = ? AND pack_id = ? AND relevance != 'other'",
+                         (post_id, pack_id)).fetchone()
+    return r["url"] if r else None
+
+
+def fill_thumbs(pack_ids, pause=0.6, log=print):
+    """Fetch every missing picture for these packs, one at a time (a background job, gentle on Instagram)."""
+    import time
+    with _conn() as conn:
+        urls = sorted({r[0] for r in conn.execute("SELECT DISTINCT url FROM evidence_posts WHERE pack_id IN (%s) AND relevance != 'other'"
+                                                    % ",".join("?" * len(pack_ids)), list(pack_ids))})
+    got = miss = 0
+    for u in urls:
+        if thumb_file(u).is_file():
+            continue
+        if thumb(u):
+            got += 1
+        else:
+            miss += 1
+        time.sleep(pause)
+    log("evidence thumbs: %d fetched, %d without a picture, %d already kept" % (got, miss, len(urls) - got - miss))
+    return got, miss
+
+
+def creator_payload(pk, code):
+    """One creator's Track record in a pack: competitor posts with numbers, KPIs over the organic ones,
+    and their normal reach for comparison. No analyst notes. None when the pack has no post of theirs."""
+    rows = [r for r in posts(pk["id"]) if r["code"] == code and r["relevance"] != "other"]
+    if not rows:
+        return None
+    organic = [r for r in rows if not r["likely_paid_boost"]]
+    comp = {}
+    for r in rows:
+        comp[r["competitor"]] = comp.get(r["competitor"], 0) + 1
+    rows.sort(key=lambda r: -(r["views"] or 0))
+    return {
+        "handle": rows[0]["handle"], "name": rows[0]["name"], "type": rows[0]["creator_type"],
+        "competitors": [{"name": k, "posts": v} for k, v in sorted(comp.items(), key=lambda kv: -kv[1])],
+        "kpis": {"posts": len(rows), "median_views": _med([r["views"] for r in organic]),
+                 "best_views": max([r["views"] or 0 for r in organic] or [0]) or None,
+                 "median_er": _med([r["er_views"] for r in organic]), "last": max(r["posted_at"] or "" for r in rows),
+                 "likes_hidden": any(r["likes_hidden"] for r in rows)},
+        "posts": [{"id": r["id"], "url": r["url"], "date": r["posted_at"], "competitor": r["competitor"], "platform": r["platform"],
+                   "collab": COLLAB_LABEL.get(r["collab_type"], r["collab_type"] or ""), "views": r["views"], "likes": r["likes"],
+                   "comments": r["comments"], "er": r["er_views"], "same_category": r["relevance"] == "match",
+                   "paid_boost": bool(r["likely_paid_boost"])} for r in rows[:60]],
+        "reach": _reach(code),
+    }
 
 
 # ------------------------------------------------------------------- views --
@@ -664,7 +791,30 @@ def list_page(scope, clients, selections, ok=None, err=None):
     return page("Competitor evidence", "".join(body), "/evidence")
 
 
-def view_page(pk, brand, selections, ok=None, err=None):
+def _track_record_card(pk, code):
+    """Admin: one creator's Track record at the top of the pack page (from the selection's row link)."""
+    c = creator_payload(pk, code)
+    if c is None:
+        return "<div class='ev-card' id='tr'><p class='ev-sub'>No competitor posts for %s in this pack.</p></div>" % e(code)
+    k = c["kpis"]
+    reach = "; ".join("%s %s views (median, own posts)" % (p, _n(r.get("median_views") if r.get("median_views") is not None else r.get("avg_reel_plays")))
+                      for p, r in (c["reach"] or {}).items() if (r.get("median_views") or r.get("avg_reel_plays")))
+    return ("<div class='ev-card' id='tr'><h2>Track record: %s</h2><p class='ev-sub'>@%s · %s · %s</p>"
+            "<div class='ev-kv'><div><b>%d</b><span>collab posts</span></div><div><b>%s</b><span>median views</span></div>"
+            "<div><b>%s</b><span>best post</span></div><div><b>%s</b><span>engagement</span></div><div><b>%s</b><span>last collab</span></div></div>"
+            "<p class='ev-mut'>Normal reach: %s</p><div class='ev-wrap'><table class='ev-t'><tr><th>Post</th><th>Brand</th><th>Type</th>"
+            "<th class='n'>Views</th><th class='n'>Likes</th><th class='n'>Comments</th><th class='n'>ER</th></tr>%s</table></div></div>") % (
+        e(c["name"] or c["handle"]), e(c["handle"]), e(code), e(", ".join("%s (%d)" % (x["name"], x["posts"]) for x in c["competitors"])),
+        k["posts"], _n(k["median_views"]), _n(k["best_views"]), _pct(k["median_er"], k["likes_hidden"]), e(k["last"] or "—"),
+        e(reach or "not in yet"),
+        "".join("<tr><td><a href='%s' target='_blank' rel='noopener'>%s</a>%s</td><td>%s</td><td>%s</td><td class='n'>%s</td><td class='n'>%s</td>"
+                "<td class='n'>%s</td><td class='n'>%s</td></tr>" % (
+                    e(p["url"]), e(p["date"] or "link"), " <span class='ev-chip paid'>paid-boosted</span>" if p["paid_boost"] else "",
+                    e(p["competitor"]), e(p["collab"]), _n(p["views"]), _n(p["likes"]) if p["likes"] is not None else "hidden",
+                    _n(p["comments"]), _pct(p["er"], p["likes"] is None)) for p in c["posts"]))
+
+
+def view_page(pk, brand, selections, ok=None, err=None, creator=None):
     data = summary(pk)
     cur = next((b for b in data if b["brand"] == brand), data[0] if data else None)
     sel = db.selection(pk["selection_id"]) if pk["selection_id"] else None
@@ -676,6 +826,8 @@ def view_page(pk, brand, selections, ok=None, err=None):
                 ("<a class='btn' href='%s'>Open selection: %s</a>" % (e(u("/selections/edit?id=%d" % sel["id"])), e(sel["name"]))) if sel is not None else "",
                 e(u("/evidence")))]
     body.append(_msgs(ok, err))
+    if creator:
+        body.append(_track_record_card(pk, creator))
     rs = roster_status(pk)
     body.append("<div class='ev-card'><h2>Creators on the roster</h2><div class='ev-kv'>"
                 "<div><b>%d</b><span>creators in this study</span></div><div><b>%d</b><span>already on the roster</span></div>"

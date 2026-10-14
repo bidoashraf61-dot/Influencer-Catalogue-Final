@@ -2791,10 +2791,23 @@ def _market_intel_btn(sid):
             + " Market Intelligence</a> ")
 
 
+def _track_record_codes(sid):
+    """(pack, codes with competitor posts in it) for a selection's evidence pack, or (None, set())."""
+    try:
+        import evidence
+        pk = evidence.for_selection(sid)
+        if pk is None:
+            return None, set()
+        return pk, {r["code"] for r in evidence.posts(pk["id"]) if r["code"] and r["relevance"] != "other"}
+    except Exception:
+        return None, set()
+
+
 def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=(), access_codes=()):
     by = {c["code"]: c for c in creators}
     codes = json.loads(sel["codes"] or "[]")
     own = json.loads(sel["prices"] or "{}")
+    _tr_pack, _tr_codes = _track_record_codes(sel["id"])
     keys = sel.keys()
     import fx
     usable = fx.rates()
@@ -2871,6 +2884,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
             + "<small>" + e(code) + " · " + e(c["tier"] or "—") + " · " + ui.compact(c["followers"]) + "</small></span></td>"
             "<td class='num sr-cost'></td><td class='num sr-price'></td><td class=sr-gain><div class=profit></div></td>"
             "<td class=sr-act><button type=button class='btn tiny ghost sr-edit'>Edit</button>"
+            + ((" <a class='btn tiny ghost' href='" + e(u("/evidence/view?id=%d&c=%s#tr" % (_tr_pack["id"], urllib.parse.quote(code))))
+                + "'>Track record</a>") if _tr_pack is not None and code in _tr_codes else "")
             + hid("code", e(code)) + hid("cost", cost_txt)
             + "<input type=hidden name=p_from" + (" value='" + val(0) + "'" if val(0) else "")
             + (" data-def='%d|%d'" % (default[0], default[1]) if default and default[0] is not None else "") + ">"

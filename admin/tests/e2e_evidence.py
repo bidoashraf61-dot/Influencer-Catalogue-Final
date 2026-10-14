@@ -155,10 +155,44 @@ class Evidence(unittest.TestCase):
         self.assertTrue(comp["top"][0]["in_selection"])           # added in test 2
         raw = json.dumps(ev)
         self.assertNotIn("internal note", raw)                    # no analyst notes
-        self.assertNotIn("HV-MI-001", raw)                        # no roster codes
+        self.assertNotIn("HV-MI-002", raw)                        # no roster code outside this selection
+        self.assertEqual(ev["by_code"]["HV-MI-001"], {"brands": 1, "posts": 2})   # Track record count on the card
         self.assertNotIn("/reel/A5/", raw)                        # other-product posts left out
         s, b, _ = self.stranger.get("/api/evidence?s=" + self.token)
         self.assertEqual(s, 401)                                  # another company's account
+
+    def test_3a_track_record_for_one_creator(self):
+        s, b, _ = self.client.get("/api/evidence/creator?s=%s&c=HV-MI-001" % self.token)
+        self.assertEqual(s, 200, b)
+        self.assertIn("creator", b, b)
+        c = b["creator"]
+        self.assertEqual((c["handle"], c["kpis"]["posts"], c["kpis"]["median_views"]), ("noha", 2, 70000))
+        self.assertEqual(c["competitors"], [{"name": "RivalSkin", "posts": 2}])
+        self.assertNotIn("internal note", json.dumps(b))
+        self.assertEqual(self.client.get("/api/evidence/creator?s=%s&c=HV-MI-002" % self.token)[0], 404)   # not in the selection
+        self.assertEqual(self.stranger.get("/api/evidence/creator?s=%s&c=HV-MI-001" % self.token)[0], 401)
+        a = self.admin()
+        s, body, _ = a.get("/selections/edit?id=%d" % self.sel)
+        self.assertIn("/evidence/view?id=%d&amp;c=HV-MI-001#tr" % self.pack_id(), body)   # row link
+        s, body, _ = a.get("/evidence/view?id=%d&c=HV-MI-001" % self.pack_id())
+        self.assertIn("Track record: Noha", body)
+
+    def test_3b_post_pictures_come_from_our_server(self):
+        import thumbs
+        jpg = b"\xff\xd8\xff\xe0" + b"\x00" * 64
+        seen = []
+        thumbs.candidates = lambda url, plat, hint=None: seen.append(url) or ["https://cdn.example/x.jpg"]
+        thumbs._image = lambda u: (jpg, "jpg")
+        c = self.client.get("/api/evidence/creator?s=%s&c=HV-MI-001" % self.token)[1]["creator"]
+        pid = c["posts"][0]["id"]
+        r = self.client.op.open(urllib.request.Request(self.base + "/api/evidence/thumb?s=%s&p=%d" % (self.token, pid), headers={"Origin": self.base}))
+        self.assertEqual((r.status, r.headers["Content-Type"], r.read()), (200, "image/jpeg", jpg))
+        self.client.op.open(urllib.request.Request(self.base + "/api/evidence/thumb?s=%s&p=%d" % (self.token, pid)))
+        self.assertEqual(len(seen), 1)                                     # fetched once, then kept
+        with db.connect() as conn:
+            other = conn.execute("SELECT id FROM evidence_posts WHERE relevance = 'other' AND pack_id = ?", (self.pack_id(),)).fetchone()[0]
+        self.assertEqual(self.client.get("/api/evidence/thumb?s=%s&p=%d" % (self.token, other))[0], 404)   # not shown
+        self.assertEqual(self.stranger.get("/api/evidence/thumb?s=%s&p=%d" % (self.token, pid))[0], 401)
 
     def test_4_tiktok_adds_to_the_same_pack(self):
         a = self.admin()
