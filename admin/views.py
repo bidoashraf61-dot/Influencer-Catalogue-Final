@@ -2837,6 +2837,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         cost = costs.get(code)
         if cost is None and "cost" in c.keys():
             cost = c["cost"]
+        if not cost:                       # 0 is "no cost typed" (older saves stored 0), never a real fee
+            cost = None
         # Costs are kept in SAR but shown and typed in the selection's currency,
         # so the whole page speaks one currency.
         cost_txt = format(int(round(cost * rate_c)), ",") if cost is not None else ""
@@ -3004,6 +3006,8 @@ MARGIN_JS = """<script>
   function stepOf(c){return c==='USD'?5:c==='EGP'?50:10;}
   var step=stepOf(cur);
   function n(v){v=String(v==null?'':v).replace(/[^0-9.]/g,'');return v===''?null:Number(v);}
+  function nc(v){var x=n(v);return x?x:null;}                         // a cost of 0 is "no cost typed"
+  var marginTouched=false;                                            // the margin was changed on this page
   function num(x){return Math.round(x).toLocaleString('en-US');}
   function fmt(x){return cur+' '+num(x);}
   function price(cost,mg){return Math.ceil(cost*(1+(mg||0)/100)/step)*step;}
@@ -3019,37 +3023,56 @@ MARGIN_JS = """<script>
   // A price range that differs from the automatic one was typed by hand; keep it.
   function detectManual(){
     rows.forEach(function(r){
-      var cost=n(r.querySelector('input[name=cost]').value), lo=n(r.querySelector('input[name=p_from]').value), hi=n(r.querySelector('input[name=p_to]').value);
+      var cost=nc(r.querySelector('input[name=cost]').value), lo=n(r.querySelector('input[name=p_from]').value), hi=n(r.querySelector('input[name=p_to]').value);
       if(cost!==null&&lo!==null){ var a=autoRange(cost); if(Math.abs(lo-a[0])>step||Math.abs((hi===null?lo:hi)-a[1])>step) r.dataset.manual='1'; }
+      // No cost: a stored price that is not the standard price was typed by hand (the standard one follows the margin).
+      var d=(r.querySelector('input[name=p_from]').getAttribute('data-def')||'').split('|');
+      if(cost===null&&lo!==null&&d.length===2){ var s0=sh(Number(d[0])), s1=sh(Number(d[1])), h1=(hi===null?lo:hi);
+        var mg0=n(m.value)||0, mgx0=mx?n(mx.value):null, top=(mgx0!==null&&mgx0>mg0)?mgx0:mg0;
+        var plain=Math.abs(lo-s0)<=step&&Math.abs(h1-s1)<=step;
+        var marked=Math.abs(lo-price(s0,mg0))<=step&&Math.abs(h1-price(s1,top))<=step;   // saved earlier as standard + margin
+        if(marked&&!plain) r.dataset.stdauto='1';
+        else if(!plain) r.dataset.manual='1'; }
     });
   }
   detectManual();
   var totalsSet=false;
   function rowPrice(r,mg){
     var c=r.querySelector('input[name=cost]'), lo=r.querySelector('input[name=p_from]'), hi=r.querySelector('input[name=p_to]');
-    var cost=n(c.value), loV=n(lo.value), hiV=n(hi.value), manual=r.dataset.manual==='1';
+    var cost=nc(c.value), loV=n(lo.value), hiV=n(hi.value), manual=r.dataset.manual==='1';
     if(cost!==null&&!manual){
       var a=autoRange(cost);
       lo.value=num(a[0]); hi.value=num(a[1]); lo.dataset.auto=hi.dataset.auto='1';
       return {cost:cost,lo:a[0],hi:a[1],auto:true};
+    }
+    var d=(lo.getAttribute('data-def')||'').split('|');          // standard price (SAR): the creator's own rate, else the tier's band
+    var std=d.length===2&&d[0]!=='';
+    // No cost typed and no price typed by hand: once the margin is changed on this page, the margin goes on top of
+    // the standard price, and the standard price counts as the cost.
+    if(cost===null&&!manual&&std&&(marginTouched||r.dataset.stdauto==='1')){
+      var s0=sh(Number(d[0])), s1=sh(Number(d[1]));
+      var mg0=n(m.value)||0, mgx0=mx?n(mx.value):null, top=(mgx0!==null&&mgx0>mg0)?mgx0:mg0;
+      var a0=price(s0,mg0), a1=price(s1,top);
+      lo.value=num(a0); hi.value=num(a1); lo.dataset.auto=hi.dataset.auto='1';
+      return {cost:s0,costHi:s1,lo:a0,hi:a1,auto:true,fromStd:true};
     }
     if(lo.dataset.auto&&cost===null){lo.value='';hi.value='';delete lo.dataset.auto;delete hi.dataset.auto;loV=hiV=null;}
     if(loV!==null||hiV!==null){
       var a=loV!==null?loV:hiV, b=hiV!==null?hiV:loV;
       return {cost:cost,lo:Math.min(a,b),hi:Math.max(a,b),manual:true};
     }
-    var d=(lo.getAttribute('data-def')||'').split('|');          // standard price (SAR): counts toward the total
-    if(d.length===2) return {cost:cost,lo:sh(Number(d[0])),hi:sh(Number(d[1])),standard:true};
+    if(std) return {cost:cost,lo:sh(Number(d[0])),hi:sh(Number(d[1])),standard:true};
     return {cost:cost,lo:null,hi:null};
   }
   function run(){
-    var mg=n(m.value), tc=0, tpl=0, tph=0, tlo=0, thi=0, costed=0, counted=0;
+    var mg=n(m.value), tc=0, tch=0, tpl=0, tph=0, tlo=0, thi=0, costed=0, counted=0;
     rows.forEach(function(r){
       var out=r.querySelector('.profit'), gone=r.dataset.drop==='1', x=rowPrice(r,mg);
       out.textContent='';
       if(x.lo!==null){
         if(x.cost!==null){
-          var p1=x.lo-x.cost, p2=x.hi-x.cost, m1=x.cost?p1/x.cost*100:0, m2=x.cost?p2/x.cost*100:0;
+          var ch=x.costHi!=null?x.costHi:x.cost;
+          var p1=x.lo-x.cost, p2=x.hi-ch, m1=x.cost?p1/x.cost*100:0, m2=ch?p2/ch*100:0;
           function sg(v){return (v>=0?'+':'')+num(v);}
           out.textContent=cur+' '+(p1===p2?sg(p1):sg(p1)+' to '+sg(p2))+' · '+(p1===p2?(Math.round(m1*10)/10).toFixed(1):(Math.round(m1*10)/10).toFixed(1)+'–'+(Math.round(m2*10)/10).toFixed(1))+'% margin'+(x.manual?' · your price':'');
           out.style.color=p1<0?'#c01010':'';
@@ -3057,12 +3080,12 @@ MARGIN_JS = """<script>
       }
       if(gone) return;
       if(x.lo!==null){tlo+=x.lo;thi+=x.hi;counted++;}
-      if(x.cost!==null&&x.lo!==null){tc+=x.cost;tpl+=x.lo;tph+=x.hi;costed++;}
+      if(x.cost!==null&&x.lo!==null){tc+=x.cost;tch+=(x.costHi!=null?x.costHi:x.cost);tpl+=x.lo;tph+=x.hi;costed++;}
     });
-    var pl=tpl-tc, ph=tph-tc, ml=tc?pl/tc*100:0, mh=tc?ph/tc*100:0, same=Math.round(pl)===Math.round(ph);
+    var pl=tpl-tc, ph=tph-tch, ml=tc?pl/tc*100:0, mh=tch?ph/tch*100:0, same=Math.round(pl)===Math.round(ph);
     var priceTxt=counted?(thi>tlo?fmt(tlo)+' – '+fmt(thi):fmt(tlo)):'—';
     sum.innerHTML=(costed||counted)?(
-      (costed?'<div><dt>Cost ('+costed+')</dt><dd>'+fmt(tc)+'</dd></div>':'')+
+      (costed?'<div><dt>Cost ('+costed+')</dt><dd>'+(Math.round(tch)>Math.round(tc)?fmt(tc)+' – '+fmt(tch):fmt(tc))+'</dd></div>':'')+
       '<div><dt>Client price ('+counted+')</dt><dd>'+priceTxt+'</dd></div>'+
       (costed?'<div><dt>Profit'+(same?'':' (min – max)')+'</dt><dd class="gain">'+(same?fmt(pl):fmt(pl)+' – '+fmt(ph))+'</dd></div>'+
         '<div><dt>Margin on cost</dt><dd class="gain">'+(same?(Math.round(ml*10)/10)+'%':(Math.round(ml*10)/10)+'% – '+(Math.round(mh*10)/10)+'%')+'</dd></div>':'')):
@@ -3082,7 +3105,7 @@ MARGIN_JS = """<script>
   function detectManual0(){}      // margins changed: rows that follow the margins simply follow them
   document.addEventListener('input',function(e){
     var t=e.target;
-    if(t===m||t===mx||t.name==='cost'){ if(t===m||t===mx) detectManual0(); run(); }
+    if(t===m||t===mx||t.name==='cost'){ if(t===m||t===mx){ marginTouched=true; detectManual0(); } run(); }
     else if(t.name==='p_from'||t.name==='p_to'){
       var r=t.closest('tr'), cost=n(r.querySelector('input[name=cost]').value), pl=r.querySelector('input[name=p_from]'), ph=r.querySelector('input[name=p_to]');
       // When the two boxes held ONE price, typing in one makes a fixed price (the other follows).
@@ -3091,7 +3114,7 @@ MARGIN_JS = """<script>
       if(single&&t===pl&&ph.dataset.auto) ph.value=t.value;
       if(single&&t===ph&&pl.dataset.auto) pl.value=t.value;
       delete pl.dataset.auto; delete ph.dataset.auto;
-      if(t.value==='') delete r.dataset.manual; else if(cost!==null) r.dataset.manual='1';
+      if(t.value==='') delete r.dataset.manual; else r.dataset.manual='1';      // a price typed by hand is kept, cost or not
       run();
     } else if(t===tf||t===tt){
       if(tf.value===''&&tt.value==='') delete tf.dataset.manual; else tf.dataset.manual='1';

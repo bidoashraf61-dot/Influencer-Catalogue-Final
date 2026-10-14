@@ -2798,7 +2798,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # Costs and prices are typed in the selection's currency, and the
             # price is rounded in it too (10 SAR, 10 AED, 5 USD, 50 EGP);
             # they are stored in SAR underneath.
-            cost = num(cost)
+            cost = num(cost) or None             # 0 is "no cost typed", never a real fee
             if cost is not None:
                 rate = float(fx.rates().get(cur, 1.0))
                 step_c = {"USD": 5, "EGP": 50}.get(cur, 10)
