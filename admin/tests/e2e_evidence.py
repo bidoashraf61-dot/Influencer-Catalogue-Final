@@ -127,6 +127,10 @@ class Evidence(unittest.TestCase):
         self.assertEqual(s, 200)
         self.assertIn("RivalSkin", body)
         self.assertIn("internal note", body)                      # admins see the analyst's read
+        self.assertIn("Open selection: Polyco glow", body)       # back to the selection
+        s2, sbody, _ = a.get("/selections/edit?id=%d" % self.sel)
+        self.assertIn("Market Intelligence", sbody)               # and from the selection to the pack
+        self.assertIn("/evidence/view?id=%d" % pid, sbody)
         self.assertEqual(a.get("/evidence")[0], 200)
 
     def test_2_add_creators_to_the_selection(self):

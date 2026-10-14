@@ -2778,6 +2778,19 @@ def _brief_note(sel):
             + e(ago(row["created_at"])) + ". Scores on this page use that objective and audience.</span>" + quote + "</div>")
 
 
+def _market_intel_btn(sid):
+    """"Market Intelligence": the competitor evidence pack filed under this selection, when there is one."""
+    try:
+        import evidence
+        pk = evidence.for_selection(sid)
+    except Exception:
+        pk = None
+    if pk is None:
+        return ""
+    return ("<a class='btn ghost' href='" + e(u("/evidence/view?id=%d" % pk["id"])) + "'>" + ui.icon("bars", 16)
+            + " Market Intelligence</a> ")
+
+
 def selection_edit_page(sel, creators, bands, origin, error=None, message=None, campaigns=(), scores=None, interests=(), access_codes=()):
     by = {c["code"]: c for c in creators}
     codes = json.loads(sel["codes"] or "[]")
@@ -2907,7 +2920,8 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         roster_list
         + ui.header(sel["name"], "A priced shortlist for one client: " + str(n_cr) + " creator" + ("" if n_cr == 1 else "s") + ". " + client_pill + " " + _lcu.chip(_lc_key),
                     crumbs=[("Selections", u("/selections")), (sel["name"], None)],
-                    actions=open_link("selection", sel["token"], "Open client link", "btn ghost")
+                    actions=_market_intel_btn(sel["id"])
+                    + open_link("selection", sel["token"], "Open client link", "btn ghost")
                     + " <button type='button' class='btn lime' data-go-tab='st:share'>" + ui.icon("send", 16) + " Share</button>")
         + note + (("<div class='err'>" + client_deleted_pill(sel).strip() + " The client no longer sees this selection and its link does not open for them. "
                    "Take it out of the archive to restore it.</div>") if client_deleted_pill(sel) else "")

@@ -670,9 +670,11 @@ def view_page(pk, brand, selections, ok=None, err=None):
     sel = db.selection(pk["selection_id"]) if pk["selection_id"] else None
     in_sel = set(json.loads(sel["codes"] or "[]")) if sel is not None else set()
     body = [CSS, "<div class='ev-top'><div><h1>%s</h1><p>%s · %s · updated %s</p></div>"
-            "<div class='ev-bar'><a class='btn' href='%s'>All packs</a></div></div>" % (
+            "<div class='ev-bar'>%s<a class='btn' href='%s'>All packs</a></div></div>" % (
                 e(pk["title"]), e(", ".join(json.loads(pk["platforms"] or "[]")) or "—"), e(pk["source"] or ""),
-                e(db_date(pk["updated_at"])), e(u("/evidence")))]
+                e(db_date(pk["updated_at"])),
+                ("<a class='btn' href='%s'>Open selection: %s</a>" % (e(u("/selections/edit?id=%d" % sel["id"])), e(sel["name"]))) if sel is not None else "",
+                e(u("/evidence")))]
     body.append(_msgs(ok, err))
     rs = roster_status(pk)
     body.append("<div class='ev-card'><h2>Creators on the roster</h2><div class='ev-kv'>"
