@@ -245,7 +245,7 @@ def board_cards(team=False):
             continue                                   # the team's own tests stay out of the board unless asked
         client = _clean_label(s["code_label"]) or "No client yet"
         price = ("SAR {:,}".format(int(s["total_from"])) + ("–{:,}".format(int(s["total_to"])) if s["total_to"] and s["total_to"] != s["total_from"] else "")) \
-            if s["total_from"] else "—"
+            if s["total_from"] else "Not priced"
         href = u("/selections/edit") + "?id=%d" % s["id"]
         when = st.get("requested_at") if k == "requested" else s["updated_at"]
         nxt, tone = "", ""
