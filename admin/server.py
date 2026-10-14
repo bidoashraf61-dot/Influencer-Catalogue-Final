@@ -4815,7 +4815,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "evidence": None}, self.cors())
         codes = json.loads(sel["codes"] or "[]")
         if as_map:
-            out = evidence.map_payload(pk, codes, self.selection_objective(sel))
+            import selstatus
+            removed = {c for c, st in selstatus.of(sel["id"]).items() if st["s"] in ("rejected", "unavailable")}
+            out = evidence.map_payload(pk, codes, self.selection_objective(sel), removed)
             reader = self.selection_viewer(sel["token"])
             out["can_add"] = bool(staff or (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())))
             out["preview"] = bool(staff and not pk["client_visible"])

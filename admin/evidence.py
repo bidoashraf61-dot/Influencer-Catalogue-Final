@@ -761,12 +761,13 @@ def fill_thumbs(pack_ids, pause=0.6, log=print):
     return got, miss
 
 
-def map_payload(pk, selection_codes=(), objective="Awareness"):
-    """The Market Intelligence map: the client's brand, its competitors (sized by views) and every creator
-    who worked with them (median organic views, type, which competitors, their posts). Creators who are
-    in this selection carry their code (it is on their card already); nobody else's code leaves."""
-    inset = set(selection_codes or ())
-    rows = [r for r in posts(pk["id"]) if r["relevance"] != "other"]
+def map_payload(pk, selection_codes=(), objective="Awareness", removed=()):
+    """The Market Intelligence map of ONE selection (owner, 2026-10-15): the client's brand, the competitors
+    and only the creators of this selection who worked with them. A creator taken out of the selection, or
+    rejected / marked unavailable on it (``removed``), is not on the map, and the competitor totals count
+    the selection's creators only."""
+    inset = set(selection_codes or ()) - set(removed or ())
+    rows = [r for r in posts(pk["id"]) if r["relevance"] != "other" and r["code"] in inset]
     brand = (json.loads(pk["brands"] or "[]") or [{}])[0].get("brand") or ""
     comps, people = {}, {}
     for r in rows:

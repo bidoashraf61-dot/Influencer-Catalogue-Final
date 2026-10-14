@@ -195,19 +195,20 @@ class Evidence(unittest.TestCase):
         self.assertEqual(self.client.get("/api/evidence/thumb?s=%s&p=%d" % (self.token, other))[0], 404)   # not shown
         self.assertEqual(self.stranger.get("/api/evidence/thumb?s=%s&p=%d" % (self.token, pid))[0], 401)
 
-    def test_3c_market_intelligence_map(self):
+    def test_3c_market_intelligence_map_is_this_selection_only(self):
         s, b, _ = self.client.get("/api/evidence/map?s=" + self.token)
         self.assertEqual(s, 200, b)
         m = b["map"]
         self.assertEqual(m["brand"], "Glow Serum")
-        self.assertEqual([c["name"] for c in m["competitors"]], ["RivalSkin"])
-        by = {c["handle"]: c for c in m["creators"]}
-        self.assertEqual(by["noha"]["code"], "HV-MI-001")          # in the selection: its code is on its card anyway
-        self.assertIsNone(by["sara"]["code"])                       # not in the selection: no roster code
-        self.assertNotIn("lina", by)                                # other-product posts are left out
-        self.assertTrue(by["bought"]["paid_only"])
+        self.assertEqual([c["handle"] for c in m["creators"]], ["noha"])      # only the selection's creators
+        self.assertEqual([(c["name"], c["creators"]) for c in m["competitors"]], [("RivalSkin", 1)])
         self.assertNotIn("internal note", json.dumps(b))
         self.assertEqual(self.stranger.get("/api/evidence/map?s=" + self.token)[0], 401)
+        # The owner removes noha (rejects her): she leaves the map; taking it back puts her on it again.
+        self.assertEqual(self.client.post("/api/selection/status", {"token": self.token, "code": "HV-MI-001", "status": "rejected"})[0], 200)
+        self.assertEqual(self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]["creators"], [])
+        self.client.post("/api/selection/status", {"token": self.token, "code": "HV-MI-001", "status": "review"})
+        self.assertEqual(len(self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]["creators"]), 1)
 
     def test_3d_logos_ranking_and_add_to_selection(self):
         svg_ok = b'<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>'
@@ -219,15 +220,15 @@ class Evidence(unittest.TestCase):
         r = self.client.op.open(urllib.request.Request(self.base + "/api/brand-logo?n=RivalSkin"))
         self.assertEqual((r.status, r.headers["Content-Type"]), (200, "image/svg+xml"))
         self.assertEqual(self.client.get("/api/brand-logo?n=Pending")[0], 404)       # not approved: not served
+        # sara is in the pack and on the roster but not in the selection: not on the map until added
         m = self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]
-        self.assertEqual(m["rank_by"], "views")                                      # no objective set: views
-        self.assertTrue(m["competitors"][0]["logo"].startswith("/api/brand-logo?n=RivalSkin"))
-        self.assertEqual([c["handle"] for c in m["creators"]][:3], ["noha", "newface", "sara"])  # ranked by median views
-        self.assertTrue(m["can_add"])                                                # the owner may add
-        # sara is in the pack and on the roster but not in the selection: the owner adds her
+        self.assertNotIn("sara", [c["handle"] for c in m["creators"]])
         s, b, _ = self.client.post("/api/evidence/add", {"token": self.token, "handle": "sara"})
         self.assertEqual((s, b.get("code")), (200, "HV-MI-002"), b)
-        self.assertIn("HV-MI-002", json.loads(db.selection(self.sel)["codes"]))
+        m = self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]
+        self.assertEqual(m["rank_by"], "views")
+        self.assertTrue(m["competitors"][0]["logo"].startswith("/api/brand-logo?n=RivalSkin"))
+        self.assertEqual([c["handle"] for c in m["creators"]], ["noha", "sara"])        # ranked by median views
         self.assertEqual(self.stranger.post("/api/evidence/add", {"token": self.token, "handle": "sara"})[0], 403)
         self.assertEqual(self.client.post("/api/evidence/add", {"token": self.token, "handle": "nobody"})[0], 404)
 
