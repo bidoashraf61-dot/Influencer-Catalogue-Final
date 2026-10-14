@@ -68,6 +68,7 @@ import auth  # noqa: E402
 import guard  # noqa: E402
 import mailer  # noqa: E402
 import industry  # noqa: E402
+import lifecycle  # noqa: E402
 import industry_views  # noqa: E402
 import portal  # noqa: E402
 import portal_api  # noqa: E402
@@ -1108,6 +1109,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                   self.cors())
         if path == "/api/admin/creator":
             return self.api_admin_creator_post()
+        if path == "/api/admin/board/move":
+            return self.api_board_move()
         if path == "/api/admin/creator/photo":
             return self.api_admin_creator_photo()
         if path.startswith("/api/") and self.portal_post(path):
@@ -2161,6 +2164,62 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 conn.execute("UPDATE creators SET photo = ?, updated_at = ? WHERE code = ?", (saved, db.now(), code))
         Handler.forget_photo_widths()
         return self.send_json(200, self._quick_payload(db.creator(code)), self.cors())
+
+    def api_board_move(self):
+        """Drag-and-drop on the selections-and-campaigns board (owner-approved 2026-10-14). Only the moves an admin
+        may make; each goes through the same rules as its button elsewhere, and is recorded in History."""
+        who = self.admin()
+        if not who or not team.can(who, "POST", "/campaigns/status"):
+            return self.send_json(403, {"ok": False, "message": "Only the HelloVoice team can move cards."}, self.cors())
+        b = self.json_body() or {}
+        kind, to = b.get("kind"), b.get("to")
+        try:
+            rid = int(b.get("id") or 0)
+        except (TypeError, ValueError):
+            rid = 0
+        no = lambda msg: self.send_json(400, {"ok": False, "message": msg}, self.cors())
+        actor = (who["name"] if "name" in who.keys() and who["name"] else who["email"])
+
+        def go_live(k):
+            missing = [w for w, ok in (("the first and last day", k["starts_at"] and k["ends_at"]), ("the client's access code", k["code_id"])) if not ok]
+            if missing:
+                return {"ok": True, "go": BASE + "/campaigns/edit?id=%d&e=%s" % (k["id"], urllib.parse.quote(
+                    "Set %s on the Setup tab, then press Go live." % " and ".join(missing)))}
+            with history.tracked("campaign", k["id"], "Started %s from the board" % k["name"]):
+                db.save_campaign(k["id"], status="live")
+            return {"ok": True, "message": "%s is live." % k["name"]}
+
+        if kind == "sel":
+            sel = db.selection(rid)
+            if sel is None or not kam_scope.allows(sel["code_id"]):
+                return no("That selection is not here any more.")
+            key = lifecycle.state_of(sel)["key"]
+            if to == "ready" and key in ("draft", "requested"):
+                with history.tracked("selection", sel["id"], "Marked the quote ready for %s (board)" % sel["name"]):
+                    _k, err = lifecycle.set_ready(sel, b.get("note") or "", "", actor)
+                return self.send_json(200, {"ok": True, "message": "Quote ready: the client was told."}) if not err else no("That quote can't be marked ready now.")
+            if to == "requested" and key == "ready":
+                with history.tracked("selection", sel["id"], "Took the quote back for %s (board)" % sel["name"]):
+                    _k, err = lifecycle.withdraw_ready(sel)
+                return self.send_json(200, {"ok": True, "message": "Taken back."}) if not err else no("Only a quote that is ready and not yet approved can be taken back.")
+            if to == "live" and key == "approved":
+                camps = [c for c in lifecycle.state_of(sel)["campaigns"] if c["status"] == "draft"]
+                if camps:
+                    return self.send_json(200, go_live(db.campaign(camps[0]["id"])))
+                return self.send_json(200, {"ok": True, "go": BASE + "/campaigns/setup?selection=%d" % sel["id"]})
+            return no("That move is not possible from here.")
+        if kind == "camp":
+            k = db.campaign(rid)
+            if k is None or not kam_scope.allows(k["code_id"]):
+                return no("That campaign is not here any more.")
+            if to == "live" and k["status"] in ("draft", "ended"):
+                return self.send_json(200, go_live(k))
+            if to == "completed" and k["status"] == "live":
+                with history.tracked("campaign", k["id"], "Ended %s from the board" % k["name"]):
+                    db.save_campaign(k["id"], status="ended")
+                return self.send_json(200, {"ok": True, "message": "%s has ended." % k["name"]})
+            return no("That move is not possible from here.")
+        return no("Unknown card.")
 
     def post_roster_review(self):
         f = self.form_body(multi=("ind_subs", "ind_also"))

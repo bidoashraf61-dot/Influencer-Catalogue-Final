@@ -88,6 +88,25 @@ class Hub(unittest.TestCase):
         self.assertNotIn("Team test list", body)
         self.assertIn("Team test list", a.get("/work?team=1")[1])
 
+    def test_6_board_moves(self):
+        import lifecycle
+        a = self.admin()
+        sel = next(x for x in db.list_selections() if x["name"] == "Retail shortlist")
+        s, b, _ = a.post("/api/admin/board/move", {"kind": "sel", "id": sel["id"], "to": "ready", "note": "Prices inside"})
+        self.assertEqual((s, b["ok"]), (200, True), b)
+        self.assertEqual(lifecycle.state_of(db.selection(sel["id"]))["key"], "ready")
+        s, b, _ = a.post("/api/admin/board/move", {"kind": "sel", "id": sel["id"], "to": "requested"})
+        self.assertNotEqual(lifecycle.state_of(db.selection(sel["id"]))["key"], "ready")
+        s, b, _ = a.post("/api/admin/board/move", {"kind": "sel", "id": sel["id"], "to": "approved"})
+        self.assertEqual(s, 400)                                  # approving is the client's step
+        cid = db.create_campaign("Board camp", code_id=sel["code_id"])
+        s, b, _ = a.post("/api/admin/board/move", {"kind": "camp", "id": cid, "to": "live"})
+        self.assertIn("/campaigns/edit", b.get("go", ""))         # no dates yet: sent to set them up
+        db.save_campaign(cid, status="live")
+        s, b, _ = a.post("/api/admin/board/move", {"kind": "camp", "id": cid, "to": "completed"})
+        self.assertEqual(db.campaign(cid)["status"], "ended")
+        self.assertEqual(Client(self.base).post("/api/admin/board/move", {"kind": "camp", "id": cid, "to": "live"})[0], 403)
+
     def test_5_old_pages_still_open(self):
         a = self.admin()
         for p in ("/clients/by-code", "/clients?archived=1", "/selections", "/portal", "/codes"):

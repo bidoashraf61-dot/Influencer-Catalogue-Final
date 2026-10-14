@@ -272,7 +272,7 @@ def board_cards(team=False):
             else:
                 nxt, tone = "Report", "go" if k == "live" else "calm"
         cards[k].append({"name": s["name"], "client": client, "n": n, "price": price, "next": nxt, "tone": tone, "href": href,
-                         "when": when or 0, "find": (s["name"] + " " + client).lower()})
+                         "when": when or 0, "find": (s["name"] + " " + client).lower(), "kind": "sel", "id": s["id"]})
     for c in db.list_campaigns():
         if c["id"] in linked or ("archived_at" in c.keys() and c["archived_at"]):
             continue
@@ -291,7 +291,7 @@ def board_cards(team=False):
                 nxt, tone = "%d post%s still to come" % (gap, "" if gap == 1 else "s"), ""
         href = u("/campaigns/edit") + "?id=%d" % c["id"] if k == "approved" else u("/campaigns/report") + "?id=%d" % c["id"]
         cards[k].append({"name": c["name"], "client": client, "n": c["creators"] or 0, "price": info or "Campaign", "next": nxt, "tone": tone,
-                         "href": href, "when": c["updated_at"] or 0, "find": (c["name"] + " " + client).lower()})
+                         "href": href, "when": c["updated_at"] or 0, "find": (c["name"] + " " + client).lower(), "kind": "camp", "id": c["id"]})
     # Quote requests the client sent from the catalogue that no selection carries yet: they wait in the black column too,
     # so the board and the "quote requests waiting" count agree.
     shown = {(c["find"]) for c in cards["requested"]}
@@ -320,14 +320,16 @@ def board_page(ok=None, err=None, team=False):
         lst = cards[k]
         shown = lst[:12] if k == "completed" else lst
         html = "".join(
-            "<a class='hb-card' href='%s' data-find='%s'><b>%s</b><div class='c'>%s%s</div><div class='r'><span>%s</span><em>%s</em></div>%s</a>" % (
-                e(c["href"]), e(c["find"]), e(c["name"]), e(c["client"]), (" · " + e(ago(c["when"]))) if k == "requested" and c["when"] else "",
+            "<a class='hb-card' href='%s' data-find='%s'%s><b>%s</b><div class='c'>%s%s</div><div class='r'><span>%s</span><em>%s</em></div>%s</a>" % (
+                e(c["href"]), e(c["find"]),
+                (" draggable='true' data-kind='%s' data-id='%d' data-from='%s'" % (c["kind"], c["id"], k)) if c.get("kind") else "",
+                e(c["name"]), e(c["client"]), (" · " + e(ago(c["when"]))) if k == "requested" and c["when"] else "",
                 "%d creator%s" % (c["n"], "" if c["n"] == 1 else "s"), e(c["price"]),
                 ("<div class='nx %s'>%s</div>" % (c["tone"], e(c["next"]))) if c["next"] else "") for c in shown)
         if k == "completed" and len(lst) > 12:
             html += "<a class='hb-more' href='%s'>All %d completed</a>" % (u("/campaigns"), len(lst))
-        cols += "<section class='hb-col%s' aria-label='%s'><h3>%s <i>%d</i></h3>%s</section>" % (
-            " hot" if k == "requested" else "", e(lab), e(lab), len(lst), html or "<p class='hb-empty'>Nothing here.</p>")
+        cols += "<section class='hb-col%s' aria-label='%s' data-col='%s'><h3>%s <i>%d</i></h3>%s</section>" % (
+            " hot" if k == "requested" else "", e(lab), k, e(lab), len(lst), html or "<p class='hb-empty'>Nothing here.</p>")
     head = ("<div class='hb-top'><div><h1>Selections and campaigns</h1><p>Every shortlist from first draft to finished campaign. "
             "The black column is waiting for you. Open a card to price it, send the quote, or follow the campaign.</p></div>"
             "<div class='hb-btns'><nav class='hb-seg' aria-label='View'><a href='%s' aria-current='true'>Board</a><a href='%s'>List</a></nav>"
@@ -338,5 +340,49 @@ def board_page(ok=None, err=None, team=False):
            "<a href='" + u("/work") + "?team=1'" + (" aria-current='true'" if team else "") + ">Include the team's tests</a></nav>"
            "<a class='btn ghost' href='" + u("/campaigns") + "'>All campaigns</a></div>")
     banner = (("<div class='ok'>" + e(ok) + "</div>") if ok else "") + (("<div class='err'>" + e(err) + "</div>") if err else "")
-    legend = "<p class='hb-legend'>Cards move by themselves as the client requests and approves, and as you price, send, go live and end. Archived ones are in the List view.</p>"
-    return page("Selections and campaigns", CSS + head + banner + bar + "<div class='hb-board'>" + cols + "</div>" + legend + _FIND_JS, "/work")
+    legend = ("<p class='hb-legend'>Drag a card to move it: to <b>Quote ready</b> (tells the client), back to <b>Quote requested</b>, "
+              "from <b>Approved</b> to <b>Campaign live</b> (sets up or starts the campaign), and between <b>Campaign live</b> and "
+              "<b>Completed</b>. Every move asks you first and can be undone in History. <b>Approved</b> is the client's own step.</p>")
+    return page("Selections and campaigns", CSS + DND_CSS + head + banner + bar + "<div class='hb-board'>" + cols + "</div>" + legend + _FIND_JS
+                + DND_JS % json.dumps(u("/api/admin/board/move")), "/work")
+
+
+DND_CSS = ("<style>.hb-card[draggable=true]{cursor:grab}.hb-card.dragging{opacity:.45}"
+           ".hb-col.drop-ok{outline:2px dashed var(--ink);outline-offset:-4px}.hb-col.hot.drop-ok{outline-color:var(--lime)}"
+           ".hb-col.drop-no{opacity:.55}"
+           "@media (prefers-reduced-motion:reduce){.hb-card{transition:none}}</style>")
+
+# Which moves a card may make, by kind and from-column. Everything else is refused before asking.
+DND_JS = """<script>(function(){
+var URL=%s;
+var MOVES={sel:{draft:['ready'],requested:['ready'],ready:['requested'],approved:['live']},
+           camp:{approved:['live'],live:['completed'],completed:['live']}};
+var ASK={ready:'Mark this quote ready? The client is told in their portal and can approve it.',
+         requested:'Take the quote back? The selection reads Quote requested again.',
+         live:'Start this campaign? The client sees its report.',
+         completed:'End this campaign? Its report is kept as it is now.'};
+var drag=null;
+function allowed(c,to){var m=MOVES[c.dataset.kind]||{};return (m[c.dataset.from]||[]).indexOf(to)>=0;}
+document.querySelectorAll('.hb-card[draggable=true]').forEach(function(c){
+  c.addEventListener('dragstart',function(ev){drag=c;c.classList.add('dragging');ev.dataTransfer.effectAllowed='move';
+    try{ev.dataTransfer.setData('text/plain',c.dataset.id);}catch(x){}
+    document.querySelectorAll('.hb-col').forEach(function(col){var to=col.dataset.col;
+      if(to===c.dataset.from)return;col.classList.add(allowed(c,to)?'drop-ok':'drop-no');});});
+  c.addEventListener('dragend',function(){c.classList.remove('dragging');drag=null;
+    document.querySelectorAll('.hb-col').forEach(function(col){col.classList.remove('drop-ok','drop-no');});});
+});
+document.querySelectorAll('.hb-col').forEach(function(col){
+  col.addEventListener('dragover',function(ev){if(drag&&allowed(drag,col.dataset.col)){ev.preventDefault();ev.dataTransfer.dropEffect='move';}});
+  col.addEventListener('drop',function(ev){ev.preventDefault();var c=drag,to=col.dataset.col;if(!c||!allowed(c,to))return;
+    var note='';
+    if(to==='ready'){note=window.prompt(ASK.ready+'\n\nA short note for the client (optional):','');if(note===null)return;}
+    else if(!window.confirm(ASK[to]||'Move this card?'))return;
+    fetch(URL,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({kind:c.dataset.kind,id:Number(c.dataset.id),to:to,note:note})})
+     .then(function(r){return r.json().catch(function(){return {};}).then(function(b){return {s:r.status,b:b};});})
+     .then(function(r){if(r.b.go){location.href=r.b.go;return;}
+       if(r.s!==200||!r.b.ok){window.alert(r.b.message||'That move did not work. Open the card instead.');return;}
+       location.href=location.pathname+location.search.replace(/([?&])(ok|e)=[^&]*/g,'')+(location.search?'&':'?')+'ok='+encodeURIComponent(r.b.message||'Moved.');});
+  });
+});
+})();</script>"""

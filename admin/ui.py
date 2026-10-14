@@ -199,7 +199,6 @@ a{color:inherit}
 .nav-item .ic{flex:none}
 .nav-item .badge{margin-left:auto;flex:none}
 td code{white-space:nowrap}
-@media (min-width:1001px){.hv-voice{right:auto!important;left:calc(var(--side) - 84px)!important;bottom:132px!important}.app.is-collapsed~.hv-voice{left:2px!important}}
 .nav-item span.t{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .views{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-6px 0 14px}
 .views .pill{text-decoration:none}.views .vx{border:0;background:transparent;cursor:pointer;color:var(--gray);font-size:var(--t-lg,17px);line-height:1;padding:0 6px 0 0;min-width:24px;min-height:24px}
@@ -619,6 +618,8 @@ body:has(#cp-log) .hv-voice{display:none}
 @media (prefers-reduced-motion:reduce){.hv-launch,.hv-launch:hover{animation:none}.hv-launch__vid{display:none}}
 @media (max-width:760px){.hv-voice{right:16px;bottom:16px}body:has(.savebar) .hv-voice{bottom:84px}.hv-launch{width:60px;height:60px}.hv-launch__face,.hv-launch__vid{width:64px;height:84px;clip-path:inset(0 0 0 0 round 0 0 32px 32px)}.hv-tip{display:none}
   body:has(#undo-toast:not([hidden])) .hv-voice{opacity:0;pointer-events:none}}
+/* Smaller in the corner (owner, 2026-10-14), so it covers less of a table */
+.hv-voice{right:20px;bottom:20px}.hv-launch{width:48px;height:48px}.hv-launch__face,.hv-launch__vid{left:-1px;width:50px;height:66px;clip-path:inset(0 0 0 0 round 0 0 25px 25px)}body:has(.savebar) .hv-voice{bottom:84px}
 @media print{.hv-voice{display:none!important}}
 .hd-acts{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .hd-acts form{margin:0}
