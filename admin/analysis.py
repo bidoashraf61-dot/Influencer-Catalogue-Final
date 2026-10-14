@@ -530,13 +530,22 @@ def media_path(code, name):
 _TT_LIVE = {}      # TikTok picture links, kept a day: the lookup is about a second per post
 
 
+_IG_ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_"
+
+
 def live_picture(post_url):
     """The platform's own picture for a post, as a link the viewer's browser loads: Instagram's /media/ address
     for a post or reel, TikTok's thumbnail from its public lookup. None when the link is not one of ours."""
     u = str(post_url or "")
     m = re.search(r"instagram\.com/(?:[^/]+/)?(?:p|reel|reels|tv)/([A-Za-z0-9_-]+)", u)
     if m:
-        return "https://www.instagram.com/p/%s/media/?size=m" % m.group(1)
+        code = m.group(1)
+        if code.isdigit():                   # some links carry Instagram's numeric id: the address needs its short code
+            n, code = int(code), ""
+            while n:
+                n, r = divmod(n, 64)
+                code = _IG_ALPHA[r] + code
+        return "https://www.instagram.com/p/%s/media/?size=m" % code
     if re.search(r"tiktok\.com/@[^/]+/video/\d+", u):
         hit = _TT_LIVE.get(u)
         if hit and time.time() - hit[0] < 86400:
