@@ -1,0 +1,38 @@
+{
+ "version": "2026-10-14",
+ "note": "TikTok engagement = (likes + comments) / views, %; middle half of our creators per size",
+ "platforms": {
+  "TikTok": {
+   "nano": {
+    "n": 1658,
+    "low": 4.06,
+    "median": 6.52,
+    "high": 10.59
+   },
+   "micro": {
+    "n": 2736,
+    "low": 3.58,
+    "median": 5.64,
+    "high": 10.35
+   },
+   "mid": {
+    "n": 1634,
+    "low": 3.26,
+    "median": 5.13,
+    "high": 8.27
+   },
+   "macro": {
+    "n": 660,
+    "low": 3.63,
+    "median": 5.67,
+    "high": 10.09
+   },
+   "mega": {
+    "n": 386,
+    "low": 3.49,
+    "median": 5.28,
+    "high": 8.37
+   }
+  }
+ }
+}

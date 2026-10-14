@@ -761,8 +761,8 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     if fake is not None:
         out["checks"].append({"label": "Fake followers", "text": "%s of followers look fake" % _pct(fake),
                               "level": "ok" if fake <= fk_good else "bad" if fake >= fk_bad else "warn"})
-        if fake >= fk_bad:
-            extra_watch.append("fake followers %s, not counted in this score" % _pct(fake))
+        if fake >= fk_bad and fake <= ((target or {}).get("max_fake") or 30):
+            extra_watch.append("fake followers %s: on the high side" % _pct(fake))
     if record and record.get("posts", 0) >= 2 and record.get("er") is not None and record.get("typical_er"):
         r = record["er"] / record["typical_er"]
         out["checks"].append({"label": "Our campaigns", "text": "%s engagement per view in %d of our campaign%s (typical %s)" % (
@@ -808,26 +808,30 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
     # (shown as "Not recommended"). Unknown fake share: no cap, but it is listed as a check.
     # Rule 1 (owner-approved 2026-10-14): views more than three times the typical top for their size are
     # "check" and cannot score above 80, because such numbers are usually bought or inflated.
+    rule_notes = []
     if use_v5 and v5r and v5r.get("metrics", {}).get("reach"):
         rv = v5r["metrics"]["reach"]
         top = (rv.get("benchmark") or {}).get("high") or 0
         if top and rv.get("value", 0) > 3 * top:
             val = min(val, 80)
-            out.setdefault("watchouts", []).append("views are %.0f times the typical top: check the posts before booking" % (rv["value"] / top))
+            rule_notes.append("Views are %.0f times the typical top: score capped at 80, check the posts before booking" % (rv["value"] / top))
+    # Rule 1b (owner-approved 2026-10-14): the same for engagement more than three times the typical top for their size.
+    if use_v5 and v5r and v5r.get("metrics", {}).get("engagement"):
+        ev = v5r["metrics"]["engagement"]
+        top = (ev.get("benchmark") or {}).get("high") or 0
+        if top and ev.get("value", 0) > 3 * top:
+            val = min(val, 80)
+            rule_notes.append("Engagement is %.0f times the typical top: score capped at 80, check the posts before booking" % (ev["value"] / top))
     fake_lim = (target or {}).get("max_fake") or 30
     fake_now = doc.get("fake_followers_pct")
     if isinstance(fake_now, (int, float)) and fake_now > fake_lim:
         val = min(val, 39)
-        fake_note = "Fake followers %s is over the limit of %d%%: score capped at the Weak band" % (_pct(fake_now), fake_lim)
-        out["watchouts"] = out.get("watchouts", [])
-        out.setdefault("_fake_cap", fake_note)
+        rule_notes.insert(0, "Fake followers %s is over the limit of %d%%: score capped at Not recommended" % (_pct(fake_now), fake_lim))
     out["score"], out["tag"] = val, band_for(val)
-    if out.get("_fake_cap"):
-        out["watchouts"] = [out.pop("_fake_cap")] + out["watchouts"]
     lo_s, hi_s = out["score_range"]
     out["tag_range"] = [band_for(lo_s), band_for(hi_s)]
     out["strengths"] = [got[k]["good"] for k in sm.PARAMS if k in got and got[k]["mid"] >= 0.6]
-    out["watchouts"] = extra_watch + [got[k]["bad"] for k in sm.PARAMS if k in got and got[k]["mid"] < 0.3]
+    out["watchouts"] = rule_notes + extra_watch + [got[k]["bad"] for k in sm.PARAMS if k in got and got[k]["mid"] < 0.3]
     if capped:
         out["watchouts"].insert(0, capped)
         out["metrics"].append({"label": "Cap", "value": "max %d (%s)" % (sm.FEED_CAP, band_for(sm.FEED_CAP)), "note": capped, "level": "warn"})

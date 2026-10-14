@@ -99,10 +99,30 @@ def _roster_bands():
 ROSTER_BANDS = _roster_bands()
 
 
+def _engagement_bands():
+    """Our own TikTok engagement-per-view bands (admin/reference/engagement_bands.json, from tools/engagement_bands.py).
+    TikTok's rate is per view; the published per-follower ranges (3.4-3.8%) made ordinary creators read as twice the top."""
+    import json, os
+    f = os.path.join(os.path.dirname(os.path.abspath(__file__)), "reference", "engagement_bands.json")
+    try:
+        with open(f) as fh:
+            return json.load(fh).get("platforms", {})
+    except (OSError, ValueError):
+        return {}
+
+
+ENG_BANDS = _engagement_bands()
+
+
 def _range(kind, platform, followers):
     if kind == "engagement":
-        ref = intl_benchmarks.reference(platform, followers)
-        rng = [ref["low"], ref["high"]] if ref else None
+        band = intl_benchmarks.band_of(followers) if followers else None
+        mine = (ENG_BANDS.get(platform) or {}).get(band) if band else None
+        if mine:                                   # TikTok: our roster's per-view range
+            rng = [mine["low"], mine["high"]]
+        else:
+            ref = intl_benchmarks.reference(platform, followers)
+            rng = [ref["low"], ref["high"]] if ref else None
     else:
         band = intl_benchmarks.band_of(followers) if followers else None
         mine = (ROSTER_BANDS.get(platform) or {}).get(band) if band else None
@@ -124,7 +144,7 @@ def _grade(kind, value, rng):
 def _graded(kind, value, creator, source, conf, note=None):
     """Entry for a benchmarked metric, or None when the value is implausible or has no benchmark."""
     platform, followers = creator.get("platform"), _num(creator.get("followers"))
-    if value is None or value < 0 or value > IMPLAUSIBLE[kind]:
+    if value is None or value <= 0 or value > IMPLAUSIBLE[kind]:
         return None
     rng = _range(kind, platform, followers) if followers else None
     if not rng:
@@ -146,6 +166,12 @@ def _engagement(c):
     er = _num(c.get("er_pct"))
     has = lambda k: _num(c.get(k)) is not None
     backed = has("avg_likes") or has("avg_views") or has("avg_plays") or has("engagements")
+    # 0 engagement, or under one like per post on a real account, is missing data (hidden likes, a failed scrape),
+    # not a creator nobody reacts to: the creator then "needs data" instead of scoring 0 (owner-approved 2026-10-14).
+    if er is not None and er <= 0:
+        er = None
+    if platform == "Instagram" and has("avg_likes") and _num(c.get("avg_likes")) < 1 and (followers or 0) >= 1000:
+        return None
     # rung 1: the stored rate with figures behind it. Instagram needs likes (hidden likes understate the rate).
     if er is not None and (has("avg_likes") if platform == "Instagram" else backed):
         got = _graded("engagement", er, c, "stored", CONF["engagement"]["stored"])
