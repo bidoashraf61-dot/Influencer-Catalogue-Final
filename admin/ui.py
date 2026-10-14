@@ -75,7 +75,7 @@ NAV = [
     ("", [("/", "Control Centre", "grid", None)]),
     ("Control", [("/roster", "Creators", "users", None),
                  ("/clients", "Clients and codes", "building", None),
-                 ("/work", "Selections and campaigns", "flag", None),
+                 ("/work", "Selections & campaigns", "flag", None),
                  ("/reference", "Scoring rules", "target", None),
                  ("/settings", "Settings and keys", "gear", None),
                  ("/team", "People and access", "key", None)]),
@@ -197,7 +197,8 @@ a{color:inherit}
 .nav-item[aria-current=page]{background:var(--ink-3);color:#fff}
 .nav-item[aria-current=page] .ic{color:var(--lime)}
 .nav-item .ic{flex:none}
-.nav-item .badge{margin-left:auto}
+.nav-item .badge{margin-left:auto;flex:none}
+.nav-item span.t{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .views{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:-6px 0 14px}
 .views .pill{text-decoration:none}.views .vx{border:0;background:transparent;cursor:pointer;color:var(--gray);font-size:var(--t-lg,17px);line-height:1;padding:0 6px 0 0;min-width:24px;min-height:24px}
 .bulkbar{position:sticky;top:calc(var(--bar) + 8px);z-index:20;display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 14px;margin:0 0 12px;background:var(--ink);color:#fff;border-radius:var(--r-md);box-shadow:0 10px 30px rgba(0,0,0,.2)}
