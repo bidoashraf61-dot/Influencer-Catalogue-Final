@@ -613,6 +613,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_discover("facets")
         if path == "/api/evidence":
             return self.api_evidence(query.get("s") or "")
+        if path == "/api/brand-logo":
+            got = evidence.logo_file(query.get("n") or "")
+            if not got:
+                return self.send(404, b"", "text/plain")
+            return self.send(200, got[0], got[1], [("Cache-Control", "public, max-age=2592000"),
+                                                    ("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'")])
         if path == "/api/evidence/map":
             return self.api_evidence(query.get("s") or "", None, None, True)
         if path == "/api/evidence/thumb":
@@ -1134,6 +1140,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_tags()
         if path == "/api/selection/platform":
             return self.api_selection_platform()
+        if path == "/api/evidence/add":
+            return self.api_evidence_add()
         if path == "/api/selection/status":
             return self.api_selection_status()
         if path == "/api/selection/reason":
@@ -4766,6 +4774,27 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect("/evidence?ok=" + urllib.parse.quote("Pack deleted."))
         return self.send(404, "Not found", "text/plain; charset=utf-8")
 
+    def api_evidence_add(self):
+        """Market Intelligence: put a creator from the selection's evidence pack into the selection.
+        For HelloVoice (and a KAM on her client) and the selection's owner; colleagues only look."""
+        b = self.json_body()
+        token = str(b.get("token") or "")
+        sel = db.selection(token=token) if token else None
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        staff = self.admin_like_for(sel["code_id"])
+        reader = self.selection_viewer(token)
+        if not staff and not (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())):
+            return self.send_json(403, {"ok": False, "reason": "not_owner"}, self.cors())
+        pk = evidence.for_selection(sel["id"], client_only=not staff)
+        if pk is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        with history.tracked("selection", sel["id"], "Added @%s from Market Intelligence" % str(b.get("handle") or "")[:40]):
+            code = evidence.add_by_handle(pk, sel, str(b.get("handle") or ""))
+        if code is None:
+            return self.send_json(404, {"ok": False, "reason": "not_on_roster"}, self.cors())
+        return self.send_json(200, {"ok": True, "code": code}, self.cors())
+
     def api_evidence(self, token, creator=None, thumb_post=None, as_map=False):
         """The competitor evidence filed under a selection, for its client page — only when an admin
         switched it on for the client, and behind the same link check as /api/selection. With
@@ -4786,7 +4815,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "evidence": None}, self.cors())
         codes = json.loads(sel["codes"] or "[]")
         if as_map:
-            out = evidence.map_payload(pk, codes)
+            out = evidence.map_payload(pk, codes, self.selection_objective(sel))
+            reader = self.selection_viewer(sel["token"])
+            out["can_add"] = bool(staff or (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())))
             out["preview"] = bool(staff and not pk["client_visible"])
             return self.send_json(200, {"ok": True, "map": out}, self.cors())
         if thumb_post is not None:

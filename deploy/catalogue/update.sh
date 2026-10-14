@@ -56,6 +56,9 @@ mkdir -p "$DST/campaign/dashboard" "$DST/creator" "$DST/account" "$DST/privacy" 
 cp "$SRC/campaign/index.html"       "$DST/campaign/index.html"
 cp "$SRC/campaign/dashboard/index.html" "$DST/campaign/dashboard/index.html"
 cp "$SRC/creator/index.html"        "$DST/creator/index.html"
+# Market Intelligence (competitor map), hand-written; opened from a selection.
+mkdir -p "$DST/market"
+cp "$SRC/market/index.html"         "$DST/market/index.html"
 # The client's own account page, also hand-written.
 cp "$SRC/account/index.html"        "$DST/account/index.html"
 # HELVY Connect privacy notice and terms (drafts pending legal review), hand-written.
@@ -86,7 +89,7 @@ names = ('js/catalogue.js', 'css/catalogue.css', 'js/portal.js', 'css/portal.css
          'js/connect.js', 'css/connect.css', 'js/evidence.js', 'css/evidence.css')
 stamp = {n: h('assets/' + n) for n in names}
 for page in ('index.html', 'selection/index.html', 'campaign/index.html',
-             'campaign/dashboard/index.html', 'creator/index.html', 'account/index.html',
+             'campaign/dashboard/index.html', 'creator/index.html', 'account/index.html', 'market/index.html',
              'privacy/index.html', 'terms/index.html'):
     f = root / page
     s = f.read_text()

@@ -128,7 +128,7 @@ class Evidence(unittest.TestCase):
         self.assertIn("RivalSkin", body)
         self.assertIn("internal note", body)                      # admins see the analyst's read
         self.assertIn("Open selection: Polyco glow", body)       # back to the selection
-        self.assertIn("&amp;mi=map", body)                         # and to the client-side map
+        self.assertIn("/market/#s=", body)                         # and to the Market Intelligence page
         s2, sbody, _ = a.get("/selections/edit?id=%d" % self.sel)
         self.assertIn("Market Intelligence", sbody)               # and from the selection to the pack
         self.assertIn("/evidence/view?id=%d" % pid, sbody)
@@ -208,6 +208,27 @@ class Evidence(unittest.TestCase):
         self.assertTrue(by["bought"]["paid_only"])
         self.assertNotIn("internal note", json.dumps(b))
         self.assertEqual(self.stranger.get("/api/evidence/map?s=" + self.token)[0], 401)
+
+    def test_3d_logos_ranking_and_add_to_selection(self):
+        svg_ok = b'<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>'
+        evidence.set_logo("RivalSkin", svg_ok, "svg", source="test")
+        with self.assertRaises(ValueError):
+            evidence.set_logo("Evil", b'<svg onload="alert(1)"></svg>', "svg")
+        evidence.set_logo("Pending", svg_ok, "svg", approved=False)
+        r = self.client.op.open(urllib.request.Request(self.base + "/api/brand-logo?n=RivalSkin"))
+        self.assertEqual((r.status, r.headers["Content-Type"]), (200, "image/svg+xml"))
+        self.assertEqual(self.client.get("/api/brand-logo?n=Pending")[0], 404)       # not approved: not served
+        m = self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]
+        self.assertEqual(m["rank_by"], "views")                                      # no objective set: views
+        self.assertTrue(m["competitors"][0]["logo"].startswith("/api/brand-logo?n=RivalSkin"))
+        self.assertEqual([c["handle"] for c in m["creators"]][:3], ["noha", "newface", "sara"])  # ranked by median views
+        self.assertTrue(m["can_add"])                                                # the owner may add
+        # sara is in the pack and on the roster but not in the selection: the owner adds her
+        s, b, _ = self.client.post("/api/evidence/add", {"token": self.token, "handle": "sara"})
+        self.assertEqual((s, b.get("code")), (200, "HV-MI-002"), b)
+        self.assertIn("HV-MI-002", json.loads(db.selection(self.sel)["codes"]))
+        self.assertEqual(self.stranger.post("/api/evidence/add", {"token": self.token, "handle": "sara"})[0], 403)
+        self.assertEqual(self.client.post("/api/evidence/add", {"token": self.token, "handle": "nobody"})[0], 404)
 
     def test_4_tiktok_adds_to_the_same_pack(self):
         a = self.admin()

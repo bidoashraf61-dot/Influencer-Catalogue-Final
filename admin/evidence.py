@@ -52,6 +52,15 @@ CREATE TABLE IF NOT EXISTS evidence_posts (
 );
 CREATE INDEX IF NOT EXISTS evidence_posts_pack ON evidence_posts (pack_id, brand, competitor);
 CREATE INDEX IF NOT EXISTS evidence_posts_code ON evidence_posts (code);
+-- Brand logos (competitors and the client's own brands), shown only once approved by HelloVoice.
+CREATE TABLE IF NOT EXISTS brand_logos (
+    name TEXT PRIMARY KEY,        -- the brand as studies name it, e.g. "Garnier", "Alpha Plus"
+    file TEXT NOT NULL,           -- in LOGO_DIR
+    source TEXT,
+    credit TEXT,                  -- licence credit when one is required
+    approved_at INTEGER,
+    updated_at INTEGER
+);
 -- Creators a pack put on the roster: the mark Apify jobs target ("evidence:<pack id>"), even while hidden.
 CREATE TABLE IF NOT EXISTS evidence_roster (
     code TEXT PRIMARY KEY,
@@ -590,8 +599,11 @@ def client_payload(pk, selection_codes=()):
             d["brands"].add(r["competitor"])
             d["posts"] += 1
     by_code = {c: {"brands": len(d["brands"]), "posts": d["posts"]} for c, d in by_code.items()}
+    approved = logos()
+    names = {c["competitor"] for b in brands for c in b["competitors"]} | {b["brand"] for b in brands}
     return {"title": pk["title"], "objective": pk["objective"], "platforms": json.loads(pk["platforms"] or "[]"),
-            "updated": pk["updated_at"], "brands": brands, "by_code": by_code}
+            "updated": pk["updated_at"], "brands": brands, "by_code": by_code,
+            "logos": {n: logo_url(n, approved) for n in names if logo_url(n, approved)}}
 
 
 def _reach(code):
@@ -623,6 +635,69 @@ import threading as _threading
 _thumb_locks = {}
 _thumb_guard = _threading.Lock()
 _thumb_miss = {}                      # file name -> when a fetch last failed (retried after an hour)
+
+
+LOGO_DIR = None      # set in init(): admin/brand_logos (not in git)
+
+
+def logo_dir():
+    from pathlib import Path
+    return LOGO_DIR or (Path(__file__).resolve().parent / "brand_logos")
+
+
+def logos():
+    """{brand name (lower case): row} for approved logos."""
+    with _conn() as conn:
+        return {r["name"].lower(): r for r in conn.execute("SELECT * FROM brand_logos WHERE approved_at IS NOT NULL")}
+
+
+def logo_url(name, approved=None):
+    """The public link of a brand's approved logo, or None (then the page falls back to text)."""
+    approved = logos() if approved is None else approved
+    r = approved.get((name or "").lower())
+    return ("/api/brand-logo?n=%s&v=%d" % (urllib.parse.quote(r["name"]), r["updated_at"] or 0)) if r else None
+
+
+def logo_file(name):
+    """(bytes, content type) of an approved logo, for /api/brand-logo."""
+    r = logos().get((name or "").lower())
+    if r is None:
+        return None
+    from pathlib import Path
+    f = logo_dir() / Path(r["file"]).name
+    if not f.is_file():
+        return None
+    ext = f.suffix.lower()
+    return f.read_bytes(), {".svg": "image/svg+xml", ".png": "image/png", ".webp": "image/webp", ".jpg": "image/jpeg"}.get(ext, "application/octet-stream")
+
+
+def set_logo(name, data, ext, source="", credit="", approved=True):
+    """Store a brand logo (SVGs are checked for scripts and external references)."""
+    import re as _re
+    ext = ext.lower().lstrip(".")
+    if ext not in ("svg", "png", "webp", "jpg"):
+        raise ValueError("Logos must be SVG, PNG, WebP or JPG.")
+    if ext == "svg":
+        text = data.decode("utf-8", "replace")
+        if _re.search(r"<script|on\w+\s*=|javascript:|<foreignObject|xlink:href\s*=\s*[\"']https?:|href\s*=\s*[\"']https?:", text, _re.I):
+            raise ValueError("That SVG has scripts or outside links in it.")
+        # Without a viewBox an SVG drawn inside another one stretches instead of keeping its shape.
+        m = _re.search(r"<svg\b[^>]*>", text)
+        if m and "viewbox" not in m.group(0).lower():
+            w = _re.search(r'\bwidth="([\d.]+)', m.group(0)); h = _re.search(r'\bheight="([\d.]+)', m.group(0))
+            if w and h:
+                text = text.replace(m.group(0), m.group(0)[:-1].rstrip("/") + ' viewBox="0 0 %s %s">' % (w.group(1), h.group(1)), 1)
+                data = text.encode()
+    d = logo_dir()
+    d.mkdir(exist_ok=True)
+    fname = "%s.%s" % (_re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "logo", ext)
+    (d / fname).write_bytes(data)
+    with _conn() as conn:
+        conn.execute("INSERT INTO brand_logos (name, file, source, credit, approved_at, updated_at) VALUES (?,?,?,?,?,?) "
+                     "ON CONFLICT(name) DO UPDATE SET file=excluded.file, source=excluded.source, credit=excluded.credit, "
+                     "approved_at=excluded.approved_at, updated_at=excluded.updated_at",
+                     (name, fname, source, credit, db.now() if approved else None, db.now()))
+    return fname
 
 
 def thumb_file(url):
@@ -686,7 +761,7 @@ def fill_thumbs(pack_ids, pause=0.6, log=print):
     return got, miss
 
 
-def map_payload(pk, selection_codes=()):
+def map_payload(pk, selection_codes=(), objective="Awareness"):
     """The Market Intelligence map: the client's brand, its competitors (sized by views) and every creator
     who worked with them (median organic views, type, which competitors, their posts). Creators who are
     in this selection carry their code (it is on their card already); nobody else's code leaves."""
@@ -705,22 +780,58 @@ def map_payload(pk, selection_codes=()):
         p["platforms"].add(r["platform"])
         p["competitors"][r["competitor"]] = p["competitors"].get(r["competitor"], 0) + 1
         p["posts"].append(r)
+    # Ranking follows the campaign objective (owner, 2026-10-14): awareness by views, engagement by
+    # likes + comments. Nothing else is weighed in.
+    by_eng = "Engagement" in (objective or "") and "Awareness" not in (objective or "")
+    with _conn() as conn:
+        roster = {r["code"]: r for r in conn.execute(
+            "SELECT code, photo, active FROM creators WHERE code IN (SELECT DISTINCT code FROM evidence_posts WHERE pack_id = ?)", (pk["id"],))}
+    by_handle_code = {}
+    for r in rows:
+        if r["code"]:
+            by_handle_code.setdefault(r["handle"], r["code"])
+    import links
     out = []
     for p in people.values():
         organic = [r for r in p["posts"] if not r["likely_paid_boost"]]
         ps = sorted(p["posts"], key=lambda r: -(r["views"] or 0))
-        out.append({"handle": p["handle"], "name": p["name"], "type": p["type"], "followers": p["followers"], "code": p["code"],
+        rc = roster.get(by_handle_code.get(p["handle"]))
+        photo = rc["photo"] if rc is not None and rc["active"] and rc["photo"] else None
+        inter = _med([(r["likes"] or 0) + (r["comments"] or 0) for r in organic if r["likes"] is not None])
+        out.append({"handle": p["handle"], "name": p["name"], "type": _ctype(p["type"]), "followers": p["followers"], "code": p["code"],
+                    "in_selection": bool(p["code"]), "on_roster": rc is not None,
+                    "photo": links.thumb(photo) if photo else None, "photo_large": links.photo(photo) if photo else None,
+                    "interactions": inter,
+                    "rank_value": inter if by_eng else _med([r["views"] for r in organic]),
                     "platforms": sorted(p["platforms"]), "competitors": p["competitors"],
                     "median_views": _med([r["views"] for r in organic]), "median_er": _med([r["er_views"] for r in organic]),
                     "paid_only": not organic,
                     "posts": [{"id": r["id"], "url": r["url"], "date": r["posted_at"], "competitor": r["competitor"], "platform": r["platform"],
                                "collab": COLLAB_LABEL.get(r["collab_type"], r["collab_type"] or ""), "views": r["views"], "likes": r["likes"],
-                               "comments": r["comments"], "er": r["er_views"], "paid_boost": bool(r["likely_paid_boost"])} for r in ps[:12]]})
-    out.sort(key=lambda p: -(p["median_views"] or 0))
-    return {"brand": brand, "title": pk["title"],
-            "competitors": sorted([{"name": c["name"], "posts": c["posts"], "views": c["views"], "creators": len(c["creators"])}
-                                   for c in comps.values()], key=lambda c: -c["views"]),
+                               "comments": r["comments"], "er": r["er_views"], "paid_boost": bool(r["likely_paid_boost"]),
+                               "same_category": r["relevance"] == "match"} for r in ps]})
+    out.sort(key=lambda p: -(p["rank_value"] or 0))
+    approved = logos()
+    return {"brand": brand, "brand_logo": logo_url(brand, approved), "title": pk["title"],
+            "rank_by": "interactions" if by_eng else "views", "objective": objective,
+            "competitors": sorted([{"name": c["name"], "posts": c["posts"], "views": c["views"], "creators": len(c["creators"]),
+                                    "logo": logo_url(c["name"], approved)} for c in comps.values()], key=lambda c: -c["views"]),
             "creators": out}
+
+
+def add_by_handle(pk, sel, handle):
+    """Put a creator from the pack into the selection (by handle; they must be on the roster).
+    Returns their code, or None."""
+    with _conn() as conn:
+        r = conn.execute("SELECT code FROM evidence_posts WHERE pack_id = ? AND handle = ? AND code IS NOT NULL LIMIT 1",
+                         (pk["id"], (handle or "").lower().lstrip("@"))).fetchone()
+    if r is None:
+        return None
+    have = json.loads(sel["codes"] or "[]")
+    if r["code"] not in have:
+        db.save_selection(sel["id"], sel["name"], have + [r["code"]], json.loads(sel["prices"] or "{}"),
+                          sel["total_from"], sel["total_to"], platform=sel["platform"] if "platform" in sel.keys() else None)
+    return r["code"]
 
 
 def creator_payload(pk, code):
@@ -746,6 +857,7 @@ def creator_payload(pk, code):
                    "comments": r["comments"], "er": r["er_views"], "same_category": r["relevance"] == "match",
                    "paid_boost": bool(r["likely_paid_boost"])} for r in rows[:60]],
         "reach": _reach(code),
+        "logos": {k: logo_url(k) for k in comp if logo_url(k)},
     }
 
 
@@ -869,7 +981,7 @@ def view_page(pk, brand, selections, ok=None, err=None, creator=None):
                 e(pk["title"]), e(", ".join(json.loads(pk["platforms"] or "[]")) or "—"), e(pk["source"] or ""),
                 e(db_date(pk["updated_at"])),
                 (("<a class='btn' href='%s'>Open selection: %s</a>" % (e(u("/selections/edit?id=%d" % sel["id"])), e(sel["name"])))
-                 + ("<a class='btn' href='%s' target='_blank' rel='noopener'>Open map</a>" % e("/selection/#s=%s&mi=map" % sel["token"]))) if sel is not None else "",
+                 + ("<a class='btn' href='%s' target='_blank' rel='noopener'>Open map</a>" % e("/market/#s=%s" % sel["token"]))) if sel is not None else "",
                 e(u("/evidence")))]
     body.append(_msgs(ok, err))
     if creator:
