@@ -136,6 +136,7 @@
 .ev-map__comp > circle { fill: var(--white); stroke: var(--ink); stroke-width: 2.5; }
 .ev-map__comp:hover > circle, .ev-map__comp:focus > circle { stroke-width: 4; }
 .ev-map__comp--hub > circle { fill: var(--white); stroke: var(--lime); stroke-width: 8; }
+.ev-map__comp--hub-dark > circle { stroke: var(--ink); }
 .ev-map__cname { font-family: Bebasneue, "Bebas Neue", sans-serif; font-weight: 400; fill: var(--ink); }
 .ev-map__cnum { font: 700 11px "DM Sans", sans-serif; fill: #383838; paint-order: stroke; stroke: #faf8f4; stroke-width: 4px; }
 .ev-map__dot { cursor: pointer; }

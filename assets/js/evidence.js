@@ -654,7 +654,9 @@
       placed.push({ x: x, y: y, r: r }); return { x: x, y: y };
     }
     function bubble(name, url, x, y, r, big) {
-      var gg = svg("g", { class: "ev-map__comp" + (big ? " ev-map__comp--hub" : ""), tabindex: "0", role: "button", "aria-label": name });
+      // A lime logo (Alpha Plus) disappears in the lime ring, so its ring is black (owner, 2026-10-15).
+      var dark = big && /alpha\s*plus/i.test(name);
+      var gg = svg("g", { class: "ev-map__comp" + (big ? " ev-map__comp--hub" : "") + (dark ? " ev-map__comp--hub-dark" : ""), tabindex: "0", role: "button", "aria-label": name });
       var id = "evl" + (++dotSeq);
       var clip = svg("clipPath", { id: id }); clip.appendChild(svg("circle", { cx: x, cy: y, r: r - 3 })); defs.appendChild(clip);
       gg.appendChild(svg("circle", { cx: x, cy: y, r: r }));
