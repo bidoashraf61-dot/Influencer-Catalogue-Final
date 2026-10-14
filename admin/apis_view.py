@@ -17,6 +17,12 @@ def _sources(current):
             ("all", "All active creators"),
             ("noanalysis", "Only creators with no analysis uploaded yet"),
             ("nosnap", "Only creators not scraped yet on this platform")]
+    import evidence
+    packs = evidence.list_packs()
+    if packs:
+        opts.append(("evidence", "Evidence: every creator added from competitor evidence (hidden ones too)"))
+    for p in packs:
+        opts.append(("evidence:%d" % p["id"], "Evidence: " + (p["title"] or "Untitled")))
     for s in db.list_selections():
         opts.append(("selection:%d" % s["id"], "Selection: " + (s["name"] or "Untitled")))
     for c in db.list_campaigns():

@@ -886,6 +886,7 @@ def build():
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/connect.css')}"/>
+<link rel="stylesheet" href="{stamp('/assets/css/evidence.css')}"/>
 </head>
 <body class="cat-locked" data-page="selection">
 
@@ -997,6 +998,11 @@ def build():
     </div></div>
   </section>
 
+  <!-- Competitor evidence (admin/evidence.py): drawn by evidence.js when a pack is shared on this selection. -->
+  <section class="ev-sec" id="sel-evidence" hidden aria-labelledby="ev-title">
+    <div class="cat-pad"><div class="cat-container" id="ev-root"></div></div>
+  </section>
+
   <section class="cat-close" id="cat-close">
     <div class="cat-pad"><div class="cat-container">
       <h2 class="cat-close__title">Happy with this selection?</h2>
@@ -1089,6 +1095,7 @@ def build():
 <script src="{stamp('/assets/js/catalogue.js')}"></script>
 <script src="{stamp('/assets/js/portal.js')}"></script>
 <script src="{stamp('/assets/js/connect.js')}"></script>
+<script src="{stamp('/assets/js/evidence.js')}"></script>
 </body>
 </html>
 """

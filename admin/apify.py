@@ -348,6 +348,14 @@ def build_handles(job):
             allowed = set(json.loads(r["codes"] or "[]")) if r else set()
         elif src.startswith("creator:"):
             allowed = {src[8:].strip().upper()}
+        elif src == "evidence" or (src.startswith("evidence:") and src[9:].isdigit()):
+            # Creators a competitor evidence pack added to the roster. They are hidden until reviewed,
+            # and analysing them is the point of the mark, so hidden ones count here.
+            import evidence
+            allowed = evidence.roster_codes(int(src[9:]) if src != "evidence" else None)
+            have = {c["code"] for c in rows}
+            rows = list(rows) + [c for c in conn.execute("SELECT * FROM creators WHERE active = 0 ORDER BY sort, code")
+                                 if c["code"] in allowed and c["code"] not in have]
         elif src == "sample20":
             have = {r["code"] for r in conn.execute("SELECT code FROM creator_analysis")}
             ranked = sorted(rows, key=lambda c: (c["code"] not in have, c["code"]))
@@ -826,6 +834,7 @@ def ingest(run, job, items):
                                                                m["posts"], m["verified"], run["id"]))
                     saved += 1
                     save_basic(conn, code, plat, h, it, m, run["id"])
+                    _evidence_profile(conn, code, plat, m["followers"], it)
                 continue
             if job and job["kind"] == "profiles" and code:
                 f = next((x for x in (_num(it.get(k)) for k in (
@@ -841,10 +850,23 @@ def ingest(run, job, items):
                     saved += 1
                     if plat == "Instagram" and "followersCount" in it:
                         save_basic(conn, code, plat, h, it, derive_instagram(it), run["id"])
+                    _evidence_profile(conn, code, plat, f, it)
     return saved
 
 
 _SLIM = "profilePicUrl,profilePicUrlHD,externalUrlShimmed,latestIgtvVideos,relatedProfiles"
+# Instagram profile runs keep the HD picture link: creators added from competitor evidence take their photo from it.
+_SLIM_IG_PROFILES = "profilePicUrl,externalUrlShimmed,latestIgtvVideos,relatedProfiles"
+
+
+def _evidence_profile(conn, code, plat, followers, item):
+    """Creators a competitor evidence pack added are hidden until reviewed; their roster entry (followers,
+    tier, photo) is brought up to date from the profile result. Never fails an ingest."""
+    try:
+        import evidence
+        evidence.on_profile(conn, code, plat, followers, item)
+    except Exception as ex:
+        print("evidence profile update:", code, repr(ex)[:120], flush=True)
 
 
 def refresh_run(run):
@@ -870,7 +892,8 @@ def refresh_run(run):
         offset = 0
         while True:
             page = call("GET", "/datasets/%s/items" % run["dataset"],
-                        params={"format": "json", "clean": "1", "limit": "20", "offset": str(offset), "omit": _SLIM},
+                        params={"format": "json", "clean": "1", "limit": "20", "offset": str(offset),
+                                "omit": _SLIM_IG_PROFILES if job and job["kind"] == "profiles" and job["platform"] == "Instagram" else _SLIM},
                         timeout=90)
             page = page if isinstance(page, list) else []
             if not page:

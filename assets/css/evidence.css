@@ -1,0 +1,34 @@
+/* Competitor evidence on the selection page (assets/js/evidence.js). Uses catalogue.css tokens. */
+.ev-sec { background: var(--white); padding: 56px 0 24px; border-top: 1px solid rgba(18, 18, 18, .08); }
+.ev-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--gray); margin: 0 0 6px; }
+.ev-title { font-family: Bebasneue, "Bebas Neue", sans-serif; font-weight: 400; font-size: clamp(2.75rem, 1.6rem + 3.6vw, 5.5rem); line-height: .9; margin: 0; color: var(--ink); }
+.ev-lede { max-width: 72ch; color: var(--gray); margin: 10px 0 18px; font-size: 15px; line-height: 1.5; }
+.ev-product { color: var(--gray); font-size: 14px; margin: 0 0 14px; }
+.ev-tabs { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border: 1px solid rgba(18, 18, 18, .16); border-radius: 999px; margin-bottom: 14px; }
+.ev-tab { border: 0; background: transparent; border-radius: 999px; padding: 8px 16px; font: 600 14px "DM Sans", sans-serif; color: var(--ink); cursor: pointer; min-height: 40px; }
+.ev-tab[aria-selected="true"] { background: var(--ink); color: var(--lime); }
+.ev-card { border: 1px solid rgba(18, 18, 18, .1); border-radius: 20px; padding: 18px 20px; margin-bottom: 14px; background: var(--white); }
+.ev-card__top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ev-card__name { font-family: Bebasneue, "Bebas Neue", sans-serif; font-weight: 400; font-size: clamp(2rem, 1.4rem + 1.8vw, 3rem); line-height: 1; margin: 0; }
+.ev-chip { display: inline-flex; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 3px 10px; background: var(--linen); color: var(--ink); white-space: nowrap; }
+.ev-chip--in { background: var(--lime); }
+.ev-chip--cat { background: var(--go-soft); color: var(--go); }
+.ev-chip--paid { background: #fde9e9; color: #c01010; }
+.ev-kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 14px 0 6px; }
+.ev-kv div { background: #efece6; border-radius: 12px; padding: 10px 12px; }
+.ev-kv b { display: block; font-family: Bebasneue, "Bebas Neue", sans-serif; font-weight: 400; font-size: 28px; line-height: 1; }
+.ev-kv span { font-size: 12px; color: var(--gray); }
+.ev-sub { font-size: 12.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--gray); margin: 16px 0 6px; }
+.ev-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.ev-t { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; }
+.ev-t th { text-align: left; font-size: 11.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--gray); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid rgba(18, 18, 18, .18); white-space: nowrap; }
+.ev-t td { padding: 9px 10px; border-bottom: 1px solid rgba(18, 18, 18, .08); vertical-align: top; }
+.ev-t .n { text-align: right; white-space: nowrap; }
+.ev-t tr:last-child td { border-bottom: 0; }
+.ev-mut { color: var(--gray); font-size: 12.5px; }
+.ev-link { color: var(--ink); font-weight: 600; text-underline-offset: 3px; }
+.ev-posts summary { cursor: pointer; font-weight: 600; margin-top: 12px; min-height: 32px; display: list-item; }
+@media (max-width: 640px) {
+  .ev-card { padding: 14px; }
+  .ev-t { font-size: 13px; }
+}

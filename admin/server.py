@@ -92,6 +92,7 @@ import matcher  # noqa: E402
 import apify
 import profile_thumbs
 import apis_view
+import evidence
 import reference_view
 import views  # noqa: E402
 import ui  # noqa: E402
@@ -130,6 +131,7 @@ PHOTO_DIR = HERE.parent / "site" / "assets" / "catalogue"
 ROSTER_PAGE = 100
 links.PHOTO_DIR = PHOTO_DIR
 history.PHOTO_DIR = PHOTO_DIR
+evidence.PHOTO_DIR = PHOTO_DIR
 LOGO = HERE.parent / "site" / "assets" / "helv" / "logo-knockout.webp"
 STATIC = HERE / "static"
 ADMIN_COOKIE = "hv_admin"
@@ -608,6 +610,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "licences": licence.for_roster()}, self.cors())
         if path == "/api/discover/facets":
             return self.api_discover("facets")
+        if path == "/api/evidence":
+            return self.api_evidence(query.get("s") or "")
         if path == "/api/selection":
             return self.api_selection(
                 query.get("s") or "", query.get("n") or "",
@@ -911,6 +915,15 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/clients" and not (query.get("archived") or query.get("page")):
             import hub_views
             return self.send(200, hub_views.clients_page(query.get("show") or "all", query.get("open"), query.get("ok"), query.get("e")))
+        if path == "/evidence":
+            return self.send(200, evidence.list_page(kam_scope.clients(who), db.list_codes(), db.list_selections(),
+                                                     query.get("ok"), query.get("e")))
+        if path == "/evidence/view":
+            pk = evidence.pack(kam_scope._int(query.get("id")))
+            if pk is None:
+                return self.redirect("/evidence?e=" + urllib.parse.quote("That pack is gone."))
+            sels = [s for s in db.list_selections() if pk["code_id"] is None or s["code_id"] == pk["code_id"]]
+            return self.send(200, evidence.view_page(pk, query.get("brand"), sels, query.get("ok"), query.get("e")))
         if path == "/work":
             import hub_views
             return self.send(200, hub_views.board_page(query.get("ok"), query.get("e"), query.get("team") == "1"))
@@ -1163,6 +1176,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_history_undo()
         if path == "/clients/preview":
             return self.post_client_preview()
+        if path.startswith("/evidence/"):
+            return self.post_evidence(path, who)
         if path == "/archive":
             f = self.form_body()
             kind = f.get("kind")
@@ -4610,6 +4625,86 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             db.delete_campaign(int(cid))
         return self.redirect("/campaigns?ok=" + urllib.parse.quote("Campaign deleted."))
 
+    # ------------------------------------------------- competitor evidence --
+
+    def post_evidence(self, path, who):
+        f = self.form_body(multi=("codes",))
+        one = lambda k: (f.get(k)[0] if isinstance(f.get(k), list) else f.get(k)) or ""
+        pid = kam_scope._int(one("id") or one("pack_id"))
+        pk = evidence.pack(pid) if pid is not None else None
+        back = "/evidence/view?id=%d" % pid if pk is not None else "/evidence"
+        go = lambda key, msg, extra="": self.redirect(back + ("&" if "?" in back else "?") + key + "=" + urllib.parse.quote(msg) + extra)
+
+        def sel_ok(sid, code_id):
+            """A selection may only carry a pack of its own client."""
+            if sid is None:
+                return True
+            sel = db.selection(sid)
+            return sel is not None and (code_id is None or sel["code_id"] == code_id)
+
+        if path == "/evidence/import":
+            part = f.get("file")
+            if not isinstance(part, dict) or not part.get("data"):
+                return go("e", "Choose the evidence-pack JSON file.")
+            try:
+                if pk is not None:
+                    _, n, m = evidence.import_pack(part["data"], None, pk["code_id"], pack_id=pk["id"], by=who["email"])
+                    return go("ok", "Added %d posts (%d matched to the roster)." % (n, m))
+                code_id, sid = kam_scope._int(one("code_id")), kam_scope._int(one("selection_id"))
+                if code_id is None:
+                    return go("e", "Choose the client this pack is for.")
+                if not sel_ok(sid, code_id):
+                    return go("e", "That selection belongs to another client.")
+                new, n, m = evidence.import_pack(part["data"], one("title").strip()[:120], code_id, sid, by=who["email"])
+            except ValueError as ex:
+                return go("e", str(ex))
+            return self.redirect("/evidence/view?id=%d&ok=%s" % (new, urllib.parse.quote(
+                "Imported %d posts; %d matched to roster creators." % (n, m))))
+        if pk is None:
+            return self.redirect("/evidence?e=" + urllib.parse.quote("That pack is gone."))
+        if path == "/evidence/save":
+            sid = kam_scope._int(one("selection_id"))
+            if not sel_ok(sid, pk["code_id"]):
+                return go("e", "That selection belongs to another client.")
+            evidence.save(pk["id"], one("title").strip()[:120] or pk["title"], sid, one("client_visible") == "1")
+            return go("ok", "Saved.")
+        if path == "/evidence/rematch":
+            return go("ok", "%d posts matched to roster creators." % evidence.rematch(pk["id"]))
+        if path == "/evidence/add":
+            codes = [c.strip().upper() for c in (f.get("codes") or []) if c.strip()]
+            if pk["selection_id"] is None:
+                return go("e", "File this pack under a selection first.")
+            n = evidence.add_to_selection(pk, codes)
+            brand = one("back")
+            return go("ok", "Added %d creator%s to the selection." % (n, "" if n == 1 else "s"),
+                      ("&brand=" + urllib.parse.quote(brand)) if brand else "")
+        if path == "/evidence/roster":
+            added, _ = evidence.add_to_roster(pk, who["email"])
+            return go("ok", "Added %d creator%s to the roster, hidden and marked for analysis." % (len(added), "" if len(added) == 1 else "s"))
+        if path == "/evidence/delete":
+            evidence.delete(pk["id"])
+            return self.redirect("/evidence?ok=" + urllib.parse.quote("Pack deleted."))
+        return self.send(404, "Not found", "text/plain; charset=utf-8")
+
+    def api_evidence(self, token):
+        """The competitor evidence filed under a selection, for its client page — only when an admin
+        switched it on for the client, and behind the same link check as /api/selection."""
+        sel = db.selection(token=token) if token else None
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        staff = self.admin_like_for(sel["code_id"]) or (self.staff_viewer() and self.kam_clients() is None)
+        if not staff:
+            cid = self.link_code("s:" + token) or self.signed_in_client()
+            if cid is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(int(cid))
+                               and int(cid) != db.admin_code_id()):
+                return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
+        pk = evidence.for_selection(sel["id"], client_only=not staff)
+        if pk is None:
+            return self.send_json(200, {"ok": True, "evidence": None}, self.cors())
+        out = evidence.client_payload(pk, json.loads(sel["codes"] or "[]"))
+        out["preview"] = bool(staff and not pk["client_visible"])
+        return self.send_json(200, {"ok": True, "evidence": out}, self.cors())
+
     def api_selection(self, token, name=None, codes=None):
         """A priced selection, for the client's page — by its token, or by the
         name and creators of a link the client already holds. Behind the same
@@ -5461,6 +5556,7 @@ def main():
     licence.init()
     account.init()
     team.init()
+    evidence.init()
     apify.start_scheduler()
     # Post thumbnails (2026-10-13): two resumable jobs fetched from the post links (scripts in /app/admin/jobs/).
     # This keeps them running: if one is not running it is started again, so a restart of this service does not
