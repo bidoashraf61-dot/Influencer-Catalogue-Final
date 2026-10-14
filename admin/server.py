@@ -67,6 +67,8 @@ sys.path.insert(0, str(HERE))
 import auth  # noqa: E402
 import guard  # noqa: E402
 import mailer  # noqa: E402
+import industry  # noqa: E402
+import industry_views  # noqa: E402
 import portal  # noqa: E402
 import portal_api  # noqa: E402
 import team  # noqa: E402
@@ -567,6 +569,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path in ("/api/roster/page", "/api/roster/facets", "/api/roster/cards"):
             return self.api_roster_paged(path.rsplit("/", 1)[1],
                                          urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query, keep_blank_values=True))
+        if path == "/api/admin/creator":
+            return self.api_admin_creator_get((query.get("code") or "").strip().upper())
         if path.startswith("/api/") and self.portal_get(path, query):
             return
         if path == "/api/roster":
@@ -777,6 +781,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 tab=query.get("tab"), dupes=db.duplicate_groups(),
                 page_no=page, pages=pages, total=total, per_page=ROSTER_PAGE,
                 dates=(d_from if t_from is not None else "", d_to if t_to is not None else "")))
+        if path == "/roster/review":
+            country = query.get("country") if query.get("country") in industry.COUNTRIES else None
+            row = industry.next_in_queue(country, query.get("after"))
+            card = industry.review_card(row, BASE) if row is not None else None
+            return self.send(200, industry_views.review_page(card, industry.queue_counts(country), country, query.get("ok"), query.get("e")))
         if path == "/roster/export":
             only = {c.strip().upper() for c in (query.get("codes") or "").split(",") if c.strip()} or None
             return self.send(200, self.roster_csv(only), "text/csv; charset=utf-8",
@@ -1053,6 +1062,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(403, {"ok": False, "reason": "preview",
                                         "message": "You are previewing as a client: this is read-only. Exit the preview to make changes."},
                                   self.cors())
+        if path == "/api/admin/creator":
+            return self.api_admin_creator_post()
+        if path == "/api/admin/creator/photo":
+            return self.api_admin_creator_photo()
         if path.startswith("/api/") and self.portal_post(path):
             return
         if path == "/api/unlock":
@@ -1162,6 +1175,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_device_remove()
         if path == "/roster/save":
             return self.post_roster_save()
+        if path == "/roster/review":
+            return self.post_roster_review()
         if path == "/selections/new":
             return self.post_selection_new()
         if path == "/selections/save":
@@ -1891,7 +1906,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def post_roster_save(self):
         f = self.form_body(multi=("city", "interest",
-                                  "p_platform", "p_url", "p_followers"))
+                                  "p_platform", "p_url", "p_followers", "ind_subs", "ind_also"))
         code = (f.get("code") or "").strip().upper()
         tier = (f.get("tier") or "Nano").strip()
         # Adding: the portal assigns the code from what is already in the
@@ -2003,9 +2018,122 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             "rating": (int(f["rating"]) if (f.get("rating") or "").isdigit()
                        and 1 <= int(f["rating"]) <= 5 else None),
         })
+        # The Industry section (Control Centre step 3). Only written when the form carried it and something changed,
+        # so an older form, or a save that did not touch it, leaves the classification alone.
+        if "ind_main" in f and (f.get("ind_main") or "").strip():
+            try:
+                ind, subs, also, tier = industry.clean(f.get("ind_main").strip(), list(f.get("ind_subs") or []),
+                                                       list(f.get("ind_also") or []), f.get("ind_tier") or "Confirmed")
+                cur = industry.current(existing) if existing is not None else None
+                if cur is None or (cur["industry"], cur["subs"], cur["also"], cur["tier"]) != (ind, subs, also, tier):
+                    who = self.admin()
+                    with db.connect() as conn:
+                        industry.write(conn, code, ind, subs, also, tier, (who["email"] if who else ""), existing)
+            except ValueError as exc:
+                return self.roster_back(f, code, e=str(exc))
         # Back to the view the edit was made from: same search, same page,
         # scrolled to this creator, with a note saying it saved.
         return self.roster_back(f, code, ok=("Saved " + code + "."))
+
+    # ---- quick edit from the catalogue (Control Centre step 3): team members who may edit creators only --
+    def _creator_editor(self):
+        who = self.admin()
+        if not who or not team.can(who, "POST", "/roster/save"):
+            self.send_json(403, {"ok": False, "reason": "not_allowed", "message": "Only the HelloVoice team can edit creators."}, self.cors())
+            return None
+        return who
+
+    def _quick_payload(self, row):
+        cur = industry.current(row)
+        return {"ok": True, "code": row["code"], "name": row["name"] or "", "city": row["city"] or "", "nationality": row["nationality"] or "",
+                "handle": row["handle"] or "", "platform": row["platform"] or "", "followers": row["followers"] or 0,
+                "active": bool(row["active"]), "photo_url": links.photo(row["photo"]) if row["photo"] else None,
+                "industry": cur["industry"] or "", "subs": cur["subs"], "also": cur["also"], "tier": cur["tier"] or "",
+                "updated_at": str(row["updated_at"] or ""), "industries": industry.INDUSTRIES, "sub_list": industry.SUBS,
+                "admin_url": BASE + "/roster?q=" + urllib.parse.quote(row["code"])}
+
+    def api_admin_creator_get(self, code):
+        if not self._creator_editor():
+            return
+        row = db.creator(code)
+        if row is None:
+            return self.send_json(404, {"ok": False, "message": "No such creator."}, self.cors())
+        return self.send_json(200, self._quick_payload(row), self.cors())
+
+    def api_admin_creator_post(self):
+        who = self._creator_editor()
+        if not who:
+            return
+        b = self.json_body() or {}
+        code = str(b.get("code") or "").strip().upper()
+        row = db.creator(code)
+        if row is None:
+            return self.send_json(404, {"ok": False, "message": "No such creator."}, self.cors())
+        if b.get("prev_updated") and str(row["updated_at"] or "") != str(b.get("prev_updated")):
+            return self.send_json(409, {"ok": False, "reason": "changed",
+                                        "message": "Someone else changed this creator a moment ago. Close and open it again."}, self.cors())
+        name = " ".join(str(b.get("name") or row["name"] or "").split())[:120]
+        city = " ".join(str(b.get("city") or "").split())[:120] or None
+        active = 1 if b.get("active", bool(row["active"])) else 0
+        actor = who["email"]
+        try:
+            ind = None
+            if b.get("industry"):
+                ind = industry.clean(b.get("industry"), b.get("subs") or [], b.get("also") if b.get("also") is not None else industry.current(row)["also"], "Confirmed")
+            with history.tracked("creator", code, "Quick edit of %s on the catalogue" % code):
+                with db.connect() as conn:
+                    conn.execute("UPDATE creators SET name = ?, city = ?, active = ?, updated_at = ? WHERE code = ?",
+                                 (name or row["name"], city, active, db.now(), code))
+                    cur = industry.current(row)
+                    if ind and (cur["industry"], cur["subs"], cur["also"], cur["tier"]) != ind:
+                        industry.write(conn, code, ind[0], ind[1], ind[2], ind[3], actor, row)
+        except ValueError as exc:
+            return self.send_json(400, {"ok": False, "message": str(exc)}, self.cors())
+        return self.send_json(200, self._quick_payload(db.creator(code)), self.cors())
+
+    def api_admin_creator_photo(self):
+        if not self._creator_editor():
+            return
+        b = self.json_body() or {}
+        code = str(b.get("code") or "").strip().upper()
+        row = db.creator(code)
+        if row is None:
+            return self.send_json(404, {"ok": False, "message": "No such creator."}, self.cors())
+        raw = str(b.get("data") or "")
+        try:
+            import base64
+            data = base64.b64decode(raw.split(",", 1)[1] if raw.startswith("data:") else raw, validate=False)
+        except Exception:
+            data = b""
+        if not data or len(data) > 8 * 1024 * 1024:
+            return self.send_json(400, {"ok": False, "message": "Choose a JPG or PNG under 8 MB."}, self.cors())
+        saved, err = uploads.save_photo({"data": data, "filename": "photo.jpg"}, code, PHOTO_DIR)
+        if err or not saved:
+            return self.send_json(400, {"ok": False, "message": err or "That picture could not be used."}, self.cors())
+        with history.tracked("creator", code, "Replaced the photo of %s on the catalogue" % code):
+            with db.connect() as conn:
+                conn.execute("UPDATE creators SET photo = ?, updated_at = ? WHERE code = ?", (saved, db.now(), code))
+        Handler.forget_photo_widths()
+        return self.send_json(200, self._quick_payload(db.creator(code)), self.cors())
+
+    def post_roster_review(self):
+        f = self.form_body(multi=("ind_subs", "ind_also"))
+        code = (f.get("code") or "").strip().upper()
+        country = f.get("country") if f.get("country") in industry.COUNTRIES else ""
+        back = "/roster/review?" + ("country=%s&" % country if country else "")
+        who = self.admin()
+        actor = (who["name"] if "name" in who.keys() and who["name"] else who["email"]) if who else ""
+        do = f.get("do") or "confirm"
+        try:
+            if do == "skip":
+                return self.redirect(back + "after=" + urllib.parse.quote(f.get("after") or ""))
+            if do == "unfit":
+                industry.hide(code, actor)
+                return self.redirect(back + "ok=" + urllib.parse.quote("%s is hidden from clients. Undo it in History." % code))
+            industry.set_for(code, f.get("ind_main"), list(f.get("ind_subs") or []), list(f.get("ind_also") or []), "Confirmed", actor)
+        except ValueError as exc:
+            return self.redirect(back + "e=" + urllib.parse.quote(str(exc)))
+        return self.redirect(back + "ok=" + urllib.parse.quote("Saved %s as %s." % (code, f.get("ind_main"))))
 
     def post_roster_import(self):
         part = self.form_body().get("sheet")

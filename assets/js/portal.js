@@ -816,9 +816,10 @@
       cc.appendChild(h("span", { class: "pt-cc__arr", "aria-hidden": "true" }, "\u2192"));
       cc.addEventListener("click", function () { toggle(false); });
       menu.appendChild(cc);
-      var soon = item("Edit on this page", {}, h("span", { class: "pt-menu__badge" }, "Soon"), "pt-menu__item--quiet");
-      soon.setAttribute("aria-disabled", "true");
-      soon.title = "Edit buttons on creators, right here in the catalogue. Coming next.";
+      var editOn = HV.editMode && HV.editMode.on();
+      var esw = item("Edit on this page", { go: function () { HV.editMode.set(!HV.editMode.on()); } },
+        h("span", { class: "pt-menu__badge", style: "background:" + (editOn ? "#e8ff76" : "rgba(18,18,18,.08)") + ";color:#121212" }, editOn ? "On" : "Off"));
+      esw.setAttribute("role", "menuitemcheckbox"); esw.setAttribute("aria-checked", editOn ? "true" : "false");
     }
     if (ME.staff) {
       var on = !!ME.unlock;
@@ -3960,10 +3961,141 @@
     });
   }
 
+  // ---- Edit on this page (Control Centre step 3): team members put a pencil on every creator card and edit
+  // name, city, industry, photo and visibility in a side panel. Saved at once; History can undo it. Clients never see it.
+  function mountEditMode() {
+    var team = ME && (ME.staff || ME.kind === "admin");
+    var KEY = "hv-edit";
+    function on() { try { return team && localStorage.getItem(KEY) === "1"; } catch (e) { return false; } }
+    HV.editMode = { on: on, set: function (v) { try { localStorage.setItem(KEY, v ? "1" : "0"); } catch (e) { /* private window */ } location.reload(); } };
+    if (!on() || !document.querySelector("#cat-grid, .cat-card")) return;
+    document.body.classList.add("hv-editing");
+    var pill = h("div", { class: "hv-editbar", role: "status" },
+      h("span", null, "Edit mode is on. Only the team sees the pencils."),
+      h("button", { type: "button", class: "hv-editbar__off", onclick: function () { HV.editMode.set(false); } }, "Turn off"));
+    document.body.appendChild(pill);
+    var PEN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>';
+    function pen(card) {
+      if (card.querySelector(".hv-pencil") || !card.dataset.code) return;
+      var media = card.querySelector(".cat-card__media") || card;
+      var b = h("button", { type: "button", class: "hv-pencil", "aria-label": "Edit " + (card.dataset.name || card.dataset.code), html: PEN });
+      b.addEventListener("click", function (ev) { ev.preventDefault(); ev.stopPropagation(); openEditor(card.dataset.code, card); });
+      b.addEventListener("keydown", function (ev) { ev.stopPropagation(); });
+      media.appendChild(b);
+    }
+    Array.prototype.forEach.call(document.querySelectorAll(".cat-card"), pen);
+    new MutationObserver(function (muts) {
+      muts.forEach(function (m) {
+        Array.prototype.forEach.call(m.addedNodes, function (n) {
+          if (n.nodeType !== 1) return;
+          if (n.classList.contains("cat-card")) pen(n);
+          else if (n.querySelectorAll) Array.prototype.forEach.call(n.querySelectorAll(".cat-card"), pen);
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+
+  function openEditor(code, card) {
+    var old = $("hv-editor");
+    if (old) old.remove();
+    var panel = h("aside", { id: "hv-editor", class: "hv-editor", role: "dialog", "aria-modal": "false", "aria-label": "Quick edit" });
+    var body = h("div", { class: "hv-editor__b" }, h("p", { class: "hv-editor__muted" }, "Loading…"));
+    panel.appendChild(body);
+    document.body.appendChild(panel);
+    document.body.classList.add("hv-editor-open");
+    function close() { panel.remove(); document.body.classList.remove("hv-editor-open"); document.removeEventListener("keydown", onKey); if (card) card.focus(); }
+    function onKey(ev) { if (ev.key === "Escape") close(); }
+    document.addEventListener("keydown", onKey);
+    api("GET", "/api/admin/creator?code=" + encodeURIComponent(code)).then(function (r) {
+      if (r.s !== 200 || !r.b.ok) { body.innerHTML = ""; body.appendChild(h("p", { class: "hv-editor__err" }, r.b.message || "Could not open this creator.")); return; }
+      draw(r.b);
+    });
+    function draw(c) {
+      panel.innerHTML = "";
+      var x = h("button", { type: "button", class: "hv-editor__x", "aria-label": "Close", onclick: close }, "✕");
+      var head = h("div", { class: "hv-editor__h" },
+        c.photo_url ? h("img", { src: c.photo_url, alt: "" }) : h("span", { class: "hv-editor__ph" }),
+        h("div", null, h("b", null, c.name || c.code), h("span", null, ["@" + c.handle, c.platform, (c.followers || 0).toLocaleString()].filter(Boolean).join(" · "))), x);
+      var f = h("form", { class: "hv-editor__b", id: "hv-editor-form", novalidate: true });
+      function field(label, input) { return h("label", { class: "hv-editor__f" }, h("span", null, label), input); }
+      var name = h("input", { type: "text", value: c.name, maxlength: "120" });
+      var city = h("input", { type: "text", value: c.city, maxlength: "120" });
+      var ind = h("select", null);
+      ind.appendChild(h("option", { value: "" }, "Not set"));
+      c.industries.forEach(function (i) { var o = h("option", { value: i }, i); if (i === c.industry) o.selected = true; ind.appendChild(o); });
+      var chips = h("div", { class: "hv-editor__chips" });
+      var picked = {};
+      c.subs.forEach(function (s) { picked[s] = 1; });
+      function drawSubs() {
+        chips.innerHTML = "";
+        var list = c.sub_list[ind.value] || [];
+        if (!list.length) { chips.appendChild(h("span", { class: "hv-editor__muted" }, "No sub-niches for this industry.")); return; }
+        list.forEach(function (s) {
+          var b = h("button", { type: "button", class: "hv-chip", "aria-pressed": picked[s] ? "true" : "false" }, s);
+          b.addEventListener("click", function () { if (picked[s]) delete picked[s]; else picked[s] = 1; b.setAttribute("aria-pressed", picked[s] ? "true" : "false"); });
+          chips.appendChild(b);
+        });
+      }
+      ind.addEventListener("change", function () { picked = {}; drawSubs(); });
+      drawSubs();
+      var file = h("input", { type: "file", accept: "image/jpeg,image/png,image/webp", class: "hv-editor__file" });
+      var photoBtn = h("button", { type: "button", class: "hv-btn hv-btn--ghost", onclick: function () { file.click(); } }, "Replace photo");
+      var note = h("span", { class: "hv-editor__note", role: "status" });
+      file.addEventListener("change", function () {
+        var fl = file.files && file.files[0];
+        if (!fl) return;
+        if (fl.size > 8 * 1024 * 1024) { note.textContent = "Choose a picture under 8 MB."; return; }
+        var rd = new FileReader();
+        rd.onload = function () {
+          note.textContent = "Uploading…";
+          api("POST", "/api/admin/creator/photo", { code: c.code, data: rd.result }).then(function (r) {
+            if (r.s !== 200 || !r.b.ok) { note.textContent = r.b.message || "That picture could not be used."; return; }
+            c = r.b; note.textContent = "Photo replaced ✓";
+            var img = card && card.querySelector(".cat-card__media img");
+            if (img && c.photo_url) img.src = c.photo_url;
+            var hi = head.querySelector("img"); if (hi && c.photo_url) hi.src = c.photo_url;
+          });
+        };
+        rd.readAsDataURL(fl);
+      });
+      var shown = h("input", { type: "checkbox", class: "hv-switch" });
+      shown.checked = !!c.active;
+      var vis = h("label", { class: "hv-editor__vis" },
+        h("span", null, h("b", null, "Shown to clients"), h("small", null, "Turn off to hide this creator from the catalogue. Nothing is deleted.")), shown);
+      f.appendChild(h("div", { class: "hv-editor__two" }, field("Name", name), field("City", city)));
+      f.appendChild(field("Main industry", ind));
+      f.appendChild(h("div", { class: "hv-editor__f" }, h("span", null, "Sub-niches"), chips));
+      f.appendChild(h("div", { class: "hv-editor__f" }, h("span", null, "Photo"), h("div", { class: "hv-editor__row" }, photoBtn, file)));
+      f.appendChild(vis);
+      var save = h("button", { type: "submit", class: "hv-btn", form: "hv-editor-form" }, "Save");
+      var foot = h("div", { class: "hv-editor__foot" }, h("a", { href: c.admin_url, target: "_blank", rel: "noopener" }, "Open full profile in admin"), note, save);
+      f.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        save.disabled = true; note.textContent = "Saving…";
+        api("POST", "/api/admin/creator", { code: c.code, name: name.value, city: city.value, industry: ind.value,
+          subs: Object.keys(picked).filter(function (s) { return (c.sub_list[ind.value] || []).indexOf(s) !== -1; }),
+          active: shown.checked, prev_updated: c.updated_at }).then(function (r) {
+          save.disabled = false;
+          if (r.s !== 200 || !r.b.ok) { note.textContent = r.b.message || "Not saved. Try again."; return; }
+          c = r.b; note.textContent = "Saved ✓";
+          if (card) {
+            var nm = card.querySelector(".cat-card__name"); if (nm) nm.textContent = c.name;
+            card.dataset.name = c.name;
+            card.classList.toggle("hv-hidden-card", !c.active);
+          }
+        });
+      });
+      panel.appendChild(head);
+      panel.appendChild(f);
+      panel.appendChild(foot);
+      name.focus();
+    }
+  }
+
   function boot() {
     me(6).then(function (r) {
       if (r.b && r.b.signed_in) {
-        ME = r.b; HV.me = ME; mountDock(); mountVoice(); mountAiCard(); mountLicences(); mountPreviewBar(); mountAdminStillNote();
+        ME = r.b; HV.me = ME; mountEditMode(); mountDock(); mountVoice(); mountAiCard(); mountLicences(); mountPreviewBar(); mountAdminStillNote();
         try { document.dispatchEvent(new CustomEvent("hv:me", { detail: ME })); } catch (e) { /* old browser */ }
         var m = /[#&]s=([^&]+)/.exec(location.hash || "");
         // (The selection page asks for a missing objective in its own bar: catalogue.js renderObjective.)

@@ -836,7 +836,7 @@ def control_centre(who, message=None, error=None):
         tile("creators", "Creators", fmt(c["creators"]), "active creators",
              ("%s need an industry check" % fmt(review)) if review else "Every creator has an industry", not review,
              [("Find or edit a creator", "/roster", None), ("Add or import creators", "/roster#add", None),
-              ("Creator analysis", "/analysis", c["analysis_open"] or None)]),
+              ("Industry review", "/roster/review", review or None)]),
         tile("clients", "Clients and codes", fmt(c["clients"]), "client accounts",
              ("%d waiting for approval" % c["pending"]) if c["pending"] else "No one waiting for approval", not c["pending"],
              [("Approve or hold clients", "/portal", c["pending"] or None), ("Access codes", "/codes", None),
@@ -1878,7 +1878,7 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, ba
         + "<div><label>Nationality</label><input name='nationality' value='"
         + val("nationality") + "' list='nationalities' placeholder='Saudi'></div>"
         + interest_field(c, interests)
-        + "</div><div class='row'>"
+        + "</div>" + __import__("industry_views").form_section(c) + "<div class='row'>"
         + "<div><label>Photo</label>" + photo_field + "</div>"
         + "<div><label>Sort</label><input name='sort' value='" + val("sort", "0") + "'></div>"
         + "<div><label>Note (internal)</label><input name='note' value='" + val("note") + "'></div>"
