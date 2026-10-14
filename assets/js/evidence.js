@@ -369,7 +369,7 @@
   function fill(bd, code, c, preview) {
     var S = sel();
     if (preview) bd.appendChild(el("p", "ev-chip ev-chip--paid", "Preview — not shared with the client yet"));
-    var meta = "@" + c.handle + (c.type === "hcp" ? " · Doctor / pharmacist" : c.type === "ugc" ? " · UGC creator" : "");
+    var meta = "@" + c.handle + (c.type === "hcp" ? " · Doctor / pharmacist" : " · Influencer");
     bd.appendChild(el("p", "ev-mut", meta));
 
     var colours = {};
@@ -495,8 +495,8 @@
   /* ---------------- Market Intelligence: Map / Data view ---------------- */
 
   var mi = null, miData = null, miFilter = { type: "all", platform: "all" }, miOpen = {};
-  var TYPE_RING = { hcp: "#14884a", influencer: "#121212", ugc: "#ff691e" };
-  var TYPE_NAME = { hcp: "Doctors / pharmacists", influencer: "Influencers", ugc: "UGC creators" };
+  var TYPE_RING = { hcp: "#14884a", influencer: "#121212" };
+  var TYPE_NAME = { hcp: "Doctors / pharmacists", influencer: "Influencers" };
 
   function miButton() {
     if (document.getElementById("ev-mi-btn")) return;
@@ -576,7 +576,7 @@
     var bar = el("div", "ev-mi__bar");
     var hasTT = d.creators.some(function (c) { return c.platforms.indexOf("tiktok") >= 0; });
     bar.appendChild(chips("Platform", [["all", "All platforms"], ["instagram", "Instagram"], ["tiktok", "TikTok", hasTT ? "" : "TikTok study not in yet"]], "platform"));
-    bar.appendChild(chips("Creator type", [["all", "Everyone"], ["hcp", "Doctors / pharmacists"], ["influencer", "Influencers"], ["ugc", "UGC"]], "type"));
+    bar.appendChild(chips("Creator type", [["all", "Everyone"], ["hcp", "Doctors / pharmacists"], ["influencer", "Influencers"]], "type"));
     var leg = el("div", "ev-key");
     Object.keys(TYPE_RING).forEach(function (k) { var s2 = el("span"), i = el("i"); i.style.background = "transparent"; i.style.border = "3px solid " + TYPE_RING[k]; s2.appendChild(i); s2.appendChild(document.createTextNode(TYPE_NAME[k])); leg.appendChild(s2); });
     var sz = el("span", "", "Dot size = median views on competitor posts"); leg.appendChild(sz);
@@ -584,7 +584,7 @@
     body.appendChild(bar);
 
     var people = d.creators.filter(function (c) {
-      return (miFilter.type === "all" || c.type === miFilter.type) && (miFilter.platform === "all" || c.platforms.indexOf(miFilter.platform) >= 0);
+      return (miFilter.type === "all" || (c.type === "hcp" ? "hcp" : "influencer") === miFilter.type) && (miFilter.platform === "all" || c.platforms.indexOf(miFilter.platform) >= 0);
     });
     var stage = el("div", "ev-mi__stage");
     stage.appendChild(mapSvg(d, people, stage));
@@ -706,7 +706,7 @@
       ini.textContent = ((p.name || p.handle || "?").replace(/[^\p{L}\p{N} ]/gu, "").trim().split(/\s+/).map(function (w) { return w.charAt(0); }).slice(0, 2).join("") || "?").toUpperCase();
       gg.appendChild(ini);
     }
-    gg.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r, class: "ev-map__ring", stroke: TYPE_RING[p.type] || "#121212" }));
+    gg.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r, class: "ev-map__ring", stroke: p.type === "hcp" ? TYPE_RING.hcp : TYPE_RING.influencer }));
     if (shared) gg.appendChild(svg("circle", { cx: at.x + r * 0.72, cy: at.y - r * 0.72, r: 5, class: "ev-map__badge" }));
     var lit = function (on) { (lines || []).forEach(function (l) { l.classList.toggle("ev-map__lit", on); }); };
     gg.addEventListener("mouseenter", function () { tip(p, gg, stage); lit(true); });
@@ -737,7 +737,7 @@
     box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); box.setAttribute("aria-label", "Posts by " + (p.name || p.handle));
     var hd = el("div", "ev-pop__hd"), tt = el("div");
     tt.appendChild(el("h3", "ev-pn__t", p.name || ("@" + p.handle)));
-    tt.appendChild(el("p", "ev-mut", "@" + p.handle + " · " + (TYPE_NAME[p.type] || "Creator") + (p.followers ? " · " + num(p.followers) + " followers" : "")));
+    tt.appendChild(el("p", "ev-mut", "@" + p.handle + " · " + (p.type === "hcp" ? "Doctor / pharmacist" : "Influencer") + (p.followers ? " · " + num(p.followers) + " followers" : "")));
     hd.appendChild(tt);
     var x = el("button", "ev-pn__x", "×"); x.type = "button"; x.setAttribute("aria-label", "Close");
     var close = function () { scrim.remove(); document.removeEventListener("keydown", esc, true); };

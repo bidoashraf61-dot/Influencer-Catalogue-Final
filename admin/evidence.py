@@ -75,6 +75,12 @@ COLLAB_LABEL = {"co_author": "Co-author", "co_author_paid": "Co-author + paid", 
 _ready = False
 
 
+def _ctype(t):
+    """Creator types are influencer and hcp only: UGC is a kind of video, not a kind of creator (owner, 2026-10-14)."""
+    t = (t or "").strip().lower()
+    return "hcp" if t == "hcp" else "influencer"
+
+
 def init():
     global _ready
     with db.connect() as conn:
@@ -82,6 +88,8 @@ def init():
         cols = {r[1] for r in conn.execute("PRAGMA table_info(evidence_packs)")}
         if "creators" not in cols:     # handle -> {name, followers, city, type, links}
             conn.execute("ALTER TABLE evidence_packs ADD COLUMN creators TEXT")
+        # Studies imported before 2026-10-14 tagged some creators "ugc"; they are influencers.
+        conn.execute("UPDATE evidence_posts SET creator_type = 'influencer' WHERE creator_type = 'ugc'")
     _ready = True
 
 
@@ -140,7 +148,7 @@ def parse_pack(raw):
                 posts.append({
                     "brand": name, "competitor": comp, "platform": str(p.get("platform") or "instagram").lower(),
                     "url": url, "handle": str(p.get("handle") or "").lower().lstrip("@").strip(),
-                    "name": p.get("name"), "creator_type": p.get("creator_type"), "city": p.get("city"),
+                    "name": p.get("name"), "creator_type": _ctype(p.get("creator_type")), "city": p.get("city"),
                     "followers": _num(p.get("followers"), int), "posted_at": str(p.get("date") or "")[:10],
                     "collab_type": p.get("collab_type"), "posted_on": p.get("posted_on"),
                     "content_type": p.get("content_type"), "product_tags": p.get("product_tags"),
@@ -224,7 +232,7 @@ def rematch(pack_id):
 
 # ------------------------------------------------------------------ roster --
 
-INTEREST = {"hcp": "Skincare, Health", "ugc": "Skincare, Beauty", "influencer": "Skincare, Beauty"}
+INTEREST = {"hcp": "Skincare, Health", "influencer": "Skincare, Beauty"}
 
 
 def roster_status(pk):
