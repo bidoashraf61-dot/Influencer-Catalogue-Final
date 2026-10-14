@@ -809,9 +809,10 @@ def save_basic(conn, code, plat, handle, it, m, run_id):
     return True
 
 
-def ingest(run, job, items):
+def ingest(run, job, items, store_raw=True):
     """Keep every result as the actor returned it, the follower number as a
-    dated snapshot, and for Instagram profile runs the basic numbers."""
+    dated snapshot, and for Instagram profile runs the basic numbers.
+    store_raw=False reads results already kept (reingest_run) without storing them twice."""
     hmap = json.loads(run["handle_map"] or "{}")
     plat = job["platform"] if job else ""
     saved = 0
@@ -823,10 +824,13 @@ def ingest(run, job, items):
             code = hmap.get(h) if h else None
             raw = trim_posts(it) if isinstance(it.get("recentPosts"), dict) else it
             small = raw if len(json.dumps(raw, default=str)) <= 60000 else _compact(raw)
-            conn.execute("INSERT INTO profile_raw (run_id, code, platform, actor, at, data) VALUES (?,?,?,?,?,?)",
-                         (run["id"], code or "", plat, job["actor"] if job else "", db.now(),
-                          json.dumps(small, default=str)))
-            if job and job["kind"] == "profiles" and code and isinstance(it.get("audience"), dict) and isinstance(it.get("creator"), dict):
+            if store_raw:
+                conn.execute("INSERT INTO profile_raw (run_id, code, platform, actor, at, data) VALUES (?,?,?,?,?,?)",
+                             (run["id"], code or "", plat, job["actor"] if job else "", db.now(),
+                              json.dumps(small, default=str)))
+            # The TikTok analytics actor (preset kind "analysis") brings the profile counts too: its
+            # numbers were only read on "profiles" jobs, so the preset's own runs saved nothing.
+            if job and job["kind"] in ("profiles", "analysis") and code and isinstance(it.get("audience"), dict) and isinstance(it.get("creator"), dict):
                 m = derive_tiktok_analytics(it)
                 if m["followers"] is not None:
                     conn.execute("INSERT INTO profile_snapshots (code,platform,handle,at,followers,following,posts,verified,run_id) "
@@ -838,20 +842,34 @@ def ingest(run, job, items):
                 continue
             if job and job["kind"] == "profiles" and code:
                 f = next((x for x in (_num(it.get(k)) for k in (
-                    "followersCount", "followers", "followerCount", "subscriberCount",
+                    "followersCount", "followers", "followerCount", "follower_count", "subscriberCount",
                     "subscribersCount", "subscribers")) if x is not None), None)
                 if f is None and isinstance(it.get("authorMeta"), dict):
                     f = _num(it["authorMeta"].get("fans"))
                 if f is not None:
                     conn.execute("INSERT INTO profile_snapshots (code,platform,handle,at,followers,following,posts,verified,run_id) "
                                  "VALUES (?,?,?,?,?,?,?,?,?)",
-                                 (code, plat, h, db.now(), f, _num(it.get("followsCount", it.get("following"))),
-                                  _num(it.get("postsCount", it.get("posts"))), 1 if it.get("verified") else 0, run["id"]))
+                                 (code, plat, h, db.now(), f,
+                                  _num(it.get("followsCount", it.get("following", it.get("following_count")))),
+                                  _num(it.get("postsCount", it.get("posts", it.get("video_count")))),
+                                  1 if it.get("verified") else 0, run["id"]))
                     saved += 1
                     if plat == "Instagram" and "followersCount" in it:
                         save_basic(conn, code, plat, h, it, derive_instagram(it), run["id"])
                     _evidence_profile(conn, code, plat, f, it)
     return saved
+
+
+def reingest_run(run_id):
+    """Read a finished run's kept results again (after a reader fix), without asking Apify or paying
+    again. Returns how many creators' numbers were saved."""
+    with db.connect() as conn:
+        run = conn.execute("SELECT * FROM api_runs WHERE id = ?", (run_id,)).fetchone()
+        items = [json.loads(r["data"]) for r in conn.execute("SELECT data FROM profile_raw WHERE run_id = ? ORDER BY id", (run_id,))]
+    if run is None or not items:
+        return 0
+    job = get_job(run["job_id"]) if run["job_id"] else None
+    return ingest(run, job, items, store_raw=False)
 
 
 _SLIM = "profilePicUrl,profilePicUrlHD,externalUrlShimmed,latestIgtvVideos,relatedProfiles"

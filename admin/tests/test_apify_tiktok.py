@@ -67,6 +67,40 @@ class Hundred(unittest.TestCase):
             row = conn.execute("SELECT input FROM api_jobs WHERE name = 'old'").fetchone()
         self.assertEqual(json.loads(row["input"])["postSampleSize"], 100)
 
+    def test_profile_and_analytics_results_are_read_and_can_be_read_again(self):
+        """2026-10-14: the TikTok profile actor says follower_count, and the analytics preset is kind
+        "analysis" — neither was read. reingest_run reads kept results again without a new run."""
+        db.init()
+        apify.init()
+        db.upsert_creator({"code": "HV-MI-900", "name": "T", "handle": "tt1", "platform": "TikTok", "followers": 1,
+                           "city": "Riyadh", "nationality": None, "tier": "Micro", "interest": None, "photo": None,
+                           "profiles": json.dumps([{"platform": "TikTok", "url": "https://www.tiktok.com/@tt1", "followers": 1}]),
+                           "active": 1, "note": "", "sort": 0})
+        with db.connect() as conn:
+            prof = conn.execute("INSERT INTO api_jobs (name,actor,kind,platform,source,input,created_at) VALUES (?,?,?,?,?,?,?)",
+                                ("p", "khadinakbar/tiktok-profile-scraper", "profiles", "TikTok", "all", '{"profiles": "{{handles}}"}', db.now())).lastrowid
+            ana = conn.execute("INSERT INTO api_jobs (name,actor,kind,platform,source,input,created_at) VALUES (?,?,?,?,?,?,?)",
+                               ("a", "maximedupre/tiktok-creator-analytics", "analysis", "TikTok", "all", '{"x": "{{handles}}"}', db.now())).lastrowid
+            r1 = conn.execute("INSERT INTO api_runs (job_id, job_name, trigger, status, handle_map, started_at) VALUES (?,?,'manual',?,?,?)",
+                              (prof, "p", "SUCCEEDED", json.dumps({"tt1": "HV-MI-900"}), db.now())).lastrowid
+            r2 = conn.execute("INSERT INTO api_runs (job_id, job_name, trigger, status, handle_map, started_at) VALUES (?,?,'manual',?,?,?)",
+                              (ana, "a", "SUCCEEDED", json.dumps({"tt1": "HV-MI-900"}), db.now())).lastrowid
+        run1 = dict(id=r1, handle_map=json.dumps({"tt1": "HV-MI-900"}))
+        n = apify.ingest(run1, apify.get_job(prof), [{"username": "tt1", "follower_count": 2539, "following_count": 9, "video_count": 586}])
+        self.assertEqual(n, 1)
+        with db.connect() as conn:
+            snap = conn.execute("SELECT followers, posts FROM profile_snapshots WHERE run_id = ?", (r1,)).fetchone()
+        self.assertEqual((snap["followers"], snap["posts"]), (2539, 586))
+        res = dict(result(30), creator={"handle": "tt1", "isVerified": False, "bio": "b"})
+        with db.connect() as conn:
+            conn.execute("INSERT INTO profile_raw (run_id, code, platform, actor, at, data) VALUES (?,?,?,?,?,?)",
+                         (r2, "HV-MI-900", "TikTok", "maximedupre/tiktok-creator-analytics", db.now(), json.dumps(apify.trim_posts(res))))
+        self.assertEqual(apify.reingest_run(r2), 1)
+        with db.connect() as conn:
+            self.assertEqual(conn.execute("SELECT COUNT(*) FROM profile_raw WHERE run_id = ?", (r2,)).fetchone()[0], 1)  # not stored twice
+            a_ = conn.execute("SELECT data FROM creator_analysis WHERE code = 'HV-MI-900' AND platform = 'TikTok'").fetchone()
+        self.assertEqual(json.loads(a_["data"])["followers"], 50000)
+
     @classmethod
     def tearDownClass(cls):
         shutil.rmtree(TMP, ignore_errors=True)
