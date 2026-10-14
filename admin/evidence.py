@@ -678,6 +678,43 @@ def fill_thumbs(pack_ids, pause=0.6, log=print):
     return got, miss
 
 
+def map_payload(pk, selection_codes=()):
+    """The Market Intelligence map: the client's brand, its competitors (sized by views) and every creator
+    who worked with them (median organic views, type, which competitors, their posts). Creators who are
+    in this selection carry their code (it is on their card already); nobody else's code leaves."""
+    inset = set(selection_codes or ())
+    rows = [r for r in posts(pk["id"]) if r["relevance"] != "other"]
+    brand = (json.loads(pk["brands"] or "[]") or [{}])[0].get("brand") or ""
+    comps, people = {}, {}
+    for r in rows:
+        c = comps.setdefault(r["competitor"], {"name": r["competitor"], "posts": 0, "views": 0, "creators": set()})
+        c["posts"] += 1
+        c["views"] += r["views"] or 0
+        c["creators"].add(r["handle"])
+        p = people.setdefault(r["handle"], {"handle": r["handle"], "name": r["name"], "type": r["creator_type"],
+                                             "followers": r["followers"], "code": r["code"] if r["code"] in inset else None,
+                                             "platforms": set(), "competitors": {}, "posts": []})
+        p["platforms"].add(r["platform"])
+        p["competitors"][r["competitor"]] = p["competitors"].get(r["competitor"], 0) + 1
+        p["posts"].append(r)
+    out = []
+    for p in people.values():
+        organic = [r for r in p["posts"] if not r["likely_paid_boost"]]
+        ps = sorted(p["posts"], key=lambda r: -(r["views"] or 0))
+        out.append({"handle": p["handle"], "name": p["name"], "type": p["type"], "followers": p["followers"], "code": p["code"],
+                    "platforms": sorted(p["platforms"]), "competitors": p["competitors"],
+                    "median_views": _med([r["views"] for r in organic]), "median_er": _med([r["er_views"] for r in organic]),
+                    "paid_only": not organic,
+                    "posts": [{"id": r["id"], "url": r["url"], "date": r["posted_at"], "competitor": r["competitor"], "platform": r["platform"],
+                               "collab": COLLAB_LABEL.get(r["collab_type"], r["collab_type"] or ""), "views": r["views"], "likes": r["likes"],
+                               "comments": r["comments"], "er": r["er_views"], "paid_boost": bool(r["likely_paid_boost"])} for r in ps[:12]]})
+    out.sort(key=lambda p: -(p["median_views"] or 0))
+    return {"brand": brand, "title": pk["title"],
+            "competitors": sorted([{"name": c["name"], "posts": c["posts"], "views": c["views"], "creators": len(c["creators"])}
+                                   for c in comps.values()], key=lambda c: -c["views"]),
+            "creators": out}
+
+
 def creator_payload(pk, code):
     """One creator's Track record in a pack: competitor posts with numbers, KPIs over the organic ones,
     and their normal reach for comparison. No analyst notes. None when the pack has no post of theirs."""
@@ -823,7 +860,8 @@ def view_page(pk, brand, selections, ok=None, err=None, creator=None):
             "<div class='ev-bar'>%s<a class='btn' href='%s'>All packs</a></div></div>" % (
                 e(pk["title"]), e(", ".join(json.loads(pk["platforms"] or "[]")) or "—"), e(pk["source"] or ""),
                 e(db_date(pk["updated_at"])),
-                ("<a class='btn' href='%s'>Open selection: %s</a>" % (e(u("/selections/edit?id=%d" % sel["id"])), e(sel["name"]))) if sel is not None else "",
+                (("<a class='btn' href='%s'>Open selection: %s</a>" % (e(u("/selections/edit?id=%d" % sel["id"])), e(sel["name"])))
+                 + ("<a class='btn' href='%s' target='_blank' rel='noopener'>Open map</a>" % e("/selection/#s=%s&mi=map" % sel["token"]))) if sel is not None else "",
                 e(u("/evidence")))]
     body.append(_msgs(ok, err))
     if creator:

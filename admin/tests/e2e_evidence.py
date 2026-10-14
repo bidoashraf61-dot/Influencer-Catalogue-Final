@@ -128,6 +128,7 @@ class Evidence(unittest.TestCase):
         self.assertIn("RivalSkin", body)
         self.assertIn("internal note", body)                      # admins see the analyst's read
         self.assertIn("Open selection: Polyco glow", body)       # back to the selection
+        self.assertIn("&amp;mi=map", body)                         # and to the client-side map
         s2, sbody, _ = a.get("/selections/edit?id=%d" % self.sel)
         self.assertIn("Market Intelligence", sbody)               # and from the selection to the pack
         self.assertIn("/evidence/view?id=%d" % pid, sbody)
@@ -193,6 +194,20 @@ class Evidence(unittest.TestCase):
             other = conn.execute("SELECT id FROM evidence_posts WHERE relevance = 'other' AND pack_id = ?", (self.pack_id(),)).fetchone()[0]
         self.assertEqual(self.client.get("/api/evidence/thumb?s=%s&p=%d" % (self.token, other))[0], 404)   # not shown
         self.assertEqual(self.stranger.get("/api/evidence/thumb?s=%s&p=%d" % (self.token, pid))[0], 401)
+
+    def test_3c_market_intelligence_map(self):
+        s, b, _ = self.client.get("/api/evidence/map?s=" + self.token)
+        self.assertEqual(s, 200, b)
+        m = b["map"]
+        self.assertEqual(m["brand"], "Glow Serum")
+        self.assertEqual([c["name"] for c in m["competitors"]], ["RivalSkin"])
+        by = {c["handle"]: c for c in m["creators"]}
+        self.assertEqual(by["noha"]["code"], "HV-MI-001")          # in the selection: its code is on its card anyway
+        self.assertIsNone(by["sara"]["code"])                       # not in the selection: no roster code
+        self.assertNotIn("lina", by)                                # other-product posts are left out
+        self.assertTrue(by["bought"]["paid_only"])
+        self.assertNotIn("internal note", json.dumps(b))
+        self.assertEqual(self.stranger.get("/api/evidence/map?s=" + self.token)[0], 401)
 
     def test_4_tiktok_adds_to_the_same_pack(self):
         a = self.admin()

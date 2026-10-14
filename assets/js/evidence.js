@@ -132,7 +132,7 @@
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) {
         if (!j || !j.ok || !j.evidence || !j.evidence.brands || !j.evidence.brands.length) { sec.hidden = true; loadedFor = null; return; }
-        data = j.evidence; brandIx = 0; draw(); decorate();
+        data = j.evidence; brandIx = 0; draw(); decorate(); miButton();
       })
       .catch(function () { loadedFor = null; });
   }
@@ -492,7 +492,297 @@
       }).catch(function () { btn.disabled = false; });
   }
 
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && panel) closePanel(); });
+  /* ---------------- Market Intelligence: Map / Data view ---------------- */
+
+  var mi = null, miData = null, miFilter = { type: "all", platform: "all" }, miOpen = {};
+  var TYPE_RING = { hcp: "#14884a", influencer: "#121212", ugc: "#ff691e" };
+  var TYPE_NAME = { hcp: "Doctors / pharmacists", influencer: "Influencers", ugc: "UGC creators" };
+
+  function miButton() {
+    if (document.getElementById("ev-mi-btn")) return;
+    var title = document.getElementById("sel-title");
+    if (!title || !title.parentNode) return;
+    var b = el("button", "ev-mi-btn"); b.id = "ev-mi-btn"; b.type = "button";
+    b.appendChild(el("span", "ev-mi-btn__ic", "◎"));
+    b.appendChild(document.createTextNode("Market Intelligence"));
+    b.addEventListener("click", function () { openMI("map"); });
+    title.parentNode.insertBefore(b, title.nextSibling);
+    if (/[#&]mi=map/.test(location.hash)) openMI("map");
+  }
+
+  function photoOf(code) {
+    if (!code || !grid) return null;
+    var img = grid.querySelector('article.cat-card[data-code="' + code + '"] img.cat-card__img');
+    return img && img.currentSrc ? img.currentSrc : (img && img.src) || null;
+  }
+
+  function closeMI() {
+    if (!mi) return;
+    mi.root.remove(); mi = null;
+    document.body.classList.remove("pt-lock");
+    var b = document.getElementById("ev-mi-btn"); if (b) b.focus();
+  }
+
+  function openMI(tab) {
+    if (mi) closeMI();
+    var root = el("div", "ev-mi"); root.setAttribute("role", "dialog"); root.setAttribute("aria-modal", "true"); root.setAttribute("aria-labelledby", "ev-mi-t");
+    var hd = el("header", "ev-mi__hd");
+    var t = el("div");
+    t.appendChild(el("p", "ev-eyebrow", "Market Intelligence"));
+    var h = el("h2", "ev-mi__t", "Who works with your competitors"); h.id = "ev-mi-t"; t.appendChild(h);
+    hd.appendChild(t);
+    var tabs = el("div", "ev-tabs"); tabs.setAttribute("role", "tablist");
+    [["map", "Map"], ["data", "Data"]].forEach(function (x) {
+      var b = el("button", "ev-tab", x[1]); b.type = "button"; b.setAttribute("role", "tab");
+      b.setAttribute("aria-selected", x[0] === tab ? "true" : "false");
+      b.addEventListener("click", function () {
+        if (x[0] === "data") { closeMI(); var s2 = document.getElementById("sel-evidence"); if (s2) s2.scrollIntoView({ behavior: "smooth" }); return; }
+      });
+      tabs.appendChild(b);
+    });
+    hd.appendChild(tabs);
+    var x = el("button", "ev-pn__x", "×"); x.type = "button"; x.setAttribute("aria-label", "Close"); x.addEventListener("click", closeMI);
+    hd.appendChild(x);
+    var body = el("div", "ev-mi__bd");
+    body.appendChild(el("p", "ev-mut", "Loading the map…"));
+    root.appendChild(hd); root.appendChild(body);
+    document.body.appendChild(root); document.body.classList.add("pt-lock");
+    mi = { root: root, body: body };
+    x.focus();
+    var go = function (d) { if (!mi) return; miData = d; drawMI(); };
+    if (miData) return go(miData);
+    fetch((CFG.api || "") + "/api/evidence/map?s=" + encodeURIComponent(token()), { credentials: "include" })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j && j.ok && j.map) go(j.map); else if (mi) { body.textContent = ""; body.appendChild(el("p", "ev-mut", "The map is not available.")); } })
+      .catch(function () { if (mi) { body.textContent = ""; body.appendChild(el("p", "ev-mut", "Could not load the map.")); } });
+  }
+
+  function chips(label, opts, key) {
+    var g = el("div", "ev-mi__chips"); g.setAttribute("role", "group"); g.setAttribute("aria-label", label);
+    opts.forEach(function (o) {
+      var b = el("button", "ev-brand", o[1]); b.type = "button";
+      b.setAttribute("aria-pressed", miFilter[key] === o[0] ? "true" : "false");
+      if (o[2]) { b.disabled = true; b.title = o[2]; }
+      b.addEventListener("click", function () { miFilter[key] = o[0]; drawMI(); });
+      g.appendChild(b);
+    });
+    return g;
+  }
+
+  function drawMI() {
+    var d = miData, body = mi.body;
+    body.textContent = "";
+    if (d.preview) body.appendChild(el("p", "ev-chip ev-chip--paid", "Preview — not shared with the client yet"));
+    var bar = el("div", "ev-mi__bar");
+    var hasTT = d.creators.some(function (c) { return c.platforms.indexOf("tiktok") >= 0; });
+    bar.appendChild(chips("Platform", [["all", "All platforms"], ["instagram", "Instagram"], ["tiktok", "TikTok", hasTT ? "" : "TikTok study not in yet"]], "platform"));
+    bar.appendChild(chips("Creator type", [["all", "Everyone"], ["hcp", "Doctors / pharmacists"], ["influencer", "Influencers"], ["ugc", "UGC"]], "type"));
+    var leg = el("div", "ev-key");
+    Object.keys(TYPE_RING).forEach(function (k) { var s2 = el("span"), i = el("i"); i.style.background = "transparent"; i.style.border = "3px solid " + TYPE_RING[k]; s2.appendChild(i); s2.appendChild(document.createTextNode(TYPE_NAME[k])); leg.appendChild(s2); });
+    var sz = el("span", "", "Dot size = median views on competitor posts"); leg.appendChild(sz);
+    bar.appendChild(leg);
+    body.appendChild(bar);
+
+    var people = d.creators.filter(function (c) {
+      return (miFilter.type === "all" || c.type === miFilter.type) && (miFilter.platform === "all" || c.platforms.indexOf(miFilter.platform) >= 0);
+    });
+    var stage = el("div", "ev-mi__stage");
+    stage.appendChild(mapSvg(d, people, stage));
+    body.appendChild(stage);
+    body.appendChild(el("p", "ev-viz__note", people.length + " creators · " + d.competitors.length + " competitors. Hover a creator for a summary; click to watch their posts."));
+  }
+
+  function mapSvg(d, people, stage) {
+    var W = 1200, H = 860, cx = W / 2, cy = H / 2;
+    var g = svg("svg", { viewBox: "0 0 " + W + " " + H, class: "ev-map", role: "img",
+      "aria-label": d.brand + " in the centre, " + d.competitors.length + " competitors around it, each with the creators who worked with them." });
+    var defs = svg("defs"); g.appendChild(defs);
+    var links = svg("g", { class: "ev-map__links" }), nodes = svg("g");
+    g.appendChild(links); g.appendChild(nodes);
+    var n = d.competitors.length, R = n > 1 ? 300 : 0;
+    var maxV = Math.max.apply(null, d.competitors.map(function (c) { return c.views; }).concat([1]));
+    var pos = {};
+    d.competitors.forEach(function (c, i) {
+      var a = -Math.PI / 2 + i * 2 * Math.PI / Math.max(n, 1);
+      pos[c.name] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), a: a, r: 40 + 22 * Math.sqrt(c.views / maxV) };
+    });
+    var maxM = Math.max.apply(null, people.map(function (p) { return p.median_views || 0; }).concat([1]));
+    var dotR = function (p) { return 8 + 13 * Math.sqrt((p.median_views || 0) / maxM); };
+
+    // Centre: the client's brand.
+    var hub = svg("g", { class: "ev-map__hub" });
+    hub.appendChild(svg("circle", { cx: cx, cy: cy, r: 64 }));
+    var ht = svg("text", { x: cx, y: cy + 6, "text-anchor": "middle" }); ht.textContent = d.brand || "Your brand"; hub.appendChild(ht);
+    nodes.appendChild(hub);
+    d.competitors.forEach(function (c) {
+      var p = pos[c.name];
+      links.appendChild(svg("line", { x1: cx, y1: cy, x2: p.x, y2: p.y, class: "ev-map__spoke" }));
+    });
+
+    var placed = [];
+    function free(x, y, r) { return placed.every(function (q) { var dx = q.x - x, dy = q.y - y; return dx * dx + dy * dy >= (q.r + r + 3) * (q.r + r + 3); }); }
+    function place(x, y, r) {
+      for (var k = 0; k < 160; k++) {
+        var ang = k * 2.4, rad = k * 1.6, xx = x + rad * Math.cos(ang), yy = y + rad * Math.sin(ang);
+        if (xx > r + 4 && xx < W - r - 4 && yy > r + 4 && yy < H - r - 4 && free(xx, yy, r)) { placed.push({ x: xx, y: yy, r: r }); return { x: xx, y: yy }; }
+      }
+      placed.push({ x: x, y: y, r: r }); return { x: x, y: y };
+    }
+    placed.push({ x: cx, y: cy, r: 64 });
+    d.competitors.forEach(function (c) {
+      var p = pos[c.name];
+      placed.push({ x: p.x, y: p.y, r: p.r });
+      [-56, -28, 0, 28, 56].forEach(function (dx) { placed.push({ x: p.x + dx, y: p.y + p.r + 12, r: 12 }); });   // the views label
+    });
+
+    // Shared creators sit in the band between the centre and the competitors, at the angle of the
+    // competitors they share; their lines show on hover so the map stays readable.
+    people.filter(function (p) { return Object.keys(p.competitors).length > 1; })
+      .sort(function (a, b) { return (b.median_views || 0) - (a.median_views || 0); })
+      .forEach(function (p, i) {
+        var ks = Object.keys(p.competitors), ssin = 0, scos = 0;
+        ks.forEach(function (k) { ssin += Math.sin(pos[k].a); scos += Math.cos(pos[k].a); });
+        var ang = Math.atan2(ssin, scos), r = dotR(p), rad = 120 + (i % 3) * 34;
+        var at = place(cx + rad * Math.cos(ang), cy + rad * Math.sin(ang), r);
+        var mine = ks.map(function (k) { var l = svg("line", { x1: at.x, y1: at.y, x2: pos[k].x, y2: pos[k].y, class: "ev-map__share" }); links.appendChild(l); return l; });
+        nodes.appendChild(dot(p, at, r, defs, stage, true, mine));
+      });
+
+    // Each competitor's own creators: the top 12, then "+N more".
+    d.competitors.forEach(function (c) {
+      var own = people.filter(function (p) { var ks = Object.keys(p.competitors); return ks.length === 1 && ks[0] === c.name; });
+      var show = miOpen[c.name] ? own : own.slice(0, 12), cp = pos[c.name];
+      show.forEach(function (p, i) {
+        var r = dotR(p), ring = Math.floor(i / 12), k = i % 12;
+        var spread = (n > 1 ? 1.9 : 6.28), a = cp.a + (k - 5.5) / 11 * spread;
+        var dist = cp.r + 34 + ring * 34 + (k % 2) * 14;
+        var at = place(cp.x + dist * Math.cos(a), cp.y + dist * Math.sin(a), r);
+        var l = svg("line", { x1: at.x, y1: at.y, x2: cp.x, y2: cp.y, class: "ev-map__own" }); links.appendChild(l);
+        nodes.appendChild(dot(p, at, r, defs, stage, false, [l]));
+      });
+      if (own.length > show.length || miOpen[c.name] && own.length > 12) {
+        var a2 = cp.a, dd = cp.r + 34 + 2 * 34 + 26;
+        var at2 = place(cp.x + dd * Math.cos(a2), cp.y + dd * Math.sin(a2), 22);
+        var more = svg("g", { class: "ev-map__more", tabindex: "0", role: "button",
+          "aria-label": miOpen[c.name] ? "Show the top 12 for " + c.name : "Show all " + own.length + " creators of " + c.name });
+        more.appendChild(svg("circle", { cx: at2.x, cy: at2.y, r: 22 }));
+        var mt = svg("text", { x: at2.x, y: at2.y + 4, "text-anchor": "middle" });
+        mt.textContent = miOpen[c.name] ? "Less" : "+" + (own.length - show.length); more.appendChild(mt);
+        var toggle = function () { miOpen[c.name] = !miOpen[c.name]; drawMI(); };
+        more.addEventListener("click", toggle);
+        more.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+        nodes.appendChild(more);
+      }
+    });
+
+    // Competitor bubbles last, so they sit on top. (Logos come in once approved.)
+    d.competitors.forEach(function (c) {
+      var p = pos[c.name], gg = svg("g", { class: "ev-map__comp" });
+      gg.appendChild(svg("circle", { cx: p.x, cy: p.y, r: p.r }));
+      var fs = Math.min(22, (2 * p.r - 14) / Math.max(c.name.length * 0.5, 1));
+      var t1 = svg("text", { x: p.x, y: p.y + fs * 0.35, "text-anchor": "middle", class: "ev-map__cname", "font-size": fs.toFixed(1) }); t1.textContent = c.name; gg.appendChild(t1);
+      var t2 = svg("text", { x: p.x, y: p.y + p.r + 16, "text-anchor": "middle", class: "ev-map__cnum" });
+      t2.textContent = num(c.views) + " views · " + c.creators + " creators"; gg.appendChild(t2);
+      var tt = svg("title"); tt.textContent = c.name + ": " + c.posts + " collab posts, " + c.creators + " creators, " + num(c.views) + " views"; gg.appendChild(tt);
+      nodes.appendChild(gg);
+    });
+    return g;
+  }
+
+  var dotSeq = 0;
+  function dot(p, at, r, defs, stage, shared, lines) {
+    var gg = svg("g", { class: "ev-map__dot" + (p.paid_only ? " ev-map__dot--paid" : ""), tabindex: "0", role: "button",
+      "aria-label": (p.name || p.handle) + ", " + num(p.median_views) + " median views. Open posts." });
+    var id = "evc" + (++dotSeq);
+    var clip = svg("clipPath", { id: id }); clip.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r })); defs.appendChild(clip);
+    gg.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r, class: "ev-map__bg" }));
+    var src = photoOf(p.code);
+    if (src) {
+      var im = svg("image", { x: at.x - r, y: at.y - r, width: 2 * r, height: 2 * r, "clip-path": "url(#" + id + ")", preserveAspectRatio: "xMidYMid slice" });
+      im.setAttributeNS("http://www.w3.org/1999/xlink", "href", src); im.setAttribute("href", src);
+      gg.appendChild(im);
+    } else {
+      var ini = svg("text", { x: at.x, y: at.y + 4, "text-anchor": "middle", class: "ev-map__ini" });
+      ini.textContent = ((p.name || p.handle || "?").replace(/[^\p{L}\p{N} ]/gu, "").trim().split(/\s+/).map(function (w) { return w.charAt(0); }).slice(0, 2).join("") || "?").toUpperCase();
+      gg.appendChild(ini);
+    }
+    gg.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r, class: "ev-map__ring", stroke: TYPE_RING[p.type] || "#121212" }));
+    if (shared) gg.appendChild(svg("circle", { cx: at.x + r * 0.72, cy: at.y - r * 0.72, r: 5, class: "ev-map__badge" }));
+    var lit = function (on) { (lines || []).forEach(function (l) { l.classList.toggle("ev-map__lit", on); }); };
+    gg.addEventListener("mouseenter", function () { tip(p, gg, stage); lit(true); });
+    gg.addEventListener("focus", function () { tip(p, gg, stage); lit(true); });
+    gg.addEventListener("mouseleave", function () { untip(stage); lit(false); });
+    gg.addEventListener("blur", function () { untip(stage); lit(false); });
+    gg.addEventListener("click", function () { untip(stage); popup(p); });
+    gg.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); popup(p); } });
+    return gg;
+  }
+
+  function tip(p, node, stage) {
+    untip(stage);
+    var b = node.getBoundingClientRect(), s0 = stage.getBoundingClientRect();
+    var t = el("div", "ev-tip"); t.setAttribute("role", "tooltip");
+    t.appendChild(el("b", "", p.name || ("@" + p.handle)));
+    t.appendChild(el("span", "", "@" + p.handle + (p.followers ? " · " + num(p.followers) + " followers" : "")));
+    t.appendChild(el("span", "", num(p.median_views) + " median views · " + Object.keys(p.competitors).join(", ")));
+    t.style.left = Math.min(s0.width - 240, Math.max(0, b.left - s0.left + b.width / 2 - 110)) + "px";
+    t.style.top = (b.top - s0.top + b.height + 8) + "px";
+    stage.appendChild(t);
+  }
+  function untip(stage) { var o = stage.querySelector(".ev-tip"); if (o) o.remove(); }
+
+  function popup(p) {
+    var old = document.querySelector(".ev-pop"); if (old) old.remove();
+    var scrim = el("div", "ev-pop"), box = el("div", "ev-pop__box");
+    box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true"); box.setAttribute("aria-label", "Posts by " + (p.name || p.handle));
+    var hd = el("div", "ev-pop__hd"), tt = el("div");
+    tt.appendChild(el("h3", "ev-pn__t", p.name || ("@" + p.handle)));
+    tt.appendChild(el("p", "ev-mut", "@" + p.handle + " · " + (TYPE_NAME[p.type] || "Creator") + (p.followers ? " · " + num(p.followers) + " followers" : "")));
+    hd.appendChild(tt);
+    var x = el("button", "ev-pn__x", "×"); x.type = "button"; x.setAttribute("aria-label", "Close");
+    var close = function () { scrim.remove(); document.removeEventListener("keydown", esc, true); };
+    var esc = function (e) { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    x.addEventListener("click", close); scrim.addEventListener("click", function (e) { if (e.target === scrim) close(); });
+    document.addEventListener("keydown", esc, true);
+    hd.appendChild(x); box.appendChild(hd);
+    var i = 0, stageEl = el("div", "ev-pop__body");
+    box.appendChild(stageEl);
+    function show() {
+      stageEl.textContent = "";
+      var q = p.posts[i]; if (!q) return;
+      var src = player(q.url), wrap = el("div", "ev-pop__grid"), left = el("div", "ev-pop__media");
+      if (src) { var fr = el("iframe"); fr.src = src; fr.title = "Post"; fr.setAttribute("allow", "autoplay; encrypted-media; picture-in-picture"); left.appendChild(fr); }
+      else left.appendChild(link(q.url, "Open post"));
+      var right = el("div");
+      var brand = el("span", "ev-post__brand ev-pop__brand", q.competitor); right.appendChild(brand);
+      right.appendChild(el("p", "ev-post__meta", (q.date || "") + " · " + (q.collab || "")));
+      var ms = el("div", "ev-post__ms");
+      ms.appendChild(metric(num(q.views), "views"));
+      ms.appendChild(metric(q.likes == null ? HIDDEN : num(q.likes), q.likes == null ? "likes hidden" : "likes"));
+      ms.appendChild(metric(num(q.comments), "comments"));
+      ms.appendChild(metric(q.er == null ? HIDDEN : pct(q.er), q.er == null ? "engagement n/a" : "engagement"));
+      right.appendChild(ms);
+      if (q.paid_boost) right.appendChild(el("p", "ev-chip ev-chip--paid", "Paid-boosted"));
+      var nav = el("div", "ev-pop__nav");
+      var prev = el("button", "ev-act", "← Previous"); prev.type = "button"; prev.disabled = i === 0;
+      var next = el("button", "ev-act", "Next →"); next.type = "button"; next.disabled = i >= p.posts.length - 1;
+      prev.addEventListener("click", function () { i--; show(); }); next.addEventListener("click", function () { i++; show(); });
+      nav.appendChild(prev); nav.appendChild(el("span", "ev-mut", (i + 1) + " of " + p.posts.length)); nav.appendChild(next);
+      right.appendChild(nav);
+      right.appendChild(link(q.url, "Open on " + (q.platform === "tiktok" ? "TikTok" : "Instagram")));
+      if (p.code && data && data.by_code && data.by_code[p.code]) {
+        var tr = el("button", "ev-act ev-act--yes", "Track record"); tr.type = "button";
+        tr.addEventListener("click", function () { close(); openPanel(p.code, tr); });
+        right.appendChild(tr);
+      }
+      wrap.appendChild(left); wrap.appendChild(right); stageEl.appendChild(wrap);
+    }
+    show();
+    scrim.appendChild(box); document.body.appendChild(scrim);
+    x.focus();
+  }
+
+  document.addEventListener("keydown", function (e) { if (e.key !== "Escape") return; if (panel) closePanel(); else if (mi && !document.querySelector(".ev-pop")) closeMI(); });
   if (grid && window.MutationObserver) {
     // Cards are redrawn on every render; put the button back when they are.
     var pending = false;

@@ -613,6 +613,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_discover("facets")
         if path == "/api/evidence":
             return self.api_evidence(query.get("s") or "")
+        if path == "/api/evidence/map":
+            return self.api_evidence(query.get("s") or "", None, None, True)
         if path == "/api/evidence/thumb":
             return self.api_evidence(query.get("s") or "", None, kam_scope._int(query.get("p")))
         if path == "/api/evidence/creator":
@@ -4764,7 +4766,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect("/evidence?ok=" + urllib.parse.quote("Pack deleted."))
         return self.send(404, "Not found", "text/plain; charset=utf-8")
 
-    def api_evidence(self, token, creator=None, thumb_post=None):
+    def api_evidence(self, token, creator=None, thumb_post=None, as_map=False):
         """The competitor evidence filed under a selection, for its client page — only when an admin
         switched it on for the client, and behind the same link check as /api/selection. With
         ``creator`` (a code in the selection): that creator's Track record."""
@@ -4779,10 +4781,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         pk = evidence.for_selection(sel["id"], client_only=not staff)
         if pk is None:
-            if creator is not None or thumb_post is not None:
+            if creator is not None or thumb_post is not None or as_map:
                 return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
             return self.send_json(200, {"ok": True, "evidence": None}, self.cors())
         codes = json.loads(sel["codes"] or "[]")
+        if as_map:
+            out = evidence.map_payload(pk, codes)
+            out["preview"] = bool(staff and not pk["client_visible"])
+            return self.send_json(200, {"ok": True, "map": out}, self.cors())
         if thumb_post is not None:
             url = evidence.post_for_thumb(pk["id"], thumb_post)
             got = evidence.thumb(url) if url else None

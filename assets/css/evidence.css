@@ -109,3 +109,54 @@
 .ev-play iframe { display: block; width: 100%; height: min(640px, 70vh); border: 0; }
 .ev-play__bar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px; }
 @media (max-width: 640px) { .ev-postgrid { grid-template-columns: repeat(2, 1fr); gap: 8px; } .ev-hb__row { grid-template-columns: 96px 1fr auto; } }
+
+/* Market Intelligence: button, full-screen view, map, hover card, post pop-up */
+.ev-mi-btn { display: inline-flex; align-items: center; gap: 8px; margin: 14px 0 0; min-height: 44px; padding: 0 20px; border-radius: 999px; border: 1px solid var(--ink); background: var(--lime); color: var(--ink); font: 700 15px "DM Sans", sans-serif; cursor: pointer; }
+.ev-mi-btn:hover { background: var(--ink); color: var(--lime); }
+.ev-mi-btn:focus-visible, .ev-map__dot:focus-visible, .ev-map__more:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.ev-mi-btn__ic { font-size: 18px; line-height: 1; }
+.ev-mi { position: fixed; inset: 0; z-index: 310; background: var(--white); display: flex; flex-direction: column; }
+.ev-mi__hd { display: flex; align-items: center; gap: 16px; padding: 14px 22px; border-bottom: 1px solid rgba(18, 18, 18, .1); flex-wrap: wrap; }
+.ev-mi__hd > div:first-child { flex: 1; min-width: 200px; }
+.ev-mi__t { font-family: Bebasneue, "Bebas Neue", sans-serif; font-weight: 400; font-size: clamp(2rem, 1.4rem + 1.8vw, 3rem); line-height: 1; margin: 0; }
+.ev-mi__hd .ev-tabs { margin: 0; }
+.ev-mi__bd { flex: 1; overflow: auto; padding: 14px 22px 24px; }
+.ev-mi__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin-bottom: 8px; }
+.ev-mi__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.ev-mi__chips .ev-brand:disabled { opacity: .45; cursor: not-allowed; }
+.ev-mi__stage { position: relative; background: #faf8f4; border: 1px solid rgba(18, 18, 18, .08); border-radius: 20px; }
+.ev-map { display: block; width: 100%; height: auto; max-height: calc(100vh - 220px); }
+.ev-map__spoke { stroke: rgba(18, 18, 18, .12); stroke-width: 2; }
+.ev-map__own { stroke: rgba(18, 18, 18, .08); stroke-width: 1; }
+.ev-map__share { stroke: #ff691e; stroke-width: 1; stroke-opacity: .14; stroke-dasharray: 3 3; }
+.ev-map__lit { stroke: #ff691e !important; stroke-opacity: 1 !important; stroke-width: 2.5 !important; stroke-dasharray: none !important; }
+.ev-map__hub circle { fill: var(--lime); stroke: var(--ink); stroke-width: 2; }
+.ev-map__hub text { font: 400 30px Bebasneue, "Bebas Neue", sans-serif; fill: var(--ink); }
+.ev-map__comp circle { fill: var(--ink); }
+.ev-map__cname { font-family: Bebasneue, "Bebas Neue", sans-serif; font-weight: 400; fill: #fff; }
+.ev-map__cnum { font: 700 11px "DM Sans", sans-serif; fill: #383838; paint-order: stroke; stroke: #faf8f4; stroke-width: 4px; }
+.ev-map__dot { cursor: pointer; }
+.ev-map__bg { fill: #e9dcd2; }
+.ev-map__ring { fill: none; stroke-width: 3; }
+.ev-map__ini { font: 700 10px "DM Sans", sans-serif; fill: var(--ink); pointer-events: none; }
+.ev-map__badge { fill: #ff691e; stroke: #fff; stroke-width: 1.5; }
+.ev-map__dot:hover .ev-map__ring, .ev-map__dot:focus .ev-map__ring { stroke-width: 5; }
+.ev-map__dot--paid { opacity: .55; }
+.ev-map__more { cursor: pointer; }
+.ev-map__more circle { fill: var(--white); stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 3 2; }
+.ev-map__more text { font: 700 12px "DM Sans", sans-serif; fill: var(--ink); }
+.ev-tip { position: absolute; z-index: 5; width: 220px; background: var(--ink); color: #fff; border-radius: 12px; padding: 10px 12px; font-size: 12.5px; line-height: 1.4; pointer-events: none; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .5); }
+.ev-tip b { display: block; font-size: 14px; margin-bottom: 2px; }
+.ev-tip span { display: block; color: rgba(255, 255, 255, .8); }
+.ev-pop { position: fixed; inset: 0; z-index: 320; background: rgba(18, 18, 18, .55); display: grid; place-items: center; padding: 16px; }
+.ev-pop__box { background: var(--white); border-radius: 20px; width: min(980px, 100%); max-height: calc(100vh - 32px); overflow: auto; }
+.ev-pop__hd { display: flex; gap: 12px; align-items: flex-start; padding: 16px 20px; border-bottom: 1px solid rgba(18, 18, 18, .1); }
+.ev-pop__hd > div { flex: 1; min-width: 0; }
+.ev-pop__body { padding: 16px 20px 20px; }
+.ev-pop__grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+.ev-pop__media iframe { display: block; width: 100%; height: min(620px, 70vh); border: 0; border-radius: 12px; background: #efede8; }
+.ev-pop__brand { position: static; display: inline-block; background: var(--ink); }
+.ev-pop__nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 12px 0; }
+.ev-pop__body .ev-post__ms { padding: 8px 0; }
+.ev-pop__body .ev-act { margin-top: 8px; }
+@media (max-width: 720px) { .ev-pop__grid { grid-template-columns: 1fr; } .ev-mi__bd { padding: 12px; } .ev-mi__hd { padding: 12px; } }
