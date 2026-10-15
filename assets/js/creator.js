@@ -649,95 +649,120 @@
     if (p.thumb) return /^(https?:|\/)/.test(p.thumb) ? p.thumb : API + "/" + p.thumb;
     return p.live || null;
   }
-  /* TikTok cards show TikTok's own player over the saved picture (owner, 2026-10-15), quietly: every TikTok
-     overlay off (no controls, caption, music, buttons), never autoplaying, never taking the click, which still
-     opens our player. The picture shows at once; the player is made only near the screen, through a queue
+  /* Every TikTok and Instagram card plays the platform's own embed over its saved picture (owner, 2026-10-15:
+     "add both live even if it takes time to load"), quietly: TikTok with every overlay off, Instagram cropped to
+     the media; never autoplaying, never taking the click, which still opens our player. The picture shows at once; the player is made only near the screen, through a queue
      (one every 400 ms, at most 6 loading) so a long grid never trips TikTok's throttling. It fades in only
      once it has loaded and TikTok has not reported the video missing (postMessage onPlayerError, which a
      deleted post sends); a frame that has not loaded within 8 s is removed. Either way the picture stays. Far off screen, live frames are unloaded again.
-     Instagram stays on pictures: its embed is slow and brings its own header. Same code in evidence.js. */
-  var TTLIVE = (function () {
-    var PARAMS = "controls=0&progress_bar=0&play_button=0&volume_control=0&fullscreen_button=0&timestamp=0" +
-      "&music_info=0&description=0&rel=0&native_context_menu=0&closed_caption=0&autoplay=0&loop=0";
-    var queue = [], loading = [], all = [], timer = null, near = null, far = null;
+     Instagram's embed is slow (20-25 s) and waits up to 30 s. Same code in evidence.js. */
+  var LIVEPOST = (function () {
+    // One queue per platform, so neither throttles us: TikTok one per 400 ms (6 loading at most), Instagram one per
+    // second (3 at most; its embed is heavy). The card nearest the middle of the screen goes first.
+    var KIND = {
+      tt: { gap: 400, max: 6, wait: 8000, grace: 2000, origin: /^https:\/\/([a-z0-9-]+\.)*tiktok\.com$/,
+            src: function (id) { return "https://www.tiktok.com/player/v1/" + encodeURIComponent(id) + "?controls=0&progress_bar=0&play_button=0" +
+              "&volume_control=0&fullscreen_button=0&timestamp=0&music_info=0&description=0&rel=0&native_context_menu=0&closed_caption=0&autoplay=0&loop=0"; } },
+      ig: { gap: 1000, max: 3, wait: 30000, grace: 0, origin: /^https:\/\/([a-z0-9-]+\.)*instagram\.com$/,
+            src: function (id) { return "https://www.instagram.com/p/" + encodeURIComponent(id) + "/embed/"; } }
+    };
+    var Q = { tt: [], ig: [] }, loading = { tt: [], ig: [] }, timer = { tt: null, ig: null }, all = [], near = null, far = null;
     if (!window.IntersectionObserver) return { watch: function () {} };
-    function idOf(box) { return box.getAttribute("data-tt"); }
+    function kindOf(box) { return (box.getAttribute("data-live") || "").split(":")[0]; }
+    function idOf(box) { return (box.getAttribute("data-live") || "").split(":").slice(1).join(":"); }
+    function state(box, s) { if (s) box.setAttribute("data-live-state", s); return box.getAttribute("data-live-state"); }
+    function fit(box) { box.style.setProperty("--lv-s", (box.clientWidth / 340).toFixed(4)); }   // Instagram's frame is laid out 340 wide, then scaled
     function start(box) {
-      var f = document.createElement("iframe");
-      f.className = "tt-live"; f.src = "https://www.tiktok.com/player/v1/" + encodeURIComponent(idOf(box)) + "?" + PARAMS;
-      f.title = "TikTok preview"; f.setAttribute("aria-hidden", "true"); f.tabIndex = -1;
-      f.setAttribute("allow", "encrypted-media"); f.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
-      box.__tt = { f: f, t: setTimeout(function () { fail(box); }, 8000) };
-      // Shown once the frame has loaded and TikTok has had 2 s to report a missing video (onPlayerError);
-      // onPlayerReady shows it sooner. Not every browser gets onPlayerReady before the video is on screen.
-      f.addEventListener("load", function () { setTimeout(function () { ready(box); }, 2000); });
-      box.setAttribute("data-tt-state", "loading");
-      loading.push(box);
+      var k = kindOf(box), K = KIND[k], f = document.createElement("iframe");
+      f.className = "lv-frame lv-" + k; f.src = K.src(idOf(box));
+      f.title = (k === "tt" ? "TikTok" : "Instagram") + " preview"; f.setAttribute("aria-hidden", "true"); f.tabIndex = -1;
+      f.setAttribute("allow", "encrypted-media"); f.setAttribute("scrolling", "no");
+      f.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+      if (k === "ig") fit(box);
+      box.__lv = { f: f, t: setTimeout(function () { fail(box); }, K.wait) };
+      // Shown a moment after the frame loads (TikTok reports a missing video in that time); a ready message shows it sooner.
+      // Instagram waits for its own MEASURE message with a real height: an unavailable post loads an empty frame.
+      if (K.grace) f.addEventListener("load", function () { setTimeout(function () { ready(box); }, K.grace); });
+      state(box, "loading"); loading[k].push(box);
       box.appendChild(f);
     }
-    function settle(box) { clearTimeout(box.__tt && box.__tt.t); loading = loading.filter(function (b) { return b !== box; }); pump(); }
-    function ready(box) {
-      if (box.getAttribute("data-tt-state") !== "loading") return;
-      box.setAttribute("data-tt-state", "live"); box.classList.add("is-tt-live"); settle(box);
+    function settle(box) {
+      var k = kindOf(box);
+      clearTimeout(box.__lv && box.__lv.t);
+      loading[k] = loading[k].filter(function (b) { return b !== box; });
+      pump(k);
     }
+    function ready(box) {
+      if (state(box) !== "loading") return;
+      state(box, "live"); box.classList.add("is-live", "is-live-" + kindOf(box)); settle(box);
+    }
+    // Failed, timed out or missing: the frame goes, the card stays with its picture or placeholder.
     function fail(box) {
-      if (box.__tt && box.__tt.f) box.__tt.f.remove();
-      box.classList.remove("is-tt-live"); box.setAttribute("data-tt-state", "off");     // not tried again on this page
+      if (box.__lv && box.__lv.f) box.__lv.f.remove();
+      box.classList.remove("is-live", "is-live-tt", "is-live-ig"); state(box, "off");      // not tried again on this page
       settle(box);
     }
     function unload(box) {
-      if (box.getAttribute("data-tt-state") !== "live") return;
-      if (box.__tt && box.__tt.f) box.__tt.f.remove();
-      box.classList.remove("is-tt-live"); box.setAttribute("data-tt-state", "idle");
+      if (state(box) !== "live") return;
+      if (box.__lv && box.__lv.f) box.__lv.f.remove();
+      box.classList.remove("is-live", "is-live-tt", "is-live-ig"); state(box, "idle");
     }
-    function pump() {
-      if (timer || !queue.length) return;
-      timer = setTimeout(function () {
-        timer = null;
-        while (queue.length && loading.length < 6) {
-          var box = queue.shift();
-          if (box.isConnected && box.__near && box.getAttribute("data-tt-state") === "idle") { start(box); break; }
+    function pump(k) {
+      if (timer[k] || !Q[k].length) return;
+      timer[k] = setTimeout(function () {
+        timer[k] = null;
+        Q[k] = Q[k].filter(function (b) { return b.isConnected && b.__near && state(b) === "idle"; });
+        if (Q[k].length && loading[k].length < KIND[k].max) {
+          var mid = window.innerHeight / 2;
+          Q[k].sort(function (a, b) {
+            var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+            return Math.abs(ra.top + ra.height / 2 - mid) - Math.abs(rb.top + rb.height / 2 - mid);
+          });
+          start(Q[k].shift());
         }
-        pump();
-      }, 400);
+        pump(k);
+      }, KIND[k].gap);
     }
     window.addEventListener("message", function (e) {
-      if (!/^https:\/\/([a-z0-9-]+\.)*tiktok\.com$/.test(e.origin || "")) return;
+      var o = e.origin || "", box = all.filter(function (b) { return b.__lv && b.__lv.f.isConnected && b.__lv.f.contentWindow === e.source; })[0];
+      if (!box || !KIND[kindOf(box)].origin.test(o)) return;
       var d = e.data;
       if (typeof d === "string") { try { d = JSON.parse(d); } catch (x) { return; } }
       if (!d || !d.type) return;
-      var box = all.filter(function (b) { return b.__tt && b.__tt.f.isConnected && b.__tt.f.contentWindow === e.source; })[0];
-      if (!box) return;
-      if (d.type === "onPlayerReady") setTimeout(function () { ready(box); }, 250);
-      else if (/error/i.test(d.type)) fail(box);           // e.g. onPlayerError INVALID_VIDEO for a deleted post, even after it showed
+      if (d.type === "onPlayerReady" || (d.type === "MEASURE" && d.details && d.details.height >= 200)) setTimeout(function () { ready(box); }, 250);
+      else if (/error/i.test(d.type)) fail(box);          // TikTok onPlayerError (INVALID_VIDEO for a deleted post), even after it showed
     });
+    window.addEventListener("resize", function () { all.forEach(function (b) { if (kindOf(b) === "ig") fit(b); }); }, { passive: true });
     function watch(root) {
-      var boxes = [].slice.call((root || document).querySelectorAll("[data-tt]"));
+      var boxes = [].slice.call((root || document).querySelectorAll("[data-live]"));
       if (!boxes.length) return;
       near = near || new IntersectionObserver(function (es) {
         es.forEach(function (en) {
-          var box = en.target; box.__near = en.isIntersecting;
-          if (en.isIntersecting && box.getAttribute("data-tt-state") === "idle" && queue.indexOf(box) < 0) { queue.push(box); pump(); }
+          var box = en.target, k = kindOf(box); box.__near = en.isIntersecting;
+          if (en.isIntersecting && state(box) === "idle" && Q[k].indexOf(box) < 0) { Q[k].push(box); pump(k); }
         });
       }, { rootMargin: "300px 0px" });
       far = far || new IntersectionObserver(function (es) {
-        if (all.filter(function (b) { return b.isConnected; }).length <= 12) return;     // a short page keeps its players
+        if (all.filter(function (b) { return b.isConnected; }).length <= 12) return;     // a short page keeps its embeds
         es.forEach(function (en) { if (!en.isIntersecting) unload(en.target); });
       }, { rootMargin: "1600px 0px" });
       boxes.forEach(function (b) {
-        if (b.__ttWatched) return;
-        b.__ttWatched = true; b.setAttribute("data-tt-state", "idle"); all.push(b);
+        if (b.__lvWatched || !KIND[kindOf(b)]) return;
+        b.__lvWatched = true; state(b, "idle"); all.push(b);
         near.observe(b); far.observe(b);
       });
     }
     return { watch: watch };
   })();
   function ttId(u) { var m = /tiktok\.com\/@[^\/]+\/video\/(\d+)/.exec(u || ""); return m ? m[1] : null; }
+  // An Instagram shortcode, never a numeric id (instagram.com/p/<digits> are posts that no longer open).
+  function igCode(u) { var m = /instagram\.com\/(?:[^\/]+\/)?(?:p|reel|reels|tv)\/([A-Za-z0-9_-]+)/.exec(u || ""); return m && !/^\d+$/.test(m[1]) ? m[1] : null; }
+  function liveAttr(u) { var t = ttId(u), g = !t && igCode(u); return t ? "tt:" + t : g ? "ig:" + g : ""; }
 
   function postGrid(list, sponsored, recent) {
     return '<div class="pp-posts">' + list.map(function (p, i) {
       return '<a class="pp-post" href="' + esc(p.url) + '" target="_blank" rel="noopener" aria-label="Play post ' + (i + 1) + '" data-post="' + i + '"' + (sponsored ? ' data-sp="1"' : "") + (recent ? ' data-rc="1"' : "") + ">"
-        + '<span class="pp-post__media"' + (ttId(p.url) ? ' data-tt="' + ttId(p.url) + '"' : "") + (live(p) ? ' style="background-image:url(\'' + esc(live(p)) + '\')"' : "") + ">"
+        + '<span class="pp-post__media"' + (liveAttr(p.url) ? ' data-live="' + liveAttr(p.url) + '"' : "") + (live(p) ? ' style="background-image:url(\'' + esc(live(p)) + '\')"' : "") + ">"
         + (live(p) ? "" : '<span class="pp-post__none">' + esc(PLAT || "Instagram") + " post</span>")
         + '<span class="pp-post__play">' + I_PLAY + "</span>"
         + (sponsored && p.brand && BRANDLOGO[String(p.brand).toLowerCase()] ? '<span class="pp-post__brand pp-post__brand--logo" role="img" aria-label="' + esc(p.brand) + '" style="background-image:url(\'' + logoSrc(BRANDLOGO[String(p.brand).toLowerCase()].src) + '\');background-size:' + logoSize(BRANDLOGO[String(p.brand).toLowerCase()].w) + '"></span>' : "")
@@ -753,7 +778,7 @@
     sec.hidden = !rec.length;
     if (!rec.length) return;
     $("pp-recent").innerHTML = postGrid(rec, false, true);
-    if (!(D && D.sample)) TTLIVE.watch($("pp-recent"));
+    if (!(D && D.sample)) LIVEPOST.watch($("pp-recent"));
     $("pp-recent").onclick = function (e) {
       var el = e.target.closest("[data-post]"); if (!el) return;
       var p = rec[+el.getAttribute("data-post")], sc = p && shortcode(p.url);
@@ -786,7 +811,7 @@
     $("pp-posts").innerHTML = (top.length || sp.length)
       ? (top.length ? postGrid(top, false) : "") + (sp.length ? '<h3 class="pp-h3">Sponsored posts</h3>' + postGrid(sp, true) : "")
       : '<p class="pp-missing">Not in this report.</p>';
-    if (!(D && D.sample)) TTLIVE.watch($("pp-posts"));
+    if (!(D && D.sample)) LIVEPOST.watch($("pp-posts"));
     $("pp-posts").onclick = function (e) {
       var el = e.target.closest("[data-post]"); if (!el) return;
       if (D && D.sample) { e.preventDefault(); return; }          // the sample has no posts to open
