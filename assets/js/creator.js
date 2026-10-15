@@ -697,7 +697,18 @@
       state(box, "live"); box.classList.add("is-live", "is-live-" + kindOf(box)); settle(box);
     }
     // Failed, timed out or missing: the frame goes, the card stays with its picture or placeholder.
-    function fail(box) {
+    // Confirmed unplayable (TikTok says the video is unavailable, Instagram reports a zero-height embed) and no
+    // saved picture: the card is hidden from display only, its data is untouched (owner, 2026-10-15). A timeout
+    // is not proof, so a slow embed keeps its placeholder.
+    function gone(box) {
+      var media = box.querySelector(".pp-post__media, .ev-dpost__img");
+      var hasPic = !!(media && /url\(/.test(media.getAttribute("style") || ""));
+      if (hasPic) return false;
+      var c = box.closest(".pp-post"); if (c) c.hidden = true;
+      state(box, "gone"); return true;
+    }
+    function fail(box, unplayable) {
+      if (unplayable && gone(box)) { settle(box); return; }
       if (box.__lv && box.__lv.f) box.__lv.f.remove();
       box.classList.remove("is-live", "is-live-tt", "is-live-ig"); state(box, "off");      // not tried again on this page
       settle(box);
@@ -730,7 +741,8 @@
       if (typeof d === "string") { try { d = JSON.parse(d); } catch (x) { return; } }
       if (!d || !d.type) return;
       if (d.type === "onPlayerReady" || (d.type === "MEASURE" && d.details && d.details.height >= 200)) setTimeout(function () { ready(box); }, 250);
-      else if (/error/i.test(d.type)) fail(box);          // TikTok onPlayerError (INVALID_VIDEO for a deleted post), even after it showed
+      else if (d.type === "MEASURE" && d.details && d.details.height === 0) fail(box, true);   // Instagram: post unavailable
+      else if (/error/i.test(d.type)) fail(box, true);          // TikTok onPlayerError (INVALID_VIDEO for a deleted post), even after it showed
     });
     window.addEventListener("resize", function () { all.forEach(function (b) { if (kindOf(b) === "ig") fit(b); }); }, { passive: true });
     function watch(root) {
