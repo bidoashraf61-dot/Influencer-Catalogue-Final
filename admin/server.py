@@ -393,8 +393,15 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def staff_unlocked(self):
         """A person with admin access who has switched "Show locked data" on. A key account
         manager's switch never unlocks everything: see kam_unlocked()."""
-        return (self.cookies().get(self.UNLOCK_COOKIE, "") == "1" and self.staff_viewer()
-                and self.kam_clients() is None)
+        if not self.staff_viewer() or self.kam_clients() is not None:
+            return False
+        if self.cookies().get(self.UNLOCK_COOKIE, "") == "1":
+            return True
+        # Owner and admin accounts see everything without the switch (owner, 2026-10-15).
+        u = portal.user_for_code(self.viewer_cookie_id())
+        a = db.admin_by_email(u["email"]) if u is not None and u["email"] else None
+        import team as _team
+        return a is not None and _team.role_of(a) in ("owner", "admin")
 
     def kam_clients(self):
         """None, or (for a key account manager signed in to the admin, or to the portal with an
@@ -4256,10 +4263,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not (self.admin_like_for(sel["code_id"]) or self.selection_role(sel, reader) == "admin"):
             return self.send_json(403, {"ok": False, "reason": "hv_only", "message": "Only HelloVoice publishes scores."}, self.cors())
         on = bool(b.get("publish"))
+        # what: "scores" (default) or "analysis" (the creators' full profile analysis).
+        col = "analysis_published" if b.get("what") == "analysis" else "scores_published"
         with db.connect() as conn:
-            conn.execute("UPDATE selections SET scores_published = ? WHERE id = ?", (1 if on else 0, sel["id"]))
-        db.log("shortlist", reader, self.client_ip(), self.headers.get("User-Agent"), "scores:%s:%s" % (sel["id"], "publish" if on else "hide"))
-        return self.send_json(200, {"ok": True, "published": on}, self.cors())
+            conn.execute("UPDATE selections SET %s = ? WHERE id = ?" % col, (1 if on else 0, sel["id"]))
+        db.log("shortlist", reader, self.client_ip(), self.headers.get("User-Agent"), "%s:%s:%s" % (col, sel["id"], "publish" if on else "hide"))
+        return self.send_json(200, {"ok": True, "published": on, "what": "analysis" if col == "analysis_published" else "scores"}, self.cors())
 
     def selection_scoring_off(self, sel):
         """True when a selection shows no scores (setting selections_unscored: a list of
@@ -5098,7 +5107,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         reader0 = self.selection_viewer(sel["token"])
         team = self.selection_role(sel, reader0) == "admin" or self.admin_like_for(sel["code_id"])
         gated = self.scores_gated(sel)
-        out["scores_gate"] = {"applies": self.scores_gate_applies(sel), "published": not gated, "team": bool(team)}
+        out["scores_gate"] = {"applies": self.scores_gate_applies(sel), "published": not gated, "team": bool(team),
+                              "analysis": bool(sel["analysis_published"] if "analysis_published" in sel.keys() else 0)}
         if gated and not team and out.get("scores"):
             out["scores"] = {}
             out["needs_objective"] = False

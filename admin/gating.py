@@ -79,6 +79,21 @@ def _unlock_all():
     return portal.unlock_all()
 
 
+def published_codes(code_id):
+    """Creators in this team's selections whose profile analysis HelloVoice pushed (owner, 2026-10-15):
+    every creator of such a selection, including ones added after the push."""
+    team = _team(code_id)
+    if not team:
+        return set()
+    with db.connect() as conn:
+        rows = conn.execute("SELECT codes FROM selections WHERE analysis_published = 1 AND deleted_at IS NULL AND code_id IN (%s)"
+                            % ",".join("?" * len(team)), list(team)).fetchall()
+    out = set()
+    for r in rows:
+        out.update(json.loads(r["codes"] or "[]"))
+    return out
+
+
 def unlocked(code_id, code):
     if code_id is None:
         return False
@@ -87,6 +102,8 @@ def unlocked(code_id, code):
     import portal
     if portal.unlock_creator(code):
         return True                                    # a key account manager: creators of her clients
+    if code in published_codes(code_id):
+        return True                                    # pushed on one of the team's selections
     team = _team(code_id)
     with db.connect() as conn:
         return bool(conn.execute("SELECT 1 FROM analysis_grants WHERE code = ? AND code_id IN (%s) LIMIT 1"
@@ -102,7 +119,7 @@ def unlocked_set(code_id, codes=None):
     team = _team(code_id)
     with db.connect() as conn:
         rows = conn.execute("SELECT code FROM analysis_grants WHERE code_id IN (%s)" % ",".join("?" * len(team)), list(team)).fetchall()
-    got = {r["code"] for r in rows}
+    got = {r["code"] for r in rows} | published_codes(code_id)
     import portal
     if codes is not None:
         got |= {c for c in codes if portal.unlock_creator(c)}   # a key account manager's own clients

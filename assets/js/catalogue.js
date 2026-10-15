@@ -3145,17 +3145,20 @@
     // shrinks to a done line (Objective added ✓ · Awareness, Engagement · Edit).
     function objectiveWords(o) { return String(o || "").split("+").filter(Boolean).join(", "); }
     function publishScores(btn) {
-      var on = btn.getAttribute("data-publish") === "1";
-      if (on && !window.confirm("Publish the scores to the client? They will see every creator's score on this selection.")) return;
+      var on = btn.getAttribute("data-publish") === "1", what = btn.getAttribute("data-what") || "scores";
+      if (on && !window.confirm(what === "analysis"
+        ? "Publish the profile analysis to the client? Everyone who can open this selection will see the full analysis of every creator in it."
+        : "Publish the scores to the client? They will see every creator's score on this selection.")) return;
       btn.disabled = true;
       fetch(CFG.api + "/api/selection/scores", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: CURATED.token, publish: on }) })
+        body: JSON.stringify({ token: CURATED.token, publish: on, what: what }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (j) {
           btn.disabled = false;
           if (!j || !j.ok) { stToast((j && j.message) || "Couldn't change that. Please try again."); return; }
-          CURATED.scoresGate.published = !!j.published;
-          stToast(j.published ? "Scores published: the client sees them now." : "Scores hidden from the client.");
+          if (what === "analysis") CURATED.scoresGate.analysis = !!j.published; else CURATED.scoresGate.published = !!j.published;
+          stToast(what === "analysis" ? (j.published ? "Profile analysis published to the client." : "Profile analysis locked for the client.")
+            : (j.published ? "Scores published: the client sees them now." : "Scores hidden from the client."));
           renderObjective();
         })
         .catch(function () { btn.disabled = false; stToast("Couldn't reach the server. Please try again."); });
@@ -3192,7 +3195,9 @@
       if (have) {
         var gateHtml = gate && gate.applies && gate.team
           ? '<span class="sel-gate sel-gate--' + (gate.published ? "on" : "off") + '">' + (gate.published ? "Scores visible to the client" : "Scores hidden from the client") + "</span>" +
-            '<button type="button" class="sel-obj__pub" data-publish="' + (gate.published ? "0" : "1") + '">' + (gate.published ? "Hide from client" : "Publish scores to client") + "</button>"
+            '<button type="button" class="sel-obj__pub" data-what="scores" data-publish="' + (gate.published ? "0" : "1") + '">' + (gate.published ? "Hide scores" : "Publish scores to client") + "</button>" +
+            '<span class="sel-gate sel-gate--' + (gate.analysis ? "on" : "off") + '">' + (gate.analysis ? "Profile analysis open to the client" : "Profile analysis locked for the client") + "</span>" +
+            '<button type="button" class="sel-obj__pub" data-what="analysis" data-publish="' + (gate.analysis ? "0" : "1") + '">' + (gate.analysis ? "Lock analysis" : "Publish analysis to client") + "</button>"
           : "";
         host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic sel-obj__ic--done">' + hvIcon("check") + "</span>" +
           '<p class="sel-obj__tx"><b>Objective added</b><span class="sel-obj__what">' + esc(objectiveWords(CURATED.brief.objective)) + "</span>" +

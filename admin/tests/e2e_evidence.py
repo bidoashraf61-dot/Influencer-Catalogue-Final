@@ -144,7 +144,8 @@ class Evidence(unittest.TestCase):
     def test_3_client_sees_it_only_once_shared(self):
         pid = self.pack_id()
         s, b, _ = self.client.get("/api/evidence?s=" + self.token)
-        self.assertEqual((s, b["evidence"]), (200, None))         # not shared yet
+        self.assertEqual(s, 200)
+        self.assertIsNotNone(b["evidence"])                       # visible from the start (owner, 2026-10-15)
         a = self.admin()
         a.req("POST", "/evidence/save", form={"id": str(pid), "title": "Polyco competitors",
                                               "selection_id": str(self.sel), "client_visible": "1"})
@@ -379,7 +380,7 @@ class Evidence(unittest.TestCase):
             b = self.client.get("/api/selection?s=" + self.token)[1]
             self.assertEqual(b["scores"], {}, b.get("scores"))                    # client: nothing yet
             self.assertTrue(b.get("scores_pending"))
-            self.assertEqual(b["scores_gate"], {"applies": True, "published": False, "team": False})
+            self.assertEqual(b["scores_gate"], {"applies": True, "published": False, "team": False, "analysis": False})
             a = self.admin()
             b = a.get("/api/selection?s=" + self.token)[1]
             self.assertIn("HV-MI-005", b["scores"])                                # HelloVoice: always
@@ -390,6 +391,16 @@ class Evidence(unittest.TestCase):
             b = self.client.get("/api/selection?s=" + self.token)[1]
             self.assertIn("HV-MI-005", b["scores"])                                # published
             self.assertFalse(b.get("scores_pending"))
+            # Profile analysis gate: locked for the client until pushed on this selection, then open.
+            import gating
+            self.assertNotIn("HV-MI-005", gating.unlocked_set(self.mine["code_id"], ["HV-MI-005"]))
+            s, j, _ = a.post("/api/selection/scores", {"token": self.token, "publish": True, "what": "analysis"})
+            self.assertEqual((s, j.get("what")), (200, "analysis"), j)
+            self.assertIn("HV-MI-005", gating.unlocked_set(self.mine["code_id"], ["HV-MI-005"]))
+            self.assertTrue(gating.unlocked(self.mine["code_id"], "HV-MI-005"))
+            self.assertFalse(gating.unlocked(self.theirs["code_id"], "HV-MI-005"))    # another company: still locked
+            a.post("/api/selection/scores", {"token": self.token, "publish": False, "what": "analysis"})
+            self.assertFalse(gating.unlocked(self.mine["code_id"], "HV-MI-005"))
         finally:
             server.Handler.selection_scores = real
 

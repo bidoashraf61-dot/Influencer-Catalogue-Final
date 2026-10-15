@@ -510,6 +510,10 @@ def migrate(conn):
     if "group_by" not in sel_cols:
         # How the client page opens: "" (one grid) or a grouping such as "segment" or "tier".
         conn.execute("ALTER TABLE selections ADD COLUMN group_by TEXT")
+    if "analysis_published" not in sel_cols:
+        # Profile analysis gate (owner, 2026-10-15): 1 = everyone who may open this selection sees the full
+        # analysis of its creators. Off by default; one-by-one grants (analysis_grants) still count.
+        conn.execute("ALTER TABLE selections ADD COLUMN analysis_published INTEGER")
     if "scores_published" not in sel_cols:
         # Scores gate (owner, 2026-10-15): 1 = the client sees this selection's scores. Selections that
         # existed before the gate keep showing them; a new one starts unpublished (NULL).

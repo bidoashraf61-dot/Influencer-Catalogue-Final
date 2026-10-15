@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS evidence_packs (
     platforms TEXT,
     source TEXT,
     brands TEXT,                  -- JSON [{brand, product, fit: {competitor: direct|partial|off-product}}]
-    client_visible INTEGER NOT NULL DEFAULT 0,
+    client_visible INTEGER NOT NULL DEFAULT 1,
     created_by TEXT,
     created_at INTEGER,
     updated_at INTEGER,
@@ -209,8 +209,9 @@ def import_pack(raw, title, code_id, selection_id=None, by="", pack_id=None):
         idx = handle_index(conn)
         if pack_id is None:
             pack_id = conn.execute(
+                # Visible to whoever may open the selection from the start (owner, 2026-10-15); it can still be hidden.
                 "INSERT INTO evidence_packs (title, code_id, selection_id, objective, platforms, source, brands, "
-                "creators, created_by, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                "creators, created_by, created_at, updated_at, client_visible) VALUES (?,?,?,?,?,?,?,?,?,?,?,1)",
                 (title or "Competitor evidence", code_id, selection_id, meta["objective"],
                  json.dumps(meta["platforms"]), meta["source"], json.dumps(brands, ensure_ascii=False),
                  json.dumps(meta["creators"], ensure_ascii=False), by, t, t)).lastrowid
