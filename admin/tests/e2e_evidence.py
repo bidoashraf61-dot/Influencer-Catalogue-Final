@@ -429,6 +429,20 @@ class Evidence(unittest.TestCase):
             self.assertFalse(b["scores_gate"]["team"])
             self.assertEqual(boss.post("/api/me/as-client", {"on": False})[0], 200)
             self.assertIn("HV-MI-005", boss.get("/api/selection?s=" + self.token)[1]["scores"])
+            # a team member from another company: in client view the selection opens as ITS client sees it,
+            # read-only
+            db.create_admin("ops@hv-elsewhere.com", _auth.hash_password("a-long-passphrase-here"))
+            with db.connect() as conn:
+                conn.execute("UPDATE admins SET role = 'viewer' WHERE email = ?", ("ops@hv-elsewhere.com",))
+            ops, _ = self.signup("ops@hv-elsewhere.com")
+            self.assertEqual(ops.post("/api/me/as-client", {"on": True})[0], 200)
+            s, b, _ = ops.get("/api/selection?s=" + self.token)
+            self.assertEqual(s, 200, b)
+            self.assertEqual(b["scores"], {})
+            self.assertTrue(b.get("scores_pending"))
+            s, j, _ = ops.post("/api/selection/status", {"token": self.token, "code": "HV-MI-005", "status": "approved"})
+            self.assertEqual((s, j.get("reason")), (403, "preview"), j)                # read-only
+            ops.post("/api/me/as-client", {"on": False})
         finally:
             server.Handler.selection_scores = real
 

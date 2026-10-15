@@ -492,7 +492,22 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         good and this browser is still one of its devices; else None."""
         e = self.link_entries().get(self.link_hash(key))
         if not e:
+            return self.as_client_owner(key)
+        return self._link_code_row(e)
+
+    def as_client_owner(self, key):
+        """View as client on a selection or campaign the team member's own account cannot open (it belongs
+        to another client): the page opens as that client's account sees it, read-only (owner, 2026-10-15)."""
+        if not (key[:2] in ("s:", "c:") and self.as_client() and self.staff_account()):
             return None
+        tok = key[2:]
+        obj = db.selection(token=tok) if key[:2] == "s:" else db.campaign(token=tok)
+        if obj is None or obj["code_id"] is None:
+            return None
+        own = self.viewer_cookie_id()
+        return obj["code_id"] if own is None or obj["code_id"] not in portal.team_codes(own) else None
+
+    def _link_code_row(self, e):
         row = db.get_code(e[0])
         if row is None or not db.code_state(row)[0]:
             return None
@@ -1149,7 +1164,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path.startswith("/api/"):
             guard.limiter.hit(f"api:{self.client_ip()}")
 
-        if path.startswith("/api/") and path not in PREVIEW_POSTS and self.preview_mode():
+        if path.startswith("/api/") and path not in PREVIEW_POSTS and (self.preview_mode() or (self.as_client() and path != "/api/auth/logout")):
             return self.send_json(403, {"ok": False, "reason": "preview",
                                         "message": "You are previewing as a client: this is read-only. Exit the preview to make changes."},
                                   self.cors())

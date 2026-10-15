@@ -3193,11 +3193,14 @@
         return;
       }
       if (have) {
+        // Two switches for the team (owner, 2026-10-15): what the client sees on this selection.
+        var sw = function (what, on, label) {
+          return '<button type="button" class="sel-swrow sel-obj__pub sel-obj__sw" role="switch" aria-checked="' + on + '" data-what="' + what +
+            '" data-publish="' + (on ? "0" : "1") + '"><span class="sel-sw" aria-hidden="true"></span>' + label +
+            '<small class="sel-obj__swst">' + (on ? "On for client" : "Off for client") + "</small></button>";
+        };
         var gateHtml = gate && gate.applies && gate.team
-          ? '<span class="sel-gate sel-gate--' + (gate.published ? "on" : "off") + '">' + (gate.published ? "Scores visible to the client" : "Scores hidden from the client") + "</span>" +
-            '<button type="button" class="sel-obj__pub" data-what="scores" data-publish="' + (gate.published ? "0" : "1") + '">' + (gate.published ? "Hide scores" : "Publish scores to client") + "</button>" +
-            '<span class="sel-gate sel-gate--' + (gate.analysis ? "on" : "off") + '">' + (gate.analysis ? "Profile analysis open to the client" : "Profile analysis locked for the client") + "</span>" +
-            '<button type="button" class="sel-obj__pub" data-what="analysis" data-publish="' + (gate.analysis ? "0" : "1") + '">' + (gate.analysis ? "Lock analysis" : "Publish analysis to client") + "</button>"
+          ? '<span class="sel-obj__sws">' + sw("scores", !!gate.published, "Scores &amp; fit") + sw("analysis", !!gate.analysis, "Profile analysis") + "</span>"
           : "";
         host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic sel-obj__ic--done">' + hvIcon("check") + "</span>" +
           '<p class="sel-obj__tx"><b>Objective added</b><span class="sel-obj__what">' + esc(objectiveWords(CURATED.brief.objective)) + "</span>" +
