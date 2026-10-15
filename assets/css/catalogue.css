@@ -370,6 +370,7 @@ a.sel-pchip:hover { border-color: var(--ink); }
 .cat-reach { display: inline-flex; align-items: baseline; gap: 10px; }
 .cat-reach i { font: 500 13px var(--body); font-style: normal; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); }
 .cat-reach__note { display: block; margin-top: 8px; font: 500 12px var(--body); letter-spacing: .04em; color: var(--gray); white-space: normal; }
+.cat-reach__note + .cat-reach__note { margin-top: 3px; }
 
 /* remove control, selection page only */
 .cat-card__remove {

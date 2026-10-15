@@ -615,6 +615,7 @@
     "Creators": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><circle cx="16.8" cy="9.5" r="2.5"/><path d="M15.6 14.2c2.4-.3 4.3 1.2 4.9 4"/></svg>',
     "Indicative range": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 12.6V4.5a1 1 0 0 1 1-1h8.1l8 8a1.5 1.5 0 0 1 0 2.1l-6.9 6.9a1.5 1.5 0 0 1-2.1 0z"/><circle cx="8.3" cy="8.3" r="1.5"/></svg>',
     "Quoted for": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2.8" width="12" height="18.4" rx="2.6"/><path d="M10.5 18h3"/></svg>',
+    "Projected engagement": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/></svg>',
     "Projected reach": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>',
     "Not in this roster": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5.5M12 16.4v.1"/></svg>'
   };
@@ -2200,6 +2201,8 @@
                         prices: b.prices || {}, total: b.total,
                         tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null, clientPlatforms: b.client_platforms || {},
                         segments: b.segments || {}, groupBy: b.group_by || "", reach: b.reach || {},
+                        // Views for awareness, likes + comments for engagement / conversion (owner, 2026-10-15).
+                        metric: b.metric || "views", engagement: b.engagement || {},
                         platform: b.platform || "",
                         status: b.status || {}, statusCounts: b.status_counts || null, role: b.role || "viewer",
                         owner: b.owner || "", kam: b.kam || "", credits: b.credits, lifecycle: b.lifecycle || null,
@@ -3185,13 +3188,17 @@
       if (fit && ph) ph.remove();
       if (!fit && !ph) slot(body, "sel-fitph");
 
-      // Three figures: followers across accounts, typical views (the selection's reach basis), tier.
-      var r = CURATED && CURATED.reach ? CURATED.reach[code] : null;
+      // Three figures: followers across accounts, typical views per post (likes + comments when the
+      // objective is engagement / conversion), tier.
+      var eng = CURATED && CURATED.metric === "engagement";
+      var r = CURATED ? (eng ? CURATED.engagement : CURATED.reach) : null;
+      r = r ? r[code] : null;
+      var unit = eng ? "engagements (likes + comments)" : "views";
       var tierEl = card.querySelector(".cat-card__tier");
       slot(body, "sel-stats").innerHTML =
         '<div><b>' + compact(card.dataset.followers) + '</b><span>Followers</span></div>' +
-        '<div title="' + (r ? (r[2] ? "Reach per post, estimated from followers (no view numbers yet)" : "Reach per post: typical views; best recent post " + compact(r[1])) : "Reach per post: no view numbers yet") + '"><b>' +
-          (r ? (r[2] ? "~" : "") + compact(r[0]) : "\u2014") + '</b><span>Reach</span></div>' +
+        '<div title="' + (r ? (r[2] ? "Per post, estimated from followers (no " + unit + " numbers yet)" : "Typical " + unit + " per post; best recent post " + compact(r[1])) : "No " + unit + " numbers yet") + '"><b>' +
+          (r ? (r[2] ? "~" : "") + compact(r[0]) : "\u2014") + '</b><span>' + (eng ? "Eng. / post" : "Views / post") + '</span></div>' +
         '<div><b>' + esc(tierEl ? tierEl.textContent : "") + '</b><span>Tier</span></div>';
 
       // Tags: three, then +N; adding and removing happens in Details.
@@ -3606,15 +3613,20 @@
       ];
       // Projected reach (owner, 2026-10-15): typical views (minimum) to best recent post (best case),
       // over the creators still in play. Creators with no view numbers count at 5-15% of followers.
-      if (CURATED && CURATED.reach) {
+      // Owner, 2026-10-15: the headline is the TOTAL projected views (one post each, typical views), with the
+      // range and the average per creator under it; an engagement / conversion objective projects likes +
+      // comments instead.
+      var engM = CURATED && CURATED.metric === "engagement", src = CURATED ? (engM ? CURATED.engagement : CURATED.reach) : null;
+      if (src) {
         var rLo = 0, rHi = 0, rEst = 0, rN = 0;
         selected.forEach(function (code) {
-          var r = CURATED.reach[code], st = CURATED.status && CURATED.status[code];
+          var r = src[code], st = CURATED.status && CURATED.status[code];
           if (!r || (st && (st.s === "rejected" || st.s === "unavailable"))) return;
           rLo += r[0]; rHi += r[1]; rN++; if (r[2]) rEst++;
         });
-        if (rN) rows.push(["Projected reach", '<span class="cat-reach">' + compact(rLo) + "<i>to</i>" + compact(rHi) + "</span>" +
-          '<small class="cat-reach__note">views · minimum to best case' + (rEst ? " · " + rEst + " estimated" : "") + "</small>"]);
+        if (rN) rows.push([engM ? "Projected engagement" : "Projected reach", '<span class="cat-reach">' + compact(rLo) + "</span>" +
+          '<small class="cat-reach__note">' + (engM ? "likes + comments" : "views") + " total · one post each · up to " + compact(rHi) + " best case</small>" +
+          '<small class="cat-reach__note">Avg ' + compact(Math.round(rLo / rN)) + " per creator · " + rN + " creators" + (rEst ? " · " + rEst + " estimated" : "") + "</small>"]);
       }
       if (CURATED && CURATED.platform) rows.splice(1, 0, ["Quoted for", CURATED.platform]);
       if (dropped) rows.push(["Not in this roster", String(dropped)]);

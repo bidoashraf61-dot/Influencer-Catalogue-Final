@@ -826,7 +826,8 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
         p["posts"].append(r)
     # Ranking follows the campaign objective (owner, 2026-10-14): awareness by views, engagement by
     # likes + comments. Nothing else is weighed in.
-    by_eng = "Engagement" in (objective or "") and "Awareness" not in (objective or "")
+    import fit
+    by_eng = fit.metric_for(objective) == "engagement"
     with _conn() as conn:
         roster = {r["code"]: r for r in conn.execute(
             "SELECT code, photo, active FROM creators WHERE code IN (SELECT DISTINCT code FROM evidence_posts WHERE pack_id = ?)", (pk["id"],))}
@@ -844,11 +845,16 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
         rc = roster.get(by_handle_code.get(p["handle"]))
         photo = rc["photo"] if rc is not None and rc["active"] and rc["photo"] else None
         inter = _med([(r["likes"] or 0) + (r["comments"] or 0) for r in organic if r["likes"] is not None])
+        # Estimated range per post from their competitor work (owner, 2026-10-15): lowest to highest, around
+        # the typical (median) post. Views for awareness, likes + comments for engagement / conversion.
+        vals = sorted(v for v in ([(r["likes"] or 0) + (r["comments"] or 0) for r in organic if r["likes"] is not None] if by_eng
+                                  else [r["views"] for r in organic if r["views"]]) if v)
+        est = {"lo": vals[0], "mid": _med(vals), "hi": vals[-1], "n": len(vals)} if vals else None
         out.append({"handle": p["handle"], "name": p["name"], "type": _ctype(p["type"]), "followers": p["followers"], "code": p["code"],
                     "in_selection": bool(p["code"]), "on_roster": rc is not None,
                     "locked": "unavailable" if p["code"] in locked else None,
                     "photo": links.thumb(photo) if photo else None, "photo_large": links.photo(photo) if photo else None,
-                    "interactions": inter,
+                    "interactions": inter, "estimate": est,
                     "rank_value": inter if by_eng else _med([r["views"] for r in organic]),
                     "platforms": sorted(p["platforms"]), "competitors": p["competitors"],
                     "median_views": _med([r["views"] for r in organic]), "median_er": _med([r["er_views"] for r in organic]),

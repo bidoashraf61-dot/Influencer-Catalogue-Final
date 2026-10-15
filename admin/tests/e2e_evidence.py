@@ -229,6 +229,10 @@ class Evidence(unittest.TestCase):
         self.assertEqual(m["rank_by"], "views")
         self.assertTrue(m["competitors"][0]["logo"].startswith("/api/brand-logo?n=RivalSkin"))
         self.assertEqual([c["handle"] for c in m["creators"]], ["noha", "sara"])        # ranked by median views
+        e = m["creators"][0]["estimate"]                                                # owner, 2026-10-15
+        self.assertTrue(e and e["lo"] <= e["mid"] <= e["hi"] and e["n"] >= 1, e)
+        s2, sel = self.client.get("/api/selection?s=" + self.token)[:2]
+        self.assertEqual((s2, sel.get("metric")), (200, "views"), sel)                 # awareness projects views
         self.assertEqual(self.stranger.post("/api/evidence/add", {"token": self.token, "handle": "sara"})[0], 403)
         self.assertEqual(self.client.post("/api/evidence/add", {"token": self.token, "handle": "nobody"})[0], 404)
 

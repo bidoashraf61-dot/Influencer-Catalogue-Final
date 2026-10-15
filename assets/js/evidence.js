@@ -432,6 +432,14 @@
     return c ? c.logo : (data && data.logos ? data.logos[name] : null);
   }
   function rankText(p) { return miData.rank_by === "interactions" ? num(p.rank_value) + " interactions" : num(p.rank_value) + " views"; }
+  // Estimated range per post from the creator's competitor work (owner, 2026-10-15): views for awareness,
+  // likes + comments for engagement / conversion.
+  function estUnit() { return miData.rank_by === "interactions" ? "engagements" : "views"; }
+  function estText(p) {
+    var e = p.estimate;
+    if (!e) return "";
+    return (e.lo === e.hi ? "~" + num(e.mid) : num(e.lo) + "\u2013" + num(e.hi)) + " " + estUnit() + " / post";
+  }
   function rankLabel() { return miData.rank_by === "interactions" ? "likes + comments" : "views"; }
   function typeOf(p) { return p.type === "hcp" ? "hcp" : "influencer"; }
   function kept(p) {
@@ -487,11 +495,13 @@
   }
 
   // Photo size by views on a log scale (owner, 2026-10-15): views run from thousands to millions, so a
-  // square-root scale left almost every photo the same size. Smallest 18, biggest 58 (focus: 22 to 64).
+  // square-root scale left almost every photo the same size. Brand logos stay the biggest thing on the map
+  // (owner, 2026-10-15): photos run 20 to 32 (focus: 24 to 38), under the smallest competitor logo (44) and
+  // the centre brand (74 / 80), and the gap between a small and a big creator is kept narrow.
   function sizer(list) {
     var vs = list.map(function (p) { return p.rank_value || 0; }).filter(function (v) { return v > 0; });
     var lo = vs.length ? Math.min.apply(null, vs) : 1, hi = vs.length ? Math.max.apply(null, vs) : 1;
-    var a = miFocus ? 22 : 18, b = miFocus ? 64 : 58;
+    var a = miFocus ? 24 : 20, b = miFocus ? 38 : 32;
     var L = function (v) { return Math.log10(Math.max(v, 1)); };
     var f = function (v) { return hi > lo ? (L(v) - L(lo)) / (L(hi) - L(lo)) : 0.5; };
     var r = function (p) { return a + (b - a) * Math.max(0, Math.min(1, f(p.rank_value || lo))); };
@@ -729,9 +739,10 @@
   function dot(p, at, r, defs, stage, shared, lines) {
     var lockd = !!p.locked;
     var gg = svg("g", { class: "ev-map__dot" + (p.paid_only ? " ev-map__dot--paid" : "") + (lockd ? " is-locked" : ""), tabindex: "0", role: "button",
-      "aria-label": (p.name || p.handle) + ", " + rankText(p) + (lockd ? ", unavailable" : "") + ". Open creator.",
+      "aria-label": (p.name || p.handle) + ", " + rankText(p) + (p.estimate ? ", estimated " + estText(p) : "") + (lockd ? ", unavailable" : "") + ". Open creator.",
       style: "transform-origin:" + at.x.toFixed(1) + "px " + at.y.toFixed(1) + "px;--d:" + Math.round(Math.random() * 260) + "ms" });
     gg.__h = p.handle;
+    var tip = svg("title"); tip.textContent = (p.name || "@" + p.handle) + (p.estimate ? "\nEst. " + estText(p) : ""); gg.appendChild(tip);
     var id = "evc" + (++dotSeq);
     var clip = svg("clipPath", { id: id }); clip.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r })); defs.appendChild(clip);
     gg.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r + 2.5, class: "ev-map__bg", filter: "url(#ev-lift-s)" }));
@@ -811,6 +822,7 @@
       var lg = el("span", "ev-rank__logos");
       Object.keys(p.competitors).forEach(function (k) { lg.appendChild(logoEl(k, compLogo(k), "ev-logo--mini")); });
       who.appendChild(lg);
+      if (p.estimate) who.appendChild(el("small", "ev-rank__est", "Est. " + estText(p)));
       b.appendChild(who);
       b.appendChild(el("span", "ev-rank__v", num(p.rank_value)));
       b.addEventListener("click", function () { openCreator(p); });
@@ -901,6 +913,13 @@
     if (p.code) f.acts.appendChild(linkBtn("ev-act", "chart", "Profile analysis", analysisHref(p.code)));
     var comps = {};
     Object.keys(p.competitors).forEach(function (k) { comps[k] = p.competitors[k]; });
+    if (p.estimate) {
+      var es = el("div", "ev-est");
+      es.appendChild(el("small", "", "Estimated " + estUnit() + " per post"));
+      es.appendChild(el("b", "", p.estimate.lo === p.estimate.hi ? "~" + num(p.estimate.mid) : num(p.estimate.lo) + " \u2013 " + num(p.estimate.hi)));
+      es.appendChild(el("span", "", "Typical " + num(p.estimate.mid) + " · from " + p.estimate.n + " competitor " + (p.estimate.n === 1 ? "post" : "posts")));
+      f.bd.appendChild(es);
+    }
     postsBlock(f.bd, p.posts, comps, compLogo);
     cpanel = { scrim: f.scrim, aside: f.aside };
     f.x.focus();

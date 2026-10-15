@@ -4897,6 +4897,40 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return self.send_json(200, {"ok": True, "evidence": out}, self.cors())
 
     @staticmethod
+    def selection_engagement(codes, by, platform=None):
+        """Projected engagements per post per creator (likes + comments), for an engagement or conversion
+        objective (owner, 2026-10-15): minimum = their typical (median, else average) likes + comments, best
+        case = their best recent post's, capped at three times typical. No numbers: 1-3% of followers, marked
+        estimated. {code: [low, high, estimated]}, the same shape as selection_reach."""
+        docs = db.analyses_for(codes)
+        out = {}
+        for c in codes:
+            best = None
+            for plat, row in (docs.get(c) or {}).items():
+                if platform and str(plat).lower() != str(platform).lower():
+                    continue
+                d = row.get("data") if isinstance(row, dict) else None
+                if not isinstance(d, dict):
+                    continue
+                lk = d.get("median_likes") if d.get("median_likes") is not None else d.get("avg_likes")
+                cm = d.get("median_comments") if d.get("median_comments") is not None else d.get("avg_comments")
+                if not isinstance(lk, (int, float)) or lk <= 0:
+                    continue
+                lo = lk + (cm if isinstance(cm, (int, float)) else 0)
+                tops = [(p.get("likes") or 0) + (p.get("comments") or 0) for p in (d.get("top_posts") or []) if isinstance(p, dict)]
+                hi = min(max(tops), 3 * lo) if tops else lo * 1.5
+                hi = max(hi, lo)
+                if best is None or lo > best[0]:
+                    best = [int(lo), int(hi), False]
+            if best is None:
+                fol = int((by.get(c) or {})["followers"] or 0) if by.get(c) is not None and "followers" in by[c].keys() else 0
+                if fol:
+                    best = [int(fol * 0.01), int(fol * 0.03), True]
+            if best:
+                out[c] = best
+        return out
+
+    @staticmethod
     def selection_reach(codes, by, platform=None):
         """Projected views per creator for the selection's reach range (owner, 2026-10-15): minimum = their
         typical (median) views, best case = their best recent post (top of the last 25), capped at the larger of
@@ -5026,6 +5060,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             out["reach"] = self.selection_reach(codes, by, platform)
         except Exception:
             out["reach"] = {}
+        # Views for awareness, likes + comments for engagement / conversion (owner, 2026-10-15).
+        import fit as _fit_m
+        out["metric"] = _fit_m.metric_for(sel["objective"] if "objective" in sel.keys() else None)
+        try:
+            out["engagement"] = self.selection_engagement(codes, by, platform) if out["metric"] == "engagement" else {}
+        except Exception:
+            out["engagement"] = {}
             out["verdicts"] = {k: dict(out["verdicts"].get(k) or {}) for k in set(out["verdicts"]) | set(codes)}
             for v in out["verdicts"].values():
                 if not v.get("fit"):

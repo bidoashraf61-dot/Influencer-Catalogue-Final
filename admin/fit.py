@@ -72,6 +72,13 @@ def canonical(objective):
     return "Balanced" if parts == ["Balanced"] else "+".join(parts)
 
 
+def metric_for(objective):
+    """What a selection projects (owner, 2026-10-15): views for awareness (and when there is no objective),
+    engagement (likes + comments) for an engagement or traffic/conversion objective without awareness."""
+    parts = parts_of(objective)
+    return "engagement" if ("Engagement" in parts or "Traffic" in parts) and "Awareness" not in parts else "views"
+
+
 def known_objective(objective):
     """True for one of OBJECTIVES, the legacy Conversion, or a "+" combination of them."""
     return bool(objective) and all(_norm(p) in OBJECTIVES for p in str(objective).split("+"))
