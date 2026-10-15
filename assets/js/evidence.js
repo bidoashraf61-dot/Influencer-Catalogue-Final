@@ -643,6 +643,14 @@
     requestAnimationFrame(step);
   }
 
+  // One view update per frame, and no hover transitions while the map is being dragged or zoomed.
+  var viewRaf = 0, moveT = 0;
+  function applyViewSoon() { if (!viewRaf) viewRaf = requestAnimationFrame(function () { viewRaf = 0; applyView(); }); }
+  function moving() {
+    if (!mi || !mi.svg) return;
+    mi.svg.classList.add("is-moving");
+    clearTimeout(moveT); moveT = setTimeout(function () { if (mi && mi.svg) mi.svg.classList.remove("is-moving"); }, 160);
+  }
   function applyView() {
     if (!mi || !mi.svg) return;
     var g = mi.svg.querySelector(".ev-map__world");
@@ -681,7 +689,10 @@
       var gg = svg("g", { class: "ev-map__comp" + (big ? " ev-map__comp--hub" : ""), tabindex: big ? "-1" : "0", role: big ? "img" : "button", "aria-label": name });
       var id = "evl" + (++dotSeq);
       var clip = svg("clipPath", { id: id }); clip.appendChild(svg("circle", { cx: x, cy: y, r: r - 3 })); defs.appendChild(clip);
-      gg.appendChild(svg("circle", { cx: x, cy: y, r: r, class: "ev-map__disc", filter: "url(#ev-lift)" }));
+      // Speed (owner, 2026-10-15): a soft offset disc stands in for the blur filter, which the browser
+      // recomputed on every repaint.
+      gg.appendChild(svg("circle", { cx: x, cy: y + 5, r: r + 2, class: "ev-map__shadow" }));
+      gg.appendChild(svg("circle", { cx: x, cy: y, r: r, class: "ev-map__disc" }));
       if (big) gg.appendChild(svg("circle", { cx: x, cy: y, r: r + 9, class: "ev-map__halo" }));
       gg.appendChild(svg("circle", { cx: x, cy: y, r: r + 4, class: "ev-map__focus" }));
       if (url) {
@@ -775,33 +786,13 @@
     }
     g.__spot = spot; g.__unspot = unspot; g.__dots = dots;
 
-    // Depth with the cursor: lines drift a little against it, photos with it, brand discs least. Eased,
-    // tiny, and off for anyone who asked for less motion.
-    if (!CALM) {
-      var aim = { x: 0, y: 0 }, now = { x: 0, y: 0 }, raf = 0;
-      var step = function () {
-        now.x += (aim.x - now.x) * 0.09; now.y += (aim.y - now.y) * 0.09;
-        links2.setAttribute("transform", "translate(" + (-now.x * 5).toFixed(2) + " " + (-now.y * 4).toFixed(2) + ")");
-        nodes.setAttribute("transform", "translate(" + (now.x * 9).toFixed(2) + " " + (now.y * 7).toFixed(2) + ")");
-        hubs.setAttribute("transform", "translate(" + (now.x * 3).toFixed(2) + " " + (now.y * 2).toFixed(2) + ")");
-        raf = Math.abs(aim.x - now.x) + Math.abs(aim.y - now.y) > 0.002 ? requestAnimationFrame(step) : 0;
-      };
-      g.addEventListener("pointermove", function (e) {
-        if (drag) return;
-        var b = g.getBoundingClientRect();
-        aim.x = ((e.clientX - b.left) / b.width - 0.5) * 2; aim.y = ((e.clientY - b.top) / b.height - 0.5) * 2;
-        if (!raf) raf = requestAnimationFrame(step);
-      });
-      g.addEventListener("pointerleave", function () { aim.x = 0; aim.y = 0; if (!raf) raf = requestAnimationFrame(step); });
-    }
-
     // Pan by dragging, zoom with the wheel.
     var drag = null;
-    g.addEventListener("wheel", function (e) { e.preventDefault(); miView.k = Math.max(0.6, Math.min(4, miView.k * (e.deltaY < 0 ? 1.1 : 0.9))); applyView(); }, { passive: false });
+    g.addEventListener("wheel", function (e) { e.preventDefault(); miView.k = Math.max(0.6, Math.min(4, miView.k * (e.deltaY < 0 ? 1.1 : 0.9))); moving(); applyViewSoon(); }, { passive: false });
     g.addEventListener("pointerdown", function (e) { if (e.target.closest && e.target.closest(".ev-map__dot, .ev-map__comp")) return; drag = { x: e.clientX, y: e.clientY, ox: miView.x, oy: miView.y }; g.setPointerCapture(e.pointerId); });
     g.addEventListener("pointermove", function (e) {
       if (!drag) return; var s = W / g.getBoundingClientRect().width;
-      miView.x = drag.ox + (e.clientX - drag.x) * s; miView.y = drag.oy + (e.clientY - drag.y) * s; applyView();
+      miView.x = drag.ox + (e.clientX - drag.x) * s; miView.y = drag.oy + (e.clientY - drag.y) * s; moving(); applyViewSoon();
     });
     g.addEventListener("pointerup", function () { drag = null; });
     return g;
@@ -817,7 +808,8 @@
     var tip = svg("title"); tip.textContent = (p.name || "@" + p.handle) + (p.estimate ? "\nEst. " + estText(p) : ""); gg.appendChild(tip);
     var id = "evc" + (++dotSeq);
     var clip = svg("clipPath", { id: id }); clip.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r })); defs.appendChild(clip);
-    gg.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r + 2.5, class: "ev-map__bg", filter: "url(#ev-lift-s)" }));
+    gg.appendChild(svg("circle", { cx: at.x, cy: at.y + 2.5, r: r + 3, class: "ev-map__shadow ev-map__shadow--s" }));
+    gg.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r + 2.5, class: "ev-map__bg" }));
     if (p.photo) {
       var im = svg("image", { x: at.x - r, y: at.y - r, width: 2 * r, height: 2 * r, "clip-path": "url(#" + id + ")", preserveAspectRatio: "xMidYMid slice" });
       if (lockd) im.setAttribute("filter", "url(#ev-grey)");
