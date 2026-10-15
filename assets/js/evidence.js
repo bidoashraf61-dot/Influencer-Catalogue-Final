@@ -306,6 +306,7 @@
       var ps = posts.filter(function (q) { return !active || q.competitor === active; });
       gridEl.textContent = "";
       ps.slice(0, shown).forEach(function (q) { gridEl.appendChild(dashPost(q, host, logoOf)); });
+      TTLIVE.watch(gridEl);
       moreBtn.hidden = ps.length <= shown;
       moreBtn.textContent = "See more posts (" + (ps.length - shown) + ")";
     }
@@ -954,10 +955,91 @@
     f.x.focus();
   }
 
+  /* TikTok posts show TikTok's own player over the saved picture, quietly (owner, 2026-10-15); the same queue,
+     ready check and fallback as the creator page (assets/js/creator.js TTLIVE). Instagram stays on pictures. */
+  var TTLIVE = (function () {
+    var PARAMS = "controls=0&progress_bar=0&play_button=0&volume_control=0&fullscreen_button=0&timestamp=0" +
+      "&music_info=0&description=0&rel=0&native_context_menu=0&closed_caption=0&autoplay=0&loop=0";
+    var queue = [], loading = [], all = [], timer = null, near = null, far = null;
+    if (!window.IntersectionObserver) return { watch: function () {} };
+    function idOf(box) { return box.getAttribute("data-tt"); }
+    function start(box) {
+      var f = document.createElement("iframe");
+      f.className = "tt-live"; f.src = "https://www.tiktok.com/player/v1/" + encodeURIComponent(idOf(box)) + "?" + PARAMS;
+      f.title = "TikTok preview"; f.setAttribute("aria-hidden", "true"); f.tabIndex = -1;
+      f.setAttribute("allow", "encrypted-media"); f.setAttribute("referrerpolicy", "strict-origin-when-cross-origin");
+      box.__tt = { f: f, t: setTimeout(function () { fail(box); }, 8000) };
+      // Shown once the frame has loaded and TikTok has had 2 s to report a missing video (onPlayerError);
+      // onPlayerReady shows it sooner. Not every browser gets onPlayerReady before the video is on screen.
+      f.addEventListener("load", function () { setTimeout(function () { ready(box); }, 2000); });
+      box.setAttribute("data-tt-state", "loading");
+      loading.push(box);
+      box.appendChild(f);
+    }
+    function settle(box) { clearTimeout(box.__tt && box.__tt.t); loading = loading.filter(function (b) { return b !== box; }); pump(); }
+    function ready(box) {
+      if (box.getAttribute("data-tt-state") !== "loading") return;
+      box.setAttribute("data-tt-state", "live"); box.classList.add("is-tt-live"); settle(box);
+    }
+    function fail(box) {
+      if (box.__tt && box.__tt.f) box.__tt.f.remove();
+      box.classList.remove("is-tt-live"); box.setAttribute("data-tt-state", "off");     // not tried again on this page
+      settle(box);
+    }
+    function unload(box) {
+      if (box.getAttribute("data-tt-state") !== "live") return;
+      if (box.__tt && box.__tt.f) box.__tt.f.remove();
+      box.classList.remove("is-tt-live"); box.setAttribute("data-tt-state", "idle");
+    }
+    function pump() {
+      if (timer || !queue.length) return;
+      timer = setTimeout(function () {
+        timer = null;
+        while (queue.length && loading.length < 6) {
+          var box = queue.shift();
+          if (box.isConnected && box.__near && box.getAttribute("data-tt-state") === "idle") { start(box); break; }
+        }
+        pump();
+      }, 400);
+    }
+    window.addEventListener("message", function (e) {
+      if (!/^https:\/\/([a-z0-9-]+\.)*tiktok\.com$/.test(e.origin || "")) return;
+      var d = e.data;
+      if (typeof d === "string") { try { d = JSON.parse(d); } catch (x) { return; } }
+      if (!d || !d.type) return;
+      var box = all.filter(function (b) { return b.__tt && b.__tt.f.isConnected && b.__tt.f.contentWindow === e.source; })[0];
+      if (!box) return;
+      if (d.type === "onPlayerReady") setTimeout(function () { ready(box); }, 250);
+      else if (/error/i.test(d.type)) fail(box);           // e.g. onPlayerError INVALID_VIDEO for a deleted post, even after it showed
+    });
+    function watch(root) {
+      var boxes = [].slice.call((root || document).querySelectorAll("[data-tt]"));
+      if (!boxes.length) return;
+      near = near || new IntersectionObserver(function (es) {
+        es.forEach(function (en) {
+          var box = en.target; box.__near = en.isIntersecting;
+          if (en.isIntersecting && box.getAttribute("data-tt-state") === "idle" && queue.indexOf(box) < 0) { queue.push(box); pump(); }
+        });
+      }, { rootMargin: "300px 0px" });
+      far = far || new IntersectionObserver(function (es) {
+        if (all.filter(function (b) { return b.isConnected; }).length <= 12) return;     // a short page keeps its players
+        es.forEach(function (en) { if (!en.isIntersecting) unload(en.target); });
+      }, { rootMargin: "1600px 0px" });
+      boxes.forEach(function (b) {
+        if (b.__ttWatched) return;
+        b.__ttWatched = true; b.setAttribute("data-tt-state", "idle"); all.push(b);
+        near.observe(b); far.observe(b);
+      });
+    }
+    return { watch: watch };
+  })();
+  function ttId(u) { var m = /tiktok\.com\/@[^\/]+\/video\/(\d+)/.exec(u || ""); return m ? m[1] : null; }
+
   // One post, the campaign-dashboard card: picture (whole frame, blurred fill), brand logo, play; figures under it.
   function dashPost(q, host, logoOf) {
     var card = el("article", "ev-dpost");
     var media = el("button", "ev-dpost__img"); media.type = "button"; media.setAttribute("aria-label", "Play the post from " + (q.date || ""));
+    if (ttId(q.url)) media.setAttribute("data-tt", ttId(q.url));
     var src = (CFG.api || "") + "/api/evidence/thumb?s=" + encodeURIComponent(token()) + "&p=" + encodeURIComponent(q.id);
     var fillI = el("img", "ev-fill"); fillI.src = src; fillI.alt = ""; fillI.loading = "lazy"; fillI.setAttribute("aria-hidden", "true");
     var fitI = el("img", "ev-fit"); fitI.src = src; fitI.alt = ""; fitI.loading = "lazy";

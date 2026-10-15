@@ -370,3 +370,11 @@
 @keyframes ev-shine { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
 @media (prefers-reduced-motion: reduce) { .ev-proj::after { animation: none; display: none; } }
 @media (max-width: 720px) { .ev-proj { margin-left: 0; width: 100%; box-sizing: border-box; } }
+/* TikTok's own player over the saved picture (evidence.js TTLIVE): the 9:16 frame zoomed 1.4x and centred to fill
+   the square with TikTok's like/comment rail outside it; our play button (already centred) sits over TikTok's.
+   It never takes the click. */
+.ev-dpost__img .tt-live { position: absolute; left: -20%; top: -74.4%; width: 140%; height: 248.9%; border: 0; z-index: 1;
+  pointer-events: none; opacity: 0; transition: opacity .45s cubic-bezier(.16, 1, .3, 1); }
+.ev-dpost__img.is-tt-live .tt-live { opacity: 1; }
+.ev-dpost__img .ev-dpost__brand, .ev-dpost__img .ev-post__play, .ev-dpost__img .ev-post__flag { z-index: 2; }
+@media (prefers-reduced-motion: reduce) { .ev-dpost__img .tt-live { transition: none; } }
