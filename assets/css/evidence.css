@@ -115,6 +115,8 @@
 .ev-mi-btn:hover { background: var(--ink); color: var(--lime); }
 .ev-mi-btn:focus-visible, .ev-map__dot:focus-visible, .ev-map__more:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
 .ev-mi-btn__ic { font-size: 18px; line-height: 1; }
+.cx-selact .ev-mi-btn { margin: 0; min-height: 52px; padding: 0 26px; font-size: 16px; border-color: var(--lime); text-decoration: none; box-shadow: 0 0 0 4px rgba(232, 255, 118, .22), 0 10px 26px rgba(0, 0, 0, .35); }
+.cx-selact .ev-mi-btn:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
 .ev-mi { position: fixed; inset: 0; z-index: 310; background: var(--white); display: flex; flex-direction: column; }
 .ev-mi__hd { display: flex; align-items: center; gap: 16px; padding: 14px 22px; border-bottom: 1px solid rgba(18, 18, 18, .1); flex-wrap: wrap; }
 .ev-mi__hd > div:first-child { flex: 1; min-width: 200px; }
@@ -357,3 +359,14 @@
 .ev-out__v { margin: 0; font-size: 13px; color: #4a4a4a; font-variant-numeric: tabular-nums; }
 .ev-out__card .ev-act { margin-top: auto; align-self: flex-start; min-height: 40px; }
 .ev-mi__title { flex: 1; min-width: 240px; }
+
+/* Projected range on the map (owner, 2026-10-15): lime-to-gold, with a slow shine. */
+.ev-proj { position: relative; overflow: hidden; display: grid; grid-template-columns: auto auto; column-gap: 12px; align-items: baseline; margin-left: auto; padding: 8px 18px; border-radius: 16px; color: #121212;
+  background: linear-gradient(120deg, #e8ff76 0%, #f6f9a8 35%, #ffd84d 70%, #e8ff76 100%); box-shadow: 0 0 0 3px rgba(232, 255, 118, .35), 0 8px 22px rgba(201, 160, 18, .35); }
+.ev-proj small { grid-column: 1 / -1; font: 700 11px "DM Sans", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.ev-proj b { font: 400 34px/1 Bebasneue, "Bebas Neue", sans-serif; }
+.ev-proj span { font: 600 12.5px "DM Sans", sans-serif; }
+.ev-proj::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, .75) 50%, transparent 65%); transform: translateX(-120%); animation: ev-shine 3.2s ease-in-out infinite; pointer-events: none; }
+@keyframes ev-shine { 0%, 55% { transform: translateX(-120%); } 100% { transform: translateX(120%); } }
+@media (prefers-reduced-motion: reduce) { .ev-proj::after { animation: none; display: none; } }
+@media (max-width: 720px) { .ev-proj { margin-left: 0; width: 100%; box-sizing: border-box; } }

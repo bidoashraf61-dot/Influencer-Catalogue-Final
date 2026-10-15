@@ -416,15 +416,20 @@
   var XLINK = "http://www.w3.org/1999/xlink";
   var CALM = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  function miButton() {
+  // In the header's action row, beside the ROI Calculator (owner, 2026-10-15). That row is drawn by
+  // connect.js and can arrive a moment later; without it the button sits under the title as before.
+  function miButton(tries) {
     if (document.getElementById("ev-mi-btn")) return;
+    var row = document.getElementById("cx-selact");
     var title = document.getElementById("sel-title");
-    if (!title || !title.parentNode) return;
+    if (!row && (tries || 0) < 40) { setTimeout(function () { miButton((tries || 0) + 1); }, 150); return; }
+    if (!row && (!title || !title.parentNode)) return;
     var b = el("a", "ev-mi-btn"); b.id = "ev-mi-btn";
     b.href = "/market/#s=" + encodeURIComponent(token());
-    b.appendChild(el("span", "ev-mi-btn__ic", "◎"));
+    b.appendChild(el("span", "ev-mi-btn__ic", "\u25CE"));
     b.appendChild(document.createTextNode("Market Intelligence"));
-    title.parentNode.insertBefore(b, title.nextSibling);
+    if (row) row.appendChild(b);
+    else title.parentNode.insertBefore(b, title.nextSibling);
   }
 
   function compLogo(name) {
@@ -542,6 +547,18 @@
     var hasTT = d.creators.some(function (c) { return c.platforms.indexOf("tiktok") >= 0; });
     bar.appendChild(chips("Platform", [["all", "All platforms"], ["instagram", "Instagram"], ["tiktok", "TikTok", hasTT ? "" : "TikTok study not in yet"]], "platform"));
     bar.appendChild(chips("Creator type", [["all", "Everyone"], ["hcp", "Doctors / pharmacists"], ["influencer", "Influencers"]], "type"));
+    // Projected range for the creators on show (owner, 2026-10-15): one post each, from their competitor
+    // work: typical (median) in the middle, lowest to highest around it. Follows the filters and the objective.
+    var pj = { lo: 0, mid: 0, hi: 0, n: 0 };
+    people.forEach(function (p) { var e = p.estimate; if (!e || p.locked) return; pj.lo += e.lo; pj.mid += e.mid; pj.hi += e.hi; pj.n++; });
+    if (pj.n) {
+      var pjb = el("div", "ev-proj"); pjb.setAttribute("role", "status");
+      pjb.appendChild(el("small", "", "Projected " + estUnit()));
+      pjb.appendChild(el("b", "", num(pj.mid)));
+      pjb.appendChild(el("span", "", num(pj.lo) + " \u2013 " + num(pj.hi) + " · " + pj.n + (pj.n === 1 ? " creator" : " creators") + " · one post each"));
+      pjb.title = "Typical " + estUnit() + " if each creator shown posts once, from their posts with your competitors; range = their lowest to highest.";
+      bar.appendChild(pjb);
+    }
     var leg = el("div", "ev-legend");
     var hk = el("span", "ev-legend__item"); hk.appendChild(el("i", "ev-legend__hcp")); hk.appendChild(document.createTextNode("Doctor / pharmacist"));
     leg.appendChild(hk);
