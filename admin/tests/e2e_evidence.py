@@ -204,11 +204,20 @@ class Evidence(unittest.TestCase):
         self.assertEqual([(c["name"], c["creators"]) for c in m["competitors"]], [("RivalSkin", 1)])
         self.assertNotIn("internal note", json.dumps(b))
         self.assertEqual(self.stranger.get("/api/evidence/map?s=" + self.token)[0], 401)
-        # The owner removes noha (rejects her): she leaves the map; taking it back puts her on it again.
+        self.assertEqual(m["role"], "owner")                                   # the owner gets Approve / Reject
+        self.assertIsNone(m["creators"][0]["status"])
+        totals = [(c["posts"], c["views"], c["creators"]) for c in m["competitors"]]
+        # Owner (2026-10-15): a rejected creator stays on the map, tagged, and in every total; nothing is hidden.
         self.assertEqual(self.client.post("/api/selection/status", {"token": self.token, "code": "HV-MI-001", "status": "rejected"})[0], 200)
-        self.assertEqual(self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]["creators"], [])
+        self.assertEqual(self.client.post("/api/selection/reason", {"token": self.token, "code": "HV-MI-001", "reason": "price"})[0], 200)
+        m = self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]
+        self.assertEqual([(c["handle"], c["status"]) for c in m["creators"]], [("noha", "rejected")])
+        self.assertEqual((m["rejected_on_map"], m["reasons"]), (1, {"HV-MI-001": "price"}))
+        self.assertEqual([(c["posts"], c["views"], c["creators"]) for c in m["competitors"]], totals)
+        self.client.post("/api/selection/status", {"token": self.token, "code": "HV-MI-001", "status": "approved"})
+        self.assertEqual(self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]["creators"][0]["status"], "approved")
         self.client.post("/api/selection/status", {"token": self.token, "code": "HV-MI-001", "status": "review"})
-        self.assertEqual(len(self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]["creators"]), 1)
+        self.assertIsNone(self.client.get("/api/evidence/map?s=" + self.token)[1]["map"]["creators"][0]["status"])
 
     def test_3d_logos_ranking_and_add_to_selection(self):
         svg_ok = b'<svg xmlns="http://www.w3.org/2000/svg"><rect width="10" height="10"/></svg>'

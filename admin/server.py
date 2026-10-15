@@ -4880,8 +4880,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             reader = self.selection_viewer(sel["token"])
             out = evidence.map_payload(pk, codes, self.selection_objective(sel), (), locked, rejected, approved)
             out["can_add"] = bool(staff or (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())))
-            # Approve / Reject on the panel: the same rule as the status API (HelloVoice and the owner decide).
-            out["can_decide"] = self.selection_role(sel, reader) in ("admin", "owner")
+            # Approve / Reject on the panel (owner, 2026-10-15): the same rule as the status API, so only the
+            # selection's owner and HelloVoice get the buttons; everyone else reads the status.
+            out["role"] = self.selection_role(sel, reader)
+            out["can_decide"] = out["role"] in ("admin", "owner")
+            out["reasons"] = {c: st.get("reason") or "" for c, st in status.items() if st["s"] == "rejected"}
             out["preview"] = bool(staff and not pk["client_visible"])
             return self.send_json(200, {"ok": True, "map": out}, self.cors())
         if thumb_post is not None:

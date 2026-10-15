@@ -799,8 +799,8 @@ def fill_thumbs(pack_ids, pause=0.6, log=print):
 
 def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locked=(), rejected=(), approved=()):
     """The Market Intelligence map of ONE selection (owner, 2026-10-15): the client's brand, the competitors
-    and only the creators of this selection who worked with them. A creator taken out of the selection, or
-    rejected / marked unavailable on it (``removed``), is not on the map, and the competitor totals count
+    and only the creators of this selection who worked with them. A creator taken out of the selection
+    (``removed``) is not on the map, and the competitor totals count
     the selection's creators only.
 
     ``locked`` (owner, 2026-10-15): creators HelloVoice marked Unavailable on the selection stay on the

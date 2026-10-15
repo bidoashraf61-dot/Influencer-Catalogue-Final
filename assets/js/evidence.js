@@ -195,7 +195,7 @@
     plus: "M12 5v14M5 12h14",
     chart: "M4 20h16M7 16v-4M11 16V9M15 16v-6M19 16V6",
     send: "M4 12l16-8-6 16-2.5-6.5z",
-    check: "M5 12.5l4.5 4.5L19 7.5",
+    check: "M5 12.5l4.5 4.5L19 7.5", cross: "M6.5 6.5l11 11M17.5 6.5l-11 11",
     back: "M15 5l-7 7 7 7",
     zin: "M12 6v12M6 12h12", zout: "M6 12h12", reset: "M5 12a7 7 0 1 0 2-5M5 4v4h4",
     play: "M8 5.5v13l11-6.5z"
@@ -971,7 +971,14 @@
   /* The creator panel from the map: their competitor posts, with Add to selection (or Request when they
      are unavailable) and Profile analysis. */
   var cpanel = null;
-  function closeCreator() { if (cpanel) { cpanel.scrim.remove(); cpanel.aside.remove(); cpanel = null; } }
+  function closeCreator() {
+    if (!cpanel) return;
+    var h = cpanel.handle;
+    cpanel.scrim.remove(); cpanel.aside.remove(); cpanel = null;
+    // Back to the creator's photo on the map (it may have been redrawn by a decision meanwhile).
+    var back = mi && mi.svg && mi.svg.__dots ? mi.svg.__dots.filter(function (d) { return d.__h === h && d.isConnected; })[0] : null;
+    if (back) back.focus({ preventScroll: true });
+  }
 
   function openCreator(p) {
     closeCreator();
@@ -985,10 +992,8 @@
       if (p.requested) { rq.disabled = true; rq.classList.add("is-done"); }
       rq.addEventListener("click", function () { requestCreator(p, "unavailable", rq); });
       f.acts.appendChild(rq);
-    } else if (p.status === "rejected") {
-      f.acts.appendChild(el("span", "ev-chip ev-chip--no", "Rejected"));
-    } else if (p.in_selection) {
-      f.acts.appendChild(el("span", "ev-chip ev-chip--in", "In this selection"));
+    } else if (p.in_selection && p.code) {
+      // The decision bar below says where they stand; no second chip up here.
     } else if (miData.can_add && p.on_roster) {
       var add = btn("ev-act ev-act--yes", "plus", "Add to selection");
       add.addEventListener("click", function () { addToSelection(p, add); });
@@ -1004,10 +1009,103 @@
       es.appendChild(el("span", "", "Typical " + num(p.estimate.mid) + " · from " + p.estimate.n + " competitor " + (p.estimate.n === 1 ? "post" : "posts")));
       f.bd.appendChild(es);
     }
-    if (p.code) f.bd.insertBefore(decisionBlock(p, f), f.bd.firstChild);
+    if (p.in_selection && p.code && !p.locked) f.bd.appendChild(decideBar(p));
     postsBlock(f.bd, p.posts, comps, compLogo);
-    cpanel = { scrim: f.scrim, aside: f.aside };
+    cpanel = { scrim: f.scrim, aside: f.aside, handle: p.handle };
     f.x.focus();
+  }
+
+  /* Approve / Reject from the map (owner, 2026-10-15): the selection's owner and HelloVoice decide here, the
+     map changes at once, and a rejected creator stays on it, dimmed, with Restore. Everyone else reads the
+     status. The optional "why" under a rejection is the selection page's own list. */
+  var REASONS = [["price", "Price"], ["audience", "Audience"], ["style", "Content style"], ["competitor", "Worked with a competitor"], ["other", "Other"]];
+  var DEC = { approved: "Approved", rejected: "Rejected", review: "Not decided yet" };
+  function decideBar(p) {
+    var box = el("section", "ev-dec"); box.setAttribute("aria-label", "Your decision");
+    var live = el("p", "ev-dec__live"); live.setAttribute("role", "status"); live.setAttribute("aria-live", "polite");
+    function paint(focusFirst) {
+      box.textContent = "";
+      var st = p.status === "approved" || p.status === "rejected" ? p.status : "review";
+      var may = miData.role === "admin" || miData.role === "owner";
+      box.className = "ev-dec ev-dec--" + st;
+      var head = el("div", "ev-dec__hd");
+      var pill = el("span", "ev-dec__st");
+      if (st !== "review") pill.appendChild(icon(st === "approved" ? "check" : "cross"));
+      pill.appendChild(el("span", "", DEC[st]));
+      head.appendChild(pill);
+      var why = st === "rejected" && (miData.reasons || {})[p.code];
+      var wl = why && (REASONS.filter(function (r) { return r[0] === why; })[0] || [])[1];
+      head.appendChild(el("span", "ev-dec__sub", st === "rejected" ? (wl ? "Why: " + wl + ". Still on the map, dimmed." : "Still on the map, dimmed, and in the totals.")
+        : st === "approved" ? "In this selection." : may ? "Your call." : "The selection's owner decides."));
+      box.appendChild(head);
+      if (may) {
+        var row = el("div", "ev-dec__row");
+        var opts = st === "rejected" ? [["review", "reset", "Restore"], ["approved", "check", "Approve"]]
+          : st === "approved" ? [["rejected", "cross", "Reject"], ["review", "reset", "Set back to undecided"]]
+          : [["approved", "check", "Approve"], ["rejected", "cross", "Reject"]];
+        opts.forEach(function (o, i) {
+          var b = btn("ev-act ev-dec__b ev-dec__b--" + o[0], o[1], o[2]);
+          b.addEventListener("click", function () { decide(p, o[0], box, paint, live); });
+          row.appendChild(b);
+          if (focusFirst && i === 0) setTimeout(function () { b.focus(); }, 0);
+        });
+        box.appendChild(row);
+        if (st === "rejected") box.appendChild(whyRow(p, paint));
+      }
+      box.appendChild(live);
+    }
+    paint(false);
+    return box;
+  }
+  function whyRow(p, paint) {
+    var cur = (miData.reasons || {})[p.code] || "";
+    var g = el("div", "ev-dec__why"); g.setAttribute("role", "group"); g.setAttribute("aria-label", "Why not? Optional");
+    g.appendChild(el("span", "ev-dec__q", "Why not? Optional"));
+    REASONS.forEach(function (r) {
+      var b = el("button", "ev-dec__r", r[1]); b.type = "button"; b.setAttribute("aria-pressed", String(cur === r[0]));
+      b.addEventListener("click", function () {
+        var pick = cur === r[0] ? "" : r[0];
+        [].forEach.call(g.querySelectorAll(".ev-dec__r"), function (x) { x.setAttribute("aria-pressed", String(x === b && !!pick)); });
+        saveStatus({ code: p.code, reason: pick, note: "" }, "/api/selection/reason").then(function (j) {
+          if (j && j.ok) { miData.reasons = miData.reasons || {}; miData.reasons[p.code] = pick; cur = pick; miToast(pick ? "Thanks. Noted." : "Reason cleared."); }
+          else { [].forEach.call(g.querySelectorAll(".ev-dec__r"), function (x) { x.setAttribute("aria-pressed", String(x.textContent === ((REASONS.filter(function (q) { return q[0] === cur; })[0] || [])[1]))); }); miToast("That did not save. Try again."); }
+        });
+      });
+      g.appendChild(b);
+    });
+    return g;
+  }
+  function saveStatus(body, path) {
+    body.token = token();
+    return fetch((CFG.api || "") + path, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .catch(function () { return { ok: false, message: "Could not reach the server. Try again." }; });
+  }
+  // The decision shows at once and the map redraws under the panel; a failed save puts it back.
+  function decide(p, status, box, paint, live) {
+    var was = p.status, wasWhy = (miData.reasons || {})[p.code];
+    var apply = function (s2) {
+      p.status = s2 === "review" ? null : s2;
+      miData.reasons = miData.reasons || {};
+      if (s2 !== "rejected") delete miData.reasons[p.code];
+      drawMI(); paint(true);
+    };
+    [].forEach.call(box.querySelectorAll("button"), function (b) { b.disabled = true; });
+    apply(status);
+    var msg = status === "approved" ? "Approved." : status === "rejected" ? "Rejected. They stay on the map, dimmed." : was === "rejected" ? "Restored. Not decided yet." : "Set back to undecided.";
+    box.querySelector(".ev-dec__live").textContent = msg;
+    saveStatus({ code: p.code, status: status }, "/api/selection/status").then(function (j) {
+      if (j && j.ok) { miToast(msg); return; }
+      p.status = was; if (wasWhy) miData.reasons[p.code] = wasWhy;
+      drawMI(); paint(true);
+      miToast((j && j.message) || "That did not save. Try again.");
+    });
+  }
+  var miToastEl = null;
+  function miToast(text) {
+    if (!miToastEl) { miToastEl = el("div", "sel-toast ev-toast"); miToastEl.setAttribute("role", "status"); document.body.appendChild(miToastEl); }
+    miToastEl.textContent = text; miToastEl.hidden = false;
+    clearTimeout(miToastEl._t); miToastEl._t = setTimeout(function () { miToastEl.hidden = true; }, 3200);
   }
 
   /* TikTok and Instagram posts show the platform's own embed over the saved picture (owner, 2026-10-15); the same queue,
@@ -1142,68 +1240,6 @@
       .forEach(function (s2) { var dv = el("div"); dv.appendChild(el("small", "", s2[0])); dv.appendChild(el("b", "", s2[1])); st.appendChild(dv); });
     card.appendChild(st);
     return card;
-  }
-
-  /* Approve / Reject in the map's creator panel (owner, 2026-10-15). HelloVoice and the selection's owner decide
-     through the same status API as the selection page; everyone else sees the state as text. Changing it
-     updates the map at once and shows a short note. */
-  var DEC_LABEL = { review: "Not decided yet", approved: "Approved", rejected: "Rejected", unavailable: "Unavailable" };
-  function decState(p) { return p.status === "rejected" || p.status === "approved" || p.status === "unavailable" ? p.status : "review"; }
-  function decisionBlock(p, f) {
-    var cur = decState(p), box = el("section", "ev-dec");
-    box.setAttribute("aria-label", "Decision for " + (p.name || p.handle));
-    var st = el("p", "ev-dec__state", DEC_LABEL[cur]);
-    st.setAttribute("aria-live", "polite");
-    box.appendChild(st);
-    var canDecide = !!(miData && miData.can_decide);
-    if (!canDecide || cur === "unavailable") {
-      if (cur === "unavailable") box.appendChild(el("p", "ev-mut", "HelloVoice marks this creator unavailable. Use Request to ask us."));
-      else box.appendChild(el("p", "ev-mut", "Only the selection's owner or HelloVoice can approve or reject."));
-      return box;
-    }
-    var row = el("div", "ev-dec__acts");
-    [["approved", "Approve", "check", "ev-dec__b--yes"], ["rejected", "Reject", "x", "ev-dec__b--no"]].forEach(function (o) {
-      var b = btn("ev-dec__b " + o[3], o[2], o[1]);
-      b.setAttribute("aria-pressed", String(cur === o[0]));
-      if (cur === o[0]) b.disabled = true;
-      b.addEventListener("click", function () { setDecision(p, o[0], f, box); });
-      row.appendChild(b);
-    });
-    if (cur !== "review") {
-      var back = btn("ev-dec__b ev-dec__b--back", "reset", "Back to undecided");
-      back.addEventListener("click", function () { setDecision(p, "review", f, box); });
-      row.appendChild(back);
-    }
-    box.appendChild(row);
-    return box;
-  }
-  function miToast(msg) {
-    var t = el("div", "ev-toast"); t.setAttribute("role", "status"); t.textContent = msg;
-    document.body.appendChild(t);
-    setTimeout(function () { t.classList.add("is-out"); }, 1900);
-    setTimeout(function () { t.remove(); }, 2400);
-  }
-  function setDecision(p, status, f, box) {
-    var bs = box.querySelectorAll("button");
-    [].forEach.call(bs, function (b) { b.disabled = true; });
-    fetch((CFG.api || "") + "/api/selection/status", {
-      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token: token(), code: p.code, status: status })
-    }).then(function (r) { return r.json().catch(function () { return {}; }); })
-      .then(function (j) {
-        if (!(j && j.ok)) {
-          [].forEach.call(box.querySelectorAll("button"), function (b) { b.disabled = false; });
-          miToast(j && j.message ? j.message : "That did not save. Try again.");
-          return;
-        }
-        p.status = status === "review" ? null : status;
-        box.replaceWith(decisionBlock(p, f));
-        if (miData && miData.creators) drawMI();          // the map follows at once
-        miToast(status === "approved" ? "Approved: kept in the selection." : status === "rejected" ? "Rejected: dimmed on the map, still counted." : "Back to undecided.");
-      }).catch(function () {
-        [].forEach.call(box.querySelectorAll("button"), function (b) { b.disabled = false; });
-        miToast("Could not reach the server. Try again.");
-      });
   }
 
   function addToSelection(p, b) {

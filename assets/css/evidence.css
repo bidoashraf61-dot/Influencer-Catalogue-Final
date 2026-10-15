@@ -409,24 +409,36 @@
 .ev-rank__row.is-rejected { opacity: .6; }
 .ev-chip--no { background: #fde9e9; color: #c01010; }
 
-/* Approve / Reject in the map's creator panel (evidence.js decisionBlock). Keyboard focus and reduced motion too. */
-.ev-dec { margin: 0 0 16px; padding: 12px 14px; border-radius: 14px; background: #faf8f4; border: 1px solid rgba(18,18,18,.08); }
-.ev-dec__state { margin: 0 0 8px; font: 400 22px Bebasneue, "Bebas Neue", sans-serif; letter-spacing: .02em; color: var(--ink); }
-.ev-dec .ev-mut { margin: 0; }
-.ev-dec__acts { display: flex; flex-wrap: wrap; gap: 8px; }
-.ev-dec__b { min-height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--ink); background: var(--white);
-  font: 700 14px "DM Sans", sans-serif; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
-.ev-dec__b .ev-ic { width: 16px; height: 16px; }
-.ev-dec__b--yes { background: var(--lime); }
-.ev-dec__b--no { background: #fde9e9; border-color: #c01010; color: #c01010; }
-.ev-dec__b--back { border-style: dashed; color: #5c5246; }
-.ev-dec__b:not(:disabled):hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
-.ev-dec__b--no:not(:disabled):hover { background: #c01010; color: var(--white); border-color: #c01010; }
-.ev-dec__b:disabled { opacity: .55; cursor: default; }
-.ev-dec__b:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
-.ev-toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 0); z-index: 500; max-width: min(92vw, 420px);
-  background: var(--ink); color: var(--white); border-radius: 999px; padding: 11px 18px; font: 600 14px "DM Sans", sans-serif;
-  box-shadow: 0 10px 30px -10px rgba(0,0,0,.5); animation: ev-toast-in .28s cubic-bezier(.16, 1, .3, 1) both; transition: opacity .4s ease; }
-.ev-toast.is-out { opacity: 0; }
-@keyframes ev-toast-in { from { opacity: 0; transform: translate(-50%, 10px); } }
-@media (prefers-reduced-motion: reduce) { .ev-toast { animation: none; transition: none; } .ev-dec__b { transition: none; } }
+/* Approve / Reject in the map's creator panel (owner, 2026-10-15). One bar above the posts: where the creator
+   stands, then the two moves that make sense from there. Approved reads green, rejected reads red; Unavailable
+   never gets this bar (it keeps its lock and Request). */
+.ev-dec { position: relative; display: grid; gap: 12px; margin: 0 0 18px; padding: 14px 16px; border-radius: 18px; background: var(--white); border: 1px solid rgba(18, 18, 18, .12); }
+.ev-dec--approved { background: var(--go-soft, #e7f7ed); border-color: rgba(20, 136, 74, .28); }
+.ev-dec--rejected { background: #fde9e9; border-color: rgba(192, 16, 16, .24); }
+.ev-dec__hd { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 12px; }
+.ev-dec__st { display: inline-flex; align-items: center; gap: 6px; font: 400 24px/1 "Bebas Neue", var(--heading, sans-serif); letter-spacing: .02em; color: var(--ink); }
+.ev-dec--approved .ev-dec__st { color: var(--go, #14884a); }
+.ev-dec--rejected .ev-dec__st { color: #c01010; }
+.ev-dec__st .ev-ic { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.ev-dec__sub { font-size: 13px; color: #5c5246; }
+.ev-dec--rejected .ev-dec__sub { color: #8a1c1c; }
+.ev-dec--approved .ev-dec__sub { color: #0f6a39; }
+.ev-dec__row { display: flex; flex-wrap: wrap; gap: 8px; }
+.ev-dec__b { min-height: 44px; }
+.ev-dec__b--approved { background: var(--lime); }
+.ev-dec__b--rejected { border-color: #c01010; color: #c01010; }
+.ev-dec__b--rejected:not(:disabled):hover { background: #c01010; color: var(--white); }
+.ev-dec__b--review { background: transparent; }
+.ev-dec__b:focus-visible, .ev-dec__r:focus-visible { outline: 3px solid var(--vivid-red, #ee1515); outline-offset: 2px; }
+.ev-dec__why { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-top: 10px; border-top: 1px solid rgba(192, 16, 16, .16); }
+.ev-dec__q { font-size: 12.5px; font-weight: 700; color: #8a1c1c; margin-right: 4px; }
+.ev-dec__r { min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(18, 18, 18, .16); background: var(--white); color: var(--ink); font: 600 12.5px "DM Sans", sans-serif; cursor: pointer; transition: background .15s, color .15s, border-color .15s; }
+.ev-dec__r:hover { border-color: var(--ink); }
+.ev-dec__r[aria-pressed="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.ev-dec__live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ev-toast { z-index: 1200; }
+@media (max-width: 560px) {
+  .ev-dec { padding: 12px; }
+  .ev-dec__row .ev-dec__b { flex: 1 1 140px; }
+}
+@media (prefers-reduced-motion: reduce) { .ev-dec__r { transition: none; } }
