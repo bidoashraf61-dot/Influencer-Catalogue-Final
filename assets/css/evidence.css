@@ -408,3 +408,25 @@
 .ev-legend__rej { width: 14px; height: 14px; border-radius: 50%; background: #8a8a8a; border: 2px dashed var(--white); display: inline-block; }
 .ev-rank__row.is-rejected { opacity: .6; }
 .ev-chip--no { background: #fde9e9; color: #c01010; }
+
+/* Approve / Reject in the map's creator panel (evidence.js decisionBlock). Keyboard focus and reduced motion too. */
+.ev-dec { margin: 0 0 16px; padding: 12px 14px; border-radius: 14px; background: #faf8f4; border: 1px solid rgba(18,18,18,.08); }
+.ev-dec__state { margin: 0 0 8px; font: 400 22px Bebasneue, "Bebas Neue", sans-serif; letter-spacing: .02em; color: var(--ink); }
+.ev-dec .ev-mut { margin: 0; }
+.ev-dec__acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.ev-dec__b { min-height: 42px; padding: 0 16px; border-radius: 999px; border: 1px solid var(--ink); background: var(--white);
+  font: 700 14px "DM Sans", sans-serif; color: var(--ink); cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+.ev-dec__b .ev-ic { width: 16px; height: 16px; }
+.ev-dec__b--yes { background: var(--lime); }
+.ev-dec__b--no { background: #fde9e9; border-color: #c01010; color: #c01010; }
+.ev-dec__b--back { border-style: dashed; color: #5c5246; }
+.ev-dec__b:not(:disabled):hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.ev-dec__b--no:not(:disabled):hover { background: #c01010; color: var(--white); border-color: #c01010; }
+.ev-dec__b:disabled { opacity: .55; cursor: default; }
+.ev-dec__b:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.ev-toast { position: fixed; left: 50%; bottom: 22px; transform: translate(-50%, 0); z-index: 500; max-width: min(92vw, 420px);
+  background: var(--ink); color: var(--white); border-radius: 999px; padding: 11px 18px; font: 600 14px "DM Sans", sans-serif;
+  box-shadow: 0 10px 30px -10px rgba(0,0,0,.5); animation: ev-toast-in .28s cubic-bezier(.16, 1, .3, 1) both; transition: opacity .4s ease; }
+.ev-toast.is-out { opacity: 0; }
+@keyframes ev-toast-in { from { opacity: 0; transform: translate(-50%, 10px); } }
+@media (prefers-reduced-motion: reduce) { .ev-toast { animation: none; transition: none; } .ev-dec__b { transition: none; } }

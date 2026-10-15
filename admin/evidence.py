@@ -797,7 +797,7 @@ def fill_thumbs(pack_ids, pause=0.6, log=print):
     return got, miss
 
 
-def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locked=(), rejected=()):
+def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locked=(), rejected=(), approved=()):
     """The Market Intelligence map of ONE selection (owner, 2026-10-15): the client's brand, the competitors
     and only the creators of this selection who worked with them. A creator taken out of the selection, or
     rejected / marked unavailable on it (``removed``), is not on the map, and the competitor totals count
@@ -808,7 +808,7 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
     creators who are not on the HelloVoice roster yet, for the "Not on our roster yet" strip."""
     # Owner (2026-10-15): rejected creators are on the map too, dimmed with a Rejected tag, and count in every
     # total. ``removed`` is kept for callers that still want a creator off the map entirely.
-    locked, rejected = set(locked or ()), set(rejected or ())
+    locked, rejected, approved = set(locked or ()), set(rejected or ()), set(approved or ())
     inset = (set(selection_codes or ()) - set(removed or ())) | (locked & set(selection_codes or ()))
     every = [r for r in posts(pk["id"]) if r["relevance"] != "other"]
     rows = [r for r in every if r["code"] in inset]
@@ -855,7 +855,8 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
         out.append({"handle": p["handle"], "name": p["name"], "type": _ctype(p["type"]), "followers": p["followers"], "code": p["code"],
                     "in_selection": bool(p["code"]), "on_roster": rc is not None,
                     "locked": "unavailable" if p["code"] in locked else None,
-                    "status": "rejected" if p["code"] in rejected else ("unavailable" if p["code"] in locked else None),
+                    "status": ("rejected" if p["code"] in rejected else "unavailable" if p["code"] in locked
+                               else "approved" if p["code"] in approved else None),
                     "photo": links.thumb(photo) if photo else None, "photo_large": links.photo(photo) if photo else None,
                     "interactions": inter, "estimate": est,
                     "rank_value": inter if by_eng else _med([r["views"] for r in organic]),

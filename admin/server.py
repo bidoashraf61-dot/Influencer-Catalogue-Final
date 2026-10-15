@@ -4876,9 +4876,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # Rejected creators stay on the map (owner, 2026-10-15): dimmed, with a Rejected tag, and in the totals.
             rejected = {c for c, st in status.items() if st["s"] == "rejected"}
             locked = {c for c, st in status.items() if st["s"] == "unavailable"}
-            out = evidence.map_payload(pk, codes, self.selection_objective(sel), (), locked, rejected)
+            approved = {c for c, st in status.items() if st["s"] == "approved"}
             reader = self.selection_viewer(sel["token"])
+            out = evidence.map_payload(pk, codes, self.selection_objective(sel), (), locked, rejected, approved)
             out["can_add"] = bool(staff or (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())))
+            # Approve / Reject on the panel: the same rule as the status API (HelloVoice and the owner decide).
+            out["can_decide"] = self.selection_role(sel, reader) in ("admin", "owner")
             out["preview"] = bool(staff and not pk["client_visible"])
             return self.send_json(200, {"ok": True, "map": out}, self.cors())
         if thumb_post is not None:

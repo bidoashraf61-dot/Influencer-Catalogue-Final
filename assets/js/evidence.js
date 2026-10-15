@@ -1004,6 +1004,7 @@
       es.appendChild(el("span", "", "Typical " + num(p.estimate.mid) + " · from " + p.estimate.n + " competitor " + (p.estimate.n === 1 ? "post" : "posts")));
       f.bd.appendChild(es);
     }
+    if (p.code) f.bd.insertBefore(decisionBlock(p, f), f.bd.firstChild);
     postsBlock(f.bd, p.posts, comps, compLogo);
     cpanel = { scrim: f.scrim, aside: f.aside };
     f.x.focus();
@@ -1154,6 +1155,68 @@
       .forEach(function (s2) { var dv = el("div"); dv.appendChild(el("small", "", s2[0])); dv.appendChild(el("b", "", s2[1])); st.appendChild(dv); });
     card.appendChild(st);
     return card;
+  }
+
+  /* Approve / Reject in the map's creator panel (owner, 2026-10-15). HelloVoice and the selection's owner decide
+     through the same status API as the selection page; everyone else sees the state as text. Changing it
+     updates the map at once and shows a short note. */
+  var DEC_LABEL = { review: "Not decided yet", approved: "Approved", rejected: "Rejected", unavailable: "Unavailable" };
+  function decState(p) { return p.status === "rejected" || p.status === "approved" || p.status === "unavailable" ? p.status : "review"; }
+  function decisionBlock(p, f) {
+    var cur = decState(p), box = el("section", "ev-dec");
+    box.setAttribute("aria-label", "Decision for " + (p.name || p.handle));
+    var st = el("p", "ev-dec__state", DEC_LABEL[cur]);
+    st.setAttribute("aria-live", "polite");
+    box.appendChild(st);
+    var canDecide = !!(miData && miData.can_decide);
+    if (!canDecide || cur === "unavailable") {
+      if (cur === "unavailable") box.appendChild(el("p", "ev-mut", "HelloVoice marks this creator unavailable. Use Request to ask us."));
+      else box.appendChild(el("p", "ev-mut", "Only the selection's owner or HelloVoice can approve or reject."));
+      return box;
+    }
+    var row = el("div", "ev-dec__acts");
+    [["approved", "Approve", "check", "ev-dec__b--yes"], ["rejected", "Reject", "x", "ev-dec__b--no"]].forEach(function (o) {
+      var b = btn("ev-dec__b " + o[3], o[2], o[1]);
+      b.setAttribute("aria-pressed", String(cur === o[0]));
+      if (cur === o[0]) b.disabled = true;
+      b.addEventListener("click", function () { setDecision(p, o[0], f, box); });
+      row.appendChild(b);
+    });
+    if (cur !== "review") {
+      var back = btn("ev-dec__b ev-dec__b--back", "reset", "Back to undecided");
+      back.addEventListener("click", function () { setDecision(p, "review", f, box); });
+      row.appendChild(back);
+    }
+    box.appendChild(row);
+    return box;
+  }
+  function miToast(msg) {
+    var t = el("div", "ev-toast"); t.setAttribute("role", "status"); t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function () { t.classList.add("is-out"); }, 1900);
+    setTimeout(function () { t.remove(); }, 2400);
+  }
+  function setDecision(p, status, f, box) {
+    var bs = box.querySelectorAll("button");
+    [].forEach.call(bs, function (b) { b.disabled = true; });
+    fetch((CFG.api || "") + "/api/selection/status", {
+      method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: token(), code: p.code, status: status })
+    }).then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (j) {
+        if (!(j && j.ok)) {
+          [].forEach.call(box.querySelectorAll("button"), function (b) { b.disabled = false; });
+          miToast(j && j.message ? j.message : "That did not save. Try again.");
+          return;
+        }
+        p.status = status === "review" ? null : status;
+        box.replaceWith(decisionBlock(p, f));
+        if (miData && miData.creators) drawMI();          // the map follows at once
+        miToast(status === "approved" ? "Approved: kept in the selection." : status === "rejected" ? "Rejected: dimmed on the map, still counted." : "Back to undecided.");
+      }).catch(function () {
+        [].forEach.call(box.querySelectorAll("button"), function (b) { b.disabled = false; });
+        miToast("Could not reach the server. Try again.");
+      });
   }
 
   function addToSelection(p, b) {
