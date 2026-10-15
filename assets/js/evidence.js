@@ -776,13 +776,12 @@
 
     function spot(test, comp) {
       stage.classList.add("is-spot");
-      // A brand's creators light their lines too, so every connection to that brand shows (owner, 2026-10-15).
-      dots.forEach(function (dd) { var hot = test(dd); dd.classList.toggle("is-hot", hot); (dd.__lines || []).forEach(function (l) { l.classList.toggle("ev-map__lit", hot); }); });
+      dots.forEach(function (dd) { dd.classList.toggle("is-hot", test(dd)); });
       [].forEach.call(links2.querySelectorAll(".ev-map__spoke"), function (l) { l.classList.toggle("is-hot", l.getAttribute("data-comp") === comp); });
     }
     function unspot() {
       stage.classList.remove("is-spot");
-      dots.forEach(function (dd) { dd.classList.remove("is-hot"); (dd.__lines || []).forEach(function (l) { l.classList.remove("ev-map__lit"); }); });
+      dots.forEach(function (dd) { dd.classList.remove("is-hot"); });
       [].forEach.call(links2.querySelectorAll(".is-hot"), function (l) { l.classList.remove("is-hot"); });
     }
     g.__spot = spot; g.__unspot = unspot; g.__dots = dots;
