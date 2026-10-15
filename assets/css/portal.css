@@ -1519,3 +1519,6 @@ body.hv-editor-open .hv-editbar { display: none; }
 .sel-obj__pub { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1.5px solid var(--ink); background: var(--ink); color: var(--lime); font: 700 13.5px var(--body); cursor: pointer; white-space: nowrap; }
 .sel-obj__pub[data-publish="0"] { background: var(--white); color: var(--ink); }
 .sel-obj__pub:disabled { opacity: .6; cursor: wait; }
+
+/* The account menu floats above the page (owner, 2026-10-15): never clipped by the header it opens from. */
+.pt-menu.pt-menu--float { position: fixed; left: auto; z-index: 2147481000; overflow-y: auto; overscroll-behavior: contain; }

@@ -405,6 +405,33 @@ class Evidence(unittest.TestCase):
         finally:
             server.Handler.selection_scores = real
 
+    def test_70_view_as_client(self):
+        """Owner, 2026-10-15: a team member's switch shows the selection exactly as the client sees it."""
+        import auth as _auth
+        real = server.Handler.selection_scores
+        server.Handler.selection_scores = lambda self, sel, objective=None, target=None: {
+            "HV-MI-005": {"score": 81, "tag": "Strong", "score_range": None, "tag_range": None, "metrics": [], "strengths": [],
+                          "watchouts": [], "conclusion": "", "parts": [], "platform": "Instagram", "objective": "Awareness"}}
+        try:
+            db.create_admin("boss@polyco.com", _auth.hash_password("a-long-passphrase-here"))
+            boss, _ = self.signup("boss@polyco.com")
+            with db.connect() as conn:
+                conn.execute("UPDATE selections SET objective = 'Awareness', scores_published = 0 WHERE id = ?", (self.sel,))
+            b = boss.get("/api/selection?s=" + self.token)[1]
+            self.assertIn("HV-MI-005", b["scores"])                                  # team view
+            self.assertEqual(self.client.post("/api/me/as-client", {"on": True})[0], 403)   # clients have no switch
+            self.assertEqual(boss.post("/api/me/as-client", {"on": True})[0], 200)
+            me = boss.get("/api/me")[1]
+            self.assertTrue(me["as_client"]); self.assertFalse(me["staff"])
+            b = boss.get("/api/selection?s=" + self.token)[1]
+            self.assertEqual(b["scores"], {})                                         # as the client sees it
+            self.assertTrue(b.get("scores_pending"))
+            self.assertFalse(b["scores_gate"]["team"])
+            self.assertEqual(boss.post("/api/me/as-client", {"on": False})[0], 200)
+            self.assertIn("HV-MI-005", boss.get("/api/selection?s=" + self.token)[1]["scores"])
+        finally:
+            server.Handler.selection_scores = real
+
     def test_7_delete(self):
         a = self.admin()
         pid = self.pack_id()

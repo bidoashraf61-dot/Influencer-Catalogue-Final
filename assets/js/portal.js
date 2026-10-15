@@ -821,6 +821,15 @@
         h("span", { class: "pt-menu__badge", style: "background:" + (editOn ? "#e8ff76" : "rgba(18,18,18,.08)") + ";color:#121212" }, editOn ? "On" : "Off"));
       esw.setAttribute("role", "menuitemcheckbox"); esw.setAttribute("aria-checked", editOn ? "true" : "false");
     }
+    // View as client (owner, 2026-10-15): the pages exactly as the client sees them, one tap back.
+    if (ME.staff || ME.as_client) {
+      var asOn = !!ME.as_client;
+      var vac = item("View as client", { go: function () {
+        api("POST", "/api/me/as-client", { on: !asOn }).then(function () { location.reload(); });
+      } }, h("span", { class: "pt-menu__badge", style: "background:" + (asOn ? "#e8ff76" : "rgba(18,18,18,.08)") + ";color:#121212" }, asOn ? "On" : "Off"));
+      vac.setAttribute("role", "menuitemcheckbox"); vac.setAttribute("aria-checked", asOn ? "true" : "false");
+      if (asOn) rule();
+    }
     if (ME.staff) {
       var on = !!ME.unlock;
       var sw = item("Show locked data", { go: function () {
@@ -857,13 +866,28 @@
     if (ME.kind === "admin") item("Sign out of admin", { go: adminOut }, null, "pt-menu__item--quiet");
     else item("Sign out", { go: function () { signOut().then(function () { location.href = ROOT; }); } }, null, "pt-menu__item--quiet");
 
+    // The menu opens on top of the page, anchored under the circle: inside a header that clips its
+    // overflow (the selection cover) it used to slide behind the next section (bug, 2026-10-15).
+    function place() {
+      var r = btn.getBoundingClientRect(), top = Math.round(r.bottom + 10);
+      menu.style.top = top + "px";
+      menu.style.right = Math.max(8, Math.round(window.innerWidth - r.right)) + "px";
+      menu.style.maxHeight = Math.max(200, window.innerHeight - top - 12) + "px";
+    }
     function toggle(open) {
+      if (open) {
+        if (menu.parentNode !== document.body) document.body.appendChild(menu);
+        menu.classList.add("pt-menu--float");
+        place();
+      }
       menu.hidden = !open;
       btn.setAttribute("aria-expanded", open ? "true" : "false");
       if (open) { var first = menu.querySelector(".pt-menu__item"); if (first) first.focus(); }
     }
+    window.addEventListener("resize", function () { if (!menu.hidden) place(); });
+    window.addEventListener("scroll", function () { if (!menu.hidden) place(); }, { passive: true });
     btn.addEventListener("click", function (e) { e.stopPropagation(); toggle(menu.hidden); });
-    document.addEventListener("click", function (e) { if (!menu.hidden && !dock.contains(e.target)) toggle(false); });
+    document.addEventListener("click", function (e) { if (!menu.hidden && !dock.contains(e.target) && !menu.contains(e.target)) toggle(false); });
     document.addEventListener("keydown", function (e) {
       if (menu.hidden) return;
       if (e.key === "Escape") { toggle(false); btn.focus(); return; }
@@ -3916,6 +3940,15 @@
   // An admin looking at the portal as a client (Clients > Preview as client): a bar says so, it is
   // read-only (the server refuses writes), and one link leaves.
   function mountPreviewBar() {
+    if (ME && ME.as_client && !document.getElementById("hv-previewbar")) {
+      var back = h("a", { href: "#" }, "Back to team view");
+      back.addEventListener("click", function (e) { e.preventDefault(); api("POST", "/api/me/as-client", { on: false }).then(function () { location.reload(); }); });
+      var vb = h("div", { id: "hv-previewbar", class: "hv-previewbar", role: "status" },
+        h("span", null, "Viewing as the client: ", h("b", null, "scores, badges and analysis show only where published")), back);
+      document.body.insertBefore(vb, document.body.firstChild);
+      document.body.classList.add("has-previewbar");
+      return;
+    }
     if (!ME || !ME.preview || document.getElementById("hv-previewbar")) return;
     var who = (ME.user && (ME.user.company || ME.user.name)) || "this client";
     var bar = h("div", { id: "hv-previewbar", class: "hv-previewbar", role: "status" },

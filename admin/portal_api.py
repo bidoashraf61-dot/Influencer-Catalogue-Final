@@ -103,6 +103,8 @@ class PortalMixin(connect_api.ConnectMixin):
                "preview": bool(self.preview_mode()),
                # A person with admin access: their own account, plus a switch that reveals locked data.
                "staff": bool(self.staff_viewer(cid)),
+               # View as client is on: the page is the client's; the menu still offers the way back.
+               "as_client": bool(self.as_client() and self.staff_account(cid)),
                "unlock": bool(self.staff_unlocked() or (self.kam_clients() is not None and self.cookies().get(self.UNLOCK_COOKIE, "") == "1")),
                # A key account manager: the menu offers "My clients" (account/#clients).
                "kam": bool(kind == "user" and self.kam_clients() is not None),
@@ -412,7 +414,7 @@ class PortalMixin(connect_api.ConnectMixin):
         routes = {
             "/api/auth/start": self.api_auth_start, "/api/auth/verify": self.api_auth_verify,
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,
-            "/api/me/unlock": self.api_me_unlock, "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
+            "/api/me/unlock": self.api_me_unlock, "/api/me/as-client": self.api_me_as_client, "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
             "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat, "/api/chat/stream": self.api_chat_stream,
             "/api/chat/confirm": self.api_chat_confirm, "/api/chat/dismiss": self.api_chat_dismiss,
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
@@ -556,6 +558,21 @@ class PortalMixin(connect_api.ConnectMixin):
         cookie = "%s=%s; Path=/; HttpOnly; %s; Max-Age=%d" % (srv.Handler.UNLOCK_COOKIE, "1" if on else "", policy,
                                                              12 * 3600 if on else 0)
         db.log("unlock_toggle", who[0], self.client_ip(), self._ua(), "on" if on else "off")
+        return self.send_json(200, {"ok": True, "on": on}, self.cors() + [("Set-Cookie", cookie)])
+
+    def api_me_as_client(self):
+        """POST {on}: View as client, for a team member's own portal account (owner, 2026-10-15)."""
+        who = self._need_viewer()
+        if not who:
+            return
+        if not self.staff_account(who[0]):
+            return self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+        on = bool(self.json_body().get("on"))
+        srv = self._srv()
+        policy = "SameSite=None; Secure" if srv.ALLOWED_ORIGINS else "SameSite=Lax"
+        cookie = "%s=%s; Path=/; HttpOnly; %s; Max-Age=%d" % (srv.Handler.AS_CLIENT_COOKIE, "1" if on else "", policy,
+                                                             8 * 3600 if on else 0)
+        db.log("as_client", who[0], self.client_ip(), self._ua(), "on" if on else "off")
         return self.send_json(200, {"ok": True, "on": on}, self.cors() + [("Set-Cookie", cookie)])
 
     def api_me_update(self):

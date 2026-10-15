@@ -141,7 +141,7 @@ VIEWER_COOKIE = "hv_view"
 PREVIEW_COOKIE = "hv_preview"
 PREVIEW_TTL = 3600
 # The only POSTs a preview may still make (a calculation and analytics; nothing is saved or charged).
-PREVIEW_POSTS = ("/api/event", "/api/roi/estimate", "/api/me/ping", "/api/me/unlock")
+PREVIEW_POSTS = ("/api/event", "/api/roi/estimate", "/api/me/ping", "/api/me/unlock", "/api/me/as-client")
 # Every shared link (a selection, a campaign report, the catalogue itself)
 # remembers the access code that opened it, in this browser: each new link
 # asks for its own code once, and links of different clients open side by side.
@@ -314,7 +314,19 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     # -------------------------------------------------------------- auth --
 
+    AS_CLIENT_COOKIE = "hv_asclient"
+
+    def as_client(self):
+        """View as client (owner, 2026-10-15): a team member looking at the client pages exactly as the
+        client sees them. Only the client-facing API reads it; the admin pages are never affected."""
+        if self.cookies().get(self.AS_CLIENT_COOKIE, "") != "1":
+            return False
+        p = self.route(urllib.parse.urlparse(self.path).path)
+        return p.startswith("/api/") and p not in ("/api/me/as-client",)
+
     def admin(self):
+        if self.as_client():
+            return None                                # seen as the client: no admin session
         token = auth.unsign(self.cookies().get(ADMIN_COOKIE, ""), SECRET)
         if not token:
             return None
@@ -382,6 +394,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         """True when this browser is signed in to the portal as someone who ALSO has admin access
         (their email is an admin account). They stay themselves, with their own account; a switch in
         their menu ("Show locked data") reveals what is locked, and nothing else changes."""
+        if self.as_client():
+            return False                               # View as client: a client like any other
+        return self.staff_account(cid)
+
+    def staff_account(self, cid=None):
+        """staff_viewer() whatever the View as client switch says (the switch itself needs it)."""
         cid = cid if cid is not None else self.viewer_cookie_id()
         if cid is None or cid == db.admin_code_id():
             return False
@@ -406,6 +424,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def kam_clients(self):
         """None, or (for a key account manager signed in to the admin, or to the portal with an
         email that is a KAM's admin login) the frozenset of her clients' code ids. Once per request."""
+        if self.as_client():
+            return None
         memo = getattr(self, "_kam_memo", None)
         if memo is not None and memo[0] == self.path:
             return memo[1]
@@ -5141,7 +5161,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         reject) or viewer (a colleague or a link holder: look only)."""
         if self.admin_like() or (reader is not None and int(reader) == db.admin_code_id()):
             return "admin"
-        if portal.sample_member(reader, sel):
+        if portal.sample_member(reader, sel) and not self.as_client():
             return "admin"           # the sample selection: every control on for BlueHolding and HelloVoice accounts
         if reader is not None and sel["code_id"] is not None and portal.owns(int(reader), sel["code_id"]):
             return "owner"
