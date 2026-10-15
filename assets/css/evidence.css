@@ -192,6 +192,14 @@
 .ev-rank__row { display: grid; grid-template-columns: 22px 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; width: 100%; text-align: left; background: var(--white); border: 1px solid rgba(18, 18, 18, .08); border-radius: 12px; padding: 6px 10px; cursor: pointer; font: 14px "DM Sans", sans-serif; color: var(--ink); min-height: 52px; }
 .ev-rank__row:hover { border-color: var(--ink); }
 .ev-rank__n { font: 400 18px Bebasneue, "Bebas Neue", sans-serif; color: var(--gray); }
+.ev-rank__n--gold, .ev-rank__n--silver, .ev-rank__n--bronze { width: 26px; height: 26px; margin-left: -3px; border-radius: 50%; display: grid; place-items: center; color: #121212; font-size: 16px; line-height: 1; padding-top: 2px; box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .18), 0 1px 3px rgba(0, 0, 0, .18); }
+.ev-rank__n--gold { background: radial-gradient(circle at 35% 30%, #fff3b0, #f2c230 55%, #c99a12); }
+.ev-rank__n--silver { background: radial-gradient(circle at 35% 30%, #ffffff, #c8ccd4 55%, #9aa0aa); }
+.ev-rank__n--bronze { background: radial-gradient(circle at 35% 30%, #f6d0aa, #cd7f32 55%, #9c5a1d); color: #fff; }
+.ev-brand--ic { padding: 0 14px; min-width: 52px; justify-content: center; }
+.ev-brand--ic svg { width: 22px; height: 22px; display: block; }
+.ev-brand--instagram svg { color: #d62976; }
+.ev-brand--ic[aria-pressed="true"] svg { color: currentColor; }
 .ev-rank__ph { width: 40px; height: 40px; border-radius: 50%; border: 3px solid; overflow: hidden; background: #e9dcd2; display: block; }
 .ev-rank__ph img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .ev-rank__who { min-width: 0; }

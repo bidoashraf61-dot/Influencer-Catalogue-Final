@@ -472,10 +472,18 @@
       .catch(function () { body.textContent = ""; body.appendChild(el("p", "ev-mut", "Could not load the map.")); });
   }
 
+  // Platform marks instead of the words (owner, 2026-10-15); the same drawings as the creator cards.
+  var TT_G = '<path d="M14.2 3v11.6a3.6 3.6 0 1 1-3.6-3.6"/><path d="M14.2 3.2c.45 2.7 2.05 4.3 4.75 4.6"/>';
+  var PLAT_SVG = {
+    instagram: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4.1"/><circle cx="17.3" cy="6.7" r="1.15" fill="currentColor" stroke="none"/></svg>',
+    tiktok: '<svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><g stroke="#25f4ee" transform="translate(-1,-.85)">' + TT_G +
+      '</g><g stroke="#fe2c55" transform="translate(1,.85)">' + TT_G + '</g><g stroke="currentColor">' + TT_G + "</g></svg>"
+  };
   function chips(label, opts, key) {
     var g = el("div", "ev-mi__chips"); g.setAttribute("role", "group"); g.setAttribute("aria-label", label);
     opts.forEach(function (o) {
-      var b = el("button", "ev-brand ev-brand--txt", o[1]); b.type = "button";
+      var b = el("button", "ev-brand ev-brand--txt", PLAT_SVG[o[0]] ? "" : o[1]); b.type = "button";
+      if (PLAT_SVG[o[0]]) { b.innerHTML = PLAT_SVG[o[0]]; b.classList.add("ev-brand--ic", "ev-brand--" + o[0]); b.setAttribute("aria-label", o[1]); b.title = o[1]; }
       b.setAttribute("aria-pressed", miFilter[key] === o[0] ? "true" : "false");
       if (o[2]) { b.disabled = true; b.title = o[2]; }
       b.addEventListener("click", function () { miFilter[key] = o[0]; miListN = 20; drawMI(); });
@@ -812,7 +820,11 @@
     var ol = el("ol", "ev-rank__list");
     list.slice(0, miListN).forEach(function (p, i) {
       var li = el("li"), b = el("button", "ev-rank__row" + (p.locked ? " is-locked" : "")); b.type = "button";
-      b.appendChild(el("span", "ev-rank__n", String(i + 1)));
+      // Scoreboard medals for the top three (owner, 2026-10-15).
+      var medal = ["gold", "silver", "bronze"][i];
+      var nn = el("span", "ev-rank__n" + (medal ? " ev-rank__n--" + medal : ""), String(i + 1));
+      if (medal) nn.setAttribute("aria-label", medal.charAt(0).toUpperCase() + medal.slice(1) + ", number " + (i + 1));
+      b.appendChild(nn);
       var ph = el("span", "ev-rank__ph" + (typeOf(p) === "hcp" ? " is-hcp" : ""));
       if (p.photo) { var im = el("img"); im.src = p.photo; im.alt = ""; im.loading = "lazy"; ph.appendChild(im); }
       else ph.appendChild(el("span", "ev-cp__ini", initials(p.name || p.handle)));
