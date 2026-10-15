@@ -3145,23 +3145,24 @@
     // shrinks to a done line (Objective added ✓ · Awareness, Engagement · Edit).
     function objectiveWords(o) { return String(o || "").split("+").filter(Boolean).join(", "); }
     function publishScores(btn) {
+      // The switch moves at once (owner, 2026-10-15: no confirm step); it moves back if the save fails.
       var on = btn.getAttribute("data-publish") === "1", what = btn.getAttribute("data-what") || "scores";
-      if (on && !window.confirm(what === "analysis"
-        ? "Publish the profile analysis to the client? Everyone who can open this selection will see the full analysis of every creator in it."
-        : "Publish the scores to the client? They will see every creator's score on this selection.")) return;
-      btn.disabled = true;
+      var paint = function (state) {
+        btn.setAttribute("aria-checked", state ? "true" : "false");
+        btn.setAttribute("data-publish", state ? "0" : "1");
+        var st = btn.querySelector(".sel-obj__swst"); if (st) st.textContent = state ? "On for client" : "Off for client";
+      };
+      var keep = function (state) { if (what === "analysis") CURATED.scoresGate.analysis = state; else CURATED.scoresGate.published = state; };
+      paint(on); keep(on);
       fetch(CFG.api + "/api/selection/scores", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: CURATED.token, publish: on, what: what }) })
         .then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (j) {
-          btn.disabled = false;
-          if (!j || !j.ok) { stToast((j && j.message) || "Couldn't change that. Please try again."); return; }
-          if (what === "analysis") CURATED.scoresGate.analysis = !!j.published; else CURATED.scoresGate.published = !!j.published;
-          stToast(what === "analysis" ? (j.published ? "Profile analysis published to the client." : "Profile analysis locked for the client.")
-            : (j.published ? "Scores published: the client sees them now." : "Scores hidden from the client."));
-          renderObjective();
+          if (!j || !j.ok) { paint(!on); keep(!on); stToast((j && j.message) || "Couldn't change that. Please try again."); return; }
+          stToast(what === "analysis" ? (j.published ? "Profile analysis is now open to the client." : "Profile analysis is now locked for the client.")
+            : (j.published ? "Scores and fit are now shown to the client." : "Scores and fit are now hidden from the client."));
         })
-        .catch(function () { btn.disabled = false; stToast("Couldn't reach the server. Please try again."); });
+        .catch(function () { paint(!on); keep(!on); stToast("Couldn't reach the server. Please try again."); });
     }
     function renderObjective() {
       var host = $("sel-objective");
