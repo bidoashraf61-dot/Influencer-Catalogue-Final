@@ -3085,7 +3085,21 @@
       var first = pop.querySelector('[aria-pressed="true"]') || pop.querySelector("[data-why]");
       if (first) first.focus();
     }
+    // Views per post on the full card (owner, 2026-10-15): one more row in the card's figures, typical views
+    // (likes + comments for an engagement / conversion objective), "~" when estimated from followers.
+    function renderPerPost(card) {
+      var meta = card.querySelector(".cat-card__meta");
+      if (!meta || !CURATED) return;
+      var eng = CURATED.metric === "engagement", src = eng ? CURATED.engagement : CURATED.reach;
+      var r = src ? src[card.dataset.code] : null, li = meta.querySelector(".sel-vpp");
+      if (!r) { if (li) li.remove(); return; }
+      if (!li) { li = document.createElement("li"); li.className = "sel-vpp"; meta.appendChild(li); }
+      var unit = eng ? "engagements (likes + comments)" : "views";
+      li.title = r[2] ? "Estimated from followers: no " + unit + " numbers yet" : "Typical " + unit + " per post; best recent post " + compact(r[1]);
+      li.innerHTML = "<span>" + (eng ? "Eng. / post" : "Views / post") + "</span><strong><b>" + (r[2] ? "~" : "") + compact(r[0]) + "</b></strong>";
+    }
     function renderStatus(card) {
+      renderPerPost(card);
       var body = card.querySelector(".cat-card__body");
       if (!body) return;
       var box = card.querySelector(".sel-st");

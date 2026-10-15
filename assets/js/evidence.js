@@ -158,7 +158,8 @@
         // On the card itself, not only in Details (owner, 2026-10-15): who already posted for a competitor.
         badge = el("span", "ev-trbadge", "Track record");
         badge.title = "Posted for " + info.brands + (info.brands === 1 ? " competitor" : " competitors") + " of this brand";
-        card.appendChild(badge);
+        var bd = card.querySelector(".cat-card__body");
+        if (bd) bd.insertBefore(badge, bd.firstChild); else card.appendChild(badge);
       }
       if (have) return;
       var b = el("button", "ev-tr");

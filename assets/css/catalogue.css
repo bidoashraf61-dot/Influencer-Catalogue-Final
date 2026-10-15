@@ -288,35 +288,6 @@ a.cat-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 }
 .cat-card__platform[data-n="5"] .cat-card__platform-hint, .cat-card__platform[data-n="6"] .cat-card__platform-hint { font-size: 11px; }
 
-/* Selection cards share a row height without one big hole (owner, 2026-10-15): each card is a subgrid
-   of the row, so photo, chips, name, figures, tags and buttons line up across the row and the spare
-   space is spread between sections instead of pooling above the last button. */
-@supports (grid-template-rows: subgrid) {
-  body[data-page="selection"] .cat-grid { row-gap: 0; }
-  body[data-page="selection"] .cat-card {
-    display: grid; grid-template-rows: subgrid; grid-row: span 11; row-gap: 0; margin-bottom: 28px; align-content: start;
-  }
-  body[data-page="selection"] .cat-card__body { display: contents; }
-  body[data-page="selection"] .cat-card__body > * { margin-left: 20px; margin-right: 20px; align-self: start; min-width: 0; }
-  body[data-page="selection"] .cat-card__media { grid-row: 1; margin-bottom: 20px; }
-  body[data-page="selection"] .cat-card__body > .cat-plat { grid-row: 2; }
-  body[data-page="selection"] .cat-card__body > .cat-verdict { grid-row: 3; }
-  body[data-page="selection"] .cat-card__body > .cat-card__code { grid-row: 4; }
-  body[data-page="selection"] .cat-card__body > .cat-card__name { grid-row: 5; }
-  body[data-page="selection"] .cat-card__body > .cat-card__meta { grid-row: 6; }
-  body[data-page="selection"] .cat-card__body > .cat-tags { grid-row: 7; }
-  body[data-page="selection"] .cat-card__body > .cat-card__analysis { grid-row: 8; margin-top: 0; justify-self: start; }
-  body[data-page="selection"] .cat-card__body > .ev-tr { grid-row: 9; width: auto; }
-  body[data-page="selection"] .cat-card__body > .sel-st { grid-row: 10; }
-  body[data-page="selection"] .cat-card__body > :last-child { margin-bottom: 20px; }
-  @media screen and (max-width: 767px) {
-    body[data-page="selection"] .cat-card { margin-bottom: 14px; }
-    body[data-page="selection"] .cat-card__body > * { margin-left: 14px; margin-right: 14px; }
-    body[data-page="selection"] .cat-card__media { margin-bottom: 14px; }
-    body[data-page="selection"] .cat-card__body > :last-child { margin-bottom: 14px; }
-  }
-}
-
 /* Projected reach: a range in the summary, minimum to best case */
 .cat-reach { display: inline-flex; align-items: baseline; gap: 10px; }
 .cat-reach i { font: 500 13px var(--body); font-style: normal; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); }
