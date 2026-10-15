@@ -188,16 +188,19 @@ def summary(user, code_id, secret=b""):
     import selstatus
     import lifecycle
     team = sorted(portal.team_codes(code_id))
+    # Selections HelloVoice granted this person one by one (owner, 2026-10-15), and their campaigns.
+    granted = sorted(db.granted_selection_ids(code_id)) or [-1]
+    gq = ",".join("?" * len(granted))
     with db.connect() as conn:
         sels = conn.execute(
             "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, s.request_id, s.created_at, u.name owner FROM selections s "
             "LEFT JOIN users u ON u.code_id = s.code_id "
-            "WHERE s.code_id IN (%s) AND s.archived_at IS NULL ORDER BY s.updated_at DESC LIMIT 60" % ",".join("?" * len(team)),
-            team).fetchall()
+            "WHERE (s.code_id IN (%s) OR s.id IN (%s)) AND s.archived_at IS NULL ORDER BY s.updated_at DESC LIMIT 60"
+            % (",".join("?" * len(team)), gq), team + granted).fetchall()
         camps = conn.execute(
-            "SELECT * FROM campaigns WHERE code_id IN (%s) AND status != 'draft' "
-            "ORDER BY CASE status WHEN 'live' THEN 0 ELSE 1 END, starts_at DESC LIMIT 30" % ",".join("?" * len(team)),
-            team).fetchall()
+            "SELECT * FROM campaigns WHERE (code_id IN (%s) OR selection_id IN (%s)) AND status != 'draft' "
+            "ORDER BY CASE status WHEN 'live' THEN 0 ELSE 1 END, starts_at DESC LIMIT 30" % (",".join("?" * len(team)), gq),
+            team + granted).fetchall()
 
     every = set()
     for s in sels:

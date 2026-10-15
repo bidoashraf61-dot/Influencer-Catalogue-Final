@@ -487,10 +487,15 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 out[bits[0]] = (int(bits[1]), int(bits[2]))
         return out
 
+    @staticmethod
+    def passcodes_off():
+        """Owner, 2026-10-15: nobody opens anything with a typed access code; everyone signs in by email."""
+        return bool(db.setting("passcodes_off", False))
+
     def link_code(self, key):
         """The access code this browser typed for this link, while it is still
         good and this browser is still one of its devices; else None."""
-        e = self.link_entries().get(self.link_hash(key))
+        e = None if self.passcodes_off() else self.link_entries().get(self.link_hash(key))
         if not e:
             return self.as_client_owner(key)
         return self._link_code_row(e)
@@ -567,6 +572,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             mine = db.device_hash(self.cookies().get(DEVICE_COOKIE, ""))
             if mine != parts[2] or not db.device_allowed(int(code_id), parts[2]):
                 return None
+        # Passcodes off (owner, 2026-10-15): only a pass from email sign-in counts (and the admin's client preview).
+        if self.passcodes_off() and (len(parts) < 4 or parts[3] != "e") and not self.preview_mode():
+            return None
         # Re-check the code every request: revoking must take effect at once,
         # not whenever the cookie happens to lapse.
         with db.connect() as conn:
@@ -970,6 +978,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/clients" and not (query.get("archived") or query.get("page")):
             import hub_views
             return self.send(200, hub_views.clients_page(query.get("show") or "all", query.get("open"), query.get("ok"), query.get("e")))
+        if path == "/access-requests":
+            import access
+            return self.send(200, access.page(query.get("ok"), query.get("e"), can=self.admin_like_for))
         if path == "/evidence":
             return self.send(200, evidence.list_page(kam_scope.clients(who), db.list_codes(), db.list_selections(),
                                                      query.get("ok"), query.get("e")))
@@ -1196,6 +1207,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_status()
         if path == "/api/selection/scores":
             return self.api_selection_scores_publish()
+        if path == "/api/selection/request-access":
+            return self.api_selection_request_access()
         if path == "/api/selection/reason":
             return self.api_selection_reason()
         if path == "/api/selection/replace":
@@ -1248,6 +1261,20 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_client_preview()
         if path.startswith("/evidence/"):
             return self.post_evidence(path, who)
+        if path == "/access-requests":
+            import access
+            f = self.form_body()
+            rid = kam_scope._int(f.get("id") or "")
+            r = db.access_request(rid) if rid is not None else None
+            if r is None:
+                return self.redirect("/access-requests?e=" + urllib.parse.quote("That request no longer exists."))
+            sel = db.selection(r["selection_id"])
+            if sel is not None and not self.admin_like_for(sel["code_id"]):
+                return self.redirect("/access-requests?e=" + urllib.parse.quote("That selection belongs to a client you do not manage."))
+            ok = access.grant(rid, who["email"]) if f.get("do") == "grant" else access.deny(rid, who["email"])
+            return self.redirect("/access-requests?ok=" + urllib.parse.quote(
+                ("Access granted to %s." if f.get("do") == "grant" else "Request from %s declined.") % (r["email"] or "the person")
+                if ok else "Already decided."))
         if path == "/archive":
             f = self.form_body()
             kind = f.get("kind")
@@ -3614,11 +3641,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if code_id is None:
             return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         team = sorted(portal.team_codes(code_id))
+        granted = sorted(db.granted_selection_ids(code_id)) or [-1]     # campaigns of selections granted to them
         with db.connect() as conn:
             rows = conn.execute(
                 "SELECT token, name, client, status, phase, starts_at, ends_at, logos FROM campaigns "
-                "WHERE code_id IN (%s) AND status != 'draft' ORDER BY starts_at DESC" % ",".join("?" * len(team)),
-                team).fetchall()
+                "WHERE (code_id IN (%s) OR selection_id IN (%s)) AND status != 'draft' ORDER BY starts_at DESC"
+                % (",".join("?" * len(team)), ",".join("?" * len(granted))), team + granted).fetchall()
         out = []
         for r in rows:
             d = dict(r)
@@ -3642,7 +3670,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if code_id is None:
             return None, 401
         # Not found and not yours look the same from outside.
-        if k is None or k["code_id"] not in portal.team_codes(code_id) or k["status"] == "draft":
+        if k is None or not portal.opens_campaign(code_id, k) or k["status"] == "draft":
             return None, 404
         return k, 200
 
@@ -4288,6 +4316,24 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         """True while a HelloVoice-made selection's scores are not published to the client yet."""
         return self.scores_gate_applies(sel) and not (sel["scores_published"] if "scores_published" in sel.keys() else 1)
 
+    def api_selection_request_access(self):
+        """A signed-in person asks for a selection that is not theirs (owner, 2026-10-15)."""
+        import access
+        b = self.json_body()
+        sel = db.selection(token=str(b.get("token") or ""))
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        cid = self.signed_in_client()
+        user = portal.user_for_code(cid) if cid is not None else None
+        if user is None:
+            return self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())
+        if portal.opens(cid, sel):
+            return self.send_json(200, {"ok": True, "already": True}, self.cors())
+        if self._throttled("access:%d" % cid, 10, 3600):
+            return
+        access.request(sel, user)
+        return self.send_json(200, {"ok": True, "requested": True}, self.cors())
+
     def api_selection_scores_publish(self):
         """HelloVoice publishes (or takes back) a selection's scores for the client (owner, 2026-10-15)."""
         b = self.json_body()
@@ -4897,7 +4943,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         cid = None
         if not staff:
             cid = self.link_code("s:" + token) or self.signed_in_client()
-            if cid is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(int(cid))
+            if cid is None or (sel["code_id"] is not None and not portal.opens(int(cid), sel)
                                and int(cid) != db.admin_code_id()):
                 return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         pk = evidence.for_selection(sel["id"], client_only=not staff)
@@ -4931,7 +4977,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         staff = self.admin_like_for(sel["code_id"]) or (self.staff_viewer() and self.kam_clients() is None)
         if not staff:
             cid = self.link_code("s:" + token) or self.signed_in_client()
-            if cid is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(int(cid))
+            if cid is None or (sel["code_id"] is not None and not portal.opens(int(cid), sel)
                                and int(cid) != db.admin_code_id()):
                 return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         pk = evidence.for_selection(sel["id"], client_only=not staff)
@@ -5060,7 +5106,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # identifies who is reading it. Admins signed in open any link.
             if sel is not None and not staff:
                 cid = self.link_code("s:" + token) or self.signed_in_client()
-                if cid is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(int(cid))
+                if cid is None or (sel["code_id"] is not None and not portal.opens(int(cid), sel)
                                    and int(cid) != db.admin_code_id()):
                     return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         elif not viewer:
@@ -5180,6 +5226,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return "admin"           # the sample selection: every control on for BlueHolding and HelloVoice accounts
         if reader is not None and sel["code_id"] is not None and portal.owns(int(reader), sel["code_id"]):
             return "owner"
+        if reader is not None and db.selection_granted(sel["id"], reader):
+            return "owner"           # granted this selection (owner, 2026-10-15): the client's own controls
         return "viewer"
 
     def selection_status_payload(self, sel, codes, reader, by=None):
@@ -5211,6 +5259,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     # ---------------------------------------------------------- public API --
 
     def api_unlock(self):
+        if self.passcodes_off():
+            return self.send_json(410, {"ok": False, "reason": "email_only",
+                                        "message": "Access codes are no longer used. Sign in with your work email."}, self.cors())
         body = self.json_body()
         code = (body.get("code") or "").strip()
         # Guessing codes: 10 wrong tries per address per 10 minutes.
@@ -5533,7 +5584,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if tok:
             sel = db.selection(token=tok)
             if sel is None or (sel["code_id"] is not None and int(code_id) != db.admin_code_id()
-                               and sel["code_id"] not in portal.team_codes(int(code_id))):
+                               and not portal.opens(int(code_id), sel)):
                 return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
             if not portal.may_edit(int(code_id), sel, db.admin_code_id()):
                 return self.send_json(403, {"ok": False, "reason": "not_owner",
@@ -5611,7 +5662,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return None
         sel = db.selection(token=token) if token else None
         if sel is None or (sel["code_id"] is not None and int(reader) != db.admin_code_id()
-                           and sel["code_id"] not in portal.team_codes(int(reader))):
+                           and not portal.opens(int(reader), sel)):
             self.send_json(404, {"ok": False}, self.cors())
             return None
         code = str(b.get("code") or "").strip().upper()
@@ -5740,7 +5791,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         sel = db.selection(token=str(b.get("token") or ""))
         if sel is None or (sel["code_id"] is not None and int(viewer) != db.admin_code_id()
-                           and sel["code_id"] not in portal.team_codes(int(viewer))):
+                           and not portal.opens(int(viewer), sel)):
             return self.send_json(404, {"ok": False}, self.cors())
         if not portal.may_edit(int(viewer), sel, db.admin_code_id()):
             return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only the person who owns this selection can change it. Colleagues on the same company can view it."}, self.cors())

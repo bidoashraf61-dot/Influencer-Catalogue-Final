@@ -148,7 +148,8 @@ class PortalMixin(connect_api.ConnectMixin):
         db.bump_code_use(row["id"])
         db.log("unlock_ok", row["id"], self.client_ip(), ua, "sign-in")
         expiry = db.now() + srv.VIEWER_TTL
-        ticket = auth.sign("%d:%d:%s" % (row["id"], expiry, device), srv.SECRET)
+        # ":e" marks a pass earned by email sign-in: with passcodes off, only these open anything.
+        ticket = auth.sign("%d:%d:%s:e" % (row["id"], expiry, device), srv.SECRET)
         policy = "SameSite=None; Secure" if srv.ALLOWED_ORIGINS else "SameSite=Lax"
         cookie = f"{srv.VIEWER_COOKIE}={ticket}; Path=/; HttpOnly; {policy}; Max-Age={srv.VIEWER_TTL}"
         dev = f"{srv.DEVICE_COOKIE}={token}; Path=/; HttpOnly; {policy}; Max-Age={srv.DEVICE_TTL}"
@@ -217,7 +218,8 @@ class PortalMixin(connect_api.ConnectMixin):
                 # so clients with an access code never see a sign-in that cannot work yet.
                 self.send_json(200, {"ok": True, "signed_in": False, "ai": gemini.configured(),
                                      "signup": portal.signup_mode(),
-                                     "email_signin": mailer.configured()}, self.cors())
+                                     "email_signin": mailer.configured(),
+                                     "passcodes": not self.passcodes_off()}, self.cors())
             else:
                 self.send_json(200, dict(self._me_payload(cid, user, kind), ok=True), self.cors())
             return True
@@ -288,7 +290,7 @@ class PortalMixin(connect_api.ConnectMixin):
             who = self._need_viewer()
             if who:
                 sel = db.selection(token=query.get("s") or "") if query.get("s") else None
-                if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(who[0])
+                if sel is None or (sel["code_id"] is not None and not portal.opens(who[0], sel)
                                    and who[0] != db.admin_code_id()):
                     self.send_json(404, {"ok": False}, self.cors())
                 else:
@@ -639,7 +641,7 @@ class PortalMixin(connect_api.ConnectMixin):
         cid, user, kind = who
         b = self.json_body()
         sel = db.selection(token=str(b.get("token") or "")) if b.get("token") else None
-        if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"])):
+        if sel is None or (sel["code_id"] is not None and not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"])):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         if not portal.may_edit(cid, sel, db.admin_code_id()):
             return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only the person who owns this selection can change it. Colleagues on the same company can view it."}, self.cors())
@@ -685,7 +687,7 @@ class PortalMixin(connect_api.ConnectMixin):
             return
         token = str(self.json_body().get("token") or "").strip()[:80]
         sel = db.selection(token=token, deleted=True) if token else None
-        if sel is None or (sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid)):
+        if sel is None or (sel["code_id"] is not None and not portal.opens(cid, sel)):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         if not self._may_delete_selection(sel, cid):
             return self.send_json(403, {"ok": False, "reason": "not_yours"}, self.cors())
@@ -1035,7 +1037,7 @@ class PortalMixin(connect_api.ConnectMixin):
         sel = db.selection(token=str(token or "")) if token else None
         if sel is None:
             return None
-        if sel["code_id"] is not None and sel["code_id"] not in portal.team_codes(cid) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"]) and not self.admin_like_for(sel["code_id"]):
+        if sel["code_id"] is not None and not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"]) and not self.admin_like_for(sel["code_id"]):
             return None
         with db.connect() as conn:
             br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",

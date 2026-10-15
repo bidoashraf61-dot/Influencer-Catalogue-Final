@@ -2178,7 +2178,30 @@
   var REFUSED = false;
   function refusedText() {
     return "You do not have access to this selection with the account used in this browser. " +
-      "Sign out and open the link again with the right account, or ask HelloVoice for access.";
+      "Ask for access below, or sign out and open the link again with the right account.";
+  }
+  // Request access (owner, 2026-10-15): a signed-in person asks; HelloVoice grants this one selection.
+  function refusedPanel(box) {
+    box.textContent = "";
+    var p = document.createElement("p"); p.textContent = refusedText(); box.appendChild(p);
+    var tok = readFragment().token;
+    if (!CFG.api || !tok) return;
+    var b = document.createElement("button"); b.type = "button"; b.className = "cat-btn sel-reqaccess"; b.textContent = "Request access";
+    var note = document.createElement("p"); note.className = "sel-reqaccess__note";
+    b.addEventListener("click", function () {
+      b.disabled = true; b.textContent = "Sending…";
+      fetch(CFG.api + "/api/selection/request-access", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: tok }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (j) {
+          if (j && j.already) { location.reload(); return; }
+          if (j && j.ok) { b.textContent = "Request sent"; note.textContent = "HelloVoice has your request. You’ll get an email as soon as you have access."; return; }
+          b.disabled = false; b.textContent = "Request access";
+          note.textContent = (j && j.message) || "Couldn’t send that. Please try again.";
+        })
+        .catch(function () { b.disabled = false; b.textContent = "Request access"; note.textContent = "Couldn’t reach the server. Please try again."; });
+    });
+    box.appendChild(b); box.appendChild(note);
   }
 
   function initSelection() {
@@ -3485,7 +3508,8 @@
 
       $("sel-title").textContent = selectionName;
       document.title = selectionName + " — HELVY Connect";
-      $("cat-empty").textContent = REFUSED && !selected.length ? refusedText() : selected.length
+      if (REFUSED && !selected.length) { if (!$("cat-empty").querySelector(".sel-reqaccess")) refusedPanel($("cat-empty")); }
+      else $("cat-empty").textContent = selected.length
         ? (stFilter ? "No creators in this selection are " + (ST_LABEL[stFilter] || stFilter).toLowerCase() + " right now." : "No creators in this selection match those filters.")
         : "This link does not name any creators.";
       $("cat-empty").hidden = shown !== 0;

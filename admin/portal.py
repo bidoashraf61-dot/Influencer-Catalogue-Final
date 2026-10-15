@@ -842,6 +842,24 @@ def sample_codes():
                                                    % ",".join("?" * len(ids)), ids)}
 
 
+def opens(cid, sel):
+    """May this account open the selection: its client's team, or a grant for this one selection."""
+    if sel is None or cid is None:
+        return False
+    if sel["code_id"] is None or sel["code_id"] in team_codes(int(cid)):
+        return True
+    return db.selection_granted(sel["id"], cid)
+
+
+def opens_campaign(cid, k):
+    """A campaign opens for its client's team, or for someone granted the selection it was made from."""
+    if k is None or cid is None:
+        return False
+    if k["code_id"] in team_codes(int(cid)):
+        return True
+    return bool(k["selection_id"]) and db.selection_granted(k["selection_id"], cid)
+
+
 def owns(reader, code_id):
     """True when ``reader`` owns things filed under ``code_id``: it is their own code, or a shared
     access code HelloVoice linked to their account (the code's selections became theirs)."""
@@ -884,6 +902,8 @@ def may_edit(reader, sel, admin_code_id=None):
         return True
     if sample_member(reader, sel):
         return True
+    if db.selection_granted(sel["id"], reader):
+        return True                                    # granted this selection: the client's own controls
     if sel["code_id"] is None:
         return True              # an unfiled selection has no owner to protect
     return owns(reader, sel["code_id"])

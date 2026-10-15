@@ -488,7 +488,7 @@
                ["jamjoom-pharma", "Jamjoom Pharma", 22], ["spc", "SPC", 32], ["orchidia", "Orchidia", 26]];
   var PERSONAL = /@(gmail|googlemail|hotmail|outlook|live|msn|yahoo|ymail|icloud|me|mac|aol|proton|protonmail|gmx|yandex|mail|zoho)\.[a-z.]+$/i;
 
-  function enhanceGate() {
+  function enhanceGate(info) {
     var gate = $("cat-gate");
     if (!gate || gate.getAttribute("data-pt")) return;
     gate.setAttribute("data-pt", "1");
@@ -497,7 +497,8 @@
     var oldForm = inner.querySelector(".cat-gate__form");
     var oldErr = inner.querySelector(".cat-gate__error");
     var page = document.body.getAttribute("data-page");
-    var sharedOk = page !== "catalogue" || /[?&]access=code\b/.test(location.search || "");
+    // Passcodes off (owner, 2026-10-15): email and a one-time code only, no "Enter the code".
+    var sharedOk = !(info && info.passcodes === false) && (page !== "catalogue" || /[?&]access=code\b/.test(location.search || ""));
     gate.classList.add("cx-gate");
 
     var scene = h("main", { class: "cx-scene" });
@@ -737,7 +738,7 @@
       pane.appendChild(h("p", { class: "cx-door__lead" }, opts.message || "Your account is waiting for approval by the HelloVoice team. We’ll email you as soon as it’s ready."));
     }
 
-    show(/[?&]access=code\b/.test(location.search || "") && oldForm ? "shared" : "email", { keepFocus: true });
+    show(sharedOk && /[?&]access=code\b/.test(location.search || "") && oldForm ? "shared" : "email", { keepFocus: true });
   }
 
   // A colleague's invite link (?invite=...) is kept for this visit and sent with the new
@@ -4139,7 +4140,7 @@
         return;
       }
       // Only replace the access-code gate once the server can actually send the email.
-      if (r.b && r.b.email_signin) enhanceGate();
+      if (r.b && r.b.email_signin) enhanceGate(r.b);
     });
   }
 

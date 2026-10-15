@@ -446,6 +446,37 @@ class Evidence(unittest.TestCase):
         finally:
             server.Handler.selection_scores = real
 
+    def test_71_request_access_and_email_only(self):
+        """Owner, 2026-10-15: a signed-in outsider asks, HelloVoice grants that one selection (and its campaign);
+        with passcodes off a typed code opens nothing and email sign-ins keep working."""
+        self.assertEqual(self.stranger.get("/api/selection?s=" + self.token)[0], 401)
+        s, j, _ = self.stranger.post("/api/selection/request-access", {"token": self.token})
+        self.assertEqual((s, j.get("requested")), (200, True), j)
+        self.assertEqual(self.stranger.post("/api/selection/request-access", {"token": self.token})[0], 200)   # asking twice: one request
+        reqs = db.access_requests("pending")
+        self.assertEqual(len(reqs), 1)
+        a = self.admin()
+        page = a.get("/access-requests")
+        self.assertEqual(page[0], 200)
+        self.assertIn("buyer@rivalco.com", page[2] if isinstance(page[2], str) else json.dumps(page[1]) + str(page[2]))
+        s, _, _ = a.req("POST", "/access-requests", form={"id": str(reqs[0]["id"]), "do": "grant"})
+        self.assertEqual(s, 303)
+        s, b, _ = self.stranger.get("/api/selection?s=" + self.token)
+        self.assertEqual(s, 200, b)
+        self.assertEqual(b["role"], "owner")                                       # the client's own controls
+        k = db.create_campaign("Granted", "Polyco", self.mine["code_id"])
+        db.save_campaign(k, selection_id=self.sel, status="live")
+        self.assertEqual(self.stranger.get("/api/campaign?t=" + db.campaign(k)["token"])[0], 200)
+        # passcodes off
+        db.set_setting("passcodes_off", True)
+        try:
+            s, j, _ = self.stranger.post("/api/unlock", {"code": "anything"})
+            self.assertEqual((s, j.get("reason")), (410, "email_only"))
+            self.assertEqual(self.client.get("/api/selection?s=" + self.token)[0], 200)   # signed in by email: still in
+            self.assertIs(self.client.get("/api/me")[1].get("signed_in"), True)
+        finally:
+            db.set_setting("passcodes_off", False)
+
     def test_7_delete(self):
         a = self.admin()
         pid = self.pack_id()

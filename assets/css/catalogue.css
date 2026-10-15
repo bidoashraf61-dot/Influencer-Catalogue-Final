@@ -1893,3 +1893,7 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
 .cat-ind__subs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 14px; margin: 6px 0 2px 30px; }
 .cat-ind__lead { grid-column: 1 / -1; margin: 4px 0 2px; font-size: 12px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: #5a5249; }
 @media (max-width: 560px) { .cat-ind__subs { grid-template-columns: 1fr; margin-left: 24px; } }
+
+/* Request access on a selection the signed-in person cannot open (owner, 2026-10-15). */
+.sel-reqaccess { margin-top: 14px; }
+.sel-reqaccess__note { margin-top: 10px; font-size: 14px; color: var(--gray); }

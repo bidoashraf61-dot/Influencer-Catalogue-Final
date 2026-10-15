@@ -371,6 +371,7 @@ def init():
     with connect() as conn:
         conn.executescript(SCHEMA)
         migrate(conn)
+        conn.executescript(ACCESS_SCHEMA)
 
 
 def migrate(conn):
@@ -2082,6 +2083,89 @@ def attach_request(sid, rid):
     with connect() as conn:
         conn.execute("UPDATE selections SET request_id = ?, updated_at = ? WHERE id = ?",
                      (rid, now(), sid))
+
+
+# ---------------------------------------------------- access by email (owner, 2026-10-15) --
+# No passcodes: people sign in with their work email. Someone outside the selection's client asks for
+# access from the page; HelloVoice grants that ONE selection (and the campaign made from it).
+ACCESS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS selection_access (
+    selection_id INTEGER NOT NULL, code_id INTEGER NOT NULL, granted_by TEXT, granted_at INTEGER NOT NULL,
+    PRIMARY KEY (selection_id, code_id));
+CREATE TABLE IF NOT EXISTS access_requests (
+    id INTEGER PRIMARY KEY, selection_id INTEGER NOT NULL, code_id INTEGER NOT NULL, email TEXT, name TEXT,
+    company TEXT, at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', decided_at INTEGER, decided_by TEXT);
+"""
+
+
+def access_init():
+    with connect() as conn:
+        conn.executescript(ACCESS_SCHEMA)
+
+
+def selection_granted(sel_id, code_id):
+    if sel_id is None or code_id is None:
+        return False
+    with connect() as conn:
+        return bool(conn.execute("SELECT 1 FROM selection_access WHERE selection_id = ? AND code_id = ?",
+                                 (int(sel_id), int(code_id))).fetchone())
+
+
+def granted_selection_ids(code_id):
+    if code_id is None:
+        return set()
+    with connect() as conn:
+        return {r[0] for r in conn.execute("SELECT selection_id FROM selection_access WHERE code_id = ?", (int(code_id),))}
+
+
+def grant_selection(sel_id, code_id, by=""):
+    with connect() as conn:
+        conn.execute("INSERT OR IGNORE INTO selection_access (selection_id, code_id, granted_by, granted_at) VALUES (?,?,?,?)",
+                     (int(sel_id), int(code_id), by, now()))
+
+
+def revoke_selection(sel_id, code_id):
+    with connect() as conn:
+        conn.execute("DELETE FROM selection_access WHERE selection_id = ? AND code_id = ?", (int(sel_id), int(code_id)))
+
+
+def selection_grants(sel_id):
+    with connect() as conn:
+        return conn.execute("SELECT a.*, u.email, u.name, u.company FROM selection_access a LEFT JOIN users u ON u.code_id = a.code_id "
+                            "WHERE a.selection_id = ? ORDER BY a.granted_at", (int(sel_id),)).fetchall()
+
+
+def access_request_add(sel_id, code_id, email, name, company):
+    """One pending request per person and selection; asking again returns the same one. (id, new?)"""
+    with connect() as conn:
+        r = conn.execute("SELECT id FROM access_requests WHERE selection_id = ? AND code_id = ? AND status = 'pending'",
+                         (int(sel_id), int(code_id))).fetchone()
+        if r:
+            return r[0], False
+        return conn.execute("INSERT INTO access_requests (selection_id, code_id, email, name, company, at) VALUES (?,?,?,?,?,?)",
+                            (int(sel_id), int(code_id), email, name, company, now())).lastrowid, True
+
+
+def access_request(rid):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM access_requests WHERE id = ?", (int(rid),)).fetchone()
+
+
+def access_requests(status="pending", sel_id=None):
+    q, args = "SELECT r.*, s.name AS selection_name, s.token AS selection_token FROM access_requests r " \
+              "LEFT JOIN selections s ON s.id = r.selection_id WHERE 1=1", []
+    if status:
+        q += " AND r.status = ?"; args.append(status)
+    if sel_id is not None:
+        q += " AND r.selection_id = ?"; args.append(int(sel_id))
+    with connect() as conn:
+        return conn.execute(q + " ORDER BY r.at DESC LIMIT 200", args).fetchall()
+
+
+def access_request_decide(rid, status, by=""):
+    with connect() as conn:
+        conn.execute("UPDATE access_requests SET status = ?, decided_at = ?, decided_by = ? WHERE id = ?",
+                     (status, now(), by, int(rid)))
 
 
 def set_scores_published(token_or_id, on=True):
