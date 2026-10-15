@@ -797,7 +797,7 @@ def fill_thumbs(pack_ids, pause=0.6, log=print):
     return got, miss
 
 
-def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locked=()):
+def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locked=(), rejected=()):
     """The Market Intelligence map of ONE selection (owner, 2026-10-15): the client's brand, the competitors
     and only the creators of this selection who worked with them. A creator taken out of the selection, or
     rejected / marked unavailable on it (``removed``), is not on the map, and the competitor totals count
@@ -806,7 +806,9 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
     ``locked`` (owner, 2026-10-15): creators HelloVoice marked Unavailable on the selection stay on the
     map, greyed with a lock, so the client can ask for them again. ``outside`` lists the competitors'
     creators who are not on the HelloVoice roster yet, for the "Not on our roster yet" strip."""
-    locked = set(locked or ())
+    # Owner (2026-10-15): rejected creators are on the map too, dimmed with a Rejected tag, and count in every
+    # total. ``removed`` is kept for callers that still want a creator off the map entirely.
+    locked, rejected = set(locked or ()), set(rejected or ())
     inset = (set(selection_codes or ()) - set(removed or ())) | (locked & set(selection_codes or ()))
     every = [r for r in posts(pk["id"]) if r["relevance"] != "other"]
     rows = [r for r in every if r["code"] in inset]
@@ -853,6 +855,7 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
         out.append({"handle": p["handle"], "name": p["name"], "type": _ctype(p["type"]), "followers": p["followers"], "code": p["code"],
                     "in_selection": bool(p["code"]), "on_roster": rc is not None,
                     "locked": "unavailable" if p["code"] in locked else None,
+                    "status": "rejected" if p["code"] in rejected else ("unavailable" if p["code"] in locked else None),
                     "photo": links.thumb(photo) if photo else None, "photo_large": links.photo(photo) if photo else None,
                     "interactions": inter, "estimate": est,
                     "rank_value": inter if by_eng else _med([r["views"] for r in organic]),
@@ -881,8 +884,9 @@ def map_payload(pk, selection_codes=(), objective="Awareness", removed=(), locke
                        "competitors": f["competitors"], "posts": f["posts"], "median_views": _med(f["views"])}
                       for f in far.values() if f["views"]], key=lambda f: -(f["median_views"] or 0))[:24]
     sel_n = len(set(selection_codes or ()) - set(removed or ()))
+    n_rejected = sum(1 for p in out if p["status"] == "rejected")
     approved = logos()
-    return {"brand": brand, "outside": outside, "selection_size": sel_n,
+    return {"brand": brand, "outside": outside, "selection_size": sel_n, "rejected_on_map": n_rejected,
             "on_map": sum(1 for p in out if p["code"]), "brand_logo": logo_url(brand, approved), "title": pk["title"],
             "rank_by": "interactions" if by_eng else "views", "objective": objective,
             "competitors": sorted([{"name": c["name"], "posts": c["posts"], "views": c["views"], "creators": len(c["creators"]),

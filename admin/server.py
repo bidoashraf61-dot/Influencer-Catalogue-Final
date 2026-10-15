@@ -4873,9 +4873,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if as_map:
             import selstatus
             status = selstatus.of(sel["id"])
-            removed = {c for c, st in status.items() if st["s"] == "rejected"}
+            # Rejected creators stay on the map (owner, 2026-10-15): dimmed, with a Rejected tag, and in the totals.
+            rejected = {c for c, st in status.items() if st["s"] == "rejected"}
             locked = {c for c, st in status.items() if st["s"] == "unavailable"}
-            out = evidence.map_payload(pk, codes, self.selection_objective(sel), removed, locked)
+            out = evidence.map_payload(pk, codes, self.selection_objective(sel), (), locked, rejected)
             reader = self.selection_viewer(sel["token"])
             out["can_add"] = bool(staff or (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())))
             out["preview"] = bool(staff and not pk["client_visible"])

@@ -392,8 +392,11 @@
     if (role === "admin" || role === "owner") {
       var st = S.status ? (S.status(code) || {}).s : "";
       var ft = el("footer", "ev-pn__ft");
-      ft.appendChild(el("p", "ev-mut", st === "approved" ? "Kept in this selection." : st === "rejected" ? "Removed from this selection." : "Not decided yet."));
-      [["approved", "Keep in selection"], ["rejected", "Remove from selection"]].forEach(function (o) {
+      ft.appendChild(el("p", "ev-mut", st === "approved" ? "Kept in this selection." : st === "rejected" ? "Rejected. Restore it to undecided, or keep it." : "Not decided yet."));
+      // A rejected creator is restored (back to undecided) or kept; anyone else can be kept or rejected.
+      var opts = st === "rejected" ? [["review", "Restore to selection"], ["approved", "Keep in selection"]]
+        : [["approved", "Keep in selection"], ["rejected", "Remove from selection"]];
+      opts.forEach(function (o) {
         var b = el("button", "ev-act" + (o[0] === "approved" ? " ev-act--yes" : ""), o[1]); b.type = "button";
         if (st === o[0]) b.disabled = true;
         b.addEventListener("click", function () { setStatus(code, o[0], b); });
@@ -572,13 +575,18 @@
       pjb.appendChild(pjv);
       countUp(pjv, prevProj, pj.mid);
       mi.projMid = pj.mid;
-      pjb.appendChild(el("span", "", num(pj.lo) + " \u2013 " + num(pj.hi) + " · " + pj.n + (pj.n === 1 ? " creator" : " creators") + " · one post each"));
+      var rejN = people.filter(function (p) { return p.estimate && !p.locked && p.status === "rejected"; }).length;
+      pjb.appendChild(el("span", "", num(pj.lo) + " \u2013 " + num(pj.hi) + " · " + pj.n + (pj.n === 1 ? " creator" : " creators") + " · one post each" + (rejN ? " · incl. " + rejN + " rejected" : "")));
       pjb.title = "Typical " + estUnit() + " if each creator shown posts once, from their posts with your competitors; range = their lowest to highest.";
       bar.appendChild(pjb);
     }
     var leg = el("div", "ev-legend");
     var hk = el("span", "ev-legend__item"); hk.appendChild(el("i", "ev-legend__hcp")); hk.appendChild(document.createTextNode("Doctor / pharmacist"));
     leg.appendChild(hk);
+    if (d.creators.some(function (p) { return p.status === "rejected"; })) {
+      var rj = el("span", "ev-legend__item"); var ri = el("i", "ev-legend__rej"); rj.appendChild(ri); rj.appendChild(document.createTextNode("Rejected, on the map for the totals"));
+      leg.appendChild(rj);
+    }
     if (d.creators.some(function (p) { return p.locked; })) {
       var lk = el("span", "ev-legend__item"); var li = el("i", "ev-legend__lock"); li.appendChild(icon("lock")); lk.appendChild(li); lk.appendChild(document.createTextNode("Unavailable, ask us"));
       leg.appendChild(lk);
@@ -800,9 +808,9 @@
 
   var dotSeq = 0;
   function dot(p, at, r, defs, stage, shared, lines) {
-    var lockd = !!p.locked;
-    var gg = svg("g", { class: "ev-map__dot" + (p.paid_only ? " ev-map__dot--paid" : "") + (lockd ? " is-locked" : ""), tabindex: "0", role: "button",
-      "aria-label": (p.name || p.handle) + ", " + rankText(p) + (p.estimate ? ", estimated " + estText(p) : "") + (lockd ? ", unavailable" : "") + ". Open creator.",
+    var lockd = !!p.locked, rej = p.status === "rejected";
+    var gg = svg("g", { class: "ev-map__dot" + (p.paid_only ? " ev-map__dot--paid" : "") + (lockd ? " is-locked" : "") + (rej ? " is-rejected" : ""), tabindex: "0", role: "button",
+      "aria-label": (p.name || p.handle) + ", " + rankText(p) + (p.estimate ? ", estimated " + estText(p) : "") + (lockd ? ", unavailable" : "") + (rej ? ", rejected" : "") + ". Open creator.",
       style: "transform-origin:" + at.x.toFixed(1) + "px " + at.y.toFixed(1) + "px;--d:" + Math.round(Math.random() * 260) + "ms" });
     gg.__h = p.handle; gg.__x = at.x; gg.__y = at.y;
     var hint = svg("title"); hint.textContent = (p.name || "@" + p.handle) + (p.estimate ? "\nEst. " + estText(p) : ""); gg.appendChild(hint);
@@ -837,6 +845,12 @@
       lb.appendChild(svg("path", { d: "M" + (lx - lr * 0.42) + " " + (ly - lr * 0.05) + "h" + (lr * 0.84) + "v" + (lr * 0.62) + "h" + (-lr * 0.84) + "z" +
         "M" + (lx - lr * 0.26) + " " + (ly - lr * 0.05) + "v" + (-lr * 0.2) + "a" + (lr * 0.26) + " " + (lr * 0.26) + " 0 0 1 " + (lr * 0.52) + " 0v" + (lr * 0.2) }));
       gg.appendChild(lb);
+    }
+    if (rej) {
+      // A dark "REJECTED" tag under the photo: dimmed alone would read as unavailable or as a fade-out.
+      var tw = 62, ty = at.y + r + 9;
+      gg.appendChild(svg("rect", { x: at.x - tw / 2, y: ty - 8, width: tw, height: 14, rx: 7, class: "ev-map__rej" }));
+      var tt2 = svg("text", { x: at.x, y: ty + 2, "text-anchor": "middle", class: "ev-map__rejt" }); tt2.textContent = "Rejected"; gg.appendChild(tt2);
     }
     if (shared) gg.appendChild(svg("circle", { cx: at.x + r * 0.72, cy: at.y - r * 0.72, r: 5.5, class: "ev-map__badge" }));
     var lit = function (on) { (lines || []).forEach(function (l) { l.classList.toggle("ev-map__lit", on); }); };
@@ -875,7 +889,7 @@
     box.appendChild(hd);
     var ol = el("ol", "ev-rank__list");
     list.slice(0, miListN).forEach(function (p, i) {
-      var li = el("li"), b = el("button", "ev-rank__row" + (p.locked ? " is-locked" : "")); b.type = "button";
+      var li = el("li"), b = el("button", "ev-rank__row" + (p.locked ? " is-locked" : "") + (p.status === "rejected" ? " is-rejected" : "")); b.type = "button";
       // Scoreboard medals for the top three (owner, 2026-10-15).
       var medal = ["gold", "silver", "bronze"][i];
       var nn = el("span", "ev-rank__n" + (medal ? " ev-rank__n--" + medal : ""), String(i + 1));
@@ -971,6 +985,8 @@
       if (p.requested) { rq.disabled = true; rq.classList.add("is-done"); }
       rq.addEventListener("click", function () { requestCreator(p, "unavailable", rq); });
       f.acts.appendChild(rq);
+    } else if (p.status === "rejected") {
+      f.acts.appendChild(el("span", "ev-chip ev-chip--no", "Rejected"));
     } else if (p.in_selection) {
       f.acts.appendChild(el("span", "ev-chip ev-chip--in", "In this selection"));
     } else if (miData.can_add && p.on_roster) {

@@ -397,3 +397,14 @@
 .ev-map__shadow--s { opacity: .16; }
 .ev-map.is-moving .ev-map__dot, .ev-map.is-moving .ev-map__comp { transition: none !important; pointer-events: none; }
 .ev-map__world { will-change: transform; }
+
+/* Rejected creators (owner, 2026-10-15): on the map and in every total, but dimmed with a Rejected tag. Unavailable
+   keeps its lock and its own look; the two never look alike. */
+.ev-map__dot.is-rejected { opacity: .45; }
+.ev-map__dot.is-rejected .ev-map__ring { stroke: #8a8a8a; stroke-dasharray: 4 3; }
+.ev-map__dot.is-rejected:hover { opacity: .8; }
+.ev-map__rej { fill: #383838; stroke: var(--white); stroke-width: 1.5; }
+.ev-map__rejt { font: 700 9.5px "DM Sans", sans-serif; fill: var(--white); letter-spacing: .06em; text-transform: uppercase; }
+.ev-legend__rej { width: 14px; height: 14px; border-radius: 50%; background: #8a8a8a; border: 2px dashed var(--white); display: inline-block; }
+.ev-rank__row.is-rejected { opacity: .6; }
+.ev-chip--no { background: #fde9e9; color: #c01010; }
