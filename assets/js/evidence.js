@@ -134,6 +134,7 @@
       .then(function (j) {
         if (!j || !j.ok || !j.evidence || !j.evidence.brands || !j.evidence.brands.length) { if (sec) sec.hidden = true; loadedFor = null; return; }
         data = j.evidence; brandIx = 0; decorate(); miButton();
+        if (window.hvSelection && window.hvSelection.setTrack && data.by_code) window.hvSelection.setTrack(Object.keys(data.by_code));
       })
       .catch(function () { loadedFor = null; });
   }
@@ -151,7 +152,14 @@
     [].forEach.call(grid.querySelectorAll("article.cat-card[data-code]"), function (card) {
       var code = card.getAttribute("data-code"), info = data.by_code[code];
       var have = card.querySelector(".ev-tr");
-      if (!info) { if (have) have.remove(); return; }
+      var badge = card.querySelector(".ev-trbadge");
+      if (!info) { if (have) have.remove(); if (badge) badge.remove(); return; }
+      if (!badge) {
+        // On the card itself, not only in Details (owner, 2026-10-15): who already posted for a competitor.
+        badge = el("span", "ev-trbadge", "Track record");
+        badge.title = "Posted for " + info.brands + (info.brands === 1 ? " competitor" : " competitors") + " of this brand";
+        card.appendChild(badge);
+      }
       if (have) return;
       var b = el("button", "ev-tr");
       b.type = "button";
@@ -510,12 +518,12 @@
 
   // Photo size by views on a log scale (owner, 2026-10-15): views run from thousands to millions, so a
   // square-root scale left almost every photo the same size. Brand logos stay the biggest thing on the map
-  // (owner, 2026-10-15): photos run 20 to 32 (focus: 24 to 38), under the smallest competitor logo (44) and
-  // the centre brand (74 / 80), and the gap between a small and a big creator is kept narrow.
+  // (owner, 2026-10-15): photos run 24 to 38 (focus: 28 to 44), under the smallest competitor logo (56) and
+  // the centre brand (96 / 104), and the gap between a small and a big creator is kept narrow.
   function sizer(list) {
     var vs = list.map(function (p) { return p.rank_value || 0; }).filter(function (v) { return v > 0; });
     var lo = vs.length ? Math.min.apply(null, vs) : 1, hi = vs.length ? Math.max.apply(null, vs) : 1;
-    var a = miFocus ? 24 : 20, b = miFocus ? 38 : 32;
+    var a = miFocus ? 28 : 24, b = miFocus ? 44 : 38;
     var L = function (v) { return Math.log10(Math.max(v, 1)); };
     var f = function (v) { return hi > lo ? (L(v) - L(lo)) / (L(hi) - L(lo)) : 0.5; };
     var r = function (p) { return a + (b - a) * Math.max(0, Math.min(1, f(p.rank_value || lo))); };
@@ -536,6 +544,11 @@
 
   function drawMI() {
     var d = miData, body = mi.body;
+    // Smooth filtering (owner, 2026-10-15): remember where each creator was, so after the redraw the ones
+    // still on show glide from there, new ones pop in, and the projected figure counts to its new value.
+    var prev = {};
+    if (mi.svg && mi.svg.__dots) mi.svg.__dots.forEach(function (dd) { prev[dd.__h] = { x: dd.__x, y: dd.__y }; });
+    var prevProj = mi.projMid;
     body.textContent = "";
     // Which of the selection's creators are on the map, and why the others are not (owner, 2026-10-15).
     if (mi.scope) {
@@ -555,7 +568,10 @@
     if (pj.n) {
       var pjb = el("div", "ev-proj"); pjb.setAttribute("role", "status");
       pjb.appendChild(el("small", "", "Projected " + estUnit()));
-      pjb.appendChild(el("b", "", num(pj.mid)));
+      var pjv = el("b", "", num(pj.mid));
+      pjb.appendChild(pjv);
+      countUp(pjv, prevProj, pj.mid);
+      mi.projMid = pj.mid;
       pjb.appendChild(el("span", "", num(pj.lo) + " \u2013 " + num(pj.hi) + " · " + pj.n + (pj.n === 1 ? " creator" : " creators") + " · one post each"));
       pjb.title = "Typical " + estUnit() + " if each creator shown posts once, from their posts with your competitors; range = their lowest to highest.";
       bar.appendChild(pjb);
@@ -595,6 +611,36 @@
     if (d.outside && d.outside.length) body.appendChild(outsideStrip(d.outside));
     mi.svg = svgEl;
     applyView();
+    glide(svgEl, prev);
+  }
+
+  function glide(svgEl, prev) {
+    var dots = svgEl.__dots || [];
+    if (CALM || !Object.keys(prev).length) return;
+    dots.forEach(function (dd) {
+      var o = prev[dd.__h];
+      if (o) { dd.style.transition = "none"; dd.style.transform = "translate(" + (o.x - dd.__x).toFixed(1) + "px," + (o.y - dd.__y).toFixed(1) + "px)"; }
+      else dd.classList.add("is-new");
+    });
+    var lines = svgEl.querySelector(".ev-map__links");
+    if (lines) lines.classList.add("is-fresh");
+    void svgEl.getBoundingClientRect();
+    requestAnimationFrame(function () {
+      dots.forEach(function (dd) { if (prev[dd.__h]) { dd.style.transition = "transform .7s cubic-bezier(.16, 1, .3, 1), opacity .3s ease"; dd.style.transform = ""; } });
+      setTimeout(function () { dots.forEach(function (dd) { dd.style.transition = ""; }); }, 750);
+    });
+  }
+
+  function countUp(node, from, to) {
+    if (CALM || from == null || from === to) { node.textContent = num(to); return; }
+    var t0 = null, dur = 700;
+    var step = function (t) {
+      if (t0 === null) t0 = t;
+      var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3);
+      node.textContent = num(Math.round(from + (to - from) * e));
+      if (k < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
   }
 
   function applyView() {
@@ -639,7 +685,7 @@
       if (big) gg.appendChild(svg("circle", { cx: x, cy: y, r: r + 9, class: "ev-map__halo" }));
       gg.appendChild(svg("circle", { cx: x, cy: y, r: r + 4, class: "ev-map__focus" }));
       if (url) {
-        var im = svg("image", { x: x - r * 0.72, y: y - r * 0.72, width: r * 1.44, height: r * 1.44, preserveAspectRatio: "xMidYMid meet", "clip-path": "url(#" + id + ")" });
+        var im = svg("image", { x: x - r * 0.78, y: y - r * 0.78, width: r * 1.56, height: r * 1.56, preserveAspectRatio: "xMidYMid meet", "clip-path": "url(#" + id + ")" });
         im.setAttributeNS(XLINK, "href", (CFG.api || "") + url); im.setAttribute("href", (CFG.api || "") + url);
         gg.appendChild(im);
       } else {
@@ -657,10 +703,10 @@
       var maxV = Math.max.apply(null, d.competitors.map(function (c) { return c.views; }).concat([1]));
       d.competitors.forEach(function (c, i) {
         var a = -Math.PI / 2 + i * 2 * Math.PI / Math.max(n, 1);
-        pos[c.name] = { x: cx + RX * Math.cos(a), y: cy + RY * Math.sin(a), a: a, r: 44 + 16 * Math.sqrt(c.views / maxV) };
+        pos[c.name] = { x: cx + RX * Math.cos(a), y: cy + RY * Math.sin(a), a: a, r: 56 + 20 * Math.sqrt(c.views / maxV) };
       });
-      placed.push({ x: cx, y: cy, r: 84 });
-      d.competitors.forEach(function (c) { var p = pos[c.name]; [-60, -30, 0, 30, 60].forEach(function (dx) { placed.push({ x: p.x + dx, y: p.y + p.r + 16, r: 14 }); }); placed.push({ x: p.x, y: p.y, r: p.r + 6 }); links2.appendChild(svg("line", { x1: cx, y1: cy, x2: p.x, y2: p.y, class: "ev-map__spoke", "data-comp": c.name })); });
+      placed.push({ x: cx, y: cy, r: 106 });
+      d.competitors.forEach(function (c) { var p = pos[c.name]; [-60, -30, 0, 30, 60].forEach(function (dx) { placed.push({ x: p.x + dx, y: p.y + p.r + 19, r: 15 }); }); placed.push({ x: p.x, y: p.y, r: p.r + 6 }); links2.appendChild(svg("line", { x1: cx, y1: cy, x2: p.x, y2: p.y, class: "ev-map__spoke", "data-comp": c.name })); });
       var homes = {};
       vis.forEach(function (p) {
         var ks = Object.keys(p.competitors).filter(function (k) { return pos[k]; });
@@ -682,11 +728,11 @@
           nodes.appendChild(dd);
         });
       });
-      hubs.appendChild(bubble(d.brand, d.brand_logo, cx, cy, 74, true));
+      hubs.appendChild(bubble(d.brand, d.brand_logo, cx, cy, 96, true));
       d.competitors.forEach(function (c) {
         var p = pos[c.name], b = bubble(c.name, c.logo, p.x, p.y, p.r);
         var all = people.filter(function (q) { return q.competitors[c.name]; }).length;
-        var more = svg("text", { x: p.x, y: p.y + p.r + 22, "text-anchor": "middle", class: "ev-map__cnum" });
+        var more = svg("text", { x: p.x, y: p.y + p.r + 25, "text-anchor": "middle", class: "ev-map__cnum" });
         more.textContent = num(c.views) + " views · " + all + (all === 1 ? " creator" : " creators");
         b.appendChild(more);
         var go = function () { miFocus = c.name; miView = { k: 1, x: 0, y: 0 }; miListN = 30; drawMI(); };
@@ -702,10 +748,10 @@
     } else {
       // Focus: one competitor in the centre, its creators in rings, names under the photos.
       var fc = d.competitors.filter(function (c) { return c.name === miFocus; })[0] || { name: miFocus };
-      placed.push({ x: cx, y: cy, r: 90 });
+      placed.push({ x: cx, y: cy, r: 114 });
       vis.forEach(function (p, i) {
         var r = dotR(p), ring = i < 8 ? 0 : i < 20 ? 1 : 2, idx = ring === 0 ? i : ring === 1 ? i - 8 : i - 20, cnt = ring === 0 ? 8 : 12;
-        var a = -Math.PI / 2 + idx * 2 * Math.PI / cnt + (ring === 1 ? 0.26 : 0), rad = 180 + ring * 125;
+        var a = -Math.PI / 2 + idx * 2 * Math.PI / cnt + (ring === 1 ? 0.26 : 0), rad = 205 + ring * 125;
         var at = place(cx + rad * 1.55 * Math.cos(a), cy + rad * Math.sin(a), r);
         links2.appendChild(svg("line", { x1: at.x, y1: at.y, x2: cx, y2: cy, class: "ev-map__own" }));
         var dd = dot(p, at, r, defs, stage, Object.keys(p.competitors).length > 1, []);
@@ -714,7 +760,7 @@
         nm.textContent = (p.name || p.handle).replace(/[|•·].*$/, "").trim().slice(0, 18); dd.appendChild(nm);
         nodes.appendChild(dd);
       });
-      hubs.appendChild(bubble(fc.name, fc.logo, cx, cy, 80, true));
+      hubs.appendChild(bubble(fc.name, fc.logo, cx, cy, 104, true));
     }
 
     function spot(test, comp) {
@@ -727,7 +773,7 @@
       dots.forEach(function (dd) { dd.classList.remove("is-hot"); });
       [].forEach.call(links2.querySelectorAll(".is-hot"), function (l) { l.classList.remove("is-hot"); });
     }
-    g.__spot = spot; g.__unspot = unspot;
+    g.__spot = spot; g.__unspot = unspot; g.__dots = dots;
 
     // Depth with the cursor: lines drift a little against it, photos with it, brand discs least. Eased,
     // tiny, and off for anyone who asked for less motion.
@@ -767,7 +813,7 @@
     var gg = svg("g", { class: "ev-map__dot" + (p.paid_only ? " ev-map__dot--paid" : "") + (lockd ? " is-locked" : ""), tabindex: "0", role: "button",
       "aria-label": (p.name || p.handle) + ", " + rankText(p) + (p.estimate ? ", estimated " + estText(p) : "") + (lockd ? ", unavailable" : "") + ". Open creator.",
       style: "transform-origin:" + at.x.toFixed(1) + "px " + at.y.toFixed(1) + "px;--d:" + Math.round(Math.random() * 260) + "ms" });
-    gg.__h = p.handle;
+    gg.__h = p.handle; gg.__x = at.x; gg.__y = at.y;
     var tip = svg("title"); tip.textContent = (p.name || "@" + p.handle) + (p.estimate ? "\nEst. " + estText(p) : ""); gg.appendChild(tip);
     var id = "evc" + (++dotSeq);
     var clip = svg("clipPath", { id: id }); clip.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r })); defs.appendChild(clip);

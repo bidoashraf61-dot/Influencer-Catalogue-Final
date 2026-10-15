@@ -2919,7 +2919,9 @@
       unavailable: function () { return "Set by HelloVoice when a creator can't take the job."; }
     };
     var STATUS_ON = !!(CURATED && CURATED.token && CFG.api && CURATED.status);
-    var stFilter = "";               // "", a status, "influencers" or "doctors"
+    var stFilter = "";               // "", a status, "influencers", "doctors" or "track"
+    // Creators with posts for this brand's competitors (owner, 2026-10-15), set by evidence.js.
+    var TRACK = {};
     function stLabel(k) { return { review: "Under review", approved: "Approved", rejected: "Rejected", unavailable: "Unavailable" }[k] || k; }
     function hvIcon(n) { return window.hvPortal && window.hvPortal.icon ? window.hvPortal.icon(n) : ""; }
     function statusOf(code) { return (STATUS_ON && CURATED.status[code]) || { s: "review", by: "", hv: false, at: null, reason: "", note: "", replacements: [] }; }
@@ -2931,14 +2933,15 @@
       return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + (s < 86400 * 2 ? ", " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
     }
     function stCounts() {
-      var n = { creators: selected.length, influencers: 0, doctors: 0, review: 0, approved: 0, rejected: 0, unavailable: 0 };
-      selected.forEach(function (code) { n[statusOf(code).s]++; n[isDoctor(code) ? "doctors" : "influencers"]++; });
+      var n = { creators: selected.length, influencers: 0, doctors: 0, track: 0, review: 0, approved: 0, rejected: 0, unavailable: 0 };
+      selected.forEach(function (code) { n[statusOf(code).s]++; n[isDoctor(code) ? "doctors" : "influencers"]++; if (TRACK[code]) n.track++; });
       return n;
     }
     function stMatches(code) {
       if (!stFilter) return true;
       if (stFilter === "doctors") return isDoctor(code);
       if (stFilter === "influencers") return !isDoctor(code);
+      if (stFilter === "track") return !!TRACK[code];
       return statusOf(code).s === stFilter;
     }
     // A decision shows at once (fix batch 3): the card is redrawn before the server answers, and
@@ -3365,6 +3368,7 @@
       var kinds = (n.doctors && n.influencers) ? chip("influencers", n.influencers + " influencer" + (n.influencers === 1 ? "" : "s"), "user") + chip("doctors", n.doctors + " doctor" + (n.doctors === 1 ? "" : "s"), "steth") : "";
       host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-sbar__in"><div class="sel-sum" role="group" aria-label="Show">' +
         chip("", n.creators + " creator" + (n.creators === 1 ? "" : "s"), null, true) + kinds +
+        (n.track ? chip("track", n.track + " with track record", "target") : "") +
         '<span class="sel-sum__sep" aria-hidden="true"></span>' +
         chip("approved", n.approved + " approved", "check") + chip("rejected", n.rejected + " rejected", "x") +
         chip("review", n.review + " under review", "clock") + chip("unavailable", n.unavailable + " unavailable", "ban") +
@@ -3379,6 +3383,11 @@
       role: function () { return ROLE; },
       curated: function () { return CURATED; },
       codes: function () { return selected.slice(); },
+      setTrack: function (codes) {
+        TRACK = {}; (codes || []).forEach(function (c) { TRACK[c] = 1; });
+        if (stFilter === "track" && !codes.length) stFilter = "";
+        render();
+      },
       status: function (code) { return statusOf(code); },
       creator: function (code) {
         var c = byCode[code]; if (!c) return null;

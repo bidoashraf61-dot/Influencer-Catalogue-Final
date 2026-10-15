@@ -1270,6 +1270,7 @@ a.hv-note:hover { background: #efede8; }
 .sel-ci .hv-i { width: 14px; height: 14px; stroke-width: 2.2; }
 .sel-chip--approved .sel-ci { background: var(--go-soft); color: #0e6b39; }
 .sel-chip--rejected .sel-ci { background: #fde9e9; color: #c01010; }
+.sel-chip--track .sel-ci { background: #e8ff76; color: var(--ink); }
 .sel-chip--unavailable .sel-ci { color: #383838; }
 .sel-chip[aria-pressed="true"] .sel-ci { background: rgba(232,255,118,.16); color: var(--lime); }
 .sel-sbar__tools { margin-left: auto; display: flex; align-items: center; gap: 14px; }
