@@ -928,7 +928,7 @@
     if (p === "/api/roi/save") return ok({ ok: true });
     if (p === "/api/roi/vs") return ok(versus());
     if (p === "/api/roi/selections") return ok({ ok: true, selections: [{ token: SEL, name: SEL_NAME }] });
-    if (p === "/api/analysis/sample") return ok(sampleBody(), 150);
+    if (p === "/api/analysis/sample" || p === "/api/analysis/template") return ok(sampleBody(), 150);
     if (p === "/api/creator") return ok(creatorBody(String(q.get("c") || "").toUpperCase()));
     if (p === "/api/creator/request") {
       var code = String(body.code || "").toUpperCase();

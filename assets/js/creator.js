@@ -86,7 +86,7 @@
   function load() {
     var c = code();
     if (sampleOn()) {
-      fetch(API + "/api/analysis/sample", { credentials: "include", cache: "no-store" })
+      fetch(API + "/api/analysis/template", { credentials: "include", cache: "no-store" })
         .then(function (r) {
           if (r.status === 401) { lock(); return null; }
           if (!r.ok) { unlocked(); $("pp-empty").textContent = "The sample analysis isn't available right now."; $("pp-empty").hidden = false; return null; }
@@ -409,10 +409,9 @@
     }[g.state] || ["lock", "Full analysis", "", ""];
     box.innerHTML = '<span class="pp-req__lock">' + hvi(st[0]) + '</span><div><h2 class="pp-req__h">' + st[1] + "</h2><p>" + st[2] + '</p><p class="pp-req__err" role="alert" hidden></p></div><div class="pp-req__side">' + st[3] + "</div>" +
       (g.state === "requested" ? '<div class="pp-req__track"><span class="on">Requested · ' + esc(when(g.requested_at)) + '</span><span class="now">Being prepared</span><span>Ready by ' + esc(when(g.ready_by)) + "</span></div>" : "");
-    // A sample only helps while this creator's own full analysis is closed (owner, 2026-10-12).
-    if (g.sample_full && g.state !== "unlocked") {
-      box.querySelector(".pp-req__side").appendChild(sampleButton());
-    }
+    // General rule (owner, 2026-10-15): every profile-analysis page can preview the FULL analysis with sample
+    // data, in every state, even when this creator's own analysis is open or only partly filled.
+    box.querySelector(".pp-req__side").appendChild(sampleButton());
     var ask = box.querySelector("#pp-ask-full");
     if (ask) ask.addEventListener("click", function () {
       ask.disabled = true;
@@ -429,20 +428,20 @@
     if (view) view.addEventListener("click", function () { var p = $("pp-pages").hidden ? $("pp-sealed") : $("pp-pages"); if (p) p.scrollIntoView({ behavior: "smooth", block: "start" }); });
     return box;
   }
-  /* ------------------------------------------- the sample full analysis (item 39)
-     A real analysis of one creator, anonymised on the server: no name, handle, bio, photo, link, post
-     cover or hashtag, numbers only. The button opens it in this same page (read-only, labelled);
+  /* ------------------------------------------- the sample full analysis (item 39; owner, 2026-10-15)
+     The full-analysis template (admin/analysis_template.py): every section filled with invented data and the
+     dummy pictures, never anyone's. The button opens it in this same page (read-only, labelled);
      with a mouse a small card previews its headline sections first. A tap needs no hover. */
   var SAMPLE_P = null;
   function sampleData() {
-    if (!SAMPLE_P) SAMPLE_P = fetch(API + "/api/analysis/sample", { credentials: "include" })
+    if (!SAMPLE_P) SAMPLE_P = fetch(API + "/api/analysis/template", { credentials: "include" })
       .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; });
     return SAMPLE_P;
   }
   function sampleButton() {
     var wrap = document.createElement("div");
     wrap.className = "pp-sample";
-    wrap.innerHTML = '<button type="button" class="pp-gbtn pp-gbtn--sample" id="pp-sample-btn" aria-describedby="pp-sample-card">' + hvi("unlock") + "See a sample full analysis</button>" +
+    wrap.innerHTML = '<button type="button" class="pp-gbtn pp-gbtn--sample" id="pp-sample-btn" aria-describedby="pp-sample-card">' + hvi("unlock") + "Preview with sample data</button>" +
       '<div class="pp-sample__card" id="pp-sample-card" role="tooltip" hidden></div>';
     var btn = wrap.querySelector("button"), card = wrap.querySelector(".pp-sample__card");
     var fine = window.matchMedia && matchMedia("(hover: hover) and (pointer: fine)").matches;
@@ -481,16 +480,16 @@
                  ["Fake followers", a.fake_followers_pct != null ? pct(a.fake_followers_pct) : null],
                  ["Top country", top ? esc(String(top.code).toUpperCase()) + " " + pct(top.pct, 0) : null],
                  ["Women", au.gender && au.gender.female != null ? pct(au.gender.female, 0) : null]].filter(function (x) { return x[1] != null; });
-    return '<p class="pp-sample__tag">Sample · anonymised creator</p><dl>' + stats.map(function (x) { return "<div><dt>" + x[0] + "</dt><dd>" + x[1] + "</dd></div>"; }).join("") + "</dl>" +
+    return '<p class="pp-sample__tag">Sample data · not a real creator</p><dl>' + stats.map(function (x) { return "<div><dt>" + x[0] + "</dt><dd>" + x[1] + "</dd></div>"; }).join("") + "</dl>" +
       '<p class="pp-sample__secs">Popular posts · Followers &amp; growth · Content · Brand affinity · Audience by country, city, age and gender · Hashtags</p>' +
-      '<p class="pp-sample__cta">Click to open the whole analysis</p>';
+      '<p class="pp-sample__cta">Click to see every section filled in</p>';
   }
   function sampleBand() {
     var box = document.createElement("section");
     box.className = "pp-samplebar"; box.id = "pp-gate-band";
-    box.innerHTML = '<span class="pp-samplebar__tag">' + hvi("lock") + "Sample · anonymised creator</span>" +
-      "<p>A real full analysis with the name, handle, photo, links and post covers removed. Read-only: it is shown so you can see what a full analysis holds.</p>" +
-      '<button type="button" class="pp-gbtn pp-gbtn--back" id="pp-sample-back">Back to this creator</button>';
+    box.innerHTML = '<span class="pp-samplebar__tag">' + hvi("lock") + "Sample data · not a real creator</span>" +
+      "<p>Every section of a full analysis, filled with invented figures and pictures so you can see what it holds. Nothing here is about this creator.</p>" +
+      '<button type="button" class="pp-gbtn pp-gbtn--back" id="pp-sample-back">Back to real data</button>';
     box.querySelector("button").addEventListener("click", function () {
       var c = code();
       location.hash = c ? "#c=" + encodeURIComponent(c) : "";

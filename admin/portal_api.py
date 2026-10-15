@@ -374,6 +374,13 @@ class PortalMixin(connect_api.ConnectMixin):
                 else:
                     self.send_json(200, got, self.cors() + [("Cache-Control", "private, max-age=300")])
             return True
+        if path == "/api/analysis/template":
+            # The full-analysis template (owner, 2026-10-15): every section filled with invented data and the
+            # dummy pictures, for the "Preview with sample data" button on every profile-analysis page.
+            if self._need_viewer():
+                import analysis_template
+                self.send_json(200, analysis_template.payload(), self.cors() + [("Cache-Control", "private, max-age=300")])
+            return True
         if path == "/api/analysis/sample/cover":
             # One blurred popular-post cover of the configured sample creator (never an original).
             who = self._need_viewer()
