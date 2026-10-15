@@ -998,3 +998,7 @@
 .cx-btn--roi.is-locked, .cx-selact .cx-btn--roi.is-locked { opacity: .6; cursor: not-allowed; box-shadow: none; display: inline-flex; align-items: center; gap: 8px; }
 .cx-btn--roi.is-locked small { font-size: 12px; letter-spacing: .04em; text-transform: uppercase; opacity: .8; }
 .cx-selact .cx-btn--roi.is-locked:hover { background: inherit; color: inherit; border-color: inherit; }
+
+/* Selection → its campaign: dashboard first, report beside it (owner, 2026-10-15). */
+.cx-lc__go { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+@media (max-width: 560px) { .cx-lc__go .cx-btn { flex: 1 1 100%; justify-content: center; } }

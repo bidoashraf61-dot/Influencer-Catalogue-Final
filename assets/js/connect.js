@@ -1199,9 +1199,13 @@
           return lh("li", null, (c.by || "The creators") + " changed the creators on " + lcDay(c.at) + (bits ? " (" + bits + ")" : ""));
         })));
       }
+      // From the selection straight into its campaign's dashboard (owner, 2026-10-15); the full report is
+      // one click away, here and on the dashboard's own "Full report" button.
       if (lc.campaign && (lc.key === "live" || lc.key === "completed")) {
-        kids.push(lh("a", { class: "cx-btn", href: ROOT + "campaign/#t=" + encodeURIComponent(lc.campaign.token) },
-          lc.key === "live" ? "Open the live report" : "Open the final report"));
+        var ct = encodeURIComponent(lc.campaign.token);
+        kids.push(lh("div", { class: "cx-lc__go" },
+          lh("a", { class: "cx-btn", href: ROOT + "campaign/dashboard/#t=" + ct }, icEl("arrow"), lc.key === "live" ? "Open the campaign dashboard" : "Open the final dashboard"),
+          lh("a", { class: "cx-btn cx-btn--line", href: ROOT + "campaign/#t=" + ct }, lc.key === "live" ? "Full report" : "Final report")));
       }
       if (lc.role === "viewer") kids.push(lh("p", { class: "cx-lc__ro" }, "You can follow this. " + (lc.owner || "The owner") + " requests and approves the quote."));
       // The card only appears when it has something to do or say (approve, the account manager's note
