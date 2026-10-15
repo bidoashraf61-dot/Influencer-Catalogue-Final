@@ -56,8 +56,13 @@ class Template(unittest.TestCase):
             self.assertEqual(missing, [], plat)
             for sec in analysis.AUDIENCE_SECTIONS + ["ages_female", "ages_male"]:
                 self.assertTrue(a["audience"].get(sec) and a["audience_likers"].get(sec), (plat, sec))
-            pics = [p["thumb"] for k in ("top_posts", "sponsored_posts", "recent_posts") for p in a[k]] + [b["logo"] for b in a["brands"]]
+            pics = [p["thumb"] for k in ("top_posts", "sponsored_posts", "recent_posts") for p in a[k]]
             self.assertTrue(pics and all(x.startswith("/assets/sample/") for x in pics), pics)
+            logos = [b["logo"] for b in a["brands"]]
+            self.assertTrue(len(logos) >= 6 and all(x.startswith("/assets/clients/") for x in logos), logos)
+            names = {b["name"] for b in a["brands"]}
+            self.assertTrue(all(p["brand"] in names for p in a["sponsored_posts"]))        # every sponsored badge has a logo
+            pics += logos
             for x in pics + [a["photo_url"]]:
                 self.assertTrue((ROOT / x.lstrip("/")).is_file(), x)                  # every picture exists
             self.assertTrue(all(p["url"] == "#" for k in ("top_posts", "sponsored_posts", "recent_posts") for p in a[k]))

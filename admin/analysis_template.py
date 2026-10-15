@@ -5,7 +5,8 @@ creator's own data is not there yet. The preview is invented from start to finis
 or link is read from any creator, so it can be shown to anyone signed in. It fills every field the creator
 page draws (overview, reels, stories, audience quality, audience by followers and by likers, growth, popular,
 sponsored and recent posts, brands, hashtags, interests, languages), for Instagram and TikTok, with the dummy
-pictures in assets/sample/ (a profile photo, a cover on every post and brand marks, none of them anyone's).
+pictures in assets/sample/ (a profile photo and a cover on every post, none of them anyone's) and our client logos
+from assets/clients/ as the brand marks.
 """
 import time
 
@@ -13,6 +14,11 @@ import gating
 import metrics
 
 LABEL = "Sample data · not a real creator"
+# Brand marks for the sample (owner, 2026-10-15): our own client logos from assets/clients/, so brand affinity,
+# brands worked with and the sponsored-post badges show real marks. The pairings are invented.
+BRANDS = [("cerave", "CeraVe"), ("la-roche-posay", "La Roche-Posay"), ("vichy", "Vichy"), ("svr", "SVR"),
+          ("uriage", "Uriage"), ("filorga", "Filorga"), ("skinceuticals", "SkinCeuticals"), ("ivatherm", "Ivatherm"),
+          ("bayer", "Bayer"), ("nahdi", "Nahdi"), ("qv-face", "QV Face"), ("abbott", "Abbott")]
 PLATFORMS = ("Instagram", "TikTok")
 
 
@@ -51,9 +57,13 @@ def analysis(platform):
             p["thumb"] = "/assets/sample/post-%d.jpg" % ((i + (3 if kind == "recent_posts" else 0)) % 8 + 1)
             if f and p.get("likes") is not None:
                 p["er"] = round((p["likes"] + (p.get("comments") or 0)) * 100.0 / f, 2)
-    for i, b in enumerate(a.get("brands") or []):
-        b["logo"] = "/assets/sample/brand-%d.png" % (i % 6 + 1)
-        b["logo_w"] = 256
+    a["brands"] = [{"name": name, "count": 9 - i * 2 // 3, "logo": "/assets/clients/%s@2x.webp" % slug, "logo_w": 128}
+                   for i, (slug, name) in enumerate(BRANDS)]
+    for i, p in enumerate(a["sponsored_posts"]):
+        p["brand"] = BRANDS[i % len(BRANDS)][1]
+    for aud in (a["audience"], a["audience_likers"]):
+        aud["brand_affinity"] = [{"name": BRANDS[(i + 4) % len(BRANDS)][1], "pct": r["pct"]}
+                                 for i, r in enumerate(aud.get("brand_affinity") or [])]
     a["photo_url"] = "/assets/sample/profile.jpg"
     return a
 
