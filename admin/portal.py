@@ -821,8 +821,25 @@ def team_codes(code_id):
         rows = conn.execute("SELECT code_id FROM users WHERE domain = ? AND status = 'active' AND deleted_at IS NULL",
                             (me["domain"],)).fetchall()
     mine = {r["code_id"] for r in rows} | {code_id}
+    # The demo lands on every BlueHolding account (owner, 2026-10-15): the sample selections' accounts are
+    # part of the team even if the account that holds them is ever deactivated or moved.
+    if (me["domain"] or "").lower() == DEMO_DOMAIN:
+        mine |= sample_codes()
     # Shared access codes HelloVoice moved onto these accounts: their selections and campaigns come along.
     return mine | codelinks.linked_for(mine)
+
+
+DEMO_DOMAIN = "blueholding.co.uk"
+
+
+def sample_codes():
+    """The accounts the sample selections (setting sample_selections) are filed under."""
+    ids = [int(x) for x in (db.setting("sample_selections") or []) if str(x).isdigit()]
+    if not ids:
+        return set()
+    with db.connect() as conn:
+        return {r["code_id"] for r in conn.execute("SELECT code_id FROM selections WHERE id IN (%s) AND code_id IS NOT NULL"
+                                                   % ",".join("?" * len(ids)), ids)}
 
 
 def owns(reader, code_id):
