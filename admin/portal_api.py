@@ -1041,6 +1041,8 @@ class PortalMixin(connect_api.ConnectMixin):
         scored, sc = [], {}
         try:
             sc = self.selection_scores(sel) if self.selection_has_objective(sel) and not self.selection_scoring_off(sel) else {}
+            if sc and self.scores_gated(sel) and not self.admin_like_for(sel["code_id"]):
+                sc = {}                          # not published to the client yet (owner, 2026-10-15)
             names = {r["code"]: r["name"] for r in self.roster_payload(only=set(codes))}
             scored = sorted(({"code": c, "name": names.get(c, c), "score": v.get("score"), "tag": v.get("tag")}
                              for c, v in (sc or {}).items() if c in codes and v.get("score") is not None),

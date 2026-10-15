@@ -367,6 +367,32 @@ class Evidence(unittest.TestCase):
         self.assertIsNone(ev._fetch_pic("http://scontent.cdninstagram.com/a.jpg"))
         self.assertIsNone(ev._fetch_pic("https://cdninstagram.com.evil.io/a.jpg"))
 
+    def test_69_scores_gate(self):
+        """Owner, 2026-10-15: a HelloVoice-made selection's scores reach the client only once published."""
+        real = server.Handler.selection_scores
+        server.Handler.selection_scores = lambda self, sel, objective=None, target=None: {
+            "HV-MI-005": {"score": 81, "tag": "Strong", "score_range": None, "tag_range": None, "metrics": [], "strengths": [],
+                          "watchouts": [], "conclusion": "", "parts": [], "platform": "Instagram", "objective": "Awareness"}}
+        try:
+            with db.connect() as conn:
+                conn.execute("UPDATE selections SET objective = 'Awareness', scores_published = NULL WHERE id = ?", (self.sel,))
+            b = self.client.get("/api/selection?s=" + self.token)[1]
+            self.assertEqual(b["scores"], {}, b.get("scores"))                    # client: nothing yet
+            self.assertTrue(b.get("scores_pending"))
+            self.assertEqual(b["scores_gate"], {"applies": True, "published": False, "team": False})
+            a = self.admin()
+            b = a.get("/api/selection?s=" + self.token)[1]
+            self.assertIn("HV-MI-005", b["scores"])                                # HelloVoice: always
+            self.assertTrue(b["scores_gate"]["team"])
+            self.assertEqual(self.client.post("/api/selection/scores", {"token": self.token, "publish": True})[0], 403)
+            s, j, _ = a.post("/api/selection/scores", {"token": self.token, "publish": True})
+            self.assertEqual((s, j.get("published")), (200, True), j)
+            b = self.client.get("/api/selection?s=" + self.token)[1]
+            self.assertIn("HV-MI-005", b["scores"])                                # published
+            self.assertFalse(b.get("scores_pending"))
+        finally:
+            server.Handler.selection_scores = real
+
     def test_7_delete(self):
         a = self.admin()
         pid = self.pack_id()

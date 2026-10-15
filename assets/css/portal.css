@@ -1510,3 +1510,12 @@ a.hv-note:hover { background: #efede8; }
 @media (prefers-reduced-motion: reduce) { .hv-pencil:hover { transform: none; } .hv-switch::after { transition: none; } }
 
 body.hv-editor-open .hv-editbar { display: none; }
+
+/* Scores gate (owner, 2026-10-15): HelloVoice's switch in the objective bar. */
+.sel-gate { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 999px; font: 700 12.5px var(--body); white-space: nowrap; }
+.sel-gate::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.sel-gate--off { background: #fff4e5; color: #a24a00; }
+.sel-gate--on { background: #e3f6ea; color: #0e6b39; }
+.sel-obj__pub { min-height: 40px; padding: 0 16px; border-radius: 999px; border: 1.5px solid var(--ink); background: var(--ink); color: var(--lime); font: 700 13.5px var(--body); cursor: pointer; white-space: nowrap; }
+.sel-obj__pub[data-publish="0"] { background: var(--white); color: var(--ink); }
+.sel-obj__pub:disabled { opacity: .6; cursor: wait; }

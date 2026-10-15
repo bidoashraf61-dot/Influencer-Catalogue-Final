@@ -510,6 +510,11 @@ def migrate(conn):
     if "group_by" not in sel_cols:
         # How the client page opens: "" (one grid) or a grouping such as "segment" or "tier".
         conn.execute("ALTER TABLE selections ADD COLUMN group_by TEXT")
+    if "scores_published" not in sel_cols:
+        # Scores gate (owner, 2026-10-15): 1 = the client sees this selection's scores. Selections that
+        # existed before the gate keep showing them; a new one starts unpublished (NULL).
+        conn.execute("ALTER TABLE selections ADD COLUMN scores_published INTEGER")
+        conn.execute("UPDATE selections SET scores_published = 1")
     if "client_name" not in sel_cols:
         # The client name shown on THIS selection's page; empty = the client's own label.
         conn.execute("ALTER TABLE selections ADD COLUMN client_name TEXT")

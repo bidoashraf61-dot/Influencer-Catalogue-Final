@@ -1152,6 +1152,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_evidence_request()
         if path == "/api/selection/status":
             return self.api_selection_status()
+        if path == "/api/selection/scores":
+            return self.api_selection_scores_publish()
         if path == "/api/selection/reason":
             return self.api_selection_reason()
         if path == "/api/selection/replace":
@@ -4235,6 +4237,30 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             t = {}
         return dict(fit_mod.DEFAULT_TARGET, **{k: v for k, v in t.items() if v})
 
+    @staticmethod
+    def scores_gate_applies(sel):
+        """The gate is for selections HelloVoice builds; a client's own list scores itself as before."""
+        return ((sel["origin"] if "origin" in sel.keys() else None) or "admin") == "admin"
+
+    def scores_gated(self, sel):
+        """True while a HelloVoice-made selection's scores are not published to the client yet."""
+        return self.scores_gate_applies(sel) and not (sel["scores_published"] if "scores_published" in sel.keys() else 1)
+
+    def api_selection_scores_publish(self):
+        """HelloVoice publishes (or takes back) a selection's scores for the client (owner, 2026-10-15)."""
+        b = self.json_body()
+        sel = db.selection(token=str(b.get("token") or ""))
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        reader = self.selection_viewer(sel["token"])
+        if not (self.admin_like_for(sel["code_id"]) or self.selection_role(sel, reader) == "admin"):
+            return self.send_json(403, {"ok": False, "reason": "hv_only", "message": "Only HelloVoice publishes scores."}, self.cors())
+        on = bool(b.get("publish"))
+        with db.connect() as conn:
+            conn.execute("UPDATE selections SET scores_published = ? WHERE id = ?", (1 if on else 0, sel["id"]))
+        db.log("shortlist", reader, self.client_ip(), self.headers.get("User-Agent"), "scores:%s:%s" % (sel["id"], "publish" if on else "hide"))
+        return self.send_json(200, {"ok": True, "published": on}, self.cors())
+
     def selection_scoring_off(self, sel):
         """True when a selection shows no scores (setting selections_unscored: a list of
         selection ids, or "all" while the scoring logic is being reworked, 2026-10-11)."""
@@ -5063,6 +5089,20 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             out["scores"] = {}
             out["needs_objective"] = False
             out["scoring_off"] = True
+            out["verdicts"] = {k: dict(out["verdicts"].get(k) or {}) for k in set(out["verdicts"]) | set(codes)}
+            for v in out["verdicts"].values():
+                if not v.get("fit"):
+                    v["fit"] = "Matching"
+        # Scores gate (owner, 2026-10-15): on a selection HelloVoice made, the client sees no scores until
+        # HelloVoice publishes them; HelloVoice (and the client's KAM) always see them, marked as a preview.
+        reader0 = self.selection_viewer(sel["token"])
+        team = self.selection_role(sel, reader0) == "admin" or self.admin_like_for(sel["code_id"])
+        gated = self.scores_gated(sel)
+        out["scores_gate"] = {"applies": self.scores_gate_applies(sel), "published": not gated, "team": bool(team)}
+        if gated and not team and out.get("scores"):
+            out["scores"] = {}
+            out["needs_objective"] = False
+            out["scores_pending"] = True
         try:
             out["reach"] = self.selection_reach(codes, by, platform)
         except Exception:
@@ -5074,10 +5114,6 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             out["engagement"] = self.selection_engagement(codes, by, platform) if out["metric"] == "engagement" else {}
         except Exception:
             out["engagement"] = {}
-            out["verdicts"] = {k: dict(out["verdicts"].get(k) or {}) for k in set(out["verdicts"]) | set(codes)}
-            for v in out["verdicts"].values():
-                if not v.get("fit"):
-                    v["fit"] = "Matching"
         reader = self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.

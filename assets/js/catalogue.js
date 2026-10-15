@@ -2210,7 +2210,9 @@
                         replaceCost: b.replace_cost != null ? b.replace_cost : 2, moreCost: b.more_cost != null ? b.more_cost : 3,
                         alikeCost: b.alike_cost != null ? b.alike_cost : 2, aiFree: b.ai_free || null,
                         // No campaign objective yet: nothing is scored, the page asks for it.
-                        needsObjective: !!b.needs_objective };
+                        needsObjective: !!b.needs_objective,
+                        // Scores gate (owner, 2026-10-15): HelloVoice publishes a selection's scores to the client.
+                        scoresGate: b.scores_gate || null, scoresPending: !!b.scores_pending };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
           withCards(startSelection);
@@ -3142,6 +3144,22 @@
     // (portal.js) scores THIS selection only, it never builds a new shortlist. With one, the bar
     // shrinks to a done line (Objective added ✓ · Awareness, Engagement · Edit).
     function objectiveWords(o) { return String(o || "").split("+").filter(Boolean).join(", "); }
+    function publishScores(btn) {
+      var on = btn.getAttribute("data-publish") === "1";
+      if (on && !window.confirm("Publish the scores to the client? They will see every creator's score on this selection.")) return;
+      btn.disabled = true;
+      fetch(CFG.api + "/api/selection/scores", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: CURATED.token, publish: on }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (j) {
+          btn.disabled = false;
+          if (!j || !j.ok) { stToast((j && j.message) || "Couldn't change that. Please try again."); return; }
+          CURATED.scoresGate.published = !!j.published;
+          stToast(j.published ? "Scores published: the client sees them now." : "Scores hidden from the client.");
+          renderObjective();
+        })
+        .catch(function () { btn.disabled = false; stToast("Couldn't reach the server. Please try again."); });
+    }
     function renderObjective() {
       var host = $("sel-objective");
       var need = !!(CURATED && CURATED.needsObjective && selected.length);
@@ -3154,16 +3172,31 @@
         anchor.parentNode.insertBefore(host, anchor);
         host.addEventListener("click", function (e) {
           var go = e.target.closest(".sel-obj__go, .sel-obj__edit");
+          var pub = e.target.closest(".sel-obj__pub");
+          if (pub) { publishScores(pub); return; }
           if (!go) return;
           if (window.hvPortal && window.hvPortal.scoreBrief) window.hvPortal.scoreBrief(CURATED.token, { edit: go.classList.contains("sel-obj__edit") });
         });
       }
       var canAct = ROLE === "owner" || ROLE === "admin";
       host.className = "sel-obj" + (have ? " sel-obj--done" : "");
+      var gate = CURATED && CURATED.scoresGate;
+      if (CURATED && CURATED.scoresPending) {
+        // The client, before HelloVoice publishes the scores.
+        host.className = "sel-obj sel-obj--done";
+        host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic">' + hvIcon("clock") + "</span>" +
+          '<p class="sel-obj__tx"><b>Scores coming soon</b><span class="sel-obj__what">' + esc(objectiveWords(CURATED.brief && CURATED.brief.objective)) + "</span>" +
+          '<span class="sel-obj__note">HelloVoice is finalising each creator’s score for your objective. They appear here once shared.</span></p></div></div>';
+        return;
+      }
       if (have) {
+        var gateHtml = gate && gate.applies && gate.team
+          ? '<span class="sel-gate sel-gate--' + (gate.published ? "on" : "off") + '">' + (gate.published ? "Scores visible to the client" : "Scores hidden from the client") + "</span>" +
+            '<button type="button" class="sel-obj__pub" data-publish="' + (gate.published ? "0" : "1") + '">' + (gate.published ? "Hide from client" : "Publish scores to client") + "</button>"
+          : "";
         host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic sel-obj__ic--done">' + hvIcon("check") + "</span>" +
           '<p class="sel-obj__tx"><b>Objective added</b><span class="sel-obj__what">' + esc(objectiveWords(CURATED.brief.objective)) + "</span>" +
-          '<span class="sel-obj__note">Each creator here is scored for it.</span></p>' +
+          '<span class="sel-obj__note">Each creator here is scored for it.</span></p>' + gateHtml +
           (canAct ? '<button type="button" class="sel-obj__edit">Edit</button>' : "") + "</div></div>";
         return;
       }
