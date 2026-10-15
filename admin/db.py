@@ -2095,6 +2095,12 @@ CREATE TABLE IF NOT EXISTS selection_access (
 CREATE TABLE IF NOT EXISTS access_requests (
     id INTEGER PRIMARY KEY, selection_id INTEGER NOT NULL, code_id INTEGER NOT NULL, email TEXT, name TEXT,
     company TEXT, at INTEGER NOT NULL, status TEXT NOT NULL DEFAULT 'pending', decided_at INTEGER, decided_by TEXT);
+-- Invited by email (owner, 2026-10-16): the address may not have an account yet; it is granted the one
+-- selection (view + edit, like a grant) when it signs in for the first time.
+CREATE TABLE IF NOT EXISTS selection_invites (
+    id INTEGER PRIMARY KEY, selection_id INTEGER NOT NULL, email TEXT NOT NULL, invited_by TEXT, invited_at INTEGER NOT NULL,
+    claimed_code_id INTEGER, claimed_at INTEGER, UNIQUE (selection_id, email));
+CREATE INDEX IF NOT EXISTS selection_invites_email ON selection_invites(email);
 """
 
 
@@ -2133,6 +2139,41 @@ def selection_grants(sel_id):
     with connect() as conn:
         return conn.execute("SELECT a.*, u.email, u.name, u.company FROM selection_access a LEFT JOIN users u ON u.code_id = a.code_id "
                             "WHERE a.selection_id = ? ORDER BY a.granted_at", (int(sel_id),)).fetchall()
+
+
+def invite_add(sel_id, email, by=""):
+    """(row id, new?). Inviting the same address again returns the same invite."""
+    with connect() as conn:
+        r = conn.execute("SELECT id FROM selection_invites WHERE selection_id = ? AND email = ?", (int(sel_id), email)).fetchone()
+        if r:
+            return r[0], False
+        return conn.execute("INSERT INTO selection_invites (selection_id, email, invited_by, invited_at) VALUES (?,?,?,?)",
+                            (int(sel_id), email, by, now())).lastrowid, True
+
+
+def invites_for(sel_id):
+    with connect() as conn:
+        return conn.execute("SELECT * FROM selection_invites WHERE selection_id = ? ORDER BY invited_at", (int(sel_id),)).fetchall()
+
+
+def invite_remove(sel_id, email):
+    """Takes back the invite and any grant it produced."""
+    with connect() as conn:
+        r = conn.execute("SELECT claimed_code_id FROM selection_invites WHERE selection_id = ? AND email = ?", (int(sel_id), email)).fetchone()
+        conn.execute("DELETE FROM selection_invites WHERE selection_id = ? AND email = ?", (int(sel_id), email))
+        if r and r[0] is not None:
+            conn.execute("DELETE FROM selection_access WHERE selection_id = ? AND code_id = ?", (int(sel_id), r[0]))
+
+
+def invite_claim(email, code_id):
+    """An account was made (or signed in) for ``email``: every selection it was invited to is granted. Count."""
+    with connect() as conn:
+        rows = conn.execute("SELECT id, selection_id FROM selection_invites WHERE email = ? AND claimed_code_id IS NULL", (email,)).fetchall()
+        for r in rows:
+            conn.execute("INSERT OR IGNORE INTO selection_access (selection_id, code_id, granted_by, granted_at) VALUES (?,?,?,?)",
+                         (r["selection_id"], int(code_id), "invite", now()))
+            conn.execute("UPDATE selection_invites SET claimed_code_id = ?, claimed_at = ? WHERE id = ?", (int(code_id), now(), r["id"]))
+        return len(rows)
 
 
 def access_request_add(sel_id, code_id, email, name, company):

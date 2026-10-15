@@ -3193,6 +3193,67 @@
         })
         .catch(function () { paint(!on); keep(!on); stToast("Couldn't reach the server. Please try again."); });
     }
+    // Share this selection (owner, 2026-10-16): the owner or HelloVoice gives one email access to this ONE
+    // selection (view + edit). Collapsed to one quiet line; opens inline. Backend: /api/selection/invite.
+    var SHARE = { people: null, open: false, busy: false, msg: "" };
+    function shareCall(body) {
+      body.token = CURATED.token;
+      return fetch(CFG.api + "/api/selection/invite", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body) }).then(function (r) { return r.json().catch(function () { return {}; }); });
+    }
+    function renderShare() {
+      var host = $("sel-share");
+      var ok = !!(CURATED && CURATED.token && CFG.api && (ROLE === "owner" || ROLE === "admin") && selected.length);
+      if (!ok) { if (host) host.remove(); return; }
+      if (!host) {
+        host = document.createElement("section");
+        host.id = "sel-share"; host.className = "sel-share"; host.setAttribute("aria-label", "Share this selection");
+        var anchor = document.querySelector(".cat-grid-section");
+        anchor.parentNode.insertBefore(host, anchor);
+        host.addEventListener("click", function (e) {
+          if (e.target.closest(".sel-share__toggle")) { SHARE.open = !SHARE.open; SHARE.msg = ""; renderShare();
+            var f = $("sel-share-email"); if (SHARE.open && f) f.focus(); return; }
+          var rm = e.target.closest("[data-share-remove]");
+          if (rm) { shareDo({ do: "remove", email: rm.getAttribute("data-share-remove") }); }
+        });
+        host.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var f = $("sel-share-email"), v = f ? f.value.trim() : "";
+          if (!v) { SHARE.msg = "Type an email address."; renderShare(); return; }
+          shareDo({ do: "add", email: v });
+        });
+      }
+      if (SHARE.people === null) {
+        SHARE.people = [];
+        shareCall({ do: "list" }).then(function (j) { if (j && j.ok) { SHARE.people = j.people || []; renderShare(); } });
+      }
+      var n = SHARE.people.length;
+      var list = SHARE.people.map(function (p) {
+        return '<li class="sel-share__p"><span class="sel-share__em">' + esc(p.email) + "</span><small>" +
+          (p.state === "granted" ? "Has access" : "Invited, opens at first sign-in") + '</small><button type="button" class="sel-share__rm" data-share-remove="' +
+          esc(p.email) + '" aria-label="Remove access for ' + esc(p.email) + '">Remove</button></li>';
+      }).join("");
+      host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-share__in"><span class="sel-share__ic">' + hvIcon("mail") + "</span>" +
+        '<p class="sel-share__tx"><b>' + (n ? "Shared with " + n + (n === 1 ? " person" : " people") : "Share this selection") + "</b>" +
+        "<span>Give a colleague access by email. They can view and edit this selection only.</span></p>" +
+        '<button type="button" class="sel-share__toggle" aria-expanded="' + SHARE.open + '" aria-controls="sel-share-panel">' + (SHARE.open ? "Close" : "Share") + "</button></div>" +
+        '<div class="cat-container sel-share__panel" id="sel-share-panel"' + (SHARE.open ? "" : " hidden") + ">" +
+        '<form class="sel-share__form" novalidate><label for="sel-share-email">Email</label>' +
+        '<input id="sel-share-email" type="email" inputmode="email" autocomplete="off" placeholder="name@company.com"' + (SHARE.busy ? " disabled" : "") + ">" +
+        '<button type="submit" class="sel-share__add"' + (SHARE.busy ? " disabled" : "") + ">Give access</button></form>" +
+        '<p class="sel-share__msg" role="status">' + esc(SHARE.msg) + "</p>" +
+        (list ? '<ul class="sel-share__list">' + list + "</ul>" : "") + "</div></div>";
+    }
+    function shareDo(body) {
+      SHARE.busy = true; renderShare();
+      shareCall(body).then(function (j) {
+        SHARE.busy = false;
+        if (j && j.ok) { SHARE.people = j.people || []; SHARE.msg = body.do === "add" ? "Done. They’ve been emailed the link." : "Access removed."; }
+        else SHARE.msg = (j && j.message) || "Couldn’t do that. Please try again.";
+        renderShare();
+        var f = $("sel-share-email"); if (f && body.do === "add") f.focus();
+      }).catch(function () { SHARE.busy = false; SHARE.msg = "Couldn’t reach the server. Please try again."; renderShare(); });
+    }
     function renderObjective() {
       var host = $("sel-objective");
       var need = !!(CURATED && CURATED.needsObjective && selected.length);
@@ -3557,6 +3618,7 @@
       renderHead(lo, hi);
       renderStatusBar();
       renderObjective();
+      renderShare();
 
       // keep the URL in step so what they see is what they can re-share
       // The short link only while the server holds exactly these creators.

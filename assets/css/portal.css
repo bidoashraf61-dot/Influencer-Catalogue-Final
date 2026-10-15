@@ -1532,3 +1532,25 @@ body.hv-editor-open .hv-editbar { display: none; }
 
 /* Scores switched Off: the team's page hides them as the client's does (owner, 2026-10-15). */
 body.sel-scores-off .cat-card .cat-score, body.sel-scores-off .cat-card .cat-plat, body.sel-scores-off .cat-card .cat-verdict { display: none !important; }
+
+/* Share this selection (owner, 2026-10-16): one quiet linen line, opens inline. */
+.sel-share { background: var(--linen); color: var(--ink); border-top: 1px solid rgba(0,0,0,.08); }
+.sel-share__in { display: flex; align-items: center; gap: 10px 14px; padding: 10px 0; flex-wrap: wrap; }
+.sel-share__ic { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--ink); color: var(--lime); flex: none; }
+.sel-share__ic .hv-i { width: 18px; height: 18px; }
+.sel-share__tx { margin: 0; flex: 1 1 260px; font-size: 14px; line-height: 1.4; display: flex; flex-wrap: wrap; gap: 2px 12px; align-items: baseline; }
+.sel-share__tx b { font-family: var(--heading); font-weight: 400; font-size: 22px; letter-spacing: .02em; }
+.sel-share__toggle, .sel-share__add { min-height: 44px; padding: 0 20px; border-radius: 999px; border: 1.5px solid var(--ink); background: var(--ink); color: var(--lime); font: 700 14px var(--body); cursor: pointer; }
+.sel-share__toggle[aria-expanded="true"] { background: var(--white); color: var(--ink); }
+.sel-share__toggle:focus-visible, .sel-share__add:focus-visible, .sel-share__rm:focus-visible, .sel-share__form input:focus-visible { outline: 3px solid var(--ink); outline-offset: 2px; }
+.sel-share__add:disabled { opacity: .6; cursor: wait; }
+.sel-share__panel { padding: 4px 0 16px; }
+.sel-share__form { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.sel-share__form label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.sel-share__form input { flex: 1 1 240px; min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1.5px solid var(--ink); background: var(--white); font: 500 15px var(--body); }
+.sel-share__msg { margin: 8px 0 0; font-size: 14px; min-height: 1.2em; }
+.sel-share__list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.sel-share__p { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; padding: 8px 0; border-top: 1px solid rgba(0,0,0,.08); }
+.sel-share__em { font-weight: 600; word-break: break-all; }
+.sel-share__p small { color: var(--gray); flex: 1 1 auto; }
+.sel-share__rm { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--ink); background: var(--white); color: var(--ink); font: 600 13.5px var(--body); cursor: pointer; }

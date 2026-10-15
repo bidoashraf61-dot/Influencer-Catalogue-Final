@@ -1209,6 +1209,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_scores_publish()
         if path == "/api/selection/request-access":
             return self.api_selection_request_access()
+        if path == "/api/selection/invite":
+            return self.api_selection_invite()
         if path == "/api/selection/reason":
             return self.api_selection_reason()
         if path == "/api/selection/replace":
@@ -1261,6 +1263,27 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_client_preview()
         if path.startswith("/evidence/"):
             return self.post_evidence(path, who)
+        if path == "/selections/invite":
+            import access
+            f = self.form_body()
+            sid = (f.get("id") or "").strip()
+            sel = db.selection(int(sid)) if sid.isdigit() else None
+            back = "/selections/edit?id=%s" % sid
+            if sel is None:
+                return self.redirect("/selections?e=" + urllib.parse.quote("That selection no longer exists."))
+            if sel["code_id"] is not None and not self.admin_like_for(sel["code_id"]):
+                return self.redirect("/selections?e=" + urllib.parse.quote("That selection belongs to a client you do not manage."))
+            if f.get("do") == "remove":
+                access.uninvite(sel, f.get("email") or "")
+                return self.redirect(back + "&ok=" + urllib.parse.quote("Access removed for %s." % (f.get("email") or "that email")) + "#st=share")
+            state, err = access.invite(sel, f.get("email") or "", who["email"])
+            msgs = {"email": "That does not look like an email address.", "self": "That is the selection's owner: they already have it.",
+                    "limit": "That selection already has %d invited people." % access.MAX_INVITES}
+            if err:
+                return self.redirect(back + "&e=" + urllib.parse.quote(msgs[err]) + "#st=share")
+            return self.redirect(back + "&ok=" + urllib.parse.quote(
+                "%s can now open and edit this selection." % f.get("email").strip() if state == "granted"
+                else "Invited. This selection opens for %s when they sign in with that email." % f.get("email").strip()) + "#st=share")
         if path == "/access-requests":
             import access
             f = self.form_body()
@@ -4333,6 +4356,37 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return
         access.request(sel, user)
         return self.send_json(200, {"ok": True, "requested": True}, self.cors())
+
+    def api_selection_invite(self):
+        """The selection's owner (or HelloVoice) invites an email to this one selection, lists or removes
+        invites (owner, 2026-10-16). {token, do: list|add|remove, email}"""
+        import access
+        b = self.json_body()
+        sel = db.selection(token=str(b.get("token") or ""))
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        cid = self.signed_in_client()
+        admin = self.admin_like_for(sel["code_id"])
+        if not admin:
+            if cid is None:
+                return self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())
+            if not portal.may_edit(cid, sel, db.admin_code_id()):
+                return self.send_json(403, {"ok": False, "reason": "owner_only", "message": "Only the owner of this selection can invite people."}, self.cors())
+        do = str(b.get("do") or "list")
+        email = str(b.get("email") or "")
+        if do == "remove":
+            access.uninvite(sel, email)
+        elif do == "add":
+            if cid is not None and self._throttled("invite:%d" % cid, 20, 3600):
+                return
+            me = portal.user_for_code(cid) if cid is not None else None
+            state, err = access.invite(sel, email, (me["email"] if me is not None else "HelloVoice"),
+                                       (me["name"] if me is not None else "") or "")
+            if err:
+                msg = {"email": "That does not look like an email address.", "self": "That is the selection's owner: they already have it.",
+                       "limit": "This selection already has %d invited people." % access.MAX_INVITES}[err]
+                return self.send_json(400, {"ok": False, "reason": err, "message": msg}, self.cors())
+        return self.send_json(200, {"ok": True, "people": access.people(sel)}, self.cors())
 
     def api_selection_scores_publish(self):
         """HelloVoice publishes (or takes back) a selection's scores for the client (owner, 2026-10-15)."""

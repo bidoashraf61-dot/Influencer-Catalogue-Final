@@ -54,6 +54,52 @@ def grant(rid, who):
     return True
 
 
+MAX_INVITES = 25
+
+
+def invite(sel, email, by, by_name=""):
+    """Invite an email to this ONE selection (view + edit). Returns (state, error): state is "granted" (they
+    already have an account: access is live) or "invited" (it opens when they first sign in with that email).
+    error is one of: email, self, limit."""
+    import guard
+    import portal
+    email = guard.normalise_email(email)
+    if not email:
+        return None, "email"
+    owner = portal.user_for_code(sel["code_id"]) if sel["code_id"] else None
+    if owner is not None and (owner["email"] or "").lower() == email:
+        return None, "self"
+    rows = db.invites_for(sel["id"])
+    if len(rows) >= MAX_INVITES and email not in {r["email"] for r in rows}:
+        return None, "limit"
+    _, new = db.invite_add(sel["id"], email, by)
+    user = portal.user_by_email(email)
+    state = "invited"
+    if user is not None and user["code_id"] is not None:
+        db.invite_claim(email, user["code_id"])
+        state = "granted"
+    if new and mailer.configured():
+        try:
+            mailer.send(email, "%s shared a selection with you" % (by_name or "HelloVoice"),
+                        "Hi,\n\n%s gave you access to the selection \u201c%s\u201d on HelloVoice. You can view and edit it.\n"
+                        "Open it and sign in with this email (%s):\n%s/selection/#s=%s\n\nHelloVoice"
+                        % (by_name or "HelloVoice", sel["name"], email, SITE, sel["token"]))
+        except Exception:
+            pass
+    return state, None
+
+
+def uninvite(sel, email):
+    import guard
+    db.invite_remove(sel["id"], guard.normalise_email(email) or (email or "").strip().lower())
+
+
+def people(sel):
+    """Who this selection was invited to: [{email, state: granted|invited, at}]."""
+    return [{"email": r["email"], "state": "granted" if r["claimed_code_id"] is not None else "invited", "at": r["invited_at"]}
+            for r in db.invites_for(sel["id"])]
+
+
 def deny(rid, who):
     r = db.access_request(rid)
     if r is None or r["status"] != "pending":

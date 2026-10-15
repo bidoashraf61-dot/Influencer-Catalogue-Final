@@ -465,6 +465,10 @@ def create_user(email, name, company, job_title="", phone="", ip=None):
         codelinks.claim(email, code_id)            # an access code HelloVoice invited this address to
     except Exception:
         pass
+    try:
+        db.invite_claim(email, code_id)            # selections someone invited this address to (view + edit)
+    except Exception:
+        pass
     return user_by_id(uid)
 
 

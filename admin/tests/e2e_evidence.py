@@ -477,6 +477,33 @@ class Evidence(unittest.TestCase):
         finally:
             db.set_setting("passcodes_off", False)
 
+    def test_72_invite_by_email(self):
+        """Owner, 2026-10-16: the selection's owner invites an email to this one selection (view + edit);
+        an address with no account yet gets it at its first sign-in; removing takes it back."""
+        buyer = "buyer@rivalco.com"
+        db.revoke_selection(self.sel, portal.user_by_email(buyer)["code_id"])      # test_71 granted it
+        self.assertEqual(self.stranger.get("/api/selection?s=" + self.token)[0], 401)
+        # only the owner (or HelloVoice) may invite
+        self.assertIn(self.stranger.post("/api/selection/invite", {"token": self.token, "do": "add", "email": "x@y.com"})[0], (401, 403))
+        s, j, _ = self.client.post("/api/selection/invite", {"token": self.token, "do": "add", "email": "not-an-email"})
+        self.assertEqual((s, j.get("reason")), (400, "email"))
+        s, j, _ = self.client.post("/api/selection/invite", {"token": self.token, "do": "add", "email": buyer})
+        self.assertEqual(s, 200, j)
+        self.assertEqual([p["state"] for p in j["people"]], ["granted"])
+        s, b, _ = self.stranger.get("/api/selection?s=" + self.token)
+        self.assertEqual((s, b.get("role")), (200, "owner"))                       # can open and edit
+        # an address with no account: pending until it signs up
+        s, j, _ = self.client.post("/api/selection/invite", {"token": self.token, "do": "add", "email": "newbie+tag@rivalco.com"})
+        self.assertEqual({p["email"]: p["state"] for p in j["people"]}["newbie@rivalco.com"], "invited")
+        u = portal.create_user("newbie@rivalco.com", "New Bie", "Rival Co")
+        self.assertTrue(db.selection_granted(self.sel, u["code_id"]))
+        # removing takes the access back
+        for em in (buyer, "newbie@rivalco.com"):
+            self.client.post("/api/selection/invite", {"token": self.token, "do": "remove", "email": em})
+        self.assertEqual(self.stranger.get("/api/selection?s=" + self.token)[0], 401)
+        self.assertFalse(db.selection_granted(self.sel, u["code_id"]))
+        self.assertEqual(self.client.post("/api/selection/invite", {"token": self.token, "do": "list"})[1]["people"], [])
+
     def test_7_delete(self):
         a = self.admin()
         pid = self.pack_id()

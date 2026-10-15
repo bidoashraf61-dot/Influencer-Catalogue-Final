@@ -2915,6 +2915,25 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
                  + (passcode_form(_code, "/selections/edit?id=" + str(sel["id"]) + "#st=share") if _code is not None else
                     "<p class='muted'>No client is attached yet. Pick one under <a href='#st=details' data-go-tab='st:details'>Details</a>.</p>")
                  + "</div>")
+    import access as _access
+    _inv = _access.people(sel)
+    invite_html = (
+        "<div class='card'><div class='hd'><h2>Invite by email</h2></div>"
+        "<p class='sec-desc'>Give one person access to this selection only, by email. They can view and edit it. "
+        "If they have no account yet, it opens the first time they sign in with that email, and we email them the link.</p>"
+        "<form method='post' action='" + u("/selections/invite") + "' class='row limits'>"
+        "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
+        "<div style='flex:2'><label for='inv-email'>Email</label><input id='inv-email' name='email' type='email' "
+        "placeholder='name@company.com' autocomplete='off' required></div>"
+        "<div style='align-self:end'><button class='btn small lime' name='do' value='add'>Give access</button></div></form>"
+        + ("<table class='t'><tr><th>Email</th><th>Status</th><th></th></tr>" + "".join(
+            "<tr><td>%s</td><td>%s</td><td><form method='post' action='%s' style='display:inline'>"
+            "<input type='hidden' name='id' value='%d'><input type='hidden' name='email' value=\"%s\">"
+            "<button class='btn small ghost' name='do' value='remove'>Remove</button></form></td></tr>" % (
+                e(p_["email"]), "Has access" if p_["state"] == "granted" else "Invited · opens at first sign-in",
+                e(u("/selections/invite")), sel["id"], e(p_["email"])) for p_ in _inv) + "</table>"
+           if _inv else "<p class='muted'>Nobody invited yet.</p>")
+        + "</div>")
     link_html = (
         "<div class='card'><div class='hd'><h2>Share with the client</h2></div>"
         "<p class='sec-desc'>Send this link. The client opens it with their passcode and sees these prices, never your costs or margins. "
@@ -3010,7 +3029,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         # The status panel holds forms of its own (quote ready / take back). Inside the save form
         # their </form> closed it early and left "Save changes" outside, so it sits here.
         + ui.panel("status", status_html)
-        + ui.panel("share", __import__("assign").selection_card(sel, campaigns) + link_html + pass_html) + ui.panel("campaign", campaign_html)
+        + ui.panel("share", __import__("assign").selection_card(sel, campaigns) + link_html + invite_html + pass_html) + ui.panel("campaign", campaign_html)
         + "</div>"
         + "<details class='card' style='margin-top:24px'><summary class='muted'>Delete this selection</summary>"
         + "<form method='post' action='" + u("/selections/delete") + "' data-confirm='Delete this selection? Its link stops working. You can restore it from History.' style='margin-top:12px'>"
