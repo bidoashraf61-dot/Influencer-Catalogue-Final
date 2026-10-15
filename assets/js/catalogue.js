@@ -454,65 +454,6 @@
     return sum || Number(c.followers) || 0;
   }
 
-  /* Selection masonry (owner, 2026-10-15): cards keep their natural height. Each card gets a column, the
-     shortest so far taken in list order (ties go left), and a row span on the grid's 4px track; CSS dense
-     flow stacks each column (catalogue.css, body.sel-masonry). Columns are dealt only when the set of cards
-     or the number of columns changes (filters, sort, paging, groups, resize). A card that grows or shrinks
-     afterwards only changes its own span, so the cards below it move down and nothing swaps columns. */
-  function selMasonry() {
-    if (PAGE !== "selection" || !window.ResizeObserver || !window.MutationObserver) return;
-    var root = $("cat-grid");
-    if (!root) return;
-    var ROW = 4, queued = false, lastKey = "";
-    document.body.classList.add("sel-masonry");
-    function gapOf(g) { return parseFloat(getComputedStyle(g).columnGap) || 0; }
-    function span(card) {
-      var g = card.parentNode;
-      if (!g || !card.__col) return;
-      var s = Math.max(1, Math.ceil((card.getBoundingClientRect().height + gapOf(g)) / ROW));
-      if (card.__span !== s) { card.__span = s; card.style.gridRowEnd = "span " + s; }
-    }
-    var ro = new ResizeObserver(function (list) { list.forEach(function (en) { span(en.target); }); });
-    function deal(g) {
-      var cols = getComputedStyle(g).gridTemplateColumns.split(" ").filter(Boolean).length || 1;
-      var gap = gapOf(g), h = [];
-      for (var i = 0; i < cols; i++) h.push(0);
-      [].forEach.call(g.children, function (card) {
-        if (!card.classList || !card.classList.contains("cat-card")) return;
-        if (card.hidden || getComputedStyle(card).display === "none") {
-          if (card.__col) { card.__col = 0; card.style.gridColumnStart = ""; card.style.gridRowEnd = ""; ro.unobserve(card); }
-          return;
-        }
-        var c = 0;
-        for (var k = 1; k < cols; k++) if (h[k] < h[c] - 1) c = k;
-        var s = Math.max(1, Math.ceil((card.getBoundingClientRect().height + gap) / ROW));
-        card.__col = c + 1; card.__span = s;
-        card.style.gridColumnStart = String(c + 1); card.style.gridRowEnd = "span " + s;
-        h[c] += s;
-        ro.observe(card);
-      });
-    }
-    function layout() {
-      queued = false;
-      [root].concat([].slice.call(root.querySelectorAll(".cat-grid"))).forEach(deal);
-      lastKey = cols() + ":" + root.clientWidth;
-    }
-    function cols() { return getComputedStyle(root).gridTemplateColumns.split(" ").length; }
-    // A timer, not requestAnimationFrame: a tab opened in the background still lays out before it is shown.
-    function soon() { if (!queued) { queued = true; setTimeout(layout, 30); } }
-    new MutationObserver(function (ms) {
-      // Only changes to which cards are where: cards added, moved, removed or hidden. Changes inside a card
-      // are the ResizeObserver's job (its span only).
-      if (ms.some(function (m) {
-        return m.type === "childList" ? (m.target === root || (m.target.classList && m.target.classList.contains("cat-grid")) ||
-                                         [].some.call(m.addedNodes, function (n) { return n.classList && (n.classList.contains("cat-group") || n.classList.contains("cat-card")); }))
-          : (m.target.classList && m.target.classList.contains("cat-card") && m.target.parentNode && m.target.parentNode.classList.contains("cat-grid"));
-      })) soon();
-    }).observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ["hidden"] });
-    window.addEventListener("resize", function () { if (cols() + ":" + root.clientWidth !== lastKey) soon(); }, { passive: true });
-    soon();
-  }
-
   // HelloVoice's own team never sees an analysis as locked (owner, 2026-10-15): the card reads
   // "Profile analysis" for them whether or not one is uploaded, and the page opens unlocked.
   function teamViewer() {
@@ -2241,7 +2182,6 @@
   }
 
   function initSelection() {
-    selMasonry();
     var frag = readFragment();
     var token = frag.token;
     // Ask whether this selection has been priced for the client — by token,
