@@ -102,6 +102,7 @@ class Fixes6(unittest.TestCase):
     def test_03_scores_carry_confidence_and_reach(self):
         c, _ = self.signup("score6@glowderma.com")
         tok = self.selection(c, "Scored", ["HV-MI-001", "HV-MI-002"])
+        db.set_scores_published(tok)                                      # published by HelloVoice (gate, 2026-10-15)
         s, sel, _ = c.get("/api/selection?s=" + tok)
         for code in ("HV-MI-001", "HV-MI-002"):
             sc = sel["scores"][code]

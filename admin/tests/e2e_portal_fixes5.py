@@ -98,6 +98,7 @@ class Fixes5(unittest.TestCase):
         c, _ = self.signup("attach5@glowderma.com")
         s, made, _ = c.post("/api/selection", {"name": "By hand", "codes": ["HV-MI-001", "HV-MD-004"]})
         token = made["token"]
+        db.set_scores_published(token)                                      # published by HelloVoice (gate, 2026-10-15)
         # a brief saved before this batch: one value each
         legacy = {"goal": "awareness", "platforms": ["Instagram"], "market": "AE", "gender": "Women", "age": "25-34", "category": ["skincare"]}
         s, att, _ = c.post("/api/brief/attach", {"token": token, "answers": legacy})

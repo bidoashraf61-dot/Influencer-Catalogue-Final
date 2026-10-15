@@ -48,6 +48,7 @@ class UnscoredAll(unittest.TestCase):
     def test_all_hides_every_score_and_labels_matching(self):
         c, _ = self.signup("unscored@glowderma.com")
         tok = self.selection(c, "Paused", ["HV-MI-001", "HV-MI-002"])
+        db.set_scores_published(tok)                                      # published by HelloVoice (gate, 2026-10-15)
         s, sel, _ = c.get("/api/selection?s=" + tok)
         self.assertTrue(sel["scores"])                                   # scored before the switch
         db.set_setting("selections_unscored", "all")
@@ -65,6 +66,7 @@ class UnscoredAll(unittest.TestCase):
         c, _ = self.signup("unscored2@glowderma.com")
         a = self.selection(c, "Off", ["HV-MI-001"])
         b = self.selection(c, "On", ["HV-MI-001"])
+        db.set_scores_published(a); db.set_scores_published(b)                                      # published by HelloVoice (gate, 2026-10-15)
         db.set_setting("selections_unscored", [db.selection(token=a)["id"]])
         s, sa, _ = c.get("/api/selection?s=" + a)
         s, sb, _ = c.get("/api/selection?s=" + b)

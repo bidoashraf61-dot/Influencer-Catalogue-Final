@@ -2084,6 +2084,13 @@ def attach_request(sid, rid):
                      (rid, now(), sid))
 
 
+def set_scores_published(token_or_id, on=True):
+    """Scores gate (owner, 2026-10-15): publish (or hide) a selection's scores for the client."""
+    with connect() as conn:
+        col = "token" if isinstance(token_or_id, str) else "id"
+        conn.execute("UPDATE selections SET scores_published = ? WHERE %s = ?" % col, (1 if on else 0, token_or_id))
+
+
 def delete_selection(sid):
     with connect() as conn:
         conn.execute("DELETE FROM selections WHERE id = ?", (sid,))

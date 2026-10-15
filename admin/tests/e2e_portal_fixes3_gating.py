@@ -133,6 +133,7 @@ class Fixes3Gating(unittest.TestCase):
     def test_02_selection_scores_keep_number_and_stamp_only(self):
         c, _ = self.signup("score@lockco2.com")
         tok = self.selection(c, "Scores", ["HV-MI-001", "HV-MD-004"])
+        db.set_scores_published(tok)                                      # published by HelloVoice (gate, 2026-10-15)
         b = c.get("/api/selection?s=" + tok)[1]
         sc = b["scores"]["HV-MD-004"]
         self.assertIsInstance(sc["score"], int)

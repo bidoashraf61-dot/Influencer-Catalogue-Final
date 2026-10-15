@@ -81,6 +81,7 @@ class Fixes2(unittest.TestCase):
     def test_01_no_objective_means_no_scores_until_the_brief_is_answered(self):
         c, _ = self.signup("nadia@obj-test.com")
         token = self.sel(c, "Hand-built", ["HV-MI-001", "HV-MI-002"])
+        db.set_scores_published(token)                                      # published by HelloVoice (gate, 2026-10-15)
         b = self.scores(c, token)
         self.assertTrue(b.get("needs_objective"))
         self.assertEqual(b["scores"], {})
@@ -112,6 +113,7 @@ class Fixes2(unittest.TestCase):
         db.set_selection_objective(sel["id"], "Awareness")
         self.assertNotIn("needs_objective", self.scores(c, token))
         token2 = self.sel(c, "Campaign objective", ["HV-MD-004"])
+        db.set_scores_published(token2)                                      # published by HelloVoice (gate, 2026-10-15)
         sel2 = db.selection(token=token2)
         k = db.create_campaign("Spring", "Obj test", portal.user_by_email("omar@obj-test.com")["code_id"])
         db.save_campaign(k, selection_id=sel2["id"], objective="engagement")

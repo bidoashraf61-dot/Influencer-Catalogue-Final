@@ -4246,8 +4246,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     @staticmethod
     def scores_gate_applies(sel):
-        """The gate is for selections HelloVoice builds; a client's own list scores itself as before."""
-        return ((sel["origin"] if "origin" in sel.keys() else None) or "admin") == "admin"
+        """Every selection (owner, 2026-10-15): nothing is scored for the client until an admin publishes it."""
+        return True
 
     def scores_gated(self, sel):
         """True while a HelloVoice-made selection's scores are not published to the client yet."""
@@ -5109,10 +5109,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         gated = self.scores_gated(sel)
         out["scores_gate"] = {"applies": self.scores_gate_applies(sel), "published": not gated, "team": bool(team),
                               "analysis": bool(sel["analysis_published"] if "analysis_published" in sel.keys() else 0)}
-        if gated and not team and out.get("scores"):
+        if gated and not team:
+            # No score and no fit badge (or its reason) for the client until published (owner, 2026-10-15).
+            # Without an objective the page still asks for one; with one it says the scores are coming.
             out["scores"] = {}
-            out["needs_objective"] = False
-            out["scores_pending"] = True
+            out["scores_pending"] = not out.get("needs_objective")
+            out["verdicts"] = {k: {kk: vv for kk, vv in (v or {}).items() if kk not in ("fit", "reason")}
+                               for k, v in (out.get("verdicts") or {}).items()}
         try:
             out["reach"] = self.selection_reach(codes, by, platform)
         except Exception:

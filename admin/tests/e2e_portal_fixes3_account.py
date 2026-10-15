@@ -178,6 +178,8 @@ class Fixes3Account(unittest.TestCase):
         import auth as _auth
         # a person with admin access keeps their own account; one switch reveals locked data
         db.create_admin("staff@acme-staff.com", _auth.hash_password("a-long-passphrase-here"))
+        with db.connect() as conn:                     # a viewer-role admin: owners/admins are always unlocked (2026-10-15)
+            conn.execute("UPDATE admins SET role = 'viewer' WHERE email = ?", ("staff@acme-staff.com",))
         st, b = self.signup("staff@acme-staff.com")
         me = st.get("/api/me")[1]
         self.assertEqual((me["kind"], me["staff"], me["unlock"]), ("user", True, False))     # still themselves
@@ -250,6 +252,7 @@ class Fixes3Account(unittest.TestCase):
     def test_05_brief_delete_clears_the_selection_objective(self):
         c, _ = self.signup("dana@brief-del.com")
         token = self.sel(c, "Scored by a brief", ["HV-MI-001", "HV-MI-002"])
+        db.set_scores_published(token)                                      # published by HelloVoice (gate, 2026-10-15)
         s, att, _ = c.post("/api/brief/attach", {"token": token, "answers": ANSWERS})
         self.assertTrue(att.get("ok"), att)
         b = c.get("/api/selection?s=" + token)[1]

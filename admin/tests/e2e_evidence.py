@@ -380,6 +380,7 @@ class Evidence(unittest.TestCase):
             b = self.client.get("/api/selection?s=" + self.token)[1]
             self.assertEqual(b["scores"], {}, b.get("scores"))                    # client: nothing yet
             self.assertTrue(b.get("scores_pending"))
+            self.assertFalse(any(v.get("fit") for v in (b.get("verdicts") or {}).values()))   # no fit badge either
             self.assertEqual(b["scores_gate"], {"applies": True, "published": False, "team": False, "analysis": False})
             a = self.admin()
             b = a.get("/api/selection?s=" + self.token)[1]

@@ -66,6 +66,7 @@ class Fixes3(unittest.TestCase):
     def test_01_goals_multi_select_scores_only_after_the_objective(self):
         c, _ = self.signup("hala@multi-goal.com")
         token = self.sel(c, "Multi goal", ["HV-MI-001", "HV-MI-002", "HV-MD-004"])
+        db.set_scores_published(token)                                      # published by HelloVoice (gate, 2026-10-15)
         s, b, _ = c.get("/api/selection?s=" + token)
         self.assertTrue(b.get("needs_objective"))
         self.assertEqual(b["scores"], {})
