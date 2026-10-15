@@ -805,7 +805,7 @@
       "aria-label": (p.name || p.handle) + ", " + rankText(p) + (p.estimate ? ", estimated " + estText(p) : "") + (lockd ? ", unavailable" : "") + ". Open creator.",
       style: "transform-origin:" + at.x.toFixed(1) + "px " + at.y.toFixed(1) + "px;--d:" + Math.round(Math.random() * 260) + "ms" });
     gg.__h = p.handle; gg.__x = at.x; gg.__y = at.y;
-    var tip = svg("title"); tip.textContent = (p.name || "@" + p.handle) + (p.estimate ? "\nEst. " + estText(p) : ""); gg.appendChild(tip);
+    var hint = svg("title"); hint.textContent = (p.name || "@" + p.handle) + (p.estimate ? "\nEst. " + estText(p) : ""); gg.appendChild(hint);
     var id = "evc" + (++dotSeq);
     var clip = svg("clipPath", { id: id }); clip.appendChild(svg("circle", { cx: at.x, cy: at.y, r: r })); defs.appendChild(clip);
     gg.appendChild(svg("circle", { cx: at.x, cy: at.y + 2.5, r: r + 3, class: "ev-map__shadow ev-map__shadow--s" }));

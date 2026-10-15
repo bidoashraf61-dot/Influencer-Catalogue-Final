@@ -130,7 +130,7 @@
 .ev-map { display: block; width: 100%; height: auto; max-height: calc(100vh - 220px); }
 .ev-map__spoke { stroke: rgba(18, 18, 18, .12); stroke-width: 2; }
 .ev-map__own { stroke: rgba(18, 18, 18, .08); stroke-width: 1; }
-.ev-map__share { stroke: #ff691e; stroke-width: 1.2; stroke-opacity: .2; stroke-dasharray: 4 4; transition: stroke-opacity .2s ease; }
+.ev-map__share { stroke: #ff691e; stroke-width: 1.2; stroke-opacity: .2; stroke-dasharray: 4 4; }
 /* Lit only from the creator (owner, 2026-10-15): brighter and thicker, still dotted. */
 .ev-map__lit { stroke: #ff691e !important; stroke-opacity: 1 !important; stroke-width: 2.5 !important; }
 .ev-map__hub circle { fill: var(--lime); stroke: var(--ink); stroke-width: 2; }
