@@ -3144,6 +3144,12 @@
     // (portal.js) scores THIS selection only, it never builds a new shortlist. With one, the bar
     // shrinks to a done line (Objective added ✓ · Awareness, Engagement · Edit).
     function objectiveWords(o) { return String(o || "").split("+").filter(Boolean).join(", "); }
+    // The team's page follows the Scores switch (owner, 2026-10-15): Off hides the score rings, the
+    // "Score on" chooser and the fit badges here too, so what you see is what the client gets.
+    function scoreView() {
+      var g = CURATED && CURATED.scoresGate;
+      document.body.classList.toggle("sel-scores-off", !!(g && g.team && g.applies && !g.published));
+    }
     function publishScores(btn) {
       // The switch moves at once (owner, 2026-10-15: no confirm step); it moves back if the save fails.
       var on = btn.getAttribute("data-publish") === "1", what = btn.getAttribute("data-what") || "scores";
@@ -3152,7 +3158,7 @@
         btn.setAttribute("data-publish", state ? "0" : "1");
         var st = btn.querySelector(".sel-obj__swst"); if (st) st.textContent = state ? "On for client" : "Off for client";
       };
-      var keep = function (state) { if (what === "analysis") CURATED.scoresGate.analysis = state; else CURATED.scoresGate.published = state; };
+      var keep = function (state) { if (what === "analysis") CURATED.scoresGate.analysis = state; else CURATED.scoresGate.published = state; scoreView(); };
       paint(on); keep(on);
       fetch(CFG.api + "/api/selection/scores", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: CURATED.token, publish: on, what: what }) })
@@ -3185,6 +3191,7 @@
       var canAct = ROLE === "owner" || ROLE === "admin";
       host.className = "sel-obj" + (have ? " sel-obj--done" : "");
       var gate = CURATED && CURATED.scoresGate;
+      scoreView();
       if (CURATED && CURATED.scoresPending) {
         // The client, before HelloVoice publishes the scores.
         host.className = "sel-obj sel-obj--done";

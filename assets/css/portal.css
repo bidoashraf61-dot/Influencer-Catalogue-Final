@@ -1529,3 +1529,6 @@ body.hv-editor-open .hv-editbar { display: none; }
 .sel-obj .sel-obj__sw:disabled { opacity: .6; cursor: wait; }
 .sel-obj__swst { font: 600 11.5px var(--body); color: #a24a00; background: #fff4e5; border-radius: 999px; padding: 2px 8px; }
 .sel-obj__sw[aria-checked="true"] .sel-obj__swst { color: #0e6b39; background: #e3f6ea; }
+
+/* Scores switched Off: the team's page hides them as the client's does (owner, 2026-10-15). */
+body.sel-scores-off .cat-card .cat-score, body.sel-scores-off .cat-card .cat-plat, body.sel-scores-off .cat-card .cat-verdict { display: none !important; }
