@@ -1211,8 +1211,7 @@
       // The card only appears when it has something to do or say (approve, the account manager's note
       // or link, a changes warning, the campaign report). Draft and a plain "quote requested" show
       // just the status tag in the header (Bido, 2026-10-11: remove this section from the selection page).
-      var actionable = !!(lc.can_approve || lc.note || lc.link || lc.warn || (lc.changes && lc.changes.length) ||
-                          (lc.campaign && (lc.key === "live" || lc.key === "completed")));
+      var actionable = false;          // Bido, 2026-10-16: the "Quote status" section is gone from the selection page for everyone
       if (!actionable) { if (old) old.remove(); return; }
       var sec = lh("section", { id: "cx-lc", class: "cx-lc cx-lc--" + lc.key, "aria-label": "Quote status" },
         lh("div", { class: "cat-pad" }, lh("div", { class: "cat-container" }, lh("div", { class: "cx-lc__card" }, kids))));

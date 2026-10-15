@@ -504,6 +504,14 @@ class Evidence(unittest.TestCase):
         self.assertFalse(db.selection_granted(self.sel, u["code_id"]))
         self.assertEqual(self.client.post("/api/selection/invite", {"token": self.token, "do": "list"})[1]["people"], [])
 
+    def test_73_staff_campaign_list(self):
+        """Owner, 2026-10-16: HelloVoice's own account sees every client's campaigns in My campaigns."""
+        k = db.create_campaign("Staff list", "Polyco", self.mine["code_id"])
+        db.save_campaign(k, selection_id=self.sel, status="live")
+        s, b, _ = self.admin().get("/api/campaigns")
+        self.assertEqual(s, 200, b)
+        self.assertIn("Staff list", [c["name"] for c in b["campaigns"]])
+
     def test_7_delete(self):
         a = self.admin()
         pid = self.pack_id()

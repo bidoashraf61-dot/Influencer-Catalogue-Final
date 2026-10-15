@@ -3665,6 +3665,22 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         team = sorted(portal.team_codes(code_id))
         granted = sorted(db.granted_selection_ids(code_id)) or [-1]     # campaigns of selections granted to them
+        staff = (self.admin_like() or self.kam_clients() is not None) and not self.as_client()
+        if staff:
+            # HelloVoice (owner, 2026-10-16): the team's own account has no campaigns, so its list was empty.
+            # An admin sees every campaign; a key account manager, her clients'.
+            with db.connect() as conn:
+                every = conn.execute("SELECT token, name, client, status, phase, starts_at, ends_at, logos, code_id, id FROM campaigns "
+                                     "WHERE status != 'draft' ORDER BY starts_at DESC").fetchall()
+            out = []
+            for r in every:
+                cid = r["code_id"] if r["code_id"] is not None else kam_scope.campaign_code(r["id"])[1]
+                if not self.admin_like_for(cid):
+                    continue
+                d = {k: r[k] for k in ("token", "name", "client", "status", "phase", "starts_at", "ends_at", "logos")}
+                d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
+                out.append(d)
+            return self.send_json(200, {"ok": True, "campaigns": out}, self.cors() + [("Cache-Control", "no-store")])
         with db.connect() as conn:
             rows = conn.execute(
                 "SELECT token, name, client, status, phase, starts_at, ends_at, logos FROM campaigns "
