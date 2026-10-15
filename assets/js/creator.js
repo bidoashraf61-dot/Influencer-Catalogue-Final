@@ -826,6 +826,7 @@
       : "https://www.instagram.com/p/" + encodeURIComponent(sc) + "/embed/captioned/";
     $("pp-modal-frame").innerHTML = '<iframe src="' + esc(src) + '" title="' + (tt ? "TikTok" : "Instagram") + ' post" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="eager"></iframe>';
     $("pp-modal-open").href = url;
+    $("pp-modal-open").textContent = tt ? "Open on TikTok" : "Open on Instagram";
     $("pp-modal").hidden = false; document.body.classList.add("pp-modal-on");
     $("pp-modal-close").focus();
   }
