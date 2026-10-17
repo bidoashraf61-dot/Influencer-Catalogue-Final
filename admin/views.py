@@ -1877,10 +1877,6 @@ def creator_form(c, cities=None, tiers=None, interests=None, q="", page_no=1, ba
         + city_field(c, cities)
         + "<div><label>Nationality</label><input name='nationality' value='"
         + val("nationality") + "' list='nationalities' placeholder='Saudi'></div>"
-        + "<div><label>Gender</label><select name='gender'><option value=''>Not known</option>"
-        + "".join("<option value='%s'%s>%s</option>" % (g_, " selected" if (c is not None and "gender" in c.keys() and c["gender"] == g_) else "", g_.title())
-                  for g_ in ("female", "male"))
-        + "</select></div>"
         + interest_field(c, interests)
         + "</div>" + __import__("industry_views").form_section(c) + "<div class='row'>"
         + "<div><label>Photo</label>" + photo_field + "</div>"

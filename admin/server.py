@@ -2229,8 +2229,6 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             "rating": (int(f["rating"]) if (f.get("rating") or "").isdigit()
                        and 1 <= int(f["rating"]) <= 5 else None),
         })
-        if "gender" in f:                                  # the Gender select on the creator form (blank = not known)
-            db.set_gender(code, f.get("gender"), "admin")
         # The Industry section (Control Centre step 3). Only written when the form carried it and something changed,
         # so an older form, or a save that did not touch it, leaves the classification alone.
         if "ind_main" in f and (f.get("ind_main") or "").strip():
@@ -5882,8 +5880,6 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 # tier (Confirmed / Probable / Review) says how sure we are; the estimated % stays internal.
                 "ind": r["industry"], "sub": _json_list(r["sub_niches"]), "also": _json_list(r["also_industries"]),
                 "itier": r["industry_tier"],
-                # male / female, from the roster (owner, 2026-10-18); empty when not known. Drives the Gender filter.
-                "gender": (r["gender"] if "gender" in r.keys() else None) or "",
             }
             for r in db.list_creators(active_only=True)
             if (only is not None and r["code"] in only) or (only is None and self._in_markets(r, land))

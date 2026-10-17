@@ -183,7 +183,6 @@ class Index:
         self.sub = [None] * n        # sub-niches (list)
         self.also = [None] * n       # other industries the creator also covers
         self.itier = [""] * n        # Confirmed / Probable / Review ("" = not classified)
-        self.gender = [""] * n       # "Male" / "Female" / "" (not known)
         for i, c in enumerate(cards):
             total = sum(_int(p.get("followers")) for p in (c.get("profiles") or []))
             self.followers[i] = total or _int(c.get("followers"))
@@ -207,8 +206,6 @@ class Index:
             self.sub[i] = c.get("sub") or []
             self.also[i] = c.get("also") or []
             self.itier[i] = c.get("itier") or ""
-            g = str(c.get("gender") or "").strip().lower()
-            self.gender[i] = g.title() if g in ("male", "female") else ""
         self._facets = None
 
     # -- the filter bar's options --
@@ -225,7 +222,6 @@ class Index:
                 "platform": order(self.platforms),
                 "place": order(self.places),
                 "interest": order(self.interests),
-                "gender": [g for g in ("Male", "Female") if g in set(self.gender)],
             }
             # Industry filter: only real industries (a catch-all is not one), most Confirmed creators first;
             # the sub-niches of each, most common first. No counts are sent.
@@ -338,7 +334,6 @@ def clean_query(q):
     out = {
         "q": fold(one("q", 120)),
         "tier": many("tier"), "platform": many("platform"), "place": many("place", 200), "interest": many("interest"),
-        "gender": [g for g in many("gender") if g in ("Male", "Female")],
         "industry": many("industry"), "sub": many("sub", 80),
         "fmin": num("fmin"), "fmax": num("fmax"),
         "lic": [v for v in many("lic") if v in ("SA", "AE", "EG")],
@@ -362,7 +357,7 @@ def clean_query(q):
 
 def filtering(f):
     """True when the reader has narrowed the roster: only then is a "match" count sent."""
-    return bool(f["q"] or f["tier"] or f["platform"] or f["place"] or f["interest"] or f["gender"] or f["industry"] or f["sub"] or f["fmin"] or f["fmax"]
+    return bool(f["q"] or f["tier"] or f["platform"] or f["place"] or f["interest"] or f["industry"] or f["sub"] or f["fmin"] or f["fmax"]
                 or f["lic"] or f["disc"])
 
 
@@ -429,7 +424,7 @@ def ordered(idx, f, licences=None, discover=None):
     if f["disc"]:
         codes = set(discover(f["disc"], f["dplat"]) if discover else [])
         allow = codes if allow is None else (allow & codes)
-    sets = {d: set(f[d]) for d in ("tier", "platform", "place", "interest", "gender") if f[d]}
+    sets = {d: set(f[d]) for d in ("tier", "platform", "place", "interest") if f[d]}
     ind_set, sub_set = set(f["industry"]), set(f["sub"])
     level = {}          # card position -> 1 confirmed match, 2 probable match (industry / sub-niche search only)
     keep = []
@@ -448,8 +443,6 @@ def ordered(idx, f, licences=None, discover=None):
         if "place" in sets and not any(v in sets["place"] for v in idx.places[i]):
             continue
         if "interest" in sets and not any(v in sets["interest"] for v in idx.interests[i]):
-            continue
-        if "gender" in sets and idx.gender[i] not in sets["gender"]:
             continue
         if ind_set or sub_set:
             lv = _industry_level(idx, i, ind_set, sub_set)

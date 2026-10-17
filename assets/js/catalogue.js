@@ -522,7 +522,7 @@
 
     return '<article class="cat-card" data-tier="' + esc(c.tier) +
       '" data-platform="' + esc(c.platform) + '" data-city="' + esc(c.city || "Unspecified") +
-      '" data-interest="' + esc(c.interest || "") + '" data-gender="' + esc(c.gender || "") + '" data-code="' + esc(c.code) +
+      '" data-interest="' + esc(c.interest || "") + '" data-code="' + esc(c.code) +
       (c.price && c.price.length ? '" data-price="' + esc(c.price.join("-")) : "") +
       '" data-followers="' + totalFollowers(c) + '" data-name="' + esc(c.name) +
       '" data-idx="' + (i || 0) +
@@ -765,7 +765,7 @@
     // The catalogue opens most-followed first (all platforms added up); a selection keeps
     // the order its link gives. "Recommended" is still there to pick.
     var DEFAULT_SORT = extras ? "" : "followers-desc";
-    var state = { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], gender: [], followers: [], sort: DEFAULT_SORT, q: "" };
+    var state = { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], followers: [], sort: DEFAULT_SORT, q: "" };
     // `extras` (the selection page): more filters of the same kind, in their own colour (fit,
     // role, tags), and the matching score to sort on.
     var xdims = extras ? extras.dims : [];
@@ -775,7 +775,6 @@
       card._tier = card.dataset.tier ? [card.dataset.tier] : [];
       card._platform = values(card.dataset.platform);
       card._interest = values(card.dataset.interest);
-      card._gender = card.dataset.gender ? [String(card.dataset.gender).charAt(0).toUpperCase() + String(card.dataset.gender).slice(1).toLowerCase()] : [];
       card._place = values(card.dataset.city).filter(function (v) {
         return !/^unspecified$/i.test(v);
       }).map(function (v) { return place(v).key; });
@@ -871,14 +870,6 @@
     if (platKeys.length > 1) {
       html += dropdown("platform", "Platform", '<div class="cat-dd__group">' +
         platKeys.map(function (p) { return option("platform", p, p, plats[p]); }).join("") + "</div>");
-    }
-
-    // Gender (owner, 2026-10-18): Male / Female, only once the roster knows anyone's gender.
-    var gens = tally("gender");
-    var genKeys = ["Male", "Female"].filter(function (g) { return gens[g]; });
-    if (genKeys.length) {
-      html += dropdown("gender", "Gender", '<div class="cat-dd__group">' +
-        genKeys.map(function (g) { return option("gender", g, g, gens[g]); }).join("") + "</div>");
     }
 
     // Location: countries in a fixed order, each with its cities by size.
@@ -1019,7 +1010,7 @@
         if (badge) { badge.textContent = n ? String(n) : ""; badge.hidden = !n; }
       });
       var pills = [];
-      ["industry", "sub", "tier", "platform", "gender", "place", "interest"].concat(xdims).forEach(function (dim) {
+      ["industry", "sub", "tier", "platform", "place", "interest"].concat(xdims).forEach(function (dim) {
         // A whole country picked reads as the country, not ten cities.
         var shown = state[dim].slice();
         if (dim === "place") {
@@ -1086,7 +1077,7 @@
         changed(); return;
       }
       if (e.target.closest(".cat-active__clear")) {
-        state.industry = []; state.sub = []; state.tier = []; state.platform = []; state.place = []; state.interest = []; state.gender = [];
+        state.industry = []; state.sub = []; state.tier = []; state.platform = []; state.place = []; state.interest = [];
         state.followers = []; xdims.forEach(function (d) { state[d] = []; });
         state.q = "";
         var sbox = bar.querySelector(".cat-search__input");
@@ -1155,7 +1146,7 @@
           if (state.followers[0] && f < state.followers[0]) return false;
           if (state.followers[1] && f > state.followers[1]) return false;
         }
-        if (!["tier", "platform", "place", "interest", "gender"].every(function (dim) {
+        if (!["tier", "platform", "place", "interest"].every(function (dim) {
           if (!state[dim].length) return true;
           return card["_" + dim].some(function (v) { return state[dim].indexOf(v) !== -1; });
         })) return false;
@@ -1166,7 +1157,7 @@
       },
       filtering: function () {
         return !!(state.industry.length || state.sub.length || state.tier.length || state.platform.length || state.place.length ||
-                  state.gender.length || state.interest.length || state.followers.length || !!state.q ||
+                  state.interest.length || state.followers.length || !!state.q ||
                   xdims.some(function (d) { return state[d].length; }));
       },
       // Rebuild the extra dropdowns from what the cards say now (scores load late, tags change).
@@ -1223,12 +1214,12 @@
       sorted: function () { return !!state.sort; },
       // The catalogue's server mode: the state to send, and to put back on return.
       query: function () {
-        return { industry: state.industry.slice(), sub: state.sub.slice(), tier: state.tier.slice(), platform: state.platform.slice(), gender: state.gender.slice(), place: state.place.slice(),
+        return { industry: state.industry.slice(), sub: state.sub.slice(), tier: state.tier.slice(), platform: state.platform.slice(), place: state.place.slice(),
                  interest: state.interest.slice(), followers: state.followers.slice(), sort: state.sort, q: state.q,
                  text: (bar.querySelector(".cat-search__input") || {}).value || "" };
       },
       restore: function (st) {
-        ["industry", "sub", "tier", "platform", "gender", "place", "interest", "followers"].forEach(function (d) { if (st && Array.isArray(st[d])) state[d] = st[d].slice(); });
+        ["industry", "sub", "tier", "platform", "place", "interest", "followers"].forEach(function (d) { if (st && Array.isArray(st[d])) state[d] = st[d].slice(); });
         if (st && typeof st.sort === "string") state.sort = st.sort;
         if (st && typeof st.q === "string") state.q = st.q;
         var sbox = bar.querySelector(".cat-search__input");
@@ -1353,10 +1344,10 @@
     var EXTRA = { lic: [], disc: null, dplat: null };
     var VIEW = "hv-cat-view", VIEW_TTL = 30 * 60 * 1000;
     function feedParams() {
-      var st = controls ? controls.query() : { industry: [], sub: [], tier: [], platform: [], gender: [], place: [], interest: [], followers: [], sort: "followers-desc", q: "" };
+      var st = controls ? controls.query() : { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], followers: [], sort: "followers-desc", q: "" };
       var p = new URLSearchParams();
       p.set("link", LINK);
-      ["industry", "sub", "tier", "platform", "gender", "place", "interest"].forEach(function (d) { (st[d] || []).forEach(function (v) { p.append(d, v); }); });
+      ["industry", "sub", "tier", "platform", "place", "interest"].forEach(function (d) { (st[d] || []).forEach(function (v) { p.append(d, v); }); });
       if (st.q) p.set("q", st.q);
       if (st.followers[0]) p.set("fmin", st.followers[0]);
       if (st.followers[1]) p.set("fmax", st.followers[1]);
