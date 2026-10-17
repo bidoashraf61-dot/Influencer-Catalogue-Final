@@ -600,8 +600,7 @@
   function renderGeo() {
     var a = R.audience;
     $("w-geo").innerHTML = head(IC.geo, "Creators' audience countries", "Where the creators' own followers are, from their full profile analyses, weighted by the reach each delivered. It describes the creators' audience, not who saw the campaign posts. Creators without an analysis are not counted.", "geo")
-      + '<div class="db-card__body">' + (a && a.countries.length ? bars(a.countries.slice(0, 5).map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" }; }),
-        function (r) { return flag(r.k) + esc(countryName(r.k)); }) + audTarget(a) + '<p class="db-note">' + audNote(a) + "</p>"
+      + '<div class="db-card__body">' + (a && a.countries.length ? '<p class="aud-target">' + (a.target ? flag(a.target.code) + '<span>Target market <b>' + esc(countryName(a.target.code)) + '</b></span>' : '<span>Target market</span>') + '</p>' + '<div class="aud-stamp" role="img" aria-label="Audience not analysed yet"><span>Not analysed</span><span>yet</span></div>'
         : '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>') + "</div>";
   }
 
@@ -1042,8 +1041,8 @@
     },
     geo: function () {
       var a = R.audience; if (!a) return '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>';
-      return bars(a.countries.map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(1) + "%" }; }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
-        + audTarget(a) + '<p class="db-note" style="margin-top:10px">' + audNote(a) + ".</p>";
+      return '<p class="aud-target">' + (a.target ? flag(a.target.code) + '<span>Target market <b>' + esc(countryName(a.target.code)) + '</b></span>' : '<span>Target market</span>') + '</p>'
+        + '<div class="aud-stamp" role="img" aria-label="Audience not analysed yet"><span>Not analysed</span><span>yet</span></div>';
     },
     plat: function () {
       var by = {}; posts().forEach(function (p) { var x = by[p.platform] = by[p.platform] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
