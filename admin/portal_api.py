@@ -228,9 +228,28 @@ class PortalMixin(connect_api.ConnectMixin):
             if who:
                 cid, user = who
                 a = kam_scope.admin_for_email(user["email"])
+                import hub
                 self.send_json(200, dict(account.summary(user, cid, self._srv().SECRET), ok=True,
-                                         is_kam=bool(a is not None and kam_scope.is_kam(a) and not a["disabled_at"])),
+                                         is_kam=bool(a is not None and kam_scope.is_kam(a) and not a["disabled_at"]),
+                                         hub=hub.viewer(user)[0]),
                                self.cors() + [("Cache-Control", "no-store")])
+            return True
+        if path in ("/api/hub/companies", "/api/hub/company"):
+            # The control hub on the profile (item 129): every company for an admin, a KAM's own for her.
+            who = self._need_account()
+            if who:
+                import hub
+                role, a = hub.viewer(who[1])
+                if role is None:
+                    self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+                elif path == "/api/hub/companies":
+                    self.send_json(200, dict(hub.companies(role, a), ok=True), self.cors() + [("Cache-Control", "no-store")])
+                else:
+                    got = hub.company(role, a, str(query.get("k") or ""))
+                    if got is None:
+                        self.send_json(404, {"ok": False}, self.cors())
+                    else:
+                        self.send_json(200, dict(got, ok=True, role=role), self.cors() + [("Cache-Control", "no-store")])
             return True
         if path == "/api/account/clients":
             # "My clients" (KAM scoped access, 2026-10-11): only for a key account manager's own account.
@@ -425,6 +444,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/voice/handoff": self.api_voice_handoff, "/api/chat/handoff": self.api_chat_handoff,
             "/api/me/image": self.api_me_image, "/api/me/notify": self.api_me_notify,
             "/api/me/signout-others": self.api_me_signout_others, "/api/team/invite": self.api_team_invite,
+            "/api/hub/kam": self.api_hub_kam, "/api/hub/share": self.api_hub_share,
             "/api/notifications/read": self.api_notifications_read,
         }
         fn = routes.get(path)
@@ -834,6 +854,34 @@ class PortalMixin(connect_api.ConnectMixin):
         with db.connect() as conn:
             n = conn.execute("DELETE FROM code_devices WHERE code_id = ? AND device != ?", (cid, mine)).rowcount
         return self.send_json(200, {"ok": True, "removed": n}, self.cors())
+
+    def api_hub_kam(self):
+        """Set the account manager of a company, a person, a selection or a campaign (admins only). {kind, ref, kam}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        b = self.json_body()
+        ok, msg = hub.set_kam(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("kam") or ""), a["email"])
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
+
+    def api_hub_share(self):
+        """Invite an email to a selection or a campaign from the hub. {kind, ref, email}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        if self._throttled("hubshare:%d" % who[1]["id"], 40, 3600):
+            return
+        b = self.json_body()
+        ok, msg, state = hub.share(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("email") or ""), who[1]["email"], who[1]["name"] or "")
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": msg, "state": state}, self.cors())
 
     def api_team_invite(self):
         """A colleague's access is HelloVoice's call: this only asks for it."""

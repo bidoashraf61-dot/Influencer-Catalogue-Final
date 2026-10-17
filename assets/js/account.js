@@ -122,12 +122,15 @@
     if (key === "notifications") return DATA.notifications.unread || null;
     if (key === "credits") return DATA.credits != null ? DATA.credits : null;
     if (key === "clients") return CLIENTS ? CLIENTS.clients.length || null : null;
+    if (key === "companies") return HUB.list ? HUB.list.length || null : null;
     return null;
   }
   function navItems() {
-    if (!DATA.is_kam) return NAV;
-    // A key account manager: her clients sit right under her own overview.
-    return [NAV[0], ["clients", "My clients", "users"]].concat(NAV.slice(1));
+    // A key account manager: her clients sit right under her own overview; staff also get the Companies hub.
+    var out = [NAV[0]];
+    if (DATA.is_kam) out.push(["clients", "My clients", "users"]);
+    if (DATA.hub) out.push(["companies", "Companies", "users"]);
+    return out.concat(NAV.slice(1));
   }
   function renderSide() {
     var u = DATA.user, side = $("hc-side");
@@ -1071,15 +1074,189 @@
       h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button", onclick: function () { KFILTER = "all"; renderSection(); } }, "Show all clients")));
   }
 
+  /* --------------------------------------------------------- Companies hub */
+  // Staff only (item 129, 2026-10-18). Every company for an admin, a key account manager's own for her:
+  // company > people > their selections and campaigns. Each item opens as the client sees it and has a
+  // Share panel: email a client, hand it to an account manager (admins), copy its link. Nothing priced
+  // is shown. Companies load as a list; a company's people and items load when it is opened.
+
+  var HUB = { list: null, kams: [], role: "", err: null, q: "", f: "all", open: {}, detail: {}, share: null };
+
+  function hubLoad() {
+    return api("GET", "/api/hub/companies").then(function (r) {
+      if (r.b && r.b.ok) { HUB.list = r.b.companies; HUB.kams = r.b.kams || []; HUB.role = r.b.role; HUB.err = null; }
+      else HUB.err = r.s === 403 ? "The Companies hub is for HelloVoice staff." : "The companies couldn't be loaded. Please try again shortly.";
+      if (SECTION === "companies") { renderSide(); renderSection(); }
+    });
+  }
+  function hubDetail(key) {
+    HUB.detail[key] = "loading";
+    return api("GET", "/api/hub/company?k=" + encodeURIComponent(key)).then(function (r) {
+      HUB.detail[key] = r.b && r.b.ok ? r.b : "error";
+      if (SECTION === "companies") renderSection();
+    });
+  }
+  function kamName(email) {
+    if (!email) return "";
+    var k = HUB.kams.filter(function (x) { return x.email === email; })[0];
+    return k ? (k.name || k.email) : email;
+  }
+  function kamSelect(cur, label, blank, onpick) {
+    var sel = h("select", { class: "hb-kam", "aria-label": label },
+      h("option", { value: "" }, blank));
+    HUB.kams.forEach(function (k) { sel.appendChild(h("option", { value: k.email }, k.name || k.email)); });
+    sel.value = cur || "";
+    sel.addEventListener("change", function () { onpick(sel.value, sel); });
+    return sel;
+  }
+  function hubSetKam(kind, ref, email, after) {
+    api("POST", "/api/hub/kam", { kind: kind, ref: ref, kam: email }).then(function (r) {
+      var msg = (r.b && r.b.message) || (r.b && r.b.ok ? "Saved." : "Couldn't save that.");
+      if (r.b && r.b.ok) after(); else renderSection();
+      hubSay(msg, !(r.b && r.b.ok));
+    });
+  }
+  var hubTimer = null;
+  function hubSay(text, bad) {
+    var el = $("hb-say"); if (!el) return;
+    el.textContent = text; el.className = "hb-say" + (bad ? " hb-say--bad" : "") + " is-on";
+    clearTimeout(hubTimer); hubTimer = setTimeout(function () { el.className = "hb-say"; }, 4200);
+  }
+  function hubFilter(c) {
+    var q = HUB.q.trim().toLowerCase();
+    if (q && (c.name + " " + c.domain).toLowerCase().indexOf(q) < 0) return false;
+    if (HUB.f === "live") return c.live > 0;
+    if (HUB.f === "nokam") return !c.kam.email && c.key !== "handed";
+    return true;
+  }
+  function itemStatus(kind, it) {
+    if (kind === "selection") return h("span", { class: "hb-chip hb-chip--" + (it.status.key || "draft") }, it.status.label || "");
+    var lab = it.status === "live" ? "Live" : it.status === "ended" ? "Completed" : (it.draft_by_client ? "Draft · client started" : "Draft");
+    return h("span", { class: "hb-chip hb-chip--" + (it.status === "live" ? "live" : it.status === "ended" ? "completed" : "draft") }, lab);
+  }
+  function sharePanel(kind, it, closeFn) {
+    var admin = HUB.role === "admin", msg = h("p", { class: "hb-share__msg", role: "status" });
+    var email = h("input", { type: "email", inputmode: "email", autocomplete: "off", placeholder: "name@company.com", "aria-label": "Client email" });
+    var go = h("button", { class: "hc-btn hc-btn--ink hc-btn--sm", type: "submit" }, "Share");
+    var form = h("form", { class: "hb-share__form", novalidate: "" }, email, go);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = email.value.trim(); if (!v) { note(msg, "Type an email address.", true); email.focus(); return; }
+      go.disabled = true; note(msg, "Sending…");
+      api("POST", "/api/hub/share", { kind: kind, ref: it.id, email: v }).then(function (r) {
+        go.disabled = false;
+        note(msg, (r.b && r.b.message) || (r.b && r.b.ok ? "Shared." : "Couldn't share that."), !(r.b && r.b.ok));
+        if (r.b && r.b.ok) email.value = "";
+      });
+    });
+    var copyBtn = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button" }, icon("link"), " Copy link");
+    copyBtn.addEventListener("click", function () { copy(new URL(ROOT + it.link, location.href).href, copyBtn, "Link copied"); });
+    return h("div", { class: "hb-share", role: "group", "aria-label": "Share " + it.name },
+      h("div", { class: "hb-share__col" }, h("b", null, "Share with a client"), h("small", null, "They sign in (or sign up) with that email and can view and edit this " + kind + ". They are emailed the link."), form, msg),
+      admin ? h("div", { class: "hb-share__col" }, h("b", null, "Hand to an account manager"), h("small", null, "They see and manage it on top of their own clients, and are told by email."),
+        kamSelect(it.kam, "Account manager for " + it.name, "No account manager", function (v) {
+          hubSetKam(kind, it.id, v, function () { it.kam = v; renderSection(); });
+        })) : null,
+      h("div", { class: "hb-share__col" }, h("b", null, "Copy the client link"), h("small", null, "The link opens for people who already have access."), copyBtn),
+      h("button", { class: "hb-share__x", type: "button", "aria-label": "Close sharing", onclick: closeFn }, "×"));
+  }
+  function itemRow(kind, it) {
+    var key = kind + ":" + it.id, shown = HUB.share === key;
+    var open = h("a", { class: "hb-open", href: ROOT + it.link, target: "_blank", rel: "noopener" }, "Open ", icon("arrow"));
+    var shareBtn = h("button", { class: "hb-sharebtn", type: "button", "aria-expanded": shown ? "true" : "false",
+      onclick: function () { HUB.share = shown ? null : key; renderSection(); } }, icon("link"), "Share");
+    var row = h("li", { class: "hb-it" },
+      h("div", { class: "hb-it__main" },
+        h("b", null, it.name), itemStatus(kind, it),
+        h("small", null, kind === "selection" ? plural(it.creators, "creator") : (it.has_selection ? "Has a selection" : "No selection yet")
+          + (it.kam ? "" : "")),
+        it.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(it.kam)) : null),
+      h("div", { class: "hb-it__act" }, open, shareBtn));
+    if (shown) row.appendChild(sharePanel(kind, it, function () { HUB.share = null; renderSection(); }));
+    return row;
+  }
+  function personBlock(p, co) {
+    var admin = HUB.role === "admin";
+    var head = h("div", { class: "hb-p__head" },
+      h("div", { class: "hb-p__who" }, h("b", null, p.name || p.email), h("small", null, [p.job_title, p.email].filter(Boolean).join(" · ")),
+        p.last_login_at ? h("small", null, "Last in " + ago(p.last_login_at)) : null),
+      admin && p.id ? h("label", { class: "hb-lab" }, "KAM", kamSelect(p.kam && p.kam !== (co.kam && co.kam.email) ? p.kam : "", "Account manager for " + (p.name || p.email),
+        co.kam && co.kam.email ? "Follows the company (" + kamName(co.kam.email) + ")" : "No account manager", function (v) {
+          hubSetKam("person", p.id, v, function () { p.kam = v || (co.kam && co.kam.email) || ""; renderSection(); });
+        })) : (p.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(p.kam)) : null));
+    var sels = h("ul", { class: "hb-items" }), camps = h("ul", { class: "hb-items" });
+    p.selections.forEach(function (x) { sels.appendChild(itemRow("selection", x)); });
+    p.campaigns.forEach(function (x) { camps.appendChild(itemRow("campaign", x)); });
+    return h("section", { class: "hb-p" }, head,
+      h("div", { class: "hb-p__cols" },
+        h("div", null, h("h4", null, "Selections ", h("span", null, String(p.selections.length))), p.selections.length ? sels : h("p", { class: "hb-none" }, "No selections.")),
+        h("div", null, h("h4", null, "Campaigns ", h("span", null, String(p.campaigns.length))), p.campaigns.length ? camps : h("p", { class: "hb-none" }, "No campaigns."))));
+  }
+  function companyBlock(c) {
+    var admin = HUB.role === "admin", open = !!HUB.open[c.key], det = HUB.detail[c.key];
+    var btn = h("button", { class: "hb-co__btn", type: "button", "aria-expanded": open ? "true" : "false", "aria-controls": "hb-" + c.key.replace(/[^a-z0-9]/gi, "_"),
+      onclick: function () { HUB.open[c.key] = !open; if (!open && !HUB.detail[c.key]) hubDetail(c.key); renderSection(); } },
+      h("span", { class: "hb-co__name" }, h("b", null, c.name), c.domain ? h("small", null, c.domain) : null),
+      h("span", { class: "hb-co__n" }, plural(c.people, "person", "people") + " · " + plural(c.selections, "selection") + " · " + plural(c.campaigns, "campaign") + (c.live ? " · " + c.live + " live" : "")),
+      h("span", { class: "hb-chev", "aria-hidden": "true", html: '<svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' }));
+    var kam = admin && c.domain ? h("label", { class: "hb-lab" }, "KAM", kamSelect(c.kam.email, "Account manager for " + c.name, "No account manager", function (v) {
+      hubSetKam("company", c.domain, v, function () { c.kam = { email: v, name: kamName(v) }; HUB.detail = {}; renderSection(); if (HUB.open[c.key]) hubDetail(c.key); });
+    })) : (c.kam && c.kam.email ? h("small", { class: "hb-it__kam" }, "KAM " + (c.kam.name || kamName(c.kam.email))) : null);
+    var li = h("li", { class: "hb-co" + (open ? " is-open" : "") }, h("div", { class: "hb-co__row" }, btn, kam));
+    if (open) {
+      var body = h("div", { class: "hb-co__body", id: "hb-" + c.key.replace(/[^a-z0-9]/gi, "_") });
+      if (det === "loading" || !det) body.appendChild(h("p", { class: "hb-none", role: "status" }, "Loading…"));
+      else if (det === "error") body.appendChild(h("p", { class: "hb-none" }, "This company couldn't be loaded. Please try again."));
+      else if (!det.people.length) body.appendChild(h("p", { class: "hb-none" }, "No people yet."));
+      else det.people.forEach(function (p) { body.appendChild(personBlock(p, det)); });
+      li.appendChild(body);
+    }
+    return li;
+  }
+  function renderCompanies(p) {
+    if (!DATA.hub) { renderOverview(p); return; }
+    add(p, head("Companies", "Every company, its people, and their selections and campaigns. Open anything as the client sees it, share it with a client, or hand it to an account manager."));
+    if (HUB.err) { add(p, h("div", { class: "hc-empty" }, h("b", null, "Companies"), h("p", null, HUB.err))); return; }
+    if (!HUB.list) {
+      add(p, h("div", { class: "kc-skel", "aria-hidden": "true" }, h("i"), h("i"), h("i")));
+      add(p, h("p", { class: "hc-sr", role: "status" }, "Loading the companies"));
+      hubLoad();
+      return;
+    }
+    var all = HUB.list.filter(function (c) { return c.key !== "handed"; });
+    var stats = { people: 0, sel: 0, camp: 0, live: 0 };
+    all.forEach(function (c) { stats.people += c.people; stats.sel += c.selections; stats.camp += c.campaigns; stats.live += c.live; });
+    add(p, h("dl", { class: "hc-score hc-score--4" },
+      kStat("Companies", String(all.length), plural(stats.people, "person", "people")),
+      kStat("Selections", String(stats.sel), "Across every company"),
+      kStat("Campaigns", String(stats.camp), "All statuses"),
+      kStat("Live now", String(stats.live), stats.live ? "Results refresh every 24 hours" : "None live")));
+    var q = h("input", { class: "hb-search", type: "search", placeholder: "Search companies or domains", "aria-label": "Search companies", value: HUB.q });
+    q.addEventListener("input", function () { HUB.q = q.value; var pos = q.selectionStart; renderSection(); var n = document.querySelector(".hb-search"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } });
+    var bar = h("div", { class: "kc-filter", role: "group", "aria-label": "Show" });
+    [["all", "All companies", HUB.list.length], ["live", "With a live campaign", HUB.list.filter(function (c) { return c.live > 0; }).length],
+     ["nokam", "No account manager", HUB.list.filter(function (c) { return !c.kam.email && c.key !== "handed"; }).length]].forEach(function (f) {
+      bar.appendChild(h("button", { class: "kc-chip", type: "button", "aria-pressed": HUB.f === f[0] ? "true" : "false",
+        onclick: function () { HUB.f = f[0]; renderSection(); } }, f[1], h("span", null, String(f[2]))));
+    });
+    add(p, h("div", { class: "hb-tools" }, q, bar));
+    add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" }));
+    var shown = HUB.list.filter(hubFilter);
+    var list = h("ul", { class: "hb-list" });
+    shown.forEach(function (c) { list.appendChild(companyBlock(c)); });
+    add(p, shown.length ? list : h("div", { class: "hc-empty" }, h("b", null, "No company matches"), h("p", null, "Try another search, or show all companies.")));
+  }
+
   /* ---------------------------------------------------------------- routing */
 
   var RENDER = { overview: renderOverview, selections: renderSelections, analyses: renderAnalyses, campaigns: renderCampaigns,
                  briefs: renderBriefs, notifications: renderNotifications, credits: renderCredits, account: renderAccount,
                  clients: function (p) { if (DATA.is_kam) renderClients(p); else renderOverview(p); },
+                 companies: renderCompanies,
                  // ROI Calculator: drawn by assets/js/connect.js (tier mix, save to a selection, estimate vs actual).
                  roi: function (p) { if (HV().roiPage) HV().roiPage(p); else setTimeout(function () { if (SECTION === "roi") renderSection(); }, 200); } };
   var TITLES = { overview: "My profile", selections: "Selections", analyses: "Analyses", campaigns: "Campaigns", briefs: "Briefs",
-                 roi: "ROI Calculator", notifications: "Notifications", credits: "Credits", account: "Account", clients: "My clients" };
+                 roi: "ROI Calculator", notifications: "Notifications", credits: "Credits", account: "Account", clients: "My clients", companies: "Companies" };
   function renderSection() {
     var p = $("hc-body");
     p.textContent = "";
