@@ -389,6 +389,11 @@ def migrate(conn):
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(creators)")}
     if "nationality" not in cols:
         conn.execute("ALTER TABLE creators ADD COLUMN nationality TEXT")
+    for gcol, gtype in (("gender", "TEXT"), ("gender_source", "TEXT"), ("gender_conf", "REAL")):
+        # The creator's own gender (owner, 2026-10-18): "male" | "female" | NULL (not known). gender_source says who
+        # decided it: "sheet" (the master spreadsheets), "ai" (read from name and handle) or "admin" (typed by the team).
+        if gcol not in cols:
+            conn.execute("ALTER TABLE creators ADD COLUMN %s %s" % (gcol, gtype))
     if "profiles" not in cols:
         conn.execute("ALTER TABLE creators ADD COLUMN profiles TEXT")
         # Backfill from the single platform+handle each creator had, so nobody
@@ -1673,6 +1678,24 @@ def next_code(tier, prefix="HV", conn=None):
         if tail.isdigit():
             highest = max(highest, int(tail))
     return "%s-%s-%03d" % (prefix, part, highest + 1)
+
+
+def set_gender(code, gender, source="admin", conf=None):
+    """Set a creator's gender ("male", "female" or empty to clear). A team member's choice is never overwritten
+    by the AI or a sheet: pass source="admin" to force it. Returns True when it changed."""
+    g = str(gender or "").strip().lower()
+    g = g if g in ("male", "female") else None
+    with connect() as conn:
+        cur = conn.execute("SELECT gender, gender_source FROM creators WHERE code = ?", (code,)).fetchone()
+        if cur is None:
+            return False
+        if source != "admin" and cur["gender_source"] == "admin":
+            return False
+        if cur["gender"] == g and cur["gender_source"] == (source if g else None):
+            return False
+        conn.execute("UPDATE creators SET gender = ?, gender_source = ?, gender_conf = ?, updated_at = ? WHERE code = ?",
+                     (g, source if g else None, conf if g else None, now(), code))
+    return True
 
 
 def list_creators(active_only=False, search=None, added_from=None, added_to=None):
