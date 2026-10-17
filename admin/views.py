@@ -3555,6 +3555,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
           "<a class='btn ghost' href='" + u("/campaigns/report") + "?id=" + str(k["id"]) + "'>See the report</a></div></form>"
         + ("<form id='camp-sync' method='post' action='" + u("/campaigns/sync") + "'><input type='hidden' name='id' value='" + str(k["id"]) + "'></form>"
            if k["selection_id"] else "")
+        + __import__("kam_items").banner(k)
         + __import__("assign").campaign_card(k, selection)
         + __import__("kam_items").card("campaign", k)
         + __import__("access").campaign_card(k)

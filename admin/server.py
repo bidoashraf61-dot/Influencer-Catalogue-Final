@@ -1214,6 +1214,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_request_access()
         if path == "/api/selection/invite":
             return self.api_selection_invite()
+        if path == "/api/campaign/start":
+            return self.api_campaign_start()
+        if path == "/api/campaign/build-selection":
+            return self.api_campaign_build_selection()
         if path == "/api/selection/reason":
             return self.api_selection_reason()
         if path == "/api/selection/replace":
@@ -3688,6 +3692,44 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return u["company"] or u["name"] or ""
         return (db.get_code(sel["code_id"]) or {"label": ""})["label"]
 
+    def api_campaign_start(self):
+        """A signed-in client starts a campaign from their account (owner, 2026-10-17): a draft under their
+        account that their account manager is told about and approves. {name, note}"""
+        b = self.json_body()
+        cid = self.signed_in_client()
+        user = portal.user_for_code(cid) if cid is not None else None
+        if user is None or self.admin_like():
+            return self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())
+        if self._throttled("campstart:%d" % cid, 10, 3600):
+            return
+        name = " ".join(str(b.get("name") or "").split())[:120]
+        if len(name) < 3:
+            return self.send_json(400, {"ok": False, "reason": "name", "message": "Give the campaign a name (3 letters or more)."}, self.cors())
+        note = " ".join(str(b.get("note") or "").split())[:500]
+        k = db.create_campaign(name, client=user["company"] or None, code_id=cid, origin="client")
+        if note:
+            db.save_campaign(k, notes="Client's note: " + note)
+        import kam_items
+        kam_items.tell_campaign_started(db.campaign(k), user, note)
+        return self.send_json(200, {"ok": True, "token": db.campaign(k)["token"]}, self.cors())
+
+    def api_campaign_build_selection(self):
+        """"Build your selection" on a campaign with none (owner, 2026-10-17): an empty selection is made for the
+        client, linked to the campaign, and opened in the catalogue ready to fill. {t: campaign token}"""
+        b = self.json_body()
+        cid = self.signed_in_client()
+        if cid is None or self.admin_like():
+            return self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())
+        k = db.campaign(token=str(b.get("t") or ""))
+        if k is None or k["code_id"] not in portal.team_codes(cid):
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        if k["selection_id"]:
+            sel = db.selection(k["selection_id"])
+            return self.send_json(200, {"ok": True, "token": sel["token"] if sel else None, "name": k["name"], "existing": True}, self.cors())
+        sid = db.save_selection(None, k["name"], [], {}, None, None, None, k["code_id"], origin="client")
+        db.save_campaign(k["id"], selection_id=sid)
+        return self.send_json(200, {"ok": True, "token": db.selection(sid)["token"], "name": k["name"]}, self.cors())
+
     def api_campaigns(self):
         """The campaigns this passcode may see. Drafts are never listed."""
         code_id = (db.admin_code_id() if self.admin_like() else None) or self.link_code("c:list") or self.signed_in_client()
@@ -3700,8 +3742,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # HelloVoice (owner, 2026-10-16): the team's own account has no campaigns, so its list was empty.
             # An admin sees every campaign; a key account manager, her clients'.
             with db.connect() as conn:
-                every = conn.execute("SELECT token, name, client, status, phase, starts_at, ends_at, logos, code_id, id, selection_id FROM campaigns "
-                                     "WHERE status != 'draft' ORDER BY starts_at DESC").fetchall()
+                every = conn.execute("SELECT token, name, client, status, phase, starts_at, ends_at, logos, code_id, id, selection_id, origin FROM campaigns "
+                                     "WHERE (status != 'draft' OR origin = 'client') ORDER BY starts_at DESC").fetchall()
             out = []
             for r in every:
                 cid = r["code_id"] if r["code_id"] is not None else kam_scope.campaign_code(r["id"])[1]
@@ -3709,19 +3751,26 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                     continue
                 d = {k: r[k] for k in ("token", "name", "client", "status", "phase", "starts_at", "ends_at", "logos")}
                 d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
+                d["draft"] = r["status"] == "draft"
+                d["has_selection"] = bool(r["selection_id"])
                 out.append(d)
             return self.send_json(200, {"ok": True, "campaigns": out}, self.cors() + [("Cache-Control", "no-store")])
         with db.connect() as conn:
             rows = conn.execute(
-                "SELECT token, name, client, status, phase, starts_at, ends_at, logos FROM campaigns "
-                "WHERE (code_id IN (%s) OR selection_id IN (%s)) AND status != 'draft' ORDER BY starts_at DESC"
+                "SELECT token, name, client, status, phase, starts_at, ends_at, logos, selection_id, code_id FROM campaigns "
+                "WHERE (code_id IN (%s) OR selection_id IN (%s)) AND (status != 'draft' OR origin = 'client') ORDER BY starts_at DESC"
                 % (",".join("?" * len(team)), ",".join("?" * len(granted))), team + granted).fetchall()
         out = []
+        mine_team = set(team)
         for r in rows:
             d = dict(r)
             d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
+            d["draft"] = r["status"] == "draft"
+            d["has_selection"] = bool(r["selection_id"])
+            d["can_build"] = (not r["selection_id"]) and r["code_id"] in mine_team and portal.user_for_code(code_id) is not None
+            d.pop("selection_id", None); d.pop("code_id", None)
             out.append(d)
-        return self.send_json(200, {"ok": True, "campaigns": out},
+        return self.send_json(200, {"ok": True, "can_start": portal.user_for_code(code_id) is not None, "campaigns": out},
                               self.cors() + [("Cache-Control", "no-store")])
 
     def viewer_campaign(self, token):

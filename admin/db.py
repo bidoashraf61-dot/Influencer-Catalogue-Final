@@ -598,6 +598,9 @@ def migrate(conn):
         # client reads; targets: JSON goals; logos: JSON brand logo files.
         if col not in camp_cols:
             conn.execute("ALTER TABLE campaigns ADD COLUMN " + col + " TEXT")
+    if "origin" not in camp_cols:
+        # "client": started by the client from their account (a draft the account manager approves).
+        conn.execute("ALTER TABLE campaigns ADD COLUMN origin TEXT")
     cc_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaign_creators)")}
     if "insights_token" not in cc_cols:
         conn.execute("ALTER TABLE campaign_creators ADD COLUMN insights_token TEXT")
@@ -2320,15 +2323,15 @@ def campaigns_for_selection(sid):
 
 
 def create_campaign(name, client=None, code_id=None, selection_id=None, platform=None,
-                    codes=(), costs=None):
+                    codes=(), costs=None, origin=None):
     """A new draft campaign, optionally filled from a selection. Returns its id."""
     costs = costs or {}
     with connect() as conn:
         cur = conn.execute(
             "INSERT INTO campaigns (token,name,client,code_id,selection_id,platform,status,"
-            "rules,created_at,updated_at) VALUES (?,?,?,?,?,?,'draft',?,?,?)",
+            "rules,created_at,updated_at,origin) VALUES (?,?,?,?,?,?,'draft',?,?,?,?)",
             (secrets.token_urlsafe(9), name, client, code_id, selection_id, platform,
-             json.dumps({k: [] for k in RULE_KEYS}), now(), now()))
+             json.dumps({k: [] for k in RULE_KEYS}), now(), now(), origin))
         cid = cur.lastrowid
         add_campaign_creators(cid, codes, costs, conn)
         return cid

@@ -338,6 +338,45 @@ class KamScope(unittest.TestCase):
         self.assertEqual(k.get("/selections/edit?id=%d" % self.s_other)[0], 403)
         self.assertEqual(k.get("/campaigns/edit?id=%d" % self.k_other)[0], 403)
 
+    # ----------------------------------------- client starts / builds (item 119 P2) --
+    def test_12_client_starts_campaign_and_builds_selection(self):
+        """Owner, 2026-10-17: a client starts a campaign (a draft), their KAM is told and sees it; a campaign with
+        no selection offers "Build your selection", which makes an empty selection linked to it."""
+        db.set_setting("kams", ["Mariam K <%s>" % KAM, "Omar K <%s>" % OTHER])
+        cl, _ = self.signup("starter@polyco.com")
+        mine = portal.user_by_email("starter@polyco.com")
+        s, j, _ = cl.get("/api/campaigns")
+        self.assertEqual((s, j.get("can_start")), (200, True))
+        self.assertEqual(cl.post("/api/campaign/start", {"name": "ab"})[0], 400)          # name too short
+        mailer.OUTBOX.clear()
+        s, j, _ = cl.post("/api/campaign/start", {"name": "Polyco sun launch", "note": "Reels in Riyadh"})
+        self.assertEqual(s, 200, j)
+        k = db.campaign(token=j["token"])
+        self.assertEqual((k["status"], k["origin"], k["code_id"]), ("draft", "client", mine["code_id"]))
+        self.assertTrue(any(KAM in str(m) for m in mailer.OUTBOX))                         # her KAM was emailed
+        # the client sees it as a draft with Build your selection; nobody else does
+        s, lst, _ = cl.get("/api/campaigns")
+        row = [x for x in lst["campaigns"] if x["name"] == "Polyco sun launch"][0]
+        self.assertEqual((row["draft"], row["has_selection"], row["can_build"]), (True, False, True))
+        self.assertEqual(cl.get("/api/campaign?t=" + k["token"])[0], 404)                  # a draft has no report yet
+        other, _ = self.signup("other2@rivalco.com")
+        self.assertNotIn("Polyco sun launch", [x["name"] for x in other.get("/api/campaigns")[1]["campaigns"]])
+        self.assertEqual(other.post("/api/campaign/build-selection", {"t": k["token"]})[0], 404)
+        # her KAM sees it in the admin; an unrelated KAM does not
+        self.assertIn("Polyco sun launch", self.kam.get("/campaigns")[1])
+        self.assertEqual(self.kam.get("/campaigns/edit?id=%d" % k["id"])[0], 200)
+        self.assertIn("Started by the client", self.kam.get("/campaigns/edit?id=%d" % k["id"])[1])
+        # build your selection
+        s, j2, _ = cl.post("/api/campaign/build-selection", {"t": k["token"]})
+        self.assertEqual((s, j2.get("ok")), (200, True), j2)
+        k2 = db.campaign(k["id"])
+        sel = db.selection(k2["selection_id"])
+        self.assertEqual((sel["token"], sel["code_id"], json.loads(sel["codes"])), (j2["token"], mine["code_id"], []))
+        again = cl.post("/api/campaign/build-selection", {"t": k["token"]})[1]
+        self.assertTrue(again.get("existing"))                                             # a second click makes no second one
+        row = [x for x in cl.get("/api/campaigns")[1]["campaigns"] if x["name"] == "Polyco sun launch"][0]
+        self.assertEqual((row["has_selection"], row["can_build"]), (True, False))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

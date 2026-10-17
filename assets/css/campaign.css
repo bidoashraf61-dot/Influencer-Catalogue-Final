@@ -642,3 +642,22 @@
 .db-thumb, .db-post__img, .mx-post__media { overflow: hidden; }
 
 .mx-est { font-size: 11px; font-weight: 600; color: #6a6a6a; letter-spacing: .04em; vertical-align: super; cursor: help; }
+
+/* Start a campaign / Build your selection (owner, 2026-10-17) */
+.mx-camp__state--draft { color: var(--gray); }
+.mx-camp__state--draft::before { content: ""; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--gray); box-sizing: border-box; }
+.mx-camp__acts { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading); font-size: 20px; letter-spacing: .06em; }
+.mx-camp__go--alt { background: var(--white); border-color: var(--ink); }
+.mx-camp__go:disabled { opacity: .6; cursor: wait; }
+.mx-start { margin: 0 0 18px; }
+.mx-start__open { min-height: 48px; padding: 0 22px; border-radius: var(--r-pill); border: 1.5px solid var(--ink); background: var(--ink); color: var(--lime); font: 700 15px var(--body); cursor: pointer; }
+.mx-start__open[aria-expanded="true"] { background: var(--white); color: var(--ink); }
+.mx-start__open:focus-visible, .mx-start__form input:focus-visible, .mx-start__form textarea:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.mx-start__form { margin-top: 14px; padding: 18px; border-radius: 18px; background: var(--linen); display: grid; gap: 8px; max-width: 640px; }
+.mx-start__form label { font-weight: 600; font-size: 14px; }
+.mx-start__form label small { font-weight: 400; color: var(--gray); }
+.mx-start__form input, .mx-start__form textarea { min-height: 44px; padding: 10px 14px; border-radius: 12px; border: 1.5px solid var(--ink); background: var(--white); font: 500 15px var(--body); resize: vertical; }
+.mx-start__act { margin-top: 6px; }
+.mx-start__msg { margin: 0; min-height: 1.2em; font-size: 14px; }
+@media (max-width: 720px) { .mx-camp__acts { flex-direction: column; align-items: stretch; } .mx-camp__acts .mx-camp__go { text-align: center; } }

@@ -87,6 +87,16 @@ def card(kind, item):
                 ("<p class='price-hint'>Now with %s.</p>" % e_(_name(cur))) if cur else ""))
 
 
+def banner(k):
+    """Campaign page: a draft the client started themselves, waiting for the account manager."""
+    keys = k.keys()
+    if "origin" not in keys or k["origin"] != "client" or k["status"] != "draft":
+        return ""
+    return ("<div class='card' style='border-left:4px solid var(--lime,#e8ff76)'><div class='hd'><h2>Started by the client</h2></div>"
+            "<p class='sec-desc'>The client started this from their account and is waiting. Set the dates, link or build its selection, "
+            "then set it live to approve it. Until then it shows to them as a draft.</p></div>")
+
+
 def post(handler, path):
     f = handler.form_body()
     raw = (f.get("id") or "").strip()
@@ -105,3 +115,26 @@ def post(handler, path):
     email = (f.get("kam") or "").strip().lower()
     msg = ("Handed to %s. She has been told." % _name(email)) if email else "Taken back from the account manager."
     return handler.redirect(back.replace("#st=share", "") + sep + "ok=" + q(msg) + ("#st=share" if kind == "selection" else ""))
+
+
+def tell_campaign_started(k, user, note=""):
+    """A client started a campaign: email + bell to their account manager (and the notify list). Never raises."""
+    import mailer
+    import portal
+    kam = (user["kam"] if "kam" in user.keys() else None) or None
+    who = "%s <%s>%s" % (user["name"] or user["email"], user["email"], (" · " + user["company"]) if user["company"] else "")
+    try:
+        notify.send("campaign_started", ['%s started the campaign "%s".' % (who, k["name"]), ("Their note: " + note) if note else "",
+                                         "It is a draft. Open it, set the dates and approve it to take it live."],
+                    kam=kam, link=mailer.SITE + "/admin/campaigns/edit?id=%d" % k["id"])
+    except Exception:
+        pass
+    try:
+        addr = notify.kam_address(kam)
+        u = portal.user_by_email(addr) if addr else None
+        if u is not None and u["id"]:
+            inbox.emit([u["id"]], "camp_shared", '%s started the campaign "%s"' % (user["name"] or user["email"], k["name"]),
+                       body="It is a draft waiting for you.", href="admin/campaigns/edit?id=%d" % k["id"],
+                       ref="campstart:%d" % k["id"], once=True)
+    except Exception:
+        pass

@@ -70,6 +70,12 @@
     });
   }
 
+  function post(path, body) {
+    return fetch(API + path, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j.status = r.status; return j; }); });
+  }
+  var CAN_START = false;
+
   /* ---------------------------------------------------------------- gate */
 
   var REFUSALS = { revoked: "This code has been withdrawn.", expired: "This code has expired.",
@@ -117,19 +123,69 @@
     get("/api/campaigns").then(function (b) {
       unlocked();
       var list = b.campaigns || [];
+      CAN_START = !!b.can_start;
       $("mx-all").hidden = true;
       // The list always shows, even for one campaign: list, then dashboard, then report.
       showList(list);
     }).catch(function (err) { if (err && err.locked) lock(); else empty("Could not load your campaigns. Please try again."); });
   }
 
+  // Start a campaign (owner, 2026-10-17): a signed-in client names it; it lands as a draft their
+  // account manager approves. One button, one small inline form.
+  function startPanel() {
+    if (!CAN_START) return "";
+    return '<section class="mx-start" aria-label="Start a campaign"><button type="button" class="mx-start__open" aria-expanded="false" aria-controls="mx-start-form">+ Start a campaign</button>'
+      + '<form class="mx-start__form" id="mx-start-form" hidden novalidate><label for="mx-start-name">Campaign name</label>'
+      + '<input id="mx-start-name" maxlength="120" autocomplete="off" placeholder="e.g. Ramadan sun care 2027">'
+      + '<label for="mx-start-note">What do you want it to do? <small>(optional)</small></label>'
+      + '<textarea id="mx-start-note" maxlength="500" rows="2" placeholder="Goal, dates, creators you have in mind"></textarea>'
+      + '<div class="mx-start__act"><button type="submit" class="mx-camp__go">Send to my account manager</button></div>'
+      + '<p class="mx-start__msg" role="status"></p></form></section>';
+  }
+  function wireStart() {
+    var host = $("mx-list-items");
+    var open = host.querySelector(".mx-start__open"), form = host.querySelector(".mx-start__form");
+    if (open && form) {
+      open.addEventListener("click", function () {
+        var on = form.hidden; form.hidden = !on; open.setAttribute("aria-expanded", on ? "true" : "false");
+        if (on) $("mx-start-name").focus();
+      });
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var msg = form.querySelector(".mx-start__msg"), btn = form.querySelector("button[type=submit]");
+        var name = $("mx-start-name").value.trim();
+        if (name.length < 3) { msg.textContent = "Give the campaign a name (3 letters or more)."; $("mx-start-name").focus(); return; }
+        btn.disabled = true; msg.textContent = "Sending…";
+        post("/api/campaign/start", { name: name, note: $("mx-start-note").value.trim() }).then(function (j) {
+          if (j && j.ok) { route(); return; }
+          btn.disabled = false; msg.textContent = (j && j.message) || "Couldn't start that. Please try again.";
+        }).catch(function () { btn.disabled = false; msg.textContent = "Couldn't reach the server. Please try again."; });
+      });
+    }
+    host.querySelectorAll("[data-build]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        b.disabled = true; var was = b.textContent; b.textContent = "Opening…";
+        post("/api/campaign/build-selection", { t: b.getAttribute("data-build") }).then(function (j) {
+          if (j && j.ok && j.token) {
+            var base = new URL("../", location.href).href;
+            location.href = j.existing ? base + "selection/#s=" + encodeURIComponent(j.token)
+              : base + "#n=" + encodeURIComponent(j.name || "") + "&c=&s=" + encodeURIComponent(j.token);
+            return;
+          }
+          b.disabled = false; b.textContent = was;
+        }).catch(function () { b.disabled = false; b.textContent = was; });
+      });
+    });
+  }
+
   function showList(list) {
     document.title = "My campaigns — HELVY Connect";
     if (!list.length) { showNone(); return; }
     var live = list.filter(function (c) { return c.status === "live"; }).length;
+    var drafts = list.filter(function (c) { return c.draft; }).length;
     $("mx-list-sum").innerHTML = tile("Campaigns", list.length, "") + tile("Live now", live, live ? "go" : "")
-      + tile("Completed", list.length - live, "") + '<span id="mx-sum-totals" class="mx-sum__rest"></span>';
-    $("mx-list-items").innerHTML = list.map(function (c, i) {
+      + tile("Completed", list.length - live - drafts, "") + '<span id="mx-sum-totals" class="mx-sum__rest"></span>';
+    $("mx-list-items").innerHTML = startPanel() + list.map(function (c, i) {
       var now = Date.now() / 1000, span = c.starts_at && c.ends_at ? Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400)) : 0;
       var dn = span ? Math.min(span, Math.max(0, Math.ceil((now - c.starts_at) / 86400))) : 0;
       var when = !span ? "" : now < c.starts_at ? "Starts " + day(c.starts_at) : now <= c.ends_at ? "Day " + dn + " of " + span : "Ran " + span + " days";
@@ -137,14 +193,19 @@
         + (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("") + "</div>"
         + '<div class="mx-camp__id"><h2 class="mx-camp__name">' + esc(c.name) + '</h2><div class="mx-camp__meta">'
         + esc([c.client, c.starts_at ? day(c.starts_at) + " – " + day(c.ends_at) : "", when].filter(Boolean).join(" · ")) + "</div></div>"
-        + '<span class="mx-camp__state mx-camp__state--' + (c.status === "live" ? "live" : "done") + '">' + (c.status === "live" ? "Live" : "Completed") + "</span></div>"
-        + '<div class="mx-camp__row"><div class="mx-camp__prog"><p class="mx-camp__wait">Loading progress…</p></div>'
-        + '<a class="mx-camp__go" href="dashboard/#t=' + esc(c.token) + '">Open dashboard →</a></div></article>';
+        + '<span class="mx-camp__state mx-camp__state--' + (c.draft ? "draft" : c.status === "live" ? "live" : "done") + '">' + (c.draft ? "Draft" : c.status === "live" ? "Live" : "Completed") + "</span></div>"
+        + '<div class="mx-camp__row"><div class="mx-camp__prog">' + (c.draft
+            ? '<p class="mx-camp__wait">Waiting for your account manager to set it up and approve it.' + (c.can_build ? " You can start choosing creators meanwhile." : "") + "</p>"
+            : '<p class="mx-camp__wait">Loading progress…</p>') + "</div>"
+        + '<div class="mx-camp__acts">' + (c.can_build ? '<button type="button" class="mx-camp__go mx-camp__go--alt" data-build="' + esc(c.token) + '">Build your selection →</button>' : "")
+        + (c.draft ? "" : '<a class="mx-camp__go" href="dashboard/#t=' + esc(c.token) + '">Open dashboard →</a>') + "</div></div></article>";
     }).join("");
     show("list");
+    wireStart();
     window.scrollTo(0, 0);
     var agg = { reach: 0, eng: 0, posts: 0, clicks: 0 }, left = list.length;
     list.forEach(function (c, i) {
+      if (c.draft) { if (!--left) $("mx-sum-totals").innerHTML = tile("People reached", num(agg.reach), "") + tile("Posts live", full(agg.posts), "") + tile("Engagement", num(agg.eng), ""); return; }
       get("/api/campaign?t=" + encodeURIComponent(c.token)).then(function (b) {
         var R = b.report, t = R.total || {}, card = document.querySelector('.mx-camp[data-i="' + i + '"]');
         agg.reach += t.seen != null ? t.seen : (t.views || 0); agg.eng += t.engagement || 0; agg.posts += t.posts || 0; agg.clicks += t.clicks || 0;
@@ -160,8 +221,9 @@
   // with a full-strength preview of a campaign card.
   function showNone() {
     $("mx-list-sum").innerHTML = "";
-    $("mx-list-lede").textContent = "Your campaigns will appear here as soon as HelloVoice starts one for you.";
-    $("mx-list-items").innerHTML = '<section class="mx-none"><div class="mx-none__copy"><h2>No campaigns yet</h2>'
+    $("mx-list-lede").textContent = CAN_START ? "Start a campaign yourself, or it will appear here when HelloVoice starts one for you."
+      : "Your campaigns will appear here as soon as HelloVoice starts one for you.";
+    $("mx-list-items").innerHTML = startPanel() + '<section class="mx-none"><div class="mx-none__copy"><h2>No campaigns yet</h2>'
       + "<p>Each campaign gets a live dashboard here: posts going live, people reached, engagement, and how far it is towards its objective, updated every day.</p>"
       + '<ol class="mx-none__steps"><li><b>1</b><span>Pick creators from the catalogue and send us your shortlist.</span></li>'
       + "<li><b>2</b><span>We agree the brief, the targets and the dates with you.</span></li>"
@@ -173,6 +235,7 @@
       + '<div class="mx-tl__track">' + "ddddddda.".split("").map(function (k) { return '<span class="mx-tl__seg mx-tl__seg--' + ({ d: "done", a: "active", ".": "pending" })[k] + '"></span>'; }).join("") + "</div>"
       + '<div class="mx-tl__foot"><span></span><span>7 of 9 steps done</span><span></span></div></div><p class="mx-none__tag">Example</p></div></section>';
     show("list");
+    wireStart();
   }
   // Where an audience number came from: the creators' own analyses, the average
   // of every analysed profile, or a mix of the two.
