@@ -4392,7 +4392,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             brief = {"objective": metrics.objective_of(k), "platform": k["platform"] or "Instagram",
                      "budget": "", "links": "1" if k["destination"] else "",
                      "source": "campaign"}
-        for key in ("template", "objective", "platform", "category", "budget", "links", "source") + \
+        for key in ("template", "objective", "platform", "category", "budget", "links", "stories", "source") + \
                 tuple("n_" + t for t in plans.TIERS):
             if key in query:
                 brief[key] = query[key]
@@ -4407,12 +4407,22 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         b = {"platform": brief.get("platform"), "objective": brief.get("objective"),
              "category": brief.get("category"), "budget": float(budget) if budget else 0,
              "tracked_links": brief.get("links") == "1"}
-        if k and brief.get("source") != "tiers":
-            mix = plans.mix_from_campaign(k)
+        # Platforms: the ticked ones when the form was sent, else the saved brief's, else the main platform.
+        if query.get("sub") == "1":
+            plats = [p for p in plans.PLATFORMS if query.get("p_" + p) == "1"]
         else:
-            mix = plans.mix_from_counts({t: (str(brief.get("n_" + t) or "").strip() or "0")
-                                         for t in plans.TIERS if str(brief.get("n_" + t) or "0").strip().isdigit()})
-        plan = plans.calculate(b, mix)
+            plats = [p for p in (brief.get("platforms") or []) if p in plans.PLATFORMS]
+        if not plats:
+            plats = [brief.get("platform") if brief.get("platform") in plans.PLATFORMS else "Instagram"]
+        brief["platforms"] = plats
+        brief["platform"] = plats[0]
+        b["platform"] = plats[0]
+        if k and brief.get("source") != "tiers":
+            mix = plans.mix_platforms_from_campaign(k, plats)
+        else:
+            mix = plans.mix_platforms_from_counts({t: (str(brief.get("n_" + t) or "").strip() or "0")
+                                                   for t in plans.TIERS if str(brief.get("n_" + t) or "0").strip().isdigit()}, plats)
+        plan = plans.calculate_platforms(b, mix)
         plan["brief"] = brief
         plan["template"] = brief.get("template") or None
         return self.send(200, views.planner_page(k, brief, plan, plans.house_benchmarks(), plans.library(),
