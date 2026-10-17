@@ -117,7 +117,7 @@ def check(user):
 
 
 # --------------------------------------------------------------------- tour --
-# The 3-minute tour Helvy offers after the first sign-in. The state is only what the
+# The 3-minute tour Helvi offers after the first sign-in. The state is only what the
 # page needs to decide whether to offer it again: None (never shown), "offered",
 # "later", "started" or "done". The +5 is paid once per account, enforced by the
 # ledger ref, however many times the tour is replayed.
@@ -150,7 +150,7 @@ def tour_finished(user):
         conn.execute("BEGIN IMMEDIATE")
         if _paid(conn, user["code_id"], "reward:tour"):
             return 0
-        portal._post(conn, user["code_id"], TOUR_CREDITS, "Tour reward: finished the HELVY Connect tour", "reward:tour", "system")
+        portal._post(conn, user["code_id"], TOUR_CREDITS, "Tour reward: finished the HELVi Connect tour", "reward:tour", "system")
     return TOUR_CREDITS
 
 

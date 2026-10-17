@@ -1,4 +1,4 @@
-"""AI on a selection (HELVY Connect, phase D): "Add more like these" and "Creators like this".
+"""AI on a selection (HELVi Connect, phase D): "Add more like these" and "Creators like this".
 
 Both stand on what already exists: discover.like() (who a creator resembles: topics,
 size, place, platforms and, where both are measured, audience) and the matcher's

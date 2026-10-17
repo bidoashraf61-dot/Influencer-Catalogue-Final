@@ -1,4 +1,4 @@
-"""Campaign jobs for the client's bell (HELVY Connect phase E).
+"""Campaign jobs for the client's bell (HELVi Connect phase E).
 
 1. **Weekly update.** Once a week per live campaign, one bell notification with a
    three-line verdict made from the campaign's own numbers against its targets and

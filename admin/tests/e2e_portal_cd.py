@@ -1,6 +1,6 @@
-"""End-to-end tests for HELVY Connect phases C + D: the AI-free rule during an active
+"""End-to-end tests for HELVi Connect phases C + D: the AI-free rule during an active
 campaign, access-code links to email accounts, the tour reward, the ROI Calculator,
-"Add more like these", "Creators like this", Helvy's knowledge and no-price rule, and
+"Add more like these", "Creators like this", Helvi's knowledge and no-price rule, and
 the sign-in code email.
 
 Same harness as e2e_portal.py (a throwaway copy of admin/*.py, an empty database,
@@ -238,14 +238,14 @@ class CD(unittest.TestCase):
         if payload.get("ok"):
             self.assertEqual((payload["more_cost"], payload["alike_cost"], payload["replace_cost"]), (0, 0, 0))
 
-    # ------------------------------------------------------------------ Helvy --
+    # ------------------------------------------------------------------ Helvi --
     def test_06_helvy_knowledge_and_no_prices(self):
         decl = [d["name"] for d in assistant.declarations("client")]
         self.assertNotIn("price_bands", decl)
         for t in ("campaign_results", "occasions", "my_decisions", "roi_estimate"):
             self.assertIn(t, decl)
         prompt = assistant.system_prompt("client", {"user": {"name": "Sara"}})
-        self.assertIn("You are Helvy", prompt)
+        self.assertIn("You are Helvi", prompt)
         self.assertIn("NO PRICES", prompt)
         self.assertIn("Mawthooq", prompt)
         c = db.creator("HV-MI-001")
@@ -297,9 +297,9 @@ class CD(unittest.TestCase):
     # ------------------------------------------------------------------- email --
     def test_08_sign_in_code_email(self):
         subject, text, html = mailer.otp_message("482913", 10, to="sara@northwind-test.com")
-        self.assertEqual(subject, "Your HELVY Connect sign-in code: 482913")
+        self.assertEqual(subject, "Your HELVi Connect sign-in code: 482913")
         self.assertIn("482913", text)
-        self.assertIn("Your HELVY Connect code is 482913", html)                   # preheader
+        self.assertIn("Your HELVi Connect code is 482913", html)                   # preheader
         self.assertIn(">482913<", html)                                             # copyable, no spaces between digits
         self.assertIn("Expires in 10 minutes", html)
         self.assertIn("never asks for this code by phone or chat", html)

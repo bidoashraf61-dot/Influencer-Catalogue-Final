@@ -1625,7 +1625,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if code:
                 try:
                     subject, text, html = mailer.otp_message(code, portal.OTP_MINUTES, to=email)
-                    mailer.send(email, subject.replace("HELVY Connect", "HELVY Connect admin"), text, html)
+                    mailer.send(email, subject.replace("HELVi Connect", "HELVi Connect admin"), text, html)
                     team.log("login_code", email, "", ip)
                 except mailer.MailError:
                     db.log("otp_mail_fail", None, ip, self.headers.get("User-Agent"), "admin")
@@ -1770,9 +1770,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 if mailer.configured():
                     try:
                         site = "https://influencer-catalogue.hellovoice.co.uk" + BASE + "/login"
-                        mailer.send(f.get("email").strip().lower(), "You now have HELVY Connect admin access",
-                                    "You have been given %s access to HELVY Connect admin.\n\nSign in with your work email at %s. "
-                                    "We email you a 6-digit code, so there is no password to remember.\n\nHELVY Connect · Powered by HelloVoice"
+                        mailer.send(f.get("email").strip().lower(), "You now have HELVi Connect admin access",
+                                    "You have been given %s access to HELVi Connect admin.\n\nSign in with your work email at %s. "
+                                    "We email you a 6-digit code, so there is no password to remember.\n\nHELVi Connect · Powered by HelloVoice"
                                     % (team.ROLE_LABEL.get(f.get("role"), f.get("role")), site))
                     except mailer.MailError:
                         note = " The invitation email could not be sent; tell them to sign in at the admin page."
@@ -1796,9 +1796,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 if mailer.configured():
                     try:
                         site = "https://influencer-catalogue.hellovoice.co.uk" + BASE + "/login"
-                        mailer.send(target["email"], "You have HELVY Connect admin access",
-                                    "You have %s access to HELVY Connect admin.\n\nSign in with your work email at %s. "
-                                    "We email you a 6-digit code, so there is no password to remember.\n\nHELVY Connect · Powered by HelloVoice"
+                        mailer.send(target["email"], "You have HELVi Connect admin access",
+                                    "You have %s access to HELVi Connect admin.\n\nSign in with your work email at %s. "
+                                    "We email you a 6-digit code, so there is no password to remember.\n\nHELVi Connect · Powered by HelloVoice"
                                     % (team.ROLE_LABEL.get(team.role_of(target), ""), site))
                     except mailer.MailError:
                         return back("The email could not be sent. Try again shortly.", False)
@@ -5877,7 +5877,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return self.send_json(200, {"ok": True, "status": row}, self.cors())
 
     def api_selection_replace(self):
-        """Find a replacement with Helvy: three creators like the rejected one that fit the
+        """Find a replacement with Helvi: three creators like the rejected one that fit the
         same campaign, not already in the selection. Costs credits once; the three are
         kept, so opening them again is free."""
         import matcher
@@ -5897,7 +5897,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         else:
             if self._throttled("replace:%d" % reader, 20, 3600):
                 return
-            ok, cost, bal = portal.charge(reader, "replace", "Helvy: replacement for " + code) if role == "owner" else (True, 0, None)
+            ok, cost, bal = portal.charge(reader, "replace", "Helvi: replacement for " + code) if role == "owner" else (True, 0, None)
             if not ok:
                 return self.send_json(402, {"ok": False, "reason": "no_credits", "balance": portal.balance(reader),
                                             "cost": portal.costs().get("replace", 2),
@@ -5918,7 +5918,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             picks = [i["code"] for i in items[:3]]
             if not picks:
                 portal.refund(reader, cost, "no replacement found")
-                return self.send_json(200, {"ok": True, "replacements": [], "message": "Helvy found no one close enough. Your account manager can help."}, self.cors())
+                return self.send_json(200, {"ok": True, "replacements": [], "message": "Helvi found no one close enough. Your account manager can help."}, self.cors())
             selstatus.set_replacements(sel["id"], code, picks)
         shown = {r["code"]: r for r in self.roster_payload(only=set(picks))}
         # "Why" for each pick, from card fields only (public data), as in Creators like this.

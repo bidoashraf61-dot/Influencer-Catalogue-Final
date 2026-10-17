@@ -990,7 +990,7 @@ class Portal(unittest.TestCase):
         lines = [json.loads(x) for x in (raw if isinstance(raw, str) else json.dumps(raw)).splitlines() if x.strip()]
         done = [x for x in lines if x["t"] == "done"][0]
         self.assertTrue(done["instant"])
-        self.assertNotIn("SAR", done["reply"])                       # Helvy never quotes prices (phase C + D)
+        self.assertNotIn("SAR", done["reply"])                       # Helvi never quotes prices (phase C + D)
         self.assertIn("quote", done["reply"])
         self.assertEqual(before, c.get("/api/credits")[1].get("credits"))                              # instant answers are free
         s, raw, _ = c.post("/api/chat/stream", {"message": "campaign for skincare in Riyadh please"})

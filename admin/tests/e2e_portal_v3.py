@@ -1,4 +1,4 @@
-"""End-to-end tests for HELVY Connect portal v3: the bell, the profile page and its
+"""End-to-end tests for HELVi Connect portal v3: the bell, the profile page and its
 credit rewards, invites, analysis gating and selection status.
 
 Same harness as e2e_portal.py (a throwaway copy of admin/*.py, an empty database,

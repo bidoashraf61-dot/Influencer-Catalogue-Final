@@ -250,7 +250,7 @@
     PLAT = choosePlat();
     var a = (D.analyses || {})[PLAT] || null;
     D.analysis = a;
-    document.title = D.sample ? "Sample full analysis — HELVY Connect" : c.name + " — Creator analysis — HELVY Connect";
+    document.title = D.sample ? "Sample full analysis — HELVi Connect" : c.name + " — Creator analysis — HELVi Connect";
     window.scrollTo(0, 0);
     var gate = D.gate || { state: "unlocked" };
     var oldGate = $("pp-gate"); if (oldGate) oldGate.remove();
@@ -401,7 +401,7 @@
         (sels.length ? " (this one is in <b>" + esc(sels[0]) + "</b>)" : "") + ", ready <b>within 1 working day</b>.",
         '<button type="button" class="pp-gbtn" id="pp-ask-full">' + hvi("lock") + "Request full analysis</button>"],
       requested: ["clock", "Analysis requested", "You asked on <b>" + esc(when(g.requested_at)) + "</b>. It will be ready by <b>" + esc(whenLong(g.ready_by)) +
-        "</b>, within 1 working day. Helvy rings your bell when it opens.", '<button type="button" class="pp-gbtn" disabled>' + hvi("clock") + "Requested</button>"],
+        "</b>, within 1 working day. Helvi rings your bell when it opens.", '<button type="button" class="pp-gbtn" disabled>' + hvi("clock") + "Requested</button>"],
       outside: ["lock", "Full analysis", "Add this creator to a selection to request the full analysis. It's free, and ready within 1 working day.",
         '<button type="button" class="pp-gbtn is-off" aria-disabled="true" title="Add this creator to a selection to request the full analysis.">' + hvi("lock") + "Request full analysis</button>"],
       unlocked: ["unlock", "Full analysis ready", (g.granted_at ? "Opened <b>" + esc(when(g.granted_at)) + "</b> for your team. " : "") +

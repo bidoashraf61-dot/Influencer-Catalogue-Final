@@ -1,9 +1,9 @@
-"""End-to-end tests for HELVY Connect fix batch 8 (2026-10-11, branch portal-fixes-8).
+"""End-to-end tests for HELVi Connect fix batch 8 (2026-10-11, branch portal-fixes-8).
 
 - #39 the sample full analysis: the endpoint serves only the configured creator, anonymised (no name,
   handle, bio, photo, URL, post cover, brand or hashtag), the per-creator gating is unchanged, the
   setting turns it off, and it works for a creator whose own analysis is locked;
-- #38 Helvy's new tools (explain_score, compare_creators, campaign_report, roi_walkthrough) and the
+- #38 Helvi's new tools (explain_score, compare_creators, campaign_report, roi_walkthrough) and the
   hand-off to the account manager, none of which may carry a price or budget field;
 - #41 the working note: step labels are plain actions.
 

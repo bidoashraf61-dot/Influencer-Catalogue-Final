@@ -99,7 +99,7 @@ a.cat-btn { text-decoration: none; display: inline-flex; align-items: center; ju
   padding: var(--pad);
 }
 .cat-gate__inner { max-width: 560px; text-align: center; }
-/* HELVY Connect, the portal's own mark (dark variant: white HELVY). */
+/* HELVi Connect, the portal's own mark (dark variant: white HELVi). */
 .cat-gate__logo { display: block; width: 200px; height: auto; margin: 0 auto 36px; }
 .cat-gate__eyebrow {
   display: inline-block;
@@ -373,7 +373,7 @@ a.cat-btn { text-decoration: none; display: inline-flex; align-items: center; ju
 @keyframes cat-skel { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .cat-skel { animation: none; } }
 /* The roster in batches (fix batch 3): the next 48 load as the reader nears the end. While
-   they come, Helvy flips through cards above a row of skeleton cards; a filter change dims
+   they come, Helvi flips through cards above a row of skeleton cards; a filter change dims
    the cards on screen until the new ones arrive. */
 .cat-grid.is-loading { opacity: .45; transition: opacity .18s ease .12s; pointer-events: none; }
 .cat-sentinel { height: 1px; }
@@ -711,7 +711,7 @@ body:has(#cat-tray:not([hidden])) .cat-footer { padding-bottom: 128px; }
   border-top: 1px solid rgba(255,255,255,.12);
 }
 .cat-footer__note { color: rgba(255,255,255,.58); font-size: 14px; line-height: 1.55; max-width: 60ch; margin: 0; }
-/* Powered by Hello Voice, a BlueHolding company: the house behind HELVY Connect. */
+/* Powered by Hello Voice, a BlueHolding company: the house behind HELVi Connect. */
 .cat-footer__by { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0; color: rgba(255,255,255,.58); font-size: 13px; }
 .cat-footer__by img { display: block; width: 104px; height: auto; }
 .cat-footer__portfolio {

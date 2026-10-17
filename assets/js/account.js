@@ -1,16 +1,16 @@
-/* HELVY Connect: the client's profile (/account/), drawn from /api/account.
+/* HELVi Connect: the client's profile (/account/), drawn from /api/account.
  *
  * Sections by hash: #overview (default), #selections, #analyses, #campaigns,
  * #briefs, #notifications, #credits, #account, and for a key account manager
  * #clients (My clients, from /api/account/clients). A side nav on a desktop, a strip
  * of tabs on a phone.
  *
- * Overview leads with Helvy and ONE next step, then the status line, the latest
+ * Overview leads with Helvi and ONE next step, then the status line, the latest
  * notifications, profile completion (each step priced in what its credits buy)
  * and the invite. Campaigns keep the report's own scorebug.
  *
  * Everything from the server goes on the page with textContent, never HTML.
- * Icons, the notification row and Helvy's picture come from portal.js
+ * Icons, the notification row and Helvi's picture come from portal.js
  * (window.hvPortal), which has loaded by the time /api/account answers.
  */
 (function () {
@@ -94,7 +94,7 @@
     var c = costs(), brief = c.brief || 5, rep = c.replace || 2, chat = c.chat || 1;
     if (n >= brief && n % brief === 0) return n === brief ? "1 free AI shortlist" : (n / brief) + " more AI shortlists";
     if (n === rep) return "1 replacement search";
-    return Math.floor(n / chat) + " questions to Helvy";
+    return Math.floor(n / chat) + " questions to Helvi";
   }
   var SIG = { good: "Strong", moderate: "Fair", low: "Low" };
   function sig(grade, label) { return h("span", { class: "ac-sig ac-sig--" + (grade || "none") }, label || SIG[grade] || "Too early"); }
@@ -148,7 +148,7 @@
     });
     side.appendChild(nav);
     var out = h("button", { class: "hc-more", type: "button", onclick: signOut }, icon("out"), "Sign out");
-    // The 3-minute tour, replayable any time (HELVY Connect phase C).
+    // The 3-minute tour, replayable any time (HELVi Connect phase C).
     var tourB = h("button", { class: "hc-more", type: "button", onclick: function () { if (HV().tour) HV().tour(); } }, icon("help"), "Take the tour");
     side.appendChild(h("div", { class: "hc-out" }, tourB, out));
     var cur = nav.querySelector('[aria-current="page"]');
@@ -212,12 +212,12 @@
       go.appendChild(cta);
       go.appendChild(h("button", { class: "hc-more", type: "button", onclick: function () { store(later, "1"); renderSection(); } }, "Later"));
     }
-    // Helvy's idle loop (transparent, waist-up); the still when motion is reduced or refused.
+    // Helvi's idle loop (transparent, waist-up); the still when motion is reduced or refused.
     var img = HV().clip ? HV().clip("idle", "hc-greet__clip") : h("img", { class: "hv-clip", src: HV().helvy || ROOT + "assets/brand/helvy.webp?v=c2", alt: "", width: "148", height: "148" });
-    return h("section", { class: "hc-greet", "aria-label": "Helvy's next step for you" },
+    return h("section", { class: "hc-greet", "aria-label": "Helvi's next step for you" },
       h("div", { class: "hc-greet__helvy" }, img),
       h("div", { class: "hc-greet__body" }, hi,
-        h("div", { class: "hc-bubble" }, h("div", { class: "hc-bubble__who" }, h("b", null, "Helvy"), " · your next step"), p, go)));
+        h("div", { class: "hc-bubble" }, h("div", { class: "hc-bubble__who" }, h("b", null, "Helvi"), " · your next step"), p, go)));
   }
   function scoreline() {
     var mine = DATA.selections.filter(function (s) { return s.mine && s.counts.review; }).length;
@@ -249,7 +249,7 @@
     if (HV().setUnread) HV().setUnread(DATA.notifications.unread);
   }
   var STEP_IC = { photo: "camera", job_title: "case", phone: "phone", logo: "image", brands: "tag", industry_markets: "globe" };
-  var STEP_WHY = { brands: "Helvy matches creators to them", industry_markets: "your briefs start filled in" };
+  var STEP_WHY = { brands: "Helvi matches creators to them", industry_markets: "your briefs start filled in" };
   var STEP_FIELD = { photo: "photo", job_title: "job_title", phone: "phone", logo: "logo", brands: "brands", industry_markets: "industry" };
   function ring(pct) {
     var r = 58, c = 2 * Math.PI * r;
@@ -263,7 +263,7 @@
     var b = h("button", { class: "hc-step", type: "button", "data-focus": STEP_FIELD[s.key],
       onclick: function () { focusField(STEP_FIELD[s.key]); } },
       h("span", { class: "hc-step__ic" }, icon(STEP_IC[s.key] || "plus")),
-      h("span", null, h("b", null, s.label), h("small", null, h("em", null, "= " + buys(s.credits)), STEP_WHY[s.key] ? " · " + STEP_WHY[s.key] : " with Helvy")),
+      h("span", null, h("b", null, s.label), h("small", null, h("em", null, "= " + buys(s.credits)), STEP_WHY[s.key] ? " · " + STEP_WHY[s.key] : " with Helvi")),
       h("span", { class: "hc-reward" }, "+" + s.credits));
     return h("li", null, b);
   }
@@ -273,8 +273,8 @@
     var left = c.steps.filter(function (s) { return !s.done; }).length;
     var lead = c.waiting
       ? h("p", { class: "hc-done__lead" }, h("mark", null, plural(c.waiting, "credit") + " waiting"),
-          left ? " for " + plural(left, "quick detail") + ". Helvy uses them to pre-fill your briefs." : ". Save your profile to collect them.")
-      : h("p", { class: "hc-done__lead" }, "All profile credits earned. Helvy uses your details to pre-fill your briefs.");
+          left ? " for " + plural(left, "quick detail") + ". Helvi uses them to pre-fill your briefs." : ". Save your profile to collect them.")
+      : h("p", { class: "hc-done__lead" }, "All profile credits earned. Helvi uses your details to pre-fill your briefs.");
     var steps = h("ul", { class: "hc-steps" });
     open.slice(0, 3).forEach(function (s) { steps.appendChild(stepRow(s)); });
     if (!c.bonus_paid) {
@@ -428,7 +428,7 @@
       h("a", { class: "hc-btn hc-btn--line hc-btn--sm", href: ROOT + "#cat-roster" }, "Browse creators")));
     if (!DATA.selections.length) {
       add(p, h("div", { class: "hc-empty" }, h("b", null, "No selections yet"),
-        h("p", null, "Pick creators in the catalogue, or let Helvy build a scored shortlist from a short brief."),
+        h("p", null, "Pick creators in the catalogue, or let Helvi build a scored shortlist from a short brief."),
         h("a", { class: "hc-btn", href: ROOT }, "Find creators")));
       return;
     }
@@ -453,7 +453,7 @@
     add(p, head("Analyses", "A full analysis opens a creator's audience, growth, fake-follower check, brand history, best posts and a pricing benchmark. It is free for any creator in one of your selections and ready within 1 working day."));
     if (!DATA.analyses.length) {
       add(p, h("div", { class: "hc-empty" }, h("b", null, "No analyses requested yet"),
-        h("p", null, "Open a creator from one of your selections and press Request full analysis. Helvy rings your bell when it opens."),
+        h("p", null, "Open a creator from one of your selections and press Request full analysis. Helvi rings your bell when it opens."),
         h("a", { class: "hc-btn", href: "#selections" }, "Go to my selections")));
       return;
     }
@@ -541,10 +541,10 @@
   /* ---------------------------------------------------------------- briefs */
 
   function renderBriefs(p) {
-    add(p, head("Briefs", "The campaign briefs you gave Helvy. Each one scores creators and can be opened as a selection."));
+    add(p, head("Briefs", "The campaign briefs you gave Helvi. Each one scores creators and can be opened as a selection."));
     if (!DATA.briefs.length) {
       add(p, h("div", { class: "hc-empty" }, h("b", null, "No briefs yet"),
-        h("p", null, "Answer six quick questions about a campaign and Helvy ranks the roster against them. Your industry and markets fill in for you."),
+        h("p", null, "Answer six quick questions about a campaign and Helvi ranks the roster against them. Your industry and markets fill in for you."),
         h("a", { class: "hc-btn", href: ROOT }, "Start a brief")));
       return;
     }
@@ -661,9 +661,9 @@
                                                    : "Credits you earn from your profile and invites are added straight away.")),
       h("div", { class: "hc-bal__ask" }, reqBtn, ask, h("p", null, (kam ? kam + ", your account manager," : "Your HelloVoice team") + " tops you up. Usually the same working day."), msg)));
     var c = costs();
-    var rows = [["AI shortlist", "Answer six questions about your campaign; Helvy ranks the roster against them.", c.brief],
+    var rows = [["AI shortlist", "Answer six questions about your campaign; Helvi ranks the roster against them.", c.brief],
                 ["Find a replacement", "After you reject a creator: 3 similar creators that fit the same campaign.", c.replace],
-                ["A typed question to Helvy", "Tapping Helvy's options is always free.", c.chat],
+                ["A typed question to Helvi", "Tapping Helvi's options is always free.", c.chat],
                 ["Full creator analysis", "For any creator in one of your selections. Ready within 1 working day.", 0]];
     var tb = h("tbody");
     rows.forEach(function (r) {
@@ -671,7 +671,7 @@
         h("td", null, r[2] ? h("span", { class: "hc-price__c" }, icon("coin"), String(r[2]), h("small", null, r[2] === 1 ? "credit" : "credits")) : h("span", { class: "hc-price__free" }, "Free"))));
     });
     add(p, h("section", { "aria-labelledby": "hc-buy" }, h("h2", { class: "hc-h2", id: "hc-buy", style: "margin-bottom:14px" }, "What credits buy"),
-      h("table", { class: "hc-price" }, h("thead", null, h("tr", null, h("th", null, "With Helvy"), h("th", null, "Cost"))), tb)));
+      h("table", { class: "hc-price" }, h("thead", null, h("tr", null, h("th", null, "With Helvi"), h("th", null, "Cost"))), tb)));
     var comp = DATA.completion, inv = DATA.invite;
     var left = comp.steps.filter(function (s) { return !s.done; }).length;
     add(p, h("section", { "aria-labelledby": "hc-earn" }, h("h2", { class: "hc-h2", id: "hc-earn", style: "margin-bottom:14px" }, "Earn more"),
@@ -915,7 +915,7 @@
       h("div", { class: "ac-action ac-action--danger" }, h("div", null, h("b", null, "Delete my account"), h("p", { class: "ac-muted" }, "Your account and personal data are erased. Selections and campaigns stay with your company.")),
         h("button", { class: "cat-btn ac-btn-danger", type: "button", onclick: function () { confirmBox.hidden = false; typed.focus(); } }, "Delete account")),
       confirmBox,
-      h("div", { class: "ac-action" }, h("div", null, h("b", null, "Sign out"), h("p", { class: "ac-muted" }, "Sign out of HELVY Connect on this browser.")),
+      h("div", { class: "ac-action" }, h("div", null, h("b", null, "Sign out"), h("p", { class: "ac-muted" }, "Sign out of HELVi Connect on this browser.")),
         h("button", { class: "ac-btn-line", type: "button", onclick: signOut }, "Sign out")));
   }
   function renderAccount(p) {
@@ -925,7 +925,7 @@
       imageField("logo", "Company logo", "Shown on your live campaign's scoreboard."),
       profileForm()));
     add(p, h("section", { class: "hc-sec", "aria-labelledby": "hc-brand" }, h("h2", { class: "hc-h2", id: "hc-brand" }, "Your brands and markets"),
-      h("p", null, "Helvy uses these to pre-fill your briefs, so a new shortlist starts from your industry and market."), brandForm()));
+      h("p", null, "Helvi uses these to pre-fill your briefs, so a new shortlist starts from your industry and market."), brandForm()));
     add(p, teamSection());
     add(p, privacySection());
   }
@@ -1006,7 +1006,7 @@
     var act = h("dl", { class: "kc__act" },
       h("div", null, h("dt", null, "Last sign-in"), h("dd", null, c.last_login_at ? ago(c.last_login_at) : "Never")),
       h("div", null, h("dt", null, "Credits left"), h("dd", null, h("span", { class: "hv-credit-num" }, String(c.credits)))),
-      h("div", null, h("dt", null, "Helvy chats"), h("dd", null, String(c.chats))),
+      h("div", null, h("dt", null, "Helvi chats"), h("dd", null, String(c.chats))),
       h("div", { class: c.handoffs ? "is-attn" : null }, h("dt", null, "Hand-offs"), h("dd", null, String(c.handoffs))));
 
     return h("li", null, h("article", { class: "kc", "aria-labelledby": id },
@@ -1084,7 +1084,7 @@
     var p = $("hc-body");
     p.textContent = "";
     RENDER[SECTION](p);
-    document.title = TITLES[SECTION] + " — HELVY Connect";
+    document.title = TITLES[SECTION] + " — HELVi Connect";
     var want = store("ac-focus");
     if (want) {
       try { sessionStorage.removeItem("ac-focus"); } catch (e) { /* blocked */ }

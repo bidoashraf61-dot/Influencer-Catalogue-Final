@@ -691,7 +691,7 @@ def build():
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
-<title>HELVY Connect — Influencer Catalogue</title>
+<title>HELVi Connect — Influencer Catalogue</title>
 <script src="/assets/js/hv-loader.js" data-tone="dark"></script>
 <link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
 <link rel="apple-touch-icon" href="/assets/brand/helvy-connect/helvy-icon-180.png?v=c4"/>
@@ -705,7 +705,7 @@ def build():
   <div class="cat-gate__inner">
     <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
          srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
-         alt="HELVY Connect" width="320" height="160"/>
+         alt="HELVi Connect" width="320" height="160"/>
     <p class="cat-gate__eyebrow">Confidential</p>
     <h1 class="cat-gate__title">Influencer<br/>Catalogue</h1>
     <p class="cat-gate__note">Enter the access code you were given.</p>
@@ -734,7 +734,7 @@ def build():
         <div class="cat-brand">
           <img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
                srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
-               alt="HELVY Connect" width="320" height="160"/>
+               alt="HELVi Connect" width="320" height="160"/>
         </div>
         <div class="cat-topbar__links"><a class="cat-track" href="/campaign/dashboard/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
@@ -795,7 +795,7 @@ def build():
       <div class="cat-footer__top">
         <img class="cat-footer__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
              srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
-             alt="HELVY Connect" width="320" height="160"/>
+             alt="HELVi Connect" width="320" height="160"/>
         <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
           See the portfolio at hellovoice.co.uk
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
@@ -879,7 +879,7 @@ def build():
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
-<title>Selection — HELVY Connect</title>
+<title>Selection — HELVi Connect</title>
 <script src="/assets/js/hv-loader.js" data-tone="light" data-wait="all"></script>
 <link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
 <link rel="apple-touch-icon" href="/assets/brand/helvy-connect/helvy-icon-180.png?v=c4"/>
@@ -894,7 +894,7 @@ def build():
   <div class="cat-gate__inner">
     <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
          srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
-         alt="HELVY Connect" width="320" height="160"/>
+         alt="HELVi Connect" width="320" height="160"/>
     <p class="cat-gate__eyebrow">Confidential</p>
     <h1 class="cat-gate__title">Selection</h1>
     <p class="cat-gate__note">Enter the access code you were given.</p>
@@ -936,9 +936,9 @@ def build():
     <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
         <div class="cat-brand">
-          <a href="/catalogue/" aria-label="HELVY Connect: back to the full catalogue"><img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
+          <a href="/catalogue/" aria-label="HELVi Connect: back to the full catalogue"><img class="cat-hero__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
                srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
-               alt="HELVY Connect" width="320" height="160"/></a>
+               alt="HELVi Connect" width="320" height="160"/></a>
         </div>
         <div class="cat-topbar__links"><a class="cat-track cat-track--cat" href="/catalogue/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
@@ -1025,7 +1025,7 @@ def build():
       <div class="cat-footer__top">
         <img class="cat-footer__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
              srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
-             alt="HELVY Connect" width="320" height="160"/>
+             alt="HELVi Connect" width="320" height="160"/>
         <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
           See the portfolio at hellovoice.co.uk
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>

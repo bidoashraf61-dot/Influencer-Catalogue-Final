@@ -394,7 +394,7 @@ def _settings_tab():
           % e("\n".join("%s %g %g" % (m, p[0], p[1]) for m, p in sorted(gemini.prices().items())))
         + "<label style='margin-top:14px'>What the assistant knows about HelloVoice</label>"
           "<textarea class='mono' name='kb_text' rows='6'>%s</textarea>" % e(db.setting("kb_text", None) or __import__("assistant").DEFAULT_KB)
-        + "<label style='margin-top:14px'>Campaigns Helvy may name as case studies (campaign IDs, comma-separated)</label>"
+        + "<label style='margin-top:14px'>Campaigns Helvi may name as case studies (campaign IDs, comma-separated)</label>"
           "<input name='case_study_campaigns' value='%s' placeholder='e.g. 12, 15'>"
           "<div class='price-hint'>Only for clients who approved being named. Every other campaign is used anonymised and in aggregate only. "
           "All AI is free for a client while a campaign of theirs runs (start date to end date + 30 days).</div></div>"

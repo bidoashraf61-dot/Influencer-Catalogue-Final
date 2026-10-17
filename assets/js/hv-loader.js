@@ -1,9 +1,9 @@
-/* The page loader and Helvy's clips, on every catalogue page.
+/* The page loader and Helvi's clips, on every catalogue page.
  *
  * Loader rule (client-approved 2026-10-09, replaces the old "no time limit"):
  *   - the page draws its own shell straight away (header, skeleton cards);
  *     nothing covers it while it is quick;
- *   - the loader (the HELVY Connect logo, breathing) appears only if the page is not ready after 0.6 s,
+ *   - the loader (the HELVi Connect logo, breathing) appears only if the page is not ready after 0.6 s,
  *     and it is gone 1.5 s after the page started, ready or not. The page's
  *     skeleton carries on from there;
  *   - "ready" = the window has loaded and none of the page's own requests has
@@ -15,7 +15,7 @@
  *   - clicking a link to another catalogue page brings the loader back only
  *     if that page takes longer than 0.6 s to arrive.
  *
- * HVHelvy (window.HVHelvy) is the ONE place Helvy's files are named. The clips
+ * HVHelvy (window.HVHelvy) is the ONE place Helvi's files are named. The clips
  * are transparent cut-outs, framed waist-up: VP9 with alpha (.webm) for Chrome,
  * Edge and Firefox, HEVC with alpha (.mov, hvc1) for Safari and every browser
  * on iPhone and iPad, and a transparent still for reduced motion.
@@ -23,14 +23,14 @@
  * Autoplay refused is NOT final (fix batch 3, 2026-10-10). Safari refuses every
  * autoplay in macOS / iOS Low Power Mode (NotAllowedError, readyState 0), and the
  * old code swapped the clip for the still for good on that first refusal, so a
- * laptop on battery saw a static Helvy on the sign-in page. Now the still sits
+ * laptop on battery saw a static Helvi on the sign-in page. Now the still sits
  * under the waiting clip, play is tried again when the clip can play, when the
  * tab comes back, and on the visitor's first tap, click or key anywhere (which
  * every browser accepts as permission); the still is removed the moment the clip
  * is really playing. Only a clip that cannot be decoded at all stays a still.
  *
  * Two sets (fix batch 4, 2026-10-10). "helvy" is the transparent cut-out above. "voice" is
- * Helvy head-and-shoulders on lime (assets/brand/voice/, opaque H.264 .mp4 for Safari and
+ * Helvi head-and-shoulders on lime (assets/brand/voice/, opaque H.264 .mp4 for Safari and
  * WebKit, VP9 .webm elsewhere): short, expressive reactions (point, thumbs, cheer), a think
  * and a camera "scan" loop, made for the lime circles of the AI shortlist card and the
  * selection's "Add more like these". Opaque H.264 needs no alpha decoding, so it plays in
@@ -41,7 +41,7 @@
   var me = document.currentScript;
   var tone = (me && me.getAttribute("data-tone")) === "light" ? "light" : "dark";
   var base = me && me.src ? me.src.replace(/assets\/js\/hv-loader\.js.*$/, "") : "/";
-  // The loader is the HELVY Connect logo alone, breathing (client, 2026-10-10): coloured on light
+  // The loader is the HELVi Connect logo alone, breathing (client, 2026-10-10): coloured on light
   // pages, white on ink. "dark" is the file drawn for dark backgrounds.
   var logo = base + "assets/brand/helvy-connect/helvy-connect-" + (tone === "light" ? "light" : "dark") + "-640.webp?v=c4";
   var reduce = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -57,8 +57,8 @@
     if (top_ !== window && top_.hvTourDemo && top_.hvTourDemo.active) { top_.hvTourDemo.install(window); DEMO = true; }
   } catch (e) { DEMO = false; }
 
-  /* ================================================================ Helvy */
-  var HELVY = window.HVHelvy = (function () {
+  /* ================================================================ Helvi */
+  var HELVi = window.HVHelvy = (function () {
     var dir = base + "assets/brand/helvy/";
     var CLIPS = { idle: 1, hello: 1, bye: 1, loader: 1, thinking: 1, celebrate: 1, point: 1, cards: 1, approve: 1 };
     var ua = navigator.userAgent || "";
@@ -227,7 +227,7 @@
     "html.hv-loading,html.hv-loading body{overflow:hidden;}";
   (document.head || document.documentElement).appendChild(css);
 
-  // data-helvy-only: the admin pages load this file for Helvy's clips (the copilot launcher)
+  // data-helvy-only: the admin pages load this file for Helvi's clips (the copilot launcher)
   // and nothing else: no page loader, no request counting.
   if (me && me.hasAttribute("data-helvy-only")) return;
 
@@ -238,7 +238,7 @@
     cover.setAttribute("role", "status");
     cover.setAttribute("aria-label", "Loading");
     var img = document.createElement("img");
-    img.src = logo; img.alt = "HELVY Connect"; img.className = "hv-loader__logo";
+    img.src = logo; img.alt = "HELVi Connect"; img.className = "hv-loader__logo";
     img.width = 320; img.height = 160; img.decoding = "async";
     cover.appendChild(img);
   }

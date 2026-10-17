@@ -58,7 +58,7 @@
     swap: '<path d="M4 8.5h13.5M14 5l3.5 3.5L14 12M20 15.5H6.5M10 19l-3.5-3.5L10 12"/>',
     ban: '<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
     spark: '<path d="M12 3.5v4M12 16.5v4M3.5 12h4M16.5 12h4M6 6l2.6 2.6M15.4 15.4L18 18M6 18l2.6-2.6M15.4 8.6L18 6"/>',
-    // HELVY Connect C + D
+    // HELVi Connect C + D
     shield: '<path d="M12 3.5l7 2.8v5.2c0 4.4-3 7.9-7 9-4-1.1-7-4.6-7-9V6.3z"/><path d="M9 12l2.2 2.2L15.5 10"/>',
     mail: '<rect x="3.5" y="5.5" width="17" height="13" rx="2.5"/><path d="M4.5 7l7.5 6 7.5-6"/>',
     calc: '<rect x="5" y="3" width="14" height="18" rx="2.5"/><path d="M8.5 7h7M8.5 11h.01M12 11h.01M15.5 11h.01M8.5 14.5h.01M12 14.5h.01M15.5 14.5v3M8.5 17.5h.01M12 17.5h.01"/>',
@@ -67,7 +67,7 @@
     help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2.1-2.4 3.6M12 17v.2"/>',
     minus: '<path d="M5 12h14"/>', chat: '<path d="M4.5 5.5h15v10.5h-8.2l-4.3 3.5V16h-2.5z"/><path d="M8.5 10.8h.01M12 10.8h.01M15.5 10.8h.01"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/>',
     filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
-    // HELVY Connect phase E
+    // HELVi Connect phase E
     upload: '<path d="M12 15.5V4.5M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v4.5h15V15"/>',
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M7.5 14h3v3h-3z"/>',
     bulb: '<path d="M9 17.5h6M10 21h4"/><path d="M12 3.5a6 6 0 0 0-3.6 10.8c.7.6 1.1 1.4 1.1 2.2v1h5v-1c0-.8.4-1.6 1.1-2.2A6 6 0 0 0 12 3.5z"/>',
@@ -87,12 +87,12 @@
       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' + (UI_PATHS[name] || "") + "</svg>";
   }
   HV.icon = icon;
-  // Helvy's files are named in ONE place: window.HVHelvy in hv-loader.js (every page loads it first).
+  // Helvi's files are named in ONE place: window.HVHelvy in hv-loader.js (every page loads it first).
   // Transparent cut-outs framed waist-up; HV.helvy is the transparent head still (small avatars).
   var HVH = window.HVHelvy || null;
   HV.helvy = HVH ? HVH.head : ROOT + "assets/brand/helvy-head.webp?v=c3";
   var REDUCE = !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
-  // clip(name, cls, {once, then, seq, still}) -> a frame holding Helvy. Autoplay and loop are
+  // clip(name, cls, {once, then, seq, still}) -> a frame holding Helvi. Autoplay and loop are
   // forced (muted, playsinline, set before the source) and a refused autoplay shows the still.
   function clip(name, cls, opts) {
     opts = opts || {};
@@ -110,7 +110,7 @@
     return box;
   }
   HV.clip = clip;
-  // lime(kind, cls) -> Helvy head-and-shoulders on a lime disc, from the "voice" set (fix batch 4).
+  // lime(kind, cls) -> Helvi head-and-shoulders on a lime disc, from the "voice" set (fix batch 4).
   // Used where he reacts to what the client does: the AI shortlist card, its "Building" stage and
   // the selection's "Add more like these". Expressive, short clips instead of the cut-out's slow
   // idle, and opaque H.264 / VP9, so they play in Safari and Chrome alike.
@@ -177,7 +177,7 @@
     return frame;
   }
   HV.lime = lime;
-  // "Cooking": Helvy at the director's desk while the AI works (thinking -> flipping through
+  // "Cooking": Helvi at the director's desk while the AI works (thinking -> flipping through
   // creator cards -> pressing a green check on a card, round and round) with a rotating step line. Used by
   // Add more like these, Creators like this and Find a replacement; the AI shortlist card has
   // the same sequence in its own stage.
@@ -206,7 +206,7 @@
     return el;
   };
   // The bigger "cooking" (fix batch 3, Add more like these): the AI shortlist card's wait in
-  // small. Helvy at his desk (thinking -> cards -> approve) beside named steps that light up one
+  // small. Helvi at his desk (thinking -> cards -> approve) beside named steps that light up one
   // by one, a live line and a bar. The last step holds until the work is done; finish() lights
   // everything and returns a promise that settles once the client has seen it.
   function cookingSteps(opts) {
@@ -214,7 +214,7 @@
     var el = document.createElement("div");
     el.className = "cx-cook cx-cook--steps" + (opts.dark ? " cx-cook--dark" : "") + (opts.helvy === false ? " cx-cook--bare" : "");
     el.setAttribute("role", "status"); el.setAttribute("aria-live", "polite");
-    // helvy: false when the caller's own Helvy acts out the work beside it (Add more like these).
+    // helvy: false when the caller's own Helvi acts out the work beside it (Add more like these).
     if (opts.helvy !== false) el.appendChild(clip("thinking", "cx-cook__hv", { seq: COOK_SEQ }));
     var tx = document.createElement("div"); tx.className = "cx-cook__tx";
     if (opts.title) { var t = document.createElement("p"); t.className = "cx-cook__title"; t.textContent = opts.title; tx.appendChild(t); }
@@ -252,7 +252,7 @@
   HV.api = function (m, p, b) { return api(m, p, b); };
   HV.followers = function (n) { return followers(n); };
   HV.setCredits = function (n) { return setCredits(n); };
-  // connect.css / connect.js (HELVY Connect C + D) ride along with this file on every page.
+  // connect.css / connect.js (HELVi Connect C + D) ride along with this file on every page.
   (function () {
     var v = (/[?&]v=([0-9a-z]+)/.exec(SRC) || [])[1];
     if (!document.querySelector('link[href*="assets/css/connect.css"]')) {
@@ -468,8 +468,8 @@
 
   /* ------------------------------------------------------------------ gate */
 
-  // HELVY Connect sign-in (simplified 2026-10-09, client-approved). One scene on a blurred wall
-  // of HelloVoice's own film stills: the logo and one line, then the sign-in card with Helvy
+  // HELVi Connect sign-in (simplified 2026-10-09, client-approved). One scene on a blurred wall
+  // of HelloVoice's own film stills: the logo and one line, then the sign-in card with Helvi
   // standing on its top edge (a transparent cut-out, waving hello, then idling), and one small,
   // quiet row of client logos at the foot. Client sign-in only: work email -> 6-digit code ->
   // first-time name, company, job title. There is no team door; HelloVoice reaches the admin by
@@ -506,15 +506,15 @@
     var wrap = h("div", { class: "cx-wrap cx-scene__in" });
 
     /* -- the name and one line -- */
-    var pitch = h("section", { class: "cx-pitch", "aria-label": "About HELVY Connect" });
-    pitch.appendChild(h("h1", { class: "cx-vh" }, "HELVY Connect"));
-    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5", alt: "HELVY Connect", width: "440", height: "220", fetchpriority: "high" }));
+    var pitch = h("section", { class: "cx-pitch", "aria-label": "About HELVi Connect" });
+    pitch.appendChild(h("h1", { class: "cx-vh" }, "HELVi Connect"));
+    pitch.appendChild(h("img", { class: "cx-pitch__logo", src: ROOT + "assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5", alt: "HELVi Connect", width: "440", height: "220", fetchpriority: "high" }));
     pitch.appendChild(h("p", { class: "cx-pitch__tag" }, "Connecting Brands with the Right Voices"));
 
-    /* -- the card, Helvy standing on it -- */
+    /* -- the card, Helvi standing on it -- */
     var door = h("section", { class: "cx-door", "aria-label": "Sign in" });
     var helvy = h("div", { class: "cx-door__helvy" }, clip("hello", "cx-hd--edge", { once: true, then: "idle" }));
-    var bubble = h("span", { class: "cx-door__say", "aria-hidden": "true" }, "Hi, I’m Helvy");
+    var bubble = h("span", { class: "cx-door__say", "aria-hidden": "true" }, "Hi, I’m Helvi");
     var pane = h("div", { id: "cx-pane", "aria-live": "polite" });
     var card = h("div", { class: "cx-door__card" }, pane);
     door.appendChild(helvy); door.appendChild(bubble); door.appendChild(card);
@@ -543,7 +543,7 @@
 
     var foot = h("footer", { class: "cx-scene__foot" });
     var fw = h("div", { class: "cx-wrap" });
-    fw.appendChild(h("span", null, "© " + new Date().getFullYear() + " HELVY Connect · ", h("a", { href: ROOT + "privacy/" }, "Privacy"), " · ", h("a", { href: ROOT + "terms/" }, "Terms")));
+    fw.appendChild(h("span", null, "© " + new Date().getFullYear() + " HELVi Connect · ", h("a", { href: ROOT + "privacy/" }, "Privacy"), " · ", h("a", { href: ROOT + "terms/" }, "Terms")));
     fw.appendChild(h("span", { class: "cx-by" }, h("span", null, "Powered by"),
       h("img", { src: ROOT + "assets/brand/logo-knockout.webp", alt: "HelloVoice", width: "104", height: "23" }), h("span", null, "A BlueHolding Company")));
     foot.appendChild(fw);
@@ -552,7 +552,7 @@
 
     /* -- the steps -- */
     var st = { step: "email", email: "", ticket: "", expires: 0, resendAt: 0, timer: null, company: "" };
-    var SAY = { email: "Hi, I’m Helvy", blocked: "Work email, please", code: "It’s on its way",
+    var SAY = { email: "Hi, I’m Helvi", blocked: "Work email, please", code: "It’s on its way",
                 details: "Nice to meet you", shared: "Got a code?", pending: "Almost there" };
     function setSay(k) { bubble.textContent = SAY[k] || SAY.email; }
     function errLine(text) { return h("p", { class: "cx-err", role: "alert", html: icon("info", "cx-i") }, h("span", null, text)); }
@@ -696,7 +696,7 @@
       var company = h("input", { type: "text", name: "company", autocomplete: "organization", required: true, value: st.company });
       var title = h("input", { type: "text", name: "job_title", autocomplete: "organization-title", required: true, placeholder: "e.g. Brand Manager" });
       var err = h("div");
-      var btn = label(goBtn(), "Enter HELVY Connect");
+      var btn = label(goBtn(), "Enter HELVi Connect");
       var form = h("form", { novalidate: true },
         h("label", { class: "cx-fld" }, h("span", null, "Full name"), name),
         h("div", { class: "cx-row2" }, h("label", { class: "cx-fld" }, h("span", null, "Company"), company),
@@ -710,10 +710,10 @@
         err.textContent = "";
         var miss = [[name, "your name"], [company, "your company"], [title, "your job title"]].filter(function (x) { return x[0].value.trim().length < 2; });
         if (miss.length) { err.appendChild(errLine("Please add " + miss.map(function (x) { return x[1]; }).join(", ") + ".")); miss[0][0].focus(); return; }
-        wait(btn, true, "Enter HELVY Connect");
+        wait(btn, true, "Enter HELVi Connect");
         api("POST", "/api/auth/profile", { ticket: st.ticket, name: name.value, company: company.value, job_title: title.value,
                                            invite: inviteToken() || undefined }).then(function (r) {
-          wait(btn, false, "Enter HELVY Connect");
+          wait(btn, false, "Enter HELVi Connect");
           if (!r.b.ok) { err.appendChild(errLine(r.b.message || "We couldn’t create the account. Please try again.")); return; }
           done(r.b);
         });
@@ -765,7 +765,7 @@
   /* ------------------------------------------------------------------ dock */
 
   // The account circle, top right: initials on lime, opening a small menu.
-  // Ask and Find creators live in Helvy (the chat) now, and admin moves into
+  // Ask and Find creators live in Helvi (the chat) now, and admin moves into
   // the menu, so the bar keeps only the site's own links and this circle.
   function mountDock() {
     if (!ME || !ME.signed_in || $("pt-dock")) return;
@@ -1032,12 +1032,12 @@
       if (step === 0 && HV.briefSource) {
         // Phase E: start from what the client already has: a product page or their own brief.
         body.appendChild(HV.briefSource({
-          lead: opts.attach ? "Have a product page or a brief? Helvy can answer these questions from it." : "Start from what you have",
+          lead: opts.attach ? "Have a product page or a brief? Helvi can answer these questions from it." : "Start from what you have",
           onUse: function (got, res) {
             Object.keys(got).forEach(function (k) { if (k !== "notes" || !opts.attach) answers[k] = got[k]; });
             if (opts.attach && got.notes) answers.notes = got.notes;
             var src = res.source || {};
-            wizard(qs, answers, qs.length, "Helvy filled this from " + (src.kind === "file" ? "your brief" : src.label || "the page") +
+            wizard(qs, answers, qs.length, "Helvi filled this from " + (src.kind === "file" ? "your brief" : src.label || "the page") +
               ". Check every answer and change anything that's off.", Object.assign({}, opts, { source: res }));
           }
         }));
@@ -1125,7 +1125,7 @@
     } else {
       body.appendChild(h("p", { class: "pt-sub" }, prefillNote || "This is what we'll match creators against."));
       if (opts.source) {
-        // What Helvy flagged in the link or file, and when to launch, stay in view while the client checks.
+        // What Helvi flagged in the link or file, and when to launch, stay in view while the client checks.
         (opts.source.flags || []).filter(function (f) { return f.kind !== "claims_found"; }).forEach(function (f) {
           body.appendChild(h("div", { class: "bs-flag bs-flag--" + f.kind + " bs-flag--slim" }, h("span", { class: "bs-flag__ic", html: icon(f.kind === "licence" ? "shield" : "flag") }),
             h("p", null, h("b", null, f.title + ". "), f.text)));
@@ -1179,7 +1179,7 @@
 
   /* ------------------------------------- brief from a link or a file (phase E)
      "Paste a product link" / "Upload a brief (PDF or Word)". The server reads it (public
-     pages only; an uploaded file is read and dropped, never kept), Helvy fills the brief
+     pages only; an uploaded file is read and dropped, never kept), Helvi fills the brief
      with a confidence for every field, copies only claims the source itself makes and
      flags regulated products. Nothing is used until the client presses "Use this brief",
      and every answer can still be changed after. One component for the brief window, the
@@ -1251,7 +1251,7 @@
     var fine = h("p", { class: "bs__fine" });
     var tag = srcCostTag("source");
     if (tag) fine.appendChild(tag);
-    fine.appendChild(h("span", null, "Helvy reads the page or file and fills the brief for you to check. Files are read, never kept."));
+    fine.appendChild(h("span", null, "Helvi reads the page or file and fills the brief for you to check. Files are read, never kept."));
     var err = h("p", { class: "bs__err", role: "alert", hidden: "" });
     var out = h("div", { class: "bs__out", "aria-live": "polite" });
     if (opts.lead) root.appendChild(h("p", { class: "bs__lead" }, opts.lead));
@@ -1308,14 +1308,14 @@
 
     function show(res, qs) {
       out.textContent = "";
-      var card = h("section", { class: "bs-res", "aria-label": "What Helvy read" });
+      var card = h("section", { class: "bs-res", "aria-label": "What Helvi read" });
       var src = res.source || {};
       card.appendChild(h("header", { class: "bs-res__hd" },
         h("span", { class: "bs-res__ic", html: icon(src.kind === "file" ? "brief" : "link") }),
-        h("div", null, h("h3", { class: "bs-res__t" }, "Helvy read " + (src.kind === "file" ? "your brief" : src.label || "the page")),
-          h("p", { class: "bs-res__s" }, src.kind === "file" ? src.label + " · not kept" : "Check each line. Anything Helvy wasn't sure of is marked.")),
+        h("div", null, h("h3", { class: "bs-res__t" }, "Helvi read " + (src.kind === "file" ? "your brief" : src.label || "the page")),
+          h("p", { class: "bs-res__s" }, src.kind === "file" ? src.label + " · not kept" : "Check each line. Anything Helvi wasn't sure of is marked.")),
         res.spent ? h("span", { class: "bs-res__spent" }, res.spent + " credits used") : null));
-      if (!res.ai) card.appendChild(h("p", { class: "bs-res__warn" }, "Helvy's AI is resting, so only the plain facts were picked out. Check every answer."));
+      if (!res.ai) card.appendChild(h("p", { class: "bs-res__warn" }, "Helvi's AI is resting, so only the plain facts were picked out. Check every answer."));
       var dl = h("dl", { class: "bs-rows" });
       var edits = {};
       SRC_ROWS.forEach(function (r) {
@@ -1330,7 +1330,7 @@
           if (r[0] === "audience" && val && val !== inp.value) dd.appendChild(h("small", null, val.replace(inp.value, "").replace(/^ · /, "")));
         } else dd = h("dd", null, val || "—");
         dl.appendChild(h("div", { class: "bs-rows__r" }, h("dt", null, r[1]), dd,
-          h("span", { class: "bs-conf bs-conf--" + c[1], title: conf === "missing" ? "Not in the source: answer it in the next step" : "How sure Helvy is" }, c[0])));
+          h("span", { class: "bs-conf bs-conf--" + c[1], title: conf === "missing" ? "Not in the source: answer it in the next step" : "How sure Helvi is" }, c[0])));
       });
       card.appendChild(dl);
       (res.flags || []).filter(function (f) { return f.kind !== "claims_found" || !(res.claims && res.claims.length); }).forEach(function (f) {
@@ -1340,7 +1340,7 @@
       if (res.claims && res.claims.length) {
         var cl = h("ul", { class: "bs-claims" });
         res.claims.forEach(function (c) { cl.appendChild(h("li", null, "“" + c + "”")); });
-        card.appendChild(h("div", { class: "bs-claims__w" }, h("p", { class: "bs-claims__h" }, "Claims your source makes (Helvy adds none)"), cl));
+        card.appendChild(h("div", { class: "bs-claims__w" }, h("p", { class: "bs-claims__h" }, "Claims your source makes (Helvi adds none)"), cl));
       }
       var tl = timingLine(res.timing, { dark: false });
       if (tl) card.appendChild(tl);
@@ -1509,7 +1509,7 @@
       if (!r.b.ok || r.b.brief) return;
       var box = h("div", { class: "pt-toast", role: "dialog", "aria-label": "Score this selection" },
         h("p", { class: "pt-toast__t" }, "Score this selection"),
-        h("p", { class: "pt-toast__b" }, "Six quick questions about the campaign, and Helvy scores the creators already in this selection. It doesn't add anyone. Free."));
+        h("p", { class: "pt-toast__b" }, "Six quick questions about the campaign, and Helvi scores the creators already in this selection. It doesn't add anyone. Free."));
       if (LANG === "ar") box.setAttribute("dir", "rtl");
       var later = h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { box.remove(); } }, "Not now");
       var go = h("button", { class: "pt-btn pt-btn--lime", type: "button", onclick: function () {
@@ -1522,10 +1522,10 @@
   }
   window.addEventListener("hv:selection-saved", function (e) { offerBrief(e.detail && e.detail.token); });
   // The selection page's "Add your campaign objective" (and its Edit): the objective studio,
-  // fix batch 3. Same world as the AI shortlist card (ink, lime, Helvy reacting to every
+  // fix batch 3. Same world as the AI shortlist card (ink, lime, Helvi reacting to every
   // answer over a campaign-power meter), but it only SCORES the creators already in this
   // selection: nothing is added, removed or rebuilt. The goal takes several answers. On the
-  // last answer the meter hits full power, Helvy works through named steps, and the page
+  // last answer the meter hits full power, Helvi works through named steps, and the page
   // comes back with the round score stamps on the cards.
   var OB_STEPS = {
     goal: ["Goal", '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".6" fill="currentColor"/>'],
@@ -1561,7 +1561,7 @@
       x.innerHTML = aiSvg('<path d="M6 6l12 12M18 6L6 18"/>', 18);
       card.appendChild(h("header", { class: "ob__hd" },
         h("div", null, h("h2", { class: "ai-sl__title", id: "ob-t" }, start.edit ? "Edit this selection’s objective" : "Score this selection"),
-          h("p", { class: "ob__lead" }, "Helvy scores the " + (nIn ? nIn + " creator" + (nIn === 1 ? "" : "s") + " already in " : "creators already in ") + "“" + selName +
+          h("p", { class: "ob__lead" }, "Helvi scores the " + (nIn ? nIn + " creator" + (nIn === 1 ? "" : "s") + " already in " : "creators already in ") + "“" + selName +
             "” against your campaign. Nothing is added, removed or changed. Free.")), x));
       var run = h("div", { class: "ai-sl__run ob__run" });
       var coach = h("div", { class: "ai-sl__coach", "aria-hidden": "true" });
@@ -1591,7 +1591,7 @@
       var close = layer(card);
       x.addEventListener("click", function () { close(); });
 
-      /* -- Helvy: a reaction plays once, then he waits (thinking) -- */
+      /* -- Helvi: a reaction plays once, then he waits (thinking) -- */
       // The same lime clips as the AI shortlist card (one framing, no still): a reaction plays once and the
       // coach goes back to the smile; while it works he scouts with the camera. (Fix batch 3's transparent
       // clips lost their sizing rule in batch 4 and rendered huge and blank: 2026-10-11.)
@@ -1707,7 +1707,7 @@
         finish();
       }
 
-      /* -- full power: Helvy scores the selection -- */
+      /* -- full power: Helvi scores the selection -- */
       function finish() {
         var miss = qs.filter(function (q) { return q.required && !answered(q); })[0];
         if (miss) { show(qs.indexOf(miss)); return; }
@@ -2148,13 +2148,13 @@
 
     /* -- launcher -- */
     var root = h("div", { id: "hv-voice", class: "hv-voice" });
-    var launch = h("button", { class: "hv-launch cx-launch", type: "button", "aria-label": "Chat with Helvy, your AI assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
-    // Helvy rises out of an ink disc: the transparent idle loop, cut at the disc's curve.
+    var launch = h("button", { class: "hv-launch cx-launch", type: "button", "aria-label": "Chat with Helvi, your AI assistant", "aria-expanded": "false", "aria-controls": "hv-panel" });
+    // Helvi rises out of an ink disc: the transparent idle loop, cut at the disc's curve.
     // Reduced motion, or a browser that refuses autoplay, gets the transparent still instead.
     launch.innerHTML = '<span class="hv-launch__disc" aria-hidden="true"></span>' +
       '<span class="hv-launch__x" aria-hidden="true">' + V_ICON.close + "</span>" +
       '<span class="hv-launch__dot" aria-hidden="true" hidden></span>';
-    // Helvy smiling and waving bye-bye on the lime disc: the "voice" loop (5 s, muted, looping); the lime still under reduced motion.
+    // Helvi smiling and waving bye-bye on the lime disc: the "voice" loop (5 s, muted, looping); the lime still under reduced motion.
     // The clip opens on a big toothy smile and waves with both hands, energetically (Higgsfield, Kling
     // pro, start = end frame so it loops); its poster is a smiling frame too.
     var wavePoster = HVH ? HVH.wavePoster : ROOT + "assets/brand/voice/voice-hi-poster.webp?v=t5";
@@ -2171,7 +2171,7 @@
     var panel = h("section", { id: "hv-panel", class: "hv-panel", role: "dialog", "aria-modal": "false", "aria-labelledby": "hv-name", hidden: "" });
     var head = h("header", { class: "hv-head" });
     head.classList.add("cx-chathead");
-    // Helvy in the header: idle at rest; while he works on an answer (thinking, then the words
+    // Helvi in the header: idle at rest; while he works on an answer (thinking, then the words
     // streaming in) he sits at his desk (thinking -> cards -> approve) so he never reads as a still.
     var headHelvy = clip("idle", "hv-head__helvy");
     head.appendChild(headHelvy);
@@ -2183,7 +2183,7 @@
       headHelvy = nx;
       var v = nx.querySelector("video"); if (v && HVH) HVH.play(v);
     }
-    head.insertAdjacentHTML("beforeend", '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">Helvy</h2>' +
+    head.insertAdjacentHTML("beforeend", '<div class="hv-head__id"><h2 class="hv-head__name" id="hv-name">Helvi</h2>' +
       '<p class="hv-head__role"><span class="hv-head__on"><i aria-hidden="true"></i>Your AI assistant · online</span></p></div>');
     var freshBtn = h("button", { class: "hv-head__btn", type: "button", "aria-label": "Start a new chat", title: "New chat" });
     freshBtn.innerHTML = V_ICON.fresh;
@@ -2196,18 +2196,18 @@
     minBtn.innerHTML = V_ICON.minimize;
     head.appendChild(h("div", { class: "hv-head__tools" }, growBtn, freshBtn, minBtn, closeBtn));
     var log = h("div", { class: "hv-log", role: "log", "aria-live": "polite", "aria-relevant": "additions" });
-    var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message Helvy" });
+    var ta = h("textarea", { class: "hv-input", rows: "1", maxlength: "800", placeholder: "Type a message…", "aria-label": "Message Helvi" });
     var send = h("button", { class: "hv-send", type: "button", "aria-label": "Send" });
     send.innerHTML = V_ICON.send;
     // Voice (phase E): the browser's own speech-to-text, Arabic (Saudi) or English. Nothing is
-    // recorded or uploaded by HelloVoice; the words become a normal typed message and Helvy
+    // recorded or uploaded by HelloVoice; the words become a normal typed message and Helvi
     // answers in text. Browsers without speech recognition get no mic, just a tooltip.
     var Speech = window.SpeechRecognition || window.webkitSpeechRecognition;
     var VLANG = { "ar-SA": ["ع", "Arabic (Saudi)"], "en-US": ["EN", "English"] };
     var vlang = "en-US";
     try { vlang = localStorage.getItem("hv-voice-lang") || (/^ar/i.test(navigator.language || "") ? "ar-SA" : "en-US"); } catch (e) { /* private */ }
     if (!VLANG[vlang]) vlang = "en-US";
-    var mic = Speech ? h("button", { class: "hv-mic", type: "button", "aria-label": "Speak your message", "aria-pressed": "false", title: "Speak to Helvy" }) : null;
+    var mic = Speech ? h("button", { class: "hv-mic", type: "button", "aria-label": "Speak your message", "aria-pressed": "false", title: "Speak to Helvi" }) : null;
     if (mic) mic.innerHTML = V_ICON.mic;
     var langBtn = Speech ? h("button", { class: "hv-vlang", type: "button", title: "Voice language" }) : null;
     function paintLang() {
@@ -2312,7 +2312,7 @@
     function say(text, then) {
       queue = queue.then(function () {
         return new Promise(function (done) {
-          var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "Helvy is typing" }, h("i"), h("i"), h("i")));
+          var dots = row("ai", h("div", { class: "hv-msg hv-msg--ai hv-typing", "aria-label": "Helvi is typing" }, h("i"), h("i"), h("i")));
           setTimeout(function () {
             dots.remove();
             var b = bubble("ai", text); b.textContent = "";
@@ -2465,7 +2465,7 @@
       });
     }
     function greet() {
-      say("Hi" + (first ? " " + first : "") + ", I'm Helvy 👋");
+      say("Hi" + (first ? " " + first : "") + ", I'm Helvi 👋");
       if (selToken()) { aboutSelection(); return; }
       menu("How can I help you?");
     }
@@ -2986,7 +2986,7 @@
         .catch(function () { onEvent({ t: "error", status: 0, message: "Could not reach the server. Please try again." }); });
     }
 
-    /* -- Helvy's working note (item 41): avatar, three typing dots, one typed line -- */
+    /* -- Helvi's working note (item 41): avatar, three typing dots, one typed line -- */
     var NOTE_PLAIN = [[/search|roster|find|rank|look/i, "Searching creators"], [/engage|reach|metric|calculat|check/i, "Checking engagement"],
                       [/match|scor|fit|compar/i, "Scoring fit"], [/campaign|brief|your|read|open/i, "Reading your campaign"]];
     function workNote() {
@@ -3032,7 +3032,7 @@
         stop: function () { clearInterval(typedT); clearInterval(rotT); clearTimeout(nextT); }
       };
     }
-    /* -- Helvy cannot do it: one tap sends the chat to the account manager, after a confirm card (item 38) -- */
+    /* -- Helvi cannot do it: one tap sends the chat to the account manager, after a confirm card (item 38) -- */
     function handoffCard(hf) {
       var box = h("div", { class: "hv-msg hv-msg--ai hv-act hv-hand", role: "group", "aria-label": "Send this to your account manager" });
       var ask = h("button", { class: "hv-hand__btn", type: "button" }, "Send this to my account manager");
@@ -3083,7 +3083,7 @@
       if (!roiAsk && !(ME && ME.ai) && !selToken() && REQ.test(text) && !/how much|price|cost/i.test(text)) { flowFind(text); return; }
       if (!roiAsk && !(ME && ME.ai)) { say("I can't answer typed questions on this access yet. Tap an option, or I can pass your question to your account manager."); chips([{ label: "Send it to my account manager", primary: true, go: function () { handoff("handoff", text); } }, { label: "Show the menu", ghost: true, go: function () { menu(); } }]); return; }
       busy = true; send.disabled = true;
-      // While it works (item 41): Helvy's avatar, three typing dots and ONE line typed out that names
+      // While it works (item 41): Helvi's avatar, three typing dots and ONE line typed out that names
       // what he is doing now. No box, no step list. A line stays at least 0.9 s so it never flickers;
       // the answer waits until the note has been up for 0.9 s.
       var note = workNote();
@@ -3179,7 +3179,7 @@
     minBtn.addEventListener("click", function () { toggle(false); });
     // The account page's "Message your account manager" opens straight onto the hand-off.
     HV.talk = function () { toggle(true); setTimeout(flowHuman, 400); };
-    // Tour demo only: Helvy is briefed on screen, letter by letter, then answers from the demo world.
+    // Tour demo only: Helvi is briefed on screen, letter by letter, then answers from the demo world.
     if (window.hvDemo) {
       HV.voiceDemo = function (text, fresh) {
         var wasOpen = root.classList.contains("is-open");
@@ -3215,7 +3215,7 @@
     growBtn.addEventListener("click", function () { setBig(!root.classList.contains("is-big")); });
     try { if (localStorage.getItem(BIG) === "1") setBig(true); } catch (e) { /* private */ }
 
-    /* -- speak to Helvy: what is heard shows live above the box; when the client stops,
+    /* -- speak to Helvi: what is heard shows live above the box; when the client stops,
        it is sent as a normal message. Tap the mic again to stop early. -- */
     if (mic) {
       var rec = null, said = "", base = "", hideT = 0;
@@ -3255,7 +3255,7 @@
         rec.onerror = function (e) {
           errored = true;
           var why = e && e.error;
-          strip("err", why === "not-allowed" || why === "service-not-allowed" ? "Allow the microphone for this site to speak to Helvy." :
+          strip("err", why === "not-allowed" || why === "service-not-allowed" ? "Allow the microphone for this site to speak to Helvi." :
                 why === "no-speech" ? "Didn't catch that. Tap the mic and try again." : why === "aborted" ? "Stopped." : "Voice didn't work this time. You can type instead.");
         };
         rec.onend = function () {
@@ -3271,7 +3271,7 @@
       });
     }
 
-    /* -- the page tip: a bubble from the launcher saying what Helvy can do on THIS page --
+    /* -- the page tip: a bubble from the launcher saying what Helvi can do on THIS page --
        Once per page per visit (sessionStorage), after a short beat; auto-hides, dismissible.
        Never prices or costs. Every page is a full load, so moving between pages brings the next tip. */
     var TIPS = {
@@ -3368,14 +3368,14 @@
     host.classList.add("ai-host");
     var card = h("section", { id: "ai-sl", class: "ai-sl", "aria-labelledby": "ai-sl-title" });
     var roster = document.querySelectorAll(".cat-card").length;
-    // Helvy on lime (fix batch 4): the "voice" set's expressive clips, as this card had before the
+    // Helvi on lime (fix batch 4): the "voice" set's expressive clips, as this card had before the
     // transparent cut-out replaced them (his idle and think barely move, so he read as a still).
 
     // Collapsed: the invitation.
     var intro = h("div", { class: "ai-sl__intro" });
     intro.innerHTML = '<div class="ai-sl__face"></div>' +
       '<div class="ai-sl__copy"><h2 class="ai-sl__title" id="ai-sl-title">Build a shortlist with AI</h2>' +
-      "<p>Six quick taps, and Helvy picks the creators that fit your campaign best.</p></div>";
+      "<p>Six quick taps, and Helvi picks the creators that fit your campaign best.</p></div>";
     var start = h("button", { class: "ai-sl__start", type: "button" }, "Start");
     start.insertAdjacentHTML("beforeend", aiSvg('<path d="M5 12h13M13 6l6 6-6 6"/>', 18));
     intro.appendChild(start);
@@ -3524,7 +3524,7 @@
       card.classList.remove("is-open"); run.hidden = true; intro.hidden = false;
     }
     start.addEventListener("click", function () { answers = profileAnswers(); srcRes = null; open(); });
-    // From a link or a file: Helvy fills the six answers, the client lands on the review to check them.
+    // From a link or a file: Helvi fills the six answers, the client lands on the review to check them.
     function fromSource(which) {
       card.classList.add("is-open"); intro.hidden = true; run.hidden = false; run.classList.remove("is-staging");
       shown = 0; setTrack(0); paintPower(false); coachCue("point");
@@ -3532,7 +3532,7 @@
         qs = list; byId = {}; qs.forEach(function (q) { byId[q.id] = q; });
         var p = h("div", { class: "ai-sl__q ai-sl__src" });
         p.appendChild(h("p", { class: "ai-sl__ask" }, "Start from what you have"));
-        p.appendChild(h("p", { class: "ai-sl__hint" }, "A product page or your brief. Helvy fills the brief, you check it."));
+        p.appendChild(h("p", { class: "ai-sl__hint" }, "A product page or your brief. Helvi fills the brief, you check it."));
         var bs = HV.briefSource({ dark: true, onUse: function (got, res) {
           answers = Object.assign(profileAnswers(), got); srcRes = res;
           review();
@@ -3710,7 +3710,7 @@
         }).join("") + "</div>" +
         '<div class="ai-sl__lens"></div>' +
         '<span class="ai-sl__spark ai-sl__spark--1"></span><span class="ai-sl__spark ai-sl__spark--2"></span><span class="ai-sl__spark ai-sl__spark--3"></span>';
-      // Helvy scouts with his camera while the steps tick off (the scan clip, looping). Created in
+      // Helvi scouts with his camera while the steps tick off (the scan clip, looping). Created in
       // the Build tap, so the browser lets it play.
       scene.querySelector(".ai-sl__lens").appendChild(lime("scan"));
       p.appendChild(scene);

@@ -200,7 +200,7 @@ def team_page(who, ok=None, err=None, setup_secret=None, new_member=None):
               ".pa-av{grid-area:av;align-self:start}.pa-who{grid-area:who}.pa-lvl{grid-area:lvl}.pa-seen{display:none}.pa-m{grid-area:m}}</style>"
               "<script>document.addEventListener('click',function(ev){document.querySelectorAll('.pa-more[open]').forEach(function(d){if(!d.contains(ev.target))d.removeAttribute('open')})});"
               "document.addEventListener('keydown',function(ev){if(ev.key==='Escape')document.querySelectorAll('.pa-more[open]').forEach(function(d){d.removeAttribute('open')})});</script>")
-    header = ("<div class='pa-top'><div><h1>People and access</h1><p>Who can control HELVY Connect. Everyone signs in with a code sent to their work email, "
+    header = ("<div class='pa-top'><div><h1>People and access</h1><p>Who can control HELVi Connect. Everyone signs in with a code sent to their work email, "
               "so there are no passwords to share.</p></div></div>")
     req = team.required_roles()
     policy = ("<div class='card'><h2>Sign-in rules</h2><form method='post' action='" + u("/team/policy") + "'>"

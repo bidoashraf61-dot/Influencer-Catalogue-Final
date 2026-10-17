@@ -5,7 +5,7 @@ stays on the server or is the server's sample analysis. A granted client gets it
 
 Covers the creator endpoint, the locked page's sample, selection scores (the number and
 stamp stay, the evidence that quotes the analysis goes), Add more like these, Creators
-like this, Find a replacement, content ideas, the Helvy chat tools and discovery.
+like this, Find a replacement, content ideas, the Helvi chat tools and discovery.
 
 Same harness as e2e_portal.py (throwaway copy of admin/*.py, empty database, captured
 mail, scripted Gemini).
@@ -214,7 +214,7 @@ class Fixes3Gating(unittest.TestCase):
         ideas.keep("c:1", "HV-MI-002", batch, ideas.brief_key({"style": None}))
         self.assertEqual(ideas.kept("c:1", "HV-MI-002", full=False)["ideas"], batch)
 
-    # ------------------------------------------------------------- Helvy's tools --
+    # ------------------------------------------------------------- Helvi's tools --
     def test_05_helvy_tools_answer_free_fields_only(self):
         c, _ = self.signup("chat@lockco5.com")
         cid = portal.user_by_email("chat@lockco5.com")["code_id"]

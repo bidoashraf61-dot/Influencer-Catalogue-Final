@@ -61,7 +61,7 @@ mkdir -p "$DST/market"
 cp "$SRC/market/index.html"         "$DST/market/index.html"
 # The client's own account page, also hand-written.
 cp "$SRC/account/index.html"        "$DST/account/index.html"
-# HELVY Connect privacy notice and terms (drafts pending legal review), hand-written.
+# HELVi Connect privacy notice and terms (drafts pending legal review), hand-written.
 cp "$SRC/privacy/index.html"        "$DST/privacy/index.html"
 cp "$SRC/terms/index.html"          "$DST/terms/index.html"
 

@@ -1,7 +1,7 @@
-/* HELVY Connect onboarding tour v3 (tour.js). Fetched only when a client starts the tour.
+/* HELVi Connect onboarding tour v3 (tour.js). Fetched only when a client starts the tour.
    An ink broadcast bar (DEMO, seven chapters, Exit) over the real pages playing in a frame;
    a lime-ringed spotlight with a numbered pin; a ghost cursor that shows the tap before it
-   happens; chapter cards between chapters; Helvy standing on the coach card, never in a circle.
+   happens; chapter cards between chapters; Helvi standing on the coach card, never in a circle.
    Catalogue world: ink / lime / linen, Bebas for names and actions, DM Sans for sentences. */
 
 .tv { position: fixed; inset: 0; z-index: 2147482000; display: grid; grid-template-rows: auto minmax(0, 1fr); background: var(--ink, #121212);
@@ -85,7 +85,7 @@
 .tv-coach.is-pop { animation: tv-pop .42s cubic-bezier(.16,1,.3,1) both; }
 @keyframes tv-pop { from { opacity: 0; transform: translateY(10px) scale(.98); } }
 .tv-coach.is-wait { opacity: .72; }
-/* Helvy stands on the card, his waist cut on its top edge; he turns to face the lit area */
+/* Helvi stands on the card, his waist cut on its top edge; he turns to face the lit area */
 .tv-coach--narrow { width: 340px; }
 .tv-coach__helvy { position: absolute; left: 14px; bottom: calc(100% - 2px); pointer-events: none; }
 .tv-coach .cx-hd.tv-hv { width: 116px; height: 116px; }
@@ -115,7 +115,7 @@
 .tv-btn--line { background: transparent; border-color: var(--ink); }
 .tv-btn .tv-i { width: 17px; height: 17px; }
 
-/* the finish: the coach in the middle, Helvy celebrating, the +5 stamp */
+/* the finish: the coach in the middle, Helvi celebrating, the +5 stamp */
 .tv-coach--finish { left: 50% !important; top: 50% !important; right: auto; bottom: auto; width: 460px; transform: translate(-50%, -42%); padding: 26px 28px 16px; text-align: center; }
 .tv-coach--finish.is-pop { animation: tv-pop-c .5s cubic-bezier(.16,1,.3,1) both; }
 @keyframes tv-pop-c { from { opacity: 0; transform: translate(-50%, -38%) scale(.97); } }

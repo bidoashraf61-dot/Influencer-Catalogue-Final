@@ -1,11 +1,11 @@
-"""End-to-end tests for HELVY Connect fix batch 7 (2026-10-10, branch portal-fixes-7): ROI Calculator v4,
+"""End-to-end tests for HELVi Connect fix batch 7 (2026-10-10, branch portal-fixes-7): ROI Calculator v4,
 structure vs performance.
 
 - the comparison through the API: the recommended structure for the same creators and posts, the
   Selection quality, the gap, ways to improve with machine-readable actions;
 - no budget, price, cost or market anywhere in the output, and an old client's budget/market is ignored;
 - the recommended-structure settings card: saved when each goal adds up to 100, refused otherwise;
-- Helvy's roi_compare tool and the chat's typed "N creators" answer.
+- Helvi's roi_compare tool and the chat's typed "N creators" answer.
 
 Shapes are read from roi.SHAPES_DEFAULT, never hard-coded here.
 
@@ -215,7 +215,7 @@ class Fixes7(unittest.TestCase):
         ctx = {"code_id": 1, "kind": "client"}
         out = assistant._roi_tool(ctx, "awareness", ["Instagram"], {"nano": 6})
         self.assertIn("quality_of_the_mix", out)
-        # no selection and no number: Helvy is told to ask, with the usual range as a hint
+        # no selection and no number: Helvi is told to ask, with the usual range as a hint
         ask = assistant._roi_compare_tool({"code_id": 1}, ["awareness"], ["Instagram"], 0)
         self.assertEqual(ask["ask"], "How many creators do you want? Awareness campaigns usually run %d-%d." % roi.COUNT_RANGES_DEFAULT["awareness"])
         got = assistant._roi_compare_tool({"code_id": 1}, ["awareness"], ["Instagram"], 40)

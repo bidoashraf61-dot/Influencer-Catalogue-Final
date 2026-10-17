@@ -632,9 +632,9 @@ The shared e2e harness (`e2e_portal.py`) now also copies `admin/reference/` into
 
 Client portal → Settings → "Sample full analysis": the creator code (default `HV-HCPG-003`) and an on/off switch. A locked analysis page then offers clients "See a sample full analysis": the real analysis of that one creator with the name, handle, bio, photo, links, post covers, brand names and hashtags removed, numbers only. The card shows whether it is working (the creator must exist, be active and have a full analysis, not public numbers only). Clients see nothing else through it, whatever they have unlocked. Change the code to use another creator's analysis; switch it off to hide the button and refuse the endpoint.
 
-## Helvy's hand-off (fix batch 8)
+## Helvi's hand-off (fix batch 8)
 
-When Helvy cannot do what a client asks he shows "Send this to my account manager". After the client confirms, the KAM and the "Email the team about" list get one email "Account manager request" with the client, the reason, the open selection (name and link) and the last turns of the chat. It follows the "Quote requests" switch if the event list was saved before this existed. Nothing is created in the requests table; reply to the client by email or phone as usual.
+When Helvi cannot do what a client asks he shows "Send this to my account manager". After the client confirms, the KAM and the "Email the team about" list get one email "Account manager request" with the client, the reason, the open selection (name and link) and the last turns of the chat. It follows the "Quote requests" switch if the event list was saved before this existed. Nothing is created in the requests table; reply to the client by email or phone as usual.
 
 ## Quote status and Create campaign (fix batch 9)
 

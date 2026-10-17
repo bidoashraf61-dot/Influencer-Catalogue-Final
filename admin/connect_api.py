@@ -1,4 +1,4 @@
-"""HTTP routes for HELVY Connect phases C + D, as a mixin on ``Handler`` (through PortalMixin).
+"""HTTP routes for HELVi Connect phases C + D, as a mixin on ``Handler`` (through PortalMixin).
 
 Client routes
     POST /api/tour                 {action: offered|later|started|done} -> state (+5 credits once on done)
@@ -231,7 +231,7 @@ class ConnectMixin(lifecycle_api.LifecycleMixin):
         return True, cost
 
     def api_selection_more(self):
-        """Add more like these: Helvy studies the approved creators and adds more that match
+        """Add more like these: Helvi studies the approved creators and adds more that match
         to Under review, for the owner to decide."""
         b = self.json_body()
         got = self._ai_target(b)
@@ -243,7 +243,7 @@ class ConnectMixin(lifecycle_api.LifecycleMixin):
         note = " ".join(str(b.get("note") or "").split())[:160]
         chips = [c for c in (b.get("chips") or []) if c in aimore.QUICK][:4]
         count = max(1, min(self._int(b.get("count"), 5), aimore.MAX_COUNT))
-        ok, cost = self._charged(reader, role, "more", "Helvy: add more like these")
+        ok, cost = self._charged(reader, role, "more", "Helvi: add more like these")
         if not ok:
             return
         try:
@@ -252,8 +252,8 @@ class ConnectMixin(lifecycle_api.LifecycleMixin):
             picks, err = [], "failed"
         if not picks:
             portal.refund(reader, cost, "no creators added")
-            msg = {"no_seeds": "Approve a few creators first, so Helvy knows what you like."}.get(
-                err, "Helvy found no one close enough. Try fewer filters, or ask your account manager.")
+            msg = {"no_seeds": "Approve a few creators first, so Helvi knows what you like."}.get(
+                err, "Helvi found no one close enough. Try fewer filters, or ask your account manager.")
             return self.send_json(200, {"ok": True, "added": [], "message": msg, "spent": 0,
                                         "credits": portal.balance(reader) if role == "owner" else None}, self.cors())
         sel = db.selection(sel["id"])
@@ -291,14 +291,14 @@ class ConnectMixin(lifecycle_api.LifecycleMixin):
         else:
             if self._throttled("alike:%d" % reader, 30, 3600):
                 return
-            ok, cost = self._charged(reader, role, "alike", "Helvy: creators like " + code)
+            ok, cost = self._charged(reader, role, "alike", "Helvi: creators like " + code)
             if not ok:
                 return
             picks = aimore.alike(sel, code, shown=set(before))
             if not picks:
                 portal.refund(reader, cost, "no look-alikes found")
                 return self.send_json(200, {"ok": True, "creators": [], "spent": 0,
-                                            "message": "Helvy found no one else close enough to this creator."}, self.cors())
+                                            "message": "Helvi found no one else close enough to this creator."}, self.cors())
             aimore.keep(sel["id"], code, before + [p["code"] for p in picks])
         shown = {r["code"]: r for r in self.roster_payload(only={p["code"] for p in picks})}
         return self.send_json(200, {"ok": True, "creators": [dict(shown[p["code"]], why=p["why"]) for p in picks if p["code"] in shown],

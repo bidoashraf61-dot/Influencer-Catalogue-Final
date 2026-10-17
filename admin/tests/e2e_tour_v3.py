@@ -1,4 +1,4 @@
-"""End-to-end tests for the HELVY Connect onboarding tour v3 (branch tour-v3, item 40) and its leftovers.
+"""End-to-end tests for the HELVi Connect onboarding tour v3 (branch tour-v3, item 40) and its leftovers.
 
 The tour is ONE CLIENT'S FIRST CAMPAIGN, from brief to results, played on the real portal pages in a
 frame on an invented demo roster. This suite checks, without a browser:
@@ -18,7 +18,7 @@ frame on an invented demo roster. This suite checks, without a browser:
   draws it (checked against the page sources), the opener lists the same chapters;
 - the demo API answers every endpoint the steps use with the LIVE response shapes (the tour's own
   JavaScript is run under node and compared with the server's real answers);
-- Helvy, the sign-in email and the leftovers of v2.
+- Helvi, the sign-in email and the leftovers of v2.
 
 Same harness as e2e_portal.py (a throwaway copy of admin/*.py, an empty database, captured mail, a
 scripted Gemini), so it never touches catalogue.db or the network. The tour's on-screen behaviour (each
@@ -46,7 +46,7 @@ from unittest import mock  # noqa: E402
 REPO = Path(__file__).resolve().parents[2]
 JS = REPO / "assets" / "js"
 CSS = REPO / "assets" / "css"
-CHAPTERS = ["Brief", "Shortlist", "Check a creator", "Plan", "Ask Helvy", "Quote", "Follow"]
+CHAPTERS = ["Brief", "Shortlist", "Check a creator", "Plan", "Ask Helvi", "Quote", "Follow"]
 
 
 def read(p):
@@ -177,7 +177,7 @@ class TourV3(unittest.TestCase):
     def test_04_frame_handover_happens_first_and_only_for_the_tour(self):
         # hv-loader.js is the first script on every page and installs the demo before anything else runs
         i = self.loader.index("top_.hvTourDemo.install(window)")
-        self.assertLess(i, self.loader.index("var HELVY = window.HVHelvy"))
+        self.assertLess(i, self.loader.index("var HELVi = window.HVHelvy"))
         self.assertIn("top_ !== window && top_.hvTourDemo && top_.hvTourDemo.active", self.loader)
         self.assertIn("if (DEMO) ready = true; else arm(T0);", self.loader)
         # the shim: every /api/ call answered in the frame, storage and cookies in memory, no outside link
@@ -236,7 +236,7 @@ class TourV3(unittest.TestCase):
         self.assertIn('"Northwind Pharma"', self.tour); self.assertIn('"Ramadan Skincare"', self.tour)
         # never a roster total on screen: the demo roster is its 8 people, and no copy counts the roster
         self.assertNotRegex(self.tour, r"\d[\d,]* (vetted )?creators (in|on) (the|our) (roster|catalogue)")
-        # Helvy never quotes a price in the chat
+        # Helvi never quotes a price in the chat
         for text in self.demo()["chat"]["hand"] + self.demo()["chat"]["explain"] + self.demo()["chat"]["compare"]:
             self.assertNotRegex(json.dumps(text), r"SAR\s*\d|\bCPM\b|\bAED\s*\d")
 
@@ -456,7 +456,7 @@ class TourV3(unittest.TestCase):
         self.assertEqual((first["earned"], second["earned"], third["earned"]), (5, 0, 0))
         self.assertEqual(portal.balance(cid), first["credits"])
 
-    # --------------------------------------------------------------- Helvy --
+    # --------------------------------------------------------------- Helvi --
     def test_06_helvy_approve_replaces_stamp_everywhere(self):
         helvy = REPO / "assets" / "brand" / "helvy"
         for ext in ("webm", "mov"):
@@ -466,10 +466,10 @@ class TourV3(unittest.TestCase):
         every = "".join(read("assets/js/" + f) for f in ("portal.js", "connect.js", "tour.js", "catalogue.js", "account.js", "hv-loader.js"))
         self.assertNotIn('"stamp"', every)
         self.assertEqual(every.count('["thinking", "cards", "approve"]'), 1)   # HV.cooking (COOK_SEQ), the one definition
-        # fix batch 4: the AI shortlist card's wait is Helvy's camera scan on lime again
+        # fix batch 4: the AI shortlist card's wait is Helvi's camera scan on lime again
         self.assertIn('appendChild(lime("scan"))', every)
         self.assertIn("Approving your picks…", every)
-        # the admin copilot launcher: the same HVHelvy config, Helvy only, no old clips
+        # the admin copilot launcher: the same HVHelvy config, Helvi only, no old clips
         self.assertIn('data-helvy-only', ui._VOICE_LAUNCHER)
         self.assertIn("/assets/js/hv-loader.js?v=" + ui.HELVY_VER, ui._VOICE_LAUNCHER)
         self.assertIn('VER = "?v=%s"' % ui.HELVY_VER, self.loader)
@@ -480,7 +480,7 @@ class TourV3(unittest.TestCase):
         s, body, _ = a.get("/portal?tab=codes")
         self.assertEqual(s, 200)
         self.assertIn("data-helvy-only", body)
-        self.assertIn("Ask Helvy", body)
+        self.assertIn("Ask Helvi", body)
 
     # ----------------------------------------------------------- leftovers --
     def test_07_sign_in_email_uses_the_transparent_still(self):

@@ -1,6 +1,6 @@
-"""Content ideas per creator (HELVY Connect phase E).
+"""Content ideas per creator (HELVi Connect phase E).
 
-On a selection card or a creator's page, Helvy drafts 2-3 short hooks and concepts,
+On a selection card or a creator's page, Helvi drafts 2-3 short hooks and concepts,
 each in English and Arabic, fitted to that creator's content style and the
 selection's brief.
 
@@ -153,7 +153,7 @@ def _band(f):
 
 
 def context(code, code_id, sel=None, profile=None):
-    """What Helvy may use for this creator and this client. None if the creator is not in the roster."""
+    """What Helvi may use for this creator and this client. None if the creator is not in the roster."""
     import gating
     c = db.creator(code)
     if c is None or not c["active"]:
@@ -189,7 +189,7 @@ def brief_key(ctx):
 
 
 SYSTEM = (
-    "You are Helvy, HelloVoice's creative assistant. Draft 3 short content ideas for ONE influencer, for a brand campaign in "
+    "You are Helvi, HelloVoice's creative assistant. Draft 3 short content ideas for ONE influencer, for a brand campaign in "
     "the Gulf. Fit each idea to this creator's own style (their interests, platforms, size and, when given, their recent "
     "captions) and to the brief. For each idea give: format (one of %s), hook_en (the first spoken or on-screen line, "
     "under 14 words), concept_en (what happens, under 35 words), and hook_ar and concept_ar: natural Gulf (Saudi) Arabic, "

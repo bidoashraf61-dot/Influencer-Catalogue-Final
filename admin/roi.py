@@ -1,4 +1,4 @@
-"""ROI Calculator for clients (HELVY Connect), version 4 (fix batch 7, Bido 2026-10-10).
+"""ROI Calculator for clients (HELVi Connect), version 4 (fix batch 7, Bido 2026-10-10).
 
 A calculator of campaign STRUCTURE against PERFORMANCE. No budget, no prices, no CPM or cost
 per result, no market factor: money lives in the quotation. The client sees what a selection

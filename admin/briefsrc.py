@@ -1,4 +1,4 @@
-"""Brief from a link or a file (HELVY Connect phase E).
+"""Brief from a link or a file (HELVi Connect phase E).
 
 A client pastes a product page link or uploads a brief (PDF, Word .docx or plain
 text). This module turns either into plain text, then asks Gemini to fill the
@@ -62,7 +62,7 @@ PORTS = {80, 443}
 OWN_SUFFIXES = ("hellovoice.co.uk",)
 OWN_HOSTS = {"localhost", "mail.eshteryexpress.com", "metadata.google.internal", "metadata"}
 OWN_IPS = {"54.74.66.161"}
-USER_AGENT = "Mozilla/5.0 (compatible; HELVY-Connect-BriefReader/1.0; +https://influencer-catalogue.hellovoice.co.uk/privacy/)"
+USER_AGENT = "Mozilla/5.0 (compatible; HELVi-Connect-BriefReader/1.0; +https://influencer-catalogue.hellovoice.co.uk/privacy/)"
 
 # Tests point fetch() at a local server; nothing else may set this.
 TEST_ALLOW_IPS = set()
@@ -701,11 +701,11 @@ def read(text, origin, code_id=None, credits=0):
     if kind != "none":
         flags.append({"kind": "claims", "title": "Regulated product",
                       "text": "This looks like %s. Health and benefit claims need your medical or regulatory team's approval, and "
-                              "HelloVoice checks every script before it is posted. Helvy never adds claims." % REGULATED[kind]})
+                              "HelloVoice checks every script before it is posted. Helvi never adds claims." % REGULATED[kind]})
     if (not markets and not answers.get("market")) or "SA" in markets or answers.get("market") == "SA":
         flags.append({"kind": "licence", "title": "Mawthooq licence",
                       "text": "Paid posts in Saudi Arabia need creators with a Mawthooq licence. Filter the catalogue by licence, "
-                              "or ask Helvy for licensed creators."})
+                              "or ask Helvi for licensed creators."})
     if claims and re.search(_CLAIM_WORDS, " ".join(claims), re.I):
         flags.append({"kind": "claims_found", "title": "Claims in your source",
                       "text": "Your source makes claims such as “%s”. Creators may only repeat claims your regulatory team approves." % claims[0][:90]})

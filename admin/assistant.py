@@ -47,8 +47,8 @@ def _bands():
 
 
 def creator_view(c, bands=None):
-    """A creator as Helvy may talk about them — the catalogue's own fields, and never a price:
-    Helvy does not discuss fees, rates or budgets (phase C + D rule); the account manager quotes."""
+    """A creator as Helvi may talk about them — the catalogue's own fields, and never a price:
+    Helvi does not discuss fees, rates or budgets (phase C + D rule); the account manager quotes."""
     return {"code": c["code"], "name": c["name"], "handle": c["handle"], "platforms": analysis.creator_platforms(c),
             "followers": c["followers"], "city": c["city"], "audience_nationality": c["nationality"],
             "tier": c["tier"], "interests": c["interest"]}
@@ -200,7 +200,7 @@ def _roi_tool(ctx, goal, platforms, mix):
 
 def _roi_compare_tool(ctx, goals, platforms, count=0):
     """Structure vs performance: the open selection's creators against HelloVoice's recommended
-    structure for the same number of creators, with ways to improve, each carrying an action Helvy
+    structure for the same number of creators, with ways to improve, each carrying an action Helvi
     can offer through add_creators / remove_creators (confirm-before-write)."""
     import roi
     gl = [("traffic" if g == "conversion" else g) for g in (goals or [])]
@@ -526,14 +526,14 @@ def handoff_event(code_id, user, thread_id, selection_token, reason, origin="", 
     if tid:
         th = portal.find_thread(code_id, "client", "", tid)
     for m in (portal.messages(th["id"], 8) if th else []):
-        lines.append("%s: %s" % ("Client" if m["role"] == "user" else "Helvy", " ".join(str(m["content"]).split())[:400]))
+        lines.append("%s: %s" % ("Client" if m["role"] == "user" else "Helvi", " ".join(str(m["content"]).split())[:400]))
     link, sel_name = None, None
     sel = db.selection(token=selection_token) if selection_token else None
     if sel is not None and (sel["code_id"] is None or sel["code_id"] in portal.team_codes(code_id)):
         link, sel_name = (origin or "") + "/selection/#s=" + sel["token"], sel["name"]
     who = ("%s, %s" % (user["name"], user["company"] or "") if user else "An access-code client")
     contact = (user["email"] + (" · " + user["phone"] if user["phone"] else "")) if user else "-"
-    notify.send("handoff", ["%s asked Helvy for something he could not do and sent it to the account manager." % who,
+    notify.send("handoff", ["%s asked Helvi for something he could not do and sent it to the account manager." % who,
                             "Contact: %s" % contact, "Why: %s" % (reason or "-"), "Selection: %s" % (sel_name or "-"),
                             "", "Chat:"] + lines, kam=contact_kam, link=link)
     return {"ok": True, "message": "Sent to your account manager with this chat" + (" and “%s”" % sel_name if sel_name else "") +
@@ -1663,7 +1663,7 @@ def system_prompt(scope, ctx):
             % (time.strftime("%Y-%m-%d"), counts["creators"], counts["clients"]))
     user = ctx.get("user") or {}
     return (
-        "You are Helvy, HelloVoice's AI assistant inside HELVY Connect (the influencer catalogue), talking to %s%s. You help marketing teams choose "
+        "You are Helvi, HelloVoice's AI assistant inside HELVi Connect (the influencer catalogue), talking to %s%s. You help marketing teams choose "
         "creators and plan influencer campaigns in KSA, UAE and Egypt, mainly healthcare, pharma, FMCG and retail. Rules: (0) Your only "
         "knowledge is what this client can see in the catalogue: creator cards, each creator's analysis page, their own selections and "
         "their own campaign reports, all through the tools. Never use general benchmarks, industry averages or estimates as if they were "

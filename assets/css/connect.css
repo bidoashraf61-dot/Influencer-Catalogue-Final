@@ -1,5 +1,5 @@
-/* HELVY Connect, phases C + D: sign-in scene, onboarding tour, ROI Calculator,
-   AI on selections and Helvy's states. Built from the approved mockups in
+/* HELVi Connect, phases C + D: sign-in scene, onboarding tour, ROI Calculator,
+   AI on selections and Helvi's states. Built from the approved mockups in
    .impeccable/mockups/portal-v3-cd/ (cd.css) on top of the catalogue world:
    ink / lime / linen, Bebas for names, numbers and actions, DM Sans for
    sentences, pill controls, 20/28px containers. Every class is cx- so nothing
@@ -76,8 +76,8 @@
 .cx-tag--free { background: var(--go-soft); color: #0e6b39; }
 
 
-/* ------------------------------------------------------------ Helvy frame */
-/* Helvy is a transparent cut-out framed waist-up (head and torso fill the square), never a
+/* ------------------------------------------------------------ Helvi frame */
+/* Helvi is a transparent cut-out framed waist-up (head and torso fill the square), never a
    disc: a soft shadow under him, and the waist cut fading into whatever he stands on.
    --edge: the cut sits exactly on a card's top edge, so he stands behind it (no fade).
    --head: head and shoulders for small spots, faded at the sides as well. */
@@ -128,7 +128,7 @@
 @keyframes cx-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 @media (prefers-reduced-motion: reduce) { .cx-logos__track { animation: none; } .cx-logos__row { overflow-x: auto; } }
 
-/* Helvy stands behind the card: his waist cut sits exactly on its top edge */
+/* Helvi stands behind the card: his waist cut sits exactly on its top edge */
 .cx-door { position: relative; padding-top: 182px; }
 .cx-door__helvy { position: absolute; z-index: 0; top: 0; right: 30px; animation: cx-helvy-in .8s var(--cx-ease) .2s both; }
 .cx-door__helvy .cx-hd { width: 184px; height: 184px; }
@@ -193,7 +193,7 @@
 @keyframes cx-fade { from { opacity: 0; } }
 @keyframes cx-offer-in { from { opacity: 0; transform: translate(-50%, -38%) scale(.97); } to { opacity: 1; transform: translate(-50%, -44%); } }
 @keyframes cx-offer-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
-/* Helvy stands on the card's top edge, his waist cut on the edge */
+/* Helvi stands on the card's top edge, his waist cut on the edge */
 .cx-offer__helvy { position: absolute; right: 26px; bottom: calc(100% - 2px); pointer-events: none; }
 .cx-offer__helvy .cx-hd { width: 150px; height: 150px; }
 .cx-offer h2 { margin: 0; padding-right: 120px; font-family: var(--heading); font-weight: 400; font-size: 46px; line-height: .92; letter-spacing: .01em; color: var(--lime); text-transform: none; text-wrap: balance; }
@@ -344,7 +344,7 @@
 .cx-eva__bars strong { text-align: right; font-weight: 700; color: var(--ink); font-size: 12.5px; }
 .cx-eva__row .cx-sig { justify-self: end; }
 
-/* the ROI card in Helvy's chat */
+/* the ROI card in Helvi's chat */
 .cx-rcard { background: var(--white); border-radius: 20px 20px 20px 6px; padding: 14px 14px 12px; color: var(--ink); text-align: left; }
 .cx-rcard__hd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .cx-rcard__hd b { font-family: var(--heading); font-weight: 400; font-size: 22px; letter-spacing: .03em; line-height: 1; margin-right: auto; display: inline-flex; align-items: center; gap: 6px; }
@@ -397,7 +397,7 @@
 .cx-more::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: repeating-radial-gradient(circle at 4% 120%, transparent 0 22px, rgba(255,255,255,.03) 22px 23px); }
 .cx-more > * { position: relative; z-index: 1; }
 .cx-more .cx-hd { width: 96px; height: 96px; }
-/* Helvy's lime disc (fix batch 4); a soft lime halo while he works. */
+/* Helvi's lime disc (fix batch 4); a soft lime halo while he works. */
 .cx-more__face.hv-lime { width: 96px; height: 96px; align-self: start; box-shadow: 0 0 0 5px rgba(232,255,118,.14); transition: box-shadow .4s ease; }
 .cx-more.is-cooking .cx-more__face.hv-lime { box-shadow: 0 0 0 5px rgba(232,255,118,.32), 0 0 0 12px rgba(232,255,118,.1); }
 .cx-cook--steps.cx-cook--bare { grid-template-columns: minmax(0, 1fr); }
@@ -460,7 +460,7 @@
 .cx-more-btn:disabled { opacity: .55; cursor: default; }
 .cx-sheet__empty { background: var(--white); border-radius: 20px; padding: 22px; }
 
-/* ===================================================== HELVY IN THE CHAT (D) */
+/* ===================================================== HELVi IN THE CHAT (D) */
 /* thinking: the clip + a shimmering step line */
 .cx-think { display: grid; grid-template-columns: 64px 1fr; gap: 12px; align-items: center; background: var(--white); border-radius: 20px 20px 20px 6px; padding: 10px 14px 10px 10px; max-width: 94%; color: var(--ink); }
 .cx-think .cx-hd { width: 64px; height: 64px; }
@@ -556,8 +556,8 @@
   .hv-chips.cx-stagger .hv-chip { animation: none !important; }
 }
 
-/* ---- Helvy in the live chat widget (portal.js): launcher, header, avatars, nudge */
-/* the launcher: Helvy on a lime disc (client, 2026-10-10: the launcher only). Fix batch 4: the
+/* ---- Helvi in the live chat widget (portal.js): launcher, header, avatars, nudge */
+/* the launcher: Helvi on a lime disc (client, 2026-10-10: the launcher only). Fix batch 4: the
    whole character sits INSIDE the disc, beanie to waist, with air above his head; he used to
    rise out of the top, which cut his head on the frame and his hands on the curve. The clip is
    inset (padding, contain, bottom-aligned) and the disc's circle clips only the waist. Open, the
@@ -575,7 +575,7 @@
 .cx-chathead .hv-head__helvy .hv-clip { -webkit-mask-image: none; mask-image: none; }
 .hv-row__ava.cx-ava { background-color: transparent; background-size: 100% 100%; background-position: 50% 50%; background-repeat: no-repeat; box-shadow: none; }
 /* the nudge's title: ink on white (lime on white was unreadable), on a lime marker stroke */
-/* The page tip speaks FROM Helvy's circle: it sits right above the launcher with a tail pointing
+/* The page tip speaks FROM Helvi's circle: it sits right above the launcher with a tail pointing
    at it, and pops out of the circle (grows from the tail's tip with a small overshoot). */
 .hv-nudge { right: 6px; bottom: 92px; border-radius: 22px; transform: translateY(14px) scale(.2);
   transform-origin: calc(100% - 23px) calc(100% + 30px); transition: opacity .16s ease, transform .45s cubic-bezier(.34,1.56,.64,1); }
@@ -598,7 +598,7 @@
 .cat-footer__legal a:hover, .hc-foot__legal a:hover { color: var(--lime); }
 .cx-offer:focus { outline: none; }
 
-/* ---- "Cooking": Helvy at the director's desk while the AI works (portal.js HV.cooking) */
+/* ---- "Cooking": Helvi at the director's desk while the AI works (portal.js HV.cooking) */
 .cx-cook { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; align-items: center; text-align: left; font-family: var(--body); color: var(--ink); }
 .cx-cook .cx-hd { width: 120px; height: 120px; }
 .cx-cook__now { margin: 0; font-weight: 700; font-size: 15.5px; line-height: 1.35; }
@@ -616,7 +616,7 @@
 .cx-cook--compact .cx-cook__now { font-size: 13.5px; }
 .cx-more.is-cooking > .cx-cook { grid-column: 1 / -1; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.12); }
 .cx-more.is-cooking .cx-more__form { opacity: .5; pointer-events: none; }
-/* Add more like these, working (fix batch 3): Helvy at his desk beside the AI card's step list. */
+/* Add more like these, working (fix batch 3): Helvi at his desk beside the AI card's step list. */
 .cx-cook--steps { --ai-lime: #e8ff76; --ai-ink: #121212; --ai-orange: #ff691e; --ai-ease: cubic-bezier(.2,.8,.2,1);
   grid-template-columns: 150px minmax(0, 1fr); gap: 22px; align-items: center; }
 .cx-cook--steps .cx-hd { width: 150px; height: 150px; }
@@ -811,7 +811,7 @@
 /* -- the weekly campaign update in the bell: three short lines -- */
 .hv-note__tx small { white-space: pre-line; }
 
-/* -- voice: language switch + what Helvy heard -- */
+/* -- voice: language switch + what Helvi heard -- */
 .hv-vlang { flex: none; width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(18,18,18,.18); background: var(--white); color: var(--ink); cursor: pointer;
   font-family: var(--body, "DM Sans", Arial, sans-serif); font-size: 13px; font-weight: 800; line-height: 1; letter-spacing: .02em; align-self: flex-end; margin-bottom: 2px; }
 .hv-vlang[lang="ar"] { font-size: 16px; }

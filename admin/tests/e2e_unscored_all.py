@@ -1,5 +1,5 @@
 """selections_unscored = "all" (owner, 2026-10-11): every selection shows a fit label only, no score,
-until the scoring logic is final. A list of ids still works; Helvy gives no numbers.
+until the scoring logic is final. A list of ids still works; Helvi gives no numbers.
 
     python3 admin/tests/e2e_unscored_all.py
 """

@@ -582,7 +582,7 @@ body.has-previewbar { padding-top: 36px; }
 
 /* invitation */
 .ai-sl__intro { display: grid; grid-template-columns: 84px 1fr; gap: 14px 16px; align-items: center; padding: 20px 20px 20px 18px; }
-/* Helvy on the AI card: transparent cut-outs (hv-loader.js / connect.css .cx-hd), no lime disc */
+/* Helvi on the AI card: transparent cut-outs (hv-loader.js / connect.css .cx-hd), no lime disc */
 .ai-sl__face { width: 84px; height: 84px; }
 .ai-sl__face .cx-hd, .ai-sl__lens .cx-hd, .ai-sl__cheer .cx-hd { width: 100%; height: 100%; }
 .ai-sl__title { margin: 0; font-family: Bebasneue, Arial, sans-serif; font-weight: 400; font-size: 30px; line-height: .95; letter-spacing: .02em; color: var(--ai-lime); }
@@ -817,7 +817,7 @@ body.has-previewbar { padding-top: 36px; }
 .ai-sl__run.is-staging .ai-sl__coach { display: none; }
 .ai-sl__main { min-width: 0; }
 .ai-sl__coach { position: sticky; top: 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; padding-top: 4px; }
-/* the coach: Helvy on his lime disc above the meter, reacting to every answer */
+/* the coach: Helvi on his lime disc above the meter, reacting to every answer */
 .ai-sl__cring { position: relative; width: 176px; height: 176px; border-radius: 50%; box-shadow: 0 0 0 6px rgba(232,255,118,.16); }
 .ai-sl__cring.is-bump { animation: ai-bump .5s var(--ai-ease); }
 @keyframes ai-bump { 40% { transform: translateY(-6px); } }
@@ -918,7 +918,7 @@ body.has-previewbar { padding-top: 36px; }
 /* The closed AI card (fix batch 3, 2026-10-10). It was one slim pill; phase E's "Or start from
    a product link / brief file" row was squeezed into the same pill and crushed it. Now a small
    ink panel with two rows that each keep their own room:
-     [Helvy on lime]  Build a shortlist with AI            [ Start -> ]
+     [Helvi on lime]  Build a shortlist with AI            [ Start -> ]
                       Or start from  (link) Product link  (^) Brief file
    The second row sits under the title, behind a hairline, and wraps instead of squeezing. */
 .ai-sl:not(.is-open) { border-radius: 24px; }
@@ -937,7 +937,7 @@ body.has-previewbar { padding-top: 36px; }
 }
 .ai-sl:not(.is-open) .ai-sl__alt > span { margin-right: 4px; white-space: nowrap; }
 .ai-sl:not(.is-open) .ai-sl__alt-b { min-height: 34px; padding: 0 13px; white-space: nowrap; }
-/* Helvy on a lime circle, on this card only (client, 2026-10-10): his head and shoulders
+/* Helvi on a lime circle, on this card only (client, 2026-10-10): his head and shoulders
    framed in the disc. Since fix batch 4 the disc holds the lime "voice" clips (HV.lime), whose
    own background is this same lime, so the clip and the disc read as one. */
 .ai-sl__face { position: relative; border-radius: 50%; background: var(--ai-lime); overflow: hidden; isolation: isolate; }
@@ -972,7 +972,7 @@ body.has-previewbar { padding-top: 36px; }
   .ai-sl:not(.is-open) .ai-sl__title { white-space: normal; }
 }
 @media (max-width: 520px) {
-  /* Phone: Helvy and the title on top, Start full width, the two sources side by side. */
+  /* Phone: Helvi and the title on top, Start full width, the two sources side by side. */
   .ai-sl:not(.is-open) .ai-sl__intro {
     grid-template-columns: 48px minmax(0, 1fr); grid-template-areas: "face copy" "go go" "alt alt";
     gap: 0 12px; padding: 12px;
@@ -1176,7 +1176,7 @@ body.has-previewbar { padding-top: 36px; }
 .pt-other:focus { outline: 3px solid #e8ff76; outline-offset: 1px; }
 .pt-other[hidden] { display: none; }
 
-/* ===================================================== HELVY Connect v3 ===
+/* ===================================================== HELVi Connect v3 ===
    The bell, its dropdown and the notification row (shared with /account/),
    plus the drawn icon set from portal.js (hv-i). Same world as the menu card:
    white card, pill controls, ink and lime for state, red only for "unread". */
@@ -1396,7 +1396,7 @@ a.hv-note:hover { background: #efede8; }
 .sel-dec[disabled] { opacity: .6; cursor: progress; }
 .sel-st__change { border: 0; background: none; color: var(--ink); padding: 0 2px; min-height: 32px; font: 600 12.5px var(--body); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; margin-left: auto; }
 .sel-st__off { margin: 8px 0 0; color: var(--gray); }
-/* "Find a replacement": one compact line, Helvy's face, the cost inline */
+/* "Find a replacement": one compact line, Helvi's face, the cost inline */
 .sel-repl { margin-top: 12px; max-width: 100%; display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 6px 4px 5px;
   border-radius: var(--r-pill); border: 1px solid var(--lime); background: var(--lime); color: var(--ink); cursor: pointer;
   font: 700 13px/1.2 var(--body); white-space: nowrap; transition: background .2s ease, color .2s ease, border-color .2s ease; }
@@ -1427,7 +1427,7 @@ a.hv-note:hover { background: #efede8; }
   .sel-grp__hd h2, .sel-grp__n { font-size: 34px; }
 }
 
-/* ---- Helvy's working note (fix batch 8, item 41): his avatar, three typing dots, one typed line. No box. */
+/* ---- Helvi's working note (fix batch 8, item 41): his avatar, three typing dots, one typed line. No box. */
 .hv-row--wk { align-items: center; padding: 2px 0 2px 2px; }
 .hv-wk { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; color: var(--hv-ink); }
 .hv-wk .cx-hd.hv-wk__hd { width: 44px; height: 44px; flex: none; }
@@ -1440,7 +1440,7 @@ a.hv-note:hover { background: #efede8; }
 .hv-wk__sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 @media (prefers-reduced-motion: reduce) { .hv-wk__dots i { animation: none; opacity: .6; } }
 
-/* ---- Helvy cannot do it: one tap to the account manager (item 38) */
+/* ---- Helvi cannot do it: one tap to the account manager (item 38) */
 .hv-hand { padding: 10px 12px; }
 .hv-hand__btn { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 18px; border: 0; border-radius: 999px; cursor: pointer;
   background: var(--hv-white); color: var(--hv-ink); box-shadow: inset 0 0 0 1.5px var(--hv-ink); font: 600 14px/1 "DM Sans", Arial, sans-serif;
@@ -1450,7 +1450,7 @@ a.hv-note:hover { background: #efede8; }
 .hv-hand .hv-act__yes, .hv-hand .hv-act__no { min-height: 44px; }
 @media (prefers-reduced-motion: reduce) { .hv-hand__btn { transition: none; } }
 
-/* The AI shortlist's Helvy shows the WHOLE clip (Bido, 2026-10-11: "the video is cropped"): the clips are
+/* The AI shortlist's Helvi shows the WHOLE clip (Bido, 2026-10-11: "the video is cropped"): the clips are
    square 1:1 frames, and a circle cut their corners and the shoulders. A rounded square keeps the frame. */
 .ai-sl__cring, .ai-sl__cring .hv-lime, .ai-sl__face, .ai-sl__face .hv-lime,
 .ai-sl__lens, .ai-sl__lens .hv-lime, .ai-sl__cheer, .ai-sl__cheer .hv-lime { border-radius: 6%; }   /* almost square: the whole 1:1 frame, nothing cut (2026-10-11) */

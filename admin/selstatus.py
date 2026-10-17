@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS selection_status (
     by_kind TEXT,                            -- client | hv
     by_name TEXT,
     at INTEGER,
-    replacements TEXT,                       -- JSON [codes] Helvy suggested for this one
+    replacements TEXT,                       -- JSON [codes] Helvi suggested for this one
     PRIMARY KEY (selection_id, code)
 );
 """
@@ -125,7 +125,7 @@ def ring_client(sel, code, status, by_name, note=None):
     href = "selection/#s=" + sel["token"]
     if status == "unavailable":
         inbox.emit(users, "unavailable", "%s is no longer available" % who, rest=" for " + sel["name"],
-                   body=note or "Booked in your campaign dates. Helvy can suggest a replacement.", href=href)
+                   body=note or "Booked in your campaign dates. Helvi can suggest a replacement.", href=href)
         return
     verb = {"approved": "approved", "rejected": "rejected", "review": "set back to Under review"}[status]
     first = (by_name or "HelloVoice").split()[0]

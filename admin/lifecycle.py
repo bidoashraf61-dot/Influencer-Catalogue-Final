@@ -24,7 +24,7 @@ manager and team are emailed through ``notify`` (that is the team, not the clien
 
     chip(sel)                      {"key", "label"}  cheap, for lists
     state_of(sel)                  the full state + timeline, internal
-    client_payload(sel, role)      what the selection page / profile / Helvy may read
+    client_payload(sel, role)      what the selection page / profile / Helvi may read
     admin_payload(sel)             the same + note, link, who, campaigns, "changed since ready"
 """
 import json
@@ -228,7 +228,7 @@ def admin_payload(sel):
 
 
 def summary_line(sel):
-    """One plain sentence for Helvy's context."""
+    """One plain sentence for Helvi's context."""
     st = state_of(sel)
     k = st["key"]
     extra = {"requested": " HelloVoice has not marked the quote ready yet.",

@@ -1,4 +1,4 @@
-/* HELVY Connect, phases C + D (approved mockups .impeccable/mockups/portal-v3-cd/).
+/* HELVi Connect, phases C + D (approved mockups .impeccable/mockups/portal-v3-cd/).
  *
  *  - The onboarding tour's opener ("Take the 3-minute tour?", four chapters), offered
  *    once after the first sign-in and replayable from Help and the profile. The tour
@@ -6,7 +6,7 @@
  *    finishing pays +5 credits once (server-enforced).
  *  - The ROI Calculator (v4, structure vs performance): a drawer inside a selection (its
  *    creators' own numbers), a page in the profile (a mix of sizes), a compact card in
- *    Helvy's chat, the "Download PDF" and estimate vs actual on the campaign report. A
+ *    Helvi's chat, the "Download PDF" and estimate vs actual on the campaign report. A
  *    side-by-side table of HelloVoice's recommended structure for the same number of creators
  *    and the client's selection, the Selection quality, the gap in words and up to three ranked
  *    "Ways to improve". Results are RANGES. No budget, no cost per result, no market verdict,
@@ -294,13 +294,13 @@
         ((res.gap || []).length ? "<p><b>The gap:</b> " + esc(res.gap.join("; ")) + ".</p>" : "") : "";
       var ways = (res.ways || []).slice(0, 3).map(function (w) { return "<li>" + esc(w.text) + "</li>"; }).join("");
       if (res.compare_line) head += "<p>" + esc(res.compare_line) + "</p>";
-      var html = "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><title>ROI estimate · HELVY Connect</title>" +
+      var html = "<!DOCTYPE html><html lang='en'><head><meta charset='utf-8'><title>ROI estimate · HELVi Connect</title>" +
         "<style>@page{size:A4;margin:18mm}body{font:14px/1.55 'DM Sans',Arial,sans-serif;color:#121212;margin:0}" +
         "h1{font:400 40px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;margin:18px 0 4px;letter-spacing:.01em}" +
         ".hd{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #121212;padding-bottom:12px}" +
         ".hd img{width:150px}.muted{color:#4a4a4a}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{padding:9px 6px;border-bottom:1px solid #ddd;text-align:left}td{font-weight:700;text-align:right}thead th{font-size:12px;color:#4a4a4a;text-align:right}thead th:first-child{text-align:left}.q b{font:400 44px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;margin-right:10px}" +
         ".fine{margin-top:22px;font-size:11.5px;color:#4a4a4a}</style></head><body>" +
-        "<div class='hd'><img src='" + esc(ROOT) + "assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c5' alt='HELVY Connect'><span class='muted'>" + esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + "</span></div>" +
+        "<div class='hd'><img src='" + esc(ROOT) + "assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c5' alt='HELVi Connect'><span class='muted'>" + esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + "</span></div>" +
         "<h1>ROI estimate" + (ctx && ctx.name ? " · " + esc(ctx.name) : "") + "</h1><p class='muted'>" + esc(res.summary) + "</p>" +
         head + "<table><thead><tr><th></th><th>Recommended structure<br>" + esc((res.ideal && res.ideal.title) || "") + "</th><th>Your selection</th></tr></thead><tbody>" + rows + "</tbody></table>" +
         (ways ? "<h3>Ways to improve</h3><ol>" + ways + "</ol>" : "") +
@@ -429,7 +429,7 @@
     }
     HV.openRoi = roiForSelection;
 
-    /* -- the compact card in Helvy's chat -- */
+    /* -- the compact card in Helvi's chat -- */
     HV.roiCard = function (res) {
       var card = h("div", { class: "hv-msg hv-msg--ai cx-rcard" });
       var head = h("div", { class: "cx-rcard__hd" });
@@ -515,7 +515,7 @@
       box.appendChild(rows);
       if (v.helvy) {
         var face = h("span", { class: "cx-hd" }); face.appendChild(h("img", { class: "hv-clip", src: HV.helvy, alt: "" }));
-        box.appendChild(h("div", { class: "cx-advice" }, face, h("p", { class: "cx-advice__b" }, h("b", null, "Helvy"), v.helvy)));
+        box.appendChild(h("div", { class: "cx-advice" }, face, h("p", { class: "cx-advice__b" }, h("b", null, "Helvi"), v.helvy)));
       }
       return box;
     }
@@ -655,15 +655,15 @@
       var approved = S.codes().filter(function (c) { return S.status(c).s === "approved"; });
       var from = h("div", { class: "cx-more__from" });
       approved.slice(0, 5).forEach(function (c) { var cr = S.creator(c); from.appendChild(h("span", { class: "cx-ph" }, initials(cr ? cr.name : c))); });
-      from.appendChild(h("span", null, approved.length ? "Based on your " + approved.length + " approved creator" + (approved.length === 1 ? "" : "s") : "Approve a few creators first, so Helvy knows what you like"));
-      // Helvy on his lime disc (fix batch 4), the AI shortlist card's clips: an easy loop at rest,
+      from.appendChild(h("span", null, approved.length ? "Based on your " + approved.length + " approved creator" + (approved.length === 1 ? "" : "s") : "Approve a few creators first, so Helvi knows what you like"));
+      // Helvi on his lime disc (fix batch 4), the AI shortlist card's clips: an easy loop at rest,
       // a thumbs-up when a quick pick is tapped, the camera scan while he works, a cheer when the
       // creators land.
       var face = HV.lime ? HV.lime("loop", "cx-more__face") : clip("idle");
       card.appendChild(face);
       card.appendChild(h("div", null, h("h2", { id: "cx-more-t" }, "Add more like these", costTag(cur.moreCost)),
-        h("p", null, "Helvy studies the creators you approved, their audience, tone and platforms, and adds more that match to ", h("b", null, "Under review"), " for you to decide."), from));
-      var note = h("input", { class: "cx-briefin", type: "text", maxlength: "160", placeholder: "Anything to add? e.g. Jeddah-based, Arabic-first", "aria-label": "Anything to add for Helvy" });
+        h("p", null, "Helvi studies the creators you approved, their audience, tone and platforms, and adds more that match to ", h("b", null, "Under review"), " for you to decide."), from));
+      var note = h("input", { class: "cx-briefin", type: "text", maxlength: "160", placeholder: "Anything to add? e.g. Jeddah-based, Arabic-first", "aria-label": "Anything to add for Helvi" });
       var quick = h("div", { class: "cx-quick", role: "group", "aria-label": "Quick picks" });
       [["doctors", "More doctors"], ["tiktok", "TikTok first"], ["under100k", "Under 100K followers"], ["women2534", "Women 25–34"]].forEach(function (c) {
         var b = h("button", { type: "button", "aria-pressed": "false" }, c[1]);
@@ -683,10 +683,10 @@
       card.appendChild(msg);
       go.addEventListener("click", function () {
         go.disabled = true; msg.textContent = "";
-        // While Helvy works: the director's desk (thinking -> cards -> approve) and the step line.
+        // While Helvi works: the director's desk (thinking -> cards -> approve) and the step line.
         var seeds = S.codes().filter(function (c) { return S.status(c).s === "approved"; }).length;
         if (face.loop) face.loop("scan");
-        var cook = HV.cooking ? HV.cooking({ dark: true, list: true, helvy: !face.loop, title: "Helvy is finding " + count + " more",
+        var cook = HV.cooking ? HV.cooking({ dark: true, list: true, helvy: !face.loop, title: "Helvi is finding " + count + " more",
           steps: ["Studying your " + (seeds || "") + " approved creator" + (seeds === 1 ? "" : "s") + "…", "Reading their audience and tone…",
                   "Flipping through the roster…", "Scoring each match…", "Adding the best " + count + " to Under review…"] }) : null;
         if (cook) { card.classList.add("is-cooking"); card.appendChild(cook); cook.scrollIntoView({ block: "center", behavior: HV.reduce ? "auto" : "smooth" }); }
@@ -697,9 +697,9 @@
         }).then(function (r) {
           go.disabled = false;
           if (cook) { cook.stop(); cook.remove(); card.classList.remove("is-cooking"); }
-          if (!r.b || !r.b.ok) { if (face.loop) face.loop("think"); msg.textContent = (r.b && r.b.message) || "Helvy couldn’t look just now. Please try again."; return; }
+          if (!r.b || !r.b.ok) { if (face.loop) face.loop("think"); msg.textContent = (r.b && r.b.message) || "Helvi couldn’t look just now. Please try again."; return; }
           var codes = (r.b.added || []).map(function (c) { return c.code; });
-          if (!codes.length) { if (face.loop) face.loop("think"); msg.textContent = r.b.message || "Helvy found no one close enough."; return; }
+          if (!codes.length) { if (face.loop) face.loop("think"); msg.textContent = r.b.message || "Helvi found no one close enough."; return; }
           if (face.react) face.react("cheer", "loop");
           S.add(codes);
           if (r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);
@@ -711,7 +711,7 @@
       return sec;
     }
 
-    /* -- One side panel for Helvy's suggestions on a selection: "Creators like this" and, since
+    /* -- One side panel for Helvi's suggestions on a selection: "Creators like this" and, since
        fix batch 3, "Find a replacement" (which used to open a cramped list inside the rejected
        card). Photo, name, tier, followers, platform, city, why, View profile, Add. Added creators
        join the selection as Under review; a replaced creator stays in Rejected. -- */
@@ -729,14 +729,14 @@
       var list = h("div", { class: "cx-sugs" });
       body.appendChild(list);
       sheet.appendChild(body);
-      // Looking again asks Helvy's AI again, so the button says what it costs (or that it is free).
+      // Looking again asks Helvi's AI again, so the button says what it costs (or that it is free).
       var free = aiFree() || !o.cost;
       var more = h("button", { class: "cx-btn cx-btn--ink cx-more-btn", type: "button", html: ic("sparkle") + "<span>Show 3 more</span>" });
       more.appendChild(h("span", { class: "hv-cost" + (free ? " hv-cost--free" : ""), html: free ? "Free" : ic("coin") + o.cost + " credit" + (o.cost === 1 ? "" : "s") }));
       sheet.appendChild(h("footer", { class: "cx-sheet__ft" },
         h("div", { class: "cx-sheet__fn" },
           h("span", null, "Added creators join as ", h("b", null, "Under review"), o.foot || ". HelloVoice confirms availability."),
-          h("small", null, free ? "Looking again is free with your active campaign." : "Looking again uses Helvy’s AI: " + o.cost + " credit" + (o.cost === 1 ? "" : "s") + ".")),
+          h("small", null, free ? "Looking again is free with your active campaign." : "Looking again uses Helvi’s AI: " + o.cost + " credit" + (o.cost === 1 ? "" : "s") + ".")),
         more));
       function close() { scrim.remove(); sheet.remove(); document.removeEventListener("keydown", onKey); document.body.classList.remove("pt-lock"); if (prev && prev.focus && prev.isConnected) prev.focus(); }
       function onKey(e) { if (e.key === "Escape") close(); }
@@ -744,18 +744,18 @@
       document.body.appendChild(scrim); document.body.appendChild(sheet); document.body.classList.add("pt-lock"); x.focus();
       function load(againFlag) {
         list.textContent = "";
-        var cook = HV.cooking ? HV.cooking({ steps: o.steps }) : h("div", { class: "cx-sheet__empty" }, "Helvy is looking…");
+        var cook = HV.cooking ? HV.cooking({ steps: o.steps }) : h("div", { class: "cx-sheet__empty" }, "Helvi is looking…");
         list.appendChild(h("div", { class: "cx-sheet__empty cx-sheet__cook" }, cook));
         more.disabled = true;
         o.fetch(!!againFlag).then(function (r) {
           if (cook.stop) cook.stop();
           list.textContent = "";
           more.disabled = false;
-          if (!r.b || !r.b.ok) { list.appendChild(h("div", { class: "cx-sheet__empty" }, (r.b && r.b.message) || "Helvy couldn’t look just now.")); return; }
+          if (!r.b || !r.b.ok) { list.appendChild(h("div", { class: "cx-sheet__empty" }, (r.b && r.b.message) || "Helvi couldn’t look just now.")); return; }
           if (r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);
           var found = o.pick(r.b) || [];
           if (o.loaded) o.loaded(found, r.b);
-          if (!found.length) { list.appendChild(h("div", { class: "cx-sheet__empty" }, r.b.message || "Helvy found no one else close enough.")); more.disabled = true; return; }
+          if (!found.length) { list.appendChild(h("div", { class: "cx-sheet__empty" }, r.b.message || "Helvi found no one else close enough.")); more.disabled = true; return; }
           found.forEach(function (c) {
             var ph = h("span", { class: "cx-ph" }, c.photo_url ? "" : initials(c.name));
             if (c.photo_url) ph.style.backgroundImage = 'url("' + String(c.photo_url).replace(/"/g, "%22") + '")';
@@ -793,7 +793,7 @@
         fetch: function (ag) { return api("POST", "/api/selection/alike", { token: S.token(), code: code, again: ag }); },
         pick: function (b) { return b.creators; } });
     }
-    // Find a replacement: the same panel. Helvy's three are kept on the rejected creator, so
+    // Find a replacement: the same panel. Helvi's three are kept on the rejected creator, so
     // opening it again is free; "Show 3 more" looks again (and costs again).
     HV.replaceSheet = function (code, onFound) {
       var S = window.hvSelection;
@@ -815,7 +815,7 @@
     }, true);
 
     /* ======================================================= CONTENT IDEAS (phase E)
-       On a selection card and on the creator's page: Helvy drafts 2-3 hooks and concepts,
+       On a selection card and on the creator's page: Helvi drafts 2-3 hooks and concepts,
        English and Saudi Arabic, fitted to that creator's style and the selection's brief.
        Nothing is spent until the client presses "Write ideas"; ideas are kept, so opening
        them again is free. No prices, and no claims beyond the brief. */
@@ -881,13 +881,13 @@
         if (chip) chip.remove();
         if (cost) again.appendChild(h("span", { class: "hv-cost", html: ic("coin") + cost + " credits" }));
       }
-      // Before the campaign starts: a lock and one dummy example of what Helvy will write.
+      // Before the campaign starts: a lock and one dummy example of what Helvi will write.
       function lockedView(sample) {
         list.textContent = ""; ctxRow.textContent = ""; again.hidden = true;
         list.appendChild(h("div", { class: "cx-ideas__lock" },
           h("span", { class: "cx-ideas__lockic", html: ic("lock") }),
           h("div", null, h("b", null, "Content ideas unlock when your campaign starts"),
-            h("p", null, "They open once your quote is released and approved and HelloVoice sets the campaign live. Until then, this is an example of what Helvy writes for each creator."))));
+            h("p", null, "They open once your quote is released and approved and HelloVoice sets the campaign live. Until then, this is an example of what Helvi writes for each creator."))));
         sample.forEach(function (it) {
           list.appendChild(h("article", { class: "cx-idea cx-idea--sample" },
             h("div", { class: "cx-idea__top" }, h("span", { class: "cx-idea__n" }, "Example"), h("span", { class: "cx-idea__fmt" }, it.format)),
@@ -901,19 +901,19 @@
         var write = h("button", { class: "cx-btn", type: "button", html: ic("bulb") + "<span>Write ideas</span>" });
         write.addEventListener("click", function () { generate(false); });
         list.appendChild(h("div", { class: "cx-ideas__intro" },
-          h("p", null, h("b", null, "Three ideas, in English and Arabic. "), "Helvy reads " + name + "’s platforms, interests and audience size" +
+          h("p", null, h("b", null, "Three ideas, in English and Arabic. "), "Helvi reads " + name + "’s platforms, interests and audience size" +
             " (their best posts too, once the full analysis is unlocked) and writes a hook and a concept for each."), write));
       }
       function generate(isAgain) {
         again.disabled = true;
         list.textContent = "";
         var cook = HV.cooking ? HV.cooking({ steps: ["Reading " + name + "’s style…", "Reading the brief…", "Writing hooks in English and Arabic…", "Checking: no prices, no claims…"] }) : null;
-        list.appendChild(h("div", { class: "cx-sheet__empty cx-sheet__cook" }, cook || "Helvy is writing…"));
+        list.appendChild(h("div", { class: "cx-sheet__empty cx-sheet__cook" }, cook || "Helvi is writing…"));
         api("POST", "/api/ideas", { code: code, token: token || undefined, again: !!isAgain }).then(function (r) {
           if (cook && cook.stop) cook.stop();
           again.disabled = false;
           if (r.b && r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);
-          if (!r.b || !r.b.ok) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, (r.b && r.b.message) || "Helvy couldn’t write just now. You weren’t charged.")); if (!isAgain) again.hidden = true; return; }
+          if (!r.b || !r.b.ok) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, (r.b && r.b.message) || "Helvi couldn’t write just now. You weren’t charged.")); if (!isAgain) again.hidden = true; return; }
           if (!(r.b.ideas || []).length) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, r.b.message || "No ideas this time. You weren’t charged.")); return; }
           cards(r.b.ideas, true);
           if (r.b.spent) toast(r.b.spent + " credits used.");
@@ -928,7 +928,7 @@
           if (r.b.locked) { lockedView(r.b.sample || []); return; }
           setCtx(r.b);
           if (r.b.selection && !token) token = r.b.selection.token;
-          if (!r.b.ai && !(r.b.ideas || []).length) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, "Helvy can’t write ideas right now. Please try again later.")); return; }
+          if (!r.b.ai && !(r.b.ideas || []).length) { list.textContent = ""; list.appendChild(h("div", { class: "cx-sheet__empty" }, "Helvi can’t write ideas right now. Please try again later.")); return; }
           if ((r.b.ideas || []).length) cards(r.b.ideas, false); else intro();
         });
       }
@@ -1032,11 +1032,11 @@
         .catch(function () { toast("The tour didn't load. Please try again."); });
     };
     // One client's first campaign, from brief to results: the opener lists the seven chapters (jump to any).
-    var CHAPTERS = [["chat", "Brief", "Tell Helvy the goals and countries"],
+    var CHAPTERS = [["chat", "Brief", "Tell Helvi the goals and countries"],
                     ["list", "Shortlist", "Scored picks, and how much data stands behind them"],
                     ["shield", "Check a creator", "What is open, what is locked, a sample analysis"],
                     ["calc", "Plan", "The ROI calculator: structure, quality, the gap"],
-                    ["sparkle", "Ask Helvy", "Explain a score, compare, hand off to a person"],
+                    ["sparkle", "Ask Helvi", "Explain a score, compare, hand off to a person"],
                     ["mail", "Quote", "Request it, approve it, go live"],
                     ["chart", "Follow", "The verdict, estimate vs actual, your profile"]];
 

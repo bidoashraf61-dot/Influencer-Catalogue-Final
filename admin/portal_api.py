@@ -758,7 +758,7 @@ class PortalMixin(connect_api.ConnectMixin):
         return self.send_json(200, {"ok": True, "kam": bool(user and user["kam"])}, self.cors())
 
     def api_chat_handoff(self):
-        """Helvy's one-tap "Send this to my account manager" (item 38). The snippet is read from the
+        """Helvi's one-tap "Send this to my account manager" (item 38). The snippet is read from the
         client's own stored chat thread (never from the request), with the open selection's link and a
         short reason. One notify event (type handoff); throttled like the other hand-offs."""
         who = self._need_viewer()
@@ -1069,7 +1069,7 @@ class PortalMixin(connect_api.ConnectMixin):
         except Exception:
             scored = []
         keys = sel.keys()
-        # Each score's parts, for Helvy's explain_score / compare_creators (item 38). Locked creators are
+        # Each score's parts, for Helvi's explain_score / compare_creators (item 38). Locked creators are
         # redacted in the assistant; nothing here goes to a browser.
         details = {}
         try:

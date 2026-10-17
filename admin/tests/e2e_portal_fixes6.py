@@ -1,4 +1,4 @@
-"""End-to-end tests for HELVY Connect fix batch 6 (2026-10-10, branch portal-fixes-6):
+"""End-to-end tests for HELVi Connect fix batch 6 (2026-10-10, branch portal-fixes-6):
 
 - Awareness, Engagement and Traffic are the only campaign types; a stored Conversion reads as Traffic,
   Balanced as an equal blend; a campaign without an objective of its own takes its selection's goals;
@@ -71,7 +71,7 @@ class Fixes6(unittest.TestCase):
         tok = self.selection(c, "Legacy", ["HV-MI-001", "HV-MI-002"], goal=["awareness", "conversion"])
         s, sel, _ = c.get("/api/selection?s=" + tok)
         self.assertEqual(sel["brief"]["objective"], "Awareness+Traffic")
-        # the Helvy tool and the shortlist take the three
+        # the Helvi tool and the shortlist take the three
         decl = assistant.CLIENT_TOOLS["suggest_shortlist"][1]
         self.assertNotIn("conversion", json.dumps(decl))
 

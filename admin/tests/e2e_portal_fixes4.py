@@ -1,4 +1,4 @@
-"""End-to-end tests for the HELVY Connect fix batch 4 (2026-10-10, branch portal-fixes-4):
+"""End-to-end tests for the HELVi Connect fix batch 4 (2026-10-10, branch portal-fixes-4):
 
 - the AI shortlist goals were Awareness, Engagement, Traffic and Conversion (Conversion withdrawn in fix batch 6) (Balanced and
   Sales retired), several at once, scored as a combined objective;

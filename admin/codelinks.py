@@ -1,4 +1,4 @@
-"""Moving shared access codes onto email accounts (HELVY Connect, phase C).
+"""Moving shared access codes onto email accounts (HELVi Connect, phase C).
 
 The sign-in page no longer offers "I have an access code". About six shared codes are
 still in use, so HelloVoice invites each of those clients to an email account first.

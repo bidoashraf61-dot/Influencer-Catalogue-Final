@@ -1,4 +1,4 @@
-"""End-to-end tests for the HELVY Connect fix batch of 2026-10-09 (branch portal-fixes-2):
+"""End-to-end tests for the HELVi Connect fix batch of 2026-10-09 (branch portal-fixes-2):
 
 - a selection with no campaign objective is never scored (also after "Add more like these"),
   and is scored once the client answers the brief questions;

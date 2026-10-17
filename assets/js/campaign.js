@@ -179,7 +179,7 @@
   }
 
   function showList(list) {
-    document.title = "My campaigns — HELVY Connect";
+    document.title = "My campaigns — HELVi Connect";
     if (!list.length) { showNone(); return; }
     var live = list.filter(function (c) { return c.status === "live"; }).length;
     var drafts = list.filter(function (c) { return c.draft; }).length;
@@ -406,7 +406,7 @@
 
   function render(t) {
     var c = R.campaign;
-    document.title = c.name + " — Campaign report — HELVY Connect";
+    document.title = c.name + " — Campaign report — HELVi Connect";
     renderBug(c);
     renderScoreline();
     renderProgress(c);

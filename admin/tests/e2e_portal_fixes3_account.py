@@ -1,4 +1,4 @@
-"""End-to-end tests for HELVY Connect fix batch 3, the profile's delete actions (branch f3-account):
+"""End-to-end tests for HELVi Connect fix batch 3, the profile's delete actions (branch f3-account):
 
 - a client deletes their own selection (soft: archived and marked, never erased); a colleague
   cannot (403), a selection HelloVoice built for them cannot (403), deleting twice is harmless;

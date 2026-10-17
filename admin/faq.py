@@ -41,7 +41,7 @@ def answer(text):
 def _reply(intent):
     costs = portal.costs()
     if intent == "prices":
-        # Helvy never quotes prices (phase C + D): the account manager does.
+        # Helvi never quotes prices (phase C + D): the account manager does.
         return {"reply": "I don't quote prices: your account manager will prepare a quote for exactly the creators and content you want, "
                          "usually within one working day. I can send the request now, or show the ideal creator mix for a number of creators.",
                 "next": ["Get a quote", "What is the ideal creator mix?"],

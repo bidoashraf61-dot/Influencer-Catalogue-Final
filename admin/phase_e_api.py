@@ -1,4 +1,4 @@
-"""HTTP routes for HELVY Connect phase E, as a mixin on ``Handler`` (through ConnectMixin).
+"""HTTP routes for HELVi Connect phase E, as a mixin on ``Handler`` (through ConnectMixin).
 
 Client routes
     POST /api/brief/source         {url} or {file: {name, data: base64 / data-URL}} -> the filled brief to review
@@ -204,10 +204,10 @@ class PhaseEMixin:
             return self.send_json(200, {"ok": True, "ideas": hit["ideas"], "kept": True, "spent": 0,
                                         "credits": portal.balance(reader) if reader != db.admin_code_id() else None}, self.cors())
         if not gemini.configured():
-            return self.send_json(503, {"ok": False, "reason": "not_configured", "message": "Helvy can't write ideas right now."}, self.cors())
+            return self.send_json(503, {"ok": False, "reason": "not_configured", "message": "Helvi can't write ideas right now."}, self.cors())
         if self._throttled("ideas:%d" % reader, 30, 3600):
             return
-        ok, cost, _ = portal.charge(reader, "ideas", "Helvy: content ideas for " + code)
+        ok, cost, _ = portal.charge(reader, "ideas", "Helvi: content ideas for " + code)
         if not ok:
             return self.send_json(402, {"ok": False, "reason": "no_credits", "balance": portal.balance(reader),
                                         "cost": portal.costs().get("ideas", 2),
@@ -229,7 +229,7 @@ class PhaseEMixin:
         if not out:
             portal.refund(reader, cost, "no usable content ideas")
             return self.send_json(200, {"ok": True, "ideas": [], "spent": 0,
-                                        "message": "Helvy couldn't write ideas that fit the rules this time. Please try again."}, self.cors())
+                                        "message": "Helvi couldn't write ideas that fit the rules this time. Please try again."}, self.cors())
         ideas.keep(scope, code, out, ideas.brief_key(ctx))
         db.log("ideas", reader, self.client_ip(), self._ua(), code)
         return self.send_json(200, {"ok": True, "ideas": out, "spent": cost, "free": portal.ai_free(reader) is not None,

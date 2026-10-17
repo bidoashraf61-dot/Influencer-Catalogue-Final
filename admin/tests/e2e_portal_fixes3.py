@@ -1,4 +1,4 @@
-"""End-to-end tests for the HELVY Connect fix batch 3 (2026-10-10, branch portal-fixes-3):
+"""End-to-end tests for the HELVi Connect fix batch 3 (2026-10-10, branch portal-fixes-3):
 
 - the selection objective takes several goals (stored as "Awareness+Engagement", scored with
   both goals' weights), a selection is scored only once it has an objective, and the brief's

@@ -1173,21 +1173,21 @@ def add_shell_js(*scripts):
 add_shell_js(_RECENT_JS, _JS, _JS_REVAMP, _JS_R4)
 
 
-# Helvy, the client portal's assistant, here as the way into the AI copilot: the same
+# Helvi, the client portal's assistant, here as the way into the AI copilot: the same
 # transparent cut-out rising out of an ink disc as on the client pages. His files are named
 # in ONE place, window.HVHelvy in the site's hv-loader.js (data-helvy-only: the clips and
 # nothing else, no page loader). The site serves /assets/ at the domain root.
-HELVY_VER = "t3"     # bump with hv-loader.js's VER whenever Helvy's files change
+HELVY_VER = "t3"     # bump with hv-loader.js's VER whenever Helvi's files change
 _VOICE_LAUNCHER = (
     '<script src="/assets/js/hv-loader.js?v=' + HELVY_VER + '" data-helvy-only defer></script>'
     '<div class="hv-voice"><button class="hv-launch" id="ai-toggle" type="button" aria-controls="ai-panel" aria-expanded="false" '
     'aria-label="Open the AI copilot" aria-keyshortcuts="A"><span class="hv-launch__disc" aria-hidden="true"></span>'
     '<img class="hv-launch__face" src="/assets/brand/helvy/helvy-still.webp?v=' + HELVY_VER + '" alt="" width="76" height="100" decoding="async"></button>'
-    '<span class="hv-tip" aria-hidden="true">Ask Helvy<kbd>A</kbd></span></div>')
+    '<span class="hv-tip" aria-hidden="true">Ask Helvi<kbd>A</kbd></span></div>')
 
 _JS_VOICE = r"""
 (function(){
-  // Helvy's idle loop takes the still's place once it plays; the still stays if it can't (or motion is reduced).
+  // Helvi's idle loop takes the still's place once it plays; the still stays if it can't (or motion is reduced).
   var b=document.getElementById('ai-toggle'); if(!b) return;
   if(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var n=0;

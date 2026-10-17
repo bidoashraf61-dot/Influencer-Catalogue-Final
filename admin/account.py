@@ -7,7 +7,7 @@ endpoint here refuses them.
 
     summary(user, code_id)      the whole profile page in one call: profile, completion,
                                 selections with their statuses, analyses, campaigns,
-                                briefs, notifications, credits, invites and Helvy's next step
+                                briefs, notifications, credits, invites and Helvi's next step
     save_image(user, kind, raw) the profile photo or company logo
     image_path(user, kind)      where it is, for serving it back to its owner
     completion(user)            profile completeness and the credits each step earns
@@ -157,7 +157,7 @@ def profile(user):
 
 
 def _next_step(user, selections, analyses, comp, kam):
-    """One thing to do next, for Helvy's line on Overview."""
+    """One thing to do next, for Helvi's line on Overview."""
     mine = [s for s in selections if s["mine"] and s["counts"]["review"] and s["creators"]]
     if mine:
         s = max(mine, key=lambda x: x["counts"]["review"])
@@ -174,8 +174,8 @@ def _next_step(user, selections, analyses, comp, kam):
     if comp["missing"]:
         st = next(x for x in comp["steps"] if not x["done"])
         return {"kind": "profile", "lead": st["label"] + " and earn ", "strong": "+%d credits" % st["credits"],
-                "tail": ". Helvy uses it to pre-fill your briefs.", "cta": "Finish my profile", "href": "account/#account"}
-    return {"kind": "find", "lead": "Ready for the next campaign? Tell Helvy the brief and get a ", "strong": "scored shortlist",
+                "tail": ". Helvi uses it to pre-fill your briefs.", "cta": "Finish my profile", "href": "account/#account"}
+    return {"kind": "find", "lead": "Ready for the next campaign? Tell Helvi the brief and get a ", "strong": "scored shortlist",
             "tail": ".", "cta": "Find creators", "href": ""}
 
 

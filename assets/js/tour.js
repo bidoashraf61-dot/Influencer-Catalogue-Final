@@ -1,14 +1,14 @@
-/* HELVY Connect onboarding tour v3 (Bido, 2026-10-11, item 40).
+/* HELVi Connect onboarding tour v3 (Bido, 2026-10-11, item 40).
  *
  * Loaded by connect.js only when a client starts the tour, never with the page.
  *
  * ONE CLIENT'S FIRST CAMPAIGN, from brief to results, played on the REAL portal pages inside a
  * frame: seven chapters, one action per step, one sentence per step, about three minutes.
  *   1 Brief          the AI shortlist card: several goals, several countries
- *   2 Shortlist      Helvy's picks, the fit score and how much data stands behind it
+ *   2 Shortlist      Helvi's picks, the fit score and how much data stands behind it
  *   3 Check a creator  open headline numbers, locked sections, the anonymised sample analysis
  *   4 Plan           the ROI calculator: how many creators, quality, the gap, ways to improve
- *   5 Ask Helvy      explain a score, compare creators, hand off to the account manager
+ *   5 Ask Helvi      explain a score, compare creators, hand off to the account manager
  *   6 Quote          request it, the lifecycle chip, "Quote ready", the owner approves, live
  *   7 Follow         the campaign report (verdict, estimate vs actual) and the profile
  *
@@ -48,18 +48,18 @@
     "Chapter": "الفصل", "Setting up the demo…": "جارٍ تجهيز العرض…", "You're all set": "أنت جاهز", "Tour replayed": "أُعيدت الجولة",
     "Added for finishing the tour": "أُضيفت لإكمال الجولة", "Spend them on AI shortlists and replacements.": "استخدمها في القوائم الذكية والبدائل.",
     "Replay any time from": "أعد التشغيل في أي وقت من", "Help": "المساعدة", "or your": "أو", "Profile": "ملفك",
-    "Brief": "الطلب", "Shortlist": "القائمة", "Check a creator": "افحص مؤثراً", "Plan": "خطّط", "Ask Helvy": "اسأل هيلفي", "Quote": "عرض السعر", "Follow": "تابع",
-    "Tell Helvy what the campaign is.": "أخبر هيلفي بما تريده من الحملة.", "Helvy scores the roster for you.": "هيلفي يقيّم كل المؤثرين لك.",
+    "Brief": "الطلب", "Shortlist": "القائمة", "Check a creator": "افحص مؤثراً", "Plan": "خطّط", "Ask Helvi": "اسأل هيلفي", "Quote": "عرض السعر", "Follow": "تابع",
+    "Tell Helvi what the campaign is.": "أخبر هيلفي بما تريده من الحملة.", "Helvi scores the roster for you.": "هيلفي يقيّم كل المؤثرين لك.",
     "See what is open and what is locked.": "اعرف ما هو مفتوح وما هو مقفل.", "Test the structure before you book.": "جرّب التركيبة قبل الحجز.",
     "Questions answered, with a person behind him.": "إجابات فورية، ومعها شخص حقيقي خلفه.", "Request it, approve it, go live.": "اطلبه، اعتمده، وانطلق.",
     "Results, estimate vs actual, your profile.": "النتائج، التقدير مقابل الفعلي، وملفك.",
-    "Set the campaign goals": "حدّد أهداف الحملة", "Pick one goal or several; Helvy weighs them together.": "اختر هدفاً أو أكثر؛ هيلفي يوازن بينها معاً.",
+    "Set the campaign goals": "حدّد أهداف الحملة", "Pick one goal or several; Helvi weighs them together.": "اختر هدفاً أو أكثر؛ هيلفي يوازن بينها معاً.",
     "Awareness and Engagement are both on.": "الوعي والتفاعل مفعّلان معاً.",
     "Choose the countries": "اختر الدول", "Add every country your audience lives in.": "أضف كل دولة يعيش فيها جمهورك.",
     "Saudi Arabia and the UAE are picked.": "السعودية والإمارات مختارتان.",
-    "Helvy builds the shortlist": "هيلفي يبني القائمة", "He scores the whole roster against your brief and returns the best fits.": "يقيّم كل المؤثرين وفق طلبك ويعيد الأنسب.",
+    "Helvi builds the shortlist": "هيلفي يبني القائمة", "He scores the whole roster against your brief and returns the best fits.": "يقيّم كل المؤثرين وفق طلبك ويعيد الأنسب.",
     "Every creator carries a fit score": "لكل مؤثر درجة ملاءمة", "Hover the score to see why, and how much data stands behind it.": "مرّر على الدرجة لترى السبب وحجم البيانات خلفها.",
-    "Thin data is labelled": "البيانات القليلة موسومة", "Where Helvy has little to read, the score says Limited data: a first look, not a verdict.": "حين تقلّ البيانات تقول الدرجة «بيانات محدودة»: نظرة أولى لا حكم.",
+    "Thin data is labelled": "البيانات القليلة موسومة", "Where Helvi has little to read, the score says Limited data: a first look, not a verdict.": "حين تقلّ البيانات تقول الدرجة «بيانات محدودة»: نظرة أولى لا حكم.",
     "Headline numbers are free": "الأرقام الرئيسية مجانية", "Followers, platforms, views and engagement are open; the rest stays locked until you ask.": "المتابعون والمنصات والمشاهدات والتفاعل مفتوحة؛ والباقي مقفل حتى تطلبه.",
     "See a sample first": "شاهد نموذجاً أولاً", "One tap opens a sample full analysis of an anonymised creator.": "بنقرة واحدة تفتح تحليلاً كاملاً نموذجياً لمؤثر مجهول الهوية.",
     "What a full analysis holds": "ماذا يحوي التحليل الكامل", "Audience, authenticity, growth, content and brand history.": "الجمهور، المصداقية، النمو، المحتوى وتاريخ العلامات.",
@@ -67,10 +67,10 @@
     "Choose how many creators": "اختر عدد المؤثرين", "Set the number you want to run; the recommended structure updates for it.": "حدّد العدد الذي تريده؛ وتتحدّث التركيبة الموصى بها.",
     "Selection quality and the gap": "جودة القائمة والفجوة", "Quality compares your picks with the recommended structure, and the gap says what is missing.": "الجودة تقارن اختياراتك بالتركيبة الموصى بها، والفجوة تقول ما ينقص.",
     "Up to three ways to improve": "حتى ثلاث طرق للتحسين", "Each way is one tap; the quality updates at once.": "كل طريقة بنقرة واحدة؛ وتتحدّث الجودة فوراً.",
-    "Ask why a creator scored what it did": "اسأل لماذا حصل مؤثر على درجته", "Helvy explains a score in plain words, from the creator's own numbers.": "هيلفي يشرح الدرجة بكلمات بسيطة من أرقام المؤثر نفسه.",
+    "Ask why a creator scored what it did": "اسأل لماذا حصل مؤثر على درجته", "Helvi explains a score in plain words, from the creator's own numbers.": "هيلفي يشرح الدرجة بكلمات بسيطة من أرقام المؤثر نفسه.",
     "While he works you see what he is doing: dots and one plain line.": "أثناء عمله ترى ما يفعله: نقاط وسطر واحد بسيط.",
     "Compare two creators": "قارن بين مؤثرين", "Ask for two side by side; he reads both analyses for you.": "اطلب مؤثرين جنباً إلى جنب؛ يقرأ التحليلين عنك.",
-    "A person behind him": "شخص حقيقي خلفه", "When Helvy can't answer, one tap hands the chat to your account manager.": "حين لا يستطيع هيلفي الإجابة، نقرة واحدة تحوّل المحادثة إلى مدير حسابك.",
+    "A person behind him": "شخص حقيقي خلفه", "When Helvi can't answer, one tap hands the chat to your account manager.": "حين لا يستطيع هيلفي الإجابة، نقرة واحدة تحوّل المحادثة إلى مدير حسابك.",
     "Request a quote": "اطلب عرض سعر", "When you are happy with the picks, send the selection to your account manager.": "راضٍ عن الاختيارات؟ أرسل القائمة إلى مدير حسابك.",
     "One form, then it is sent": "نموذج واحد ثم يُرسل", "Confirm your details; the quote is requested and the chip follows it.": "أكّد بياناتك؛ يُطلب العرض وتتبعه الشارة.",
     "The quote has a timeline": "لعرض السعر مسار", "Draft, Quote requested, Quote ready, Approved, Campaign live, Completed.": "مسودة، طُلب العرض، العرض جاهز، معتمد، الحملة مباشرة، مكتملة.",
@@ -625,7 +625,7 @@
       currency: "SAR", fx: FX, token: SEL, needs_objective: false, status: statuses, status_counts: counts, role: "owner", lifecycle: lifecycle(), owner: Demo.user, kam: "Marwa M.",
       replace_cost: 2, more_cost: 3, alike_cost: 2, ai_free: null, credits: STATE.credits };
   }
-  // GET /api/voice/selection: what Helvy knows about the selection on the page (brief on file, scores).
+  // GET /api/voice/selection: what Helvi knows about the selection on the page (brief on file, scores).
   function voiceSelection() {
     var scored = STATE.codes.map(function (c) { return { code: c, name: BY[c].name, score: BY[c].score.overall, tag: tagOf(BY[c].score.overall) }; })
       .sort(function (a, b) { return b.score - a.score; });
@@ -748,7 +748,7 @@
                        prefs: { analysis: true, selections: true, campaigns: true, account: true, ideas: false }, counts: { analysis: 1, selections: STATE.notes.length - 1 } },
       ledger: [{ delta: 30, reason: "Welcome credits", at: NOW - 20 * DAY, balance: 30 }],
       invite: { token: "demo", credits: 20, max: 5, paid: 0, left: 5, list: [] },
-      next: { kind: "profile", lead: "Add your phone number and earn ", strong: "+3 credits", tail: ". Helvy uses it to reach you about quotes.", cta: "Finish your profile", href: "account/#account" },
+      next: { kind: "profile", lead: "Add your phone number and earn ", strong: "+3 credits", tail: ". Helvi uses it to reach you about quotes.", cta: "Finish your profile", href: "account/#account" },
       markets: [{ value: "SA", label: "Saudi Arabia" }, { value: "AE", label: "UAE" }, { value: "EG", label: "Egypt" }], industries: [{ value: "Pharma", label: "Pharma" }, { value: "Beauty", label: "Beauty" }],
       languages: ["Arabic", "English", "Arabic and English"], team: [] };
   }
@@ -778,7 +778,7 @@
     var p = BY[c];
     return { code: p.code, name: p.name, photo_url: photo(p.photo), fit: p.score.overall, followers: prim(p).followers, city: p.city, tier: p.tier.replace(/^HCP - /, "Doctor · ") };
   }
-  // What Helvy says, as the streamed events the real chat sends (step* delta* done).
+  // What Helvi says, as the streamed events the real chat sends (step* delta* done).
   function chatEvents(text) {
     var t = String(text || ""), ev = [], reply, extra = {};
     var step = function (ms, s) { ev.push([ms, { t: "step", text: s }]); };
@@ -1024,7 +1024,7 @@
         [].forEach.call(win.document.querySelectorAll(".cat-showreel video"), function (v) { v.removeAttribute("data-src"); v.removeAttribute("src"); v.preload = "none"; });
         var st = win.document.createElement("style");
         st.textContent = "body.cat-away::after{content:none!important;display:none!important}" +
-          // on a phone the tour card and its Helvy sit where the chat launcher is
+          // on a phone the tour card and its Helvi sit where the chat launcher is
           "@media (max-width:760px){.hv-launch,.hv-nudge{display:none!important}}";
         win.document.head.appendChild(st);
       });
@@ -1043,9 +1043,9 @@
   function ic(n) { return HV.icon ? HV.icon(n, "tv-i") : ""; }
   function clipNode(name, cls, opts) { return HV.clip ? HV.clip(name, cls, opts) : h("span"); }
   // name, icon, the chapter's one line
-  var CHAPTERS = [["Brief", "chat", "Tell Helvy what the campaign is."], ["Shortlist", "list", "Helvy scores the roster for you."],
+  var CHAPTERS = [["Brief", "chat", "Tell Helvi what the campaign is."], ["Shortlist", "list", "Helvi scores the roster for you."],
                   ["Check a creator", "shield", "See what is open and what is locked."], ["Plan", "calc", "Test the structure before you book."],
-                  ["Ask Helvy", "sparkle", "Questions answered, with a person behind him."], ["Quote", "mail", "Request it, approve it, go live."],
+                  ["Ask Helvi", "sparkle", "Questions answered, with a person behind him."], ["Quote", "mail", "Request it, approve it, go live."],
                   ["Follow", "chart", "Results, estimate vs actual, your profile."]];
   // A query per view, so two views of one page are two real page loads.
   var PAGES = { catalogue: "?tour=1", selection: "selection/?tour=1#s=" + SEL, creator: "creator/?tour=1#c=DEMO-05", campaign: "campaign/?tour=1#t=" + CAMP, account: "account/?tour=1#overview" };
@@ -1056,17 +1056,17 @@
   var STOPS = [
     { ch: 0, name: "Brief", beats: [
       { view: "catalogue", fresh: true, target: "#ai-sl", clip: "hello", run: "aiAsk0", pad: 10,
-        t: "Set the campaign goals", p: "Pick one goal or several; Helvy weighs them together.", hint: "Awareness and Engagement are both on." },
+        t: "Set the campaign goals", p: "Pick one goal or several; Helvi weighs them together.", hint: "Awareness and Engagement are both on." },
       { target: "#ai-sl", clip: "point", run: "aiAsk2", pad: 10,
         t: "Choose the countries", p: "Add every country your audience lives in.", hint: "Saudi Arabia and the UAE are picked." }
     ] },
     { ch: 1, name: "Shortlist", beats: [
       { target: "#ai-sl", clip: "thinking", run: "aiGo", pad: 10,
-        t: "Helvy builds the shortlist", p: "He scores the whole roster against your brief and returns the best fits." },
+        t: "Helvi builds the shortlist", p: "He scores the whole roster against your brief and returns the best fits." },
       { view: "selection", fresh: true, target: ".cat-card[data-code='DEMO-06'] .cat-score", clip: "point", run: "scoreTip", pad: 8,
         t: "Every creator carries a fit score", p: "Hover the score to see why, and how much data stands behind it." },
       { target: ".cat-card[data-code='DEMO-08'] .cat-score", clip: "point", run: "scoreTip", pad: 8,
-        t: "Thin data is labelled", p: "Where Helvy has little to read, the score says Limited data: a first look, not a verdict." }
+        t: "Thin data is labelled", p: "Where Helvi has little to read, the score says Limited data: a first look, not a verdict." }
     ] },
     { ch: 2, name: "Check a creator", beats: [
       { view: "creator", fresh: true, target: "#pp-gate-band", clip: "point",
@@ -1086,13 +1086,13 @@
       { target: ".cx-waysbox", clip: "approve", run: "roiWays", pad: 10, narrow: true,
         t: "Up to three ways to improve", p: "Each way is one tap; the quality updates at once." }
     ] },
-    { ch: 4, name: "Ask Helvy", beats: [
+    { ch: 4, name: "Ask Helvi", beats: [
       { view: "selection", fresh: true, target: "#hv-panel", clip: "thinking", run: "chat:Why did Dr. Ghada score 88?:fresh",
-        t: "Ask why a creator scored what it did", p: "Helvy explains a score in plain words, from the creator's own numbers.", hint: "While he works you see what he is doing: dots and one plain line." },
+        t: "Ask why a creator scored what it did", p: "Helvi explains a score in plain words, from the creator's own numbers.", hint: "While he works you see what he is doing: dots and one plain line." },
       { target: "#hv-panel", clip: "point", run: "chat:Compare Lulwa and Nada",
         t: "Compare two creators", p: "Ask for two side by side; he reads both analyses for you." },
       { target: "#hv-panel", clip: "approve", run: "chat:Can you get me a better rate?:hand",
-        t: "A person behind him", p: "When Helvy can't answer, one tap hands the chat to your account manager." }
+        t: "A person behind him", p: "When Helvi can't answer, one tap hands the chat to your account manager." }
     ] },
     { ch: 5, name: "Quote", beats: [
       { view: "selection", fresh: true, lc: "draft", target: "#cat-request", clip: "point", run: "quoteOpen", pad: 10,
@@ -1128,7 +1128,7 @@
     Demo.active = true;
     STATE = freshState(Demo.user);
     var prevFocus = document.activeElement;
-    var root = h("div", { class: "tv", role: "region", "aria-label": "HELVY Connect tour, demo mode" });
+    var root = h("div", { class: "tv", role: "region", "aria-label": "HELVi Connect tour, demo mode" });
     if (IS_AR) root.setAttribute("dir", "rtl");
     var exit = h("button", { class: "tv-exit", type: "button", html: ic("x") + "<span></span>" });
     exit.querySelector("span").textContent = TT("Exit demo");
@@ -1142,7 +1142,7 @@
     var idp = h("p", null, h("b", null, SEL_NAME), h("span", null, TT("Sample data · nothing you do here is saved")));
     var bar = h("header", { class: "tv-bar" }, h("div", { class: "tv-bar__id" }, h("span", { class: "tv-badge" }, TT("Demo")), idp), chaps, exit);
     var stage = h("div", { class: "tv-stage" });
-    var frame = h("iframe", { class: "tv-frame", title: "HELVY Connect demo", "data-hv-demo": "1", tabindex: "0" });
+    var frame = h("iframe", { class: "tv-frame", title: "HELVi Connect demo", "data-hv-demo": "1", tabindex: "0" });
     var shutter = h("div", { class: "tv-shutter", "aria-hidden": "true" });
     var spot = h("div", { class: "tv-spot", "aria-hidden": "true", hidden: "" });
     var pin = h("span", { class: "tv-pin" }, "1");
@@ -1283,7 +1283,7 @@
     });
   }
 
-  /* -- the coach: Helvy (cut-out, looping) over a card of one title and one sentence -- */
+  /* -- the coach: Helvi (cut-out, looping) over a card of one title and one sentence -- */
   function drawCoach(b, i) {
     var o = ORDER[i], stop = STOPS[o.s], c = T.coach;
     c.textContent = "";
@@ -1333,7 +1333,7 @@
     if (!REDUCE) { c.classList.remove("is-pop"); void c.offsetWidth; c.classList.add("is-pop"); }
     setTimeout(function () { if (T && T.coach === c) { var x = c.querySelector(".tv-nav .tv-btn:last-child"); if (x) x.focus({ preventScroll: true, focusVisible: false }); } }, 30);
   }
-  // Helvy changes pose when something happens (the quote is approved, the answer is in).
+  // Helvi changes pose when something happens (the quote is approved, the answer is in).
   function helvyTo(name, opts) {
     if (!T) return;
     var box = T.coach.querySelector(".tv-coach__helvy");
@@ -1414,7 +1414,7 @@
       if (cd) cd.scrollIntoView({ block: "center" });
       if (P.aiDemo) later_(function () { P.aiDemo(clone(ANS), "Skincare · KSA + UAE · Awareness + Engagement"); }, 400);
       light(b);
-      // The card plays its staged wait (Helvy scouts with his camera), then the results bar opens.
+      // The card plays its staged wait (Helvi scouts with his camera), then the results bar opens.
       var seen = false;
       for (var j = 2; j < 30; j++) later_(function () {
         var rb = d.getElementById("ai-result");
@@ -1635,7 +1635,7 @@
     if (!el || !el.getBoundingClientRect().height) { T.spot.hidden = true; place(); return; }
     var mob = window.innerWidth <= 760;
     // A wide lit area leaves no room beside it: the coach docks below it, so keep that room free
-    // (phone: the docked card; desktop: the card plus the head-room Helvy stands in).
+    // (phone: the docked card; desktop: the card plus the head-room Helvi stands in).
     var padW = b.pad != null ? b.pad : 14, wide = !mob && el.getBoundingClientRect().width + 2 * padW > window.innerWidth - T.coach.offsetWidth - 100;
     var stageR = T.stage.getBoundingClientRect(), coachH = mob ? T.coach.offsetHeight : wide ? T.coach.offsetHeight + 96 : 0;
     var free = stageR.height - coachH;
@@ -1671,14 +1671,14 @@
       w.addEventListener("scroll", function () { if (tick) return; tick = requestAnimationFrame(function () { tick = 0; if (T && T.i >= 0) light(T.eff || beat(T.i), true); }); }, { passive: true });
     }
   }
-  // Desktop: the coach sits beside the lit area, Helvy facing it, a notch pointing back. Phone: docked at the bottom.
+  // Desktop: the coach sits beside the lit area, Helvi facing it, a notch pointing back. Phone: docked at the bottom.
   function place() {
     if (!T) return;
     var c = T.coach, vw = window.innerWidth, vh = window.innerHeight;
     c.removeAttribute("data-side");
     if (vw <= 760 || T.root.classList.contains("is-finish") || !T.lit || T.spot.hidden) { c.style.left = c.style.top = c.style.right = c.style.bottom = ""; c.classList.remove("is-flip"); return; }
     var w = c.offsetWidth, hh = c.offsetHeight, L = T.lit, gap = 30, left, top, side = "";
-    var stageTop = T.stage.getBoundingClientRect().top + 96;      // room above the card for Helvy, who stands on its top edge
+    var stageTop = T.stage.getBoundingClientRect().top + 96;      // room above the card for Helvi, who stands on its top edge
     var eff = T.eff || (T.i >= 0 ? beat(T.i) : {});
     if (eff.narrow && L.l - gap >= w + 16) { left = L.l - gap - w; top = Math.max(stageTop + 16, Math.min(vh - hh - 16, L.t)); side = "left"; }   // beside a drawer: in the strip it leaves
     else if (vw - L.r - gap >= w + 16) { left = L.r + gap; top = Math.max(stageTop + 16, Math.min(vh - hh - 16, L.t)); side = "right"; }

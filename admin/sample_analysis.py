@@ -1,4 +1,4 @@
-"""The sample full analysis (HELVY Connect item 39).
+"""The sample full analysis (HELVi Connect item 39).
 
 A client whose creator analysis is locked can open "a sample full analysis": the REAL analysis of one
 configured creator, drawn by the same page as any full analysis, with everything that could say who it

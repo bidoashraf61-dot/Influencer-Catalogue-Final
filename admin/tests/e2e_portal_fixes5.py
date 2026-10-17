@@ -1,4 +1,4 @@
-"""End-to-end tests for HELVY Connect fix batch 5 (2026-10-10, branch portal-fixes-5), item 44:
+"""End-to-end tests for HELVi Connect fix batch 5 (2026-10-10, branch portal-fixes-5), item 44:
 
 (b) the countries, the gender and the age groups of the AI shortlist brief take several answers
     (goal already did); the brief, the selection's target, the saved brief, "Edit brief" and the

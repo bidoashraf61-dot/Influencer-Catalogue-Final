@@ -1,4 +1,4 @@
-"""The occasions and congress calendar Helvy uses for timing advice (KSA first).
+"""The occasions and congress calendar Helvi uses for timing advice (KSA first).
 
 A small curated list, kept in Python so it ships with the admin code. Public
 dates only: national days, health awareness days, retail seasons and the medical

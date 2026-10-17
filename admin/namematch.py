@@ -1,4 +1,4 @@
-"""Find creators from names, handles, profile links or codes (Helvy's find_creators tool).
+"""Find creators from names, handles, profile links or codes (Helvi's find_creators tool).
 
 A pasted list of names rarely matches the roster letter for letter: handles carry @ or a profile
 link, Arabic names differ in alef/ya/ta-marbuta spelling and diacritics, English names come with

@@ -1364,7 +1364,7 @@
         return r.ok ? r.json() : null;
       });
     }
-    // "Loading more": Helvy flipping through cards, and a row of skeleton cards, under the grid.
+    // "Loading more": Helvi flipping through cards, and a row of skeleton cards, under the grid.
     var moreRow = document.createElement("div");
     moreRow.className = "cat-more";
     moreRow.hidden = true;
@@ -2907,7 +2907,7 @@
       if (controls) controls.refresh();
     }
 
-    /* ---- selection status (HELVY Connect v3) ----------------------------
+    /* ---- selection status (HELVi Connect v3) ----------------------------
        Every creator is Under review until the selection's owner approves or
        rejects them; HelloVoice can set any status, and only HelloVoice marks a
        creator Unavailable. Colleagues see the same statuses and cannot change
@@ -2935,7 +2935,7 @@
     var ST_SUB = {
       review: function () { return ROLE === "owner" ? "Waiting for your yes or no." : "Waiting for " + ((CURATED && CURATED.owner) ? CURATED.owner.split(" ")[0] : "the owner") + "'s yes or no."; },
       approved: function () { return "These go to " + (KAM ? KAM.split(" ")[0] : "HelloVoice") + " for the quote."; },
-      rejected: function () { return ROLE === "owner" ? "Tell Helvy why and it finds a better fit." : "Left out of the quote."; },
+      rejected: function () { return ROLE === "owner" ? "Tell Helvi why and it finds a better fit." : "Left out of the quote."; },
       unavailable: function () { return "Set by HelloVoice when a creator can't take the job."; }
     };
     var STATUS_ON = !!(CURATED && CURATED.token && CFG.api && CURATED.status);
@@ -3011,11 +3011,11 @@
       var have = (st.replacements || []).length;
       var cost = CURATED && CURATED.replaceCost != null ? CURATED.replaceCost : 2;
       var helvy = window.hvPortal && window.hvPortal.helvy ? '<img src="' + esc(window.hvPortal.helvy) + '" alt="" aria-hidden="true">' : "";
-      // Already found: the same lime pill with Helvy's face as "Find a replacement"; opening them is free.
-      if (have) return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '" aria-label="See the ' + have + ' replacement' + (have === 1 ? "" : "s") + ' Helvy found">' +
+      // Already found: the same lime pill with Helvi's face as "Find a replacement"; opening them is free.
+      if (have) return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '" aria-label="See the ' + have + ' replacement' + (have === 1 ? "" : "s") + ' Helvi found">' +
         helvy + "<span>See " + have + " replacement" + (have === 1 ? "" : "s") + "</span>" + costChip(0) + "</button>";
-      // A compact one-line pill: Helvy's face, the action, the cost inline.
-      return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '" aria-label="Find a replacement with Helvy, ' + (cost ? cost + " credits" : "free") + '">' +
+      // A compact one-line pill: Helvi's face, the action, the cost inline.
+      return '<button type="button" class="sel-repl" data-st-repl="' + esc(code) + '" aria-label="Find a replacement with Helvi, ' + (cost ? cost + " credits" : "free") + '">' +
         helvy + "<span>Find a replacement</span>" + costChip(cost) + "</button>";
     }
     /* -- why a creator was rejected: a "?" beside the status, a small pop-up to answer -- */
@@ -3032,7 +3032,7 @@
       if (!txt && !(ROLE === "owner" || ROLE === "admin")) return;
       if (whyPop) return;
       if (!whyTip) { whyTip = document.createElement("div"); whyTip.className = "sel-whytip"; whyTip.setAttribute("role", "tooltip"); whyTip.id = "sel-whytip"; document.body.appendChild(whyTip); }
-      whyTip.innerHTML = txt ? "<b>Why rejected</b>" + esc(txt) : "<b>Why rejected?</b>Add a reason (optional). It helps Helvy suggest better.";
+      whyTip.innerHTML = txt ? "<b>Why rejected</b>" + esc(txt) : "<b>Why rejected?</b>Add a reason (optional). It helps Helvi suggest better.";
       clearTimeout(whyTip._t);
       whyTip.hidden = false;
       q.setAttribute("aria-describedby", "sel-whytip");
@@ -3072,7 +3072,7 @@
       var pop = document.createElement("div");
       pop.className = "sel-whypop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-labelledby", "sel-whypop-t");
       pop.innerHTML = '<p class="sel-whypop__t" id="sel-whypop-t">Why not ' + esc(nm ? nm.textContent.trim() : code) + "?</p>" +
-        '<p class="sel-whypop__s">Optional. It helps Helvy suggest better.</p>' +
+        '<p class="sel-whypop__s">Optional. It helps Helvi suggest better.</p>' +
         '<div class="sel-whypop__chips" role="group" aria-label="Reason">' + REASONS.map(function (r) {
           return '<button type="button" aria-pressed="' + (pick === r[0]) + '" data-why="' + r[0] + '">' + esc(r[1]) + "</button>";
         }).join("") + "</div>" +
@@ -3096,7 +3096,7 @@
           save.disabled = true;
           stSave(code, { reason: pick, note: pick === "other" ? other.value.replace(/\s+/g, " ").trim() : "" }, function () {
             delete justRejected[code];
-            stToast("Thanks. Helvy will remember that.");
+            stToast("Thanks. Helvi will remember that.");
           });
           closeWhyPop(false);
           setTimeout(function () { var nq = document.querySelector('[data-st-whyq="' + code + '"]'); if (nq) nq.focus(); }, 60);
@@ -3147,15 +3147,15 @@
           '<button type="button" class="sel-dec sel-dec--no" data-st-set="rejected" data-st-code="' + esc(code) + '">' + hvIcon("x") + " Reject</button></div>";
         // "Unavailable" is now one of the reasons under Reject (no separate HelloVoice link).
       }
-      // Find a replacement opens Helvy's side panel (connect.js), like Creators like this.
+      // Find a replacement opens Helvi's side panel (connect.js), like Creators like this.
       if (canDecide && (st.s === "rejected" || st.s === "unavailable")) html += replButton(code, st);
-      // "Creators like this" (Helvy look-alikes): on every card the owner has not turned down.
+      // "Creators like this" (Helvi look-alikes): on every card the owner has not turned down.
       if (canDecide && st.s !== "rejected" && st.s !== "unavailable") {
         var ac = CURATED.alikeCost != null ? CURATED.alikeCost : 2;
-        html += '<button type="button" class="sel-alike" data-alike="' + esc(code) + '" title="' + (ac ? "Helvy finds 3 creators like this one · " + ac + " credits" : "Free with your active campaign") + '">' +
+        html += '<button type="button" class="sel-alike" data-alike="' + esc(code) + '" title="' + (ac ? "Helvi finds 3 creators like this one · " + ac + " credits" : "Free with your active campaign") + '">' +
           hvIcon("spark") + "<span>Creators like this</span></button>";
       }
-      // Phase E: Helvy's content ideas for this creator (hooks and concepts, AR + EN), for anyone who can open the selection.
+      // Phase E: Helvi's content ideas for this creator (hooks and concepts, AR + EN), for anyone who can open the selection.
       if (st.s !== "rejected" && st.s !== "unavailable") {
         html += '<button type="button" class="sel-ideas" data-ideas="' + esc(code) + '" title="Opens once your campaign has started; see an example">' +
           hvIcon("lock") + "<span>Content ideas</span></button>";
@@ -3163,7 +3163,7 @@
       box.innerHTML = html;
     }
     // The selection's campaign objective, in one bar above the creators. Without one nothing is
-    // scored (the server sends no scores) and the bar asks for it: Helvy's objective studio
+    // scored (the server sends no scores) and the bar asks for it: Helvi's objective studio
     // (portal.js) scores THIS selection only, it never builds a new shortlist. With one, the bar
     // shrinks to a done line (Objective added ✓ · Awareness, Engagement · Edit).
     function objectiveWords(o) { return String(o || "").split("+").filter(Boolean).join(", "); }
@@ -3302,7 +3302,7 @@
       }
       host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic">' + hvIcon("target") + "</span>" +
         '<p class="sel-obj__tx"><b>Add your campaign objective to score these creators</b>' +
-        "<span>" + (canAct ? "Six quick questions. Helvy scores the creators already in this selection: it doesn’t build a new shortlist or change who is in it. Free."
+        "<span>" + (canAct ? "Six quick questions. Helvi scores the creators already in this selection: it doesn’t build a new shortlist or change who is in it. Free."
                            : "Scores appear once the selection’s owner adds the campaign objective.") + "</span></p>" +
         (canAct ? '<button type="button" class="sel-obj__go">Add objective' + hvIcon("arrow") + "</button>" : "") + "</div></div>";
     }
@@ -3342,7 +3342,7 @@
         chip("review", n.review + " under review", "clock") + chip("unavailable", n.unavailable + " unavailable", "ban") +
         '</div><div class="sel-sbar__tools"><button type="button" class="sel-swrow" data-st-group role="switch" aria-checked="' + (groupBy === "status") + '"><span class="sel-sw" aria-hidden="true"></span>Group by status</button></div></div></div>';
     }
-    // HELVY Connect phase D (assets/js/connect.js): the ROI Calculator, "Add more like these"
+    // HELVi Connect phase D (assets/js/connect.js): the ROI Calculator, "Add more like these"
     // and "Creators like this" read the selection through this small hook and add creators
     // the same way the replacement's Add button does.
     window.hvSelection = {
@@ -3426,7 +3426,7 @@
         hideWhyTip();
         if (ROLE === "owner" || ROLE === "admin") openWhyPop(t, code); else showWhyTip(t, code);
       } else if (t.hasAttribute("data-st-repl")) {
-        if (!(window.hvPortal && window.hvPortal.replaceSheet)) { stToast("Helvy couldn't look just now."); return; }
+        if (!(window.hvPortal && window.hvPortal.replaceSheet)) { stToast("Helvi couldn't look just now."); return; }
         window.hvPortal.replaceSheet(code, function (list) {
           var st = statusOf(code);
           st.replacements = (list || []).map(function (c) { return c.code; });
@@ -3568,7 +3568,7 @@
       layoutGroups(grid, ordered);
 
       $("sel-title").textContent = selectionName;
-      document.title = selectionName + " — HELVY Connect";
+      document.title = selectionName + " — HELVi Connect";
       if (REFUSED && !selected.length) { if (!$("cat-empty").querySelector(".sel-reqaccess")) refusedPanel($("cat-empty")); }
       else $("cat-empty").textContent = selected.length
         ? (stFilter ? "No creators in this selection are " + (ST_LABEL[stFilter] || stFilter).toLowerCase() + " right now." : "No creators in this selection match those filters.")

@@ -1,4 +1,4 @@
-"""End-to-end tests for HELVY Connect fix batch 9 (2026-10-11, branch portal-fixes-9):
+"""End-to-end tests for HELVi Connect fix batch 9 (2026-10-11, branch portal-fixes-9):
 
 #42 the quote lifecycle chip: Draft -> Quote requested -> Quote ready -> Approved -> Campaign live ->
     Completed; owner-only request and approve; colleagues read-only; bell only (never a client email);
@@ -286,7 +286,7 @@ class Fixes9(unittest.TestCase):
         acc = c.get("/api/account")[1]
         row = next(s for s in acc["selections"] if s["token"] == tok)
         self.assertEqual((row["quote"]["key"], row["quote"]["label"]), ("requested", "Quote requested"))
-        # Helvy knows, and is told never to quote a price
+        # Helvi knows, and is told never to quote a price
         import assistant
         sel = db.selection(token=tok)
         line = lifecycle.summary_line(sel)

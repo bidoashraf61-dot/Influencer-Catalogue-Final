@@ -332,7 +332,7 @@ EMAIL_LOGO_INK = SITE + "/assets/brand/email/helvy-connect-on-ink-480.png?v=c5" 
 EMAIL_HELVY = SITE + "/assets/brand/email/helvy-still-192.png"                        # smile, transparent cut-out (no disc)
 EMAIL_HV = SITE + "/assets/brand/email/hellovoice-white-240.png"                      # Powered by
 
-# The sign-in code email (HELVY Connect, phase C, v2). Built for the inbox, not the
+# The sign-in code email (HELVi Connect, phase C, v2). Built for the inbox, not the
 # browser: one 600px table, inline styles, system fonts, every image with width,
 # height and alt, a VML button for Outlook, and dark-mode rules that only recolour
 # (the code panel is ink with lime digits in both modes). The code is real text,
@@ -346,7 +346,7 @@ OTP_HTML = """<!DOCTYPE html>
 <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
 <meta name="color-scheme" content="light dark">
 <meta name="supported-color-schemes" content="light dark">
-<title>Your HELVY Connect sign-in code</title>
+<title>Your HELVi Connect sign-in code</title>
 <!--[if mso]><noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript><![endif]-->
 <style>
   body { margin: 0 !important; padding: 0 !important; width: 100% !important; -webkit-text-size-adjust: 100%; }
@@ -377,7 +377,7 @@ OTP_HTML = """<!DOCTYPE html>
 </style>
 </head>
 <body class="bg" style="margin:0;padding:0;background-color:#efede8;">
-<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#efede8;opacity:0;">Your HELVY Connect code is {CODE}. It expires in {MIN} minutes.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#efede8;opacity:0;">Your HELVi Connect code is {CODE}. It expires in {MIN} minutes.&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
 <table role="presentation" class="bg" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#efede8;">
 <tr><td align="center" style="padding:32px 12px 40px;">
 <!--[if mso]><table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0"><tr><td><![endif]-->
@@ -385,7 +385,7 @@ OTP_HTML = """<!DOCTYPE html>
 
   <tr><td style="background-color:#121212;border-radius:24px 24px 0 0;padding:22px 32px 20px;" class="px">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-      <td valign="middle"><img src="{LOGO}" width="168" height="84" alt="HELVY Connect" style="display:block;width:168px;height:84px;border:0;"></td>
+      <td valign="middle"><img src="{LOGO}" width="168" height="84" alt="HELVi Connect" style="display:block;width:168px;height:84px;border:0;"></td>
       <td class="tag" align="right" valign="middle" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:17px;color:#a9a9a9;letter-spacing:.02em;">Connecting Brands<br>with the Right Voices</td>
     </tr></table>
   </td></tr>
@@ -394,11 +394,11 @@ OTP_HTML = """<!DOCTYPE html>
   <tr><td class="card px" style="background-color:#ffffff;padding:34px 40px 6px;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
       <td width="92" valign="middle" style="width:92px;padding-right:18px;">
-        <img src="{HELVY}" width="92" height="92" alt="Helvy, smiling" style="display:block;width:92px;height:92px;border:0;outline:none;text-decoration:none;">
+        <img src="{HELVi}" width="92" height="92" alt="Helvi, smiling" style="display:block;width:92px;height:92px;border:0;outline:none;text-decoration:none;">
       </td>
       <td valign="middle">
-        <p class="tx hi" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:26px;line-height:32px;font-weight:700;color:#121212;">Hi, it&rsquo;s Helvy &#128075;</p>
-        <p class="mu" style="margin:6px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#383838;">Here&rsquo;s your code to sign in to HELVY Connect.</p>
+        <p class="tx hi" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:26px;line-height:32px;font-weight:700;color:#121212;">Hi, it&rsquo;s Helvi &#128075;</p>
+        <p class="mu" style="margin:6px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#383838;">Here&rsquo;s your code to sign in to HELVi Connect.</p>
       </td>
     </tr></table>
   </td></tr>
@@ -414,8 +414,8 @@ OTP_HTML = """<!DOCTYPE html>
   </td></tr>
 
   <tr><td class="card px btn" align="center" style="background-color:#ffffff;padding:22px 40px 8px;">
-    <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{SITE}/" style="height:52px;v-text-anchor:middle;width:300px;" arcsize="50%" stroke="f" fillcolor="#e8ff76"><w:anchorlock/><center style="color:#121212;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Open HELVY Connect &rarr;</center></v:roundrect><![endif]-->
-    <!--[if !mso]><!--><a href="{SITE}/" style="display:inline-block;background-color:#e8ff76;color:#121212;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:52px;font-weight:700;text-decoration:none;border-radius:26px;padding:0 34px;mso-hide:all;">Open HELVY Connect &rarr;</a><!--<![endif]-->
+    <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{SITE}/" style="height:52px;v-text-anchor:middle;width:300px;" arcsize="50%" stroke="f" fillcolor="#e8ff76"><w:anchorlock/><center style="color:#121212;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Open HELVi Connect &rarr;</center></v:roundrect><![endif]-->
+    <!--[if !mso]><!--><a href="{SITE}/" style="display:inline-block;background-color:#e8ff76;color:#121212;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:52px;font-weight:700;text-decoration:none;border-radius:26px;padding:0 34px;mso-hide:all;">Open HELVi Connect &rarr;</a><!--<![endif]-->
   </td></tr>
 
   <tr><td class="card px" style="background-color:#ffffff;padding:22px 40px 34px;">
@@ -449,13 +449,13 @@ OTP_HTML = """<!DOCTYPE html>
 
 def otp_message(code, minutes=10, to=None):
     """(subject, text, html) for a sign-in code."""
-    subject = "Your HELVY Connect sign-in code: %s" % code
-    text = ("Your HELVY Connect sign-in code is %s.\n\n"
+    subject = "Your HELVi Connect sign-in code: %s" % code
+    text = ("Your HELVi Connect sign-in code is %s.\n\n"
             "It works for %d minutes. If you did not ask for it, ignore this email.\n\n"
-            "HELVY Connect · Powered by HelloVoice · A BlueHolding Company" % (code, minutes))
-    sent = (" Sent to %s because someone asked to sign in to HELVY Connect." % _html.escape(to)) if to else ""
+            "HELVi Connect · Powered by HelloVoice · A BlueHolding Company" % (code, minutes))
+    sent = (" Sent to %s because someone asked to sign in to HELVi Connect." % _html.escape(to)) if to else ""
     page = OTP_HTML
     for k, v in (("{CODE}", _html.escape(str(code))), ("{MIN}", str(int(minutes))), ("{LOGO}", EMAIL_LOGO_INK),
-                 ("{HELVY}", EMAIL_HELVY), ("{HV}", EMAIL_HV), ("{SITE}", SITE), ("{SENT}", sent)):
+                 ("{HELVi}", EMAIL_HELVY), ("{HV}", EMAIL_HV), ("{SITE}", SITE), ("{SENT}", sent)):
         page = page.replace(k, v)
     return subject, text, page

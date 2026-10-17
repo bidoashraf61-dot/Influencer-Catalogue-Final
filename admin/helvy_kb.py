@@ -1,4 +1,4 @@
-"""Helvy's second round of knowledge (phase C + D, #9): what HelloVoice's campaigns
+"""Helvi's second round of knowledge (phase C + D, #9): what HelloVoice's campaigns
 achieved, the occasions calendar, the client's own selection decisions and the KSA
 rules. Each is a read-only tool for the client assistant.
 

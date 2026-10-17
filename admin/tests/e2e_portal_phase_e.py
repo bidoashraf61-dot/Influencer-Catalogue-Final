@@ -1,4 +1,4 @@
-"""End-to-end tests for HELVY Connect phase E (branch phase-e):
+"""End-to-end tests for HELVi Connect phase E (branch phase-e):
 
 - brief from a link or a file: the filled brief comes back for review (nothing saved),
   5 credits, free with an active campaign, refunded on an AI failure, nothing charged
@@ -9,7 +9,7 @@
 - content ideas per creator: 2 credits, kept so reopening is free, "again" charges,
   no prices, only for creators in the viewer's own selection;
 - the weekly bell update and the "Next time" panel through the API, other clients refused;
-- Helvy never quotes prices in any of it.
+- Helvi never quotes prices in any of it.
 
 Same harness as e2e_portal.py (a throwaway copy of admin/*.py, an empty database,
 captured mail, a scripted Gemini), so it never touches catalogue.db or the network.

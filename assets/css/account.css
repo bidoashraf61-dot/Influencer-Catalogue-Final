@@ -1,5 +1,5 @@
-/* HELVY Connect: the client's profile (/account/). Catalogue world on a white
-   bar: side nav (tabs on a phone), Helvy's ink greeting band, linen scorelines,
+/* HELVi Connect: the client's profile (/account/). Catalogue world on a white
+   bar: side nav (tabs on a phone), Helvi's ink greeting band, linen scorelines,
    lime for the action, the orange coin chip (connect.css --hv-credit) for every credit
    amount, green / amber / red only for a
    verdict or a status. Campaigns keep the report's own scorebug (verdict stamp,
@@ -228,7 +228,7 @@ p.ac-muted { margin: 6px 0 0; max-width: 64ch; }
 }
 
 /* ================================================================ v3 shell */
-/* The white bar: the HELVY Connect logo (light variant) and its line, then
+/* The white bar: the HELVi Connect logo (light variant) and its line, then
    the site's own links, the bell and the account circle. */
 :root { --stone: #efede8; --stone-2: #e5e1d9; --rule: rgba(18,18,18,.12); --rule-soft: rgba(18,18,18,.07);
   --lime-dark: #b9d400; --red-text: #c01010; --red-soft: #fde9e9; }
@@ -526,7 +526,7 @@ a.hc-row:hover { border-color: var(--ink); box-shadow: 0 10px 28px rgba(18,18,18
 .hc-toast .hc-reward { background: var(--hv-credit); color: var(--hv-credit-text); transform: rotate(-3deg); }
 @keyframes hc-toast-in { from { opacity: 0; transform: translate(-50%, 16px); } }
 
-/* footer: HELVY Connect, powered by HelloVoice, a BlueHolding company */
+/* footer: HELVi Connect, powered by HelloVoice, a BlueHolding company */
 .hc-foot { background: var(--ink); color: rgba(255,255,255,.72); font-size: 13px; }
 .hc-foot__in { display: flex; align-items: center; justify-content: space-between; gap: 14px 28px; flex-wrap: wrap; padding: 30px 0; }
 .hc-foot__logo { display: block; width: 120px; height: auto; }
