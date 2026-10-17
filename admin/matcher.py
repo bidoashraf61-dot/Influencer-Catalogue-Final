@@ -118,6 +118,7 @@ HINTS = {
     ("goal", "awareness"): "Reach and views",
     ("goal", "engagement"): "Likes, comments and saves",
     ("goal", "traffic"): "Clicks and sales",
+    ("platforms", "Facebook"): "Add-on: recorded in the brief, not scored (no Facebook creator data yet)",
     ("creator_size", "nano"): "Under 20k followers",
     ("creator_size", "micro"): "20k to 100k",
     ("creator_size", "mid"): "100k to 500k",

@@ -2725,7 +2725,7 @@ def by_date(steps):
         keyed.append(((when or last), 0 if when else 1, i, x))
     keyed.sort(key=lambda t: (t[0], t[1], t[2]))
     return [t[3] for t in keyed]
-TARGET_KEYS = ["posts", "views", "reach", "engagement", "er", "clicks"]
+TARGET_KEYS = ["posts", "views", "engagement", "er", "clicks"]      # reach removed 2026-10-18
 
 
 def campaign_targets(campaign):
