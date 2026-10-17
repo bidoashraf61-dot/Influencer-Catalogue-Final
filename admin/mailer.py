@@ -459,3 +459,85 @@ def otp_message(code, minutes=10, to=None):
                  ("{HELVi}", EMAIL_HELVY), ("{HV}", EMAIL_HV), ("{SITE}", SITE), ("{SENT}", sent)):
         page = page.replace(k, v)
     return subject, text, page
+
+
+# ---------------------------------------------------------------------------------------------
+# The "shared with you" email (owner, 2026-10-18): same look as the sign-in code email (ink header
+# with the logo, lime rule, Helvi's greeting, an ink panel, a lime button, the ink footer), built
+# from that template's own head, header and footer so the two never drift apart. The panel names
+# the thing shared and the role; the button opens it.
+_A_START = OTP_HTML.index('<table role="presentation" class="bg"')
+_A_GREET = OTP_HTML.index('<tr><td class="card px" style="background-color:#ffffff;padding:34px 40px 6px;">')
+_A_FOOT = OTP_HTML.index('<tr><td style="background-color:#121212;border-radius:0 0 24px 24px')
+_A_HEAD = (OTP_HTML[:OTP_HTML.index("<body")].replace("Your HELVi Connect sign-in code", "{TITLE}")
+           .replace("</style>", "  @media (prefers-color-scheme: dark) { .lk { color: #e8ff76 !important; } }\n  [data-ogsc] .lk { color: #e8ff76 !important; }\n</style>", 1))
+_A_TOP = OTP_HTML[_A_START:_A_GREET]
+_A_TAIL = OTP_HTML[_A_FOOT:]
+_A_BODY = """<body class="bg" style="margin:0;padding:0;background-color:#efede8;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#efede8;opacity:0;">{PRE}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
+"""
+_A_MID = """  <tr><td class="card px" style="background-color:#ffffff;padding:34px 40px 6px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td width="92" valign="middle" style="width:92px;padding-right:18px;">
+        <img src="{HELVi}" width="92" height="92" alt="Helvi, smiling" style="display:block;width:92px;height:92px;border:0;outline:none;text-decoration:none;">
+      </td>
+      <td valign="middle">
+        <p class="tx hi" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:26px;line-height:32px;font-weight:700;color:#121212;">Hi, it&rsquo;s Helvi &#128075;</p>
+        <p class="mu" style="margin:6px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:22px;color:#383838;"><strong>{BY}</strong> shared {ARTICLE} {KIND} with you on HELVi Connect.</p>
+      </td>
+    </tr></table>
+  </td></tr>
+
+  <tr><td class="card px" style="background-color:#ffffff;padding:24px 40px 4px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td align="center" style="background-color:#121212;border-radius:18px;padding:26px 18px 22px;border-bottom:4px solid #e8ff76;">
+        <p style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:16px;font-weight:700;letter-spacing:.14em;color:#cfcfcf;text-transform:uppercase;">{KIND_UP}</p>
+        <p style="margin:10px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:28px;line-height:34px;font-weight:700;color:#e8ff76;">{NAME}</p>
+        <p style="margin:14px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:18px;color:#cfcfcf;"><span style="color:#e8ff76;">&#9679;</span>&nbsp; {ROLE}</p>
+      </td>
+    </tr></table>
+    <p class="mu" style="margin:12px 0 0;text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:#5a5a5a;">Sign in, or sign up, with <strong>{TO}</strong>. The link only opens for that address.</p>
+  </td></tr>
+
+  <tr><td class="card px btn" align="center" style="background-color:#ffffff;padding:22px 40px 8px;">
+    <!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="{LINK}" style="height:52px;v-text-anchor:middle;width:300px;" arcsize="50%" stroke="f" fillcolor="#e8ff76"><w:anchorlock/><center style="color:#121212;font-family:Arial,sans-serif;font-size:16px;font-weight:bold;">Open the {KIND} &rarr;</center></v:roundrect><![endif]-->
+    <!--[if !mso]><!--><a href="{LINK}" style="display:inline-block;background-color:#e8ff76;color:#121212;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;font-weight:700;text-decoration:none;border-radius:28px;padding:14px 34px;mso-hide:all;">Open the {KIND} &rarr;</a><!--<![endif]-->
+  </td></tr>
+
+  <tr><td class="card px" style="background-color:#ffffff;padding:22px 40px 34px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+      <td class="trust" style="background-color:#f6f3ee;border-radius:14px;padding:16px 18px;">
+        <p class="tx" style="margin:0;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:21px;color:#121212;"><strong>Not expecting this?</strong> Ignore this email. Nothing happens until you sign in with this address.</p>
+        <p class="mu" style="margin:8px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:19px;color:#5a5a5a;">Button not working? Copy this link: <a class="lk" href="{LINK}" style="color:#121212;word-break:break-all;">{LINK}</a></p>
+      </td>
+    </tr></table>
+  </td></tr>
+
+"""
+ACCESS_HTML = _A_HEAD + _A_BODY + _A_TOP + _A_MID + _A_TAIL
+
+
+def access_message(kind, name, by_name, role, link, to):
+    """(subject, text, html): "<by> shared a <kind> with you". kind: "selection", "campaign dashboard" or
+    "campaign"; role: "view and edit" or "view only"."""
+    by_name = (by_name or "HelloVoice").strip() or "HelloVoice"
+    role_text = "You can view and edit it" if role == "view and edit" else "You can view it (view only)"
+    article = "the" if kind.startswith("campaign") else "a"
+    subject = "%s shared %s %s with you" % (by_name, article, kind)
+    text = ("Hi,\n\n%s shared %s %s with you on HELVi Connect: “%s”. %s.\n"
+            "Open it and sign in (or sign up) with this email (%s):\n%s\n\nHELVi Connect · Powered by HelloVoice · A BlueHolding Company"
+            % (by_name, article, kind, name, role_text, to, link))
+    page = ACCESS_HTML
+    e = _html.escape
+    for k, v in (("{TITLE}", e(subject)), ("{PRE}", e("%s shared %s %s with you: %s." % (by_name, article, kind, name))),
+                 ("{BY}", e(by_name)), ("{ARTICLE}", article), ("{KIND_UP}", e(kind)), ("{KIND}", e(kind)), ("{NAME}", e(name)),
+                 ("{ROLE}", e(role_text)), ("{TO}", e(to)), ("{LINK}", e(link, quote=True)), ("{LOGO}", EMAIL_LOGO_INK),
+                 ("{HELVi}", EMAIL_HELVY), ("{HV}", EMAIL_HV), ("{SITE}", SITE)):
+        page = page.replace(k, v)
+    return subject, text, page
+
+
+def send_access(to, kind, name, by_name, role, link):
+    """Send it. Raises like send() does; callers wrap it."""
+    subject, text, page = access_message(kind, name, by_name, role, link, to)
+    return send(to, subject, text, html=page)

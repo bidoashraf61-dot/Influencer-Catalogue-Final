@@ -46,9 +46,8 @@ def grant(rid, who):
     sel = db.selection(r["selection_id"])
     if sel is not None and r["email"] and mailer.configured():
         try:
-            mailer.send(r["email"], "You now have access to “%s”" % sel["name"],
-                        "Hi %s,\n\nHelloVoice gave you access to the selection “%s”. Open it here (sign in with this email):\n%s/selection/#s=%s\n\nHelloVoice"
-                        % ((r["name"] or "").split(" ")[0] or "there", sel["name"], SITE, sel["token"]))
+            mailer.send_access(r["email"], "selection", sel["name"], "HelloVoice", "view and edit",
+                               "%s/selection/#s=%s" % (SITE, sel["token"]))
         except Exception:
             pass
     return True
@@ -80,10 +79,8 @@ def invite(sel, email, by, by_name=""):
         state = "granted"
     if new and mailer.configured():
         try:
-            mailer.send(email, "%s shared a selection with you" % (by_name or "HelloVoice"),
-                        "Hi,\n\n%s gave you access to the selection \u201c%s\u201d on HelloVoice. You can view and edit it.\n"
-                        "Open it and sign in with this email (%s):\n%s/selection/#s=%s\n\nHelloVoice"
-                        % (by_name or "HelloVoice", sel["name"], email, SITE, sel["token"]))
+            mailer.send_access(email, "selection", sel["name"], by_name or "HelloVoice", "view and edit",
+                               "%s/selection/#s=%s" % (SITE, sel["token"]))
         except Exception:
             pass
     return state, None
