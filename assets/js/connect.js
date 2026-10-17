@@ -300,7 +300,7 @@
         ".hd{display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #121212;padding-bottom:12px}" +
         ".hd img{width:150px}.muted{color:#4a4a4a}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{padding:9px 6px;border-bottom:1px solid #ddd;text-align:left}td{font-weight:700;text-align:right}thead th{font-size:12px;color:#4a4a4a;text-align:right}thead th:first-child{text-align:left}.q b{font:400 44px/1 Bebasneue,'Arial Narrow',Arial,sans-serif;margin-right:10px}" +
         ".fine{margin-top:22px;font-size:11.5px;color:#4a4a4a}</style></head><body>" +
-        "<div class='hd'><img src='" + esc(ROOT) + "assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c4' alt='HELVY Connect'><span class='muted'>" + esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + "</span></div>" +
+        "<div class='hd'><img src='" + esc(ROOT) + "assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c5' alt='HELVY Connect'><span class='muted'>" + esc(new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })) + "</span></div>" +
         "<h1>ROI estimate" + (ctx && ctx.name ? " · " + esc(ctx.name) : "") + "</h1><p class='muted'>" + esc(res.summary) + "</p>" +
         head + "<table><thead><tr><th></th><th>Recommended structure<br>" + esc((res.ideal && res.ideal.title) || "") + "</th><th>Your selection</th></tr></thead><tbody>" + rows + "</tbody></table>" +
         (ways ? "<h3>Ways to improve</h3><ol>" + ways + "</ol>" : "") +
