@@ -322,7 +322,7 @@ _POST_FREE = {"/access-requests", "/reauth", "/password", "/ai/chat", "/ai/dismi
               "/licences/scan"}
 _POST_SELECTION = {"/selections/save", "/selections/delete", "/selections/status", "/quote/ready", "/quote/withdraw", "/selections/invite"}
 _POST_CAMPAIGN = {"/campaigns/save", "/campaigns/status", "/campaigns/delete", "/campaigns/link",
-                  "/campaigns/content/add", "/campaigns/content/update", "/campaigns/content/bulk",
+                  "/campaigns/content/add", "/campaigns/content/update", "/campaigns/content/group", "/campaigns/content/bulk",
                   "/campaigns/content/pending", "/campaigns/insights/decide", "/campaigns/insights/upload",
                   "/campaigns/sync", "/campaigns/link/custom", "/campaigns/link/toggle", "/planner/apply",
                   "/calculator/save", "/calculator/results", "/campaigns/invite"}

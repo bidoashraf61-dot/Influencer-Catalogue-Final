@@ -601,6 +601,10 @@ def migrate(conn):
     if "origin" not in camp_cols:
         # "client": started by the client from their account (a draft the account manager approves).
         conn.execute("ALTER TABLE campaigns ADD COLUMN origin TEXT")
+    content_cols = {r["name"] for r in conn.execute("PRAGMA table_info(content)")}
+    if content_cols and "piece" not in content_cols:
+        # One video pushed to several platforms: the posts share a piece (the id of the first one).
+        conn.execute("ALTER TABLE content ADD COLUMN piece INTEGER")
     cc_cols = {r["name"] for r in conn.execute("PRAGMA table_info(campaign_creators)")}
     if "insights_token" not in cc_cols:
         conn.execute("ALTER TABLE campaign_creators ADD COLUMN insights_token TEXT")
@@ -2116,9 +2120,116 @@ CREATE INDEX IF NOT EXISTS item_kam_email ON item_kam(kam_email);
 """
 
 
+# A campaign can be shared by link: anyone who signs in (or signs up) with the link is let in to read it,
+# view only. campaign_shares holds the link's secret (one per campaign, can be turned off); campaign_viewers
+# remembers which accounts were let in, so they can open the campaign again without the link.
+SHARE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS campaign_shares (
+    campaign_id INTEGER PRIMARY KEY, token TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 1,
+    created_by TEXT, created_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS campaign_viewers (
+    campaign_id INTEGER NOT NULL, code_id INTEGER NOT NULL, via TEXT, at INTEGER NOT NULL,
+    PRIMARY KEY (campaign_id, code_id));
+"""
+
+
+# Invited by email to ONE campaign's dashboard, with a role: view (read only) or edit (also unlimited Update now
+# and may invite others). Access opens when the person signs in with that email.
+CINVITE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS campaign_invites (
+    campaign_id INTEGER NOT NULL, email TEXT NOT NULL, role TEXT NOT NULL DEFAULT 'view',
+    invited_by TEXT, invited_at INTEGER NOT NULL, seen_at INTEGER,
+    PRIMARY KEY (campaign_id, email));
+"""
+
+
+def _share_tables():
+    with connect() as conn:
+        conn.executescript(SHARE_SCHEMA)
+        conn.executescript(CINVITE_SCHEMA)
+
+
+# "Update now" on a campaign's dashboard: who pressed it and when (clients get a limited number).
+UPDATE_SCHEMA = """
+CREATE TABLE IF NOT EXISTS campaign_updates (
+    id INTEGER PRIMARY KEY, campaign_id INTEGER NOT NULL, code_id INTEGER, by_admin INTEGER NOT NULL DEFAULT 0,
+    at INTEGER NOT NULL, jobs INTEGER NOT NULL DEFAULT 0);
+CREATE INDEX IF NOT EXISTS campaign_updates_c ON campaign_updates(campaign_id, at);
+"""
+
+
+def refresh_count(cid):
+    """How many times people other than the team have pressed Update now on this campaign."""
+    with connect() as conn:
+        conn.executescript(UPDATE_SCHEMA)
+        return conn.execute("SELECT COUNT(*) FROM campaign_updates WHERE campaign_id = ? AND by_admin = 0", (int(cid),)).fetchone()[0]
+
+
+def refresh_last(cid):
+    with connect() as conn:
+        conn.executescript(UPDATE_SCHEMA)
+        r = conn.execute("SELECT MAX(at) FROM campaign_updates WHERE campaign_id = ?", (int(cid),)).fetchone()
+        return r[0] if r else None
+
+
+def refresh_log(cid, code_id, by_admin, jobs):
+    with connect() as conn:
+        conn.executescript(UPDATE_SCHEMA)
+        conn.execute("INSERT INTO campaign_updates (campaign_id, code_id, by_admin, at, jobs) VALUES (?,?,?,?,?)",
+                     (int(cid), code_id, 1 if by_admin else 0, now(), int(jobs)))
+
+
+def share_get(cid):
+    _share_tables()
+    with connect() as conn:
+        return conn.execute("SELECT * FROM campaign_shares WHERE campaign_id = ?", (int(cid),)).fetchone()
+
+
+def share_enable(cid, by=""):
+    import secrets
+    _share_tables()
+    with connect() as conn:
+        r = conn.execute("SELECT token FROM campaign_shares WHERE campaign_id = ?", (int(cid),)).fetchone()
+        if r is None:
+            conn.execute("INSERT INTO campaign_shares (campaign_id, token, enabled, created_by, created_at) VALUES (?,?,1,?,?)",
+                         (int(cid), secrets.token_urlsafe(12), by, now()))
+        else:
+            conn.execute("UPDATE campaign_shares SET enabled = 1 WHERE campaign_id = ?", (int(cid),))
+    return share_get(cid)
+
+
+def share_disable(cid):
+    _share_tables()
+    with connect() as conn:
+        conn.execute("UPDATE campaign_shares SET enabled = 0 WHERE campaign_id = ?", (int(cid),))
+
+
+def share_valid(cid, token):
+    import hmac
+    r = share_get(cid)
+    return bool(r and r["enabled"] and token and hmac.compare_digest(str(r["token"]), str(token)))
+
+
+def viewer_add(cid, code_id, via="share"):
+    _share_tables()
+    with connect() as conn:
+        conn.execute("INSERT OR IGNORE INTO campaign_viewers (campaign_id, code_id, via, at) VALUES (?,?,?,?)",
+                     (int(cid), int(code_id), via, now()))
+
+
+def campaign_viewer(cid, code_id):
+    if cid is None or code_id is None:
+        return False
+    _share_tables()
+    with connect() as conn:
+        return bool(conn.execute("SELECT 1 FROM campaign_viewers WHERE campaign_id = ? AND code_id = ?",
+                                 (int(cid), int(code_id))).fetchone())
+
+
 def access_init():
     with connect() as conn:
         conn.executescript(ACCESS_SCHEMA)
+        conn.executescript(SHARE_SCHEMA)
 
 
 def selection_granted(sel_id, code_id):
@@ -3041,6 +3152,46 @@ def update_content(content_id, **fields):
                      [fields[c] for c in cols] + [content_id])
 
 
+def group_content(cid, ids):
+    """Mark posts of one campaign and one creator as the same video on different platforms.
+    Returns (n grouped, error): error is "few" (under two) or "creator" (more than one creator)."""
+    ids = sorted({int(i) for i in ids})
+    with connect() as conn:
+        rows = conn.execute("SELECT id, code FROM content WHERE campaign_id = ? AND id IN (%s)"
+                            % ",".join("?" * len(ids)), [cid] + ids).fetchall() if ids else []
+        if len(rows) < 2:
+            return 0, "few"
+        if len({r["code"] for r in rows}) > 1:
+            return 0, "creator"
+        lead = min(r["id"] for r in rows)
+        members = [r["id"] for r in rows]
+        # posts already grouped with any of these come along, so a video never splits in two
+        old = {r["piece"] for r in conn.execute("SELECT piece FROM content WHERE id IN (%s)" % ",".join("?" * len(members)),
+                                                members) if r["piece"]}
+        if old:
+            members += [r["id"] for r in conn.execute("SELECT id FROM content WHERE campaign_id = ? AND piece IN (%s)"
+                                                      % ",".join("?" * len(old)), [cid] + sorted(old))]
+        members = sorted(set(members))
+        lead = members[0]
+        conn.execute("UPDATE content SET piece = ? WHERE id IN (%s)" % ",".join("?" * len(members)), [lead] + members)
+    return len(members), None
+
+
+def ungroup_content(content_id):
+    """Take one post out of its video. If only one post is left in it, that one is alone again."""
+    with connect() as conn:
+        r = conn.execute("SELECT campaign_id, piece FROM content WHERE id = ?", (content_id,)).fetchone()
+        if r is None or not r["piece"]:
+            return
+        conn.execute("UPDATE content SET piece = NULL WHERE id = ?", (content_id,))
+        left = [x["id"] for x in conn.execute("SELECT id FROM content WHERE campaign_id = ? AND piece = ? ORDER BY id",
+                                              (r["campaign_id"], r["piece"]))]
+        if len(left) == 1:
+            conn.execute("UPDATE content SET piece = NULL WHERE id = ?", (left[0],))
+        elif left:
+            conn.execute("UPDATE content SET piece = ? WHERE id IN (%s)" % ",".join("?" * len(left)), [left[0]] + left)
+
+
 def delete_content(content_id):
     with connect() as conn:
         conn.execute("DELETE FROM content WHERE id = ?", (content_id,))
@@ -3245,3 +3396,50 @@ def duplicate_groups():
     out = [g for g in groups.values() if len(g) > 1]
     out.sort(key=lambda g: (-len(g), g[0]["name"] or ""))
     return out
+
+
+def cinvite_add(cid, email, role, by=""):
+    """Invite (or change the role of) an email. Returns (is_new, role_changed)."""
+    _share_tables()
+    role = "edit" if role == "edit" else "view"
+    email = (email or "").strip().lower()
+    with connect() as conn:
+        r = conn.execute("SELECT role FROM campaign_invites WHERE campaign_id = ? AND email = ?", (int(cid), email)).fetchone()
+        if r is None:
+            conn.execute("INSERT INTO campaign_invites (campaign_id, email, role, invited_by, invited_at) VALUES (?,?,?,?,?)",
+                         (int(cid), email, role, by, now()))
+            return True, True
+        if r["role"] != role:
+            conn.execute("UPDATE campaign_invites SET role = ? WHERE campaign_id = ? AND email = ?", (role, int(cid), email))
+            return False, True
+        return False, False
+
+
+def cinvite_remove(cid, email):
+    _share_tables()
+    with connect() as conn:
+        conn.execute("DELETE FROM campaign_invites WHERE campaign_id = ? AND email = ?", (int(cid), (email or "").strip().lower()))
+
+
+def cinvites_for(cid):
+    _share_tables()
+    with connect() as conn:
+        return [{"email": r["email"], "role": r["role"], "state": "joined" if r["seen_at"] else "invited"}
+                for r in conn.execute("SELECT * FROM campaign_invites WHERE campaign_id = ? ORDER BY invited_at", (int(cid),))]
+
+
+def cinvite_role(cid, email):
+    if cid is None or not email:
+        return None
+    _share_tables()
+    with connect() as conn:
+        r = conn.execute("SELECT role FROM campaign_invites WHERE campaign_id = ? AND email = ?",
+                         (int(cid), str(email).strip().lower())).fetchone()
+    return r["role"] if r else None
+
+
+def cinvite_seen(cid, email):
+    _share_tables()
+    with connect() as conn:
+        conn.execute("UPDATE campaign_invites SET seen_at = ? WHERE campaign_id = ? AND email = ? AND seen_at IS NULL",
+                     (now(), int(cid), str(email).strip().lower()))

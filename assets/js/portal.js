@@ -363,13 +363,14 @@
   // Question and option labels from the server, by id and value.
   var QAR = {
     goal: ["ما الهدف الرئيسي من الحملة؟", { awareness: "الوصول لأكبر عدد من الناس", engagement: "زيادة التفاعل", traffic: "زيارات ونقرات على الرابط", balanced: "مزيج متوازن" }],
-    platforms: ["أين سيُنشر المحتوى؟", { any: "لا تفضيل" }],
+    platforms: ["أين سيُنشر المحتوى؟", { any: "لا تفضيل", Facebook: "فيسبوك" }],
     market: ["في أي دول الجمهور؟", { SA: "السعودية", AE: "الإمارات", EG: "مصر", KW: "الكويت", QA: "قطر", BH: "البحرين", OM: "عُمان", JO: "الأردن" }],
     gender: ["من الجمهور؟", { Any: "الجميع", Women: "غالباً نساء", Men: "غالباً رجال" }],
     age: ["الفئات العمرية الرئيسية", { Any: "كل الأعمار", "45-54": "45+" }],
     category: ["في أي مجال المنتج؟", { "health care": "الرعاية الصحية / الأدوية", skincare: "العناية بالبشرة والجلدية", beauty: "التجميل", "hair care": "العناية بالشعر",
       fragrance: "العطور", "mother & baby": "الأم والطفل", food: "الأغذية والمشروبات", fitness: "اللياقة والصحة", fashion: "الأزياء", lifestyle: "أسلوب الحياة",
-      technology: "التقنية", automotive: "السيارات", travel: "السفر", finance: "المال", gaming: "الألعاب" }],
+      technology: "التقنية والأجهزة", automotive: "السيارات", travel: "السفر والسياحة", finance: "المال والأعمال", gaming: "الألعاب",
+      luxury: "الفخامة", entertainment: "الترفيه والكوميديا", "e-commerce": "التجارة الإلكترونية والتسوق", sports: "الرياضة", "music & art": "الموسيقى والفن", education: "التعليم", "home & interior": "المنزل والديكور" }],
     budget: ["ميزانية المؤثرين (ريال، قبل الضريبة)", { "50": "أقل من 50,000", "150": "50,000 – 150,000", "400": "150,000 – 400,000", "400+": "أكثر من 400,000", open: "لم تُحدد بعد" }],
     count: ["كم عدد المؤثرين؟", { "25": "20 أو أكثر" }],
     deliverable: ["ما المطلوب منهم؟", { reels: "ريلز / فيديوهات قصيرة", ugc: "محتوى UGC لقنواتنا", stories: "ستوري", event: "حضور فعالية أو متجر", review: "مراجعة منتج" }],
@@ -1533,24 +1534,30 @@
     market: ["Countries", '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17"/>'],
     gender: ["Audience", '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.6-3.8 3.3-6 7-6s6.4 2.2 7 6"/>'],
     age: ["Age", '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>'],
-    category: ["Space", '<path d="M3.5 12.5l8-8h7v7l-8 8z"/><circle cx="15" cy="9" r="1.3"/>']
+    category: ["Space", '<path d="M3.5 12.5l8-8h7v7l-8 8z"/><circle cx="15" cy="9" r="1.3"/>'],
+    budget: ["Budget", '<rect x="3.5" y="6" width="17" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/>'],
+    count: ["Creators", '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.5-3.2 2.8-5 5.5-5s5 1.8 5.5 5"/><circle cx="17" cy="9.5" r="2.2"/><path d="M16.5 14.2c2.4.2 4 1.8 4.5 4.3"/>']
   };
+  // Typed answers beside the chips ("Other"): another platform, an exact amount, an exact number of creators.
+  var OB_OTHER = { platforms: ["Other platform", "Type the platform, e.g. X or LinkedIn"], budget: ["Type an amount", "Amount in SAR, e.g. 120000"], count: ["Type a number", "How many creators, e.g. 12"] };
   var OB_HINT = {
     goal: "Pick one or more. Each one counts in every creator’s score.",
     platforms: "Pick every platform the content runs on.",
     market: "Pick every country where the people you want to reach live.",
     gender: "Pick Women, Men or both. Leave it if the product is for everyone.",
     age: "Pick one or more age groups. Leave it if every age group matters.",
-    category: "Pick one or more."
+    category: "Pick one or more.",
+    budget: "What you can spend on creators. We fit the shortlist to it. Skip it if it is not decided.",
+    count: "Pick a range, or type the exact number. Skip it to let us suggest one."
   };
-  function obPoints(q) { return q.required ? 200 : 100; }
+  function obPoints(q) { return q.required ? 150 : 100; }
   function objectiveStudio(token, start) {
     start = start || {};
     var S = window.hvSelection;
     var selName = S && S.name ? S.name() : "this selection";
     var nIn = S && S.codes ? S.codes().length : 0;
     loadQuestions().then(function (all) {
-      var qs = all.filter(function (q) { return q.required || q.id === "gender" || q.id === "age"; });
+      var qs = all.filter(function (q) { return q.required || q.id === "gender" || q.id === "age" || q.id === "budget" || q.id === "count"; });
       var answers = {};
       Object.keys(start.answers || {}).forEach(function (k) { if (qs.some(function (q) { return q.id === k; })) answers[k] = start.answers[k]; });
       if (typeof answers.goal === "string") answers.goal = [answers.goal];
@@ -1647,6 +1654,7 @@
         panel.appendChild(h("h3", { class: "ai-sl__ask", id: "ob-q" }, q.id === "goal" ? "What are the campaign’s goals?" : q.label));
         panel.appendChild(h("p", { class: "ai-sl__hint" }, OB_HINT[q.id] || ""));
         var opts = h("div", { class: "ai-sl__opts", role: many ? "group" : "radiogroup", "aria-labelledby": "ob-q" });
+        var oBtn = null, oIn = null;
         var cur = function () { var v = answers[q.id]; return Array.isArray(v) ? v : v ? [v] : []; };
         q.options.forEach(function (o) {
           var b = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(cur().indexOf(o.value) > -1) }, o.label);
@@ -1656,11 +1664,12 @@
             if (many) {
               var list = toggleMulti(q, cur(), o.value);
               if (list.length) answers[q.id] = list; else delete answers[q.id];
-              [].forEach.call(opts.children, function (bb, bi) { bb.setAttribute("aria-pressed", String(cur().indexOf(q.options[bi].value) > -1)); });
+              [].forEach.call(opts.children, function (bb, bi) { if (q.options[bi]) bb.setAttribute("aria-pressed", String(cur().indexOf(q.options[bi].value) > -1)); });
               next.disabled = q.required && !answered(q);
             } else {
               answers[q.id] = o.value;
-              [].forEach.call(opts.children, function (bb, bi) { var on = q.options[bi].value === o.value; bb.setAttribute("aria-pressed", String(on)); bb.setAttribute("aria-checked", String(on)); });
+              [].forEach.call(opts.children, function (bb, bi) { if (!q.options[bi]) return; var on = q.options[bi].value === o.value; bb.setAttribute("aria-pressed", String(on)); bb.setAttribute("aria-checked", String(on)); });
+              if (oBtn) { oBtn.setAttribute("aria-pressed", "false"); oBtn.removeAttribute("aria-checked"); oIn.hidden = true; oIn.value = ""; }
             }
             if (!was && answered(q)) { plus(b, obPoints(q)); react("cheer"); celebrating = true; setTimeout(function () { celebrating = false; }, 2000); say(["Nice", "Got it", "Good one", "Noted"][step % 4]); }
             paintPower(true);
@@ -1668,7 +1677,27 @@
           });
           opts.appendChild(b);
         });
+        if (OB_OTHER[q.id]) {
+          // A typed answer the chips do not list. It is read by the server into the brief ("other:<text>").
+          var own = otherOf(answers[q.id]);
+          oBtn = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": own ? "true" : "false" }, OB_OTHER[q.id][0]);
+          oIn = otherInput(q, own, function (txt) {
+            var was = answered(q);
+            var nv = withOther(q, answers[q.id], txt);
+            if (nv) answers[q.id] = nv; else delete answers[q.id];
+            [].forEach.call(opts.children, function (bb, bi) { if (q.options[bi]) { var on = many ? asList(answers[q.id]).indexOf(q.options[bi].value) > -1 : answers[q.id] === q.options[bi].value; bb.setAttribute("aria-pressed", String(on)); if (!many) bb.setAttribute("aria-checked", String(on)); } });
+            oBtn.setAttribute("aria-pressed", txt.trim() ? "true" : "false");
+            next.disabled = q.required && !answered(q);
+            if (!was && answered(q)) { react("cheer"); say("Got it"); }
+            paintPower(true);
+          }, function () { next.click(); });
+          oIn.placeholder = OB_OTHER[q.id][1]; oIn.hidden = !own;
+          if (q.id !== "platforms") oIn.setAttribute("inputmode", q.id === "platforms" ? "text" : "numeric");
+          oBtn.addEventListener("click", function () { oIn.hidden = false; oIn.focus(); });
+          opts.appendChild(oBtn);
+        }
         panel.appendChild(opts);
+        if (oIn) panel.appendChild(oIn);
         var nav = h("div", { class: "ai-sl__nav" });
         var back = h("button", { class: "ai-sl__back", type: "button" }, "Back");
         back.addEventListener("click", function () { show(step - 1); react("point"); });

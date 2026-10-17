@@ -7,6 +7,10 @@
 
   var API = (window.CAMPAIGN_CONFIG || {}).api || "/admin";
   var ICONS = (window.HV_ICONS || {}).icons || {};
+  // Official platform marks (simple-icons, CC0): solid glyphs in each brand's own colours, over the shared outline set.
+  var BRAND = {"Instagram": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"url(#hv-ig)\" d=\"M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077\"/></svg>", "TikTok": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"#25f4ee\" transform=\"translate(-.55 -.45)\" d=\"M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z\"/><path fill=\"#fe2c55\" transform=\"translate(.55 .45)\" d=\"M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z\"/><path fill=\"currentColor\" d=\"M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z\"/></svg>", "Snapchat": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"#fffc00\" stroke=\"#121212\" stroke-width=\".9\" stroke-linejoin=\"round\" d=\"M12.206.793c.99 0 4.347.276 5.93 3.821.529 1.193.403 3.219.299 4.847l-.003.06c-.012.18-.022.345-.03.51.075.045.203.09.401.09.3-.016.659-.12 1.033-.301.165-.088.344-.104.464-.104.182 0 .359.029.509.09.45.149.734.479.734.838.015.449-.39.839-1.213 1.168-.089.029-.209.075-.344.119-.45.135-1.139.36-1.333.81-.09.224-.061.524.12.868l.015.015c.06.136 1.526 3.475 4.791 4.014.255.044.435.27.42.509 0 .075-.015.149-.045.225-.24.569-1.273.988-3.146 1.271-.059.091-.12.375-.164.57-.029.179-.074.36-.134.553-.076.271-.27.405-.555.405h-.03c-.135 0-.313-.031-.538-.074-.36-.075-.765-.135-1.273-.135-.3 0-.599.015-.913.074-.6.104-1.123.464-1.723.884-.853.599-1.826 1.288-3.294 1.288-.06 0-.119-.015-.18-.015h-.149c-1.468 0-2.427-.675-3.279-1.288-.599-.42-1.107-.779-1.707-.884-.314-.045-.629-.074-.928-.074-.54 0-.958.089-1.272.149-.211.043-.391.074-.54.074-.374 0-.523-.224-.583-.42-.061-.192-.09-.389-.135-.567-.046-.181-.105-.494-.166-.57-1.918-.222-2.95-.642-3.189-1.226-.031-.063-.052-.15-.055-.225-.015-.243.165-.465.42-.509 3.264-.54 4.73-3.879 4.791-4.02l.016-.029c.18-.345.224-.645.119-.869-.195-.434-.884-.658-1.332-.809-.121-.029-.24-.074-.346-.119-1.107-.435-1.257-.93-1.197-1.273.09-.479.674-.793 1.168-.793.146 0 .27.029.383.074.42.194.789.3 1.104.3.234 0 .384-.06.465-.105l-.046-.569c-.098-1.626-.225-3.651.307-4.837C7.392 1.077 10.739.807 11.727.807l.419-.015h.06z\"/></svg>", "YouTube": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"#ff0000\" d=\"M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z\"/></svg>", "Facebook": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"#0866ff\" d=\"M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z\"/></svg>", "X": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z\"/></svg>"};
+  ICONS = (function (base) { var o = {}, k; for (k in base) o[k] = base[k]; for (k in BRAND) o[k] = BRAND[k]; return o; })(ICONS);
+  if (document.body && !document.getElementById("hv-ig")) document.body.insertAdjacentHTML("beforeend", "<svg width=\"0\" height=\"0\" style=\"position:absolute\" aria-hidden=\"true\"><defs><linearGradient id=\"hv-ig\" x1=\"0\" y1=\"1\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#feda75\"/><stop offset=\".25\" stop-color=\"#fa7e1e\"/><stop offset=\".5\" stop-color=\"#d62976\"/><stop offset=\".75\" stop-color=\"#962fbf\"/><stop offset=\"1\" stop-color=\"#4f5bd5\"/></linearGradient></defs></svg>");
   var LINK = (window.HV_ICONS || {}).link || "";
   var R = null, TOKEN = "";
   var F = { platform: "", range: "all", from: "", to: "", creators: [] };
@@ -53,6 +57,7 @@
     img: ico('<rect x="3.5" y="3.5" width="17" height="17" rx="3"/><circle cx="9" cy="9" r="1.8"/><path d="M20.5 15l-5-5-11 10.5"/>'),
     goal: ico('<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/>')
   };
+  function shareTok() { var m = /(?:^|[#&])share=([A-Za-z0-9_-]+)/.exec(location.hash || ""); return m ? m[1] : ""; }
   function token() { var m = /(?:^|[#&])t=([A-Za-z0-9_-]+)/.exec(location.hash || ""); return m ? m[1] : ""; }
   function get(path) { return fetch(API + path, { credentials: "include", cache: "no-store" }).then(function (r) { if (r.status === 401) throw { locked: true }; if (!r.ok) throw {}; return r.json(); }); }
 
@@ -77,11 +82,11 @@
       var l = b.campaigns || [];
       location.replace("../#list"); throw { moved: true }; });
     get("/api/campaigns").then(function (b) { $("db-all").hidden = !(b.campaigns || []).length; }).catch(function () {});
-    go.then(function (t) { TOKEN = t; return get("/api/campaign?t=" + encodeURIComponent(t)); })
+    go.then(function (t) { TOKEN = t; return get("/api/campaign?t=" + encodeURIComponent(t) + (shareTok() ? "&share=" + encodeURIComponent(shareTok()) : "")); })
       .then(function (b) {
         R = b.report;
         $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked");
-        setupHeader(); setupFilters(); renderAll();
+        setupHeader(); setupFilters(); renderAll(); setupShare();
       })
       .catch(function (err) {
         if (err && err.locked) return lock();
@@ -115,7 +120,199 @@
     $("db-report").href = "../#t=" + TOKEN;
     $("db-pdf").href = "../#t=" + TOKEN;
     $("db-pdf").addEventListener("click", function () { try { sessionStorage.setItem("hv_print", "1"); } catch (e) {} });
-    $("db-fresh").textContent = "Updated every 24 hours" + (R.updated_at ? " · last " + ago(R.updated_at) : "");
+    renderFresh();
+  }
+
+  // When the data was last captured, and a live countdown to the next capture.
+  function renderFresh() {
+    var el = $("db-fresh"), next = R.next_update_at || null;
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    if (window.__cdIv) { clearInterval(window.__cdIv); window.__cdIv = null; }
+    if (!next) { el.className = "db-fresh db-fresh--live"; el.innerHTML = '<span class="db-fresh__txt">' + esc(R.updated_at ? "Updated " + ago(R.updated_at) : "Waiting for the first capture") + "</span>"; mountUpdate(el); return; }
+    el.className = "db-fresh db-fresh--live";
+    el.innerHTML = '<span class="db-fresh__txt"><span class="db-fresh__live"><i class="db-fresh__dot"></i>Live data</span>'
+      + (R.updated_at ? "Updated " + esc(ago(R.updated_at)) : "Waiting for the first capture") + "</span>"
+      + '<span class="db-fresh__lbl">Next update in</span>'
+      + '<span class="db-cd" role="timer" aria-label="Time until the next update"><b id="cd-h">00</b><i>:</i><b id="cd-m">00</b><i>:</i><b id="cd-s"><span>00</span></b></span>';
+    var lastSec = -1;
+    function tick() {
+      var left = Math.max(0, next * 1000 - Date.now()), s = Math.floor(left / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+      $("cd-h").textContent = p(h); $("cd-m").textContent = p(m);
+      var sp = $("cd-s").firstChild;
+      if (sec !== lastSec) { lastSec = sec; sp.textContent = p(sec); sp.classList.remove("is-tick"); void sp.offsetWidth; sp.classList.add("is-tick"); }
+      if (left === 0 && window.__cdIv) { clearInterval(window.__cdIv); window.__cdIv = null; setTimeout(function () { location.reload(); }, 120000); }
+    }
+    window.__cdIv = setInterval(tick, 1000); tick();
+    mountUpdate(el);
+  }
+
+  // "Update now": runs the campaign's capture jobs for the posts it has, with Helvi on screen while the numbers come in,
+  // a green tick when they are in, the balance of free updates, and a request for more when they are used up.
+  function mountUpdate(host) {
+    var box = document.createElement("span"); box.className = "db-upd";
+    box.innerHTML = '<button type="button" class="db-upd__btn" id="db-upd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.5-4.2M4 4v3.8h3.8"/><path d="M4 13a8 8 0 0 0 14.5 4.2M20 20v-3.8h-3.8"/></svg><span>Update now</span></button><small class="db-upd__left"></small>';
+    host.appendChild(box);
+    var btn = box.querySelector("button"), label = btn.querySelector("span"), left = box.querySelector("small"), S = null;
+    function leftText() { return !S || S.unlimited ? "" : S.left + " of " + S.limit + " free updates left"; }
+    function paint(s) {
+      if (!s) return; S = s;
+      left.textContent = s.unlimited ? "Unlimited for you" : leftText();
+      var out = !s.unlimited && s.left === 0;
+      btn.classList.toggle("is-out", out); label.textContent = out ? "Request more updates" : "Update now";
+    }
+    function state() { return get("/api/campaign/refresh?t=" + encodeURIComponent(TOKEN)).then(function (s) { paint(s); return s; }); }
+    state().catch(function () {});
+    function modal(extra) {
+      var o = document.createElement("div"); o.className = "db-fetch"; o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true");
+      var card = document.createElement("div"); card.className = "db-fetch__card" + (extra ? " " + extra : ""); o.appendChild(card);
+      document.body.appendChild(o);
+      return { card: card, close: function () { o.remove(); } };
+    }
+    var STEPS = ["Finding the posts on this campaign…", "Asking Instagram, TikTok and Facebook…", "Asking YouTube and Snapchat…", "Adding up the numbers…"];
+    function postJSON(path, body) {
+      return fetch(API + path, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json().then(function (b) { return { s: r.status, b: b }; }); });
+    }
+    // The wait: Helvi, the steps, the balance.
+    function run() {
+      var m = modal(), cook = null, t0 = Date.now(), poll = null;
+      try { if (window.hvPortal && window.hvPortal.cooking) cook = window.hvPortal.cooking({ list: true, dark: false, title: "Helvi is fetching the latest numbers", steps: STEPS }); } catch (e) { cook = null; }
+      if (cook) m.card.appendChild(cook); else m.card.innerHTML = '<p class="db-fetch__plain">Fetching the latest numbers…</p>';
+      // A real progress bar: it fills as the update runs and reaches 100% when the numbers are in.
+      if (cook && cook.stop) cook.stop();                // the steps are lit from the percentage, below
+      var prog = document.createElement("div"); prog.className = "db-prog";
+      prog.innerHTML = '<div class="db-pbar"><i></i></div><b class="db-pct">0%</b>'; m.card.appendChild(prog);
+      var fill = prog.querySelector("i"), pctEl = prog.querySelector("b"), P = 0, finishing = false;
+      function show(p) {
+        P = Math.max(P, Math.min(100, p)); fill.style.width = P + "%"; pctEl.textContent = Math.floor(P) + "%";
+        var items = cook ? cook.querySelectorAll(".ai-sl__st") : [], cuts = [0, 22, 50, 78];
+        [].forEach.call(items, function (li, i) { li.className = "ai-sl__st" + (P >= (cuts[i + 1] == null ? 101 : cuts[i + 1]) ? " is-done" : P >= cuts[i] ? " is-now" : ""); });
+      }
+      var tick = setInterval(function () { if (!finishing) show(95 * (1 - Math.exp(-(Date.now() - t0) / 18000))); }, 120);
+      show(0);
+      var msg = document.createElement("p"); msg.className = "db-fetch__msg"; msg.setAttribute("role", "status"); m.card.appendChild(msg);
+      var bal = document.createElement("p"); bal.className = "db-fetch__bal"; bal.textContent = leftText(); m.card.appendChild(bal);
+      btn.classList.add("is-busy");
+      function leave(reload) { clearInterval(tick); if (cook && cook.stop) cook.stop(); m.close(); btn.classList.remove("is-busy"); if (reload) load(); else state().catch(function () {}); }
+      function fail(text) {
+        if (poll) clearInterval(poll); clearInterval(tick);
+        prog.hidden = true; bal.hidden = true; if (cook) cook.hidden = true;        // nothing is running: say why, plainly
+        msg.className = "db-fetch__msg db-fetch__msg--big"; msg.textContent = text; setTimeout(function () { leave(false); }, 2800);
+      }
+      function done() {
+        if (poll) clearInterval(poll); finishing = true;
+        var from = P, t1 = Date.now();
+        (function ramp() {
+          var k = Math.min(1, (Date.now() - t1) / 900); show(from + (100 - from) * k);
+          if (k < 1) return requestAnimationFrame(ramp);
+          clearInterval(tick);
+          setTimeout(function () {
+            m.card.innerHTML = '<div class="db-ok"><svg class="db-ok__tick" viewBox="0 0 52 52" aria-hidden="true"><circle class="db-ok__c" cx="26" cy="26" r="23"/><path class="db-ok__p" d="M15 27.5l8 8 14.5-17"/></svg>'
+              + '<h3 role="status">Numbers updated successfully</h3>' + (leftText() ? "<p>" + esc(leftText()) + "</p>" : "") + "</div>";
+            setTimeout(function () { leave(true); }, 2400);
+          }, 500);
+        })();
+      }
+      postJSON("/api/campaign/refresh", { t: TOKEN }).then(function (r) {
+        if (!r.b || !r.b.ok) return fail((r.b && r.b.message) || "Could not start the update. Try again.");
+        paint(r.b); bal.textContent = leftText();
+        poll = setInterval(function () {
+          get("/api/campaign/refresh?t=" + encodeURIComponent(TOKEN)).then(function (s) {
+            paint(s); bal.textContent = leftText();
+            if (!s.running) done(); else if (Date.now() - t0 > 5 * 60 * 1000) fail("Still working. The new numbers will appear on their own.");
+          }).catch(function () {});
+        }, 3000);
+      }).catch(function () { fail("Could not reach the server. Try again."); });
+    }
+    // All free updates used: ask the team for more.
+    function request() {
+      var m = modal("db-fetch__card--light");
+      m.card.innerHTML = '<h3 class="db-req__h">You have used all your free updates</h3><p class="db-req__p">Ask for more and your account manager will add them to this campaign.</p>'
+        + '<textarea class="db-req__t" id="db-req-note" rows="3" maxlength="400" placeholder="How many extra updates do you need? (optional)"></textarea>'
+        + '<div class="db-req__row"><button type="button" class="db-upd__btn" id="db-req-send">Send request</button><button type="button" class="db-req__x" id="db-req-x">Cancel</button></div><p class="db-fetch__msg db-req__msg" id="db-req-msg" role="status"></p>';
+      var send = m.card.querySelector("#db-req-send"), msg = m.card.querySelector("#db-req-msg");
+      m.card.querySelector("#db-req-x").addEventListener("click", m.close);
+      send.addEventListener("click", function () {
+        send.classList.add("is-busy"); msg.textContent = "";
+        postJSON("/api/campaign/refresh-request", { t: TOKEN, note: m.card.querySelector("#db-req-note").value }).then(function (r) {
+          send.classList.remove("is-busy");
+          if (!r.b || !r.b.ok) { msg.textContent = r.s === 429 ? "You already asked today. We will be in touch." : "Could not send. Try again."; return; }
+          msg.textContent = r.b.message; send.hidden = true; label.textContent = "Request sent";
+          setTimeout(m.close, 2600);
+        }).catch(function () { send.classList.remove("is-busy"); msg.textContent = "Could not reach the server. Try again."; });
+      });
+    }
+    btn.addEventListener("click", function () {
+      if (btn.classList.contains("is-busy")) return;
+      if (btn.classList.contains("is-out")) request(); else run();
+    });
+  }
+
+  /* -------------------------------------------------------------- share */
+  // The team (and invitees with the edit role) get a Share button: invite emails with View or View & edit, or a view-only link.
+  function setupShare() {
+    ["db-share", "db-share-pop"].forEach(function (id) { var o = document.getElementById(id); if (o) o.remove(); });
+    var S = R.share; if (!S || !S.can) return;
+    var pdf = $("db-pdf"), btn = document.createElement("button");
+    btn.type = "button"; btn.className = "db-btn"; btn.id = "db-share"; btn.setAttribute("aria-expanded", "false"); btn.setAttribute("aria-haspopup", "dialog");
+    btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" width="16" height="16" style="vertical-align:-3px;margin-right:6px"><circle cx="18" cy="5" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="18" cy="19" r="2.6"/><path d="M8.3 10.8l7.4-4.3M8.3 13.2l7.4 4.3"/></svg>Share';
+    pdf.parentNode.insertBefore(btn, pdf);
+    var pop = document.createElement("div"); pop.className = "db-share"; pop.id = "db-share-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", "Share this dashboard"); pop.hidden = true;
+    document.body.appendChild(pop);
+    function say(t) { var m = document.getElementById("db-share-msg"); if (m) m.textContent = t || ""; }
+    var note = "";
+    function post(action, extra) {
+      var body = { t: TOKEN, action: action }; for (var k in (extra || {})) body[k] = extra[k];
+      return fetch(API + "/api/campaign/share", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json().then(function (b) { return { ok: r.ok, b: b }; }); })
+        .then(function (x) {
+          if (!x.b || !x.b.ok) { say((x.b && x.b.message) || "That did not work. Try again."); return; }
+          S.enabled = !!x.b.enabled; S.url = x.b.url; if (x.b.people) S.people = x.b.people; note = x.b.message || ""; paint();
+        })
+        .catch(function () { say("That did not work. Try again."); });
+    }
+    function roleSel(cls, v, em) {
+      return '<select class="' + cls + '" data-e="' + esc(em || "") + '" aria-label="Access level"><option value="view"' + (v === "view" ? " selected" : "") + '>View only</option><option value="edit"' + (v === "edit" ? " selected" : "") + '>View &amp; edit</option></select>';
+    }
+    function paint() {
+      var ppl = S.people || [];
+      pop.innerHTML = "<h3>Share this dashboard</h3>"
+        + '<p>Invite people by email. They sign in (or sign up) with that email and see this campaign and nothing else.</p>'
+        + '<div class="db-share__inv"><input id="db-inv-email" type="email" placeholder="name@company.com" autocomplete="off" aria-label="Email to invite">' + roleSel("db-inv-role", "view") + '<button class="db-btn db-btn--lime" id="db-inv-go" type="button">Invite</button></div>'
+        + '<p class="db-share__hint"><b>View only</b>: read the dashboard and report. <b>View &amp; edit</b>: also unlimited Update now and can invite others.</p>'
+        + (ppl.length ? '<ul class="db-share__ppl">' + ppl.map(function (p) {
+            return '<li><span class="db-share__em" title="' + esc(p.email) + '">' + esc(p.email) + '<small>' + (p.state === "joined" ? "Joined" : "Invited") + '</small></span>' + roleSel("db-ppl-role", p.role, p.email)
+              + '<button class="db-share__x" type="button" data-e="' + esc(p.email) + '" aria-label="Remove ' + esc(p.email) + '" title="Remove">&times;</button></li>';
+          }).join("") + "</ul>" : "")
+        + '<div class="db-share__sep"></div><h4>Or share a link</h4><p>Anyone with the link can open it, view only, after they sign in or sign up.</p>'
+        + (S.enabled ? '<div class="db-share__row"><input id="db-share-url" readonly aria-label="Share link" value="' + esc(S.url) + '"><button class="db-btn db-btn--lime" id="db-share-copy" type="button">Copy link</button></div>'
+            + '<button class="db-share__off" id="db-share-off" type="button">Turn off the link</button>'
+          : '<button class="db-btn" id="db-share-on" type="button">Create share link</button>')
+        + '<p class="db-share__msg" id="db-share-msg" role="status">' + esc(note) + '</p>';
+      note = "";
+      var on = document.getElementById("db-share-on"), off = document.getElementById("db-share-off"), cp = document.getElementById("db-share-copy");
+      var em = document.getElementById("db-inv-email"), go = document.getElementById("db-inv-go");
+      function invite() { var v = (em.value || "").trim(); if (!v) { say("Type an email first."); em.focus(); return; } post("invite", { email: v, role: pop.querySelector(".db-inv-role").value }); }
+      if (go) go.addEventListener("click", invite);
+      if (em) em.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); invite(); } });
+      Array.prototype.forEach.call(pop.querySelectorAll(".db-ppl-role"), function (sel) { sel.addEventListener("change", function () { post("invite", { email: sel.getAttribute("data-e"), role: sel.value }); }); });
+      Array.prototype.forEach.call(pop.querySelectorAll(".db-share__x"), function (x) { x.addEventListener("click", function () { post("remove", { email: x.getAttribute("data-e") }); }); });
+      if (on) on.addEventListener("click", function () { post("on"); });
+      if (off) off.addEventListener("click", function () { post("off"); });
+      if (cp) cp.addEventListener("click", function () {
+        var inp = document.getElementById("db-share-url");
+        function done() { cp.textContent = "Copied"; say("Link copied."); setTimeout(function () { cp.textContent = "Copy link"; }, 1800); }
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(S.url).then(done, function () { inp.select(); try { document.execCommand("copy"); done(); } catch (e) { say("Press Ctrl+C to copy."); } });
+        else { inp.select(); try { document.execCommand("copy"); done(); } catch (e) { say("Press Ctrl+C to copy."); } }
+      });
+      if (!pop.hidden) place();
+    }
+    function place() { var r = btn.getBoundingClientRect(); pop.style.top = Math.round(r.bottom + 8) + "px"; pop.style.left = Math.max(12, Math.min(window.innerWidth - pop.offsetWidth - 12, r.right - pop.offsetWidth)) + "px"; }
+    function toggle(open) { pop.hidden = !open; btn.setAttribute("aria-expanded", open ? "true" : "false"); if (open) { paint(); place(); } }
+    btn.addEventListener("click", function (e) { e.stopPropagation(); toggle(pop.hidden); });
+    document.addEventListener("click", function (e) { if (!pop.hidden && !pop.contains(e.target) && e.target !== btn) toggle(false); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !pop.hidden) { toggle(false); btn.focus(); } });
+    window.addEventListener("resize", function () { if (!pop.hidden) place(); });
   }
 
   /* ------------------------------------------------------------ filters */
@@ -173,8 +370,9 @@
     });
   }
   function sums(list) {
-    var t = { posts: list.length, views: 0, reach: 0, engagement: 0, likes: 0, comments: 0, saves: 0, shares: 0, er: null };
+    var t = { posts: pieceCount(list), views: 0, reach: 0, engagement: 0, likes: 0, comments: 0, saves: 0, shares: 0, er: null };
     var ers = [];
+    t.views_hidden = list.length > 0 && list.every(function (p) { return p.video && p.views_hidden; });
     list.forEach(function (p) {
       t.views += p.views || 0; t.reach += p.reach || 0; t.engagement += p.engagement || 0; t.likes += p.likes || 0;
       t.comments += p.comments || 0; t.saves += p.saves || 0; t.shares += p.shares || 0;
@@ -207,7 +405,7 @@
     // cumulative views and engagement by posting day, for the filtered posts
     var by = {};
     list.forEach(function (p) { var d = p.posted_at ? new Date(p.posted_at * 1000).toISOString().slice(0, 10) : null; if (!d) return;
-      var x = by[d] = by[d] || { views: 0, eng: 0, reach: 0, posts: 0 }; x.views += p.views || 0; x.eng += p.engagement || 0; x.reach += p.reach || 0; x.posts++; });
+      var x = by[d] = by[d] || { views: 0, eng: 0, reach: 0, posts: 0 }; x.views += p.views || 0; x.eng += p.engagement || 0; x.reach += p.reach || 0; if (p.piece_size <= 1 || p.id === p.pk) x.posts++; });
     var days = Object.keys(by).sort(), cv = 0, ce = 0, cr = 0, cp = 0;
     return days.map(function (d) { cv += by[d].views; ce += by[d].eng; cr += by[d].reach; cp += by[d].posts; return { d: d, views: cv, eng: ce, reach: cr, posts: cp }; });
   }
@@ -232,8 +430,8 @@
     function goal(k) { return !filtered() && g[k] ? sig(g[k].grade, "Goal " + (k === "er" ? pct(g[k].goal, 1) : num(g[k].goal))) : ""; }
     var cards = [
       ["Posts live", full(t.posts) + (!filtered() && R.total.planned ? "<small>/" + R.total.planned + "</small>" : ""), goal("posts"), spark(s.map(function (x) { return x.posts; }), COL[4]), IC.posts, "kpi"],
-      ["Views", num(t.views) + est("views"), goal("views"), spark(s.map(function (x) { return x.views; }), COL[0]), IC.views, "trend"],
-      ["Reach", num(t.reach) + (isAdj("reach") ? est("reach") : reachEst() ? '<small class="db-est" title="Instagram does not show reach on reels publicly. Placeholder at ' + Math.round(((R.reach_basis && R.reach_basis.per_view) || 0.9) * 100) + '% of views (a small margin below) until the creators\' insights arrive.">est.</small>' : ""), goal("reach"), spark(s.map(function (x) { return x.reach; }), COL[3]), IC.reach, "trend"],
+      ["Views", t.views_hidden ? '<span class="db-na" title="This platform does not show view counts">Not shown</span>' : num(t.views) + est("views"), goal("views"), spark(s.map(function (x) { return x.views; }), COL[0]), IC.views, "trend"],
+      ["Reach", t.views_hidden ? '<span class="db-na" title="Reach is worked out from views, which this platform does not show">Not shown</span>' : num(t.reach) + (isAdj("reach") ? est("reach") : reachEst() ? '<small class="db-est" title="Instagram does not show reach on reels publicly. Placeholder at ' + Math.round(((R.reach_basis && R.reach_basis.per_view) || 0.9) * 100) + '% of views (a small margin below) until the creators\' insights arrive.">est.</small>' : ""), goal("reach"), spark(s.map(function (x) { return x.reach; }), COL[3]), IC.reach, "trend"],
       ["Engagement", num(t.engagement) + est("engagement"), goal("engagement"), spark(s.map(function (x) { return x.eng; }), COL[1]), IC.engagement, "trend"],
       ["Avg eng. rate", pct(t.er) + est("er"), !filtered() ? (g.er ? goal("er") : sig(R.total.er_grade)) : "", "", IC.er, "kpi"],
       ["Link clicks", cl ? num(cl.clicks) + est("clicks") : '<span class="db-na">Not tracked</span>', cl && !filtered() ? (g.clicks ? goal("clicks") : sig(R.total.ctr_grade)) : '<span class="db-na__why">This campaign does not contain affiliate links</span>', "", IC.clicks, "clicks"]
@@ -330,15 +528,20 @@
   function who(c) { return '<a class="db-name" href="../../creator/#c=' + encodeURIComponent(c.code) + '" title="Open ' + esc(c.name) + '\'s full analysis">' + esc(c.name) + "</a>"; }
   function ranked(list) {
     if (!filtered()) return R.creators.filter(function (c) { return c.rank; }).map(function (c) { return { c: c, v: c.score, label: c.score.toFixed(0) }; });
-    var by = {}; list.forEach(function (p) { by[p.code] = (by[p.code] || 0) + seen(p); });
-    return R.creators.filter(function (c) { return by[c.code]; }).map(function (c) { return { c: c, v: by[c.code], label: num(by[c.code]) }; })
-      .sort(function (a, b) { return b.v - a.v; });
+    // Where a platform shows no views (Snapchat) the creator is ranked by engagement instead of being left out.
+    var by = {}; list.forEach(function (p) {
+      var x = by[p.code] = by[p.code] || { n: 0, eng: 0, hid: true }; x.n += seen(p); x.eng += p.engagement || 0; if (!(p.video && p.views_hidden)) x.hid = false;
+    });
+    return R.creators.filter(function (c) { var x = by[c.code]; return x && (x.n || (x.hid && x.eng)); }).map(function (c) {
+      var x = by[c.code], useEng = !x.n && x.hid;
+      return { c: c, v: useEng ? x.eng : x.n, label: useEng ? num(x.eng) + " eng." : num(x.n) };
+    }).sort(function (a, b) { return b.v - a.v; });
   }
   function renderTop(list) {
     var rows = ranked(list).slice(0, 5);
     $("w-top").innerHTML = head(IC.top, "Creators leaderboard", filtered() ? "Ranked by views in this view." : scoreTip(), "creators")
       + '<div class="db-card__body">' + (filtered() ? "" : '<div class="db-top__how">' + scoreBar(true) + "</div>") + (filtered() ? '<div class="db-top__cols"><span>Creator</span><b>Reached</b></div>' : "") + (rows.map(function (r, i) {
-                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " post · " : " posts · ") + num(r.c.seen != null ? r.c.seen : r.c.views) + " views" + '</small></span><span class="db-rank__score" title="' + (filtered() ? "People reached in this view" : "Score out of 100") + '">' + r.label + "</span></div>";
+                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " video · " : " videos · ") + num(r.c.seen != null ? r.c.seen : r.c.views) + " views" + '</small></span><span class="db-rank__score" title="' + (filtered() ? "People reached in this view" : "Score out of 100") + '">' + r.label + "</span></div>";
       }).join("") || '<p class="db-note">No creators in this view.</p>') + "</div>";
   }
 
@@ -371,7 +574,7 @@
   function renderMix(list) {
     var by = {}; list.forEach(function (p) { by[p.kind] = (by[p.kind] || 0) + 1; });
     var parts = Object.keys(by).map(function (k) { return { k: k, n: by[k] }; }).sort(function (a, b) { return b.n - a.n; });
-    $("w-mix").innerHTML = head(IC.mix, "Content mix", "How many of each format was published: photo posts, reels, stories and videos.", "mix")
+    $("w-mix").innerHTML = head(IC.mix, "Content mix", "How many of each format was published, on every platform: photo posts, reels, stories, videos and shorts.", "mix")
       + '<div class="db-card__body">' + (parts.length ? '<div class="db-donut">' + donut(parts) + '<div class="db-key">' + parts.map(function (p, i) {
         return '<div><span class="db-sw" style="background:' + COL[i % COL.length] + '"></span>' + esc(KIND[p.k] || p.k) + "<b>" + p.n + "</b></div>"; }).join("") + "</div></div>"
         : '<p class="db-note">No posts in this view.</p>') + "</div>";
@@ -400,7 +603,7 @@
         : '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>') + "</div>";
   }
 
-  var PCOL = { Instagram: "#d62976", TikTok: "#121212", Snapchat: "#f7d100", YouTube: "#ff0000", X: "#121212" };
+  var PCOL = { Instagram: "#d62976", TikTok: "#121212", Snapchat: "#f7d100", YouTube: "#ff0000", Facebook: "#0866ff", X: "#121212" };
   function ring(rows, tot) {
     var a0 = -Math.PI / 2, r = 40, out = '<circle cx="50" cy="50" r="40" fill="none" stroke="#efece6" stroke-width="12"/>';
     rows.forEach(function (p) {
@@ -414,19 +617,20 @@
     return '<svg viewBox="0 0 100 100" aria-hidden="true">' + out + "</svg>";
   }
   function renderPlat(list) {
-    var by = {}; list.forEach(function (p) { var x = by[p.platform] = by[p.platform] || { n: 0, posts: 0, eng: 0 }; x.n += seen(p); x.posts++; x.eng += p.engagement || 0; });
-    var rows = Object.keys(by).map(function (k) { return { k: k, n: by[k].n, posts: by[k].posts, eng: by[k].eng }; }).sort(function (a, b) { return b.n - a.n; });
-    var tot = rows.reduce(function (a, r) { return a + r.n; }, 0), body;
+    var by = {}; list.forEach(function (p) { var x = by[p.platform] = by[p.platform] || { n: 0, posts: 0, eng: 0, hid: true }; x.n += seen(p); x.posts++; x.eng += p.engagement || 0; if (!(p.video && p.views_hidden)) x.hid = false; });
+    var rows = Object.keys(by).map(function (k) { return { k: k, n: by[k].n, posts: by[k].posts, eng: by[k].eng, hid: by[k].hid }; }).sort(function (a, b) { return b.n - a.n; });
+    var tot = rows.reduce(function (a, r) { return a + r.n; }, 0), peak = rows.length ? Math.max(rows[0].n, 1) : 1, body;
     if (!rows.length) body = '<p class="db-note">No posts in this view.</p>';
     else {
-      var lead = rows[0];
-      body = '<div class="db-pring"><div class="db-pring__ring">' + ring(rows, tot) + '<span class="db-pring__logo" style="color:' + (PCOL[lead.k] || "#121212") + '">' + (ICONS[lead.k] || "") + "</span></div>"
-        + '<div class="db-pring__key">' + rows.map(function (r) {
-          return '<div class="db-pring__row"><span class="db-pring__name"><i style="background:' + (PCOL[r.k] || COL[0]) + '"></i>' + (ICONS[r.k] || "") + esc(r.k) + "</span>"
-            + "<b>" + num(r.n) + "</b><small>" + Math.round(tot ? r.n / tot * 100 : 0) + "% · " + r.posts + (r.posts === 1 ? " post" : " posts") + " · " + num(r.eng) + " eng.</small></div>";
-        }).join("") + "</div></div>";
+      // One line per platform, all visible: its views, a bar against the biggest platform, its share of all views and its engagement rate.
+      body = rows.map(function (r) {
+        var share = tot ? Math.round(r.n / tot * 100) : 0;
+        return '<div class="db-plr" title="' + esc(r.k) + ": " + num(r.n) + " views, " + share + '% of all views"><span class="db-plr__n" aria-label="' + esc(r.k) + '">' + (ICONS[r.k] || esc(r.k)) + "</span>"
+          + '<i style="--w:' + (r.n / peak * 100).toFixed(1) + "%;--c:" + (PCOL[r.k] || COL[0]) + '"></i>'
+          + (r.hid ? '<b class="db-plr__na" title="' + esc(r.k) + ' does not show view counts">n/a</b><span>—</span></div>' : "<b>" + num(r.n) + "</b><span>" + share + "%</span></div>");
+      }).join("");
     }
-    $("w-plat").innerHTML = head(IC.plat, "Platforms", "Views on each platform — views for videos, reach for photo posts and stories, never both added together.", "plat")
+    $("w-plat").innerHTML = head(IC.plat, "Platforms", "Views on each platform: the bar is against the biggest platform, the number is its views and the % is its share of all views. Open More for posts and engagement rate. Views for videos, reach for photo posts and stories, never both added together.", "plat")
       + '<div class="db-card__body">' + body + "</div>";
   }
 
@@ -441,6 +645,27 @@
 
   // People who saw a post: views for a video, reach for a photo or story.
   // Adding the two would count the same viewers twice.
+  // One video the creator published on several platforms is one piece: it counts once as a post.
+  function pieceKey(p) { return p.piece_size > 1 ? "g" + p.pk : "s" + p.id; }
+  function pieceCount(l) { var s = {}; l.forEach(function (p) { s[pieceKey(p)] = 1; }); return Object.keys(s).length; }
+  // The same video on several platforms as one card: numbers added up, a mark for each platform.
+  function mergePieces(list) {
+    var by = {}, order = [];
+    list.forEach(function (p) { var k = pieceKey(p); if (!by[k]) { by[k] = []; order.push(k); } by[k].push(p); });
+    return order.map(function (k) {
+      var g = by[k]; if (g.length === 1) return g[0];
+      var m = {}, lead = g[0];
+      Object.keys(lead).forEach(function (f) { m[f] = lead[f]; });
+      ["likes", "comments", "views", "reach", "impressions", "saves", "shares", "engagement", "exposure"].forEach(function (f) {
+        var v = g.map(function (x) { return x[f]; }).filter(function (x) { return x != null; });
+        m[f] = v.length ? v.reduce(function (a, b) { return a + b; }, 0) : null;
+      });
+      m.video = g.some(function (x) { return x.video; });
+      m.thumb = (g.filter(function (x) { return x.thumb; })[0] || lead).thumb;
+      m.parts = g; return m;
+    });
+  }
+  function platIcons(p) { return (p.parts || [p]).map(function (x) { return ICONS[x.platform] || ""; }).join(""); }
   function seen(p) { return p.exposure != null ? p.exposure : (p.video ? (p.views || 0) : (p.reach || 0)); }
   function topPosts(list) { return list.slice().sort(function (a, b) { return seen(b) - seen(a); }); }
   function weights() { var w = (R.objective || {}).weights || { exposure: 0.35, engagement: 0.25, er: 0.25, clicks: 0.15 }; return w; }
@@ -448,7 +673,7 @@
   // when the campaign tracks links. `small` is the compact form for the card.
   var SCORECOL = { exposure: "#14884a", engagement: "#ff691e", er: "#b9d400", clicks: "#121212" };
   function scoreParts() {
-    var w = weights(), parts = [["Views & reach", w.exposure, SCORECOL.exposure, "what they delivered, vs the top creator"], ["Engagement", w.engagement, SCORECOL.engagement, "likes + comments delivered, vs the top creator"]];
+    var w = weights(), parts = [["Views", w.exposure, SCORECOL.exposure, "what they delivered, vs the top creator"], ["Engagement", w.engagement, SCORECOL.engagement, "likes + comments delivered, vs the top creator"]];
     if (w.er > 0) parts.push(["Engagement rate", w.er, SCORECOL.er, "reactions per view vs the best creator"]);
     if (w.clicks > 0) parts.push(["Link clicks", w.clicks, SCORECOL.clicks, "vs the top creator"]);
     return parts;
@@ -463,7 +688,7 @@
   // awareness, engagement and clicks.
   function objectiveBox() {
     var w = weights(), o = R.objective || {}, links = !!o.links;
-    var tiles = [["Awareness", w.exposure || 0, "views & reach", SCORECOL.exposure], ["Engagement", (w.engagement || 0) + (w.er || 0), "likes & comments", SCORECOL.engagement],
+    var tiles = [["Awareness", w.exposure || 0, "views", SCORECOL.exposure], ["Engagement", (w.engagement || 0) + (w.er || 0), "likes & comments", SCORECOL.engagement],
       ["Clicks", w.clicks || 0, links ? "link clicks" : "no tracking links in this campaign", SCORECOL.clicks]];
     return '<h3>What this campaign is for</h3><div class="db-obj">' + tiles.map(function (t) {
       return '<div class="db-obj__t"><i style="background:' + t[3] + '"></i><b>' + Math.round(t[1] * 100) + "%</b><span>" + t[0] + "</span><small>" + t[2] + "</small></div>"; }).join("")
@@ -471,18 +696,40 @@
   }
   function scoreTip() {
     var w = weights(), o = (R.objective || {}).label || "Balanced";
-    return "Score out of 100, weighted for the " + o + " objective: views & reach " + Math.round(w.exposure * 100) + ", engagement " + Math.round(w.engagement * 100)
+    return "Score out of 100, weighted for the " + o + " objective: views " + Math.round(w.exposure * 100) + ", engagement " + Math.round(w.engagement * 100)
       + (w.er > 0 ? ", engagement rate " + Math.round(w.er * 100) : "") + (w.clicks > 0 ? ", link clicks " + Math.round(w.clicks * 100) : "")
       + ". Each is the creator's result as a share of the best creator's: it rewards what they delivered for the campaign, not their follower count.";
   }
   function renderPosts(list) {
-    var top = topPosts(list).slice(0, 3);
-    $("w-posts").innerHTML = head(IC.img, "Top posts", "The three posts that reached the most people in this view.", "posts")
+    var top = topPosts(mergePieces(list)).slice(0, 3);
+    $("w-posts").innerHTML = head(IC.img, "Top videos", "The three videos that reached the most people in this view. A video on several platforms counts once, with every platform added together.", "posts")
       + '<div class="db-card__body"><div class="db-thumbs">' + (top.map(function (p, i) {
         return '<a class="db-thumb" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + fit(p.thumb)
           + '<svg class="db-thumb__n" viewBox="0 0 40 50" aria-hidden="true">' + medalBody(i + 1) + "</svg>"
-          + "<span><em>" + esc(p.creator) + "</em><i>" + (ICONS[p.platform] || "") + num(p.video ? p.views : p.reach) + "<small style=\"font:600 10px var(--body);color:#fff;opacity:.7\">" + (p.video ? "views" : "reached") + "</small></i></span></a>";
+          + "<span><em>" + esc(p.creator) + "</em>" + (p.parts ? '<b class="db-thumb__plats">' + platIcons(p) + "</b>" : "") + "<i>" + (p.parts ? "" : (ICONS[p.platform] || "")) + (p.views_hidden && !p.parts ? num(p.likes) : num(p.parts ? seen(p) : (p.video ? p.views : p.reach))) + "<small style=\"font:600 10px var(--body);color:#fff;opacity:.7\">" + (p.views_hidden && !p.parts ? "likes" : p.video || p.parts ? "views" : "reached") + "</small></i></span></a>";
       }).join("") || '<p class="db-note">No posts in this view.</p>') + "</div></div>";
+  }
+
+  // Each creator's videos, one row per video, a chip for every platform it went out on.
+  function videosByCreator(list, rows) {
+    var pieces = mergePieces(list), by = {};
+    pieces.forEach(function (p) { (by[p.code] = by[p.code] || []).push(p); });
+    var out = rows.map(function (c) {
+      var mine = (by[c.code] || []).slice().sort(function (a, b) { return (a.posted_at || 0) - (b.posted_at || 0); });
+      if (!mine.length && !c.planned) return "";
+      var tot = mine.reduce(function (a, p) { return a + seen(p); }, 0);
+      var rowsHtml = mine.map(function (p, i) {
+        var parts = p.parts || [p];
+        return '<div class="db-vid"><div class="db-vid__t"><b>Video ' + (i + 1) + (c.planned ? " of " + c.planned : "") + "</b><small>" + esc(day(p.posted_at)) + "</small></div>"
+          + '<div class="db-vid__n">' + num(seen(p)) + "<small>views</small></div>"
+          + '<div class="db-vid__chips">' + parts.map(function (x) {
+            return '<a class="db-chip" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + (ICONS[x.platform] || "") + esc(x.platform) + " · " + num(seen(x)) + "</a>";
+          }).join("") + "</div></div>";
+      }).join("");
+      var owed = []; for (var i = mine.length; i < (c.planned || 0); i++) owed.push('<div class="db-vid is-owed"><div class="db-vid__t"><b>Video ' + (i + 1) + " of " + c.planned + "</b><small>Not published yet</small></div></div>");
+      return '<div class="db-vids"><h4>' + ava(c.photo) + "<span>" + who(c) + "</span><b>" + mine.length + (c.planned ? "/" + c.planned : "") + " videos · " + num(tot) + " views</b></h4>" + rowsHtml + owed.join("") + "</div>";
+    }).join("");
+    return out ? "<h3>Videos by creator</h3>" + out : "";
   }
 
   /* ------------------------------------------- target vs achieved (goals) */
@@ -647,7 +894,7 @@
         + pts.map(function (d) { return "<tr><td>" + esc(day(d.d, true)) + "</td><td></td><td>" + full(d.views) + "</td><td>" + full(d.eng) + "</td></tr>"; }).join("") + "</tbody></table>";
     },
     creators: function () {
-      var list = posts(), by = {}; list.forEach(function (p) { var x = by[p.code] = by[p.code] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
+      var list = posts(), by = {}; list.forEach(function (p) { var x = by[p.code] = by[p.code] || { posts: 0, views: 0, reach: 0, eng: 0, keys: {} }; if (!x.keys[pieceKey(p)]) { x.keys[pieceKey(p)] = 1; x.posts++; } x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
       var rows = filtered() ? ranked(list).map(function (r) { return r.c; }) : R.creators;
       var tot = rows.reduce(function (a, c) { var x = filtered() ? (by[c.code] || {}) : { views: c.views, eng: c.engagement }; a.v += x.views || 0; a.e += x.eng || 0; return a; }, { v: 0, e: 0 });
       function share(v, t) { return t ? Math.round((v || 0) / t * 100) + "%" : "—"; }
@@ -656,8 +903,8 @@
           var n = filtered() ? i + 1 : c.rank;
           return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
             + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
-        + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(scoreTip()) + "</p>"
-        + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views &amp; reach</th><th>Engagement</th>' + (weights().er > 0 ? "<th>Eng. rate</th>" : "") + '' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
+        + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(scoreTip()) + "</p>" + videosByCreator(list, rows)
+        + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views</th><th>Engagement</th>' + (weights().er > 0 ? "<th>Eng. rate</th>" : "") + '' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
           + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td>" + (weights().er > 0 ? "<td>" + q.er.toFixed(0) + "</td>" : "") + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + c.score.toFixed(0) + "</b></td></tr>"; }).join("")
           + "</tbody></table>");
     },
@@ -683,8 +930,8 @@
     },
     plat: function () {
       var by = {}; posts().forEach(function (p) { var x = by[p.platform] = by[p.platform] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
-      return '<table class="db-table"><thead><tr><th>Platform</th><th></th><th>Posts</th><th>Views</th><th>Reach</th><th>Engagement</th></tr></thead><tbody>'
-        + Object.keys(by).map(function (k) { var x = by[k]; return "<tr><td>" + (ICONS[k] || "") + " " + esc(k) + "</td><td></td><td>" + x.posts + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng) + "</td></tr>"; }).join("") + "</tbody></table>";
+      return '<table class="db-table"><thead><tr><th>Platform</th><th></th><th>Posts</th><th>Views</th><th>Reach</th><th>Engagement</th><th>Eng. rate</th></tr></thead><tbody>'
+        + Object.keys(by).map(function (k) { var x = by[k]; return "<tr><td>" + (ICONS[k] || "") + " " + esc(k) + "</td><td></td><td>" + x.posts + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng) + "</td><td>" + (x.views ? pct(x.eng / x.views * 100) : "—") + "</td></tr>"; }).join("") + "</tbody></table>";
     },
     clicks: function () {
       var cl = clicksFor(); if (!cl) return '<div class="db-na-card"><span class="db-na-card__icon">' + IC.clicks + '</span><span class="db-na">Not part of this campaign</span><p>This campaign does not contain affiliate links, so there are no clicks to count.</p></div>';
@@ -699,8 +946,8 @@
   function stats(p) {
     var er = p.video ? (p.video_er != null ? p.video_er : p.er) : (p.er != null ? p.er : p.imp_er);
     var out = [];
-    if (p.video) out.push(["Views", full(p.views)]);
-    if (p.reach != null) out.push([p.story ? "Story views" : "Reach" + (p.reach_real === false && !p.story ? " (est.)" : ""), full(p.reach)]);
+    if (p.video) out.push(["Views", p.views_hidden ? '<span class="db-hid" title="This platform does not show view counts">Not shown</span>' : full(p.views)]);
+    if (p.reach != null && !p.views_hidden) out.push([p.story ? "Story views" : "Reach" + (p.reach_real === false && !p.story ? " (est.)" : ""), full(p.reach)]);
     if (!p.video && p.impressions) out.push(["Impressions", full(p.impressions)]);
     out.push(["Likes", p.likes_hidden ? '<span class="db-hid" title="The creator hides the like count on this post">Hidden</span>' : full(p.likes)], ["Comments", full(p.comments)],
       ["Engagement", full(p.engagement) + (p.likes_hidden ? '<span class="db-hid-n">comments only</span>' : "")]);
@@ -736,7 +983,8 @@
   function post(p) {
     return '<a class="db-post" href="' + esc(p.url) + '" target="_blank" rel="noopener"><div class="db-post__img">' + fit(p.thumb)
       + (p.kind ? '<span class="db-kind">' + esc(ONE[p.kind] || p.kind) + "</span>" : "")
-      + '</div><div class="db-post__body"><b>' + esc(p.creator) + "</b><span>" + (ICONS[p.platform] ? "" : "") + esc(p.platform) + " · " + esc(day(p.posted_at, true)) + "</span></div>"
+      + '<span class="db-pbadge" style="color:' + (PCOL[p.platform] || "#121212") + '" title="Published on ' + esc(p.platform) + '">' + (ICONS[p.platform] || "") + "</span>"
+      + '</div><div class="db-post__body"><b>' + esc(p.creator) + '</b><span class="db-post__on"><i style="color:' + (PCOL[p.platform] || "#121212") + '">' + (ICONS[p.platform] || "") + "</i>" + esc(p.platform) + " · " + esc(day(p.posted_at, true)) + "</span></div>"
       + (p.caption ? '<p class="db-post__cap">' + esc(p.caption) + "</p>" : "")
       + '<div class="db-post__stats">' + stats(p).map(function (x) { return "<div><small>" + x[0] + "</small><b>" + x[1] + "</b></div>"; }).join("") + "</div></a>";
   }

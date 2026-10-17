@@ -146,7 +146,9 @@ def visibility(campaign):
         got = json.loads(campaign["visibility"] or "{}") if "visibility" in campaign.keys() else {}
     except ValueError:
         got = {}
-    return {k: bool(got.get(k, v)) for k, v in keys.items()}
+    out = {k: bool(got.get(k, v)) for k, v in keys.items()}
+    out["reach"] = False      # reach is not shown on any client report (owner, 2026-10-18)
+    return out
 
 
 def post_numbers(c, f):
@@ -192,6 +194,7 @@ def post_numbers(c, f):
                                                    and not story) else None
     out["video_er"] = (eng / float(views) * 100) if (video and views and likes is not None) else None
     out["likes_hidden"] = likes is None and not story
+    out["views_hidden"] = bool(video and views is None)      # the platform shows no view count (Snapchat)
     # What this post does not show publicly, so it can be asked for.
     gaps = []
     if out["likes_hidden"]:
@@ -257,6 +260,15 @@ def report(campaign, internal=False, raw=False):
             emv += (n.get(action) or 0) * _rate(rates, c["platform"], action)
         n["emv"] = emv
         posts.append({**c, **n})
+    # One video on several platforms is one piece: its numbers add up like any others, but it counts
+    # once as a delivered video and once in the engagement-rate average.
+    for p in posts:
+        p["pk"] = p.get("piece") or p["id"]
+    sizes = {}
+    for p in posts:
+        sizes[p["pk"]] = sizes.get(p["pk"], 0) + 1
+    for p in posts:
+        p["piece_size"] = sizes[p["pk"]]
 
     camp = [p for p in posts if p["section"] == "campaign"]
 
@@ -266,11 +278,14 @@ def report(campaign, internal=False, raw=False):
                        "shares", "saves", "emv")}
         t["seen"] = sum(p["exposure"] for p in items)
         t["hidden_likes"] = sum(1 for p in items if p["likes_hidden"])
-        t["posts"] = len(items)
+        pieces = {}
+        for p in items:
+            pieces.setdefault(p["pk"], []).append(p)
+        t["posts"] = len(pieces)
         t["clicks"] = extra_clicks
-        t["er"] = _avg(p["er"] for p in items)
-        t["video_er"] = _avg(p["video_er"] for p in items)
-        t["imp_er"] = _avg(p["imp_er"] for p in items)
+        t["er"] = _avg(_avg(q["er"] for q in g) for g in pieces.values())
+        t["video_er"] = _avg(_avg(q["video_er"] for q in g) for g in pieces.values())
+        t["imp_er"] = _avg(_avg(q["imp_er"] for q in g) for g in pieces.values())
         exposure = t["impressions"] + t["views"]
         t["exposure"] = exposure
         t["ctr"] = (extra_clicks / float(exposure) * 100) if exposure else None
@@ -307,7 +322,7 @@ def report(campaign, internal=False, raw=False):
         t = totals(mine, clicks_by.get(code, 0))
         if not rates:
             t["emv"] = None
-        delivered = len(mine)
+        delivered = len({p["pk"] for p in mine})
         followers = m["followers"]
         row = {"code": code, "name": m["name"] or code, "photo": m["photo"],
                "followers": followers, "planned": m["planned"], "delivered": delivered,
@@ -330,7 +345,10 @@ def report(campaign, internal=False, raw=False):
     w = weights_for(objective, links_on, campaign_weights(campaign))
     scoreboard(creators, bm, w)
     targets = db.campaign_targets(campaign)
-    progress = target_progress(campaign, total, targets)
+    # Targets cover the platforms the plan was set for; add-on platforms are tracked but do not count towards them.
+    gp = goal_platforms(plans.plan_of(campaign))
+    prog_total = total if not gp else dict(totals([p for p in camp if p["platform"] in gp], clicks["clicks"]), posts=total["posts"])
+    progress = target_progress(campaign, prog_total, targets, plan_fraction(campaign, creators))
     planned = sum(c["planned"] or 0 for c in creators)
     total["planned"] = planned or None
     total["delivered"] = total["posts"]
@@ -650,7 +668,56 @@ def scoreboard(creators, bm, weights=None):
     creators.sort(key=lambda c: (c["rank"] is None, c["rank"] or 0))
 
 
-def target_progress(campaign, total, targets):
+MATURE_DAYS = 7          # a video is expected to reach its share of the targets a week after it is due
+
+
+def plan_fraction(campaign, creators, now=None):
+    """Where the publishing plan says the campaign should be: (share of the videos due by now, share of
+    the targets those videos should have reached by now). Each creator's planned videos are spread over the
+    publishing step (the last one falls on its last day); a creator's own "next post expected" date replaces
+    the due date of the next video they owe. A video is expected to reach its share of views, reach and
+    engagement MATURE_DAYS after it is due. None when the plan cannot be read."""
+    import calendar
+    now = now or db.now()
+    pub = next((x for x in db.campaign_steps(campaign) if x["key"] == "publishing" and x["on"] and x["start"] and x["end"]), None)
+    total = sum(int(c.get("planned") or 0) for c in creators)
+    if not pub or not total:
+        return None
+
+    def ts(d, end=False):
+        y, m, dd = (int(v) for v in d.split("-"))
+        return calendar.timegm((y, m, dd, 23, 59, 59) if end else (y, m, dd, 0, 0, 0)) - 3 * 3600   # Riyadh day
+    start, end = ts(pub["start"]), ts(pub["end"], True)
+    due = mature = 0.0
+    for c in creators:
+        n = int(c.get("planned") or 0)
+        got = int(c.get("delivered") or 0)
+        for i in range(1, n + 1):
+            # First video due on the first publishing day, the last on the last day, evenly between
+            # (a creator with one video owes it on the last day).
+            t = start + (end - start) * ((i - 1) / float(n - 1) if n > 1 else 1.0)
+            if i == got + 1 and c.get("pending_date"):
+                try:
+                    t = ts(c["pending_date"])
+                except ValueError:
+                    pass
+            if t <= now:
+                due += 1
+                mature += min(1.0, (now - t) / float(MATURE_DAYS * 86400))
+    return due / total, mature / total
+
+
+def goal_platforms(plan):
+    """The platforms a saved plan sets goals on (its brief list, else its platform text split on +), or None
+    when the plan names none: then every platform counts, as before."""
+    if not plan:
+        return None
+    raw = (plan.get("brief") or {}).get("platforms") or [x.strip() for x in str(plan.get("platform") or "").split("+")]
+    got = [p for p in raw if p in ("Instagram", "TikTok", "Snapchat", "YouTube", "Facebook")]
+    return got or None
+
+
+def target_progress(campaign, total, targets, plan=None):
     """Each target against what is done, and against where the campaign
     should be by now (straight-line through its dates), graded."""
     start, end = campaign["starts_at"], campaign["ends_at"]
@@ -669,9 +736,11 @@ def target_progress(campaign, total, targets):
         got = actual.get(key) or 0
         if key == "er":                       # a rate is judged as is, not pro-rata
             expected = goal
+        elif plan is not None:                # follow the publishing plan: no minimum, nothing due = nothing expected
+            expected = goal * (plan[0] if key == "posts" else plan[1])
         else:
             expected = goal * max(elapsed, 0.15)   # the first days are not judged as failure
-        ratio = got / float(expected) if expected else 0
+        ratio = got / float(expected) if expected else (1.0 if plan is not None else 0)
         out.append({"key": key, "goal": goal, "actual": got, "pct": got / float(goal) * 100 if goal else 0,
                     "expected": expected,
                     "grade": "good" if ratio >= 1 else ("moderate" if ratio >= 0.7 else "low")})
@@ -821,6 +890,34 @@ def audience_mix(creators, reach_by_code, target=None):
     return out
 
 
+def next_capture(campaign):
+    """When this campaign's posts are next captured by a scheduled job (epoch seconds, Riyadh slots), or None."""
+    import time as _t
+    now = db.now()
+    best = None
+    with db.connect() as conn:
+        jobs = conn.execute("SELECT schedule, at_time, weekday FROM api_jobs WHERE enabled = 1 AND source = ? "
+                            "AND schedule IN ('daily','weekly')", ("campaign:%d" % campaign["id"],)).fetchall()
+    for j in jobs:
+        try:
+            hh, mm = (int(x) for x in j["at_time"].split(":"))
+        except (ValueError, AttributeError):
+            continue
+        local = now + 3 * 3600
+        slot = local - local % 86400 + hh * 3600 + mm * 60 - 3 * 3600
+        for d in range(0, 9):
+            t = slot + d * 86400
+            if t <= now:
+                continue
+            if j["schedule"] == "weekly" and _t.gmtime(t + 3 * 3600).tm_wday != j["weekday"]:
+                continue
+            best = t if best is None or t < best else best
+            break
+    if best and campaign["ends_at"] and best > campaign["ends_at"]:
+        return None
+    return best
+
+
 def client_report(campaign, photo=None, photo_large=None):
     """The report as the client may see it: no cost, no CPM, no EMV, no
     ratings or notes, and only the sections switched on for them. `photo`
@@ -831,7 +928,8 @@ def client_report(campaign, photo=None, photo_large=None):
     keep = ("id", "code", "platform", "kind", "url", "posted_at", "caption", "thumb",
             "section", "likes", "comments", "engagement", "views", "reach", "impressions",
             "shares", "saves", "er", "video_er", "imp_er", "view_rate", "story_rate", "real",
-            "reach_real", "impressions_real", "video", "story", "health", "likes_hidden", "gaps", "exposure")
+            "reach_real", "impressions_real", "video", "story", "health", "likes_hidden", "gaps", "exposure",
+            "pk", "piece_size", "views_hidden")
     posts = [{k: p.get(k) for k in keep} for p in r["posts"]
              if vis["all_content"] or p["section"] == "campaign"]
     names = {c["code"]: c["name"] for c in r["creators"]}
@@ -874,7 +972,8 @@ def client_report(campaign, photo=None, photo_large=None):
                             logos=db.campaign_logos(k), steps=steps),
            "total": total, "creators": creators, "posts": posts, "history": r["history"],
            "visibility": {kk: v for kk, v in vis.items() if kk != "emv"},
-           "updated_at": r["updated_at"], "verdict": r["verdict"], "objective": r["objective"],
+           "updated_at": r["updated_at"], "next_update_at": next_capture(campaign),
+           "verdict": r["verdict"], "objective": r["objective"],
            "plan": plans.client_view(plans.plan_of(k)), "gaps": r["gaps"],
            "progress": r["progress"] if vis["reach"] else {"elapsed": r["progress"]["elapsed"],
                                                             "items": [i for i in r["progress"]["items"]

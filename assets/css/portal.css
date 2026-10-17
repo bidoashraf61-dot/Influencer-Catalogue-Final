@@ -1554,3 +1554,8 @@ body.sel-scores-off .cat-card .cat-score, body.sel-scores-off .cat-card .cat-pla
 .sel-share__em { font-weight: 600; word-break: break-all; }
 .sel-share__p small { color: var(--gray); flex: 1 1 auto; }
 .sel-share__rm { min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1.5px solid var(--ink); background: var(--white); color: var(--ink); font: 600 13.5px var(--body); cursor: pointer; }
+
+/* Typed answers on the objective questions (Other platform, an exact amount, an exact number). */
+.ai-sl__q .pt-other { color: #fff; border-color: rgba(255,255,255,.3); background: rgba(255,255,255,.05); max-width: 440px; }
+.ai-sl__q .pt-other::placeholder { color: rgba(255,255,255,.5); }
+.ai-sl__q .pt-other:focus { outline-color: var(--ai-lime); }

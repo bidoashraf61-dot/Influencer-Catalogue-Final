@@ -3794,8 +3794,12 @@ def campaign_content_page(k, members, posts, error=None, message=None):
                 + "".join("<input name='" + m + "' placeholder='" + m + "' inputmode='numeric' value='"
                           + ("" if p.get(m) is None else str(p[m])) + "'> " for m in ("likes", "comments", "views", "shares", "saves"))
                 + "<button class='btn tiny'>Save today's numbers</button></form></details>")
+        same = sum(1 for x in posts if p.get("piece") and x.get("piece") == p["piece"])
+        pill = (" <span class='pill live' title='Same video on %d platforms: counted once, numbers added'>video #%d · %d platforms</span>"
+                % (same, p["piece"], same)) if same > 1 else ""
         rows.append(
-            "<tr><td>" + thumb + "</td><td><strong>" + e(p.get("creator_name") or p["code"]) + "</strong><br>"
+            "<tr><td><input type='checkbox' form='piece-form' name='pick' value='" + pid + "' aria-label='Select this post'></td>"
+            "<td>" + thumb + "</td><td><strong>" + e(p.get("creator_name") or p["code"]) + "</strong>" + pill + "<br>"
             + "<span class='muted'>" + e(p["platform"]) + " · " + KIND_LABEL.get(p["kind"], p["kind"]) + " · "
             + _when(p["posted_at"]) + "</span><br><a href='" + e(p["url"]) + "' target='_blank' rel='noopener'>open post</a>"
             + "<div class='muted' style='max-width:340px;font-size:var(--t-xs,12px)'>" + e((p["caption"] or "")[:160]) + "</div></td>"
@@ -3807,7 +3811,7 @@ def campaign_content_page(k, members, posts, error=None, message=None):
             + "<td class='right'>" + fpct(p["er"] if not p["video"] else p["video_er"]) + "</td>"
             + "<td>" + actions + edit + "<span class='muted' style='font-size:var(--t-xs,12px)'>numbers "
             + ago(p["metrics_at"]) + " · " + e(p["source"]) + "</span></td></tr>")
-    table = "".join(rows) or ("<tr><td colspan='8' class='muted'>No posts yet. The capture job adds them "
+    table = "".join(rows) or ("<tr><td colspan='9' class='muted'>No posts yet. The capture job adds them "
                               "every 24 hours while the campaign is live, or add one below.</td></tr>")
     # What the platform does not show publicly — to collect by hand.
     live = [p for p in posts if not p["hidden"] and p["section"] == "campaign"]
@@ -3829,7 +3833,12 @@ def campaign_content_page(k, members, posts, error=None, message=None):
     body = (
         _head(k, "content", error, message)
         + todo
-        + "<div class='card'><table><thead><tr><th></th><th>Post</th><th>Counts as</th><th class='right'>Likes</th>"
+        + "<div class='card'><form id='piece-form' method='post' action='" + u("/campaigns/content/group") + "' class='row' style='margin-bottom:10px;gap:8px;align-items:center'>"
+          "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
+          "<span class='muted'>Same video on several platforms? Tick that creator's posts:</span>"
+          "<button class='btn small lime' name='do' value='group'>Count as one video</button>"
+          "<button class='btn small ghost' name='do' value='split'>Split out</button></form>"
+          "<table><thead><tr><th></th><th></th><th>Post</th><th>Counts as</th><th class='right'>Likes</th>"
           "<th class='right'>Views</th><th class='right'>Reach / impressions</th><th class='right'>ER</th><th></th>"
           "</tr></thead><tbody>" + table + "</tbody></table>"
         + "<p class='price-hint'>est. = estimated (see Settings for how); real = from the creator's own "
@@ -3843,10 +3852,13 @@ def _content_tools(k, members, posts, opts, plats, kinds):
     import db as db_mod
     """Four ways to get posts and numbers in, on one screen."""
     cid = str(k["id"])
-    posted = {}
+    posted, seen_piece = {}, set()
     for p in posts:
         if not p["hidden"] and p["section"] == "campaign":
-            posted[p["code"]] = posted.get(p["code"], 0) + 1
+            key = (p["code"], p.get("piece") or p["id"])
+            if key not in seen_piece:           # one video on three platforms is one delivered video
+                seen_piece.add(key)
+                posted[p["code"]] = posted.get(p["code"], 0) + 1
     rows = []
     for m in members:
         n, want = posted.get(m["cc_code"], 0), m["planned"] or 0
