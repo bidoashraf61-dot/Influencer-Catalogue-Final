@@ -89,6 +89,40 @@ def invite(sel, email, by, by_name=""):
     return state, None
 
 
+def invite_campaign(k, email, by, by_name=""):
+    """Invite an email to a campaign: it opens through the selection the campaign was made from, so the person
+    gets both. A campaign with no selection yet cannot be invited (phase 2 lets the client build it).
+    Returns (state, error); error adds "no_selection"."""
+    sel = db.selection(k["selection_id"]) if k["selection_id"] else None
+    if sel is None:
+        return None, "no_selection"
+    return invite(sel, email, by, by_name)
+
+
+def campaign_card(k):
+    """The campaign Setup tab's invite card (admin pages)."""
+    sel = db.selection(k["selection_id"]) if k["selection_id"] else None
+    ppl = people(sel) if sel is not None else []
+    if sel is None:
+        return ("<div class='card'><div class='hd'><h2>Invite by email</h2></div><p class='muted'>This campaign has no selection yet. "
+                "Link or create its selection first; then you can invite a client's email to both.</p></div>")
+    return ("<div class='card'><div class='hd'><h2>Invite by email</h2></div>"
+            "<p class='sec-desc'>Give one person access to this campaign and its selection, view and edit. If they have no account yet, "
+            "it opens the first time they sign in with that email, and we email them the link.</p>"
+            "<form method='post' action='" + u("/campaigns/invite") + "' class='row limits'>"
+            "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
+            "<div style='flex:2'><label for='cinv-email'>Email</label><input id='cinv-email' name='email' type='email' "
+            "placeholder='name@company.com' autocomplete='off' required></div>"
+            "<div style='align-self:end'><button class='btn small lime' name='do' value='add'>Give access</button></div></form>"
+            + ("<table class='t'><tr><th>Email</th><th>Status</th><th></th></tr>" + "".join(
+                "<tr><td>%s</td><td>%s</td><td><form method='post' action='%s' style='display:inline'>"
+                "<input type='hidden' name='id' value='%d'><input type='hidden' name='email' value=\"%s\">"
+                "<button class='btn small ghost' name='do' value='remove'>Remove</button></form></td></tr>" % (
+                    e(p_["email"]), "Has access" if p_["state"] == "granted" else "Invited · opens at first sign-in",
+                    e(u("/campaigns/invite")), k["id"], e(p_["email"])) for p_ in ppl) + "</table>"
+               if ppl else "<p class='muted'>Nobody invited yet.</p>") + "</div>")
+
+
 def uninvite(sel, email):
     import guard
     db.invite_remove(sel["id"], guard.normalise_email(email) or (email or "").strip().lower())

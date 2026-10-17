@@ -455,13 +455,16 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         clients' work opens through admin_like_for()."""
         return (bool(self.admin()) and self.kam_clients() is None) or self.staff_unlocked()
 
-    def admin_like_for(self, code_id):
+    def admin_like_for(self, code_id, sel_id=None, camp_id=None):
         """admin_like() for one thing filed under ``code_id``: also true for a key account manager
-        when it is one of her clients."""
+        when it is one of her clients, or the selection (``sel_id``) or campaign (``camp_id``) was handed to her."""
         if self.admin_like():
             return True
         sc = self.kam_clients()
         try:
+            if sc is not None and ((sel_id is not None and int(sel_id) in getattr(sc, "sel_ids", ()))
+                                   or (camp_id is not None and int(camp_id) in getattr(sc, "camp_ids", ()))):
+                return True
             return sc is not None and code_id is not None and int(code_id) in sc
         except (TypeError, ValueError):
             return False
@@ -1263,6 +1266,30 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_client_preview()
         if path.startswith("/evidence/"):
             return self.post_evidence(path, who)
+        if path == "/campaigns/invite":
+            import access
+            f = self.form_body()
+            cid = (f.get("id") or "").strip()
+            k = db.campaign(int(cid)) if cid.isdigit() else None
+            if k is None:
+                return self.redirect("/campaigns?e=" + urllib.parse.quote("That campaign no longer exists."))
+            if not self.admin_like_for(k["code_id"] if k["code_id"] is not None else kam_scope.campaign_code(k["id"])[1],
+                                       k["selection_id"], k["id"]):
+                return self.redirect("/campaigns?e=" + urllib.parse.quote("That campaign belongs to a client you do not manage."))
+            back = "/campaigns/edit?id=%s" % cid
+            sel = db.selection(k["selection_id"]) if k["selection_id"] else None
+            if f.get("do") == "remove" and sel is not None:
+                access.uninvite(sel, f.get("email") or "")
+                return self.redirect(back + "&ok=" + urllib.parse.quote("Access removed for %s." % (f.get("email") or "that email")))
+            state, err = access.invite_campaign(k, f.get("email") or "", who["email"])
+            msgs = {"email": "That does not look like an email address.", "self": "That is the owner: they already have it.",
+                    "limit": "This already has %d invited people." % access.MAX_INVITES,
+                    "no_selection": "This campaign has no selection yet. Link its selection first."}
+            if err:
+                return self.redirect(back + "&e=" + urllib.parse.quote(msgs[err]))
+            return self.redirect(back + "&ok=" + urllib.parse.quote(
+                "%s can now open this campaign and its selection." % f.get("email").strip() if state == "granted"
+                else "Invited. It opens for %s when they sign in with that email." % f.get("email").strip()))
         if path == "/selections/invite":
             import access
             f = self.form_body()
@@ -1271,7 +1298,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             back = "/selections/edit?id=%s" % sid
             if sel is None:
                 return self.redirect("/selections?e=" + urllib.parse.quote("That selection no longer exists."))
-            if sel["code_id"] is not None and not self.admin_like_for(sel["code_id"]):
+            if sel["code_id"] is not None and not self.admin_like_for(sel["code_id"], sel["id"]):
                 return self.redirect("/selections?e=" + urllib.parse.quote("That selection belongs to a client you do not manage."))
             if f.get("do") == "remove":
                 access.uninvite(sel, f.get("email") or "")
@@ -1352,6 +1379,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path in ("/selections/assign", "/campaigns/assign"):
             import assign
             return assign.post(self, path)
+        if path in ("/selections/kam", "/campaigns/kam"):
+            import kam_items
+            return kam_items.post(self, path)
         if path == "/campaigns/new":
             return self.post_campaign_new()
         if path == "/campaigns/setup":
@@ -2308,7 +2338,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
         if kind == "sel":
             sel = db.selection(rid)
-            if sel is None or not kam_scope.allows(sel["code_id"]):
+            if sel is None or not kam_scope.allows(kam_scope.selection_code(sel["id"])[1]):
                 return no("That selection is not here any more.")
             key = lifecycle.state_of(sel)["key"]
             if to == "requested" and key == "draft":
@@ -2337,7 +2367,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return no("That move is not possible from here.")
         if kind == "camp":
             k = db.campaign(rid)
-            if k is None or not kam_scope.allows(k["code_id"]):
+            if k is None or not kam_scope.allows(kam_scope.campaign_code(k["id"])[1]):
                 return no("That campaign is not here any more.")
             if to == "live" and k["status"] in ("draft", "ended"):
                 return self.send_json(200, go_live(k))
@@ -3670,12 +3700,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # HelloVoice (owner, 2026-10-16): the team's own account has no campaigns, so its list was empty.
             # An admin sees every campaign; a key account manager, her clients'.
             with db.connect() as conn:
-                every = conn.execute("SELECT token, name, client, status, phase, starts_at, ends_at, logos, code_id, id FROM campaigns "
+                every = conn.execute("SELECT token, name, client, status, phase, starts_at, ends_at, logos, code_id, id, selection_id FROM campaigns "
                                      "WHERE status != 'draft' ORDER BY starts_at DESC").fetchall()
             out = []
             for r in every:
                 cid = r["code_id"] if r["code_id"] is not None else kam_scope.campaign_code(r["id"])[1]
-                if not self.admin_like_for(cid):
+                if not self.admin_like_for(cid, r["selection_id"], r["id"]):
                     continue
                 d = {k: r[k] for k in ("token", "name", "client", "status", "phase", "starts_at", "ends_at", "logos")}
                 d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
@@ -3696,7 +3726,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def viewer_campaign(self, token):
         k = db.campaign(token=token) if token else None
-        if k is not None and self.admin_like_for(k["code_id"] if k["code_id"] is not None else kam_scope.campaign_code(k["id"])[1]):
+        if k is not None and self.admin_like_for(k["code_id"] if k["code_id"] is not None else kam_scope.campaign_code(k["id"])[1],
+                                                 k["selection_id"], k["id"]):
             return k, 200                       # admins (and a KAM, her clients') open any report, drafts included
         # The code typed for this report, or for the client's campaign list it was opened from.
         code_id = self.link_code("c:" + token) if token else None
@@ -4382,7 +4413,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         cid = self.signed_in_client()
-        admin = self.admin_like_for(sel["code_id"])
+        admin = self.admin_like_for(sel["code_id"], sel["id"])
         if not admin:
             if cid is None:
                 return self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())

@@ -33,6 +33,17 @@ def _get(row, key):
         return row.get(key) if isinstance(row, dict) else None
 
 
+ITEM_OK = -7          # what a resolver returns for a selection or campaign handed to this KAM: always allowed
+
+
+class Scope(frozenset):
+    """The client code ids that are a KAM's, plus the single selections and campaigns the owner handed her
+    (item_kam, 2026-10-17). Behaves as the plain frozenset of client ids everywhere it was one before."""
+    email = ""
+    sel_ids = frozenset()
+    camp_ids = frozenset()
+
+
 def is_kam(who):
     import team
     return who is not None and team.role_of(who) == "kam"
@@ -101,11 +112,16 @@ def clients(who):
     client code ids that are hers. ``who`` is an admin row (session or admins table)."""
     if not is_kam(who):
         return None
+    import db
     codes = {u["code_id"] for u in user_rows(_get(who, "email"), _get(who, "name")) if u["code_id"] is not None}
     if codes:
         import codelinks
         codes |= codelinks.linked_for(codes)
-    return frozenset(int(c) for c in codes)
+    sc = Scope(int(c) for c in codes)
+    sc.email = _norm(_get(who, "email"))
+    sc.sel_ids = db.kam_item_ids(sc.email, "selection")
+    sc.camp_ids = db.kam_item_ids(sc.email, "campaign")
+    return sc
 
 
 def admin_for_email(email):
@@ -125,11 +141,24 @@ def creators(scope):
     if scope is None:
         return None
     ids = sorted(scope)
-    if not ids:
+    sel_ids, camp_ids = sorted(getattr(scope, "sel_ids", ())), sorted(getattr(scope, "camp_ids", ()))
+    if not ids and not sel_ids and not camp_ids:
         return frozenset()
     marks = ",".join("?" * len(ids))
     out = set()
     with db.connect() as conn:
+        for sid in sel_ids:                                  # the selections and campaigns handed to her
+            r = conn.execute("SELECT codes FROM selections WHERE id = ?", (sid,)).fetchone()
+            try:
+                out.update(json.loads((r["codes"] if r else None) or "[]"))
+            except ValueError:
+                pass
+        for cid in camp_ids:
+            for r in conn.execute("SELECT code FROM campaign_creators WHERE campaign_id = ?", (cid,)):
+                if r["code"]:
+                    out.add(r["code"])
+        if not ids:
+            return frozenset(str(c).upper() for c in out)
         for r in conn.execute("SELECT codes FROM selections WHERE code_id IN (%s)" % marks, ids):
             try:
                 out.update(json.loads(r["codes"] or "[]"))
@@ -173,9 +202,25 @@ def allows(code_id, scope="__current__"):
     if s is None:
         return True
     try:
-        return code_id is not None and int(code_id) in s
+        return code_id is not None and (int(code_id) == ITEM_OK or int(code_id) in s)
     except (TypeError, ValueError):
         return False
+
+
+def keep_items(rows, kind, fallback=None):
+    """Selection or campaign rows that are her client's, or that the owner handed to her."""
+    s = current()
+    if s is None:
+        return rows
+    ids = getattr(s, "sel_ids" if kind == "selection" else "camp_ids", frozenset())
+    out = []
+    for r in rows:
+        code = _get(r, "code_id")
+        if code is None and fallback:
+            code = _get(r, fallback)
+        if allows(code, s) or _get(r, "id") in ids:
+            out.append(r)
+    return out
 
 
 def keep(rows, key="code_id"):
@@ -204,6 +249,8 @@ def selection_code(sid):
     """(found, code_id) for a selection id."""
     import db
     sel = db.selection(sid) if sid is not None else None
+    if sel is not None and sid in getattr(current(), "sel_ids", ()):
+        return True, ITEM_OK
     return (sel is not None, sel["code_id"] if sel is not None else None)
 
 
@@ -213,6 +260,8 @@ def campaign_code(cid):
     k = db.campaign(cid) if cid is not None else None
     if k is None:
         return False, None
+    if cid in getattr(current(), "camp_ids", ()) or (k["selection_id"] and k["selection_id"] in getattr(current(), "sel_ids", ())):
+        return True, ITEM_OK
     if k["code_id"] is not None:
         return True, k["code_id"]
     if k["selection_id"]:
@@ -271,12 +320,12 @@ _PORTAL_TABS = {"accounts", "briefs", "chats"}
 # POSTs with no client in them that a KAM may still make: herself, the copilot's read-only chat, creators.
 _POST_FREE = {"/access-requests", "/reauth", "/password", "/ai/chat", "/ai/dismiss", "/roster/save", "/roster/bulk", "/licences/save",
               "/licences/scan"}
-_POST_SELECTION = {"/selections/save", "/selections/delete", "/selections/status", "/quote/ready", "/quote/withdraw"}
+_POST_SELECTION = {"/selections/save", "/selections/delete", "/selections/status", "/quote/ready", "/quote/withdraw", "/selections/invite"}
 _POST_CAMPAIGN = {"/campaigns/save", "/campaigns/status", "/campaigns/delete", "/campaigns/link",
                   "/campaigns/content/add", "/campaigns/content/update", "/campaigns/content/bulk",
                   "/campaigns/content/pending", "/campaigns/insights/decide", "/campaigns/insights/upload",
                   "/campaigns/sync", "/campaigns/link/custom", "/campaigns/link/toggle", "/planner/apply",
-                  "/calculator/save", "/calculator/results"}
+                  "/calculator/save", "/calculator/results", "/campaigns/invite"}
 _POST_CODE = {"/codes/revoke", "/codes/restore", "/codes/archive", "/codes/unarchive", "/codes/passcode",
               "/codes/rename", "/codes/limits", "/clients/preview"}
 _POST_USER = {"/portal/user/status", "/portal/user/credits", "/portal/user/save"}

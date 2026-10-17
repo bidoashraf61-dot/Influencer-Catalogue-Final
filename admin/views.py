@@ -3029,7 +3029,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         # The status panel holds forms of its own (quote ready / take back). Inside the save form
         # their </form> closed it early and left "Save changes" outside, so it sits here.
         + ui.panel("status", status_html)
-        + ui.panel("share", __import__("assign").selection_card(sel, campaigns) + link_html + invite_html + pass_html) + ui.panel("campaign", campaign_html)
+        + ui.panel("share", __import__("assign").selection_card(sel, campaigns) + __import__("kam_items").card("selection", sel) + link_html + invite_html + pass_html) + ui.panel("campaign", campaign_html)
         + "</div>"
         + "<details class='card' style='margin-top:24px'><summary class='muted'>Delete this selection</summary>"
         + "<form method='post' action='" + u("/selections/delete") + "' data-confirm='Delete this selection? Its link stops working. You can restore it from History.' style='margin-top:12px'>"
@@ -3556,6 +3556,8 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
         + ("<form id='camp-sync' method='post' action='" + u("/campaigns/sync") + "'><input type='hidden' name='id' value='" + str(k["id"]) + "'></form>"
            if k["selection_id"] else "")
         + __import__("assign").campaign_card(k, selection)
+        + __import__("kam_items").card("campaign", k)
+        + __import__("access").campaign_card(k)
         + "<form method='post' action='" + u("/campaigns/delete") + "' style='margin-top:24px' "
           "data-confirm-title='Delete this campaign?' data-confirm-what='" + e(k["name"]) + "' data-confirm='Its report and tracking links stop working at once.' data-confirm-ok='Delete campaign'>"
           "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"

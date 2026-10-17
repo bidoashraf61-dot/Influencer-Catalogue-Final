@@ -13,7 +13,8 @@ import mailer
 EVENTS = {"signup": "New client", "brief": "New brief", "quote": "Quote request", "credits": "Credits requested",
           "status": "Selection feedback", "analysis": "Analysis requested", "handoff": "Account manager request",
           "quote_changed": "Quote request changed", "quote_approved": "Quote approved",
-          "creator_request": "Creator requested", "access_request": "Access requested"}
+          "creator_request": "Creator requested", "access_request": "Access requested",
+          "kam_assign": "Handed to you"}
 
 
 def recipients(kam=None):
@@ -53,7 +54,7 @@ def send(event, lines, kam=None, link=None, also=None):
     """Fire and forget. ``also``: extra addresses for this one message (e.g. the owner)."""
     on = db.setting("notify_events", list(EVENTS)) or []
     # A hand-off from Helvy follows "quote" for teams that saved an event list before it existed.
-    if event not in on and not (event == "handoff" and "quote" in on):
+    if event not in on and event != "kam_assign" and not (event == "handoff" and "quote" in on):
         return
     to = list(dict.fromkeys(recipients(kam) + [str(a).strip().lower() for a in (also or []) if "@" in str(a)]))
     if not to or not mailer.configured():

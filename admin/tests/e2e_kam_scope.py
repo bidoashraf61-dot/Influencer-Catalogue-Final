@@ -297,6 +297,47 @@ class KamScope(unittest.TestCase):
         finally:
             kam_scope.end()
 
+    # ---------------------------------------------- item-level KAM (item 119) --
+    def test_11_item_level_kam_and_invites(self):
+        """Owner, 2026-10-17: the owner hands ONE selection/campaign of another client to a KAM; it is added to
+        her clients (never replaces them), she is told, she can open it and invite the client's email to it."""
+        db.set_setting("kams", ["Mariam K <%s>" % KAM, "Omar K <%s>" % OTHER])
+        k, boss = self.kam, self.admin()
+        # before: the other client's selection and campaign are refused to her
+        self.assertEqual(k.get("/selections/edit?id=%d" % self.s_other)[0], 403)
+        # she may not assign anything herself
+        self.assertEqual(k.req("POST", "/selections/kam", form={"id": self.s_other, "kam": KAM})[0], 403)
+        # the owner hands the selection and the campaign to her
+        s, _, _ = boss.req("POST", "/selections/kam", form={"id": self.s_other, "kam": KAM})
+        self.assertEqual(s, 303)
+        s, _, _ = boss.req("POST", "/campaigns/kam", form={"id": self.k_other, "kam": KAM})
+        self.assertEqual(s, 303)
+        self.assertEqual(boss.req("POST", "/selections/kam", form={"id": self.s_other, "kam": "stranger@x.com"})[0], 303)
+        self.assertEqual(db.kam_of_item("selection", self.s_other), KAM)    # an unknown KAM changed nothing
+        self.assertTrue(any(KAM in str(m) for m in mailer.OUTBOX))          # she was emailed
+        # now she opens them; her own clients still work; a third client's stays refused
+        self.assertEqual(k.get("/selections/edit?id=%d" % self.s_other)[0], 200)
+        self.assertEqual(k.get("/campaigns/edit?id=%d" % self.k_other)[0], 200)
+        self.assertEqual(k.get("/selections/edit?id=%d" % self.s_mine)[0], 200)
+        sel_list = k.get("/selections")[1]
+        self.assertIn("Rival secret launch", sel_list)
+        # the other KAM does not see what was handed to her
+        self.assertEqual(self.member(OTHER, "kam")[1] in (303, 200), True)
+        # she invites the client's email to the item
+        s, _, _ = k.req("POST", "/selections/invite", form={"id": self.s_other, "do": "add", "email": "boss@rivalco.com"})
+        self.assertEqual(s, 303)
+        self.assertEqual([p["email"] for p in __import__("access").people(db.selection(self.s_other))], ["boss@rivalco.com"])
+        s, _, _ = k.req("POST", "/campaigns/invite", form={"id": self.k_other, "do": "add", "email": "second@rivalco.com"})
+        self.assertEqual(s, 303)
+        # but not on a client that is not hers
+        s, _, _ = k.req("POST", "/selections/invite", form={"id": self.s_named, "do": "add", "email": "x@legacyco.com"})
+        self.assertEqual(s, 303)                                            # her client (named): allowed
+        # taking it back closes it again
+        boss.req("POST", "/selections/kam", form={"id": self.s_other, "kam": ""})
+        boss.req("POST", "/campaigns/kam", form={"id": self.k_other, "kam": ""})
+        self.assertEqual(k.get("/selections/edit?id=%d" % self.s_other)[0], 403)
+        self.assertEqual(k.get("/campaigns/edit?id=%d" % self.k_other)[0], 403)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

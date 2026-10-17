@@ -1842,7 +1842,10 @@ def list_selections():
         rows = conn.execute(
             "SELECT s.*, c.label code_label FROM selections s "
             "LEFT JOIN codes c ON c.id = s.code_id ORDER BY s.updated_at DESC").fetchall()
-    return _scoped(rows)
+    if _scope() is None:
+        return rows
+    import kam_scope
+    return kam_scope.keep_items(rows, "selection")
 
 
 def selection(sid=None, token=None, deleted=False):
@@ -2101,6 +2104,12 @@ CREATE TABLE IF NOT EXISTS selection_invites (
     id INTEGER PRIMARY KEY, selection_id INTEGER NOT NULL, email TEXT NOT NULL, invited_by TEXT, invited_at INTEGER NOT NULL,
     claimed_code_id INTEGER, claimed_at INTEGER, UNIQUE (selection_id, email));
 CREATE INDEX IF NOT EXISTS selection_invites_email ON selection_invites(email);
+-- Item-level key account manager (owner, 2026-10-17): the owner hands ONE selection or campaign to a KAM,
+-- on top of the clients that are hers anyway. kind is 'selection' or 'campaign'.
+CREATE TABLE IF NOT EXISTS item_kam (
+    kind TEXT NOT NULL, item_id INTEGER NOT NULL, kam_email TEXT NOT NULL, assigned_by TEXT, assigned_at INTEGER NOT NULL,
+    PRIMARY KEY (kind, item_id));
+CREATE INDEX IF NOT EXISTS item_kam_email ON item_kam(kam_email);
 """
 
 
@@ -2139,6 +2148,31 @@ def selection_grants(sel_id):
     with connect() as conn:
         return conn.execute("SELECT a.*, u.email, u.name, u.company FROM selection_access a LEFT JOIN users u ON u.code_id = a.code_id "
                             "WHERE a.selection_id = ? ORDER BY a.granted_at", (int(sel_id),)).fetchall()
+
+
+def kam_assign(kind, item_id, kam_email, by=""):
+    """Give one selection or campaign to a KAM (an empty email takes it back). Returns the previous KAM email or None."""
+    kam_email = (kam_email or "").strip().lower()
+    with connect() as conn:
+        r = conn.execute("SELECT kam_email FROM item_kam WHERE kind = ? AND item_id = ?", (kind, int(item_id))).fetchone()
+        if kam_email:
+            conn.execute("INSERT OR REPLACE INTO item_kam (kind, item_id, kam_email, assigned_by, assigned_at) VALUES (?,?,?,?,?)",
+                         (kind, int(item_id), kam_email, by, now()))
+        else:
+            conn.execute("DELETE FROM item_kam WHERE kind = ? AND item_id = ?", (kind, int(item_id)))
+        return r[0] if r else None
+
+
+def kam_of_item(kind, item_id):
+    with connect() as conn:
+        r = conn.execute("SELECT kam_email FROM item_kam WHERE kind = ? AND item_id = ?", (kind, int(item_id))).fetchone()
+    return r[0] if r else None
+
+
+def kam_item_ids(email, kind):
+    email = (email or "").strip().lower()
+    with connect() as conn:
+        return frozenset(r[0] for r in conn.execute("SELECT item_id FROM item_kam WHERE kind = ? AND kam_email = ?", (kind, email)))
 
 
 def invite_add(sel_id, email, by=""):
@@ -2269,7 +2303,7 @@ def list_campaigns():
     if _scope() is None:
         return rows
     import kam_scope
-    return [r for r in rows if kam_scope.allows(r["code_id"] if r["code_id"] is not None else r["sel_code_id"])]
+    return kam_scope.keep_items(rows, "campaign", fallback="sel_code_id")
 
 
 def campaign(cid=None, token=None):
