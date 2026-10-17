@@ -10,6 +10,8 @@ email. Moving an item to another client is phase 2.
     company(role, a, key)              one company's people with their selections and campaigns
     set_kam(role, a, kind, ref, email) kind: company | person | selection | campaign (admins only)
     share(role, a, kind, ref, email)   email invite to a selection or campaign (KAMs inside their scope)
+    people_search(role, a, q)          accounts to move an item to (a KAM: her own clients)
+    move(role, a, kind, ref, user_id, with_related, tell)   move a selection or campaign to another client
 """
 import json
 
@@ -287,3 +289,65 @@ def share(role, a, kind, ref, email, by, by_name=""):
         return False, msgs.get(err, "Could not share."), None
     em = guard.normalise_email(email)
     return True, ("%s can now open and edit it." % em) if state == "granted" else "Invited. It opens for %s when they sign in with that email." % em, state
+
+
+def people_search(role, a, q):
+    """Accounts matching a name, email or company, for the Move picker. At most 15."""
+    q = " ".join(str(q or "").lower().split())
+    if len(q) < 2:
+        return []
+    allu, scoped = _users(role, a)
+    rows = scoped[1] if scoped is not None else allu
+    out = []
+    for u in rows:
+        hay = " ".join([(u["name"] or ""), (u["email"] or ""), (u["company"] or "")]).lower()
+        if q in hay and u["code_id"] is not None and u["status"] == "active":
+            out.append({"id": u["id"], "name": u["name"] or "", "email": u["email"], "company": u["company"] or "",
+                        "domain": u["domain"] or ""})
+        if len(out) >= 15:
+            break
+    return out
+
+
+def move(role, a, kind, ref, user_id, with_related=True, tell=True):
+    """Move a selection or campaign to another client account (item 129, phase 2). Admins: anywhere. A KAM: only
+    an item of hers, to one of her own clients. Selection: its campaigns come too when ``with_related``;
+    campaign: its selection comes too. Goes through assign.py, which writes History and rings the client's bell.
+    Returns (ok, message)."""
+    import assign
+    import portal
+    target = portal.user_by_id(int(user_id)) if str(user_id).isdigit() else None
+    if target is None or target["code_id"] is None:
+        return False, "Pick the client to move it to."
+    if kind == "selection":
+        item = db.selection(int(ref)) if str(ref).isdigit() else None
+    elif kind == "campaign":
+        item = db.campaign(int(ref)) if str(ref).isdigit() else None
+    else:
+        return False, "Unknown target."
+    if item is None:
+        return False, "That item no longer exists."
+    if role == "kam":
+        sc = kam_scope.clients(a)
+        kam_scope.begin(sc)
+        try:
+            mine = kam_scope.allows(kam_scope.selection_code(item["id"])[1] if kind == "selection" else kam_scope.campaign_code(item["id"])[1])
+            dest = kam_scope.allows(target["code_id"])
+        finally:
+            kam_scope.end()
+        if not mine:
+            return False, "That belongs to a client you do not manage."
+        if not dest:
+            return False, "You can only move it to one of your own clients."
+    elif role != "admin":
+        return False, "Not allowed."
+    if kind == "selection":
+        r = assign.assign_selection(item["id"], target["code_id"], move_campaigns=bool(with_related), tell=bool(tell), confirmed=True)
+    else:
+        r = assign.assign_campaign(item["id"], target["code_id"], with_selection=bool(with_related), tell=bool(tell), confirmed=True)
+    if r["error"] or not r["ok"]:
+        return False, r["error"] or "Could not move it."
+    if r["noop"]:
+        return True, "Nothing changed: it already belongs to %s." % r["to"]
+    extra = (" Moved %d campaign%s with it." % (len(r["campaigns"]), "" if len(r["campaigns"]) == 1 else "s")) if r.get("campaigns") else ""
+    return True, "Moved to %s.%s" % (r["to"], extra)

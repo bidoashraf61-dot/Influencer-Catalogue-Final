@@ -1134,6 +1134,48 @@
     var lab = it.status === "live" ? "Live" : it.status === "ended" ? "Completed" : (it.draft_by_client ? "Draft · client started" : "Draft");
     return h("span", { class: "hb-chip hb-chip--" + (it.status === "live" ? "live" : it.status === "ended" ? "completed" : "draft") }, lab);
   }
+  // Move to another client (item 129 phase 2): search an account, confirm, done. Goes through "Assign to client",
+  // so History records it and the client's bell rings.
+  function movePanel(kind, it) {
+    var box = h("div", { class: "hb-share__col hb-move" }), msg = h("p", { class: "hb-share__msg", role: "status" });
+    var q = h("input", { type: "search", autocomplete: "off", placeholder: "Search a client or company", "aria-label": "Move to client" });
+    var res = h("ul", { class: "hb-move__res", "aria-label": "Matching clients" }), timer = null, picked = null;
+    var confirmBox = h("div", { class: "hb-move__ok", hidden: "" });
+    function pick(u) {
+      picked = u; res.textContent = ""; q.value = "";
+      var rel = h("input", { type: "checkbox", checked: "" }), tell = h("input", { type: "checkbox", checked: "" });
+      var yes = h("button", { class: "hc-btn hc-btn--ink hc-btn--sm", type: "button" }, "Confirm move");
+      var no = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button", onclick: function () { picked = null; confirmBox.hidden = true; confirmBox.textContent = ""; note(msg, ""); } }, "Cancel");
+      confirmBox.textContent = ""; confirmBox.hidden = false;
+      add(confirmBox, [h("p", null, "Move ", h("b", null, it.name), " to ", h("b", null, u.name || u.email), u.company ? " (" + u.company + ")" : "", "?"),
+        h("label", { class: "hb-move__opt" }, rel, kind === "selection" ? "Move its campaigns too" : "Move its selection too"),
+        h("label", { class: "hb-move__opt" }, tell, "Tell the client (bell)"), h("div", { class: "hb-move__btns" }, yes, no)]);
+      yes.addEventListener("click", function () {
+        yes.disabled = true; note(msg, "Moving…");
+        api("POST", "/api/hub/move", { kind: kind, ref: it.id, to: u.id, related: rel.checked, tell: tell.checked }).then(function (r) {
+          yes.disabled = false;
+          var ok = !!(r.b && r.b.ok);
+          note(msg, (r.b && r.b.message) || (ok ? "Moved." : "Couldn't move that."), !ok);
+          if (ok) { HUB.share = null; HUB.detail = {}; HUB.list = null; renderSection(); hubSay((r.b && r.b.message) || "Moved.", false); }
+        });
+      });
+    }
+    function search() {
+      var v = q.value.trim(); res.textContent = "";
+      if (v.length < 2) return;
+      api("GET", "/api/hub/people?q=" + encodeURIComponent(v)).then(function (r) {
+        var list = (r.b && r.b.people) || [];
+        if (!list.length) { res.appendChild(h("li", { class: "hb-none" }, "No client matches.")); return; }
+        list.forEach(function (u) {
+          res.appendChild(h("li", null, h("button", { type: "button", onclick: function () { pick(u); } },
+            h("b", null, u.name || u.email), h("small", null, [u.email, u.company].filter(Boolean).join(" · ")))));
+        });
+      });
+    }
+    q.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(search, 250); });
+    add(box, [h("b", null, "Move to another client"), h("small", null, HUB.role === "admin" ? "Pick any client account. It leaves its current owner and the new one sees it." : "Pick one of your own clients."), q, res, confirmBox, msg]);
+    return box;
+  }
   function sharePanel(kind, it, closeFn) {
     var admin = HUB.role === "admin", msg = h("p", { class: "hb-share__msg", role: "status" });
     var email = h("input", { type: "email", inputmode: "email", autocomplete: "off", placeholder: "name@company.com", "aria-label": "Client email" });
@@ -1157,6 +1199,7 @@
         kamSelect(it.kam, "Account manager for " + it.name, "No account manager", function (v) {
           hubSetKam(kind, it.id, v, function () { it.kam = v; renderSection(); });
         })) : null,
+      movePanel(kind, it),
       h("div", { class: "hb-share__col" }, h("b", null, "Copy the client link"), h("small", null, "The link opens for people who already have access."), copyBtn),
       h("button", { class: "hb-share__x", type: "button", "aria-label": "Close sharing", onclick: closeFn }, "×"));
   }
@@ -1202,6 +1245,7 @@
     var kam = admin && c.domain ? h("label", { class: "hb-lab" }, "KAM", kamSelect(c.kam.email, "Account manager for " + c.name, "No account manager", function (v) {
       hubSetKam("company", c.domain, v, function () { c.kam = { email: v, name: kamName(v) }; HUB.detail = {}; renderSection(); if (HUB.open[c.key]) hubDetail(c.key); });
     })) : (c.kam && c.kam.email ? h("small", { class: "hb-it__kam" }, "KAM " + (c.kam.name || kamName(c.kam.email))) : null);
+    if (open && !det) hubDetail(c.key);               // reopened after a move: fetch again
     var li = h("li", { class: "hb-co" + (open ? " is-open" : "") }, h("div", { class: "hb-co__row" }, btn, kam));
     if (open) {
       var body = h("div", { class: "hb-co__body", id: "hb-" + c.key.replace(/[^a-z0-9]/gi, "_") });

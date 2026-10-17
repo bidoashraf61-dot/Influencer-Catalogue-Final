@@ -123,6 +123,38 @@ class Hub(unittest.TestCase):
         self.assertEqual(s, 400)
         self.assertIn("do not manage", j["message"])
 
+    def test_05_move_to_another_client(self):
+        b, k = self.boss, self.kam
+        s, j, _ = b.get("/api/hub/people?q=rivalco")
+        self.assertEqual(s, 200)
+        self.assertIn("buyer@rivalco.com", [p["email"] for p in j["people"]])
+        self.assertEqual(self.plain.get("/api/hub/people?q=rivalco")[0], 403)
+        self.assertEqual(b.get("/api/hub/people?q=r")[1]["people"], [])                   # too short to search
+        second = portal.user_by_email("second@polyco.com")
+        # an admin moves a client's selection (and its campaign) to another client
+        s, j, _ = b.post("/api/hub/move", {"kind": "selection", "ref": self.s2, "to": self.lead["id"], "related": True, "tell": False})
+        self.assertEqual(s, 200, j)
+        self.assertEqual(db.selection(self.s2)["code_id"], self.lead["code_id"])
+        self.assertEqual(db.campaign(self.k2)["code_id"], self.lead["code_id"])           # it came along
+        s, j, _ = b.post("/api/hub/move", {"kind": "selection", "ref": self.s2, "to": self.buyer["id"], "related": True, "tell": False})
+        self.assertEqual((s, db.selection(self.s2)["code_id"]), (200, self.buyer["code_id"]))
+        # a campaign alone, without its selection
+        s, j, _ = b.post("/api/hub/move", {"kind": "campaign", "ref": self.k2, "to": self.lead["id"], "related": False, "tell": False})
+        self.assertEqual((s, db.campaign(self.k2)["code_id"], db.selection(self.s2)["code_id"]), (200, self.lead["code_id"], self.buyer["code_id"]))
+        b.post("/api/hub/move", {"kind": "campaign", "ref": self.k2, "to": self.buyer["id"], "related": False, "tell": False})
+        self.assertEqual(b.post("/api/hub/move", {"kind": "selection", "ref": self.s2, "to": 999999})[0], 400)
+        # a KAM moves only inside her own clients
+        s, j, _ = k.post("/api/hub/move", {"kind": "selection", "ref": self.s1, "to": second["id"], "related": True, "tell": False})
+        self.assertEqual((s, db.selection(self.s1)["code_id"]), (200, second["code_id"]), j)
+        s, j, _ = k.post("/api/hub/move", {"kind": "selection", "ref": self.s1, "to": self.buyer["id"], "related": True, "tell": False})
+        self.assertEqual(s, 400)
+        self.assertIn("own clients", j["message"])
+        s, j, _ = k.post("/api/hub/move", {"kind": "selection", "ref": self.s2, "to": second["id"]})
+        self.assertEqual(s, 400)
+        self.assertIn("do not manage", j["message"])
+        k.post("/api/hub/move", {"kind": "selection", "ref": self.s1, "to": self.lead["id"], "related": True, "tell": False})
+        self.assertEqual(db.selection(self.s1)["code_id"], self.lead["code_id"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
