@@ -485,6 +485,104 @@
       }).join("") || '<p class="db-note">No posts in this view.</p>') + "</div></div>";
   }
 
+  /* ------------------------------------------- target vs achieved (goals) */
+  // One row per agreed target: a track for the target, a bar for what is achieved, a tick for where
+  // it should be today. Click a row (not Eng. rate) for the pace chart: achieved so far against the
+  // straight line to the target. Whole-campaign by nature, so it ignores the page filters.
+  var TV_COL = { good: "#14884a", moderate: "#e2780f", low: "#ee1515" };
+  function tvFmt(k, v) { return v == null ? "—" : k === "er" ? pct(v) : num(v); }
+  function tvRows(items, lead) {
+    return items.map(function (i) {
+      var met = i.actual >= i.goal, col = TV_COL[met ? "good" : i.grade] || TV_COL.low, isR = i.key === "er";
+      var w = Math.min(100, i.pct), exp = isR || !i.goal ? null : Math.min(100, i.expected / i.goal * 100);
+      var over = met && i.pct > 100.5 ? Math.round(i.pct - 100) : 0;
+      var togo = met ? (over ? "Target met, " + over + "% over" : "Target met")
+        : tvFmt(i.key, i.goal - i.actual) + (isR ? " points" : "") + " to go";
+      var today = exp == null ? "" : " · should be at " + tvFmt(i.key, i.expected) + " by today";
+      var can = !isR, id = "tv-" + i.key;
+      var label = KEYN[i.key] + ": " + tvFmt(i.key, i.actual) + " of " + tvFmt(i.key, i.goal) + ", " + Math.round(i.pct) + "% of the target" + (exp == null ? "" : ", expected " + Math.round(exp) + "% by today");
+      var inner = '<span class="db-tv__top"><b>' + KEYN[i.key] + "</b>" + (lead.indexOf(i.key) >= 0 ? ' <span class="db-lead">headline</span>' : "")
+        + '<span class="db-tv__nums"><strong>' + tvFmt(i.key, i.actual) + "</strong> of " + tvFmt(i.key, i.goal) + "</span></span>"
+        + '<span class="db-tv__track" role="img" aria-label="' + esc(label) + '"><i style="--w:' + w.toFixed(1) + "%;background:" + col + '"></i>'
+        + (exp == null ? "" : '<em style="left:' + exp.toFixed(1) + '%"><u>today</u></em>') + (over ? '<s style="color:' + col + '">+' + over + "%</s>" : "") + "</span>"
+        + '<span class="db-tv__sub"><span class="db-tv__pct" style="color:' + col + '">' + Math.round(i.pct) + "% met</span>" + esc(togo + today)
+        + (can ? '<svg class="db-tv__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' : "") + "</span>";
+      return '<div class="db-tv__row" data-k="' + i.key + '">'
+        + (can ? '<button type="button" class="db-tv__btn" aria-expanded="false" aria-controls="' + id + '">' + inner + "</button>" : '<div class="db-tv__btn db-tv__btn--static">' + inner + "</div>")
+        + (can ? '<div class="db-tv__pace" id="' + id + '" hidden></div>' : "") + "</div>";
+    }).join("");
+  }
+  function tvInfographic(items, lead) {
+    if (!items.length) return "";
+    return '<h3>Target vs achieved</h3><div class="db-tv" id="db-tv">' + tvRows(items, lead) + "</div>"
+      + '<div class="db-legend2"><span><i class="sw" style="background:#14884a"></i>Met / on track</span><span><i class="sw" style="background:#e2780f"></i>Close</span><span><i class="sw" style="background:#ee1515"></i>Behind</span>'
+      + '<span><i class="tick"></i>Where it should be today</span><span class="db-tv__hint">Select a row for its pace</span></div>';
+  }
+  // The pace chart for one KPI: cumulative achieved by posting day against the straight line to the target.
+  function tvPace(item) {
+    var c = R.campaign || {};
+    if (!c.starts_at || !c.ends_at) return '<p class="db-note">Set the campaign dates to see its pace.</p>';
+    var all = R.posts.filter(function (p) { return p.section === "campaign"; });
+    var ser = series(all), key = item.key === "engagement" ? "eng" : item.key;
+    var t0 = c.starts_at, t1 = c.ends_at, now = Math.min(Date.now() / 1000, t1), W = 600, H = 190, L = 8, Rr = 592, T = 14, B = 164;
+    var span = Math.max(1, t1 - t0), ymax = Math.max(item.goal, item.actual) * 1.08 || 1;
+    function X(t) { return L + (Math.min(Math.max(t, t0), t1) - t0) / span * (Rr - L); }
+    function Y(v) { return B - v / ymax * (B - T); }
+    var pts = [{ t: t0, v: 0 }].concat(ser.map(function (r) { return { t: Date.parse(r.d + "T12:00:00Z") / 1000, v: r[key] || 0, d: r.d }; }));
+    pts = pts.filter(function (q) { return q.t <= now + 86400; });
+    if (pts.length) pts.push({ t: now, v: pts[pts.length - 1].v });
+    var line = pts.map(function (q) { return X(q.t).toFixed(1) + "," + Y(q.v).toFixed(1); }).join(" ");
+    var area = pts.length > 1 ? "M" + X(pts[0].t).toFixed(1) + "," + B + " L" + line.split(" ").join(" L") + " L" + X(pts[pts.length - 1].t).toFixed(1) + "," + B + " Z" : "";
+    var col = TV_COL[item.actual >= item.goal ? "good" : item.grade] || TV_COL.low;
+    var svg = '<svg class="db-tv__svg" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(KEYN[item.key] + " achieved so far against the pace to the target of " + tvFmt(item.key, item.goal)) + '" data-t0="' + t0 + '" data-t1="' + t1 + '">'
+      + '<line x1="' + L + '" y1="' + B + '" x2="' + Rr + '" y2="' + B + '" class="ax"/><line x1="' + L + '" y1="' + Y(item.goal).toFixed(1) + '" x2="' + Rr + '" y2="' + Y(item.goal).toFixed(1) + '" class="gl"/>'
+      + '<line x1="' + X(t0).toFixed(1) + '" y1="' + Y(0).toFixed(1) + '" x2="' + X(t1).toFixed(1) + '" y2="' + Y(item.goal).toFixed(1) + '" class="pace"/>'
+      + (area ? '<path d="' + area + '" fill="' + col + '" opacity=".12"/>' : "") + (pts.length > 1 ? '<polyline points="' + line + '" fill="none" stroke="' + col + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' : "")
+      + '<line x1="' + X(now).toFixed(1) + '" y1="' + T + '" x2="' + X(now).toFixed(1) + '" y2="' + B + '" class="now"/>'
+      + '<text x="' + Rr + '" y="' + (Y(item.goal) - 5).toFixed(1) + '" text-anchor="end" class="lb">Target ' + esc(tvFmt(item.key, item.goal)) + "</text>"
+      + '<text x="' + L + '" y="' + (H - 6) + '" class="lb">' + esc(day(c.starts_at)) + '</text><text x="' + Rr + '" y="' + (H - 6) + '" text-anchor="end" class="lb">' + esc(day(c.ends_at)) + "</text>"
+      + '<line class="cur" x1="0" y1="' + T + '" x2="0" y2="' + B + '" style="display:none"/><circle class="dot" r="6" cx="0" cy="0" fill="' + col + '" style="display:none"/></svg>';
+    var last = pts.length ? pts[pts.length - 1].v : 0;
+    var ahead = item.expected != null ? last - item.expected : null;
+    var read = esc(KEYN[item.key]) + ": <b>" + esc(tvFmt(item.key, last)) + "</b> so far"
+      + (ahead == null ? "" : ahead >= 0 ? " · " + esc(tvFmt(item.key, ahead)) + " ahead of the pace" : " · " + esc(tvFmt(item.key, -ahead)) + " behind the pace");
+    return '<div class="db-tv__chart" tabindex="0" data-i="' + esc(JSON.stringify(pts.map(function (q) { return [Math.round(q.t), q.v]; }))) + '" data-k="' + item.key + '">' + svg
+      + '<p class="db-tv__read" aria-live="polite">' + read + '</p><p class="db-tv__key"><span><i class="ln" style="background:' + col + '"></i>Achieved so far</span><span><i class="ln dash"></i>Pace to the target</span><span><i class="ln now"></i>Today</span></p></div>';
+  }
+  function bindTV() {
+    var box = $("db-tv"); if (!box) return;
+    requestAnimationFrame(function () { requestAnimationFrame(function () { box.classList.add("is-in"); }); });
+    var items = {}; (R.progress.items || []).forEach(function (i) { items[i.key] = i; });
+    box.addEventListener("click", function (e) {
+      var b = e.target.closest(".db-tv__btn:not(.db-tv__btn--static)"); if (!b) return;
+      var row = b.parentNode, pace = row.querySelector(".db-tv__pace"), open = b.getAttribute("aria-expanded") === "true";
+      box.querySelectorAll(".db-tv__btn[aria-expanded=true]").forEach(function (o) { if (o !== b) { o.setAttribute("aria-expanded", "false"); o.parentNode.querySelector(".db-tv__pace").hidden = true; } });
+      b.setAttribute("aria-expanded", open ? "false" : "true");
+      if (!open && !pace.firstChild) pace.innerHTML = tvPace(items[row.getAttribute("data-k")]);
+      pace.hidden = open;
+    });
+    // hover or arrow keys over a pace chart read the value on that day
+    function readAt(chart, frac) {
+      var pts = JSON.parse(chart.getAttribute("data-i")), svg = chart.querySelector("svg"), k = chart.getAttribute("data-k"), it = items[k];
+      var t0 = +svg.getAttribute("data-t0"), t1 = +svg.getAttribute("data-t1"), t = t0 + frac * (t1 - t0), v = 0;
+      pts.forEach(function (q) { if (q[0] <= t) v = q[1]; });
+      var vb = svg.viewBox.baseVal, L = 8, Rr = 592, B = 164, T = 14, ymax = Math.max(it.goal, it.actual) * 1.08 || 1;
+      var x = L + frac * (Rr - L), y = B - v / ymax * (B - T), cur = svg.querySelector(".cur"), dot = svg.querySelector(".dot");
+      cur.setAttribute("x1", x); cur.setAttribute("x2", x); cur.style.display = ""; dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.style.display = "";
+      var pace = it.goal * frac;
+      chart.querySelector(".db-tv__read").innerHTML = esc(day(Math.round(t))) + ": <b>" + esc(tvFmt(k, v)) + "</b> achieved · pace " + esc(tvFmt(k, pace));
+    }
+    box.addEventListener("pointermove", function (e) {
+      var chart = e.target.closest(".db-tv__chart"); if (!chart) return;
+      var r = chart.querySelector("svg").getBoundingClientRect(); readAt(chart, Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
+    });
+    box.addEventListener("keydown", function (e) {
+      var chart = e.target.closest && e.target.closest(".db-tv__chart"); if (!chart || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+      var f = +(chart.getAttribute("data-f") || 1) + (e.key === "ArrowRight" ? 0.05 : -0.05); f = Math.min(1, Math.max(0, f));
+      chart.setAttribute("data-f", f); readAt(chart, f); e.preventDefault();
+    });
+  }
+
   /* -------------------------------------------------------------- panel */
   var PANEL = {
     kpi: function () {
@@ -507,7 +605,7 @@
           + '<td><div class="db-goal__track"><i style="width:' + Math.min(100, i.pct) + "%;background:" + col + '"></i>' + (isR ? "" : '<em style="left:' + Math.min(100, i.expected / i.goal * 100) + '%"></em>') + "</div><small>" + Math.round(i.pct) + "%" + (met ? " · met" : "") + "</small></td>"
           + '<td class="r muted">' + range(i.key) + "</td><td>" + sig(met ? "good" : i.grade) + "</td></tr>";
       }).join("");
-      var out = head + objectiveBox() + (items.length ? '<h3>Targets agreed</h3><table class="db-table db-goals-t"><thead><tr><th>KPI</th><th class="r">Minimum agreed</th><th class="r">Now</th><th>Progress</th><th class="r">Benchmark range</th><th></th></tr></thead><tbody>' + rows + "</tbody></table>"
+      var out = head + objectiveBox() + tvInfographic(items, lead) + (items.length ? '<h3>Targets agreed</h3><table class="db-table db-goals-t"><thead><tr><th>KPI</th><th class="r">Minimum agreed</th><th class="r">Now</th><th>Progress</th><th class="r">Benchmark range</th><th></th></tr></thead><tbody>' + rows + "</tbody></table>"
         + '<div class="db-legend2"><span><i class="tick"></i>Where it should be today</span><span><i class="sw" style="background:#14884a"></i>Met / on track</span><span><i class="sw" style="background:#e2780f"></i>Close</span><span><i class="sw" style="background:#ee1515"></i>Behind</span></div>'
         : '<p class="db-note">No targets set for this campaign yet.</p>');
       // Benchmarks as gauges: the shaded band is the normal range for these
@@ -649,6 +747,7 @@
     lastFocus = document.activeElement;
     $("db-panel-title").textContent = TITLES[area] + (filtered() && area !== "stage" && area !== "geo" ? " · filtered" : "");
     $("db-panel-body").innerHTML = PANEL[area]();
+    if (area === "kpi") bindTV();
     $("db-scrim").hidden = false; $("db-panel").hidden = false;
     $("db-panel-close").focus();
   }

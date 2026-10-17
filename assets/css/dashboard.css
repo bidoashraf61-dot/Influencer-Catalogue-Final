@@ -490,3 +490,45 @@
 /* Goals: the platform's icon beside its name */
 .db-goal-sum .db-goal-plat { display: flex; align-items: center; gap: 8px; }
 .db-goal-sum .db-goal-plat svg { width: 24px; height: 24px; flex: none; }
+
+/* Goals panel: target vs achieved (owner, 2026-10-18). Target = the full track, achieved = the bar,
+   the tick = where it should be today; a row opens its pace chart. */
+.db-tv { display: grid; border-top: 1px solid var(--line); }
+.db-tv__row { border-bottom: 1px solid var(--line); }
+.db-tv__btn { box-sizing: border-box; display: grid; gap: 8px; width: 100%; padding: 14px 4px 12px; margin: 0; background: none; border: 0; border-radius: 12px; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.db-tv__btn--static { cursor: default; }
+.db-tv__btn:not(.db-tv__btn--static):hover { background: #faf9f6; }
+.db-tv__btn:focus-visible, .db-tv__chart:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.db-tv__top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
+.db-tv__top b { font-family: var(--heading); font-weight: 400; font-size: 22px; line-height: 1; }
+.db-tv__nums { margin-left: auto; white-space: nowrap; font-size: 13px; color: var(--gray); }
+.db-tv__nums strong { font-family: var(--heading); font-weight: 400; font-size: 26px; line-height: 1; color: var(--ink); margin-right: 2px; }
+.db-tv__track { position: relative; display: block; height: 16px; border-radius: 999px; background: #ece8e1; }
+.db-tv__track i { position: absolute; inset: 0 auto 0 0; width: var(--w); border-radius: 999px; transition: width .9s cubic-bezier(.16, 1, .3, 1); }
+.db-tv:not(.is-in) .db-tv__track i { width: 0; }
+.db-tv__track em { position: absolute; top: -5px; bottom: -5px; width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.db-tv__track em u { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); margin-bottom: 2px; padding: 1px 6px; border-radius: 999px; background: var(--ink); color: #fff; font: 600 10px/1.5 var(--body, inherit); text-decoration: none; letter-spacing: .04em; white-space: nowrap; opacity: 0; transition: opacity .15s ease; pointer-events: none; }
+.db-tv__btn:hover .db-tv__track em u, .db-tv__btn:focus-visible .db-tv__track em u { opacity: 1; }
+.db-tv__track s { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); text-decoration: none; font-size: 10px; font-weight: 700; letter-spacing: .02em; color: #fff !important; }
+.db-tv__sub { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; font-size: 12.5px; color: var(--gray); }
+.db-tv__pct { font-weight: 700; }
+.db-tv__chev { width: 14px; height: 14px; margin-left: auto; color: var(--ink); transition: transform .2s ease; }
+.db-tv__btn[aria-expanded="true"] .db-tv__chev { transform: rotate(180deg); }
+.db-tv__hint { margin-left: auto; color: var(--gray); }
+.db-tv__pace { margin: 0 0 14px; padding: 14px 14px 12px; border-radius: 14px; background: #f6f4f0; }
+.db-tv__chart { display: block; border-radius: 10px; }
+.db-tv__svg { display: block; width: 100%; height: auto; overflow: visible; touch-action: pan-y; }
+.db-tv__svg .ax { stroke: #cfc9bf; stroke-width: 1; }
+.db-tv__svg .gl { stroke: #cfc9bf; stroke-width: 1; stroke-dasharray: 2 4; }
+.db-tv__svg .pace { stroke: var(--ink); stroke-width: 2; stroke-dasharray: 6 5; opacity: .55; }
+.db-tv__svg .now { stroke: var(--ink); stroke-width: 1; opacity: .45; }
+.db-tv__svg .cur { stroke: var(--ink); stroke-width: 1; }
+.db-tv__svg .lb { font-size: 17px; fill: #6b6760; font-family: inherit; }
+.db-tv__read { margin: 8px 0 0; font-size: 13px; color: var(--ink); min-height: 1.3em; }
+.db-tv__key { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 6px 0 0; font-size: 12px; color: var(--gray); }
+.db-tv__key span { display: inline-flex; align-items: center; gap: 6px; }
+.db-tv__key .ln { display: inline-block; width: 18px; height: 3px; border-radius: 2px; }
+.db-tv__key .ln.dash { height: 0; border-top: 2px dashed var(--ink); opacity: .55; background: none; }
+.db-tv__key .ln.now { height: 12px; width: 1px; background: var(--ink); opacity: .5; }
+@media (prefers-reduced-motion: reduce) { .db-tv__track i, .db-tv__chev, .db-tv__track em u { transition: none; } }
+@media (max-width: 640px) { .db-tv__nums strong { font-size: 24px; } .db-tv__hint { display: none; } }
