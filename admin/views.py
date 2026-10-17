@@ -3539,6 +3539,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
                + "".join("<label class='tick'><input type='checkbox' name='vis_" + key + "' value='1'" + (" checked" if vis[key] else "")
                          + "><span>" + lbl + "</span></label>" for key, lbl in
                          [("reach", "Reach &amp; impressions"), ("clicks", "Affiliate link clicks"),
+                          ("audience", "Creators' audience countries"),
                           ("all_content", "Posts outside the hashtags")])
                + "</div><p class='price-hint'>These apply to the dashboard and the full report. Costs, CPM, EMV, notes and ratings are never shown to the client.</p>")
         + "<h2>Internal</h2><div class='card'><div class='row'>"
@@ -3739,7 +3740,7 @@ def client_report_card(k):
         "<label class='tick'><input type='checkbox' name='vis_" + key + "' value='1'"
         + (" checked" if vis[key] else "") + "><span>" + label + "</span></label>"
         for key, label in [("reach", "Reach &amp; impressions"), ("clicks", "Link clicks"),
-                           ("emv", "EMV"), ("all_content", "Posts outside the rules (All content)")])
+                           ("emv", "EMV"), ("audience", "Creators' audience countries"), ("all_content", "Posts outside the rules (All content)")])
     rates = "".join(
         "<div><label>" + e(a) + " (SAR each)</label><input name='emv_" + a + "' inputmode='decimal' value='"
         + (("%g" % own[a]) if own.get(a) else "") + "' placeholder='default'></div>"

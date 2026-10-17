@@ -3308,7 +3308,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                          platform=platform, starts_at=t_start, ends_at=t_end, status=status,
                          rules=rules, destination=destination or None,
                          cost=money(f.get("total_cost")), notes=(f.get("notes") or "").strip() or None)
-        vis = {key: f.get("vis_" + key) == "1" for key in ("reach", "clicks", "all_content")}
+        vis = {key: f.get("vis_" + key) == "1" for key in ("reach", "clicks", "all_content", "audience")}
         vis["emv"] = False                   # EMV is internal only
         own_rates = self.rates_from(f)
         targets = {}

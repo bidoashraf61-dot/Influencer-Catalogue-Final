@@ -240,9 +240,9 @@
   // Where an audience number came from: the creators' own analyses, the average
   // of every analysed profile, or a mix of the two.
   function audNote(a) {
-    if (a.basis === "average") return "Average audience of " + a.profiles + " creator profiles";
-    if (a.basis === "mixed") return "Weighted by reach · " + a.coverage.toFixed(0) + "% from this campaign's creators, the rest the average of " + a.profiles + " profiles";
-    return "Weighted by reach" + (a.coverage < 99 ? " · " + a.coverage.toFixed(0) + "% of reach covered" : "");
+    var s = "Creators' profile audience, weighted by reach";
+    if (a.basis === "partial") s += " · " + a.coverage.toFixed(0) + "% of reach analysed so far, the rest not yet analysed";
+    return s;
   }
   function tile(label, value, tone) { return '<div class="mx-sum__tile' + (tone ? " mx-sum__tile--" + tone : "") + '"><b>' + value + "</b><span>" + label + "</span></div>"; }
   // The campaign's timeline: one segment per scope-of-work step, in order,
@@ -779,9 +779,11 @@
         return '<div><span class="mx-sw" style="background:' + p[2] + '"></span>' + p[0] + "<b>" + full(p[1]) + "</b></div>";
       }).join("") + "</div></div>");
     if (R.audience && R.audience.countries.length) {
-      mix.push('<div class="mx-panel"><h3>Who was reached</h3>' + bars(R.audience.countries.map(function (c) {
+      mix.push('<div class="mx-panel"><h3>Creators\' audience</h3>' + bars(R.audience.countries.map(function (c) {
         return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" };
       }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
+        + (R.audience.target ? '<p class="mx-panel__note"><b>Target market: ' + esc(countryName(R.audience.target.code)) + "</b> · "
+            + R.audience.target.pct.toFixed(0) + "% of these creators' audience" + (R.audience.target.rank ? " (#" + R.audience.target.rank + ")" : "") + "</p>" : "")
         + '<p class="mx-panel__note">' + audNote(R.audience) + "</p></div>");
     }
     $("mx-mix").innerHTML = mix.join("");

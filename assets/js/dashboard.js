@@ -381,16 +381,22 @@
     var peak = Math.max.apply(null, rows.map(function (r) { return r.n; }).concat([1]));
     return rows.map(function (r, i) { return '<div class="db-bar"><span>' + keyHtml(r) + '</span><i style="--w:' + (r.n / peak * 100).toFixed(1) + "%;--c:" + (colourOf ? colourOf(i) : COL[i % 4]) + '"></i><b>' + r.label + "</b></div>"; }).join("");
   }
+  // The creators' own profile audience, not who saw the campaign (owner, 2026-10-18): say so, and show
+  // where the campaign's target market sits.
   function audNote(a) {
-    if (a.basis === "average") return "Average audience of " + a.profiles + " creator profiles";
-    if (a.basis === "mixed") return "Weighted by reach · " + a.coverage.toFixed(0) + "% from this campaign's creators, the rest the average of " + a.profiles + " profiles";
-    return a.coverage < 99 ? a.coverage.toFixed(0) + "% of reach covered" : "Weighted by reach";
+    var s = "Creators' profile audience, weighted by reach";
+    if (a.basis === "partial") s += " · " + a.coverage.toFixed(0) + "% of reach analysed so far, the rest not yet analysed";
+    return s;
+  }
+  function audTarget(a) {
+    var t = a && a.target; if (!t) return "";
+    return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
   function renderGeo() {
     var a = R.audience;
-    $("w-geo").innerHTML = head(IC.geo, "Audience countries", "Where the campaign's audience is: the creators' own profile analyses where there are any, otherwise the average audience of all analysed profiles. Shows the whole campaign.", "geo")
+    $("w-geo").innerHTML = head(IC.geo, "Creators' audience countries", "Where the creators' own followers are, from their full profile analyses, weighted by the reach each delivered. It describes the creators' audience, not who saw the campaign posts. Creators without an analysis are not counted.", "geo")
       + '<div class="db-card__body">' + (a && a.countries.length ? bars(a.countries.slice(0, 5).map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" }; }),
-        function (r) { return flag(r.k) + esc(countryName(r.k)); }) + '<p class="db-note">' + audNote(a) + "</p>"
+        function (r) { return flag(r.k) + esc(countryName(r.k)); }) + audTarget(a) + '<p class="db-note">' + audNote(a) + "</p>"
         : '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>') + "</div>";
   }
 
@@ -576,7 +582,7 @@
     geo: function () {
       var a = R.audience; if (!a) return '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>';
       return bars(a.countries.map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(1) + "%" }; }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
-        + '<p class="db-note" style="margin-top:10px">' + audNote(a) + ".</p>";
+        + audTarget(a) + '<p class="db-note" style="margin-top:10px">' + audNote(a) + ".</p>";
     },
     plat: function () {
       var by = {}; posts().forEach(function (p) { var x = by[p.platform] = by[p.platform] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });

@@ -141,7 +141,7 @@ def _rate(rates, platform, action):
 
 def visibility(campaign):
     """What the client's report shows. All on unless switched off."""
-    keys = {"clicks": True, "emv": True, "all_content": False, "reach": True}
+    keys = {"clicks": True, "emv": True, "all_content": False, "reach": True, "audience": True}
     try:
         got = json.loads(campaign["visibility"] or "{}") if "visibility" in campaign.keys() else {}
     except ValueError:
@@ -771,44 +771,54 @@ def catalogue_audience():
     return out
 
 
-def audience_mix(creators, reach_by_code):
-    """Where the campaign's audience is. A creator with an uploaded full
-    analysis counts with their own audience, weighted by the reach they
-    delivered. Whatever share of the reach has no analysis of its own is
-    filled with the average audience of every profile that has one, so the
-    panel never depends on a campaign's creators having been analysed.
+def target_country(campaign):
+    """The market the campaign is for, from its selection's target (an ISO code), or None."""
+    try:
+        sid = campaign["selection_id"] if "selection_id" in campaign.keys() else None
+        sel = db.selection(sid) if sid else None
+        t = json.loads((sel["target"] if sel is not None and "target" in sel.keys() else None) or "{}")
+    except (ValueError, TypeError):
+        return None
+    cc = str(t.get("country") or "").strip().upper()
+    return cc if len(cc) == 2 and cc.isalpha() else None
 
-    basis: "own" (every creator analysed), "mixed", or "average" (none are).
-    coverage is the share of reach that came from the creators' own analyses."""
-    own, covered, all_reach = {}, 0.0, 0.0
+
+def audience_mix(creators, reach_by_code, target=None):
+    """Where the creators' audience is (owner, 2026-10-18): each creator who has an uploaded full analysis
+    counts with their own audience, weighted by the reach they delivered (equal weights while no reach is
+    counted yet). Creators without an analysis are NOT filled in with the catalogue average any more, which
+    read as a verdict on the campaign; their share is reported as not yet analysed.
+
+    basis: "own" (every creator with reach is analysed) or "partial". coverage is the share of reach that
+    came from analysed creators. ``target`` (an ISO country) adds where the campaign's market ranks."""
+    rows_in = []
     for c in creators:
-        w = float(reach_by_code.get(c["code"]) or 0)
-        all_reach += w
         a = db.analysis(c["code"])
         countries = ((a or {}).get("data") or {}).get("audience", {}).get("countries") or []
-        if not a or not countries or not w:
+        rows_in.append((c, float(reach_by_code.get(c["code"]) or 0), countries))
+    all_reach = sum(w for _, w, _ in rows_in)
+    equal = all_reach <= 0
+    own, covered, total = {}, 0.0, 0.0
+    for c, w, countries in rows_in:
+        w = 1.0 if equal else w
+        total += w
+        if not countries or not w:
             continue
         covered += w
         for row in countries:
             cc, pct_ = (row.get("code") or "").upper(), row.get("pct")
             if len(cc) == 2 and isinstance(pct_, (int, float)):
                 own[cc] = own.get(cc, 0.0) + w * pct_ / 100.0
-    avg, profiles = catalogue_audience()
-    if not covered and not avg:
+    if not covered or not own:
         return None
-    rest = max(all_reach - covered, 0.0)
-    if all_reach <= 0:                        # nothing counted yet: the average alone
-        rest, all_reach = 1.0, 1.0
-    totals = dict(own)
-    if rest and avg:
-        for cc, v in avg.items():
-            totals[cc] = totals.get(cc, 0.0) + rest * v / 100.0
-    denom = (covered + rest) if (rest and avg) else covered
-    rows = sorted(({"code": k, "pct": v / denom * 100} for k, v in totals.items()),
-                  key=lambda r: -r["pct"])[:8]
-    coverage = covered / all_reach * 100 if all_reach else 0
-    basis = "own" if (not rest or not avg) else ("mixed" if covered else "average")
-    return {"countries": rows, "coverage": coverage, "basis": basis, "profiles": profiles}
+    ranked = sorted(({"code": k, "pct": v / covered * 100} for k, v in own.items()), key=lambda r: -r["pct"])
+    coverage = covered / total * 100 if total else 0
+    out = {"countries": ranked[:8], "coverage": coverage, "basis": "own" if coverage >= 99 else "partial",
+           "analysed": sum(1 for _, _, ct in rows_in if ct), "creators": len(rows_in)}
+    if target:
+        t = next(((n + 1, r) for n, r in enumerate(ranked) if r["code"] == target), None)
+        out["target"] = {"code": target, "pct": t[1]["pct"] if t else 0.0, "rank": t[0] if t else None}
+    return out
 
 
 def client_report(campaign, photo=None, photo_large=None):
@@ -879,7 +889,7 @@ def client_report(campaign, photo=None, photo_large=None):
     out["progress"]["due"] = (sum(min(100.0, i["expected"] / i["goal"] * 100) for i in its) / len(its)) if its else None
     out["progress"]["all_met"] = bool(its) and all(i["actual"] >= i["goal"] for i in its)
     reach_by = {c["code"]: (c.get("reach") or 0) + (c.get("views") or 0) for c in r["creators"]}
-    out["audience"] = audience_mix(r["creators"], reach_by)
+    out["audience"] = audience_mix(r["creators"], reach_by, target_country(campaign)) if vis["audience"] else None
     out["reach_basis"] = {"per_view": factors()["report_reach_per_view"]}
     if vis["clicks"]:
         cl = r["clicks"]
