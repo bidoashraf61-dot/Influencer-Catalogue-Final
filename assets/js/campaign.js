@@ -11,6 +11,10 @@
   var CFG = window.CAMPAIGN_CONFIG || {};
   var API = CFG.api || "/admin";
   var ICONS = (window.HV_ICONS || {}).icons || {};
+  // Official platform marks (simple-icons, CC0): solid glyphs in each brand's own colours, over the shared outline set.
+  var BRAND = {"Instagram": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"url(#hv-ig)\" d=\"M7.0301.084c-1.2768.0602-2.1487.264-2.911.5634-.7888.3075-1.4575.72-2.1228 1.3877-.6652.6677-1.075 1.3368-1.3802 2.127-.2954.7638-.4956 1.6365-.552 2.914-.0564 1.2775-.0689 1.6882-.0626 4.947.0062 3.2586.0206 3.6671.0825 4.9473.061 1.2765.264 2.1482.5635 2.9107.308.7889.72 1.4573 1.388 2.1228.6679.6655 1.3365 1.0743 2.1285 1.38.7632.295 1.6361.4961 2.9134.552 1.2773.056 1.6884.069 4.9462.0627 3.2578-.0062 3.668-.0207 4.9478-.0814 1.28-.0607 2.147-.2652 2.9098-.5633.7889-.3086 1.4578-.72 2.1228-1.3881.665-.6682 1.0745-1.3378 1.3795-2.1284.2957-.7632.4966-1.636.552-2.9124.056-1.2809.0692-1.6898.063-4.948-.0063-3.2583-.021-3.6668-.0817-4.9465-.0607-1.2797-.264-2.1487-.5633-2.9117-.3084-.7889-.72-1.4568-1.3876-2.1228C21.2982 1.33 20.628.9208 19.8378.6165 19.074.321 18.2017.1197 16.9244.0645 15.6471.0093 15.236-.005 11.977.0014 8.718.0076 8.31.0215 7.0301.0839m.1402 21.6932c-1.17-.0509-1.8053-.2453-2.2287-.408-.5606-.216-.96-.4771-1.3819-.895-.422-.4178-.6811-.8186-.9-1.378-.1644-.4234-.3624-1.058-.4171-2.228-.0595-1.2645-.072-1.6442-.079-4.848-.007-3.2037.0053-3.583.0607-4.848.05-1.169.2456-1.805.408-2.2282.216-.5613.4762-.96.895-1.3816.4188-.4217.8184-.6814 1.3783-.9003.423-.1651 1.0575-.3614 2.227-.4171 1.2655-.06 1.6447-.072 4.848-.079 3.2033-.007 3.5835.005 4.8495.0608 1.169.0508 1.8053.2445 2.228.408.5608.216.96.4754 1.3816.895.4217.4194.6816.8176.9005 1.3787.1653.4217.3617 1.056.4169 2.2263.0602 1.2655.0739 1.645.0796 4.848.0058 3.203-.0055 3.5834-.061 4.848-.051 1.17-.245 1.8055-.408 2.2294-.216.5604-.4763.96-.8954 1.3814-.419.4215-.8181.6811-1.3783.9-.4224.1649-1.0577.3617-2.2262.4174-1.2656.0595-1.6448.072-4.8493.079-3.2045.007-3.5825-.006-4.848-.0608M16.953 5.5864A1.44 1.44 0 1 0 18.39 4.144a1.44 1.44 0 0 0-1.437 1.4424M5.8385 12.012c.0067 3.4032 2.7706 6.1557 6.173 6.1493 3.4026-.0065 6.157-2.7701 6.1506-6.1733-.0065-3.4032-2.771-6.1565-6.174-6.1498-3.403.0067-6.156 2.771-6.1496 6.1738M8 12.0077a4 4 0 1 1 4.008 3.9921A3.9996 3.9996 0 0 1 8 12.0077\"/></svg>", "TikTok": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"#25f4ee\" transform=\"translate(-.55 -.45)\" d=\"M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z\"/><path fill=\"#fe2c55\" transform=\"translate(.55 .45)\" d=\"M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z\"/><path fill=\"currentColor\" d=\"M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z\"/></svg>", "Snapchat": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"#fffc00\" stroke=\"#121212\" stroke-width=\".9\" stroke-linejoin=\"round\" d=\"M12.206.793c.99 0 4.347.276 5.93 3.821.529 1.193.403 3.219.299 4.847l-.003.06c-.012.18-.022.345-.03.51.075.045.203.09.401.09.3-.016.659-.12 1.033-.301.165-.088.344-.104.464-.104.182 0 .359.029.509.09.45.149.734.479.734.838.015.449-.39.839-1.213 1.168-.089.029-.209.075-.344.119-.45.135-1.139.36-1.333.81-.09.224-.061.524.12.868l.015.015c.06.136 1.526 3.475 4.791 4.014.255.044.435.27.42.509 0 .075-.015.149-.045.225-.24.569-1.273.988-3.146 1.271-.059.091-.12.375-.164.57-.029.179-.074.36-.134.553-.076.271-.27.405-.555.405h-.03c-.135 0-.313-.031-.538-.074-.36-.075-.765-.135-1.273-.135-.3 0-.599.015-.913.074-.6.104-1.123.464-1.723.884-.853.599-1.826 1.288-3.294 1.288-.06 0-.119-.015-.18-.015h-.149c-1.468 0-2.427-.675-3.279-1.288-.599-.42-1.107-.779-1.707-.884-.314-.045-.629-.074-.928-.074-.54 0-.958.089-1.272.149-.211.043-.391.074-.54.074-.374 0-.523-.224-.583-.42-.061-.192-.09-.389-.135-.567-.046-.181-.105-.494-.166-.57-1.918-.222-2.95-.642-3.189-1.226-.031-.063-.052-.15-.055-.225-.015-.243.165-.465.42-.509 3.264-.54 4.73-3.879 4.791-4.02l.016-.029c.18-.345.224-.645.119-.869-.195-.434-.884-.658-1.332-.809-.121-.029-.24-.074-.346-.119-1.107-.435-1.257-.93-1.197-1.273.09-.479.674-.793 1.168-.793.146 0 .27.029.383.074.42.194.789.3 1.104.3.234 0 .384-.06.465-.105l-.046-.569c-.098-1.626-.225-3.651.307-4.837C7.392 1.077 10.739.807 11.727.807l.419-.015h.06z\"/></svg>", "YouTube": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"#ff0000\" d=\"M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z\"/></svg>", "Facebook": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"#0866ff\" d=\"M9.101 23.691v-7.98H6.627v-3.667h2.474v-1.58c0-4.085 1.848-5.978 5.858-5.978.401 0 .955.042 1.468.103a8.68 8.68 0 0 1 1.141.195v3.325a8.623 8.623 0 0 0-.653-.036 26.805 26.805 0 0 0-.733-.009c-.707 0-1.259.096-1.675.309a1.686 1.686 0 0 0-.679.622c-.258.42-.374.995-.374 1.752v1.297h3.919l-.386 2.103-.287 1.564h-3.246v8.245C19.396 23.238 24 18.179 24 12.044c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.628 3.874 10.35 9.101 11.647Z\"/></svg>", "X": "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path fill=\"currentColor\" d=\"M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z\"/></svg>"};
+  ICONS = (function (base) { var o = {}, k; for (k in base) o[k] = base[k]; for (k in BRAND) o[k] = BRAND[k]; return o; })(ICONS);
+  if (document.body && !document.getElementById("hv-ig")) document.body.insertAdjacentHTML("beforeend", "<svg width=\"0\" height=\"0\" style=\"position:absolute\" aria-hidden=\"true\"><defs><linearGradient id=\"hv-ig\" x1=\"0\" y1=\"1\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#feda75\"/><stop offset=\".25\" stop-color=\"#fa7e1e\"/><stop offset=\".5\" stop-color=\"#d62976\"/><stop offset=\".75\" stop-color=\"#962fbf\"/><stop offset=\"1\" stop-color=\"#4f5bd5\"/></linearGradient></defs></svg>");
   var ICON_LINK = (window.HV_ICONS || {}).link || "";
   var R = null;
   var FILTER = { platform: "", kind: "", section: "campaign" };
@@ -383,6 +387,20 @@
 
   /* ---------------------------------------------------------- carousel */
 
+  // One row per video the creator published, a chip for each platform it went out on, nothing counted twice.
+  function creatorVideos(c) {
+    var mine = mergePieces((R.posts || []).filter(function (p) { return p.code === c.code && p.section === "campaign"; }))
+      .sort(function (a, b) { return (a.posted_at || 0) - (b.posted_at || 0); });
+    function v(p) { return p.exposure != null ? p.exposure : (p.video ? (p.views || 0) : (p.reach || 0)); }
+    var rows = mine.map(function (p, i) {
+      return '<div class="mx-cc__vid"><b>Video ' + (i + 1) + (c.planned ? " of " + c.planned : "") + "</b><span>" + num(v(p)) + ' views</span><div class="mx-cc__chips">'
+        + (p.parts || [p]).map(function (x) {
+          return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener" aria-label="' + esc(x.platform) + '">' + icon(x.platform) + num(v(x)) + "</a>";
+        }).join("") + "</div></div>";
+    });
+    for (var i = mine.length; i < (c.planned || 0); i++) rows.push('<div class="mx-cc__vid is-owed"><b>Video ' + (i + 1) + " of " + c.planned + "</b><span>Not published yet</span></div>");
+    return rows.length ? '<div class="mx-cc__vids">' + rows.join("") + "</div>" : "";
+  }
   function renderCarousel() {
     var cs = R.creators || [];
     $("mx-carousel-wrap").hidden = !cs.length;
@@ -394,7 +412,8 @@
         + (c.photo_large || c.photo ? '<img src="' + esc(c.photo_large || c.photo) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
         + '</a><div class="mx-cc__body"><a class="mx-cc__name" href="../creator/#c=' + encodeURIComponent(c.code) + '">' + esc(c.name) + "</a>"
         + '<span class="mx-cc__meta">' + esc((R.benchmarks.bands[c.band] || "").replace(/ \(.*/, "")) + (c.followers ? " · " + num(c.followers) + " followers" : "")
-        + '</span><span class="mx-cc__meta">' + c.delivered + (c.planned ? " of " + c.planned : "") + " posts live</span>"
+        + '</span><span class="mx-cc__meta">' + c.delivered + (c.planned ? " of " + c.planned : "") + " videos live</span>"
+        + creatorVideos(c)
         + '<div class="mx-tc__links">' + marks + "</div></div></article>";
     }).join("");
   }
@@ -569,12 +588,39 @@
       + (h.band ? " for " + (R.benchmarks.bands[h.band] || h.band) + " creators" : "");
   }
 
+  // One video the creator pushed to several platforms is one card: the numbers of every platform
+  // added together, a mark for each platform, and a link to each.
+  function mergePieces(list) {
+    var by = {}, order = [];
+    list.forEach(function (p) {
+      var k = p.piece_size > 1 ? "g" + p.pk : "s" + p.id;
+      if (!by[k]) { by[k] = []; order.push(k); }
+      by[k].push(p);
+    });
+    return order.map(function (k) {
+      var g = by[k];
+      if (g.length === 1) return g[0];
+      var m = {}, lead = g[0];
+      Object.keys(lead).forEach(function (f) { m[f] = lead[f]; });
+      ["likes", "comments", "views", "reach", "impressions", "saves", "shares", "engagement", "exposure"].forEach(function (f) {
+        var vals = g.map(function (x) { return x[f]; }).filter(function (v) { return v != null; });
+        m[f] = vals.length ? vals.reduce(function (a, b) { return a + b; }, 0) : null;
+      });
+      m.video = g.some(function (x) { return x.video; });
+      m.parts = g;
+      m.reach_real = g.every(function (x) { return x.reach_real; });
+      var ers = g.map(function (x) { return m.video ? x.video_er : x.er; }).filter(function (v) { return v != null; });
+      m.er = m.video_er = ers.length ? ers.reduce(function (a, b) { return a + b; }, 0) / ers.length : null;
+      return m;
+    });
+  }
+
   function renderWall() {
     var vis = R.visibility;
-    var list = R.posts.filter(function (p) {
+    var list = mergePieces(R.posts.filter(function (p) {
       return (!FILTER.section || p.section === FILTER.section) && (!FILTER.platform || p.platform === FILTER.platform)
         && (!FILTER.kind || p.kind === FILTER.kind);
-    });
+    }));
     var owed = pendingCards();
     if (!list.length && !owed.length) { $("mx-wall").innerHTML = '<p class="mx-empty-note">No posts yet. They appear here within 24 hours of going live.</p>'; return; }
     $("mx-wall").innerHTML = owed.length && !list.length ? owed.map(pendingCard).join("") : list.map(function (p) {
@@ -592,12 +638,17 @@
       var img = p.thumb ? '<img class="hv-fill" src="' + esc(p.thumb) + '" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
         + '<img class="hv-fit" src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "";
       return '<article class="mx-post"><div class="mx-post__media"><div class="mx-post__plate">' + icon(p.platform) + "</div>" + img
-        + '<span class="mx-post__tag">' + icon(p.platform) + esc(KIND[p.kind] || p.kind) + '</span><span class="mx-post__sig">'
+        + '<span class="mx-post__tag">' + (p.parts ? p.parts.map(function (x) { return icon(x.platform); }).join("") + "One video · " + p.parts.length + " platforms"
+          : icon(p.platform) + esc(KIND[p.kind] || p.kind)) + '</span><span class="mx-post__sig">'
         + sig(h.grade, healthTitle(h)) + '</span></div><div class="mx-post__body"><div class="mx-who">' + ava(p.photo)
         + "<div><b>" + esc(p.creator) + "</b><span>" + esc(day(p.posted_at)) + '</span></div></div><dl class="mx-nums">'
         + n.slice(0, 6).map(function (x) { return "<div><dt>" + x[0] + "</dt><dd>" + x[1] + "</dd></div>"; }).join("")
-        + '</dl><a class="mx-post__go" href="' + esc(p.url) + '" target="_blank" rel="noopener">View on ' + esc(p.platform)
-        + ' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a></div></article>';
+        + '</dl>' + (p.parts ? '<p class="mx-post__plats">Combined across ' + p.parts.map(function (x) { return esc(x.platform); }).join(", ") + "</p>" : "")
+        + (p.parts || [p]).map(function (x) {
+          return '<a class="mx-post__go" href="' + esc(x.url) + '" target="_blank" rel="noopener">View on ' + esc(x.platform)
+            + (p.parts && x.video && x.views != null ? " · " + num(x.views) + " views" : "")
+            + ' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>';
+        }).join("") + '</div></article>';
     }).join("") + (list.length ? owed.map(pendingCard).join("") : "");
   }
 
@@ -760,6 +811,7 @@
 
     var posts = R.posts.filter(function (p) { return p.section === "campaign"; }), mix = [];
     var byPlat = {}, byKind = {};
+    var seenPiece = {};
     posts.forEach(function (p) {
       var a = byPlat[p.platform] = byPlat[p.platform] || { n: 0, x: 0 }; a.n++; a.x += p.exposure != null ? p.exposure : (p.video ? (p.views || 0) : (p.reach || 0));
       byKind[p.kind] = (byKind[p.kind] || 0) + 1;

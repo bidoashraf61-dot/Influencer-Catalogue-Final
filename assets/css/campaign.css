@@ -661,3 +661,21 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 .mx-start__act { margin-top: 6px; }
 .mx-start__msg { margin: 0; min-height: 1.2em; font-size: 14px; }
 @media (max-width: 720px) { .mx-camp__acts { flex-direction: column; align-items: stretch; } .mx-camp__acts .mx-camp__go { text-align: center; } }
+
+.mx-post__plats { margin: -4px 0 0; font-size: 12px; color: var(--gray, #383838); }
+.mx-post__body .mx-post__go + .mx-post__go { margin-top: -6px; }
+
+/* One row per video on the creator card, a chip for each platform */
+.mx-cc__vids { display: grid; gap: 8px; margin: 10px 0 2px; }
+.mx-cc__vid { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: baseline; padding-top: 8px; border-top: 1px solid var(--rule, rgba(18,18,18,.12)); font-size: 12px; }
+.mx-cc__vid b { font-weight: 700; }
+.mx-cc__vid span { color: var(--graphite, #383838); }
+.mx-cc__chips { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 5px; }
+.mx-cc__chips a { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--rule, rgba(18,18,18,.12)); border-radius: 999px; font-weight: 600; font-size: 11px; color: inherit; text-decoration: none; }
+.mx-cc__chips a:hover { background: var(--ink, #121212); color: #fff; }
+.mx-cc__chips svg { width: 12px; height: 12px; }
+.mx-cc__vid.is-owed { opacity: .55; }
+.mx-cc__vid.is-owed { grid-template-columns: 1fr; gap: 0; }
+.pt-dock--fixed, .hv-voice .hv-launch { cursor: grab; touch-action: none; }
+.pt-dock--fixed button, .pt-dock--fixed a { cursor: pointer; }
+.hv-dragging, .hv-dragging * { cursor: grabbing !important; user-select: none; }

@@ -633,7 +633,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.insights_public(path[len("/insights/"):], query)
         if path == "/api/campaigns":
             return self.api_campaigns()
+        if path == "/api/campaign/refresh":
+            return self.api_campaign_refresh(query.get("t") or "", False)
         if path == "/api/campaign":
+            self._share_token = (query.get("share") or "").strip()
             return self.api_campaign(query.get("t") or "")
         if path == "/api/creator":
             return self.api_creator((query.get("c") or "").strip().upper())
@@ -1214,6 +1217,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_request_access()
         if path == "/api/selection/invite":
             return self.api_selection_invite()
+        if path == "/api/campaign/share":
+            return self.api_campaign_share()
+        if path == "/api/campaign/refresh":
+            return self.api_campaign_refresh((self.json_body().get("t") or ""), True)
+        if path == "/api/campaign/refresh-request":
+            return self.api_campaign_refresh_request()
         if path == "/api/campaign/start":
             return self.api_campaign_start()
         if path == "/api/campaign/build-selection":
@@ -1406,6 +1415,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_content_add()
         if path == "/campaigns/content/update":
             return self.post_content_update()
+        if path == "/campaigns/content/group":
+            return self.post_content_group()
         if path == "/campaigns/content/bulk":
             return self.post_content_bulk()
         if path == "/campaigns/content/pending":
@@ -3547,6 +3558,27 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             msg += " %d already here." % seen
         return self.redirect(back + "&ok=" + urllib.parse.quote(msg))
 
+    def post_content_group(self):
+        """Tick posts of one creator, say they are the same video on different platforms (or split one out)."""
+        f = self.form_body(multi=("pick",))
+        cid = (f.get("id") or "").strip()
+        k = db.campaign(int(cid)) if cid.isdigit() else None
+        if k is None:
+            return self.redirect("/campaigns")
+        back = "/campaigns/content?id=" + cid
+        q = urllib.parse.quote
+        picks = [int(x) for x in (f.get("pick") or []) if str(x).isdigit()]
+        if f.get("do") == "split":
+            for i in picks:
+                db.ungroup_content(i)
+            return self.redirect(back + "&ok=" + q("Taken out of its video."))
+        n, err = db.group_content(k["id"], picks)
+        if err == "few":
+            return self.redirect(back + "&e=" + q("Tick at least two posts of the same video."))
+        if err == "creator":
+            return self.redirect(back + "&e=" + q("Those posts are from different creators. Tick one creator's posts only."))
+        return self.redirect(back + "&ok=" + q("%d posts now count as one video. Their numbers add up." % n))
+
     def post_content_update(self):
         f = self.form_body()
         cid, pid = (f.get("id") or "").strip(), (f.get("content") or "").strip()
@@ -3786,6 +3818,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 code_id = listed
         if code_id is None:
             code_id = self.signed_in_client()
+        share = getattr(self, "_share_token", "")
+        if k is not None and share and k["status"] != "draft" and db.share_valid(k["id"], share):
+            acct = self.signed_in_client()
+            if acct is None:
+                return None, 401                # the share link needs a sign in or sign up first
+            db.viewer_add(k["id"], acct, "share")
+            code_id = acct
         if code_id is None:
             return None, 401
         # Not found and not yours look the same from outside.
@@ -3793,18 +3832,182 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return None, 404
         return k, 200
 
+    def campaign_role(self, k):
+        """admin (the team) | edit | view (invited by email) | None."""
+        if k is None:
+            return None
+        if self.admin_like_for(k["code_id"] if k["code_id"] is not None else kam_scope.campaign_code(k["id"])[1],
+                               k["selection_id"], k["id"]):
+            return "admin"
+        acct = self.signed_in_client()
+        u = portal.user_for_code(acct) if acct is not None else None
+        return db.cinvite_role(k["id"], u["email"]) if u is not None else None
+
     def api_campaign(self, token):
         k, status = self.viewer_campaign(token)
         if k is None:
-            return self.send_json(status, {"ok": False}, self.cors())
+            return self.send_json(status, {"ok": False, "signin": status == 401}, self.cors())
         db.log("view", self.viewer_code_id(), self.client_ip(), self.headers.get("User-Agent"),
                "campaign:" + k["name"][:60])
         rep = metrics.client_report(k, photo=links.thumb, photo_large=links.photo)
         rep["campaign"]["logos"] = [self.logo_url(x, k["token"]) for x in rep["campaign"]["logos"]]
         for p in rep["posts"]:
             p["thumb"] = self.thumb_url(p.get("thumb"), k["token"])
+        role = self.campaign_role(k)
+        if role in ("view", "edit"):
+            acct = self.signed_in_client()
+            u = portal.user_for_code(acct) if acct is not None else None
+            if u is not None:
+                db.cinvite_seen(k["id"], u["email"])
+        if role in ("admin", "edit"):
+            import mailer
+            sh = db.share_get(k["id"])
+            on = bool(sh and sh["enabled"])
+            rep["share"] = {"can": True, "role": role, "people": db.cinvites_for(k["id"]), "enabled": on,
+                            "url": (mailer.SITE + "/campaign/dashboard/#t=%s&share=%s" % (k["token"], sh["token"])) if on else None}
         return self.send_json(200, {"ok": True, "report": rep},
                               self.cors() + [("Cache-Control", "no-store")])
+
+    REFRESH_LIMIT = 10          # "Update now" presses a client may use per campaign; the team has no limit
+    REFRESH_WAIT = 90           # seconds between two updates of one campaign
+
+    def api_campaign_refresh(self, token, start):
+        """The dashboard's Update now: run the campaign's capture jobs (the ones that fit the posts it has) so the
+        numbers are fresh. GET = the state ({left, running, last_at}); POST = start the run."""
+        import apify
+        k, status = self.viewer_campaign(token)
+        if k is None:
+            return self.send_json(status, {"ok": False, "signin": status == 401}, self.cors())
+        team = self.campaign_role(k) in ("admin", "edit")
+        jobs = [j for j in apify.list_jobs() if j["source"] == "campaign:%d" % k["id"] and j["kind"] == "post_urls"
+                and j["enabled"] and j["schedule"] in ("daily", "weekly")]
+        ids = [j["id"] for j in jobs]
+
+        def running():
+            if not ids:
+                return False
+            with db.connect() as conn:
+                return bool(conn.execute("SELECT 1 FROM api_runs WHERE status IN ('QUEUED','RUNNING') AND job_id IN (%s)"
+                                         % ",".join("?" * len(ids)), ids).fetchone())
+
+        def state(**more):
+            used = db.refresh_count(k["id"])
+            try:
+                extra = int((db.setting("campaign_update_extra", {}) or {}).get(str(k["id"]), 0))
+            except (TypeError, ValueError, AttributeError):
+                extra = 0
+            limit = self.REFRESH_LIMIT + max(0, extra)         # a team-granted extra comes on top of the free ones
+            d = {"ok": True, "limit": limit, "used": used, "unlimited": team,
+                 "left": None if team else max(0, limit - used), "running": running(), "last_at": db.refresh_last(k["id"])}
+            d.update(more)
+            return self.send_json(200, d, self.cors() + [("Cache-Control", "no-store")])
+        if not start:
+            if running():
+                try:
+                    apify.refresh_all()          # finish runs that are done, without waiting for the minute tick
+                except Exception:
+                    pass
+            return state()
+        if running():
+            return state()
+        who = self.admin()
+        try:
+            extra = int((db.setting("campaign_update_extra", {}) or {}).get(str(k["id"]), 0))
+        except (TypeError, ValueError, AttributeError):
+            extra = 0
+        if not team and db.refresh_count(k["id"]) >= self.REFRESH_LIMIT + max(0, extra):
+            return self.send_json(429, {"ok": False, "reason": "limit", "message": "You have used all your free updates for this campaign."}, self.cors())
+        last = db.refresh_last(k["id"])
+        if last and db.now() - last < self.REFRESH_WAIT:
+            return self.send_json(429, {"ok": False, "reason": "wait", "message": "Updated a moment ago. Try again in a minute."}, self.cors())
+        started, t0 = 0, db.now()
+        for j in jobs:
+            if apify._post_pairs(j):
+                ok, _msg = apify.start_job(j["id"], "portal")
+                started += 1 if ok else 0
+        if not started:
+            return self.send_json(502, {"ok": False, "reason": "none", "message": "There is nothing to update right now."}, self.cors())
+        # The daily capture follows the last update: from now it runs every 24 hours from this moment.
+        lt = time.gmtime(t0 + 3 * 3600)
+        with db.connect() as conn:
+            conn.execute("UPDATE api_jobs SET at_time = ? WHERE id IN (%s)" % ",".join("?" * len(ids)), ["%02d:%02d" % (lt.tm_hour, lt.tm_min)] + ids)
+        db.refresh_log(k["id"], self.signed_in_client(), team, started)
+        return state(started=started)
+
+    def api_campaign_refresh_request(self):
+        """A viewer who used all their free updates asks the team for more: the account manager and the owners are emailed."""
+        b = self.json_body()
+        k, status = self.viewer_campaign(str(b.get("t") or ""))
+        if k is None:
+            return self.send_json(status, {"ok": False, "signin": status == 401}, self.cors())
+        cid = self.viewer_code_id()
+        user = portal.user_for_code(cid) if cid is not None else None
+        if self._throttled("updreq:%d:%d" % (k["id"], cid or 0), 3, 86400):
+            return
+        note = " ".join(str(b.get("note") or "").split())[:400]
+        who = "%s <%s>%s" % ((user["name"] or user["email"]) if user else "A viewer", user["email"] if user else "no email",
+                             (" · " + user["company"]) if user and user["company"] else "")
+        import access
+        import notify
+        notify.send("quote", ['%s used all their free updates on the campaign "%s" and asks for more.' % (who, k["name"]),
+                              ("Their note: " + note) if note else "",
+                              "To give them more, add an extra for this campaign (or reply to them)."],
+                    kam=(user["kam"] if user is not None and "kam" in user.keys() else None),
+                    link=mailer.SITE + "/admin/campaigns/edit?id=%d" % k["id"], also=access._owners())
+        return self.send_json(200, {"ok": True, "message": "Request sent. Your account manager will be in touch."}, self.cors())
+
+    def api_campaign_share(self):
+        """Manage who can open a campaign's dashboard (the team, and invitees with the edit role).
+        {t, action: on|off|invite|role|remove, email?, role?: view|edit}"""
+        import guard
+        import mailer
+        b = self.json_body()
+        k = db.campaign(token=str(b.get("t") or ""))
+        role = self.campaign_role(k)
+        if role not in ("admin", "edit"):
+            return self.send_json(404, {"ok": False}, self.cors())
+        action = str(b.get("action") or "on")
+        who = self.admin()
+        acct = self.signed_in_client()
+        u = portal.user_for_code(acct) if acct is not None else None
+        by = who["email"] if who is not None else (u["email"] if u is not None else "")
+        by_name = (u["name"] if u is not None and u["name"] else "") or "HelloVoice"
+        msg = ""
+        if action == "off":
+            db.share_disable(k["id"])
+        elif action == "on":
+            db.share_enable(k["id"], by)
+        elif action in ("invite", "role", "remove"):
+            raw = str(b.get("email") or "")
+            email = guard.normalise_email(raw) or ""
+            if not email:
+                return self.send_json(400, {"ok": False, "message": "That does not look like an email address."}, self.cors())
+            if action == "remove":
+                db.cinvite_remove(k["id"], email)
+                msg = "Access removed for %s." % email
+            else:
+                r = "edit" if str(b.get("role") or "view") == "edit" else "view"
+                have = db.cinvites_for(k["id"])
+                if len(have) >= 25 and email not in {x["email"] for x in have}:
+                    return self.send_json(400, {"ok": False, "message": "This dashboard already has 25 invited people."}, self.cors())
+                if u is not None and (u["email"] or "").lower() == email:
+                    return self.send_json(400, {"ok": False, "message": "That is you: you already have access."}, self.cors())
+                new, changed = db.cinvite_add(k["id"], email, r, by)
+                what = "view and edit" if r == "edit" else "view only"
+                msg = "%s can now %s." % (email, what) if not new else "Invited %s (%s)." % (email, what)
+                if changed and mailer.configured():
+                    try:
+                        mailer.send_access(email, "campaign dashboard", k["name"], by_name, what,
+                                           "%s/campaign/dashboard/#t=%s" % (mailer.SITE, k["token"]))
+                        msg += " We emailed them the link."
+                    except Exception:
+                        msg += " The email could not be sent: copy the link to them."
+        else:
+            return self.send_json(400, {"ok": False}, self.cors())
+        sh = db.share_get(k["id"])
+        on = bool(sh and sh["enabled"])
+        return self.send_json(200, {"ok": True, "enabled": on, "message": msg, "people": db.cinvites_for(k["id"]),
+                                    "url": (mailer.SITE + "/campaign/dashboard/#t=%s&share=%s" % (k["token"], sh["token"])) if on else None}, self.cors())
 
     def api_campaign_csv(self, token):
         k, status = self.viewer_campaign(token)
@@ -4170,7 +4373,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def logo_url(self, ref, token):
         if ref.startswith("clients/"):
-            return "/assets/clients/" + Path(ref).name
+            name = Path(ref).name
+            try:
+                v = int((CLIENT_LOGOS / name).stat().st_mtime)      # a replaced logo is fetched again, not served from the browser cache
+            except (OSError, TypeError):
+                v = 0
+            return "/assets/clients/" + name + ("?v=%d" % v if v else "")
         return BASE + "/api/campaign-logo?" + urllib.parse.urlencode({"t": token, "n": Path(ref).name})
 
     # ------------------------------------------------------------ planner --
@@ -6052,6 +6260,7 @@ TRACKED = {
     "/campaigns/link/toggle": ("campaign", "id", "Switched a tracking link"),
     "/campaigns/content/add": ("campaign", "id", "Added a post"),
     "/campaigns/content/update": ("campaign", "id", "Changed a post"),
+    "/campaigns/content/group": ("campaign", "id", "Grouped posts as one video"),
     "/campaigns/content/bulk": ("campaign", "id", "Bulk-added posts or numbers"),
     "/campaigns/content/pending": ("campaign", "id", "Updated who is still to post"),
     "/campaigns/insights/decide": ("campaign", "id", "Reviewed insights"),

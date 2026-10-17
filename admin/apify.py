@@ -52,6 +52,23 @@ PRESETS = {
     "ig_reels": {"label": "Instagram · reel views (12 latest reels)", "platform": "Instagram", "kind": "posts",
                  "actor": "apify/instagram-reel-scraper", "est": 0.032,
                  "input": '{"username": "{{handles}}", "resultsLimit": 12, "skipPinnedPosts": true}'},
+    # Campaign posts: one run for all of a campaign's links on one platform (source "campaign:<id>"),
+    # numbers stored as a dated snapshot on each post. Each result is matched to its post by the id in its link.
+    "post_ig": {"label": "Campaign posts · Instagram reels", "platform": "Instagram", "kind": "post_urls",
+                "actor": "codenest/instagram-reels-scraper", "est": 0.004,
+                "input": '{"reel_urls": "{{url_objs}}"}'},
+    "post_tt": {"label": "Campaign posts · TikTok videos", "platform": "TikTok", "kind": "post_urls",
+                "actor": "maximedupre/tiktok-audio-downloader", "est": 0.002,
+                "input": '{"videoUrls": "{{url_objs}}"}'},
+    "post_sc": {"label": "Campaign posts · Snapchat spotlights", "platform": "Snapchat", "kind": "post_urls",
+                "actor": "tri_angle/snapchat-spotlight-scraper", "est": 0.003,
+                "input": '{"spotlightUrls": "{{urls}}"}'},
+    "post_fb": {"label": "Campaign posts · Facebook reels", "platform": "Facebook", "kind": "post_urls",
+                "actor": "clappi/facebook-posts-reels-scraper", "est": 0.005,
+                "input": '{"postUrls": "{{urls}}"}'},
+    "post_yt": {"label": "Campaign posts · YouTube videos and shorts", "platform": "YouTube", "kind": "post_urls",
+                "actor": "beyondops/youtube-metadata-scraper-pro-v2", "est": 0.001,
+                "input": '{"videoUrls": "{{urls}}"}'},
     "custom": {"label": "Another actor", "platform": "", "kind": "other", "actor": "", "est": 0.01,
                "input": '{"profiles": "{{handles}}"}'},
 }
@@ -339,8 +356,22 @@ def creator_handles(c):
     return out
 
 
+def _post_pairs(job):
+    """[(content id, post link)] for a campaign's live posts on the job's platform."""
+    src = job["source"] or ""
+    if not (src.startswith("campaign:") and src[9:].isdigit()):
+        return []
+    with db.connect() as conn:
+        rows = conn.execute("SELECT id, url FROM content WHERE campaign_id = ? AND hidden = 0 AND platform = ? "
+                            "ORDER BY id", (int(src[9:]), job["platform"])).fetchall()
+    cap = max(1, min(int(job["max_handles"] or 100), HARD_MAX_HANDLES))
+    return [(str(r["id"]), r["url"]) for r in rows][:cap]
+
+
 def build_handles(job):
     """[(creator code, handle)] for a job, in order, no duplicates, capped."""
+    if job["kind"] == "post_urls":
+        return _post_pairs(job)
     plat = job["platform"]
     with db.connect() as conn:
         rows = conn.execute("SELECT * FROM creators WHERE active = 1 ORDER BY sort, code").fetchall()
@@ -426,7 +457,7 @@ def save_job(f):
         json.loads(tmpl)
     except ValueError:
         raise ApifyError("The input is not valid JSON.")
-    if "{{handles}}" not in tmpl and "{{handle}}" not in tmpl:
+    if not any(t in tmpl for t in ("{{handles}}", "{{handle}}", "{{urls}}", "{{url_objs}}")):
         raise ApifyError("The input must contain {{handles}} (all in one run) or {{handle}} "
                          "(one run per creator) where the handles go.")
     sched = f.get("schedule") if f.get("schedule") in ("manual", "daily", "weekly") else "manual"
@@ -438,7 +469,7 @@ def save_job(f):
     except ValueError:
         est = 0.01
     vals = ((f.get("name") or "").strip() or "Untitled job", actor,
-            f.get("kind") if f.get("kind") in ("profiles", "analysis", "posts", "other") else "other",
+            f.get("kind") if f.get("kind") in ("profiles", "analysis", "posts", "post_urls", "other") else "other",
             (f.get("platform") or "").strip(), (f.get("source") or "all").strip(),
             tmpl, max(1, min(mh, HARD_MAX_HANDLES)), sched, at, wd, est)
     with db.connect() as conn:
@@ -490,7 +521,9 @@ def _refuse(job, trigger, why):
 def render_input(tmpl, handles):
     """The job's JSON with the handles put in. "{{handles}}" becomes the list,
     "{{handle}}" the first one, "{{count}}" how many there are."""
-    t = tmpl.replace('"{{handles}}"', json.dumps(handles))
+    t = tmpl.replace('"{{url_objs}}"', json.dumps([{"url": h} for h in handles]))
+    t = t.replace('"{{urls}}"', json.dumps(list(handles)))
+    t = t.replace('"{{handles}}"', json.dumps(handles))
     t = t.replace('"{{handle}}"', json.dumps(handles[0] if handles else ""))
     t = t.replace('"{{count}}"', str(max(1, len(handles))))
     return json.loads(t)
@@ -818,12 +851,123 @@ def save_basic(conn, code, plat, handle, it, m, run_id):
     return True
 
 
+_POST_FIELDS = {
+    "likes": ("likescount", "likecount", "likes", "diggcount", "reactioncount", "reactionscount", "reactions",
+              "like_count", "digg_count", "totalreactions"),
+    "comments": ("commentscount", "commentcount", "comments", "comment_count", "commentnum"),
+    "views": ("videoplaycount", "viewscount", "playcount", "play_count", "videoviewcount", "viewcount", "views", "view_count",
+              "plays", "videoplays", "playscount"),
+    "shares": ("sharescount", "sharecount", "shares", "share_count", "repostcount", "reposts"),
+    "saves": ("collectcount", "savescount", "savecount", "saves", "bookmarkcount", "favoritecount"),
+}
+
+
+def _post_key(url):
+    """The id that names a post in its link, lower case, as it will appear in the actor's result."""
+    u = (url or "").lower()
+    for rx in (r"/(?:reel|reels|p|tv)/([a-z0-9_\-]+)", r"/video/(\d+)", r"/shorts/([a-z0-9_\-]+)",
+               r"[?&]v=([a-z0-9_\-]+)", r"/spotlight/([a-z0-9_\-]{16,})", r"/share/(?:r|v|p)/([a-z0-9_\-]+)"):
+        m = re.search(rx, u)
+        if m:
+            return m.group(1)[:24]
+    return None
+
+
+def _scalars(obj, out, depth=0):
+    if depth > 3:
+        return
+    if isinstance(obj, dict):
+        for k, v in obj.items():
+            if isinstance(v, (dict, list)):
+                _scalars(v, out, depth + 1)
+            elif isinstance(v, (int, float)) and not isinstance(v, bool):
+                out.setdefault(str(k).lower(), v)
+    elif isinstance(obj, list):
+        for v in obj[:5]:
+            _scalars(v, out, depth + 1)
+
+
+def post_numbers(item):
+    """{likes, comments, views, shares, saves} found in one actor result, whatever it calls them."""
+    flat = {}
+    _scalars(item, flat)
+    vals = {}
+    for m, names in _POST_FIELDS.items():
+        for n in names:
+            v = _num(flat.get(n))
+            if v is not None and v >= 0:      # -1 means the platform does not show it
+                vals[m] = v
+                break
+    return vals
+
+
+def _thumb_hint(item):
+    """A picture link the actor returned for a post, for the thumbnail fetch to try when the page gives none."""
+    flat = {}
+
+    def walk(o, d=0):
+        if d > 2:
+            return
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if isinstance(v, str) and v.startswith("http"):
+                    flat.setdefault(str(k).lower(), v)
+                elif isinstance(v, (dict, list)):
+                    walk(v, d + 1)
+        elif isinstance(o, list):
+            for v in o[:3]:
+                walk(v, d + 1)
+    walk(item)
+    for k in ("thumbnailurl", "displayurl", "coverurl", "cover", "thumbnail", "thumbnail_url", "imageurl",
+              "previewimageurl", "thumb", "image", "poster"):
+        if flat.get(k):
+            return flat[k]
+    return None
+
+
+def ingest_posts(run, job, items, hmap, store_raw=True):
+    """Campaign-post runs: each result goes to the post whose link id it carries (the only post when a
+    run has one), and its numbers become that post's snapshot for today."""
+    saved = 0
+    keys = {url: (cid, _post_key(url)) for url, cid in hmap.items()}
+    with db.connect() as conn:
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            text = json.dumps(it, default=str).lower()
+            cid = next((c for _u, (c, k) in keys.items() if k and k in text), None)
+            if cid is None and len(keys) == 1:
+                cid = next(iter(keys.values()))[0]
+            if store_raw:
+                small = it if len(json.dumps(it, default=str)) <= 60000 else _compact(it)
+                conn.execute("INSERT INTO profile_raw (run_id, code, platform, actor, at, data) VALUES (?,?,?,?,?,?)",
+                             (run["id"], "post:%s" % cid if cid else "", job["platform"], job["actor"], db.now(),
+                              json.dumps(small, default=str)))
+            vals = post_numbers(it) if cid else {}
+            hint = _thumb_hint(it) if cid else None
+            if hint:
+                conn.execute("UPDATE content SET thumb = ? WHERE id = ? AND (thumb IS NULL OR thumb = '')", (hint, int(cid)))
+            if vals:
+                db.add_snapshot(int(cid), vals, "apify", conn)
+                saved += 1
+        camp = conn.execute("SELECT campaign_id FROM content WHERE id = ?", (int(next(iter(hmap.values()))),)).fetchone() if hmap else None
+    if camp:
+        try:
+            import thumbs
+            thumbs.fill_later(camp["campaign_id"])      # store the pictures on our own server
+        except Exception:
+            pass
+    return saved
+
+
 def ingest(run, job, items, store_raw=True):
     """Keep every result as the actor returned it, the follower number as a
     dated snapshot, and for Instagram profile runs the basic numbers.
     store_raw=False reads results already kept (reingest_run) without storing them twice."""
     hmap = json.loads(run["handle_map"] or "{}")
     plat = job["platform"] if job else ""
+    if job and job["kind"] == "post_urls":
+        return ingest_posts(run, job, items, hmap, store_raw)
     saved = 0
     with db.connect() as conn:
         for it in items:
@@ -978,6 +1122,8 @@ def refresh_run(run):
             note = "The run finished but returned no results."
         elif job and job["kind"] == "profiles" and not saved:
             note = "Results kept, but no follower count was recognised in them."
+        elif job and job["kind"] == "post_urls" and not saved:
+            note = "Results kept, but no post numbers were recognised in them."
     except ApifyError as ex:
         note = "Run finished but the results could not be read: " + str(ex)
     if job and job["actor"] == REEL_ACTOR:
@@ -996,13 +1142,22 @@ def _finish(run, status, results, saved, cost, message):
                      (status, results, saved, cost, message, db.now(), run["id"]))
 
 
+_REFRESH_LOCK = threading.Lock()
+
+
 def refresh_all():
-    with db.connect() as conn:
-        live = conn.execute("SELECT * FROM api_runs WHERE status = 'RUNNING' AND apify_run IS NOT NULL").fetchall()
-    for r in live:
-        refresh_run(r)
-    pump()
-    return len(live)
+    # One pass at a time: the scheduler and a dashboard's "Update now" both call this.
+    if not _REFRESH_LOCK.acquire(blocking=False):
+        return 0
+    try:
+        with db.connect() as conn:
+            live = conn.execute("SELECT * FROM api_runs WHERE status = 'RUNNING' AND apify_run IS NOT NULL").fetchall()
+        for r in live:
+            refresh_run(r)
+        pump()
+        return len(live)
+    finally:
+        _REFRESH_LOCK.release()
 
 
 def get_run(rid):

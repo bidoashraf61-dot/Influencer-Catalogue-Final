@@ -1012,7 +1012,7 @@
     /* ================================================================ TOUR */
     // Tour v3 lives in tour.js + tour.css, fetched only when the client starts it (the demo
     // photos and the invented roster load with the demo pages). Here: the opener card and the loader.
-    var TOUR_JS = "assets/js/tour.js?v=t3a", TOUR_CSS = "assets/css/tour.css?v=t3a";
+    var TOUR_JS = "assets/js/tour.js?v=6a87b52e", TOUR_CSS = "assets/css/tour.css?v=de5abd66";
     var tourLoad = null;
     function loadTour() {
       if (window.hvTour) return Promise.resolve(window.hvTour);

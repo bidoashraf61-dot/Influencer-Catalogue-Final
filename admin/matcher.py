@@ -32,21 +32,30 @@ QUESTIONS = [
      "legacy": [("balanced", "Balanced"), ("conversion", "Traffic")]},
     {"id": "platforms", "type": "many", "label": "Where should the content run?", "required": True,
      "options": [("Instagram", "Instagram"), ("TikTok", "TikTok"), ("Snapchat", "Snapchat"),
-                 ("YouTube", "YouTube"), ("any", "No preference")]},
+                 ("YouTube", "YouTube"), ("Facebook", "Facebook"), ("any", "No preference")]},
     {"id": "market", "type": "one", "multi_ok": True, "label": "Which countries is the audience in?", "required": True,
-     "options": [("SA", "Saudi Arabia"), ("AE", "UAE"), ("EG", "Egypt"), ("KW", "Kuwait"), ("QA", "Qatar"),
-                 ("BH", "Bahrain"), ("OM", "Oman"), ("JO", "Jordan")]},
+     "options": [("SA", "Saudi Arabia"), ("AE", "UAE"), ("EG", "Egypt")],
+     # The form offers three markets (2026-10-18). Briefs saved with the others still read.
+     "legacy": [("KW", "Kuwait"), ("QA", "Qatar"), ("BH", "Bahrain"), ("OM", "Oman"), ("JO", "Jordan")]},
     {"id": "gender", "type": "one", "multi_ok": True, "label": "Who is the audience?", "required": False,
      "options": [("Any", "Everyone"), ("Women", "Mostly women"), ("Men", "Mostly men")]},
     {"id": "age", "type": "one", "multi_ok": True, "label": "Main age groups", "required": False,
      "options": [("Any", "All ages"), ("18-24", "18–24"), ("25-34", "25–34"), ("35-44", "35–44"), ("45-54", "45+")]},
     {"id": "category", "type": "many", "label": "Which space is the product in?", "required": True,
-     # "beauty" is kept as the stored value of Makeup, so briefs saved before this change still read.
-     "options": [("health care", "Healthcare / pharma"), ("skincare", "Skincare and dermatology"), ("beauty", "Makeup"),
-                 ("hair care", "Hair care"), ("fragrance", "Fragrance"), ("mother & baby", "Mother and baby"),
-                 ("food", "Food and drink"), ("fitness", "Fitness and wellness"), ("fashion", "Fashion"),
-                 ("lifestyle", "Lifestyle"), ("technology", "Technology"), ("automotive", "Automotive"),
-                 ("travel", "Travel"), ("finance", "Finance"), ("gaming", "Gaming")]},
+     # The interests the catalogue's own Interest filter lists (2026-10-18). A value is what is stored and matched against
+     # the creators' interest tags; "beauty" is the stored value of Beauty and makeup and "fitness" of Health and fitness,
+     # so briefs saved before this change still read.
+     "options": [("health care", "Healthcare and medical"), ("skincare", "Skincare"), ("beauty", "Beauty and makeup"),
+                 ("hair care", "Hair care"), ("fragrance", "Fragrance"), ("fashion", "Fashion"), ("luxury", "Luxury"),
+                 ("lifestyle", "Lifestyle"), ("mother & baby", "Mother and baby"), ("food", "Food and restaurants"),
+                 ("travel", "Travel and tourism"), ("fitness", "Health and fitness"),
+                 ("entertainment", "Entertainment and comedy"), ("e-commerce", "E-commerce and shopping"),
+                 ("sports", "Sports"), ("music & art", "Music and art"), ("education", "Education"),
+                 ("home & interior", "Home and interior"), ("technology", "Tech and gadgets"),
+                 ("automotive", "Automotive"), ("finance", "Finance and business"), ("gaming", "Gaming")]},
+    {"id": "budget", "type": "one", "label": "Budget for creators (SAR, before VAT)", "required": False,
+     "options": [("50", "Under 50,000"), ("150", "50,000 – 150,000"), ("400", "150,000 – 400,000"),
+                 ("400+", "Over 400,000"), ("open", "Not decided yet")]},
     {"id": "creator_size", "type": "many", "label": "Which creator sizes?", "required": False,
      "options": [("nano", "Nano: under 20k"), ("micro", "Micro: 20k to 100k"), ("mid", "Mid: 100k to 500k"),
                  ("macro", "Macro: 500k to 1M"), ("mega", "Mega: 1M and over")]},
@@ -64,12 +73,7 @@ QUESTIONS = [
      "options": [("asap", "Within 2 weeks"), ("month", "Within 6 weeks"), ("quarter", "Next quarter"), ("later", "Just exploring")]},
     {"id": "notes", "type": "text", "label": "Anything else we should know?", "required": False, "max": 600},
 ]
-# Kept out of the form (budget was removed from the brief on 2026-10-13) so briefs saved with it still read.
-LEGACY_QUESTIONS = [
-    {"id": "budget", "type": "one", "label": "Budget for creators (SAR, before VAT)", "required": False,
-     "options": [("50", "Under 50,000"), ("150", "50,000 – 150,000"), ("400", "150,000 – 400,000"),
-                 ("400+", "Over 400,000"), ("open", "Not decided yet")]},
-]
+LEGACY_QUESTIONS = []          # budget is asked again (2026-10-18)
 _BY_ID = {q["id"]: q for q in QUESTIONS + LEGACY_QUESTIONS}
 OBJECTIVE_OF = {"awareness": "Awareness", "engagement": "Engagement", "traffic": "Traffic", "conversion": "Traffic",
                 "balanced": "Balanced"}
@@ -81,7 +85,7 @@ def objective_for(goal):
     return fit.objective_of([OBJECTIVE_OF.get(g) for g in goals])
 BUDGET_MAX = {"50": 50000, "150": 150000, "400": 400000, "400+": None, "open": None}
 COUNT_OF = {"5": 5, "8": 8, "15": 15, "25": 25}
-PLATFORMS = {"Instagram", "TikTok", "Snapchat", "YouTube"}
+PLATFORMS = {"Instagram", "TikTok", "Snapchat", "YouTube", "Facebook"}
 
 
 # "Other": every multiple-choice question also takes a short value the client types. It is
@@ -346,7 +350,7 @@ _GOAL_WORDS = {
     "awareness": ["awareness", "reach", "visibility", "launch", "known", "انتشار", "وعي", "اطلاق", "إطلاق"],
 }
 _PLATFORM_WORDS = {"Instagram": ["instagram", "insta", " ig ", "reels", "انستقرام", "انستغرام"], "TikTok": ["tiktok", "tik tok", "تيك توك"],
-                   "Snapchat": ["snapchat", "snap", "سناب"], "YouTube": ["youtube", "you tube", "يوتيوب"]}
+                   "Snapchat": ["snapchat", "snap", "سناب"], "YouTube": ["youtube", "you tube", "يوتيوب"], "Facebook": ["facebook", "فيسبوك", "فيس بوك"]}
 _EXTRA_CATEGORY = {
     "health care": ["pharma", "medical", "doctor", "hospital", "clinic", "medicine", "drug", "patient", "healthcare", "صحة", "طبي", "دواء"],
     "skincare": ["skincare", "skin care", "sunscreen", "sun screen", "derma", "cream", "serum", "moistur", "acne", "بشرة"],

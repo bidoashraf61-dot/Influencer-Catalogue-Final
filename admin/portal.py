@@ -861,6 +861,11 @@ def opens_campaign(cid, k):
         return False
     if k["code_id"] in team_codes(int(cid)):
         return True
+    if db.campaign_viewer(k["id"], cid):
+        return True                              # let in by the campaign's share link (view only)
+    u = user_for_code(int(cid))
+    if u is not None and db.cinvite_role(k["id"], u["email"]):
+        return True                              # invited by email, with a role
     return bool(k["selection_id"]) and db.selection_granted(k["selection_id"], cid)
 
 
