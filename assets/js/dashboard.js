@@ -529,7 +529,6 @@
         + gauge("Views per video", "% of followers", pb.view_rate, vrNow, gr(vrNow, pb.view_rate))
         + gauge("Engagement rate", "% of views", pb.eng_rate, erNow, gr(erNow, pb.eng_rate))
         + (links && pb.ctr ? gauge("Click-through", "% of views", pb.ctr, t.ctr, gr(t.ctr, pb.ctr)) : "")
-        + '<div class="db-gauge db-gauge--fact"><div class="db-gauge__lbl"><b>Reach</b><small>unique people</small></div><div class="db-fact"><b>' + Math.round((pb.reach_per_view || 0.4) * 100) + "%</b> of views are unique people</div><div></div></div>"
         + '</div><div class="db-legend2"><span><i class="sw band"></i>Normal range for creators this size</span><span><i class="dot"></i>This campaign now</span></div>';
       var G = R.gaps || {};
       // Hidden likes change the numbers the client reads, so they are shown;
