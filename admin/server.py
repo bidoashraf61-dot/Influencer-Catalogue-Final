@@ -1078,6 +1078,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send(200, json.dumps(data, indent=2, ensure_ascii=False).encode(),
                              "application/json; charset=utf-8",
                              [("Content-Disposition", "attachment; filename=run-%s.json" % query["id"])])
+        if path == "/reference/goal-formulas":
+            import goal_docs
+            return self.send(200, goal_docs.page_html())
         if path == "/reference":
             return self.send(200, reference_view.reference_page(query))
         if path == "/apis":

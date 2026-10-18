@@ -89,6 +89,7 @@ CHILDREN = {
               ("/evidence", "Competitor evidence", None), ("/calculator", "ROI calculator", None)],
     "/settings": [("/settings#kams", "Key account managers", None), ("/apis", "APIs & keys", None)],
     "/team": [("/history", "History & undo", None)],
+    "/reference": [("/reference/goal-formulas", "Goal formulas and benchmarks", None)],
 }
 STAFF_ONLY = {"/apis", "/reference", "/settings"}          # hidden from KAMs and viewers (the server refuses them anyway)
 # Pages that read across every client: a key account manager (kam_scope) is refused them, so the
