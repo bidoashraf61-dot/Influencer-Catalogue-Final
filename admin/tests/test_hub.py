@@ -202,8 +202,8 @@ class Hub(unittest.TestCase):
         s, j, _ = self.boss.post("/api/hub/kam", {"kind": "company", "ref": "polyco.com", "kam": "salma@blueholding.co.uk"})
         self.assertEqual((s, kam_scope.domain_map()["polyco.com"]), (200, "salma@blueholding.co.uk"))
         self.boss.post("/api/hub/kam", {"kind": "company", "ref": "polyco.com", "kam": KAM})
-        # team accounts are not move targets
-        self.assertEqual(self.boss.get("/api/hub/people?q=salma")[1]["people"], [])
+        # team accounts are move targets, marked as account managers (the item is held under their name)
+        self.assertEqual([p["kind"] for p in self.boss.get("/api/hub/people?q=salma")[1]["people"]], ["team"])
         # a stray item can be moved to its client
         s, j, _ = self.boss.post("/api/hub/move", {"kind": "selection", "ref": lsel, "to": self.lead["id"], "related": True, "tell": False})
         self.assertEqual((s, db.selection(lsel)["code_id"]), (200, self.lead["code_id"]))
@@ -268,6 +268,65 @@ class Hub(unittest.TestCase):
         camp3 = db.create_campaign("Just the campaign", code_id=None, selection_id=sel3)
         s, j, _ = self.boss.post("/api/hub/delete", {"kind": "campaign", "ref": camp3, "with_selection": False})
         self.assertEqual((s, db.campaign(camp3), db.selection(sel3) is not None), (200, None, True))
+
+    def test_09_team_kam_choice_team_move_and_roles(self):
+        """Owner, 2026-10-18: any BlueHolding email can be chosen as KAM (it used to snap back to "no KAM"), a campaign can be
+        filed under a BlueHolding account manager, and sharing a campaign takes view or edit."""
+        tm = portal.user_by_email("salma@blueholding.co.uk") or (self.signup("salma@blueholding.co.uk"), portal.user_by_email("salma@blueholding.co.uk"))[1]
+        sel = db.save_selection(None, "For Salma", ["HV-MI-001"], {}, None, None, code_id=self.buyer["code_id"])
+        camp = db.create_campaign("Salma's campaign", code_id=self.buyer["code_id"], selection_id=sel)
+        # a BlueHolding email that is not in the Settings list is accepted, and it sticks
+        s, j, _ = self.boss.post("/api/hub/kam", {"kind": "campaign", "ref": camp, "kam": "salma@blueholding.co.uk"})
+        self.assertEqual((s, db.kam_of_item("campaign", camp)), (200, "salma@blueholding.co.uk"), j)
+        s, j, _ = self.boss.post("/api/hub/kam", {"kind": "campaign", "ref": camp, "kam": "stranger@x.com"})
+        self.assertEqual(s, 400)
+        self.assertEqual(db.kam_of_item("campaign", camp), "salma@blueholding.co.uk")          # unchanged
+        # the account manager is a Move target (their account holds it for now)
+        hit = [p for p in self.boss.get("/api/hub/people?q=salma")[1]["people"] if p["kind"] == "team"]
+        self.assertEqual([p["email"] for p in hit], ["salma@blueholding.co.uk"])
+        self.assertEqual(self.boss.get("/api/hub/people?q=boss@")[1]["people"], [])               # the owner's own login is not
+        s, j, _ = self.boss.post("/api/hub/move", {"kind": "campaign", "ref": camp, "to": tm["id"], "tell": False})
+        self.assertEqual(s, 200, j)
+        self.assertEqual((db.campaign(camp)["code_id"], db.selection(sel)["code_id"]), (tm["code_id"], tm["code_id"]))
+        # share with a role: view = dashboard only, edit = dashboard and selection
+        s, j, _ = self.boss.post("/api/hub/share", {"kind": "campaign", "ref": camp, "email": "viewer@acme.com", "role": "view"})
+        self.assertEqual(s, 200, j)
+        self.assertEqual(db.cinvite_role(camp, "viewer@acme.com"), "view")
+        self.assertNotIn("viewer@acme.com", [p["email"] for p in __import__("access").people(db.selection(sel))])
+        s, j, _ = self.boss.post("/api/hub/share", {"kind": "campaign", "ref": camp, "email": "editor@acme.com", "role": "edit"})
+        self.assertEqual(s, 200, j)
+        self.assertEqual(db.cinvite_role(camp, "editor@acme.com"), "edit")
+        self.assertIn("editor@acme.com", [p["email"] for p in __import__("access").people(db.selection(sel))])
+        s, j, _ = self.boss.post("/api/hub/share", {"kind": "campaign", "ref": camp, "email": "viewer@acme.com", "role": "edit"})       # change a role
+        self.assertEqual(db.cinvite_role(camp, "viewer@acme.com"), "edit")
+        self.assertEqual(self.boss.post("/api/hub/share", {"kind": "campaign", "ref": camp, "email": "nope", "role": "view"})[0], 400)
+
+    def test_10_kam_can_pass_on_team_work(self):
+        """Owner, 2026-10-18: any campaign filed under a BlueHolding account can be given an account manager, not only by
+        admins: a KAM can do it for team-filed items and for items handed to her, never for a client company's."""
+        tm = portal.user_by_email("salma@blueholding.co.uk")
+        sel = db.save_selection(None, "Team pick", ["HV-MI-001"], {}, None, None, code_id=tm["code_id"])
+        camp = db.create_campaign("Team campaign", code_id=tm["code_id"], selection_id=sel)
+        # the flag the page reads
+        s, d, _ = self.boss.get("/api/hub/campaigns?q=team%20campaign")
+        self.assertTrue(d["items"][0]["can_kam"])
+        s, d, _ = self.kam.get("/api/hub/campaigns?q=nothing-here")
+        self.assertEqual(d["items"], [])
+        # BlueHolding's own work is visible to a KAM, with the KAM menu, even when it was not handed to her
+        s, d, _ = self.kam.get("/api/hub/campaigns?q=team%20campaign")
+        self.assertEqual([(c["name"], c["can_kam"]) for c in d["items"]], [("Team campaign", True)])
+        self.assertIn("team", [c["key"] for c in self.kam.get("/api/hub/companies")[1]["companies"]])
+        s, td, _ = self.kam.get("/api/hub/company?k=team")
+        self.assertEqual(s, 200)
+        self.assertIn("Team campaign", [x["name"] for p in td["people"] for x in p["campaigns"]])
+        s, j, _ = self.kam.post("/api/hub/kam", {"kind": "campaign", "ref": camp, "kam": OTHER})                     # she passes it on
+        self.assertEqual((s, db.kam_of_item("campaign", camp)), (200, OTHER), j)
+        self.assertEqual(self.boss.get("/api/hub/company?k=team")[0], 404)                                           # admins use the full tree
+        # a client company's item stays out of reach of a KAM's KAM menu
+        self.assertEqual(self.kam.post("/api/hub/kam", {"kind": "campaign", "ref": self.k2, "kam": OTHER})[0], 400)
+        # and company / person level stays admin only
+        self.assertEqual(self.kam.post("/api/hub/kam", {"kind": "company", "ref": "polyco.com", "kam": OTHER})[0], 400)
+        self.boss.post("/api/hub/kam", {"kind": "campaign", "ref": camp, "kam": ""})
 
 
 if __name__ == "__main__":

@@ -1126,7 +1126,7 @@
     var q = HUB.q.trim().toLowerCase();
     if (q && (c.name + " " + c.domain).toLowerCase().indexOf(q) < 0) return false;
     if (HUB.f === "live") return c.live > 0;
-    if (HUB.f === "nokam") return !c.kam.email && c.key !== "handed" && c.key !== "unassigned";
+    if (HUB.f === "nokam") return !c.kam.email && c.key !== "handed" && c.key !== "unassigned" && c.key !== "team";
     return true;
   }
   function itemStatus(kind, it) {
@@ -1168,12 +1168,13 @@
         if (!list.length) { res.appendChild(h("li", { class: "hb-none" }, "No client matches.")); return; }
         list.forEach(function (u) {
           res.appendChild(h("li", null, h("button", { type: "button", onclick: function () { pick(u); } },
-            h("b", null, u.name || u.email), h("small", null, [u.email, u.company].filter(Boolean).join(" · ")))));
+            h("b", null, u.name || u.email), u.kind === "team" ? h("span", { class: "hb-chip hb-chip--approved" }, "Account manager") : null,
+            h("small", null, [u.email, u.company].filter(Boolean).join(" · ")))));
         });
       });
     }
     q.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(search, 250); });
-    add(box, [h("b", null, solo ? "Assign this " + kind + " to a client" : "Move to another client"), h("small", null, HUB.role === "admin" ? "Search a client account or access code. The campaign moves with its selection, brief and everything attached." : "Pick one of your own clients."), q, res, confirmBox, msg]);
+    add(box, [h("b", null, solo ? "Assign this " + kind + " to a client" : "Move to another client"), h("small", null, HUB.role === "admin" ? "Search a client, an access code, or a BlueHolding account manager (to hold it for now and share it with their client later). The campaign moves with its selection, brief and everything attached." : "Pick one of your own clients."), q, res, confirmBox, msg]);
     return box;
   }
   // Delete a campaign: one explicit confirm, then it goes (History can bring it back).
@@ -1206,12 +1207,13 @@
     var admin = HUB.role === "admin", msg = h("p", { class: "hb-share__msg", role: "status" });
     var email = h("input", { type: "email", inputmode: "email", autocomplete: "off", placeholder: "name@company.com", "aria-label": "Client email" });
     var go = h("button", { class: "hc-btn hc-btn--ink hc-btn--sm", type: "submit" }, "Share");
-    var form = h("form", { class: "hb-share__form", novalidate: "" }, email, go);
+    var role = kind === "campaign" ? h("select", { class: "hb-kam", "aria-label": "Access" }, h("option", { value: "view" }, "View only"), h("option", { value: "edit" }, "View and edit")) : null;
+    var form = h("form", { class: "hb-share__form", novalidate: "" }, email, role, go);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var v = email.value.trim(); if (!v) { note(msg, "Type an email address.", true); email.focus(); return; }
       go.disabled = true; note(msg, "Sending…");
-      api("POST", "/api/hub/share", { kind: kind, ref: it.id, email: v }).then(function (r) {
+      api("POST", "/api/hub/share", { kind: kind, ref: it.id, email: v, role: role ? role.value : "edit" }).then(function (r) {
         go.disabled = false;
         note(msg, (r.b && r.b.message) || (r.b && r.b.ok ? "Shared." : "Couldn't share that."), !(r.b && r.b.ok));
         if (r.b && r.b.ok) email.value = "";
@@ -1220,8 +1222,8 @@
     var copyBtn = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button" }, icon("link"), " Copy link");
     copyBtn.addEventListener("click", function () { copy(new URL(ROOT + it.link, location.href).href, copyBtn, "Link copied"); });
     return h("div", { class: "hb-share", role: "group", "aria-label": "Share " + it.name },
-      h("div", { class: "hb-share__col" }, h("b", null, "Share with a client"), h("small", null, "They sign in (or sign up) with that email and can view and edit this " + kind + ". They are emailed the link."), form, msg),
-      admin ? h("div", { class: "hb-share__col" }, h("b", null, "Hand to an account manager"), h("small", null, "They see and manage it on top of their own clients, and are told by email."),
+      h("div", { class: "hb-share__col" }, h("b", null, "Share with a client"), h("small", null, "They sign in (or sign up) with that email. " + (kind === "campaign" ? "Pick view only or view and edit. Edit also opens its selection. " : "They can view and edit it. ") + "They are emailed the link."), form, msg),
+      it.can_kam ? h("div", { class: "hb-share__col" }, h("b", null, "Hand to an account manager"), h("small", null, "They see and manage it on top of their own clients, and are told by email."),
         kamSelect(it.kam, "Account manager for " + it.name, "No account manager", function (v) {
           hubSetKam(kind, it.id, v, function () { it.kam = v; renderSection(); });
         })) : null,
@@ -1245,7 +1247,9 @@
         h("b", null, it.name), itemStatus(kind, it),
         h("small", null, kind === "selection" ? plural(it.creators, "creator") : (it.has_selection ? "Has a selection" : "No selection yet")
           + (it.kam ? "" : "")),
-        it.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(it.kam)) : null,
+        it.can_kam ? h("label", { class: "hb-lab hb-it__kamsel" }, "KAM", kamSelect(it.kam, "Account manager for " + it.name, "No account manager", function (v) {
+          hubSetKam(kind, it.id, v, function () { it.kam = v; renderSection(); });
+        })) : (it.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(it.kam)) : null),
         it.owner ? h("small", { class: "hb-it__owner" }, "Filed under " + it.owner.label) : null,
         it.selection ? h("small", null, "Selection: " + it.selection) : null),
       h("div", { class: "hb-it__act" }, open, assignBtn, shareBtn, kind === "campaign" ? delBtn : null));
@@ -1358,7 +1362,7 @@
       hubLoad();
       return;
     }
-    var all = HUB.list.filter(function (c) { return c.key !== "handed" && c.key !== "unassigned"; });
+    var all = HUB.list.filter(function (c) { return c.key !== "handed" && c.key !== "unassigned" && c.key !== "team"; });
     var stats = { people: 0, sel: 0, camp: 0, live: 0 };
     all.forEach(function (c) { stats.people += c.people; stats.sel += c.selections; stats.camp += c.campaigns; stats.live += c.live; });
     add(p, h("dl", { class: "hc-score hc-score--4" },
@@ -1370,7 +1374,7 @@
     q.addEventListener("input", function () { HUB.q = q.value; var pos = q.selectionStart; renderSection(); var n = document.querySelector(".hb-search"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } });
     var bar = h("div", { class: "kc-filter", role: "group", "aria-label": "Show" });
     [["all", "All companies", HUB.list.length], ["live", "With a live campaign", HUB.list.filter(function (c) { return c.live > 0; }).length],
-     ["nokam", "No account manager", HUB.list.filter(function (c) { return !c.kam.email && c.key !== "handed" && c.key !== "unassigned"; }).length]].forEach(function (f) {
+     ["nokam", "No account manager", HUB.list.filter(function (c) { return !c.kam.email && c.key !== "handed" && c.key !== "unassigned" && c.key !== "team"; }).length]].forEach(function (f) {
       bar.appendChild(h("button", { class: "kc-chip", type: "button", "aria-pressed": HUB.f === f[0] ? "true" : "false",
         onclick: function () { HUB.f = f[0]; renderSection(); } }, f[1], h("span", null, String(f[2]))));
     });

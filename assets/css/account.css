@@ -796,3 +796,7 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
 .hb-views { margin: 18px 0 4px; }
 .hb-items--flat { margin-top: 10px; }
 .hb-it__owner { padding: 1px 8px; border-radius: var(--r-pill); background: var(--stone); color: var(--ink) !important; font-weight: 600; }
+
+/* Companies hub: the KAM menu right on each item */
+.hb-it__kamsel { margin-left: auto; }
+.hb-it__kamsel .hb-kam { max-width: 260px; min-height: 36px; }

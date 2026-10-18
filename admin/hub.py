@@ -240,6 +240,14 @@ def companies(role, a):
             rows.append({"key": "handed", "name": "Handed to you", "domain": "", "kam": {"email": "", "name": ""},
                          "people": 0, "selections": sum(1 for r in hs.values() if r["code_id"] not in own),
                          "campaigns": sum(1 for r in hc.values() if r["code_id"] not in own), "live": 0})
+    if role == "kam":
+        tw = [p for p in _unassigned_people() if p.get("staff") and p.get("id")]
+        if tw:
+            rows.append({"key": "team", "name": "BlueHolding team work", "domain": "", "kam": {"email": "", "name": ""},
+                         "people": len(tw), "selections": sum(len(p["selections"]) for p in tw),
+                         "campaigns": sum(len(p["campaigns"]) for p in tw),
+                         "live": sum(1 for p in tw for k in p["campaigns"] if k["status"] == "live"),
+                         "note": "Work filed under BlueHolding accounts. Pass any of it on to an account manager."})
     if role == "admin":
         un = _unassigned_people()
         if un:
@@ -255,9 +263,12 @@ def companies(role, a):
 def company(role, a, key):
     dmap = kam_scope.domain_map()
     kam = _item_kams()
+    if key == "team" and role == "kam":
+        return {"key": key, "name": "BlueHolding team work", "domain": "", "kam": {"email": "", "name": ""},
+                "people": _annotate(role, a, [p for p in _unassigned_people() if p.get("staff") and p.get("id")])}
     if key == UNASSIGNED:
         return {"key": key, "name": "Not filed under a client", "domain": "", "kam": {"email": "", "name": ""},
-                "people": _unassigned_people()} if role == "admin" else None
+                "people": _annotate(role, a, _unassigned_people())} if role == "admin" else None
     if key == "handed" and role == "kam":
         groups, _, _ = _groups(role, a)
         own = {u["code_id"] for g in groups.values() for u in g["users"]}
@@ -280,7 +291,7 @@ def company(role, a, key):
                         "email": (u["email"] if u else "") or "", "job_title": (u["job_title"] if u else "") or "",
                         "company": (u["company"] if u else "") or "", "kam": "", "last_login_at": u["last_login_at"] if u else None,
                         "selections": ss, "campaigns": cc})
-        return {"key": key, "name": "Handed to you", "people": out}
+        return {"key": key, "name": "Handed to you", "people": _annotate(role, a, out)}
     groups, _, _ = _groups(role, a)
     g = groups.get(key)
     if g is None:
@@ -295,7 +306,7 @@ def company(role, a, key):
                     "status": u["status"], "selections": [_sel_row(x, kam) for x in s], "campaigns": [_camp_row(x, kam) for x in c]})
     k_email = "" if key.startswith(FREE) else dmap.get(key, "")
     return {"key": key, "name": _name_of(key, g), "domain": "" if key.startswith(FREE) else key,
-            "kam": {"email": k_email, "name": _kam_name(k_email) if k_email else ""}, "people": out}
+            "kam": {"email": k_email, "name": _kam_name(k_email) if k_email else ""}, "people": _annotate(role, a, out)}
 
 
 def _valid_kam(email):
@@ -303,9 +314,45 @@ def _valid_kam(email):
     return email if (not email or email in {k["email"] for k in kam_options()}) else None
 
 
+def _staff_codes():
+    with db.connect() as conn:
+        return {r["code_id"] for r in conn.execute("SELECT code_id, domain FROM users WHERE code_id IS NOT NULL AND deleted_at IS NULL")
+                if (r["domain"] or "").lower() in staff_domains()}
+
+
+def _can_kam(role, a, code_id, current, staff=None):
+    """May this viewer set the account manager of an item? Admins: any. A KAM: only an item filed under a BlueHolding team
+    account (so she can pass team work on) or one handed to her."""
+    if role == "admin":
+        return True
+    if role != "kam" or a is None:
+        return False
+    staff = _staff_codes() if staff is None else staff
+    return code_id in staff or (current or "").lower() == (a["email"] or "").lower()
+
+
+def _annotate(role, a, people):
+    """Add can_kam to every selection and campaign row in these people blocks."""
+    staff = _staff_codes() if role == "kam" else None
+    codes = {}
+    with db.connect() as conn:
+        for kind, table in (("selection", "selections"), ("campaign", "campaigns")):
+            for r in conn.execute("SELECT id, code_id FROM %s" % table):
+                codes[(kind, r["id"])] = r["code_id"]
+    for p in people:
+        for kind, key in (("selection", "selections"), ("campaign", "campaigns")):
+            for it in p.get(key, []):
+                it["can_kam"] = _can_kam(role, a, codes.get((kind, it["id"])), it.get("kam"), staff)
+    return people
+
+
 def set_kam(role, a, kind, ref, email, by=""):
-    """Admins only. Returns (ok, message)."""
-    if role != "admin":
+    """Admins anywhere; a KAM only on items under team accounts or handed to her. Returns (ok, message)."""
+    if role == "kam" and kind in ("selection", "campaign") and str(ref).isdigit():
+        item = db.selection(int(ref)) if kind == "selection" else db.campaign(int(ref))
+        if item is None or not _can_kam(role, a, item["code_id"], db.kam_of_item(kind, item["id"])):
+            return False, "You can only pass on work filed under BlueHolding team accounts or handed to you."
+    elif role != "admin":
         return False, "Only HelloVoice admins can change an account manager."
     k = _valid_kam(email)
     if k is None:
@@ -342,7 +389,7 @@ def set_kam(role, a, kind, ref, email, by=""):
     return False, "Unknown target."
 
 
-def share(role, a, kind, ref, email, by, by_name=""):
+def share(role, a, kind, ref, email, by, by_name="", access_role="edit"):
     """Invite an email to a selection or campaign. A KAM only inside her scope. Returns (ok, message, state)."""
     import access
     if kind == "selection":
@@ -364,7 +411,9 @@ def share(role, a, kind, ref, email, by, by_name=""):
             kam_scope.end()
         if not allowed:
             return False, "That belongs to a client you do not manage.", None
-    state, err = (access.invite(item, email, by, by_name) if kind == "selection" else access.invite_campaign(item, email, by, by_name))
+    if kind == "campaign":
+        return _share_campaign(item, email, by, by_name, access_role)
+    state, err = access.invite(item, email, by, by_name)
     msgs = {"email": "That does not look like an email address.", "self": "That is the owner: they already have it.",
             "limit": "That already has %d invited people." % access.MAX_INVITES,
             "no_selection": "This campaign has no selection yet. Link its selection first."}
@@ -384,9 +433,13 @@ def people_search(role, a, q):
     out = []
     for u in rows:
         hay = " ".join([(u["name"] or ""), (u["email"] or ""), (u["company"] or "")]).lower()
-        if q in hay and u["code_id"] is not None and u["status"] == "active" and (u["domain"] or "").lower() not in staff_domains():
-            out.append({"id": u["id"], "code_id": u["code_id"], "kind": "account", "name": u["name"] or "", "email": u["email"],
-                        "company": u["company"] or "", "domain": u["domain"] or ""})
+        dom = (u["domain"] or "").lower()
+        if dom == "hellovoice.co.uk":
+            continue                                   # the owner's own account is not a place to file work
+        if q in hay and u["code_id"] is not None and u["status"] == "active":
+            team = dom in staff_domains()              # a BlueHolding account manager: file it under their name
+            out.append({"id": u["id"], "code_id": u["code_id"], "kind": "team" if team else "account", "name": u["name"] or "", "email": u["email"],
+                        "company": ("Team · " + (u["job_title"] or "BlueHolding")) if team else (u["company"] or ""), "domain": u["domain"] or ""})
         if len(out) >= 15:
             break
     if len(out) < 15:                                  # clients that only have a plain access code (no account)
@@ -528,11 +581,14 @@ def campaigns(role, a, q="", offset=0, limit=40):
         codes = {c["id"]: c for c in conn.execute("SELECT id, label FROM codes")}
     if role == "kam":
         sc = kam_scope.clients(a)
+        staff = _staff_codes()
         kam_scope.begin(sc)
         try:
-            rows = kam_scope.keep_items(rows, "campaign", fallback="sel_code_id")
+            mine = kam_scope.keep_items(rows, "campaign", fallback="sel_code_id")
         finally:
             kam_scope.end()
+        have = {r["id"] for r in mine}
+        rows = mine + [r for r in rows if r["id"] not in have and r["code_id"] in staff]     # BlueHolding's own work is visible to the team
     out = []
     for r in rows:
         owner = _owner_label(r["code_id"], users, codes)
@@ -542,4 +598,33 @@ def campaigns(role, a, q="", offset=0, limit=40):
         if not q or q in hay:
             out.append(row)
     total = len(out)
-    return {"total": total, "items": out[int(offset):int(offset) + int(limit)]}
+    page = out[int(offset):int(offset) + int(limit)]
+    _annotate(role, a, [{"campaigns": page}])
+    return {"total": total, "items": page}
+
+
+def _share_campaign(k, email, by, by_name, access_role):
+    """Invite an email to a campaign's dashboard with a role: "view" (read the dashboard and report) or "edit" (also
+    update it and invite others). Edit also opens the campaign's selection for them; view does not. One email."""
+    import access
+    import mailer
+    em = guard.normalise_email(email)
+    if not em:
+        return False, "That does not look like an email address.", None
+    role_ = "edit" if access_role == "edit" else "view"
+    have = db.cinvites_for(k["id"])
+    if len(have) >= access.MAX_INVITES and em not in {x["email"] for x in have}:
+        return False, "That already has %d invited people." % access.MAX_INVITES, None
+    new, changed = db.cinvite_add(k["id"], em, role_, by)
+    sel = db.selection(k["selection_id"]) if k["selection_id"] else None
+    if sel is not None and role_ == "edit":
+        access.invite(sel, em, by, by_name, send=False)           # the selection comes with an editor, silently
+    if changed and mailer.configured():
+        try:
+            mailer.send_access(em, "campaign dashboard", k["name"], by_name or "HelloVoice",
+                               "view and edit" if role_ == "edit" else "view only",
+                               "%s/campaign/dashboard/#t=%s" % (mailer.SITE, k["token"]))
+        except Exception:
+            pass
+    what = "view and edit" if role_ == "edit" else "view only"
+    return True, ("%s can now %s it." % (em, what)) if not new else "Invited %s (%s). It opens when they sign in with that email." % (em, what), "invited" if new else "granted"

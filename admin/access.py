@@ -56,7 +56,7 @@ def grant(rid, who):
 MAX_INVITES = 25
 
 
-def invite(sel, email, by, by_name=""):
+def invite(sel, email, by, by_name="", send=True):
     """Invite an email to this ONE selection (view + edit). Returns (state, error): state is "granted" (they
     already have an account: access is live) or "invited" (it opens when they first sign in with that email).
     error is one of: email, self, limit."""
@@ -77,7 +77,7 @@ def invite(sel, email, by, by_name=""):
     if user is not None and user["code_id"] is not None:
         db.invite_claim(email, user["code_id"])
         state = "granted"
-    if new and mailer.configured():
+    if new and send and mailer.configured():
         try:
             mailer.send_access(email, "selection", sel["name"], by_name or "HelloVoice", "view and edit",
                                "%s/selection/#s=%s" % (SITE, sel["token"]))

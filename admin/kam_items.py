@@ -20,7 +20,10 @@ SEL_ROUTE, CAMP_ROUTE = "/selections/kam", "/campaigns/kam"
 
 
 def kam_options():
-    return notify.kams()
+    """[(name, email)] of everyone who can be an account manager: the BlueHolding team's accounts, KAM logins and the
+    Settings list (see hub.kam_options)."""
+    import hub
+    return [(k["name"], k["email"]) for k in hub.kam_options()]
 
 
 def _name(email):

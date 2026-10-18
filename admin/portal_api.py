@@ -902,7 +902,8 @@ class PortalMixin(connect_api.ConnectMixin):
         if self._throttled("hubshare:%d" % who[1]["id"], 40, 3600):
             return
         b = self.json_body()
-        ok, msg, state = hub.share(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("email") or ""), who[1]["email"], who[1]["name"] or "")
+        ok, msg, state = hub.share(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("email") or ""), who[1]["email"], who[1]["name"] or "",
+                                 "view" if str(b.get("role") or "") == "view" else "edit")
         return self.send_json(200 if ok else 400, {"ok": ok, "message": msg, "state": state}, self.cors())
 
     def api_hub_delete(self):
