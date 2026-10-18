@@ -56,6 +56,39 @@ def grant(rid, who):
 MAX_INVITES = 25
 
 
+def known_email(email):
+    """True when this email already has a portal account."""
+    import guard
+    import portal
+    em = guard.normalise_email(email)
+    u_ = portal.user_by_email(em) if em else None
+    return bool(u_ is not None and u_["code_id"] is not None)
+
+
+def invite_fields(prefix):
+    """The invite row (owner, 2026-10-18): type to search the accounts already on the portal (the browser's own
+    suggestions list), then Give access for someone who has an account, or Send invite for someone who has none:
+    they get an email with the link, sign in or sign up with that address, and it is on their list."""
+    import portal
+    opts = []
+    try:
+        for r in portal.list_users()[:800]:
+            if r["email"]:
+                label = " · ".join(x for x in ((r["name"] or "").strip(), (r["company"] or "").strip()) if x)
+                opts.append("<option value=\"%s\">%s</option>" % (e(r["email"]), e(label)))
+    except Exception:
+        pass
+    return ("<datalist id='" + prefix + "-people'>" + "".join(opts) + "</datalist>"
+            "<div style='flex:2'><label for='" + prefix + "-email'>Search the portal, or type a new email</label>"
+            "<input id='" + prefix + "-email' name='email' type='email' list='" + prefix + "-people' "
+            "placeholder='name@company.com' autocomplete='off' required></div>"
+            "<div style='align-self:end;display:flex;gap:8px'>"
+            "<button class='btn small lime' name='do' value='add' title='For someone who already has a portal account'>Give access</button>"
+            "<button class='btn small' name='do' value='invite' title='For someone with no account yet: emails them the link'>Send invite</button></div>"
+            "<p class='muted' style='flex-basis:100%;margin:6px 0 0'>No account yet? Choose <b>Send invite</b>: we email them the link, "
+            "they sign in or sign up with that address, and it appears on their list.</p>")
+
+
 def invite(sel, email, by, by_name=""):
     """Invite an email to this ONE selection (view + edit). Returns (state, error): state is "granted" (they
     already have an account: access is live) or "invited" (it opens when they first sign in with that email).
@@ -108,9 +141,7 @@ def campaign_card(k):
             "it opens the first time they sign in with that email, and we email them the link.</p>"
             "<form method='post' action='" + u("/campaigns/invite") + "' class='row limits'>"
             "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
-            "<div style='flex:2'><label for='cinv-email'>Email</label><input id='cinv-email' name='email' type='email' "
-            "placeholder='name@company.com' autocomplete='off' required></div>"
-            "<div style='align-self:end'><button class='btn small lime' name='do' value='add'>Give access</button></div></form>"
+            + invite_fields("cinv") + "</form>"
             + ("<table class='t'><tr><th>Email</th><th>Status</th><th></th></tr>" + "".join(
                 "<tr><td>%s</td><td>%s</td><td><form method='post' action='%s' style='display:inline'>"
                 "<input type='hidden' name='id' value='%d'><input type='hidden' name='email' value=\"%s\">"

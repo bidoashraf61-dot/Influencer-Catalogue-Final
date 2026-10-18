@@ -1285,6 +1285,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if f.get("do") == "remove" and sel is not None:
                 access.uninvite(sel, f.get("email") or "")
                 return self.redirect(back + "&ok=" + urllib.parse.quote("Access removed for %s." % (f.get("email") or "that email")))
+            if f.get("do") == "add" and not access.known_email(f.get("email") or ""):
+                return self.redirect(back + "&e=" + urllib.parse.quote("%s has no portal account yet. Use Send invite: we email them the link." % (f.get("email") or "").strip()))
             state, err = access.invite_campaign(k, f.get("email") or "", who["email"])
             msgs = {"email": "That does not look like an email address.", "self": "That is the owner: they already have it.",
                     "limit": "This already has %d invited people." % access.MAX_INVITES,
@@ -1307,6 +1309,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if f.get("do") == "remove":
                 access.uninvite(sel, f.get("email") or "")
                 return self.redirect(back + "&ok=" + urllib.parse.quote("Access removed for %s." % (f.get("email") or "that email")) + "#st=share")
+            if f.get("do") == "add" and not access.known_email(f.get("email") or ""):
+                return self.redirect(back + "&e=" + urllib.parse.quote("%s has no portal account yet. Use Send invite: we email them the link." % (f.get("email") or "").strip()) + "#st=share")
             state, err = access.invite(sel, f.get("email") or "", who["email"])
             msgs = {"email": "That does not look like an email address.", "self": "That is the selection's owner: they already have it.",
                     "limit": "That selection already has %d invited people." % access.MAX_INVITES}

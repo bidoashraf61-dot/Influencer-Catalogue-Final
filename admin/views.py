@@ -2923,9 +2923,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         "If they have no account yet, it opens the first time they sign in with that email, and we email them the link.</p>"
         "<form method='post' action='" + u("/selections/invite") + "' class='row limits'>"
         "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
-        "<div style='flex:2'><label for='inv-email'>Email</label><input id='inv-email' name='email' type='email' "
-        "placeholder='name@company.com' autocomplete='off' required></div>"
-        "<div style='align-self:end'><button class='btn small lime' name='do' value='add'>Give access</button></div></form>"
+        + _access.invite_fields("inv") + "</form>"
         + ("<table class='t'><tr><th>Email</th><th>Status</th><th></th></tr>" + "".join(
             "<tr><td>%s</td><td>%s</td><td><form method='post' action='%s' style='display:inline'>"
             "<input type='hidden' name='id' value='%d'><input type='hidden' name='email' value=\"%s\">"
