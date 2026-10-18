@@ -498,6 +498,11 @@
       + goals;
   }
 
+  // The width the panel's content really has, so a chart drawn for it is not stretched.
+  function panelW() {
+    var b = $("db-panel-body"), cs = getComputedStyle(b), w = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    return Math.max(280, Math.round(w) || 600);
+  }
   function areaChart(pts, keyA, keyB, w, h) {
     if (!pts.length) return '<p class="db-note">Nothing in this view yet.</p>';
     if (pts.length === 1) pts = [{ d: pts[0].d, views: 0, eng: 0 }, pts[0]];
@@ -1065,7 +1070,7 @@
     trend: function () {
       var s = series(posts()), useHist = !filtered() && R.history && R.history.length > 1;
       var pts = fromStart(useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s);
-      return "<h3>Views & engagement over time</h3><div style=\"height:240px\">" + areaChart(pts, "views", "eng", 600, 240) + "</div>"
+      return "<h3>Views & engagement over time</h3><div class=\"db-trendbox\">" + areaChart(pts, "views", "eng", panelW(), 240) + "</div>"
         + '<h3>Day by day</h3><table class="db-table"><thead><tr><th>Day</th><th></th><th>Views</th><th>Engagement</th></tr></thead><tbody>'
         + pts.map(function (d) { return "<tr><td>" + esc(day(d.d, true)) + "</td><td></td><td>" + full(d.views) + "</td><td>" + full(d.eng) + "</td></tr>"; }).join("") + "</tbody></table>";
     },
@@ -1170,6 +1175,7 @@
     if (!PANEL[area]) return;
     lastFocus = document.activeElement;
     $("db-panel-title").textContent = TITLES[area] + (area === "kpi" ? (F.platform ? " · " + F.platform : "") : filtered() && area !== "stage" && area !== "geo" ? " · filtered" : "");
+    $("db-scrim").hidden = false; $("db-panel").hidden = false;      // shown first: charts are drawn at the panel's real width
     $("db-panel-body").innerHTML = PANEL[area]();
     curArea = area;
     if (area === "kpi") bindTV();
