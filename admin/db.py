@@ -1874,7 +1874,7 @@ def zero_prices(codes):
     return {c: [0, 0] for c in codes}
 
 
-def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
+def _save_selection_raw(sid, name, codes, prices, total_from, total_to, request_id=None,
                    code_id=None, platform=None, margin=None, costs=None, margin_max=False,
                    tags=None, verdicts=None, platforms=None, segments=None, origin="admin"):
     """Create (sid None) or update one priced selection. Returns its id.
@@ -2322,7 +2322,7 @@ def campaigns_for_selection(sid):
                             "ORDER BY created_at DESC", (sid,)).fetchall()
 
 
-def create_campaign(name, client=None, code_id=None, selection_id=None, platform=None,
+def _create_campaign_raw(name, client=None, code_id=None, selection_id=None, platform=None,
                     codes=(), costs=None, origin=None):
     """A new draft campaign, optionally filled from a selection. Returns its id."""
     costs = costs or {}
@@ -3244,4 +3244,30 @@ def duplicate_groups():
         groups.setdefault(find(r["code"]), []).append(r)
     out = [g for g in groups.values() if len(g) > 1]
     out.sort(key=lambda g: (-len(g), g[0]["name"] or ""))
+    return out
+
+
+def _auto_kam(kind, item_id):
+    """A key account manager's own new selection or campaign is handed to her (owner, 2026-10-18), so she
+    sees what she makes and nobody else on her team does. No email: she made it."""
+    try:
+        import kam_scope
+        sc = kam_scope.current()
+        em = getattr(sc, "email", "") if sc is not None else ""
+        if em and item_id:
+            kam_assign(kind, item_id, em, em)
+    except Exception:
+        pass
+
+
+def save_selection(sid, *args, **kw):
+    out = _save_selection_raw(sid, *args, **kw)
+    if sid is None:
+        _auto_kam("selection", out)
+    return out
+
+
+def create_campaign(*args, **kw):
+    out = _create_campaign_raw(*args, **kw)
+    _auto_kam("campaign", out)
     return out
