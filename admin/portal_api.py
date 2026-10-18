@@ -466,7 +466,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/voice/handoff": self.api_voice_handoff, "/api/chat/handoff": self.api_chat_handoff,
             "/api/me/image": self.api_me_image, "/api/me/notify": self.api_me_notify,
             "/api/me/signout-others": self.api_me_signout_others, "/api/team/invite": self.api_team_invite,
-            "/api/hub/kam": self.api_hub_kam, "/api/hub/share": self.api_hub_share, "/api/hub/move": self.api_hub_move, "/api/hub/delete": self.api_hub_delete,
+            "/api/hub/kam": self.api_hub_kam, "/api/hub/share": self.api_hub_share, "/api/hub/move": self.api_hub_move, "/api/hub/delete": self.api_hub_delete, "/api/hub/assign-kam": self.api_hub_assign_kam,
             "/api/notifications/read": self.api_notifications_read,
         }
         fn = routes.get(path)
@@ -905,6 +905,21 @@ class PortalMixin(connect_api.ConnectMixin):
         ok, msg, state = hub.share(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("email") or ""), who[1]["email"], who[1]["name"] or "",
                                  "view" if str(b.get("role") or "") == "view" else "edit")
         return self.send_json(200 if ok else 400, {"ok": ok, "message": msg, "state": state}, self.cors())
+
+    def api_hub_assign_kam(self):
+        """Assign a KAM to a campaign or selection: the package moves under that account manager's account. {kind, ref, kam}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        if self._throttled("hubassignkam:%d" % who[1]["id"], 60, 3600):
+            return
+        b = self.json_body()
+        ok, msg = hub.assign_kam(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("kam") or ""), a["email"], b.get("tell", True) is not False)
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
 
     def api_hub_delete(self):
         """Delete a campaign from the hub. {kind: "campaign", ref}"""

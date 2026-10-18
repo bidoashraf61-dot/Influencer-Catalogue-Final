@@ -328,28 +328,51 @@ class Hub(unittest.TestCase):
         self.assertEqual(self.kam.post("/api/hub/kam", {"kind": "company", "ref": "polyco.com", "kam": OTHER})[0], 400)
         self.boss.post("/api/hub/kam", {"kind": "campaign", "ref": camp, "kam": ""})
 
-    def test_11_access_code_work_goes_to_a_kam(self):
-        """Owner, 2026-10-18: everything under an access code that has no client yet can be handed to a KAM in one go."""
+    def test_12_assign_kam_moves_the_package_under_the_kam(self):
+        """Owner, 2026-10-18: Assign KAM on a campaign (or its selection) files the whole package under that account manager's
+        own account and removes the access code it came from once that code is empty."""
+        tm = portal.user_by_email("salma@blueholding.co.uk")
+        def code(label, h):
+            with db.connect() as conn:
+                return conn.execute("INSERT INTO codes (code_hash, hint, label, created_at) VALUES (?, '····', ?, ?)", (h, label, db.now())).lastrowid
+        c1 = code("Penduline code", "h-pend")
+        sel = db.save_selection(None, "Penduline picks", ["HV-MI-001"], {}, None, None, code_id=c1)
+        camp = db.create_campaign("Penduline wave", code_id=c1, selection_id=sel)
         with db.connect() as conn:
-            code = conn.execute("INSERT INTO codes (code_hash, hint, label, created_at) VALUES ('h-kamcode', '····', 'Pending client code', ?)", (db.now(),)).lastrowid
-        s1 = db.save_selection(None, "Code pick A", ["HV-MI-001"], {}, None, None, code_id=code)
-        s2 = db.save_selection(None, "Code pick B", ["HV-MI-002"], {}, None, None, code_id=code)
-        c1 = db.create_campaign("Code campaign", code_id=code, selection_id=s1)
+            conn.execute("INSERT INTO briefs (code_id, selection_id, source, answers, created_at) VALUES (?,?,?,?,?)", (c1, sel, "text", "{}", db.now()))
+        # the page gets the package: the campaign carries its selection, the selection is marked as inside a campaign
         d = self.boss.get("/api/hub/company?k=unassigned")[1]
-        blk = [p for p in d["people"] if p.get("code_id") == code]
-        self.assertEqual([(p["name"], p["kam"]) for p in blk], [("Pending client code", "")])
-        s, j, _ = self.boss.post("/api/hub/kam", {"kind": "code", "ref": code, "kam": KAM})
+        blk = [p for p in d["people"] if p.get("code_id") == c1][0]
+        self.assertEqual(blk["campaigns"][0]["package"]["name"], "Penduline picks")
+        self.assertTrue(blk["selections"][0]["in_campaign"])
+        # assign the KAM from the campaign alone: selection, brief and tag move together; the emptied code goes
+        s, j, _ = self.boss.post("/api/hub/assign-kam", {"kind": "campaign", "ref": camp, "kam": "salma@blueholding.co.uk"})
         self.assertEqual(s, 200, j)
-        self.assertIn("3 items", j["message"])
-        self.assertEqual([db.kam_of_item("selection", s1), db.kam_of_item("selection", s2), db.kam_of_item("campaign", c1)], [KAM, KAM, KAM])
-        blk = [p for p in self.boss.get("/api/hub/company?k=unassigned")[1]["people"] if p.get("code_id") == code]
-        self.assertEqual(blk[0]["kam"], KAM)                                       # the block shows who holds it
-        hd = self.kam.get("/api/hub/company?k=handed")[1]
-        self.assertTrue({"Code pick A", "Code pick B"} <= {x["name"] for p in hd["people"] for x in p["selections"]})
-        self.assertEqual(self.kam.post("/api/hub/kam", {"kind": "code", "ref": code, "kam": OTHER})[0], 400)         # a KAM cannot re-deal a code
-        s, j, _ = self.boss.post("/api/hub/kam", {"kind": "code", "ref": code, "kam": ""})
-        self.assertEqual((s, db.kam_of_item("selection", s1)), (200, None))
-        self.assertEqual(self.boss.post("/api/hub/kam", {"kind": "code", "ref": 99999, "kam": KAM})[0], 400)
+        self.assertEqual((db.campaign(camp)["code_id"], db.selection(sel)["code_id"]), (tm["code_id"], tm["code_id"]))
+        with db.connect() as conn:
+            self.assertEqual({r[0] for r in conn.execute("SELECT code_id FROM briefs WHERE selection_id = ?", (sel,))}, {tm["code_id"]})
+        self.assertEqual((db.kam_of_item("campaign", camp), db.kam_of_item("selection", sel)), ("salma@blueholding.co.uk",) * 2)
+        self.assertIsNone(db.get_code(c1))                                                    # the access code was removed
+        self.assertIn("removed", j["message"])
+        self.assertIn("Assigned", j["message"])
+        # a code that still holds other work stays
+        c2 = code("Busy code", "h-busy")
+        sel_b = db.save_selection(None, "Other work", ["HV-MI-002"], {}, None, None, code_id=c2)
+        sel_c = db.save_selection(None, "Move me", ["HV-MI-001"], {}, None, None, code_id=c2)
+        s, j, _ = self.boss.post("/api/hub/assign-kam", {"kind": "selection", "ref": sel_c, "kam": "salma@blueholding.co.uk"})
+        self.assertEqual((s, db.selection(sel_c)["code_id"]), (200, tm["code_id"]))
+        self.assertIsNotNone(db.get_code(c2))
+        self.assertNotIn("removed", j["message"])
+        # an account manager with no portal account only gets it handed over (tagged), nothing moves
+        sel_d = db.save_selection(None, "Stays put", ["HV-MI-001"], {}, None, None, code_id=c2)
+        s, j, _ = self.boss.post("/api/hub/assign-kam", {"kind": "selection", "ref": sel_d, "kam": OTHER})
+        self.assertEqual((s, db.selection(sel_d)["code_id"], db.kam_of_item("selection", sel_d)), (200, c2, OTHER), j)
+        self.assertIn("no portal account", j["message"])
+        # rules: an outsider or a stranger email is refused; a KAM only on team-filed or handed work
+        self.assertEqual(self.boss.post("/api/hub/assign-kam", {"kind": "selection", "ref": sel_d, "kam": "stranger@x.com"})[0], 400)
+        self.assertEqual(self.plain.post("/api/hub/assign-kam", {"kind": "selection", "ref": sel_d, "kam": KAM})[0], 403)
+        self.assertEqual(self.kam.post("/api/hub/assign-kam", {"kind": "selection", "ref": self.s2, "kam": OTHER})[0], 400)    # a client's item
+        self.assertEqual(self.kam.post("/api/hub/assign-kam", {"kind": "selection", "ref": sel_c, "kam": OTHER})[0], 200)        # team-filed (now under Salma)
 
 
 if __name__ == "__main__":

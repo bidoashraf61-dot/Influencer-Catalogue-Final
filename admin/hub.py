@@ -139,7 +139,7 @@ def _sel_row(s, kam):
 def _camp_row(k, kam):
     return {"id": k["id"], "token": k["token"], "name": k["name"], "status": k["status"],
             "draft_by_client": bool(k["origin"] == "client" and k["status"] == "draft"),
-            "starts_at": k["starts_at"], "ends_at": k["ends_at"], "has_selection": bool(k["selection_id"]),
+            "starts_at": k["starts_at"], "ends_at": k["ends_at"], "has_selection": bool(k["selection_id"]), "selection_id": k["selection_id"],
             "kam": kam.get(("campaign", k["id"]), ""), "link": "campaign/dashboard/#t=" + k["token"]}
 
 
@@ -344,7 +344,7 @@ def _annotate(role, a, people):
         for kind, key in (("selection", "selections"), ("campaign", "campaigns")):
             for it in p.get(key, []):
                 it["can_kam"] = _can_kam(role, a, codes.get((kind, it["id"])), it.get("kam"), staff)
-    return people
+    return _attach_packages(people)
 
 
 def set_kam(role, a, kind, ref, email, by=""):
@@ -379,24 +379,6 @@ def set_kam(role, a, kind, ref, email, by=""):
         with db.connect() as conn:
             conn.execute("UPDATE users SET kam = ? WHERE id = ?", (k or None, u["id"]))
         return True, ("%s now looks after %s." % (_kam_name(k), u["name"] or u["email"])) if k else "%s follows the company's account manager." % (u["name"] or u["email"])
-    if kind == "code":
-        # An access code with no client behind it: hand ALL its selections and campaigns to one account manager (or take them back).
-        import kam_items
-        cid = int(ref) if str(ref).isdigit() else None
-        code = db.get_code(cid) if cid else None
-        if code is None:
-            return False, "That access code no longer exists."
-        n = 0
-        with db.connect() as conn:
-            sels = [r[0] for r in conn.execute("SELECT id FROM selections WHERE code_id = ? AND deleted_at IS NULL AND archived_at IS NULL", (cid,))]
-            camps = [r[0] for r in conn.execute("SELECT id FROM campaigns WHERE code_id = ?", (cid,))]
-        for kind_, ids in (("selection", sels), ("campaign", camps)):
-            for i in ids:
-                item, err = kam_items.assign(kind_, i, k, by)
-                n += 0 if err else 1
-        who = code["label"] or "this access code"
-        return True, ("%d item%s of %s handed to %s. They have been told." % (n, "" if n == 1 else "s", who, _kam_name(k))) if k else \
-            "%d item%s of %s taken back." % (n, "" if n == 1 else "s", who)
     if kind in ("selection", "campaign"):
         import kam_items
         item, err = kam_items.assign(kind, int(ref), k, by)
@@ -508,24 +490,32 @@ def move(role, a, kind, ref, user_id, with_related=True, tell=True, to_code=None
             return False, "You can only move it to one of your own clients."
     elif role != "admin":
         return False, "Not allowed."
-    # A campaign is its whole package (owner, 2026-10-18): the campaign, its selection, every campaign made from that
-    # selection, its briefs and the quote request all move together.
+    ok, msg, _ = _move_package(kind, item, target["code_id"], tell)
+    return ok, msg
+
+
+def _move_package(kind, item, target_code, tell=True):
+    """The move itself, with no permission check. A campaign is its whole package (owner, 2026-10-18): the campaign, its
+    selection, every campaign made from that selection, its briefs and the quote request all move together.
+    Returns (ok, message, old_code_id)."""
+    import assign
     sel = item if kind == "selection" else (db.selection(item["selection_id"]) if item["selection_id"] else None)
+    old = (sel["code_id"] if sel is not None else item["code_id"])
     if sel is not None:
-        r = assign.assign_selection(sel["id"], target["code_id"], move_campaigns=True, tell=bool(tell), confirmed=True)
+        r = assign.assign_selection(sel["id"], target_code, move_campaigns=True, tell=bool(tell), confirmed=True)
     else:
-        r = assign.assign_campaign(item["id"], target["code_id"], with_selection=False, tell=bool(tell), confirmed=True)
+        r = assign.assign_campaign(item["id"], target_code, with_selection=False, tell=bool(tell), confirmed=True)
     if r["error"] or not r["ok"]:
-        return False, r["error"] or "Could not move it."
+        return False, r["error"] or "Could not move it.", old
     briefs = 0
     if sel is not None:
         with db.connect() as conn:
             briefs = conn.execute("UPDATE briefs SET code_id = ? WHERE selection_id = ? AND code_id != ?",
-                                  (target["code_id"], sel["id"], target["code_id"])).rowcount
+                                  (target_code, sel["id"], target_code)).rowcount
             if sel["request_id"]:
-                conn.execute("UPDATE requests SET code_id = ? WHERE id = ?", (target["code_id"], sel["request_id"]))
+                conn.execute("UPDATE requests SET code_id = ? WHERE id = ?", (target_code, sel["request_id"]))
     if r["noop"] and not briefs:
-        return True, "Nothing changed: it already belongs to %s." % r["to"]
+        return True, "Nothing changed: it already belongs to %s." % r["to"], old
     bits = []
     if sel is not None:
         bits.append("its selection")
@@ -533,7 +523,69 @@ def move(role, a, kind, ref, user_id, with_related=True, tell=True, to_code=None
         bits.append("%d campaign%s" % (len(r["campaigns"]), "" if len(r["campaigns"]) == 1 else "s"))
     if briefs:
         bits.append("%d brief%s" % (briefs, "" if briefs == 1 else "s"))
-    return True, "Moved to %s%s." % (r["to"], (" with " + ", ".join(bits)) if bits else "")
+    return True, "Moved to %s%s." % (r["to"], (" with " + ", ".join(bits)) if bits else ""), old
+
+
+def _drop_empty_code(code_id, by=""):
+    """After work leaves a plain access code (no account behind it), remove the code when nothing is tied to it any more.
+    Archives then deletes it through History, so it can be restored. Returns its label when removed, else None."""
+    import history
+    import portal
+    code = db.get_code(code_id) if code_id else None
+    if code is None or code_id == db.admin_code_id() or portal.user_for_code(code_id) is not None:
+        return None
+    with db.connect() as conn:
+        left = conn.execute("SELECT (SELECT COUNT(*) FROM selections WHERE code_id = ? AND deleted_at IS NULL) + "
+                            "(SELECT COUNT(*) FROM campaigns WHERE code_id = ?)", (code_id, code_id)).fetchone()[0]
+    if left:
+        return None
+    history.set_actor(by or "admin")
+    with history.tracked("code", code_id, "Deleted access code %s (its work moved to an account manager)" % (code["label"] or "")):
+        if not code["archived_at"]:
+            db.archive_code(code_id)
+        why = db.delete_code(code_id)
+    return None if why else (code["label"] or "the access code")
+
+
+def assign_kam(role, a, kind, ref, email, by="", tell=True):
+    """Assign a KAM to a campaign or selection (owner, 2026-10-18): the whole package moves under that account manager's own
+    account (their name, the BlueHolding domain) and an access code it came from is removed when it is left empty. They can
+    then share it with their client. An account manager with no portal account yet only gets it handed to them (tagged).
+    Admins: any. A KAM: only team-filed work or what was handed to her. Returns (ok, message)."""
+    import portal
+    k = _valid_kam(email)
+    if not k:
+        return False, "Pick an account manager from the list."
+    item = None
+    if kind == "selection":
+        item = db.selection(int(ref)) if str(ref).isdigit() else None
+    elif kind == "campaign":
+        item = db.campaign(int(ref)) if str(ref).isdigit() else None
+    else:
+        return False, "Unknown target."
+    if item is None:
+        return False, "That item no longer exists."
+    if role != "admin":
+        if role != "kam" or not _can_kam(role, a, item["code_id"], db.kam_of_item(kind, item["id"])):
+            return False, "You can only pass on work filed under BlueHolding team accounts or handed to you."
+    target = portal.user_by_email(k)
+    if target is None or target["code_id"] is None or target["status"] != "active":
+        ok, msg = set_kam(role, a, kind, ref, k, by)           # no account to file it under: hand it over, tagged
+        return ok, (msg + " They have no portal account yet, so it stays where it is.") if ok else msg
+    ok, msg, old = _move_package(kind, item, target["code_id"], tell)
+    if not ok:
+        return False, msg
+    # tag every selection and campaign of the package so the hub shows who holds it
+    sel = item if kind == "selection" else (db.selection(item["selection_id"]) if item["selection_id"] else None)
+    import kam_items
+    if sel is not None:
+        kam_items.assign("selection", sel["id"], k, by)
+        for c in db.campaigns_for_selection(sel["id"]):
+            kam_items.assign("campaign", c["id"], k, by)
+    else:
+        kam_items.assign("campaign", item["id"], k, by)
+    gone = _drop_empty_code(old, by)
+    return True, msg.replace("Moved to", "Assigned to %s: moved to" % _kam_name(k), 1) + ((" The access code “%s” was removed." % gone) if gone else "")
 
 
 def delete(role, a, kind, ref, by="", with_selection=True):
@@ -647,3 +699,31 @@ def _share_campaign(k, email, by, by_name, access_role):
             pass
     what = "view and edit" if role_ == "edit" else "view only"
     return True, ("%s can now %s it." % (em, what)) if not new else "Invited %s (%s). It opens when they sign in with that email." % (em, what), "invited" if new else "granted"
+
+
+def _package_ctx():
+    """({selection ids used by a campaign}, {selection id: info}) for the merged campaign-and-selection cards."""
+    import lifecycle
+    with db.connect() as conn:
+        used = {r[0] for r in conn.execute("SELECT DISTINCT selection_id FROM campaigns WHERE selection_id IS NOT NULL")}
+        info = {}
+        for r in conn.execute("SELECT id, token, name, codes, code_id, updated_at, request_id FROM selections WHERE id IN "
+                              "(SELECT DISTINCT selection_id FROM campaigns WHERE selection_id IS NOT NULL) AND deleted_at IS NULL"):
+            try:
+                n = len(json.loads(r["codes"] or "[]"))
+            except ValueError:
+                n = 0
+            info[r["id"]] = {"id": r["id"], "token": r["token"], "name": r["name"], "creators": n, "link": "selection/#s=" + r["token"],
+                             "status": lifecycle.chip(r)}
+    return used, info
+
+
+def _attach_packages(people):
+    """Mark selections that belong to a campaign, and put each campaign's selection on its card."""
+    used, info = _package_ctx()
+    for p in people:
+        for sel in p.get("selections", []):
+            sel["in_campaign"] = sel["id"] in used
+        for c in p.get("campaigns", []):
+            c["package"] = info.get(c.get("selection_id"))
+    return people

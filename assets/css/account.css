@@ -800,3 +800,80 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
 /* Companies hub: the KAM menu right on each item */
 .hb-it__kamsel { margin-left: auto; }
 .hb-it__kamsel .hb-kam { max-width: 260px; min-height: 36px; }
+
+/* Companies hub: a campaign card carries its selection; Assign KAM */
+.hb-it__sel { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; padding: 8px 12px; border-radius: 12px; background: var(--white); font-size: 14px; }
+.hb-it__sel b { font-size: 14px; overflow-wrap: anywhere; }
+.hb-it__sel small { font-size: 12.5px; color: var(--gray); }
+.hb-it__tag { padding: 1px 8px; border-radius: var(--r-pill); background: var(--stone); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.hb-kambtn { background: var(--lime); }
+
+/* ====================================================================== Companies hub: polish (2026-10-18)
+   One calm hierarchy: company > person > campaign card. A campaign card reads top to bottom as name and status, the selection
+   inside it, then the actions in three tiers: look (Open), manage (Assign KAM is the lead, Assign client and Share beside it),
+   and Delete set apart. Panels open under the card as a quiet tray. */
+.hb-list { gap: 14px; }
+.hb-co { border-radius: 24px; }
+.hb-co__name b { font-size: 30px; }
+.hb-co.is-open { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.hb-co__body { gap: 6px; padding: 4px 28px 28px; }
+.hb-p { border-top: 1px solid var(--rule-soft); padding-top: 4px; gap: 6px; }
+.hb-p__btn { padding: 14px 16px; margin: 0 -16px; }
+.hb-p__who b { font-size: 17px; }
+.hb-p__who small { line-height: 1.4; }
+.hb-p__cols { gap: 22px 32px; }
+.hb-p h4 { display: flex; align-items: center; gap: 8px; margin: 14px 0 10px; letter-spacing: .1em; }
+
+/* the campaign / selection card */
+.hb-items { gap: 12px; }
+.hb-it { gap: 12px; padding: 16px 18px 14px; border-radius: 20px; background: var(--white); box-shadow: 0 0 0 1px var(--rule), 0 1px 2px rgba(18,18,18,.04); }
+.hb-it__main { gap: 6px 10px; }
+.hb-it__main > b { font-family: var(--heading); font-weight: 400; font-size: 24px; line-height: 1.05; letter-spacing: .01em; }
+.hb-it__main small { font-size: 12.5px; }
+.hb-it__owner { font-weight: 600; }
+.hb-it__sel { gap: 6px 10px; padding: 10px 14px; border-radius: 14px; background: var(--stone); }
+.hb-it__sel b { font-size: 14.5px; }
+
+/* status chips: one size, one voice */
+.hb-chip { min-height: 24px; padding: 0 10px; font-size: 12px; font-weight: 700; border: 1px solid var(--rule); background: var(--white); color: var(--ink); }
+.hb-chip--live, .hb-chip--approved { color: #0f6b39; border-color: #14884a; background: #f1faf4; }
+.hb-chip--requested, .hb-chip--ready { color: #8a4604; border-color: #e2780f; background: #fff7ef; }
+.hb-chip--draft { color: #5a5a5a; background: var(--stone); border-color: transparent; }
+.hb-chip--completed { color: var(--ink); background: var(--stone); border-color: transparent; }
+
+/* the action bar: three tiers */
+.hb-it__act { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding-top: 12px; border-top: 1px solid var(--rule-soft); }
+.hb-it__grp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hb-it__grp--danger { margin-left: auto; }
+.hb-open { min-height: 40px; padding: 0 6px; border: 0; background: none; border-radius: var(--r-pill); font-weight: 700; text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1.5px; }
+.hb-open:hover { background: var(--stone); text-decoration-color: transparent; }
+.hb-assignbtn, .hb-sharebtn { min-height: 40px; padding: 0 16px; border: 1.5px solid var(--ink); background: var(--white); color: var(--ink); }
+.hb-assignbtn:hover, .hb-sharebtn:hover { background: var(--stone); }
+.hb-assignbtn[aria-expanded="true"], .hb-sharebtn[aria-expanded="true"] { background: var(--ink); color: var(--lime); }
+.hb-kambtn, .hb-assignbtn.is-primary { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.hb-kambtn:hover, .hb-assignbtn.is-primary:hover { background: #dcf25f; }
+.hb-kambtn[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: var(--lime); }
+.hb-delbtn { min-height: 40px; padding: 0 14px; border: 0; background: none; color: #b01010; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1.5px; }
+.hb-delbtn:hover, .hb-delbtn[aria-expanded="true"] { background: #fdeaea; color: #b01010; text-decoration-color: transparent; }
+
+/* the tray under a card */
+.hb-share { margin-top: 2px; padding: 20px 52px 18px 20px; border-radius: 16px; background: var(--stone); box-shadow: none; gap: 18px 28px; }
+.hb-share--solo { max-width: 580px; }
+.hb-share__col b { font-size: 14.5px; }
+.hb-share__col small { max-width: 52ch; }
+.hb-share input, .hb-share .hb-kam { border: 1px solid rgba(18,18,18,.35); background: var(--white); }
+.hb-share__x { background: var(--white); }
+.hb-move__res button { border: 1px solid var(--rule); background: var(--white); }
+.hb-move__res button:hover { border-color: var(--ink); background: var(--white); box-shadow: inset 0 0 0 1px var(--ink); }
+.hb-move__ok { background: var(--white); box-shadow: inset 0 0 0 1px var(--rule); }
+.hb-share .hb-danger { background: #b01010; border-color: #b01010; }
+
+@media (max-width: 760px) {
+  .hb-co__body { padding: 2px 14px 20px; }
+  .hb-it { padding: 14px 14px 12px; }
+  .hb-it__main > b { font-size: 22px; }
+  .hb-it__act { gap: 8px 14px; }
+  .hb-it__grp--manage { flex: 1 1 100%; }
+  .hb-it__grp--danger { margin-left: 0; }
+  .hb-share { padding: 44px 16px 16px; }
+}
