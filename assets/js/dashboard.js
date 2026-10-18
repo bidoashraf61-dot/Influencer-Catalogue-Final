@@ -431,14 +431,20 @@
     var whole = !filtered() ? R.total : null;
     renderObjective();
     // KPI cards
-    var g = {}; (R.progress.items || []).forEach(function (i) { g[i.key] = i; });
-    function goal(k) { return !filtered() && g[k] ? sig(g[k].grade, "Goal " + (k === "er" ? pct(g[k].goal, 1) : num(g[k].goal))) : ""; }
+    // A platform filter on its own keeps the goal pills, measured on that platform's own targets;
+    // a platform with no goal says so instead of leaving the foot of the card empty.
+    var psc = !F.creators.length && F.range === "all" ? scope() : { mode: "none" }, pm = psc.mode === "plat", bonus = psc.mode === "bonus";
+    var g = {}; ((pm ? psc.bp.progress : R.progress).items || []).forEach(function (i) { g[i.key] = i; });
+    function goal(k) {
+      if (bonus && k !== "clicks") return '<span class="db-na__why">No goal on ' + esc(psc.pl) + " (bonus)</span>";
+      return (!filtered() || pm) && g[k] ? sig(g[k].grade, "Goal " + (k === "er" ? pct(g[k].goal, 1) : num(g[k].goal))) : "";
+    }
     var cards = [
-      ["Posts live", full(t.posts) + (!filtered() && R.total.planned ? "<small>/" + R.total.planned + "</small>" : ""), goal("posts"), spark(s.map(function (x) { return x.posts; }), COL[4]), IC.posts, "kpi"],
+      ["Posts live", full(t.posts) + (pm && g.posts ? "<small>/" + g.posts.goal + "</small>" : !filtered() && R.total.planned ? "<small>/" + R.total.planned + "</small>" : ""), goal("posts"), spark(s.map(function (x) { return x.posts; }), COL[4]), IC.posts, "kpi"],
       ["Views", t.views_hidden ? '<span class="db-na" title="This platform does not show view counts">Not shown</span>' : num(t.views) + est("views"), goal("views"), spark(s.map(function (x) { return x.views; }), COL[0]), IC.views, "trend"],
       ["Reach", t.views_hidden ? '<span class="db-na" title="Reach is worked out from views, which this platform does not show">Not shown</span>' : num(t.reach) + (isAdj("reach") ? est("reach") : reachEst() ? '<small class="db-est" title="Instagram does not show reach on reels publicly. Placeholder at ' + Math.round(((R.reach_basis && R.reach_basis.per_view) || 0.9) * 100) + '% of views (a small margin below) until the creators\' insights arrive.">est.</small>' : ""), goal("reach"), spark(s.map(function (x) { return x.reach; }), COL[3]), IC.reach, "trend"],
       ["Engagement", num(t.engagement) + est("engagement"), goal("engagement"), spark(s.map(function (x) { return x.eng; }), COL[1]), IC.engagement, "trend"],
-      ["Avg eng. rate", pct(t.er) + est("er"), !filtered() ? (g.er ? goal("er") : sig(R.total.er_grade)) : "", "", IC.er, "kpi"],
+      ["Avg eng. rate", pct(t.er) + est("er"), pm || bonus ? goal("er") : !filtered() ? (g.er ? goal("er") : sig(R.total.er_grade)) : "", "", IC.er, "kpi"],
       ["Link clicks", cl ? num(cl.clicks) + est("clicks") : '<span class="db-na">Not tracked</span>', cl && !filtered() ? (g.clicks ? goal("clicks") : sig(R.total.ctr_grade)) : '<span class="db-na__why">This campaign does not contain affiliate links</span>', "", IC.clicks, "clicks"]
     ];
     // Sections the admin switched off are left out, not shown empty.
