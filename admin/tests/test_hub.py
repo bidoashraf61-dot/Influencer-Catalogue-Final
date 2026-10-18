@@ -328,6 +328,29 @@ class Hub(unittest.TestCase):
         self.assertEqual(self.kam.post("/api/hub/kam", {"kind": "company", "ref": "polyco.com", "kam": OTHER})[0], 400)
         self.boss.post("/api/hub/kam", {"kind": "campaign", "ref": camp, "kam": ""})
 
+    def test_11_access_code_work_goes_to_a_kam(self):
+        """Owner, 2026-10-18: everything under an access code that has no client yet can be handed to a KAM in one go."""
+        with db.connect() as conn:
+            code = conn.execute("INSERT INTO codes (code_hash, hint, label, created_at) VALUES ('h-kamcode', '····', 'Pending client code', ?)", (db.now(),)).lastrowid
+        s1 = db.save_selection(None, "Code pick A", ["HV-MI-001"], {}, None, None, code_id=code)
+        s2 = db.save_selection(None, "Code pick B", ["HV-MI-002"], {}, None, None, code_id=code)
+        c1 = db.create_campaign("Code campaign", code_id=code, selection_id=s1)
+        d = self.boss.get("/api/hub/company?k=unassigned")[1]
+        blk = [p for p in d["people"] if p.get("code_id") == code]
+        self.assertEqual([(p["name"], p["kam"]) for p in blk], [("Pending client code", "")])
+        s, j, _ = self.boss.post("/api/hub/kam", {"kind": "code", "ref": code, "kam": KAM})
+        self.assertEqual(s, 200, j)
+        self.assertIn("3 items", j["message"])
+        self.assertEqual([db.kam_of_item("selection", s1), db.kam_of_item("selection", s2), db.kam_of_item("campaign", c1)], [KAM, KAM, KAM])
+        blk = [p for p in self.boss.get("/api/hub/company?k=unassigned")[1]["people"] if p.get("code_id") == code]
+        self.assertEqual(blk[0]["kam"], KAM)                                       # the block shows who holds it
+        hd = self.kam.get("/api/hub/company?k=handed")[1]
+        self.assertTrue({"Code pick A", "Code pick B"} <= {x["name"] for p in hd["people"] for x in p["selections"]})
+        self.assertEqual(self.kam.post("/api/hub/kam", {"kind": "code", "ref": code, "kam": OTHER})[0], 400)         # a KAM cannot re-deal a code
+        s, j, _ = self.boss.post("/api/hub/kam", {"kind": "code", "ref": code, "kam": ""})
+        self.assertEqual((s, db.kam_of_item("selection", s1)), (200, None))
+        self.assertEqual(self.boss.post("/api/hub/kam", {"kind": "code", "ref": 99999, "kam": KAM})[0], 400)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

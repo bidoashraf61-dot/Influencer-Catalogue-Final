@@ -190,8 +190,9 @@ def _unassigned_people():
         s_, c_ = items.get(cid, ([], []))
         if s_ or c_:
             lab = (loose[cid]["label"] or "").strip() or "Access code #%d" % cid
-            out.append({"id": None, "name": lab, "email": "", "job_title": "Plain access code (no account)", "company": "", "kam": "",
-                        "last_login_at": None, "status": "", "staff": True,
+            kams = {kam.get(("selection", x["id"]), "") for x in s_} | {kam.get(("campaign", x["id"]), "") for x in c_}
+            out.append({"id": None, "code_id": cid, "name": lab, "email": "", "job_title": "Plain access code (no account)", "company": "",
+                        "kam": kams.pop() if len(kams) == 1 else "", "last_login_at": None, "status": "", "staff": True,
                         "selections": [_sel_row(x, kam) for x in s_], "campaigns": [_camp_row(x, kam) for x in c_]})
     return out
 
@@ -378,6 +379,24 @@ def set_kam(role, a, kind, ref, email, by=""):
         with db.connect() as conn:
             conn.execute("UPDATE users SET kam = ? WHERE id = ?", (k or None, u["id"]))
         return True, ("%s now looks after %s." % (_kam_name(k), u["name"] or u["email"])) if k else "%s follows the company's account manager." % (u["name"] or u["email"])
+    if kind == "code":
+        # An access code with no client behind it: hand ALL its selections and campaigns to one account manager (or take them back).
+        import kam_items
+        cid = int(ref) if str(ref).isdigit() else None
+        code = db.get_code(cid) if cid else None
+        if code is None:
+            return False, "That access code no longer exists."
+        n = 0
+        with db.connect() as conn:
+            sels = [r[0] for r in conn.execute("SELECT id FROM selections WHERE code_id = ? AND deleted_at IS NULL AND archived_at IS NULL", (cid,))]
+            camps = [r[0] for r in conn.execute("SELECT id FROM campaigns WHERE code_id = ?", (cid,))]
+        for kind_, ids in (("selection", sels), ("campaign", camps)):
+            for i in ids:
+                item, err = kam_items.assign(kind_, i, k, by)
+                n += 0 if err else 1
+        who = code["label"] or "this access code"
+        return True, ("%d item%s of %s handed to %s. They have been told." % (n, "" if n == 1 else "s", who, _kam_name(k))) if k else \
+            "%d item%s of %s taken back." % (n, "" if n == 1 else "s", who)
     if kind in ("selection", "campaign"):
         import kam_items
         item, err = kam_items.assign(kind, int(ref), k, by)

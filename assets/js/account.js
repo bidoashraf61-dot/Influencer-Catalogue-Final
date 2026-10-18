@@ -1268,6 +1268,8 @@
       h("span", { class: "hb-p__n" }, plural(p.selections.length, "selection") + " · " + plural(p.campaigns.length, "campaign")),
       h("span", { class: "hb-chev", "aria-hidden": "true", html: '<svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' }));
     var head = h("div", { class: "hb-p__head" }, pbtn,
+      admin && !p.id && p.code_id ? h("label", { class: "hb-lab" }, "KAM for all", kamSelect(p.kam || "", "Account manager for everything under " + p.name,
+        "No account manager yet", function (v) { hubSetKam("code", p.code_id, v, function () { HUB.detail = {}; renderSection(); }); })) :
       admin && p.id && !p.staff ? h("label", { class: "hb-lab" }, "KAM", kamSelect(p.kam && p.kam !== (co.kam && co.kam.email) ? p.kam : "", "Account manager for " + (p.name || p.email),
         co.kam && co.kam.email ? "Follows the company (" + kamName(co.kam.email) + ")" : "No account manager", function (v) {
           hubSetKam("person", p.id, v, function () { p.kam = v || (co.kam && co.kam.email) || ""; renderSection(); });
