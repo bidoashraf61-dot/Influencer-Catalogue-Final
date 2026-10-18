@@ -348,14 +348,6 @@
       renderAll();
     });
     document.addEventListener("click", function (e) { if (!e.target.closest(".db-pick")) { $("db-creators").hidden = true; $("db-creators-btn").setAttribute("aria-expanded", "false"); } });
-    $("db-reset").addEventListener("click", function () {
-      F = { platform: "", range: "all", from: "", to: "", creators: [] };
-      [].forEach.call($("db-platforms").children, function (x, i) { x.setAttribute("aria-pressed", i === 0 ? "true" : "false"); });
-      $("db-range").value = "all"; $("db-custom").hidden = true;
-      [].forEach.call($("db-creators").querySelectorAll("input"), function (i) { i.checked = false; });
-      $("db-creators-btn").textContent = "All creators"; $("db-creators-btn").classList.remove("is-on");
-      renderAll();
-    });
   }
   function filtered() { return !!(F.platform || F.range !== "all" || F.creators.length); }
   function inRange(t) {
@@ -416,7 +408,6 @@
   }
 
   function renderAll() {
-    $("db-reset").hidden = !filtered();
     var list = posts(), t = sums(list), s = series(list), cl = clicksFor();
     // Whole-campaign totals set by HelloVoice by hand replace the measured
     // ones in the unfiltered view and are always marked as estimates.
@@ -537,22 +528,31 @@
   function medal(n) { return '<svg viewBox="0 0 40 50" role="img" aria-label="Rank ' + n + '">' + medalBody(n) + "</svg>"; }
   // Creator names open their full analysis (the same page as the roster's).
   function who(c) { return '<a class="db-name" href="../../creator/#c=' + encodeURIComponent(c.code) + '" title="Open ' + esc(c.name) + '\'s full analysis">' + esc(c.name) + "</a>"; }
+  // The same 0-100 score the campaign uses, worked out on the posts in the current view: each part is a
+  // creator's result as a share of the best creator's in this view (clicks are per creator link, not per platform).
+  var viewScore = {};
   function ranked(list) {
+    viewScore = {};
     if (!filtered()) return R.creators.filter(function (c) { return c.rank; }).map(function (c) { return { c: c, v: c.score, label: c.score.toFixed(0) }; });
-    // Where a platform shows no views (Snapchat) the creator is ranked by engagement instead of being left out.
-    var by = {}; list.forEach(function (p) {
-      var x = by[p.code] = by[p.code] || { n: 0, eng: 0, hid: true }; x.n += seen(p); x.eng += p.engagement || 0; if (!(p.video && p.views_hidden)) x.hid = false;
+    var w = weights(), by = {}; list.forEach(function (p) {
+      var x = by[p.code] = by[p.code] || { n: 0, eng: 0, vw: 0, er: [] }; x.n += seen(p); x.eng += p.engagement || 0;
+      if (p.video_er != null) x.er.push(p.video_er);
     });
-    return R.creators.filter(function (c) { var x = by[c.code]; return x && (x.n || (x.hid && x.eng)); }).map(function (c) {
-      var x = by[c.code], useEng = !x.n && x.hid;
-      return { c: c, v: useEng ? x.eng : x.n, label: useEng ? num(x.eng) + " eng." : num(x.n) };
+    var rows = R.creators.filter(function (c) { return by[c.code] && (by[c.code].n || by[c.code].eng); });
+    function peak(f) { return Math.max.apply(null, rows.map(f).concat([0])) || 1; }
+    function q(c) { var e = by[c.code].er; return e.length ? e.reduce(function (a, b) { return a + b; }, 0) / e.length : 0; }
+    var pn = peak(function (c) { return by[c.code].n; }), pe = peak(function (c) { return by[c.code].eng; }), pq = peak(q), pc = peak(function (c) { return c.clicks || 0; });
+    return rows.map(function (c) {
+      var x = by[c.code], sc = 100 * ((w.exposure || 0) * x.n / pn + (w.engagement || 0) * x.eng / pe + (w.er || 0) * q(c) / pq + (w.clicks || 0) * (c.clicks || 0) / pc);
+      viewScore[c.code] = sc;
+      return { c: c, v: sc, label: sc.toFixed(0) };
     }).sort(function (a, b) { return b.v - a.v; });
   }
   function renderTop(list) {
     var rows = ranked(list).slice(0, 5);
-    $("w-top").innerHTML = head(IC.top, "Creators leaderboard", filtered() ? "Ranked by views in this view." : scoreTip(), "creators")
-      + '<div class="db-card__body">' + (filtered() ? "" : '<div class="db-top__how">' + scoreBar(true) + "</div>") + (filtered() ? '<div class="db-top__cols"><span>Creator</span><b>Reached</b></div>' : "") + (rows.map(function (r, i) {
-                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " video · " : " videos · ") + num(r.c.seen != null ? r.c.seen : r.c.views) + " views" + '</small></span><span class="db-rank__score" title="' + (filtered() ? "People reached in this view" : "Score out of 100") + '">' + r.label + "</span></div>";
+    $("w-top").innerHTML = head(IC.top, "Creators leaderboard", (filtered() ? "Score out of 100, worked out on the posts in this view. " : "") + scoreTip(), "creators")
+      + '<div class="db-card__body"><div class="db-top__how">' + scoreBar(true) + "</div>" + (rows.map(function (r, i) {
+                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " video · " : " videos · ") + num(r.c.seen != null ? r.c.seen : r.c.views) + " views" + '</small></span><span class="db-rank__score" title="' + "Score out of 100" + '">' + r.label + "</span></div>";
       }).join("") || '<p class="db-note">No creators in this view.</p>') + "</div>";
   }
 
@@ -1068,11 +1068,11 @@
       var rows = filtered() ? ranked(list).map(function (r) { return r.c; }) : R.creators;
       var tot = rows.reduce(function (a, c) { var x = filtered() ? (by[c.code] || {}) : { views: c.views, eng: c.engagement }; a.v += x.views || 0; a.e += x.eng || 0; return a; }, { v: 0, e: 0 });
       function share(v, t) { return t ? Math.round((v || 0) / t * 100) + "%" : "—"; }
-      return (filtered() ? "" : '<h3 style="margin-top:0">How creators are scored · out of 100</h3>' + scoreBar()) + '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>% of views</th><th>% of eng.</th><th>ER</th>' + (R.visibility.clicks && R.objective.links ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
+      return '<h3 style="margin-top:0">How creators are scored · out of 100</h3>' + scoreBar() + '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>% of views</th><th>% of eng.</th><th>ER</th>' + (R.visibility.clicks && R.objective.links ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
         + rows.map(function (c, i) { var x = filtered() ? (by[c.code] || {}) : { posts: c.delivered, views: c.views, reach: c.reach, eng: c.engagement };
           var n = filtered() ? i + 1 : c.rank;
           return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
-            + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
+            + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (filtered() && viewScore[c.code] != null ? viewScore[c.code].toFixed(0) : c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
         + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(scoreTip()) + "</p>" + videosByCreator(list, rows)
         + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views</th><th>Engagement</th>' + (weights().er > 0 ? "<th>Eng. rate</th>" : "") + '' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
           + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td>" + (weights().er > 0 ? "<td>" + q.er.toFixed(0) + "</td>" : "") + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + c.score.toFixed(0) + "</b></td></tr>"; }).join("")
