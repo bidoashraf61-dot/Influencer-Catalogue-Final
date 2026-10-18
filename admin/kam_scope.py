@@ -322,13 +322,25 @@ _POST_FREE = {"/access-requests", "/reauth", "/password", "/ai/chat", "/ai/dismi
               "/licences/scan"}
 _POST_SELECTION = {"/selections/save", "/selections/delete", "/selections/status", "/quote/ready", "/quote/withdraw", "/selections/invite"}
 _POST_CAMPAIGN = {"/campaigns/save", "/campaigns/status", "/campaigns/delete", "/campaigns/link",
-                  "/campaigns/content/add", "/campaigns/content/update", "/campaigns/content/bulk",
+                  "/campaigns/content/add", "/campaigns/content/update", "/campaigns/content/group", "/campaigns/content/bulk",
                   "/campaigns/content/pending", "/campaigns/insights/decide", "/campaigns/insights/upload",
                   "/campaigns/sync", "/campaigns/link/custom", "/campaigns/link/toggle", "/planner/apply",
                   "/calculator/save", "/calculator/results", "/campaigns/invite"}
 _POST_CODE = {"/codes/revoke", "/codes/restore", "/codes/archive", "/codes/unarchive", "/codes/passcode",
               "/codes/rename", "/codes/limits", "/clients/preview"}
 _POST_USER = {"/portal/user/status", "/portal/user/credits", "/portal/user/save"}
+
+
+# A key account manager runs HER selections and campaigns and their sharing, and nothing else (owner,
+# 2026-10-18): no creator roster, client accounts or codes, analyses, licences, competitor evidence, AI copilot,
+# calculator index, quote inbox or admin catalogue view. Refused before any other rule.
+_NEVER_GET = ("/portal", "/evidence", "/roster", "/licences", "/clients", "/codes", "/requests", "/open-catalogue",
+              "/ai", "/calculator", "/analysis")
+_NEVER_POST = ("/portal", "/evidence", "/roster", "/licences", "/clients", "/codes", "/requests", "/ai", "/analysis")
+
+
+def _never(prefixes, path):
+    return any(path == p or path.startswith(p + "/") for p in prefixes)
 
 
 def check(scope, method, path, query=None, form=None):
@@ -338,6 +350,12 @@ def check(scope, method, path, query=None, form=None):
         return None
     query = query or {}
     form = form or {}
+    if method == "GET":
+        if path != "/analysis/json" and _never(_NEVER_GET, path) and not (path == "/calculator" and query.get("id")):
+            return NOT_YOURS
+    else:
+        if _never(_NEVER_POST, path) or (path == "/archive" and form.get("kind") == "client"):
+            return NOT_YOURS
 
     def code_ok(found_code):
         found, code_id = found_code

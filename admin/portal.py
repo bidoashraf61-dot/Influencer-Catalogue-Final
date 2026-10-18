@@ -820,7 +820,10 @@ def team_codes(code_id):
     private = {str(d).strip().lower() for d in (db.setting("team_sharing_off_domains") or [])}
     if (not db.setting("team_sharing", True) or guard._matches(me["domain"] or "", guard.FREE_DOMAINS)
             or (me["domain"] or "").lower() in private):
-        return {code_id} | codelinks.linked_for({code_id})
+        own = {code_id} | codelinks.linked_for({code_id})
+        # A private team still sees the shared demo selections (owner, 2026-10-18): BlueHolding accounts are
+        # private to each person, but the sample belongs to all of them.
+        return own | sample_codes() if (me["domain"] or "").lower() == DEMO_DOMAIN else own
     with db.connect() as conn:
         rows = conn.execute("SELECT code_id FROM users WHERE domain = ? AND status = 'active' AND deleted_at IS NULL",
                             (me["domain"],)).fetchall()
@@ -861,6 +864,11 @@ def opens_campaign(cid, k):
         return False
     if k["code_id"] in team_codes(int(cid)):
         return True
+    if db.campaign_viewer(k["id"], cid):
+        return True                              # let in by the campaign's share link (view only)
+    u = user_for_code(int(cid))
+    if u is not None and db.cinvite_role(k["id"], u["email"]):
+        return True                              # invited by email, with a role
     return bool(k["selection_id"]) and db.selection_granted(k["selection_id"], cid)
 
 
