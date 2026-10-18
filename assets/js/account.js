@@ -519,7 +519,7 @@
       h("div", { class: "ac-bug__row" }, h("h2", { class: "ac-bug__title" }, c.name), stamp(c.verdict)),
       scorelineDl([
         ["Views", big(c.views), null, null],
-        ["Engagement", big(c.engagement || 0), null, null],
+        ["Engagement", (c.engagement || 0).toLocaleString("en-US"), null, null],
         ["Avg eng. rate", c.er != null ? c.er.toFixed(2) : "—", c.er != null ? "%" : null, (gg.er || c.er_grade) ? sig(gg.er || c.er_grade) : null],
         ["Posts live", String(c.delivered), c.planned ? "/" + c.planned : null, gg.posts ? sig(gg.posts) : (p ? sig(p.grade, p.label) : null)]
       ]),
