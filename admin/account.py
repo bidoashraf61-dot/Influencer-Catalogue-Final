@@ -244,7 +244,9 @@ def summary(user, code_id, secret=b""):
                "starts_at": k["starts_at"], "ends_at": k["ends_at"],
                "verdict": {"label": v.get("label"), "grade": v.get("grade")},
                "exposure": t.get("exposure") or 0, "reach": t.get("reach") or 0, "views": t.get("views") or 0,
-               "er": t.get("er"), "er_grade": t.get("er_grade"),
+               # Same rate the dashboard shows: the video engagement rate when there is one.
+               "er": t.get("video_er") if t.get("video_er") is not None else t.get("er"),
+               "er_grade": t.get("er_grade"), "engagement": t.get("engagement") or 0,
                "delivered": t.get("delivered") or 0, "planned": t.get("planned") or 0,
                "updated_at": rep["updated_at"] if rep else None,
                # The dashboard's own goal grades, so the card says what the dashboard says.
