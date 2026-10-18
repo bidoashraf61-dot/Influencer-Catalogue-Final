@@ -102,7 +102,8 @@ class PortalMixin(connect_api.ConnectMixin):
         out = {"signed_in": True, "kind": kind, "credits": portal.balance(cid) if kind != "admin" else None,
                "preview": bool(self.preview_mode()),
                # A person with admin access: their own account, plus a switch that reveals locked data.
-               "staff": bool(self.staff_viewer(cid)),
+               # Only a real admin (owner or admin) is "staff" in the page: a key account manager is not (owner, 2026-10-18).
+               "staff": bool(self.staff_viewer(cid)) and self.kam_clients() is None,
                # View as client is on: the page is the client's; the menu still offers the way back.
                "as_client": bool(self.as_client() and self.staff_account(cid)),
                "unlock": bool(self.staff_unlocked() or (self.kam_clients() is not None and self.cookies().get(self.UNLOCK_COOKIE, "") == "1")),
@@ -231,8 +232,30 @@ class PortalMixin(connect_api.ConnectMixin):
                 import hub
                 self.send_json(200, dict(account.summary(user, cid, self._srv().SECRET), ok=True,
                                          is_kam=bool(a is not None and kam_scope.is_kam(a) and not a["disabled_at"]),
-                                         hub=hub.viewer(user)[0]),
+                                         hub=(None if (a is not None and kam_scope.is_kam(a)) else hub.viewer(user)[0])),
                                self.cors() + [("Cache-Control", "no-store")])
+            return True
+        if path == "/api/hub/campaigns":
+            who = self._need_account()
+            if who:
+                import hub
+                role, a = hub.viewer(who[1])
+                if role is None:
+                    self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+                else:
+                    self.send_json(200, dict(hub.campaigns(role, a, query.get("q") or "", self._int(query.get("offset"), 0), 40), ok=True, role=role),
+                                   self.cors() + [("Cache-Control", "no-store")])
+            return True
+        if path == "/api/hub/people":
+            who = self._need_account()
+            if who:
+                import hub
+                role, a = hub.viewer(who[1])
+                if role is None:
+                    self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+                else:
+                    self.send_json(200, {"ok": True, "people": hub.people_search(role, a, query.get("q") or "")},
+                                   self.cors() + [("Cache-Control", "no-store")])
             return True
         if path in ("/api/hub/companies", "/api/hub/company"):
             # The control hub on the profile (item 129): every company for an admin, a KAM's own for her.
@@ -240,7 +263,7 @@ class PortalMixin(connect_api.ConnectMixin):
             if who:
                 import hub
                 role, a = hub.viewer(who[1])
-                if role is None:
+                if role is None or role == "kam":            # a key account manager has "My clients", not the company list
                     self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
                 elif path == "/api/hub/companies":
                     self.send_json(200, dict(hub.companies(role, a), ok=True), self.cors() + [("Cache-Control", "no-store")])
@@ -309,7 +332,7 @@ class PortalMixin(connect_api.ConnectMixin):
             who = self._need_viewer()
             if who:
                 sel = db.selection(token=query.get("s") or "") if query.get("s") else None
-                if sel is None or (sel["code_id"] is not None and not portal.opens(who[0], sel)
+                if sel is None or (not portal.opens(who[0], sel)
                                    and who[0] != db.admin_code_id()):
                     self.send_json(404, {"ok": False}, self.cors())
                 else:
@@ -444,7 +467,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/voice/handoff": self.api_voice_handoff, "/api/chat/handoff": self.api_chat_handoff,
             "/api/me/image": self.api_me_image, "/api/me/notify": self.api_me_notify,
             "/api/me/signout-others": self.api_me_signout_others, "/api/team/invite": self.api_team_invite,
-            "/api/hub/kam": self.api_hub_kam, "/api/hub/share": self.api_hub_share,
+            "/api/hub/kam": self.api_hub_kam, "/api/hub/share": self.api_hub_share, "/api/hub/move": self.api_hub_move, "/api/hub/delete": self.api_hub_delete, "/api/hub/assign-kam": self.api_hub_assign_kam,
             "/api/notifications/read": self.api_notifications_read,
         }
         fn = routes.get(path)
@@ -572,7 +595,7 @@ class PortalMixin(connect_api.ConnectMixin):
         who = self._need_viewer()
         if not who:
             return
-        if not self.staff_viewer(who[0]):
+        if not self.staff_viewer(who[0]) or self.kam_clients() is not None:         # real admins only, never a key account manager
             return self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
         on = bool(self.json_body().get("on"))
         srv = self._srv()
@@ -587,7 +610,7 @@ class PortalMixin(connect_api.ConnectMixin):
         who = self._need_viewer()
         if not who:
             return
-        if not self.staff_account(who[0]):
+        if not self.staff_account(who[0]) or self.kam_clients() is not None:       # real admins only, never a key account manager
             return self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
         on = bool(self.json_body().get("on"))
         srv = self._srv()
@@ -661,7 +684,7 @@ class PortalMixin(connect_api.ConnectMixin):
         cid, user, kind = who
         b = self.json_body()
         sel = db.selection(token=str(b.get("token") or "")) if b.get("token") else None
-        if sel is None or (sel["code_id"] is not None and not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"])):
+        if sel is None or (not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"])):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         if not portal.may_edit(cid, sel, db.admin_code_id()):
             return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only the person who owns this selection can change it. Colleagues on the same company can view it."}, self.cors())
@@ -707,7 +730,7 @@ class PortalMixin(connect_api.ConnectMixin):
             return
         token = str(self.json_body().get("token") or "").strip()[:80]
         sel = db.selection(token=token, deleted=True) if token else None
-        if sel is None or (sel["code_id"] is not None and not portal.opens(cid, sel)):
+        if sel is None or (not portal.opens(cid, sel)):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         if not self._may_delete_selection(sel, cid):
             return self.send_json(403, {"ok": False, "reason": "not_yours"}, self.cors())
@@ -880,8 +903,54 @@ class PortalMixin(connect_api.ConnectMixin):
         if self._throttled("hubshare:%d" % who[1]["id"], 40, 3600):
             return
         b = self.json_body()
-        ok, msg, state = hub.share(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("email") or ""), who[1]["email"], who[1]["name"] or "")
+        ok, msg, state = hub.share(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("email") or ""), who[1]["email"], who[1]["name"] or "",
+                                 "view" if str(b.get("role") or "") == "view" else "edit")
         return self.send_json(200 if ok else 400, {"ok": ok, "message": msg, "state": state}, self.cors())
+
+    def api_hub_assign_kam(self):
+        """Assign a KAM to a campaign or selection: the package moves under that account manager's account. {kind, ref, kam}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        if self._throttled("hubassignkam:%d" % who[1]["id"], 60, 3600):
+            return
+        b = self.json_body()
+        ok, msg = hub.assign_kam(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("kam") or ""), a["email"], b.get("tell", True) is not False)
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
+
+    def api_hub_delete(self):
+        """Delete a campaign from the hub. {kind: "campaign", ref}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        if self._throttled("hubdel:%d" % who[1]["id"], 30, 3600):
+            return
+        b = self.json_body()
+        ok, msg = hub.delete(role, a, str(b.get("kind") or ""), b.get("ref"), a["email"], b.get("with_selection", True) is not False)
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
+
+    def api_hub_move(self):
+        """Move a selection or campaign to another client account. {kind, ref, to, related, tell}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        if self._throttled("hubmove:%d" % who[1]["id"], 60, 3600):
+            return
+        b = self.json_body()
+        ok, msg = hub.move(role, a, str(b.get("kind") or ""), b.get("ref"), b.get("to"), b.get("related", True) is not False, b.get("tell", True) is not False, b.get("code"))
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
 
     def api_team_invite(self):
         """A colleague's access is HelloVoice's call: this only asks for it."""
@@ -1085,7 +1154,7 @@ class PortalMixin(connect_api.ConnectMixin):
         sel = db.selection(token=str(token or "")) if token else None
         if sel is None:
             return None
-        if sel["code_id"] is not None and not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"]) and not self.admin_like_for(sel["code_id"]):
+        if not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"]) and not self.admin_like_for(sel["code_id"]):
             return None
         with db.connect() as conn:
             br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",

@@ -187,14 +187,25 @@ def summary(user, code_id, secret=b""):
     import rewards
     import selstatus
     import lifecycle
-    team = sorted(portal.team_codes(code_id))
+    team = set(portal.team_codes(code_id))
+    is_admin = False
+    # An owner or admin also sees, in their own Selections and Campaigns, everything filed under team accounts or
+    # plain access codes (owner, 2026-10-18), so work like "Jamjoom" is never out of sight.
+    try:
+        import hub
+        if hub.viewer(user)[0] == "admin":
+            is_admin = True
+            team |= hub.unfiled_code_ids()
+    except Exception:
+        pass
+    team = sorted(team)
     # Selections HelloVoice granted this person one by one (owner, 2026-10-15), and their campaigns.
-    granted = sorted(db.granted_selection_ids(code_id)) or [-1]
+    granted = sorted(set(db.granted_selection_ids(code_id)) | portal.sample_ids_for(code_id)) or [-1]
     gq = ",".join("?" * len(granted))
     with db.connect() as conn:
         sels = conn.execute(
-            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, s.request_id, s.created_at, u.name owner FROM selections s "
-            "LEFT JOIN users u ON u.code_id = s.code_id "
+            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, s.request_id, s.created_at, u.name owner, c.label code_label FROM selections s "
+            "LEFT JOIN users u ON u.code_id = s.code_id LEFT JOIN codes c ON c.id = s.code_id "
             "WHERE (s.code_id IN (%s) OR s.id IN (%s)) AND s.archived_at IS NULL ORDER BY s.updated_at DESC LIMIT 60"
             % (",".join("?" * len(team)), gq), team + granted).fetchall()
         camps = conn.execute(
@@ -213,7 +224,7 @@ def summary(user, code_id, secret=b""):
             shortlisted.update(codes)
         st = selstatus.of(s["id"])
         selections.append({"name": s["name"], "token": s["token"], "creators": len(codes), "updated_at": s["updated_at"],
-                           "mine": s["code_id"] == code_id, "owner": None if s["code_id"] == code_id else (s["owner"] or "A colleague"),
+                           "id": s["id"], "admin_delete": is_admin, "mine": s["code_id"] == code_id, "owner": None if s["code_id"] == code_id else (s["owner"] or s["code_label"] or "A colleague"),
                            # Only the client's own work can be deleted: not a colleague's, not HelloVoice's.
                            "can_delete": (s["origin"] or "admin") == "client" and code_id != db.admin_code_id()
                                          and portal.owns(code_id, s["code_id"]),
@@ -233,9 +244,13 @@ def summary(user, code_id, secret=b""):
                "starts_at": k["starts_at"], "ends_at": k["ends_at"],
                "verdict": {"label": v.get("label"), "grade": v.get("grade")},
                "exposure": t.get("exposure") or 0, "reach": t.get("reach") or 0, "views": t.get("views") or 0,
-               "er": t.get("er"), "er_grade": t.get("er_grade"),
+               # Same rate the dashboard shows: the video engagement rate when there is one.
+               "er": t.get("video_er") if t.get("video_er") is not None else t.get("er"),
+               "er_grade": t.get("er_grade"), "engagement": t.get("engagement") or 0,
                "delivered": t.get("delivered") or 0, "planned": t.get("planned") or 0,
                "updated_at": rep["updated_at"] if rep else None,
+               # The dashboard's own goal grades, so the card says what the dashboard says.
+               "goal_grades": {i.get("key"): i.get("grade") for i in ((rep or {}).get("progress") or {}).get("items") or [] if i.get("key")},
                "quote": (lifecycle.chip(db.selection(k["selection_id"])) if k["selection_id"] and db.selection(k["selection_id"]) is not None else None)}
         campaigns.append(row)
         if k["status"] == "live":

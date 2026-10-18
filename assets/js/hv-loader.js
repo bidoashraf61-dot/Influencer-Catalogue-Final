@@ -89,13 +89,19 @@
       if (!v.parentNode || v.getAttribute("data-fallback")) return;
       v.setAttribute("data-fallback", "1");
       unwait(v);
-      var im = img(v.getAttribute("data-cls"), v.getAttribute("data-set"), v.getAttribute("data-poster"));
+      var im = img(v.getAttribute("data-cls"), v.getAttribute("data-set"), v.getAttribute("data-poster") || animFor(v));
       v.parentNode.replaceChild(im, v);
       try { v.removeAttribute("src"); v.load(); } catch (e) { /* gone */ }
     }
     // Autoplay refused for now (Low Power Mode, a strict browser): the clip is hidden
     // (so no native play button ever shows) with the still in its place, and waits.
     var waiting = [];
+    // While a clip waits for permission to play (Low Power Mode) show a moving loop, not a frozen frame (owner, 2026-10-18).
+    function animFor(v) {
+      if (v.getAttribute("data-set")) return null;
+      var c = v.getAttribute("data-clip") || "";
+      return dir + "helvy-" + (c === "idle" || c === "hello" || c === "bye" ? "idle" : "thinking") + ".anim.webp?v=a1";
+    }
     function wait(v) {
       if (v.getAttribute("data-wait") || !v.parentNode) return;
       v.setAttribute("data-wait", "1");

@@ -2923,9 +2923,7 @@ def selection_edit_page(sel, creators, bands, origin, error=None, message=None, 
         "If they have no account yet, it opens the first time they sign in with that email, and we email them the link.</p>"
         "<form method='post' action='" + u("/selections/invite") + "' class='row limits'>"
         "<input type='hidden' name='id' value='" + str(sel["id"]) + "'>"
-        "<div style='flex:2'><label for='inv-email'>Email</label><input id='inv-email' name='email' type='email' "
-        "placeholder='name@company.com' autocomplete='off' required></div>"
-        "<div style='align-self:end'><button class='btn small lime' name='do' value='add'>Give access</button></div></form>"
+        + _access.invite_fields("inv") + "</form>"
         + ("<table class='t'><tr><th>Email</th><th>Status</th><th></th></tr>" + "".join(
             "<tr><td>%s</td><td>%s</td><td><form method='post' action='%s' style='display:inline'>"
             "<input type='hidden' name='id' value='%d'><input type='hidden' name='email' value=\"%s\">"
@@ -4703,18 +4701,18 @@ def _fmt(key, v):
 
 
 def planner_page(k, brief, plan, house, lib, error=None, message=None):
-    """Goals & ROI: a brief in, the benchmark, the value floor for the budget,
-    the safe and expected estimates and the targets to agree out. Works for
-    a campaign (its booked creators) or on its own, for a pitch."""
+    """Goals & ROI, tables only: a small input row, the calculation table
+    (value floor, safe, expected, target), a summary, and the benchmark tables
+    for every factor the numbers use. Reach is left out of the goals."""
     import plans
     q = (lambda key, d="": e(brief.get(key, d) if brief.get(key) is not None else d))
     opt = lambda items, cur: "".join("<option value='" + e(v) + "'" + (" selected" if v == cur else "") + ">"
                                      + e(l) + "</option>" for v, l in items)
-    tpl_opts = "<option value=''>— none —</option>" + opt([(key, t["label"]) for key, t in plans.TEMPLATES.items()],
-                                                          brief.get("template") or "")
     obj_opts = opt([("awareness", "Awareness"), ("engagement", "Engagement"), ("traffic", "Traffic (visits and clicks)"),
                     ("balanced", "Balanced")], plan["objective"])
-    plat_opts = opt([(p, p) for p in plans.PLATFORMS], plan["platform"])
+    on = plan.get("platforms") or [plan["platform"]]
+    plat_boxes = "".join("<label class='tick'><input type='checkbox' name='p_" + p + "' value='1'" + (" checked" if p in on else "")
+                         + "><span>" + e(p) + "</span></label>" for p in plans.PLATFORMS)
     cat_opts = opt([(key, v[0]) for key, v in plans.CATEGORIES.items()], plan["category"])
     use_campaign = bool(k) and brief.get("source") != "tiers"
     tiers_in = "".join("<div><label>" + e(plans.TIER_LABEL[t]) + " — posts</label><input name='n_" + t
@@ -4729,133 +4727,84 @@ def planner_page(k, brief, plan, house, lib, error=None, message=None):
                + " onchange='this.form.submit()'><span>Plan by posts per tier</span></label></div>")
     form = ("<form method='get' action='" + u("/planner") + "' class='card'>"
             + ("<input type='hidden' name='id' value='" + str(k["id"]) + "'>" if k else "")
-            + "<div class='row'><div style='flex:2'><label>Start from a template</label><select name='template' "
-              "onchange=\"this.form.querySelector('[name=apply_template]').value='1';this.form.submit()\">" + tpl_opts + "</select>"
-              "<input type='hidden' name='apply_template' value=''></div>"
-              "<div><label>Objective</label><select name='objective'>" + obj_opts + "</select></div>"
-              "<div><label>Main platform</label><select name='platform'>" + plat_opts + "</select></div>"
-              "<div><label>Product category</label><select name='category'>" + cat_opts + "</select></div></div>"
-            + "<div class='row'><div><label>Client budget — what the client pays (SAR, before VAT)</label>"
+            + "<div class='row'><div><label>Objective</label><select name='objective'>" + obj_opts + "</select></div>"
+              "<div style='flex:2'><label>Platforms (each post counts on every ticked platform)</label>"
+              "<div class='ticks'>" + plat_boxes + "</div><input type='hidden' name='sub' value='1'></div>"
+              "<div><label>Product category</label><select name='category'>" + cat_opts + "</select></div>"
+              "<div><label>Client budget (SAR, before VAT)</label>"
               "<input name='budget' inputmode='numeric' value='" + q("budget") + "' placeholder='e.g. 25000'></div>"
               "<div><label>Tracked links</label><select name='links'>" + opt([("", "No affiliate links"), ("1", "Yes — each creator has a link")],
-                                                                              "1" if plan["links"] else "") + "</select></div></div>"
+                                                                              "1" if plan["links"] else "") + "</select></div>"
+              "<div><label>Stories tracked</label><select name='stories'>" + opt([("", "No — Reels only"), ("1", "Yes")],
+                                                                                  brief.get("stories") or "") + "</select></div></div>"
             + src + "<div class='row'>" + tiers_in + "</div>"
             + "<button class='btn'>Calculate</button></form>")
 
-    house_p = house.get(plan["platform"]) or {}
-    bm = plan.get("benchmark") or {}
-    def bench(key):
-        if key == "views" and bm.get("view_rate"):
-            return "%g–%g%% of followers per video" % tuple(bm["view_rate"])
-        if key == "reach":
-            return "≈ %d%% of views" % round((bm.get("reach_per_view") or 0.85) * 100)
-        if key in ("engagement", "er") and bm.get("eng_rate"):
-            return "%g–%g%% of views" % tuple(bm["eng_rate"])
-        if key == "clicks" and bm.get("ctr"):
-            return "%g–%g%% of views" % tuple(bm["ctr"])
-        return ""
-    def ours(key):
-        if not house_p.get("posts"):
-            return "<span class='muted'>no data yet</span>"
-        if key == "views" and house_p.get("view_rate") is not None:
-            return "%.1f%% of followers <span class='muted'>(%d videos)</span>" % (house_p["view_rate"], house_p["posts"])
-        if key in ("engagement", "er") and house_p.get("eng_rate") is not None:
-            return "%.2f%% of views" % house_p["eng_rate"]
-        return "<span class='muted'>—</span>"
     est_s, est_x, fl, tgt = plan["estimate"]["safe"], plan["estimate"]["expected"], plan["floor"], plan["target"]
+    keys = [key for key in ("posts", "views", "engagement", "er", "clicks") if key in tgt or key in est_s]
     rows = ""
-    for key in ("posts", "views", "reach", "engagement", "er", "clicks"):
-        if key not in tgt and key not in est_s:
-            continue
-        lead = key in plan["primary"]
+    for key in keys:
         chk = next((c for c in plan["checks"] if c["key"] == key), None)
         flag = ""
         if chk:
             flag = (" <span class='pill live'>clears value</span>" if chk["ok"]
                     else " <span class='pill warn'>below value</span>")
-        rows += ("<tr" + (" class='rec-lead'" if lead else "") + "><td><strong>" + e(PLAN_LABEL[key]) + "</strong>"
-                 + (" <span class='pill own'>headline</span>" if lead else "") + "</td>"
+        rows += ("<tr><td><strong>" + e(PLAN_LABEL[key]) + "</strong></td>"
                  + "<td class='right'>" + _fmt(key, fl.get(key)) + "</td>"
                  + "<td class='right'>" + _fmt(key, est_s.get(key)) + flag + "</td>"
                  + "<td class='right muted'>" + _fmt(key, est_x.get(key)) + "</td>"
                  + "<td class='right'><input form='apply' name='target_" + key + "' value='"
-                 + e(tgt.get(key) if tgt.get(key) is not None else "") + "' inputmode='decimal' style='width:120px;text-align:right'></td>"
-                 + "<td class='muted' style='font-size:var(--t-xs,12px)'>" + bench(key) + "</td>"
-                 + "<td style='font-size:var(--t-xs,12px)'>" + ours(key) + "</td></tr>")
-    roi = plan.get("roi") or {}
-    roi_html = ""
-    if roi:
-        c = roi["ceilings"]
-        def line(lbl, key):
-            if not c.get(key) or roi["safe"].get(key) is None:
-                return ""
-            v = roi["safe"][key]
-            gr = "live" if v <= c[key][1] else ("warn" if v <= c[key][0] else "dead")
-            word = {"live": "strong value", "warn": "fair value", "dead": "poor value"}[gr]
-            return ("<tr><td>" + lbl + "</td><td class='right'><strong>SAR %.2f</strong></td><td class='right muted'>SAR %.2f</td>"
-                    "<td class='right muted'>≤ %g good · ≤ %g acceptable</td><td><span class='pill %s'>%s</span></td></tr>"
-                    % (v, roi["expected"][key] or 0, c[key][1], c[key][0], gr, word))
-        roi_html = ("<h2>Return on the budget</h2><div class='card'><table><thead><tr><th>Cost per result</th>"
-                    "<th class='right'>At the safe estimate</th><th class='right'>At expected</th><th class='right'>Ceiling</th><th></th></tr></thead><tbody>"
-                    + line("Per 1,000 views (CPM)", "cpm") + line("Per engagement", "cpe") + line("Per link click", "cpc")
-                    + "</tbody></table><p class='price-hint'>The ceiling is the most a client should pay per result for the campaign "
-                      "to be fair value. The value floor in the table above is the budget divided by that ceiling.</p></div>")
-    tiers = plan.get("tiers") or {}
-    tier_rows = "".join("<tr><td>" + e(plans.TIER_LABEL[t]) + "</td><td class='right'>" + str(tiers[t]["posts"])
-                        + "</td><td class='right'>" + _fmt("views", tiers[t]["views"][0]) + "</td><td class='right muted'>"
-                        + _fmt("views", tiers[t]["views"][1]) + "</td><td class='right'>" + _fmt("engagement", tiers[t]["engagement"][0])
-                        + "</td></tr>" for t in plans.TIERS if t in tiers)
+                 + e(tgt.get(key) if tgt.get(key) is not None else "") + "' inputmode='decimal' style='width:120px;text-align:right'></td></tr>")
+    calc = ("<h2>Calculation</h2><div class='card'><table><thead><tr><th>KPI</th>"
+            "<th class='right'>Value floor<br><small>budget ÷ ceiling</small></th><th class='right'>Safe estimate</th>"
+            "<th class='right'>Expected</th><th class='right'>Target to agree</th></tr></thead><tbody>" + rows
+            + "</tbody></table><p class='price-hint' style='margin-top:10px'>Views = followers × view rate × posts. "
+              "Engagement = views × engagement rate × category factor. Clicks = views × click-through, with tracked links only. "
+              "Target = the lower of the value floor and the safe estimate."
+            + ("" if brief.get("stories") == "1" else " Stories are not tracked, so the goals cover Reels and videos only.")
+            + "</p></div>")
+    sumrows = "".join("<tr><td><strong>" + e(PLAN_LABEL[key]) + "</strong></td><td class='right'>" + _fmt(key, est_s.get(key))
+                      + "</td><td class='right'>" + _fmt(key, est_x.get(key)) + "</td></tr>"
+                      for key in ("views", "engagement", "er", "clicks") if est_s.get(key) is not None)
+    summary = ("<h2>Summary</h2><div class='card'><table><thead><tr><th>Goal</th><th class='right'>Commit (safe)</th>"
+               "<th class='right'>Aim (expected)</th></tr></thead><tbody>" + sumrows + "</tbody></table></div>") if sumrows else ""
+
     saved = json.dumps(plan)
-    apply = ""
     if k:
         apply = ("<form method='post' action='" + u("/planner/apply") + "' id='apply' class='savebar'>"
                  "<input type='hidden' name='id' value='" + str(k["id"]) + "'>"
                  "<input type='hidden' name='objective' value='" + e(plan["objective"]) + "'>"
                  "<input type='hidden' name='template' value='" + e(brief.get("template") or "") + "'>"
                  "<input type='hidden' name='plan' value='" + e(saved) + "'>"
-                 "<button class='btn'>Save as this campaign's goals</button>"
-                 "<span class='price-hint' style='margin-left:12px'>Saves the targets (edit any figure first), the objective "
-                 "and the benchmark the client sees on Goals. The budget and costs stay internal.</span></form>")
+                 "<button class='btn'>Save as this campaign's goals</button></form>")
     else:
-        apply = "<form id='apply'></form><p class='price-hint'>Open the planner from a campaign to save these as its goals.</p>"
-    notes = "".join("<li>" + e(n) + "</li>" for n in plan["notes"])
-    lib_json = json.dumps(lib, indent=1, ensure_ascii=False)
-    body = ((_head(k, "plan", error, message) if k else ui.header("ROI planner", "Price a pitch from a budget before a campaign exists.", crumbs=[("Selections and campaigns", None), ("ROI planner", None)]) + _notes(error, message))
-            + "<div class='card' style='background:#fff8ec;border-color:#f3d9a8'><strong>The ROI calculator is the main tool now.</strong> "
-              "It does everything on this page and also measures real selections and campaigns. "
-              "<a href='" + u("/calculator") + ("?id=" + str(k["id"]) if k else "") + "'>Open the calculator</a>. "
-              "This older page stays for editing the <a href='#library'>benchmark library</a>.</div>"
-            + "<p class='price-hint'>Brief in, numbers out. The target to agree is the <strong>minimum accepted</strong>: "
-              "the lower of what the budget must buy to be fair value and what the creators can safely deliver — "
-              "so we commit to it and beat it.</p>"
-            + form
-            + "<h2>Targets</h2><div class='card'><table><thead><tr><th>KPI</th><th class='right'>Value floor<br><small>budget ÷ ceiling</small></th>"
-              "<th class='right'>Safe estimate</th><th class='right'>Expected</th><th class='right'>Target to agree</th>"
-              "<th>Industry guide</th><th>HelloVoice past campaigns</th></tr></thead><tbody>" + rows + "</tbody></table>"
-            + ("<ul class='price-hint' style='margin-top:10px'>" + notes + "</ul>" if notes else "") + "</div>"
-            + apply + roi_html
-            + ("<h2>By creator size</h2><div class='card'><table><thead><tr><th>Tier</th><th class='right'>Posts</th>"
-               "<th class='right'>Views, safe</th><th class='right'>Views, expected</th><th class='right'>Engagement, safe</th></tr></thead><tbody>"
-               + tier_rows + "</tbody></table></div>" if tier_rows else "")
-            + "<h2>How the numbers are worked out</h2><div class='card price-hint' style='font-size:var(--t-sm,13px);line-height:1.6'>"
-              "<p><strong>Views</strong> = each creator's followers × the view rate for their size (safe / expected) × posts. "
-              "<strong>Reach</strong> = views × unique-viewer share. <strong>Engagement</strong> = views × engagement rate, "
-              "adjusted for the product category. <strong>Clicks</strong> = views × click-through, only with tracked links.</p>"
-              "<p><strong>Value floor</strong> = budget ÷ the most a client should pay per 1,000 views, per engagement or per click. "
-              "<strong>Target</strong> = the lower of the floor and the safe estimate.</p>"
-              "<p><strong>Creator score</strong> on the report (0–100) rewards the results each creator delivered, as a share of the best creator's result: "
-              "awareness: views &amp; reach 70, engagement 20, clicks 10 · engagement: 20 / 70 / 10 · traffic: 20 / 20 / 60 · balanced: 45 / 35 / 20. "
-              "With no tracking links the clicks part is dropped and the others scale up to 100. Nothing is compared with followers or outside benchmarks.</p></div>"
-            + benchmark_refs()
-            + "<details id='library' style='margin-top:20px'><summary><strong>Benchmark library</strong> — edit the guide ranges</summary>"
-              "<form method='post' action='" + u("/planner/library") + "' class='card' style='margin-top:10px'>"
-              + ("<input type='hidden' name='back' value='" + str(k["id"]) + "'>" if k else "")
-              + "<p class='price-hint'>Per platform: view_rate and eng_rate per tier as [safe, expected] %; ctr [safe, expected] %; "
-                "cpm, cpe, cpc as [acceptable, good] SAR ceilings; reach_per_view 0–1. Save with your own numbers once "
-                "campaigns give us better ones.</p>"
-              "<textarea name='library' rows='22' style='font-family:ui-monospace,monospace;font-size:var(--t-xs,12px)'>" + e(lib_json) + "</textarea>"
-              "<div class='savebar'><button class='btn small'>Save library</button>"
-              "<button class='btn small ghost' name='reset' value='1'>Reset to defaults</button></div></form></details>")
+        apply = "<form id='apply'></form>"
+
+    cf = plans.CATEGORIES[plan["category"]][1]
+    tier_bench = other = ""
+    for pl in on:
+        L = lib.get(pl) or {}
+        if not L.get("view_rate"):
+            continue
+        brows = "".join("<tr><td>" + e(plans.TIER_LABEL[t]) + "</td><td class='right'>%g–%g%%</td><td class='right'>%g–%g%%</td></tr>"
+                        % (tuple(L["view_rate"][t]) + tuple(L["eng_rate"][t])) for t in plans.TIERS)
+        tier_bench += ("<h2>Benchmarks — " + e(pl) + "</h2><div class='card'><table><thead><tr><th>Creator size</th>"
+                       "<th class='right'>View rate<br><small>% of followers per video</small></th>"
+                       "<th class='right'>Engagement rate<br><small>% of views</small></th></tr></thead><tbody>" + brows
+                       + "</tbody></table><table style='margin-top:14px'><thead><tr><th>Factor</th><th class='right'>Safe / acceptable</th>"
+                       "<th class='right'>Expected / good</th></tr></thead><tbody>"
+                       "<tr><td>Link click-through (%% of views)</td><td class='right'>%g%%</td><td class='right'>%g%%</td></tr>"
+                       "<tr><td>CPM ceiling (SAR)</td><td class='right'>%g</td><td class='right'>%g</td></tr>"
+                       "<tr><td>CPE ceiling (SAR)</td><td class='right'>%g</td><td class='right'>%g</td></tr>"
+                       "<tr><td>CPC ceiling (SAR)</td><td class='right'>%g</td><td class='right'>%g</td></tr></tbody></table></div>"
+                       % (tuple(L["ctr"]) + tuple(L["cpm"]) + tuple(L["cpe"]) + tuple(L["cpc"])))
+    catrows = "".join("<tr" + (" class='rec-lead'" if key == plan["category"] else "") + "><td>" + e(v[0])
+                      + "</td><td class='right'>%g</td></tr>" % v[1] for key, v in plans.CATEGORIES.items())
+    cat_bench = ("<div class='card'><table><thead><tr><th>Industry</th><th class='right'>Engagement factor</th></tr></thead><tbody>"
+                 + catrows + "</tbody></table></div>")
+
+    body = ((_head(k, "plan", error, message) if k else ui.header("ROI planner", "Goals from a budget and a creator mix.", crumbs=[("Selections and campaigns", None), ("ROI planner", None)]) + _notes(error, message))
+            + form + calc + apply + summary + tier_bench + cat_bench)
     return page(("%s — Goals & ROI" % k["name"]) if k else "ROI planner", body, "/campaigns")
 
 

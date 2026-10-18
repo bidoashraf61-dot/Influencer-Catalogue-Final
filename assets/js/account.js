@@ -387,6 +387,20 @@
     if (h1) { h1.setAttribute("tabindex", "-1"); h1.focus(); }
     toast(0, text);
   }
+  // Admins: delete any selection (History can restore it); one a campaign still uses points to the campaign instead.
+  function adminDeleteSelection(s, btn) {
+    confirmDelete({ title: "Delete “" + s.name + "”?", action: "Delete selection",
+      body: "It leaves every list and its briefs go with it. You can bring it back from History in the admin. A selection a campaign uses can't be deleted here: delete the campaign instead.",
+      run: function () {
+        return api("POST", "/api/hub/delete", { kind: "selection", ref: s.id }).then(function (r) {
+          if (!(r.b && r.b.ok)) return (r.b && r.b.message) || "Couldn't delete it. Please try again.";
+          DATA.selections = DATA.selections.filter(function (x) { return x.token !== s.token; });
+          HUB.list = null; HUB.detail = {}; ALLC.items = null;
+          afterDelete("Selection deleted.");
+          return null;
+        });
+      } }, btn);
+  }
   function deleteSelection(s, btn) {
     confirmDelete({ title: "Delete “" + s.name + "”?", action: "Delete selection",
       body: "It leaves your profile and its link stops opening, for you and your colleagues. Your approvals and notes on it go too. HelloVoice keeps a copy for your account manager.",
@@ -426,6 +440,41 @@
     var f = HV().lifecycleChip;
     return f ? f(q) : h("span", { class: "lc-chip lc-chip--" + q.key }, h("i", { "aria-hidden": "true" }), q.label);
   }
+  // Share from any profile (owner, 2026-10-18): the Share button on a selection or campaign opens an email box and a
+  // Copy link button. A new person gets the email, signs in or up with that address, and it lands on their list.
+  // The server decides who may share: the owner, an invited editor, HelloVoice, or the account manager.
+  function pShare(kind, it) {
+    var box = h("div", { class: "kc-sharebox", hidden: "" }), msg = h("p", { class: "kc-sharebox__msg", role: "status" });
+    var email = h("input", { type: "email", inputmode: "email", autocomplete: "off", placeholder: "name@company.com", "aria-label": "Email to share with" });
+    var role = kind === "campaign" ? h("select", { "aria-label": "Access" }, h("option", { value: "view" }, "View only"), h("option", { value: "edit" }, "View and edit")) : null;
+    var go = h("button", { class: "hc-btn hc-btn--ink hc-btn--sm", type: "submit" }, "Send invite");
+    var form = h("form", { class: "kc-sharebox__form", novalidate: "" }, email, role, go);
+    var link = kind === "campaign" ? "campaign/dashboard/#t=" + encodeURIComponent(it.token) : "selection/#s=" + encodeURIComponent(it.token);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = email.value.trim(); if (!v) { note(msg, "Type an email address.", true); email.focus(); return; }
+      go.disabled = true; note(msg, "Sending…");
+      var body = kind === "campaign" ? { t: it.token, action: "invite", email: v, role: role.value } : { token: it.token, do: "add", email: v };
+      api("POST", kind === "campaign" ? "/api/campaign/share" : "/api/selection/invite", body).then(function (r) {
+        go.disabled = false;
+        var ok = !!(r.b && r.b.ok);
+        note(msg, (r.b && r.b.message) || (ok ? "Invited. They get an email with the link; it appears on their list when they sign in or sign up." : "Couldn't share that."), !ok);
+        if (ok) email.value = "";
+      });
+    });
+    var copyBtn = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button" }, icon("link"), " Copy link");
+    copyBtn.addEventListener("click", function () { copy(new URL(ROOT + link, location.href).href, copyBtn, "Link copied"); });
+    box.appendChild(h("p", { class: "kc-sharebox__t" }, "Share this with someone by email. They sign in, or sign up, with that address."));
+    box.appendChild(form); box.appendChild(copyBtn); box.appendChild(msg);
+    var btn = h("button", { class: "kc-share", type: "button", "aria-expanded": "false", "aria-label": "Share " + (it.name || "") }, icon("link"), " Share");
+    btn.addEventListener("click", function () {
+      var opening = box.hasAttribute("hidden");
+      if (opening) box.removeAttribute("hidden"); else box.setAttribute("hidden", "");
+      btn.setAttribute("aria-expanded", opening ? "true" : "false");
+      if (opening) email.focus();
+    });
+    return [btn, box];
+  }
   function renderSelections(p) {
     add(p, head("Selections", "Approve the creators you want and reject the ones you don't. Your account manager sees every change and quotes the approved list.",
       h("a", { class: "hc-btn hc-btn--line hc-btn--sm", href: ROOT + "#cat-roster" }, "Browse creators")));
@@ -439,13 +488,17 @@
     DATA.selections.forEach(function (s) {
       var c = s.counts;
       // Delete only on the client's own selections: never a colleague's or one HelloVoice shared.
-      var del = s.can_delete ? delBtn("Delete " + s.name, function () { deleteSelection(s, this); }) : null;
-      list.appendChild(h("li", null, actRow(ROOT + "selection/#s=" + encodeURIComponent(s.token),
+      var del = s.can_delete ? delBtn("Delete " + s.name, function () { deleteSelection(s, this); })
+        : (s.admin_delete ? delBtn("Delete " + s.name, function () { adminDeleteSelection(s, this); }) : null);
+      var sh = pShare("selection", s);
+      var li = h("li", null, actRow(ROOT + "selection/#s=" + encodeURIComponent(s.token),
         h("div", null, h("span", { class: "hc-row__name" }, s.name), " ", qchip(s.quote),
           h("div", { class: "hc-row__meta" },
             h("span", null, plural(c.creators, "creator") + (c.doctors ? " · " + plural(c.doctors, "doctor") : "")),
             statusSigs(c), h("span", null, (s.owner ? s.owner + "'s · " : "") + "updated " + ago(s.updated_at)))),
-        [s.mine && c.review ? "Review" : "Open", h("span", { class: "hc-sr" }, " " + s.name), " ", icon("arrow")], del)));
+        [s.mine && c.review ? "Review" : "Open", h("span", { class: "hc-sr" }, " " + s.name), " ", icon("arrow")], h("span", { class: "hc-row__share" }, sh[0], del)));
+      li.appendChild(sh[1]);
+      list.appendChild(li);
     });
     add(p, list);
   }
@@ -494,7 +547,7 @@
     return dl;
   }
   function scorebug(c) {
-    var u = DATA.user, p = pace(c);
+    var u = DATA.user, p = pace(c), gg = c.goal_grades || {};
     var brands = h("div", { class: "ac-bug__brands" });
     if (u.logo) { brands.appendChild(h("img", { src: imgUrl("logo", u.logo), alt: u.company || "" })); brands.appendChild(h("span", { class: "ac-bug__x", "aria-hidden": "true" }, "×")); }
     brands.appendChild(h("img", { class: "ac-bug__hv", src: ROOT + "assets/brand/logo.png", alt: "HelloVoice" }));
@@ -504,9 +557,9 @@
       h("div", { class: "ac-bug__row" }, h("h2", { class: "ac-bug__title" }, c.name), stamp(c.verdict)),
       scorelineDl([
         ["Views", big(c.views), null, null],
-        ["Reach", big(c.reach), null, h("span", { class: "ac-muted" }, "people reached")],
-        ["Engagement", c.er != null ? c.er.toFixed(1) : "—", c.er != null ? "%" : null, c.er_grade ? sig(c.er_grade) : null],
-        ["Posts live", String(c.delivered), c.planned ? "/" + c.planned : null, p ? sig(p.grade, p.label) : null]
+        ["Engagement", (c.engagement || 0).toLocaleString("en-US"), null, null],
+        ["Avg eng. rate", c.er != null ? c.er.toFixed(2) : "—", c.er != null ? "%" : null, (gg.er || c.er_grade) ? sig(gg.er || c.er_grade) : null],
+        ["Posts live", String(c.delivered), c.planned ? "/" + c.planned : null, gg.posts ? sig(gg.posts) : (p ? sig(p.grade, p.label) : null)]
       ]),
       h("div", { class: "ac-bug__go" }, h("a", { class: "hc-btn", href: ROOT + "campaign/#t=" + encodeURIComponent(c.token) }, "Open the full report")));
   }
@@ -530,9 +583,9 @@
       h("a", { class: "hc-btn hc-btn--ink hc-btn--sm", href: ROOT + "campaign/dashboard/" }, icon("chart"), " Campaign tracking")));
     var live = DATA.campaigns.filter(function (c) { return c.status === "live"; });
     var rest = DATA.campaigns.filter(function (c) { return c.status !== "live"; });
-    live.forEach(function (c) { add(p, scorebug(c)); });
+    live.forEach(function (c) { add(p, scorebug(c)); var sh = pShare("campaign", c); add(p, h("div", { class: "kc-sharewrap" }, sh[0], sh[1])); });
     if (rest.length) add(p, h("div", null, h("h2", { class: "hc-h2", style: "margin-bottom:14px" }, live.length ? "Earlier campaigns" : "Your campaigns"),
-      h("div", { class: "ac-grid" }, rest.map(campaignCard))));
+      h("div", { class: "ac-grid" }, rest.map(function (c, i) { var el = campaignCard(c, i), sh = pShare("campaign", c); el.appendChild(h("div", { class: "kc-sharewrap" }, sh[0], sh[1])); return el; }))));
     if (!DATA.campaigns.length) {
       add(p, h("div", { class: "hc-empty" }, h("b", null, "No campaigns yet"),
         h("p", null, "When HelloVoice runs a campaign for you, it goes live here with its report, and your bell tells you."),
@@ -955,10 +1008,43 @@
   function kStat(term, fig, sub) {
     return h("div", null, h("dt", null, term), h("dd", { class: "hc-score__fig" }, fig), h("dd", { class: "hc-score__sub" }, sub));
   }
-  function kRow(href, name, side, meta) {
-    return h("li", null, h("a", { class: "kc-row", href: href },
+  // A key account manager shares her own selection or campaign from the card (owner, 2026-10-18): an email gets
+  // the link (a new person signs up with it), or she copies the link.
+  function kShare(sp, name) {
+    var box = h("div", { class: "kc-sharebox", hidden: "" }), msg = h("p", { class: "kc-sharebox__msg", role: "status" });
+    var email = h("input", { type: "email", inputmode: "email", autocomplete: "off", placeholder: "client@company.com", "aria-label": "Client email" });
+    var role = sp.kind === "campaign" ? h("select", { "aria-label": "Access" }, h("option", { value: "view" }, "View only"), h("option", { value: "edit" }, "View and edit")) : null;
+    var go = h("button", { class: "hc-btn hc-btn--ink hc-btn--sm", type: "submit" }, "Send");
+    var form = h("form", { class: "kc-sharebox__form", novalidate: "" }, email, role, go);
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var v = email.value.trim(); if (!v) { note(msg, "Type an email address.", true); email.focus(); return; }
+      go.disabled = true; note(msg, "Sending…");
+      api("POST", "/api/hub/share", { kind: sp.kind, ref: sp.id, email: v, role: role ? role.value : "edit" }).then(function (r) {
+        go.disabled = false;
+        note(msg, (r.b && r.b.message) || (r.b && r.b.ok ? "Shared." : "Couldn't share that."), !(r.b && r.b.ok));
+        if (r.b && r.b.ok) email.value = "";
+      });
+    });
+    var copyBtn = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button" }, icon("link"), " Copy link");
+    copyBtn.addEventListener("click", function () { copy(new URL(ROOT + sp.link, location.href).href, copyBtn, "Link copied"); });
+    box.appendChild(h("p", { class: "kc-sharebox__t" }, "Share with a client. They sign in or sign up with that email and it lands on their list."));
+    box.appendChild(form); box.appendChild(copyBtn); box.appendChild(msg);
+    var btn = h("button", { class: "kc-share", type: "button", "aria-expanded": "false", "aria-label": "Share " + name }, icon("link"), " Share");
+    btn.addEventListener("click", function () {
+      var open = box.hasAttribute("hidden");
+      if (open) box.removeAttribute("hidden"); else box.setAttribute("hidden", "");
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+      if (open) email.focus();
+    });
+    return [btn, box];
+  }
+  function kRow(href, name, side, meta, share) {
+    var li = h("li", null, h("a", { class: "kc-row", href: href },
       h("span", { class: "kc-row__top" }, h("span", { class: "kc-row__name" }, name), side || null),
       meta ? h("span", { class: "kc-row__meta" }, meta) : null));
+    if (share && share.id) { var parts = kShare(share, name); li.appendChild(parts[0]); li.appendChild(parts[1]); li.className = "kc-row--share"; }
+    return li;
   }
   function kCol(id, title, n, body, empty) {
     return h("section", { class: "kc__col", "aria-labelledby": id },
@@ -982,13 +1068,15 @@
       if (n.rejected) meta.push(h("span", { class: "hc-sig hc-sig--no" }, n.rejected + " rejected"));
       if (n.review) meta.push(h("span", null, n.review + " to review"));
       if (!n.creators) meta.push(h("span", null, "No creators yet"));
-      sels.appendChild(kRow(ROOT + "selection/#s=" + encodeURIComponent(s.token), s.name, qchip(s.quote), meta));
+      sels.appendChild(kRow(ROOT + "selection/#s=" + encodeURIComponent(s.token), s.name, qchip(s.quote), meta,
+        { kind: "selection", id: s.id, link: "selection/#s=" + encodeURIComponent(s.token) }));
     });
     var camps = h("ul", { class: "kc__rows" });
     c.campaigns.forEach(function (k) {
       var meta = [h("span", null, h("b", null, k.posts + (k.planned ? "/" + k.planned : "")), (k.planned || k.posts) === 1 ? " post captured" : " posts captured"),
                   h("span", null, h("b", null, big(k.views)), " views")];
-      camps.appendChild(kRow(ROOT + "campaign/dashboard/#t=" + encodeURIComponent(k.token), k.name, campStatus(k), meta));
+      camps.appendChild(kRow(ROOT + "campaign/dashboard/#t=" + encodeURIComponent(k.token), k.name, campStatus(k), meta,
+        { kind: "campaign", id: k.id, link: "campaign/dashboard/#t=" + encodeURIComponent(k.token) }));
     });
     var a = c.analyses;
     var trio = h("dl", { class: "kc__trio" },
@@ -1080,7 +1168,7 @@
   // Share panel: email a client, hand it to an account manager (admins), copy its link. Nothing priced
   // is shown. Companies load as a list; a company's people and items load when it is opened.
 
-  var HUB = { list: null, kams: [], role: "", err: null, q: "", f: "all", open: {}, detail: {}, share: null };
+  var HUB = { list: null, kams: [], role: "", err: null, q: "", f: "all", view: "companies", open: {}, openP: {}, detail: {}, share: null, shareMode: "all" };
 
   function hubLoad() {
     return api("GET", "/api/hub/companies").then(function (r) {
@@ -1104,7 +1192,7 @@
   function kamSelect(cur, label, blank, onpick) {
     var sel = h("select", { class: "hb-kam", "aria-label": label },
       h("option", { value: "" }, blank));
-    HUB.kams.forEach(function (k) { sel.appendChild(h("option", { value: k.email }, k.name || k.email)); });
+    HUB.kams.forEach(function (k) { sel.appendChild(h("option", { value: k.email }, (k.name && k.name !== k.email.split("@")[0] ? k.name + " · " : "") + k.email)); });
     sel.value = cur || "";
     sel.addEventListener("change", function () { onpick(sel.value, sel); });
     return sel;
@@ -1126,7 +1214,7 @@
     var q = HUB.q.trim().toLowerCase();
     if (q && (c.name + " " + c.domain).toLowerCase().indexOf(q) < 0) return false;
     if (HUB.f === "live") return c.live > 0;
-    if (HUB.f === "nokam") return !c.kam.email && c.key !== "handed";
+    if (HUB.f === "nokam") return !c.kam.email && c.key !== "handed" && c.key !== "unassigned" && c.key !== "team";
     return true;
   }
   function itemStatus(kind, it) {
@@ -1134,16 +1222,86 @@
     var lab = it.status === "live" ? "Live" : it.status === "ended" ? "Completed" : (it.draft_by_client ? "Draft · client started" : "Draft");
     return h("span", { class: "hb-chip hb-chip--" + (it.status === "live" ? "live" : it.status === "ended" ? "completed" : "draft") }, lab);
   }
-  function sharePanel(kind, it, closeFn) {
+  // Move to another client (item 129 phase 2): search an account, confirm, done. Goes through "Assign to client",
+  // so History records it and the client's bell rings.
+  function movePanel(kind, it, solo) {
+    var box = h("div", { class: "hb-share__col hb-move" }), msg = h("p", { class: "hb-share__msg", role: "status" });
+    var q = h("input", { type: "search", autocomplete: "off", placeholder: "Search a client or company", "aria-label": "Move to client" });
+    var res = h("ul", { class: "hb-move__res", "aria-label": "Matching clients" }), timer = null, picked = null;
+    var confirmBox = h("div", { class: "hb-move__ok", hidden: "" });
+    function pick(u) {
+      picked = u; res.textContent = ""; q.value = "";
+      var tell = h("input", { type: "checkbox", checked: "" });
+      var yes = h("button", { class: "hc-btn hc-btn--ink hc-btn--sm", type: "button" }, "Confirm move");
+      var no = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button", onclick: function () { picked = null; confirmBox.hidden = true; confirmBox.textContent = ""; note(msg, ""); } }, "Cancel");
+      confirmBox.textContent = ""; confirmBox.hidden = false;
+      add(confirmBox, [h("p", null, "Move ", h("b", null, it.name), " to ", h("b", null, u.name || u.email), u.company ? " (" + u.company + ")" : "", "?"),
+        h("small", null, "The campaign moves with its selection, brief and everything attached."),
+        h("label", { class: "hb-move__opt" }, tell, "Tell the client (bell)"), h("div", { class: "hb-move__btns" }, yes, no)]);
+      yes.addEventListener("click", function () {
+        yes.disabled = true; note(msg, "Moving…");
+        api("POST", "/api/hub/move", { kind: kind, ref: it.id, to: u.id, code: u.kind === "code" ? u.code_id : null, related: true, tell: tell.checked }).then(function (r) {
+          yes.disabled = false;
+          var ok = !!(r.b && r.b.ok);
+          note(msg, (r.b && r.b.message) || (ok ? "Moved." : "Couldn't move that."), !ok);
+          if (ok) { HUB.share = null; HUB.detail = {}; HUB.list = null; ALLC.items = null; renderSection(); hubSay((r.b && r.b.message) || "Moved.", false); }
+        });
+      });
+    }
+    function search() {
+      var v = q.value.trim(); res.textContent = "";
+      if (v.length < 2) return;
+      api("GET", "/api/hub/people?q=" + encodeURIComponent(v)).then(function (r) {
+        var list = (r.b && r.b.people) || [];
+        if (!list.length) { res.appendChild(h("li", { class: "hb-none" }, "No client matches.")); return; }
+        list.forEach(function (u) {
+          res.appendChild(h("li", null, h("button", { type: "button", onclick: function () { pick(u); } },
+            h("b", null, u.name || u.email), u.kind === "team" ? h("span", { class: "hb-chip hb-chip--approved" }, "Account manager") : null,
+            h("small", null, [u.email, u.company].filter(Boolean).join(" · ")))));
+        });
+      });
+    }
+    q.addEventListener("input", function () { clearTimeout(timer); timer = setTimeout(search, 250); });
+    add(box, [h("b", null, solo ? "Assign this " + kind + " to a client" : "Move to another client"), h("small", null, HUB.role === "admin" ? "Search a client, an access code, or a BlueHolding account manager (to hold it for now and share it with their client later). The campaign moves with its selection, brief and everything attached." : "Pick one of your own clients."), q, res, confirmBox, msg]);
+    return box;
+  }
+  // Delete a campaign: one explicit confirm, then it goes (History can bring it back).
+  function deletePanel(kind, it, closeFn) {
+    var msg = h("p", { class: "hb-share__msg", role: "status" });
+    var both = h("input", { type: "checkbox", checked: "" });
+    var yes = h("button", { class: "hc-btn hc-btn--sm hb-danger", type: "button" }, kind === "campaign" ? "Delete campaign" : "Delete selection");
+    var no = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button", onclick: closeFn }, "Cancel");
+    yes.addEventListener("click", function () {
+      yes.disabled = true; note(msg, "Deleting…");
+      api("POST", "/api/hub/delete", { kind: kind, ref: it.id, with_selection: both.checked }).then(function (r) {
+        yes.disabled = false;
+        var ok = !!(r.b && r.b.ok);
+        note(msg, (r.b && r.b.message) || (ok ? "Deleted." : "Couldn't delete that."), !ok);
+        if (ok) { HUB.share = null; HUB.detail = {}; HUB.list = null; ALLC.items = null; renderSection(); hubSay((r.b && r.b.message) || "Deleted.", false); }
+      });
+    });
+    return h("div", { class: "hb-share hb-share--solo", role: "alertdialog", "aria-label": "Delete " + it.name },
+      h("div", { class: "hb-share__col" }, h("b", null, "Delete “" + it.name + "”?"),
+        h("small", null, "Its report and tracking links stop working at once. You can bring it back from History in the admin."),
+        kind === "campaign" ? h("label", { class: "hb-move__opt" }, both, "Also delete its selection and brief (unless another campaign uses the selection)") : null,
+        h("div", { class: "hb-move__btns" }, yes, no), msg),
+      h("button", { class: "hb-share__x", type: "button", "aria-label": "Close", onclick: closeFn }, "×"));
+  }
+  function sharePanel(kind, it, closeFn, mode) {
+    if (mode === "assign") {
+      return h("div", { class: "hb-share hb-share--solo", role: "group", "aria-label": "Assign " + it.name }, movePanel(kind, it, true),
+        h("button", { class: "hb-share__x", type: "button", "aria-label": "Close", onclick: closeFn }, "×"));
+    }
     var admin = HUB.role === "admin", msg = h("p", { class: "hb-share__msg", role: "status" });
     var email = h("input", { type: "email", inputmode: "email", autocomplete: "off", placeholder: "name@company.com", "aria-label": "Client email" });
     var go = h("button", { class: "hc-btn hc-btn--ink hc-btn--sm", type: "submit" }, "Share");
-    var form = h("form", { class: "hb-share__form", novalidate: "" }, email, go);
+    var role = kind === "campaign" ? h("select", { class: "hb-kam", "aria-label": "Access" }, h("option", { value: "view" }, "View only"), h("option", { value: "edit" }, "View and edit")) : null;
+    var form = h("form", { class: "hb-share__form", novalidate: "" }, email, role, go);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       var v = email.value.trim(); if (!v) { note(msg, "Type an email address.", true); email.focus(); return; }
       go.disabled = true; note(msg, "Sending…");
-      api("POST", "/api/hub/share", { kind: kind, ref: it.id, email: v }).then(function (r) {
+      api("POST", "/api/hub/share", { kind: kind, ref: it.id, email: v, role: role ? role.value : "edit" }).then(function (r) {
         go.disabled = false;
         note(msg, (r.b && r.b.message) || (r.b && r.b.ok ? "Shared." : "Couldn't share that."), !(r.b && r.b.ok));
         if (r.b && r.b.ok) email.value = "";
@@ -1152,57 +1310,109 @@
     var copyBtn = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button" }, icon("link"), " Copy link");
     copyBtn.addEventListener("click", function () { copy(new URL(ROOT + it.link, location.href).href, copyBtn, "Link copied"); });
     return h("div", { class: "hb-share", role: "group", "aria-label": "Share " + it.name },
-      h("div", { class: "hb-share__col" }, h("b", null, "Share with a client"), h("small", null, "They sign in (or sign up) with that email and can view and edit this " + kind + ". They are emailed the link."), form, msg),
-      admin ? h("div", { class: "hb-share__col" }, h("b", null, "Hand to an account manager"), h("small", null, "They see and manage it on top of their own clients, and are told by email."),
-        kamSelect(it.kam, "Account manager for " + it.name, "No account manager", function (v) {
-          hubSetKam(kind, it.id, v, function () { it.kam = v; renderSection(); });
-        })) : null,
+      h("div", { class: "hb-share__col" }, h("b", null, "Share with a client"), h("small", null, "They sign in (or sign up) with that email. " + (kind === "campaign" ? "Pick view only or view and edit. Edit also opens its selection. " : "They can view and edit it. ") + "They are emailed the link."), form, msg),
+      movePanel(kind, it),
       h("div", { class: "hb-share__col" }, h("b", null, "Copy the client link"), h("small", null, "The link opens for people who already have access."), copyBtn),
       h("button", { class: "hb-share__x", type: "button", "aria-label": "Close sharing", onclick: closeFn }, "×"));
   }
-  function itemRow(kind, it) {
-    var key = kind + ":" + it.id, shown = HUB.share === key;
+  // Assign KAM (owner, 2026-10-18): pick the account manager; the campaign moves with its selection, brief and everything attached
+  // under THEIR account, and an access code it came from is removed when it is left empty.
+  function kamPanel(kind, it, closeFn) {
+    var msg = h("p", { class: "hb-share__msg", role: "status" }), confirmBox = h("div", { class: "hb-move__ok", hidden: "" }),
+        list = h("ul", { class: "hb-move__res", "aria-label": "Account managers" });
+    HUB.kams.forEach(function (k) {
+      list.appendChild(h("li", null, h("button", { type: "button", onclick: function () { pick(k); } }, h("b", null, k.name || k.email), h("small", null, k.email))));
+    });
+    function pick(k) {
+      var tell = h("input", { type: "checkbox", checked: "" });
+      var yes = h("button", { class: "hc-btn hc-btn--ink hc-btn--sm", type: "button" }, "Confirm assign");
+      var no = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button", onclick: function () { confirmBox.hidden = true; confirmBox.textContent = ""; note(msg, ""); } }, "Cancel");
+      confirmBox.textContent = ""; confirmBox.hidden = false;
+      add(confirmBox, [h("p", null, "Assign ", h("b", null, it.name), " to ", h("b", null, k.name || k.email), "?"),
+        h("small", null, "The campaign moves with its selection, brief and everything attached, and is filed under " + (k.name || k.email) + "'s account. " +
+          "An access code it came from is removed once nothing else uses it. They can then share it with their client."),
+        h("label", { class: "hb-move__opt" }, tell, "Tell them (email and bell)"), h("div", { class: "hb-move__btns" }, yes, no)]);
+      yes.addEventListener("click", function () {
+        yes.disabled = true; note(msg, "Assigning…");
+        api("POST", "/api/hub/assign-kam", { kind: kind, ref: it.id, kam: k.email, tell: tell.checked }).then(function (r) {
+          yes.disabled = false;
+          var ok = !!(r.b && r.b.ok);
+          note(msg, (r.b && r.b.message) || (ok ? "Assigned." : "Couldn't assign that."), !ok);
+          if (ok) { HUB.share = null; HUB.detail = {}; HUB.list = null; ALLC.items = null; renderSection(); hubSay((r.b && r.b.message) || "Assigned.", false); }
+        });
+      });
+    }
+    return h("div", { class: "hb-share hb-share--solo", role: "group", "aria-label": "Assign a KAM to " + it.name },
+      h("div", { class: "hb-share__col" }, h("b", null, "Assign a KAM to this " + kind), h("small", null, "Choose the BlueHolding account manager who will hold it."), list, confirmBox, msg),
+      h("button", { class: "hb-share__x", type: "button", "aria-label": "Close", onclick: closeFn }, "×"));
+  }
+  // One card per campaign, with its selection inside it: they are one package (move, assign, share and delete act on both).
+  function itemRow(kind, it, co) {
+    var key = kind + ":" + it.id, mode = HUB.share === key ? HUB.shareMode : "";
+    var shown = mode === "all", assigning = mode === "assign", deleting = mode === "delete", kaming = mode === "kam";
+    var flagged = !!(co && co.key === "unassigned");
+    function toggle(m) { return function () { if (HUB.share === key && HUB.shareMode === m) { HUB.share = null; } else { HUB.share = key; HUB.shareMode = m; } renderSection(); }; }
     var open = h("a", { class: "hb-open", href: ROOT + it.link, target: "_blank", rel: "noopener" }, "Open ", icon("arrow"));
-    var shareBtn = h("button", { class: "hb-sharebtn", type: "button", "aria-expanded": shown ? "true" : "false",
-      onclick: function () { HUB.share = shown ? null : key; renderSection(); } }, icon("link"), "Share");
+    var openSel = kind === "campaign" && it.package ? h("a", { class: "hb-open", href: ROOT + it.package.link, target: "_blank", rel: "noopener" }, "Open selection ", icon("arrow")) : null;
+    var kamBtn = it.can_kam ? h("button", { class: "hb-assignbtn hb-kambtn", type: "button", "aria-expanded": kaming ? "true" : "false", onclick: toggle("kam") }, icon("users"), "Assign KAM") : null;
+    var assignBtn = h("button", { class: "hb-assignbtn" + (flagged && !kamBtn ? " is-primary" : ""), type: "button", "aria-expanded": assigning ? "true" : "false", onclick: toggle("assign") }, icon("users"), "Assign client");
+    var shareBtn = h("button", { class: "hb-sharebtn", type: "button", "aria-expanded": shown ? "true" : "false", onclick: toggle("all") }, icon("link"), "Share");
+    var delBtn = (kind === "campaign" || (kind === "selection" && HUB.role === "admin")) ? h("button", { class: "hb-delbtn", type: "button", "aria-expanded": deleting ? "true" : "false", onclick: toggle("delete") }, "Delete") : null;
+    var pkg = kind === "campaign" && it.package;
     var row = h("li", { class: "hb-it" },
       h("div", { class: "hb-it__main" },
         h("b", null, it.name), itemStatus(kind, it),
-        h("small", null, kind === "selection" ? plural(it.creators, "creator") : (it.has_selection ? "Has a selection" : "No selection yet")
-          + (it.kam ? "" : "")),
-        it.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(it.kam)) : null),
-      h("div", { class: "hb-it__act" }, open, shareBtn));
-    if (shown) row.appendChild(sharePanel(kind, it, function () { HUB.share = null; renderSection(); }));
+        kind === "selection" ? h("small", null, plural(it.creators, "creator")) : (it.has_selection ? null : h("small", null, "No selection yet")),
+        it.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(it.kam)) : null,
+        it.owner ? h("small", { class: "hb-it__owner" }, "Filed under " + it.owner.label) : null),
+      pkg ? h("div", { class: "hb-it__sel" }, h("span", { class: "hb-it__tag" }, "Selection"), h("b", null, pkg.name), h("small", null, plural(pkg.creators, "creator")),
+        h("span", { class: "hb-chip hb-chip--" + (pkg.status.key || "draft") }, pkg.status.label || "")) : null,
+      h("div", { class: "hb-it__act" },
+        h("div", { class: "hb-it__grp hb-it__grp--view" }, open, openSel),
+        h("div", { class: "hb-it__grp hb-it__grp--manage" }, kamBtn, assignBtn, shareBtn),
+        delBtn ? h("div", { class: "hb-it__grp hb-it__grp--danger" }, delBtn) : null));
+    var close = function () { HUB.share = null; renderSection(); };
+    if (shown) row.appendChild(sharePanel(kind, it, close, "all"));
+    if (assigning) row.appendChild(sharePanel(kind, it, close, "assign"));
+    if (kaming) row.appendChild(kamPanel(kind, it, close));
+    if (deleting) row.appendChild(deletePanel(kind, it, close));
     return row;
   }
   function personBlock(p, co) {
     var admin = HUB.role === "admin";
-    var head = h("div", { class: "hb-p__head" },
-      h("div", { class: "hb-p__who" }, h("b", null, p.name || p.email), h("small", null, [p.job_title, p.email].filter(Boolean).join(" · ")),
+    var pk = (co.key || "") + ":" + (p.id || p.email || p.name), open = !!HUB.openP[pk];
+    var pbtn = h("button", { class: "hb-p__btn", type: "button", "aria-expanded": open ? "true" : "false",
+      onclick: function () { HUB.openP[pk] = !open; renderSection(); } },
+      h("span", { class: "hb-p__who" }, h("b", null, p.name || p.email), h("small", null, [p.job_title, p.email].filter(Boolean).join(" · ")),
         p.last_login_at ? h("small", null, "Last in " + ago(p.last_login_at)) : null),
-      admin && p.id ? h("label", { class: "hb-lab" }, "KAM", kamSelect(p.kam && p.kam !== (co.kam && co.kam.email) ? p.kam : "", "Account manager for " + (p.name || p.email),
+      h("span", { class: "hb-p__n" }, plural(p.selections.length, "selection") + " · " + plural(p.campaigns.length, "campaign")),
+      h("span", { class: "hb-chev", "aria-hidden": "true", html: '<svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' }));
+    var head = h("div", { class: "hb-p__head" }, pbtn,
+      admin && p.id && !p.staff ? h("label", { class: "hb-lab" }, "KAM", kamSelect(p.kam && p.kam !== (co.kam && co.kam.email) ? p.kam : "", "Account manager for " + (p.name || p.email),
         co.kam && co.kam.email ? "Follows the company (" + kamName(co.kam.email) + ")" : "No account manager", function (v) {
           hubSetKam("person", p.id, v, function () { p.kam = v || (co.kam && co.kam.email) || ""; renderSection(); });
         })) : (p.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(p.kam)) : null));
     var sels = h("ul", { class: "hb-items" }), camps = h("ul", { class: "hb-items" });
-    p.selections.forEach(function (x) { sels.appendChild(itemRow("selection", x)); });
-    p.campaigns.forEach(function (x) { camps.appendChild(itemRow("campaign", x)); });
-    return h("section", { class: "hb-p" }, head,
+    var loose = p.selections.filter(function (x) { return !x.in_campaign; });
+    loose.forEach(function (x) { sels.appendChild(itemRow("selection", x, co)); });
+    p.campaigns.forEach(function (x) { camps.appendChild(itemRow("campaign", x, co)); });
+    return h("section", { class: "hb-p" + (open ? " is-open" : "") }, head, open ?
       h("div", { class: "hb-p__cols" },
-        h("div", null, h("h4", null, "Selections ", h("span", null, String(p.selections.length))), p.selections.length ? sels : h("p", { class: "hb-none" }, "No selections.")),
-        h("div", null, h("h4", null, "Campaigns ", h("span", null, String(p.campaigns.length))), p.campaigns.length ? camps : h("p", { class: "hb-none" }, "No campaigns."))));
+        h("div", null, h("h4", null, "Campaigns, each with its selection ", h("span", null, String(p.campaigns.length))), p.campaigns.length ? camps : h("p", { class: "hb-none" }, "No campaigns.")),
+        h("div", null, h("h4", null, "Selections without a campaign ", h("span", null, String(loose.length))), loose.length ? sels : h("p", { class: "hb-none" }, "None."))) : null);
   }
   function companyBlock(c) {
     var admin = HUB.role === "admin", open = !!HUB.open[c.key], det = HUB.detail[c.key];
     var btn = h("button", { class: "hb-co__btn", type: "button", "aria-expanded": open ? "true" : "false", "aria-controls": "hb-" + c.key.replace(/[^a-z0-9]/gi, "_"),
       onclick: function () { HUB.open[c.key] = !open; if (!open && !HUB.detail[c.key]) hubDetail(c.key); renderSection(); } },
-      h("span", { class: "hb-co__name" }, h("b", null, c.name), c.domain ? h("small", null, c.domain) : null),
+      h("span", { class: "hb-co__name" }, h("b", null, c.name), c.domain ? h("small", null, c.domain) : (c.note ? h("small", null, c.note) : null)),
       h("span", { class: "hb-co__n" }, plural(c.people, "person", "people") + " · " + plural(c.selections, "selection") + " · " + plural(c.campaigns, "campaign") + (c.live ? " · " + c.live + " live" : "")),
       h("span", { class: "hb-chev", "aria-hidden": "true", html: '<svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' }));
     var kam = admin && c.domain ? h("label", { class: "hb-lab" }, "KAM", kamSelect(c.kam.email, "Account manager for " + c.name, "No account manager", function (v) {
       hubSetKam("company", c.domain, v, function () { c.kam = { email: v, name: kamName(v) }; HUB.detail = {}; renderSection(); if (HUB.open[c.key]) hubDetail(c.key); });
     })) : (c.kam && c.kam.email ? h("small", { class: "hb-it__kam" }, "KAM " + (c.kam.name || kamName(c.kam.email))) : null);
-    var li = h("li", { class: "hb-co" + (open ? " is-open" : "") }, h("div", { class: "hb-co__row" }, btn, kam));
+    if (open && !det) hubDetail(c.key);               // reopened after a move: fetch again
+    var li = h("li", { class: "hb-co" + (open ? " is-open" : "") + (c.key === "unassigned" ? " hb-co--flag" : "") }, h("div", { class: "hb-co__row" }, btn, kam));
     if (open) {
       var body = h("div", { class: "hb-co__body", id: "hb-" + c.key.replace(/[^a-z0-9]/gi, "_") });
       if (det === "loading" || !det) body.appendChild(h("p", { class: "hb-none", role: "status" }, "Loading…"));
@@ -1213,9 +1423,59 @@
     }
     return li;
   }
+  /* ------------------------------------------------------ All campaigns (flat) */
+  // Every campaign in one searchable list, wherever it is filed (a client, a team account, an access code, nobody).
+  // Same actions as the tree: Open, Assign client, Share, Delete.
+  var ALLC = { q: "", items: null, total: 0, busy: false, timer: null };
+  function loadAllCampaigns(more) {
+    if (ALLC.busy) return;
+    ALLC.busy = true;
+    var off = more && ALLC.items ? ALLC.items.length : 0;
+    api("GET", "/api/hub/campaigns?q=" + encodeURIComponent(ALLC.q) + "&offset=" + off).then(function (r) {
+      ALLC.busy = false;
+      if (r.b && r.b.ok) { ALLC.items = (more && ALLC.items ? ALLC.items : []).concat(r.b.items); ALLC.total = r.b.total; HUB.role = r.b.role || HUB.role; }
+      else ALLC.items = ALLC.items || [];
+      if (SECTION === "companies" && HUB.view === "campaigns") renderSection();
+    });
+  }
+  function renderAllCampaigns(p) {
+    var q = h("input", { class: "hb-search", type: "search", placeholder: "Search a campaign, brand, client or who it is filed under", "aria-label": "Search campaigns", value: ALLC.q });
+    q.addEventListener("input", function () {
+      ALLC.q = q.value; clearTimeout(ALLC.timer);
+      ALLC.timer = setTimeout(function () { ALLC.items = null; ALLC.refocus = true; renderSection(); }, 300);
+    });
+    add(p, h("div", { class: "hb-tools" }, q));
+    add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" }));
+    if (ALLC.refocus) { ALLC.refocus = false; setTimeout(function () { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }, 0); }
+    if (!ALLC.items) {
+      add(p, h("div", { class: "kc-skel", "aria-hidden": "true" }, h("i"), h("i"), h("i")));
+      add(p, h("p", { class: "hc-sr", role: "status" }, "Loading the campaigns"));
+      if (!HUB.kams.length) { hubLoad(); }
+      loadAllCampaigns(false);
+      return;
+    }
+    add(p, h("p", { class: "hb-none" }, plural(ALLC.total, "campaign") + (ALLC.q ? " match" : " in all")));
+    var list = h("ul", { class: "hb-items hb-items--flat" });
+    ALLC.items.forEach(function (c) { list.appendChild(itemRow("campaign", c, null)); });
+    add(p, ALLC.items.length ? list : h("div", { class: "hc-empty" }, h("b", null, "No campaign matches"), h("p", null, "Try another search.")));
+    if (ALLC.items.length < ALLC.total) {
+      add(p, h("button", { class: "hc-btn hc-btn--line", type: "button", onclick: function () { loadAllCampaigns(true); } }, "Show more campaigns"));
+    }
+  }
+  function hubViewBar() {
+    var bar = h("div", { class: "kc-filter hb-views", role: "group", "aria-label": "View" });
+    [["companies", "Companies"], ["campaigns", "All campaigns"]].forEach(function (v) {
+      bar.appendChild(h("button", { class: "kc-chip", type: "button", "aria-pressed": HUB.view === v[0] ? "true" : "false",
+        onclick: function () { HUB.view = v[0]; HUB.share = null; if (v[0] === "campaigns") ALLC.items = null; renderSection(); } }, v[1]));
+    });
+    return bar;
+  }
+
   function renderCompanies(p) {
     if (!DATA.hub) { renderOverview(p); return; }
-    add(p, head("Companies", "Every company, its people, and their selections and campaigns. Open anything as the client sees it, share it with a client, or hand it to an account manager."));
+    add(p, head("Companies", "Every company, its people, and their campaigns with their selections. Open anything as the client sees it, assign it to a client, share it, or hand it to an account manager."));
+    add(p, hubViewBar());
+    if (HUB.view === "campaigns") { renderAllCampaigns(p); return; }
     if (HUB.err) { add(p, h("div", { class: "hc-empty" }, h("b", null, "Companies"), h("p", null, HUB.err))); return; }
     if (!HUB.list) {
       add(p, h("div", { class: "kc-skel", "aria-hidden": "true" }, h("i"), h("i"), h("i")));
@@ -1223,7 +1483,7 @@
       hubLoad();
       return;
     }
-    var all = HUB.list.filter(function (c) { return c.key !== "handed"; });
+    var all = HUB.list.filter(function (c) { return c.key !== "handed" && c.key !== "unassigned" && c.key !== "team"; });
     var stats = { people: 0, sel: 0, camp: 0, live: 0 };
     all.forEach(function (c) { stats.people += c.people; stats.sel += c.selections; stats.camp += c.campaigns; stats.live += c.live; });
     add(p, h("dl", { class: "hc-score hc-score--4" },
@@ -1235,7 +1495,7 @@
     q.addEventListener("input", function () { HUB.q = q.value; var pos = q.selectionStart; renderSection(); var n = document.querySelector(".hb-search"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } });
     var bar = h("div", { class: "kc-filter", role: "group", "aria-label": "Show" });
     [["all", "All companies", HUB.list.length], ["live", "With a live campaign", HUB.list.filter(function (c) { return c.live > 0; }).length],
-     ["nokam", "No account manager", HUB.list.filter(function (c) { return !c.kam.email && c.key !== "handed"; }).length]].forEach(function (f) {
+     ["nokam", "No account manager", HUB.list.filter(function (c) { return !c.kam.email && c.key !== "handed" && c.key !== "unassigned" && c.key !== "team"; }).length]].forEach(function (f) {
       bar.appendChild(h("button", { class: "kc-chip", type: "button", "aria-pressed": HUB.f === f[0] ? "true" : "false",
         onclick: function () { HUB.f = f[0]; renderSection(); } }, f[1], h("span", null, String(f[2]))));
     });

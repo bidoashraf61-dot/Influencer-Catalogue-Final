@@ -529,7 +529,7 @@ def handoff_event(code_id, user, thread_id, selection_token, reason, origin="", 
         lines.append("%s: %s" % ("Client" if m["role"] == "user" else "Helvi", " ".join(str(m["content"]).split())[:400]))
     link, sel_name = None, None
     sel = db.selection(token=selection_token) if selection_token else None
-    if sel is not None and (sel["code_id"] is None or sel["code_id"] in portal.team_codes(code_id)):
+    if sel is not None and (portal.opens(code_id, sel)):
         link, sel_name = (origin or "") + "/selection/#s=" + sel["token"], sel["name"]
     who = ("%s, %s" % (user["name"], user["company"] or "") if user else "An access-code client")
     contact = (user["email"] + (" · " + user["phone"] if user["phone"] else "")) if user else "-"

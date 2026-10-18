@@ -790,7 +790,7 @@
     var head = h("div", { class: "pt-menu__head" }, h("b", { class: "pt-menu__name" }, name));
     var sub = u ? [u.job_title, u.company].filter(Boolean).join(" · ") || u.email : ME.kind === "admin" ? "Administrator" : "Signed in with an access code";
     // A person with admin access is just a label on their own account: same profile, same data.
-    if (ME.staff) sub = "Administrator" + (sub ? " · " + sub : "");
+    if (ME.staff || ME.kam) sub = (ME.kam ? "Account manager" : "Administrator") + (sub ? " · " + sub : "");
     if (sub) head.appendChild(h("span", { class: "pt-menu__sub" }, sub));
     menu.appendChild(head);
     function item(label, act, extra, cls) {
@@ -807,21 +807,21 @@
     // Admin access, one switch: reveal locked data (analysis, ideas, owner-only tools). Off by default;
     // everything else stays as it is, including this account.
     // Admin mode: the Control Centre, one tap away, for team members only. Clients never see it.
-    var isTeam = ME.staff || ME.kind === "admin";
+    var isTeam = ME.staff || ME.kam || ME.kind === "admin";
     if (isTeam) {
       btn.classList.add("pt-avatar--admin");
-      btn.appendChild(h("i", { class: "pt-avatar__admin", "aria-hidden": "true" }, "Admin"));
-      btn.setAttribute("aria-label", "Account menu, admin");
+      btn.appendChild(h("i", { class: "pt-avatar__admin", "aria-hidden": "true" }, ME.kam ? "KAM" : "Admin"));
+      btn.setAttribute("aria-label", ME.kam ? "Account menu, account manager" : "Account menu, admin");
       var cc = h("a", { class: "pt-cc", role: "menuitem", href: API + "/" });
       cc.appendChild(h("span", { class: "pt-cc__ico", "aria-hidden": "true", html: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="4" width="7" height="7" rx="1.5"/><rect x="4" y="13" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/></svg>' }));
-      cc.appendChild(h("span", { class: "pt-cc__txt" }, h("b", null, "Control Centre"), h("small", null, "Creators, clients, campaigns, settings")));
+      cc.appendChild(h("span", { class: "pt-cc__txt" }, h("b", null, "Control Centre"), h("small", null, ME.kam ? "Your selections, campaigns and clients" : "Creators, clients, campaigns, settings")));
       cc.appendChild(h("span", { class: "pt-cc__arr", "aria-hidden": "true" }, "\u2192"));
       cc.addEventListener("click", function () { toggle(false); });
       menu.appendChild(cc);
       var editOn = HV.editMode && HV.editMode.on();
-      var esw = item("Edit on this page", { go: function () { HV.editMode.set(!HV.editMode.on()); } },
+      var esw = ME.kam ? null : item("Edit on this page", { go: function () { HV.editMode.set(!HV.editMode.on()); } },
         h("span", { class: "pt-menu__badge", style: "background:" + (editOn ? "#e8ff76" : "rgba(18,18,18,.08)") + ";color:#121212" }, editOn ? "On" : "Off"));
-      esw.setAttribute("role", "menuitemcheckbox"); esw.setAttribute("aria-checked", editOn ? "true" : "false");
+      if (esw) { esw.setAttribute("role", "menuitemcheckbox"); esw.setAttribute("aria-checked", editOn ? "true" : "false"); }
     }
     // View as client (owner, 2026-10-15): the pages exactly as the client sees them, one tap back.
     if (ME.staff || ME.as_client) {

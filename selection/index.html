@@ -5,17 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
-<title>Selection — HelloVoice</title>
-<link rel="icon" href="../assets/icons/icon-32.png" type="image/png"/>
-<link rel="apple-touch-icon" href="../assets/icons/icon-180.png"/>
-<link rel="stylesheet" href="../assets/css/catalogue.css?v=64c37ceb"/>
-<link rel="stylesheet" href="../assets/css/portal.css?v=d90469e8"/>
+<title>Selection — HELVi Connect</title>
+<script src="../assets/js/hv-loader.js?v=8d3ddf8e" data-tone="light" data-wait="all"></script>
+<link rel="icon" href="../assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
+<link rel="apple-touch-icon" href="../assets/brand/helvy-connect/helvy-icon-180.png?v=c4"/>
+<link rel="stylesheet" href="../assets/css/catalogue.css?v=b3c5f0ff"/>
+<link rel="stylesheet" href="../assets/css/portal.css?v=43d27fec"/>
+<link rel="stylesheet" href="../assets/css/connect.css?v=15677cc7"/>
+<link rel="stylesheet" href="../assets/css/evidence.css?v=dd2d6efa"/>
 </head>
 <body class="cat-locked" data-page="selection">
 
 <div class="cat-gate" id="cat-gate">
   <div class="cat-gate__inner">
-    <img class="cat-gate__logo" src="../assets/brand/logo-knockout.webp" alt="HelloVoice"/>
+    <img class="cat-gate__logo" src="../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
+         srcset="../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, ../assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
+         alt="HELVi Connect" width="320" height="160"/>
     <p class="cat-gate__eyebrow">Confidential</p>
     <h1 class="cat-gate__title">Selection</h1>
     <p class="cat-gate__note">Enter the access code you were given.</p>
@@ -30,39 +35,77 @@
 
 <main class="cat-app" id="cat-app" hidden>
 
-  <header class="cat-hero">
-    <div class="cat-pad"><div class="cat-container">
+  <header class="cat-hero cat-hero--cover cat-hero--short cat-hero--desk">
+    <!-- A shortlist, drawn: three creator cards fanned on the desk, the front
+         one ticked. The portraits are faceless flat illustrations (generated
+         on Higgsfield, 2026-10-08), never real creators. -->
+    <svg class="cat-desk" viewBox="0 0 560 420" aria-hidden="true" focusable="false">
+      <defs><clipPath id="dk-ph"><rect x="14" y="14" width="152" height="150" rx="10"/></clipPath></defs>
+      <g class="cat-desk__card" transform="translate(300 40) rotate(9 90 120)">
+        <rect width="180" height="240" rx="18"/>
+        <image class="cat-desk__photo" href="../assets/illustrations/creator-curly.jpg" x="14" y="14" width="152" height="150" preserveAspectRatio="xMidYMin slice" clip-path="url(#dk-ph)"/>
+        <rect class="cat-desk__ln" x="14" y="182" width="96" height="10" rx="5"/><rect class="cat-desk__ln" x="14" y="202" width="64" height="8" rx="4"/>
+      </g>
+      <g class="cat-desk__card" transform="translate(70 70) rotate(-8 90 120)">
+        <rect width="180" height="240" rx="18"/>
+        <image class="cat-desk__photo" href="../assets/illustrations/creator-ghutra.jpg" x="14" y="14" width="152" height="150" preserveAspectRatio="xMidYMin slice" clip-path="url(#dk-ph)"/>
+        <rect class="cat-desk__ln" x="14" y="182" width="110" height="10" rx="5"/><rect class="cat-desk__ln" x="14" y="202" width="70" height="8" rx="4"/>
+      </g>
+      <g class="cat-desk__card is-picked" transform="translate(190 120) rotate(2 90 120)">
+        <rect width="180" height="240" rx="18"/>
+        <image class="cat-desk__photo" href="../assets/illustrations/creator-shayla.jpg" x="14" y="14" width="152" height="150" preserveAspectRatio="xMidYMin slice" clip-path="url(#dk-ph)"/>
+        <rect class="cat-desk__ln" x="14" y="182" width="104" height="10" rx="5"/><rect class="cat-desk__ln" x="14" y="202" width="58" height="8" rx="4"/>
+        <circle class="cat-desk__tick" cx="152" cy="28" r="22"/><path class="cat-desk__mark" d="M141 28l8 8 15-16"/>
+      </g>
+    </svg>
+
+    <div class="cat-cover__nav"><div class="cat-pad"><div class="cat-container">
       <div class="cat-topbar">
-        <img class="cat-hero__logo" src="../assets/brand/logo.png" alt="HelloVoice"/>
-        <div class="cat-topbar__links"><a class="cat-track" href="../campaign/dashboard/">
+        <div class="cat-brand">
+          <a href="../" aria-label="HELVi Connect: back to the full catalogue"><img class="cat-hero__logo" src="../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
+               srcset="../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, ../assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
+               alt="HELVi Connect" width="320" height="160"/></a>
+        </div>
+        <div class="cat-topbar__links"><a class="cat-track cat-track--cat" href="../">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          Full catalogue
+        </a><a class="cat-track" href="../../campaign/dashboard/">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19V10M10 19V5M16 19v-6M22 19H2"/></svg>
           Campaign tracking
         </a>
-        <a class="cat-portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
-          Portfolio
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
-        </a>
       </div>
       </div>
-      <a class="cat-back" href="../">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
-        Full catalogue
-      </a>
-      <div class="cat-hero__head">
-        <div class="cat-pill">Selection</div>
-        <h1 class="cat-hero__title" id="sel-title">Selection</h1>
+    </div></div></div>
+
+    <div class="cat-cover__body"><div class="cat-pad"><div class="cat-container">
+      <div class="cat-selhead">
+        <div class="cat-selhead__lock">
+          <span class="cat-selhead__tag">Selection</span>
+          <h1 class="cat-selhead__title" id="sel-title">Selection</h1>
+        </div>
+        <p class="cat-selhead__client" id="sel-client" hidden></p>
+        <div class="cat-selhead__foot">
+          <a class="cat-back" href="../">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+            Full catalogue
+          </a>
+          <div class="cat-selhead__brief" id="sel-brief" hidden></div>
+        </div>
       </div>
-      <p class="cat-hero__lead">
-        The creators shortlisted for this campaign. Remove anyone who does not
-        fit, then send it back for a full quote.
-      </p>
-    </div></div>
+    </div></div></div>
   </header>
 
   <section class="cat-summary" aria-label="Summary">
     <div class="cat-pad"><div class="cat-container">
       <dl class="cat-summary__grid" id="sel-summary"></dl>
-      <p class="cat-note">The total is an indicative range for this shortlist as a whole. Final rates vary with campaign requirements, deliverables, exclusivity, seasonality and any special agreement, and are confirmed in the quote.</p>
+      <div class="cat-price-notice" role="note">
+        <p class="cat-price-notice__title">Please note</p>
+        <ul>
+          <li><strong>These are indicative prices, not a final price.</strong> Rates vary by creator, season, deliverables, exclusivity and campaign requirements, and are confirmed in our quote.</li>
+          <li><strong>All prices exclude taxes</strong> (VAT is added on the final quote).</li>
+          <li><strong>Prices do not include logistics,</strong> including product logistics — getting products to and from creators is quoted separately.</li>
+        </ul>
+      </div>
     </div></div>
   </section>
 
@@ -76,6 +119,10 @@
     </div>
   </section>
 
+  <section class="cat-controls cat-controls--selection" aria-label="Filters">
+    <div class="cat-pad"><div class="cat-container"></div></div>
+  </section>
+
   <section class="cat-grid-section">
     <div class="cat-pad"><div class="cat-container">
       <div class="cat-grid" id="cat-grid">
@@ -85,6 +132,11 @@
     </div></div>
   </section>
 
+  <!-- Competitor evidence (admin/evidence.py): drawn by evidence.js when a pack is shared on this selection. -->
+  <section class="ev-sec" id="sel-evidence" hidden aria-labelledby="ev-title">
+    <div class="cat-pad"><div class="cat-container" id="ev-root"></div></div>
+  </section>
+
   <section class="cat-close" id="cat-close">
     <div class="cat-pad"><div class="cat-container">
       <h2 class="cat-close__title">Happy with this selection?</h2>
@@ -92,6 +144,7 @@
         Send it back and we will come back with a full quote, deliverables and
         availability for each creator.
       </p>
+      <p class="cat-close__sub cat-close__sub--note">Prices shown are indicative and exclude taxes and logistics.</p>
       <div class="cat-close__actions">
         <button type="button" class="cat-btn cat-btn--lime" id="cat-request-2">Request a quote</button>
         <button type="button" class="cat-btn cat-btn--ghost" id="cat-copy-link">Copy link</button>
@@ -103,18 +156,23 @@
 
   <footer class="cat-footer">
     <div class="cat-pad"><div class="cat-container">
-      <img class="cat-footer__logo" src="../assets/helv/logo-knockout.webp"
-           srcset="../assets/helv/logo-knockout@2x.webp 2x"
-           alt="HelloVoice" width="760" height="166"/>
-      <p class="cat-footer__note">
-        Confidential and not for redistribution.
-        Creator identities are released on agreement.
-      </p>
-      <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
-        See the portfolio at hellovoice.co.uk
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
-      </a>
-      
+      <div class="cat-footer__top">
+        <img class="cat-footer__logo" src="../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
+             srcset="../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, ../assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
+             alt="HELVi Connect" width="320" height="160"/>
+        <a class="cat-footer__portfolio" href="https://hellovoice.co.uk" target="_blank" rel="noopener">
+          See the portfolio at hellovoice.co.uk
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg>
+        </a>
+      </div>
+      <div class="cat-footer__base">
+        <p class="cat-footer__note">
+          Confidential and not for redistribution.
+          Creator identities are released on agreement.
+        </p>
+        <p class="cat-footer__by"><span>Powered by</span><img src="../assets/brand/logo-knockout.webp" alt="HelloVoice" width="112" height="25"/><span>A BlueHolding Company</span></p>
+        <p class="cat-footer__legal"><a href="../../privacy/">Privacy</a> · <a href="../../terms/">Terms</a></p>
+      </div>
     </div></div>
   </footer>
 
@@ -123,6 +181,7 @@
       <div class="cat-tray__count"><strong id="cat-tray-n">0</strong> in this selection</div>
       <div class="cat-tray__codes" id="cat-tray-codes"></div>
       <div class="cat-tray__actions">
+        <a class="cat-btn cat-btn--ghost cat-tray__edit" href="../">Add more creators</a>
         <button type="button" class="cat-btn cat-btn--lime" id="cat-request">Request a quote</button>
       </div>
     </div>
@@ -163,11 +222,13 @@
     passHash: "760b5281",
     endpoint: "https://formsubmit.co/ajax/info@hellovoice.co.uk",
     api: "/admin",
-    tierPrice: {"Nano": [435, 870], "Micro": [870, 1740], "Mid-Tier": [1450, 2900], "Macro": [2175, 4350]},
+    tierPrice: {"Nano": [435, 870], "Micro": [870, 1740], "Macro": [2175, 9000], "Mega": [10000, 50000], "HCP - Nano": [870, 1740], "HCP - Micro": [1740, 3480], "HCP - Macro": [4350, 8700], "HCP - Mega": [20000, 100000]},
     photoBase: "../assets/catalogue/"
   };
 </script>
-<script src="../assets/js/catalogue.js?v=b1c6ea49"></script>
-<script src="../assets/js/portal.js?v=a50fe34d"></script>
+<script src="../assets/js/catalogue.js?v=1e4bcc2d"></script>
+<script src="../assets/js/portal.js?v=947bce31"></script>
+<script src="../assets/js/connect.js?v=0b2aacfd"></script>
+<script src="../assets/js/evidence.js?v=695841f9"></script>
 </body>
 </html>

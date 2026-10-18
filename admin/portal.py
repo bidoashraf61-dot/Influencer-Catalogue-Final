@@ -818,8 +818,7 @@ def team_codes(code_id):
     # team_sharing_off_domains (owner, 2026-10-11): companies whose selections stay with the one
     # account they are assigned to (plus HelloVoice), e.g. polygonpharma.com.
     private = {str(d).strip().lower() for d in (db.setting("team_sharing_off_domains") or [])}
-    if (not db.setting("team_sharing", True) or guard._matches(me["domain"] or "", guard.FREE_DOMAINS)
-            or (me["domain"] or "").lower() in private):
+    if True:   # team sharing is always off (owner, 2026-10-18): nobody sees a colleague's work unless it is shared with them
         return {code_id} | codelinks.linked_for({code_id})
     with db.connect() as conn:
         rows = conn.execute("SELECT code_id FROM users WHERE domain = ? AND status = 'active' AND deleted_at IS NULL",
@@ -827,8 +826,6 @@ def team_codes(code_id):
     mine = {r["code_id"] for r in rows} | {code_id}
     # The demo lands on every BlueHolding account (owner, 2026-10-15): the sample selections' accounts are
     # part of the team even if the account that holds them is ever deactivated or moved.
-    if (me["domain"] or "").lower() == DEMO_DOMAIN:
-        mine |= sample_codes()
     # Shared access codes HelloVoice moved onto these accounts: their selections and campaigns come along.
     return mine | codelinks.linked_for(mine)
 
@@ -850,7 +847,9 @@ def opens(cid, sel):
     """May this account open the selection: its client's team, or a grant for this one selection."""
     if sel is None or cid is None:
         return False
-    if sel["code_id"] is None or sel["code_id"] in team_codes(int(cid)):
+    if sel["code_id"] is not None and sel["code_id"] in team_codes(int(cid)):
+        return True                                  # an unfiled selection belongs to no client: only grants and the demo open it
+    if sample_member(cid, sel):
         return True
     return db.selection_granted(sel["id"], cid)
 
@@ -866,6 +865,8 @@ def opens_campaign(cid, k):
     u = user_for_code(int(cid))
     if u is not None and db.cinvite_role(k["id"], u["email"]):
         return True                              # invited by email, with a role
+    if k["selection_id"] and sample_member(cid, db.selection(k["selection_id"])):
+        return True                              # the demo campaign, for BlueHolding and HelloVoice people
     return bool(k["selection_id"]) and db.selection_granted(k["selection_id"], cid)
 
 
@@ -880,6 +881,17 @@ def owns(reader, code_id):
         return False
     import codelinks
     return int(code_id) in codelinks.linked_for({int(reader)})
+
+
+def sample_ids_for(code_id):
+    """The demo selections' ids a BlueHolding or HelloVoice account is shown on its own list."""
+    me = user_for_code(int(code_id)) if code_id is not None else None
+    if not me or (me["domain"] or "").lower() not in SAMPLE_DOMAINS:
+        return set()
+    try:
+        return {int(x) for x in (db.setting("sample_selections") or [])}
+    except (TypeError, ValueError):
+        return set()
 
 
 SAMPLE_DOMAINS = ("blueholding.co.uk", "hellovoice.co.uk")
@@ -914,7 +926,7 @@ def may_edit(reader, sel, admin_code_id=None):
     if db.selection_granted(sel["id"], reader):
         return True                                    # granted this selection: the client's own controls
     if sel["code_id"] is None:
-        return True              # an unfiled selection has no owner to protect
+        return False             # an unfiled selection is HelloVoice's: only the team edits it
     return owns(reader, sel["code_id"])
 
 

@@ -89,11 +89,13 @@ CHILDREN = {
               ("/evidence", "Competitor evidence", None), ("/calculator", "ROI calculator", None)],
     "/settings": [("/settings#kams", "Key account managers", None), ("/apis", "APIs & keys", None)],
     "/team": [("/history", "History & undo", None)],
+    "/reference": [("/reference/goal-formulas", "Goal formulas and benchmarks", None)],
 }
 STAFF_ONLY = {"/apis", "/reference", "/settings"}          # hidden from KAMs and viewers (the server refuses them anyway)
 # Pages that read across every client: a key account manager (kam_scope) is refused them, so the
 # sidebar does not offer them either.
-KAM_HIDDEN = {"/analytics", "/history"}
+KAM_HIDDEN = {"/analytics", "/history", "/roster", "/analysis", "/licences", "/clients", "/portal", "/codes", "/requests",
+              "/evidence", "/ai", "/calculator"}
 
 import threading as _threading
 _role = _threading.local()
@@ -891,7 +893,7 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
         + crumb +
         '<span class="grow"></span>'
         '<button class="search-btn" type="button" data-open-search aria-label="Search">' + icon("search", 17) + '<span>Search creators, selections…</span><kbd>⌘K</kbd></button>'
-        '<a class="iconbtn" href="' + u("/requests") + '" aria-label="Inbox">' + icon("bell", 20)
+        '<a class="iconbtn" href="' + u("/access-requests" if getattr(_role, "value", "owner") == "kam" else "/requests") + '" aria-label="Inbox">' + icon("bell", 20)
         + ('<span class="badge">%d</span>' % bell_n if bell_n else "") + '</a>'
         '<button class="iconbtn" id="help-toggle" type="button" aria-label="Guides" aria-expanded="false" aria-controls="help">' + icon("help", 20) + '</button>'
         '</header><main class="page" id="main">' + body + '</main></div></div>'

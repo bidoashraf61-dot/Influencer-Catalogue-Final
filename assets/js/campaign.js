@@ -831,12 +831,7 @@
         return '<div><span class="mx-sw" style="background:' + p[2] + '"></span>' + p[0] + "<b>" + full(p[1]) + "</b></div>";
       }).join("") + "</div></div>");
     if (R.audience && R.audience.countries.length) {
-      mix.push('<div class="mx-panel"><h3>Creators\' audience</h3>' + bars(R.audience.countries.map(function (c) {
-        return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" };
-      }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
-        + (R.audience.target ? '<p class="mx-panel__note"><b>Target market: ' + esc(countryName(R.audience.target.code)) + "</b> · "
-            + R.audience.target.pct.toFixed(0) + "% of these creators' audience" + (R.audience.target.rank ? " (#" + R.audience.target.rank + ")" : "") + "</p>" : "")
-        + '<p class="mx-panel__note">' + audNote(R.audience) + "</p></div>");
+      mix.push('<div class="mx-panel"><h3>Creators\' audience</h3>' + (R.audience ? '<p class="aud-target">' + (R.audience.target ? flag(R.audience.target.code) + '<span>Target market <b>' + esc(countryName(R.audience.target.code)) + '</b></span>' : '<span>Target market</span>') + '</p>' + '<div class="aud-stamp" role="img" aria-label="Audience not analysed yet"><span>Not analysed</span><span>yet</span></div>' : '') + '</div>');
     }
     $("mx-mix").innerHTML = mix.join("");
     decorateH3("mx-mix");

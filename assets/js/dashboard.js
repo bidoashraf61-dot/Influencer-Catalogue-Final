@@ -111,7 +111,7 @@
       bits.push(day(c.starts_at) + " – " + day(c.ends_at, true));
     }
     if (c.client) bits.unshift(esc(c.client));
-    $("db-sub").innerHTML = bits.join(" · ");
+    $("db-sub").innerHTML = bits.map(function (b) { return '<span class="db-sub__i">' + b + "</span>"; }).join("");
     var v = R.verdict || {};
     // The verdict, big and solid, with how much of the goals is reached.
     var P = R.progress || {}, pc = P.overall != null ? Math.round(P.all_met ? 100 : Math.min(99, P.overall)) : null;
@@ -318,15 +318,18 @@
   /* ------------------------------------------------------------ filters */
   function setupFilters() {
     var plats = {}; R.posts.forEach(function (p) { plats[p.platform] = 1; });
+    // a goal platform nobody has posted on yet still gets its chip, so its targets can be read at zero
+    ((R.goals || {}).platforms || []).forEach(function (p) { plats[p] = 1; });
     var list = Object.keys(plats).sort();
     $("db-platforms").innerHTML = ['<button type="button" data-p="" aria-pressed="true">All</button>'].concat(list.map(function (p) {
-      return '<button type="button" data-p="' + esc(p) + '" aria-pressed="false">' + (ICONS[p] || "") + esc(p) + "</button>";
+      return '<button type="button" data-p="' + esc(p) + '" aria-pressed="false" aria-label="' + esc(p) + '" title="' + esc(p) + '">' + (ICONS[p] || "") + '<span class="db-seg__t">' + esc(p) + "</span></button>";
     })).join("");
     $("db-platforms").addEventListener("click", function (e) {
       var b = e.target.closest("button"); if (!b) return;
       F.platform = b.getAttribute("data-p");
       [].forEach.call(this.children, function (x) { x.setAttribute("aria-pressed", x === b ? "true" : "false"); });
       renderAll();
+      if (curArea === "kpi" && !$("db-panel").hidden) openPanel("kpi");
     });
     $("db-range").addEventListener("change", function () {
       F.range = this.value; $("db-custom").hidden = F.range !== "custom"; renderAll();
@@ -345,14 +348,6 @@
       renderAll();
     });
     document.addEventListener("click", function (e) { if (!e.target.closest(".db-pick")) { $("db-creators").hidden = true; $("db-creators-btn").setAttribute("aria-expanded", "false"); } });
-    $("db-reset").addEventListener("click", function () {
-      F = { platform: "", range: "all", from: "", to: "", creators: [] };
-      [].forEach.call($("db-platforms").children, function (x, i) { x.setAttribute("aria-pressed", i === 0 ? "true" : "false"); });
-      $("db-range").value = "all"; $("db-custom").hidden = true;
-      [].forEach.call($("db-creators").querySelectorAll("input"), function (i) { i.checked = false; });
-      $("db-creators-btn").textContent = "All creators"; $("db-creators-btn").classList.remove("is-on");
-      renderAll();
-    });
   }
   function filtered() { return !!(F.platform || F.range !== "all" || F.creators.length); }
   function inRange(t) {
@@ -391,8 +386,10 @@
   }
 
   /* ------------------------------------------------------------- cards */
+  // The "i" mark: hover, keyboard focus or a tap shows the note; Esc or a tap elsewhere closes it.
+  function info(tip, what) { return '<button type="button" class="db-info" data-tip="' + esc(tip) + '" aria-label="' + esc("About " + (what || "this")) + '">i</button>'; }
   function head(icon, title, tip, area) {
-    return '<header class="db-card__head"><h2>' + icon + esc(title) + "</h2>" + (tip ? '<span class="db-info" tabindex="0" data-tip="' + esc(tip) + '">i</span>' : "")
+    return '<header class="db-card__head"><h2>' + icon + esc(title) + "</h2>" + (tip ? info(tip, title) : "")
       + (area ? '<button type="button" class="db-more" data-area="' + area + '">More ›</button>' : "") + "</header>";
   }
   function spark(vals, colour) {
@@ -410,9 +407,14 @@
     return days.map(function (d) { cv += by[d].views; ce += by[d].eng; cr += by[d].reach; cp += by[d].posts; return { d: d, views: cv, eng: ce, reach: cr, posts: cp }; });
   }
 
+  // Every curve starts from zero on the campaign's first day, so the day before the first video reads 0.
+  function fromStart(pts) {
+    var st = R.campaign && R.campaign.starts_at; if (!st || !pts.length) return pts;
+    var d = new Date(st * 1000).toISOString().slice(0, 10);
+    return d < pts[0].d ? [{ d: d, views: 0, eng: 0, reach: 0, posts: 0 }].concat(pts) : pts;
+  }
   function renderAll() {
-    $("db-reset").hidden = !filtered();
-    var list = posts(), t = sums(list), s = series(list), cl = clicksFor();
+    var list = posts(), t = sums(list), s = fromStart(series(list)), cl = clicksFor();
     // Whole-campaign totals set by HelloVoice by hand replace the measured
     // ones in the unfiltered view and are always marked as estimates.
     var adj = (!filtered() && R.total && R.total.adjusted) || [];
@@ -426,14 +428,20 @@
     var whole = !filtered() ? R.total : null;
     renderObjective();
     // KPI cards
-    var g = {}; (R.progress.items || []).forEach(function (i) { g[i.key] = i; });
-    function goal(k) { return !filtered() && g[k] ? sig(g[k].grade, "Goal " + (k === "er" ? pct(g[k].goal, 1) : num(g[k].goal))) : ""; }
+    // A platform filter on its own keeps the goal pills, measured on that platform's own targets;
+    // a platform with no goal says so instead of leaving the foot of the card empty.
+    var psc = !F.creators.length && F.range === "all" ? scope() : { mode: "none" }, pm = psc.mode === "plat", bonus = psc.mode === "bonus";
+    var g = {}; ((pm ? psc.bp.progress : R.progress).items || []).forEach(function (i) { g[i.key] = i; });
+    function goal(k) {
+      if (bonus && k !== "clicks") return '<span class="db-na__why">No goal on ' + esc(psc.pl) + " (bonus)</span>";
+      return (!filtered() || pm) && g[k] ? sig(g[k].grade, "Goal " + (k === "er" ? pct(g[k].goal, 1) : num(g[k].goal))) : "";
+    }
     var cards = [
-      ["Posts live", full(t.posts) + (!filtered() && R.total.planned ? "<small>/" + R.total.planned + "</small>" : ""), goal("posts"), spark(s.map(function (x) { return x.posts; }), COL[4]), IC.posts, "kpi"],
+      ["Posts live", full(t.posts) + (pm && g.posts ? "<small>/" + g.posts.goal + "</small>" : !filtered() && R.total.planned ? "<small>/" + R.total.planned + "</small>" : ""), goal("posts"), spark(s.map(function (x) { return x.posts; }), COL[4]), IC.posts, "kpi"],
       ["Views", t.views_hidden ? '<span class="db-na" title="This platform does not show view counts">Not shown</span>' : num(t.views) + est("views"), goal("views"), spark(s.map(function (x) { return x.views; }), COL[0]), IC.views, "trend"],
       ["Reach", t.views_hidden ? '<span class="db-na" title="Reach is worked out from views, which this platform does not show">Not shown</span>' : num(t.reach) + (isAdj("reach") ? est("reach") : reachEst() ? '<small class="db-est" title="Instagram does not show reach on reels publicly. Placeholder at ' + Math.round(((R.reach_basis && R.reach_basis.per_view) || 0.9) * 100) + '% of views (a small margin below) until the creators\' insights arrive.">est.</small>' : ""), goal("reach"), spark(s.map(function (x) { return x.reach; }), COL[3]), IC.reach, "trend"],
       ["Engagement", num(t.engagement) + est("engagement"), goal("engagement"), spark(s.map(function (x) { return x.eng; }), COL[1]), IC.engagement, "trend"],
-      ["Avg eng. rate", pct(t.er) + est("er"), !filtered() ? (g.er ? goal("er") : sig(R.total.er_grade)) : "", "", IC.er, "kpi"],
+      ["Avg eng. rate", pct(t.er) + est("er"), pm || bonus ? goal("er") : !filtered() ? (g.er ? goal("er") : sig(R.total.er_grade)) : "", "", IC.er, "kpi"],
       ["Link clicks", cl ? num(cl.clicks) + est("clicks") : '<span class="db-na">Not tracked</span>', cl && !filtered() ? (g.clicks ? goal("clicks") : sig(R.total.ctr_grade)) : '<span class="db-na__why">This campaign does not contain affiliate links</span>', "", IC.clicks, "clicks"]
     ];
     // Sections the admin switched off are left out, not shown empty.
@@ -490,6 +498,11 @@
       + goals;
   }
 
+  // The width the panel's content really has, so a chart drawn for it is not stretched.
+  function panelW() {
+    var b = $("db-panel-body"), cs = getComputedStyle(b), w = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    return Math.max(280, Math.round(w) || 600);
+  }
   function areaChart(pts, keyA, keyB, w, h) {
     if (!pts.length) return '<p class="db-note">Nothing in this view yet.</p>';
     if (pts.length === 1) pts = [{ d: pts[0].d, views: 0, eng: 0 }, pts[0]];
@@ -515,7 +528,7 @@
 
   function renderTrend(s) {
     var useHist = !filtered() && R.history && R.history.length > 1;
-    var pts = useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s;
+    var pts = fromStart(useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s);
     $("w-trend").innerHTML = head(IC.trend, "Views & engagement", "Total views (green) and engagement — likes and comments (orange) — growing over the campaign. Each line has its own scale.", "trend")
       + '<div class="db-legend"><span><i style="background:' + COL[0] + '"></i>Views</span><span><i style="background:' + COL[1] + '"></i>Engagement</span></div>'
       + '<div class="db-card__body">' + areaChart(pts, "views", "eng", 640, 200) + "</div>";
@@ -526,22 +539,31 @@
   function medal(n) { return '<svg viewBox="0 0 40 50" role="img" aria-label="Rank ' + n + '">' + medalBody(n) + "</svg>"; }
   // Creator names open their full analysis (the same page as the roster's).
   function who(c) { return '<a class="db-name" href="../../creator/#c=' + encodeURIComponent(c.code) + '" title="Open ' + esc(c.name) + '\'s full analysis">' + esc(c.name) + "</a>"; }
+  // The same 0-100 score the campaign uses, worked out on the posts in the current view: each part is a
+  // creator's result as a share of the best creator's in this view (clicks are per creator link, not per platform).
+  var viewScore = {};
   function ranked(list) {
+    viewScore = {};
     if (!filtered()) return R.creators.filter(function (c) { return c.rank; }).map(function (c) { return { c: c, v: c.score, label: c.score.toFixed(0) }; });
-    // Where a platform shows no views (Snapchat) the creator is ranked by engagement instead of being left out.
-    var by = {}; list.forEach(function (p) {
-      var x = by[p.code] = by[p.code] || { n: 0, eng: 0, hid: true }; x.n += seen(p); x.eng += p.engagement || 0; if (!(p.video && p.views_hidden)) x.hid = false;
+    var w = weights(), by = {}; list.forEach(function (p) {
+      var x = by[p.code] = by[p.code] || { n: 0, eng: 0, vw: 0, er: [] }; x.n += seen(p); x.eng += p.engagement || 0;
+      if (p.video_er != null) x.er.push(p.video_er);
     });
-    return R.creators.filter(function (c) { var x = by[c.code]; return x && (x.n || (x.hid && x.eng)); }).map(function (c) {
-      var x = by[c.code], useEng = !x.n && x.hid;
-      return { c: c, v: useEng ? x.eng : x.n, label: useEng ? num(x.eng) + " eng." : num(x.n) };
+    var rows = R.creators.filter(function (c) { return by[c.code] && (by[c.code].n || by[c.code].eng); });
+    function peak(f) { return Math.max.apply(null, rows.map(f).concat([0])) || 1; }
+    function q(c) { var e = by[c.code].er; return e.length ? e.reduce(function (a, b) { return a + b; }, 0) / e.length : 0; }
+    var pn = peak(function (c) { return by[c.code].n; }), pe = peak(function (c) { return by[c.code].eng; }), pq = peak(q), pc = peak(function (c) { return c.clicks || 0; });
+    return rows.map(function (c) {
+      var x = by[c.code], sc = 100 * ((w.exposure || 0) * x.n / pn + (w.engagement || 0) * x.eng / pe + (w.er || 0) * q(c) / pq + (w.clicks || 0) * (c.clicks || 0) / pc);
+      viewScore[c.code] = sc;
+      return { c: c, v: sc, label: sc.toFixed(0) };
     }).sort(function (a, b) { return b.v - a.v; });
   }
   function renderTop(list) {
     var rows = ranked(list).slice(0, 5);
-    $("w-top").innerHTML = head(IC.top, "Creators leaderboard", filtered() ? "Ranked by views in this view." : scoreTip(), "creators")
-      + '<div class="db-card__body">' + (filtered() ? "" : '<div class="db-top__how">' + scoreBar(true) + "</div>") + (filtered() ? '<div class="db-top__cols"><span>Creator</span><b>Reached</b></div>' : "") + (rows.map(function (r, i) {
-                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " video · " : " videos · ") + num(r.c.seen != null ? r.c.seen : r.c.views) + " views" + '</small></span><span class="db-rank__score" title="' + (filtered() ? "People reached in this view" : "Score out of 100") + '">' + r.label + "</span></div>";
+    $("w-top").innerHTML = head(IC.top, "Creators leaderboard", (filtered() ? "Score out of 100, worked out on the posts in this view. " : "") + scoreTip(), "creators")
+      + '<div class="db-card__body"><div class="db-top__how">' + scoreBar(true) + "</div>" + (rows.map(function (r, i) {
+                return '<div class="db-rank' + (i === 0 ? " is-1" : "") + '"><span class="db-rank__n">' + (i < 3 ? medal(i + 1) : i + 1) + "</span>" + ava(r.c.photo) + "<span><b>" + who(r.c) + "</b><small>" + r.c.delivered + (r.c.planned ? "/" + r.c.planned : "") + (r.c.delivered === 1 && !r.c.planned ? " video · " : " videos · ") + num(r.c.seen != null ? r.c.seen : r.c.views) + " views" + '</small></span><span class="db-rank__score" title="' + "Score out of 100" + '">' + r.label + "</span></div>";
       }).join("") || '<p class="db-note">No creators in this view.</p>') + "</div>";
   }
 
@@ -598,8 +620,7 @@
   function renderGeo() {
     var a = R.audience;
     $("w-geo").innerHTML = head(IC.geo, "Creators' audience countries", "Where the creators' own followers are, from their full profile analyses, weighted by the reach each delivered. It describes the creators' audience, not who saw the campaign posts. Creators without an analysis are not counted.", "geo")
-      + '<div class="db-card__body">' + (a && a.countries.length ? bars(a.countries.slice(0, 5).map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" }; }),
-        function (r) { return flag(r.k) + esc(countryName(r.k)); }) + audTarget(a) + '<p class="db-note">' + audNote(a) + "</p>"
+      + '<div class="db-card__body">' + (a && a.countries.length ? '<p class="aud-target">' + (a.target ? flag(a.target.code) + '<span>Target market <b>' + esc(countryName(a.target.code)) + '</b></span>' : '<span>Target market</span>') + '</p>' + '<div class="aud-stamp" role="img" aria-label="Audience not analysed yet"><span>Not analysed</span><span>yet</span></div>'
         : '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>') + "</div>";
   }
 
@@ -690,9 +711,9 @@
     var w = weights(), o = R.objective || {}, links = !!o.links;
     var tiles = [["Awareness", w.exposure || 0, "views", SCORECOL.exposure], ["Engagement", (w.engagement || 0) + (w.er || 0), "likes & comments", SCORECOL.engagement],
       ["Clicks", w.clicks || 0, links ? "link clicks" : "no tracking links in this campaign", SCORECOL.clicks]];
-    return '<h3>What this campaign is for</h3><div class="db-obj">' + tiles.map(function (t) {
-      return '<div class="db-obj__t"><i style="background:' + t[3] + '"></i><b>' + Math.round(t[1] * 100) + "%</b><span>" + t[0] + "</span><small>" + t[2] + "</small></div>"; }).join("")
-      + '</div><p class="db-note">Objective: ' + esc(o.label || "Balanced") + ". Each share is what that part is worth in a creator's score out of 100.</p>";
+    return sec("for", "What this campaign is for", "Objective: " + (o.label || "Balanced") + ". Each share is what that part is worth in a creator's score out of 100.",
+      '<div class="db-obj">' + tiles.map(function (t) {
+        return '<div class="db-obj__t"><i style="background:' + t[3] + '"></i><b>' + Math.round(t[1] * 100) + "%</b><span>" + t[0] + "</span><small>" + t[2] + "</small></div>"; }).join("") + "</div>");
   }
   function scoreTip() {
     var w = weights(), o = (R.objective || {}).label || "Balanced";
@@ -732,129 +753,295 @@
     return out ? "<h3>Videos by creator</h3>" + out : "";
   }
 
-  /* ------------------------------------------- target vs achieved (goals) */
-  // One row per agreed target: a track for the target, a bar for what is achieved, a tick for where
-  // it should be today. Click a row (not Eng. rate) for the pace chart: achieved so far against the
-  // straight line to the target. Whole-campaign by nature, so it ignores the page filters.
+  /* ------------------------------------------- goals: targets, forecast, benchmarks */
+  // The Goals & benchmarks tab, for the client. One list of targets (achieved, benchmark range, where it
+  // should be today, a status in words); click a row for its pace chart, which follows the publishing plan.
+  // One headline per section, with its description in the "i" beside it rather than a paragraph under it.
+  function sec(id, title, tip, body, aside) {
+    return '<section class="db-sec" aria-labelledby="sec-' + id + '"><header class="db-sec__h"><h3 class="db-sec__t" id="sec-' + id + '">' + esc(title) + "</h3>" + (tip ? info(tip, title) : "")
+      + (aside ? '<span class="db-sec__aside">' + aside + "</span>" : "") + "</header>" + body + "</section>";
+  }
+  function subsec(title, tip, body) {
+    return '<div class="db-sub2"><div class="db-sec__h db-sec__h--s"><h4 class="db-sec__s">' + esc(title) + "</h4>" + (tip ? info(tip, title) : "") + "</div>" + body + "</div>";
+  }
   var TV_COL = { good: "#14884a", moderate: "#e2780f", low: "#ee1515" };
+  var STW = { good: "On track", moderate: "Close", low: "Behind" };
   function tvFmt(k, v) { return v == null ? "—" : k === "er" ? pct(v) : num(v); }
+  // The Goals tab follows the page's platform filter (not the date filter: it is always measured from the start).
+  // "all": every goal platform together. "plat": one goal platform, on its own targets. "bonus": a platform
+  // with no goal. An older plan that kept no per-platform estimate shows the whole campaign ("whole").
+  function scope() {
+    var g = R.goals, pl = F.platform;
+    if (!g || !pl) return { mode: "all" };
+    if (g.platforms.indexOf(pl) < 0) return { mode: "bonus", pl: pl };
+    if (g.platforms.length === 1) return { mode: "all" };
+    var bp = g.by_platform && g.by_platform[pl];
+    return bp ? { mode: "plat", pl: pl, bp: bp } : { mode: "whole", pl: pl };
+  }
+  function GL() {
+    var g = R.goals; if (!g) return null;
+    var sc = scope();
+    return sc.mode === "plat" ? Object.assign({}, g, { creators: sc.bp.creators, forecast: sc.bp.forecast, pace: sc.bp.pace, aim: sc.bp.aim }) : g;
+  }
+  function SP() { var sc = scope(); return sc.mode === "plat" ? sc.bp.progress : R.progress; }
+  function goalPlats() { var g = R.goals, sc = scope(); return g ? (sc.mode === "plat" ? [sc.pl] : g.platforms) : []; }
+  // The platforms a plan was benchmarked for, always one entry each so every one gets its own icon.
+  function planPlats() {
+    var g = R.goals, plan = R.plan || {};
+    if (g && g.platforms && g.platforms.length) return g.platforms;
+    if (plan.platforms && plan.platforms.length) return plan.platforms;
+    return String(plan.platform || "").split("+").map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+  function stPill(cls, word) { return '<span class="db-st db-st--' + cls + '">' + esc(word) + "</span>"; }
+  // Status in words as well as colour: Met / On track / Close / Behind.
+  function tvStatus(i) { return i.actual >= i.goal ? ["good", "Met"] : [i.grade || "low", STW[i.grade] || "Behind"]; }
+  function planRange(k) {
+    var p = R.plan || {}, sf = p.safe || {}, ex = p.estimate || {}, sc = scope();
+    if (sc.mode === "plat") { var o = (p.by_platform || {})[sc.pl] || {}; sf = o.safe || {}; ex = o.expected || {}; }
+    return k !== "posts" && sf[k] != null && ex[k] != null ? tvFmt(k, sf[k]) + " – " + tvFmt(k, ex[k]) : "";
+  }
   function tvRows(items, lead) {
     return items.map(function (i) {
-      var met = i.actual >= i.goal, col = TV_COL[met ? "good" : i.grade] || TV_COL.low, isR = i.key === "er";
+      var met = i.actual >= i.goal, col = TV_COL[met ? "good" : i.grade] || TV_COL.low, isR = i.key === "er", st = tvStatus(i);
       var w = Math.min(100, i.pct), exp = isR || !i.goal ? null : Math.min(100, i.expected / i.goal * 100);
       var over = met && i.pct > 100.5 ? Math.round(i.pct - 100) : 0;
       var togo = met ? (over ? "Target met, " + over + "% over" : "Target met")
         : tvFmt(i.key, i.goal - i.actual) + (isR ? " points" : "") + " to go";
       var today = exp == null ? "" : " · should be at " + tvFmt(i.key, i.expected) + " by today";
-      var can = !isR, id = "tv-" + i.key;
-      var label = KEYN[i.key] + ": " + tvFmt(i.key, i.actual) + " of " + tvFmt(i.key, i.goal) + ", " + Math.round(i.pct) + "% of the target" + (exp == null ? "" : ", expected " + Math.round(exp) + "% by today");
-      var inner = '<span class="db-tv__top"><b>' + KEYN[i.key] + "</b>" + (lead.indexOf(i.key) >= 0 ? ' <span class="db-lead">headline</span>' : "")
+      var rng = planRange(i.key), can = !isR, id = "tv-" + i.key;
+      var label = KEYN[i.key] + ": " + tvFmt(i.key, i.actual) + " of " + tvFmt(i.key, i.goal) + ", " + Math.round(i.pct) + "% of the target" + (exp == null ? "" : ", expected " + Math.round(exp) + "% by today") + ", " + st[1];
+      var inner = '<span class="db-tv__top"><b>' + KEYN[i.key] + "</b>" + (lead.indexOf(i.key) >= 0 ? ' <span class="db-lead">headline</span>' : "") + stPill(st[0], st[1])
         + '<span class="db-tv__nums"><strong>' + tvFmt(i.key, i.actual) + "</strong> of " + tvFmt(i.key, i.goal) + "</span></span>"
         + '<span class="db-tv__track" role="img" aria-label="' + esc(label) + '"><i style="--w:' + w.toFixed(1) + "%;background:" + col + '"></i>'
         + (exp == null ? "" : '<em style="left:' + exp.toFixed(1) + '%"><u>today</u></em>') + (over ? '<s style="color:' + col + '">+' + over + "%</s>" : "") + "</span>"
         + '<span class="db-tv__sub"><span class="db-tv__pct" style="color:' + col + '">' + Math.round(i.pct) + "% met</span>" + esc(togo + today)
-        + (can ? '<svg class="db-tv__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' : "") + "</span>";
+        + (can ? '<svg class="db-tv__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' : "") + "</span>"
+        + (rng ? '<span class="db-tv__rng">Benchmark range for these creators <b>' + esc(rng) + "</b></span>" : "");
       return '<div class="db-tv__row" data-k="' + i.key + '">'
         + (can ? '<button type="button" class="db-tv__btn" aria-expanded="false" aria-controls="' + id + '">' + inner + "</button>" : '<div class="db-tv__btn db-tv__btn--static">' + inner + "</div>")
         + (can ? '<div class="db-tv__pace" id="' + id + '" hidden></div>' : "") + "</div>";
     }).join("");
   }
   function tvInfographic(items, lead) {
-    if (!items.length) return "";
-    return '<h3>Target vs achieved</h3><div class="db-tv" id="db-tv">' + tvRows(items, lead) + "</div>"
+    var tip = "Each row is one target: what is achieved so far, where the plan says it should be today, and the benchmark range, which is what creators of this size typically get. The low end is what we commit to, the high end is what we aim for. Select a row to see its pace over time.";
+    if (!items.length) return sec("targets", "Targets", tip, '<p class="db-empty">No targets set for this campaign yet.</p>');
+    return sec("targets", "Targets", tip, '<div class="db-tv" id="db-tv">' + tvRows(items, lead) + "</div>"
       + '<div class="db-legend2"><span><i class="sw" style="background:#14884a"></i>Met / on track</span><span><i class="sw" style="background:#e2780f"></i>Close</span><span><i class="sw" style="background:#ee1515"></i>Behind</span>'
-      + '<span><i class="tick"></i>Where it should be today</span><span class="db-tv__hint">Select a row for its pace</span></div>';
+      + '<span><i class="tick"></i>Where it should be today</span><span class="db-tv__hint">Select a row for its pace</span></div>');
   }
-  // The pace chart for one KPI: cumulative achieved by posting day against the straight line to the target.
-  function tvPace(item) {
-    var c = R.campaign || {};
-    if (!c.starts_at || !c.ends_at) return '<p class="db-note">Set the campaign dates to see its pace.</p>';
-    var all = R.posts.filter(function (p) { return p.section === "campaign"; });
-    var ser = series(all), key = item.key === "engagement" ? "eng" : item.key;
-    var t0 = c.starts_at, t1 = c.ends_at, now = Math.min(Date.now() / 1000, t1), W = 600, H = 190, L = 8, Rr = 592, T = 14, B = 164;
-    var span = Math.max(1, t1 - t0), ymax = Math.max(item.goal, item.actual) * 1.08 || 1;
+
+  // The pace curve follows the publishing plan: the share of the target the videos due so far should have reached.
+  function paceArr(item) { var P = (GL() || {}).pace; return P ? (item.key === "posts" ? P.posts : P.mature) : null; }
+  function paceFrac(item, t) {
+    var P = (GL() || {}).pace; if (!P) return null;
+    var arr = paceArr(item);
+    if (!arr || !arr.length) return Math.min(1, Math.max(0, (t - P.start) / Math.max(1, P.end - P.start)));
+    if (t <= arr[0][0]) return item.key === "posts" ? arr[0][1] : 0;
+    for (var n = 1; n < arr.length; n++) if (t <= arr[n][0]) { var a = arr[n - 1], b = arr[n]; return item.key === "posts" ? a[1] : a[1] + (b[1] - a[1]) * (t - a[0]) / Math.max(1, b[0] - a[0]); }
+    return arr[arr.length - 1][1];
+  }
+  function goalPosts() { var g = GL(), pls = goalPlats(); return R.posts.filter(function (p) { return p.section === "campaign" && (!g || pls.indexOf(p.platform) >= 0); }); }
+  // Chart geometry is kept on the svg so the hover and arrow-key readout draw on the same scale as the chart.
+  function paceGeom(svg) {
+    var g = {}; ["w", "h", "l", "r", "t", "b", "t0", "t1", "ymax", "now"].forEach(function (k) { g[k] = +svg.getAttribute("data-" + k); }); return g;
+  }
+  // The pace chart for one target: cumulative achieved by posting day against the pace the publishing plan sets.
+  function tvPace(item, W) {
+    var c = R.campaign || {}, P = (GL() || {}).pace || (c.starts_at && c.ends_at ? { start: c.starts_at, end: c.ends_at } : null);
+    if (!P) return '<p class="db-empty">The pace appears once the publishing dates are set.</p>';
+    var steps = item.key === "posts", key = item.key === "engagement" ? "eng" : item.key;
+    W = Math.max(260, Math.min(720, Math.round(W || 600)));
+    var H = 196, L = 10, Rr = W - 12, T = 26, B = 158;
+    var data = series(goalPosts()).map(function (r) { return { t: Date.parse(r.d + "T12:00:00Z") / 1000, v: r[key] || 0 }; });
+    var nowRaw = Date.now() / 1000;
+    var t0 = Math.min(P.start, data.length ? data[0].t - 86400 : P.start), t1 = Math.max(P.end, data.length ? data[data.length - 1].t : P.end);
+    var now = Math.min(nowRaw, t1), span = Math.max(1, t1 - t0), ymax = Math.max(item.goal, item.actual) * 1.08 || 1;
     function X(t) { return L + (Math.min(Math.max(t, t0), t1) - t0) / span * (Rr - L); }
     function Y(v) { return B - v / ymax * (B - T); }
-    var pts = [{ t: t0, v: 0 }].concat(ser.map(function (r) { return { t: Date.parse(r.d + "T12:00:00Z") / 1000, v: r[key] || 0, d: r.d }; }));
+    function f1(n) { return n.toFixed(1); }
+    function path(points) {   // [[t, v]...] -> svg points; videos land on a day, so a count steps up instead of sloping
+      var o = [], prev = null;
+      points.forEach(function (q) { var x = X(q[0]), y = Y(q[1]); if (steps && prev) o.push(f1(x) + "," + f1(prev)); o.push(f1(x) + "," + f1(y)); prev = y; });
+      return o.join(" ");
+    }
+    // achieved: rises from zero the day before the first data, so a single day still draws a line
+    var pts = data.length ? [{ t: data[0].t - 86400, v: 0 }].concat(data) : [];
     pts = pts.filter(function (q) { return q.t <= now + 86400; });
-    if (pts.length) pts.push({ t: now, v: pts[pts.length - 1].v });
-    var line = pts.map(function (q) { return X(q.t).toFixed(1) + "," + Y(q.v).toFixed(1); }).join(" ");
-    var area = pts.length > 1 ? "M" + X(pts[0].t).toFixed(1) + "," + B + " L" + line.split(" ").join(" L") + " L" + X(pts[pts.length - 1].t).toFixed(1) + "," + B + " Z" : "";
+    if (pts.length) pts.push({ t: Math.max(now, pts[pts.length - 1].t), v: pts[pts.length - 1].v });
+    var line = path(pts.map(function (q) { return [q.t, q.v]; }));
     var col = TV_COL[item.actual >= item.goal ? "good" : item.grade] || TV_COL.low;
-    var svg = '<svg class="db-tv__svg" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="' + esc(KEYN[item.key] + " achieved so far against the pace to the target of " + tvFmt(item.key, item.goal)) + '" data-t0="' + t0 + '" data-t1="' + t1 + '">'
-      + '<line x1="' + L + '" y1="' + B + '" x2="' + Rr + '" y2="' + B + '" class="ax"/><line x1="' + L + '" y1="' + Y(item.goal).toFixed(1) + '" x2="' + Rr + '" y2="' + Y(item.goal).toFixed(1) + '" class="gl"/>'
-      + '<line x1="' + X(t0).toFixed(1) + '" y1="' + Y(0).toFixed(1) + '" x2="' + X(t1).toFixed(1) + '" y2="' + Y(item.goal).toFixed(1) + '" class="pace"/>'
-      + (area ? '<path d="' + area + '" fill="' + col + '" opacity=".12"/>' : "") + (pts.length > 1 ? '<polyline points="' + line + '" fill="none" stroke="' + col + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' : "")
-      + '<line x1="' + X(now).toFixed(1) + '" y1="' + T + '" x2="' + X(now).toFixed(1) + '" y2="' + B + '" class="now"/>'
-      + '<text x="' + Rr + '" y="' + (Y(item.goal) - 5).toFixed(1) + '" text-anchor="end" class="lb">Target ' + esc(tvFmt(item.key, item.goal)) + "</text>"
-      + '<text x="' + L + '" y="' + (H - 6) + '" class="lb">' + esc(day(c.starts_at)) + '</text><text x="' + Rr + '" y="' + (H - 6) + '" text-anchor="end" class="lb">' + esc(day(c.ends_at)) + "</text>"
-      + '<line class="cur" x1="0" y1="' + T + '" x2="0" y2="' + B + '" style="display:none"/><circle class="dot" r="6" cx="0" cy="0" fill="' + col + '" style="display:none"/></svg>';
-    var last = pts.length ? pts[pts.length - 1].v : 0;
-    var ahead = item.expected != null ? last - item.expected : null;
+    var arr = paceArr(item), pp;
+    if (arr && arr.length) {
+      var a2 = arr.map(function (q) { return [q[0], item.goal * q[1]]; });
+      if (a2[0][0] > t0) a2.unshift([t0, 0]);
+      if (a2[a2.length - 1][0] < t1) a2.push([t1, a2[a2.length - 1][1]]);
+      pp = path(a2);
+    } else { steps = false; pp = path([[P.start, 0], [P.end, item.goal]]); }
+    var area = pts.length > 1 ? "M" + f1(X(pts[0].t)) + "," + B + " L" + line.split(" ").join(" L") + " L" + f1(X(pts[pts.length - 1].t)) + "," + B + " Z" : "";
+    var dots = data.length <= 16 ? data.filter(function (q) { return q.t <= now + 86400; }).map(function (q) { return '<circle cx="' + f1(X(q.t)) + '" cy="' + f1(Y(q.v)) + '" r="4.5" fill="' + col + '" stroke="#fff" stroke-width="2"/>'; }).join("") : "";
+    var nx = X(now), anc = nx > Rr - 46 ? "end" : nx < L + 46 ? "start" : "middle";
+    var attrs = ' data-w="' + W + '" data-h="' + H + '" data-l="' + L + '" data-r="' + Rr + '" data-t="' + T + '" data-b="' + B + '" data-t0="' + t0 + '" data-t1="' + t1 + '" data-ymax="' + ymax + '" data-now="' + now + '"';
+    var svg = '<svg class="db-tv__svg" viewBox="0 0 ' + W + " " + H + '" width="' + W + '" height="' + H + '" role="img" aria-label="' + esc(KEYN[item.key] + " achieved so far against the pace set by the publishing plan, target " + tvFmt(item.key, item.goal)) + '"' + attrs + ">"
+      + '<line x1="' + L + '" y1="' + B + '" x2="' + Rr + '" y2="' + B + '" class="ax"/><line x1="' + L + '" y1="' + f1(Y(item.goal)) + '" x2="' + Rr + '" y2="' + f1(Y(item.goal)) + '" class="gl"/>'
+      + '<polyline points="' + pp + '" class="pace" fill="none"/>'
+      + (area ? '<path d="' + area + '" fill="' + col + '" opacity=".12"/>' : "") + (pts.length > 1 ? '<polyline points="' + line + '" fill="none" stroke="' + col + '" stroke-width="3" stroke-linejoin="round" stroke-linecap="round"/>' : "") + dots
+      + '<line x1="' + f1(nx) + '" y1="' + (T - 6) + '" x2="' + f1(nx) + '" y2="' + B + '" class="now"/><text x="' + f1(nx) + '" y="' + (T - 10) + '" text-anchor="' + anc + '" class="lb lb--now">Today</text>'
+      + '<text x="' + Rr + '" y="' + f1(Y(item.goal) - 6) + '" text-anchor="end" class="lb">Target ' + esc(tvFmt(item.key, item.goal)) + "</text>"
+      + '<text x="' + L + '" y="' + (H - 8) + '" class="lb">' + esc(day(t0)) + '</text><text x="' + Rr + '" y="' + (H - 8) + '" text-anchor="end" class="lb">' + esc(day(t1)) + "</text>"
+      + '<line class="cur" x1="0" y1="' + T + '" x2="0" y2="' + B + '" style="display:none"/><circle class="dot" r="6" cx="0" cy="0" data-c="' + col + '" fill="' + col + '" stroke="#fff" stroke-width="2" style="display:none"/></svg>';
+    var last = pts.length ? pts[pts.length - 1].v : 0, ahead = item.expected != null ? last - item.expected : null;
     var read = esc(KEYN[item.key]) + ": <b>" + esc(tvFmt(item.key, last)) + "</b> so far"
       + (ahead == null ? "" : ahead >= 0 ? " · " + esc(tvFmt(item.key, ahead)) + " ahead of the pace" : " · " + esc(tvFmt(item.key, -ahead)) + " behind the pace");
-    return '<div class="db-tv__chart" tabindex="0" data-i="' + esc(JSON.stringify(pts.map(function (q) { return [Math.round(q.t), q.v]; }))) + '" data-k="' + item.key + '">' + svg
-      + '<p class="db-tv__read" aria-live="polite">' + read + '</p><p class="db-tv__key"><span><i class="ln" style="background:' + col + '"></i>Achieved so far</span><span><i class="ln dash"></i>Pace to the target</span><span><i class="ln now"></i>Today</span></p></div>';
+    return '<div class="db-tv__chart" tabindex="0" role="group" aria-label="' + esc(KEYN[item.key] + " pace chart. Use the left and right arrow keys to read each day.") + '" data-k="' + item.key + '" data-f="' + ((now - t0) / span).toFixed(4) + '" data-i="'
+      + esc(JSON.stringify(pts.map(function (q) { return [Math.round(q.t), q.v]; }))) + '">' + svg
+      + '<p class="db-tv__read" aria-live="polite">' + read + '</p><p class="db-tv__key"><span><i class="ln" style="background:' + col + '"></i>Achieved so far</span><span><i class="ln dash"></i>Pace set by the publishing plan</span><span><i class="ln now"></i>Today</span></p></div>';
   }
   function bindTV() {
     var box = $("db-tv"); if (!box) return;
     requestAnimationFrame(function () { requestAnimationFrame(function () { box.classList.add("is-in"); }); });
-    var items = {}; (R.progress.items || []).forEach(function (i) { items[i.key] = i; });
+    var items = {}; (SP().items || []).forEach(function (i) { items[i.key] = i; });
     box.addEventListener("click", function (e) {
       var b = e.target.closest(".db-tv__btn:not(.db-tv__btn--static)"); if (!b) return;
       var row = b.parentNode, pace = row.querySelector(".db-tv__pace"), open = b.getAttribute("aria-expanded") === "true";
       box.querySelectorAll(".db-tv__btn[aria-expanded=true]").forEach(function (o) { if (o !== b) { o.setAttribute("aria-expanded", "false"); o.parentNode.querySelector(".db-tv__pace").hidden = true; } });
       b.setAttribute("aria-expanded", open ? "false" : "true");
-      if (!open && !pace.firstChild) pace.innerHTML = tvPace(items[row.getAttribute("data-k")]);
       pace.hidden = open;
+      // drawn once visible, at the width it will be shown at
+      if (!open && !pace.firstChild) pace.innerHTML = tvPace(items[row.getAttribute("data-k")], pace.clientWidth - 28);
     });
-    // hover or arrow keys over a pace chart read the value on that day
+    // hover, touch or arrow keys over a pace chart read the value on that day
     function readAt(chart, frac) {
-      var pts = JSON.parse(chart.getAttribute("data-i")), svg = chart.querySelector("svg"), k = chart.getAttribute("data-k"), it = items[k];
-      var t0 = +svg.getAttribute("data-t0"), t1 = +svg.getAttribute("data-t1"), t = t0 + frac * (t1 - t0), v = 0;
+      var pts = JSON.parse(chart.getAttribute("data-i")), svg = chart.querySelector("svg"), k = chart.getAttribute("data-k"), it = items[k], G = paceGeom(svg);
+      frac = Math.min(1, Math.max(0, frac));
+      var t = G.t0 + frac * (G.t1 - G.t0), future = t > G.now + 43200, v = 0;
       pts.forEach(function (q) { if (q[0] <= t) v = q[1]; });
-      var vb = svg.viewBox.baseVal, L = 8, Rr = 592, B = 164, T = 14, ymax = Math.max(it.goal, it.actual) * 1.08 || 1;
-      var x = L + frac * (Rr - L), y = B - v / ymax * (B - T), cur = svg.querySelector(".cur"), dot = svg.querySelector(".dot");
+      var pf = paceFrac(it, t), pace = it.goal * (pf == null ? frac : pf), x = G.l + frac * (G.r - G.l);
+      var y = G.b - (future ? pace : v) / G.ymax * (G.b - G.t), cur = svg.querySelector(".cur"), dot = svg.querySelector(".dot");
       cur.setAttribute("x1", x); cur.setAttribute("x2", x); cur.style.display = ""; dot.setAttribute("cx", x); dot.setAttribute("cy", y); dot.style.display = "";
-      var pace = it.goal * frac;
-      chart.querySelector(".db-tv__read").innerHTML = esc(day(Math.round(t))) + ": <b>" + esc(tvFmt(k, v)) + "</b> achieved · pace " + esc(tvFmt(k, pace));
+      dot.setAttribute("fill", future ? "#fff" : dot.getAttribute("data-c")); dot.setAttribute("stroke", future ? "#1b1b1b" : "#fff");
+      chart.setAttribute("data-f", frac);
+      chart.querySelector(".db-tv__read").innerHTML = esc(day(Math.round(t))) + (future ? ": pace " + esc(tvFmt(k, pace)) + " <span class=\"db-dim\">· not reached yet</span>"
+        : ": <b>" + esc(tvFmt(k, v)) + "</b> achieved · pace " + esc(tvFmt(k, pace)));
     }
-    box.addEventListener("pointermove", function (e) {
-      var chart = e.target.closest(".db-tv__chart"); if (!chart) return;
-      var r = chart.querySelector("svg").getBoundingClientRect(); readAt(chart, Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)));
-    });
+    function fromPointer(chart, e) {
+      var svg = chart.querySelector("svg"), G = paceGeom(svg), r = svg.getBoundingClientRect(), x = (e.clientX - r.left) * (G.w / r.width);
+      return (x - G.l) / (G.r - G.l);
+    }
+    box.addEventListener("pointermove", function (e) { var chart = e.target.closest(".db-tv__chart"); if (chart) readAt(chart, fromPointer(chart, e)); });
+    box.addEventListener("pointerdown", function (e) { var chart = e.target.closest(".db-tv__chart"); if (chart) readAt(chart, fromPointer(chart, e)); });
+    box.addEventListener("focusin", function (e) { var chart = e.target.classList && e.target.classList.contains("db-tv__chart") ? e.target : null; if (chart && !chart.querySelector(".cur").style.display) readAt(chart, +chart.getAttribute("data-f")); });
     box.addEventListener("keydown", function (e) {
-      var chart = e.target.closest && e.target.closest(".db-tv__chart"); if (!chart || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
-      var f = +(chart.getAttribute("data-f") || 1) + (e.key === "ArrowRight" ? 0.05 : -0.05); f = Math.min(1, Math.max(0, f));
-      chart.setAttribute("data-f", f); readAt(chart, f); e.preventDefault();
+      var chart = e.target.closest && e.target.closest(".db-tv__chart"); if (!chart || ["ArrowLeft", "ArrowRight", "Home", "End"].indexOf(e.key) < 0) return;
+      var G = paceGeom(chart.querySelector("svg")), day1 = 86400 / Math.max(1, G.t1 - G.t0), f = +chart.getAttribute("data-f");
+      f = e.key === "Home" ? 0 : e.key === "End" ? 1 : f + (e.key === "ArrowRight" ? day1 : -day1);
+      readAt(chart, f); e.preventDefault();
     });
   }
 
-  /* -------------------------------------------------------------- panel */
+  // "On pace for X – Y": the low end keeps today's average per video, the high end has the videos still to come
+  // match what creators of their size typically get.
+  function forecastBox() {
+    var g = GL(), FC = g && g.forecast; if (!FC) return "";
+    var VW = { ahead: ["good", "Ahead"], ontrack: ["good", "On track"], behind: ["low", "Behind"] };
+    var tip = "Where the campaign is heading by the end. Low end: the videos still to come do as well as the average so far. High end: they reach what creators of their size typically get.";
+    if (!FC.live) return sec("forecast", "Forecast to the end", tip, '<p class="db-empty">The forecast appears once the first videos are live.</p>');
+    var cards = [["views", "Views"], ["engagement", "Engagement"]].filter(function (k) { return FC[k[0]]; }).map(function (k) {
+      var f = FC[k[0]], v = VW[f.verdict] || VW.behind, top = Math.max(f.high, f.target) * 1.1 || 1, lo = f.low / top * 100, hi = f.high / top * 100, tg = f.target / top * 100;
+      return '<div class="db-fc"><div class="db-fc__h"><b>' + k[1] + "</b>" + stPill(v[0], v[1]) + "</div>"
+        + '<div class="db-fc__big">' + (f.low === f.high ? num(f.low) : num(f.low) + " – " + num(f.high)) + "</div>"
+        + '<div class="db-fc__sub">on pace by the end · target ' + num(f.target) + "</div>"
+        + '<div class="db-fc__bar" role="img" aria-label="' + esc(k[1] + " forecast " + num(f.low) + " to " + num(f.high) + ", target " + num(f.target)) + '"><i class="db-fc__band db-fc__band--' + v[0] + '" style="left:' + lo.toFixed(1) + "%;width:" + Math.max(1.5, hi - lo).toFixed(1) + '%"></i><em style="left:' + tg.toFixed(1) + '%"><u>target</u></em></div></div>';
+    }).join("");
+    return sec("forecast", "Forecast to the end", tip, '<div class="db-fcs">' + cards + "</div>"
+      + (FC.early ? '<p class="db-flag">Early estimate: based on ' + FC.live + " of " + FC.planned + " videos so far. It firms up as more go live.</p>" : ""));
+  }
+
+  var SW = { met: ["good", "Met"], close: ["moderate", "Close"], behind: ["low", "Behind"], ontrack: ["good", "On track"] };
+  function platChip(p) { return '<span class="db-pc">' + (ICONS[p.platform] || "") + "<b>" + num(p.followers) + "</b></span>"; }
+  // One row per creator: their size, what creators like them typically get per video, and what they got.
+  function creatorBench() {
+    var g = GL(); if (!g || !g.creators.length) return "";
+    var rows = g.creators.map(function (c) {
+      var soon = !c.live, st = c.status && SW[c.status], when = c.next && c.next.at ? day(c.next.at) : "";
+      var res = soon ? '<span class="db-cb__soon">Coming soon · ' + (when ? esc(when) : "date to be confirmed") + "</span>"
+        : '<strong>' + num(c.views_per_video) + "</strong><small>views per video</small>";
+      var link = who({ code: c.code, name: c.name });
+      return '<div class="db-cb__row' + (soon ? " is-soon" : "") + '"><div class="db-cb__who">' + ava(c.photo) + "<span><b>" + link + "</b><small>" + (c.live || 0) + " of " + (c.planned || "?") + ((c.planned || 0) === 1 ? " video live" : " videos live") + "</small></span></div>"
+        + '<div class="db-cb__size"><span class="db-cb__lbl">Followers</span><span class="db-cb__chips">' + c.platforms.map(platChip).join("") + "</span><small>" + esc(c.size) + "</small></div>"
+        + '<div class="db-cb__exp"><span class="db-cb__lbl">Typical per video</span><b>' + (c.exp_views ? esc(num(c.exp_views[0]) + " – " + num(c.exp_views[1])) : "—") + "</b><small>views</small></div>"
+        + '<div class="db-cb__act"><span class="db-cb__lbl">This campaign</span>' + res + "</div>"
+        + '<div class="db-cb__st">' + (st ? stPill(st[0], st[1]) : soon ? '<span class="db-st db-st--none">Not live yet</span>' : "") + "</div></div>";
+    }).join("");
+    return subsec("Creator by creator", "Typical per video is what creators of that size usually get on these platforms: the low end is what we commit to, the high end is what we aim for.", '<div class="db-cb">' + rows + "</div>");
+  }
+  function platformSplit() {
+    var g = GL(); if (!g || !g.split.length) return "";
+    var goals = g.split.filter(function (p) { return p.goal; }), extra = g.split.filter(function (p) { return !p.goal; });
+    function line(label, got, safe, aim, status) {
+      var st = SW[status] || SW.behind, col = TV_COL[st[0]];
+      if (!safe) return '<div class="db-ps__l"><span class="db-ps__lb">' + label + '</span><span class="db-ps__n"><strong>' + num(got) + "</strong></span></div>";
+      var w = Math.min(100, got / safe * 100);
+      return '<div class="db-ps__l"><span class="db-ps__lb">' + label + '</span><span class="db-ps__n"><strong>' + num(got) + "</strong> of " + num(safe) + '</span><span class="db-ps__bar" role="img" aria-label="' + esc(label + " " + num(got) + " of " + num(safe) + ", " + st[1]) + '"><i style="width:' + w.toFixed(1) + "%;background:" + col + '"></i></span>'
+        + stPill(st[0], st[1]) + "<small>Typical range " + num(safe) + " – " + num(aim) + "</small></div>";
+    }
+    var sel = F.platform || "";
+    var cards = goals.map(function (p) {
+      return '<div class="db-ps' + (sel === p.platform ? " is-sel" : sel ? " is-dim" : "") + '"><div class="db-ps__h">' + (ICONS[p.platform] || "") + "<b>" + esc(p.platform) + "</b><small>" + (p.videos ? p.videos + (p.videos === 1 ? " video live" : " videos live") : "Nothing posted yet") + "</small></div>"
+        + line("Views", p.views, p.views_safe, p.views_aim, p.views_status) + line("Engagement", p.engagement, p.eng_safe, p.eng_aim, p.eng_status) + "</div>";
+    }).join("");
+    if (extra.length) {
+      var v = 0, e = 0; extra.forEach(function (p) { v += p.views; e += p.engagement; });
+      cards += '<div class="db-ps db-ps--add' + (sel && !goals.some(function (p) { return p.platform === sel; }) ? " is-sel" : sel ? " is-dim" : "") + '"><div class="db-ps__h"><b>Bonus platforms</b><span class="db-st db-st--none">No goal set</span></div>'
+        + extra.map(function (p) { return '<p class="db-ps__add">' + (ICONS[p.platform] || "") + "<b>" + esc(p.platform) + "</b><span><strong>" + num(p.views) + "</strong> views · <strong>" + num(p.engagement) + "</strong> engagement · " + p.videos + (p.videos === 1 ? " video" : " videos") + "</span></p>"; }).join("")
+        + (extra.length > 1 ? '<p class="db-ps__add db-ps__add--tot"><b>Total</b><span><strong>' + num(v) + "</strong> views · <strong>" + num(e) + "</strong> engagement</span></p>" : "") + "</div>";
+    }
+    return sec("platforms", "Platform split", "Views and engagement on each platform the goals were set for, against what is typical there. Bonus platforms are tracked too, but have no goal and do not count towards the targets or the All targets %.",
+      '<div class="db-pss' + (goals.length + (extra.length ? 1 : 0) === 1 ? " db-pss--one" : "") + '">' + cards + "</div>");
+  }
+  function stillToCome() {
+    var g = GL(); if (!g) return "";
+    var tip = "The videos not yet published, with the planned date when one is set.";
+    if (!g.owed.length) return g.creators.some(function (c) { return c.planned; }) ? sec("owed", "Still to come", tip, '<p class="db-empty">Every planned video is live.</p>') : "";
+    var by = {}; (R.creators || []).forEach(function (c) { by[c.code] = c; });
+    return sec("owed", "Still to come", tip, '<div class="db-owed">' + g.owed.map(function (o) {
+      var c = by[o.code] || {};
+      return '<div class="db-owed__r">' + ava(c.photo) + "<span><b>" + esc(o.name) + "</b><small>Video " + o.n + " of " + o.of + "</small></span><em>"
+        + (o.at ? esc(day(o.at)) + (o.confirmed ? "" : " <small>planned</small>") : "Date to be confirmed") + "</em></div>";
+    }).join("") + "</div>", g.owed.length + (g.owed.length === 1 ? " video" : " videos"));
+  }
+  function dataNotes() {
+    var g = GL(); if (!g || !g.notes.length) return "";
+    return sec("notes", "Data notes", "Only the things that change how to read the numbers above.", '<ul class="db-dn">' + g.notes.map(function (n) { return "<li>" + esc(n) + "</li>"; }).join("") + "</ul>");
+  }
+
+  // What the tab is showing, in one line, when the page's platform filter changes it.
+  function scopeNote(sc) {
+    var ic = sc.pl ? (ICONS[sc.pl] || "") : "";
+    if (sc.mode === "plat") return '<p class="db-scope" role="status">' + ic + "<span>Showing <b>" + esc(sc.pl) + "</b> only: its own targets and results, from the start of the campaign. Choose All for every goal platform together.</span></p>";
+    if (sc.mode === "whole") return '<p class="db-scope" role="status">' + ic + "<span>This campaign has one set of targets for all its platforms, so it is shown whole.</span></p>";
+    return "";
+  }
+  // A platform the goals were not set for: no targets to measure, only what it brought as a bonus.
+  function bonusCard(pl) {
+    var list = R.posts.filter(function (p) { return p.section === "campaign" && p.platform === pl; }), pcs = {};
+    list.forEach(function (p) { pcs[p.pk || p.id] = 1; });
+    var v = list.reduce(function (a, p) { return a + (p.views || 0); }, 0), e = list.reduce(function (a, p) { return a + (p.engagement || 0); }, 0), n = Object.keys(pcs).length;
+    return '<section class="db-sec db-bonus" aria-labelledby="sec-bonus"><header class="db-sec__h"><h3 class="db-sec__t" id="sec-bonus">Bonus platform: ' + esc(pl) + "</h3></header>"
+      + '<p class="db-bonus__msg">' + (ICONS[pl] || "") + "<span>No goal on " + esc(pl) + "; its numbers count as bonus.</span></p>"
+      + '<div class="db-bonus__nums"><div><span>Views</span><b>' + num(v) + "</b></div><div><span>Engagement</span><b>" + num(e) + "</b></div><div><span>Videos</span><b>" + n + "</b></div></div></section>";
+  }
+
   var PANEL = {
     kpi: function () {
-      var items = R.progress.items || [], bm = R.benchmarks, t = R.total, P = R.progress || {}, plan = R.plan || {}, pb = plan.benchmark || {};
+      var sc = scope(), P = SP() || {}, items = P.items || [], t = R.total, plan = R.plan || {}, pb = sc.mode === "plat" ? (sc.bp.bench || {}) : (plan.benchmark || {}), g = GL();
       var o = R.objective || {}, lead = o.kpis || [];
-      function fv(k, v) { return v == null ? "—" : k === "er" ? pct(v) : num(v); }
-      // The guide range for each KPI, worked out for this campaign's creators.
-      function range(k) {
-        var sf = plan.safe || {}, ex = plan.estimate || {};
-        if (k !== "posts" && sf[k] != null && ex[k] != null) return fv(k, sf[k]) + " – " + fv(k, ex[k]);
-        return "—";
-      }
-      var head = '<div class="db-goal-sum"><div><span>All targets</span><b>' + Math.round(P.all_met ? 100 : Math.min(99, P.overall || 0)) + '%</b><small>' + (P.all_met ? "Every target met" : "100% only when every target is met") + "</small></div>"
+      var plats = sc.mode === "plat" ? [sc.pl] : planPlats();
+      var head = '<div class="db-goal-sum" role="group" aria-label="Summary"><div><span>' + (sc.mode === "plat" ? esc(sc.pl) + " targets" : "All targets") + '</span><b>' + (items.length ? Math.round(P.all_met ? 100 : Math.min(99, P.overall || 0)) + "%" : "—") + '</b><small>' + (!items.length ? "No targets set yet" : P.all_met ? "Every target met" : "100% only when every target is met") + "</small></div>"
         + "<div><span>Objective</span><b>" + esc(o.label || "Balanced") + "</b><small>" + esc(lead.map(function (k) { return KEYN[k]; }).join(" & ")) + " lead</small></div>"
-        + (plan.platform ? "<div><span>Benchmarked for</span><b class=\"db-goal-plat\">" + (ICONS[plan.platform] || "") + esc(plan.platform) + "</b><small>" + esc(plan.category || plan.template || "") + "</small></div>" : "") + "</div>";
-      var rows = items.map(function (i) {
-        var isR = i.key === "er", col = { good: "#14884a", moderate: "#e2780f", low: "#ee1515" }[i.grade], met = i.actual >= i.goal;
-        return "<tr" + (lead.indexOf(i.key) >= 0 ? ' class="is-lead"' : "") + "><td><b>" + KEYN[i.key] + "</b>" + (lead.indexOf(i.key) >= 0 ? ' <span class="db-lead">headline</span>' : "") + "</td>"
-          + '<td class="r">' + fv(i.key, i.goal) + "</td><td class=\"r\"><b>" + fv(i.key, i.actual) + "</b></td>"
-          + '<td><div class="db-goal__track"><i style="width:' + Math.min(100, i.pct) + "%;background:" + col + '"></i>' + (isR ? "" : '<em style="left:' + Math.min(100, i.expected / i.goal * 100) + '%"></em>') + "</div><small>" + Math.round(i.pct) + "%" + (met ? " · met" : "") + "</small></td>"
-          + '<td class="r muted">' + range(i.key) + "</td><td>" + sig(met ? "good" : i.grade) + "</td></tr>";
-      }).join("");
-      var out = head + objectiveBox() + tvInfographic(items, lead) + (items.length ? '<h3>Targets agreed</h3><table class="db-table db-goals-t"><thead><tr><th>KPI</th><th class="r">Minimum agreed</th><th class="r">Now</th><th>Progress</th><th class="r">Benchmark range</th><th></th></tr></thead><tbody>' + rows + "</tbody></table>"
-        + '<div class="db-legend2"><span><i class="tick"></i>Where it should be today</span><span><i class="sw" style="background:#14884a"></i>Met / on track</span><span><i class="sw" style="background:#e2780f"></i>Close</span><span><i class="sw" style="background:#ee1515"></i>Behind</span></div>'
-        : '<p class="db-note">No targets set for this campaign yet.</p>');
+        + (plats.length ? "<div><span>Benchmarked for</span><b class=\"db-goal-plat\">" + plats.map(function (p) { return '<span class="db-goal-plat__p"><span class="db-goal-plat__ic" style="color:' + (PCOL[p] || "#121212") + '">' + (ICONS[p] || "") + "</span><i>" + esc(p) + "</i></span>"; }).join("") + "</b><small>" + esc(plan.category || plan.template || "") + "</small></div>" : "") + "</div>";
+      var out = head + scopeNote(sc);
+      if (sc.mode === "bonus") return out + bonusCard(sc.pl) + platformSplit() + dataNotes();
+      out += objectiveBox() + tvInfographic(items, lead) + forecastBox();
       // Benchmarks as gauges: the shaded band is the normal range for these
       // creators, the dot is where the campaign is now.
       function gauge(label, unit, band, now, grade) {
@@ -863,33 +1050,27 @@
         var dot = now != null ? '<i class="db-gauge__dot ' + (grade || "") + '" style="left:' + Math.min(100, now / top * 100).toFixed(1) + '%"><span>' + now.toFixed(now < 10 ? 2 : 1) + "%</span></i>" : "";
         return '<div class="db-gauge"><div class="db-gauge__lbl"><b>' + label + "</b><small>" + unit + '</small></div><div class="db-gauge__bar"><i class="db-gauge__band" style="left:' + l.toFixed(1) + "%;width:" + w.toFixed(1) + '%"></i>' + dot
           + '<em style="left:' + l.toFixed(1) + '%">' + band[0] + '%</em><em style="left:' + (l + w).toFixed(1) + '%">' + band[1] + "%</em></div>"
-          + '<div class="db-gauge__sig">' + (now != null ? sig(grade) : '<span class="db-na">Typical</span>') + "</div></div>";
+          + '<div class="db-gauge__sig">' + (now != null ? sig(grade) : '<span class="db-na">Not measured yet</span>') + "</div></div>";
       }
-      var vids = R.posts.filter(function (p) { return p.section === "campaign" && p.view_rate != null; });
+      // Only the platforms the goals were set for feed the gauges; add-ons are tracked beside them.
+      var vids = goalPosts().filter(function (p) { return p.view_rate != null; });
       var vrNow = vids.length ? vids.reduce(function (a, p) { return a + p.view_rate; }, 0) / vids.length : null;
-      var erNow = t.video_er != null ? t.video_er : t.er;
+      var erNow = sc.mode === "plat" ? sc.bp.now.er : t.video_er != null ? t.video_er : t.er;
       function gr(v, b) { return v == null ? null : v >= b[1] ? "good" : v >= b[0] ? "moderate" : "low"; }
       var links = (R.objective || {}).links;
-      if (pb.view_rate) out += '<h3>Benchmarks for these creators</h3><div class="db-gauges">'
+      var gauges = pb.view_rate ? '<div class="db-gauges">'
         + gauge("Views per video", "% of followers", pb.view_rate, vrNow, gr(vrNow, pb.view_rate))
         + gauge("Engagement rate", "% of views", pb.eng_rate, erNow, gr(erNow, pb.eng_rate))
-        + (links && pb.ctr ? gauge("Click-through", "% of views", pb.ctr, t.ctr, gr(t.ctr, pb.ctr)) : "")
-        + '</div><div class="db-legend2"><span><i class="sw band"></i>Normal range for creators this size</span><span><i class="dot"></i>This campaign now</span></div>';
-      var G = R.gaps || {};
-      // Hidden likes change the numbers the client reads, so they are shown;
-      // estimates and missing shares/saves are internal (admin Content tab).
-      if (G.likes_hidden) {
-        var by = {}; (G.hidden || []).forEach(function (h) { var x = by[h.creator] = by[h.creator] || { n: 0, url: h.url }; x.n++; });
-        out += '<h3>About the data</h3><div class="db-hidden"><div class="db-hidden__n"><b>' + G.likes_hidden + "</b><span>of " + G.posts + ' posts hide likes</span><i style="--w:' + (G.likes_hidden / G.posts * 100).toFixed(1) + '%"></i></div>'
-          + '<div class="db-hidden__body"><div class="db-hidden__chips">' + Object.keys(by).map(function (k) { return '<a href="' + esc(by[k].url) + '" target="_blank" rel="noopener">' + esc(k) + (by[k].n > 1 ? " <small>×" + by[k].n + "</small>" : "") + "</a>"; }).join("")
-          + '</div><p><b>Engagement</b> on these posts = comments only · <b>Engagement rate</b> leaves them out</p></div></div>';
-      }
-      return out;
+        + (links && pb.ctr && sc.mode !== "plat" ? gauge("Click-through", "% of views", pb.ctr, t.ctr, gr(t.ctr, pb.ctr)) : "")
+        + '</div><div class="db-legend2"><span><i class="sw band"></i>Normal range for creators this size</span><span><i class="dot"></i>This campaign now</span></div>' : "";
+      var cb = creatorBench();
+      if (gauges || cb) out += sec("bench", "Benchmarks for these creators", "What creators of these sizes typically get on these platforms. The shaded range is normal, the dot is where this campaign is now. The low end of a range is what we commit to, the high end is what we aim for.", gauges + cb);
+      return out + platformSplit() + stillToCome() + dataNotes();
     },
     trend: function () {
       var s = series(posts()), useHist = !filtered() && R.history && R.history.length > 1;
-      var pts = useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s;
-      return "<h3>Views & engagement over time</h3><div style=\"height:240px\">" + areaChart(pts, "views", "eng", 600, 240) + "</div>"
+      var pts = fromStart(useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s);
+      return "<h3>Views & engagement over time</h3><div class=\"db-trendbox\">" + areaChart(pts, "views", "eng", panelW(), 240) + "</div>"
         + '<h3>Day by day</h3><table class="db-table"><thead><tr><th>Day</th><th></th><th>Views</th><th>Engagement</th></tr></thead><tbody>'
         + pts.map(function (d) { return "<tr><td>" + esc(day(d.d, true)) + "</td><td></td><td>" + full(d.views) + "</td><td>" + full(d.eng) + "</td></tr>"; }).join("") + "</tbody></table>";
     },
@@ -898,11 +1079,11 @@
       var rows = filtered() ? ranked(list).map(function (r) { return r.c; }) : R.creators;
       var tot = rows.reduce(function (a, c) { var x = filtered() ? (by[c.code] || {}) : { views: c.views, eng: c.engagement }; a.v += x.views || 0; a.e += x.eng || 0; return a; }, { v: 0, e: 0 });
       function share(v, t) { return t ? Math.round((v || 0) / t * 100) + "%" : "—"; }
-      return (filtered() ? "" : '<h3 style="margin-top:0">How creators are scored · out of 100</h3>' + scoreBar()) + '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>% of views</th><th>% of eng.</th><th>ER</th>' + (R.visibility.clicks && R.objective.links ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
+      return '<h3 style="margin-top:0">How creators are scored · out of 100</h3>' + scoreBar() + '<table class="db-table"><thead><tr><th>#</th><th>Creator</th><th>Posts</th><th>Views</th>' + (R.visibility.reach === false ? "" : "<th>Reach</th>") + '<th>Eng.</th><th>% of views</th><th>% of eng.</th><th>ER</th>' + (R.visibility.clicks && R.objective.links ? "<th>Clicks</th>" : "") + "<th>Score</th></tr></thead><tbody>"
         + rows.map(function (c, i) { var x = filtered() ? (by[c.code] || {}) : { posts: c.delivered, views: c.views, reach: c.reach, eng: c.engagement };
           var n = filtered() ? i + 1 : c.rank;
           return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
-            + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
+            + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (filtered() && viewScore[c.code] != null ? viewScore[c.code].toFixed(0) : c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
         + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(scoreTip()) + "</p>" + videosByCreator(list, rows)
         + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views</th><th>Engagement</th>' + (weights().er > 0 ? "<th>Eng. rate</th>" : "") + '' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
           + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td>" + (weights().er > 0 ? "<td>" + q.er.toFixed(0) + "</td>" : "") + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + c.score.toFixed(0) + "</b></td></tr>"; }).join("")
@@ -925,8 +1106,8 @@
     },
     geo: function () {
       var a = R.audience; if (!a) return '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>';
-      return bars(a.countries.map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(1) + "%" }; }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
-        + audTarget(a) + '<p class="db-note" style="margin-top:10px">' + audNote(a) + ".</p>";
+      return '<p class="aud-target">' + (a.target ? flag(a.target.code) + '<span>Target market <b>' + esc(countryName(a.target.code)) + '</b></span>' : '<span>Target market</span>') + '</p>'
+        + '<div class="aud-stamp" role="img" aria-label="Audience not analysed yet"><span>Not analysed</span><span>yet</span></div>';
     },
     plat: function () {
       var by = {}; posts().forEach(function (p) { var x = by[p.platform] = by[p.platform] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
@@ -989,37 +1170,45 @@
       + '<div class="db-post__stats">' + stats(p).map(function (x) { return "<div><small>" + x[0] + "</small><b>" + x[1] + "</b></div>"; }).join("") + "</div></a>";
   }
   var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "Audience countries", plat: "Platforms", clicks: "Affiliate clicks" };
-  var lastFocus = null;
+  var lastFocus = null, curArea = null;
   function openPanel(area) {
     if (!PANEL[area]) return;
     lastFocus = document.activeElement;
-    $("db-panel-title").textContent = TITLES[area] + (filtered() && area !== "stage" && area !== "geo" ? " · filtered" : "");
+    $("db-panel-title").textContent = TITLES[area] + (area === "kpi" ? (F.platform ? " · " + F.platform : "") : filtered() && area !== "stage" && area !== "geo" ? " · filtered" : "");
+    $("db-scrim").hidden = false; $("db-panel").hidden = false;      // shown first: charts are drawn at the panel's real width
     $("db-panel-body").innerHTML = PANEL[area]();
+    curArea = area;
     if (area === "kpi") bindTV();
     $("db-scrim").hidden = false; $("db-panel").hidden = false;
     $("db-panel-close").focus();
   }
-  function closePanel() { $("db-scrim").hidden = true; $("db-panel").hidden = true; if (lastFocus) lastFocus.focus(); }
+  function closePanel() { curArea = null; $("db-scrim").hidden = true; $("db-panel").hidden = true; if (lastFocus) lastFocus.focus(); }
   // Info tips: one floating box placed beside the "i", flipped and clamped
   // so it never runs off the screen or under the next card.
-  var tipEl = null;
+  var tipEl = null, tipFor = null, tipPinned = false;
   function showTip(t) {
     hideTip();
-    tipEl = document.createElement("div"); tipEl.className = "db-tip"; tipEl.setAttribute("role", "tooltip");
-    tipEl.textContent = t.getAttribute("data-tip"); document.body.appendChild(tipEl);
+    tipEl = document.createElement("div"); tipEl.className = "db-tip"; tipEl.setAttribute("role", "tooltip"); tipEl.id = "db-tip"; tipFor = t;
+    tipEl.textContent = t.getAttribute("data-tip"); document.body.appendChild(tipEl); t.setAttribute("aria-describedby", "db-tip");
     var r = t.getBoundingClientRect(), w = tipEl.offsetWidth, h = tipEl.offsetHeight, vw = innerWidth, vh = innerHeight;
     var x = Math.max(8, Math.min(r.left, vw - w - 8)), y = r.bottom + 8;
     if (y + h > vh - 8) y = Math.max(8, r.top - h - 8);
     tipEl.style.left = x + "px"; tipEl.style.top = y + "px";
   }
-  function hideTip() { if (tipEl) { tipEl.remove(); tipEl = null; } }
-  ["mouseover", "focusin"].forEach(function (ev) { document.addEventListener(ev, function (e) { var t = e.target.closest && e.target.closest(".db-info"); if (t) showTip(t); }); });
-  ["mouseout", "focusout"].forEach(function (ev) { document.addEventListener(ev, function (e) { if (e.target.closest && e.target.closest(".db-info")) hideTip(); }); });
+  function hideTip() { if (tipEl) { tipEl.remove(); tipEl = null; } if (tipFor) { tipFor.removeAttribute("aria-describedby"); tipFor = null; } tipPinned = false; }
+  ["mouseover", "focusin"].forEach(function (ev) { document.addEventListener(ev, function (e) { var t = e.target.closest && e.target.closest(".db-info"); if (t && !tipPinned) showTip(t); }); });
+  ["mouseout", "focusout"].forEach(function (ev) { document.addEventListener(ev, function (e) { if (!tipPinned && e.target.closest && e.target.closest(".db-info")) hideTip(); }); });
+  // a tap (or a click) keeps the note open; a second tap on the mark, a tap elsewhere, or Esc closes it
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest && e.target.closest(".db-info");
+    if (t) { if (tipPinned && tipFor === t) hideTip(); else { showTip(t); tipPinned = true; } e.preventDefault(); e.stopPropagation(); }
+    else if (tipEl) hideTip();
+  }, true);
   addEventListener("scroll", hideTip, true);
   document.addEventListener("click", function (e) { var b = e.target.closest("[data-area]"); if (b && b.closest("#cat-app")) openPanel(b.getAttribute("data-area")); });
   $("db-panel-close").addEventListener("click", closePanel);
   $("db-scrim").addEventListener("click", closePanel);
-  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !$("db-panel").hidden) closePanel(); });
+  document.addEventListener("keydown", function (e) { if (e.key !== "Escape") return; if (tipEl) { hideTip(); return; } if (!$("db-panel").hidden) closePanel(); });
 
   load();
 })();

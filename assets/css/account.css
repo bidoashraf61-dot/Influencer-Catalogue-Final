@@ -750,3 +750,176 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
   .hb-share { padding-right: 18px; padding-top: 44px; }
 }
 @media (prefers-reduced-motion: reduce) { .hb-chev, .hb-say { transition: none; } }
+
+/* Companies hub: Move to another client */
+.hb-move__res { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.hb-move__res button { display: grid; width: 100%; box-sizing: border-box; gap: 1px; padding: 8px 12px; border-radius: 12px; border: 1.5px solid var(--rule); background: var(--white); text-align: left; font: inherit; cursor: pointer; }
+.hb-move__res button:hover { border-color: var(--ink); background: var(--stone); }
+.hb-move__res button:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.hb-move__res small { font-size: 12.5px; color: var(--gray); }
+.hb-move__ok { display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--stone); font-size: 14px; }
+.hb-move__ok[hidden] { display: none; }
+.hb-move__ok p { margin: 0; }
+.hb-move__opt { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.hb-move__btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.hb-share .hb-move__opt input { flex: none; width: 18px; height: 18px; min-height: 0; padding: 0; accent-color: var(--ink); }
+
+/* Companies hub: items not yet filed under a client */
+.hb-co--flag { background: #fbfdf0; box-shadow: inset 0 0 0 1.5px var(--lime); }
+.hb-co--flag.is-open { box-shadow: inset 0 0 0 1.5px var(--ink); }
+
+/* Companies hub: each person is a dropdown */
+.hb-p { padding-top: 6px; }
+.hb-p__btn { flex: 1 1 320px; display: flex; align-items: center; gap: 6px 18px; flex-wrap: wrap; min-width: 0; padding: 12px 14px; margin: 0 -14px; border: 0; border-radius: 16px; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.hb-p__btn:hover { background: #f6f4f0; }
+.hb-p__btn:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 0; }
+.hb-p__n { margin-left: auto; font-size: 13px; color: var(--gray); }
+.hb-p .hb-chev { transition: transform .2s ease; }
+.hb-p.is-open .hb-chev { transform: rotate(180deg); }
+.hb-p.is-open > .hb-p__cols { margin-top: 6px; padding-bottom: 6px; }
+@media (max-width: 760px) { .hb-p__n { margin-left: 0; } .hb-p__btn { margin: 0 -8px; padding: 12px 8px; } }
+
+/* Companies hub: Assign client button and the solo assign panel */
+.hb-assignbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); font: 700 13.5px var(--body); cursor: pointer; border: 1.5px solid var(--ink); background: var(--white); color: var(--ink); }
+.hb-assignbtn .hc-icw { width: 16px; height: 16px; }
+.hb-assignbtn.is-primary, .hb-assignbtn[aria-expanded="true"] { background: var(--lime); }
+.hb-assignbtn:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.hb-share--solo { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
+
+/* Companies hub: delete a campaign */
+.hb-delbtn { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); font: 700 13.5px var(--body); cursor: pointer; border: 1.5px solid #c01010; background: var(--white); color: #c01010; }
+.hb-delbtn:hover, .hb-delbtn[aria-expanded="true"] { background: #c01010; color: var(--white); }
+.hb-delbtn:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.hb-share .hb-danger { background: #c01010; border-color: #c01010; color: var(--white); }
+
+/* Companies hub: view switch and the flat All campaigns list */
+.hb-views { margin: 18px 0 4px; }
+.hb-items--flat { margin-top: 10px; }
+.hb-it__owner { padding: 1px 8px; border-radius: var(--r-pill); background: var(--stone); color: var(--ink) !important; font-weight: 600; }
+
+/* Companies hub: the KAM menu right on each item */
+.hb-it__kamsel { margin-left: auto; }
+.hb-it__kamsel .hb-kam { max-width: 260px; min-height: 36px; }
+
+/* Companies hub: a campaign card carries its selection; Assign KAM */
+.hb-it__sel { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; padding: 8px 12px; border-radius: 12px; background: var(--white); font-size: 14px; }
+.hb-it__sel b { font-size: 14px; overflow-wrap: anywhere; }
+.hb-it__sel small { font-size: 12.5px; color: var(--gray); }
+.hb-it__tag { padding: 1px 8px; border-radius: var(--r-pill); background: var(--stone); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.hb-kambtn { background: var(--lime); }
+
+/* ====================================================================== Companies hub: polish (2026-10-18)
+   One calm hierarchy: company > person > campaign card. A campaign card reads top to bottom as name and status, the selection
+   inside it, then the actions in three tiers: look (Open), manage (Assign KAM is the lead, Assign client and Share beside it),
+   and Delete set apart. Panels open under the card as a quiet tray. */
+.hb-list { gap: 14px; }
+.hb-co { border-radius: 24px; }
+.hb-co__name b { font-size: 30px; }
+.hb-co.is-open { box-shadow: inset 0 0 0 1.5px var(--ink); }
+.hb-co__body { gap: 6px; padding: 4px 28px 28px; }
+.hb-p { border-top: 1px solid var(--rule-soft); padding-top: 4px; gap: 6px; }
+.hb-p__btn { padding: 14px 16px; margin: 0 -16px; }
+.hb-p__who b { font-size: 17px; }
+.hb-p__who small { line-height: 1.4; }
+.hb-p__cols { gap: 22px 32px; }
+.hb-p h4 { display: flex; align-items: center; gap: 8px; margin: 14px 0 10px; letter-spacing: .1em; }
+
+/* the campaign / selection card */
+.hb-items { gap: 12px; }
+.hb-it { gap: 12px; padding: 16px 18px 14px; border-radius: 20px; background: var(--white); box-shadow: 0 0 0 1px var(--rule), 0 1px 2px rgba(18,18,18,.04); }
+.hb-it__main { gap: 6px 10px; }
+.hb-it__main > b { font-family: var(--heading); font-weight: 400; font-size: 24px; line-height: 1.05; letter-spacing: .01em; }
+.hb-it__main small { font-size: 12.5px; }
+.hb-it__owner { font-weight: 600; }
+.hb-it__sel { gap: 6px 10px; padding: 10px 14px; border-radius: 14px; background: var(--stone); }
+.hb-it__sel b { font-size: 14.5px; }
+
+/* status chips: one size, one voice */
+.hb-chip { min-height: 24px; padding: 0 10px; font-size: 12px; font-weight: 700; border: 1px solid var(--rule); background: var(--white); color: var(--ink); }
+.hb-chip--live, .hb-chip--approved { color: #0f6b39; border-color: #14884a; background: #f1faf4; }
+.hb-chip--requested, .hb-chip--ready { color: #8a4604; border-color: #e2780f; background: #fff7ef; }
+.hb-chip--draft { color: #5a5a5a; background: var(--stone); border-color: transparent; }
+.hb-chip--completed { color: var(--ink); background: var(--stone); border-color: transparent; }
+
+/* the action bar: three tiers */
+.hb-it__act { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding-top: 12px; border-top: 1px solid var(--rule-soft); }
+.hb-it__grp { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hb-it__grp--danger { margin-left: auto; }
+.hb-open { min-height: 40px; padding: 0 6px; border: 0; background: none; border-radius: var(--r-pill); font-weight: 700; text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1.5px; }
+.hb-open:hover { background: var(--stone); text-decoration-color: transparent; }
+.hb-assignbtn, .hb-sharebtn { min-height: 40px; padding: 0 16px; border: 1.5px solid var(--ink); background: var(--white); color: var(--ink); }
+.hb-assignbtn:hover, .hb-sharebtn:hover { background: var(--stone); }
+.hb-assignbtn[aria-expanded="true"], .hb-sharebtn[aria-expanded="true"] { background: var(--ink); color: var(--lime); }
+.hb-kambtn, .hb-assignbtn.is-primary { background: var(--lime); border-color: var(--lime); color: var(--ink); }
+.hb-kambtn:hover, .hb-assignbtn.is-primary:hover { background: #dcf25f; }
+.hb-kambtn[aria-expanded="true"] { background: var(--ink); border-color: var(--ink); color: var(--lime); }
+.hb-delbtn { min-height: 40px; padding: 0 14px; border: 0; background: none; color: #b01010; font-weight: 700; text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1.5px; }
+.hb-delbtn:hover, .hb-delbtn[aria-expanded="true"] { background: #fdeaea; color: #b01010; text-decoration-color: transparent; }
+
+/* the tray under a card */
+.hb-share { margin-top: 2px; padding: 20px 52px 18px 20px; border-radius: 16px; background: var(--stone); box-shadow: none; gap: 18px 28px; }
+.hb-share--solo { max-width: 580px; }
+.hb-share__col b { font-size: 14.5px; }
+.hb-share__col small { max-width: 52ch; }
+.hb-share input, .hb-share .hb-kam { border: 1px solid rgba(18,18,18,.35); background: var(--white); }
+.hb-share__x { background: var(--white); }
+.hb-move__res button { border: 1px solid var(--rule); background: var(--white); }
+.hb-move__res button:hover { border-color: var(--ink); background: var(--white); box-shadow: inset 0 0 0 1px var(--ink); }
+.hb-move__ok { background: var(--white); box-shadow: inset 0 0 0 1px var(--rule); }
+.hb-share .hb-danger { background: #b01010; border-color: #b01010; }
+
+@media (max-width: 760px) {
+  .hb-co__body { padding: 2px 14px 20px; }
+  .hb-it { padding: 14px 14px 12px; }
+  .hb-it__main > b { font-size: 22px; }
+  .hb-it__act { gap: 8px 14px; }
+  .hb-it__grp--manage { flex: 1 1 100%; }
+  .hb-it__grp--danger { margin-left: 0; }
+  .hb-share { padding: 44px 16px 16px; }
+}
+
+/* Campaign scorebug: compact (2026-10-18). Same content, a third of the height, easy to scan. */
+.ac-bug { border-radius: 18px; padding: 16px 20px 18px; }
+.ac-bug__brands img { height: 28px; max-width: 110px; }
+.ac-bug__brands .ac-bug__hv { height: 20px; }
+.ac-bug__x { font-size: 18px; }
+.ac-live { font-size: 15px; }
+.ac-bug__row { margin-top: 10px; align-items: center; gap: 12px; }
+.ac-bug__title { font-size: clamp(1.7rem, 1.3rem + 1.1vw, 2.3rem); line-height: 1; max-width: none; flex: 1 1 260px; }
+.ac-verdict { font-size: clamp(1.1rem, .95rem + .5vw, 1.4rem); padding: 7px 16px; transform: rotate(-2deg); }
+.ac-scoreline > div { padding: 10px 12px 10px 0; }
+.ac-scoreline > div + div { padding-left: 14px; }
+.ac-scoreline dt { font-size: 11px; }
+.ac-scoreline dd { margin-top: 4px; font-size: clamp(1.6rem, 1.3rem + .6vw, 2rem); }
+.ac-scoreline__sig { margin-top: 6px; min-height: 0; }
+.ac-bug__go { margin-top: 12px; }
+.ac-bug__go .hc-btn { padding: 9px 18px; font-size: 1.05rem; min-height: 0; }
+@media screen and (max-width: 767px) {
+  .ac-bug { padding: 14px 14px 16px; }
+  .ac-scoreline dd { font-size: 1.7rem; }
+}
+
+/* My clients: Share on a selection or campaign card (owner, 2026-10-18). */
+.kc-row--share { position: relative; }
+.kc-share { display: inline-flex; align-items: center; gap: 6px; margin: 4px 0 0 16px; padding: 4px 12px; border-radius: 999px; border: 1.5px solid var(--ink, #121212); background: transparent; color: var(--ink, #121212); font: 600 12px/1.4 var(--body, "DM Sans", sans-serif); cursor: pointer; }
+.kc-share:hover, .kc-share[aria-expanded="true"] { background: var(--lime, #e8ff76); }
+.kc-share svg { width: 14px; height: 14px; }
+.kc-sharebox { display: grid; gap: 10px; margin: 8px 0 6px 16px; padding: 14px 16px; border-radius: 14px; background: var(--stone, #f4f1ec); box-shadow: inset 0 0 0 1.5px var(--ink, #121212); }
+.kc-sharebox[hidden] { display: none; }
+.kc-sharebox__t { margin: 0; font-size: 13px; color: var(--gray, #5a5a5a); }
+.kc-sharebox__form { display: flex; gap: 8px; flex-wrap: wrap; }
+.kc-sharebox__form input { flex: 1 1 200px; min-width: 0; padding: 8px 12px; border-radius: 10px; border: 1.5px solid var(--ink, #121212); font: inherit; }
+.kc-sharebox__form select { padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--ink, #121212); font: inherit; background: #fff; }
+.kc-sharebox__msg { margin: 0; font-size: 13px; }
+
+/* Share on the profile's own selections and campaigns (owner, 2026-10-18). */
+.hc-row__share { display: inline-flex; align-items: center; gap: 4px; }
+.hc-row__share .kc-share { margin: 0 8px 0 0; }
+.hc-list > li > .kc-sharebox { margin: 6px 0 4px; }
+.kc-sharewrap { margin: 2px 0 14px; }
+.kc-sharewrap .kc-share { margin-left: 0; }
+.kc-sharewrap .kc-sharebox { margin-left: 0; }
+
+/* The row's stretched link covers the whole row: the Share button and its box sit above it (like Delete). */
+.kc-share { position: relative; z-index: 2; }
+.kc-sharebox, .kc-sharewrap { position: relative; z-index: 2; }
