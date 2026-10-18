@@ -592,8 +592,10 @@ def delete(role, a, kind, ref, by="", with_selection=True):
     """Delete a campaign (item 129). Admins: any. A KAM: only a campaign inside her scope. History records it, so it can be
     brought back from History. Returns (ok, message)."""
     import history
+    if kind == "selection":
+        return _delete_selection(role, ref, by)
     if kind != "campaign":
-        return False, "Only campaigns can be deleted here."
+        return False, "Only campaigns and selections can be deleted here."
     k = db.campaign(int(ref)) if str(ref).isdigit() else None
     if k is None:
         return False, "That campaign no longer exists."
@@ -624,7 +626,34 @@ def delete(role, a, kind, ref, by="", with_selection=True):
                 ids = [r[0] for r in conn.execute("SELECT id FROM briefs WHERE selection_id = ? AND deleted_at IS NULL", (sel["id"],))]
             n = sum(1 for bid in ids if portal.delete_brief(bid, db.admin_code_id()))
             tail = " with its selection" + ((" and %d brief%s" % (n, "" if n == 1 else "s")) if n else "")
+    gone = _drop_empty_code(k["code_id"], by) if with_selection else None
+    if gone:
+        tail += " and the empty access code “%s”" % gone
     return True, "Deleted “%s”%s. You can bring it back from History." % (k["name"] or "the campaign", tail)
+
+
+def _delete_selection(role, ref, by=""):
+    """Delete a selection that has no campaign (admins only), with its briefs; an access code left empty goes too."""
+    import history
+    import portal
+    if role != "admin":
+        return False, "Only an admin can delete a selection here."
+    sel = db.selection(int(ref)) if str(ref).isdigit() else None
+    if sel is None:
+        return False, "That selection no longer exists."
+    if db.campaigns_for_selection(sel["id"]):
+        return False, "A campaign uses this selection: delete the campaign instead."
+    history.set_actor(by or "admin")
+    code_id = sel["code_id"]
+    with history.tracked("selection", sel["id"], "Deleted selection " + (sel["name"] or "")):
+        db.delete_selection(sel["id"])
+    with db.connect() as conn:
+        ids = [r[0] for r in conn.execute("SELECT id FROM briefs WHERE selection_id = ? AND deleted_at IS NULL", (sel["id"],))]
+    n = sum(1 for bid in ids if portal.delete_brief(bid, db.admin_code_id()))
+    gone = _drop_empty_code(code_id, by)
+    return True, "Deleted “%s”%s%s. You can bring it back from History." % (
+        sel["name"] or "the selection", (" and %d brief%s" % (n, "" if n == 1 else "s")) if n else "",
+        (" and the empty access code “%s”" % gone) if gone else "")
 
 
 def _owner_label(code_id, users, codes):

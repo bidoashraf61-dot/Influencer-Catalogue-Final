@@ -375,5 +375,27 @@ class Hub(unittest.TestCase):
         self.assertEqual(self.kam.post("/api/hub/assign-kam", {"kind": "selection", "ref": sel_c, "kam": OTHER})[0], 200)        # team-filed (now under Salma)
 
 
+    def test_13_delete_loose_selection_and_campaign_drops_empty_code(self):
+        """A plain access code's loose selection can be deleted (admin); the emptied code goes with it, and so does it when
+        the last campaign is deleted."""
+        def code(label, h):
+            with db.connect() as conn:
+                return conn.execute("INSERT INTO codes (code_hash, hint, label, created_at) VALUES (?, '····', ?, ?)", (h, label, db.now())).lastrowid
+        c1 = code("Parkville code", "h-park")
+        sel = db.save_selection(None, "Skincare", ["HV-MI-001"], {}, None, None, code_id=c1)
+        self.assertEqual(self.kam.post("/api/hub/delete", {"kind": "selection", "ref": sel})[0], 400)
+        s, j, _ = self.boss.post("/api/hub/delete", {"kind": "selection", "ref": sel})
+        self.assertEqual(s, 200, j)
+        self.assertIsNone(db.get_code(c1))
+        self.assertIn("access code", j["message"])
+        c2 = code("Pend code", "h-pend2")
+        sel2 = db.save_selection(None, "Wave", ["HV-MI-001"], {}, None, None, code_id=c2)
+        camp = db.create_campaign("Wave", code_id=c2, selection_id=sel2)
+        self.assertEqual(self.boss.post("/api/hub/delete", {"kind": "selection", "ref": sel2})[0], 400)   # a campaign uses it
+        s, j, _ = self.boss.post("/api/hub/delete", {"kind": "campaign", "ref": camp, "with_selection": True})
+        self.assertEqual(s, 200, j)
+        self.assertIsNone(db.get_code(c2))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

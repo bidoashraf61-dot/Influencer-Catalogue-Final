@@ -1181,7 +1181,7 @@
   function deletePanel(kind, it, closeFn) {
     var msg = h("p", { class: "hb-share__msg", role: "status" });
     var both = h("input", { type: "checkbox", checked: "" });
-    var yes = h("button", { class: "hc-btn hc-btn--sm hb-danger", type: "button" }, "Delete campaign");
+    var yes = h("button", { class: "hc-btn hc-btn--sm hb-danger", type: "button" }, kind === "campaign" ? "Delete campaign" : "Delete selection");
     var no = h("button", { class: "hc-btn hc-btn--line hc-btn--sm", type: "button", onclick: closeFn }, "Cancel");
     yes.addEventListener("click", function () {
       yes.disabled = true; note(msg, "Deleting…");
@@ -1195,7 +1195,7 @@
     return h("div", { class: "hb-share hb-share--solo", role: "alertdialog", "aria-label": "Delete " + it.name },
       h("div", { class: "hb-share__col" }, h("b", null, "Delete “" + it.name + "”?"),
         h("small", null, "Its report and tracking links stop working at once. You can bring it back from History in the admin."),
-        h("label", { class: "hb-move__opt" }, both, "Also delete its selection and brief (unless another campaign uses the selection)"),
+        kind === "campaign" ? h("label", { class: "hb-move__opt" }, both, "Also delete its selection and brief (unless another campaign uses the selection)") : null,
         h("div", { class: "hb-move__btns" }, yes, no), msg),
       h("button", { class: "hb-share__x", type: "button", "aria-label": "Close", onclick: closeFn }, "×"));
   }
@@ -1269,7 +1269,7 @@
     var kamBtn = it.can_kam ? h("button", { class: "hb-assignbtn hb-kambtn", type: "button", "aria-expanded": kaming ? "true" : "false", onclick: toggle("kam") }, icon("users"), "Assign KAM") : null;
     var assignBtn = h("button", { class: "hb-assignbtn" + (flagged && !kamBtn ? " is-primary" : ""), type: "button", "aria-expanded": assigning ? "true" : "false", onclick: toggle("assign") }, icon("users"), "Assign client");
     var shareBtn = h("button", { class: "hb-sharebtn", type: "button", "aria-expanded": shown ? "true" : "false", onclick: toggle("all") }, icon("link"), "Share");
-    var delBtn = kind === "campaign" ? h("button", { class: "hb-delbtn", type: "button", "aria-expanded": deleting ? "true" : "false", onclick: toggle("delete") }, "Delete") : null;
+    var delBtn = (kind === "campaign" || (kind === "selection" && HUB.role === "admin")) ? h("button", { class: "hb-delbtn", type: "button", "aria-expanded": deleting ? "true" : "false", onclick: toggle("delete") }, "Delete") : null;
     var pkg = kind === "campaign" && it.package;
     var row = h("li", { class: "hb-it" },
       h("div", { class: "hb-it__main" },
