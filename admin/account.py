@@ -189,7 +189,7 @@ def summary(user, code_id, secret=b""):
     import lifecycle
     team = sorted(portal.team_codes(code_id))
     # Selections HelloVoice granted this person one by one (owner, 2026-10-15), and their campaigns.
-    granted = sorted(db.granted_selection_ids(code_id)) or [-1]
+    granted = sorted(set(db.granted_selection_ids(code_id)) | portal.sample_ids_for(code_id)) or [-1]
     gq = ",".join("?" * len(granted))
     with db.connect() as conn:
         sels = conn.execute(
