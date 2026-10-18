@@ -407,8 +407,14 @@
     return days.map(function (d) { cv += by[d].views; ce += by[d].eng; cr += by[d].reach; cp += by[d].posts; return { d: d, views: cv, eng: ce, reach: cr, posts: cp }; });
   }
 
+  // Every curve starts from zero on the campaign's first day, so the day before the first video reads 0.
+  function fromStart(pts) {
+    var st = R.campaign && R.campaign.starts_at; if (!st || !pts.length) return pts;
+    var d = new Date(st * 1000).toISOString().slice(0, 10);
+    return d < pts[0].d ? [{ d: d, views: 0, eng: 0, reach: 0, posts: 0 }].concat(pts) : pts;
+  }
   function renderAll() {
-    var list = posts(), t = sums(list), s = series(list), cl = clicksFor();
+    var list = posts(), t = sums(list), s = fromStart(series(list)), cl = clicksFor();
     // Whole-campaign totals set by HelloVoice by hand replace the measured
     // ones in the unfiltered view and are always marked as estimates.
     var adj = (!filtered() && R.total && R.total.adjusted) || [];
@@ -517,7 +523,7 @@
 
   function renderTrend(s) {
     var useHist = !filtered() && R.history && R.history.length > 1;
-    var pts = useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s;
+    var pts = fromStart(useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s);
     $("w-trend").innerHTML = head(IC.trend, "Views & engagement", "Total views (green) and engagement — likes and comments (orange) — growing over the campaign. Each line has its own scale.", "trend")
       + '<div class="db-legend"><span><i style="background:' + COL[0] + '"></i>Views</span><span><i style="background:' + COL[1] + '"></i>Engagement</span></div>'
       + '<div class="db-card__body">' + areaChart(pts, "views", "eng", 640, 200) + "</div>";
@@ -1058,7 +1064,7 @@
     },
     trend: function () {
       var s = series(posts()), useHist = !filtered() && R.history && R.history.length > 1;
-      var pts = useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s;
+      var pts = fromStart(useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s);
       return "<h3>Views & engagement over time</h3><div style=\"height:240px\">" + areaChart(pts, "views", "eng", 600, 240) + "</div>"
         + '<h3>Day by day</h3><table class="db-table"><thead><tr><th>Day</th><th></th><th>Views</th><th>Engagement</th></tr></thead><tbody>'
         + pts.map(function (d) { return "<tr><td>" + esc(day(d.d, true)) + "</td><td></td><td>" + full(d.views) + "</td><td>" + full(d.eng) + "</td></tr>"; }).join("") + "</tbody></table>";
