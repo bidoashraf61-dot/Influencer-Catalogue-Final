@@ -695,3 +695,56 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
 .aud-stamp span:last-child { font-size: .8em; letter-spacing: .14em; }
 .mx-panel .aud-stamp { margin: 22px auto 6px; font-size: clamp(26px, 5vw, 40px); }
 @media print { .aud-stamp { transform: none; } }
+
+/* ---- report print and mobile polish 2026-10-18 (owner, design audit) ---------------------------------------------
+   PDF: sections used to be "keep whole", so a long section jumped to the next page and left the one before it half
+   empty (a cover with 60% blank, the last two highlight cards alone on a page, a progress page with the bottom half
+   empty). Now sections flow and only the cards, rows and charts stay whole; headings stay with what follows. */
+@media print {
+  #mx-report .mx-sec, .mx-band, .mx-status, .mx-sec--progress { break-inside: auto !important; }
+  .mx-sec__head, .mx-h2, .mx-note { break-after: avoid; }
+  .mx-post, .mx-cc, .mx-pod, .mx-panel, .mx-chart, .mx-bullet, .mx-gantt__row, .mx-table tr, .mx-goal { break-inside: avoid; }
+  .mx-post__tag { max-width: 62%; font-size: 11px; padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mx-post__sig { transform-origin: top right; transform: scale(.9); }
+  /* campaign progress: a wide name column, the state badge under the step name, nothing overlapping the lane */
+  .mx-gantt { --gl: 210px !important; }
+  .mx-gantt__name { flex-wrap: wrap; row-gap: 3px; padding-right: 12px; font-size: 13px; line-height: 1.25; }
+  .mx-gantt__name b { flex: 1 1 100%; }
+  .mx-gantt__row { min-height: 40px !important; }
+  .mx-gantt__lane { height: 40px !important; }
+  .mx-gantt__bar { top: 11px !important; }
+  .mx-gantt__bar.is-active { box-shadow: none !important; }
+  .mx-gantt__undated { left: 8px; top: 12px; }
+  .mx-gantt__out { top: 12px; }
+}
+/* Full report on a phone */
+@media (max-width: 640px) {
+  /* the section tabs scroll sideways: the fade shows there is more */
+  .mx-tabs__in { -webkit-mask-image: linear-gradient(90deg, #000 86%, transparent); mask-image: linear-gradient(90deg, #000 86%, transparent); padding-right: 36px; }
+  /* the ranked table scrolls inside its own box instead of being clipped */
+  .mx-table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  /* charts never reach past the screen */
+  .mx-chart, .mx-panel { overflow: hidden; }
+  .mx-chart svg, .mx-panel svg { max-width: 100%; height: auto; }
+  /* the podium is one swipe row, not three screens */
+  .mx-podium { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch; padding: 24px 2px 10px; margin-bottom: 18px; align-items: stretch; }
+  .mx-podium .mx-pod { flex: 0 0 78%; scroll-snap-align: center; }
+  .mx-podium .mx-pod--1 { order: -1; }
+}
+
+/* ---- report print round 2: the creator cards fit under the cover, three highlight cards across, the progress chart stays whole ---- */
+@media print {
+  /* creator cards: a shorter photo so the whole row fits on the cover page */
+  .mx-cc__photo { aspect-ratio: 16 / 9 !important; }
+  .mx-carousel__track { align-items: start; }
+  /* highlights: three across (four were too narrow and cut names and dates) */
+  .mx-wall { grid-template-columns: repeat(3, 1fr) !important; gap: 12px !important; }
+  /* campaign progress: its own page, never split in two */
+  #sec-timeline, .mx-sec--progress { break-before: page !important; break-inside: avoid !important; }
+  .mx-gantt__undated { background: var(--white, #fff); padding: 0 6px; z-index: 2; }
+}
+
+/* ---- report print round 3: the cover is its own page; the Overview starts cleanly on page 2 ---- */
+@media print {
+  #sec-overview { break-before: page !important; }
+}

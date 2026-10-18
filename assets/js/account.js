@@ -1559,6 +1559,20 @@
     c.appendChild(h("a", { class: "hc-btn", href: ROOT }, "Go to the catalogue"));
     c.hidden = false;
   }
+  // Campaign numbers stay current on an open profile (owner, 2026-10-18): every five minutes, while the tab is visible and
+  // nothing is being typed or shared, it asks for the profile and redraws only if a campaign's numbers or status changed.
+  function pollProfile() {
+    setInterval(function () {
+      if (document.hidden || !DATA || (SECTION !== "campaigns" && SECTION !== "overview")) return;
+      var ae = document.activeElement; if (ae && /^(INPUT|SELECT|TEXTAREA)$/.test(ae.tagName)) return;
+      if (document.querySelector(".kc-sharebox:not([hidden])")) return;
+      api("GET", "/api/account").then(function (r) {
+        if (!r.b || !r.b.ok) return;
+        var sig = function (cs) { return (cs || []).map(function (c) { return [c.token, c.status, c.views, c.delivered, c.engagement].join(":"); }).join("|"); };
+        if (sig(r.b.campaigns) !== sig(DATA.campaigns)) { DATA.campaigns = r.b.campaigns; renderSection(); }
+      }).catch(function () {});
+    }, window.__pollMs || 300000);
+  }
   function load() {
     return api("GET", "/api/account").then(function (r) {
       if (r.s === 401) { closed("Please sign in", "Sign in on the catalogue to see your profile."); return; }
@@ -1577,6 +1591,7 @@
       };
       hv.onReadAll = function () { if (DATA) { DATA.notifications.items.forEach(function (x) { x.unread = false; }); if (SECTION === "notifications" || SECTION === "overview") renderSection(); } };
       route(false);
+      if (!window.__pp) { window.__pp = 1; pollProfile(); }
       if (DATA.is_kam) loadClients();          // the side nav's count, and the page if it is open
     });
   }

@@ -282,9 +282,10 @@
       // No tracking links = no clicks anywhere on the report: no tab, no
       // column, no share of the score (the server already scored without it).
       if (R.objective && R.objective.links === false) R.visibility.clicks = false;
-      FILTER = { platform: "", kind: "", section: "campaign" };
+      if (!same || !FILTER) FILTER = { platform: "", kind: "", section: "campaign" };      // a refresh keeps the reader's filters
       render(t);
       show("report");
+      pollReport();
       if (!same) window.scrollTo(0, 0);
       get("/api/campaigns").then(function (x) { $("mx-all").hidden = !(x.campaigns || []).length; }).catch(function () {});
     }).catch(function (err) {
@@ -293,6 +294,20 @@
     });
   }
   window.addEventListener("hashchange", route);
+  // New numbers appear without a reload (owner, 2026-10-18): while the report is open and visible it asks for the
+  // report every five minutes, and redraws it only when something changed (the reader's filters and place are kept).
+  var POLL_ID = null;
+  function pollReport() {
+    if (POLL_ID) return;
+    POLL_ID = setInterval(function () {
+      if (document.hidden || !R || !R._t) return;
+      get("/api/campaign?t=" + encodeURIComponent(R._t)).then(function (b) {
+        var n = b && b.report; if (!n) return;
+        var sig = function (r) { return [r.updated_at, r.total && r.total.views, r.total && r.total.likes, r.total && r.total.comments, (r.posts || []).length].join("|"); };
+        if (sig(n) !== sig(R)) openReport(R._t);
+      }).catch(function () {});
+    }, window.__pollMs || 300000);
+  }
 
   /* ---------------------------------------------------------------- render */
 
