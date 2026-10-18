@@ -137,7 +137,7 @@ CATEGORIES = {
 
 # What each objective puts first, and so which targets the client sees as
 # the headline. The leaderboard weights live in metrics.OBJECTIVES.
-OBJECTIVE_KPIS = {"awareness": ["views", "reach"], "engagement": ["engagement", "er"],
+OBJECTIVE_KPIS = {"awareness": ["views"], "engagement": ["engagement", "er"],
                   "traffic": ["clicks", "views"], "balanced": ["views", "engagement", "er"]}
 
 # Ready briefs to start from; everything they set can be changed on the page.
@@ -243,6 +243,115 @@ def mix_from_counts(counts, followers=None):
     fol = dict(TIER_FOLLOWERS, **(followers or {}))
     return [{"tier": t, "posts": int(counts.get(t) or 0), "followers": fol[t]}
             for t in TIERS if int(counts.get(t) or 0) > 0]
+
+
+def mix_platforms_from_campaign(campaign, platforms):
+    """[{platform, tier, posts, followers, slot}] for the booked creators: every
+    planned post is counted on each chosen platform where the creator has an
+    account, at their follower count on that platform."""
+    rows = []
+    for m in db.campaign_creators(campaign["id"]):
+        foll = {}
+        for a in db.split_profiles(m["profiles"] or ""):
+            if a.get("followers"):
+                foll[a["platform"]] = int(a["followers"])
+        if m["followers"] and m["platform"] and m["platform"] not in foll:
+            foll[m["platform"]] = int(m["followers"])
+        name = m["name"] or m["cc_code"]
+        for p in platforms:
+            if foll.get(p):
+                rows.append({"platform": p, "tier": tier_of(foll[p]), "posts": m["planned"] or 1,
+                             "followers": foll[p], "name": name, "slot": name})
+    return rows
+
+
+def mix_platforms_from_counts(counts, platforms, followers=None):
+    """Posts per tier at typical sizes, each post on every chosen platform."""
+    return [dict(r, platform=p, slot=r["tier"]) for p in platforms for r in mix_from_counts(counts, followers)]
+
+
+def calculate_platforms(brief, rows):
+    """The plan for a campaign that runs on several platforms: each platform is
+    worked with its own library rates and the creators' followers there, then
+    added up. The value floor uses ceilings blended by each platform's share of
+    the safe estimate. One platform gives exactly what calculate() gives."""
+    plats = [p for p in PLATFORMS if any(r["platform"] == p for r in rows)]
+    if not plats:
+        return calculate(brief, [])
+    parts = {p: calculate(dict(brief, platform=p), [r for r in rows if r["platform"] == p]) for p in plats}
+    base = parts[plats[0]]
+    def by_platform():
+        return {p: {k: {kk: parts[p]["estimate"][k].get(kk) for kk in ("views", "engagement", "er")}
+                    for k in ("safe", "expected")} for p in plats}
+    if len(plats) == 1:
+        base["platforms"] = plats
+        base["by_platform"] = by_platform()
+        return base
+    lib = library()
+    links = base["links"]
+    budget = float(brief.get("budget") or 0)
+    slots = {}
+    for r in rows:
+        slots[r.get("slot", r["tier"])] = max(slots.get(r.get("slot", r["tier"]), 0), r["posts"])
+    posts = sum(slots.values())
+    est = {}
+    for kind in ("safe", "expected"):
+        v = sum(parts[p]["estimate"][kind]["views"] for p in plats)
+        e_ = sum(parts[p]["estimate"][kind]["engagement"] for p in plats)
+        x = {"views": v, "engagement": e_, "posts": posts, "er": e_ / v * 100 if v else None,
+             "reach": sum(parts[p]["estimate"][kind]["reach"] for p in plats)}
+        x["clicks"] = sum(parts[p]["estimate"][kind]["clicks"] for p in plats) if links else None
+        est[kind] = x
+    sv = {p: parts[p]["estimate"]["safe"]["views"] for p in plats}
+    se = {p: parts[p]["estimate"]["safe"]["engagement"] for p in plats}
+    tv, te = sum(sv.values()) or 1, sum(se.values()) or 1
+    blend = lambda key, w, tot, i: sum(w[p] / tot * lib[p][key][i] for p in plats)
+    floor = {}
+    if budget:
+        floor["views"] = budget / blend("cpm", sv, tv, 0) * 1000
+        floor["reach"] = floor["views"] * sum(sv[p] / tv * lib[p]["reach_per_view"] for p in plats)
+        floor["engagement"] = budget / blend("cpe", se, te, 0)
+        if links:
+            floor["clicks"] = budget / blend("cpc", sv, tv, 0)
+    target, checks = {"posts": posts}, []
+    for key in ("views", "reach", "engagement", "clicks"):
+        safe = est["safe"].get(key)
+        if safe is None:
+            continue
+        fl = floor.get(key)
+        if fl is None:
+            target[key] = safe
+            continue
+        target[key] = min(fl, safe)
+        checks.append({"key": key, "floor": fl, "safe": safe, "expected": est["expected"][key],
+                       "ok": safe >= fl, "margin": (safe / fl - 1) * 100 if fl else None})
+    if est["safe"]["er"] is not None:
+        target["er"] = est["safe"]["er"]
+    target = {k: _round(k, v) for k, v in target.items() if v}
+    roi = {}
+    if budget:
+        for kind in ("safe", "expected"):
+            x = est[kind]
+            roi[kind] = {"cpm": budget / x["views"] * 1000 if x["views"] else None,
+                         "cpe": budget / x["engagement"] if x["engagement"] else None,
+                         "cpc": budget / x["clicks"] if x.get("clicks") else None}
+        roi["ceilings"] = {"cpm": [round(blend("cpm", sv, tv, 0), 1), round(blend("cpm", sv, tv, 1), 1)],
+                           "cpe": [round(blend("cpe", se, te, 0), 2), round(blend("cpe", se, te, 1), 2)],
+                           "cpc": [round(blend("cpc", sv, tv, 0), 1), round(blend("cpc", sv, tv, 1), 1)] if links else None}
+    cf = CATEGORIES[base["category"]][1]
+    n = len(rows) and sum(r["posts"] for r in rows)
+    vr = [sum(lib[r["platform"]]["view_rate"][r["tier"]][i] * r["posts"] for r in rows) / n for i in (0, 1)]
+    er = [sum(lib[r["platform"]]["eng_rate"][r["tier"]][i] * r["posts"] for r in rows) / n * cf for i in (0, 1)]
+    bench = {"view_rate": [round(vr[0], 1), round(vr[1], 1)], "eng_rate": [round(er[0], 2), round(er[1], 2)]}
+    if links:
+        bench["ctr"] = [min(lib[p]["ctr"][0] for p in plats), max(lib[p]["ctr"][1] for p in plats)]
+    out = dict(base)
+    out.update({"platform": " + ".join(plats), "platforms": plats, "by_platform": by_platform(), "posts": posts,
+                "estimate": {k: {kk: _round(kk, vv) for kk, vv in v.items() if vv is not None} for k, v in est.items()},
+                "floor": {k: _round(k, v) for k, v in floor.items()}, "target": target, "checks": checks,
+                "roi": roi, "tiers": {}, "benchmark": bench, "avg_followers": None,
+                "notes": [x for p in plats for x in parts[p]["notes"][:0]]})
+    return out
 
 
 def calculate(brief, mix):
@@ -379,11 +488,12 @@ def client_view(plan):
     estimate, never the budget, the value floor or the cost ratios."""
     if not plan:
         return None
-    return {"platform": plan.get("platform"), "category": CATEGORIES.get(plan.get("category"), ("", 1))[0],
+    return {"platform": plan.get("platform"), "platforms": plan.get("platforms") or [], "category": CATEGORIES.get(plan.get("category"), ("", 1))[0],
             "template": (TEMPLATES.get(plan.get("template") or "") or {}).get("label"),
             "benchmark": plan.get("benchmark") or {},
             "estimate": (plan.get("estimate") or {}).get("expected") or {},
-            "safe": (plan.get("estimate") or {}).get("safe") or {}}
+            "safe": (plan.get("estimate") or {}).get("safe") or {},
+            "by_platform": plan.get("by_platform") or {}}
 
 
 # ----------------------------------------------- selections and campaigns --
