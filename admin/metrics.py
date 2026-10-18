@@ -777,6 +777,118 @@ def _ri(v, nd=0):
     return int(round(v, nd))
 
 
+def _platform_goals(campaign, plan, gp, r, camp, members, sched, window):
+    """The Goals tab measured one goal platform at a time, so the page's platform filter can switch it:
+    {platform: {progress, forecast, creators, pace, bench, now}}. Targets are the plan's own estimate for that
+    platform (plan.by_platform) and the videos the creators planned there (a planned video counts on every goal
+    platform where the creator has an account). Empty when the plan kept no per-platform estimate, so older plans
+    fall back to the whole-campaign view."""
+    own = plan.get("by_platform") or {}
+    if not own or any(not ((own.get(pl) or {}).get("safe") and (own[pl].get("expected"))) for pl in gp):
+        return {}
+    lib = plans.library()
+    cf = plans.CATEGORIES.get(plan.get("category"), ("", 1.0))[1]
+    camp_targets = db.campaign_targets(campaign)
+    by_code = {m["cc_code"]: m for m in members}
+    out = {}
+    for pl in gp:
+        o = own[pl]
+        mine = [c for c in r["creators"] if (creator_followers(by_code[c["code"]]).get(pl) if c["code"] in by_code else None)]
+        posts_pl = [p for p in camp if p["platform"] == pl]
+        pieces = {}
+        for p in posts_pl:
+            pieces.setdefault(p["pk"], []).append(p)
+        # ---- targets: this platform's own
+        tgt = {}
+        planned = sum(int(c.get("planned") or 0) or 1 for c in mine)
+        for key in ("posts", "views", "engagement", "er"):
+            if key not in camp_targets:
+                continue
+            v = planned if key == "posts" else o["safe"].get(key)
+            if v:
+                tgt[key] = plans._round(key, v)
+        tot = {"posts": len(pieces), "views": sum(p.get("views") or 0 for p in posts_pl), "reach": 0,
+               "engagement": sum(p.get("engagement") or 0 for p in posts_pl), "clicks": 0,
+               "er": _avg(_avg(q["er"] for q in g) for g in pieces.values()),
+               "video_er": _avg(_avg(q["video_er"] for q in g) for g in pieces.values())}
+        # ---- the publishing plan for the videos on this platform
+        cs = []
+        for c in mine:
+            got = len({p["pk"] for p in posts_pl if p["code"] == c["code"]})
+            cs.append(dict(c, planned=int(c.get("planned") or 0) or 1, delivered=got))
+        planf = plan_fraction(campaign, cs)
+        progress = target_progress(campaign, tot, tgt, planf)
+        # ---- creators on this platform
+        crs, tv, te = [], [0.0, 0.0], [0.0, 0.0]
+        for c in cs:
+            f = creator_followers(by_code[c["code"]])[pl]
+            t = plans.tier_of(f)
+            v = [f * lib[pl]["view_rate"][t][i] / 100.0 for i in (0, 1)]
+            e = [v[i] * lib[pl]["eng_rate"][t][i] * cf / 100.0 for i in (0, 1)]
+            n = c["planned"]
+            for i in (0, 1):
+                tv[i] += v[i] * n
+                te[i] += e[i] * n
+            mp = [p for p in posts_pl if p["code"] == c["code"]]
+            pc = len({p["pk"] for p in mp})
+            avg_v = sum(p.get("views") or 0 for p in mp) / float(pc) if pc else None
+            ratio = (avg_v / v[0]) if (avg_v is not None and v[0]) else None
+            nxt = next(((tt, conf) for (i, tt, conf) in sched.get(c["code"], [])), None)
+            crs.append({"code": c["code"], "name": c["name"], "photo": c.get("photo"), "planned": n, "live": pc,
+                        "platforms": [{"platform": pl, "followers": f, "size": SIZE_WORDS[t]}], "size": SIZE_WORDS[t],
+                        "exp_views": [_ri(v[0], -2), _ri(v[1], -2)] if v[1] else None,
+                        "views_per_video": round(avg_v) if avg_v is not None else None,
+                        "eng_per_video": round(sum(p.get("engagement") or 0 for p in mp) / pc) if pc else None,
+                        "status": None if ratio is None else ("met" if ratio >= 1 else "close" if ratio >= 0.7 else "behind"),
+                        "next": ({"at": nxt[0], "confirmed": nxt[1]} if (nxt and not pc) else None)})
+        # ---- forecast to the end, on this platform's videos
+        prog = {i["key"]: i for i in progress["items"]}
+        fc = {"planned": planned, "live": len(pieces)}
+        for key, got, aim in (("views", tot["views"], tv[1]), ("engagement", tot["engagement"], te[1])):
+            it = prog.get(key)
+            if not it or not pieces or not planned:
+                continue
+            run = got / float(len(pieces)) * planned
+            left = 0.0
+            for c in crs:
+                owed = max(0, (c["planned"] or 1) - (c["live"] or 0))
+                if owed and c["exp_views"]:
+                    f = c["platforms"][0]["followers"]
+                    t = plans.tier_of(f)
+                    vv = f * lib[pl]["view_rate"][t][1] / 100.0
+                    left += owed * (vv if key == "views" else vv * lib[pl]["eng_rate"][t][1] * cf / 100.0)
+            lo, hi = sorted((run, got + left))
+            fc[key] = {"low": _ri(lo, -2 if lo >= 1000 else 0), "high": _ri(hi, -2 if hi >= 1000 else 0), "target": it["goal"],
+                       "verdict": "ahead" if lo >= it["goal"] else ("ontrack" if hi >= it["goal"] else "behind")}
+        fc["early"] = len(pieces) < 3
+        # ---- pace on this platform's share
+        pace = None
+        if planf and window:
+            t0, t1 = window[0], window[1] + MATURE_DAYS * 86400
+            pts = [(t, plan_fraction(campaign, cs, now=t)) for t in range(t0, t1 + 86400, 86400)]
+            pace = {"start": t0, "end": t1, "posts": [[t, round(f[0], 4)] for t, f in pts if f],
+                    "mature": [[t, round(f[1], 4)] for t, f in pts if f]}
+        elif campaign["starts_at"] and campaign["ends_at"]:
+            pace = {"start": campaign["starts_at"], "end": campaign["ends_at"], "posts": None, "mature": None}
+        # ---- benchmark band and where this platform is now
+        n = sum(c["planned"] for c in cs)
+        bench = None
+        if n:
+            vr, er = [0.0, 0.0], [0.0, 0.0]
+            for c in cs:
+                t = plans.tier_of(creator_followers(by_code[c["code"]])[pl])
+                for i in (0, 1):
+                    vr[i] += lib[pl]["view_rate"][t][i] * c["planned"] / n
+                    er[i] += lib[pl]["eng_rate"][t][i] * c["planned"] / n * cf
+            bench = {"view_rate": [round(vr[0], 1), round(vr[1], 1)], "eng_rate": [round(er[0], 2), round(er[1], 2)]}
+        vrs = [p["view_rate"] for p in posts_pl if p.get("view_rate") is not None]
+        out[pl] = {"progress": progress, "forecast": fc, "creators": crs, "pace": pace, "bench": bench,
+                   "now": {"view_rate": (sum(vrs) / len(vrs)) if vrs else None,
+                           "er": tot["video_er"] if tot["video_er"] is not None else tot["er"]},
+                   "aim": {"views": _ri(tv[1], -3), "engagement": _ri(te[1], -2)}}
+    return out
+
+
 def goals_view(campaign, r, photo=None):
     """Everything the client's "Goals & benchmarks" tab needs beyond the targets themselves: the forecast, each
     creator's own benchmark, the platform split, what is still to come, the pace curves and the data notes.
@@ -925,7 +1037,8 @@ def goals_view(campaign, r, photo=None):
     if planned and done_pieces < planned:
         notes.append("Videos keep gaining views for about a week after they go live, so recent videos read low at first.")
     return {"platforms": gp, "creators": creators, "split": platforms, "forecast": fc, "owed": owed, "pace": pace,
-            "aim": {"views": _ri(tot_v[1], -3), "engagement": _ri(tot_e[1], -2)}, "notes": notes}
+            "aim": {"views": _ri(tot_v[1], -3), "engagement": _ri(tot_e[1], -2)}, "notes": notes,
+            "by_platform": _platform_goals(campaign, plan, gp, r, camp, members, sched, window)}
 
 
 def target_progress(campaign, total, targets, plan=None):
@@ -1206,6 +1319,9 @@ def client_report(campaign, photo=None, photo_large=None):
     for g in (out["goals"] or {}).get("creators", []):
         g["photo"] = pics.get(g["code"])
         g.pop("ratio", None)
+    for bp in ((out["goals"] or {}).get("by_platform") or {}).values():
+        for g in bp["creators"]:
+            g["photo"] = pics.get(g["code"])
     out["reach_basis"] = {"per_view": factors()["report_reach_per_view"]}
     if vis["clicks"]:
         cl = r["clicks"]

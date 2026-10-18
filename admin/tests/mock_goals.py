@@ -104,6 +104,7 @@ def build(mode):
     db.set_planned(cid, {d[0]: d[4] for d in DOCTORS})
     lib, cf = plans.library(), plans.CATEGORIES["pharma"][1]
     est = {"safe": {"views": 0.0, "engagement": 0.0}, "expected": {"views": 0.0, "engagement": 0.0}}
+    byp = {pl: {"safe": {"views": 0.0, "engagement": 0.0, "er": 0}, "expected": {"views": 0.0, "engagement": 0.0, "er": 0}} for pl in ("Instagram", "TikTok")}
     for code, name, ig, tt, n in DOCTORS:
         for pl, f in (("Instagram", ig), ("TikTok", tt)):
             t = plans.tier_of(f)
@@ -111,12 +112,19 @@ def build(mode):
                 v = f * lib[pl]["view_rate"][t][i] / 100.0 * n
                 est[k]["views"] += v
                 est[k]["engagement"] += v * lib[pl]["eng_rate"][t][i] * cf / 100.0
+                byp[pl][k]["views"] += v
+                byp[pl][k]["engagement"] += v * lib[pl]["eng_rate"][t][i] * cf / 100.0
     plan = {"platform": "Instagram + TikTok", "platforms": ["Instagram", "TikTok"], "category": "pharma", "template": "awareness",
             "benchmark": {"view_rate": [6.0, 14.0], "eng_rate": [1.6, 3.0]},
             "estimate": {k: {kk: int(round(vv, -3)) for kk, vv in v.items()} for k, v in est.items()}}
+    if "--no-byplatform" not in sys.argv:    # older plans did not keep a per-platform estimate
+        plan["by_platform"] = {pl: {k: {"views": int(round(d[k]["views"], -3)), "engagement": int(round(d[k]["engagement"], -2)),
+                                        "er": round(d[k]["engagement"] / d[k]["views"] * 100, 2)} for k in d} for pl, d in byp.items()}
     steps = [{"key": "publishing", "on": True, "start": day(0), "end": day(21), "state": "active"}]
     db.save_campaign(cid, status="live", starts_at=now - 17 * 86400, ends_at=now + 43 * 86400, plan=plan, steps=steps,
-                     targets={"posts": 11, "views": 1082000, "engagement": 14200, "er": 1.31}, objective="awareness",
+                     targets=({"posts": 11, "views": sum(v["safe"]["views"] for v in plan["by_platform"].values()),
+                              "engagement": sum(v["safe"]["engagement"] for v in plan["by_platform"].values()), "er": 1.31}
+                             if plan.get("by_platform") else {"posts": 11, "views": 1082000, "engagement": 14200, "er": 1.31}), objective="awareness",
                      visibility={"clicks": False})
     vid = [0]
 

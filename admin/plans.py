@@ -488,7 +488,7 @@ def client_view(plan):
     estimate, never the budget, the value floor or the cost ratios."""
     if not plan:
         return None
-    return {"platform": plan.get("platform"), "category": CATEGORIES.get(plan.get("category"), ("", 1))[0],
+    return {"platform": plan.get("platform"), "platforms": plan.get("platforms") or [], "category": CATEGORIES.get(plan.get("category"), ("", 1))[0],
             "template": (TEMPLATES.get(plan.get("template") or "") or {}).get("label"),
             "benchmark": plan.get("benchmark") or {},
             "estimate": (plan.get("estimate") or {}).get("expected") or {},
