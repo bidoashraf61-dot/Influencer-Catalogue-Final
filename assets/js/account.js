@@ -1104,7 +1104,7 @@
   function kamSelect(cur, label, blank, onpick) {
     var sel = h("select", { class: "hb-kam", "aria-label": label },
       h("option", { value: "" }, blank));
-    HUB.kams.forEach(function (k) { sel.appendChild(h("option", { value: k.email }, k.name || k.email)); });
+    HUB.kams.forEach(function (k) { sel.appendChild(h("option", { value: k.email }, (k.name && k.name !== k.email.split("@")[0] ? k.name + " · " : "") + k.email)); });
     sel.value = cur || "";
     sel.addEventListener("change", function () { onpick(sel.value, sel); });
     return sel;
@@ -1126,7 +1126,7 @@
     var q = HUB.q.trim().toLowerCase();
     if (q && (c.name + " " + c.domain).toLowerCase().indexOf(q) < 0) return false;
     if (HUB.f === "live") return c.live > 0;
-    if (HUB.f === "nokam") return !c.kam.email && c.key !== "handed";
+    if (HUB.f === "nokam") return !c.kam.email && c.key !== "handed" && c.key !== "unassigned";
     return true;
   }
   function itemStatus(kind, it) {
@@ -1223,7 +1223,7 @@
     var head = h("div", { class: "hb-p__head" },
       h("div", { class: "hb-p__who" }, h("b", null, p.name || p.email), h("small", null, [p.job_title, p.email].filter(Boolean).join(" · ")),
         p.last_login_at ? h("small", null, "Last in " + ago(p.last_login_at)) : null),
-      admin && p.id ? h("label", { class: "hb-lab" }, "KAM", kamSelect(p.kam && p.kam !== (co.kam && co.kam.email) ? p.kam : "", "Account manager for " + (p.name || p.email),
+      admin && p.id && !p.staff ? h("label", { class: "hb-lab" }, "KAM", kamSelect(p.kam && p.kam !== (co.kam && co.kam.email) ? p.kam : "", "Account manager for " + (p.name || p.email),
         co.kam && co.kam.email ? "Follows the company (" + kamName(co.kam.email) + ")" : "No account manager", function (v) {
           hubSetKam("person", p.id, v, function () { p.kam = v || (co.kam && co.kam.email) || ""; renderSection(); });
         })) : (p.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(p.kam)) : null));
@@ -1239,14 +1239,14 @@
     var admin = HUB.role === "admin", open = !!HUB.open[c.key], det = HUB.detail[c.key];
     var btn = h("button", { class: "hb-co__btn", type: "button", "aria-expanded": open ? "true" : "false", "aria-controls": "hb-" + c.key.replace(/[^a-z0-9]/gi, "_"),
       onclick: function () { HUB.open[c.key] = !open; if (!open && !HUB.detail[c.key]) hubDetail(c.key); renderSection(); } },
-      h("span", { class: "hb-co__name" }, h("b", null, c.name), c.domain ? h("small", null, c.domain) : null),
+      h("span", { class: "hb-co__name" }, h("b", null, c.name), c.domain ? h("small", null, c.domain) : (c.note ? h("small", null, c.note) : null)),
       h("span", { class: "hb-co__n" }, plural(c.people, "person", "people") + " · " + plural(c.selections, "selection") + " · " + plural(c.campaigns, "campaign") + (c.live ? " · " + c.live + " live" : "")),
       h("span", { class: "hb-chev", "aria-hidden": "true", html: '<svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' }));
     var kam = admin && c.domain ? h("label", { class: "hb-lab" }, "KAM", kamSelect(c.kam.email, "Account manager for " + c.name, "No account manager", function (v) {
       hubSetKam("company", c.domain, v, function () { c.kam = { email: v, name: kamName(v) }; HUB.detail = {}; renderSection(); if (HUB.open[c.key]) hubDetail(c.key); });
     })) : (c.kam && c.kam.email ? h("small", { class: "hb-it__kam" }, "KAM " + (c.kam.name || kamName(c.kam.email))) : null);
     if (open && !det) hubDetail(c.key);               // reopened after a move: fetch again
-    var li = h("li", { class: "hb-co" + (open ? " is-open" : "") }, h("div", { class: "hb-co__row" }, btn, kam));
+    var li = h("li", { class: "hb-co" + (open ? " is-open" : "") + (c.key === "unassigned" ? " hb-co--flag" : "") }, h("div", { class: "hb-co__row" }, btn, kam));
     if (open) {
       var body = h("div", { class: "hb-co__body", id: "hb-" + c.key.replace(/[^a-z0-9]/gi, "_") });
       if (det === "loading" || !det) body.appendChild(h("p", { class: "hb-none", role: "status" }, "Loading…"));
@@ -1267,7 +1267,7 @@
       hubLoad();
       return;
     }
-    var all = HUB.list.filter(function (c) { return c.key !== "handed"; });
+    var all = HUB.list.filter(function (c) { return c.key !== "handed" && c.key !== "unassigned"; });
     var stats = { people: 0, sel: 0, camp: 0, live: 0 };
     all.forEach(function (c) { stats.people += c.people; stats.sel += c.selections; stats.camp += c.campaigns; stats.live += c.live; });
     add(p, h("dl", { class: "hc-score hc-score--4" },
@@ -1279,7 +1279,7 @@
     q.addEventListener("input", function () { HUB.q = q.value; var pos = q.selectionStart; renderSection(); var n = document.querySelector(".hb-search"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } });
     var bar = h("div", { class: "kc-filter", role: "group", "aria-label": "Show" });
     [["all", "All companies", HUB.list.length], ["live", "With a live campaign", HUB.list.filter(function (c) { return c.live > 0; }).length],
-     ["nokam", "No account manager", HUB.list.filter(function (c) { return !c.kam.email && c.key !== "handed"; }).length]].forEach(function (f) {
+     ["nokam", "No account manager", HUB.list.filter(function (c) { return !c.kam.email && c.key !== "handed" && c.key !== "unassigned"; }).length]].forEach(function (f) {
       bar.appendChild(h("button", { class: "kc-chip", type: "button", "aria-pressed": HUB.f === f[0] ? "true" : "false",
         onclick: function () { HUB.f = f[0]; renderSection(); } }, f[1], h("span", null, String(f[2]))));
     });

@@ -22,6 +22,31 @@ import notify
 import team
 
 FREE = "personal:"
+UNASSIGNED = "unassigned"      # items filed under team accounts or plain access codes: not a client yet
+STAFF_DOMAINS = ("blueholding.co.uk", "hellovoice.co.uk")      # the owner and its team of account managers: never "clients"
+
+
+def staff_domains():
+    extra = db.setting("staff_domains") or []
+    return {d.strip().lower() for d in list(STAFF_DOMAINS) + (extra if isinstance(extra, list) else []) if str(d).strip()}
+
+
+def kam_options():
+    """Who can be an account manager: the BlueHolding team's own accounts (the owner, HelloVoice, is not one), every
+    KAM login in the admin, and anyone in the Settings "kams" list. [{name, email}], by name."""
+    seen = {}
+    team_domains = staff_domains() - {"hellovoice.co.uk"}
+    with db.connect() as conn:
+        for u in conn.execute("SELECT name, email, domain FROM users WHERE deleted_at IS NULL AND email IS NOT NULL"):
+            if (u["domain"] or "").lower() in team_domains:
+                seen[u["email"].lower()] = (u["name"] or "").strip()
+        for r in conn.execute("SELECT name, email FROM admins WHERE role = 'kam' AND disabled_at IS NULL AND email LIKE '%@%'"):
+            seen.setdefault(r["email"].lower(), (r["name"] or "").strip())
+            if r["name"] and not seen[r["email"].lower()]:
+                seen[r["email"].lower()] = r["name"]
+    for n, m in notify.kams():
+        seen.setdefault(m, (n or "").strip())
+    return [{"name": n or m.split("@")[0], "email": m} for m, n in sorted(seen.items(), key=lambda kv: ((kv[1] or kv[0]).lower()))]
 
 
 def viewer(user):
@@ -35,9 +60,9 @@ def viewer(user):
 
 def _kam_name(email):
     email = (email or "").strip().lower()
-    for n, m in notify.kams():
-        if m == email:
-            return n or m
+    for k in kam_options():
+        if k["email"] == email:
+            return k["name"] or email
     return email
 
 
@@ -129,12 +154,46 @@ def _groups(role, a):
     users = allu if scoped is None else scoped[1]
     groups = {}
     for u in users:
+        if (u["domain"] or "").lower() in staff_domains():
+            continue                           # HelloVoice (the owner) and BlueHolding (the account managers) are not clients
         g = groups.setdefault(_key(u), {"users": [], "names": {}})
         g["users"].append(u)
         c = (u["company"] or "").strip()
         if c:
             g["names"][c] = g["names"].get(c, 0) + 1
     return groups, allu, scoped
+
+
+def _unassigned_people():
+    """Items filed under the team's own accounts or under plain access codes (no account behind them): shown so an
+    admin can move them to the right client. Only entries that actually hold something."""
+    kam = _item_kams()
+    dmap = kam_scope.domain_map()
+    with db.connect() as conn:
+        allu = conn.execute("SELECT * FROM users WHERE deleted_at IS NULL").fetchall()
+        user_codes = {u["code_id"] for u in allu if u["code_id"] is not None}
+        loose_ids = [r[0] for r in conn.execute(
+            "SELECT code_id FROM selections WHERE code_id IS NOT NULL AND deleted_at IS NULL AND archived_at IS NULL "
+            "UNION SELECT code_id FROM campaigns WHERE code_id IS NOT NULL")]
+        loose = {r["id"]: r for r in conn.execute("SELECT id, label FROM codes")} if loose_ids else {}
+    staff = [u for u in allu if (u["domain"] or "").lower() in staff_domains() and u["code_id"] is not None]
+    loose_codes = [i for i in loose_ids if i not in user_codes and i != db.admin_code_id() and i in loose]
+    items = _items([u["code_id"] for u in staff] + loose_codes)
+    out = []
+    for u in sorted(staff, key=lambda r: ((r["name"] or r["email"] or "").lower())):
+        s_, c_ = items.get(u["code_id"], ([], []))
+        if s_ or c_:
+            out.append({"id": u["id"], "name": u["name"] or u["email"], "email": u["email"], "job_title": u["job_title"] or "Team account",
+                        "company": u["company"] or "", "kam": "", "last_login_at": u["last_login_at"], "status": u["status"], "staff": True,
+                        "selections": [_sel_row(x, kam) for x in s_], "campaigns": [_camp_row(x, kam) for x in c_]})
+    for cid in sorted(loose_codes):
+        s_, c_ = items.get(cid, ([], []))
+        if s_ or c_:
+            lab = (loose[cid]["label"] or "").strip() or "Access code #%d" % cid
+            out.append({"id": None, "name": lab, "email": "", "job_title": "Plain access code (no account)", "company": "", "kam": "",
+                        "last_login_at": None, "status": "", "staff": True,
+                        "selections": [_sel_row(x, kam) for x in s_], "campaigns": [_camp_row(x, kam) for x in c_]})
+    return out
 
 
 def _name_of(key, g):
@@ -168,13 +227,24 @@ def companies(role, a):
             rows.append({"key": "handed", "name": "Handed to you", "domain": "", "kam": {"email": "", "name": ""},
                          "people": 0, "selections": sum(1 for r in hs.values() if r["code_id"] not in own),
                          "campaigns": sum(1 for r in hc.values() if r["code_id"] not in own), "live": 0})
-    rows.sort(key=lambda r: (r["key"] == "handed", r["name"].lower()))
-    return {"companies": rows, "kams": [{"name": n, "email": m} for n, m in notify.kams()], "role": role}
+    if role == "admin":
+        un = _unassigned_people()
+        if un:
+            rows.append({"key": UNASSIGNED, "name": "Not filed under a client", "domain": "", "kam": {"email": "", "name": ""},
+                         "people": len(un), "selections": sum(len(p["selections"]) for p in un),
+                         "campaigns": sum(len(p["campaigns"]) for p in un),
+                         "live": sum(1 for p in un for k in p["campaigns"] if k["status"] == "live"),
+                         "note": "Filed under team accounts or plain access codes. Open one and Move it to its client."})
+    rows.sort(key=lambda r: (r["key"] != UNASSIGNED, r["key"] == "handed", r["name"].lower()))
+    return {"companies": rows, "kams": kam_options(), "role": role}
 
 
 def company(role, a, key):
     dmap = kam_scope.domain_map()
     kam = _item_kams()
+    if key == UNASSIGNED:
+        return {"key": key, "name": "Not filed under a client", "domain": "", "kam": {"email": "", "name": ""},
+                "people": _unassigned_people()} if role == "admin" else None
     if key == "handed" and role == "kam":
         groups, _, _ = _groups(role, a)
         own = {u["code_id"] for g in groups.values() for u in g["users"]}
@@ -217,7 +287,7 @@ def company(role, a, key):
 
 def _valid_kam(email):
     email = (email or "").strip().lower()
-    return email if (not email or email in {m for _, m in notify.kams()}) else None
+    return email if (not email or email in {k["email"] for k in kam_options()}) else None
 
 
 def set_kam(role, a, kind, ref, email, by=""):
@@ -301,7 +371,7 @@ def people_search(role, a, q):
     out = []
     for u in rows:
         hay = " ".join([(u["name"] or ""), (u["email"] or ""), (u["company"] or "")]).lower()
-        if q in hay and u["code_id"] is not None and u["status"] == "active":
+        if q in hay and u["code_id"] is not None and u["status"] == "active" and (u["domain"] or "").lower() not in staff_domains():
             out.append({"id": u["id"], "name": u["name"] or "", "email": u["email"], "company": u["company"] or "",
                         "domain": u["domain"] or ""})
         if len(out) >= 15:

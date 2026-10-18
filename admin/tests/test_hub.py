@@ -155,6 +155,44 @@ class Hub(unittest.TestCase):
         k.post("/api/hub/move", {"kind": "selection", "ref": self.s1, "to": self.lead["id"], "related": True, "tell": False})
         self.assertEqual(db.selection(self.s1)["code_id"], self.lead["code_id"])
 
+    def test_06_team_is_not_a_client_and_kam_options(self):
+        """Owner, 2026-10-18: HelloVoice (owner) and BlueHolding (the account managers) are not clients; their emails are
+        the KAM choices; items filed under team accounts or plain access codes show in "Not filed under a client"."""
+        team = self.signup("salma@blueholding.co.uk")[0]
+        tu = portal.user_by_email("salma@blueholding.co.uk")
+        tsel = db.save_selection(None, "Jamjoom campaign", ["HV-MI-001"], {}, None, None, code_id=tu["code_id"])
+        tcamp = db.create_campaign("Jamjoom Wave 1", code_id=tu["code_id"], selection_id=tsel)
+        with db.connect() as conn:                                              # a plain access code that holds work
+            cur = conn.execute("INSERT INTO codes (code_hash, hint, label, created_at) VALUES ('h-test', '····', 'Shared pharma code', ?)", (db.now(),))
+            loose = cur.lastrowid
+        lsel = db.save_selection(None, "Loose shortlist", ["HV-MI-002"], {}, None, None, code_id=loose)
+        s, b, _ = self.boss.get("/api/hub/companies")
+        self.assertEqual(s, 200)
+        keys = [c["key"] for c in b["companies"]]
+        self.assertNotIn("blueholding.co.uk", keys)                              # not a client
+        self.assertNotIn("hellovoice.co.uk", keys)
+        self.assertEqual(keys[0], "unassigned")                                  # flagged group first
+        emails = [k["email"] for k in b["kams"]]
+        self.assertIn("salma@blueholding.co.uk", emails)                         # team emails are the KAM choices
+        self.assertNotIn("buyer@rivalco.com", emails)                            # a client is not
+        s, d, _ = self.boss.get("/api/hub/company?k=unassigned")
+        self.assertEqual(s, 200)
+        names = {p["name"]: p for p in d["people"]}
+        self.assertIn("Jamjoom campaign", [x["name"] for p in d["people"] for x in p["selections"]])
+        self.assertIn("Jamjoom Wave 1", [x["name"] for p in d["people"] for x in p["campaigns"]])
+        self.assertIn("Shared pharma code", names)                               # the plain code is listed by its label
+        self.assertEqual(self.kam.get("/api/hub/company?k=unassigned")[0], 404)  # a KAM never sees this group
+        self.assertNotIn("unassigned", [c["key"] for c in self.kam.get("/api/hub/companies")[1]["companies"]])
+        # a team email can be set as the account manager; a stranger cannot
+        s, j, _ = self.boss.post("/api/hub/kam", {"kind": "company", "ref": "polyco.com", "kam": "salma@blueholding.co.uk"})
+        self.assertEqual((s, kam_scope.domain_map()["polyco.com"]), (200, "salma@blueholding.co.uk"))
+        self.boss.post("/api/hub/kam", {"kind": "company", "ref": "polyco.com", "kam": KAM})
+        # team accounts are not move targets
+        self.assertEqual(self.boss.get("/api/hub/people?q=salma")[1]["people"], [])
+        # a stray item can be moved to its client
+        s, j, _ = self.boss.post("/api/hub/move", {"kind": "selection", "ref": lsel, "to": self.lead["id"], "related": True, "tell": False})
+        self.assertEqual((s, db.selection(lsel)["code_id"]), (200, self.lead["code_id"]))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
