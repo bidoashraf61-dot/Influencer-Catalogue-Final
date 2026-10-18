@@ -945,6 +945,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send(200, views.selection_fit_panel(sel, db.list_creators(), self.selection_scores(sel), db.known_interests()))
         if path == "/campaigns/setup":
             return self.get_campaign_setup(query)
+        if path == "/campaigns/template.xlsx":
+            import campaign_sheet
+            return self.send(200, campaign_sheet.template(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                             [("Content-Disposition", 'attachment; filename="campaign-template.xlsx"')])
         if path == "/campaigns":
             return self.send(200, views.campaigns_page(
                 db.list_campaigns(), db.list_codes(), query.get("e"), query.get("ok"),
@@ -1397,6 +1401,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return kam_items.post(self, path)
         if path == "/campaigns/new":
             return self.post_campaign_new()
+        if path in ("/campaigns/import", "/campaigns/import/confirm"):
+            return self.post_campaign_import(path.endswith("/confirm"))
         if path == "/campaigns/setup":
             return self.post_campaign_setup()
         if path == "/quote/ready":
@@ -3249,6 +3255,36 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         cid = db.create_campaign(name, client=(f.get("client") or "").strip() or None,
                                  code_id=int(code_id) if code_id.isdigit() else None)
         return self.redirect("/campaigns/edit?id=%d" % cid)
+
+    _IMPORTS = {}                           # token -> (parsed sheet, time): a preview waits for its Confirm
+
+    def post_campaign_import(self, confirm):
+        """Upload a filled campaign workbook: preview it (writes nothing), then create the campaign on Confirm."""
+        import campaign_sheet
+        import kam_scope
+        if kam_scope.current() is not None:
+            return self.redirect("/campaigns?e=" + urllib.parse.quote("Only an admin can set up a campaign from a workbook."))
+        pend = Handler._IMPORTS
+        for t in [t for t, (_, at) in pend.items() if time.time() - at > 1800]:
+            pend.pop(t, None)
+        f = self.form_body()
+        if confirm:
+            got = pend.pop((f.get("token") or "").strip(), None)
+            if got is None:
+                return self.redirect("/campaigns?e=" + urllib.parse.quote("That preview has expired. Upload the workbook again."))
+            parsed = got[0]
+            if parsed["errors"]:
+                return self.redirect("/campaigns?e=" + urllib.parse.quote("The workbook still has problems."))
+            cid, notes = campaign_sheet.apply(parsed, getattr(self, "admin_name", None) or "admin")
+            return self.redirect("/campaigns/edit?id=%d&ok=%s" % (cid, urllib.parse.quote(" ".join(notes[-1:]))))
+        part = f.get("sheet")
+        if not part or not isinstance(part, dict) or not part.get("data"):
+            return self.redirect("/campaigns?e=" + urllib.parse.quote("Choose the filled workbook first."))
+        parsed = campaign_sheet.parse(part["data"])
+        import secrets
+        token = secrets.token_urlsafe(12)
+        pend[token] = (parsed, time.time())
+        return self.send(200, views.campaign_import_preview(parsed, token))
 
     def post_campaign_save(self):
         f = self.form_body(multi=("code", "cost", "drop", "planned", "logo", "logo_file",
@@ -6246,6 +6282,7 @@ TRACKED = {
     "/selections/save": ("selection", "id", "Saved selection"),
     "/selections/delete": ("selection", "id", "Deleted selection"),
     "/campaigns/new": ("campaign", None, "Created campaign"),
+    "/campaigns/import/confirm": ("campaign", None, "Created campaign from an Excel template"),
     "/campaigns/setup": ("campaign", None, "Created campaign from a selection"),
     "/campaigns/save": ("campaign", "id", "Saved campaign"),
     "/campaigns/delete": ("campaign", "id", "Deleted campaign"),

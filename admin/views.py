@@ -3297,7 +3297,15 @@ def campaigns_page(camps, codes, error=None, message=None, selections=()):
         "<div class='row'><div><label>Client (brand)</label><input name='client' placeholder='e.g. SVR'></div>"
         "<div><label>Passcode that sees it</label>" + code_select(codes, None) + "</div></div>"
         "<button class='btn'>" + ui.icon("plus", 15) + " Create blank campaign</button></form>"
-        "</div></div>")
+        "</div>"
+        "<form method='post' enctype='multipart/form-data' action='" + u("/campaigns/import") + "' class='startbox' style='margin-top:14px'>"
+        "<h3>From an Excel template</h3>"
+        "<p class='sec-desc'>Fill one workbook with the campaign, its creators and its post-detection rules. Goals are worked out for you. "
+        "You see a preview and every problem before anything is saved.</p>"
+        "<div class='row'><a class='btn ghost' href='" + u("/campaigns/template.xlsx") + "'>Download template</a>"
+        "<input type='file' name='sheet' accept='.xlsx' required>"
+        "<button class='btn lime'>" + ui.icon("plus", 15) + " Upload and preview</button></div></form>"
+        "</div>")
     table = (ui.empty("flag", "No campaigns yet", "Start one above. It stays a draft, invisible to the client, until you set it live.")
              if not camps else
              "<div class='stat-row'><div class='stat'><b>" + str(n_live) + "</b><span>Live</span></div>"
@@ -5629,3 +5637,51 @@ def kam_dashboard(who, scope, message=None, error=None):
                + "".join("<span>%s</span>" % e(d) for d in doms) + "</div></div><p class='muted'>New sign-ups on these domains "
                "become your clients automatically.</p></section>" if doms else ""))
     return page("Home", body, "/")
+
+
+def campaign_import_preview(parsed, token):
+    """What an uploaded campaign workbook will create, and every problem in it, before anything is saved."""
+    c, errs, warns = parsed["campaign"], parsed["errors"], parsed["warnings"]
+    out = []
+    if errs:
+        out.append("<div class='card'><div class='hd'><h2>Fix these first (" + str(len(errs)) + ")</h2></div><ul>"
+                   + "".join("<li>" + e(x) + "</li>" for x in errs) + "</ul>"
+                   "<p class='sec-desc'>Nothing was saved. Correct the workbook and upload it again.</p></div>")
+    if warns:
+        out.append("<div class='card'><div class='hd'><h2>Worth a look</h2></div><ul>"
+                   + "".join("<li>" + e(x) + "</li>" for x in warns) + "</ul></div>")
+    if c.get("name"):
+        rows = [("Campaign", c["name"]), ("Client", c.get("client") or "—"),
+                ("Type", " + ".join(g.title() for g in c.get("goals") or []) or "—"),
+                ("Platforms", ", ".join(c.get("platforms") or []) or "—"),
+                ("Dates", ((c.get("starts") or "?") + " to " + (c.get("ends") or "?"))),
+                ("Tracked links", "yes, to " + (c.get("destination") or "(no destination yet)") if c.get("tracked") else "no"),
+                ("Detection", " ".join((c["rules"]["hashtags"] + c["rules"]["mentions"] + c["rules"]["keywords"])[:12]) or "—")]
+        out.append("<div class='card'><div class='hd'><h2>Campaign</h2></div><table><tbody>"
+                   + "".join("<tr><td class='muted'>" + e(a) + "</td><td>" + e(b) + "</td></tr>" for a, b in rows)
+                   + "</tbody></table></div>")
+    if parsed["creators"]:
+        body = "".join("<tr><td>" + str(x["row"]) + "</td><td>" + e(x["entry"]) + "</td><td>"
+                       + (e(x["name"]) + " <span class='muted'>(" + e(x["code"]) + ")</span>" if x["code"] else "<span class='muted'>new, will be added</span>")
+                       + "</td><td>" + str(x["planned"]) + "</td><td>" + (str(x["fee"]) if x["fee"] is not None else "—") + "</td></tr>"
+                       for x in parsed["creators"])
+        out.append("<div class='card'><div class='hd'><h2>Creators (" + str(len(parsed["creators"])) + ")</h2></div><table><thead><tr>"
+                   "<th>Row</th><th>As written</th><th>Matched to</th><th>Videos</th><th>Fee (SAR)</th></tr></thead><tbody>" + body + "</tbody></table></div>")
+    t = parsed.get("targets")
+    if t and not errs:
+        est, tg = t.get("estimate") or {}, t.get("target") or {}
+        def fmt(k):
+            v = tg.get(k)
+            return "{:,.0f}".format(v) if v else "—"
+        out.append("<div class='card'><div class='hd'><h2>Goals worked out for you</h2></div><div class='stat-row'>"
+                   "<div class='stat'><b>" + fmt("views") + "</b><span>Views target</span></div>"
+                   "<div class='stat'><b>" + fmt("engagement") + "</b><span>Engagements target</span></div>"
+                   + ("<div class='stat'><b>" + fmt("clicks") + "</b><span>Clicks target</span></div>" if tg.get("clicks") else "")
+                   + "</div><p class='sec-desc'>From the goal type, platforms, industry and the creators' followers. They are recalculated when the campaign is created.</p></div>")
+    action = ("<form method='post' action='" + u("/campaigns/import/confirm") + "'><input type='hidden' name='token' value='" + e(token) + "'>"
+              "<button class='btn lime'>" + ui.icon("plus", 15) + " Create the campaign</button> "
+              "<a class='btn ghost' href='" + u("/campaigns") + "'>Cancel</a></form>") if not errs else (
+              "<a class='btn' href='" + u("/campaigns") + "'>Back to Campaigns</a>")
+    body = ui.header("Check the workbook", "Nothing is saved until you confirm.",
+                     crumbs=[("Selections and campaigns", None), ("Campaigns", "/campaigns"), ("Import", None)]) + "".join(out) + action
+    return page("Check the workbook", body, "/campaigns")
