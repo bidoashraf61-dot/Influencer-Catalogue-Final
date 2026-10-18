@@ -196,6 +196,19 @@ def _unassigned_people():
     return out
 
 
+def unfiled_code_ids():
+    """The client codes behind the "Not filed under a client" group: team accounts and plain codes that hold work."""
+    allu = []
+    with db.connect() as conn:
+        allu = conn.execute("SELECT code_id, domain FROM users WHERE deleted_at IS NULL AND code_id IS NOT NULL").fetchall()
+        used = {r[0] for r in conn.execute(
+            "SELECT code_id FROM selections WHERE code_id IS NOT NULL AND deleted_at IS NULL AND archived_at IS NULL "
+            "UNION SELECT code_id FROM campaigns WHERE code_id IS NOT NULL")}
+    user_codes = {u["code_id"] for u in allu}
+    staff = {u["code_id"] for u in allu if (u["domain"] or "").lower() in staff_domains()}
+    return (staff | {i for i in used if i not in user_codes}) - {db.admin_code_id()}
+
+
 def _name_of(key, g):
     if key.startswith(FREE):
         u = g["users"][0]

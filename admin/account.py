@@ -187,14 +187,23 @@ def summary(user, code_id, secret=b""):
     import rewards
     import selstatus
     import lifecycle
-    team = sorted(portal.team_codes(code_id))
+    team = set(portal.team_codes(code_id))
+    # An owner or admin also sees, in their own Selections and Campaigns, everything filed under team accounts or
+    # plain access codes (owner, 2026-10-18), so work like "Jamjoom" is never out of sight.
+    try:
+        import hub
+        if hub.viewer(user)[0] == "admin":
+            team |= hub.unfiled_code_ids()
+    except Exception:
+        pass
+    team = sorted(team)
     # Selections HelloVoice granted this person one by one (owner, 2026-10-15), and their campaigns.
     granted = sorted(db.granted_selection_ids(code_id)) or [-1]
     gq = ",".join("?" * len(granted))
     with db.connect() as conn:
         sels = conn.execute(
-            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, s.request_id, s.created_at, u.name owner FROM selections s "
-            "LEFT JOIN users u ON u.code_id = s.code_id "
+            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, s.request_id, s.created_at, u.name owner, c.label code_label FROM selections s "
+            "LEFT JOIN users u ON u.code_id = s.code_id LEFT JOIN codes c ON c.id = s.code_id "
             "WHERE (s.code_id IN (%s) OR s.id IN (%s)) AND s.archived_at IS NULL ORDER BY s.updated_at DESC LIMIT 60"
             % (",".join("?" * len(team)), gq), team + granted).fetchall()
         camps = conn.execute(
@@ -213,7 +222,7 @@ def summary(user, code_id, secret=b""):
             shortlisted.update(codes)
         st = selstatus.of(s["id"])
         selections.append({"name": s["name"], "token": s["token"], "creators": len(codes), "updated_at": s["updated_at"],
-                           "mine": s["code_id"] == code_id, "owner": None if s["code_id"] == code_id else (s["owner"] or "A colleague"),
+                           "mine": s["code_id"] == code_id, "owner": None if s["code_id"] == code_id else (s["owner"] or s["code_label"] or "A colleague"),
                            # Only the client's own work can be deleted: not a colleague's, not HelloVoice's.
                            "can_delete": (s["origin"] or "admin") == "client" and code_id != db.admin_code_id()
                                          and portal.owns(code_id, s["code_id"]),

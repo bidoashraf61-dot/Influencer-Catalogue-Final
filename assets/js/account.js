@@ -1080,7 +1080,7 @@
   // Share panel: email a client, hand it to an account manager (admins), copy its link. Nothing priced
   // is shown. Companies load as a list; a company's people and items load when it is opened.
 
-  var HUB = { list: null, kams: [], role: "", err: null, q: "", f: "all", open: {}, detail: {}, share: null };
+  var HUB = { list: null, kams: [], role: "", err: null, q: "", f: "all", open: {}, openP: {}, detail: {}, share: null };
 
   function hubLoad() {
     return api("GET", "/api/hub/companies").then(function (r) {
@@ -1220,9 +1220,14 @@
   }
   function personBlock(p, co) {
     var admin = HUB.role === "admin";
-    var head = h("div", { class: "hb-p__head" },
-      h("div", { class: "hb-p__who" }, h("b", null, p.name || p.email), h("small", null, [p.job_title, p.email].filter(Boolean).join(" · ")),
+    var pk = (co.key || "") + ":" + (p.id || p.email || p.name), open = !!HUB.openP[pk];
+    var pbtn = h("button", { class: "hb-p__btn", type: "button", "aria-expanded": open ? "true" : "false",
+      onclick: function () { HUB.openP[pk] = !open; renderSection(); } },
+      h("span", { class: "hb-p__who" }, h("b", null, p.name || p.email), h("small", null, [p.job_title, p.email].filter(Boolean).join(" · ")),
         p.last_login_at ? h("small", null, "Last in " + ago(p.last_login_at)) : null),
+      h("span", { class: "hb-p__n" }, plural(p.selections.length, "selection") + " · " + plural(p.campaigns.length, "campaign")),
+      h("span", { class: "hb-chev", "aria-hidden": "true", html: '<svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' }));
+    var head = h("div", { class: "hb-p__head" }, pbtn,
       admin && p.id && !p.staff ? h("label", { class: "hb-lab" }, "KAM", kamSelect(p.kam && p.kam !== (co.kam && co.kam.email) ? p.kam : "", "Account manager for " + (p.name || p.email),
         co.kam && co.kam.email ? "Follows the company (" + kamName(co.kam.email) + ")" : "No account manager", function (v) {
           hubSetKam("person", p.id, v, function () { p.kam = v || (co.kam && co.kam.email) || ""; renderSection(); });
@@ -1230,10 +1235,10 @@
     var sels = h("ul", { class: "hb-items" }), camps = h("ul", { class: "hb-items" });
     p.selections.forEach(function (x) { sels.appendChild(itemRow("selection", x)); });
     p.campaigns.forEach(function (x) { camps.appendChild(itemRow("campaign", x)); });
-    return h("section", { class: "hb-p" }, head,
+    return h("section", { class: "hb-p" + (open ? " is-open" : "") }, head, open ?
       h("div", { class: "hb-p__cols" },
         h("div", null, h("h4", null, "Selections ", h("span", null, String(p.selections.length))), p.selections.length ? sels : h("p", { class: "hb-none" }, "No selections.")),
-        h("div", null, h("h4", null, "Campaigns ", h("span", null, String(p.campaigns.length))), p.campaigns.length ? camps : h("p", { class: "hb-none" }, "No campaigns."))));
+        h("div", null, h("h4", null, "Campaigns ", h("span", null, String(p.campaigns.length))), p.campaigns.length ? camps : h("p", { class: "hb-none" }, "No campaigns."))) : null);
   }
   function companyBlock(c) {
     var admin = HUB.role === "admin", open = !!HUB.open[c.key], det = HUB.detail[c.key];

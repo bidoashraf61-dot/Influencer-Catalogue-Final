@@ -181,6 +181,13 @@ class Hub(unittest.TestCase):
         self.assertIn("Jamjoom campaign", [x["name"] for p in d["people"] for x in p["selections"]])
         self.assertIn("Jamjoom Wave 1", [x["name"] for p in d["people"] for x in p["campaigns"]])
         self.assertIn("Shared pharma code", names)                               # the plain code is listed by its label
+        # an owner or admin also sees these in their own profile (Selections and Campaigns tabs)
+        sm = self.boss.get("/api/account")[1]
+        self.assertIn("Jamjoom campaign", [x["name"] for x in sm["selections"]])
+        self.assertIn("Loose shortlist", [x["name"] for x in sm["selections"]])
+        self.assertIn("Shared pharma code", [x["owner"] for x in sm["selections"] if x["name"] == "Loose shortlist"])
+        self.assertNotIn("Loose shortlist", [x["name"] for x in self.plain.get("/api/account")[1]["selections"]])   # a client never does
+        self.assertNotIn("Loose shortlist", [x["name"] for x in self.kam.get("/api/account")[1]["selections"]])     # nor a KAM
         self.assertEqual(self.kam.get("/api/hub/company?k=unassigned")[0], 404)  # a KAM never sees this group
         self.assertNotIn("unassigned", [c["key"] for c in self.kam.get("/api/hub/companies")[1]["companies"]])
         # a team email can be set as the account manager; a stranger cannot
