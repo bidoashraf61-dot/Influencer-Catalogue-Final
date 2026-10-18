@@ -65,7 +65,11 @@ def send(event, lines, kam=None, link=None, also=None):
     def run():
         for addr in to[:10]:
             try:
-                mailer.send(addr, subject, text)
+                try:
+                    page = mailer.notify_message(EVENTS.get(event, event), lines, link, addr)
+                except Exception:
+                    page = None
+                mailer.send(addr, subject, text, html=page)
             except Exception:
                 pass
     threading.Thread(target=run, daemon=True).start()

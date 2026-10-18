@@ -11,6 +11,7 @@ in Resend. ``OUTBOX`` captures messages when ``CAPTURE`` is on (tests, demo).
 import html as _html
 import json
 import os
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -541,3 +542,24 @@ def send_access(to, kind, name, by_name, role, link):
     """Send it. Raises like send() does; callers wrap it."""
     subject, text, page = access_message(kind, name, by_name, role, link, to)
     return send(to, subject, text, html=page)
+
+
+def notify_message(event_label, lines, link, to):
+    """(html) for the team notification emails (owner, 2026-10-18): the access email's design, so every
+    message HELVi Connect sends looks the same. First line is the headline, the rest the detail."""
+    e = _html.escape
+    lines = [str(x) for x in lines if x]
+    head = lines[0] if lines else event_label
+    detail = "<br>".join(e(x) for x in lines[1:]) or "&nbsp;"
+    page = ACCESS_HTML
+    page = page.replace("<strong>{BY}</strong> shared {ARTICLE} {KIND} with you on HELVi Connect.", "{SUB}")
+    page = page.replace("Open the {KIND} &rarr;", "Open it &rarr;")
+    page = re.sub(r"Sign in, or sign up, with <strong>\{TO\}</strong>\. The link only opens for that address\.", "Sent to {TO}.", page)
+    page = re.sub(r'<p class="tx"([^>]*)><strong>Not expecting this\?</strong>.*?</p>',
+                  lambda mo: '<p class="tx"' + mo.group(1) + '><strong>Just so you know.</strong> This is an update from HELVi Connect. You can open it from the button above.</p>', page, count=1, flags=re.S)
+    for k, v in (("{TITLE}", e("HelloVoice catalogue · " + event_label)), ("{PRE}", e(head)), ("{SUB}", e(event_label)),
+                 ("{KIND_UP}", e(event_label)), ("{NAME}", e(head)), ("{ROLE}", detail), ("{TO}", e(to)),
+                 ("{LINK}", e(link or SITE, quote=True)), ("{LOGO}", EMAIL_LOGO_INK), ("{HELVi}", EMAIL_HELVY),
+                 ("{HV}", EMAIL_HV), ("{SITE}", SITE)):
+        page = page.replace(k, v)
+    return page
