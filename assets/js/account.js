@@ -509,7 +509,7 @@
     return dl;
   }
   function scorebug(c) {
-    var u = DATA.user, p = pace(c);
+    var u = DATA.user, p = pace(c), gg = c.goal_grades || {};
     var brands = h("div", { class: "ac-bug__brands" });
     if (u.logo) { brands.appendChild(h("img", { src: imgUrl("logo", u.logo), alt: u.company || "" })); brands.appendChild(h("span", { class: "ac-bug__x", "aria-hidden": "true" }, "×")); }
     brands.appendChild(h("img", { class: "ac-bug__hv", src: ROOT + "assets/brand/logo.png", alt: "HelloVoice" }));
@@ -520,8 +520,8 @@
       scorelineDl([
         ["Views", big(c.views), null, null],
         ["Reach", big(c.reach), null, h("span", { class: "ac-muted" }, "people reached")],
-        ["Engagement", c.er != null ? c.er.toFixed(1) : "—", c.er != null ? "%" : null, c.er_grade ? sig(c.er_grade) : null],
-        ["Posts live", String(c.delivered), c.planned ? "/" + c.planned : null, p ? sig(p.grade, p.label) : null]
+        ["Engagement", c.er != null ? c.er.toFixed(2) : "—", c.er != null ? "%" : null, (gg.er || c.er_grade) ? sig(gg.er || c.er_grade) : null],
+        ["Posts live", String(c.delivered), c.planned ? "/" + c.planned : null, gg.posts ? sig(gg.posts) : (p ? sig(p.grade, p.label) : null)]
       ]),
       h("div", { class: "ac-bug__go" }, h("a", { class: "hc-btn", href: ROOT + "campaign/#t=" + encodeURIComponent(c.token) }, "Open the full report")));
   }

@@ -247,6 +247,8 @@ def summary(user, code_id, secret=b""):
                "er": t.get("er"), "er_grade": t.get("er_grade"),
                "delivered": t.get("delivered") or 0, "planned": t.get("planned") or 0,
                "updated_at": rep["updated_at"] if rep else None,
+               # The dashboard's own goal grades, so the card says what the dashboard says.
+               "goal_grades": {i.get("key"): i.get("grade") for i in ((rep or {}).get("progress") or {}).get("items") or [] if i.get("key")},
                "quote": (lifecycle.chip(db.selection(k["selection_id"])) if k["selection_id"] and db.selection(k["selection_id"]) is not None else None)}
         campaigns.append(row)
         if k["status"] == "live":
