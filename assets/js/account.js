@@ -387,6 +387,20 @@
     if (h1) { h1.setAttribute("tabindex", "-1"); h1.focus(); }
     toast(0, text);
   }
+  // Admins: delete any selection (History can restore it); one a campaign still uses points to the campaign instead.
+  function adminDeleteSelection(s, btn) {
+    confirmDelete({ title: "Delete “" + s.name + "”?", action: "Delete selection",
+      body: "It leaves every list and its briefs go with it. You can bring it back from History in the admin. A selection a campaign uses can't be deleted here: delete the campaign instead.",
+      run: function () {
+        return api("POST", "/api/hub/delete", { kind: "selection", ref: s.id }).then(function (r) {
+          if (!(r.b && r.b.ok)) return (r.b && r.b.message) || "Couldn't delete it. Please try again.";
+          DATA.selections = DATA.selections.filter(function (x) { return x.token !== s.token; });
+          HUB.list = null; HUB.detail = {}; ALLC.items = null;
+          afterDelete("Selection deleted.");
+          return null;
+        });
+      } }, btn);
+  }
   function deleteSelection(s, btn) {
     confirmDelete({ title: "Delete “" + s.name + "”?", action: "Delete selection",
       body: "It leaves your profile and its link stops opening, for you and your colleagues. Your approvals and notes on it go too. HelloVoice keeps a copy for your account manager.",
@@ -439,7 +453,8 @@
     DATA.selections.forEach(function (s) {
       var c = s.counts;
       // Delete only on the client's own selections: never a colleague's or one HelloVoice shared.
-      var del = s.can_delete ? delBtn("Delete " + s.name, function () { deleteSelection(s, this); }) : null;
+      var del = s.can_delete ? delBtn("Delete " + s.name, function () { deleteSelection(s, this); })
+        : (s.admin_delete ? delBtn("Delete " + s.name, function () { adminDeleteSelection(s, this); }) : null);
       list.appendChild(h("li", null, actRow(ROOT + "selection/#s=" + encodeURIComponent(s.token),
         h("div", null, h("span", { class: "hc-row__name" }, s.name), " ", qchip(s.quote),
           h("div", { class: "hc-row__meta" },

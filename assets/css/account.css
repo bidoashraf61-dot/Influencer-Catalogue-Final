@@ -877,3 +877,24 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
   .hb-it__grp--danger { margin-left: 0; }
   .hb-share { padding: 44px 16px 16px; }
 }
+
+/* Campaign scorebug: compact (2026-10-18). Same content, a third of the height, easy to scan. */
+.ac-bug { border-radius: 18px; padding: 16px 20px 18px; }
+.ac-bug__brands img { height: 28px; max-width: 110px; }
+.ac-bug__brands .ac-bug__hv { height: 20px; }
+.ac-bug__x { font-size: 18px; }
+.ac-live { font-size: 15px; }
+.ac-bug__row { margin-top: 10px; align-items: center; gap: 12px; }
+.ac-bug__title { font-size: clamp(1.7rem, 1.3rem + 1.1vw, 2.3rem); line-height: 1; max-width: none; flex: 1 1 260px; }
+.ac-verdict { font-size: clamp(1.1rem, .95rem + .5vw, 1.4rem); padding: 7px 16px; transform: rotate(-2deg); }
+.ac-scoreline > div { padding: 10px 12px 10px 0; }
+.ac-scoreline > div + div { padding-left: 14px; }
+.ac-scoreline dt { font-size: 11px; }
+.ac-scoreline dd { margin-top: 4px; font-size: clamp(1.6rem, 1.3rem + .6vw, 2rem); }
+.ac-scoreline__sig { margin-top: 6px; min-height: 0; }
+.ac-bug__go { margin-top: 12px; }
+.ac-bug__go .hc-btn { padding: 9px 18px; font-size: 1.05rem; min-height: 0; }
+@media screen and (max-width: 767px) {
+  .ac-bug { padding: 14px 14px 16px; }
+  .ac-scoreline dd { font-size: 1.7rem; }
+}

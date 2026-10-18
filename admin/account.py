@@ -188,11 +188,13 @@ def summary(user, code_id, secret=b""):
     import selstatus
     import lifecycle
     team = set(portal.team_codes(code_id))
+    is_admin = False
     # An owner or admin also sees, in their own Selections and Campaigns, everything filed under team accounts or
     # plain access codes (owner, 2026-10-18), so work like "Jamjoom" is never out of sight.
     try:
         import hub
         if hub.viewer(user)[0] == "admin":
+            is_admin = True
             team |= hub.unfiled_code_ids()
     except Exception:
         pass
@@ -222,7 +224,7 @@ def summary(user, code_id, secret=b""):
             shortlisted.update(codes)
         st = selstatus.of(s["id"])
         selections.append({"name": s["name"], "token": s["token"], "creators": len(codes), "updated_at": s["updated_at"],
-                           "mine": s["code_id"] == code_id, "owner": None if s["code_id"] == code_id else (s["owner"] or s["code_label"] or "A colleague"),
+                           "id": s["id"], "admin_delete": is_admin, "mine": s["code_id"] == code_id, "owner": None if s["code_id"] == code_id else (s["owner"] or s["code_label"] or "A colleague"),
                            # Only the client's own work can be deleted: not a colleague's, not HelloVoice's.
                            "can_delete": (s["origin"] or "admin") == "client" and code_id != db.admin_code_id()
                                          and portal.owns(code_id, s["code_id"]),
