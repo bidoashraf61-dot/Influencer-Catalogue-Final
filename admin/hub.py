@@ -385,14 +385,22 @@ def people_search(role, a, q):
     for u in rows:
         hay = " ".join([(u["name"] or ""), (u["email"] or ""), (u["company"] or "")]).lower()
         if q in hay and u["code_id"] is not None and u["status"] == "active" and (u["domain"] or "").lower() not in staff_domains():
-            out.append({"id": u["id"], "name": u["name"] or "", "email": u["email"], "company": u["company"] or "",
-                        "domain": u["domain"] or ""})
+            out.append({"id": u["id"], "code_id": u["code_id"], "kind": "account", "name": u["name"] or "", "email": u["email"],
+                        "company": u["company"] or "", "domain": u["domain"] or ""})
         if len(out) >= 15:
             break
+    if len(out) < 15:                                  # clients that only have a plain access code (no account)
+        import assign
+        for t in assign.targets():
+            if t["kind"] == "code" and q in (t["label"] or "").lower():
+                if role == "admin" or kam_scope.allows(t["id"], kam_scope.clients(a)):
+                    out.append({"id": None, "code_id": t["id"], "kind": "code", "name": t["label"], "email": "", "company": "Access code", "domain": ""})
+            if len(out) >= 15:
+                break
     return out
 
 
-def move(role, a, kind, ref, user_id, with_related=True, tell=True):
+def move(role, a, kind, ref, user_id, with_related=True, tell=True, to_code=None):
     """Move a selection or campaign to another client account (item 129, phase 2). Admins: anywhere. A KAM: only
     an item of hers, to one of her own clients. Selection: its campaigns come too when ``with_related``;
     campaign: its selection comes too. Goes through assign.py, which writes History and rings the client's bell.
@@ -400,6 +408,10 @@ def move(role, a, kind, ref, user_id, with_related=True, tell=True):
     import assign
     import portal
     target = portal.user_by_id(int(user_id)) if str(user_id).isdigit() else None
+    if target is None and str(to_code or "").isdigit():
+        code_row = db.get_code(int(to_code))              # a client that only has a plain access code
+        if code_row is not None and portal.user_for_code(code_row["id"]) is None:
+            target = {"code_id": code_row["id"], "domain": ""}
     if target is None or target["code_id"] is None:
         return False, "Pick the client to move it to."
     if kind == "selection":
@@ -424,13 +436,110 @@ def move(role, a, kind, ref, user_id, with_related=True, tell=True):
             return False, "You can only move it to one of your own clients."
     elif role != "admin":
         return False, "Not allowed."
-    if kind == "selection":
-        r = assign.assign_selection(item["id"], target["code_id"], move_campaigns=bool(with_related), tell=bool(tell), confirmed=True)
+    # A campaign is its whole package (owner, 2026-10-18): the campaign, its selection, every campaign made from that
+    # selection, its briefs and the quote request all move together.
+    sel = item if kind == "selection" else (db.selection(item["selection_id"]) if item["selection_id"] else None)
+    if sel is not None:
+        r = assign.assign_selection(sel["id"], target["code_id"], move_campaigns=True, tell=bool(tell), confirmed=True)
     else:
-        r = assign.assign_campaign(item["id"], target["code_id"], with_selection=bool(with_related), tell=bool(tell), confirmed=True)
+        r = assign.assign_campaign(item["id"], target["code_id"], with_selection=False, tell=bool(tell), confirmed=True)
     if r["error"] or not r["ok"]:
         return False, r["error"] or "Could not move it."
-    if r["noop"]:
+    briefs = 0
+    if sel is not None:
+        with db.connect() as conn:
+            briefs = conn.execute("UPDATE briefs SET code_id = ? WHERE selection_id = ? AND code_id != ?",
+                                  (target["code_id"], sel["id"], target["code_id"])).rowcount
+            if sel["request_id"]:
+                conn.execute("UPDATE requests SET code_id = ? WHERE id = ?", (target["code_id"], sel["request_id"]))
+    if r["noop"] and not briefs:
         return True, "Nothing changed: it already belongs to %s." % r["to"]
-    extra = (" Moved %d campaign%s with it." % (len(r["campaigns"]), "" if len(r["campaigns"]) == 1 else "s")) if r.get("campaigns") else ""
-    return True, "Moved to %s.%s" % (r["to"], extra)
+    bits = []
+    if sel is not None:
+        bits.append("its selection")
+    if r.get("campaigns"):
+        bits.append("%d campaign%s" % (len(r["campaigns"]), "" if len(r["campaigns"]) == 1 else "s"))
+    if briefs:
+        bits.append("%d brief%s" % (briefs, "" if briefs == 1 else "s"))
+    return True, "Moved to %s%s." % (r["to"], (" with " + ", ".join(bits)) if bits else "")
+
+
+def delete(role, a, kind, ref, by="", with_selection=True):
+    """Delete a campaign (item 129). Admins: any. A KAM: only a campaign inside her scope. History records it, so it can be
+    brought back from History. Returns (ok, message)."""
+    import history
+    if kind != "campaign":
+        return False, "Only campaigns can be deleted here."
+    k = db.campaign(int(ref)) if str(ref).isdigit() else None
+    if k is None:
+        return False, "That campaign no longer exists."
+    if role == "kam":
+        sc = kam_scope.clients(a)
+        kam_scope.begin(sc)
+        try:
+            ok = kam_scope.allows(kam_scope.campaign_code(k["id"])[1])
+        finally:
+            kam_scope.end()
+        if not ok:
+            return False, "That belongs to a client you do not manage."
+    elif role != "admin":
+        return False, "Not allowed."
+    history.set_actor(by or "admin")
+    sel = db.selection(k["selection_id"]) if k["selection_id"] else None
+    with history.tracked("campaign", k["id"], "Deleted campaign " + (k["name"] or "")):
+        db.delete_campaign(k["id"])
+    tail = ""
+    if with_selection and sel is not None:
+        if db.campaigns_for_selection(sel["id"]):                 # another campaign still uses it: keep it
+            tail = " (its selection stays: another campaign uses it)"
+        else:
+            import portal
+            with history.tracked("selection", sel["id"], "Deleted selection " + (sel["name"] or "") + " (with its campaign)"):
+                db.delete_selection(sel["id"])
+            with db.connect() as conn:
+                ids = [r[0] for r in conn.execute("SELECT id FROM briefs WHERE selection_id = ? AND deleted_at IS NULL", (sel["id"],))]
+            n = sum(1 for bid in ids if portal.delete_brief(bid, db.admin_code_id()))
+            tail = " with its selection" + ((" and %d brief%s" % (n, "" if n == 1 else "s")) if n else "")
+    return True, "Deleted “%s”%s. You can bring it back from History." % (k["name"] or "the campaign", tail)
+
+
+def _owner_label(code_id, users, codes):
+    if code_id is None:
+        return {"label": "Not filed under anyone", "kind": "none"}
+    u = users.get(code_id)
+    if u is not None:
+        who = (u["name"] or u["email"] or "").strip()
+        return {"label": who + ((" · " + u["company"]) if u["company"] else ""), "kind": "account",
+                "staff": (u["domain"] or "").lower() in staff_domains()}
+    c = codes.get(code_id)
+    return {"label": ((c["label"] if c is not None else "") or "Access code #%s" % code_id) + " (access code)", "kind": "code"}
+
+
+def campaigns(role, a, q="", offset=0, limit=40):
+    """Every campaign, found by name, client, brand or owner (item 129): the flat list behind "All campaigns". Admins see all,
+    even those filed under nobody; a KAM, her clients' plus what was handed to her. -> {total, items: [camp row + owner + selection]}"""
+    q = " ".join(str(q or "").lower().split())
+    kam = _item_kams()
+    with db.connect() as conn:
+        rows = conn.execute("SELECT k.id, k.token, k.name, k.client, k.code_id, k.selection_id, k.status, k.starts_at, k.ends_at, k.origin, k.updated_at, "
+                            "s.name AS sel_name, s.code_id AS sel_code_id FROM campaigns k LEFT JOIN selections s ON s.id = k.selection_id "
+                            "ORDER BY CASE k.status WHEN 'live' THEN 0 WHEN 'draft' THEN 1 ELSE 2 END, k.updated_at DESC").fetchall()
+        users = {u["code_id"]: u for u in conn.execute("SELECT * FROM users WHERE code_id IS NOT NULL")}
+        codes = {c["id"]: c for c in conn.execute("SELECT id, label FROM codes")}
+    if role == "kam":
+        sc = kam_scope.clients(a)
+        kam_scope.begin(sc)
+        try:
+            rows = kam_scope.keep_items(rows, "campaign", fallback="sel_code_id")
+        finally:
+            kam_scope.end()
+    out = []
+    for r in rows:
+        owner = _owner_label(r["code_id"], users, codes)
+        row = _camp_row(r, kam)
+        row.update({"owner": owner, "selection": r["sel_name"] or "", "client": r["client"] or ""})
+        hay = " ".join([row["name"], row["client"], owner["label"], row["selection"]]).lower()
+        if not q or q in hay:
+            out.append(row)
+    total = len(out)
+    return {"total": total, "items": out[int(offset):int(offset) + int(limit)]}

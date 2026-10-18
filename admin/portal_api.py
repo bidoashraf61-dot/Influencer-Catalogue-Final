@@ -234,6 +234,17 @@ class PortalMixin(connect_api.ConnectMixin):
                                          hub=hub.viewer(user)[0]),
                                self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/hub/campaigns":
+            who = self._need_account()
+            if who:
+                import hub
+                role, a = hub.viewer(who[1])
+                if role is None:
+                    self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+                else:
+                    self.send_json(200, dict(hub.campaigns(role, a, query.get("q") or "", self._int(query.get("offset"), 0), 40), ok=True, role=role),
+                                   self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/hub/people":
             who = self._need_account()
             if who:
@@ -455,7 +466,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/voice/handoff": self.api_voice_handoff, "/api/chat/handoff": self.api_chat_handoff,
             "/api/me/image": self.api_me_image, "/api/me/notify": self.api_me_notify,
             "/api/me/signout-others": self.api_me_signout_others, "/api/team/invite": self.api_team_invite,
-            "/api/hub/kam": self.api_hub_kam, "/api/hub/share": self.api_hub_share, "/api/hub/move": self.api_hub_move,
+            "/api/hub/kam": self.api_hub_kam, "/api/hub/share": self.api_hub_share, "/api/hub/move": self.api_hub_move, "/api/hub/delete": self.api_hub_delete,
             "/api/notifications/read": self.api_notifications_read,
         }
         fn = routes.get(path)
@@ -894,6 +905,21 @@ class PortalMixin(connect_api.ConnectMixin):
         ok, msg, state = hub.share(role, a, str(b.get("kind") or ""), b.get("ref"), str(b.get("email") or ""), who[1]["email"], who[1]["name"] or "")
         return self.send_json(200 if ok else 400, {"ok": ok, "message": msg, "state": state}, self.cors())
 
+    def api_hub_delete(self):
+        """Delete a campaign from the hub. {kind: "campaign", ref}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        if self._throttled("hubdel:%d" % who[1]["id"], 30, 3600):
+            return
+        b = self.json_body()
+        ok, msg = hub.delete(role, a, str(b.get("kind") or ""), b.get("ref"), a["email"], b.get("with_selection", True) is not False)
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
+
     def api_hub_move(self):
         """Move a selection or campaign to another client account. {kind, ref, to, related, tell}"""
         who = self._need_account()
@@ -906,7 +932,7 @@ class PortalMixin(connect_api.ConnectMixin):
         if self._throttled("hubmove:%d" % who[1]["id"], 60, 3600):
             return
         b = self.json_body()
-        ok, msg = hub.move(role, a, str(b.get("kind") or ""), b.get("ref"), b.get("to"), b.get("related", True) is not False, b.get("tell", True) is not False)
+        ok, msg = hub.move(role, a, str(b.get("kind") or ""), b.get("ref"), b.get("to"), b.get("related", True) is not False, b.get("tell", True) is not False, b.get("code"))
         return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
 
     def api_team_invite(self):

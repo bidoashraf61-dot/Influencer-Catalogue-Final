@@ -778,3 +778,21 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
 .hb-p.is-open .hb-chev { transform: rotate(180deg); }
 .hb-p.is-open > .hb-p__cols { margin-top: 6px; padding-bottom: 6px; }
 @media (max-width: 760px) { .hb-p__n { margin-left: 0; } .hb-p__btn { margin: 0 -8px; padding: 12px 8px; } }
+
+/* Companies hub: Assign client button and the solo assign panel */
+.hb-assignbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); font: 700 13.5px var(--body); cursor: pointer; border: 1.5px solid var(--ink); background: var(--white); color: var(--ink); }
+.hb-assignbtn .hc-icw { width: 16px; height: 16px; }
+.hb-assignbtn.is-primary, .hb-assignbtn[aria-expanded="true"] { background: var(--lime); }
+.hb-assignbtn:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.hb-share--solo { grid-template-columns: minmax(0, 1fr); max-width: 520px; }
+
+/* Companies hub: delete a campaign */
+.hb-delbtn { display: inline-flex; align-items: center; min-height: 40px; padding: 0 16px; border-radius: var(--r-pill); font: 700 13.5px var(--body); cursor: pointer; border: 1.5px solid #c01010; background: var(--white); color: #c01010; }
+.hb-delbtn:hover, .hb-delbtn[aria-expanded="true"] { background: #c01010; color: var(--white); }
+.hb-delbtn:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.hb-share .hb-danger { background: #c01010; border-color: #c01010; color: var(--white); }
+
+/* Companies hub: view switch and the flat All campaigns list */
+.hb-views { margin: 18px 0 4px; }
+.hb-items--flat { margin-top: 10px; }
+.hb-it__owner { padding: 1px 8px; border-radius: var(--r-pill); background: var(--stone); color: var(--ink) !important; font-weight: 600; }

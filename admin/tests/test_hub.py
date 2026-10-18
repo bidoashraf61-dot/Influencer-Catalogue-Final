@@ -138,10 +138,18 @@ class Hub(unittest.TestCase):
         self.assertEqual(db.campaign(self.k2)["code_id"], self.lead["code_id"])           # it came along
         s, j, _ = b.post("/api/hub/move", {"kind": "selection", "ref": self.s2, "to": self.buyer["id"], "related": True, "tell": False})
         self.assertEqual((s, db.selection(self.s2)["code_id"]), (200, self.buyer["code_id"]))
-        # a campaign alone, without its selection
+        # a campaign always moves as a package: its selection and brief come with it
+        with db.connect() as conn:
+            conn.execute("INSERT INTO briefs (code_id, selection_id, source, answers, created_at) VALUES (?,?,?,?,?)",
+                         (self.buyer["code_id"], self.s2, "text", "{}", db.now()))
         s, j, _ = b.post("/api/hub/move", {"kind": "campaign", "ref": self.k2, "to": self.lead["id"], "related": False, "tell": False})
-        self.assertEqual((s, db.campaign(self.k2)["code_id"], db.selection(self.s2)["code_id"]), (200, self.lead["code_id"], self.buyer["code_id"]))
+        self.assertEqual(s, 200, j)
+        self.assertEqual((db.campaign(self.k2)["code_id"], db.selection(self.s2)["code_id"]), (self.lead["code_id"], self.lead["code_id"]))
+        self.assertIn("selection", j["message"])
+        with db.connect() as conn:
+            self.assertEqual({r[0] for r in conn.execute("SELECT code_id FROM briefs WHERE selection_id = ?", (self.s2,))}, {self.lead["code_id"]})
         b.post("/api/hub/move", {"kind": "campaign", "ref": self.k2, "to": self.buyer["id"], "related": False, "tell": False})
+        self.assertEqual(db.selection(self.s2)["code_id"], self.buyer["code_id"])
         self.assertEqual(b.post("/api/hub/move", {"kind": "selection", "ref": self.s2, "to": 999999})[0], 400)
         # a KAM moves only inside her own clients
         s, j, _ = k.post("/api/hub/move", {"kind": "selection", "ref": self.s1, "to": second["id"], "related": True, "tell": False})
@@ -199,6 +207,67 @@ class Hub(unittest.TestCase):
         # a stray item can be moved to its client
         s, j, _ = self.boss.post("/api/hub/move", {"kind": "selection", "ref": lsel, "to": self.lead["id"], "related": True, "tell": False})
         self.assertEqual((s, db.selection(lsel)["code_id"]), (200, self.lead["code_id"]))
+
+    def test_07_assign_to_plain_code_and_delete(self):
+        """Owner, 2026-10-18: assign a campaign to a client that only has an access code; delete a campaign (History keeps it)."""
+        import history
+        with db.connect() as conn:
+            code = conn.execute("INSERT INTO codes (code_hash, hint, label, created_at) VALUES ('h-plain', '····', 'Plainco shared code', ?)", (db.now(),)).lastrowid
+        sel = db.save_selection(None, "Plainco picks", ["HV-MI-001"], {}, None, None, code_id=self.buyer["code_id"])
+        camp = db.create_campaign("Plainco push", code_id=self.buyer["code_id"], selection_id=sel)
+        s, j, _ = self.boss.get("/api/hub/people?q=plainco")
+        self.assertEqual(s, 200)
+        hit = [p for p in j["people"] if p["kind"] == "code"]
+        self.assertEqual([(p["name"], p["code_id"]) for p in hit], [("Plainco shared code", code)])
+        # a KAM cannot assign to a code outside her clients (and does not even see it)
+        self.assertEqual(self.kam.get("/api/hub/people?q=plainco")[1]["people"], [])
+        self.assertEqual(self.kam.post("/api/hub/move", {"kind": "campaign", "ref": camp, "code": code, "related": False, "tell": False})[0], 400)
+        s, j, _ = self.boss.post("/api/hub/move", {"kind": "campaign", "ref": camp, "code": code, "related": False, "tell": False})
+        self.assertEqual((s, db.campaign(camp)["code_id"]), (200, code), j)
+        # delete: a KAM outside her scope is refused; an admin deletes; History has it
+        self.assertEqual(self.kam.post("/api/hub/delete", {"kind": "campaign", "ref": camp})[0], 400)
+        self.assertEqual(self.boss.post("/api/hub/delete", {"kind": "selection", "ref": sel})[0], 400)       # only campaigns
+        self.assertEqual(self.plain.post("/api/hub/delete", {"kind": "campaign", "ref": camp})[0], 403)
+        s, j, _ = self.boss.post("/api/hub/delete", {"kind": "campaign", "ref": camp})
+        self.assertEqual(s, 200, j)
+        self.assertIsNone(db.campaign(camp))
+        self.assertTrue(any("Deleted campaign Plainco push" in (r["label"] or "") for r in history.listing("campaign")))
+        self.assertEqual(self.boss.post("/api/hub/delete", {"kind": "campaign", "ref": camp})[0], 400)       # already gone
+
+    def test_08_all_campaigns_and_package_delete(self):
+        """Owner, 2026-10-18: every campaign is reachable from the panel (even one filed under nobody) and Delete takes the
+        campaign with its selection and brief, unless another campaign uses the selection."""
+        import history
+        sel = db.save_selection(None, "Orphan picks", ["HV-MI-001"], {}, None, None, code_id=None)
+        camp = db.create_campaign("Nobody's campaign", code_id=None, selection_id=sel)
+        with db.connect() as conn:
+            conn.execute("INSERT INTO briefs (code_id, selection_id, source, answers, created_at) VALUES (?,?,?,?,?)", (1, sel, "text", "{}", db.now()))
+        s, j, _ = self.boss.get("/api/hub/campaigns?q=nobody")
+        self.assertEqual(s, 200)
+        self.assertEqual([(c["name"], c["owner"]["kind"], c["selection"]) for c in j["items"]], [("Nobody's campaign", "none", "Orphan picks")])
+        s, j, _ = self.boss.get("/api/hub/campaigns")
+        self.assertGreaterEqual(j["total"], 3)
+        self.assertEqual(self.plain.get("/api/hub/campaigns")[0], 403)
+        kn = [c["name"] for c in self.kam.get("/api/hub/campaigns")[1]["items"]]
+        self.assertNotIn("Nobody's campaign", kn)                                  # a KAM only sees her own
+        # a second campaign on the same selection keeps it alive
+        camp2 = db.create_campaign("Second wave", code_id=None, selection_id=sel)
+        s, j, _ = self.boss.post("/api/hub/delete", {"kind": "campaign", "ref": camp2, "with_selection": True})
+        self.assertEqual(s, 200, j)
+        self.assertIsNotNone(db.selection(sel))                                    # still used by the first campaign
+        self.assertIn("stays", j["message"])
+        s, j, _ = self.boss.post("/api/hub/delete", {"kind": "campaign", "ref": camp, "with_selection": True})
+        self.assertEqual(s, 200, j)
+        self.assertIsNone(db.campaign(camp))
+        self.assertIsNone(db.selection(sel))                                       # the package went together
+        with db.connect() as conn:
+            self.assertIsNotNone(conn.execute("SELECT deleted_at FROM briefs WHERE selection_id = ?", (sel,)).fetchone()[0])
+        self.assertTrue(any("Deleted selection Orphan picks" in (r["label"] or "") for r in history.listing("selection")))
+        # campaign only, selection kept
+        sel3 = db.save_selection(None, "Keep me", ["HV-MI-001"], {}, None, None, code_id=None)
+        camp3 = db.create_campaign("Just the campaign", code_id=None, selection_id=sel3)
+        s, j, _ = self.boss.post("/api/hub/delete", {"kind": "campaign", "ref": camp3, "with_selection": False})
+        self.assertEqual((s, db.campaign(camp3), db.selection(sel3) is not None), (200, None, True))
 
 
 if __name__ == "__main__":
