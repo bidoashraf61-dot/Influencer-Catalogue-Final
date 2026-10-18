@@ -530,7 +530,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return db.admin_code_id()
         if token and self.kam_clients() is not None:
             sel = db.selection(token=token, deleted=True)
-            if sel is not None and self.admin_like_for(sel["code_id"]):
+            if sel is not None and self.admin_like_for(sel["code_id"], sel["id"]):
                 return db.admin_code_id()          # a key account manager on her own client's selection
         return (self.link_code("s:" + token) if token else None) or self.viewer_code_id()
 
@@ -1323,7 +1323,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if r is None:
                 return self.redirect("/access-requests?e=" + urllib.parse.quote("That request no longer exists."))
             sel = db.selection(r["selection_id"])
-            if sel is not None and not self.admin_like_for(sel["code_id"]):
+            if sel is not None and not self.admin_like_for(sel["code_id"], sel["id"]):
                 return self.redirect("/access-requests?e=" + urllib.parse.quote("That selection belongs to a client you do not manage."))
             ok = access.grant(rid, who["email"]) if f.get("do") == "grant" else access.deny(rid, who["email"])
             return self.redirect("/access-requests?ok=" + urllib.parse.quote(
@@ -4491,7 +4491,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         reader = self.selection_viewer(sel["token"])
-        if not (self.admin_like_for(sel["code_id"]) or self.selection_role(sel, reader) == "admin"):
+        if not (self.admin_like_for(sel["code_id"], sel["id"]) or self.selection_role(sel, reader) == "admin"):
             return self.send_json(403, {"ok": False, "reason": "hv_only", "message": "Only HelloVoice publishes scores."}, self.cors())
         on = bool(b.get("publish"))
         # what: "scores" (default) or "analysis" (the creators' full profile analysis).
@@ -5067,7 +5067,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         sel = db.selection(token=token) if token else None
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
-        staff = self.admin_like_for(sel["code_id"])
+        staff = self.admin_like_for(sel["code_id"], sel["id"])
         reader = self.selection_viewer(token)
         if not staff and not (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())):
             return self.send_json(403, {"ok": False, "reason": "not_owner"}, self.cors())
@@ -5089,7 +5089,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         sel = db.selection(token=token) if token else None
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
-        staff = self.admin_like_for(sel["code_id"]) or (self.staff_viewer() and self.kam_clients() is None)
+        staff = self.admin_like_for(sel["code_id"], sel["id"]) or (self.staff_viewer() and self.kam_clients() is None)
         cid = None
         if not staff:
             cid = self.link_code("s:" + token) or self.signed_in_client()
@@ -5124,7 +5124,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         sel = db.selection(token=token) if token else None
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
-        staff = self.admin_like_for(sel["code_id"]) or (self.staff_viewer() and self.kam_clients() is None)
+        staff = self.admin_like_for(sel["code_id"], sel["id"]) or (self.staff_viewer() and self.kam_clients() is None)
         if not staff:
             cid = self.link_code("s:" + token) or self.signed_in_client()
             if cid is None or (sel["code_id"] is not None and not portal.opens(int(cid), sel)
@@ -5247,7 +5247,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # A selection its client deleted is "unknown" to clients; HelloVoice still opens it.
             sel = db.selection(token=token, deleted=bool(self.admin_like() or self.kam_clients() is not None))
             # An admin opens every selection, whether signed in to the admin or to the portal with an admin email.
-            staff = sel is not None and (self.admin_like_for(sel["code_id"])
+            staff = sel is not None and (self.admin_like_for(sel["code_id"], sel["id"])
                                          or (self.staff_viewer() and self.kam_clients() is None))
             if sel is not None and sel["deleted_at"] and not staff:
                 sel = None                      # a KAM opens deleted selections of her own clients only
@@ -5336,7 +5336,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # Scores gate (owner, 2026-10-15): on a selection HelloVoice made, the client sees no scores until
         # HelloVoice publishes them; HelloVoice (and the client's KAM) always see them, marked as a preview.
         reader0 = self.selection_viewer(sel["token"])
-        team = self.selection_role(sel, reader0) == "admin" or self.admin_like_for(sel["code_id"])
+        team = self.selection_role(sel, reader0) == "admin" or self.admin_like_for(sel["code_id"], sel["id"])
         gated = self.scores_gated(sel)
         out["scores_gate"] = {"applies": self.scores_gate_applies(sel), "published": not gated, "team": bool(team),
                               "analysis": bool(sel["analysis_published"] if "analysis_published" in sel.keys() else 0)}
@@ -5361,7 +5361,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         reader = self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.
-        open_ = None if self.admin_like() or portal.sample_member(reader, sel) or (self.kam_unlocked() and self.admin_like_for(sel["code_id"])) else gating.unlocked_set(reader, codes)
+        open_ = None if self.admin_like() or portal.sample_member(reader, sel) or (self.kam_unlocked() and self.admin_like_for(sel["code_id"], sel["id"])) else gating.unlocked_set(reader, codes)
         if open_ is not None:
             out["scores"] = {k: (v if k in open_ else gating.redact_score(v)) for k, v in out["scores"].items()}
         out.update(self.selection_status_payload(sel, codes, reader, by))
