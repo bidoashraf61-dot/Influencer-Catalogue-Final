@@ -622,11 +622,11 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v6 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v8 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
-  var CM_COL = { pos: "#14884a", neu: "#e8ff76", neg: "#ee1515" };
+  var CM_COL = { pos: "#14884a", neu: "#d9c7b3", neg: "#ee1515" };
   // One drawn icon per theme, picked from the words of the AI's label.
   var CM_TI = [
     [/avail|where|find|stock|pharmac|store|shop|country|egypt|kuwait|saudi/i, '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/>'],
@@ -743,6 +743,11 @@
         + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) + " " + p2[0].toFixed(1) + " " + p2[1].toFixed(1);
     }
     return d;
+  }
+  // Good / middle / bad, for a number worth judging: share asking to buy, share positive.
+  function cmTone(k, r) {
+    if (k === "buy") return r >= 0.4 ? "is-good" : r >= 0.15 ? "is-mid" : "is-bad";
+    return r >= 0.6 ? "is-good" : r >= 0.3 ? "is-mid" : "is-bad";
   }
 
   var PCOL = { Instagram: "#d62976", TikTok: "#121212", Snapchat: "#f7d100", YouTube: "#ff0000", Facebook: "#0866ff", X: "#121212" };
@@ -1091,7 +1096,7 @@
       var sub1 = topA ? 'Most ask <q dir="auto">' + esc(topA) + "</q>" + (t.asks[topA].en ? " (" + esc(t.asks[topA].en.replace(/\?$/, "")) + ")" : "") + " · " + t.asks[topA].n + " times"
         : mainT ? "The talk is mostly about " + esc(mainT.toLowerCase()) : "";
       return '<section class="cmp-top"><div class="cmp-boxes">'
-        + box(full(t.n), "comments read") + box(v(t.intent), "ask how to buy", "is-hot") + box(v(t.pos), "positive") + box(t.videos, "video" + (t.videos === 1 ? "" : "s"))
+        + box(full(t.n), "comments read") + box(v(t.intent), "ask how to buy", "is-hot " + (t.small ? "" : cmTone("buy", share))) + box(v(t.pos), "positive", t.small ? "" : cmTone("pos", p)) + box(t.videos, "video" + (t.videos === 1 ? "" : "s"))
         + '</div><aside class="cmp-say" aria-label="The insight from the comments"><img class="cmp-say__av" src="../../assets/brand/helvy-connect/helvy-icon-180.png" alt="" width="48" height="48">'
         + '<div class="cmp-say__b"><p class="cmp-say__k">Helvi read the comments</p><p class="cmp-say__t">' + head1 + "</p>" + (sub1 ? '<p class="cmp-say__s">' + sub1 + "</p>" : "")
         + (C.next_read || C.last_read ? '<p class="cmp-say__d">' + (C.last_read ? "Read " + cmDay(C.last_read) : "") + (C.next_read ? (C.last_read ? " · " : "") + "next read " + cmDay(C.next_read) : "") + "</p>" : "")
@@ -1101,7 +1106,7 @@
         + "</div></div>"
         + (plats.length ? "<h3>Where the comments came from</h3>" + '<div class="cmp-src">' + cmShare(plats, t) + '<div class="cmp-plats">' + plats.map(function (k) { var x = t.plats[k]; x.small = x.n < 30;
             return '<div class="cmp-plat" style="--pc:' + (PCOL[k] || "#121212") + '"><p class="cmp-plat__n">' + (ICONS[k] || "") + "<b>" + esc(k) + "</b><em>" + cmPct(x.n, t.n) + "%</em></p>" + cmRing(x, "cm-ring--plat")
-              + '<p class="cmp-plat__s"><span><b>' + full(x.n) + "</b>comments</span><span><b>" + cmPct(x.intent, x.n) + "%</b>ask to buy</span></p></div>"; }).join("") + "</div></div>" : "")
+              + '<p class="cmp-plat__s"><span><b>' + full(x.n) + "</b>comments</span><span class=\"" + (x.small ? "" : cmTone("buy", x.intent / x.n)) + "\"><b>" + cmPct(x.intent, x.n) + "%</b>ask to buy</span></p></div>"; }).join("") + "</div></div>" : "")
         + (mainT ? "<h3>What people talk about</h3>" + '<div class="cmp-insight"><span class="cmp-insight__ic">' + cmIcon(mainT) + '</span><div class="cmp-insight__b">'
             + '<p class="cmp-insight__k">The biggest topic · <b>' + v(t.themes[mainT]) + "</b> of comments</p><p class=\"cmp-insight__t\">" + esc(mainT) + "</p>" + (AR[mainT] ? '<p class="cmp-insight__ar" dir="rtl" lang="ar">' + esc(AR[mainT]) + "</p>" : "")
             + ((TA[mainT] || []).length ? '<p class="cmp-insight__l">What they ask about it</p><div class="cmp-chips">' + asksOf(mainT, 4) + "</div>" : "") + "</div></div>"
@@ -1123,9 +1128,9 @@
             var pts = ds.map(function (d, i) { return [L + (ds.length === 1 ? 0 : i * (W - L - Rr) / (ds.length - 1)), T + (1 - t.days[d] / mx) * (H - T - B)]; });
             var line = cmCurve(pts), area = line + " L" + pts[pts.length - 1][0].toFixed(1) + " " + (H - B) + " L" + pts[0][0].toFixed(1) + " " + (H - B) + " Z";
             return '<div class="cmp-curve"><svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Comments per day: ' + ds.map(function (d) { return day(d) + " " + t.days[d]; }).join(", ") + '">'
-              + '<defs><linearGradient id="cm-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e8ff76" stop-opacity=".95"/><stop offset="1" stop-color="#e8ff76" stop-opacity=".15"/></linearGradient></defs>'
+              + '<defs><linearGradient id="cm-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f5e63" stop-opacity=".22"/><stop offset="1" stop-color="#0f5e63" stop-opacity=".02"/></linearGradient></defs>'
               + '<line x1="' + L + '" y1="' + (H - B) + '" x2="' + (W - Rr) + '" y2="' + (H - B) + '" stroke="#e6e2db" stroke-width="1.5"/>'
-              + '<path class="cmp-curve__a" d="' + area + '" fill="url(#cm-fill)"/><path class="cmp-curve__l" d="' + line + '" fill="none" stroke="#8aa600" stroke-width="3.5" stroke-linecap="round"/>'
+              + '<path class="cmp-curve__a" d="' + area + '" fill="url(#cm-fill)"/><path class="cmp-curve__l" d="' + line + '" fill="none" stroke="#0f5e63" stroke-width="3.5" stroke-linecap="round"/>'
               + pts.map(function (p, i) { var d = ds[i], isPk = d === pk;
                   return '<g class="cmp-curve__p' + (isPk ? " is-pk" : "") + '"><circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + (isPk ? 8 : 5.5) + '"/>'
                     + '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] - 14).toFixed(1) + '" text-anchor="middle" class="cmp-curve__v">' + t.days[d] + "</text>"
@@ -1137,7 +1142,7 @@
         + "<h3>By creator</h3>" + '<div class="cmp-who">' + who.map(function (c) { var w = t.by[c], few = w.n < ((C.min_sample) || 30), top = cmTop(w.themes)[0]; w.small = few;
             return '<div class="cmp-who__r">' + ava(pics[c]) + '<span class="cmp-who__n"><b>' + esc(names[c] || c) + "</b><small>" + w.plats.map(function (x) { return ICONS[x] || esc(x); }).join("") + "</small></span>"
               + cmRing(w, "cm-ring--who") + '<span class="cmp-who__c cmp-who__c--n"><b>' + full(w.n) + "</b><small>comments</small></span>"
-              + '<span class="cmp-who__c cmp-who__c--b"><b>' + (few ? w.intent : cmPct(w.intent, w.n) + "%") + "</b><small>" + (few ? "of " + w.n + " ask" : "ask to buy") + "</small></span>"
+              + '<span class="cmp-who__c cmp-who__c--b ' + (few ? "" : cmTone("buy", w.intent / w.n)) + '"><b>' + (few ? w.intent : cmPct(w.intent, w.n) + "%") + "</b><small>" + (few ? "of " + w.n + " ask" : "ask to buy") + "</small></span>"
               + '<span class="cmp-who__t">' + (few ? "<small>Too few to say</small>" : cmIcon(top) + "<span>" + esc(top || "—") + ar(top) + "</span>") + "</span></div>"; }).join("")
         + silent.map(function (c) { return '<div class="cmp-who__r is-quiet">' + ava(c.photo) + '<span class="cmp-who__n"><b>' + esc(c.name) + "</b></span><span class=\"cmp-who__wait\">" + (c.posts ? "Comments not read yet" : "No video yet") + "</span></div>"; }).join("")
         + "</div>"
