@@ -353,6 +353,17 @@ def report(campaign, internal=False, raw=False):
     w = weights_for(objective, links_on, campaign_weights(campaign))
     scoreboard(creators, bm, w)
     targets = db.campaign_targets(campaign)
+    targets_auto = False
+    if not targets:
+        # Every campaign shows its progress bar (owner, 2026-10-19): with no agreed targets, the safe targets built from
+        # its creators and their planned posts stand in, marked as suggested. ER is left out: the builder's rate is per
+        # follower, the report's video rate is per view, so the two would not compare.
+        try:
+            safe = recommend_targets(campaign).get("safe") or {}
+        except Exception:
+            safe = {}
+        targets = {k: safe[k] for k in db.TARGET_KEYS if k != "er" and isinstance(safe.get(k), (int, float)) and safe[k] > 0}
+        targets_auto = bool(targets)
     # Only the platforms the goals were set for feed the targets; add-ons are tracked beside them.
     gp = goal_platforms(plans.plan_of(campaign))
     tot_goal = total
@@ -377,7 +388,7 @@ def report(campaign, internal=False, raw=False):
            "total": total, "creators": creators, "posts": posts,
            "history": db.content_history(cid), "clicks": clicks,
            "emv_set": bool(rates), "visibility": vis, "factors": f,
-           "benchmarks": bm, "targets": targets, "progress": progress, "verdict": verdict,
+           "benchmarks": bm, "targets": targets, "targets_auto": targets_auto, "progress": progress, "verdict": verdict,
            "objective": {"key": objective, "label": objective_info(objective)[0], "kpis": objective_info(objective)[2],
                          "weights": dict(zip(("exposure", "engagement", "er", "clicks"), w)), "links": links_on},
            "gaps": data_gaps(camp),
@@ -1299,7 +1310,7 @@ def client_report(campaign, photo=None, photo_large=None):
            "total": total, "creators": creators, "posts": posts, "history": r["history"],
            "visibility": {kk: v for kk, v in vis.items() if kk != "emv"},
            "updated_at": r["updated_at"], "next_update_at": next_capture(campaign),
-           "verdict": r["verdict"], "objective": r["objective"],
+           "verdict": r["verdict"], "objective": r["objective"], "targets_auto": r.get("targets_auto", False),
            "plan": plans.client_view(plans.plan_of(k)), "gaps": r["gaps"],
            "progress": r["progress"] if vis["reach"] else {"elapsed": r["progress"]["elapsed"],
                                                             "items": [i for i in r["progress"]["items"]

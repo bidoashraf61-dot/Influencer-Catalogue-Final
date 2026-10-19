@@ -832,3 +832,4 @@
 .cmp-who td small { display: block; color: var(--gray); font-size: 12px; }
 .cmp-foot { margin: 26px 0 0; font-size: 12.5px; color: var(--gray); line-height: 1.5; max-width: 80ch; }
 @media (max-width: 760px) { .cmp-asks, .cmp-quotes { grid-template-columns: 1fr; } .cmp-themes .db-bar { grid-template-columns: minmax(120px, 1.4fr) 1fr 40px; } }
+.db-obj__auto { display: inline-flex; align-items: center; margin-left: 8px; padding: 3px 9px; border-radius: 999px; background: #f2f0eb; font: 600 11px/1.2 var(--body); color: var(--gray); white-space: nowrap; cursor: help; }

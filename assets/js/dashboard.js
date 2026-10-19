@@ -483,7 +483,9 @@
     var due = P.due != null ? P.due : items.reduce(function (a, i) { return a + Math.min(100, i.expected / i.goal * 100); }, 0) / items.length;
     if (!P.all_met) done = Math.min(done, 99);
     var r = due ? done / due : 1, gr = P.all_met ? "good" : r >= 1 ? "good" : r >= 0.7 ? "moderate" : "low";
-    box.innerHTML = '<span class="db-obj__label">Objective · <b>' + esc(o.label) + '</b></span><div class="db-obj__track" role="img" aria-label="' + Math.round(done) + '% of all targets achieved">'
+    box.innerHTML = '<span class="db-obj__label">Objective · <b>' + esc(o.label) + '</b>'
+      + (R.targets_auto ? '<span class="db-obj__auto" title="No targets were agreed for this campaign yet, so these come from what its creators usually deliver for the posts booked.">Suggested targets</span>' : "")
+      + '</span><div class="db-obj__track" role="img" aria-label="' + Math.round(done) + '% of all targets achieved">'
       + '<i class="db-obj__fill ' + gr + '" style="width:' + done.toFixed(1) + '%"></i><i class="db-obj__due" style="left:' + due.toFixed(1) + '%" title="Where it should be today"></i></div>'
       + '<span class="db-obj__pct" title="All targets together, each counted up to its goal">' + Math.round(done) + "%</span>" + sig(gr, "Expected by today: " + Math.round(due) + "%")
       + '<span class="db-obj__parts">' + items.map(function (i) { var met = i.actual >= i.goal; return '<span class="' + (met ? "met" : "short") + '" title="' + (met ? "Met" : "Not met yet") + '">' + KEYN[i.key] + " <b>" + Math.round(i.pct) + "%</b></span>"; }).join("") + "</span>"
