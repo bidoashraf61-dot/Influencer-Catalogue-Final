@@ -182,7 +182,7 @@ class Push(unittest.TestCase):
         state = {"views": 150000, "posts": 0, "progress": [{"key": "posts", "goal": 20, "actual": 0, "pct": 0}]}
         real = metrics.report
         metrics.report = lambda k, internal=False, raw=False: ({"total": {"views": state["views"], "posts": state["posts"]},
-                                                               "progress": state["progress"]} if k["id"] == cid else real(k, internal, raw))
+                                                               "progress": {"items": state["progress"], "overall": 0}} if k["id"] == cid else real(k, internal, raw))
         try:
             self.assertEqual(push.milestones(), 0)               # first sight: recorded, nothing sent (100K already passed)
             state.update(views=1200000, posts=1, progress=[{"key": "posts", "goal": 20, "actual": 11, "pct": 55}])

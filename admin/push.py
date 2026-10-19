@@ -655,12 +655,18 @@ def milestones():
     with db.connect() as conn:
         camps = conn.execute("SELECT * FROM campaigns WHERE status = 'live' AND code_id IS NOT NULL").fetchall()
     for k in camps:
-        cid = k["id"]
         try:
-            rep = metrics.report(k)
+            fired += _campaign_milestones(k, R, inbox, metrics)
         except Exception as exc:
-            print("push: report failed for campaign %d: %r" % (cid, exc), flush=True)
-            continue
+            print("push: milestones skipped for campaign %d: %r" % (k["id"], exc), flush=True)
+    return fired
+
+
+def _campaign_milestones(k, R, inbox, metrics):
+    fired = 0
+    cid = k["id"]
+    if True:
+        rep = metrics.report(k)
         users = inbox.for_codes([k["code_id"]])
         href = "campaign/#t=" + k["token"]
         with db.connect() as conn:
@@ -675,7 +681,8 @@ def milestones():
             new += [("v%d" % s, None, None, None) for s in hit if s != top]
             new.append(("v%d" % top, "camp_views", "%s views: %s" % (_fmt(top), k["name"]),
                         "Your campaign passed %s views." % _fmt(top)))
-        for p in rep.get("progress") or []:
+        prog = rep.get("progress") or {}
+        for p in (prog.get("items") if isinstance(prog, dict) else prog) or []:
             if p.get("key") not in GOAL_NAMES or not p.get("goal"):
                 continue
             hit = [s for s in R["goal_steps"] if p.get("pct", 0) >= s and "g:%s:%d" % (p["key"], s) not in done]
@@ -708,7 +715,7 @@ def milestones():
                 conn.execute("UPDATE push_camp_state SET posts = ?, posts_push_at = ? WHERE campaign_id = ?",
                              (posts, now if post_note else st["posts_push_at"], cid))
         if not seeded:
-            continue                                    # first sight: record only
+            return 0                                    # first sight: record only
         kam = []
         if users:
             with db.connect() as conn:
