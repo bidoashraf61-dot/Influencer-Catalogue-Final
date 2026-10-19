@@ -5,8 +5,9 @@ campaign dashboard. Brief: Portal Programme/BRIEF-comment-insights-2026-10-19.md
 
 Privacy: only the comment's text, date, like count and platform id are kept, never who wrote it. Apify's
 copy of each run's dataset is deleted as soon as it is read. The client sees totals and the quotes a team
-member approved; red flags (complaints, side-effect claims, misinformation, regulatory wording) stay in the
-admin and are emailed to the campaign's account manager.
+member approved, and since 2026-10-19 (owner's choice) every comment in a browser, red-flagged ones included.
+Red flags (complaints, side-effect claims, misinformation, regulatory wording) are listed in the admin and
+emailed to the campaign's account manager so the team can act before the client asks.
 
 Cost: every run is written to api_runs, so it counts against the Apify budget in Settings like any other
 job; Gemini calls are audited in ai_audit (kind "comments"). Instagram and TikTok re-fetch the whole
@@ -618,7 +619,7 @@ def admin_page(k, error=None, message=None):
             "" if not r["flag_seen"] else " class='muted'", "bad" if not r["flag_seen"] else "", e(FLAGS.get(r["flag"], r["flag"])),
             ctext(r), who(r), "" if r["flag_seen"] else form("seen", "Mark seen", c=r["id"]))
         for r in flags)
-    flag_card = ("<h2>Red flags <span class='muted' style='font-size:13px'>team only, never shown to the client</span></h2><div class='card'>"
+    flag_card = ("<h2>Red flags <span class='muted' style='font-size:13px'>the client sees these comments too, in their comment list</span></h2><div class='card'>"
                  + ("<table><tbody>" + flag_rows + "</tbody></table>" if flag_rows else "<p class='muted'>No red flags.</p>") + "</div>")
 
     quote_rows = "".join(
@@ -645,7 +646,7 @@ def admin_page(k, error=None, message=None):
                     "Facebook, YouTube).</p>") + "</div>")
     body = (views._head(k, "comments", error, message)
             + "<p class='sub'>What viewers wrote under the campaign videos. The client's dashboard shows the mood, the buying "
-              "questions, the themes and the quotes you pick here. Commenters' names are never stored.</p>"
+              "questions, the themes, every comment (red-flagged ones included) and the quotes you pick here. Commenters' names are never stored.</p>"
             + stats + flag_card + quote_card + read_card)
     return views.page(k["name"] + " — Comments", body, "/campaigns")
 
