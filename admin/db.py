@@ -3010,6 +3010,21 @@ def set_setting(key, value):
 
 KINDS = ["post", "reel", "story", "video", "short"]
 VIDEO_KINDS = {"reel", "video", "short"}
+
+
+def kind_from_url(url, kind):
+    """A post left on the default "post" whose link says what it is (an Instagram or Facebook reel, a TikTok video,
+    a YouTube short) takes that kind, so a reel added by hand is not counted as a photo (Ivatherm, 2026-10-19)."""
+    if kind not in (None, "", "post"):
+        return kind
+    u = (url or "").lower()
+    if "tiktok.com" in u and "/video/" in u:
+        return "video"
+    if "youtube.com/shorts/" in u or "youtu.be/" in u:
+        return "short"
+    if ("instagram.com" in u and ("/reel/" in u or "/reels/" in u)) or ("facebook.com" in u and ("/reel/" in u or "/share/r/" in u)):
+        return "reel"
+    return kind or "post"
 METRICS = ["likes", "comments", "views", "shares", "saves"]
 
 
@@ -3050,7 +3065,7 @@ def add_content(cid, item, source="capture", conn=None):
         cur = conn.execute(
             "INSERT INTO content (campaign_id,code,platform,kind,url,posted_at,caption,thumb,"
             "followers,section,disclosure_ok,source,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
-            (cid, item["code"], item["platform"], item["kind"], item["url"], item.get("posted_at"),
+            (cid, item["code"], item["platform"], kind_from_url(item["url"], item.get("kind")), item["url"], item.get("posted_at"),
              item.get("caption"), item.get("thumb"), item.get("followers"), section, disc,
              source, now()))
         content_id = cur.lastrowid
