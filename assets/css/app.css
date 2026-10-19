@@ -1,0 +1,143 @@
+/* HELVY Connect app (item 168): the phone layer over the portal. A fixed ink bar
+   at the bottom (phones and tablets under 900px), the install guides, the alerts
+   opt-in card. Approved mockup: Portal Programme/mockups/pwa/ (2026-10-19).
+   Catalogue world: ink bar, lime for the active tab and the action, red count. */
+
+:root { --hca-nav-h: 0px; --hca-ease: cubic-bezier(.2, .8, .2, 1); }
+
+.hca-nav { display: none; }
+
+@media (max-width: 899px) {
+  body.hca-nav-on { --hca-nav-h: calc(64px + env(safe-area-inset-bottom, 0px)); padding-bottom: var(--hca-nav-h); }
+
+  .hca-nav {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 88;
+    background: #121212; color: rgba(233, 220, 210, .66);
+    padding: 7px max(6px, env(safe-area-inset-right, 0px)) calc(7px + env(safe-area-inset-bottom, 0px)) max(6px, env(safe-area-inset-left, 0px));
+    box-shadow: 0 -10px 30px -18px rgba(0, 0, 0, .55);
+    font-family: "DM Sans", Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .hca-nav a, .hca-nav button {
+    position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+    min-height: 50px; padding: 2px 0; border: 0; background: none; color: inherit; cursor: pointer;
+    font: 600 10.5px/1 "DM Sans", Arial, sans-serif; letter-spacing: .02em; text-decoration: none;
+  }
+  .hca-nav .hca-pill { display: grid; place-items: center; width: 56px; height: 30px; border-radius: 999px; transition: background-color .25s var(--hca-ease), color .25s var(--hca-ease); }
+  .hca-nav svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .hca-nav [aria-current="page"] { color: #e8ff76; }
+  .hca-nav [aria-current="page"] .hca-pill { background: #e8ff76; color: #121212; }
+  .hca-nav a:focus-visible, .hca-nav button:focus-visible { outline: none; }
+  .hca-nav a:focus-visible .hca-pill, .hca-nav button:focus-visible .hca-pill { box-shadow: 0 0 0 2px #121212, 0 0 0 4px #e8ff76; }
+  .hca-nav a:active .hca-pill { transform: scale(.94); }
+  .hca-badge {
+    position: absolute; top: 0; left: calc(50% + 6px); min-width: 19px; height: 19px; padding: 0 5px; box-sizing: border-box;
+    border-radius: 999px; background: #ee1515; color: #fff; box-shadow: 0 0 0 2px #121212;
+    font: 400 14px/19px Bebasneue, "Bebas Neue", Arial, sans-serif; letter-spacing: .04em; text-align: center;
+  }
+  .hca-badge[hidden] { display: none; }
+
+  /* Things that already sit at the bottom of the screen move up over the bar. */
+  body.hca-nav-on .cat-tray { bottom: var(--hca-nav-h); }
+  body.hca-nav-on .cat-top { bottom: calc(20px + var(--hca-nav-h)); }
+  body.hca-nav-on .hv-voice { bottom: calc(16px + var(--hv-lift, 0px) + var(--hca-nav-h)); }
+  body.hca-nav-on .sel-toast, body.hca-nav-on .hc-toast { bottom: calc(18px + var(--hca-nav-h)); }
+  body.hca-nav-on .pt-toast { bottom: calc(18px + var(--hca-nav-h)); }
+  body.hca-nav-on .hv-editbar { bottom: calc(12px + var(--hca-nav-h)); }
+  body.hca-nav-on .hca-card { bottom: calc(12px + var(--hca-nav-h)); }
+}
+
+/* ------------------------------------------------ install guide + opt-in card -- */
+
+.hca-scrim { position: fixed; inset: 0; z-index: 2147481100; background: rgba(18, 18, 18, .48); animation: hca-fade .25s ease both; }
+.hca-sheet {
+  position: fixed; left: 8px; right: 8px; bottom: calc(10px + env(safe-area-inset-bottom, 0px)); z-index: 2147481101;
+  max-width: 460px; margin: 0 auto; box-sizing: border-box;
+  background: #fff; color: #121212; border-radius: 28px; padding: 20px 20px 16px;
+  box-shadow: 0 -10px 40px -14px rgba(0, 0, 0, .4);
+  font-family: "DM Sans", Arial, sans-serif; animation: hca-up .4s var(--hca-ease) both;
+}
+.hca-sheet--ios { bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+.hca-id { display: flex; gap: 12px; align-items: center; margin-bottom: 14px; }
+.hca-id img { width: 56px; height: 56px; border-radius: 12px; box-shadow: 0 2px 8px -2px rgba(0, 0, 0, .25); }
+.hca-id b { display: block; font-size: 15px; }
+.hca-id span { font-size: 12.5px; color: #5a5a58; }
+.hca-id .hca-logo { height: 34px; width: auto; border-radius: 0; box-shadow: none; }
+.hca-sheet h2 { margin: 0 0 6px; font: 400 30px/.95 Bebasneue, "Bebas Neue", Arial, sans-serif; letter-spacing: .005em; }
+.hca-sheet p { margin: 0; font-size: 13.5px; line-height: 1.5; color: #5a5a58; }
+.hca-steps { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 8px; }
+.hca-steps li { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; font-size: 14px; line-height: 1.35; background: #f5f3ef; border-radius: 12px; padding: 10px 12px; }
+.hca-steps i { width: 30px; height: 30px; border-radius: 50%; background: #121212; color: #e8ff76; display: grid; place-items: center; font: 400 20px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; font-style: normal; }
+.hca-steps .hca-ic { width: 34px; height: 34px; border-radius: 12px; background: #fff; display: grid; place-items: center; box-shadow: inset 0 0 0 1px rgba(18, 18, 18, .1); }
+.hca-steps .hca-ic svg { width: 20px; height: 20px; fill: none; stroke: #0a84ff; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.hca-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 14px; }
+.hca-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 0 22px; border-radius: 999px; border: 0; cursor: pointer;
+  font: 400 19px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; letter-spacing: .06em; text-decoration: none; white-space: nowrap;
+  transition: background-color .2s ease, color .2s ease;
+}
+.hca-btn--ink { background: #121212; color: #e8ff76; }
+.hca-btn--ink:hover { background: #000; }
+.hca-btn--lime { background: #e8ff76; color: #121212; }
+.hca-btn--lime:hover { background: #121212; color: #e8ff76; }
+.hca-btn--line { background: transparent; color: #121212; box-shadow: inset 0 0 0 1.5px #121212; }
+.hca-btn--quiet { background: transparent; color: #5a5a58; font: 600 13px "DM Sans", Arial, sans-serif; letter-spacing: 0; padding: 0 10px; }
+.hca-btn:focus-visible { outline: 3px solid #ee1515; outline-offset: 2px; }
+.hca-pointer {
+  position: fixed; z-index: 2147481102; left: 50%; bottom: calc(52px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  color: #e8ff76; pointer-events: none;
+}
+.hca-pointer svg { width: 26px; height: 34px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; animation: hca-bob 1.4s ease-in-out infinite; }
+
+/* Android: a bar under the header, then Chrome's own dialog. */
+.hca-bar {
+  position: fixed; left: 10px; right: 10px; top: calc(10px + env(safe-area-inset-top, 0px)); z-index: 2147481000;
+  max-width: 520px; margin: 0 auto; box-sizing: border-box;
+  display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 20px;
+  background: #121212; color: #fff; box-shadow: 0 14px 30px -14px rgba(0, 0, 0, .6);
+  font-family: "DM Sans", Arial, sans-serif; animation: hca-down .45s var(--hca-ease) both;
+}
+.hca-bar img { width: 46px; height: 46px; border-radius: 12px; flex: none; }
+.hca-bar b { display: block; font: 400 22px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; letter-spacing: .03em; }
+.hca-bar span { font-size: 12px; color: rgba(255, 255, 255, .72); }
+.hca-bar .hca-btn { min-height: 38px; padding: 0 16px; font-size: 17px; margin-left: auto; }
+.hca-x { width: 34px; height: 34px; flex: none; border-radius: 50%; border: 0; background: rgba(255, 255, 255, .12); display: grid; place-items: center; cursor: pointer; color: #fff; }
+.hca-x svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.hca-x:focus-visible { outline: 3px solid #e8ff76; outline-offset: 2px; }
+
+/* The soft alerts card: linen, Helvy, one action. */
+.hca-card {
+  position: fixed; left: 12px; right: 12px; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); z-index: 2147480900;
+  max-width: 440px; margin: 0 auto; box-sizing: border-box;
+  display: grid; grid-template-columns: auto 1fr auto; gap: 4px 12px; align-items: start;
+  background: #e9dcd2; color: #121212; border-radius: 22px; padding: 16px;
+  box-shadow: 0 18px 40px -18px rgba(18, 18, 18, .55);
+  font-family: "DM Sans", Arial, sans-serif; animation: hca-up .45s var(--hca-ease) both;
+}
+.hca-card > img { width: 46px; height: 46px; grid-row: span 2; }
+.hca-card b { font: 400 23px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; letter-spacing: .02em; padding-top: 2px; }
+.hca-card p { grid-column: 2 / 3; margin: 0; font-size: 13px; line-height: 1.45; color: #3d3a36; }
+.hca-card .hca-x { grid-row: 1; grid-column: 3; background: rgba(18, 18, 18, .08); color: #121212; width: 30px; height: 30px; }
+.hca-card .hca-acts { grid-column: 1 / -1; display: flex; gap: 8px; align-items: center; margin-top: 10px; }
+.hca-card .hca-msg { grid-column: 1 / -1; font-size: 13px; margin-top: 8px; color: #a85507; }
+
+/* Account -> Notifications: the "Phone alerts" row the app adds. */
+.hca-phone { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; margin: 0 0 16px; border-radius: 18px; background: #e9dcd2; }
+.hca-phone b { display: block; font-size: 15px; }
+.hca-phone span { font-size: 13px; color: #5a5a58; }
+
+@keyframes hca-fade { from { opacity: 0; } }
+@keyframes hca-up { from { opacity: 0; transform: translateY(24px); } }
+@keyframes hca-down { from { opacity: 0; transform: translateY(-24px); } }
+@keyframes hca-bob { 50% { transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) {
+  .hca-sheet, .hca-bar, .hca-card, .hca-scrim { animation: none; }
+  .hca-pointer svg { animation: none; }
+}
+
+/* Installed app: no browser chrome, so the page owns the very top. */
+@media (display-mode: standalone) {
+  body { -webkit-user-select: none; user-select: none; overscroll-behavior-y: none; }
+  input, textarea, [contenteditable], p, td, li { -webkit-user-select: text; user-select: text; }
+}

@@ -71,9 +71,9 @@ def role_of(who):
 # Paths a KAM may never change (POST). Prefix match.
 _KAM_DENY_POST = ("/settings", "/apis", "/portal/settings", "/portal/keys", "/tiers", "/roster/delete", "/roster/import",
                   "/roster/merge", "/roster/photos", "/team", "/planner/library", "/codes/delete",
-                  "/portal/user/delete")
+                  "/portal/user/delete", "/app-alerts")
 # Pages only owners and admins may open (GET). Prefix match; /portal?tab=settings handled separately.
-_STAFF_ONLY_GET = ("/apis", "/settings", "/reference")
+_STAFF_ONLY_GET = ("/apis", "/settings", "/reference", "/app-alerts")
 # What a viewer may still POST: their own account and the read-only copilot chat.
 _VIEWER_POST = ("/password", "/account/", "/ai/chat", "/reauth")
 

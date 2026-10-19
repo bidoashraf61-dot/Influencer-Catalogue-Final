@@ -688,16 +688,36 @@ def build():
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
 <title>HELVi Connect — Influencer Catalogue</title>
 <script src="/assets/js/hv-loader.js" data-tone="dark"></script>
 <link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
-<link rel="apple-touch-icon" href="/assets/brand/helvy-connect/helvy-icon-180.png?v=c4"/>
+<link rel="apple-touch-icon" href="/assets/app/apple-touch-icon.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/connect.css')}"/>
+<!-- HELVi Connect app (item 168): install, splash, bottom bar, alerts -->
+<link rel="manifest" href="/manifest.webmanifest"/>
+<meta name="theme-color" content="#ffffff"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="HELVi"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1206x2622.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"/>
+<link rel="stylesheet" href="{stamp('/assets/css/app.css')}"/>
+<script src="{stamp('/assets/js/app.js')}" defer></script>
+<!-- /HELVi Connect app -->
 </head>
 <body class="cat-locked" data-page="catalogue">
 
@@ -876,17 +896,37 @@ def build():
 <html lang="en">
 <head>
 <meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
 <meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
 <meta name="referrer" content="no-referrer"/>
 <title>Selection — HELVi Connect</title>
 <script src="/assets/js/hv-loader.js" data-tone="light" data-wait="all"></script>
 <link rel="icon" href="/assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
-<link rel="apple-touch-icon" href="/assets/brand/helvy-connect/helvy-icon-180.png?v=c4"/>
+<link rel="apple-touch-icon" href="/assets/app/apple-touch-icon.png"/>
 <link rel="stylesheet" href="{stamp('/assets/css/catalogue.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/portal.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/connect.css')}"/>
 <link rel="stylesheet" href="{stamp('/assets/css/evidence.css')}"/>
+<!-- HELVi Connect app (item 168): install, splash, bottom bar, alerts -->
+<link rel="manifest" href="/manifest.webmanifest"/>
+<meta name="theme-color" content="#ffffff"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="HELVi"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1320x2868.png" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1290x2796.png" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1206x2622.png" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1179x2556.png" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1284x2778.png" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1170x2532.png" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1125x2436.png" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-1242x2688.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-828x1792.png" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"/>
+<link rel="apple-touch-startup-image" href="/assets/app/splash-750x1334.png" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)"/>
+<link rel="stylesheet" href="{stamp('/assets/css/app.css')}"/>
+<script src="{stamp('/assets/js/app.js')}" defer></script>
+<!-- /HELVi Connect app -->
 </head>
 <body class="cat-locked" data-page="selection">
 

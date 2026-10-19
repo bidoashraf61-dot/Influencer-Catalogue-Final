@@ -211,6 +211,9 @@ class PortalMixin(connect_api.ConnectMixin):
         """Handle a public portal GET. Returns True if the path was ours."""
         if self.connect_get(path, query):
             return True
+        if path.startswith("/api/push/"):
+            import push_api
+            return push_api.handle(self, "GET", path, query)
         if path == "/api/me":
             cid, user, kind = self._identity()
             if cid is None:
@@ -454,6 +457,9 @@ class PortalMixin(connect_api.ConnectMixin):
         """Handle a public portal POST. Returns True if the path was ours."""
         if self.connect_post(path):
             return True
+        if path.startswith("/api/push/"):
+            import push_api
+            return push_api.handle(self, "POST", path)
         routes = {
             "/api/auth/start": self.api_auth_start, "/api/auth/verify": self.api_auth_verify,
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,

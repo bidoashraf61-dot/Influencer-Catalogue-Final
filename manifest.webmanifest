@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "HELVi Connect",
+  "short_name": "HELVi",
+  "description": "HelloVoice's creator catalogue, selections and live campaign reports.",
+  "start_url": "/account/?src=app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/assets/app/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/app/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/assets/app/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/app/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/assets/app/badge-96.png", "sizes": "96x96", "type": "image/png", "purpose": "monochrome" }
+  ],
+  "shortcuts": [
+    { "name": "Campaigns", "url": "/account/?src=app#campaigns", "icons": [{ "src": "/assets/app/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Selections", "url": "/account/?src=app#selections", "icons": [{ "src": "/assets/app/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Catalogue", "url": "/?src=app", "icons": [{ "src": "/assets/app/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Alerts", "url": "/account/?src=app#notifications", "icons": [{ "src": "/assets/app/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

@@ -58,6 +58,12 @@ def send(event, lines, kam=None, link=None, also=None):
     if event not in on and event not in ("kam_assign", "campaign_started", "comment_flags") and not (event == "handoff" and "quote" in on):
         return
     to = list(dict.fromkeys(recipients(kam) + [str(a).strip().lower() for a in (also or []) if "@" in str(a)]))
+    if to:
+        try:
+            import push
+            push.team(event, lines, link, to)       # the team's phones too (HELVY Connect app)
+        except Exception:
+            pass
     if not to or not mailer.configured():
         return
     subject = "HelloVoice catalogue · %s" % EVENTS.get(event, event)

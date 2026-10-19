@@ -141,7 +141,8 @@ VIEWER_COOKIE = "hv_view"
 PREVIEW_COOKIE = "hv_preview"
 PREVIEW_TTL = 3600
 # The only POSTs a preview may still make (a calculation and analytics; nothing is saved or charged).
-PREVIEW_POSTS = ("/api/event", "/api/roi/estimate", "/api/me/ping", "/api/me/unlock", "/api/me/as-client")
+PREVIEW_POSTS = ("/api/event", "/api/roi/estimate", "/api/me/ping", "/api/me/unlock", "/api/me/as-client",
+                 "/api/push/event", "/api/push/subscribe", "/api/push/unsubscribe", "/api/push/ack", "/api/push/click")
 # Every shared link (a selection, a campaign report, the catalogue itself)
 # remembers the access code that opened it, in this browser: each new link
 # asks for its own code once, and links of different clients open side by side.
@@ -337,6 +338,76 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if row is not None:
             self._admin_token = token
         return row
+
+    # ------------------------------------------------- App & alerts (item 168) --
+
+    def get_app_alerts(self, path, query):
+        import push
+        import push_views
+        if path == "/app-alerts/reach":
+            try:
+                aud = json.loads(query.get("aud") or "{}")
+            except ValueError:
+                aud = {}
+            return self.send_json(200, dict(push.reach(aud if isinstance(aud, dict) else {}), ok=True))
+        flash = None
+        if query.get("ok"):
+            flash = ("ok", query["ok"])
+        elif query.get("e"):
+            flash = ("err", query["e"])
+        tab = query.get("tab") or "overview"
+        if tab == "send":
+            return self.send(200, push_views.send_page(flash))
+        if tab == "history":
+            return self.send(200, push_views.history_page(flash))
+        if tab == "rules":
+            return self.send(200, push_views.rules_page(flash))
+        return self.send(200, push_views.overview_page(query.get("q", ""), flash))
+
+    def post_app_alerts(self, path, who):
+        import push
+        import push_views
+        f = self.form_body()
+        me = who["email"] if "email" in who.keys() else "admin"
+        q = urllib.parse.quote
+        if path == "/app-alerts/rules":
+            push.save_rules(push_views.parse_rules(f))
+            team.log("push_rules", me, "saved", self.client_ip())
+            return self.redirect("/app-alerts?tab=rules&ok=" + q("Rules saved."))
+        if path == "/app-alerts/cancel":
+            ok = push.cancel(int(f.get("id") or 0)) if str(f.get("id") or "").isdigit() else False
+            return self.redirect("/app-alerts?tab=history&" + ("ok=" + q("Scheduled push cancelled.") if ok else "e=" + q("That push was already sent.")))
+        if path == "/app-alerts/test":
+            email = (f.get("email") or "").strip().lower()
+            n = push.create_message("Test from HelloVoice", "If you can read this, alerts work on this phone.", "/account/#notifications",
+                                    {}, me, test_email=email) if email else 0
+            return self.redirect("/app-alerts?" + ("ok=" + q("Test push sent to %d phone%s." % (n, "" if n == 1 else "s")) if n
+                                                   else "e=" + q("No phone with alerts on for that person.")))
+        if path == "/app-alerts/send":
+            title, body = (f.get("title") or "").strip(), (f.get("body") or "").strip()
+            url = (f.get("url") or "").strip() if f.get("dest") == "custom" else (f.get("dest") or "/account/")
+            if not title:
+                return self.redirect("/app-alerts?tab=send&e=" + q("Give the push a title."))
+            if f.get("test"):
+                n = push.create_message(title, body, url, {}, me, test_email=me)
+                return self.redirect("/app-alerts?tab=send&" + ("ok=" + q("Test sent to your %d phone%s." % (n, "" if n == 1 else "s")) if n
+                                                                else "e=" + q("You have no phone with alerts on yet. Open the portal on your phone, install the app and turn alerts on.")))
+            try:
+                aud = json.loads(f.get("aud") or "{}")
+            except ValueError:
+                aud = {}
+            if not isinstance(aud, dict) or aud.get("type") not in push.AUDIENCES:
+                return self.redirect("/app-alerts?tab=send&e=" + q("Choose who gets it."))
+            users, emails = push.resolve(aud)
+            if not users and not emails:
+                return self.redirect("/app-alerts?tab=send&e=" + q("Nobody matches that audience."))
+            at = push_views.parse_send_at(f.get("send_at")) if f.get("when") == "later" else None
+            if f.get("when") == "later" and (not at or at <= db.now() + 60):
+                return self.redirect("/app-alerts?tab=send&e=" + q("Pick a time in the future to schedule it."))
+            mid = push.create_message(title, body, url, aud, me, send_at=at)
+            team.log("push_send", me, "%s · %s" % (mid, title[:60]), self.client_ip())
+            return self.redirect("/app-alerts?tab=history&ok=" + q("Push scheduled." if at else "Push sent."))
+        return self.send(404, "Not found", "text/plain")
 
     def not_your_client(self, path):
         """403 for a key account manager outside her clients: a page in the admin, JSON for the API."""
@@ -1077,6 +1148,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return self.send(404, b"", "text/plain")
             kind = uploads.image_kind(f.read_bytes()[:16]) or "png"
             return self.send(200, f.read_bytes(), "image/" + ("jpeg" if kind == "jpg" else kind))
+        if path == "/app-alerts" or path.startswith("/app-alerts/"):
+            return self.get_app_alerts(path, query)
         if path == "/settings":
             return self.send(200, views.settings_page(
                 db.setting("emv_rates") or {}, metrics.factors(),
@@ -1294,6 +1367,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_history_undo()
         if path == "/clients/preview":
             return self.post_client_preview()
+        if path.startswith("/app-alerts/"):
+            return self.post_app_alerts(path, who)
         if path.startswith("/evidence/"):
             return self.post_evidence(path, who)
         if path == "/campaigns/invite":
@@ -6384,6 +6459,8 @@ def main():
     account.init()
     team.init()
     evidence.init()
+    import push
+    push.init()
     apify.start_scheduler()
     # Post thumbnails (2026-10-13): two resumable jobs fetched from the post links (scripts in /app/admin/jobs/).
     # This keeps them running: if one is not running it is started again, so a restart of this service does not
@@ -6414,6 +6491,8 @@ def main():
     # What people said (2026-10-19): campaign comments read 2 and 7 days after each video.
     import comments
     comments.start()
+    # HELVY Connect app (item 168): phone pushes from the bell, team alerts, milestones and manual sends.
+    push.start()
     db.purge_expired_sessions()
     ALLOWED_ORIGINS.update(args.origin)
     global BASE

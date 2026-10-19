@@ -55,3 +55,5 @@ admin/.mail-graph
 
 # Client profile photos and company logos, uploaded from /account/.
 admin/profile_media/
+# Web Push (VAPID) signing key: HELVi Connect app pushes. Never commit.
+admin/.vapid-key

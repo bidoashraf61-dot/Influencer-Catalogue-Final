@@ -64,6 +64,10 @@ cp "$SRC/account/index.html"        "$DST/account/index.html"
 # HELVi Connect privacy notice and terms (drafts pending legal review), hand-written.
 cp "$SRC/privacy/index.html"        "$DST/privacy/index.html"
 cp "$SRC/terms/index.html"          "$DST/terms/index.html"
+# HELVi Connect app (item 168): the service worker, manifest and offline page live at the site root.
+cp "$SRC/sw.js"                     "$DST/sw.js"
+cp "$SRC/manifest.webmanifest"      "$DST/manifest.webmanifest"
+cp "$SRC/offline.html"              "$DST/offline.html"
 
 # Stamp a ?v=<hash> onto the js/css URLs. The source templates carry one but
 # the dist build drops it, so catalogue.js sits at a URL that never changes —
@@ -86,7 +90,7 @@ names = ('js/catalogue.js', 'css/catalogue.css', 'js/portal.js', 'css/portal.css
          'js/campaign.js', 'css/campaign.css',
          'js/creator.js', 'css/creator.css', 'js/hv-icons.js',
          'js/dashboard.js', 'css/dashboard.css', 'js/account.js', 'css/account.css', 'js/hv-loader.js',
-         'js/connect.js', 'css/connect.css', 'js/evidence.js', 'css/evidence.css')
+         'js/connect.js', 'css/connect.css', 'js/evidence.js', 'css/evidence.css', 'js/app.js', 'css/app.css')
 stamp = {n: h('assets/' + n) for n in names}
 for page in ('index.html', 'selection/index.html', 'campaign/index.html',
              'campaign/dashboard/index.html', 'creator/index.html', 'account/index.html', 'market/index.html',

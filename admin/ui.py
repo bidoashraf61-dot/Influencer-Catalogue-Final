@@ -75,6 +75,7 @@ NAV = [
     ("", [("/", "Control Centre", "grid", None)]),
     ("Control", [("/roster", "Creators", "users", None),
                  ("/clients", "Clients and codes", "building", None),
+                 ("/app-alerts", "App & alerts", "bell", None),
                  ("/work", "Selections & campaigns", "flag", None),
                  ("/reference", "Scoring rules", "target", None),
                  ("/settings", "Settings and keys", "gear", None),
@@ -90,7 +91,7 @@ CHILDREN = {
     "/settings": [("/settings#kams", "Key account managers", None), ("/apis", "APIs & keys", None)],
     "/team": [("/history", "History & undo", None)],
 }
-STAFF_ONLY = {"/apis", "/reference", "/settings"}          # hidden from KAMs and viewers (the server refuses them anyway)
+STAFF_ONLY = {"/apis", "/reference", "/settings", "/app-alerts"}          # hidden from KAMs and viewers (the server refuses them anyway)
 # Pages that read across every client: a key account manager (kam_scope) is refused them, so the
 # sidebar does not offer them either.
 KAM_HIDDEN = {"/analytics", "/history"}

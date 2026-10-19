@@ -46,6 +46,8 @@ KINDS = {
     "camp_live": "campaigns", "camp_report": "campaigns", "camp_final": "campaigns",
     "camp_shared": "campaigns",
     "camp_weekly": "campaigns", "camp_next": "campaigns",
+    "camp_goal": "campaigns", "camp_views": "campaigns", "camp_posts": "campaigns",   # milestones (push.milestones)
+    "announce": "account",                                                             # a manual push from HelloVoice
     "credits_low": "account", "credits_monthly": "account", "credits_added": "account", "colleague": "account",
     "idea": "ideas",
 }
@@ -102,20 +104,22 @@ def for_codes(code_ids, team=True, exclude_user=None):
 
 # -------------------------------------------------------------------- emit --
 
-def emit(user_ids, kind, title, rest="", body="", href="", ref=None, meta=None, once=False, conn=None):
+def emit(user_ids, kind, title, rest="", body="", href="", ref=None, meta=None, once=False, conn=None, push=True):
     """Store a notification for each account. ``ref`` with ``once`` skips accounts that
     already have this kind+ref (e.g. one "report updated" a day). Pass ``conn`` to write
     inside a transaction that is already open. Never raises: a notification must not
-    break the action that caused it."""
+    break the action that caused it. Each stored notification is also handed to the
+    phone push queue (push.from_inbox) unless ``push`` is False."""
     if kind not in KINDS:
         return 0
     if conn is None:
         try:
             with db.connect() as own:
-                return emit(user_ids, kind, title, rest, body, href, ref, meta, once, own)
+                return emit(user_ids, kind, title, rest, body, href, ref, meta, once, own, push)
         except Exception:
             return 0
     n = 0
+    stored = []
     try:
         for uid in dict.fromkeys(u for u in (user_ids or ()) if u):
             if once and ref and conn.execute("SELECT 1 FROM notifications WHERE user_id = ? AND kind = ? AND ref = ?",
@@ -128,9 +132,21 @@ def emit(user_ids, kind, title, rest="", body="", href="", ref=None, meta=None, 
             conn.execute("DELETE FROM notifications WHERE user_id = ? AND id NOT IN "
                          "(SELECT id FROM notifications WHERE user_id = ? ORDER BY id DESC LIMIT ?)", (uid, uid, KEEP))
             n += 1
+            stored.append((uid, kind, title, rest, body, href))
     except Exception:
         return n
+    finally:
+        if push and stored:
+            _to_push(stored)
     return n
+
+
+def _to_push(rows):
+    try:
+        import push as _push
+        _push.from_inbox(rows)
+    except Exception:
+        pass
 
 
 def bundle(user_ids, kind, ref, window, build, meta_new):
@@ -154,6 +170,7 @@ def bundle(user_ids, kind, ref, window, build, meta_new):
                                  "VALUES (?,?,?,?,?,?,?,?,?,?)",
                                  (uid, kind, KINDS[kind], title[:200], (rest or "")[:200], (body or "")[:300], href or "",
                                   ref, json.dumps(meta), db.now()))
+                    _to_push([(uid, kind, title, rest, body, href)])
     except Exception:
         pass
 
