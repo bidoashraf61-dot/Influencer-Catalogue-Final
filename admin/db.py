@@ -3355,8 +3355,15 @@ def _profile_key(url):
         return None
     u = re.sub(r"^https?://", "", u)
     u = re.sub(r"^(www\.|m\.)", "", u)
-    u = u.split("?")[0].split("#")[0].rstrip("/")
-    return u or None
+    u = u.split("#")[0]
+    path, _, query = u.partition("?")
+    path = path.rstrip("/")
+    # Facebook's numeric profiles are all facebook.com/profile.php: the account is the ?id=, so keep it
+    # (without it, every profile.php link looked like one person). A bare profile.php names nobody.
+    if path.endswith("/profile.php"):
+        m = re.search(r"(?:^|&)id=(\d+)", query)
+        return (path + "?id=" + m.group(1)) if m else None
+    return path or None
 
 
 def duplicate_groups():
