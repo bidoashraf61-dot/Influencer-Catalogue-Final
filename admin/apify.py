@@ -73,6 +73,13 @@ PRESETS = {
                "input": '{"profiles": "{{handles}}"}'},
 }
 
+# Campaign capture (Bido, 2026-10-19): a campaign that goes live gets the same daily capture jobs as Jamjoom, one per
+# platform, so the dashboard's Update now and the daily run work from day one. Snapchat uses the actor Jamjoom settled on.
+CAMPAIGN_CAPTURE = [("post_ig", None), ("post_tt", None), ("post_fb", None), ("post_yt", None),
+                    ("post_sc", {"actor": "chronometrica/snapchat-metrics-scraper", "est": 0.002,
+                                 "input": '{"startUrls": "{{urls}}"}'})]
+CAMPAIGN_CAPTURE_AT = "18:00"          # Riyadh time; Update now moves it to the time of the last press
+
 MAX_PARALLEL = 5                       # per-creator runs in flight at once
 # TikTok analytics samples the last 100 posts (the actor charges $0.00001 per creator at any size,
 # 1-100); a creator with fewer posts is covered whole. Fix batch 6, Bido 2026-10-10.
@@ -1393,6 +1400,8 @@ def tick(t=None):
         return
     for job in list_jobs():
         if _due(job, t):
+            if job["kind"] == "post_urls" and not _post_pairs(job):
+                continue                   # a campaign platform with no posts yet: nothing to read, nothing to log
             start_job(job["id"], "schedule")
 
 
@@ -1416,3 +1425,36 @@ def snapshot_summary():
     with db.connect() as conn:
         r = conn.execute("SELECT COUNT(*) n, COUNT(DISTINCT code) c, MAX(at) last FROM profile_snapshots").fetchone()
     return r["n"], r["c"], r["last"]
+
+
+# ----------------------------------------------------------- campaign capture --
+
+def ensure_campaign_jobs(cid):
+    """Give a campaign a daily capture job for each platform it has none for (the Jamjoom set). A platform that
+    already has a job, even a paused or manual one, is left as the team set it. Returns the ids created."""
+    src = "campaign:%d" % int(cid)
+    with db.connect() as conn:
+        k = conn.execute("SELECT name FROM campaigns WHERE id = ?", (int(cid),)).fetchone()
+        if k is None:
+            return []
+        have = {r["platform"] for r in conn.execute(
+            "SELECT platform FROM api_jobs WHERE source = ? AND kind = 'post_urls'", (src,))}
+    made = []
+    for key, over in CAMPAIGN_CAPTURE:
+        p = dict(PRESETS[key], **(over or {}))
+        if p["platform"] in have:
+            continue
+        what = p["label"].split("·", 1)[-1].split("(")[0].strip()
+        made.append(save_job({"name": "%s · %s" % ((k["name"] or "Campaign").strip(), what), "actor": p["actor"],
+                              "kind": "post_urls", "platform": p["platform"], "source": src, "input": p["input"],
+                              "max_handles": "50", "est_each": str(p["est"]), "schedule": "daily",
+                              "at_time": CAMPAIGN_CAPTURE_AT, "weekday": "0"}))
+    return made
+
+
+def _on_campaign_status(cid, was, now_):
+    if now_ == "live":
+        ensure_campaign_jobs(cid)
+
+
+db.on("campaign_status", _on_campaign_status)

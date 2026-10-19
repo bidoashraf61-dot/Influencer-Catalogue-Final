@@ -3915,6 +3915,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if k is None:
             return self.send_json(status, {"ok": False, "signin": status == 401}, self.cors())
         team = self.campaign_role(k) in ("admin", "edit")
+        if start and k["status"] == "live":
+            apify.ensure_campaign_jobs(k["id"])     # a campaign set live before 2026-10-19 gets its capture jobs here
         jobs = [j for j in apify.list_jobs() if j["source"] == "campaign:%d" % k["id"] and j["kind"] == "post_urls"
                 and j["enabled"] and j["schedule"] in ("daily", "weekly")]
         ids = [j["id"] for j in jobs]
