@@ -211,6 +211,7 @@
     sheet = el("div", { class: "hca-sheet" + (safari ? " hca-sheet--ios" : ""), role: "dialog", "aria-modal": "true", "aria-labelledby": "hca-guide-t" }, [
       fromQr ? qrNote() : null,
       el("div", { class: "hca-id" }, [el("img", { src: ICON, alt: "" }), el("div", null, [el("b", null, "HELVi Connect"), el("span", null, "Save it as an icon on your Home Screen")])]),
+      safari ? howVideo("ios") : null,
       el("h2", { id: "hca-guide-t" }, "One tap from your Home Screen"),
       el("p", null, iosVer && iosVer < 16.4 ? "Opens full screen, like an app."
         : "Opens full screen, and it is the only way iPhone can send you campaign alerts."),
@@ -225,6 +226,15 @@
     if (safari) { pointer = el("div", { class: "hca-pointer", html: '<svg viewBox="0 0 26 34" aria-hidden="true"><path d="M13 2v28M4 22l9 9 9-9"/></svg>' }); document.body.appendChild(pointer); }
     var first = sheet.querySelector("button:last-child"); if (first) first.focus({ preventScroll: true });
     document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { snoozeGuide(); document.removeEventListener("keydown", esc); } });
+  }
+  // The how-to film for this phone (iPhone or Android, picked from the device): muted, looping, inline.
+  function howVideo(kind) {
+    var v = el("video", { class: "hca-vid", src: "/assets/app/setup-" + kind + ".mp4", poster: "/assets/app/setup-" + kind + ".jpg",
+      muted: "", autoplay: "", loop: "", playsinline: "", "webkit-playsinline": "", preload: "auto",
+      "aria-label": kind === "ios" ? "Video: saving HELVi to an iPhone Home Screen" : "Video: installing HELVi on Android" });
+    v.muted = true;
+    var p = v.play && v.play(); if (p && p.catch) p.catch(function () { /* autoplay blocked: the poster stays */ });
+    return v;
   }
   function qrNote() {
     if (QR_BAD) return el("div", { class: "hca-note hca-note--warn" }, QR_BAD === "devices"
@@ -247,6 +257,7 @@
     sheet = el("div", { class: "hca-sheet", role: "dialog", "aria-modal": "true", "aria-labelledby": "hca-guide-t" }, [
       fromQr ? qrNote() : null,
       el("div", { class: "hca-id" }, [el("img", { src: ICON, alt: "" }), el("div", null, [el("b", null, "HELVi Connect"), el("span", null, "Save it as an icon on your Home screen")])]),
+      howVideo("android"),
       el("h2", { id: "hca-guide-t" }, "One tap from your Home screen"),
       el("p", null, "Opens full screen and sends you campaign alerts."),
       deferred ? null : steps,
