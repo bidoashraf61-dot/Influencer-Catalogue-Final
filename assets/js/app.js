@@ -24,6 +24,10 @@
   var iosVer = (function () { var m = /OS (\d+)[_.](\d+)/.exec(ua); return m ? parseFloat(m[1] + "." + m[2]) : 0; })();
   var PUSH_OK = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && (!IOS || STANDALONE);
   var ME = null, deferred = null, reg = null;
+  var FROM_QR = /[?&]src=qr/.test(location.search), QR_BAD = (/[?&]qr=(expired|devices)/.exec(location.search) || [])[1];
+  if (FROM_QR && history.replaceState) {               // keep the address clean for "Add to Home Screen"
+    try { history.replaceState(null, "", location.pathname + "?src=app" + location.hash); } catch (e) { /* ignore */ }
+  }
 
   // ---------------------------------------------------------------- utils --
   function get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
@@ -32,8 +36,8 @@
   function sput(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* storage off */ } }
   // Another layer is open (the tour, Helvi's next-step bubble, a dialog): wait for it to close.
   function busy() {
-    var q = ":popover-open, dialog[open], .tv, .cx-offer, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card";
-    try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .tv, .cx-offer, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card"); }
+    var q = ":popover-open, dialog[open], .tv, .cx-offer, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal";
+    try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .tv, .cx-offer, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal"); }
   }
   function whenFree(fn, tries) {
     tries = tries == null ? 20 : tries;
@@ -80,6 +84,10 @@
     bell: '<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
     help: '<path d="M4.5 5.5h15v10h-8l-4 3.5v-3.5h-3z"/><path d="M10 9.2a2 2 0 1 1 2.6 1.9c-.4.2-.6.5-.6.9v.4"/><path d="M12 14h0"/>',
     admin: '<rect x="3.5" y="4" width="17" height="13" rx="2"/><path d="M8 21h8M12 17v4"/>',
+    phone: '<rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M10.5 18.5h3"/>',
+    install: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 7v6M9 10.5l3 3 3-3"/><path d="M8 21h8"/>',
+    dots: '<circle cx="12" cy="5" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="19" r="1.4"/>',
+    check: '<path d="M4.5 12.5l5 5 10-11"/>',
     share: '<path d="M12 3v12"/><path d="M8 7l4-4 4 4"/><path d="M8 11H6v10h12V11h-2"/>',
     plus: '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M12 8v8M8 12h8"/>',
     x: '<path d="M3 3l8 8M11 3l-8 8"/>'
@@ -156,10 +164,18 @@
   function closeSheet() { [sheet, scrim, pointer].forEach(function (n) { if (n) n.remove(); }); sheet = scrim = pointer = null; }
   function visits() { var n = (+get("hca-visits") || 0); if (!sget("hca-counted")) { n += 1; put("hca-visits", n); sput("hca-counted", "1"); } return n; }
   function maybeInstall() {
-    if (STANDALONE || PLATFORM === "desktop" || snoozed("hca-install-x") || sget("hca-install-shown")) return;
+    if (STANDALONE || PLATFORM === "desktop") return;
+    if (FROM_QR) { track("qr"); return openGuide(true); }
+    if (snoozed("hca-install-x") || sget("hca-install-shown")) return;
     if (visits() < 2) return;
     if (ANDROID && deferred) return showBar();
     if (IOS) return showGuide();
+  }
+  // From the QR, the menu or Account: always the full help for this phone.
+  function openGuide(fromQr) {
+    if (STANDALONE) return;
+    if (IOS) return showGuide(fromQr);
+    if (ANDROID) return showAndroidGuide(fromQr);
   }
   function showBar() {
     if (bar) return;
@@ -178,23 +194,24 @@
     ]);
     document.body.appendChild(bar);
   }
-  function showGuide() {
+  function showGuide(fromQr) {
     if (sheet) return;
     sput("hca-install-shown", "1");
     track("guide");
     var safari = IOS_SAFARI;
     scrim = el("div", { class: "hca-scrim", onclick: snoozeGuide });
     var steps = safari ? el("ol", { class: "hca-steps" }, [
-      el("li", { html: "<i>1</i><span>Tap <b>Share</b> in Safari's bar</span><span class=\"hca-ic\">" + svg("share") + "</span>" }),
-      el("li", { html: "<i>2</i><span>Choose <b>Add to Home Screen</b></span><span class=\"hca-ic\">" + svg("plus") + "</span>" }),
+      el("li", { html: "<i>1</i><span>Tap <b>Share</b> at the bottom of Safari</span><span class=\"hca-ic\">" + svg("share") + "</span>" }),
+      el("li", { html: "<i>2</i><span>Scroll and tap <b>Add to Home Screen</b></span><span class=\"hca-ic\">" + svg("plus") + "</span>" }),
       el("li", { html: "<i>3</i><span>Tap <b>Add</b>, then open HELVi from your Home Screen</span>" })
     ]) : el("ol", { class: "hca-steps" }, [
       el("li", { html: "<i>1</i><span>Open this page in <b>Safari</b></span>" }),
       el("li", { html: "<i>2</i><span>Tap <b>Share</b>, then <b>Add to Home Screen</b></span><span class=\"hca-ic\">" + svg("share") + "</span>" })
     ]);
     sheet = el("div", { class: "hca-sheet" + (safari ? " hca-sheet--ios" : ""), role: "dialog", "aria-modal": "true", "aria-labelledby": "hca-guide-t" }, [
-      el("div", { class: "hca-id" }, [el("img", { src: ICON, alt: "" }), el("div", null, [el("b", null, "HELVi Connect"), el("span", null, "Add it to your Home Screen")])]),
-      el("h2", { id: "hca-guide-t" }, "Your campaigns, one tap away"),
+      fromQr ? qrNote() : null,
+      el("div", { class: "hca-id" }, [el("img", { src: ICON, alt: "" }), el("div", null, [el("b", null, "HELVi Connect"), el("span", null, "Save it as an icon on your Home Screen")])]),
+      el("h2", { id: "hca-guide-t" }, "One tap from your Home Screen"),
       el("p", null, iosVer && iosVer < 16.4 ? "Opens full screen, like an app."
         : "Opens full screen, and it is the only way iPhone can send you campaign alerts."),
       steps,
@@ -208,6 +225,36 @@
     if (safari) { pointer = el("div", { class: "hca-pointer", html: '<svg viewBox="0 0 26 34" aria-hidden="true"><path d="M13 2v28M4 22l9 9 9-9"/></svg>' }); document.body.appendChild(pointer); }
     var first = sheet.querySelector("button:last-child"); if (first) first.focus({ preventScroll: true });
     document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { snoozeGuide(); document.removeEventListener("keydown", esc); } });
+  }
+  function qrNote() {
+    if (QR_BAD) return el("div", { class: "hca-note hca-note--warn" }, QR_BAD === "devices"
+      ? "This account is signed in on its maximum number of devices. Sign out on one, then scan again."
+      : "That code had expired. Sign in below, or scan a fresh code from your computer.");
+    return el("div", { class: "hca-note", html: svg("check") + "<span>Signed in from your computer</span>" });
+  }
+  function showAndroidGuide(fromQr) {
+    if (sheet) return;
+    track("guide");
+    scrim = el("div", { class: "hca-scrim", onclick: snoozeGuide });
+    var steps = el("ol", { class: "hca-steps" }, [
+      el("li", { html: "<i>1</i><span>Tap <b>&#8942;</b> at the top right of the browser</span><span class=\"hca-ic hca-ic--g\">" + svg("dots") + "</span>" }),
+      el("li", { html: "<i>2</i><span>Tap <b>Add to Home screen</b>, then <b>Install</b></span><span class=\"hca-ic hca-ic--g\">" + svg("plus") + "</span>" })
+    ]);
+    var go = deferred ? el("button", { class: "hca-btn hca-btn--lime", type: "button", onclick: function () {
+      var d = deferred; deferred = null; d.prompt();
+      d.userChoice.then(function (c) { track(c && c.outcome === "accepted" ? "installed" : "guide_closed"); closeSheet(); });
+    } }, "Install now") : el("button", { class: "hca-btn hca-btn--line", type: "button", onclick: function () { track("guide_closed"); closeSheet(); } }, "Got it");
+    sheet = el("div", { class: "hca-sheet", role: "dialog", "aria-modal": "true", "aria-labelledby": "hca-guide-t" }, [
+      fromQr ? qrNote() : null,
+      el("div", { class: "hca-id" }, [el("img", { src: ICON, alt: "" }), el("div", null, [el("b", null, "HELVi Connect"), el("span", null, "Save it as an icon on your Home screen")])]),
+      el("h2", { id: "hca-guide-t" }, "One tap from your Home screen"),
+      el("p", null, "Opens full screen and sends you campaign alerts."),
+      deferred ? null : steps,
+      el("div", { class: "hca-foot" }, [el("button", { class: "hca-btn hca-btn--quiet", type: "button", onclick: snoozeGuide }, "Remind me later"), go])
+    ]);
+    document.body.appendChild(scrim);
+    document.body.appendChild(sheet);
+    go.focus({ preventScroll: true });
   }
   function snoozeGuide() { put("hca-install-x", Date.now()); track("guide_closed"); closeSheet(); }
 
@@ -246,7 +293,7 @@
   }
   function maybeCard() {
     if (card || !PUSH_OK || perm() !== "default" || !hasValue() || snoozed("hca-card-x") || sget("hca-card-shown")) return;
-    if (sheet || bar) return;
+    if (sheet || bar || modal) return;
     sput("hca-card-shown", "1");
     track("asked");
     var msg = el("div", { class: "hca-msg", role: "status", hidden: "" });
@@ -284,7 +331,7 @@
       var p = perm();
       if (!PUSH_OK) {
         status.textContent = IOS && !STANDALONE ? "Add HELVi Connect to your Home Screen to get alerts on this iPhone." : "This browser cannot show alerts.";
-        btn.hidden = !(IOS && !STANDALONE); btn.textContent = "How"; btn.onclick = function () { sput("hca-install-shown", ""); put("hca-install-x", 0); showGuide(); };
+        btn.hidden = !(IOS && !STANDALONE); btn.textContent = "How"; btn.onclick = function () { openGuide(false); };
         return;
       }
       if (p === "denied") { status.textContent = "Blocked in this browser's settings."; btn.hidden = true; return; }
@@ -298,6 +345,123 @@
     host.insertBefore(row, host.firstChild);
   }
 
+  // ----------------------------------------- desktop: get it on your phone --
+  var STATE = null;
+  function state() {
+    if (STATE) return STATE;
+    STATE = fetch(API + "state", { credentials: "include" }).then(function (r) { return r.json(); }).catch(function () { return {}; });
+    return STATE;
+  }
+  // A fresh personal code: scanning it signs the phone in (one use, 15 minutes), so it is
+  // fetched when shown and refreshed while it stays on screen.
+  function qrBox(size) {
+    var box = el("div", { class: "hca-qr", style: "width:" + size + "px;height:" + size + "px", role: "img", "aria-label": "QR code to open HELVi Connect on your phone" });
+    var timer;
+    function load() {
+      if (!document.body.contains(box) && timer) { clearInterval(timer); return; }
+      post("handoff", {}).then(function (r) {
+        if (!r || !r.svg) { box.classList.add("is-off"); box.textContent = "Open this page on your phone to install."; return; }
+        box.innerHTML = r.svg + '<img class="hca-qr__head" src="' + HEAD + '" alt="">';
+      });
+    }
+    load();
+    timer = setInterval(load, 13 * 60 * 1000);
+    return box;
+  }
+  var modal;
+  function closeModal() { if (modal) { modal.remove(); modal = null; } if (scrim) { scrim.remove(); scrim = null; } }
+  function showPhoneModal(welcome) {
+    if (modal) return;
+    track(welcome ? "welcome" : "qr_open");
+    if (welcome) post("welcome", { k: deviceKey() });
+    scrim = el("div", { class: "hca-scrim", onclick: closeModal });
+    var alertBtn = PUSH_OK && perm() === "default" ? el("button", { class: "hca-btn hca-btn--ink", type: "button", onclick: function () {
+      enable().then(function (p) { alertBtn.textContent = p === "granted" ? "Alerts on for this computer" : "Not turned on"; alertBtn.disabled = true; });
+    } }, "Also alert me on this computer") : null;
+    modal = el("div", { class: "hca-modal", role: "dialog", "aria-modal": "true", "aria-labelledby": "hca-modal-t" }, [
+      el("button", { class: "hca-x hca-x--dark", type: "button", "aria-label": "Close", html: svg("x", "0 0 14 14"), onclick: closeModal }),
+      el("div", { class: "hca-modal__l" }, [
+        el("img", { class: "hca-modal__logo", src: LOGO, alt: "HELVi Connect" }),
+        el("h2", { id: "hca-modal-t", html: welcome ? "Take your campaigns<br>with you" : "HELVi on your phone" }),
+        el("p", null, "HELVi Connect is now an app. Get a tap on your phone when a campaign hits a milestone, a selection is ready or a quote comes back."),
+        el("ol", { class: "hca-modal__steps" }, [
+          el("li", { html: "<i>1</i><div><b>Scan the code with your phone's camera</b><span>It opens HELVi already signed in and shows how to save it as an icon.</span></div>" }),
+          el("li", { html: "<i>2</i><div><b>Add it to your Home Screen</b><span>iPhone: Share, then Add to Home Screen. Android: tap Install.</span></div>" }),
+          el("li", { html: "<i>3</i><div><b>Turn on alerts</b><span>A few a week, never at night.</span></div>" })
+        ]),
+        el("div", { class: "hca-modal__acts" }, [alertBtn, el("button", { class: "hca-btn hca-btn--quiet", type: "button", onclick: closeModal }, welcome ? "Maybe later" : "Close")])
+      ]),
+      el("div", { class: "hca-modal__r" }, [qrBox(184), el("b", null, "Scan to get the app"), el("span", null, "Point your phone camera here"),
+        el("div", { class: "hca-modal__plats" }, [el("em", null, "iPhone"), el("em", null, "Android")])])
+    ]);
+    document.body.appendChild(scrim);
+    document.body.appendChild(modal);
+    document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { closeModal(); document.removeEventListener("keydown", esc); } });
+  }
+  function maybeWelcome() {
+    if (PLATFORM !== "desktop" || STANDALONE || !(ME && ME.user) || ME.as_client || ME.preview) return;
+    state().then(function (st) { if (st && st.account && !st.welcome_seen && !st.phone_app) whenFree(function () { showPhoneModal(true); }); });
+  }
+
+  // Account -> Overview: the quiet card, until the person has the app on a phone.
+  function mountCard() {
+    if (PLATFORM !== "desktop" || !(ME && ME.user) || snoozed("hca-qcard-x")) return;
+    if (!/^\/account\/?$/.test(location.pathname) || ((location.hash || "#overview").slice(1).split("/")[0] || "overview") !== "overview") return;
+    var greet = document.querySelector(".hc-greet");
+    if (!greet || document.getElementById("hca-qcard")) return;
+    state().then(function (st) {
+      if (!st || !st.account || st.phone_app || document.getElementById("hca-qcard")) return;
+      var on = perm() === "granted";
+      var card = el("section", { class: "hca-qcard", id: "hca-qcard", "aria-labelledby": "hca-qcard-t" }, [
+        qrBox(112),
+        el("div", null, [el("h2", { id: "hca-qcard-t" }, "HELVi on your phone"),
+          el("p", null, "Scan with your phone's camera to save HELVi as an icon and get campaign alerts. Takes 30 seconds."),
+          el("div", { class: "hca-qcard__st" }, [
+            el("span", { html: '<s class="is-off"></s>Phone app not set up yet' }),
+            el("span", { html: '<s class="' + (on ? "" : "is-off") + '"></s>' + (on ? "Alerts on for this computer" : "Alerts off on this computer") })])]),
+        el("div", { class: "hca-qcard__acts" }, [
+          PUSH_OK && perm() === "default" ? el("button", { class: "hca-btn hca-btn--line", type: "button", onclick: function () { enable().then(function () { card.remove(); STATE = null; mountCard(); }); } }, "Alerts on this computer") : null,
+          el("button", { class: "hca-btn hca-btn--quiet", type: "button", onclick: function () { put("hca-qcard-x", Date.now()); card.remove(); } }, "Hide for now")])
+      ]);
+      var g = document.querySelector(".hc-greet");
+      if (g && g.parentNode) g.parentNode.insertBefore(card, g.nextSibling);
+    });
+  }
+
+  // The account menu (portal.js) gains the app's entries, above Sign out.
+  function mountMenu() {
+    var menu = document.getElementById("pt-menu");
+    if (!menu || menu.querySelector(".hca-mi")) return;
+    var items = [];
+    function item(icon, label, go, note) {
+      var a = el("button", { class: "pt-menu__item hca-mi", type: "button", role: "menuitem", html: '<span class="hca-mi__ic">' + svg(icon) + "</span><span>" + label + "</span>" + (note ? '<em class="hca-mi__note">' + note + "</em>" : ""),
+        onclick: function () { var b = document.getElementById("pt-avatar"); if (b && !menu.hidden) b.click(); go(); } });
+      items.push(a);
+    }
+    if (PLATFORM === "desktop") {
+      if (ME && ME.user) item("phone", "Get the app on your phone", function () { showPhoneModal(false); }, "QR");
+      if (deferred && !STANDALONE) item("install", "Install on this computer", function () {
+        var d = deferred; deferred = null; d.prompt(); d.userChoice.then(function (c) { if (c && c.outcome === "accepted") track("installed"); });
+      });
+      if (PUSH_OK && perm() === "default") item("bell", "Alerts on this computer", function () { enable(); });
+    } else if (!STANDALONE) {
+      item("plus", "Add HELVi to Home Screen", function () { openGuide(false); });
+      if (ME && ME.user) item("bell", "Phone alerts", function () { location.href = "/account/#notifications"; });
+    }
+    if (!items.length) return;
+    var rules = menu.querySelectorAll(".pt-menu__rule");
+    var before = rules.length ? rules[rules.length - 1] : null;
+    menu.insertBefore(el("div", { class: "pt-menu__rule hca-mi", role: "separator" }), before);
+    items.forEach(function (a) { menu.insertBefore(a, before); });
+  }
+
+  // The tour's finish card ends with the same QR (desktop, account holders).
+  function tourBlock() {
+    if (PLATFORM !== "desktop" || !(ME && ME.user)) return null;
+    return el("div", { class: "hca-tour" }, [qrBox(112), el("div", null, [el("b", null, "Take it with you"),
+      el("span", null, "Scan with your phone's camera to save HELVi as an icon on your Home Screen, then turn on alerts.")])]);
+  }
+
   // ---------------------------------------------------------------- boot --
   function boot(me) {
     if (ME) return;
@@ -309,8 +473,15 @@
     if (STANDALONE && !sget("hca-launch")) { sput("hca-launch", "1"); track("launch"); }
     // Already allowed: keep this phone's subscription fresh (once a day) and tied to whoever is signed in.
     if (PUSH_OK && perm() === "granted" && Date.now() - (+get("hca-sub-at") || 0) > DAY) subscribe().catch(function () {});
-    setTimeout(function () { whenFree(maybeInstall); }, 3000);
-    setTimeout(function () { whenFree(maybeCard); }, 8000);
+    if (FROM_QR) setTimeout(maybeInstall, 900); else setTimeout(function () { whenFree(maybeInstall); }, 3000);
+    setTimeout(function () { whenFree(maybeCard); }, FROM_QR ? 20000 : 8000);
+    setTimeout(maybeWelcome, 2500);
+    setTimeout(mountMenu, 300);
+    window.addEventListener("beforeinstallprompt", function () { setTimeout(function () { var m = document.getElementById("pt-menu"); if (m) [].forEach.call(m.querySelectorAll(".hca-mi"), function (x) { x.remove(); }); mountMenu(); }, 50); });
+    // The account page redraws its sections on every hash change: put the card back each time.
+    var body = document.getElementById("hc-body");
+    if (body && window.MutationObserver) new MutationObserver(function () { mountCard(); }).observe(body, { childList: true });
+    setTimeout(mountCard, 1200);
     setInterval(function () { if (!document.hidden) pollUnread(); }, 90000);
     document.addEventListener("visibilitychange", function () { if (!document.hidden) pollUnread(); });
     window.addEventListener("hashchange", function () { setTimeout(mountPhoneRow, 400); });
@@ -318,7 +489,8 @@
     // The bell elsewhere on the page marks things read: follow it.
     document.addEventListener("click", function (e) { if (e.target.closest && e.target.closest(".hv-bell, .hv-note, .pt-bell")) setTimeout(pollUnread, 1200); });
   }
-  window.HCApp = { enable: enable, perm: perm, standalone: STANDALONE, platform: PLATFORM, guide: function () { put("hca-install-x", 0); sput("hca-install-shown", ""); IOS ? showGuide() : (deferred ? showBar() : null); } };
+  window.HCApp = { enable: enable, perm: perm, standalone: STANDALONE, platform: PLATFORM, tourBlock: function () { return tourBlock(); },
+    phone: function () { showPhoneModal(false); }, guide: function () { openGuide(false); } };
   var hv = window.hvPortal;
   if (hv && hv.me) boot(hv.me);
   else document.addEventListener("hv:me", function (e) { boot(e.detail); });

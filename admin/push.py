@@ -112,7 +112,13 @@ CREATE TABLE IF NOT EXISTS push_prefs (user_id INTEGER PRIMARY KEY, phone INTEGE
 CREATE TABLE IF NOT EXISTS push_milestones (campaign_id INTEGER NOT NULL, key TEXT NOT NULL, at INTEGER,
     PRIMARY KEY (campaign_id, key));
 CREATE TABLE IF NOT EXISTS push_camp_state (campaign_id INTEGER PRIMARY KEY, posts INTEGER, posts_push_at INTEGER);
+-- "Scan to get the app" (item 169): a one-use, 15-minute sign-in for the person's phone.
+CREATE TABLE IF NOT EXISTS app_handoff (token_hash TEXT PRIMARY KEY, user_id INTEGER NOT NULL, created_at INTEGER NOT NULL,
+    expires_at INTEGER NOT NULL, used_at INTEGER, used_ip TEXT);
 """
+LATER_COLUMNS = (("app_clients", "qr_at", "INTEGER"), ("app_clients", "welcome_at", "INTEGER"),
+                 ("push_prefs", "welcome_at", "INTEGER"))
+HANDOFF_TTL = 15 * 60
 
 DEFAULT_RULES = {
     "on": True,                     # master switch for every automatic push
@@ -145,6 +151,9 @@ _lock = threading.Lock()
 def init():
     with db.connect() as conn:
         conn.executescript(SCHEMA)
+        for table, col, ddl in LATER_COLUMNS:
+            if col not in {r[1] for r in conn.execute("PRAGMA table_info(%s)" % table)}:
+                conn.execute("ALTER TABLE %s ADD COLUMN %s %s" % (table, col, ddl))
 
 
 def rules():
@@ -208,7 +217,7 @@ def _clean(v, n=60):
     return str(v or "")[:n]
 
 
-EVENT_COLS = {"guide": "guide_at", "guide_closed": "guide_closed_at", "asked": "asked_at", "prompted": "prompted_at",
+EVENT_COLS = {"qr": "qr_at", "welcome": "welcome_at", "guide": "guide_at", "guide_closed": "guide_closed_at", "asked": "asked_at", "prompted": "prompted_at",
               "granted": "granted_at", "denied": "denied_at", "installed": "installed_at"}
 
 
@@ -249,6 +258,66 @@ def track(ident, body, ua=""):
         conn.execute("UPDATE app_clients SET %s WHERE device_key = ?" % ", ".join("%s = ?" % c for c in sets),
                      list(sets.values()) + [key])
     return True
+
+
+# ---------------------------------------------------------- phone hand-off --
+
+def _hash(token):
+    import hashlib
+    return hashlib.sha256(str(token).encode()).hexdigest()
+
+
+def handoff(user_id):
+    """A one-use token that signs this person in on the phone that scans it."""
+    token = secrets.token_urlsafe(24)
+    now = db.now()
+    with db.connect() as conn:
+        conn.execute("DELETE FROM app_handoff WHERE expires_at < ?", (now - 86400,))
+        n = conn.execute("SELECT COUNT(*) FROM app_handoff WHERE user_id = ? AND created_at > ?", (user_id, now - 3600)).fetchone()[0]
+        if n >= 20:
+            return None
+        conn.execute("INSERT INTO app_handoff (token_hash, user_id, created_at, expires_at) VALUES (?,?,?,?)",
+                     (_hash(token), user_id, now, now + HANDOFF_TTL))
+    return token
+
+
+def redeem(token, ip=None):
+    """The user id for a fresh, unused token (and marks it used), else None."""
+    if not token or len(str(token)) > 64:
+        return None
+    now = db.now()
+    with db.connect() as conn:
+        r = conn.execute("SELECT * FROM app_handoff WHERE token_hash = ?", (_hash(token),)).fetchone()
+        if r is None or r["used_at"] or r["expires_at"] < now:
+            return None
+        if not conn.execute("UPDATE app_handoff SET used_at = ?, used_ip = ? WHERE token_hash = ? AND used_at IS NULL",
+                            (now, ip, r["token_hash"])).rowcount:
+            return None
+    return r["user_id"]
+
+
+def welcome_seen(user_id):
+    if not user_id:
+        return True
+    with db.connect() as conn:
+        r = conn.execute("SELECT welcome_at FROM push_prefs WHERE user_id = ?", (user_id,)).fetchone()
+    return bool(r and r["welcome_at"])
+
+
+def mark_welcome(user_id):
+    with db.connect() as conn:
+        conn.execute("INSERT INTO push_prefs (user_id, phone, welcome_at) VALUES (?, 1, ?) "
+                     "ON CONFLICT(user_id) DO UPDATE SET welcome_at = COALESCE(welcome_at, excluded.welcome_at)",
+                     (user_id, db.now()))
+
+
+def phone_app(user_id):
+    """Has this person the app on a phone with alerts on?"""
+    if not user_id:
+        return False
+    with db.connect() as conn:
+        return bool(conn.execute("SELECT 1 FROM push_devices WHERE user_id = ? AND status = 'active' AND platform IN ('ios','android')",
+                                 (user_id,)).fetchone())
 
 
 def subscribe(ident, sub, device_key="", ua="", standalone=False, old=None):
@@ -791,6 +860,8 @@ def overview(days=30):
         clicked = q("SELECT COUNT(*) FROM push_deliveries WHERE clicked_at IS NOT NULL AND sent_at >= ?", since)
         mobile = "platform IN ('ios','android')"
         funnel = [
+            ("Saw the desktop welcome", q("SELECT COUNT(*) FROM app_clients WHERE welcome_at IS NOT NULL")),
+            ("Scanned the QR", q("SELECT COUNT(*) FROM app_handoff WHERE used_at IS NOT NULL")),
             ("Visited on a phone", q("SELECT COUNT(*) FROM app_clients WHERE " + mobile)),
             ("Saw the install guide", q("SELECT COUNT(*) FROM app_clients WHERE guide_at IS NOT NULL AND " + mobile)),
             ("Installed the app", q("SELECT COUNT(*) FROM app_clients WHERE installed_at IS NOT NULL AND " + mobile)),

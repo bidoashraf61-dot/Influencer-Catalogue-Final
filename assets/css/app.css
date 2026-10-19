@@ -127,12 +127,73 @@
 .hca-phone b { display: block; font-size: 15px; }
 .hca-phone span { font-size: 13px; color: #5a5a58; }
 
+/* ------------------------------------------- setup: QR to the phone (item 169) -- */
+
+.hca-qr { position: relative; flex: none; background: #fff; border-radius: 16px; padding: 10px; box-sizing: content-box;
+  box-shadow: 0 14px 30px -18px rgba(0, 0, 0, .45); display: grid; place-items: center; }
+.hca-qr svg { width: 100%; height: 100%; display: block; }
+.hca-qr__head { position: absolute; left: 50%; top: 50%; width: 24%; height: 24%; transform: translate(-50%, -50%);
+  background: #fff; border-radius: 8px; padding: 2px; box-sizing: border-box; }
+.hca-qr.is-off { font-size: 12px; color: #5a5a58; text-align: center; padding: 14px; }
+
+.hca-modal {
+  position: fixed; z-index: 2147481101; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; box-sizing: border-box;
+  display: grid; grid-template-columns: minmax(0, 1fr) 300px; background: #fff; color: #121212; border-radius: 28px;
+  box-shadow: 0 40px 80px -30px rgba(0, 0, 0, .6); font-family: "DM Sans", Arial, sans-serif; animation: hca-pop .4s var(--hca-ease) both;
+}
+.hca-modal__l { padding: 34px 34px 28px; }
+.hca-modal__logo { height: 46px; width: auto; display: block; margin-bottom: 18px; }
+.hca-modal h2 { font: 400 46px/.92 Bebasneue, "Bebas Neue", Arial, sans-serif; margin: 0 0 10px; }
+.hca-modal p { margin: 0 0 18px; color: #5a5a58; font-size: 15px; line-height: 1.55; max-width: 40ch; }
+.hca-modal__steps { list-style: none; margin: 0 0 22px; padding: 0; display: grid; gap: 10px; }
+.hca-modal__steps li { display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: start; font-size: 14.5px; }
+.hca-modal__steps i { width: 34px; height: 34px; border-radius: 50%; background: #121212; color: #e8ff76; display: grid; place-items: center;
+  font: 400 20px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; font-style: normal; }
+.hca-modal__steps b { display: block; }
+.hca-modal__steps span { color: #5a5a58; font-size: 13px; }
+.hca-modal__acts { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.hca-modal__r { background: #e8ff76; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 28px 26px; text-align: center; }
+.hca-modal__r > b { font: 400 26px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; margin-top: 16px; letter-spacing: .02em; }
+.hca-modal__r > span { font-size: 13px; color: #3d3a36; margin-top: 6px; }
+.hca-modal__plats { display: flex; gap: 8px; margin-top: 12px; }
+.hca-modal__plats em { font-style: normal; font-size: 12px; font-weight: 700; background: rgba(18, 18, 18, .08); border-radius: 999px; padding: 4px 10px; }
+.hca-x--dark { position: absolute; top: 14px; right: 14px; z-index: 2; background: rgba(18, 18, 18, .08); color: #121212; }
+.hca-btn[disabled] { opacity: .6; cursor: default; }
+@media (max-width: 720px) { .hca-modal { grid-template-columns: 1fr; } .hca-modal__r { order: -1; } }
+
+.hca-qcard { margin: 18px 0 0; background: #e9dcd2; border-radius: 22px; padding: 22px 24px; display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto; gap: 22px; align-items: center; font-family: "DM Sans", Arial, sans-serif; }
+.hca-qcard h2 { margin: 0 0 4px; font: 400 32px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; }
+.hca-qcard p { margin: 0; color: #3d3a36; font-size: 14px; max-width: 52ch; }
+.hca-qcard__st { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+.hca-qcard__st span { font-size: 12.5px; font-weight: 600; background: rgba(255, 255, 255, .7); border-radius: 999px; padding: 5px 12px; display: inline-flex; gap: 6px; align-items: center; }
+.hca-qcard__st s { width: 8px; height: 8px; border-radius: 50%; background: #14884a; display: block; text-decoration: none; }
+.hca-qcard__st s.is-off { background: #c9bfb6; }
+.hca-qcard__acts { display: grid; gap: 8px; justify-items: end; }
+.hca-qcard .hca-btn--line { min-height: 38px; font-size: 17px; }
+
+.hca-tour { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; background: #e9dcd2; border-radius: 20px; padding: 16px; margin-top: 14px; }
+.hca-tour b { display: block; font: 400 24px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; margin-bottom: 4px; }
+.hca-tour span { font-size: 13.5px; color: #3d3a36; line-height: 1.45; }
+
+.hca-mi { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; text-align: left; border: 0; background: none; font: inherit; cursor: pointer; }
+.hca-mi__ic { display: none; }                     /* the portal's menu has no icons */
+.hca-mi__note { margin-left: auto; font-style: normal; font-size: 11.5px; font-weight: 700; color: #5a5a58; }
+
+.hca-note { display: flex; gap: 8px; align-items: center; margin: -4px 0 14px; padding: 9px 12px; border-radius: 12px; background: #e8ff76;
+  font-size: 13px; font-weight: 600; }
+.hca-note svg { width: 16px; height: 16px; flex: none; fill: none; stroke: #121212; stroke-width: 2.2; }
+.hca-note--warn { background: #fff1e2; color: #a85507; }
+.hca-steps .hca-ic--g svg { stroke: #383838; }
+
+@keyframes hca-pop { from { opacity: 0; transform: translate(-50%, -46%); } }
 @keyframes hca-fade { from { opacity: 0; } }
 @keyframes hca-up { from { opacity: 0; transform: translateY(24px); } }
 @keyframes hca-down { from { opacity: 0; transform: translateY(-24px); } }
 @keyframes hca-bob { 50% { transform: translateY(6px); } }
 @media (prefers-reduced-motion: reduce) {
-  .hca-sheet, .hca-bar, .hca-card, .hca-scrim { animation: none; }
+  .hca-sheet, .hca-bar, .hca-card, .hca-scrim, .hca-modal { animation: none; }
   .hca-pointer svg { animation: none; }
 }
 

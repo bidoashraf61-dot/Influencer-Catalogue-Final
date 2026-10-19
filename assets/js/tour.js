@@ -1309,6 +1309,9 @@
       words.appendChild(prize);
       words.appendChild(h("p", { class: "tv-coach__fine", html: ic("help") + "<span></span>" }));
       words.lastChild.querySelector("span").textContent = TT("Replay any time from") + " " + TT("Help") + " " + TT("or your") + " " + TT("Profile") + ".";
+      // HELVi Connect app (item 169): leave the tour with the app on your phone.
+      var app = window.HCApp && window.HCApp.tourBlock && window.HCApp.tourBlock();
+      if (app) words.appendChild(app);
       api("POST", "/api/tour", { action: "done" }).then(function (r) {
         if (!r.b || !r.b.ok) return;
         if (r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);

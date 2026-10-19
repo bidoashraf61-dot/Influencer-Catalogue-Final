@@ -228,6 +228,38 @@ class Push(unittest.TestCase):
         self.assertEqual(k.get("/app-alerts")[0], 403)
         self.assertEqual(k.req("POST", "/app-alerts/send", form={"title": "x"})[0], 403)
 
+    def test_09_qr_handoff_signs_the_phone_in(self):
+        anon = base.Client(self.base)
+        self.assertIn(anon.post("/api/push/handoff", {})[0], (401, 403))
+        s, b, _ = self.c.post("/api/push/handoff", {})
+        self.assertEqual(s, 200, b)
+        self.assertTrue(b["svg"].startswith("<svg") and "/api/push/qr?h=" in b["url"])
+        path = b["url"].split("127.0.0.1:%d" % self.httpd.server_address[1])[-1] if "127.0.0.1" in b["url"] else "/api/push/qr?h=" + b["url"].split("h=")[1]
+        phone = base.Client(self.base)
+        s, _, r = phone.get(path)
+        self.assertEqual(s, 302)
+        self.assertEqual(r.headers["Location"], "/account/?src=qr#overview")
+        self.assertIn("hv_view=", r.headers.get_all("Set-Cookie")[0])
+        s, me, _ = phone.get("/api/me")
+        self.assertEqual(me["user"]["email"], "sara@jamjoom.com")
+        s, _, r = base.Client(self.base).get(path)                      # one use only
+        self.assertIn("qr=expired", r.headers["Location"])
+        with db.connect() as conn:                                       # and 15 minutes
+            conn.execute("UPDATE app_handoff SET expires_at = 1")
+        s, b2, _ = self.c.post("/api/push/handoff", {})
+        with db.connect() as conn:
+            conn.execute("UPDATE app_handoff SET expires_at = 1 WHERE used_at IS NULL")
+        s, _, r = base.Client(self.base).get("/api/push/qr?h=" + b2["url"].split("h=")[1])
+        self.assertIn("qr=expired", r.headers["Location"])
+
+    def test_10_welcome_once_and_funnel(self):
+        s, st, _ = self.c.get("/api/push/state")
+        self.assertFalse(st["welcome_seen"])
+        self.c.post("/api/push/welcome", {"k": "desk-key-0001"})
+        self.assertTrue(self.c.get("/api/push/state")[1]["welcome_seen"])
+        labels = [l for l, _n in push.overview()["funnel"]]
+        self.assertEqual(labels[:2], ["Saw the desktop welcome", "Scanned the QR"])
+
 
 if __name__ == "__main__":
     unittest.main()
