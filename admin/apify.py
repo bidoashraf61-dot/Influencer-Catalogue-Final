@@ -932,6 +932,40 @@ def _thumb_hint(item):
     return None
 
 
+def _posted_at(item):
+    """When the post went up, from whichever field the actor uses (epoch seconds or milliseconds, or an ISO date)."""
+    import datetime as _dt
+    for k in ("taken_at_ts", "taken_at", "createTime", "create_time", "createdAt", "datePosted", "publishedAt",
+              "published_at", "timestamp", "upload_date", "uploadDate", "date"):
+        v = item.get(k)
+        if v in (None, "", 0):
+            continue
+        try:
+            n = float(v)
+            return int(n / 1000 if n > 1e12 else n)
+        except (TypeError, ValueError):
+            pass
+        s = str(v).strip().replace("Z", "+00:00")
+        for fmt in (None, "%Y-%m-%d", "%Y%m%d"):
+            try:
+                d = _dt.datetime.fromisoformat(s) if fmt is None else _dt.datetime.strptime(s[:10 if fmt == "%Y-%m-%d" else 8], fmt)
+                if d.tzinfo is None:
+                    d = d.replace(tzinfo=_dt.timezone.utc)
+                return int(d.timestamp())
+            except ValueError:
+                continue
+    return None
+
+
+def _caption(item):
+    c = item.get("caption")
+    if isinstance(c, dict):
+        c = c.get("text")
+    if not c:
+        c = item.get("description") or item.get("title") or item.get("text")
+    return c.strip()[:4000] if isinstance(c, str) and c.strip() else None
+
+
 def ingest_posts(run, job, items, hmap, store_raw=True):
     """Campaign-post runs: each result goes to the post whose link id it carries (the only post when a
     run has one), and its numbers become that post's snapshot for today."""
@@ -954,6 +988,17 @@ def ingest_posts(run, job, items, hmap, store_raw=True):
             hint = _thumb_hint(it) if cid else None
             if hint:
                 conn.execute("UPDATE content SET thumb = ? WHERE id = ? AND (thumb IS NULL OR thumb = '')", (hint, int(cid)))
+            if cid:
+                # The date and caption the platform shows, for a post added by hand without them (the chart is drawn by date,
+                # and the disclosure check reads the caption). Never overwrites what the team typed in.
+                row = conn.execute("SELECT c.posted_at, c.caption, k.* FROM content c JOIN campaigns k ON k.id = c.campaign_id "
+                                   "WHERE c.id = ?", (int(cid),)).fetchone()
+                when, cap = _posted_at(it), _caption(it)
+                if row is not None and row["posted_at"] is None and when:
+                    conn.execute("UPDATE content SET posted_at = ? WHERE id = ?", (when, int(cid)))
+                if row is not None and not row["caption"] and cap:
+                    _sec, disc = db.match_rules(db.rules_of(row), cap)
+                    conn.execute("UPDATE content SET caption = ?, disclosure_ok = ? WHERE id = ?", (cap, disc, int(cid)))
             if vals:
                 db.add_snapshot(int(cid), vals, "apify", conn)
                 saved += 1
