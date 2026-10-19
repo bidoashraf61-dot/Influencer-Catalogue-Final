@@ -55,7 +55,7 @@ def ask(key, model, batch):
         "required": ["code", "tones"]}}
     body = {"systemInstruction": {"parts": [{"text": SYSTEM}]},
             "contents": [{"role": "user", "parts": [{"text": json.dumps(batch, ensure_ascii=False)}]}],
-            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 2048, "responseMimeType": "application/json",
+            "generationConfig": {"temperature": 0.1, "maxOutputTokens": 8192, "responseMimeType": "application/json",
                                  "responseSchema": schema}}
     req = urllib.request.Request(ENDPOINT.format(model=model), data=json.dumps(body).encode(), method="POST",
                                  headers={"Content-Type": "application/json", "x-goog-api-key": key})
@@ -93,12 +93,20 @@ def main():
     tin = tout = n = 0
     batch = []
     with open(a.out, "a") as out:
-        def flush():
+        def flush(part=None):
             nonlocal tin, tout, n
-            got, i, o = ask(key, a.model, batch)
+            part = batch if part is None else part
+            try:
+                got, i, o = ask(key, a.model, part)
+            except ValueError:
+                # A cut or malformed answer: try the two halves, then give up on a single creator.
+                if len(part) > 1:
+                    flush(part[:len(part) // 2])
+                    flush(part[len(part) // 2:])
+                return
             tin += i
             tout += o
-            want = {b["code"] for b in batch}
+            want = {b["code"] for b in part}
             for r in got:
                 if r.get("code") in want:
                     out.write(json.dumps({"code": r["code"], "tones": [t for t in r.get("tones") or [] if t in TAGS][:2],
