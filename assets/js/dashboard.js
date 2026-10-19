@@ -1033,7 +1033,7 @@
         var g = {}; list.forEach(function (p) { (g[p.kind] = g[p.kind] || []).push(p); });
         return Object.keys(g).map(function (k) { return "<h3>" + esc(KIND[k] || k) + " · " + g[k].length + '</h3><div class="db-wall">' + g[k].map(post).join("") + "</div>"; }).join("") + pendingWall();
       }
-      return '<div class="db-wall">' + list.map(post).join("") + "</div>";
+      return creatorWalls(list);
     },
     geo: function () {
       var C = R.comments, t = cmPick();
@@ -1169,6 +1169,48 @@
     return out;
   }
   // Booked posts not live yet, each a card with where it stands.
+  // All posts, grouped by creator (owner, 2026-10-19): a creator index on top, then each creator in leaderboard
+  // order with their photo, profiles, totals, their posts and the videos they still owe.
+  function pendingCard(c, n) {
+    var pic = c.photo_large || c.photo;
+    return '<div class="db-post db-post--pending"><div class="db-post__img">' + (pic ? '<img src="' + esc(pic) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
+      + '<span class="db-kind db-kind--pending">Pending</span></div><div class="db-post__body"><b>' + esc(c.name) + "</b><span>"
+      + esc(c.pending_status || "Coming soon") + " · " + esc(c.pending_date ? day(c.pending_date) : "date to be confirmed")
+      + " · video " + n + " of " + c.planned + "</span></div></div>";
+  }
+  function creatorWalls(list) {
+    var by = {}; list.forEach(function (p) { (by[p.code] = by[p.code] || []).push(p); });
+    var known = {}, order = (R.creators || []).slice().sort(function (a, b) {
+      return (a.rank == null) - (b.rank == null) || (a.rank || 0) - (b.rank || 0) || (b.views || 0) - (a.views || 0); });
+    order.forEach(function (c) { known[c.code] = 1; });
+    Object.keys(by).forEach(function (k) { if (!known[k]) order.push({ code: k, name: by[k][0].creator, photo: by[k][0].photo, profiles: [] }); });
+    var shown = order.filter(function (c) { return by[c.code] || (!filtered() && (c.planned || 0) > (c.delivered || 0)); });
+    if (!shown.length) return '<p class="db-note">Nothing in this view yet.</p>';
+    var nav = shown.length > 1 ? '<nav class="db-cw__nav" aria-label="Jump to a creator">' + shown.map(function (c) {
+      return '<button type="button" data-cw="' + esc(c.code) + '">' + ava(c.photo) + "<span>" + esc(c.name) + "</span><b>" + pieceCount(by[c.code] || []) + "</b></button>"; }).join("") + "</nav>" : "";
+    return nav + shown.map(function (c) {
+      var mine = topPosts(by[c.code] || []), vids = pieceCount(mine);
+      var v = 0, e = 0, ve = 0; mine.forEach(function (p) { v += seen(p); e += p.engagement || 0; if (p.video && !p.views_hidden) ve += p.views || 0; });
+      var er = ve ? mine.filter(function (p) { return p.video && !p.views_hidden; }).reduce(function (a, p) { return a + (p.engagement || 0); }, 0) / ve * 100 : null;
+      var rank = !filtered() && c.rank ? (c.rank <= 3 ? '<span class="db-cw__medal">' + medal(c.rank) + "</span>" : '<span class="db-cw__rk">#' + c.rank + "</span>") : "";
+      var profs = (c.profiles || []).filter(function (x) { return x.url; }).map(function (x) {
+        return '<a class="db-chip" href="' + esc(x.url) + '" target="_blank" rel="noopener" style="--pc:' + (PCOL[x.platform] || "#121212") + '">' + (ICONS[x.platform] || "") + esc(x.platform) + (x.followers ? " · " + num(x.followers) : "") + "</a>"; }).join("");
+      var owed = []; if (!filtered()) for (var i = (c.delivered || 0); i < (c.planned || 0); i++) owed.push(pendingCard(c, i + 1));
+      return '<section class="db-cw" id="cw-' + esc(c.code) + '"><header class="db-cw__h">'
+        + '<span class="db-cw__pic">' + ((c.photo_large || c.photo) ? '<img src="' + esc(c.photo_large || c.photo) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : '<span class="db-ava"></span>') + rank + "</span>"
+        + '<div class="db-cw__id"><h4>' + (known[c.code] ? who(c) : esc(c.name)) + "</h4>" + (profs ? '<div class="db-cw__prof">' + profs + "</div>" : "") + "</div>"
+        + '<dl class="db-cw__st"><div><dt>Videos</dt><dd>' + vids + (c.planned && !filtered() ? "<small>/" + c.planned + "</small>" : "") + "</dd></div>"
+        + "<div><dt>Views</dt><dd>" + num(v) + "</dd></div><div><dt>Engagement</dt><dd>" + num(e) + "</dd></div>"
+        + "<div><dt>Eng. rate</dt><dd>" + pct(er) + "</dd></div></dl></header>"
+        + (mine.length || owed.length ? '<div class="db-wall">' + mine.map(post).join("") + owed.join("") + "</div>" : "")
+        + "</section>";
+    }).join("");
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-cw]"); if (!b) return;
+    var t = document.getElementById("cw-" + b.getAttribute("data-cw"));
+    if (t) t.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+  });
   function pendingWall() {
     var out = [];
     (R.creators || []).forEach(function (c) {
