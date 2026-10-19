@@ -622,7 +622,7 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v12 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v13 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
@@ -1195,13 +1195,11 @@
                   + '<span class="cmp-tl__n">' + full(t.themes[q]) + "<small>comments</small></span><span class=\"cmp-tl__chev\" aria-hidden=\"true\"></span></summary><div class=\"cmp-tl__body\">"
                   + ((TA[q] || []).length ? '<p class="cmp-tl__l">What they ask</p><div class="cmp-chips">' + asksOf(q, 4) + "</div>" : "")
                   + '<p class="cmp-tl__l">What they say</p><div class="cmp-tl__s" data-theme="' + esc(q) + '"><p class="cmb__load">Loading the comments…</p></div></div></details>'; }).join("") + "</div>" : "")
-            + (plats.length > 1 ? "<h3>Which platform each topic came from</h3>" + (function () { var list = th.slice(0, 7), mx = Math.max.apply(null, list.map(function (q) { return t.themes[q]; }));
-                return '<div class="cmp-sb">' + list.map(function (q) { var tot = t.themes[q];
-                    return '<div class="cmp-sb__r"><span class="cmp-sb__t">' + cmIcon(q) + "<span>" + esc(q) + ar(q) + '</span></span><span class="cmp-sb__w"><span class="cmp-sb__bar" style="--w:' + (tot / mx * 100).toFixed(1) + '%">'
-                      + plats.map(function (k) { var n = (t.tp[q] || {})[k] || 0; if (!n) return "";
-                          return '<i style="flex:' + n + " 1 0;--pc:" + (PCOL[k] || "#121212") + '" title="' + esc(k) + ": " + n + ' comments">' + (n / tot >= 0.12 && n >= 3 ? n : "") + "</i>"; }).join("")
-                      + '</span><b class="cmp-sb__n">' + tot + "</b></span></div>"; }).join("")
-                  + '<p class="cmp-sb__k">' + plats.map(function (k) { return '<span style="--pc:' + (PCOL[k] || "#121212") + '">' + (ICONS[k] || "") + esc(k) + "</span>"; }).join("") + "</p></div>"; })() : "") : "")
+            + (plats.length > 1 ? "<h3>Which topics come from which platform</h3>" + (function () { var list = th.slice(0, 7), mx = 1;
+                list.forEach(function (q) { plats.forEach(function (k) { mx = Math.max(mx, (t.tp[q] || {})[k] || 0); }); });
+                return '<div class="cmp-heat" style="--cols:' + plats.length + '"><span></span>' + plats.map(function (k) { return '<span class="cmp-heat__h">' + (ICONS[k] || "") + "<small>" + esc(k) + "</small></span>"; }).join("")
+                  + list.map(function (q) { return '<span class="cmp-heat__r">' + cmIcon(q) + "<span>" + esc(q) + ar(q) + "</span></span>" + plats.map(function (k) { var n = (t.tp[q] || {})[k] || 0, f = n / mx;
+                      return '<span class="cmp-heat__c' + (f > .55 ? " is-hot" : "") + '" style="--a:' + (n ? (0.1 + 0.9 * f).toFixed(2) : 0) + '" title="' + esc(q) + " · " + esc(k) + ": " + n + ' comments">' + (n || "") + "</span>"; }).join(""); }).join("") + "</div>"; })() : "") : "")
         + (asks.length ? "<h3>What buyers asked</h3>" + (function () { var all = cmTop(t.asks, "n"), top = all.slice(0, 8), more = all.slice(8, 22), mx = t.asks[all[0]].n;
             return '<ol class="cmp-rank">' + top.map(function (q, i) { var n = t.asks[q].n;
                 return '<li style="--w:' + (n / mx * 100).toFixed(1) + '%"' + (i ? "" : ' class="is-1"') + '><span class="cmp-rank__i">' + (i + 1) + '</span><span class="cmp-rank__q"><q dir="auto">' + esc(q) + "</q><small>" + esc(t.asks[q].en || "") + '</small></span><b>' + n + "</b></li>"; }).join("") + "</ol>"

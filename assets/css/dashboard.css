@@ -785,7 +785,7 @@
 @media (prefers-reduced-motion: reduce) { .db-pl__bar i { animation: none; } }
 .db-pl__strip i[data-p="Snapchat"] span { color: #121212; text-shadow: none; }
 
-/* What people said (2026-10-19, v12 same day): viewers' comments read by AI, in the old audience slot. */
+/* What people said (2026-10-19, v13 same day): viewers' comments read by AI, in the old audience slot. */
 .cm.db-card__body { gap: 8px; }
 .cm-top { display: flex; align-items: center; gap: 12px; }
 .cm-ring { position: relative; width: 74px; height: 74px; flex: none; }
