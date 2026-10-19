@@ -257,6 +257,11 @@ class Push(unittest.TestCase):
         self.assertFalse(st["welcome_seen"])
         self.c.post("/api/push/welcome", {"k": "desk-key-0001"})
         self.assertTrue(self.c.get("/api/push/state")[1]["welcome_seen"])
+        fresh, _ = self.signup("nina@freshco.com")
+        self.assertFalse(fresh.get("/api/push/state?k=fresh-phone-01")[1]["installed"])
+        fresh.post("/api/push/event", {"k": "fresh-phone-01", "e": "launch", "p": "android", "sa": True})
+        self.assertTrue(fresh.get("/api/push/state?k=fresh-phone-01")[1]["installed"])      # this phone
+        self.assertTrue(fresh.get("/api/push/state")[1]["installed"])                       # and the person
         labels = [l for l, _n in push.overview()["funnel"]]
         self.assertEqual(labels[:2], ["Saw the desktop welcome", "Scanned the QR"])
 

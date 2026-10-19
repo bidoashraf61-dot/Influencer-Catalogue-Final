@@ -320,6 +320,18 @@ def phone_app(user_id):
                                  (user_id,)).fetchone())
 
 
+def installed(user_id=None, device_key=None):
+    """Has this person (or this very phone) the app on a phone's Home Screen?"""
+    with db.connect() as conn:
+        if device_key and conn.execute("SELECT 1 FROM app_clients WHERE device_key = ? AND installed_at IS NOT NULL",
+                                       (str(device_key)[:40],)).fetchone():
+            return True
+        if user_id and conn.execute("SELECT 1 FROM app_clients WHERE user_id = ? AND installed_at IS NOT NULL AND platform IN ('ios','android')",
+                                    (user_id,)).fetchone():
+            return True
+    return phone_app(user_id)
+
+
 def subscribe(ident, sub, device_key="", ua="", standalone=False, old=None):
     try:
         endpoint = str(sub["endpoint"])

@@ -163,13 +163,16 @@
   function closeBar() { if (bar) { bar.remove(); bar = null; } }
   function closeSheet() { [sheet, scrim, pointer].forEach(function (n) { if (n) n.remove(); }); sheet = scrim = pointer = null; }
   function visits() { var n = (+get("hca-visits") || 0); if (!sget("hca-counted")) { n += 1; put("hca-visits", n); sput("hca-counted", "1"); } return n; }
+  // Every visit until the app is on this person's phone (Bido, 2026-10-19): once per browser
+  // session, so it does not come back on every page of the same visit.
   function maybeInstall() {
     if (STANDALONE || PLATFORM === "desktop") return;
-    if (FROM_QR) { track("qr"); return openGuide(true); }
-    if (snoozed("hca-install-x") || sget("hca-install-shown")) return;
-    if (visits() < 2) return;
-    if (ANDROID && deferred) return showBar();
-    if (IOS) return showGuide();
+    if (FROM_QR) { track("qr"); sput("hca-install-shown", "1"); return openGuide(true); }
+    if (sget("hca-install-shown")) return;
+    state().then(function (st) {
+      if (st && st.installed) return;
+      whenFree(function () { if (!sget("hca-install-shown") && !sheet) { sput("hca-install-shown", "1"); openGuide(false); } });
+    });
   }
   // From the QR, the menu or Account: always the full help for this phone.
   function openGuide(fromQr) {
@@ -217,7 +220,7 @@
         : "Opens full screen, and it is the only way iPhone can send you campaign alerts."),
       steps,
       el("div", { class: "hca-foot" }, [
-        el("button", { class: "hca-btn hca-btn--quiet", type: "button", onclick: snoozeGuide }, "Remind me later"),
+        el("button", { class: "hca-btn hca-btn--quiet", type: "button", onclick: snoozeGuide }, "Not now"),
         el("button", { class: "hca-btn hca-btn--line", type: "button", onclick: function () { track("guide_closed"); closeSheet(); } }, "Got it")
       ])
     ]);
@@ -261,7 +264,7 @@
       el("h2", { id: "hca-guide-t" }, "One tap from your Home screen"),
       el("p", null, "Opens full screen and sends you campaign alerts."),
       deferred ? null : steps,
-      el("div", { class: "hca-foot" }, [el("button", { class: "hca-btn hca-btn--quiet", type: "button", onclick: snoozeGuide }, "Remind me later"), go])
+      el("div", { class: "hca-foot" }, [el("button", { class: "hca-btn hca-btn--quiet", type: "button", onclick: snoozeGuide }, "Not now"), go])
     ]);
     document.body.appendChild(scrim);
     document.body.appendChild(sheet);
@@ -360,7 +363,7 @@
   var STATE = null;
   function state() {
     if (STATE) return STATE;
-    STATE = fetch(API + "state", { credentials: "include" }).then(function (r) { return r.json(); }).catch(function () { return {}; });
+    STATE = fetch(API + "state?k=" + encodeURIComponent(deviceKey()), { credentials: "include" }).then(function (r) { return r.json(); }).catch(function () { return {}; });
     return STATE;
   }
   // A fresh personal code: scanning it signs the phone in (one use, 15 minutes), so it is
@@ -409,9 +412,13 @@
     document.body.appendChild(modal);
     document.addEventListener("keydown", function esc(e) { if (e.key === "Escape") { closeModal(); document.removeEventListener("keydown", esc); } });
   }
+  // Desktop: every visit (once per browser session) until a phone has the app.
   function maybeWelcome() {
-    if (PLATFORM !== "desktop" || STANDALONE || !(ME && ME.user) || ME.as_client || ME.preview) return;
-    state().then(function (st) { if (st && st.account && !st.welcome_seen && !st.phone_app) whenFree(function () { showPhoneModal(true); }); });
+    if (PLATFORM !== "desktop" || STANDALONE || !(ME && ME.user) || ME.as_client || ME.preview || sget("hca-welcome-shown")) return;
+    state().then(function (st) {
+      if (!st || !st.account || st.phone_app || st.installed) return;
+      whenFree(function () { if (!sget("hca-welcome-shown")) { sput("hca-welcome-shown", "1"); showPhoneModal(true); } });
+    });
   }
 
   // Account -> Overview: the quiet card, until the person has the app on a phone.
