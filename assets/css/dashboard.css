@@ -897,3 +897,5 @@
 }
 /* end What people said */
 .db-obj__auto { display: inline-flex; align-items: center; margin-left: 8px; padding: 3px 9px; border-radius: 999px; background: #f2f0eb; font: 600 11px/1.2 var(--body); color: var(--gray); white-space: nowrap; cursor: help; }
+.db-rank__score { white-space: nowrap; }
+.db-rank .db-rank__score .db-pct { display: inline; font-size: .62em; margin-left: 1px; vertical-align: .32em; color: inherit; }
