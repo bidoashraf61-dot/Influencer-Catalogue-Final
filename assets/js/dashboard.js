@@ -622,7 +622,7 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v11 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v12 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
@@ -752,6 +752,81 @@
   function cmTone(k, r) {
     if (k === "buy") return r >= 0.4 ? "is-good" : r >= 0.15 ? "is-mid" : "is-bad";
     return r >= 0.6 ? "is-good" : r >= 0.3 ? "is-mid" : "is-bad";
+  }
+  /* The comment browser (owner, 2026-10-19): every comment, grouped by doctor then video, with filters. Loaded on demand. */
+  var CMB = { items: null, busy: false, waits: [], f: { mood: "", theme: "", plat: "", buy: false, q: "" }, open: {} };
+  var CM_MOOD = { p: "pos", n: "neu", x: "neg" };
+  var CM_HEART = ico('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>');
+  function cmLoad(cb) {
+    if (CMB.items) return cb();
+    CMB.waits.push(cb); if (CMB.busy) return; CMB.busy = true;
+    get("/api/campaign/comments?t=" + encodeURIComponent(TOKEN) + (shareTok() ? "&share=" + encodeURIComponent(shareTok()) : ""))
+      .then(function (b) { CMB.items = b.items || []; }).catch(function () { CMB.items = []; })
+      .then(function () { CMB.busy = false; var w = CMB.waits; CMB.waits = []; w.forEach(function (f) { f(); }); });
+  }
+  function cmInPage(it) { return (!F.platform || it[2] === F.platform) && (!F.creators.length || F.creators.indexOf(it[1]) >= 0); }
+  function cmRow(it) {
+    var m = CM_MOOD[it[3]] || "neu";
+    return '<div class="cmb-c"><i class="cm-face" style="--c:' + CM_COL[m] + '">' + CM_FACE[m] + '</i><div class="cmb-c__b"><q dir="auto">' + esc(it[7]) + "</q>"
+      + (it[8] ? "<p>" + esc(it[8]) + "</p>" : "") + '<p class="cmb-c__m">' + (it[5] ? '<span class="cmb-tag">' + cmIcon(it[5]) + esc(it[5]) + "</span>" : "")
+      + (it[4] ? '<span class="cmb-buy">Asks to buy' + (it[6] ? ' · <q dir="auto">' + esc(it[6]) + "</q>" : "") + "</span>" : "")
+      + (it[9] ? '<span class="cmb-likes">' + CM_HEART + it[9] + "</span>" : "") + "</p></div></div>";
+  }
+  function cmSamples() {
+    [].forEach.call(document.querySelectorAll(".cmp-tl__s[data-theme]"), function (el) {
+      var th = el.getAttribute("data-theme"), got = (CMB.items || []).filter(function (it) { return it[5] === th && cmInPage(it); }).slice(0, 3);
+      el.innerHTML = got.length ? got.map(cmRow).join("") : '<p class="cmb__load">No comments to show.</p>';
+    });
+  }
+  function cmFilters() {
+    var th = {}, pl = {};
+    (CMB.items || []).forEach(function (it) { if (it[5]) th[it[5]] = (th[it[5]] || 0) + 1; pl[it[2]] = 1; });
+    var f = CMB.f, moods = [["", "All"], ["p", "Positive"], ["n", "Neutral"], ["x", "Negative"]];
+    return '<div class="cmb-f"><div class="cmb-f__mood" role="group" aria-label="Mood">' + moods.map(function (m) {
+        return '<button type="button" data-mood="' + m[0] + '" aria-pressed="' + (f.mood === m[0]) + '">' + (m[0] ? '<i class="cm-face" style="--c:' + CM_COL[CM_MOOD[m[0]]] + '">' + CM_FACE[CM_MOOD[m[0]]] + "</i>" : "") + m[1] + "</button>"; }).join("") + "</div>"
+      + '<select data-f="theme" aria-label="Topic"><option value="">All topics</option>' + Object.keys(th).sort(function (a, b) { return th[b] - th[a]; }).map(function (q) { return '<option value="' + esc(q) + '"' + (f.theme === q ? " selected" : "") + ">" + esc(q) + "</option>"; }).join("") + "</select>"
+      + '<select data-f="plat" aria-label="Platform"><option value="">All platforms</option>' + Object.keys(pl).map(function (k) { return '<option' + (f.plat === k ? " selected" : "") + ">" + esc(k) + "</option>"; }).join("") + "</select>"
+      + '<label class="cmb-f__buy"><input type="checkbox" data-f="buy"' + (f.buy ? " checked" : "") + "> Buying questions only</label>"
+      + '<input type="search" data-f="q" placeholder="Search the comments" value="' + esc(f.q) + '" aria-label="Search the comments"></div>';
+  }
+  function cmList() {
+    var f = CMB.f, q = f.q.trim().toLowerCase(), all = (CMB.items || []).filter(cmInPage);
+    var list = all.filter(function (it) { return (!f.mood || it[3] === f.mood) && (!f.theme || it[5] === f.theme) && (!f.plat || it[2] === f.plat) && (!f.buy || it[4])
+      && (!q || (it[7] + " " + it[8] + " " + it[6]).toLowerCase().indexOf(q) >= 0); });
+    var posts = {}; (R.posts || []).forEach(function (p) { posts[p.id] = p; });
+    var names = {}, pics = {}; (R.creators || []).forEach(function (c) { names[c.code] = c.name; pics[c.code] = c.photo; });
+    var by = {}, order = [];
+    list.forEach(function (it) { if (!by[it[1]]) { by[it[1]] = {}; order.push(it[1]); } (by[it[1]][it[0]] = by[it[1]][it[0]] || []).push(it); });
+    var head = '<p class="cmb-count">Showing <b>' + full(list.length) + "</b> of " + full(all.length) + " comments</p>";
+    if (!list.length) return head + '<p class="cmb__load">No comment matches these filters.</p>';
+    return head + order.map(function (code) {
+      var vids = Object.keys(by[code]).sort(function (a, b) { return by[code][b].length - by[code][a].length; }), n = 0;
+      vids.forEach(function (v) { n += by[code][v].length; });
+      return '<section class="cmb-d"><header class="cmb-d__h">' + ava(pics[code]) + "<b>" + esc(names[code] || code) + "</b><span>" + full(n) + " comment" + (n === 1 ? "" : "s") + "</span></header>"
+        + vids.map(function (vid) { var cs = by[code][vid], p = posts[vid] || {}, open = CMB.open[vid], show = open ? cs : cs.slice(0, 10);
+          return '<div class="cmb-v"><div class="cmb-v__h"><a class="cmb-v__th" href="' + esc(p.url || "#") + '" target="_blank" rel="noopener">' + (p.thumb ? fit(p.thumb) : "") + "</a>"
+            + '<span class="cmb-v__t">' + (ICONS[p.platform || cs[0][2]] || "") + "<b>" + esc((KIND[p.kind] || p.kind || "Video") + " · " + (p.platform || cs[0][2])) + "</b><small>" + (p.posted_at ? day(p.posted_at) : "") + " · " + full(cs.length) + " comments</small></span>"
+            + (p.url ? '<a class="cmb-v__go" href="' + esc(p.url) + '" target="_blank" rel="noopener">Open video ›</a>' : "") + "</div>"
+            + '<div class="cmb-v__l">' + show.map(cmRow).join("") + "</div>"
+            + (cs.length > 10 ? '<button type="button" class="cmb-more" data-more="' + vid + '">' + (open ? "Show fewer" : "Show " + (cs.length - 10) + " more") + "</button>" : "") + "</div>"; }).join("")
+        + "</section>";
+    }).join("");
+  }
+  function cmBind() {
+    var box = $("cmb"); if (!box) return;
+    cmLoad(function () {
+      if (!$("cmb")) return;
+      cmSamples();
+      box.innerHTML = cmFilters() + '<div class="cmb-l">' + cmList() + "</div>";
+      var redraw = function () { box.querySelector(".cmb-l").innerHTML = cmList(); }, timer;
+      box.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-mood]"), m = e.target.closest("[data-more]");
+        if (b) { CMB.f.mood = b.getAttribute("data-mood"); [].forEach.call(box.querySelectorAll("[data-mood]"), function (x) { x.setAttribute("aria-pressed", x === b); }); redraw(); }
+        if (m) { var v = m.getAttribute("data-more"); CMB.open[v] = !CMB.open[v]; redraw(); }
+      });
+      box.addEventListener("change", function (e) { var k = e.target.getAttribute("data-f"); if (!k || k === "q") return; CMB.f[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value; redraw(); });
+      box.addEventListener("input", function (e) { if (e.target.getAttribute("data-f") !== "q") return; CMB.f.q = e.target.value; clearTimeout(timer); timer = setTimeout(redraw, 200); });
+    });
   }
 
   var PCOL = { Instagram: "#d62976", TikTok: "#121212", Snapchat: "#f7d100", YouTube: "#ff0000", Facebook: "#0866ff", X: "#121212" };
@@ -1106,7 +1181,7 @@
         + (C.next_read || C.last_read ? '<p class="cmp-say__d">' + (C.last_read ? "Read " + cmDay(C.last_read) : "") + (C.next_read ? (C.last_read ? " · " : "") + "next read " + cmDay(C.next_read) : "") + "</p>" : "")
         + "</div></aside></section>"
         + "<h3>The mood</h3>" + '<div class="cmp-mood">' + cmRing(t, "cm-ring--hero") + '<div class="cmp-mood__k">'
-        + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cmp-mood__r" style="--c:' + CM_COL[s[0]] + '">' + '<i class="cm-face">' + CM_FACE[s[0]] + '</i><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + " comments</small></div>"; }).join("")
+        + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cmp-mood__r" style="--c:' + CM_COL[s[0]] + '">' + '<i class="cm-face">' + CM_FACE[s[0]] + '</i><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small><em>" + full(n) + "</em> comments</small></div>"; }).join("")
         + "</div></div>"
         + (plats.length ? "<h3>Where the comments came from</h3>" + '<div class="cmp-src">' + cmShare(plats, t) + '<div class="cmp-plats">' + plats.map(function (k) { var x = t.plats[k]; x.small = x.n < 30;
             return '<div class="cmp-plat" style="--pc:' + (PCOL[k] || "#121212") + '"><p class="cmp-plat__n">' + (ICONS[k] || "") + "<b>" + esc(k) + "</b><em>" + cmPct(x.n, t.n) + "%</em></p>" + cmRing(x, "cm-ring--plat")
@@ -1114,15 +1189,19 @@
         + (mainT ? "<h3>What people talk about</h3>" + '<div class="cmp-insight"><span class="cmp-insight__ic">' + cmIcon(mainT) + '</span><div class="cmp-insight__b">'
             + '<p class="cmp-insight__k">The biggest topic · <b>' + v(t.themes[mainT]) + "</b> of comments</p><p class=\"cmp-insight__t\">" + esc(mainT) + "</p>" + (AR[mainT] ? '<p class="cmp-insight__ar" dir="rtl" lang="ar">' + esc(AR[mainT]) + "</p>" : "")
             + ((TA[mainT] || []).length ? '<p class="cmp-insight__l">What they ask about it</p><div class="cmp-chips">' + asksOf(mainT, 4) + "</div>" : "") + "</div></div>"
-            + (restT.length ? '<div class="cmp-insights">' + restT.map(function (q) {
-                return '<div class="cmp-insight cmp-insight--sm" style="--w:' + (t.themes[q] / t.themes[mainT] * 100).toFixed(1) + '%"><span class="cmp-insight__ic">' + cmIcon(q) + '</span><div class="cmp-insight__b">'
-                  + '<p class="cmp-insight__k"><b>' + v(t.themes[q]) + "</b> of comments</p><p class=\"cmp-insight__t\">" + esc(q) + "</p>" + (AR[q] ? '<p class="cmp-insight__ar" dir="rtl" lang="ar">' + esc(AR[q]) + "</p>" : "")
-                  + '<i class="cmp-insight__bar"></i>' + ((TA[q] || []).length ? '<div class="cmp-chips">' + asksOf(q, 2) + "</div>" : "") + "</div></div>"; }).join("") + "</div>" : "")
-            + (plats.length > 1 ? "<h3>Which topics come from which platform</h3>" + (function () { var list = th.slice(0, 7), mx = 1;
-                list.forEach(function (q) { plats.forEach(function (k) { mx = Math.max(mx, (t.tp[q] || {})[k] || 0); }); });
-                return '<div class="cmp-heat" style="--cols:' + plats.length + '"><span></span>' + plats.map(function (k) { return '<span class="cmp-heat__h">' + (ICONS[k] || "") + "<small>" + esc(k) + "</small></span>"; }).join("")
-                  + list.map(function (q) { return '<span class="cmp-heat__r">' + cmIcon(q) + "<span>" + esc(q) + ar(q) + "</span></span>" + plats.map(function (k) { var n = (t.tp[q] || {})[k] || 0, f = n / mx;
-                      return '<span class="cmp-heat__c' + (f > .55 ? " is-hot" : "") + '" style="--a:' + (n ? (0.1 + 0.9 * f).toFixed(2) : 0) + '" title="' + esc(q) + " · " + esc(k) + ": " + n + ' comments">' + (n || "") + "</span>"; }).join(""); }).join("") + "</div>"; })() : "") : "")
+            + (restT.length ? '<div class="cmp-tl">' + restT.map(function (q) {
+                return '<details class="cmp-tl__r" style="--w:' + (t.themes[q] / t.themes[mainT] * 100).toFixed(1) + '%"><summary><span class="cmp-tl__ic">' + cmIcon(q) + '</span><span class="cmp-tl__t"><b>' + esc(q) + "</b>"
+                  + (AR[q] ? '<span class="cmp-tl__ar" dir="rtl" lang="ar">' + esc(AR[q]) + "</span>" : "") + '</span><span class="cmp-tl__bar"><i></i></span><span class="cmp-tl__p">' + v(t.themes[q]) + "</span>"
+                  + '<span class="cmp-tl__n">' + full(t.themes[q]) + "<small>comments</small></span><span class=\"cmp-tl__chev\" aria-hidden=\"true\"></span></summary><div class=\"cmp-tl__body\">"
+                  + ((TA[q] || []).length ? '<p class="cmp-tl__l">What they ask</p><div class="cmp-chips">' + asksOf(q, 4) + "</div>" : "")
+                  + '<p class="cmp-tl__l">What they say</p><div class="cmp-tl__s" data-theme="' + esc(q) + '"><p class="cmb__load">Loading the comments…</p></div></div></details>'; }).join("") + "</div>" : "")
+            + (plats.length > 1 ? "<h3>Which platform each topic came from</h3>" + (function () { var list = th.slice(0, 7), mx = Math.max.apply(null, list.map(function (q) { return t.themes[q]; }));
+                return '<div class="cmp-sb">' + list.map(function (q) { var tot = t.themes[q];
+                    return '<div class="cmp-sb__r"><span class="cmp-sb__t">' + cmIcon(q) + "<span>" + esc(q) + ar(q) + '</span></span><span class="cmp-sb__w"><span class="cmp-sb__bar" style="--w:' + (tot / mx * 100).toFixed(1) + '%">'
+                      + plats.map(function (k) { var n = (t.tp[q] || {})[k] || 0; if (!n) return "";
+                          return '<i style="flex:' + n + " 1 0;--pc:" + (PCOL[k] || "#121212") + '" title="' + esc(k) + ": " + n + ' comments">' + (n / tot >= 0.12 && n >= 3 ? n : "") + "</i>"; }).join("")
+                      + '</span><b class="cmp-sb__n">' + tot + "</b></span></div>"; }).join("")
+                  + '<p class="cmp-sb__k">' + plats.map(function (k) { return '<span style="--pc:' + (PCOL[k] || "#121212") + '">' + (ICONS[k] || "") + esc(k) + "</span>"; }).join("") + "</p></div>"; })() : "") : "")
         + (asks.length ? "<h3>What buyers asked</h3>" + (function () { var all = cmTop(t.asks, "n"), top = all.slice(0, 8), more = all.slice(8, 22), mx = t.asks[all[0]].n;
             return '<ol class="cmp-rank">' + top.map(function (q, i) { var n = t.asks[q].n;
                 return '<li style="--w:' + (n / mx * 100).toFixed(1) + '%"' + (i ? "" : ' class="is-1"') + '><span class="cmp-rank__i">' + (i + 1) + '</span><span class="cmp-rank__q"><q dir="auto">' + esc(q) + "</q><small>" + esc(t.asks[q].en || "") + '</small></span><b>' + n + "</b></li>"; }).join("") + "</ol>"
@@ -1143,6 +1222,7 @@
         + (quotes.length ? "<h3>In their words</h3>" + '<div class="cmp-quotes">' + quotes.map(function (q) {
             return '<article class="cmp-quote"><q dir="auto">' + esc(q.text) + "</q>" + (q.gloss ? "<p>“" + esc(q.gloss) + "”</p>" : "")
               + "<footer>" + ava(pics[q.code]) + "<b>" + esc(names[q.code] || q.code || "") + "</b><span>" + (ICONS[q.platform] || esc(q.platform)) + "</span></footer></article>"; }).join("") + "</div>" : "")
+        + "<h3>All comments</h3>" + '<div id="cmb" class="cmb"><p class="cmb__load">Loading the comments…</p></div>' + (setTimeout(cmBind, 0) && "")
         + "<h3>By creator</h3>" + '<div class="cmp-who">' + who.map(function (c) { var w = t.by[c], few = w.n < ((C.min_sample) || 30), top = cmTop(w.themes)[0]; w.small = few;
             return '<div class="cmp-who__r">' + ava(pics[c]) + '<span class="cmp-who__n"><b>' + esc(names[c] || c) + "</b><small>" + w.plats.map(function (x) { return ICONS[x] || esc(x); }).join("") + "</small></span>"
               + cmRing(w, "cm-ring--who") + '<span class="cmp-who__c cmp-who__c--n"><b>' + full(w.n) + "</b><small>comments</small></span>"

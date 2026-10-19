@@ -635,6 +635,16 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_campaigns()
         if path == "/api/campaign/refresh":
             return self.api_campaign_refresh(query.get("t") or "", False)
+        if path == "/api/campaign/comments":
+            # What people say (2026-10-19): the full comment list for the client's browser, same access as the report.
+            self._share_token = (query.get("share") or "").strip()
+            k, status = self.viewer_campaign(query.get("t") or "", public_ok=True)
+            if k is None:
+                return self.send_json(status, {"ok": False}, self.cors())
+            if not metrics.visibility(k).get("audience", True):
+                return self.send_json(200, {"ok": True, "items": []}, self.cors())
+            import comments
+            return self.send_json(200, dict(comments.client_list(k), ok=True), self.cors())
         if path == "/api/campaign":
             self._share_token = (query.get("share") or "").strip()
             return self.api_campaign(query.get("t") or "")

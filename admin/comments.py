@@ -491,8 +491,8 @@ def client_view(k):
     with db.connect() as conn:
         rows = conn.execute(
             "SELECT m.code, m.platform, m.sentiment, m.intent, m.ask, m.ask_en, m.theme, m.content_id, m.posted_at FROM comments m "
-            "JOIN content c ON c.id = m.content_id WHERE m.campaign_id = ? AND c.hidden = 0 AND m.sentiment IS NOT NULL "
-            "AND m.flag IS NULL", (cid,)).fetchall()   # red-flagged comments stay in the admin
+            "JOIN content c ON c.id = m.content_id WHERE m.campaign_id = ? AND c.hidden = 0 AND m.sentiment IS NOT NULL",
+            (cid,)).fetchall()   # every comment counts on the client's page, red-flagged ones included (owner, 2026-10-19)
         reads = conn.execute("SELECT r.status, r.due_at, r.finished_at FROM comment_reads r JOIN content c ON c.id = r.content_id "
                              "WHERE r.campaign_id = ? AND c.hidden = 0", (cid,)).fetchall()
         quotes = conn.execute(
@@ -540,6 +540,20 @@ def client_view(k):
             "last_read": max(done) if done else None,
             "final_read": max([r["due_at"] for r in reads] or [0]) or None,
             "read_days": list(READ_DAYS)}
+
+
+def client_list(k):
+    """Every read comment of a campaign for the client's comment browser (owner, 2026-10-19: all comments, red flags
+    included). Compact rows, most liked first: [content_id, code, platform, mood, buying, theme, ask, text, gloss, likes, posted]."""
+    init()
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT m.content_id, m.code, m.platform, m.sentiment, m.intent, m.theme, m.ask, m.text, m.gloss, m.likes, m.posted_at "
+            "FROM comments m JOIN content c ON c.id = m.content_id WHERE m.campaign_id = ? AND c.hidden = 0 AND m.sentiment IS NOT NULL "
+            "ORDER BY COALESCE(m.likes, 0) DESC, m.id", (k["id"],)).fetchall()
+    mood = {"positive": "p", "negative": "x"}
+    return {"items": [[r["content_id"], r["code"], r["platform"], mood.get(r["sentiment"], "n"), 1 if r["intent"] else 0, r["theme"] or "",
+                       r["ask"] or "", r["text"], r["gloss"] or "", r["likes"] or 0, r["posted_at"] or 0] for r in rows]}
 
 
 # ----------------------------------------------------------------------------- admin tab --
