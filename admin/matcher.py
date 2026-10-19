@@ -19,6 +19,7 @@ import db
 import fit
 import gemini
 import metrics
+import powerups
 
 # --------------------------------------------------------------- questions --
 # One definition drives the client form, the validation and the brief record.
@@ -56,6 +57,9 @@ QUESTIONS = [
     {"id": "budget", "type": "one", "label": "Budget for creators (SAR, before VAT)", "required": False,
      "options": [("50", "Under 50,000"), ("150", "50,000 – 150,000"), ("400", "150,000 – 400,000"),
                  ("400+", "Over 400,000"), ("open", "Not decided yet")]},
+    # Item 172 (2026-10-19): the AI card's fifth step. Replaced Budget, which only 1% of creators carry a price for.
+    {"id": "mix", "type": "one", "label": "What mix of creators?", "required": False,
+     "options": [("hero", "Hero + crowd"), ("micro", "Many micro"), ("big", "Big names"), ("auto", "Let Helvi decide")]},
     {"id": "creator_size", "type": "many", "label": "Which creator sizes?", "required": False,
      "options": [("nano", "Nano: under 20k"), ("micro", "Micro: 20k to 100k"), ("mid", "Mid: 100k to 500k"),
                  ("macro", "Macro: 500k to 1M"), ("mega", "Mega: 1M and over")]},
@@ -116,6 +120,10 @@ def answer_label(qid, v):
 # One line under an option in the form, saying what it means for the score. The labels stay short.
 HINTS = {
     ("goal", "awareness"): "Reach and views",
+    ("mix", "hero"): "1 big name to launch, mid and micro creators to spread it",
+    ("mix", "micro"): "Lots of smaller, trusted voices close to their followers",
+    ("mix", "big"): "A few large creators for maximum reach",
+    ("mix", "auto"): "Helvi picks the mix that fits your goal",
     ("goal", "engagement"): "Likes, comments and saves",
     ("goal", "traffic"): "Clicks and sales",
     ("platforms", "Facebook"): "Add-on: recorded in the brief, not scored (no Facebook creator data yet)",
@@ -188,6 +196,7 @@ def clean_answers(raw):
                 out[q["id"]] = _clean_other(v)
         if q["required"] and q["id"] not in out:
             missing.append(q["id"])
+    out.update(powerups.clean(raw))          # the optional power-ups (item 172)
     return out, missing
 
 
@@ -248,6 +257,9 @@ def resolve(answers):
                 out[q["id"]] = keep
         elif got is not None:
             out[q["id"]] = got
+    for k, v in answers.items():                    # the power-ups (item 172) pass through as they are
+        if k not in _BY_ID:
+            out.setdefault(k, v)
     return out, typed
 
 
@@ -262,7 +274,8 @@ def to_brief(answers):
     notes = answers.get("notes", "")
     if typed:
         notes = "; ".join(typed) + (". " + notes if notes else "")
-    return {
+    power = powerups.from_answers(answers)
+    out = {
         "objective": objective_for(answers.get("goal")),
         "target": {"country": "|".join(_values(answers.get("market"), _enum("market"))) or "SA",
                    "gender": fit.one_gender(answers.get("gender")),
@@ -278,7 +291,12 @@ def to_brief(answers):
         "size": _values(answers.get("creator_size"), ["nano", "micro", "mid", "macro", "mega"]),
         "max_fake": int(answers["max_fake"]) if answers.get("max_fake") in ("15", "30", "50") else None,
         "min_engagement": answers.get("min_engagement") if answers.get("min_engagement") in ("above_benchmark", "top25") else None,
+        "mix": answers.get("mix") if answers.get("mix") in ("hero", "micro", "big") else None,
     }
+    if power:
+        # Kept in the target, so a selection built from the brief scores its creators the same way.
+        out["target"]["power"] = power
+    return out
 
 
 def _values(v, allowed):
@@ -334,6 +352,11 @@ def describe(answers):
     if answers.get("count"):
         n = label("count", answers["count"])
         bits.append(n if "creator" in n.lower() else n + " creators")
+    if answers.get("mix") and answers["mix"] != "auto":
+        bits.append("mix: " + label("mix", answers["mix"]).lower())
+    n = len(powerups.from_answers(answers)) and sum(1 for c in powerups.CARDS if any(answers.get(f) for f in c["fields"]))
+    if n:
+        bits.append("sharpened with %d power-up%s" % (n, "" if n == 1 else "s"))
     text = "; ".join(bits)
     return (text[:1].upper() + text[1:]) if text else "No details given"
 
@@ -510,6 +533,16 @@ def apply_rules(c, s, val, basis, target):
         val = int(round(val * CATEGORY_MISS_WEIGHT))
         factor *= CATEGORY_MISS_WEIGHT
         s = watch(s, "Not tagged for %s" % ", ".join(cats))
+    # The power-ups (item 172): 60% performance, 40% fit to what the client asked for. Only when
+    # at least one power-up was answered; otherwise the score is the performance alone, as before.
+    if target.get("power"):
+        f = powerups.fit_for(c, target["power"], s.get("platform"))
+        if f is not None:
+            new = powerups.blend(val, f["score"])
+            if val:
+                factor *= new / float(val)
+            s = dict(s, fit=f, perf=val)
+            val = new
     if val != old:
         s = dict(s, score=val, tag=fit.band_for(val))
         if s.get("score_range") and old:
@@ -625,13 +658,40 @@ def score_all(brief, exclude=(), only=None):
             "basis": basis, "platform": s.get("platform") or single, "price": list(price) if price else None,
             "strengths": (s.get("strengths") or [])[:3], "watchouts": ([aud_note] if aud_note else []) + (s.get("watchouts") or [])[:2],
             "followers": c["followers"] or 0, "audience_level": aud_lvl,
+            "band": metrics.band_of(c["followers"]),
         })
+        if s.get("fit"):
+            items[-1].update(perf=s.get("perf"), fit=s["fit"]["score"], chips=s["fit"]["chips"], fit_items=s["fit"]["items"])
     items = _client_limits(brief, items)
     # Equal scores are common on public data; break the tie the way the goal would: reach for
     # awareness, the smaller (cheaper, closer) account otherwise.
     big_first = "Awareness" in str(objective).split("+")
     items.sort(key=lambda i: (i.get("audience_level", 1), -i["rank_score"], -i["followers"] if big_first else i["followers"], i["code"]))
     return items
+
+
+MIX_LIFT = 1.15
+BIG, SMALL = ("macro", "mega"), ("nano", "micro")
+
+
+def _mix(items, mix):
+    """The creator mix (item 172): a soft lift, never a filter. "micro" lifts nano and micro
+    accounts, "big" lifts macro and mega; "hero" puts the best macro or mega creator first and
+    lifts the small and mid accounts behind them. Audience fit still orders first."""
+    if mix not in ("hero", "micro", "big") or not items:
+        return items
+    lift = {"micro": SMALL, "big": BIG, "hero": SMALL + ("mid",)}[mix]
+
+    def key(i):
+        rs = i["rank_score"] * (MIX_LIFT if i.get("band") in lift else 1.0)
+        return (i.get("audience_level", 1), -rs, i["code"])
+    out = sorted(items, key=key)
+    if mix == "hero":
+        hero = next((i for i in items if i.get("band") in BIG), None)
+        if hero is not None:
+            out.remove(hero)
+            out.insert(0, hero)
+    return out
 
 
 def _tagged(c, cats):
@@ -650,7 +710,7 @@ def rank(brief, exclude=()):
     ``{code, score, rank_score, tag, basis, platform, price, strengths, watchouts}``.
     ``basis`` is "analysis", "basic" (public numbers) or "roster" (an estimate).
     """
-    items = score_all(brief, exclude)
+    items = _mix(score_all(brief, exclude), brief.get("mix"))
 
     count, cap = brief.get("count") or 8, brief.get("budget_max")
     picks, spent = [], 0

@@ -49,6 +49,7 @@ import mailer
 import matcher
 import notify
 import portal
+import powerups
 import kam_scope
 import portal_views
 import rewards
@@ -312,7 +313,14 @@ class PortalMixin(connect_api.ConnectMixin):
                                                                          ("X-Content-Type-Options", "nosniff")])
             return True
         if path == "/api/brief/questions":
-            self.send_json(200, {"ok": True, "questions": matcher.public_questions(), "costs": portal.costs()}, self.cors())
+            self.send_json(200, {"ok": True, "questions": matcher.public_questions(), "powerups": powerups.public(),
+                                 "costs": portal.costs()}, self.cors())
+            return True
+        if path == "/api/brief/find":
+            self.api_brief_find(query)
+            return True
+        if path == "/api/brief/mine":
+            self.api_brief_mine()
             return True
         if path == "/api/credits":
             who = self._need_viewer()
@@ -467,6 +475,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat, "/api/chat/stream": self.api_chat_stream,
             "/api/chat/confirm": self.api_chat_confirm, "/api/chat/dismiss": self.api_chat_dismiss,
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
+            "/api/brief/claim": self.api_brief_claim,
             "/api/selection/delete": self.api_selection_delete, "/api/brief/delete": self.api_brief_delete,
             "/api/credits/request": self.api_credits_request, "/api/me/delete": self.api_me_delete,
             "/api/voice/handoff": self.api_voice_handoff, "/api/chat/handoff": self.api_chat_handoff,
@@ -679,6 +688,72 @@ class PortalMixin(connect_api.ConnectMixin):
             _score_cache.clear()
         _score_cache[b["id"]] = (time.time(), out)
         return out
+
+    # ------------------------------------------------- brief power-ups (172) --
+
+    @staticmethod
+    def _pick_card(r):
+        """What the lookalike picker shows of a creator: the card's own public fields only."""
+        return {"code": r["code"], "name": r["name"], "photo_url": r.get("photo_url"), "tier": r.get("tier"),
+                "interest": r.get("interest"), "city": r.get("city")}
+
+    def api_brief_find(self, query):
+        """Creators by name or handle for "Creators like these" (8 at most, never a count)."""
+        who = self._need_viewer()
+        if not who:
+            return
+        q = " ".join(str((query.get("q") if isinstance(query, dict) else "") or "").lower().split())[:60]
+        if len(q) < 2:
+            return self.send_json(200, {"ok": True, "items": []}, self.cors())
+        if self._throttled("bfind:%d" % who[0], 120, 600):
+            return
+        hits = []
+        for r in self.roster_payload():
+            hay = (str(r.get("name") or "") + " " + str(r.get("handle") or "")).lower()
+            if q in hay:
+                hits.append(self._pick_card(r))
+                if len(hits) >= 8:
+                    break
+        self.send_json(200, {"ok": True, "items": hits}, self.cors() + [("Cache-Control", "no-store")])
+
+    def api_brief_mine(self):
+        """Creators from the viewer's latest selections, to pick lookalikes from."""
+        who = self._need_viewer()
+        if not who:
+            return
+        cid = who[0]
+        teams = sorted(portal.team_codes(int(cid)))
+        out = []
+        with db.connect() as conn:
+            rows = conn.execute("SELECT name, codes FROM selections WHERE code_id IN (%s) AND deleted_at IS NULL "
+                                "ORDER BY updated_at DESC LIMIT 3" % ",".join("?" * len(teams)), teams).fetchall()
+        want = []
+        for r in rows:
+            for c in json.loads(r["codes"] or "[]"):
+                if c not in want:
+                    want.append(c)
+        want = want[:12]
+        shown = {r["code"]: r for r in self.roster_payload(only=set(want))} if want else {}
+        out = [self._pick_card(shown[c]) for c in want if c in shown]
+        self.send_json(200, {"ok": True, "from": rows[0]["name"] if rows else "", "items": out},
+                       self.cors() + [("Cache-Control", "no-store")])
+
+    def api_brief_claim(self):
+        """Helvi reads a product and its main claim: sub-niches to match and whether it is a
+        health claim. Free, like the rest of the brief (Gemini when it is set up)."""
+        who = self._need_viewer()
+        if not who:
+            return
+        b = self.json_body()
+        product = " ".join(str(b.get("product") or "").split())[:120]
+        claim = " ".join(str(b.get("claim") or "").split())[:200]
+        if not (product or claim):
+            return self.send_json(400, {"ok": False, "reason": "empty"}, self.cors())
+        if self._throttled("bclaim:%d" % who[0], 20, 3600):
+            return
+        cats = b.get("category") if isinstance(b.get("category"), list) else []
+        got = powerups.read_claim(product, claim, cats[:4], who[0])
+        self.send_json(200, {"ok": True, "tags": got["tags"], "regulated": got["regulated"]}, self.cors())
 
     def api_brief_attach(self):
         """A client built a selection by hand and answers the brief questions for it: free. The

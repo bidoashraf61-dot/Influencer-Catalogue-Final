@@ -101,7 +101,26 @@ def summary(d, platform):
         "langs": _shares(au.get("languages")),
         "interests": _shares(au.get("interests")),
         "affinity": _shares(au.get("brand_affinity")),
+        # Brief power-ups (item 172): the languages the creator posts in, and their paid-collab record.
+        "clangs": _content_langs(d.get("content_languages")),
+        "collab": _collab(d.get("collab_summary")),
     }
+
+
+def _content_langs(v):
+    out = set()
+    for x in v or []:
+        name = x.get("name") if isinstance(x, dict) else x
+        if name and str(name).strip().lower() != "unknown":
+            out.add(str(name).strip().lower())
+    return frozenset(out)
+
+
+def _collab(v):
+    if not isinstance(v, dict):
+        return None
+    paid = _num(v.get("paid"))
+    return {"paid": int(paid) if paid is not None else 0, "last": str(v.get("last_date") or "")[:10]}
 
 
 def _load():
@@ -294,17 +313,24 @@ def _tier(t):
 def like(code, limit=48):
     """Creators most like ``code``: what they post about, where they are,
     their size and, where both are measured, who their audience is."""
+    scored = sorted(((s, other) for other, s in like_scores(code).items()), key=lambda x: (-x[0], x[1]))
+    return [c for _, c in scored[:limit]]
+
+
+def like_scores(code):
+    """{other code: raw likeness} for every creator with any likeness to ``code`` (the brief's
+    "Creators like these" power-up normalises these to 0-100)."""
     rows = {r["code"]: r for r in db.list_creators(active_only=True)}
     me = rows.get(code)
     if not me:
-        return []
+        return {}
     docs = _load()
     mine = (docs.get(code) or [None])[0]
     my_topics = _tokens(me["interest"]) | ({t.lower() for t in mine["topics"]} if mine else set())
     my_tier, my_hcp = _tier(me["tier"])
     my_city = str(me["city"] or "").lower()
     my_plats = {p.strip().lower() for p in str(me["platform"] or "").split(",") if p.strip()}
-    scored = []
+    scored = {}
     for other, r in rows.items():
         if other == code:
             continue
@@ -343,9 +369,8 @@ def like(code, limit=48):
             if c is not None:
                 s += 1.5 * c
         if s > 0:
-            scored.append((s, other))
-    scored.sort(key=lambda x: (-x[0], x[1]))
-    return [c for _, c in scored[:limit]]
+            scored[other] = s
+    return scored
 
 
 # A sentence -> sidebar filters. Keyword reading only (free, instant): the

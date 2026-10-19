@@ -1002,7 +1002,11 @@
   var QUESTIONS = null;
   function loadQuestions() {
     if (QUESTIONS) return Promise.resolve(QUESTIONS);
-    return api("GET", "/api/brief/questions").then(function (r) { QUESTIONS = localise(r.b.questions || []); return QUESTIONS; });
+    return api("GET", "/api/brief/questions").then(function (r) {
+      QUESTIONS = localise(r.b.questions || []);
+      POWER = r.b.powerups && r.b.powerups.cards ? r.b.powerups : null;     // item 172; the tour's demo has none
+      return QUESTIONS;
+    });
   }
 
   function openWizard() {
@@ -1557,9 +1561,14 @@
     var selName = S && S.name ? S.name() : "this selection";
     var nIn = S && S.codes ? S.codes().length : 0;
     loadQuestions().then(function (all) {
-      var qs = all.filter(function (q) { return q.required || q.id === "gender" || q.id === "age" || q.id === "budget" || q.id === "count"; });
+      // Gender and age are power-ups now (item 172); the tour's demo, which has none, keeps them here.
+      // Budget left the brief for the creator mix (item 172, D5); scoring a selection needs neither.
+      var qs = all.filter(function (q) { return q.required || (!POWER && (q.id === "gender" || q.id === "age" || q.id === "budget")) || q.id === "count"; });
+      var core = {}; all.forEach(function (q) { core[q.id] = q; });
+      var pwFields = {};
+      if (POWER) POWER.cards.forEach(function (c) { c.fields.forEach(function (f) { pwFields[f] = 1; }); });
       var answers = {};
-      Object.keys(start.answers || {}).forEach(function (k) { if (qs.some(function (q) { return q.id === k; })) answers[k] = start.answers[k]; });
+      Object.keys(start.answers || {}).forEach(function (k) { if (pwFields[k] || qs.some(function (q) { return q.id === k; })) answers[k] = start.answers[k]; });
       if (typeof answers.goal === "string") answers.goal = [answers.goal];
       var step = 0, busy = false;
       var reduce = REDUCE;
@@ -1588,6 +1597,16 @@
         li.addEventListener("click", function () { if (!busy && (i <= step || answered(qs[i - 1] || q))) show(i); });
         track.appendChild(li);
       });
+      var pwNode = null;
+      if (POWER) {
+        pwNode = h("li", { class: "ai-sl__node ai-sl__node--pw", "data-i": String(qs.length) });
+        pwNode.innerHTML = '<span class="ai-sl__dot">' + aiSvg('<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>', 18) + '</span><span class="ai-sl__lbl">' + T("Sharpen") + "</span>";
+        pwNode.addEventListener("click", function () { if (!busy && qs.every(function (q) { return !q.required || answered(q); })) sharpenOb(); });
+        track.appendChild(pwNode);
+        track.style.gridTemplateColumns = "repeat(" + (qs.length + 1) + ", 1fr)";
+      }
+      track.style.setProperty("--n", String(qs.length + (POWER ? 1 : 0)));
+      track.classList.add("ai-sl__track--n");
       var fill = h("span", { class: "ai-sl__fill", "aria-hidden": "true" });
       track.appendChild(fill);
       head.appendChild(track);
@@ -1622,9 +1641,9 @@
       /* -- campaign power: every answered question fills the meter -- */
       function answered(q) { var v = answers[q.id]; return Array.isArray(v) ? v.length > 0 : !!v; }
       var shown = 0;
-      function score() { return qs.reduce(function (t, q) { return t + (answered(q) ? obPoints(q) : 0); }, 0); }
+      function score() { return qs.reduce(function (t, q) { return t + (answered(q) ? obPoints(q) : 0); }, 0) + pwCount(answers) * PW_POINTS; }
       function paintPower(gain) {
-        var n = Math.min(1000, score() + (qs.some(function (q) { return !q.required; }) ? 0 : 200));
+        var n = Math.min(1000, score() + (POWER || qs.some(function (q) { return !q.required; }) ? 0 : 200));
         var lvl = n >= 1000 ? "Full power" : n >= 600 ? "Strong" : n >= 300 ? "Good" : "Draft";
         var b = power.querySelector("b");
         if (gain && n > shown) { power.classList.remove("is-gain"); void power.offsetWidth; power.classList.add("is-gain"); }
@@ -1633,10 +1652,13 @@
         power.querySelector(".ai-sl__pw-lvl").textContent = lvl;
         power.classList.toggle("is-full", n >= 1000);
         [].forEach.call(track.querySelectorAll(".ai-sl__node"), function (li, i) {
+          if (!qs[i]) return;                                   // the power-up node, below
           li.classList.toggle("is-done", answered(qs[i]) && i !== step);
           li.classList.toggle("is-now", i === step);
         });
-        fill.style.setProperty("--p", (qs.length > 1 ? Math.min(100, step / (qs.length - 1) * 100) : 100) + "%");
+        var lastI = POWER ? qs.length : qs.length - 1;
+        fill.style.setProperty("--p", (lastI > 0 ? Math.min(100, step / lastI * 100) : 100) + "%");
+        if (pwNode) { pwNode.classList.toggle("is-now", step === qs.length); pwNode.classList.toggle("is-done", pwCount(answers) > 0 && step !== qs.length); }
       }
       function plus(btn, pts) {
         if (reduce || !btn) return;
@@ -1703,7 +1725,7 @@
         back.addEventListener("click", function () { show(step - 1); react("point"); });
         if (step === 0) back.hidden = true;
         var last = step === qs.length - 1;
-        var next = h("button", { class: "ai-sl__next", type: "button" }, last ? "Score this selection" : q.required ? "Next" : "Next / skip");
+        var next = h("button", { class: "ai-sl__next", type: "button" }, last && !POWER ? "Score this selection" : q.required ? "Next" : "Next / skip");
         next.disabled = q.required && !answered(q);
         next.addEventListener("click", advance);
         nav.appendChild(back); nav.appendChild(next);
@@ -1733,7 +1755,22 @@
         var q = qs[step];
         if (q.required && !answered(q)) return;
         if (step < qs.length - 1) { show(step + 1); if (!celebrating) react("point"); return; }
+        if (POWER) { sharpenOb(); return; }
         finish();
+      }
+      // Item 172: the optional power-ups, then score.
+      function sharpenOb(openId) {
+        step = qs.length;
+        stage.textContent = "";
+        var panel = powerStage({ answers: answers, core: core, openId: openId, ready: "score", buildLabel: "Score this selection",
+          onChange: function (gain, said) {
+            paintPower(gain);
+            if (gain) { react("cheer"); say(said || "Sharper"); }
+          },
+          onBack: function () { show(qs.length - 1); },
+          onBuild: finish });
+        stage.appendChild(h("div", { class: "ai-sl__panel ai-sl__q" }, panel));
+        paintPower(false);
       }
 
       /* -- full power: Helvi scores the selection -- */
@@ -3340,6 +3377,323 @@
     }
   }
 
+  /* ------------------------------------------------- brief power-ups (172) */
+  // "Make it sharper": optional cards after the core brief, shared by the AI shortlist card and
+  // the selection's "Score this selection" studio. Helvi shows the three that matter most for the
+  // brief's space, the rest sit under "More power-ups"; each row opens in place. Every answer is a
+  // soft boost on the server (60% performance + 40% fit), never a filter.
+  var PW_ICON = {
+    type: '<path d="M9 4v5a3 3 0 0 0 6 0V4"/><path d="M12 12v3a4 4 0 0 0 8 0v-1"/><circle cx="20" cy="12" r="2"/>',
+    claim: '<path d="M8 3h8l-1 5 3 3v8a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2v-8l3-3z"/><path d="M9.5 14.5h5M12 12v5"/>',
+    licence: '<rect x="4" y="4" width="16" height="13" rx="2"/><path d="M8 9h8M8 12.5h5"/><path d="M14.5 17l1.5 4 1.5-2 2 .5-1.5-3.5"/>',
+    age: '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+    gender: '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.6-3.8 3.3-6 7-6s6.4 2.2 7 6"/>',
+    city: '<path d="M4 20V9l5-3v14M9 20V4l7 3v13M16 20v-8l4 2v6M3 20h18"/>',
+    lang: '<path d="M4 6h9M8.5 4v2M6 6c.5 3 2.5 5.5 6 7M11 6c-.6 3.5-3 6.2-6.5 7.5"/><path d="M13 20l3.5-8 3.5 8M14.2 17.5h4.6"/>',
+    like: '<circle cx="8" cy="9" r="3"/><circle cx="16" cy="9" r="3"/><path d="M3 19c.5-2.8 2.5-4.3 5-4.3s4.5 1.5 5 4.3M11 19c.5-2.8 2.5-4.3 5-4.3s4.5 1.5 5 4.3"/>',
+    fresh: '<path d="M12 21c-4.5-1.5-7-5-7-9 4 0 7 2.5 7 6 0-5 2.5-9 7-11 0 7-2.5 12-7 14z"/>',
+    tone: '<path d="M4 14c2.5-6 5-6 7 0s4.5 6 7 0"/><circle cx="20" cy="9" r="1"/>'
+  };
+  var PW_TICK = '<path d="M5 12.5l4.2 4.2L19 7"/>', PW_SPARK = '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>';
+  var PW_INFO = '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8h.01"/>', PW_CHEV = '<path d="M6 9l6 6 6-6"/>';
+  var PW_WHY = {
+    type: "Matched to each creator’s speciality. Healthcare briefs also lift our medical creators.",
+    licence: "A boost, not a filter: creators without a stamp stay in the list.",
+    city: "Not every creator has a city breakdown yet. Those stay neutral, not lower.",
+    like: "Helvi compares audience, topics and size, then lifts the closest creators. Your picks are not added.",
+    tone: "Read from each creator’s profile. Creators not read yet stay neutral."
+  };
+  var PW_POINTS = 60;
+  function pwPop(el, pts) {
+    if (REDUCE || !el) return;
+    var s = h("span", { class: "ai-sl__plus", "aria-hidden": "true" }, "+" + pts);
+    el.appendChild(s); setTimeout(function () { s.remove(); }, 700);
+  }
+  function pwInitials(name) {
+    return String(name || "").replace(/^dr\.?\s+/i, "").split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0]; }).join("").toUpperCase();
+  }
+  var POWER = null;
+  function pwAnswered(card, answers) {
+    return card.fields.some(function (f) { var v = answers[f]; return Array.isArray(v) ? v.length > 0 : !!v; });
+  }
+  function pwCount(answers) {
+    return POWER ? POWER.cards.filter(function (c) { return pwAnswered(c, answers); }).length : 0;
+  }
+  function pwTop(answers) {
+    if (!POWER) return [];
+    var cats = asList(answers.category), top = null;
+    cats.some(function (c) { top = POWER.top3[c]; return !!top; });
+    return top || POWER.top3.other;
+  }
+  function pwQ(id) { return POWER ? POWER.questions.filter(function (q) { return q.id === id; })[0] : null; }
+  // The answer in words, for the open row and the review ticket.
+  function pwLabel(card, answers, core) {
+    function lab(qid, v) {
+      var q = pwQ(qid) || (core && core[qid]);
+      return q ? optionLabel(q, v) : v;
+    }
+    if (card.id === "claim") return [answers.product, answers.claim ? "“" + answers.claim + "”" : ""].filter(Boolean).join(" · ") || asList(answers.claim_tags).join(", ");
+    if (card.id === "like") return (answers._like_names || []).join(", ") || (asList(answers.lookalikes).length + " picked");
+    if (card.id === "gender") return isAny(answers.gender) ? "Both" : asList(answers.gender).map(function (v) { return lab("gender", v); }).join(", ");
+    var f = card.fields[0];
+    return asList(answers[f]).map(function (v) { return lab(f, v); }).join(" · ");
+  }
+  // One power-up stage. opts: answers, core (core questions by id), onChange(gained), onBuild,
+  // onBack, buildLabel, cost, openId, say(text).
+  function powerStage(opts) {
+    var answers = opts.answers, open = opts.openId || null, fresh = null;
+    var wrap = h("div", { class: "ai-pw" });
+    function render(gain, said) {
+      wrap.textContent = "";
+      var n = pwCount(answers);
+      wrap.appendChild(h("p", { class: "ai-sl__ask" }, n >= 7 ? "Full power. Helvi knows exactly who you need." : "Make it sharper"));
+      wrap.appendChild(h("p", { class: "ai-sl__hint", html: "Your brief is ready" + (opts.ready ? " to " + opts.ready : "") + " now. Each power-up helps Helvi put the <b>best-fitting</b> creators first. Answer any, skip any." }));
+      var top = pwTop(answers), cats = asList(answers.category);
+      var core = opts.core || {};
+      var spaceName = cats.length === 1 && core.category ? optionLabel(core.category, cats[0]) : "your brief";
+      wrap.appendChild(h("p", { class: "ai-pw__picked", html: aiSvg(PW_SPARK, 16) + "<span></span>" }));
+      wrap.lastChild.querySelector("span").textContent = "Helvi’s picks for " + spaceName;
+      var ul = h("ul", { class: "ai-pw__lanes" });
+      top.forEach(function (id) { var c = card(id); if (c) ul.appendChild(lane(c)); });
+      wrap.appendChild(ul);
+      var rest = POWER.cards.filter(function (c) { return top.indexOf(c.id) < 0; });
+      var more = h("div", { class: "ai-pw__more" }, h("p", { class: "ai-pw__more-h" }, "More power-ups"));
+      var ul2 = h("ul", { class: "ai-pw__lanes" });
+      rest.forEach(function (c) { ul2.appendChild(lane(c)); });
+      more.appendChild(ul2);
+      wrap.appendChild(more);
+      var nav = h("div", { class: "ai-sl__nav ai-pw__nav" });
+      if (opts.onBack) nav.appendChild(h("button", { class: "ai-sl__back", type: "button", onclick: opts.onBack }, "Back"));
+      nav.appendChild(h("span", { class: "ai-pw__sp" }));
+      if (opts.onReview) nav.appendChild(h("button", { class: "ai-sl__skip", type: "button", onclick: opts.onReview }, "Review brief"));
+      var bd = h("button", { class: "ai-sl__next ai-pw__build", type: "button", onclick: opts.onBuild }, opts.buildLabel || "Build my shortlist");
+      if (opts.cost) bd.appendChild(h("small", null, opts.cost));
+      nav.appendChild(bd);
+      wrap.appendChild(nav);
+      setTimeout(function () { fresh = null; }, 0);
+      if (opts.onChange) opts.onChange(!!gain, said);
+    }
+    function card(id) { return POWER.cards.filter(function (c) { return c.id === id; })[0]; }
+    function set(cardObj, field, value, keepOpen, said) {
+      var was = pwAnswered(cardObj, answers);
+      if (value == null || (Array.isArray(value) && !value.length) || value === "") delete answers[field]; else answers[field] = value;
+      var now = pwAnswered(cardObj, answers);
+      if (!keepOpen && now) open = null;
+      render(!was && now, said || (!was && now ? ["Noted", "Sharper", "Good one", "Got it"][pwCount(answers) % 4] : null));
+    }
+    function lane(c) {
+      var done = pwAnswered(c, answers), isOpen = open === c.id;
+      var li = h("li", { class: "ai-pw__lane" + (done ? " is-done" : "") + (isOpen ? " is-open" : "") + (fresh === c.id ? " is-fresh" : "") });
+      var b = h("button", { class: "ai-pw__btn", type: "button", "aria-expanded": String(isOpen) });
+      b.innerHTML = '<span class="ai-pw__ic">' + aiSvg(done ? PW_TICK : PW_ICON[c.id], 20) + '</span><span class="ai-pw__tx"><span class="ai-pw__t"></span>' +
+        '<span class="ai-pw__d"></span><span class="ai-pw__a"></span></span><span class="ai-pw__pts">+' + PW_POINTS + '</span><span class="ai-pw__chev">' + aiSvg(PW_CHEV, 20) + "</span>";
+      b.querySelector(".ai-pw__t").textContent = T(c.label);
+      b.querySelector(".ai-pw__d").textContent = T(c.hint);
+      b.querySelector(".ai-pw__a").textContent = done ? pwLabel(c, answers, opts.core) : "";
+      b.addEventListener("click", function () { open = open === c.id ? null : c.id; fresh = open; render(false); });
+      li.appendChild(b);
+      if (isOpen) {
+        var body = h("div", { class: "ai-pw__body" });
+        body.appendChild(ui(c));
+        if (PW_WHY[c.id]) body.appendChild(h("p", { class: "ai-pw__why", html: aiSvg(PW_INFO, 16) + "<span></span>" }));
+        if (PW_WHY[c.id]) body.lastChild.querySelector("span").textContent = T(PW_WHY[c.id]);
+        li.appendChild(body);
+      }
+      return li;
+    }
+    function chips(c, q, many, values, onPick) {
+      var box = h("div", { class: "ai-sl__opts", role: many ? "group" : "radiogroup", "aria-label": T(c.label) });
+      values.forEach(function (o) {
+        var cur = asList(answers[q]);
+        var on = cur.indexOf(o.value) > -1;
+        var bt = h("button", { class: "ai-sl__opt" + (o.sub ? " ai-pw__tall" : ""), type: "button", "aria-pressed": String(on) });
+        if (o.sub) { bt.appendChild(h("span", null, o.label)); bt.appendChild(h("small", null, o.sub)); } else bt.textContent = T(o.label);
+        if (!many) bt.setAttribute("role", "radio"), bt.setAttribute("aria-checked", String(on));
+        bt.addEventListener("click", function () {
+          if (onPick) return onPick(o.value, bt);
+          var list = asList(answers[q]).slice(), k = list.indexOf(o.value);
+          if (many) { if (k > -1) list.splice(k, 1); else list.push(o.value); } else list = [o.value];
+          if (!pwAnswered(c, answers) && list.length) pwPop(bt, PW_POINTS);
+          var go = function () { set(c, q, many ? list : list[0], many); };
+          if (many) go(); else setTimeout(go, REDUCE ? 0 : 360);
+        });
+        box.appendChild(bt);
+      });
+      return box;
+    }
+    function opts_(qid, subs) {
+      var q = pwQ(qid);
+      return (q ? q.options : []).map(function (o) { return { value: o.value, label: o.label, sub: subs && subs[o.value] }; });
+    }
+    function ui(c) {
+      var core = opts.core || {};
+      if (c.id === "type") return chips(c, "creator_type", true, opts_("creator_type"));
+      if (c.id === "licence") return chips(c, "licence", false, opts_("licence", { preferred: "Licensed creators rank higher" }));
+      if (c.id === "city") return chips(c, "aud_city", true, opts_("aud_city"));
+      if (c.id === "lang") return chips(c, "content_lang", false, opts_("content_lang"));
+      if (c.id === "fresh") return chips(c, "collab", false, opts_("collab", { fresh: "Few paid posts lately", proven: "Has run paid content" }));
+      if (c.id === "tone") return chips(c, "tone", true, opts_("tone"));
+      if (c.id === "age") {
+        var ages = (core.age ? core.age.options : []).filter(function (o) { return !isAny(o.value); });
+        return chips(c, "age", true, ages);
+      }
+      if (c.id === "gender") {
+        var g = [{ value: "Women", label: "Mostly women" }, { value: "Men", label: "Mostly men" }, { value: "Any", label: "Both" }];
+        return chips(c, "gender", false, g, function (v, bt) {
+          if (!pwAnswered(c, answers)) pwPop(bt, PW_POINTS);
+          setTimeout(function () { set(c, "gender", v); }, REDUCE ? 0 : 360);
+        });
+      }
+      if (c.id === "like") return likeUI(c);
+      if (c.id === "claim") return claimUI(c);
+      return h("div");
+    }
+    function face(x) {
+      var f = h("i", { class: "ai-pw__face" }, x.photo_url ? "" : pwInitials(x.name));
+      if (x.photo_url) bg(f, x.photo_url);
+      return f;
+    }
+    function likeUI(c) {
+      var w = h("div", { class: "ai-pw__like" });
+      var picked = asList(answers.lookalikes), names = answers._like_names || [], faces = answers._like_faces || [];
+      var slots = h("div", { class: "ai-pw__slots" });
+      for (var i = 0; i < 3; i++) {
+        var s = h("div", { class: "ai-pw__slot" + (picked[i] ? " is-full" : "") });
+        if (picked[i]) {
+          var f = face({ name: names[i] || picked[i], photo_url: faces[i] });
+          (function (code) {
+            f.appendChild(h("button", { class: "ai-pw__x", type: "button", "aria-label": "Remove " + (names[i] || code), html: aiSvg('<path d="M7 7l10 10M17 7L7 17"/>', 12),
+              onclick: function () { toggle({ code: code }); } }));
+          })(picked[i]);
+          s.appendChild(f); s.appendChild(h("span", null, names[i] || picked[i]));
+        } else {
+          s.appendChild(h("i", { class: "ai-pw__face ai-pw__face--empty", html: aiSvg('<path d="M12 6v12M6 12h12"/>', 20) }));
+          s.appendChild(h("span", null, "Pick " + (i + 1)));
+        }
+        slots.appendChild(s);
+      }
+      w.appendChild(slots);
+      var search = h("div", { class: "ai-pw__search" });
+      search.innerHTML = aiSvg('<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/>', 18);
+      var inp = h("input", { type: "search", placeholder: "Search the catalogue by name or handle", "aria-label": "Search creators", autocomplete: "off" });
+      search.appendChild(inp);
+      w.appendChild(search);
+      var found = h("div", { class: "ai-pw__cands", "aria-live": "polite" });
+      w.appendChild(found);
+      var from = h("p", { class: "ai-pw__from" }, "From your selections");
+      var mine = h("div", { class: "ai-pw__cands" });
+      w.appendChild(from); w.appendChild(mine);
+      function cand(x) {
+        var on = picked.indexOf(x.code) > -1;
+        var b = h("button", { class: "ai-pw__cand", type: "button", "aria-pressed": String(on) }, face(x), h("span", null, x.name),
+                  x.interest ? h("small", null, String(x.interest).split(",")[0]) : null);
+        b.addEventListener("click", function () { toggle(x); });
+        return b;
+      }
+      function toggle(x) {
+        var list = asList(answers.lookalikes).slice(), nm = (answers._like_names || []).slice(), ph = (answers._like_faces || []).slice();
+        var k = list.indexOf(x.code);
+        if (k > -1) { list.splice(k, 1); nm.splice(k, 1); ph.splice(k, 1); }
+        else if (list.length < 3) { list.push(x.code); nm.push(x.name); ph.push(x.photo_url || ""); }
+        else return;
+        answers._like_names = nm; answers._like_faces = ph;
+        set(c, "lookalikes", list, true, list.length > picked.length ? "Love that one" : null);
+      }
+      var timer = null;
+      inp.addEventListener("input", function () {
+        clearTimeout(timer);
+        var q = inp.value.trim();
+        if (q.length < 2) { found.textContent = ""; return; }
+        timer = setTimeout(function () {
+          api("GET", "/api/brief/find?q=" + encodeURIComponent(q)).then(function (r) {
+            if (inp.value.trim() !== q) return;
+            found.textContent = "";
+            var items = (r.b && r.b.items) || [];
+            if (!items.length) found.appendChild(h("p", { class: "ai-pw__none" }, "No creator by that name."));
+            items.forEach(function (x) { found.appendChild(cand(x)); });
+          });
+        }, 220);
+      });
+      api("GET", "/api/brief/mine").then(function (r) {
+        var items = (r.b && r.b.items) || [];
+        if (!items.length) { from.hidden = true; return; }
+        from.textContent = T("From your selections") + (r.b.from ? " · " + r.b.from : "");
+        items.forEach(function (x) { mine.appendChild(cand(x)); });
+      });
+      return w;
+    }
+    function claimUI(c) {
+      var w = h("div", { class: "ai-pw__claim" });
+      var grid = h("div", { class: "ai-pw__fields" });
+      var p = h("input", { id: "pw-product", value: answers.product || "", maxlength: "120", placeholder: "e.g. Vitamin D drops for babies" });
+      var cl = h("input", { id: "pw-claim", value: answers.claim || "", maxlength: "200", placeholder: "e.g. Supports strong bones" });
+      grid.appendChild(h("div", { class: "ai-pw__field" }, h("label", { for: "pw-product" }, "Product"), p));
+      grid.appendChild(h("div", { class: "ai-pw__field" }, h("label", { for: "pw-claim" }, "Main claim"), cl));
+      w.appendChild(grid);
+      if (asList(answers.claim_tags).length || answers.regulated) {
+        var read = h("div", { class: "ai-pw__read" });
+        read.appendChild(h("p", { class: "ai-pw__read-h", html: aiSvg(PW_SPARK, 16) + "<span>Helvi read this as</span>" }));
+        var tags = h("div", { class: "ai-pw__tags" });
+        asList(answers.claim_tags).forEach(function (t) { tags.appendChild(h("span", { class: "ai-pw__tag" }, t)); });
+        if (answers.regulated === "yes") tags.appendChild(h("span", { class: "ai-pw__tag ai-pw__tag--flag" }, "Health claim"));
+        read.appendChild(tags);
+        read.appendChild(h("p", null, answers.regulated === "yes"
+          ? "A health claim usually needs medical voices. Pharmacists, doctors and licensed creators move up. Others still count."
+          : "Creators who post about these move up. Nobody is removed."));
+        w.appendChild(read);
+      }
+      var go = h("button", { class: "ai-sl__next ai-pw__read-b", type: "button" }, asList(answers.claim_tags).length ? "Read it again" : "Read it, Helvi");
+      var err = h("p", { class: "ai-pw__err", role: "alert", hidden: "" });
+      go.addEventListener("click", function () {
+        var pv = p.value.trim(), cv = cl.value.trim();
+        if (!pv && !cv) { err.textContent = T("Add the product or its claim first."); err.hidden = false; return; }
+        go.disabled = true; go.textContent = T("Helvi is reading…");
+        api("POST", "/api/brief/claim", { product: pv, claim: cv, category: asList(answers.category) }).then(function (r) {
+          go.disabled = false;
+          if (!r.b || !r.b.ok) { err.textContent = T("Helvi couldn't read it just now. Try again."); err.hidden = false; go.textContent = T("Read it, Helvi"); return; }
+          var was = pwAnswered(c, answers);
+          if (pv) answers.product = pv; else delete answers.product;
+          if (cv) answers.claim = cv; else delete answers.claim;
+          answers.claim_tags = r.b.tags || [];
+          answers.regulated = r.b.regulated ? "yes" : "no";
+          open = c.id;
+          render(!was, r.b.regulated ? "Health claim spotted" : "Got it");
+        });
+      });
+      w.appendChild(go); w.appendChild(err);
+      return w;
+    }
+    render(false);
+    return wrap;
+  }
+  // The why-chips and the "Why Helvi picked" panel for one pick (words only: the audience shares
+  // behind them are locked analysis figures).
+  function whyBox(p, light) {
+    if (!p || !p.chips) return null;
+    var box = h("div", { class: "ai-why" + (light ? " ai-why--light" : ""), "data-noselect": "" });
+    var row = h("div", { class: "ai-why__chips" });
+    p.chips.forEach(function (c) { row.appendChild(h("span", { class: "ai-why__chip", html: aiSvg(PW_TICK, 13) + "<span></span>" })); row.lastChild.querySelector("span").textContent = c; });
+    box.appendChild(row);
+    var tg = h("button", { class: "ai-why__b", type: "button", "aria-expanded": "false", html: aiSvg(PW_INFO, 15) + "<span>Why Helvi picked them</span>" });
+    var panel = h("div", { class: "ai-why__panel", hidden: "" });
+    panel.appendChild(h("p", { class: "ai-why__h" }, "How they fit your brief"));
+    var ul = h("ul");
+    var LV = { strong: "Strong", good: "Good", weak: "Weak", none: "Not measured" };
+    (p.fit_items || []).forEach(function (it) {
+      ul.appendChild(h("li", { class: "is-" + it.level }, h("span", null, it.label), h("em", null, LV[it.level] || it.level)));
+    });
+    panel.appendChild(ul);
+    if (p.perf != null && p.fit != null) {
+      panel.appendChild(h("p", { class: "ai-why__split" }, h("span", null, "Performance ", h("b", null, String(p.perf))), h("span", null, "Fit to brief ", h("b", null, String(p.fit)))));
+      panel.appendChild(h("div", { class: "ai-why__blend", html: '<i style="width:60%"></i><i style="width:40%"></i>' }));
+      panel.appendChild(h("p", { class: "ai-why__note" }, "60% performance, 40% fit. “Not measured” counts as neutral: it never pulls a creator down."));
+    }
+    tg.addEventListener("click", function (e) { e.stopPropagation(); e.preventDefault(); panel.hidden = !panel.hidden; tg.setAttribute("aria-expanded", String(!panel.hidden)); });
+    box.addEventListener("click", function (e) { e.stopPropagation(); });
+    box.appendChild(tg); box.appendChild(panel);
+    return box;
+  }
+
   /* ---------------------------------------------------- AI shortlist card */
   // "Build a shortlist with AI": a card beside the catalogue's filters. Six
   // taps fill a brief (free), the server scores the whole roster, and the grid
@@ -3352,7 +3706,8 @@
     ["platforms", "Platforms", '<rect x="7" y="3" width="10" height="18" rx="2.5"/><path d="M11 17.5h2"/>'],
     ["market", "Audience", '<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.6 2.6 2.6 14.4 0 17M12 3.5c-2.6 2.6-2.6 14.4 0 17"/>'],
     ["category", "Space", '<path d="M3.5 12.5l8-8h7v7l-8 8z"/><circle cx="15" cy="9" r="1.3"/>'],
-    ["budget", "Budget", '<rect x="3.5" y="6.5" width="17" height="12" rx="2.5"/><path d="M15.5 12.5h2.5M3.5 10h17"/>'],
+    // Item 172: Creator mix replaced Budget (prices exist for about 1% of creators).
+    ["mix", "Mix", '<circle cx="7" cy="15" r="3.5"/><circle cx="15" cy="11" r="5.5"/><circle cx="20" cy="18" r="1.8"/>'],
     ["count", "Creators", '<circle cx="9" cy="8.5" r="3"/><circle cx="16.5" cy="9.5" r="2.4"/><path d="M3.5 19c.5-3 2.7-4.6 5.5-4.6s5 1.6 5.5 4.6M15 14.6c2.6 0 4.6 1.4 5 4.4"/>']
   ];
   var AI_SHORT = { Instagram: "IG", TikTok: "TT", Snapchat: "SC", YouTube: "YT" };
@@ -3426,6 +3781,11 @@
       li.innerHTML = '<span class="ai-sl__dot">' + aiSvg(s[2], 18) + '<i class="ai-sl__tick">' + aiSvg('<path d="M5 12.5l4.2 4.2L19 7"/>', 16) + "</i></span><span class=\"ai-sl__lbl\">" + s[1] + "</span>";
       track.appendChild(li);
     });
+    // The seventh node is not a step: a lime diamond, the optional power-up stage (item 172).
+    var pwNode = h("li", { class: "ai-sl__node ai-sl__node--pw", "data-i": String(AI_STEPS.length) });
+    pwNode.innerHTML = '<span class="ai-sl__dot">' + aiSvg('<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z"/>', 18) + '</span><span class="ai-sl__lbl">' + T("Sharpen") + "</span>";
+    track.appendChild(pwNode);
+    track.classList.add("ai-sl__track--7");
     var fill = h("span", { class: "ai-sl__fill", "aria-hidden": "true" });
     track.appendChild(fill);
     head.appendChild(track); head.appendChild(level); head.appendChild(quit);
@@ -3500,14 +3860,16 @@
     }
     // A complete brief is worth exactly 1000: every answered question counts in full,
     // whatever was picked (one platform or three, "not decided yet" included).
-    var POINTS = { goal: 150, platforms: 150, market: 150, category: 250, budget: 150, count: 150 };
-    var LEVELS = [[0, "Draft"], [250, "Focused"], [500, "Sharp"], [800, "Ready to launch"]];
+    // Item 172: the core six fill the meter to 600 ("Strong"); every power-up answered adds 60, to
+    // "Full power" at 1000.
+    var POINTS = { goal: 100, platforms: 100, market: 100, category: 100, mix: 100, count: 100 };
+    var LEVELS = [[0, "Draft"], [300, "Good"], [600, "Strong"], [1000, "Full power"]];
     function scoreOf(id) {
       var v = answers[id];
       if (v == null || (Array.isArray(v) && !v.length)) return 0;
       return POINTS[id] || 0;
     }
-    function powerNow() { return AI_STEPS.reduce(function (t, s) { return t + scoreOf(s[0]); }, 0); }
+    function powerNow() { return Math.min(1000, AI_STEPS.reduce(function (t, s) { return t + scoreOf(s[0]); }, 0) + pwCount(answers) * PW_POINTS); }
     function levelOf(n) { var l = LEVELS[0][1]; LEVELS.forEach(function (x) { if (n >= x[0]) l = x[1]; }); return l; }
     var shown = 0;
     function paintPower(gain) {
@@ -3533,13 +3895,38 @@
     }
 
     function setTrack(at, done) {
-      Array.prototype.forEach.call(track.querySelectorAll(".ai-sl__node"), function (n, i) {
+      var nodes = track.querySelectorAll(".ai-sl__node");
+      pwNode.hidden = !POWER;
+      track.classList.toggle("ai-sl__track--7", !!POWER);
+      Array.prototype.forEach.call(nodes, function (n, i) {
         n.classList.toggle("is-done", i < at || !!done);
         n.classList.toggle("is-now", i === at && !done);
       });
-      var pct = done ? 100 : Math.round(at / (AI_STEPS.length - 1) * 100);
+      var last = POWER ? AI_STEPS.length : AI_STEPS.length - 1;
+      var pct = done ? 100 : Math.round(Math.min(at, last) / last * 100);
       fill.style.setProperty("--p", pct + "%");
-      level.innerHTML = done ? "<b>Brief</b> complete" : "<b>Brief " + Math.min(at + 1, AI_STEPS.length) + "</b> / " + AI_STEPS.length;
+      level.innerHTML = done ? "<b>Brief</b> complete" : at >= AI_STEPS.length ? "<b>Power-ups</b> optional"
+        : "<b>Brief " + Math.min(at + 1, AI_STEPS.length) + "</b> / " + AI_STEPS.length;
+    }
+    // "Make it sharper": the optional power-ups after the core six (item 172).
+    function sharpen(openId) {
+      if (!POWER) return review();
+      step = AI_STEPS.length; setTrack(AI_STEPS.length); paintPower(false);
+      coachCue("point");
+      var panel = powerStage({ answers: answers, core: byId, openId: openId, ready: "build",
+        cost: costLine().split(" · ")[0],
+        onChange: function (gain, said) {
+          if (!gain) { paintPower(false); return; }
+          var leveled = paintPower(true);
+          coachSay(leveled ? "Level up!" : said || "+" + PW_POINTS);
+          coachPlay("cheer", "think");
+        },
+        onBack: function () { ask(AI_STEPS.length - 1); },
+        onReview: review,
+        onBuild: function () { if (!busy) go(nameFor()); } });
+      var p = h("div", { class: "ai-sl__q" });
+      p.appendChild(panel);
+      swap(p);
     }
     function open() {
       card.classList.add("is-open"); intro.hidden = true; run.hidden = false; run.classList.remove("is-staging");
@@ -3599,6 +3986,33 @@
       var p = h("div", { class: "ai-sl__q" });
       p.appendChild(h("p", { class: "ai-sl__ask" }, id === "goal" ? "What are the campaign’s goals?" : q.label));
       p.appendChild(h("p", { class: "ai-sl__hint" }, multiGoal ? "Pick one or more, then Next" : many ? "Pick any, then Next" : "Tap one"));
+      if (id === "mix") {
+        // Creator mix: four shape cards, each drawn as its line-up (item 172).
+        p.lastChild.textContent = T("Pick the shape of your line-up. Helvi balances reach and trust to match.");
+        var mix = h("div", { class: "ai-mix", role: "radiogroup", "aria-label": T(q.label) });
+        var SHAPE = { hero: [40, 26, 26, 16, 16, 16], micro: [16, 16, 16, 16, 16, 16, 16, 16], big: [40, 40, 40] };
+        q.options.forEach(function (o) {
+          var on = answers[id] === o.value;
+          var b = h("button", { class: "ai-mix__o", type: "button", role: "radio", "aria-checked": String(on), "aria-pressed": String(on) });
+          var viz = h("span", { class: "ai-mix__viz", "aria-hidden": "true" });
+          if (SHAPE[o.value]) SHAPE[o.value].forEach(function (d) { var i = h("i"); i.style.width = i.style.height = d + "px"; viz.appendChild(i); });
+          else viz.innerHTML = aiSvg('<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/>', 34);
+          b.appendChild(viz); b.appendChild(h("b", null, o.label)); b.appendChild(h("span", null, o.hint || ""));
+          b.addEventListener("click", function () {
+            answers[id] = o.value;
+            Array.prototype.forEach.call(mix.children, function (x) { x.setAttribute("aria-pressed", String(x === b)); x.setAttribute("aria-checked", String(x === b)); });
+            pop(b, scoreOf(id)); reward(scoreOf(id)); setTimeout(next, reduce ? 0 : 750);
+          });
+          mix.appendChild(b);
+        });
+        p.appendChild(mix);
+        var mnav = h("div", { class: "ai-sl__nav" });
+        mnav.appendChild(h("button", { class: "ai-sl__back", type: "button", onclick: function () { ask(i - 1); } }, "Back"));
+        mnav.appendChild(h("button", { class: "ai-sl__skip", type: "button", onclick: function () { delete answers[id]; next(); } }, "Skip"));
+        p.appendChild(mnav);
+        swap(p);
+        return;
+      }
       var opts = h("div", { class: "ai-sl__opts" + (q.options.length > 6 ? " ai-sl__opts--many" : "") });
       q.options.forEach(function (o) {
         var on = many ? picked.indexOf(o.value) > -1 : answers[id] === o.value;
@@ -3653,7 +4067,7 @@
       if (oNext) nav.appendChild(oNext);
       p.appendChild(nav);
       swap(p);
-      function next() { if (i + 1 < AI_STEPS.length) ask(i + 1); else review(); }
+      function next() { if (i + 1 < AI_STEPS.length) ask(i + 1); else sharpen(); }
     }
     function pop(el, pts) {
       if (reduce) return;
@@ -3679,7 +4093,7 @@
       return c.search ? c.search + " credits" : "Free";
     }
     function review() {
-      setTrack(AI_STEPS.length, true);
+      setTrack(AI_STEPS.length + 1, true);
       var p = h("div", { class: "ai-sl__review" });
       var ticket = h("div", { class: "ai-sl__ticket" });
       ticket.appendChild(h("p", { class: "ai-sl__tk-h" }, "Campaign brief"));
@@ -3699,6 +4113,24 @@
         dl.appendChild(row);
       });
       ticket.appendChild(dl);
+      // The power-ups answered, each with Change (item 172).
+      var pws = POWER ? POWER.cards.filter(function (c) { return pwAnswered(c, answers); }) : [];
+      if (pws.length) {
+        ticket.appendChild(h("p", { class: "ai-sl__tk-sep" }, "Power-ups"));
+        var dl2 = h("dl", { class: "ai-sl__rows" });
+        var SHORT = { type: "Creator type", claim: "Product", licence: "Licence", age: "Age", gender: "Gender", city: "City",
+                      lang: "Language", like: "Like these", fresh: "Fresh / proven", tone: "Tone" };
+        pws.forEach(function (c) {
+          var row = h("div", { class: "ai-sl__row ai-sl__row--pw" });
+          row.appendChild(h("dt", null, SHORT[c.id] || c.label));
+          row.appendChild(h("dd", null, pwLabel(c, answers, byId)));
+          row.appendChild(h("button", { class: "ai-sl__edit", type: "button", "aria-label": "Change " + c.label, onclick: function () { sharpen(c.id); } }, "Change"));
+          dl2.appendChild(row);
+        });
+        ticket.appendChild(dl2);
+      } else if (POWER) {
+        ticket.appendChild(h("button", { class: "ai-sl__edit ai-sl__tk-more", type: "button", onclick: function () { sharpen(); } }, "Add power-ups to sharpen the list"));
+      }
       p.appendChild(ticket);
       var side = h("div", { class: "ai-sl__go" });
       side.appendChild(h("p", { class: "ai-sl__ask" }, "Ready when you are."));
@@ -3815,6 +4247,7 @@
       Array.prototype.forEach.call(document.querySelectorAll(".cat-card.ai-pick, .cat-card.ai-out"), function (c) {
         c.classList.remove("ai-pick", "ai-out"); c.style.order = "";
         var x = c.querySelector(".ai-badges"); if (x) x.remove();
+        var y = c.querySelector(".ai-why"); if (y) y.remove();
       });
       var bar = $("ai-result"); if (bar) bar.remove();
       document.body.classList.remove("ai-mode");
@@ -3834,8 +4267,8 @@
       clearResult(true);
       var grid = $("cat-grid");
       if (!grid) return;
-      var rank = {}, why = {};
-      res.picks.forEach(function (p, i) { rank[p.code] = i + 1; why[p.code] = p.why || ""; });
+      var rank = {}, why = {}, pickOf = {};
+      res.picks.forEach(function (p, i) { rank[p.code] = i + 1; why[p.code] = p.why || ""; pickOf[p.code] = p; });
       grid.classList.add("ai-on");
       document.body.classList.add("ai-mode");
       Array.prototype.forEach.call(grid.querySelectorAll(".cat-card[data-code]"), function (c) {
@@ -3854,6 +4287,8 @@
           box.appendChild(s);
         });
         media.appendChild(box);
+        var wb = whyBox(pickOf[code], true);
+        if (wb) (c.querySelector(".cat-card__body") || c).appendChild(wb);
         if (c.getAttribute("aria-pressed") !== "true") c.click();
       });
       var bar = h("div", { id: "ai-result", class: "ai-result" });
