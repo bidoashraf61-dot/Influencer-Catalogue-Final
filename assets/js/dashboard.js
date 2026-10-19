@@ -139,7 +139,7 @@
     el.innerHTML = '<span class="db-fresh__txt"><span class="db-fresh__live"><i class="db-fresh__dot"></i>Live data</span>'
       + (R.updated_at ? "Updated " + esc(ago(R.updated_at)) : "Waiting for the first capture") + "</span>"
       + '<span class="db-fresh__lbl">Next update in</span>'
-      + '<span class="db-cd" role="timer" aria-label="Time until the next update"><b id="cd-h">00</b><i>:</i><b id="cd-m">00</b><i>:</i><b id="cd-s"><span>00</span></b></span>';
+      + '<span class="db-cd" role="timer" aria-label="Time until the next update" title="Next update in (hours : minutes : seconds)"><b id="cd-h">00</b><i>:</i><b id="cd-m">00</b><i>:</i><b id="cd-s"><span>00</span></b></span>';
     var lastSec = -1;
     function tick() {
       var left = Math.max(0, next * 1000 - Date.now()), s = Math.floor(left / 1000), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;

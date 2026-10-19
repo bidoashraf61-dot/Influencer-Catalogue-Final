@@ -1181,3 +1181,27 @@
 .db-pick__all.is-on::after { content: ""; float: right; width: 5px; height: 9px; margin: 1px 4px 0 0; border: solid var(--go); border-width: 0 2px 2px 0; transform: rotate(45deg); }
 @media (max-width: 760px) { .db-pick__t { max-width: 110px; } }
 @media (prefers-reduced-motion: reduce) { .db-pick__chev { transition: none; } }
+/* Platforms as icons on wider screens too, so the filters and the live-data block share one line (owner, 2026-10-19).
+   The chosen platform keeps its name; every button keeps it for screen readers and as a tooltip. */
+@media (min-width: 641px) {
+  .db-seg button[data-p]:not([data-p=""]) { padding: 6px 9px; }
+  .db-seg button[data-p]:not([data-p=""]) svg { width: 17px; height: 17px; }
+  .db-seg button[data-p]:not([data-p=""]):not([aria-pressed="true"]) .db-seg__t { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .db-seg button[aria-pressed="true"][data-p]:not([data-p=""]) { padding: 6px 12px 6px 10px; }
+}
+@media (min-width: 761px) and (max-width: 1800px) {
+  .db-filters { gap: 10px; }
+  .db-fresh--live { gap: 8px 12px; }
+  .db-cd b { font-size: 30px; padding: 7px 10px 5px; min-width: 46px; border-radius: 10px; }
+  .db-cd i { font-size: 24px; }
+  .db-upd { flex-direction: column; align-items: center; gap: 3px; }
+  .db-upd__btn { padding: 9px 16px; }
+  .db-upd__left { font-size: 11px; }
+}
+@media (min-width: 761px) and (max-width: 1400px) {
+  .db-fresh__lbl { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+@media (min-width: 761px) and (max-width: 1240px) {
+  .db-fresh { flex-basis: 100%; margin-left: 0; }
+  .db-fresh--live { justify-content: flex-start; }
+}
