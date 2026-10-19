@@ -943,6 +943,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if sel is None:
                 return self.send(404, "<p class='err'>That selection no longer exists.</p>")
             return self.send(200, views.selection_fit_panel(sel, db.list_creators(), self.selection_scores(sel), db.known_interests()))
+        if path == "/campaigns/comments":
+            import comments
+            return comments.admin_get(self, query)
         if path == "/campaigns/setup":
             return self.get_campaign_setup(query)
         if path == "/campaigns/template.xlsx":
@@ -1411,6 +1414,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_quote_withdraw()
         if path == "/campaigns/save":
             return self.post_campaign_save()
+        if path == "/campaigns/comments":
+            import comments
+            return comments.admin_post(self)
         if path == "/campaigns/status":
             return self.post_campaign_status()
         if path == "/campaigns/delete":
@@ -6395,6 +6401,9 @@ def main():
     # Prediction log (2026-10-13): freezes each campaign creator's score so it can be tested against the results.
     import scorelog
     scorelog.start()
+    # What people said (2026-10-19): campaign comments read 2 and 7 days after each video.
+    import comments
+    comments.start()
     db.purge_expired_sessions()
     ALLOWED_ORIGINS.update(args.origin)
     global BASE

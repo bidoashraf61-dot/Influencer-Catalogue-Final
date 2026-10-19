@@ -595,12 +595,68 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
+  /* What people said (owner, 2026-10-19): viewers' comments, read by AI 2 and 7 days after each video. It takes the
+     audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
+  var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
+  var CM_TIP = "What viewers wrote under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
+  function cmPick() {
+    var C = R.comments || {}, t = { n: 0, pos: 0, neu: 0, neg: 0, intent: 0, videos: 0, asks: {}, themes: {}, by: {} };
+    (C.buckets || []).forEach(function (b) {
+      if ((F.platform && b.platform !== F.platform) || (F.creators.length && F.creators.indexOf(b.code) < 0)) return;
+      ["n", "pos", "neu", "neg", "intent", "videos"].forEach(function (k) { t[k] += b[k] || 0; });
+      Object.keys(b.asks || {}).forEach(function (q) { var x = t.asks[q] = t.asks[q] || { n: 0, en: b.asks[q].en }; x.n += b.asks[q].n; });
+      Object.keys(b.themes || {}).forEach(function (q) { t.themes[q] = (t.themes[q] || 0) + b.themes[q]; });
+      var w = t.by[b.code] = t.by[b.code] || { n: 0, pos: 0, neu: 0, neg: 0, intent: 0, plats: [], themes: {} };
+      ["n", "pos", "neu", "neg", "intent"].forEach(function (k) { w[k] += b[k] || 0; });
+      if (w.plats.indexOf(b.platform) < 0) w.plats.push(b.platform);
+      Object.keys(b.themes || {}).forEach(function (q) { w.themes[q] = (w.themes[q] || 0) + b.themes[q]; });
+    });
+    t.small = t.n < ((R.comments || {}).min_sample || 30);
+    return t;
+  }
+  function cmPct(x, n) { return n ? Math.round(x / n * 100) : 0; }
+  function cmTop(o, k) { return Object.keys(o).sort(function (a, b) { return (k ? o[b][k] - o[a][k] : o[b] - o[a]); }); }
+  function cmMood(t, big) {
+    var p = cmPct(t.pos, t.n), z = cmPct(t.neg, t.n), u = Math.max(0, 100 - p - z);
+    return '<div class="cm-mood' + (big ? " cm-mood--big" : "") + '" role="img" aria-label="' + p + "% positive, " + u + "% neutral, " + z + '% negative">'
+      + '<i class="p" style="width:' + p + '%"></i><i class="n" style="width:' + u + '%"></i><i class="x" style="width:' + z + '%"></i></div>';
+  }
+  function cmKey(t, extra) {
+    var v = function (x) { return t.small ? x : cmPct(x, t.n) + "%"; };
+    return '<div class="cm-key"><span style="--c:var(--d1)"><b>' + v(t.pos) + '</b> positive</span><span style="--c:#cfc6bb"><b>' + v(t.neu)
+      + '</b> neutral</span>' + (t.neg ? '<span style="--c:var(--vivid-red)"><b>' + v(t.neg) + "</b> negative</span>" : "") + (extra || "") + "</div>";
+  }
+  function cmVerdict(t) {
+    if (t.small) return ["none", "Too few to judge"];
+    var p = t.pos / t.n, z = t.neg / t.n;
+    return z >= 0.3 ? ["low", "Mixed to negative"] : p >= 0.6 && z < 0.15 ? ["good", "Mostly positive"] : ["moderate", "Mixed"];
+  }
+  function cmDay(t) { return t ? day(t) : "—"; }
+  function cmWait(C) {
+    if (C.status === "none" || !C.first_post) return '<div class="cm-wait"><p>No videos are live yet. Once creators post, viewers\' comments are read here.</p></div>';
+    var now = Date.now() / 1000, d = C.read_days || [2, 7], fp = C.first_post, r1 = C.next_read || fp + d[0] * 86400, r2 = C.final_read || fp + d[1] * 86400;
+    return '<div class="cm-wait"><p>Comments are read ' + d[0] + " and " + d[1] + " days after each video. The first reading lands on <b>" + cmDay(r1) + "</b>.</p>"
+      + '<div class="cm-steps"><div class="on"><b>Posted</b>' + cmDay(fp) + '</div><div class="' + (now >= r1 ? "on" : "next") + '"><b>First read</b>' + cmDay(r1)
+      + '</div><div class="' + (now >= r1 ? "next" : "") + '"><b>Final read</b>' + cmDay(r2) + "</div></div></div>";
+  }
+  function cmAsks(t, n) {
+    return cmTop(t.asks, "n").slice(0, n).map(function (q, i) {
+      return '<span class="cm-ask' + (i ? "" : " cm-ask--top") + '" title="' + esc(t.asks[q].en || "") + '"><q dir="auto">' + esc(q) + "</q><b>×" + t.asks[q].n + "</b></span>";
+    }).join("");
+  }
   function renderGeo() {
-    var a = R.audience;
-    $("w-geo").innerHTML = head(IC.geo, "Creators' audience countries", "Where the creators' own followers are, from their full profile analyses, weighted by the reach each delivered. It describes the creators' audience, not who saw the campaign posts. Creators without an analysis are not counted.", "geo")
-      + '<div class="db-card__body">' + (a && a.countries.length ? bars(a.countries.slice(0, 5).map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" }; }),
-        function (r) { return flag(r.k) + esc(countryName(r.k)); }) + audTarget(a) + '<p class="db-note">' + audNote(a) + "</p>"
-        : '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>') + "</div>";
+    var C = R.comments, t = cmPick(), body;
+    if (!C || !t.n) body = cmWait(C || { status: "none" });
+    else {
+      var v = cmVerdict(t), C2 = R.comments;
+      body = '<div class="cm-lead"><div class="cm-big">' + (t.small ? t.intent : cmPct(t.intent, t.n) + "%") + "<small>" + (t.small ? "of " + t.n + " comments ask" : "of comments ask") + " how to buy</small></div>"
+        + '<span class="db-sig db-sig--' + v[0] + '">' + v[1] + "</span></div>"
+        + "<div>" + cmMood(t) + cmKey(t) + "</div>"
+        + (Object.keys(t.asks).length ? '<div class="cm-asks" aria-label="Most asked">' + cmAsks(t, 3) + "</div>" : "")
+        + '<p class="db-note">' + full(t.n) + " comments on " + t.videos + " video" + (t.videos === 1 ? "" : "s")
+        + (C2.next_read ? " · next read " + cmDay(C2.next_read) : C2.last_read ? " · read " + cmDay(C2.last_read) : "") + "</p>";
+    }
+    $("w-geo").innerHTML = head(CMI, "What people said", CM_TIP, C && t.n ? "geo" : null) + '<div class="db-card__body cm">' + body + "</div>";
   }
 
   var PCOL = { Instagram: "#d62976", TikTok: "#121212", Snapchat: "#f7d100", YouTube: "#ff0000", Facebook: "#0866ff", X: "#121212" };
@@ -924,9 +980,36 @@
       return '<div class="db-wall">' + list.map(post).join("") + "</div>";
     },
     geo: function () {
-      var a = R.audience; if (!a) return '<p class="db-note">Audience data appears when creators\' full analyses are uploaded.</p>';
-      return bars(a.countries.map(function (c) { return { k: c.code, n: c.pct, label: c.pct.toFixed(1) + "%" }; }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
-        + audTarget(a) + '<p class="db-note" style="margin-top:10px">' + audNote(a) + ".</p>";
+      var C = R.comments, t = cmPick();
+      if (!C || !t.n) return cmWait(C || { status: "none" });
+      var share = t.intent / t.n, p = t.pos / t.n, z = t.neg / t.n, th = cmTop(t.themes);
+      var mood = z >= 0.3 ? "Viewers are divided" : p >= 0.6 ? "Viewers are warm" : "Viewers are mostly neutral";
+      var buy = share >= 0.15 ? ", and <em>1 in " + Math.max(2, Math.round(1 / share)) + " wants to buy</em>" : share >= 0.04 ? ", and some ask how to buy" : ", and few ask about buying";
+      var verdict = t.small ? "Only " + t.n + " comments so far: too few to judge." : mood + buy + (th[0] ? ". They talk most about " + esc(th[0].toLowerCase()) + "." : ".");
+      var asks = cmTop(t.asks, "n").slice(0, 6);
+      var peak = th.length ? t.themes[th[0]] : 1;
+      var names = {}; (R.creators || []).forEach(function (c) { names[c.code] = c.name; });
+      var quotes = ((C.quotes) || []).filter(function (q) { return (!F.platform || q.platform === F.platform) && (!F.creators.length || F.creators.indexOf(q.code) >= 0); });
+      var who = Object.keys(t.by).sort(function (a, b) { return t.by[b].n - t.by[a].n; });
+      var silent = (R.creators || []).filter(function (c) { return !t.by[c.code] && (!F.creators.length || F.creators.indexOf(c.code) >= 0); });
+      return "<h3>The verdict</h3>" + '<p class="cmp-verdict">' + verdict + "</p>"
+        + '<div class="cmp-mood">' + cmMood(t, true) + cmKey(t, "<span>" + full(t.n) + " comments · " + t.videos + " video" + (t.videos === 1 ? "" : "s") + "</span>") + "</div>"
+        + (asks.length ? "<h3>What buyers asked</h3>" + '<div class="cmp-asks">' + asks.map(function (q) {
+          return '<div class="cmp-ask"><q dir="auto">' + esc(q) + "</q><span>" + esc(t.asks[q].en || "") + "</span><b>" + t.asks[q].n + "</b></div>"; }).join("") + "</div>" : "")
+        + (th.length ? "<h3>What people talk about</h3>" + '<div class="cmp-themes">' + th.slice(0, 6).map(function (q, i) {
+          return '<div class="db-bar"><span>' + esc(q) + '</span><i style="--w:' + (t.themes[q] / peak * 100).toFixed(1) + "%;--c:" + (i < 2 ? "var(--d1)" : "var(--d4)") + '"></i><b>'
+            + (t.small ? t.themes[q] : cmPct(t.themes[q], t.n) + "%") + "</b></div>"; }).join("") + "</div>" : "")
+        + (quotes.length ? "<h3>In their words</h3>" + '<div class="cmp-quotes">' + quotes.map(function (q) {
+          return '<article class="cmp-quote"><q dir="auto">' + esc(q.text) + "</q>" + (q.gloss ? "<p>“" + esc(q.gloss) + "”</p>" : "")
+            + "<footer><b>" + esc(names[q.code] || q.code || "") + "</b><span>" + esc(q.platform) + "</span></footer></article>"; }).join("") + "</div>" : "")
+        + "<h3>By creator</h3>" + '<table class="db-table cmp-who"><thead><tr><th>Creator</th><th>Comments</th><th>Mood</th><th>Ask how to buy</th><th>Talked most about</th></tr></thead><tbody>'
+        + who.map(function (c) { var w = t.by[c], few = w.n < ((C.min_sample) || 30), top = cmTop(w.themes)[0];
+          return "<tr><td><b>" + esc(names[c] || c) + "</b><small>" + esc(w.plats.join(", ")) + "</small></td><td>" + full(w.n) + "</td><td>" + cmMood(w) + "</td><td><b>"
+            + (few ? w.intent + "</b> <small>of " + w.n + "</small>" : cmPct(w.intent, w.n) + "%</b>") + "</td><td>" + (few ? "Too few to say" : esc(top || "—")) + "</td></tr>"; }).join("")
+        + silent.map(function (c) { return "<tr><td><b>" + esc(c.name) + "</b></td><td colspan=\"4\"><small>" + (c.posts ? "Comments not read yet" : "No video yet") + "</small></td></tr>"; }).join("")
+        + "</tbody></table>"
+        + '<p class="cmp-foot">Comments are read twice per video, ' + (C.read_days || [2, 7]).join(" and ") + " days after it is posted, up to 300 per post, and grouped by AI. "
+        + "Quotes are chosen by HelloVoice. Commenters' names and photos are never stored or shown.</p>";
     },
     plat: function () {
       // One ledger row per platform, biggest first: its views and share of all views lead, a bar against the biggest
@@ -1021,12 +1104,12 @@
       + (p.caption ? '<p class="db-post__cap">' + esc(p.caption) + "</p>" : "")
       + '<div class="db-post__stats">' + stats(p).map(function (x) { return "<div><small>" + x[0] + "</small><b>" + x[1] + "</b></div>"; }).join("") + "</div></a>";
   }
-  var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "Audience countries", plat: "Platforms", clicks: "Affiliate clicks" };
+  var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "What people said", plat: "Platforms", clicks: "Affiliate clicks" };
   var lastFocus = null;
   function openPanel(area) {
     if (!PANEL[area]) return;
     lastFocus = document.activeElement;
-    $("db-panel-title").textContent = TITLES[area] + (filtered() && area !== "stage" && area !== "geo" ? " · filtered" : "");
+    $("db-panel-title").textContent = TITLES[area] + (filtered() && area !== "stage" ? " · filtered" : "");
     $("db-panel-body").innerHTML = PANEL[area]();
     if (area === "kpi") bindTV();
     $("db-scrim").hidden = false; $("db-panel").hidden = false;

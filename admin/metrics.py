@@ -1315,6 +1315,14 @@ def client_report(campaign, photo=None, photo_large=None):
     out["progress"]["all_met"] = bool(its) and all(i["actual"] >= i["goal"] for i in its)
     reach_by = {c["code"]: (c.get("reach") or 0) + (c.get("views") or 0) for c in r["creators"]}
     out["audience"] = audience_mix(r["creators"], reach_by, target_country(campaign)) if vis["audience"] else None
+    # What people said (2026-10-19) takes the audience card's place and its visibility switch.
+    out["comments"] = None
+    if vis["audience"]:
+        try:
+            import comments
+            out["comments"] = comments.client_view(k)
+        except Exception as exc:
+            print("comments: client view skipped:", repr(exc)[:160], flush=True)
     out["goals"] = goals_view(campaign, r)
     for g in (out["goals"] or {}).get("creators", []):
         g["photo"] = pics.get(g["code"])

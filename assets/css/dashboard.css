@@ -784,3 +784,51 @@
 }
 @media (prefers-reduced-motion: reduce) { .db-pl__bar i { animation: none; } }
 .db-pl__strip i[data-p="Snapchat"] span { color: #121212; text-shadow: none; }
+
+/* What people said (2026-10-19): viewers' comments read by AI, in the old audience slot. */
+.cm.db-card__body { gap: 9px; }
+.cm-lead { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.cm-big { font-family: var(--heading); font-size: 46px; line-height: .82; color: var(--ink); }
+.cm-big small { display: block; font-family: var(--body); font-size: 12px; line-height: 1.3; color: var(--gray); margin-top: 6px; letter-spacing: 0; }
+.cm-mood { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #efece6; }
+.cm-mood i { display: block; height: 100%; }
+.cm-mood .p { background: var(--d1); } .cm-mood .n { background: #cfc6bb; } .cm-mood .x { background: var(--vivid-red); }
+.cm-mood--big { height: 16px; }
+.cm-key { display: flex; gap: 12px; font-size: 11.5px; color: var(--gray); margin-top: 6px; flex-wrap: wrap; }
+.cm-key span { display: inline-flex; align-items: center; gap: 5px; }
+.cm-key span[style]::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.cm-key b { color: var(--ink); font-weight: 600; }
+.cm-asks { display: flex; flex-wrap: wrap; gap: 6px; max-height: 30px; overflow: hidden; }
+.cm-ask { display: inline-flex; align-items: baseline; gap: 6px; padding: 5px 10px 5px 8px; border-radius: 999px; background: #f2f0eb; font-size: 13px; }
+.cm-ask q, .cmp-ask q, .cmp-quote q { quotes: none; unicode-bidi: isolate; font-family: "Geeza Pro", "Noto Kufi Arabic", var(--body); color: var(--ink); }
+.cm-ask b { font-size: 11px; color: var(--gray); font-weight: 600; }
+.cm-ask--top { background: var(--lime); } .cm-ask--top b { color: var(--ink); }
+.cm-wait { margin: auto 0; display: flex; flex-direction: column; gap: 14px; }
+.cm-wait p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink); max-width: 32ch; }
+.cm-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; position: relative; }
+.cm-steps::before { content: ""; position: absolute; left: 7px; right: calc(33.3% - 7px); top: 6px; height: 2px; background: #e6e2db; }
+.cm-steps div { position: relative; font-size: 11px; color: var(--gray); line-height: 1.35; }
+.cm-steps div::before { content: ""; display: block; width: 14px; height: 14px; border-radius: 50%; background: #fff; border: 2px solid #cfc6bb; margin-bottom: 7px; box-sizing: border-box; }
+.cm-steps div.on::before { background: var(--ink); border-color: var(--ink); }
+.cm-steps div.next::before { background: var(--lime); border-color: var(--ink); }
+.cm-steps b { display: block; color: var(--ink); font-weight: 600; }
+.cmp-verdict { font-family: var(--heading); font-size: 30px; line-height: 1; margin: 0 0 14px; max-width: 28ch; }
+.cmp-verdict em { font-style: normal; background: var(--lime); padding: 0 6px; }
+.cmp-mood .cm-key { font-size: 13px; gap: 18px; margin-top: 10px; }
+.cmp-asks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.cmp-ask { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; }
+.cmp-ask q { display: block; text-align: start; font-size: 20px; line-height: 1.3; }
+.cmp-ask span { display: block; font-size: 12.5px; color: var(--gray); margin-top: 6px; }
+.cmp-ask b { font-family: var(--heading); font-size: 30px; font-weight: 400; line-height: 1; display: block; margin-top: 8px; }
+.cmp-themes .db-bar { grid-template-columns: minmax(180px, 1.4fr) 1fr 44px; font-size: 13.5px; margin-bottom: 10px; }
+.cmp-themes .db-bar i { height: 10px; }
+.cmp-quotes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.cmp-quote { background: #f6f4ef; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 8px; }
+.cmp-quote q { font-size: 17px; line-height: 1.45; }
+.cmp-quote p { margin: 0; font-size: 12.5px; color: var(--gray); line-height: 1.45; }
+.cmp-quote footer { margin-top: auto; font-size: 11.5px; color: var(--gray); display: flex; justify-content: space-between; gap: 8px; }
+.cmp-quote footer b { color: var(--ink); font-weight: 600; }
+.cmp-who td .cm-mood { width: 120px; height: 8px; }
+.cmp-who td small { display: block; color: var(--gray); font-size: 12px; }
+.cmp-foot { margin: 26px 0 0; font-size: 12.5px; color: var(--gray); line-height: 1.5; max-width: 80ch; }
+@media (max-width: 760px) { .cmp-asks, .cmp-quotes { grid-template-columns: 1fr; } .cmp-themes .db-bar { grid-template-columns: minmax(120px, 1.4fr) 1fr 40px; } }
