@@ -603,11 +603,11 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v3 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v5 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
-  var CM_COL = { pos: "#14884a", neu: "#3d7fe0", neg: "#ee1515" };
+  var CM_COL = { pos: "#14884a", neu: "#a8bf2a", neg: "#ee1515" };
   // One drawn icon per theme, picked from the words of the AI's label.
   var CM_TI = [
     [/avail|where|find|stock|pharmac|store|shop|country|egypt|kuwait|saudi/i, '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/>'],
@@ -626,12 +626,14 @@
     return ico(hit ? hit[1] : '<path d="M4 5.5h16v10.5H9l-5 4z"/>');
   }
   function cmPick() {
-    var C = R.comments || {}, t = { n: 0, pos: 0, neu: 0, neg: 0, intent: 0, videos: 0, asks: {}, themes: {}, by: {}, plats: {} };
+    var C = R.comments || {}, t = { n: 0, pos: 0, neu: 0, neg: 0, intent: 0, videos: 0, asks: {}, themes: {}, by: {}, plats: {}, tp: {}, days: {} };
     (C.buckets || []).forEach(function (b) {
       if ((F.platform && b.platform !== F.platform) || (F.creators.length && F.creators.indexOf(b.code) < 0)) return;
       ["n", "pos", "neu", "neg", "intent", "videos"].forEach(function (k) { t[k] += b[k] || 0; });
       Object.keys(b.asks || {}).forEach(function (q) { var x = t.asks[q] = t.asks[q] || { n: 0, en: b.asks[q].en }; x.n += b.asks[q].n; });
-      Object.keys(b.themes || {}).forEach(function (q) { t.themes[q] = (t.themes[q] || 0) + b.themes[q]; });
+      Object.keys(b.themes || {}).forEach(function (q) { t.themes[q] = (t.themes[q] || 0) + b.themes[q];
+        var tp = t.tp[q] = t.tp[q] || {}; tp[b.platform] = (tp[b.platform] || 0) + b.themes[q]; });
+      Object.keys(b.days || {}).forEach(function (d) { t.days[d] = (t.days[d] || 0) + b.days[d]; });
       var w = t.by[b.code] = t.by[b.code] || { n: 0, pos: 0, neu: 0, neg: 0, intent: 0, plats: [], themes: {} };
       ["n", "pos", "neu", "neg", "intent"].forEach(function (k) { w[k] += b[k] || 0; });
       if (w.plats.indexOf(b.platform) < 0) w.plats.push(b.platform);
@@ -680,14 +682,37 @@
     var C = R.comments, t = cmPick(), body;
     if (!C || !t.n) body = cmWait(C || { status: "none" });
     else {
-      var v = cmVerdict(t), top = cmTop(t.asks, "n")[0];
-      body = '<div class="cm-top">' + cmRing(t)
-        + '<div class="cm-buy"><b class="cm-big">' + (t.small ? t.intent : cmPct(t.intent, t.n) + "%") + "</b>" + '<span class="cm-buy__l"><small>' + (t.small ? "of " + t.n + " ask" : "of " + full(t.n) + " ask to buy") + "</small>"
-        + '<span class="db-sig db-sig--' + v[0] + '">' + v[1] + "</span></span>" + cmKey(t, true) + "</div></div>"
-        + (top ? '<p class="cm-most" title="' + esc(t.asks[top].en || "") + '"><span>Most asked</span><q dir="auto">' + esc(top) + "</q><b>×" + t.asks[top].n + "</b></p>" : "")
-        + "";
+      body = '<div class="cm-hero">' + cmRing(t, "cm-ring--card") + '<div class="cm-legend">'
+        + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cm-legend__r" style="--c:' + CM_COL[s[0]] + '"><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + "</small></div>"; }).join("")
+        + '<p class="cm-legend__n">' + full(t.n) + " comments · " + t.videos + " video" + (t.videos === 1 ? "" : "s") + "</p></div></div>";
     }
     $("w-geo").innerHTML = head(CMI, "What people commented", CM_TIP, C && t.n ? "geo" : null) + '<div class="db-card__body cm">' + body + "</div>";
+  }
+  // Share of all comments by platform: one donut in the platforms' own colours, the leader in the middle.
+  function cmShare(plats, t) {
+    var off = 25, segs = plats.map(function (k) { var s = t.n ? t.plats[k].n / t.n * 100 : 0;
+      var c = '<circle cx="21" cy="21" r="15.915" fill="none" stroke="' + (PCOL[k] || "#121212") + '" stroke-width="6" stroke-dasharray="' + s.toFixed(2) + " " + (100 - s).toFixed(2) + '" stroke-dashoffset="' + off.toFixed(2) + '"/>';
+      off -= s; return c; }).join("");
+    var top = plats[0];
+    return '<div class="cmp-share"><div class="cm-ring cm-ring--share"><svg viewBox="0 0 42 42" role="img" aria-label="' + plats.map(function (k) { return k + " " + cmPct(t.plats[k].n, t.n) + "%"; }).join(", ") + '">'
+      + '<circle cx="21" cy="21" r="15.915" fill="none" stroke="#efece6" stroke-width="6"/>' + segs + '</svg><span><b style="color:' + (PCOL[top] || "#121212") + '">' + cmPct(t.plats[top].n, t.n) + "%</b>from " + esc(top) + "</span></div>"
+      + '<ul class="cmp-share__k">' + plats.map(function (k) { return '<li style="--pc:' + (PCOL[k] || "#121212") + '">' + (ICONS[k] || "") + "<span>" + esc(k) + "</span><b>" + cmPct(t.plats[k].n, t.n) + "%</b><small>" + full(t.plats[k].n) + "</small></li>"; }).join("") + "</ul></div>";
+  }
+  // Squarified treemap in a 160 x 100 box: [x, y, w, h] per value, biggest first.
+  function cmSquarify(vals, x, y, w, h) {
+    var out = [], tot = vals.reduce(function (a, b) { return a + b; }, 0); if (!tot) return out;
+    var area = vals.map(function (v) { return v / tot * w * h; }), i = 0;
+    var sum = function (r) { return r.reduce(function (a, b) { return a + b; }, 0); };
+    while (i < area.length) {
+      var side = Math.min(w, h), row = [area[i]], j = i + 1;
+      var worst = function (r) { var s = sum(r); return Math.max(side * side * Math.max.apply(null, r) / (s * s), s * s / (side * side * Math.min.apply(null, r))); };
+      while (j < area.length && worst(row.concat(area[j])) <= worst(row)) { row.push(area[j]); j++; }
+      var s = sum(row);
+      if (w >= h) { var cw = s / h, cy = y; row.forEach(function (a) { out.push([x, cy, cw, a / cw]); cy += a / cw; }); x += cw; w -= cw; }
+      else { var ch = s / w, cx = x; row.forEach(function (a) { out.push([cx, y, a / ch, ch]); cx += a / ch; }); y += ch; h -= ch; }
+      i = j;
+    }
+    return out;
   }
 
   var PCOL = { Instagram: "#d62976", TikTok: "#121212", Snapchat: "#f7d100", YouTube: "#ff0000", Facebook: "#0866ff", X: "#121212" };
@@ -1029,26 +1054,46 @@
       var box = function (n, l, cls) { return '<div class="cmp-box' + (cls ? " " + cls : "") + '"><b>' + n + "</b><span>" + l + "</span></div>"; };
       var asksOf = function (q, k) { return (TA[q] || []).slice(0, k).map(function (a) {
         return '<span class="cmp-chip" title="' + esc(a[1] || "") + '"><q dir="auto">' + esc(a[0]) + "</q><b>×" + a[2] + "</b></span>"; }).join(""); };
-      var mainT = th[0], restT = th.slice(1, 7);
+      var mainT = th[0], restT = th.slice(1, 7), topA = cmTop(t.asks, "n")[0];
+      // One line, the strongest finding first (owner: shorter, the insight highlighted).
+      var head1 = t.small ? "Only " + t.n + " comments so far" : share >= 0.15 ? "<mark>1 in " + Math.max(2, Math.round(1 / share)) + " want to buy</mark>"
+        : z >= 0.3 ? "<mark>Viewers are divided</mark>" : p >= 0.6 ? "<mark>Viewers love it</mark>" : "<mark>Mostly neutral</mark>";
+      var sub1 = topA ? 'Most ask <q dir="auto">' + esc(topA) + "</q>" + (t.asks[topA].en ? " (" + esc(t.asks[topA].en.replace(/\?$/, "")) + ")" : "") + " · " + t.asks[topA].n + " times"
+        : mainT ? "The talk is mostly about " + esc(mainT.toLowerCase()) : "";
       return '<section class="cmp-top"><div class="cmp-boxes">'
         + box(full(t.n), "comments read") + box(v(t.intent), "ask how to buy", "is-hot") + box(v(t.pos), "positive") + box(t.videos, "video" + (t.videos === 1 ? "" : "s"))
-        + '</div><aside class="cmp-say" aria-label="The verdict from the comments"><img class="cmp-say__av" src="../../assets/brand/helvy-connect/helvy-icon-180.png" alt="" width="48" height="48">'
-        + '<div class="cmp-say__b"><p class="cmp-say__k">Helvi read the comments</p><p class="cmp-say__t">' + verdict + "</p>"
+        + '</div><aside class="cmp-say" aria-label="The insight from the comments"><img class="cmp-say__av" src="../../assets/brand/helvy-connect/helvy-icon-180.png" alt="" width="48" height="48">'
+        + '<div class="cmp-say__b"><p class="cmp-say__k">Helvi read the comments</p><p class="cmp-say__t">' + head1 + "</p>" + (sub1 ? '<p class="cmp-say__s">' + sub1 + "</p>" : "")
         + (C.next_read || C.last_read ? '<p class="cmp-say__d">' + (C.last_read ? "Read " + cmDay(C.last_read) : "") + (C.next_read ? (C.last_read ? " · " : "") + "next read " + cmDay(C.next_read) : "") + "</p>" : "")
         + "</div></aside></section>"
         + "<h3>The mood</h3>" + '<div class="cmp-mood">' + cmRing(t, "cm-ring--hero") + '<div class="cmp-mood__k">'
         + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cmp-mood__r" style="--c:' + CM_COL[s[0]] + '"><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + " comments</small></div>"; }).join("")
         + "</div></div>"
-        + (plats.length ? "<h3>Where people commented</h3>" + '<div class="cmp-plats">' + plats.map(function (k) { var x = t.plats[k]; x.small = x.n < 30;
-            return '<div class="cmp-plat">' + cmRing(x, "cm-ring--plat") + '<p class="cmp-plat__n">' + (ICONS[k] || "") + "<b>" + esc(k) + "</b></p><p class=\"cmp-plat__s\">" + full(x.n) + " comments · <b>" + cmPct(x.intent, x.n) + "%</b> ask to buy</p></div>"; }).join("") + "</div>" : "")
+        + (plats.length ? "<h3>Where the comments came from</h3>" + '<div class="cmp-src">' + cmShare(plats, t) + '<div class="cmp-plats">' + plats.map(function (k) { var x = t.plats[k]; x.small = x.n < 30;
+            return '<div class="cmp-plat" style="--pc:' + (PCOL[k] || "#121212") + '"><p class="cmp-plat__n">' + (ICONS[k] || "") + "<b>" + esc(k) + "</b><em>" + cmPct(x.n, t.n) + "%</em></p>" + cmRing(x, "cm-ring--plat")
+              + '<p class="cmp-plat__s"><span><b>' + full(x.n) + "</b>comments</span><span><b>" + cmPct(x.intent, x.n) + "%</b>ask to buy</span></p></div>"; }).join("") + "</div></div>" : "")
         + (mainT ? "<h3>What people talk about</h3>" + '<div class="cmp-insight"><span class="cmp-insight__ic">' + cmIcon(mainT) + '</span><div class="cmp-insight__b">'
             + '<p class="cmp-insight__k">The biggest topic · ' + v(t.themes[mainT]) + " of comments</p><p class=\"cmp-insight__t\">" + esc(mainT) + "</p>" + (AR[mainT] ? '<p class="cmp-insight__ar" dir="rtl" lang="ar">' + esc(AR[mainT]) + "</p>" : "")
             + ((TA[mainT] || []).length ? '<p class="cmp-insight__l">What they ask about it</p><div class="cmp-chips">' + asksOf(mainT, 4) + "</div>" : "") + "</div></div>"
-            + (restT.length ? '<div class="cmp-themes">' + restT.map(function (q) {
-              return '<div class="cmp-theme" style="--w:' + (t.themes[q] / t.themes[mainT] * 100).toFixed(1) + '%"><span class="cmp-theme__ic">' + cmIcon(q) + '</span><span class="cmp-theme__t">' + esc(q) + ar(q) + "</span><b>" + v(t.themes[q]) + "</b><i></i>"
-                + ((TA[q] || []).length ? '<div class="cmp-chips">' + asksOf(q, 2) + "</div>" : "") + "</div>"; }).join("") + "</div>" : "") : "")
-        + (asks.length ? "<h3>What buyers asked</h3>" + '<ol class="cmp-asks">' + asks.map(function (q, i) {
-            return '<li style="--w:' + (t.asks[q].n / apeak * 100).toFixed(1) + '%"' + (i ? "" : ' class="is-1"') + '><span class="cmp-asks__q"><q dir="auto">' + esc(q) + "</q><small>" + esc(t.asks[q].en || "") + "</small></span><i></i><b>" + t.asks[q].n + "</b></li>"; }).join("") + "</ol>" : "")
+            + (function () { var list = th.slice(0, 9), boxes = cmSquarify(list.map(function (q) { return t.themes[q]; }), 0, 0, 160, 100);
+                return '<div class="cmp-tree" role="list">' + list.map(function (q, i) { var r = boxes[i], big = r[2] * r[3] >= 1500, mid = r[2] * r[3] >= 650, ta = (TA[q] || [])[0];
+                  return '<div role="listitem" class="cmp-tree__c' + (i ? "" : " is-1") + (big ? " is-big" : mid ? " is-mid" : r[2] * r[3] < 260 ? " is-tiny" : "") + '" style="left:' + (r[0] / 1.6).toFixed(2) + "%;top:" + r[1].toFixed(2) + "%;width:" + (r[2] / 1.6).toFixed(2) + "%;height:" + r[3].toFixed(2) + '%" title="' + esc(q) + " · " + v(t.themes[q]) + '">'
+                    + '<span class="cmp-tree__ic">' + cmIcon(q) + "</span><b>" + v(t.themes[q]) + '</b><span class="cmp-tree__t">' + esc(q) + "</span>"
+                    + (AR[q] && (big || mid) ? '<span class="cmp-tree__ar" dir="rtl" lang="ar">' + esc(AR[q]) + "</span>" : "")
+                    + (ta && big ? '<span class="cmp-chip"><q dir="auto">' + esc(ta[0]) + "</q><b>×" + ta[2] + "</b></span>" : "") + "</div>"; }).join("") + "</div>"; })()
+            + (plats.length > 1 ? "<h3>Which topics come from which platform</h3>" + (function () { var list = th.slice(0, 7), mx = 1;
+                list.forEach(function (q) { plats.forEach(function (k) { mx = Math.max(mx, (t.tp[q] || {})[k] || 0); }); });
+                return '<div class="cmp-heat" style="--cols:' + plats.length + '"><span></span>' + plats.map(function (k) { return '<span class="cmp-heat__h">' + (ICONS[k] || "") + "<small>" + esc(k) + "</small></span>"; }).join("")
+                  + list.map(function (q) { return '<span class="cmp-heat__r">' + cmIcon(q) + "<span>" + esc(q) + ar(q) + "</span></span>" + plats.map(function (k) { var n = (t.tp[q] || {})[k] || 0, f = n / mx;
+                      return '<span class="cmp-heat__c' + (f > .55 ? " is-hot" : "") + '" style="--a:' + (n ? (0.1 + 0.9 * f).toFixed(2) : 0) + '" title="' + esc(q) + " · " + esc(k) + ": " + n + ' comments">' + (n || "") + "</span>"; }).join(""); }).join("") + "</div>"; })() : "") : "")
+        + (asks.length ? "<h3>What buyers asked</h3>" + (function () { var all = cmTop(t.asks, "n").slice(0, 18), mx = t.asks[all[0]].n, mn = t.asks[all[all.length - 1]].n;
+            var order = all.map(function (q, i) { return [q, i]; }).sort(function (a, b) { return (a[1] % 2) - (b[1] % 2) || (a[1] % 2 ? b[1] - a[1] : a[1] - b[1]); }).map(function (x) { return x[0]; });
+            return '<div class="cmp-cloud">' + order.map(function (q) { var n = t.asks[q].n, f = mx === mn ? 1 : (n - mn) / (mx - mn);
+              return '<span class="cmp-cloud__q' + (q === all[0] ? " is-1" : f > .6 ? " is-hi" : "") + '" style="--f:' + f.toFixed(2) + '" title="' + esc((t.asks[q].en || "") + " · asked " + n + " times") + '"><q dir="auto">' + esc(q) + "</q><b>" + n + "</b></span>"; }).join("") + "</div>"; })() : "")
+        + (Object.keys(t.days).length > 1 ? "<h3>Comments per day</h3>" + (function () { var ds = Object.keys(t.days).sort(), mx = Math.max.apply(null, ds.map(function (d) { return t.days[d]; })), pk = ds.filter(function (d) { return t.days[d] === mx; })[0];
+            return '<div class="cmp-days" style="--n:' + ds.length + '">' + ds.map(function (d) { var n = t.days[d];
+              return '<div class="cmp-days__c' + (d === pk ? " is-pk" : "") + '" title="' + day(d) + ": " + n + ' comments"><b>' + n + '</b><i style="--h:' + (n / mx * 100).toFixed(1) + '%"></i><small>' + day(d) + "</small></div>"; }).join("") + "</div>"
+              + '<p class="cmp-days__n">The conversation peaked on <b>' + day(pk) + "</b> with " + mx + " comments.</p>"; })() : "")
         + (quotes.length ? "<h3>In their words</h3>" + '<div class="cmp-quotes">' + quotes.map(function (q) {
             return '<article class="cmp-quote"><q dir="auto">' + esc(q.text) + "</q>" + (q.gloss ? "<p>“" + esc(q.gloss) + "”</p>" : "")
               + "<footer>" + ava(pics[q.code]) + "<b>" + esc(names[q.code] || q.code || "") + "</b><span>" + (ICONS[q.platform] || esc(q.platform)) + "</span></footer></article>"; }).join("") + "</div>" : "")
@@ -1059,8 +1104,7 @@
               + '<span class="cmp-who__t">' + (few ? "<small>Too few to say</small>" : cmIcon(top) + "<span>" + esc(top || "—") + ar(top) + "</span>") + "</span></div>"; }).join("")
         + silent.map(function (c) { return '<div class="cmp-who__r is-quiet">' + ava(c.photo) + '<span class="cmp-who__n"><b>' + esc(c.name) + "</b></span><span class=\"cmp-who__wait\">" + (c.posts ? "Comments not read yet" : "No video yet") + "</span></div>"; }).join("")
         + "</div>"
-        + '<p class="cmp-foot">Comments are read twice per video, ' + (C.read_days || [2, 7]).join(" and ") + " days after it is posted, up to 300 per post, and grouped by AI. "
-        + "Quotes are chosen by HelloVoice. Commenters' names and photos are never stored or shown.</p>";
+        + "";
     },
     plat: function () {
       // One ledger row per platform, biggest first: its views and share of all views lead, a bar against the biggest

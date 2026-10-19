@@ -490,7 +490,7 @@ def client_view(k):
     cid = k["id"]
     with db.connect() as conn:
         rows = conn.execute(
-            "SELECT m.code, m.platform, m.sentiment, m.intent, m.ask, m.ask_en, m.theme, m.content_id FROM comments m "
+            "SELECT m.code, m.platform, m.sentiment, m.intent, m.ask, m.ask_en, m.theme, m.content_id, m.posted_at FROM comments m "
             "JOIN content c ON c.id = m.content_id WHERE m.campaign_id = ? AND c.hidden = 0 AND m.sentiment IS NOT NULL "
             "AND m.flag IS NULL", (cid,)).fetchall()   # red-flagged comments stay in the admin
         reads = conn.execute("SELECT r.status, r.due_at, r.finished_at FROM comment_reads r JOIN content c ON c.id = r.content_id "
@@ -505,10 +505,13 @@ def client_view(k):
     buckets = {}
     for r in rows:
         b = buckets.setdefault((r["code"], r["platform"]), {"code": r["code"], "platform": r["platform"], "n": 0, "pos": 0, "neu": 0,
-                                                            "neg": 0, "intent": 0, "asks": {}, "themes": {}, "videos": set()})
+                                                            "neg": 0, "intent": 0, "asks": {}, "themes": {}, "videos": set(), "days": {}})
         b["n"] += 1
         b[{"positive": "pos", "negative": "neg"}.get(r["sentiment"], "neu")] += 1
         b["videos"].add(r["content_id"])
+        if r["posted_at"]:                                  # comments per day, Riyadh time (owner, 2026-10-19)
+            d = time.strftime("%Y-%m-%d", time.gmtime(r["posted_at"] + 3 * 3600))
+            b["days"][d] = b["days"].get(d, 0) + 1
         if r["intent"]:
             b["intent"] += 1
             if r["ask"]:
