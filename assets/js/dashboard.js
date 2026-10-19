@@ -34,6 +34,12 @@
   }
   function full(v) { return v == null ? "—" : Math.round(v).toLocaleString("en-US"); }
   function pct(v, d) { return v == null || isNaN(v) ? "—" : v.toFixed(d == null ? 2 : d) + "%"; }
+  // A score as a % of the best creator: one decimal under 1 so a small share never reads as 0 (owner, 2026-10-19).
+  function scoreTxt(v, html) {
+    if (v == null || isNaN(v)) return "—";
+    var n = v > 0 && v < 1 ? v.toFixed(1) : String(Math.round(v));
+    return n + (html ? '<small class="db-pct">%</small>' : "%");
+  }
   function day(t, y) { if (!t) return ""; var d = typeof t === "number" ? new Date(t * 1000) : new Date(t + "T00:00:00Z");
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: y ? "numeric" : undefined, timeZone: "UTC" }); }
   function ago(t) { if (!t) return ""; var s = Date.now() / 1000 - t; return s < 3600 ? Math.max(1, Math.round(s / 60)) + " min ago" : s < 86400 ? Math.round(s / 3600) + " h ago" : Math.round(s / 86400) + " days ago"; }
@@ -529,7 +535,7 @@
   // Creator names open their full analysis (the same page as the roster's).
   function who(c) { return '<a class="db-name" href="../../creator/#c=' + encodeURIComponent(c.code) + '" title="Open ' + esc(c.name) + '\'s full analysis">' + esc(c.name) + "</a>"; }
   function ranked(list) {
-    if (!filtered()) return R.creators.filter(function (c) { return c.rank; }).map(function (c) { return { c: c, v: c.score, label: c.score.toFixed(0) }; });
+    if (!filtered()) return R.creators.filter(function (c) { return c.rank; }).map(function (c) { return { c: c, v: c.score, label: scoreTxt(c.score, true) }; });
     // Where a platform shows no views (Snapchat) the creator is ranked by engagement instead of being left out.
     var by = {}; list.forEach(function (p) {
       var x = by[p.code] = by[p.code] || { n: 0, eng: 0, hid: true }; x.n += seen(p); x.eng += p.engagement || 0; if (!(p.video && p.views_hidden)) x.hid = false;
@@ -985,7 +991,7 @@
             + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (c.score != null ? c.score.toFixed(0) : "—") + "</td></tr>"; }).join("")
         + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(scoreTip()) + "</p>" + videosByCreator(list, rows)
         + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views</th><th>Engagement</th>' + (weights().er > 0 ? "<th>Eng. rate</th>" : "") + '' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
-          + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td>" + (weights().er > 0 ? "<td>" + q.er.toFixed(0) + "</td>" : "") + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + c.score.toFixed(0) + "</b></td></tr>"; }).join("")
+          + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td>" + (weights().er > 0 ? "<td>" + q.er.toFixed(0) + "</td>" : "") + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + scoreTxt(c.score) + "</b></td></tr>"; }).join("")
           + "</tbody></table>");
     },
     stage: function () {
