@@ -785,7 +785,7 @@
 @media (prefers-reduced-motion: reduce) { .db-pl__bar i { animation: none; } }
 .db-pl__strip i[data-p="Snapchat"] span { color: #121212; text-shadow: none; }
 
-/* What people said (2026-10-19, v17 same day): viewers' comments read by AI, in the old audience slot. */
+/* What people said (2026-10-19, v20 same day): viewers' comments read by AI, in the old audience slot. */
 .cm.db-card__body { gap: 8px; }
 .cm-top { display: flex; align-items: center; gap: 12px; }
 .cm-ring { position: relative; width: 74px; height: 74px; flex: none; }
@@ -1072,19 +1072,19 @@
   .cmp-rank li { grid-template-columns: 24px 1fr auto; gap: 10px; padding: 10px 12px; } .cmp-rank__q q { font-size: 17px; } .cmp-rank b { font-size: 28px; }
 }
 /* v7: linen neutral, deep teal numbers, soft teal fills instead of lime */
-.db-card__body.cm, .db-panel { --cm-num: #0f5e63; }
+.db-card__body.cm, .db-panel { --cm-num: #ff691e; }
 .cmp-box.is-hot { background: #e2f0ee; }
-.cmp-box.is-hot b { color: #0f5e63; }
+.cmp-box.is-hot b { color: #ff691e; }
 .cmp-say__t mark { background: linear-gradient(transparent 55%, #cfe6e3 55%); }
 .cmp-say__s q { background: #e2f0ee; }
 .cmp-rank li::before { background: #e2f0ee; }
 .cmp-rank li.is-1::before { background: #c6e1dd; }
-.cmp-curve__p circle { stroke: #0f5e63; }
-.cmp-curve__p.is-pk circle { fill: #0f5e63; stroke: #fff; }
-.cmp-heat__c { background: rgba(15,94,99,calc(var(--a) * .35)); }
-.cmp-heat__c.is-hot { color: #fff; background: rgba(15,94,99,var(--a)); }
-.cmp-insight__bar::after, .cmp-asks i::after, .cmp-theme i::after { background: #0f5e63; }
-.cmp-insight__bar { background: #e2ece9; }
+.cmp-curve__p circle { stroke: #ff691e; }
+.cmp-curve__p.is-pk circle { fill: #ff691e; stroke: #fff; }
+.cmp-heat__c { background: rgba(255,105,30,calc(var(--a) * .35)); }
+.cmp-heat__c.is-hot { color: #fff; background: rgba(255,105,30,var(--a)); }
+.cmp-insight__bar::after, .cmp-asks i::after, .cmp-theme i::after { background: #ff691e; }
+.cmp-insight__bar { background: #fdebe2; }
 /* v8: figures in ink again; colour only as a signal (green good, orange middle, red bad) */
 .db-card__body.cm, .db-panel { --cm-num: var(--ink); }
 .cmp-box.is-hot { background: #f6f4ef; }
@@ -1259,6 +1259,34 @@
 .cmv__list li[aria-selected="true"] button { background: #f4fbcf; }
 .cmv button:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
 @media (max-width: 760px) { .cmv { flex-basis: 100%; } .cmv__list { max-width: 100%; width: 100%; } }
+/* v18: orange heatmap, ink figures on every cell */
+.cmp-heat__c.is-hot { color: var(--ink); }
+.cmp-curve__p.is-pk circle { fill: #ff691e; stroke: #fff; }
+/* v19: drop-down sections */
+.cmp-secbar { display: flex; gap: 8px; justify-content: flex-end; margin: 14px 0 -6px; }
+.cmp-secbar button { border: 0; background: #f2f0eb; border-radius: 999px; padding: 7px 14px; font: 600 12.5px var(--body); color: var(--ink); cursor: pointer; }
+.cmp-secbar button:hover { background: var(--lime); }
+.cmp-sec { border-top: 1px solid var(--line); margin-top: 18px; }
+.cmp-sec > summary, .cmb-d > summary, .cmb-v > summary { list-style: none; cursor: pointer; }
+.cmp-sec > summary::-webkit-details-marker, .cmb-d > summary::-webkit-details-marker, .cmb-v > summary::-webkit-details-marker { display: none; }
+.cmp-sec > summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 0 12px; font-size: 12.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--gray); font-weight: 600; }
+.cmp-sec > summary:hover { color: var(--ink); }
+.cmp-sec > summary:focus-visible, .cmb-d > summary:focus-visible, .cmb-v > summary:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; border-radius: 10px; }
+.cmp-sec__b { padding-bottom: 8px; }
+.cmp-chev { width: 9px; height: 9px; border: solid currentColor; border-width: 0 2px 2px 0; transform: rotate(45deg); margin: -3px 6px 0 0; flex: none; transition: transform .2s; }
+details[open] > summary > .cmp-chev { transform: rotate(-135deg); margin-top: 4px; }
+.cmb-d { display: block; padding: 0; }
+.cmb-d > summary { padding: 14px 16px; }
+.cmb-d__b { display: grid; gap: 12px; padding: 0 16px 14px; }
+.cmb-v { display: block; padding: 0; border-top: 1px solid var(--line); }
+.cmb-v > summary { padding-top: 12px; }
+.cmb-v__body { display: grid; gap: 8px; padding-top: 8px; }
+.cmb-d__h > span { margin-left: auto; }
+.cmb-d__h .cmp-chev, .cmb-v__h .cmp-chev { margin-left: 10px; }
+/* v20: doctor picker */
+.cmv__av { flex: none; display: block; }
+.cmv__av img, .cmv__av .db-ava { width: 42px; height: 42px; border-radius: 50%; object-fit: cover; background: var(--linen); display: block; }
+.cmv--doc { flex: 1 1 260px; }
 /* end What people said */
 .db-obj__auto { display: inline-flex; align-items: center; margin-left: 8px; padding: 3px 9px; border-radius: 999px; background: #f2f0eb; font: 600 11px/1.2 var(--body); color: var(--gray); white-space: nowrap; cursor: help; }
 .db-rank__score { white-space: nowrap; }

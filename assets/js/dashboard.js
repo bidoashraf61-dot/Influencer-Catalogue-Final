@@ -622,7 +622,7 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v17 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v20 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
@@ -755,9 +755,18 @@
   }
   /* The comment browser (owner, 2026-10-19; v15): every comment in its own language, grouped by doctor then video,
      filtered by doctor, video, mood, platform (icons), topic, buying questions and search, and exported as CSV. */
-  var CMB = { items: null, busy: false, waits: [], f: { doc: "", vid: "", mood: "", plat: "", theme: "", buy: false, q: "" }, open: {} };
+  var CMB = { closed: {}, items: null, busy: false, waits: [], f: { doc: "", vid: "", mood: "", plat: "", theme: "", buy: false, q: "" }, open: {} };
   var CM_MOOD = { p: "pos", n: "neu", x: "neg" }, CM_MOOD_W = { p: "Positive", n: "Neutral", x: "Negative" };
   var CM_HEART = ico('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>');
+  var CM_CHEV = '<i class="cmp-chev" aria-hidden="true"></i>';
+  // Every section of the panel is a drop-down: its heading is the toggle; "Collapse all / Expand all" sits above the first.
+  function cmSections(html) {
+    var parts = html.split("<h3>"), out = parts[0] + '<div class="cmp-secbar"><button type="button" onclick="document.querySelectorAll(\'.cmp-sec\').forEach(function(d){d.open=false})">Collapse all</button>'
+      + '<button type="button" onclick="document.querySelectorAll(\'.cmp-sec\').forEach(function(d){d.open=true})">Expand all</button></div>';
+    for (var i = 1; i < parts.length; i++) { var j = parts[i].indexOf("</h3>");
+      out += '<details class="cmp-sec" open><summary><span>' + parts[i].slice(0, j) + "</span>" + CM_CHEV + '</summary><div class="cmp-sec__b">' + parts[i].slice(j + 5) + "</div></details>"; }
+    return out;
+  }
   var CM_DL = ico('<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>');
   function cmLoad(cb) {
     if (CMB.items) return cb();
@@ -804,14 +813,22 @@
       + '<ul class="cmv__list" role="listbox" aria-label="Videos" hidden><li role="option" aria-selected="' + (!f.vid) + '"><button type="button" data-vid="">' + allCard + "</button></li>"
       + ids.map(function (id) { return '<li role="option" aria-selected="' + (f.vid === id) + '"><button type="button" data-vid="' + id + '">' + card(id) + "</button></li>"; }).join("") + "</ul></div>";
   }
+  // The doctor filter: the same picker as the video filter, with each doctor's photo, name and comment count.
+  function cmDocPicker(docs, docKeys, P) {
+    var f = CMB.f, total = 0; docKeys.forEach(function (c) { total += docs[c]; });
+    var card = function (c) { return '<span class="cmv__av">' + ava(P.pics[c]) + '</span><span class="cmv__t"><b>' + esc(P.names[c] || c) + "</b><small>" + full(docs[c]) + " comments</small></span>"; };
+    var allCard = '<span class="cmv__all">' + IC.reach + '</span><span class="cmv__t"><b>All doctors</b><small>' + docKeys.length + " doctor" + (docKeys.length === 1 ? "" : "s") + " · " + full(total) + " comments</small></span>";
+    return '<div class="cmv cmv--doc"><button type="button" class="cmv__btn" data-cmv="1" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose a doctor">' + (f.doc && docs[f.doc] ? card(f.doc) : allCard) + '<span class="cmv__chev" aria-hidden="true"></span></button>'
+      + '<ul class="cmv__list" role="listbox" aria-label="Doctors" hidden><li role="option" aria-selected="' + (!f.doc) + '"><button type="button" data-docpick="">' + allCard + "</button></li>"
+      + docKeys.map(function (c) { return '<li role="option" aria-selected="' + (f.doc === c) + '"><button type="button" data-docpick="' + esc(c) + '">' + card(c) + "</button></li>"; }).join("") + "</ul></div>";
+  }
   function cmFilters() {
     var f = CMB.f, all = (CMB.items || []).filter(cmInPage), P = cmPeople(), posts = cmPosts(), docs = {}, vids = {}, th = {}, pl = {};
     all.forEach(function (it) { docs[it[1]] = (docs[it[1]] || 0) + 1; if (!f.doc || it[1] === f.doc) vids[it[0]] = (vids[it[0]] || 0) + 1; if (it[5]) th[it[5]] = (th[it[5]] || 0) + 1; pl[it[2]] = (pl[it[2]] || 0) + 1; });
     var moods = [["", "All"], ["p", "Positive"], ["n", "Neutral"], ["x", "Negative"]];
     var docKeys = Object.keys(docs).sort(function (a, b) { return docs[b] - docs[a]; });
     return '<div class="cmb-f">'
-      + '<div class="cmb-f__row cmb-f__docs"><select data-f="doc" aria-label="Doctor"><option value="">All doctors (' + docKeys.length + ")</option>"
-      + docKeys.map(function (c) { return '<option value="' + esc(c) + '"' + (f.doc === c ? " selected" : "") + ">" + esc(P.names[c] || c) + " (" + docs[c] + ")</option>"; }).join("") + "</select>"
+      + '<div class="cmb-f__row cmb-f__docs">' + cmDocPicker(docs, docKeys, P)
       + cmVidPicker(vids, all, P, posts) + "</div>"
       + '<div class="cmb-f__row"><div class="cmb-seg" role="group" aria-label="Mood">' + moods.map(function (m) {
           return '<button type="button" data-mood="' + m[0] + '" aria-pressed="' + (f.mood === m[0]) + '"' + (m[0] ? ' title="' + m[1] + '"' : "") + ">" + (m[0] ? '<i class="cm-face" style="--c:' + CM_COL[CM_MOOD[m[0]]] + '">' + CM_FACE[CM_MOOD[m[0]]] + '</i><span class="cmb-seg__t">' + m[1] + "</span>" : m[1]) + "</button>"; }).join("") + "</div>"
@@ -830,14 +847,14 @@
     return head + order.map(function (code) {
       var vids = Object.keys(by[code]).sort(function (a, b) { return by[code][b].length - by[code][a].length; }), n = 0;
       vids.forEach(function (v) { n += by[code][v].length; });
-      return '<section class="cmb-d"><header class="cmb-d__h">' + ava(P.pics[code]) + "<b>" + esc(P.names[code] || code) + "</b><span>" + full(n) + " comment" + (n === 1 ? "" : "s") + " · " + vids.length + " video" + (vids.length === 1 ? "" : "s") + "</span></header>"
+      return '<details class="cmb-d" data-key="d:' + esc(code) + '"' + (CMB.closed["d:" + code] ? "" : " open") + '><summary class="cmb-d__h">' + ava(P.pics[code]) + "<b>" + esc(P.names[code] || code) + "</b><span>" + full(n) + " comment" + (n === 1 ? "" : "s") + " · " + vids.length + " video" + (vids.length === 1 ? "" : "s") + "</span>" + CM_CHEV + '</summary><div class="cmb-d__b">'
         + vids.map(function (vid) { var cs = by[code][vid], p = posts[vid] || {}, open = CMB.open[vid], show = open ? cs : cs.slice(0, 10);
-          return '<div class="cmb-v"><div class="cmb-v__h"><a class="cmb-v__th" href="' + esc(p.url || "#") + '" target="_blank" rel="noopener">' + (p.thumb ? fit(p.thumb) : "") + "</a>"
+          return '<details class="cmb-v" data-key="v:' + vid + '"' + (CMB.closed["v:" + vid] ? "" : " open") + '><summary class="cmb-v__h"><a class="cmb-v__th" href="' + esc(p.url || "#") + '" target="_blank" rel="noopener">' + (p.thumb ? fit(p.thumb) : "") + "</a>"
             + '<span class="cmb-v__t">' + (ICONS[p.platform || cs[0][2]] || "") + "<b>" + esc((KIND[p.kind] || p.kind || "Video") + " · " + (p.platform || cs[0][2])) + "</b><small>" + (p.posted_at ? day(p.posted_at) + " · " : "") + full(cs.length) + " comments</small></span>"
-            + (p.url ? '<a class="cmb-v__go" href="' + esc(p.url) + '" target="_blank" rel="noopener">Open video ›</a>' : "") + "</div>"
+            + (p.url ? '<a class="cmb-v__go" href="' + esc(p.url) + '" target="_blank" rel="noopener">Open video ›</a>' : "") + CM_CHEV + '</summary><div class="cmb-v__body">'
             + '<div class="cmb-v__l">' + show.map(cmRow).join("") + "</div>"
-            + (cs.length > 10 ? '<button type="button" class="cmb-more" data-more="' + vid + '">' + (open ? "Show fewer" : "Show all " + cs.length) + "</button>" : "") + "</div>"; }).join("")
-        + "</section>";
+            + (cs.length > 10 ? '<button type="button" class="cmb-more" data-more="' + vid + '">' + (open ? "Show fewer" : "Show all " + cs.length) + "</button>" : "") + "</div></details>"; }).join("")
+        + "</div></details>";
     }).join("");
   }
   function cmExport() {
@@ -859,11 +876,14 @@
       var draw = function () { box.innerHTML = cmFilters() + '<div class="cmb-l">' + cmList() + "</div>"; };
       var list = function () { box.querySelector(".cmb-l").innerHTML = cmList(); }, timer;
       draw();
-      document.addEventListener("click", function (e) { var ul = box.querySelector(".cmv__list"); if (ul && !ul.hidden && !e.target.closest(".cmv")) { ul.hidden = true; box.querySelector(".cmv__btn").setAttribute("aria-expanded", "false"); } });
-      box.addEventListener("keydown", function (e) { if (e.key !== "Escape") return; var ul = box.querySelector(".cmv__list"); if (ul && !ul.hidden) { ul.hidden = true; var bt = box.querySelector(".cmv__btn"); bt.setAttribute("aria-expanded", "false"); bt.focus(); e.stopPropagation(); } });
+      box.addEventListener("toggle", function (e) { var d = e.target; if (d.dataset && d.dataset.key) CMB.closed[d.dataset.key] = !d.open; }, true);
+      var shut = function () { var any = false; [].forEach.call(box.querySelectorAll(".cmv__list"), function (x) { if (!x.hidden) { any = true; x.hidden = true; x.parentNode.querySelector(".cmv__btn").setAttribute("aria-expanded", "false"); } }); return any; };
+      document.addEventListener("click", function (e) { if (!e.target.closest(".cmv")) shut(); });
+      box.addEventListener("keydown", function (e) { if (e.key === "Escape" && shut()) e.stopPropagation(); });
       box.addEventListener("click", function (e) {
-        var tv = e.target.closest("[data-cmv]"), ov = e.target.closest("[data-vid]"), b = e.target.closest("[data-mood]"), pl = e.target.closest("[data-plat]"), m = e.target.closest("[data-more]");
-        if (tv) { var ul = tv.parentNode.querySelector(".cmv__list"), op = ul.hidden; ul.hidden = !op; tv.setAttribute("aria-expanded", op); return; }
+        var tv = e.target.closest("[data-cmv]"), dc = e.target.closest("[data-docpick]"), ov = e.target.closest("[data-vid]"), b = e.target.closest("[data-mood]"), pl = e.target.closest("[data-plat]"), m = e.target.closest("[data-more]");
+        if (tv) { var ul = tv.parentNode.querySelector(".cmv__list"), was = ul.hidden; [].forEach.call(box.querySelectorAll(".cmv__list"), function (x) { x.hidden = true; x.parentNode.querySelector(".cmv__btn").setAttribute("aria-expanded", "false"); }); if (was) { ul.hidden = false; tv.setAttribute("aria-expanded", "true"); } return; }
+        if (dc) { CMB.f.doc = dc.getAttribute("data-docpick"); CMB.f.vid = ""; draw(); return; }
         if (ov) { CMB.f.vid = ov.getAttribute("data-vid"); draw(); return; }
         if (b) { CMB.f.mood = b.getAttribute("data-mood"); draw(); return; }
         if (pl) { CMB.f.plat = pl.getAttribute("data-plat"); draw(); return; }
@@ -1220,7 +1240,7 @@
         : z >= 0.3 ? "<mark>Viewers are divided</mark>" : p >= 0.6 ? "<mark>Viewers love it</mark>" : "<mark>Mostly neutral</mark>";
       var sub1 = topA ? 'Most ask <q dir="auto">' + esc(topA) + "</q>" + (t.asks[topA].en ? " (" + esc(t.asks[topA].en.replace(/\?$/, "")) + ")" : "") + " · " + t.asks[topA].n + " times"
         : mainT ? "The talk is mostly about " + esc(mainT.toLowerCase()) : "";
-      return '<section class="cmp-top"><div class="cmp-boxes">'
+      return cmSections('<section class="cmp-top"><div class="cmp-boxes">'
         + box(full(t.n), "comments read") + box(v(t.intent), "ask how to buy", "is-hot " + (t.small ? "" : cmTone("buy", share))) + box(v(t.pos), "positive", t.small ? "" : cmTone("pos", p)) + box(t.videos, "video" + (t.videos === 1 ? "" : "s"))
         + '</div><aside class="cmp-say" aria-label="The insight from the comments"><img class="cmp-say__av" src="../../assets/brand/helvy-connect/helvy-icon-180.png" alt="" width="48" height="48">'
         + '<div class="cmp-say__b"><p class="cmp-say__k">Helvi read the comments</p><p class="cmp-say__t">' + head1 + "</p>" + (sub1 ? '<p class="cmp-say__s">' + sub1 + "</p>" : "")
@@ -1255,9 +1275,9 @@
             var pts = ds.map(function (d, i) { return [L + (ds.length === 1 ? 0 : i * (W - L - Rr) / (ds.length - 1)), T + (1 - t.days[d] / mx) * (H - T - B)]; });
             var line = cmCurve(pts), area = line + " L" + pts[pts.length - 1][0].toFixed(1) + " " + (H - B) + " L" + pts[0][0].toFixed(1) + " " + (H - B) + " Z";
             return '<div class="cmp-curve"><svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Comments per day: ' + ds.map(function (d) { return day(d) + " " + t.days[d]; }).join(", ") + '">'
-              + '<defs><linearGradient id="cm-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0f5e63" stop-opacity=".22"/><stop offset="1" stop-color="#0f5e63" stop-opacity=".02"/></linearGradient></defs>'
+              + '<defs><linearGradient id="cm-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff691e" stop-opacity=".22"/><stop offset="1" stop-color="#ff691e" stop-opacity=".02"/></linearGradient></defs>'
               + '<line x1="' + L + '" y1="' + (H - B) + '" x2="' + (W - Rr) + '" y2="' + (H - B) + '" stroke="#e6e2db" stroke-width="1.5"/>'
-              + '<path class="cmp-curve__a" d="' + area + '" fill="url(#cm-fill)"/><path class="cmp-curve__l" d="' + line + '" fill="none" stroke="#0f5e63" stroke-width="3.5" stroke-linecap="round"/>'
+              + '<path class="cmp-curve__a" d="' + area + '" fill="url(#cm-fill)"/><path class="cmp-curve__l" d="' + line + '" fill="none" stroke="#ff691e" stroke-width="3.5" stroke-linecap="round"/>'
               + pts.map(function (p, i) { var d = ds[i], isPk = d === pk;
                   return '<g class="cmp-curve__p' + (isPk ? " is-pk" : "") + '"><circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + (isPk ? 8 : 5.5) + '"/>'
                     + '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] - 14).toFixed(1) + '" text-anchor="middle" class="cmp-curve__v">' + t.days[d] + "</text>"
@@ -1274,7 +1294,7 @@
         + silent.map(function (c) { return '<div class="cmp-who__r is-quiet">' + ava(c.photo) + '<span class="cmp-who__n"><b>' + esc(c.name) + "</b></span><span class=\"cmp-who__wait\">" + (c.posts ? "Comments not read yet" : "No video yet") + "</span></div>"; }).join("")
         + "</div>"
         + "<h3>All comments</h3>" + '<div id="cmb" class="cmb"><p class="cmb__load">Loading the comments…</p></div>' + (setTimeout(cmBind, 0) && "")
-        + "";
+        + "");
     },
     plat: function () {
       // One ledger row per platform, biggest first: its views and share of all views lead, a bar against the biggest
