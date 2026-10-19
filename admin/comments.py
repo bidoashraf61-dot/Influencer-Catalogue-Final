@@ -231,7 +231,7 @@ def start_due(now=None):
         since = "6 days" if platform == "Facebook" and no == 2 else None
         try:
             d = apify.call("POST", "/acts/%s/runs" % actor, build(urls, MAX_PER_POST, since),
-                           params={"maxTotalChargeUsd": "%.2f" % max(0.1, est * 1.5)}).get("data") or {}
+                           params={"maxTotalChargeUsd": "%.2f" % max(0.5, est * 1.5)}).get("data") or {}
         except Exception as exc:
             with db.connect() as conn:
                 conn.executemany("UPDATE comment_reads SET status = 'failed', message = ? WHERE id = ?",
