@@ -41,7 +41,7 @@ _lock = threading.Lock()
 _build_lock = threading.Lock()     # held for a whole index build (minutes at 14,000+ creators); _lock never is
 _state = {"checked": 0.0, "key": None, "versions": [], "results": {}}
 
-SORTS = ("", "followers-desc", "followers-asc", "tier-desc", "tier-asc", "name")
+SORTS = ("", "followers-desc", "followers-asc", "tier-desc", "tier-asc", "name", "added-desc", "added-asc")
 GROUPS = ("tier", "platform", "country", "interest")
 # Labels the classification can return that are not an industry a client would book by.
 NOT_AN_INDUSTRY = ("General Lifestyle", "Unclassifiable")
@@ -158,6 +158,16 @@ def tier_rank(name, table):
 
 # ------------------------------------------------------------------------------- the index
 
+def _added_at():
+    """{code: created_at} for the "Newest added" / "Oldest added" sorts (the cards do not carry the date)."""
+    try:
+        import db
+        with db.connect() as conn:
+            return {r[0]: r[1] or 0 for r in conn.execute("SELECT code, created_at FROM creators")}
+    except Exception:
+        return {}
+
+
 class Index:
     """The roster cards and, per card, the values the filters, sorts and groups read."""
 
@@ -183,6 +193,8 @@ class Index:
         self.sub = [None] * n        # sub-niches (list)
         self.also = [None] * n       # other industries the creator also covers
         self.itier = [""] * n        # Confirmed / Probable / Review ("" = not classified)
+        self.added = [0] * n         # when the creator joined the roster (epoch; 0 = not known, always sorts last)
+        added = _added_at() if cards and "created_at" not in cards[0] else {}
         for i, c in enumerate(cards):
             total = sum(_int(p.get("followers")) for p in (c.get("profiles") or []))
             self.followers[i] = total or _int(c.get("followers"))
@@ -206,6 +218,7 @@ class Index:
             self.sub[i] = c.get("sub") or []
             self.also[i] = c.get("also") or []
             self.itier[i] = c.get("itier") or ""
+            self.added[i] = _int(c.get("created_at")) or added.get(c.get("code"), 0)
         self._facets = None
 
     # -- the filter bar's options --
@@ -464,6 +477,10 @@ def ordered(idx, f, licences=None, discover=None):
         keep.sort(key=lambda i: (rank[i], -fol[i]))
     elif s == "name":
         keep.sort(key=lambda i: idx.name[i])
+    elif s == "added-desc":
+        keep.sort(key=lambda i: (-idx.added[i], -fol[i]))
+    elif s == "added-asc":
+        keep.sort(key=lambda i: (idx.added[i] or float("inf"), -fol[i]))
     if level:                       # confirmed matches first, probable ones after; the chosen order holds inside each
         keep.sort(key=lambda i: level[i])
     matched = len(keep)

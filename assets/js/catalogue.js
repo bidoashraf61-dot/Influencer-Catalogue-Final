@@ -913,7 +913,9 @@
         intKeys.length > 8);
     }
 
-    var sortList = SORTS.concat(extras ? [["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]] : []);
+    // Date added is known on the server only, so it is offered on the catalogue, not on a selection.
+    var sortList = SORTS.concat(extras ? [["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]]
+      : [["added-desc", "Newest added"], ["added-asc", "Oldest added"]]);
     var sort = '<label class="cat-sort"><span class="cat-sort__label">Sort</span>' +
       '<select class="cat-sort__select" aria-label="Sort creators">' +
       sortList.map(function (s) { return '<option value="' + s[0] + '"' + (s[0] === DEFAULT_SORT ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") +
