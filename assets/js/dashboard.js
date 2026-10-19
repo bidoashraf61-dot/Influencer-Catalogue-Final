@@ -603,11 +603,11 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v2 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v3 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
-  var CM_COL = { pos: "#14884a", neu: "#9a8b78", neg: "#ee1515" };
+  var CM_COL = { pos: "#14884a", neu: "#3d7fe0", neg: "#ee1515" };
   // One drawn icon per theme, picked from the words of the AI's label.
   var CM_TI = [
     [/avail|where|find|stock|pharmac|store|shop|country|egypt|kuwait|saudi/i, '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/>'],
@@ -645,13 +645,14 @@
   function cmPct(x, n) { return n ? Math.round(x / n * 100) : 0; }
   function cmTop(o, k) { return Object.keys(o).sort(function (a, b) { return (k ? o[b][k] - o[a][k] : o[b] - o[a]); }); }
   function cmParts(t) { var p = cmPct(t.pos, t.n), z = cmPct(t.neg, t.n); return [["pos", p, "positive"], ["neu", Math.max(0, 100 - p - z), "neutral"], ["neg", z, "negative"]]; }
-  // Mood ring: the three moods round a circle, the comment count in the middle.
-  function cmRing(t, label) {
+  // Mood ring: the three moods round a circle, the main mood (biggest share) written in the middle.
+  function cmMain(t) { return cmParts(t).slice().sort(function (a, b) { return b[1] - a[1]; })[0]; }
+  function cmRing(t, cls) {
     var off = 25, segs = cmParts(t).filter(function (s) { return s[1] > 0; }).map(function (s) {
       var c = '<circle cx="21" cy="21" r="15.915" fill="none" stroke="' + CM_COL[s[0]] + '" stroke-width="5.2" stroke-dasharray="' + s[1] + " " + (100 - s[1]) + '" stroke-dashoffset="' + off + '"/>';
       off -= s[1]; return c; }).join("");
-    return '<div class="cm-ring"><svg viewBox="0 0 42 42" role="img" aria-label="' + cmParts(t).map(function (s) { return s[1] + "% " + s[2]; }).join(", ") + '">'
-      + '<circle cx="21" cy="21" r="15.915" fill="none" stroke="#efece6" stroke-width="5.2"/>' + segs + "</svg><span><b>" + num(t.n) + "</b>" + (label || "comments") + "</span></div>";
+    return '<div class="cm-ring' + (cls ? " " + cls : "") + '"><svg viewBox="0 0 42 42" role="img" aria-label="' + cmParts(t).map(function (s) { return s[1] + "% " + s[2]; }).join(", ") + '">'
+      + '<circle cx="21" cy="21" r="15.915" fill="none" stroke="#efece6" stroke-width="5.2"/>' + segs + '</svg><span style="--c:' + CM_COL[cmMain(t)[0]] + '"><b>' + cmMain(t)[1] + "%</b>" + cmMain(t)[2] + "</span></div>";
   }
   function cmMood(t, big) {
     return '<div class="cm-mood' + (big ? " cm-mood--big" : "") + '" role="img" aria-label="' + cmParts(t).map(function (s) { return s[1] + "% " + s[2]; }).join(", ") + '">'
@@ -681,7 +682,7 @@
     else {
       var v = cmVerdict(t), top = cmTop(t.asks, "n")[0];
       body = '<div class="cm-top">' + cmRing(t)
-        + '<div class="cm-buy"><b class="cm-big">' + (t.small ? t.intent : cmPct(t.intent, t.n) + "%") + "</b>" + '<span class="cm-buy__l"><small>' + (t.small ? "of " + t.n + " ask" : "ask how to buy") + "</small>"
+        + '<div class="cm-buy"><b class="cm-big">' + (t.small ? t.intent : cmPct(t.intent, t.n) + "%") + "</b>" + '<span class="cm-buy__l"><small>' + (t.small ? "of " + t.n + " ask" : "of " + full(t.n) + " ask to buy") + "</small>"
         + '<span class="db-sig db-sig--' + v[0] + '">' + v[1] + "</span></span>" + cmKey(t, true) + "</div></div>"
         + (top ? '<p class="cm-most" title="' + esc(t.asks[top].en || "") + '"><span>Most asked</span><q dir="auto">' + esc(top) + "</q><b>×" + t.asks[top].n + "</b></p>" : "")
         + "";
@@ -1014,35 +1015,48 @@
       if (!C || !t.n) return cmWait(C || { status: "none" });
       var share = t.intent / t.n, p = t.pos / t.n, z = t.neg / t.n, th = cmTop(t.themes);
       var mood = z >= 0.3 ? "Viewers are divided" : p >= 0.6 ? "Viewers are warm" : share >= 0.3 ? "Viewers are mostly asking questions" : "Viewers are mostly neutral";
-      var buy = share >= 0.15 ? ", and <em>1 in " + Math.max(2, Math.round(1 / share)) + " wants to buy</em>" : share >= 0.04 ? ", and some ask how to buy" : ", and few ask about buying";
-      var verdict = t.small ? "Only " + t.n + " comments so far: too few to judge." : mood + buy + (th[0] ? ". The talk is mostly about <em>" + esc(th[0].toLowerCase()) + "</em>." : ".");
+      var buy = share >= 0.15 ? ", and <mark>1 in " + Math.max(2, Math.round(1 / share)) + " wants to buy</mark>" : share >= 0.04 ? ", and some ask how to buy" : ", and few ask about buying";
+      var verdict = t.small ? "Only " + t.n + " comments so far: too few to judge." : mood + buy + (th[0] ? ". The talk is mostly about <mark>" + esc(th[0].toLowerCase()) + "</mark>." : ".");
       var asks = cmTop(t.asks, "n").slice(0, 6), apeak = asks.length ? t.asks[asks[0]].n : 1;
       var names = {}, pics = {}; (R.creators || []).forEach(function (c) { names[c.code] = c.name; pics[c.code] = c.photo; });
       var quotes = (C.quotes || []).filter(function (q) { return (!F.platform || q.platform === F.platform) && (!F.creators.length || F.creators.indexOf(q.code) >= 0); });
       var who = Object.keys(t.by).sort(function (a, b) { return t.by[b].n - t.by[a].n; });
       var silent = (R.creators || []).filter(function (c) { return !t.by[c.code] && (!F.creators.length || F.creators.indexOf(c.code) >= 0); });
-      var plats = cmTop(t.plats, "n"), ppeak = plats.length ? t.plats[plats[0]].n : 1;
-      var stat = function (n, l) { return "<div><b>" + n + "</b><span>" + l + "</span></div>"; };
-      return '<section class="cmp-hero"><p class="cmp-hero__k">The verdict from the comments</p><p class="cmp-verdict">' + verdict + "</p>"
-        + '<div class="cmp-hero__stats">' + stat(full(t.n), "comments read") + stat(t.small ? t.intent : cmPct(t.intent, t.n) + "%", "ask how to buy")
-        + stat(t.small ? t.pos : cmPct(t.pos, t.n) + "%", "positive") + stat(t.videos, "video" + (t.videos === 1 ? "" : "s")) + "</div>"
-        + (C.next_read || C.last_read ? '<p class="cmp-hero__next">' + (C.last_read ? "Last read " + cmDay(C.last_read) : "") + (C.next_read ? (C.last_read ? " · " : "") + "next read " + cmDay(C.next_read) : "") + "</p>" : "") + "</section>"
-        + "<h3>The mood</h3>" + '<div class="cmp-mood">' + cmMood(t, true) + cmKey(t) + "</div>"
-        + (plats.length > 1 ? "<h3>Where people commented</h3>" + '<div class="cmp-plats">' + plats.map(function (k) { var x = t.plats[k];
-            return '<div class="cmp-plat"><span class="cmp-plat__ic">' + (ICONS[k] || "") + "</span><span class=\"cmp-plat__n\"><b>" + esc(k) + "</b><small>" + full(x.n) + " comments · "
-              + cmPct(x.intent, x.n) + '% ask to buy</small></span><div class="cmp-plat__bar" style="--w:' + (x.n / ppeak * 100).toFixed(1) + '%">' + cmMood(x) + "</div></div>"; }).join("") + "</div>" : "")
+      var plats = cmTop(t.plats, "n");
+      var TA = C.theme_asks || {}, AR = C.theme_ar || {};
+      var ar = function (q) { return AR[q] ? '<span class="cm-ar" dir="rtl" lang="ar">' + esc(AR[q]) + "</span>" : ""; };
+      var v = function (x, n) { var q = cmPct(x, n || t.n); return t.small ? x : (x && !q ? "<1%" : q + "%"); };
+      var box = function (n, l, cls) { return '<div class="cmp-box' + (cls ? " " + cls : "") + '"><b>' + n + "</b><span>" + l + "</span></div>"; };
+      var asksOf = function (q, k) { return (TA[q] || []).slice(0, k).map(function (a) {
+        return '<span class="cmp-chip" title="' + esc(a[1] || "") + '"><q dir="auto">' + esc(a[0]) + "</q><b>×" + a[2] + "</b></span>"; }).join(""); };
+      var mainT = th[0], restT = th.slice(1, 7);
+      return '<section class="cmp-top"><div class="cmp-boxes">'
+        + box(full(t.n), "comments read") + box(v(t.intent), "ask how to buy", "is-hot") + box(v(t.pos), "positive") + box(t.videos, "video" + (t.videos === 1 ? "" : "s"))
+        + '</div><aside class="cmp-say" aria-label="The verdict from the comments"><img class="cmp-say__av" src="../../assets/brand/helvy-connect/helvy-icon-180.png" alt="" width="48" height="48">'
+        + '<div class="cmp-say__b"><p class="cmp-say__k">Helvi read the comments</p><p class="cmp-say__t">' + verdict + "</p>"
+        + (C.next_read || C.last_read ? '<p class="cmp-say__d">' + (C.last_read ? "Read " + cmDay(C.last_read) : "") + (C.next_read ? (C.last_read ? " · " : "") + "next read " + cmDay(C.next_read) : "") + "</p>" : "")
+        + "</div></aside></section>"
+        + "<h3>The mood</h3>" + '<div class="cmp-mood">' + cmRing(t, "cm-ring--hero") + '<div class="cmp-mood__k">'
+        + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cmp-mood__r" style="--c:' + CM_COL[s[0]] + '"><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + " comments</small></div>"; }).join("")
+        + "</div></div>"
+        + (plats.length ? "<h3>Where people commented</h3>" + '<div class="cmp-plats">' + plats.map(function (k) { var x = t.plats[k]; x.small = x.n < 30;
+            return '<div class="cmp-plat">' + cmRing(x, "cm-ring--plat") + '<p class="cmp-plat__n">' + (ICONS[k] || "") + "<b>" + esc(k) + "</b></p><p class=\"cmp-plat__s\">" + full(x.n) + " comments · <b>" + cmPct(x.intent, x.n) + "%</b> ask to buy</p></div>"; }).join("") + "</div>" : "")
+        + (mainT ? "<h3>What people talk about</h3>" + '<div class="cmp-insight"><span class="cmp-insight__ic">' + cmIcon(mainT) + '</span><div class="cmp-insight__b">'
+            + '<p class="cmp-insight__k">The biggest topic · ' + v(t.themes[mainT]) + " of comments</p><p class=\"cmp-insight__t\">" + esc(mainT) + "</p>" + (AR[mainT] ? '<p class="cmp-insight__ar" dir="rtl" lang="ar">' + esc(AR[mainT]) + "</p>" : "")
+            + ((TA[mainT] || []).length ? '<p class="cmp-insight__l">What they ask about it</p><div class="cmp-chips">' + asksOf(mainT, 4) + "</div>" : "") + "</div></div>"
+            + (restT.length ? '<div class="cmp-themes">' + restT.map(function (q) {
+              return '<div class="cmp-theme" style="--w:' + (t.themes[q] / t.themes[mainT] * 100).toFixed(1) + '%"><span class="cmp-theme__ic">' + cmIcon(q) + '</span><span class="cmp-theme__t">' + esc(q) + ar(q) + "</span><b>" + v(t.themes[q]) + "</b><i></i>"
+                + ((TA[q] || []).length ? '<div class="cmp-chips">' + asksOf(q, 2) + "</div>" : "") + "</div>"; }).join("") + "</div>" : "") : "")
         + (asks.length ? "<h3>What buyers asked</h3>" + '<ol class="cmp-asks">' + asks.map(function (q, i) {
             return '<li style="--w:' + (t.asks[q].n / apeak * 100).toFixed(1) + '%"' + (i ? "" : ' class="is-1"') + '><span class="cmp-asks__q"><q dir="auto">' + esc(q) + "</q><small>" + esc(t.asks[q].en || "") + "</small></span><i></i><b>" + t.asks[q].n + "</b></li>"; }).join("") + "</ol>" : "")
-        + (th.length ? "<h3>What people talk about</h3>" + '<div class="cmp-themes">' + th.slice(0, 6).map(function (q, i) {
-            var pc = t.small ? t.themes[q] : cmPct(t.themes[q], t.n) + "%";
-            return '<div class="cmp-theme' + (i ? "" : " is-1") + '" style="--w:' + (t.themes[q] / t.themes[th[0]] * 100).toFixed(1) + '%"><span class="cmp-theme__ic">' + cmIcon(q) + "</span><span class=\"cmp-theme__t\">" + esc(q) + "</span><b>" + pc + "</b><i></i></div>"; }).join("") + "</div>" : "")
         + (quotes.length ? "<h3>In their words</h3>" + '<div class="cmp-quotes">' + quotes.map(function (q) {
             return '<article class="cmp-quote"><q dir="auto">' + esc(q.text) + "</q>" + (q.gloss ? "<p>“" + esc(q.gloss) + "”</p>" : "")
               + "<footer>" + ava(pics[q.code]) + "<b>" + esc(names[q.code] || q.code || "") + "</b><span>" + (ICONS[q.platform] || esc(q.platform)) + "</span></footer></article>"; }).join("") + "</div>" : "")
-        + "<h3>By creator</h3>" + '<div class="cmp-who">' + who.map(function (c) { var w = t.by[c], few = w.n < ((C.min_sample) || 30), top = cmTop(w.themes)[0];
+        + "<h3>By creator</h3>" + '<div class="cmp-who">' + who.map(function (c) { var w = t.by[c], few = w.n < ((C.min_sample) || 30), top = cmTop(w.themes)[0]; w.small = few;
             return '<div class="cmp-who__r">' + ava(pics[c]) + '<span class="cmp-who__n"><b>' + esc(names[c] || c) + "</b><small>" + w.plats.map(function (x) { return ICONS[x] || esc(x); }).join("") + "</small></span>"
-              + '<span class="cmp-who__c cmp-who__c--n"><b>' + full(w.n) + "</b><small>comments</small></span>" + cmRing(w, "") + '<span class="cmp-who__c cmp-who__c--b"><b>' + (few ? w.intent : cmPct(w.intent, w.n) + "%") + "</b><small>" + (few ? "of " + w.n + " ask" : "ask to buy") + "</small></span>"
-              + '<span class="cmp-who__t">' + (few ? "<small>Too few to say</small>" : cmIcon(top) + "<span>" + esc(top || "—") + "</span>") + "</span></div>"; }).join("")
+              + cmRing(w, "cm-ring--who") + '<span class="cmp-who__c cmp-who__c--n"><b>' + full(w.n) + "</b><small>comments</small></span>"
+              + '<span class="cmp-who__c cmp-who__c--b"><b>' + (few ? w.intent : cmPct(w.intent, w.n) + "%") + "</b><small>" + (few ? "of " + w.n + " ask" : "ask to buy") + "</small></span>"
+              + '<span class="cmp-who__t">' + (few ? "<small>Too few to say</small>" : cmIcon(top) + "<span>" + esc(top || "—") + ar(top) + "</span>") + "</span></div>"; }).join("")
         + silent.map(function (c) { return '<div class="cmp-who__r is-quiet">' + ava(c.photo) + '<span class="cmp-who__n"><b>' + esc(c.name) + "</b></span><span class=\"cmp-who__wait\">" + (c.posts ? "Comments not read yet" : "No video yet") + "</span></div>"; }).join("")
         + "</div>"
         + '<p class="cmp-foot">Comments are read twice per video, ' + (C.read_days || [2, 7]).join(" and ") + " days after it is posted, up to 300 per post, and grouped by AI. "

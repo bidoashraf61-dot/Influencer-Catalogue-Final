@@ -88,6 +88,10 @@ CREATE TABLE IF NOT EXISTS comments (
   UNIQUE (content_id, ext_id)
 );
 CREATE INDEX IF NOT EXISTS comments_campaign ON comments(campaign_id, sentiment);
+CREATE TABLE IF NOT EXISTS comment_labels (
+  label TEXT PRIMARY KEY,                       -- a theme label as the AI wrote it (English)
+  ar    TEXT                                    -- its Arabic title, shown under the English on the client's page
+);
 """
 
 _ready = False
@@ -421,6 +425,36 @@ def _tell_flags(cid, n):
         print("comments: flag mail skipped:", repr(exc)[:120], flush=True)
 
 
+LABELS = {"type": "OBJECT", "properties": {"items": {"type": "ARRAY", "items": {"type": "OBJECT", "properties": {
+    "label": {"type": "STRING"}, "ar": {"type": "STRING"}}, "required": ["label", "ar"]}}}, "required": ["items"]}
+
+
+def translate_labels():
+    """Arabic titles for theme labels that have none yet (owner, 2026-10-19). One call for up to 40 labels."""
+    import gemini
+    init()
+    if not gemini.configured():
+        return 0
+    with db.connect() as conn:
+        todo = [r[0] for r in conn.execute("SELECT DISTINCT theme FROM comments WHERE theme IS NOT NULL AND theme NOT IN "
+                                            "(SELECT label FROM comment_labels WHERE ar IS NOT NULL AND ar != '') LIMIT 40")]
+    if not todo:
+        return 0
+    try:
+        out = gemini.generate_json("Translate each topic label to a short, natural Modern Standard Arabic title (2-5 words) for a "
+                                   "Saudi / Egyptian marketing report. Keep the meaning, no quotes.\n" + json.dumps(todo, ensure_ascii=False),
+                                   LABELS, kind="comments", temperature=0.1, max_tokens=2048, timeout=45)
+    except Exception as exc:
+        print("comments: label translation failed:", repr(exc)[:160], flush=True)
+        return 0
+    got = {str(it.get("label") or "").strip(): str(it.get("ar") or "").strip()[:80] for it in (out.get("items") or []) if isinstance(it, dict)}
+    with db.connect() as conn:
+        for lab in todo:
+            if got.get(lab):
+                conn.execute("INSERT OR REPLACE INTO comment_labels (label, ar) VALUES (?, ?)", (lab, got[lab]))
+    return len([l for l in todo if got.get(l)])
+
+
 # --------------------------------------------------------------------------------- loop --
 
 def tick():
@@ -429,6 +463,7 @@ def tick():
         saved = poll_runs()
         started = start_due()
         read, _ = classify_pending()
+        translate_labels()
     return {"saved": saved, "started": started, "read": read}
 
 
@@ -466,6 +501,7 @@ def client_view(k):
             (cid, MAX_QUOTES)).fetchall()
         first_post = conn.execute("SELECT MIN(posted_at) FROM content WHERE campaign_id = ? AND hidden = 0 AND section = 'campaign'",
                                   (cid,)).fetchone()[0]
+        labels = {r[0]: r[1] for r in conn.execute("SELECT label, ar FROM comment_labels WHERE ar IS NOT NULL")}
     buckets = {}
     for r in rows:
         b = buckets.setdefault((r["code"], r["platform"]), {"code": r["code"], "platform": r["platform"], "n": 0, "pos": 0, "neu": 0,
@@ -480,6 +516,14 @@ def client_view(k):
                 a["n"] += 1
         if r["theme"]:
             b["themes"][r["theme"]] = b["themes"].get(r["theme"], 0) + 1
+    # What people ask about each topic (owner, 2026-10-19): the buying questions inside every theme, most asked first.
+    ta = {}
+    for r in rows:
+        if r["intent"] and r["ask"] and r["theme"]:
+            d = ta.setdefault(r["theme"], {})
+            x = d.setdefault(r["ask"], [r["ask"], r["ask_en"] or "", 0])
+            x[2] += 1
+    theme_asks = {th: sorted(d.values(), key=lambda x: -x[2])[:4] for th, d in ta.items()}
     out = []
     for b in buckets.values():
         b["videos"] = len(b["videos"])
@@ -488,6 +532,7 @@ def client_view(k):
     done = [r["finished_at"] for r in reads if r["status"] == "done" and r["finished_at"]]
     return {"status": "ready" if out else ("waiting" if reads or first_post else "none"),
             "buckets": out, "quotes": [dict(q) for q in quotes], "min_sample": MIN_SAMPLE,
+            "theme_asks": theme_asks, "theme_ar": {k: v for k, v in labels.items() if any(k in b["themes"] for b in out)},
             "first_post": first_post, "next_read": min(pending) if pending else None,
             "last_read": max(done) if done else None,
             "final_read": max([r["due_at"] for r in reads] or [0]) or None,
