@@ -622,7 +622,7 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v10 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v11 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
@@ -644,6 +644,10 @@
     var hit = CM_TI.filter(function (r) { return r[0].test(label || ""); })[0];
     return ico(hit ? hit[1] : '<path d="M4 5.5h16v10.5H9l-5 4z"/>');
   }
+  // Sentiment faces, drawn in the mood's colour (smile / flat / frown), as listening tools show them.
+  var CM_FACE = (function () { var f = function (m) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">'
+      + '<circle cx="12" cy="12" r="9.2" fill="currentColor" fill-opacity=".12"/><circle cx="9" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/>' + m + "</svg>"; };
+    return { pos: f('<path d="M8.3 13.6a4.2 4.2 0 0 0 7.4 0"/>'), neu: f('<path d="M8.8 14.8h6.4"/>'), neg: f('<path d="M8.3 16.4a4.2 4.2 0 0 1 7.4 0"/>') }; })();
   function cmPick() {
     var C = R.comments || {}, t = { n: 0, pos: 0, neu: 0, neg: 0, intent: 0, videos: 0, asks: {}, themes: {}, by: {}, plats: {}, tp: {}, days: {} };
     (C.buckets || []).forEach(function (b) {
@@ -682,7 +686,7 @@
   function cmKey(t, short) {
     var v = function (x) { return t.small ? x : cmPct(x, t.n) + "%"; };
     return '<div class="cm-key">' + [["pos", t.pos, short ? "pos." : "positive"], ["neu", t.neu, "neutral"], ["neg", t.neg, short ? "neg." : "negative"]].filter(function (s) { return s[1] || s[0] !== "neg"; })
-      .map(function (s) { return '<span style="--c:' + CM_COL[s[0]] + '"><b>' + v(s[1]) + "</b> " + s[2] + "</span>"; }).join("") + "</div>";
+      .map(function (s) { return '<span class="has-face" style="--c:' + CM_COL[s[0]] + '">' + '<i class="cm-face">' + CM_FACE[s[0]] + '</i><b>' + v(s[1]) + "</b> " + s[2] + "</span>"; }).join("") + "</div>";
   }
   function cmVerdict(t) {
     if (t.small) return ["none", "Too few to judge"];
@@ -702,10 +706,10 @@
     if (!C || !t.n) body = cmWait(C || { status: "none" });
     else {
       body = '<div class="cm-hero">' + cmRing(t, "cm-ring--card") + '<div class="cm-legend">'
-        + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cm-legend__r" style="--c:' + CM_COL[s[0]] + '"><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + "</small></div>"; }).join("")
+        + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cm-legend__r" style="--c:' + CM_COL[s[0]] + '">' + '<i class="cm-face">' + CM_FACE[s[0]] + '</i><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + "</small></div>"; }).join("")
         + '<p class="cm-legend__n">' + full(t.n) + " comments · " + t.videos + " video" + (t.videos === 1 ? "" : "s") + "</p></div></div>";
     }
-    $("w-geo").innerHTML = head(CMI, "What people commented", CM_TIP, C && t.n ? "geo" : null) + '<div class="db-card__body cm">' + body + "</div>";
+    $("w-geo").innerHTML = head(CMI, "What people say", CM_TIP, C && t.n ? "geo" : null) + '<div class="db-card__body cm">' + body + "</div>";
   }
   // Share of all comments by platform: one donut in the platforms' own colours, the leader in the middle.
   function cmShare(plats, t) {
@@ -1102,7 +1106,7 @@
         + (C.next_read || C.last_read ? '<p class="cmp-say__d">' + (C.last_read ? "Read " + cmDay(C.last_read) : "") + (C.next_read ? (C.last_read ? " · " : "") + "next read " + cmDay(C.next_read) : "") + "</p>" : "")
         + "</div></aside></section>"
         + "<h3>The mood</h3>" + '<div class="cmp-mood">' + cmRing(t, "cm-ring--hero") + '<div class="cmp-mood__k">'
-        + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cmp-mood__r" style="--c:' + CM_COL[s[0]] + '"><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + " comments</small></div>"; }).join("")
+        + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cmp-mood__r" style="--c:' + CM_COL[s[0]] + '">' + '<i class="cm-face">' + CM_FACE[s[0]] + '</i><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + " comments</small></div>"; }).join("")
         + "</div></div>"
         + (plats.length ? "<h3>Where the comments came from</h3>" + '<div class="cmp-src">' + cmShare(plats, t) + '<div class="cmp-plats">' + plats.map(function (k) { var x = t.plats[k]; x.small = x.n < 30;
             return '<div class="cmp-plat" style="--pc:' + (PCOL[k] || "#121212") + '"><p class="cmp-plat__n">' + (ICONS[k] || "") + "<b>" + esc(k) + "</b><em>" + cmPct(x.n, t.n) + "%</em></p>" + cmRing(x, "cm-ring--plat")
@@ -1283,7 +1287,7 @@
       + (p.caption ? '<p class="db-post__cap">' + esc(p.caption) + "</p>" : "")
       + '<div class="db-post__stats">' + stats(p).map(function (x) { return "<div><small>" + x[0] + "</small><b>" + x[1] + "</b></div>"; }).join("") + "</div></a>";
   }
-  var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "What people said in the comments", plat: "Platforms", clicks: "Affiliate clicks" };
+  var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "What people say", plat: "Platforms", clicks: "Affiliate clicks" };
   var lastFocus = null;
   function openPanel(area) {
     if (!PANEL[area]) return;
