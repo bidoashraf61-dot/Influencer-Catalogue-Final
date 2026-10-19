@@ -1019,6 +1019,7 @@
   .cmp-heat { grid-template-columns: minmax(120px, 1.4fr) repeat(var(--cols), minmax(38px, 1fr)); gap: 4px; } .cmp-heat__r .cm-ar { display: none; }
   .cmp-heat__c { min-height: 38px; font-size: 17px; }
   .cmp-days { gap: 4px; } .cmp-days__c small { font-size: 9.5px; }
+  .cmp-cloud { padding: 14px 10px; gap: 8px; } .cmp-cloud__q { font-size: calc(13px + 9px * var(--f)); }
 }
 /* end What people said */
 .db-obj__auto { display: inline-flex; align-items: center; margin-left: 8px; padding: 3px 9px; border-radius: 999px; background: #f2f0eb; font: 600 11px/1.2 var(--body); color: var(--gray); white-space: nowrap; cursor: help; }
