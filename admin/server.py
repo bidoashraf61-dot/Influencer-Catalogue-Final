@@ -374,6 +374,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             push.save_rules(push_views.parse_rules(f))
             team.log("push_rules", me, "saved", self.client_ip())
             return self.redirect("/app-alerts?tab=rules&ok=" + q("Rules saved."))
+        if path == "/app-alerts/update-now":
+            n = push.send_update(created_by=me)
+            team.log("push_update", me, "%d devices" % n, self.client_ip())
+            return self.redirect("/app-alerts?tab=history&ok=" + q("Update notice sent to %d device%s." % (n, "" if n == 1 else "s")))
         if path == "/app-alerts/cancel":
             ok = push.cancel(int(f.get("id") or 0)) if str(f.get("id") or "").isdigit() else False
             return self.redirect("/app-alerts?tab=history&" + ("ok=" + q("Scheduled push cancelled.") if ok else "e=" + q("That push was already sent.")))

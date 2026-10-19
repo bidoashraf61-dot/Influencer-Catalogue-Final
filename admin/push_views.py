@@ -441,13 +441,19 @@ def rules_page(flash=None):
               '<label>Thresholds <input type="text" name="view_steps" value="%s" style="width:300px"></label>' % e(steps("view_steps")))
         + row("bell", "Selections, analysis, quotes, credits", "Everything else the bell sends, as a push too")
         + row("team", "Team: briefs, quote requests, red-flag comments, milestones", "To KAMs and admins, the same events they get by email")
+        + row("update", "App updated", "When a new version of the app goes live: \"HELVi has been updated, tap to update\" to everyone with alerts on. At most once a day; the daily cap does not apply")
         + '<div class="pa-rule"><div><b>Limits</b><p>Riyadh time</p><div class="opts">'
           '<label>Quiet from <input type="number" min="0" max="23" name="quiet_a" value="%d" style="width:70px">:00</label>'
           '<label>to <input type="number" min="0" max="23" name="quiet_b" value="%d" style="width:70px">:00</label>'
           '<label>Max automatic pushes per person per day <input type="number" min="1" max="20" name="daily_max" value="%d" style="width:70px"></label>'
           '</div></div><span></span><span></span></div>' % (R["quiet"][0], R["quiet"][1], R["daily_max"])
         + '<div class="pa-acts"><button class="btn" type="submit">Save rules</button></div></div></form>'
-        '<p class="muted" style="max-width:80ch;font-size:13px">People choose per group in Account → Notifications (the same switches as the bell) plus one "Phone alerts" switch. '
+        + ('<form method="post" action="%s" class="pa-card" style="max-width:940px;margin-top:18px;display:flex;justify-content:space-between;align-items:center;gap:16px">'
+           '<div><h2>Send the update notice now</h2><p class="muted" style="margin:0">Current app version %s%s. Goes to everyone with alerts on, right away (quiet hours still apply).</p></div>'
+           '<button class="btn lime" type="submit">Send update notice</button></form>'
+           % (u("/app-alerts/update-now"), e(push.app_version()),
+              (" · last notice " + _when((db.setting("app_update_sent", None) or {}).get("at"))) if db.setting("app_update_sent", None) else ""))
+        + '<p class="muted" style="max-width:80ch;font-size:13px">People choose per group in Account → Notifications (the same switches as the bell) plus one "Phone alerts" switch. '
         'Pushes use standard Web Push with HelloVoice\'s own key (no Firebase): Android Chrome, Edge and Samsung, iPhone Home Screen apps on iOS 16.4+, and desktop browsers.</p>'
     )
     return _shell("rules", body, flash)
@@ -468,7 +474,7 @@ def parse_rules(form):
             except ValueError:
                 pass
         return out
-    ch = {k: form.get(k) == "1" for k in ("on", "camp_status", "goals", "posts", "views", "bell", "team")}
+    ch = {k: form.get(k) == "1" for k in ("on", "camp_status", "goals", "posts", "views", "bell", "team", "update")}
     ch["goal_steps"] = [s for s in steps(form.get("goal_steps")) if 0 < s <= 1000]
     ch["view_steps"] = steps(form.get("view_steps"))
     ch["posts_gap_h"] = form.get("posts_gap_h")

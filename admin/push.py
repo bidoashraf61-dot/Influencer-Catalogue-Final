@@ -128,12 +128,13 @@ DEFAULT_RULES = {
     "views": True, "view_steps": [100000, 500000, 1000000, 5000000],
     "bell": True,                   # everything else the bell sends (selections, analysis, quotes, credits)
     "team": True,                   # KAM / admin: briefs, quote requests, red flags
+    "update": True,                 # a new app version went live: "tap to update", at most once a day
     "quiet": [23, 8],               # Riyadh hours, start and end
     "daily_max": 3,
 }
 RULE_LABELS = {"camp_status": "Campaign live / ended / final report", "goals": "Goal reached",
                "posts": "First post + new posts live", "views": "Views passed", "bell": "Selections, analysis, quotes, credits",
-               "team": "Team alerts", "manual": "Manual", "test": "Test"}
+               "team": "Team alerts", "update": "App updated", "manual": "Manual", "test": "Test"}
 # inbox kind -> rule. Kinds not listed never push (daily "report updated", ideas).
 KIND_RULE = {"camp_live": "camp_status", "camp_final": "camp_status", "camp_goal": "goals", "camp_views": "views",
              "camp_posts": "posts", "camp_shared": "bell", "camp_weekly": "bell", "camp_next": "bell",
@@ -496,7 +497,7 @@ def _make(rule, title, body, url, user_ids=(), emails=(), source="auto", tag=Non
         for d in devs:
             person = d["user_id"] or (d["email"] or "").lower() or d["id"]
             status, reason = "queued", None
-            if source == "auto":
+            if source == "auto" and rule != "update":
                 if person not in capped:
                     capped[person] = _today_auto(conn, d["user_id"], d["email"], now) >= R["daily_max"]
                 if capped[person]:
@@ -812,6 +813,94 @@ def _campaign_milestones(k, R, inbox, metrics):
     return fired
 
 
+# ------------------------------------------------------------ app version --
+# Any change to the portal's scripts or styles is a new app version. When one goes live the
+# loop waits until it has been stable for 10 minutes (a deploy touches many files), then
+# tells everyone with alerts on, at most once a day (Bido, 2026-10-19).
+
+import hashlib
+import os
+from pathlib import Path
+
+_HERE = Path(__file__).resolve().parent
+UPDATE_SETTLE = 600
+UPDATE_GAP = 20 * 3600
+_ver_cache = {"at": 0, "v": None}
+
+
+def _asset_dirs():
+    for base in (_HERE.parent / "site" / "assets", _HERE.parent / "assets"):
+        if (base / "js").is_dir():
+            return [base / "js", base / "css"]
+    return []
+
+
+def app_version():
+    """A short hash over the live portal scripts and styles (cached for a minute)."""
+    now = time.time()
+    if _ver_cache["v"] and now - _ver_cache["at"] < 60:
+        return _ver_cache["v"]
+    h = hashlib.sha1()
+    for d in _asset_dirs():
+        for f in sorted(d.iterdir()):
+            if f.suffix in (".js", ".css") and f.is_file():
+                h.update(f.name.encode())
+                h.update(f.read_bytes())
+    sw = _HERE.parent / "site" / "sw.js"
+    if sw.is_file():
+        h.update(sw.read_bytes())
+    _ver_cache.update(at=now, v=h.hexdigest()[:10])
+    return _ver_cache["v"]
+
+
+def _update_audience():
+    with db.connect() as conn:
+        rows = conn.execute("SELECT DISTINCT user_id, lower(email) e FROM push_devices WHERE status = 'active'").fetchall()
+    return [r["user_id"] for r in rows if r["user_id"]], [r["e"] for r in rows if not r["user_id"] and r["e"]]
+
+
+def send_update(created_by=None, version=None):
+    """'HELVi has been updated': a tap opens the app on the new version. Returns devices queued."""
+    users, emails = _update_audience()
+    v = version or app_version()
+    n = _make("update", "HELVi has been updated", "Tap to get the latest version.", "/account/?update=1",
+              users, emails, source="manual" if created_by else "auto", tag="update",
+              audience={"type": "update", "version": v}, created_by=created_by)
+    db.set_setting("app_update_sent", {"version": v, "at": db.now()})
+    return n
+
+
+def check_update(now=None):
+    """Called by the loop. Returns True when an update push was queued."""
+    now = now or db.now()
+    v = app_version()
+    known = db.setting("app_version", None)
+    if not known:
+        db.set_setting("app_version", v)              # first run: today's version is the baseline
+        return False
+    if v == known:
+        db.set_setting("app_version_pending", None)
+        return False
+    pend = db.setting("app_version_pending", None) or {}
+    if pend.get("version") != v:
+        db.set_setting("app_version_pending", {"version": v, "since": now})
+        return False
+    if now - pend.get("since", now) < UPDATE_SETTLE:
+        return False
+    R = rules()
+    if not R["on"] or not R.get("update"):
+        db.set_setting("app_version", v)              # switched off: accept the version silently
+        db.set_setting("app_version_pending", None)
+        return False
+    last = (db.setting("app_update_sent", None) or {}).get("at", 0)
+    if now - last < UPDATE_GAP:
+        return False                                 # one a day: this version waits for the next slot
+    send_update(version=v)
+    db.set_setting("app_version", v)
+    db.set_setting("app_version_pending", None)
+    return True
+
+
 # ------------------------------------------------------------------- loop --
 
 _started = False
@@ -846,6 +935,8 @@ def start():
                     n = milestones()
                     if n:
                         print("push: %d milestone(s)" % n, flush=True)
+                    if check_update():
+                        print("push: app update notice queued", flush=True)
                 out = tick()
                 if out["sent"] or out["scheduled"]:
                     print("push:", out, flush=True)

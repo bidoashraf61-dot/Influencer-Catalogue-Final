@@ -25,6 +25,10 @@
   var PUSH_OK = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window && (!IOS || STANDALONE);
   var ME = null, deferred = null, reg = null;
   var FROM_QR = /[?&]src=qr/.test(location.search), QR_BAD = (/[?&]qr=(expired|devices)/.exec(location.search) || [])[1];
+  var FROM_UPDATE = /[?&]update=1/.test(location.search);
+  if (FROM_UPDATE && history.replaceState) {
+    try { history.replaceState(null, "", location.pathname + "?src=app" + location.hash); } catch (e) { /* ignore */ }
+  }
   if (FROM_QR && history.replaceState) {               // keep the address clean for "Add to Home Screen"
     try { history.replaceState(null, "", location.pathname + "?src=app" + location.hash); } catch (e) { /* ignore */ }
   }
@@ -480,6 +484,37 @@
       el("span", null, "Scan with your phone's camera to save HELVi as an icon on your Home Screen, then turn on alerts.")])]);
   }
 
+  // ----------------------------------------------------- new app version --
+  // The update push opens the app with ?update=1; a release that lands while the app is open
+  // shows a bar. Either way the worker and the page reload onto the new files.
+  var BOOT_V = null, upbar;
+  function applyUpdate() {
+    var go = function () { location.reload(); };
+    ready().then(function (r) {
+      return r.update().then(function () {
+        if (r.waiting) { r.waiting.postMessage({ type: "SKIP_WAITING" }); setTimeout(go, 400); } else go();
+      });
+    }).catch(go);
+  }
+  function showUpdateBar() {
+    if (upbar) return;
+    upbar = el("div", { class: "hca-up", role: "status" }, [
+      el("span", { html: svg("check") }), el("b", null, "A new version of HELVi is ready"),
+      el("button", { class: "hca-btn hca-btn--ink", type: "button", onclick: function () { this.disabled = true; this.textContent = "Updating…"; applyUpdate(); } }, "Update now")
+    ]);
+    document.body.appendChild(upbar);
+  }
+  function checkVersion() {
+    if (!BOOT_V || document.hidden) return;
+    fetch(API + "version", { credentials: "include", cache: "no-store" }).then(function (r) { return r.json(); })
+      .then(function (j) { if (j && j.v && j.v !== BOOT_V) showUpdateBar(); }).catch(function () {});
+  }
+  function updatedToast() {
+    var t = el("div", { class: "hca-up hca-up--done", role: "status" }, [el("span", { html: svg("check") }), el("b", null, "You're on the latest version of HELVi")]);
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 4000);
+  }
+
   // ---------------------------------------------------------------- boot --
   function boot(me) {
     if (ME) return;
@@ -495,6 +530,10 @@
     setTimeout(function () { whenFree(maybeCard); }, FROM_QR ? 20000 : 8000);
     setTimeout(maybeWelcome, 2500);
     setTimeout(mountMenu, 300);
+    state().then(function (st) { BOOT_V = st && st.v; });
+    if (FROM_UPDATE) { if ("serviceWorker" in navigator) ready().then(function (r) { r.update(); }).catch(function () {}); setTimeout(updatedToast, 600); }
+    setInterval(checkVersion, 10 * 60 * 1000);
+    document.addEventListener("visibilitychange", checkVersion);
     window.addEventListener("beforeinstallprompt", function () { setTimeout(function () { var m = document.getElementById("pt-menu"); if (m) [].forEach.call(m.querySelectorAll(".hca-mi"), function (x) { x.remove(); }); mountMenu(); }, 50); });
     // The account page redraws its sections on every hash change: put the card back each time.
     var body = document.getElementById("hc-body");

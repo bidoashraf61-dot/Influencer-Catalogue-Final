@@ -55,7 +55,9 @@ def handle(h, method, path, query=None):
             uid = who.get("user_id")
             h.send_json(200, {"ok": True, "phone": push.phone_on(uid), "signed": bool(who), "account": bool(uid),
                               "welcome_seen": push.welcome_seen(uid), "phone_app": push.phone_app(uid),
-                              "installed": push.installed(uid, (query or {}).get("k"))}, h.cors())
+                              "installed": push.installed(uid, (query or {}).get("k")), "v": push.app_version()}, h.cors())
+        elif op == "version":
+            h.send_json(200, {"ok": True, "v": push.app_version()}, h.cors() + [("Cache-Control", "no-store")])
         elif op == "qr":
             return qr_landing(h, (query or {}).get("h", ""))
         else:

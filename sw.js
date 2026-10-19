@@ -3,7 +3,7 @@
    Pages always come from the network (client data is private and changes all day);
    the cache only holds the app shell pieces that carry a ?v= stamp, the icons and
    the offline page. Nothing under /admin/ is ever cached. */
-const VERSION = "hca-1";
+const VERSION = "hca-2";
 const SHELL = ["/offline.html", "/assets/app/icon-192.png", "/assets/app/badge-96.png",
   "/assets/brand/helvy-connect/helvy-connect-light-320.webp",
   "/assets/ref/68efdbc172d0ac625d40c65f_BebasNeue-Regular.woff2"];
@@ -11,6 +11,11 @@ const API = "/admin/api/push/";
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
+});
+
+// The page asks a waiting worker to take over at once ("Update now").
+self.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {

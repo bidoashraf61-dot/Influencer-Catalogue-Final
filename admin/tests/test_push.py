@@ -265,6 +265,40 @@ class Push(unittest.TestCase):
         labels = [l for l, _n in push.overview()["funnel"]]
         self.assertEqual(labels[:2], ["Saw the desktop welcome", "Scanned the QR"])
 
+    def test_11_update_notice_once_a_day(self):
+        real = push.app_version
+        ver = {"v": "aaa"}
+        push.app_version = lambda: ver["v"]
+        try:
+            push.save_rules({"on": True, "update": True})
+            for k in ("app_version", "app_version_pending", "app_update_sent"):
+                db.set_setting(k, None)
+            t0 = db.now()
+            self.assertFalse(push.check_update(t0))                      # baseline only
+            self.assertEqual(db.setting("app_version"), "aaa")
+            ver["v"] = "bbb"
+            self.assertFalse(push.check_update(t0 + 60))                 # new version seen: settle first
+            self.assertFalse(push.check_update(t0 + 300))
+            SENT.clear()
+            self.assertTrue(push.check_update(t0 + 60 + push.UPDATE_SETTLE))
+            self.drain()
+            got = [p for _e, p, _k in SENT if p["title"] == "HELVi has been updated"]
+            self.assertTrue(got)
+            self.assertEqual(got[0]["url"], "/account/?update=1")
+            ver["v"] = "ccc"                                              # a second release the same day waits
+            self.assertFalse(push.check_update(t0 + 1000))
+            self.assertFalse(push.check_update(t0 + 1000 + push.UPDATE_SETTLE))
+            self.assertTrue(push.check_update(t0 + 60 + push.UPDATE_SETTLE + push.UPDATE_GAP))
+            s, v, _ = self.c.get("/api/push/version")
+            self.assertEqual((s, v["v"]), (200, "ccc"))
+            a = self.admin()
+            s, _, resp = a.req("POST", "/app-alerts/update-now", form={})
+            self.assertEqual(s, 303)
+            self.assertIn("Update", __import__("urllib.parse").parse.unquote(resp.headers["Location"]))
+            self.assertEqual(a.get("/app-alerts?tab=rules")[0], 200)
+        finally:
+            push.app_version = real
+
 
 if __name__ == "__main__":
     unittest.main()
