@@ -282,9 +282,10 @@
       // No tracking links = no clicks anywhere on the report: no tab, no
       // column, no share of the score (the server already scored without it).
       if (R.objective && R.objective.links === false) R.visibility.clicks = false;
-      FILTER = { platform: "", kind: "", section: "campaign" };
+      if (!same || !FILTER) FILTER = { platform: "", kind: "", section: "campaign" };      // a refresh keeps the reader's filters
       render(t);
       show("report");
+      pollReport();
       if (!same) window.scrollTo(0, 0);
       get("/api/campaigns").then(function (x) { $("mx-all").hidden = !(x.campaigns || []).length; }).catch(function () {});
     }).catch(function (err) {
@@ -293,6 +294,20 @@
     });
   }
   window.addEventListener("hashchange", route);
+  // New numbers appear without a reload (owner, 2026-10-18): while the report is open and visible it asks for the
+  // report every five minutes, and redraws it only when something changed (the reader's filters and place are kept).
+  var POLL_ID = null;
+  function pollReport() {
+    if (POLL_ID) return;
+    POLL_ID = setInterval(function () {
+      if (document.hidden || !R || !R._t) return;
+      get("/api/campaign?t=" + encodeURIComponent(R._t)).then(function (b) {
+        var n = b && b.report; if (!n) return;
+        var sig = function (r) { return [r.updated_at, r.total && r.total.views, r.total && r.total.likes, r.total && r.total.comments, (r.posts || []).length].join("|"); };
+        if (sig(n) !== sig(R)) openReport(R._t);
+      }).catch(function () {});
+    }, window.__pollMs || 300000);
+  }
 
   /* ---------------------------------------------------------------- render */
 
@@ -638,7 +653,7 @@
       var img = p.thumb ? '<img class="hv-fill" src="' + esc(p.thumb) + '" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
         + '<img class="hv-fit" src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "";
       return '<article class="mx-post"><div class="mx-post__media"><div class="mx-post__plate">' + icon(p.platform) + "</div>" + img
-        + '<span class="mx-post__tag">' + (p.parts ? p.parts.map(function (x) { return icon(x.platform); }).join("") + "One video · " + p.parts.length + " platforms"
+        + '<span class="mx-post__tag">' + (p.parts ? p.parts.map(function (x) { return icon(x.platform); }).join("") + "<span class=\"mx-post__one\">One video · </span>" + p.parts.length + " platforms"
           : icon(p.platform) + esc(KIND[p.kind] || p.kind)) + '</span><span class="mx-post__sig">'
         + sig(h.grade, healthTitle(h)) + '</span></div><div class="mx-post__body"><div class="mx-who">' + ava(p.photo)
         + "<div><b>" + esc(p.creator) + "</b><span>" + esc(day(p.posted_at)) + '</span></div></div><dl class="mx-nums">'
@@ -649,7 +664,7 @@
             + (p.parts && x.video && x.views != null ? " · " + num(x.views) + " views" : "")
             + ' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>';
         }).join("") + '</div></article>';
-    }).join("") + (list.length ? owed.map(pendingCard).join("") : "");
+    }).join("") + (list.length && owed.length ? pendingStrip(owed) : "");
   }
 
   // A card for every booked post that is not live yet: the creator, where
@@ -664,6 +679,15 @@
       for (var i = 0; i < owed; i++) out.push({ c: c, n: (c.delivered || 0) + i + 1 });
     });
     return out;
+  }
+  // With posts already live, the ones still to come fold into one short
+  // "Coming next" list instead of a full card each (mobile audit 2026-10-19).
+  function pendingStrip(owed) {
+    return '<section class="mx-next" aria-label="Coming next"><h3 class="mx-next__h">Coming next · ' + owed.length + (owed.length === 1 ? " video" : " videos") + "</h3><ul>"
+      + owed.map(function (x) {
+        var c = x.c, when = c.pending_date ? "Expected " + day(c.pending_date) : "Date to be confirmed";
+        return "<li>" + ava(c.photo) + "<span><b>" + esc(c.name) + "</b><small>Post " + x.n + " of " + c.planned + "</small></span><em>" + esc(when) + "</em></li>";
+      }).join("") + "</ul></section>";
   }
   function pendingCard(x) {
     var c = x.c, when = c.pending_date ? "Expected " + day(c.pending_date) : "Date to be confirmed";
@@ -754,7 +778,9 @@
         + '<div class="mx-bullet__num"><b>' + (isRate ? pct(i.actual) : num(i.actual)) + "</b>of " + (isRate ? pct(i.goal, 1) : num(i.goal)) + " goal</div></div>";
     }).join("") : "";
     var ex = [];
-    ex.push(["Engagement rate", t.er, t.er_grade, "Strong from " + bm.er.micro[0] + "% (micro creators)"]);
+    // One rule: with a campaign ER goal, the card grades against it, like the score line (owner, 2026-10-19).
+    var erT = (p.items || []).filter(function (i) { return i.key === "er"; })[0];
+    ex.push(["Engagement rate", t.er, erT ? erT.grade : t.er_grade, erT ? "Against the campaign goal of " + pct(erT.goal, 1) + " · industry guide " + bm.er.micro[0] + "% (micro creators)" : "Strong from " + bm.er.micro[0] + "% (micro creators)"]);
     if (t.video_er != null) ex.push(["Video engagement", t.video_er, t.video_er_grade, "Strong from " + bm.video_er[0] + "%"]);
     if (R.visibility.clicks && t.ctr != null && R.clicks && R.clicks.links) ex.push(["Click-through", t.ctr, t.ctr_grade, "Strong from " + bm.ctr[0] + "%"]);
     $("mx-bench").innerHTML = ex.map(function (x) {
@@ -831,12 +857,7 @@
         return '<div><span class="mx-sw" style="background:' + p[2] + '"></span>' + p[0] + "<b>" + full(p[1]) + "</b></div>";
       }).join("") + "</div></div>");
     if (R.audience && R.audience.countries.length) {
-      mix.push('<div class="mx-panel"><h3>Creators\' audience</h3>' + bars(R.audience.countries.map(function (c) {
-        return { k: c.code, n: c.pct, label: c.pct.toFixed(0) + "%" };
-      }), function (r) { return flag(r.k) + esc(countryName(r.k)); })
-        + (R.audience.target ? '<p class="mx-panel__note"><b>Target market: ' + esc(countryName(R.audience.target.code)) + "</b> · "
-            + R.audience.target.pct.toFixed(0) + "% of these creators' audience" + (R.audience.target.rank ? " (#" + R.audience.target.rank + ")" : "") + "</p>" : "")
-        + '<p class="mx-panel__note">' + audNote(R.audience) + "</p></div>");
+      mix.push('<div class="mx-panel"><h3>Creators\' audience</h3>' + (R.audience ? '<p class="aud-target">' + (R.audience.target ? flag(R.audience.target.code) + '<span>Target market <b>' + esc(countryName(R.audience.target.code)) + '</b></span>' : '<span>Target market</span>') + '</p>' + '<div class="aud-stamp" role="img" aria-label="Audience not analysed yet"><span>Not analysed</span><span>yet</span></div>' : '') + '</div>');
     }
     $("mx-mix").innerHTML = mix.join("");
     decorateH3("mx-mix");
