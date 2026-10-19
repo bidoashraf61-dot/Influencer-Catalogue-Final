@@ -151,8 +151,19 @@ def visibility(campaign):
     return out
 
 
-def post_numbers(c, f):
-    """Every derived number for one piece of content."""
+ENG_ALL_KEY = "engagement_all"   # setting [campaign ids] whose engagement also counts shares and saves (Ivatherm #10, 2026-10-19)
+
+
+def counts_shares_saves(campaign_id):
+    try:
+        return int(campaign_id) in {int(x) for x in (db.setting(ENG_ALL_KEY) or [])}
+    except (TypeError, ValueError):
+        return False
+
+
+def post_numbers(c, f, all_eng=False):
+    """Every derived number for one piece of content. `all_eng`: engagement is likes + comments + shares + saves
+    (the campaign's choice); otherwise likes + comments, as the benchmarks are."""
     likes, comments = c.get("likes"), c.get("comments")
     ins = c.get("insights") or {}
     if ins.get("likes") is not None:
@@ -167,6 +178,9 @@ def post_numbers(c, f):
     out = {"likes": likes, "comments": comments, "engagement": eng, "views": views or 0,
            "shares": ins.get("shares", c.get("shares")), "saves": ins.get("saves", c.get("saves")),
            "video": video, "story": story, "real": bool(ins)}
+    if all_eng:
+        eng += (out["shares"] or 0) + (out["saves"] or 0)
+        out["engagement"] = eng
 
     if video:
         out["reach"] = int(ins["reach"]) if ins.get("reach") else \
@@ -259,9 +273,10 @@ def report(campaign, internal=False, raw=False):
             got = (foll_by.get(c["code"]) or {}).get(c["platform"])
             if got:
                 c["followers"] = got
+    all_eng = counts_shares_saves(cid)
     posts = []
     for c in content:
-        n = post_numbers(c, f)
+        n = post_numbers(c, f, all_eng)
         n["health"] = post_health(n, c.get("followers"), bm)
         emv = 0.0
         for action in ("impressions", "views", "likes", "comments", "shares", "saves"):
@@ -331,7 +346,9 @@ def report(campaign, internal=False, raw=False):
         if not rates:
             t["emv"] = None
         delivered = len({p["pk"] for p in mine})
-        followers = m["followers"]
+        # Graded on the followers of the campaign's platform when the creator has them there (a TikTok-sized
+        # count made an Instagram creator "mega", 2026-10-19), else on their main count.
+        followers = (foll_by.get(code) or {}).get(campaign["platform"]) or m["followers"]
         row = {"code": code, "name": m["name"] or code, "photo": m["photo"],
                "followers": followers, "planned": m["planned"], "delivered": delivered,
                "pending_status": (m["pending_status"] if "pending_status" in m.keys() else None),

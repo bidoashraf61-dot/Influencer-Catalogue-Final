@@ -32,6 +32,7 @@ INTERVAL = 900
 BATCH = 60                   # comments per Gemini call
 MIN_SAMPLE = 30              # under this the client sees counts, not percentages
 MAX_QUOTES = 6
+WEEKLY_KEY = "comments_weekly"   # setting {campaign id: "YYYY-MM-DD"}: re-read every video weekly until that day
 
 # platform: (actor, USD per comment at the account's tier, input builder)
 ACTORS = {
@@ -164,12 +165,46 @@ def _is_sample(k):
     return text.startswith("sample") or "(demo)" in text or "dummy data" in text
 
 
+def weekly_until(now=None):
+    """{campaign id: last day as epoch} for the campaigns whose comments are re-read every week (owner, 2026-10-19:
+    Ivatherm #10 until 30 Nov). Their videos are read however old they were when first seen."""
+    now = now or db.now()
+    out = {}
+    for k, day in (db.setting(WEEKLY_KEY) or {}).items():
+        try:
+            end = time.mktime(time.strptime(str(day), "%Y-%m-%d")) + 86399
+        except ValueError:
+            continue
+        if end >= now:
+            out[int(k)] = end
+    return out
+
+
+def weekly_rereads(now=None):
+    """Every video of a weekly campaign whose last read finished 7+ days ago is read again (comments are kept by
+    their id, so a re-read adds only the new ones). The video's latest read row is the one sent again."""
+    init()
+    now = now or db.now()
+    n = 0
+    with db.connect() as conn:
+        for cid in weekly_until(now):
+            cur = conn.execute(
+                "UPDATE comment_reads SET status = 'due', due_at = ?, message = NULL WHERE id IN ("
+                "SELECT MAX(id) FROM comment_reads WHERE campaign_id = ? AND status = 'done' GROUP BY content_id) "
+                "AND finished_at < ? AND content_id NOT IN "
+                "(SELECT content_id FROM comment_reads WHERE campaign_id = ? AND status IN ('due','running'))",
+                (now, cid, now - 7 * 86400, cid))
+            n += cur.rowcount
+    return n
+
+
 def ensure_reads(cid=None, now=None):
     """Two reads per campaign video on a live campaign: 2 and 7 days after it went up. A post first seen after
     its second read was due gets that read only; one older than FRESH_DAYS is not read."""
     init()
     now = now or db.now()
     added = 0
+    weekly = weekly_until(now)
     with db.connect() as conn:
         camps = conn.execute("SELECT * FROM campaigns WHERE status = 'live'" + (" AND id = %d" % int(cid) if cid else "")).fetchall()
         for k in camps:
@@ -178,11 +213,15 @@ def ensure_reads(cid=None, now=None):
             rows = conn.execute("SELECT id, platform, posted_at FROM content WHERE campaign_id = ? AND hidden = 0 "
                                 "AND section = 'campaign' AND posted_at IS NOT NULL", (k["id"],)).fetchall()
             for c in rows:
-                if c["platform"] not in ACTORS or now - c["posted_at"] > FRESH_DAYS * 86400:
+                old = now - c["posted_at"] > FRESH_DAYS * 86400
+                if c["platform"] not in ACTORS or (old and k["id"] not in weekly):
                     continue
                 d1, d2 = (c["posted_at"] + d * 86400 for d in READ_DAYS)
                 for no, due in ((1, d1), (2, d2)):
                     st = "skipped" if no == 1 and now >= d2 else "due"
+                    if old and no == 2 and conn.execute("SELECT 1 FROM comment_reads WHERE content_id = ? AND read_no = 1 "
+                                                        "AND status != 'skipped'", (c["id"],)).fetchone():
+                        st = "skipped"         # an old video read on read 1 needs no second read now; weekly re-reads follow
                     cur = conn.execute("INSERT OR IGNORE INTO comment_reads (content_id, campaign_id, platform, read_no, due_at, status) "
                                        "VALUES (?,?,?,?,?,?)", (c["id"], k["id"], c["platform"], no, due, st))
                     added += cur.rowcount
@@ -461,6 +500,7 @@ def translate_labels():
 def tick():
     with _lock:
         ensure_reads()
+        weekly_rereads()
         saved = poll_runs()
         started = start_due()
         read, _ = classify_pending()
