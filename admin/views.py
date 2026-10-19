@@ -3728,7 +3728,11 @@ def _head(k, tab, error=None, message=None):
            "<input type='hidden' name='campaign' value='" + str(k["id"]) + "'>"
            "<button class='btn ghost' title='Make a priced selection from this campaign&#39;s creators'>"
            + ui.icon("list", 15) + " Selection from this campaign</button></form>") if tab == "setup" and not k["selection_id"] else ""
-    # On every campaign tab: straight to what the client sees.
+    # On every campaign tab: back to the selection the campaign was booked from.
+    if k["selection_id"]:
+        act += ("<a class='btn ghost' href='" + u("/selections/edit") + "?id=" + str(k["selection_id"])
+                + "' title='The selection this campaign was booked from'>" + ui.icon("list", 15) + " Go to selection</a>")
+    # And straight to what the client sees.
     act = "<div class='hd-acts'>" + act + open_link("campaign", k["token"], "Open client report", "btn ghost") + "</div>"
     return (ui.header(k["name"], desc + " &middot; " + status_pill(k["status"]),
                       crumbs=[("Campaigns", u("/campaigns")), (k["name"], None)], actions=act,
