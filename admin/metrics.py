@@ -3,7 +3,7 @@ out, so the dashboard, the client's page and the exports cannot disagree.
 
 Definitions (also in docs/CAMPAIGN-TRACKER-BRIEF.md §11):
 
-  engagement          likes + comments
+  engagement          likes + comments + shares + saves (every campaign, owner 2026-10-19)
   est. reach, post    engagement × REACH_PER_ENGAGEMENT, capped at followers
   est. reach, video   views × VIDEO_REACH_PER_VIEW (40%) — plays count replays and
                       repeat viewers, so unique people are fewer than views
@@ -151,19 +151,9 @@ def visibility(campaign):
     return out
 
 
-ENG_ALL_KEY = "engagement_all"   # setting [campaign ids] whose engagement also counts shares and saves (Ivatherm #10, 2026-10-19)
-
-
-def counts_shares_saves(campaign_id):
-    try:
-        return int(campaign_id) in {int(x) for x in (db.setting(ENG_ALL_KEY) or [])}
-    except (TypeError, ValueError):
-        return False
-
-
-def post_numbers(c, f, all_eng=False):
-    """Every derived number for one piece of content. `all_eng`: engagement is likes + comments + shares + saves
-    (the campaign's choice); otherwise likes + comments, as the benchmarks are."""
+def post_numbers(c, f, all_eng=True):
+    """Every derived number for one piece of content. Engagement is likes + comments + shares + saves;
+    `all_eng=False` gives likes + comments only (published benchmarks count those)."""
     likes, comments = c.get("likes"), c.get("comments")
     ins = c.get("insights") or {}
     if ins.get("likes") is not None:
@@ -264,7 +254,19 @@ def report(campaign, internal=False, raw=False):
     clicks_by = {r["k"]: r["n"] for r in clicks["by_creator"]}
     content = [c for c in db.campaign_content(cid) if not c["hidden"]]
 
-    bm = benchmarks()
+    bm0 = benchmarks()
+    # The grading benchmarks are published likes + comments rates; engagement here also counts shares + saves,
+    # so they are lifted by what shares + saves add on each platform (plans.share_save_uplift): a post by its own
+    # platform, creator rows and totals by the campaign's main platform.
+    up = plans.share_save_uplift()
+
+    def lifted(platform):
+        f = up.get(platform, 1.0)
+        if f == 1.0:
+            return bm0
+        return dict(bm0, er={b: [v * f for v in pair] for b, pair in bm0["er"].items()},
+                    video_er=[v * f for v in bm0["video_er"]])
+
     # A post that carries no follower count of its own takes the creator's followers on that platform, so
     # its view rate can be worked out (the benchmark gauge read "Typical" without it).
     foll_by = {m["cc_code"]: creator_followers(m) for m in members}
@@ -273,11 +275,10 @@ def report(campaign, internal=False, raw=False):
             got = (foll_by.get(c["code"]) or {}).get(c["platform"])
             if got:
                 c["followers"] = got
-    all_eng = counts_shares_saves(cid)
     posts = []
     for c in content:
-        n = post_numbers(c, f, all_eng)
-        n["health"] = post_health(n, c.get("followers"), bm)
+        n = post_numbers(c, f)
+        n["health"] = post_health(n, c.get("followers"), lifted(c["platform"]))
         emv = 0.0
         for action in ("impressions", "views", "likes", "comments", "shares", "saves"):
             emv += (n.get(action) or 0) * _rate(rates, c["platform"], action)
@@ -294,6 +295,13 @@ def report(campaign, internal=False, raw=False):
         p["piece_size"] = sizes[p["pk"]]
 
     camp = [p for p in posts if p["section"] == "campaign"]
+    main = campaign["platform"] if campaign["platform"] in plans.PLATFORMS else None
+    if not main and camp:
+        counts = {}
+        for p in camp:
+            counts[p["platform"]] = counts.get(p["platform"], 0) + 1
+        main = max(counts, key=counts.get)
+    bm = lifted(main)
 
     def totals(items, extra_clicks=0):
         t = {k: sum((p.get(k) or 0) for p in items)
@@ -814,7 +822,7 @@ def _platform_goals(campaign, plan, gp, r, camp, members, sched, window):
     own = plan.get("by_platform") or {}
     if not own or any(not ((own.get(pl) or {}).get("safe") and (own[pl].get("expected"))) for pl in gp):
         return {}
-    lib = plans.library()
+    lib = plans.rates()
     cf = plans.CATEGORIES.get(plan.get("category"), ("", 1.0))[1]
     camp_targets = db.campaign_targets(campaign)
     by_code = {m["cc_code"]: m for m in members}
@@ -925,7 +933,7 @@ def goals_view(campaign, r, photo=None):
     gp = goal_platforms(plan)
     if not plan or not gp:
         return None
-    lib = plans.library()
+    lib = plans.rates()
     cf = plans.CATEGORIES.get(plan.get("category"), ("", 1.0))[1]
     members = db.campaign_creators(campaign["id"])
     by_code = {m["cc_code"]: m for m in members}

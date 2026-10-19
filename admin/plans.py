@@ -74,7 +74,8 @@ def tier_of(followers):
 #
 # Per platform, per tier, [safe, expected]:
 #   view_rate  views of one video ÷ the creator's followers, %
-#   eng_rate   engagement (likes + comments) ÷ views, %
+#   eng_rate   engagement (likes + comments) ÷ views, % — as published. Planning uses rates(),
+#              which lifts it by the shares + saves our own campaigns measure (owner, 2026-10-19)
 # Per platform:
 #   reach_per_view  unique people ÷ views (replays and repeat viewers)
 #   ctr             link clicks ÷ views, % — only with a tracked link
@@ -185,6 +186,57 @@ def library():
     return out
 
 
+# Engagement is likes + comments + shares + saves on every campaign (owner, 2026-10-19). Published benchmarks
+# count likes + comments only, so planning lifts them by what shares + saves add on our own tracked videos,
+# per platform: 1 + (shares + saves) / (likes + comments). Needs UPLIFT_MIN_POSTS videos showing both counts,
+# else 1.0 (no lift); capped at UPLIFT_MAX. Sample / demo campaigns are left out.
+UPLIFT_MIN_POSTS = 3
+UPLIFT_MAX = 2.5
+_uplift_cache = {"at": 0.0, "val": None}
+
+
+def share_save_uplift(fresh=False):
+    """{platform: factor}, recalculated at most hourly as campaigns add posts."""
+    import time as _t
+    if not fresh and _uplift_cache["val"] is not None and _t.time() - _uplift_cache["at"] < 3600:
+        return _uplift_cache["val"]
+    out = {}
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT k.name, k.client, c.platform, c.kind, s.likes, s.comments, s.shares, s.saves "
+            "FROM content c JOIN campaigns k ON k.id = c.campaign_id "
+            "JOIN snapshots s ON s.id = (SELECT id FROM snapshots x WHERE x.content_id = c.id ORDER BY x.at DESC, x.id DESC LIMIT 1) "
+            "WHERE c.hidden = 0 AND c.section = 'campaign'").fetchall()
+    acc = {}
+    for r in rows:
+        name = ("%s %s" % (r["name"] or "", r["client"] or "")).lower()
+        if name.startswith("sample") or "(demo)" in name or "dummy data" in name:
+            continue
+        if r["kind"] not in db.VIDEO_KINDS or r["likes"] is None or r["shares"] is None or r["saves"] is None:
+            continue
+        a = acc.setdefault(r["platform"], [0, 0, 0])
+        a[0] += 1
+        a[1] += (r["likes"] or 0) + (r["comments"] or 0)
+        a[2] += (r["shares"] or 0) + (r["saves"] or 0)
+    for plat in PLATFORMS:
+        n, lc, ss = acc.get(plat, (0, 0, 0))
+        out[plat] = round(min(UPLIFT_MAX, 1.0 + ss / float(lc)), 2) if n >= UPLIFT_MIN_POSTS and lc else 1.0
+    _uplift_cache.update(at=_t.time(), val=out)
+    return out
+
+
+def rates():
+    """library() for planning: engagement rates lifted by share_save_uplift(). The Settings editor keeps
+    using library() (the published, likes + comments values)."""
+    out = library()
+    up = share_save_uplift()
+    for plat, L in out.items():
+        f = up.get(plat, 1.0)
+        L["eng_rate"] = {t: [round(v * f, 3) for v in pair] for t, pair in L["eng_rate"].items()}
+        L["eng_uplift"] = f
+    return out
+
+
 # ------------------------------------------------------- our own numbers --
 
 def house_benchmarks():
@@ -287,7 +339,7 @@ def calculate_platforms(brief, rows):
         base["platforms"] = plats
         base["by_platform"] = by_platform()
         return base
-    lib = library()
+    lib = rates()
     links = base["links"]
     budget = float(brief.get("budget") or 0)
     slots = {}
@@ -357,7 +409,7 @@ def calculate_platforms(brief, rows):
 def calculate(brief, mix):
     """The plan. `brief`: platform, objective, category, budget (SAR, what the
     client pays), tracked_links (bool). `mix`: from mix_from_*."""
-    lib = library()
+    lib = rates()
     plat = brief.get("platform") if brief.get("platform") in lib else "Instagram"
     L = lib[plat]
     cat = brief.get("category") if brief.get("category") in CATEGORIES else "other"
