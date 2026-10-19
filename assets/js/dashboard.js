@@ -622,7 +622,7 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v14 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v15 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
@@ -753,10 +753,12 @@
     if (k === "buy") return r >= 0.4 ? "is-good" : r >= 0.15 ? "is-mid" : "is-bad";
     return r >= 0.6 ? "is-good" : r >= 0.3 ? "is-mid" : "is-bad";
   }
-  /* The comment browser (owner, 2026-10-19): every comment, grouped by doctor then video, with filters. Loaded on demand. */
-  var CMB = { items: null, busy: false, waits: [], f: { mood: "", theme: "", plat: "", buy: false, q: "" }, open: {} };
-  var CM_MOOD = { p: "pos", n: "neu", x: "neg" };
+  /* The comment browser (owner, 2026-10-19; v15): every comment in its own language, grouped by doctor then video,
+     filtered by doctor, video, mood, platform (icons), topic, buying questions and search, and exported as CSV. */
+  var CMB = { items: null, busy: false, waits: [], f: { doc: "", vid: "", mood: "", plat: "", theme: "", buy: false, q: "" }, open: {} };
+  var CM_MOOD = { p: "pos", n: "neu", x: "neg" }, CM_MOOD_W = { p: "Positive", n: "Neutral", x: "Negative" };
   var CM_HEART = ico('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>');
+  var CM_DL = ico('<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>');
   function cmLoad(cb) {
     if (CMB.items) return cb();
     CMB.waits.push(cb); if (CMB.busy) return; CMB.busy = true;
@@ -765,10 +767,13 @@
       .then(function () { CMB.busy = false; var w = CMB.waits; CMB.waits = []; w.forEach(function (f) { f(); }); });
   }
   function cmInPage(it) { return (!F.platform || it[2] === F.platform) && (!F.creators.length || F.creators.indexOf(it[1]) >= 0); }
+  function cmPeople() { var names = {}, pics = {}; (R.creators || []).forEach(function (c) { names[c.code] = c.name; pics[c.code] = c.photo; }); return { names: names, pics: pics }; }
+  function cmPosts() { var posts = {}; (R.posts || []).forEach(function (p) { posts[p.id] = p; }); return posts; }
+  function cmVidName(p, it) { return (KIND[p.kind] || p.kind || "Video") + " · " + (p.platform || it[2]) + (p.posted_at ? " · " + day(p.posted_at) : ""); }
   function cmRow(it) {
     var m = CM_MOOD[it[3]] || "neu";
-    return '<div class="cmb-c"><i class="cm-face" style="--c:' + CM_COL[m] + '">' + CM_FACE[m] + '</i><div class="cmb-c__b"><q dir="auto">' + esc(it[7]) + "</q>"
-      + (it[8] ? "<p>" + esc(it[8]) + "</p>" : "") + '<p class="cmb-c__m">' + (it[5] ? '<span class="cmb-tag">' + cmIcon(it[5]) + esc(it[5]) + "</span>" : "")
+    return '<div class="cmb-c"><i class="cm-face" style="--c:' + CM_COL[m] + '" title="' + CM_MOOD_W[it[3]] + '">' + CM_FACE[m] + '</i><div class="cmb-c__b"><q dir="auto">' + esc(it[7]) + "</q>"
+      + '<p class="cmb-c__m">' + (it[5] ? '<span class="cmb-tag">' + cmIcon(it[5]) + esc(it[5]) + "</span>" : "")
       + (it[4] ? '<span class="cmb-buy">Asks to buy' + (it[6] ? ' · <q dir="auto">' + esc(it[6]) + "</q>" : "") + "</span>" : "")
       + (it[9] ? '<span class="cmb-likes">' + CM_HEART + it[9] + "</span>" : "") + "</p></div></div>";
   }
@@ -778,54 +783,79 @@
       el.innerHTML = got.length ? got.map(cmRow).join("") : '<p class="cmb__load">No comments to show.</p>';
     });
   }
+  function cmPick2(skipVid) {
+    var f = CMB.f, q = f.q.trim().toLowerCase();
+    return (CMB.items || []).filter(function (it) { return cmInPage(it) && (!f.doc || it[1] === f.doc) && (skipVid || !f.vid || String(it[0]) === String(f.vid))
+      && (!f.mood || it[3] === f.mood) && (!f.plat || it[2] === f.plat) && (!f.theme || it[5] === f.theme) && (!f.buy || it[4])
+      && (!q || (it[7] + " " + it[6]).toLowerCase().indexOf(q) >= 0); });
+  }
   function cmFilters() {
-    var th = {}, pl = {};
-    (CMB.items || []).forEach(function (it) { if (it[5]) th[it[5]] = (th[it[5]] || 0) + 1; pl[it[2]] = 1; });
-    var f = CMB.f, moods = [["", "All"], ["p", "Positive"], ["n", "Neutral"], ["x", "Negative"]];
-    return '<div class="cmb-f"><div class="cmb-f__mood" role="group" aria-label="Mood">' + moods.map(function (m) {
-        return '<button type="button" data-mood="' + m[0] + '" aria-pressed="' + (f.mood === m[0]) + '">' + (m[0] ? '<i class="cm-face" style="--c:' + CM_COL[CM_MOOD[m[0]]] + '">' + CM_FACE[CM_MOOD[m[0]]] + "</i>" : "") + m[1] + "</button>"; }).join("") + "</div>"
-      + '<select data-f="theme" aria-label="Topic"><option value="">All topics</option>' + Object.keys(th).sort(function (a, b) { return th[b] - th[a]; }).map(function (q) { return '<option value="' + esc(q) + '"' + (f.theme === q ? " selected" : "") + ">" + esc(q) + "</option>"; }).join("") + "</select>"
-      + '<select data-f="plat" aria-label="Platform"><option value="">All platforms</option>' + Object.keys(pl).map(function (k) { return '<option' + (f.plat === k ? " selected" : "") + ">" + esc(k) + "</option>"; }).join("") + "</select>"
+    var f = CMB.f, all = (CMB.items || []).filter(cmInPage), P = cmPeople(), posts = cmPosts(), docs = {}, vids = {}, th = {}, pl = {};
+    all.forEach(function (it) { docs[it[1]] = (docs[it[1]] || 0) + 1; if (!f.doc || it[1] === f.doc) vids[it[0]] = (vids[it[0]] || 0) + 1; if (it[5]) th[it[5]] = (th[it[5]] || 0) + 1; pl[it[2]] = (pl[it[2]] || 0) + 1; });
+    var moods = [["", "All"], ["p", "Positive"], ["n", "Neutral"], ["x", "Negative"]];
+    var docKeys = Object.keys(docs).sort(function (a, b) { return docs[b] - docs[a]; });
+    return '<div class="cmb-f">'
+      + '<div class="cmb-f__row cmb-f__docs" role="group" aria-label="Doctor"><button type="button" data-doc="" aria-pressed="' + (!f.doc) + '">All doctors</button>'
+      + docKeys.map(function (c) { return '<button type="button" data-doc="' + esc(c) + '" aria-pressed="' + (f.doc === c) + '">' + ava(P.pics[c]) + "<span>" + esc(P.names[c] || c) + "</span><small>" + docs[c] + "</small></button>"; }).join("")
+      + '<select data-f="vid" aria-label="Video"><option value="">All videos (' + Object.keys(vids).length + ")</option>"
+      + Object.keys(vids).sort(function (a, b) { return vids[b] - vids[a]; }).map(function (id) { var p = posts[id] || {}, it = all.filter(function (x) { return String(x[0]) === id; })[0];
+          return '<option value="' + id + '"' + (f.vid === id ? " selected" : "") + ">" + esc((f.doc ? "" : (P.names[it[1]] || it[1]) + " · ") + cmVidName(p, it)) + " (" + vids[id] + ")</option>"; }).join("") + "</select></div>"
+      + '<div class="cmb-f__row"><div class="cmb-seg" role="group" aria-label="Mood">' + moods.map(function (m) {
+          return '<button type="button" data-mood="' + m[0] + '" aria-pressed="' + (f.mood === m[0]) + '"' + (m[0] ? ' title="' + m[1] + '"' : "") + ">" + (m[0] ? '<i class="cm-face" style="--c:' + CM_COL[CM_MOOD[m[0]]] + '">' + CM_FACE[CM_MOOD[m[0]]] + '</i><span class="cmb-seg__t">' + m[1] + "</span>" : m[1]) + "</button>"; }).join("") + "</div>"
+      + '<div class="cmb-seg cmb-seg--pl" role="group" aria-label="Platform"><button type="button" data-plat="" aria-pressed="' + (!f.plat) + '">All</button>'
+      + Object.keys(pl).sort(function (a, b) { return pl[b] - pl[a]; }).map(function (k) { return '<button type="button" data-plat="' + esc(k) + '" aria-pressed="' + (f.plat === k) + '" title="' + esc(k) + " · " + pl[k] + ' comments" aria-label="' + esc(k) + '">' + (ICONS[k] || esc(k)) + "<small>" + pl[k] + "</small></button>"; }).join("") + "</div>"
+      + '<button type="button" class="cmb-export" data-export="1">' + CM_DL + "Export CSV</button></div>"
+      + '<div class="cmb-f__row"><select data-f="theme" aria-label="Topic"><option value="">All topics</option>' + Object.keys(th).sort(function (a, b) { return th[b] - th[a]; }).map(function (q) { return '<option value="' + esc(q) + '"' + (f.theme === q ? " selected" : "") + ">" + esc(q) + " (" + th[q] + ")</option>"; }).join("") + "</select>"
       + '<label class="cmb-f__buy"><input type="checkbox" data-f="buy"' + (f.buy ? " checked" : "") + "> Buying questions only</label>"
-      + '<input type="search" data-f="q" placeholder="Search the comments" value="' + esc(f.q) + '" aria-label="Search the comments"></div>';
+      + '<input type="search" data-f="q" placeholder="Search the comments" value="' + esc(f.q) + '" aria-label="Search the comments"></div></div>';
   }
   function cmList() {
-    var f = CMB.f, q = f.q.trim().toLowerCase(), all = (CMB.items || []).filter(cmInPage);
-    var list = all.filter(function (it) { return (!f.mood || it[3] === f.mood) && (!f.theme || it[5] === f.theme) && (!f.plat || it[2] === f.plat) && (!f.buy || it[4])
-      && (!q || (it[7] + " " + it[8] + " " + it[6]).toLowerCase().indexOf(q) >= 0); });
-    var posts = {}; (R.posts || []).forEach(function (p) { posts[p.id] = p; });
-    var names = {}, pics = {}; (R.creators || []).forEach(function (c) { names[c.code] = c.name; pics[c.code] = c.photo; });
-    var by = {}, order = [];
+    var list = cmPick2(), total = (CMB.items || []).filter(cmInPage).length, P = cmPeople(), posts = cmPosts(), by = {}, order = [];
     list.forEach(function (it) { if (!by[it[1]]) { by[it[1]] = {}; order.push(it[1]); } (by[it[1]][it[0]] = by[it[1]][it[0]] || []).push(it); });
-    var head = '<p class="cmb-count">Showing <b>' + full(list.length) + "</b> of " + full(all.length) + " comments</p>";
+    var head = '<p class="cmb-count">Showing <b>' + full(list.length) + "</b> of " + full(total) + " comments</p>";
     if (!list.length) return head + '<p class="cmb__load">No comment matches these filters.</p>';
     return head + order.map(function (code) {
       var vids = Object.keys(by[code]).sort(function (a, b) { return by[code][b].length - by[code][a].length; }), n = 0;
       vids.forEach(function (v) { n += by[code][v].length; });
-      return '<section class="cmb-d"><header class="cmb-d__h">' + ava(pics[code]) + "<b>" + esc(names[code] || code) + "</b><span>" + full(n) + " comment" + (n === 1 ? "" : "s") + "</span></header>"
+      return '<section class="cmb-d"><header class="cmb-d__h">' + ava(P.pics[code]) + "<b>" + esc(P.names[code] || code) + "</b><span>" + full(n) + " comment" + (n === 1 ? "" : "s") + " · " + vids.length + " video" + (vids.length === 1 ? "" : "s") + "</span></header>"
         + vids.map(function (vid) { var cs = by[code][vid], p = posts[vid] || {}, open = CMB.open[vid], show = open ? cs : cs.slice(0, 10);
           return '<div class="cmb-v"><div class="cmb-v__h"><a class="cmb-v__th" href="' + esc(p.url || "#") + '" target="_blank" rel="noopener">' + (p.thumb ? fit(p.thumb) : "") + "</a>"
-            + '<span class="cmb-v__t">' + (ICONS[p.platform || cs[0][2]] || "") + "<b>" + esc((KIND[p.kind] || p.kind || "Video") + " · " + (p.platform || cs[0][2])) + "</b><small>" + (p.posted_at ? day(p.posted_at) : "") + " · " + full(cs.length) + " comments</small></span>"
+            + '<span class="cmb-v__t">' + (ICONS[p.platform || cs[0][2]] || "") + "<b>" + esc((KIND[p.kind] || p.kind || "Video") + " · " + (p.platform || cs[0][2])) + "</b><small>" + (p.posted_at ? day(p.posted_at) + " · " : "") + full(cs.length) + " comments</small></span>"
             + (p.url ? '<a class="cmb-v__go" href="' + esc(p.url) + '" target="_blank" rel="noopener">Open video ›</a>' : "") + "</div>"
             + '<div class="cmb-v__l">' + show.map(cmRow).join("") + "</div>"
-            + (cs.length > 10 ? '<button type="button" class="cmb-more" data-more="' + vid + '">' + (open ? "Show fewer" : "Show " + (cs.length - 10) + " more") + "</button>" : "") + "</div>"; }).join("")
+            + (cs.length > 10 ? '<button type="button" class="cmb-more" data-more="' + vid + '">' + (open ? "Show fewer" : "Show all " + cs.length) + "</button>" : "") + "</div>"; }).join("")
         + "</section>";
     }).join("");
+  }
+  function cmExport() {
+    var list = cmPick2(), P = cmPeople(), posts = cmPosts();
+    var cell = function (v) { v = String(v == null ? "" : v); return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var rows = [["Doctor", "Platform", "Video", "Video link", "Mood", "Topic", "Asks to buy", "Buying question", "Comment", "Likes", "Comment date"]];
+    list.forEach(function (it) { var p = posts[it[0]] || {};
+      rows.push([P.names[it[1]] || it[1], it[2], cmVidName(p, it), p.url || "", CM_MOOD_W[it[3]] || "", it[5], it[4] ? "Yes" : "", it[6], it[7], it[9], it[10] ? new Date(it[10] * 1000).toISOString().slice(0, 10) : ""]); });
+    var csv = "﻿" + rows.map(function (r) { return r.map(cell).join(","); }).join("\r\n");
+    var a = document.createElement("a"), url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.href = url; a.download = ((R.campaign && R.campaign.name) || "campaign").replace(/[^\w؀-ۿ -]+/g, "").trim().replace(/\s+/g, "-") + "-comments.csv";
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 500);
   }
   function cmBind() {
     var box = $("cmb"); if (!box) return;
     cmLoad(function () {
       if (!$("cmb")) return;
       cmSamples();
-      box.innerHTML = cmFilters() + '<div class="cmb-l">' + cmList() + "</div>";
-      var redraw = function () { box.querySelector(".cmb-l").innerHTML = cmList(); }, timer;
+      var draw = function () { box.innerHTML = cmFilters() + '<div class="cmb-l">' + cmList() + "</div>"; };
+      var list = function () { box.querySelector(".cmb-l").innerHTML = cmList(); }, timer;
+      draw();
       box.addEventListener("click", function (e) {
-        var b = e.target.closest("[data-mood]"), m = e.target.closest("[data-more]");
-        if (b) { CMB.f.mood = b.getAttribute("data-mood"); [].forEach.call(box.querySelectorAll("[data-mood]"), function (x) { x.setAttribute("aria-pressed", x === b); }); redraw(); }
-        if (m) { var v = m.getAttribute("data-more"); CMB.open[v] = !CMB.open[v]; redraw(); }
+        var d = e.target.closest("[data-doc]"), b = e.target.closest("[data-mood]"), pl = e.target.closest("[data-plat]"), m = e.target.closest("[data-more]");
+        if (d) { CMB.f.doc = d.getAttribute("data-doc"); CMB.f.vid = ""; draw(); return; }
+        if (b) { CMB.f.mood = b.getAttribute("data-mood"); draw(); return; }
+        if (pl) { CMB.f.plat = pl.getAttribute("data-plat"); draw(); return; }
+        if (m) { var v = m.getAttribute("data-more"); CMB.open[v] = !CMB.open[v]; list(); return; }
+        if (e.target.closest("[data-export]")) cmExport();
       });
-      box.addEventListener("change", function (e) { var k = e.target.getAttribute("data-f"); if (!k || k === "q") return; CMB.f[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value; redraw(); });
-      box.addEventListener("input", function (e) { if (e.target.getAttribute("data-f") !== "q") return; CMB.f.q = e.target.value; clearTimeout(timer); timer = setTimeout(redraw, 200); });
+      box.addEventListener("change", function (e) { var k = e.target.getAttribute("data-f"); if (!k || k === "q") return; CMB.f[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value; list(); });
+      box.addEventListener("input", function (e) { if (e.target.getAttribute("data-f") !== "q") return; CMB.f.q = e.target.value; clearTimeout(timer); timer = setTimeout(list, 200); });
     });
   }
 
@@ -1218,7 +1248,7 @@
                     + '<text x="' + p[0].toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="cmp-curve__d">' + day(d) + "</text></g>"; }).join("")
               + '</svg></div><p class="cmp-days__n">The conversation peaked on <b>' + day(pk) + "</b> with " + mx + " comments.</p>"; })() : "")
         + (quotes.length ? "<h3>In their words</h3>" + '<div class="cmp-quotes">' + quotes.map(function (q) {
-            return '<article class="cmp-quote"><q dir="auto">' + esc(q.text) + "</q>" + (q.gloss ? "<p>“" + esc(q.gloss) + "”</p>" : "")
+            return '<article class="cmp-quote"><q dir="auto">' + esc(q.text) + "</q>" + ""
               + "<footer>" + ava(pics[q.code]) + "<b>" + esc(names[q.code] || q.code || "") + "</b><span>" + (ICONS[q.platform] || esc(q.platform)) + "</span></footer></article>"; }).join("") + "</div>" : "")
         + "<h3>By creator</h3>" + '<div class="cmp-who">' + who.map(function (c) { var w = t.by[c], few = w.n < ((C.min_sample) || 30), top = cmTop(w.themes)[0]; w.small = few;
             return '<div class="cmp-who__r">' + ava(pics[c]) + '<span class="cmp-who__n"><b>' + esc(names[c] || c) + "</b><small>" + w.plats.map(function (x) { return ICONS[x] || esc(x); }).join("") + "</small></span>"
