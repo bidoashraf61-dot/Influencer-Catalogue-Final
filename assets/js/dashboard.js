@@ -622,7 +622,7 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v16 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v17 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
@@ -789,6 +789,21 @@
       && (!f.mood || it[3] === f.mood) && (!f.plat || it[2] === f.plat) && (!f.theme || it[5] === f.theme) && (!f.buy || it[4])
       && (!q || (it[7] + " " + it[6]).toLowerCase().indexOf(q) >= 0); });
   }
+  // The video filter: one button showing the chosen video, a list of video cards (thumbnail, platform, type, date, comments).
+  function cmVidPicker(vids, all, P, posts) {
+    var f = CMB.f, ids = Object.keys(vids).sort(function (a, b) { return vids[b] - vids[a]; }), total = 0;
+    ids.forEach(function (i) { total += vids[i]; });
+    var card = function (id) {
+      var p = posts[id] || {}, it = all.filter(function (x) { return String(x[0]) === id; })[0] || [];
+      return '<span class="cmv__th">' + (p.thumb ? fit(p.thumb) : "") + '<i class="cmv__pl">' + (ICONS[p.platform || it[2]] || "") + '</i></span><span class="cmv__t"><b>' + esc((KIND[p.kind] || p.kind || "Video") + " · " + (p.platform || it[2]))
+        + "</b><small>" + (f.doc ? "" : esc(P.names[it[1]] || it[1]) + " · ") + (p.posted_at ? day(p.posted_at) + " · " : "") + full(vids[id]) + " comments</small></span>";
+    };
+    var allCard = '<span class="cmv__all">' + IC.posts + '</span><span class="cmv__t"><b>All videos</b><small>' + ids.length + " video" + (ids.length === 1 ? "" : "s") + " · " + full(total) + " comments</small></span>";
+    var cur = f.vid && vids[f.vid] ? card(f.vid) : allCard;
+    return '<div class="cmv"><button type="button" class="cmv__btn" data-cmv="1" aria-haspopup="listbox" aria-expanded="false" aria-label="Choose a video">' + cur + '<span class="cmv__chev" aria-hidden="true"></span></button>'
+      + '<ul class="cmv__list" role="listbox" aria-label="Videos" hidden><li role="option" aria-selected="' + (!f.vid) + '"><button type="button" data-vid="">' + allCard + "</button></li>"
+      + ids.map(function (id) { return '<li role="option" aria-selected="' + (f.vid === id) + '"><button type="button" data-vid="' + id + '">' + card(id) + "</button></li>"; }).join("") + "</ul></div>";
+  }
   function cmFilters() {
     var f = CMB.f, all = (CMB.items || []).filter(cmInPage), P = cmPeople(), posts = cmPosts(), docs = {}, vids = {}, th = {}, pl = {};
     all.forEach(function (it) { docs[it[1]] = (docs[it[1]] || 0) + 1; if (!f.doc || it[1] === f.doc) vids[it[0]] = (vids[it[0]] || 0) + 1; if (it[5]) th[it[5]] = (th[it[5]] || 0) + 1; pl[it[2]] = (pl[it[2]] || 0) + 1; });
@@ -797,9 +812,7 @@
     return '<div class="cmb-f">'
       + '<div class="cmb-f__row cmb-f__docs"><select data-f="doc" aria-label="Doctor"><option value="">All doctors (' + docKeys.length + ")</option>"
       + docKeys.map(function (c) { return '<option value="' + esc(c) + '"' + (f.doc === c ? " selected" : "") + ">" + esc(P.names[c] || c) + " (" + docs[c] + ")</option>"; }).join("") + "</select>"
-      + '<select data-f="vid" aria-label="Video"><option value="">All videos (' + Object.keys(vids).length + ")</option>"
-      + Object.keys(vids).sort(function (a, b) { return vids[b] - vids[a]; }).map(function (id) { var p = posts[id] || {}, it = all.filter(function (x) { return String(x[0]) === id; })[0];
-          return '<option value="' + id + '"' + (f.vid === id ? " selected" : "") + ">" + esc((f.doc ? "" : (P.names[it[1]] || it[1]) + " · ") + cmVidName(p, it)) + " (" + vids[id] + ")</option>"; }).join("") + "</select></div>"
+      + cmVidPicker(vids, all, P, posts) + "</div>"
       + '<div class="cmb-f__row"><div class="cmb-seg" role="group" aria-label="Mood">' + moods.map(function (m) {
           return '<button type="button" data-mood="' + m[0] + '" aria-pressed="' + (f.mood === m[0]) + '"' + (m[0] ? ' title="' + m[1] + '"' : "") + ">" + (m[0] ? '<i class="cm-face" style="--c:' + CM_COL[CM_MOOD[m[0]]] + '">' + CM_FACE[CM_MOOD[m[0]]] + '</i><span class="cmb-seg__t">' + m[1] + "</span>" : m[1]) + "</button>"; }).join("") + "</div>"
       + '<div class="cmb-seg cmb-seg--pl" role="group" aria-label="Platform"><button type="button" data-plat="" aria-pressed="' + (!f.plat) + '">All</button>'
@@ -846,8 +859,12 @@
       var draw = function () { box.innerHTML = cmFilters() + '<div class="cmb-l">' + cmList() + "</div>"; };
       var list = function () { box.querySelector(".cmb-l").innerHTML = cmList(); }, timer;
       draw();
+      document.addEventListener("click", function (e) { var ul = box.querySelector(".cmv__list"); if (ul && !ul.hidden && !e.target.closest(".cmv")) { ul.hidden = true; box.querySelector(".cmv__btn").setAttribute("aria-expanded", "false"); } });
+      box.addEventListener("keydown", function (e) { if (e.key !== "Escape") return; var ul = box.querySelector(".cmv__list"); if (ul && !ul.hidden) { ul.hidden = true; var bt = box.querySelector(".cmv__btn"); bt.setAttribute("aria-expanded", "false"); bt.focus(); e.stopPropagation(); } });
       box.addEventListener("click", function (e) {
-        var b = e.target.closest("[data-mood]"), pl = e.target.closest("[data-plat]"), m = e.target.closest("[data-more]");
+        var tv = e.target.closest("[data-cmv]"), ov = e.target.closest("[data-vid]"), b = e.target.closest("[data-mood]"), pl = e.target.closest("[data-plat]"), m = e.target.closest("[data-more]");
+        if (tv) { var ul = tv.parentNode.querySelector(".cmv__list"), op = ul.hidden; ul.hidden = !op; tv.setAttribute("aria-expanded", op); return; }
+        if (ov) { CMB.f.vid = ov.getAttribute("data-vid"); draw(); return; }
         if (b) { CMB.f.mood = b.getAttribute("data-mood"); draw(); return; }
         if (pl) { CMB.f.plat = pl.getAttribute("data-plat"); draw(); return; }
         if (m) { var v = m.getAttribute("data-more"); CMB.open[v] = !CMB.open[v]; list(); return; }
