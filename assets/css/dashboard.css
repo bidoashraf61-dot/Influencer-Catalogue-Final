@@ -1119,3 +1119,23 @@
   .db-cw__st { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 12px; }
   .db-cw__st > div:nth-child(3) { padding-left: 0; border-left: 0; }
 }
+
+/* Creators filter: a label like Dates, and the creators it covers as overlapping photos (2026-10-19) */
+.db-filter__lbl { color: var(--gray); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; }
+#db-creators-btn { display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px 3px 4px; --ring: #fff; }
+#db-creators-btn.is-on { --ring: var(--lime); }
+#db-creators-btn:hover { --ring: var(--ink); }
+.db-stack { display: inline-flex; align-items: center; }
+.db-stack__i { width: 28px; height: 28px; margin-left: -9px; border-radius: 50%; border: 2px solid var(--ring); overflow: hidden; background: var(--linen); display: grid; place-items: center; flex: none; }
+.db-stack__i:first-child { margin-left: 0; }
+.db-stack__i img, .db-stack__i .db-ava { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: 0; }
+.db-stack__more { background: var(--ink); color: #fff; font: 400 13px/1 var(--heading); letter-spacing: .02em; }
+#db-creators-btn:hover .db-stack__more { background: var(--lime); color: var(--ink); }
+.db-pick__t { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-pick__chev { width: 12px; height: 12px; flex: none; transition: transform .2s ease; }
+#db-creators-btn[aria-expanded="true"] .db-pick__chev { transform: rotate(180deg); }
+.db-pick__all { display: block; width: 100%; text-align: left; font: 600 13px/1.2 var(--body); color: var(--ink); padding: 9px 10px; margin-bottom: 4px; border: 0; border-bottom: 1px solid var(--line); border-radius: 12px 12px 0 0; background: #fff; cursor: pointer; }
+.db-pick__all:hover { background: #f4f2ee; }
+.db-pick__all.is-on::after { content: ""; float: right; width: 5px; height: 9px; margin: 1px 4px 0 0; border: solid var(--go); border-width: 0 2px 2px 0; transform: rotate(45deg); }
+@media (max-width: 760px) { .db-pick__t { max-width: 110px; } }
+@media (prefers-reduced-motion: reduce) { .db-pick__chev { transition: none; } }

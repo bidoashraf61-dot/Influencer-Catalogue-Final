@@ -338,16 +338,20 @@
       F.range = this.value; $("db-custom").hidden = F.range !== "custom"; renderAll();
     });
     ["db-from", "db-to"].forEach(function (id) { $(id).addEventListener("change", function () { F.from = $("db-from").value; F.to = $("db-to").value; renderAll(); }); });
-    $("db-creators").innerHTML = R.creators.map(function (c) {
+    $("db-creators").innerHTML = '<button type="button" class="db-pick__all" id="db-creators-all">All creators</button>' + R.creators.map(function (c) {
       return '<label><input type="checkbox" value="' + esc(c.code) + '">' + ava(c.photo) + esc(c.name) + "</label>";
     }).join("");
+    creatorBtn();
+    $("db-creators-all").addEventListener("click", function () {
+      [].forEach.call($("db-creators").querySelectorAll("input:checked"), function (i) { i.checked = false; });
+      $("db-creators").dispatchEvent(new Event("change"));
+    });
     $("db-creators-btn").addEventListener("click", function () {
       var m = $("db-creators"), open = m.hidden; m.hidden = !open; this.setAttribute("aria-expanded", open ? "true" : "false");
     });
     $("db-creators").addEventListener("change", function () {
       F.creators = [].map.call(this.querySelectorAll("input:checked"), function (i) { return i.value; });
-      $("db-creators-btn").textContent = F.creators.length ? F.creators.length + (F.creators.length === 1 ? " creator" : " creators") : "All creators";
-      $("db-creators-btn").classList.toggle("is-on", !!F.creators.length);
+      creatorBtn();
       renderAll();
     });
     document.addEventListener("click", function (e) { if (!e.target.closest(".db-pick")) { $("db-creators").hidden = true; $("db-creators-btn").setAttribute("aria-expanded", "false"); } });
@@ -356,11 +360,26 @@
       [].forEach.call($("db-platforms").children, function (x, i) { x.setAttribute("aria-pressed", i === 0 ? "true" : "false"); });
       $("db-range").value = "all"; $("db-custom").hidden = true;
       [].forEach.call($("db-creators").querySelectorAll("input"), function (i) { i.checked = false; });
-      $("db-creators-btn").textContent = "All creators"; $("db-creators-btn").classList.remove("is-on");
+      creatorBtn();
       renderAll();
     });
   }
   function filtered() { return !!(F.platform || F.range !== "all" || F.creators.length); }
+  // The creators filter shows who it covers (owner, 2026-10-19): overlapping photos (the chosen ones, or everyone),
+  // then "All 11", the one name, or "3 selected".
+  function creatorBtn() {
+    var sel = F.creators, all = R.creators || [], list = sel.length ? all.filter(function (c) { return sel.indexOf(c.code) >= 0; }) : all;
+    var stack = list.slice(0, 4).map(function (c) { return '<span class="db-stack__i">' + ava(c.photo) + "</span>"; }).join("")
+      + (list.length > 4 ? '<span class="db-stack__i db-stack__more">+' + (list.length - 4) + "</span>" : "");
+    var txt = !sel.length ? "All " + all.length : sel.length === 1 ? list[0].name : sel.length + " selected";
+    var b = $("db-creators-btn");
+    b.innerHTML = '<span class="db-stack" aria-hidden="true">' + stack + '</span><span class="db-pick__t">' + esc(txt) + "</span>"
+      + '<svg class="db-pick__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    b.setAttribute("aria-label", "Creators filter: " + (sel.length ? txt : "all " + all.length + " creators"));
+    b.title = sel.length ? list.map(function (c) { return c.name; }).join(", ") : "Showing all " + all.length + " creators. Pick one or more to filter the dashboard.";
+    b.classList.toggle("is-on", !!sel.length);
+    var a = $("db-creators-all"); if (a) a.classList.toggle("is-on", !sel.length);
+  }
   function inRange(t) {
     if (!t) return F.range === "all";
     if (F.range === "all") return true;
