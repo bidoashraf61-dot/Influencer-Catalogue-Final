@@ -597,12 +597,30 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19): viewers' comments, read by AI 2 and 7 days after each video. It takes the
-     audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
+  /* What people said (owner, 2026-10-19; v2 same day): viewers' comments, read by AI 2 and 7 days after each video.
+     It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
-  var CM_TIP = "What viewers wrote under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
+  var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
+  var CM_COL = { pos: "#14884a", neu: "#9a8b78", neg: "#ee1515" };
+  // One drawn icon per theme, picked from the words of the AI's label.
+  var CM_TI = [
+    [/avail|where|find|stock|pharmac|store|shop|country|egypt|kuwait|saudi/i, '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/>'],
+    [/price|cost|pric|cheap|expens|money|purchas|buy|order/i, '<path d="M20.5 13.5l-7 7a1.8 1.8 0 0 1-2.5 0l-7.5-7.5V4h8.5l8.5 8.5a1.8 1.8 0 0 1 0 1z"/><circle cx="8" cy="8" r="1.4"/>'],
+    [/dos|usage|use|how to|capsule|pill|tablet|supplement|vitamin|all-in-one/i, '<rect x="3.2" y="8.6" width="17.6" height="6.8" rx="3.4" transform="rotate(-35 12 12)"/><path d="M9.2 7.9l5.6 8.2"/>'],
+    [/medic|safety|side|health|condition|disease|doctor|pregnan|risk/i, '<path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.2-7.5 9.5-4.3-1.3-7.5-4.9-7.5-9.5V6z"/><path d="M12 9v6M9 12h6"/>'],
+    [/humou?r|joke|banter|funny|laugh/i, '<circle cx="12" cy="12" r="8.5"/><path d="M8.5 14a4.2 4.2 0 0 0 7 0"/><path d="M9 9.6h.01M15 9.6h.01"/>'],
+    [/prais|thank|love|appreciat|compliment|creator|support/i, '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>'],
+    [/quality|effect|result|work|review|experience/i, '<path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6-5.3-3-5.3 3 1.2-6L3.4 9.3l6-.7z"/>'],
+    [/deliver|ship|amazon|online/i, '<path d="M3 7h11v9H3zM14 10h4l3 3v3h-7z"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17.5" cy="17.5" r="1.8"/>'],
+    [/age|old|young|women|men|kid|child|baby|fertil/i, '<circle cx="12" cy="7.5" r="3.5"/><path d="M5 20.5a7 7 0 0 1 14 0"/>'],
+    [/skin|hair|beauty|makeup|derm/i, '<path d="M12 3.5s6 6.4 6 10.5a6 6 0 0 1-12 0c0-4.1 6-10.5 6-10.5z"/>']
+  ];
+  function cmIcon(label) {
+    var hit = CM_TI.filter(function (r) { return r[0].test(label || ""); })[0];
+    return ico(hit ? hit[1] : '<path d="M4 5.5h16v10.5H9l-5 4z"/>');
+  }
   function cmPick() {
-    var C = R.comments || {}, t = { n: 0, pos: 0, neu: 0, neg: 0, intent: 0, videos: 0, asks: {}, themes: {}, by: {} };
+    var C = R.comments || {}, t = { n: 0, pos: 0, neu: 0, neg: 0, intent: 0, videos: 0, asks: {}, themes: {}, by: {}, plats: {} };
     (C.buckets || []).forEach(function (b) {
       if ((F.platform && b.platform !== F.platform) || (F.creators.length && F.creators.indexOf(b.code) < 0)) return;
       ["n", "pos", "neu", "neg", "intent", "videos"].forEach(function (k) { t[k] += b[k] || 0; });
@@ -612,53 +630,57 @@
       ["n", "pos", "neu", "neg", "intent"].forEach(function (k) { w[k] += b[k] || 0; });
       if (w.plats.indexOf(b.platform) < 0) w.plats.push(b.platform);
       Object.keys(b.themes || {}).forEach(function (q) { w.themes[q] = (w.themes[q] || 0) + b.themes[q]; });
+      var pl = t.plats[b.platform] = t.plats[b.platform] || { n: 0, pos: 0, neu: 0, neg: 0, intent: 0 };
+      ["n", "pos", "neu", "neg", "intent"].forEach(function (k) { pl[k] += b[k] || 0; });
     });
     t.small = t.n < ((R.comments || {}).min_sample || 30);
     return t;
   }
   function cmPct(x, n) { return n ? Math.round(x / n * 100) : 0; }
   function cmTop(o, k) { return Object.keys(o).sort(function (a, b) { return (k ? o[b][k] - o[a][k] : o[b] - o[a]); }); }
-  function cmMood(t, big) {
-    var p = cmPct(t.pos, t.n), z = cmPct(t.neg, t.n), u = Math.max(0, 100 - p - z);
-    return '<div class="cm-mood' + (big ? " cm-mood--big" : "") + '" role="img" aria-label="' + p + "% positive, " + u + "% neutral, " + z + '% negative">'
-      + '<i class="p" style="width:' + p + '%"></i><i class="n" style="width:' + u + '%"></i><i class="x" style="width:' + z + '%"></i></div>';
+  function cmParts(t) { var p = cmPct(t.pos, t.n), z = cmPct(t.neg, t.n); return [["pos", p, "positive"], ["neu", Math.max(0, 100 - p - z), "neutral"], ["neg", z, "negative"]]; }
+  // Mood ring: the three moods round a circle, the comment count in the middle.
+  function cmRing(t, label) {
+    var off = 25, segs = cmParts(t).filter(function (s) { return s[1] > 0; }).map(function (s) {
+      var c = '<circle cx="21" cy="21" r="15.915" fill="none" stroke="' + CM_COL[s[0]] + '" stroke-width="5.2" stroke-dasharray="' + s[1] + " " + (100 - s[1]) + '" stroke-dashoffset="' + off + '"/>';
+      off -= s[1]; return c; }).join("");
+    return '<div class="cm-ring"><svg viewBox="0 0 42 42" role="img" aria-label="' + cmParts(t).map(function (s) { return s[1] + "% " + s[2]; }).join(", ") + '">'
+      + '<circle cx="21" cy="21" r="15.915" fill="none" stroke="#efece6" stroke-width="5.2"/>' + segs + "</svg><span><b>" + num(t.n) + "</b>" + (label || "comments") + "</span></div>";
   }
-  function cmKey(t, extra) {
+  function cmMood(t, big) {
+    return '<div class="cm-mood' + (big ? " cm-mood--big" : "") + '" role="img" aria-label="' + cmParts(t).map(function (s) { return s[1] + "% " + s[2]; }).join(", ") + '">'
+      + cmParts(t).map(function (s) { return '<i class="' + s[0] + '" style="width:' + s[1] + '%">' + (big && s[1] >= 9 ? s[1] + "%" : "") + "</i>"; }).join("") + "</div>";
+  }
+  function cmKey(t, short) {
     var v = function (x) { return t.small ? x : cmPct(x, t.n) + "%"; };
-    return '<div class="cm-key"><span style="--c:var(--d1)"><b>' + v(t.pos) + '</b> positive</span><span style="--c:#cfc6bb"><b>' + v(t.neu)
-      + '</b> neutral</span>' + (t.neg ? '<span style="--c:var(--vivid-red)"><b>' + v(t.neg) + "</b> negative</span>" : "") + (extra || "") + "</div>";
+    return '<div class="cm-key">' + [["pos", t.pos, short ? "pos." : "positive"], ["neu", t.neu, "neutral"], ["neg", t.neg, short ? "neg." : "negative"]].filter(function (s) { return s[1] || s[0] !== "neg"; })
+      .map(function (s) { return '<span style="--c:' + CM_COL[s[0]] + '"><b>' + v(s[1]) + "</b> " + s[2] + "</span>"; }).join("") + "</div>";
   }
   function cmVerdict(t) {
     if (t.small) return ["none", "Too few to judge"];
     var p = t.pos / t.n, z = t.neg / t.n;
-    return z >= 0.3 ? ["low", "Mixed to negative"] : p >= 0.6 && z < 0.15 ? ["good", "Mostly positive"] : ["moderate", "Mixed"];
+    return z >= 0.3 ? ["low", "Mixed to negative"] : p >= 0.6 && z < 0.15 ? ["good", "Mostly positive"] : z < 0.1 && t.intent / t.n >= 0.3 ? ["good", "Ready to buy"] : ["moderate", "Mixed"];
   }
   function cmDay(t) { return t ? day(t) : "—"; }
   function cmWait(C) {
-    if (C.status === "none" || !C.first_post) return '<div class="cm-wait"><p>No videos are live yet. Once creators post, viewers\' comments are read here.</p></div>';
+    if (C.status === "none" || !C.first_post) return '<div class="cm-wait"><p>No videos are live yet. Once creators post, the comments under them are read here.</p></div>';
     var now = Date.now() / 1000, d = C.read_days || [2, 7], fp = C.first_post, r1 = C.next_read || fp + d[0] * 86400, r2 = C.final_read || fp + d[1] * 86400;
     return '<div class="cm-wait"><p>Comments are read ' + d[0] + " and " + d[1] + " days after each video. The first reading lands on <b>" + cmDay(r1) + "</b>.</p>"
       + '<div class="cm-steps"><div class="on"><b>Posted</b>' + cmDay(fp) + '</div><div class="' + (now >= r1 ? "on" : "next") + '"><b>First read</b>' + cmDay(r1)
       + '</div><div class="' + (now >= r1 ? "next" : "") + '"><b>Final read</b>' + cmDay(r2) + "</div></div></div>";
   }
-  function cmAsks(t, n) {
-    return cmTop(t.asks, "n").slice(0, n).map(function (q, i) {
-      return '<span class="cm-ask' + (i ? "" : " cm-ask--top") + '" title="' + esc(t.asks[q].en || "") + '"><q dir="auto">' + esc(q) + "</q><b>×" + t.asks[q].n + "</b></span>";
-    }).join("");
-  }
   function renderGeo() {
     var C = R.comments, t = cmPick(), body;
     if (!C || !t.n) body = cmWait(C || { status: "none" });
     else {
-      var v = cmVerdict(t), C2 = R.comments;
-      body = '<div class="cm-lead"><div class="cm-big">' + (t.small ? t.intent : cmPct(t.intent, t.n) + "%") + "<small>" + (t.small ? "of " + t.n + " comments ask" : "of comments ask") + " how to buy</small></div>"
-        + '<span class="db-sig db-sig--' + v[0] + '">' + v[1] + "</span></div>"
-        + "<div>" + cmMood(t) + cmKey(t) + "</div>"
-        + (Object.keys(t.asks).length ? '<div class="cm-asks" aria-label="Most asked">' + cmAsks(t, 3) + "</div>" : "")
-        + '<p class="db-note">' + full(t.n) + " comments on " + t.videos + " video" + (t.videos === 1 ? "" : "s")
-        + (C2.next_read ? " · next read " + cmDay(C2.next_read) : C2.last_read ? " · read " + cmDay(C2.last_read) : "") + "</p>";
+      var v = cmVerdict(t), top = cmTop(t.asks, "n")[0];
+      body = '<div class="cm-top">' + cmRing(t)
+        + '<div class="cm-buy"><b class="cm-big">' + (t.small ? t.intent : cmPct(t.intent, t.n) + "%") + "</b>" + '<span class="cm-buy__l"><small>' + (t.small ? "of " + t.n + " ask" : "ask how to buy") + "</small>"
+        + '<span class="db-sig db-sig--' + v[0] + '">' + v[1] + "</span></span>" + cmKey(t, true) + "</div></div>"
+        + (top ? '<p class="cm-most" title="' + esc(t.asks[top].en || "") + '"><span>Most asked</span><q dir="auto">' + esc(top) + "</q><b>×" + t.asks[top].n + "</b></p>" : "")
+        + "";
     }
-    $("w-geo").innerHTML = head(CMI, "What people said", CM_TIP, C && t.n ? "geo" : null) + '<div class="db-card__body cm">' + body + "</div>";
+    $("w-geo").innerHTML = head(CMI, "What people commented", CM_TIP, C && t.n ? "geo" : null) + '<div class="db-card__body cm">' + body + "</div>";
   }
 
   var PCOL = { Instagram: "#d62976", TikTok: "#121212", Snapchat: "#f7d100", YouTube: "#ff0000", Facebook: "#0866ff", X: "#121212" };
@@ -985,31 +1007,38 @@
       var C = R.comments, t = cmPick();
       if (!C || !t.n) return cmWait(C || { status: "none" });
       var share = t.intent / t.n, p = t.pos / t.n, z = t.neg / t.n, th = cmTop(t.themes);
-      var mood = z >= 0.3 ? "Viewers are divided" : p >= 0.6 ? "Viewers are warm" : "Viewers are mostly neutral";
+      var mood = z >= 0.3 ? "Viewers are divided" : p >= 0.6 ? "Viewers are warm" : share >= 0.3 ? "Viewers are mostly asking questions" : "Viewers are mostly neutral";
       var buy = share >= 0.15 ? ", and <em>1 in " + Math.max(2, Math.round(1 / share)) + " wants to buy</em>" : share >= 0.04 ? ", and some ask how to buy" : ", and few ask about buying";
-      var verdict = t.small ? "Only " + t.n + " comments so far: too few to judge." : mood + buy + (th[0] ? ". They talk most about " + esc(th[0].toLowerCase()) + "." : ".");
-      var asks = cmTop(t.asks, "n").slice(0, 6);
-      var peak = th.length ? t.themes[th[0]] : 1;
-      var names = {}; (R.creators || []).forEach(function (c) { names[c.code] = c.name; });
-      var quotes = ((C.quotes) || []).filter(function (q) { return (!F.platform || q.platform === F.platform) && (!F.creators.length || F.creators.indexOf(q.code) >= 0); });
+      var verdict = t.small ? "Only " + t.n + " comments so far: too few to judge." : mood + buy + (th[0] ? ". The talk is mostly about <em>" + esc(th[0].toLowerCase()) + "</em>." : ".");
+      var asks = cmTop(t.asks, "n").slice(0, 6), apeak = asks.length ? t.asks[asks[0]].n : 1;
+      var names = {}, pics = {}; (R.creators || []).forEach(function (c) { names[c.code] = c.name; pics[c.code] = c.photo; });
+      var quotes = (C.quotes || []).filter(function (q) { return (!F.platform || q.platform === F.platform) && (!F.creators.length || F.creators.indexOf(q.code) >= 0); });
       var who = Object.keys(t.by).sort(function (a, b) { return t.by[b].n - t.by[a].n; });
       var silent = (R.creators || []).filter(function (c) { return !t.by[c.code] && (!F.creators.length || F.creators.indexOf(c.code) >= 0); });
-      return "<h3>The verdict</h3>" + '<p class="cmp-verdict">' + verdict + "</p>"
-        + '<div class="cmp-mood">' + cmMood(t, true) + cmKey(t, "<span>" + full(t.n) + " comments · " + t.videos + " video" + (t.videos === 1 ? "" : "s") + "</span>") + "</div>"
-        + (asks.length ? "<h3>What buyers asked</h3>" + '<div class="cmp-asks">' + asks.map(function (q) {
-          return '<div class="cmp-ask"><q dir="auto">' + esc(q) + "</q><span>" + esc(t.asks[q].en || "") + "</span><b>" + t.asks[q].n + "</b></div>"; }).join("") + "</div>" : "")
+      var plats = cmTop(t.plats, "n"), ppeak = plats.length ? t.plats[plats[0]].n : 1;
+      var stat = function (n, l) { return "<div><b>" + n + "</b><span>" + l + "</span></div>"; };
+      return '<section class="cmp-hero"><p class="cmp-hero__k">The verdict from the comments</p><p class="cmp-verdict">' + verdict + "</p>"
+        + '<div class="cmp-hero__stats">' + stat(full(t.n), "comments read") + stat(t.small ? t.intent : cmPct(t.intent, t.n) + "%", "ask how to buy")
+        + stat(t.small ? t.pos : cmPct(t.pos, t.n) + "%", "positive") + stat(t.videos, "video" + (t.videos === 1 ? "" : "s")) + "</div>"
+        + (C.next_read || C.last_read ? '<p class="cmp-hero__next">' + (C.last_read ? "Last read " + cmDay(C.last_read) : "") + (C.next_read ? (C.last_read ? " · " : "") + "next read " + cmDay(C.next_read) : "") + "</p>" : "") + "</section>"
+        + "<h3>The mood</h3>" + '<div class="cmp-mood">' + cmMood(t, true) + cmKey(t) + "</div>"
+        + (plats.length > 1 ? "<h3>Where people commented</h3>" + '<div class="cmp-plats">' + plats.map(function (k) { var x = t.plats[k];
+            return '<div class="cmp-plat"><span class="cmp-plat__ic">' + (ICONS[k] || "") + "</span><span class=\"cmp-plat__n\"><b>" + esc(k) + "</b><small>" + full(x.n) + " comments · "
+              + cmPct(x.intent, x.n) + '% ask to buy</small></span><div class="cmp-plat__bar" style="--w:' + (x.n / ppeak * 100).toFixed(1) + '%">' + cmMood(x) + "</div></div>"; }).join("") + "</div>" : "")
+        + (asks.length ? "<h3>What buyers asked</h3>" + '<ol class="cmp-asks">' + asks.map(function (q, i) {
+            return '<li style="--w:' + (t.asks[q].n / apeak * 100).toFixed(1) + '%"' + (i ? "" : ' class="is-1"') + '><span class="cmp-asks__q"><q dir="auto">' + esc(q) + "</q><small>" + esc(t.asks[q].en || "") + "</small></span><i></i><b>" + t.asks[q].n + "</b></li>"; }).join("") + "</ol>" : "")
         + (th.length ? "<h3>What people talk about</h3>" + '<div class="cmp-themes">' + th.slice(0, 6).map(function (q, i) {
-          return '<div class="db-bar"><span>' + esc(q) + '</span><i style="--w:' + (t.themes[q] / peak * 100).toFixed(1) + "%;--c:" + (i < 2 ? "var(--d1)" : "var(--d4)") + '"></i><b>'
-            + (t.small ? t.themes[q] : cmPct(t.themes[q], t.n) + "%") + "</b></div>"; }).join("") + "</div>" : "")
+            var pc = t.small ? t.themes[q] : cmPct(t.themes[q], t.n) + "%";
+            return '<div class="cmp-theme' + (i ? "" : " is-1") + '" style="--w:' + (t.themes[q] / t.themes[th[0]] * 100).toFixed(1) + '%"><span class="cmp-theme__ic">' + cmIcon(q) + "</span><span class=\"cmp-theme__t\">" + esc(q) + "</span><b>" + pc + "</b><i></i></div>"; }).join("") + "</div>" : "")
         + (quotes.length ? "<h3>In their words</h3>" + '<div class="cmp-quotes">' + quotes.map(function (q) {
-          return '<article class="cmp-quote"><q dir="auto">' + esc(q.text) + "</q>" + (q.gloss ? "<p>“" + esc(q.gloss) + "”</p>" : "")
-            + "<footer><b>" + esc(names[q.code] || q.code || "") + "</b><span>" + esc(q.platform) + "</span></footer></article>"; }).join("") + "</div>" : "")
-        + "<h3>By creator</h3>" + '<table class="db-table cmp-who"><thead><tr><th>Creator</th><th>Comments</th><th>Mood</th><th>Ask how to buy</th><th>Talked most about</th></tr></thead><tbody>'
-        + who.map(function (c) { var w = t.by[c], few = w.n < ((C.min_sample) || 30), top = cmTop(w.themes)[0];
-          return "<tr><td><b>" + esc(names[c] || c) + "</b><small>" + esc(w.plats.join(", ")) + "</small></td><td>" + full(w.n) + "</td><td>" + cmMood(w) + "</td><td><b>"
-            + (few ? w.intent + "</b> <small>of " + w.n + "</small>" : cmPct(w.intent, w.n) + "%</b>") + "</td><td>" + (few ? "Too few to say" : esc(top || "—")) + "</td></tr>"; }).join("")
-        + silent.map(function (c) { return "<tr><td><b>" + esc(c.name) + "</b></td><td colspan=\"4\"><small>" + (c.posts ? "Comments not read yet" : "No video yet") + "</small></td></tr>"; }).join("")
-        + "</tbody></table>"
+            return '<article class="cmp-quote"><q dir="auto">' + esc(q.text) + "</q>" + (q.gloss ? "<p>“" + esc(q.gloss) + "”</p>" : "")
+              + "<footer>" + ava(pics[q.code]) + "<b>" + esc(names[q.code] || q.code || "") + "</b><span>" + (ICONS[q.platform] || esc(q.platform)) + "</span></footer></article>"; }).join("") + "</div>" : "")
+        + "<h3>By creator</h3>" + '<div class="cmp-who">' + who.map(function (c) { var w = t.by[c], few = w.n < ((C.min_sample) || 30), top = cmTop(w.themes)[0];
+            return '<div class="cmp-who__r">' + ava(pics[c]) + '<span class="cmp-who__n"><b>' + esc(names[c] || c) + "</b><small>" + w.plats.map(function (x) { return ICONS[x] || esc(x); }).join("") + "</small></span>"
+              + '<span class="cmp-who__c cmp-who__c--n"><b>' + full(w.n) + "</b><small>comments</small></span>" + cmRing(w, "") + '<span class="cmp-who__c cmp-who__c--b"><b>' + (few ? w.intent : cmPct(w.intent, w.n) + "%") + "</b><small>" + (few ? "of " + w.n + " ask" : "ask to buy") + "</small></span>"
+              + '<span class="cmp-who__t">' + (few ? "<small>Too few to say</small>" : cmIcon(top) + "<span>" + esc(top || "—") + "</span>") + "</span></div>"; }).join("")
+        + silent.map(function (c) { return '<div class="cmp-who__r is-quiet">' + ava(c.photo) + '<span class="cmp-who__n"><b>' + esc(c.name) + "</b></span><span class=\"cmp-who__wait\">" + (c.posts ? "Comments not read yet" : "No video yet") + "</span></div>"; }).join("")
+        + "</div>"
         + '<p class="cmp-foot">Comments are read twice per video, ' + (C.read_days || [2, 7]).join(" and ") + " days after it is posted, up to 300 per post, and grouped by AI. "
         + "Quotes are chosen by HelloVoice. Commenters' names and photos are never stored or shown.</p>";
     },
@@ -1106,7 +1135,7 @@
       + (p.caption ? '<p class="db-post__cap">' + esc(p.caption) + "</p>" : "")
       + '<div class="db-post__stats">' + stats(p).map(function (x) { return "<div><small>" + x[0] + "</small><b>" + x[1] + "</b></div>"; }).join("") + "</div></a>";
   }
-  var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "What people said", plat: "Platforms", clicks: "Affiliate clicks" };
+  var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "What people said in the comments", plat: "Platforms", clicks: "Affiliate clicks" };
   var lastFocus = null;
   function openPanel(area) {
     if (!PANEL[area]) return;
