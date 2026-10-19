@@ -929,9 +929,42 @@
         + audTarget(a) + '<p class="db-note" style="margin-top:10px">' + audNote(a) + ".</p>";
     },
     plat: function () {
-      var by = {}; posts().forEach(function (p) { var x = by[p.platform] = by[p.platform] || { posts: 0, views: 0, reach: 0, eng: 0 }; x.posts++; x.views += p.views || 0; x.reach += p.reach || 0; x.eng += p.engagement || 0; });
-      return '<table class="db-table"><thead><tr><th>Platform</th><th></th><th>Posts</th><th>Views</th><th>Reach</th><th>Engagement</th><th>Eng. rate</th></tr></thead><tbody>'
-        + Object.keys(by).map(function (k) { var x = by[k]; return "<tr><td>" + (ICONS[k] || "") + " " + esc(k) + "</td><td></td><td>" + x.posts + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng) + "</td><td>" + (x.views ? pct(x.eng / x.views * 100) : "—") + "</td></tr>"; }).join("") + "</tbody></table>";
+      // One ledger row per platform, biggest first: its views and share of all views lead, a bar against the biggest
+      // platform, then reach, engagement and engagement rate against what is typical there (same rule as the gauges).
+      var by = {}, tot = 0;
+      posts().forEach(function (p) {
+        var x = by[p.platform] = by[p.platform] || { k: p.platform, posts: 0, views: 0, reach: 0, eng: 0, shown: 0 };
+        x.posts++; x.reach += p.reach || 0; x.eng += p.engagement || 0;
+        if (!p.views_hidden) { x.views += p.views || 0; x.shown++; }
+      });
+      var rows = Object.keys(by).map(function (k) { tot += by[k].views; return by[k]; }).sort(function (a, b) { return b.views - a.views; });
+      if (!rows.length) return '<div class="db-na-card"><span class="db-na-card__icon">' + IC.plat + '</span><span class="db-na">Nothing posted yet</span><p>Each platform appears here with its views, reach and engagement once its first post is live.</p></div>';
+      // reach only when a platform has some: reels and videos are counted by views, so a column of dashes says nothing
+      var peak = rows[0].views || 1, showReach = R.visibility.reach !== false && rows.some(function (x) { return x.reach > 0; });
+      function band(k) {
+        var bp = R.goals && R.goals.by_platform && R.goals.by_platform[k];
+        var v = (R.benchmarks || {}).video_er;       // the built-in guide, [good, moderate], when no plan sets a range
+        return (bp && bp.bench && bp.bench.eng_rate) || ((R.plan || {}).benchmark || {}).eng_rate || (v && v.length === 2 ? [Math.min(v[0], v[1]), Math.max(v[0], v[1])] : null);
+      }
+      function share(x) { return tot && x.shown ? Math.round(x.views / tot * 100) : null; }
+      var strip = '<div class="db-pl__strip" role="img" aria-label="' + esc(rows.map(function (x) { var s = share(x); return x.k + " " + (s == null ? "views not shown" : s + "% of views"); }).join(", ")) + '">'
+        + rows.map(function (x) { var s = share(x); return s ? '<i data-p="' + esc(x.k) + '" style="flex:' + s + ";--c:" + (PCOL[x.k] || COL[0]) + '">' + (s >= 22 ? "<span>" + esc(x.k) + " " + s + "%</span>" : "") + "</i>" : ""; }).join("") + "</div>";
+      var list = rows.map(function (x) {
+        var s = share(x), er = x.shown && x.views ? x.eng / x.views * 100 : null, b = band(x.k);
+        var grade = er == null || !b ? null : er >= b[1] ? "good" : er >= b[0] ? "moderate" : "low";
+        var c = PCOL[x.k] || COL[0];
+        return '<article class="db-pl" style="--c:' + c + '">'
+          + '<header class="db-pl__h"><span class="db-pl__ic" aria-hidden="true">' + (ICONS[x.k] || "") + '</span><span class="db-pl__nm"><b>' + esc(x.k) + "</b><small>" + x.posts + (x.posts === 1 ? " post" : " posts") + "</small></span>"
+          + '<span class="db-pl__v">' + (x.shown ? "<b>" + num(x.views) + "</b><small>views" + (s != null ? " · " + s + "% of all" : "") + "</small>" : '<b class="db-pl__na">n/a</b><small>' + esc(x.k) + " does not show views</small>") + "</span></header>"
+          + '<div class="db-pl__bar" aria-hidden="true"><i style="width:' + (x.shown ? Math.max(2, x.views / peak * 100) : 0).toFixed(1) + '%"></i></div>'
+          + '<dl class="db-pl__st' + (showReach ? "" : " db-pl__st--2") + '">'
+          + (showReach ? "<div><dt>Reach</dt><dd>" + (x.reach ? num(x.reach) : "—") + "</dd></div>" : "")
+          + "<div><dt>Engagement</dt><dd>" + num(x.eng) + "</dd></div>"
+          + "<div><dt>Eng. rate</dt><dd>" + pct(er) + (grade ? " " + sig(grade, "Typical on " + x.k + ": " + b[0] + "% – " + b[1] + "%") : "") + "</dd>"
+          + (b ? "<small>Typical " + b[0] + "% – " + b[1] + "%</small>" : "") + "</div></dl></article>";
+      }).join("");
+      return (rows.length > 1 ? strip : "") + '<div class="db-pls">' + list + "</div>"
+        + '<p class="db-note">Views count videos; reach counts photo posts and stories, so the two are never added together. Engagement rate is engagement ÷ views.</p>';
     },
     clicks: function () {
       var cl = clicksFor(); if (!cl) return '<div class="db-na-card"><span class="db-na-card__icon">' + IC.clicks + '</span><span class="db-na">Not part of this campaign</span><p>This campaign does not contain affiliate links, so there are no clicks to count.</p></div>';

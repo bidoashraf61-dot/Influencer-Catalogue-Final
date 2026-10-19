@@ -745,3 +745,42 @@
   .db-panel .db-tv__btn { padding: 16px 4px 14px; }
 }
 @media (max-width: 480px) { .db-panel .db-goal-sum { grid-template-columns: 1fr; } }
+
+/* Platforms panel (2026-10-19): one ledger row per platform, views and share lead */
+.db-pl__strip { display: flex; gap: 3px; height: 30px; margin: 0 0 18px; border-radius: 8px; overflow: hidden; }
+.db-pl__strip i { position: relative; min-width: 0; background: var(--c); display: flex; align-items: center; padding: 0 10px; }
+.db-pl__strip span { font: 600 11px/1 var(--body); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.db-pls { display: grid; }
+.db-pl { padding: 18px 0 20px; border-top: 1px solid var(--line); }
+.db-pl:first-child { border-top: 0; padding-top: 4px; }
+.db-pl__h { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+.db-pl__ic { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--c);
+  background: color-mix(in srgb, var(--c) 10%, #fff); }
+.db-pl__ic svg { width: 24px; height: 24px; display: block; }
+.db-pl__nm { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.db-pl__nm b { font: 600 15px/1.2 var(--body); }
+.db-pl__nm small, .db-pl__v small { font-size: 12px; color: var(--gray); }
+.db-pl__v { display: flex; flex-direction: column; align-items: flex-end; text-align: right; }
+.db-pl__v b { font-family: var(--heading); font-weight: 400; font-size: 40px; line-height: .95; letter-spacing: .01em; }
+.db-pl__v b.db-pl__na { font-size: 28px; color: var(--gray); }
+.db-pl__bar { height: 8px; margin: 14px 0 16px; border-radius: 999px; background: #efece6; overflow: hidden; }
+.db-pl__bar i { display: block; height: 100%; border-radius: 999px; background: var(--c); transform-origin: left; animation: db-pl-grow .7s cubic-bezier(.16,1,.3,1) both; }
+@keyframes db-pl-grow { from { transform: scaleX(0); } }
+.db-pl__st { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin: 0; }
+.db-pl__st--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.db-pl__st > div { padding: 2px 14px; border-left: 1px solid var(--line); min-width: 0; }
+.db-pl__st > div:first-child { padding-left: 0; border-left: 0; }
+.db-pl__st dt { font: 600 11px/1.3 var(--body); letter-spacing: .08em; text-transform: uppercase; color: var(--gray); margin: 0 0 6px; }
+.db-pl__st dd { margin: 0; font-family: var(--heading); font-size: 24px; line-height: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.db-pl__st dd .db-sig { font-family: var(--body); }
+.db-pl__st small { display: block; margin-top: 6px; font-size: 11px; color: var(--gray); }
+.db-pls + .db-note { margin-top: 6px; }
+@media (max-width: 640px) {
+  .db-pl__h { grid-template-columns: 40px minmax(0, 1fr) auto; gap: 10px; }
+  .db-pl__ic { width: 40px; height: 40px; }
+  .db-pl__v b { font-size: 34px; }
+  .db-pl__st > div { padding: 2px 10px; }
+  .db-pl__st dd { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { .db-pl__bar i { animation: none; } }
+.db-pl__strip i[data-p="Snapchat"] span { color: #121212; text-shadow: none; }
