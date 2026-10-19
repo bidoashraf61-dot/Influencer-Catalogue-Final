@@ -785,7 +785,7 @@
 @media (prefers-reduced-motion: reduce) { .db-pl__bar i { animation: none; } }
 .db-pl__strip i[data-p="Snapchat"] span { color: #121212; text-shadow: none; }
 
-/* What people said (2026-10-19, v8 same day): viewers' comments read by AI, in the old audience slot. */
+/* What people said (2026-10-19, v9 same day): viewers' comments read by AI, in the old audience slot. */
 .cm.db-card__body { gap: 8px; }
 .cm-top { display: flex; align-items: center; gap: 12px; }
 .cm-ring { position: relative; width: 74px; height: 74px; flex: none; }
@@ -799,7 +799,7 @@
 .cm-buy small { font-size: 11.5px; color: var(--gray); }
 .cm-mood { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #efece6; gap: 2px; }
 .cm-mood i { display: block; height: 100%; }
-.cm-mood .pos { background: #14884a; } .cm-mood .neu { background: #d9c7b3; } .cm-mood .neg { background: var(--vivid-red); }
+.cm-mood .pos { background: #14884a; } .cm-mood .neu { background: #ff9a4d; } .cm-mood .neg { background: var(--vivid-red); }
 .cm-key { display: flex; gap: 12px; font-size: 11.5px; color: var(--gray); flex-wrap: wrap; }
 .cm-key span { display: inline-flex; align-items: center; gap: 5px; }
 .cm-key span::before { content: ""; width: 9px; height: 9px; border-radius: 3px; background: var(--c); }
@@ -1095,6 +1095,24 @@
 .cmp-box.is-good { border-color: rgba(20,136,74,.35); } .cmp-box.is-mid { border-color: rgba(226,120,15,.35); } .cmp-box.is-bad { border-color: rgba(238,21,21,.3); }
 .cmp-box.is-good span::before, .cmp-box.is-mid span::before, .cmp-box.is-bad span::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 6px; vertical-align: 1px; background: currentColor; }
 .cmp-box.is-good span::before { background: #14884a; } .cmp-box.is-mid span::before { background: #e2780f; } .cmp-box.is-bad span::before { background: #ee1515; }
+/* v9: box figures all ink (the dot keeps the signal), brand lime rows, bigger comment text */
+.db-panel .cmp-box b { color: var(--ink) !important; }
+.cmp-box.is-good, .cmp-box.is-mid, .cmp-box.is-bad { border-color: var(--line); }
+.cmp-box.is-hot { background: #fff; }
+.cmp-rank li::before { background: #f4fbcf; }
+.cmp-rank li.is-1::before { background: #e8ff76; }
+.cmp-rank__i, .cmp-rank b { color: var(--ink); }
+.cmp-rank__q q { font-size: 24px; }
+.cmp-rank__q small { font-size: 14px; }
+.cmp-chip { font-size: 16px; padding: 5px 13px; }
+.cmp-chip b { font-size: 12.5px; }
+.cmp-insight--sm .cmp-chip, .cmp-rank__more .cmp-chip { font-size: 15px; padding: 4px 12px; }
+.cmp-say__s { font-size: 16px; } .cmp-say__s q { font-size: 20px; }
+.cmp-say__t mark { background: linear-gradient(transparent 55%, #e8ff76 55%); }
+.cmp-say__s q { background: #e8ff76; }
+.cmp-quote q { font-size: 20px; } .cmp-quote p { font-size: 14px; }
+.cmp-insight__ar { font-size: 21px; } .cmp-insight--sm .cmp-insight__ar { font-size: 17px; }
+@media (max-width: 760px) { .cmp-rank__q q { font-size: 20px; } .cmp-chip { font-size: 15px; } }
 /* end What people said */
 .db-obj__auto { display: inline-flex; align-items: center; margin-left: 8px; padding: 3px 9px; border-radius: 999px; background: #f2f0eb; font: 600 11px/1.2 var(--body); color: var(--gray); white-space: nowrap; cursor: help; }
 .db-rank__score { white-space: nowrap; }
