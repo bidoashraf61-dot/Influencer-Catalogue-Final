@@ -785,7 +785,7 @@
 @media (prefers-reduced-motion: reduce) { .db-pl__bar i { animation: none; } }
 .db-pl__strip i[data-p="Snapchat"] span { color: #121212; text-shadow: none; }
 
-/* What people said (2026-10-19, v5 same day): viewers' comments read by AI, in the old audience slot. */
+/* What people said (2026-10-19, v6 same day): viewers' comments read by AI, in the old audience slot. */
 .cm.db-card__body { gap: 8px; }
 .cm-top { display: flex; align-items: center; gap: 12px; }
 .cm-ring { position: relative; width: 74px; height: 74px; flex: none; }
@@ -799,7 +799,7 @@
 .cm-buy small { font-size: 11.5px; color: var(--gray); }
 .cm-mood { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #efece6; gap: 2px; }
 .cm-mood i { display: block; height: 100%; }
-.cm-mood .pos { background: #14884a; } .cm-mood .neu { background: #a8bf2a; } .cm-mood .neg { background: var(--vivid-red); }
+.cm-mood .pos { background: #14884a; } .cm-mood .neu { background: #e8ff76; } .cm-mood .neg { background: var(--vivid-red); }
 .cm-key { display: flex; gap: 12px; font-size: 11.5px; color: var(--gray); flex-wrap: wrap; }
 .cm-key span { display: inline-flex; align-items: center; gap: 5px; }
 .cm-key span::before { content: ""; width: 9px; height: 9px; border-radius: 3px; background: var(--c); }
@@ -1020,6 +1020,56 @@
   .cmp-heat__c { min-height: 38px; font-size: 17px; }
   .cmp-days { gap: 4px; } .cmp-days__c small { font-size: 9.5px; }
   .cmp-cloud { padding: 14px 10px; gap: 8px; } .cmp-cloud__q { font-size: calc(13px + 9px * var(--f)); }
+}
+/* v6: less black, pure lime neutral, orange figures, topics as insight cards, ranked questions, a curve per day */
+.db-card__body.cm, .db-panel { --cm-num: #d4560a; }
+.cm-ring b, .cm-legend__r b, .cmp-box b, .cmp-mood__r b, .cmp-plat__s b, .cmp-who__c b, .cmp-share__k b, .cmp-src .cmp-plat__s b { color: var(--cm-num); }
+.cm-ring--share b { color: var(--cm-num) !important; }
+.cmp-box.is-hot b { color: #a63e00; }
+.cmp-insight__k b { color: var(--cm-num); font-weight: 700; }
+.cmp-insight__t { color: var(--ink); }
+.cmp-insights { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.cmp-insight--sm { margin: 0; padding: 14px 16px; background: #fcfdf5; border-color: #e3ecb0; gap: 12px; }
+.cmp-insight--sm .cmp-insight__ic { width: 42px; height: 42px; border-radius: 12px; background: #f3f8d5; }
+.cmp-insight--sm .cmp-insight__ic svg { width: 21px; height: 21px; }
+.cmp-insight--sm .cmp-insight__b { flex: 1; }
+.cmp-insight--sm .cmp-insight__k { font-size: 11px; }
+.cmp-insight--sm .cmp-insight__k b { font-family: var(--heading); font-size: 22px; letter-spacing: 0; font-weight: 400; margin-right: 2px; }
+.cmp-insight--sm .cmp-insight__t { font-size: 24px; }
+.cmp-insight--sm .cmp-insight__ar { font-size: 15px; font-weight: 500; color: var(--gray); }
+.cmp-insight__bar { display: block; height: 5px; border-radius: 999px; background: #eef2d8; margin: 10px 0 8px; overflow: hidden; }
+.cmp-insight__bar::after { content: ""; display: block; height: 100%; width: var(--w); background: #b9d400; border-radius: 999px; transform-origin: left center; animation: cm-grow .9s cubic-bezier(.16,1,.3,1) both; }
+.cmp-insight--sm .cmp-chip { font-size: 13px; padding: 3px 10px; }
+.cmp-rank { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.cmp-rank li { position: relative; display: grid; grid-template-columns: 30px 1fr auto; gap: 14px; align-items: center; padding: 12px 16px; border-radius: 14px; background: #f6f4ef; overflow: hidden; isolation: isolate; }
+.cmp-rank li::before { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--w); background: #eef7b8; z-index: -1; transform-origin: left center; animation: cm-grow .9s cubic-bezier(.16,1,.3,1) both; }
+.cmp-rank li.is-1::before { background: #e8ff76; }
+.cmp-rank__i { font-family: var(--heading); font-size: 22px; color: var(--cm-num); text-align: center; }
+.cmp-rank__q q { display: block; quotes: none; unicode-bidi: isolate; font-family: "Geeza Pro", "Noto Kufi Arabic", var(--body); font-size: 20px; font-weight: 600; color: var(--ink); line-height: 1.25; text-align: start; }
+.cmp-rank__q small { display: block; font-size: 12.5px; color: #5d5a52; margin-top: 2px; }
+.cmp-rank b { font-family: var(--heading); font-weight: 400; font-size: 34px; line-height: 1; color: var(--cm-num); }
+.cmp-rank__more { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0 0; }
+.cmp-rank__more > span:first-child { font-size: 12px; color: var(--gray); margin-right: 4px; }
+.cmp-rank__more .cmp-chip { font-size: 13px; padding: 3px 10px; }
+.cmp-curve { border: 1px solid var(--line); border-radius: 20px; padding: 10px 12px 4px; }
+.cmp-curve svg { width: 100%; height: auto; display: block; overflow: visible; }
+.cmp-curve__l { stroke-dasharray: 2000; animation: cm-line 1.4s cubic-bezier(.16,1,.3,1) both; }
+.cmp-curve__a { animation: cm-fade 1s ease-out .2s both; }
+.cmp-curve__p circle { fill: #fff; stroke: #8aa600; stroke-width: 3; }
+.cmp-curve__p.is-pk circle { fill: #ff691e; stroke: #fff; stroke-width: 3; }
+.cmp-curve__v { font-family: Bebasneue, Arial, sans-serif; font-size: 20px; fill: var(--cm-num); }
+.cmp-curve__p.is-pk .cmp-curve__v { font-size: 26px; }
+.cmp-curve__d { font-family: "DM Sans", Arial, sans-serif; font-size: 12px; fill: #6b675f; }
+@keyframes cm-line { from { stroke-dashoffset: 2000; } to { stroke-dashoffset: 0; } }
+@keyframes cm-fade { from { opacity: 0; } }
+/* less black: heatmap in lime to orange, rings and bars never ink */
+.cmp-heat__c { background: rgba(232,255,118,var(--a)); }
+.cmp-heat__c.is-hot { color: #fff; background: rgba(212,86,10,var(--a)); }
+.cmp-asks i::after, .cmp-theme i::after { background: #b9d400; }
+@media (prefers-reduced-motion: reduce) { .cmp-insight__bar::after, .cmp-rank li::before, .cmp-curve__l, .cmp-curve__a { animation: none; } }
+@media (max-width: 760px) {
+  .cmp-insights { grid-template-columns: 1fr; }
+  .cmp-rank li { grid-template-columns: 24px 1fr auto; gap: 10px; padding: 10px 12px; } .cmp-rank__q q { font-size: 17px; } .cmp-rank b { font-size: 28px; }
 }
 /* end What people said */
 .db-obj__auto { display: inline-flex; align-items: center; margin-left: 8px; padding: 3px 9px; border-radius: 999px; background: #f2f0eb; font: 600 11px/1.2 var(--body); color: var(--gray); white-space: nowrap; cursor: help; }
