@@ -622,7 +622,7 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v15 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v16 same day): viewers' comments, read by AI 2 and 7 days after each video.
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
@@ -795,8 +795,8 @@
     var moods = [["", "All"], ["p", "Positive"], ["n", "Neutral"], ["x", "Negative"]];
     var docKeys = Object.keys(docs).sort(function (a, b) { return docs[b] - docs[a]; });
     return '<div class="cmb-f">'
-      + '<div class="cmb-f__row cmb-f__docs" role="group" aria-label="Doctor"><button type="button" data-doc="" aria-pressed="' + (!f.doc) + '">All doctors</button>'
-      + docKeys.map(function (c) { return '<button type="button" data-doc="' + esc(c) + '" aria-pressed="' + (f.doc === c) + '">' + ava(P.pics[c]) + "<span>" + esc(P.names[c] || c) + "</span><small>" + docs[c] + "</small></button>"; }).join("")
+      + '<div class="cmb-f__row cmb-f__docs"><select data-f="doc" aria-label="Doctor"><option value="">All doctors (' + docKeys.length + ")</option>"
+      + docKeys.map(function (c) { return '<option value="' + esc(c) + '"' + (f.doc === c ? " selected" : "") + ">" + esc(P.names[c] || c) + " (" + docs[c] + ")</option>"; }).join("") + "</select>"
       + '<select data-f="vid" aria-label="Video"><option value="">All videos (' + Object.keys(vids).length + ")</option>"
       + Object.keys(vids).sort(function (a, b) { return vids[b] - vids[a]; }).map(function (id) { var p = posts[id] || {}, it = all.filter(function (x) { return String(x[0]) === id; })[0];
           return '<option value="' + id + '"' + (f.vid === id ? " selected" : "") + ">" + esc((f.doc ? "" : (P.names[it[1]] || it[1]) + " · ") + cmVidName(p, it)) + " (" + vids[id] + ")</option>"; }).join("") + "</select></div>"
@@ -847,14 +847,13 @@
       var list = function () { box.querySelector(".cmb-l").innerHTML = cmList(); }, timer;
       draw();
       box.addEventListener("click", function (e) {
-        var d = e.target.closest("[data-doc]"), b = e.target.closest("[data-mood]"), pl = e.target.closest("[data-plat]"), m = e.target.closest("[data-more]");
-        if (d) { CMB.f.doc = d.getAttribute("data-doc"); CMB.f.vid = ""; draw(); return; }
+        var b = e.target.closest("[data-mood]"), pl = e.target.closest("[data-plat]"), m = e.target.closest("[data-more]");
         if (b) { CMB.f.mood = b.getAttribute("data-mood"); draw(); return; }
         if (pl) { CMB.f.plat = pl.getAttribute("data-plat"); draw(); return; }
         if (m) { var v = m.getAttribute("data-more"); CMB.open[v] = !CMB.open[v]; list(); return; }
         if (e.target.closest("[data-export]")) cmExport();
       });
-      box.addEventListener("change", function (e) { var k = e.target.getAttribute("data-f"); if (!k || k === "q") return; CMB.f[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value; list(); });
+      box.addEventListener("change", function (e) { var k = e.target.getAttribute("data-f"); if (!k || k === "q") return; CMB.f[k] = e.target.type === "checkbox" ? e.target.checked : e.target.value; if (k === "doc") { CMB.f.vid = ""; draw(); } else list(); });
       box.addEventListener("input", function (e) { if (e.target.getAttribute("data-f") !== "q") return; CMB.f.q = e.target.value; clearTimeout(timer); timer = setTimeout(list, 200); });
     });
   }
