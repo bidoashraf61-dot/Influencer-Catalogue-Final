@@ -41,10 +41,36 @@ _lock = threading.Lock()
 _build_lock = threading.Lock()     # held for a whole index build (minutes at 14,000+ creators); _lock never is
 _state = {"checked": 0.0, "key": None, "versions": [], "results": {}}
 
-SORTS = ("", "followers-desc", "followers-asc", "tier-desc", "tier-asc", "name", "added-desc", "added-asc")
+SORTS = ("", "daily", "followers-desc", "followers-asc", "tier-desc", "tier-asc", "name", "added-desc", "added-asc")
 GROUPS = ("tier", "platform", "country", "interest")
 # Labels the classification can return that are not an industry a client would book by.
 NOT_AN_INDUSTRY = ("General Lifestyle", "Unclassifiable")
+# "Recommended" (sort=daily, the catalogue's default since 2026-10-19): the biggest names first, then
+# doctors, then the tiers by size; random inside each group, the same random for everyone all day
+# (seeded by the Riyadh date), a new one the next day. Unknown or no tier goes last.
+DAILY_GROUPS = {"mega": 0, "hcp": 1, "macro": 2, "mid-tier": 3, "mid": 3, "micro": 4, "nano": 5}
+RIYADH_OFFSET = 3 * 3600    # Riyadh is UTC+3 all year (no daylight saving)
+
+
+def riyadh_day(now=None):
+    """Today in Riyadh as "YYYYMMDD": the seed of the daily order."""
+    return time.strftime("%Y%m%d", time.gmtime((time.time() if now is None else now) + RIYADH_OFFSET))
+
+
+def daily_group(tier):
+    """0 Mega, 1 doctors (any HCP tier), 2 Macro, 3 Mid, 4 Micro, 5 Nano, 6 anything else."""
+    t = str(tier or "").strip().lower()
+    if t.startswith("hcp"):
+        return 1
+    return DAILY_GROUPS.get(t, 6)
+
+
+def daily_key(day, code):
+    """The creator's place inside its group on ``day``: a hash, so it does not depend on who
+    else is in the result (a filtered view keeps the same relative order)."""
+    return int.from_bytes(hashlib.blake2b(("%s|%s" % (day, code)).encode(), digest_size=8).digest(), "big")
+
+
 G_NONE = {"tier": "No tier", "platform": "No platform", "country": "Location not specified",
           "interest": "No interest listed"}
 
@@ -220,6 +246,15 @@ class Index:
             self.itier[i] = c.get("itier") or ""
             self.added[i] = _int(c.get("created_at")) or added.get(c.get("code"), 0)
         self._facets = None
+        self._daily = (None, None)
+
+    def daily(self, day):
+        """(group, shuffle key) per card for ``day``; worked out once a day per index."""
+        got_day, keys = self._daily
+        if got_day != day:
+            keys = [(daily_group(self.tier[i]), daily_key(day, c.get("code") or "")) for i, c in enumerate(self.cards)]
+            self._daily = (day, keys)
+        return keys
 
     # -- the filter bar's options --
     def facets(self):
@@ -343,14 +378,14 @@ def clean_query(q):
             return None
         return n if n > 0 else None
 
-    sort = one("sort", 20) if "sort" in q else "followers-desc"
+    sort = one("sort", 20) if "sort" in q else "daily"
     out = {
         "q": fold(one("q", 120)),
         "tier": many("tier"), "platform": many("platform"), "place": many("place", 200), "interest": many("interest"),
         "industry": many("industry"), "sub": many("sub", 80),
         "fmin": num("fmin"), "fmax": num("fmax"),
         "lic": [v for v in many("lic") if v in ("SA", "AE", "EG")],
-        "sort": sort if sort in SORTS else "followers-desc",
+        "sort": sort if sort in SORTS else "daily",
         "group": one("group", 20) if one("group", 20) in GROUPS else "",
         "disc": None, "dplat": None,
     }
@@ -422,8 +457,11 @@ def _industry_level(idx, i, inds, subs):
     return level
 
 
-def ordered(idx, f, licences=None, discover=None):
-    """This query's Ordered answer, best first, and how many creators match. Cached for RESULT_TTL."""
+def ordered(idx, f, licences=None, discover=None, day=None):
+    """This query's Ordered answer, best first, and how many creators match. Cached for RESULT_TTL.
+    ``day`` ("YYYYMMDD", Riyadh) seeds the daily order; today when not given."""
+    if f["sort"] == "daily":
+        f = dict(f, day=day or riyadh_day())
     key = _key(idx, f)
     now = time.time()
     with _lock:
@@ -467,7 +505,10 @@ def ordered(idx, f, licences=None, discover=None):
         keep.append(i)
     s = f["sort"]
     fol, rank = idx.followers, idx.rank
-    if s == "followers-desc":
+    if s == "daily":
+        dk = idx.daily(f["day"])
+        keep.sort(key=lambda i: dk[i])
+    elif s == "followers-desc":
         keep.sort(key=lambda i: -fol[i])
     elif s == "followers-asc":
         keep.sort(key=lambda i: fol[i])
@@ -537,10 +578,14 @@ def _grouped(idx, keep, dim):
 
 def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
     """One batch. The cursor is "<version tag>.<offset>": a version still held keeps
-    its order, so a list never shifts under someone scrolling it."""
-    start = 0
+    its order, so a list never shifts under someone scrolling it. The daily order adds
+    ".<day>", so someone scrolling across Riyadh midnight keeps the day they started on."""
+    start, day = 0, None
     if cursor:
         tag, _, off = str(cursor).partition(".")
+        off, _, d = off.partition(".")
+        if f["sort"] == "daily" and len(d) == 8 and d.isdigit():
+            day = d
         older = held(tag)
         if older is not None:
             idx = older
@@ -549,7 +594,9 @@ def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
         except ValueError:
             start = 0
     limit = max(1, min(MAX_LIMIT, int(limit or BATCH)))
-    seq, matched = ordered(idx, f, licences, discover)
+    if f["sort"] == "daily" and day is None:
+        day = riyadh_day()
+    seq, matched = ordered(idx, f, licences, discover, day)
     chunk = seq.slice(start, start + limit)
     items = []
     for i, g, pm in chunk:
@@ -562,7 +609,7 @@ def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
     end = start + len(chunk)
     more = end < len(seq)
     out = {"ok": True, "items": items, "has_more": more,
-           "cursor": ("%s.%d" % (_tag(idx), end)) if more else None, "v": _tag(idx)}
+           "cursor": ("%s.%d" % (_tag(idx), end) + ("." + day if day else "")) if more else None, "v": _tag(idx)}
     if filtering(f):
         out["match"] = matched
     # The roster's size, rounded DOWN to the thousand and shown as "14,000+" (owner, 2026-10-13): the exact

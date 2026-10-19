@@ -136,8 +136,10 @@ class Paging(unittest.TestCase):
         s, full, _ = self.c.get("/api/roster")
         by = {r["code"]: r for r in full["roster"]}
         self.assertEqual(items[0], by[items[0]["code"]])
-        # default order: most followers first, summed over accounts
-        fs = [self.total(c) for c in items]
+        # default order (2026-10-19): "Recommended", the daily order: tier groups biggest first, shuffled inside
+        groups = [paging.daily_group(c["tier"]) for c in items]
+        self.assertEqual(groups, sorted(groups))
+        fs = [self.total(c) for c in self.walk(sort="followers-desc")[0]]
         self.assertEqual(fs, sorted(fs, reverse=True))
         # limit: up to 480 (returning to the same spot), never more
         self.assertEqual(len(self.page(limit=100)["items"]), 100)
@@ -238,7 +240,7 @@ class Paging(unittest.TestCase):
         self.assertNotIn(top, [c["code"] for c in fresh["items"]])
         self.assertEqual([c["code"] for c in self.page(cursor=b["cursor"], sort="followers-desc")["items"]], second)
         # a junk cursor starts from the top rather than failing
-        self.assertEqual(self.page(cursor="nonsense")["items"][0]["code"], fresh["items"][0]["code"])
+        self.assertEqual(self.page(cursor="nonsense", sort="followers-desc")["items"][0]["code"], fresh["items"][0]["code"])
 
     # --------------------------------------------------------------------- gate --
     def test_06_gated_exactly_like_the_roster(self):

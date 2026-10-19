@@ -762,9 +762,10 @@
   // filtering, sorting and grouping happen on the server; query() hands it the state.
   function Controls(host, cards, onChange, extras, facets) {
     // followers: [] for no limit, else [min, max] with either end null.
-    // The catalogue opens most-followed first (all platforms added up); a selection keeps
-    // the order its link gives. "Recommended" is still there to pick.
-    var DEFAULT_SORT = extras ? "" : "followers-desc";
+    // The catalogue opens on "Recommended" (sort=daily, admin/paging.py): Mega, then doctors,
+    // then Macro, Micro, Nano, shuffled inside each group once a Riyadh day. A selection keeps
+    // the order its link gives ("" there).
+    var DEFAULT_SORT = extras ? "" : "daily";
     var state = { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], followers: [], sort: DEFAULT_SORT, q: "" };
     // `extras` (the selection page): more filters of the same kind, in their own colour (fit,
     // role, tags), and the matching score to sort on.
@@ -914,8 +915,8 @@
     }
 
     // Date added is known on the server only, so it is offered on the catalogue, not on a selection.
-    var sortList = SORTS.concat(extras ? [["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]]
-      : [["added-desc", "Newest added"], ["added-asc", "Oldest added"]]);
+    var sortList = extras ? SORTS.concat([["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]])
+      : [["daily", "Recommended"]].concat(SORTS.slice(1), [["added-desc", "Newest added"], ["added-asc", "Oldest added"]]);
     var sort = '<label class="cat-sort"><span class="cat-sort__label">Sort</span>' +
       '<select class="cat-sort__select" aria-label="Sort creators">' +
       sortList.map(function (s) { return '<option value="' + s[0] + '"' + (s[0] === DEFAULT_SORT ? " selected" : "") + ">" + s[1] + "</option>"; }).join("") +
@@ -1346,7 +1347,7 @@
     var EXTRA = { lic: [], disc: null, dplat: null };
     var VIEW = "hv-cat-view", VIEW_TTL = 30 * 60 * 1000;
     function feedParams() {
-      var st = controls ? controls.query() : { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], followers: [], sort: "followers-desc", q: "" };
+      var st = controls ? controls.query() : { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], followers: [], sort: "daily", q: "" };
       var p = new URLSearchParams();
       p.set("link", LINK);
       ["industry", "sub", "tier", "platform", "place", "interest"].forEach(function (d) { (st[d] || []).forEach(function (v) { p.append(d, v); }); });
@@ -3772,7 +3773,7 @@
   function firstParams() {
     var p = new URLSearchParams(), g = "";
     p.set("link", LINK);
-    p.set("sort", "followers-desc");
+    p.set("sort", "daily");
     try { g = sessionStorage.getItem("hv-group:catalogue") || ""; } catch (e) { /* blocked */ }
     if (g) p.set("group", g);
     return p;

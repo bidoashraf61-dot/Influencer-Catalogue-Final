@@ -40,7 +40,7 @@ class T(unittest.TestCase):
         self.assertEqual(got, [("C", 0)])
 
     def test_unclassified_and_catchall_never(self):
-        got, _ = self.run_q(industry=["Sports", "General Lifestyle"])
+        got, _ = self.run_q(industry=["Sports", "General Lifestyle"], sort="followers-desc")
         self.assertEqual([c for c, _ in got], ["E", "F"])             # F is Confirmed under its own label if asked directly
         got, _ = self.run_q(industry="Fashion")
         self.assertNotIn("G", [c for c, _ in got])
