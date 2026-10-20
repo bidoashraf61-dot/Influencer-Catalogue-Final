@@ -1773,3 +1773,13 @@ body.sel-scores-off .cat-card .cat-score, body.sel-scores-off .cat-card .cat-pla
 }
 @media (prefers-reduced-motion: reduce) { .aa-row, .aa-ph, .aa-tx, .aa-tick, .aa-n__b { transition: none; } }
 .aa-foot .ai-sl__next { white-space: nowrap; } .aa-foot .ai-sl__back { flex: none; }
+
+/* Release r20 PWA check (item 183, 2026-10-20): "Add N to selection" sat 22px below the studio's
+   visible edge (sticky bottom was negative while the dialog has no bottom padding), so on a phone
+   the main button was cut off, and on an iPhone the home indicator covered what was left. The bar
+   now sticks at the visible edge and clears the safe area; the dialog leaves room for both insets. */
+.aa-foot { bottom: 0; padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px)); }
+@media (max-width: 640px) {
+  .aa-foot { bottom: 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
+  .ai-sl.ob { max-height: calc(100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
+}

@@ -1085,3 +1085,24 @@
   .cx-hiw__t { font-size: 21px; }
 }
 @media (prefers-reduced-motion: reduce) { .cx-hiw { animation: none; } .cx-hiw.is-out { transition: none; } }
+
+/* ---------------------------------------- Release r20 PWA check (item 183, 2026-10-20) */
+/* Rename on the selection page's dark cover: light lettering, white rule, outlined Cancel. */
+.cat-hero--cover .hv-rn-btn { color: rgba(255,255,255,.8); }
+.cat-hero--cover .hv-rn-btn:hover { color: var(--ink); background: var(--lime); border-color: var(--lime); }
+.cat-hero--cover .hv-rn-btn:focus-visible, .cat-hero--cover .hv-rn__save:focus-visible, .cat-hero--cover .hv-rn__cancel:focus-visible { outline-color: var(--lime); }
+.cat-hero--cover .hv-rn__in { color: var(--white); border-bottom-color: rgba(255,255,255,.85); caret-color: var(--lime); }
+.cat-hero--cover .hv-rn__in:focus { box-shadow: inset 0 -4px 0 var(--lime); }
+.cat-hero--cover .hv-rn__in::selection { background: rgba(232,255,118,.35); color: var(--white); }
+.cat-hero--cover .hv-rn__save { border-color: var(--lime); background: var(--lime); color: var(--ink); }
+.cat-hero--cover .hv-rn__save:hover:not(:disabled) { background: var(--white); border-color: var(--white); color: var(--ink); }
+.cat-hero--cover .hv-rn__cancel { border-color: rgba(255,255,255,.7); background: transparent; color: var(--white); }
+.cat-hero--cover .hv-rn__cancel:hover:not(:disabled) { background: var(--white); border-color: var(--white); color: var(--ink); }
+.cat-hero--cover .hv-rn__count { color: rgba(255,255,255,.72); }
+.cat-hero--cover .hv-rn__count.is-near { color: #ffb366; }
+.cat-hero--cover .hv-rn__count.is-over, .cat-hero--cover .hv-rn__err { color: #ff9a9a; }
+/* 44px hit areas: the one-time film card and the campaign dialog's controls. */
+.cx-hiw__go, .cx-hiw__later { min-height: 44px; }
+.cx-hiw__x { width: 44px; height: 44px; top: 2px; right: 2px; padding: 6px; background-clip: content-box; }
+.cx-camp__seg { min-height: 44px; }
+.cx-camp__x { width: 44px; height: 44px; }

@@ -1489,9 +1489,10 @@
     offered[token] = 1;
     api("GET", "/api/brief/for?s=" + encodeURIComponent(token)).then(function (r) {
       if (!r.b.ok || r.b.brief) return;
-      var box = h("div", { class: "pt-toast", role: "dialog", "aria-label": "Score this selection" },
-        h("p", { class: "pt-toast__t" }, "Score this selection"),
-        h("p", { class: "pt-toast__b" }, "Six quick questions about the campaign, and Helvi scores the creators already in this selection. It doesn't add anyone. Free."));
+      // Clients and KAMs never see scores (owner, 2026-10-20): the objective is asked for the campaign, not for a score.
+      var box = h("div", { class: "pt-toast", role: "dialog", "aria-label": "Add the campaign objective" },
+        h("p", { class: "pt-toast__t" }, "Add the campaign objective"),
+        h("p", { class: "pt-toast__b" }, "Six quick questions about the campaign, so Helvi and your account manager know what it needs. It doesn't add anyone. Free."));
       if (LANG === "ar") box.setAttribute("dir", "rtl");
       var later = h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { box.remove(); } }, "Not now");
       var go = h("button", { class: "pt-btn pt-btn--lime", type: "button", onclick: function () {
@@ -1523,7 +1524,7 @@
   // Typed answers beside the chips ("Other"): another platform, an exact amount, an exact number of creators.
   var OB_OTHER = { platforms: ["Other platform", "Type the platform, e.g. X or LinkedIn"], budget: ["Type an amount", "Amount in SAR, e.g. 120000"], count: ["Type a number", "How many creators, e.g. 12"] };
   var OB_HINT = {
-    goal: "Pick one or more. Each one counts in every creator’s score.",
+    goal: "Pick one or more. Helvi weighs each one when it picks creators.",
     platforms: "Pick every platform the content runs on.",
     market: "Pick every country where the people you want to reach live.",
     gender: "Pick Women, Men or both. Leave it if the product is for everyone.",
@@ -3521,8 +3522,8 @@
        Never prices or costs. Every page is a full load, so moving between pages brings the next tip. */
     var TIPS = {
       catalogue: ["Looking for creators?", "Tell me your goal and city and I'll shortlist the best fits."],
-      creator: ["Weighing this creator?", "I can explain the score and suggest similar creators."],
-      selection: ["Working on your selection?", "I can compare creators, add more like these or request a full analysis."],
+      creator: ["Weighing this creator?", "I can tell you about this creator and suggest similar ones."],
+      selection: ["Working on your selection?", "I can compare creators, find more with AI or help you start a campaign."],
       campaign: ["Reading the report?", "Ask me what any number means and how the campaign is doing."],
       account: ["Need a hand here?", "I can explain your credits, selections and campaigns."]
     };

@@ -267,6 +267,8 @@ def for_client(code_id):
         gr = conn.execute("SELECT g.code, g.granted_at, r.name FROM analysis_grants g LEFT JOIN creators r ON r.code = g.code "
                           "WHERE g.code_id IN (%s) ORDER BY g.granted_at DESC" % ph, list(team)).fetchall()
     out, seen = [], set()
+    if not CLIENTS_SEE_ANALYSIS:
+        gr = []                      # a grant opens nothing for clients now, so it is not listed as "unlocked"
     for g in gr:
         if g["code"] in seen:
             continue

@@ -3242,7 +3242,18 @@
       var canAct = ROLE === "owner" || ROLE === "admin";
       host.className = "sel-obj" + (have ? " sel-obj--done" : "");
       var gate = CURATED && CURATED.scoresGate;
+      // Clients and key account managers never see scores (owner, 2026-10-20, item 174): for them the
+      // objective is what the campaign is planned around, never a promise of scores.
+      var team = !!(gate && gate.team);
       scoreView();
+      if (CURATED && CURATED.scoresPending && !team) {
+        host.className = "sel-obj sel-obj--done";
+        host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic sel-obj__ic--done">' + hvIcon("check") + "</span>" +
+          '<p class="sel-obj__tx"><b>Objective added</b><span class="sel-obj__what">' + esc(objectiveWords(CURATED.brief && CURATED.brief.objective)) + "</span>" +
+          '<span class="sel-obj__note">Your account manager plans this campaign around it.</span></p>' +
+          (canAct ? '<button type="button" class="sel-obj__edit">Edit</button>' : "") + "</div></div>";
+        return;
+      }
       if (CURATED && CURATED.scoresPending) {
         // The client, before HelloVoice publishes the scores.
         host.className = "sel-obj sel-obj--done";
@@ -3263,14 +3274,17 @@
           : "";
         host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic sel-obj__ic--done">' + hvIcon("check") + "</span>" +
           '<p class="sel-obj__tx"><b>Objective added</b><span class="sel-obj__what">' + esc(objectiveWords(CURATED.brief.objective)) + "</span>" +
-          '<span class="sel-obj__note">Each creator here is scored for it.</span></p>' + gateHtml +
+          '<span class="sel-obj__note">' + (team ? "Each creator here is scored for it." : "Your account manager plans this campaign around it.") + "</span></p>" + gateHtml +
           (canAct ? '<button type="button" class="sel-obj__edit">Edit</button>' : "") + "</div></div>";
         return;
       }
       host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-obj__in"><span class="sel-obj__ic">' + hvIcon("target") + "</span>" +
-        '<p class="sel-obj__tx"><b>Add your campaign objective to score these creators</b>' +
-        "<span>" + (canAct ? "Six quick questions. Helvi scores the creators already in this selection: it doesn’t build a new shortlist or change who is in it. Free."
-                           : "Scores appear once the selection’s owner adds the campaign objective.") + "</span></p>" +
+        (team ? '<p class="sel-obj__tx"><b>Add your campaign objective to score these creators</b>' +
+          "<span>" + (canAct ? "Six quick questions. Helvi scores the creators already in this selection: it doesn’t build a new shortlist or change who is in it. Free."
+                             : "Scores appear once the selection’s owner adds the campaign objective.") + "</span></p>"
+              : '<p class="sel-obj__tx"><b>Add your campaign objective</b>' +
+          "<span>" + (canAct ? "Six quick questions, so Helvi and your account manager know what this campaign needs. It doesn’t change who is in this selection. Free."
+                             : "The selection’s owner adds the campaign objective.") + "</span></p>") +
         (canAct ? '<button type="button" class="sel-obj__go">Add objective' + hvIcon("arrow") + "</button>" : "") + "</div></div>";
     }
     function renderStatusBar() {

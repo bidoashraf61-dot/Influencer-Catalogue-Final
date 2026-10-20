@@ -486,3 +486,7 @@ body.pp-modal-on { overflow: hidden; }
 .pp-logos { display: flex; flex-wrap: wrap; gap: 14px; }
 .pp-logo--wall { width: 76px; max-width: none; height: 76px; border: 1px solid var(--rule, rgba(18,18,18,.12)); background-origin: content-box; padding: 8px; box-sizing: border-box; }
 .pp-post__brand--logo { width: 48px; height: 48px; padding: 6px; border-radius: 12px; background: var(--white) no-repeat center / contain; background-origin: content-box; box-sizing: border-box; }
+
+/* Release r20 (2026-10-20): "Ask your account manager about this creator" is longer than the old
+   label; on a phone it wraps to two balanced lines inside the pill instead of being cut off. */
+#pp-ask-full { white-space: normal; text-align: center; text-wrap: balance; line-height: 1.05; padding-top: 10px; padding-bottom: 10px; }

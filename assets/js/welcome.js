@@ -16,7 +16,7 @@
     { t: 10, name: "Brief Helvi",       note: "Type it, say it, or paste your product link. Helvi reads the brief and builds a shortlist of vetted creators." },
     { t: 24, name: "Browse and filter", note: "Platform, size, city, audience and licence. Every creator is checked by HelloVoice." },
     { t: 36, name: "Your shortlist",    note: "Approve or reject each creator, and Helvi finds a replacement in seconds." },
-    { t: 50, name: "Full analysis",     note: "Real audience, authenticity, growth and brand history for your finalists, ready within one working day." },
+    { t: 50, name: "Ask about a creator", note: "Your account manager tells you about a finalist's audience, past brand work and rates." },
     { t: 62, name: "Request a quote",   note: "Your account manager replies within one working day, right in your bell." },
     { t: 74, name: "Track results",     note: "Every post, its views and engagement, verdict first, updated every 24 hours." },
     { t: 87, name: "Take it with you",  note: "Selections, campaigns and credits live in your profile, and on your phone as the HELVi app." }

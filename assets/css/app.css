@@ -210,3 +210,7 @@
   body { -webkit-user-select: none; user-select: none; overscroll-behavior-y: none; }
   input, textarea, [contenteditable], p, td, li { -webkit-user-select: text; user-select: text; }
 }
+
+/* Release r20 (item 183): the soft alerts card never sits on top of an open sheet or dialog
+   (Helvi's studio, the campaign sheet, side panels); it is back once they close. */
+body:has(.ai-sl.ob, dialog[open], .cx-sheet, .cx-dr, .pt-scrim) .hca-card { display: none; }

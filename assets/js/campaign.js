@@ -366,7 +366,12 @@
     }
     function open(on) {
       pop.hidden = !on; btn.setAttribute("aria-expanded", on ? "true" : "false");
-      if (on) { q.value = ""; draw(); setTimeout(function () { q.focus(); }, 0); }
+      if (on) {
+        q.value = ""; draw();
+        // Desktop: a switcher low on the page scrolls into view (phones get a fixed sheet in CSS).
+        if (window.innerWidth >= 900 && pop.getBoundingClientRect().bottom > window.innerHeight) pop.scrollIntoView({ block: "nearest" });
+        setTimeout(function () { q.focus({ preventScroll: true }); }, 0);
+      }
     }
     btn.addEventListener("click", function () { open(pop.hidden); });
     q.addEventListener("input", draw);

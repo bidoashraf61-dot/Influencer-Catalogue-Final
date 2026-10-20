@@ -321,7 +321,7 @@
         h("span", { class: "hc-how__play", html: PLAY })),
       h("div", { class: "hc-how__txt" },
         h("h2", { class: "hc-h2", id: "hc-how-t" }, "How HELVi works"),
-        h("p", null, "A short film, start to finish: brief Helvi, shortlist creators, check the analysis, request a quote and follow every post."),
+        h("p", null, "A short film, start to finish: brief Helvi, shortlist creators, request a quote and follow every post."),
         h("a", { class: "hc-btn", href: href }, "Watch the film")));
   }
   function renderOverview(p) {
@@ -490,10 +490,12 @@
   /* -------------------------------------------------------------- analyses */
 
   function renderAnalyses(p) {
-    add(p, head("Analyses", "A full analysis opens a creator's audience, growth, fake-follower check, brand history, best posts and a pricing benchmark. It is free for any creator in one of your selections and ready within 1 working day."));
+    // Clients never get the full profile analysis now (owner, 2026-10-20): this tab lists the creators
+    // they asked their account manager about, from the creator page's "Ask your account manager" button.
+    add(p, head("Analyses", "The creators you asked your account manager about. They reply to you directly."));
     if (!DATA.analyses.length) {
-      add(p, h("div", { class: "hc-empty" }, h("b", null, "No analyses requested yet"),
-        h("p", null, "Open a creator from one of your selections and press Request full analysis. Helvi rings your bell when it opens."),
+      add(p, h("div", { class: "hc-empty" }, h("b", null, "No questions yet"),
+        h("p", null, "Open a creator from one of your selections and press Ask your account manager about this creator."),
         h("a", { class: "hc-btn", href: "#selections" }, "Go to my selections")));
       return;
     }
@@ -504,8 +506,8 @@
         h("div", null, h("span", { class: "hc-row__name" }, a.name),
           h("div", { class: "hc-row__meta" }, h("span", null, a.code),
             open ? h("span", { class: "hc-sig hc-sig--ok" }, "Unlocked " + dm(a.at))
-                 : h("span", { class: "hc-sig hc-sig--wait" }, "Requested · ready by " + shortDay(a.ready_by)))),
-        h("span", { class: "hc-row__go" }, open ? "View full analysis" : "See what's free now", " ", icon("arrow")))));
+                 : h("span", { class: "hc-sig hc-sig--wait" }, "Asked " + dm(a.at)))),
+        h("span", { class: "hc-row__go" }, open ? "View full analysis" : "Open creator", " ", icon("arrow")))));
     });
     add(p, list);
   }
