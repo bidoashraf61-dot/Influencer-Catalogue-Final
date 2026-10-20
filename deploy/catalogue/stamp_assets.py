@@ -49,6 +49,8 @@ def stamp_js(root, write, stale):
     for _ in range(6):                      # nested references settle in a pass or two
         changed = False
         for f in sorted(js_dir.glob("*.js")):
+            if f.name.startswith("."):          # macOS ._ copies are binary, not scripts
+                continue
             text = f.read_text(encoding="utf-8")
 
             def sub(m):
@@ -73,6 +75,8 @@ def pages(root):
     for f in sorted(root.rglob("*.html")):
         rel = f.relative_to(root).parts
         if rel and rel[0] in ("assets", "admin", "node_modules", ".git"):
+            continue
+        if f.name.startswith("."):
             continue
         if any(p.startswith(".") for p in rel):     # ._index.html (macOS copy junk) and dotfiles
             continue
