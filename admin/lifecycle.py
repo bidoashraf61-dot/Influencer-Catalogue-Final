@@ -112,8 +112,10 @@ def state_of(sel):
     with db.connect() as conn:
         q = _row(conn, sid)
         legacy = _request(conn, sel)
+        # A campaign holds many selections (item 174): its first in campaigns.selection_id, the rest linked.
         camps = conn.execute("SELECT id, name, token, status, starts_at, ends_at, updated_at FROM campaigns "
-                             "WHERE selection_id = ? ORDER BY created_at", (sid,)).fetchall()
+                             "WHERE selection_id = ? OR id IN (SELECT campaign_id FROM campaign_selections WHERE selection_id = ?) "
+                             "ORDER BY created_at", (sid, sid)).fetchall()
         changes = conn.execute("SELECT at, by_name, added, removed FROM quote_changes WHERE selection_id = ? "
                                "ORDER BY at DESC, id DESC LIMIT 8", (sid,)).fetchall()
     q = dict(q) if q is not None else {}

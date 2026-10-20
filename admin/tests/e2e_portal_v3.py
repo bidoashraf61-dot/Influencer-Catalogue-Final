@@ -38,6 +38,8 @@ class V3(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         base.seed()
+        import gating
+        gating.CLIENTS_SEE_ANALYSIS = True        # these tests exercise the grant path, switched off for clients since 2026-10-20 (item 174)
         db.set_setting("signup_mode", "open")
         db.set_setting("signups_per_ip_day", 1000)
         mailer.CAPTURE = True

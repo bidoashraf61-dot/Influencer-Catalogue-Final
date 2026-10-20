@@ -445,6 +445,12 @@ Linen tiles at 20px radius (22px padding): a 12px uppercase graphite term over a
 ### Campaign List Rows
 On the access code's campaign list: linen rows at 20px radius (26px 30px), brand logos at 56px, a Bebas name, a graphite meta line and the lime "Open report" pill. Hover lifts 2px with the hover shadow; single column under 700px.
 
+### Campaign Board (items 174, 176, 177, 182)
+`/campaign/` opens on a six-lane board: Draft, Shortlisting, Client review, Approved, Live, Completed. Each lane is a linen panel at 20px radius with a Bebas 28px name, a graphite count and a 12px hint; the Live lane carries the vivid-red pulse dot. Cards are white at 12px radius with a 1px soft rule: the client's logo bare at 44px tall (a linen monogram circle when there is none), a Bebas 28px campaign name, a graphite meta line, then the selections it holds as hairline-ruled rows (name, creator count). A pin (drawn, 36px circle) turns lime when on and floats the card to the top of its lane and of the switcher; a pinned card's border darkens to ink. The team's demo campaign keeps its orange outline and "Demo" tag. Admins only: a pill stage menu and a lime "Go live" / white "Unlive" pill per card. Under 900px the lanes become one swipeable column per screen (scroll-snap) with a row of stage pills above that follow the swipe; the PWA bottom bar stays clear. A campaign switcher (pill button, floating panel with search, pinned first, live dot) sits in the board toolbar and in a slim bar above every report, beside "Campaign board". The report names the campaign's selections as outlined pills under its sub line.
+
+### Create Campaign Dialog
+On a selection, the main button reads "Create campaign with this selection" and opens a native `<dialog>` (28px radius; a bottom sheet under 560px): a linen segmented control (Add to a campaign / New campaign), the campaign list as radio rows that turn lime when chosen (rows that already hold the selection are dimmed), a name field, one lime Bebas action, and "Just request a quote" as an underlined text button.
+
 ### Passport Data Page (signature)
 A linen block at 28px radius with a faint concentric security pattern (repeating radial rule at 3.5% ink). Photo at 4:5 on the left (180 to 280px), fields on the right: a 13px uppercase type line, the name at display size, white handle pills with platform marks (inverting to ink and lime on hover), and a ruled definition list of Bebas 28px values. Single column under 820px.
 

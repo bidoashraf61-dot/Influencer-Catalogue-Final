@@ -344,7 +344,19 @@ def _annotate(role, a, people):
         for kind, key in (("selection", "selections"), ("campaign", "campaigns")):
             for it in p.get(key, []):
                 it["can_kam"] = _can_kam(role, a, codes.get((kind, it["id"])), it.get("kam"), staff)
+                if kind == "campaign":
+                    _stage(role, it)
     return _attach_packages(people)
+
+
+def _stage(role, it):
+    """The campaign's board stage (item 177): every row shows it; only an admin may change it or set Live / Unlive."""
+    import board
+    k = db.campaign(int(it["id"]))
+    if k is not None:
+        st = board.stage_of(k)
+        it["stage"] = {"key": st, "label": board.LABEL[st]}
+    it["can_stage"] = role == "admin"
 
 
 def set_kam(role, a, kind, ref, email, by=""):

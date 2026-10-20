@@ -297,6 +297,19 @@ class PortalMixin(connect_api.ConnectMixin):
                     else:
                         self.send_json(200, dict(got, ok=True, role=role), self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path in ("/api/board", "/api/board/targets"):
+            # The campaign board (item 174/176): admins every campaign, a KAM hers, a client their own (read-only).
+            import board
+            if path == "/api/board":
+                got = board.board(self, self._srv().CLIENT_LOGOS)
+            else:
+                sel = db.selection(token=str(query.get("s") or ""))
+                got = board.targets(self, sel) if sel is not None else None
+            if got is None:
+                self.send_json(401 if board.viewer(self)[0] is None else 404, {"ok": False, "reason": "signin" if board.viewer(self)[0] is None else "unknown"}, self.cors())
+            else:
+                self.send_json(200, dict(got, ok=True), self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/account/clients":
             # "My clients" (KAM scoped access, 2026-10-11): only for a key account manager's own account.
             who = self._need_account()
@@ -503,6 +516,8 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/me/signout-others": self.api_me_signout_others, "/api/team/invite": self.api_team_invite,
             "/api/hub/kam": self.api_hub_kam, "/api/hub/share": self.api_hub_share, "/api/hub/move": self.api_hub_move, "/api/hub/delete": self.api_hub_delete, "/api/hub/assign-kam": self.api_hub_assign_kam,
             "/api/notifications/read": self.api_notifications_read,
+            "/api/board/stage": self.api_board_stage, "/api/board/live": self.api_board_live,
+            "/api/board/pin": self.api_board_pin, "/api/board/attach": self.api_board_attach,
         }
         fn = routes.get(path)
         if not fn:
@@ -977,6 +992,76 @@ class PortalMixin(connect_api.ConnectMixin):
         with db.connect() as conn:
             n = conn.execute("DELETE FROM code_devices WHERE code_id = ? AND device != ?", (cid, mine)).rowcount
         return self.send_json(200, {"ok": True, "removed": n}, self.cors())
+
+    # ------------------------------------------------------- campaign board --
+    # Item 174/177/182 (owner, 2026-10-20). Stage moves and Live / Unlive are for admins only; board.move
+    # checks the role itself, so a hidden button is never the only guard.
+
+    def _board_campaign(self, b):
+        import board
+        k, role = board.campaign_for(self, token=str(b.get("t") or "") or None, cid=b.get("id"))
+        if role is None:
+            self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())
+            return None
+        if k is None:
+            self.send_json(404, {"ok": False, "reason": "unknown", "message": "That campaign is not here any more."}, self.cors())
+            return None
+        return k
+
+    def _board_done(self, ok, msg, extra):
+        status = extra.pop("status", None) or (200 if ok else 400)
+        self.send_json(status, dict(extra, ok=ok, message=msg), self.cors())
+
+    def api_board_stage(self):
+        """{t | id, to}: an admin moves a campaign to another column."""
+        import board
+        b = self.json_body() or {}
+        k = self._board_campaign(b)
+        if k is None:
+            return
+        ok, msg, extra = board.move(self, k, str(b.get("to") or ""))
+        if ok:
+            extra["stage"] = board.stage_of(db.campaign(k["id"]))
+        self._board_done(ok, msg, extra)
+
+    def api_board_live(self):
+        """{t | id, on}: Live / Unlive (admins only)."""
+        import board
+        b = self.json_body() or {}
+        k = self._board_campaign(b)
+        if k is None:
+            return
+        ok, msg, extra = board.set_live(self, k, bool(b.get("on")))
+        if ok:
+            extra["stage"] = board.stage_of(db.campaign(k["id"]))
+        self._board_done(ok, msg, extra)
+
+    def api_board_pin(self):
+        """{t, on}: pin a campaign to the top of my board and switcher (per person)."""
+        import board
+        b = self.json_body() or {}
+        k = self._board_campaign(b)
+        if k is None:
+            return
+        ok = board.pin(self, k, bool(b.get("on")))
+        self.send_json(200 if ok else 400, {"ok": ok, "my_pin": bool(b.get("on")) if ok else None}, self.cors())
+
+    def api_board_attach(self):
+        """{s: selection token, t: campaign token | name: new campaign}: "Create campaign with this selection"."""
+        import board
+        b = self.json_body() or {}
+        sel = db.selection(token=str(b.get("s") or ""))
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown", "message": "That selection is not here any more."}, self.cors())
+        if board.viewer(self)[0] is None:
+            return self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())
+        if self._throttled("boardattach:%s" % (board.pin_key(self) or self.client_ip()), 30, 3600):
+            return
+        ok, msg, k, created = board.attach(self, sel, campaign_ref=str(b.get("t") or "") or None, new_name=b.get("name"))
+        if not ok:
+            return self.send_json(400, {"ok": False, "message": msg}, self.cors())
+        return self.send_json(200, {"ok": True, "message": msg, "created": created,
+                                    "campaign": {"token": k["token"], "name": k["name"], "stage": board.stage_of(k)}}, self.cors())
 
     def api_hub_kam(self):
         """Set the account manager of a company, a person, a selection or a campaign (admins only). {kind, ref, kam}"""

@@ -19,6 +19,7 @@ from http.server import ThreadingHTTPServer  # noqa: E402
 
 class UnscoredAll(unittest.TestCase):
     signup = base.Portal.signup
+    admin = base.Portal.admin
     selection = f6.Fixes6.selection
 
     @classmethod
@@ -49,15 +50,19 @@ class UnscoredAll(unittest.TestCase):
         c, _ = self.signup("unscored@glowderma.com")
         tok = self.selection(c, "Paused", ["HV-MI-001", "HV-MI-002"])
         db.set_scores_published(tok)                                      # published by HelloVoice (gate, 2026-10-15)
-        s, sel, _ = c.get("/api/selection?s=" + tok)
+        a = self.admin()                                                 # scores are HelloVoice's alone (owner, 2026-10-20)
+        s, sel, _ = a.get("/api/selection?s=" + tok)
         self.assertTrue(sel["scores"])                                   # scored before the switch
+        self.assertEqual(c.get("/api/selection?s=" + tok)[1]["scores"], {})   # the client: never a score
         db.set_setting("selections_unscored", "all")
-        s, sel, _ = c.get("/api/selection?s=" + tok)
+        s, sel, _ = a.get("/api/selection?s=" + tok)
         self.assertEqual(sel["scores"], {})
         self.assertTrue(sel["scoring_off"])
         self.assertFalse(sel["needs_objective"])
         self.assertEqual({k: v["fit"] for k, v in sel["verdicts"].items()},
                          {"HV-MI-001": "Matching", "HV-MI-002": "Matching"})
+        s, sel, _ = c.get("/api/selection?s=" + tok)
+        self.assertFalse(any(v.get("fit") for v in sel["verdicts"].values()))   # and no fit badge for the client
         res = assistant._explain({}, "HV-MI-001")
         self.assertIsNone(res["score"])
         self.assertTrue(res["paused"])
@@ -68,8 +73,9 @@ class UnscoredAll(unittest.TestCase):
         b = self.selection(c, "On", ["HV-MI-001"])
         db.set_scores_published(a); db.set_scores_published(b)                                      # published by HelloVoice (gate, 2026-10-15)
         db.set_setting("selections_unscored", [db.selection(token=a)["id"]])
-        s, sa, _ = c.get("/api/selection?s=" + a)
-        s, sb, _ = c.get("/api/selection?s=" + b)
+        adm = self.admin()
+        s, sa, _ = adm.get("/api/selection?s=" + a)
+        s, sb, _ = adm.get("/api/selection?s=" + b)
         self.assertEqual(sa["scores"], {})
         self.assertTrue(sb["scores"])
         self.assertNotIn("scoring_off", sb)

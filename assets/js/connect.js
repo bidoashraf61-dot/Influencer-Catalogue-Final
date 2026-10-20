@@ -591,8 +591,116 @@
       return aiFree() || !cost ? h("span", { class: "cx-tag cx-tag--free", html: ic("check") + "Free with your active campaign" })
         : h("span", { class: "cx-tag cx-tag--cost", html: ic("coin") + cost + " credits" });
     }
+    /* ============================ CREATE CAMPAIGN WITH THIS SELECTION (item 174) */
+    // Owner, 2026-10-20: the selection's main button becomes "Create campaign with this selection". A small dialog
+    // adds it to one of my campaigns or starts a new one (a Draft under the client, run by their account manager,
+    // who is told). The quote request stays one tap away inside the dialog. Shown only when the server says this
+    // reader may file the selection (GET /api/board/targets).
+    var campOffer = null;
+    function mountCampaignCta() {
+      var S = window.hvSelection;
+      if (!S || !S.token() || !(HV.me && HV.me.signed_in) || campOffer === S.token()) return;
+      campOffer = S.token();
+      api("GET", "/api/board/targets?s=" + encodeURIComponent(S.token())).then(function (r) {
+        if (!(r.b && r.b.ok)) return;
+        ["cat-request", "cat-request-2"].forEach(function (id) {
+          var old = document.getElementById(id);
+          if (!old || document.getElementById(id + "-camp")) return;
+          var b = h("button", { type: "button", class: old.className + " cx-campcta", id: id + "-camp" }, "Create campaign with this selection");
+          b.addEventListener("click", function () { campDialog(S, old, b); });
+          old.insertAdjacentElement("beforebegin", b);
+          old.hidden = true;
+          old.setAttribute("data-cx-quote", "1");
+        });
+      });
+    }
+    function campDialog(S, quoteBtn, opener) {
+      var dlg = document.getElementById("cx-camp");
+      if (dlg) dlg.remove();
+      dlg = h("dialog", { id: "cx-camp", class: "cx-camp", "aria-labelledby": "cx-camp-t" });
+      var body = h("div", { class: "cx-camp__in" });
+      dlg.appendChild(body);
+      document.body.appendChild(dlg);
+      var close = function () { dlg.close(); };
+      dlg.addEventListener("close", function () { dlg.remove(); if (opener) opener.focus(); });
+      dlg.addEventListener("click", function (e) { if (e.target === dlg) close(); });
+      body.appendChild(h("p", { class: "cx-camp__load", role: "status" }, "Loading your campaigns…"));
+      dlg.showModal();
+      api("GET", "/api/board/targets?s=" + encodeURIComponent(S.token())).then(function (r) {
+        body.textContent = "";
+        if (!(r.b && r.b.ok)) { body.appendChild(h("p", { class: "cx-camp__msg is-bad" }, (r.b && r.b.message) || "This selection can't be filed from here.")); return; }
+        var list = r.b.campaigns || [], LAB = { draft: "Draft", shortlisting: "Shortlisting", review: "Client review", approved: "Approved", live: "Live", completed: "Completed" };
+        var pick = list.filter(function (c) { return !c.has; }).length ? "existing" : "new";
+        var name = h("input", { id: "cx-camp-name", type: "text", maxlength: "120", autocomplete: "off", value: S.name() || "" });
+        var msg = h("p", { class: "cx-camp__msg", role: "status", "aria-live": "polite" });
+        var go = h("button", { type: "submit", class: "cx-camp__go" });
+        var form = h("form", { class: "cx-camp__form", novalidate: "" });
+        var radios = h("ul", { class: "cx-camp__list", "aria-label": "My campaigns" });
+        list.forEach(function (c, i) {
+          var id = "cx-camp-k" + i;
+          radios.appendChild(h("li", null, h("input", { type: "radio", name: "cx-camp-k", id: id, value: c.token, disabled: c.has || null }),
+            h("label", { for: id }, h("b", null, c.name),
+              h("small", null, [c.client, LAB[c.stage] || c.stage, c.has ? "already holds this selection" : ""].filter(Boolean).join(" · ")))));
+        });
+        var first = radios.querySelector("input:not([disabled])");
+        if (first) first.checked = true;
+        function mode(m) {
+          pick = m;
+          tabA.setAttribute("aria-pressed", m === "existing" ? "true" : "false");
+          tabB.setAttribute("aria-pressed", m === "new" ? "true" : "false");
+          paneA.hidden = m !== "existing"; paneB.hidden = m !== "new";
+          go.textContent = m === "new" ? "Start the campaign" : "Add to this campaign";
+          go.disabled = m === "existing" && !first;
+        }
+        var tabA = h("button", { type: "button", class: "cx-camp__seg", onclick: function () { mode("existing"); } }, "Add to a campaign");
+        var tabB = h("button", { type: "button", class: "cx-camp__seg", onclick: function () { mode("new"); name.focus(); } }, "New campaign");
+        var paneA = h("div", { class: "cx-camp__pane" }, list.length ? radios : h("p", { class: "cx-camp__none" }, "You have no open campaigns yet. Start one with this selection."));
+        var paneB = h("div", { class: "cx-camp__pane" }, h("label", { for: "cx-camp-name" }, "Campaign name"), name,
+          h("p", { class: "cx-camp__hint" }, "It starts as a Draft. Your account manager is told and takes it from there."));
+        form.appendChild(h("div", { class: "cx-camp__segs", role: "group", "aria-label": "Where it goes" }, tabA, tabB));
+        form.appendChild(paneA); form.appendChild(paneB);
+        form.appendChild(msg);
+        var acts = h("div", { class: "cx-camp__acts" }, go);
+        if (quoteBtn && S.role() === "owner") {
+          acts.appendChild(h("button", { type: "button", class: "cx-camp__alt", onclick: function () { close(); quoteBtn.click(); } }, "Just request a quote"));
+        }
+        form.appendChild(acts);
+        form.addEventListener("submit", function (e) {
+          e.preventDefault();
+          var payload = { s: S.token() };
+          if (pick === "new") {
+            var v = name.value.trim();
+            if (v.length < 3) { msg.textContent = "Give the campaign a name (3 letters or more)."; msg.className = "cx-camp__msg is-bad"; name.focus(); return; }
+            payload.name = v;
+          } else {
+            var sel = radios.querySelector("input:checked");
+            if (!sel) { msg.textContent = "Pick one of your campaigns."; msg.className = "cx-camp__msg is-bad"; return; }
+            payload.t = sel.value;
+          }
+          go.disabled = true; msg.className = "cx-camp__msg"; msg.textContent = pick === "new" ? "Starting it…" : "Adding it…";
+          api("POST", "/api/board/attach", payload).then(function (res) {
+            if (!(res.b && res.b.ok)) { go.disabled = false; msg.className = "cx-camp__msg is-bad"; msg.textContent = (res.b && res.b.message) || "That didn't work. Please try again."; return; }
+            body.textContent = "";
+            body.appendChild(h("h2", { id: "cx-camp-t", class: "cx-camp__t" }, res.b.created ? "Campaign started" : "Added to the campaign"));
+            body.appendChild(h("p", { class: "cx-camp__lede" }, res.b.message));
+            var open = h("a", { class: "cx-camp__go", href: ROOT + "campaign/#list" }, "Open my campaign board");
+            body.appendChild(h("div", { class: "cx-camp__acts" }, open, h("button", { type: "button", class: "cx-camp__alt", onclick: close }, "Stay here")));
+            open.focus();
+            toast(res.b.message);
+          });
+        });
+        body.appendChild(h("div", { class: "cx-camp__head" }, h("h2", { id: "cx-camp-t", class: "cx-camp__t" }, "Create a campaign"),
+          h("button", { type: "button", class: "cx-camp__x", "aria-label": "Close", onclick: close, html: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>' })));
+        body.appendChild(h("p", { class: "cx-camp__lede" }, "With the selection ", h("b", null, S.name() || "this selection"), "."));
+        body.appendChild(form);
+        mode(pick);
+        (pick === "new" ? name : (first || tabA)).focus();
+      });
+    }
+
     function mountSelection() {
       mountLifecycle();
+      mountCampaignCta();
       var S = window.hvSelection;
       if (!S || !S.token() || document.getElementById("cx-selact")) return;
       // Bottom row of the selection header, pushed to its right end (CSS), a lime primary button.
@@ -1249,6 +1357,7 @@
         setTimeout(campaignNextTime, 1200);
       }
       if (PAGE === "creator") mountCreatorIdeas();
+      if (window.hvSelection) mountCampaignCta();
     }
     if (HV.me) onMe(); else document.addEventListener("hv:me", onMe);
     if (window.hvSelection) mountSelection();

@@ -94,14 +94,19 @@ def published_codes(code_id):
     return out
 
 
+# Owner, 2026-10-20 (item 174): clients and key account managers never see a creator's full profile analysis,
+# granted or published. Grants and publish flags are kept in the database untouched; set True to bring them back.
+CLIENTS_SEE_ANALYSIS = False
+
+
 def unlocked(code_id, code):
     if code_id is None:
         return False
     if code_id == db.admin_code_id() or _unlock_all():
         return True
-    import portal
-    if portal.unlock_creator(code):
-        return True                                    # a key account manager: creators of her clients
+    if not CLIENTS_SEE_ANALYSIS:
+        return False
+    # A key account manager's scope never unlocks an analysis (owner, 2026-10-20, item 174).
     if code in published_codes(code_id):
         return True                                    # pushed on one of the team's selections
     team = _team(code_id)
@@ -116,13 +121,12 @@ def unlocked_set(code_id, codes=None):
         return set()
     if code_id == db.admin_code_id() or _unlock_all():
         return None
+    if not CLIENTS_SEE_ANALYSIS:
+        return set()
     team = _team(code_id)
     with db.connect() as conn:
         rows = conn.execute("SELECT code FROM analysis_grants WHERE code_id IN (%s)" % ",".join("?" * len(team)), list(team)).fetchall()
     got = {r["code"] for r in rows} | published_codes(code_id)
-    import portal
-    if codes is not None:
-        got |= {c for c in codes if portal.unlock_creator(c)}   # a key account manager's own clients
     return got if codes is None else got & set(codes)
 
 

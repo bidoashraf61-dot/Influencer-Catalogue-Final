@@ -54,6 +54,8 @@ class Fixes3Gating(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         base.seed()
+        import gating
+        gating.CLIENTS_SEE_ANALYSIS = True        # these tests exercise the grant path, switched off for clients since 2026-10-20 (item 174)
         db.set_setting("signup_mode", "open")
         db.set_setting("signups_per_ip_day", 1000)
         mailer.CAPTURE = True
@@ -134,23 +136,11 @@ class Fixes3Gating(unittest.TestCase):
         c, _ = self.signup("score@lockco2.com")
         tok = self.selection(c, "Scores", ["HV-MI-001", "HV-MD-004"])
         db.set_scores_published(tok)                                      # published by HelloVoice (gate, 2026-10-15)
-        b = c.get("/api/selection?s=" + tok)[1]
-        sc = b["scores"]["HV-MD-004"]
-        self.assertIsInstance(sc["score"], int)
-        self.assertTrue(sc["tag"])
-        self.assertTrue(sc.get("locked"))
-        self.assertEqual([p for p in sc["parts"] if "udience" in p["label"]], [])
-        self.clean(b["scores"], "selection scores (locked)")
-        # the voice/chat view of the selection: number and stamp only
+        self.assertEqual(c.get("/api/selection?s=" + tok)[1]["scores"], {})   # a client never gets scores (owner, 2026-10-20)
+        self.assertEqual(c.get("/api/selection?s=" + tok)[1]["scores_gate"]["team"], False)
+        # the voice/chat view of the selection: no locked evidence
         v = c.get("/api/voice/selection?s=" + tok)[1]
         self.clean(v, "/api/voice/selection")
-        # granted: the evidence is back, and the number is the same
-        self.grant("score@lockco2.com", "HV-MD-004")
-        open_ = c.get("/api/selection?s=" + tok)[1]["scores"]["HV-MD-004"]
-        self.assertEqual(open_["score"], sc["score"])
-        self.assertFalse(open_.get("locked"))
-        self.assertIn("Measured audience", json.dumps(open_))               # fix batch 6: a check beside the number, not a part of it
-        self.assertIn("of the audience", json.dumps(open_))
         # the redaction itself: measured part and its lines go, free lines stay
         red = gating.redact_score({"score": 70, "tag": "Good fit", "conclusion": "x",
                                    "parts": [{"label": "Engagement", "s": 1}, {"label": "Audience (measured)", "s": 0.9},

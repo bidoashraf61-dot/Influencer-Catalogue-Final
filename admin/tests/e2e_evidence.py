@@ -378,8 +378,8 @@ class Evidence(unittest.TestCase):
             with db.connect() as conn:
                 conn.execute("UPDATE selections SET objective = 'Awareness', scores_published = NULL WHERE id = ?", (self.sel,))
             b = self.client.get("/api/selection?s=" + self.token)[1]
-            self.assertEqual(b["scores"], {}, b.get("scores"))                    # client: nothing yet
-            self.assertTrue(b.get("scores_pending"))
+            self.assertEqual(b["scores"], {}, b.get("scores"))                    # client: nothing
+            self.assertFalse(b.get("scores_pending"))                              # and no "coming soon" (owner, 2026-10-20)
             self.assertFalse(any(v.get("fit") for v in (b.get("verdicts") or {}).values()))   # no fit badge either
             self.assertEqual(b["scores_gate"], {"applies": True, "published": False, "team": False, "analysis": False})
             a = self.admin()
@@ -390,16 +390,17 @@ class Evidence(unittest.TestCase):
             s, j, _ = a.post("/api/selection/scores", {"token": self.token, "publish": True})
             self.assertEqual((s, j.get("published")), (200, True), j)
             b = self.client.get("/api/selection?s=" + self.token)[1]
-            self.assertIn("HV-MI-005", b["scores"])                                # published
+            self.assertEqual(b["scores"], {})                                      # published or not: never for a client (owner, 2026-10-20)
             self.assertFalse(b.get("scores_pending"))
             # Profile analysis gate: locked for the client until pushed on this selection, then open.
             import gating
             self.assertNotIn("HV-MI-005", gating.unlocked_set(self.mine["code_id"], ["HV-MI-005"]))
             s, j, _ = a.post("/api/selection/scores", {"token": self.token, "publish": True, "what": "analysis"})
             self.assertEqual((s, j.get("what")), (200, "analysis"), j)
-            self.assertIn("HV-MI-005", gating.unlocked_set(self.mine["code_id"], ["HV-MI-005"]))
-            self.assertTrue(gating.unlocked(self.mine["code_id"], "HV-MI-005"))
-            self.assertFalse(gating.unlocked(self.theirs["code_id"], "HV-MI-005"))    # another company: still locked
+            # Owner, 2026-10-20 (item 174): published or not, a client never gets the full analysis.
+            self.assertNotIn("HV-MI-005", gating.unlocked_set(self.mine["code_id"], ["HV-MI-005"]))
+            self.assertFalse(gating.unlocked(self.mine["code_id"], "HV-MI-005"))
+            self.assertFalse(gating.unlocked(self.theirs["code_id"], "HV-MI-005"))
             a.post("/api/selection/scores", {"token": self.token, "publish": False, "what": "analysis"})
             self.assertFalse(gating.unlocked(self.mine["code_id"], "HV-MI-005"))
         finally:
@@ -425,7 +426,7 @@ class Evidence(unittest.TestCase):
             self.assertTrue(me["as_client"]); self.assertFalse(me["staff"])
             b = boss.get("/api/selection?s=" + self.token)[1]
             self.assertEqual(b["scores"], {})                                         # as the client sees it
-            self.assertTrue(b.get("scores_pending"))
+            self.assertFalse(b.get("scores_pending"))
             self.assertFalse(b["scores_gate"]["team"])
             self.assertEqual(boss.post("/api/me/as-client", {"on": False})[0], 200)
             self.assertIn("HV-MI-005", boss.get("/api/selection?s=" + self.token)[1]["scores"])
@@ -439,7 +440,7 @@ class Evidence(unittest.TestCase):
             s, b, _ = ops.get("/api/selection?s=" + self.token)
             self.assertEqual(s, 200, b)
             self.assertEqual(b["scores"], {})
-            self.assertTrue(b.get("scores_pending"))
+            self.assertFalse(b.get("scores_pending"))
             s, j, _ = ops.post("/api/selection/status", {"token": self.token, "code": "HV-MI-005", "status": "approved"})
             self.assertEqual((s, j.get("reason")), (403, "preview"), j)                # read-only
             ops.post("/api/me/as-client", {"on": False})
