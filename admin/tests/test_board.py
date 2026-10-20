@@ -417,6 +417,59 @@ class Board(unittest.TestCase):
         self.assertEqual(len(bells(u_kam["id"])), 2)
         self.assertEqual(self.boss.get("/api/board")[1]["me"], BOSS)
 
+    def test_12_client_logo_reaches_every_viewer(self):
+        """Item 214 (owner 2026-10-21): the board's HelloVoice x client logo must load for everyone who sees the card:
+        HelloVoice staff signed in to the portal, the client's KAM and the client, drafts included."""
+        import base64
+        png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+        for kid in (self.k_live, self.k_draft):
+            tok = db.campaign(kid)["token"]
+            s, b, _ = self.boss.post("/api/board/logo", {"t": tok, "data": "data:image/png;base64," + base64.b64encode(png).decode()})
+            self.assertEqual(s, 200, b)
+            for who in (self.boss, self.kam, self.lead):
+                s, b, _ = who.get("/api/board")
+                c = next(x for x in b["campaigns"] if x["token"] == tok)
+                self.assertTrue(c["logos"], c)
+                s, body, r = who.get(c["logos"][0])
+                self.assertEqual(s, 200, (who.jar, c["logos"][0]))
+                self.assertTrue(r.headers.get("Content-Type", "").startswith("image/"))
+        # a stranger never gets it
+        self.assertEqual(self.rival.get(c["logos"][0])[0], 404)
+        self.assertEqual(base.Client(self.base).get(c["logos"][0])[0], 404)
+
+    def test_13_client_name_for_the_card(self):
+        """Item 214: an access-code label or our own name is never shown as the client."""
+        self.assertEqual(board.clean_client("Client: someone@blueholding.co.uk"), "")
+        self.assertEqual(board.clean_client("Blueholding"), "")
+        self.assertEqual(board.clean_client(" Arac "), "Arac")
+        kid = db.create_campaign("Junk client camp", client="Client: lead@polyco.com", code_id=self.u_lead["code_id"])
+        co = board._account_company(self.u_lead["code_id"])
+        self.assertEqual(board.client_of(db.campaign(kid)), co)                # the owning account's company
+        kid2 = db.create_campaign("Ours", client="HelloVoice (demo)", code_id=self.u_lead["code_id"])
+        self.assertEqual(board.client_of(db.campaign(kid2)), "HelloVoice")
+        s, b, _ = self.lead.get("/api/board")
+        c = next(x for x in b["campaigns"] if x["name"] == "Junk client camp")
+        self.assertNotIn("@", c["client"])
+
+    def test_14_activity_panel_history(self):
+        """Item 219: the card's Activity panel reads the full history, for whoever sees the card only."""
+        tok = db.campaign(self.k_short)["token"]
+        for i in range(5):
+            self.boss.post("/api/board/edit", {"t": tok, "next": "Step %d" % i})
+        s, b, _ = self.lead.get("/api/board/activity?t=" + tok)
+        self.assertEqual(s, 200, b)
+        self.assertGreaterEqual(len(b["items"]), 5)                              # more than the card's old last 3
+        self.assertTrue(all(set(x) == {"at", "who", "what"} for x in b["items"]))
+        self.assertNotIn("@", json.dumps(b["items"]))
+        self.assertEqual(self.rival.get("/api/board/activity?t=" + tok)[0], 404)
+        self.assertEqual(base.Client(self.base).get("/api/board/activity?t=" + tok)[0], 401)
+        stok = db.selection(self.s_more)["token"]
+        self.lead.post("/api/board/selection-stage", {"s": stok, "to": "review"})
+        for who, want in ((self.lead, 200), (self.mate, 200), (self.kam, 200), (self.boss, 200), (self.rival, 404)):
+            s, b, _ = who.get("/api/board/activity?s=" + stok)
+            self.assertEqual(s, want, ([n for n in ("lead","mate","kam","boss","rival") if getattr(self, n) is who], b))
+        self.assertIn("Second wave", self.lead.get("/api/board/activity?s=" + stok)[1]["items"][0]["what"])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)
