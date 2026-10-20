@@ -5399,7 +5399,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         plat = analysis.canon_platform(self.json_body().get("platform")) or db.platforms_of(code)[0]
         ok, why = gating.request(code_id, code, plat)
         if not ok:
-            msg = {"outside": "Add this creator to a selection to request the full analysis.",
+            msg = {"outside": "Add this creator to one of your selections first, then ask your account manager.",
                    "unlocked": "The full analysis is already open for you."}.get(why, "This can't be requested here.")
             return self.send_json(403 if why == "outside" else 400, {"ok": False, "reason": why, "message": msg}, self.cors())
         db.log("shortlist", code_id, self.client_ip(), self.headers.get("User-Agent"), "analysis request:%s:%s" % (code, plat))
@@ -5407,10 +5407,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             u = portal.user_for_code(code_id)
             sels = gating.selections_with(code_id, code)
             import notify
-            notify.send("analysis", ["%s asked for the full analysis of %s (%s)." % (
-                ((u["name"] or u["email"]) + ", " + (u["company"] or "")) if u else "An access-code client", c["name"], code),
+            # Owner, 2026-10-20: the creator page's button is now "Ask your account manager about this
+            # creator" (clients never get the full analysis); the KAM is told exactly as before.
+            notify.send("analysis", ["%s asked their account manager about %s (%s)." % (
+                ((u["name"] or u["email"]) + ", " + (u["company"] or "")) if u else "A client", c["name"], code),
                 "In: %s" % ", ".join(x["name"] for x in sels[:3]),
-                "Promised within 1 working day. Fulfil it on the Creator analysis page."],
+                "Reply to them directly. The full profile analysis is not shown to clients."],
                 kam=u["kam"] if u is not None else None)
         return self.send_json(200, {"ok": True, "gate": gating.state(code_id, code)}, self.cors())
 

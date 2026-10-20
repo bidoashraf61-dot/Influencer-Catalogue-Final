@@ -215,6 +215,8 @@ def fulfil(request_id, who="", conn=None):
 
 
 def _ring(conn, code_id, code):
+    if not CLIENTS_SEE_ANALYSIS:
+        return                       # nothing opens for the client, so no "Full analysis ready" bell
     import inbox
     c = conn.execute("SELECT name FROM creators WHERE code = ?", (code,)).fetchone()
     name = (c["name"] if c else code) or code

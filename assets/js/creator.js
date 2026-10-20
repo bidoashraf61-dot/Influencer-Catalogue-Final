@@ -388,19 +388,22 @@
     box.id = "pp-gate-band";
     box.setAttribute("aria-live", "polite");
     var sels = (g.selections || []).map(function (x) { return x.name; });
+    // Owner, 2026-10-20 (round 3): clients and KAMs never get the full profile analysis, so the
+    // band no longer promises one. It asks the account manager about this creator instead; the
+    // request still reaches the KAM exactly as the old "Request full analysis" did.
+    var ASK = "Ask your account manager about this creator";
     var st = {
-      locked: ["lock", "Full analysis", "Popular posts, real and fake followers, growth, content performance, brand affinity and the audience by country, city, age and gender. <b>Free</b> for creators in your selections" +
-        (sels.length ? " (this one is in <b>" + esc(sels[0]) + "</b>)" : "") + ", ready <b>within 1 working day</b>.",
-        '<button type="button" class="pp-gbtn" id="pp-ask-full">' + hvi("lock") + "Request full analysis</button>"],
-      requested: ["clock", "Analysis requested", "You asked on <b>" + esc(when(g.requested_at)) + "</b>. It will be ready by <b>" + esc(whenLong(g.ready_by)) +
-        "</b>, within 1 working day. Helvi rings your bell when it opens.", '<button type="button" class="pp-gbtn" disabled>' + hvi("clock") + "Requested</button>"],
-      outside: ["lock", "Full analysis", "Add this creator to a selection to request the full analysis. It's free, and ready within 1 working day.",
-        '<button type="button" class="pp-gbtn is-off" aria-disabled="true" title="Add this creator to a selection to request the full analysis.">' + hvi("lock") + "Request full analysis</button>"],
+      locked: ["chat", "Questions about " + esc(c.name) + "?", "Your account manager knows this creator's audience, past brand work and rates" +
+        (sels.length ? " (they are in <b>" + esc(sels[0]) + "</b>)" : "") + ". Ask, and they will get back to you.",
+        '<button type="button" class="pp-gbtn" id="pp-ask-full">' + hvi("chat") + ASK + "</button>"],
+      requested: ["chat", "Your account manager has your question", "You asked about " + esc(c.name) + " on <b>" + esc(when(g.requested_at)) +
+        "</b>. Your account manager will get back to you.", '<button type="button" class="pp-gbtn" disabled>' + hvi("chat") + "Asked</button>"],
+      outside: ["chat", "Questions about " + esc(c.name) + "?", "Add this creator to one of your selections, then ask your account manager about them.",
+        '<button type="button" class="pp-gbtn is-off" aria-disabled="true" title="Add this creator to a selection first.">' + hvi("chat") + ASK + "</button>"],
       unlocked: ["unlock", "Full analysis ready", (g.granted_at ? "Opened <b>" + esc(when(g.granted_at)) + "</b> for your team. " : "") +
         "Every section is live: audience, authenticity, content and brand history, and the PDF.", '<button type="button" class="pp-gbtn" id="pp-view-full">' + hvi("unlock") + "View full analysis</button>"]
     }[g.state] || ["lock", "Full analysis", "", ""];
-    box.innerHTML = '<span class="pp-req__lock">' + hvi(st[0]) + '</span><div><h2 class="pp-req__h">' + st[1] + "</h2><p>" + st[2] + '</p><p class="pp-req__err" role="alert" hidden></p></div><div class="pp-req__side">' + st[3] + "</div>" +
-      (g.state === "requested" ? '<div class="pp-req__track"><span class="on">Requested · ' + esc(when(g.requested_at)) + '</span><span class="now">Being prepared</span><span>Ready by ' + esc(when(g.ready_by)) + "</span></div>" : "");
+    box.innerHTML = '<span class="pp-req__lock">' + hvi(st[0]) + '</span><div><h2 class="pp-req__h">' + st[1] + "</h2><p>" + st[2] + '</p><p class="pp-req__err" role="alert" hidden></p></div><div class="pp-req__side">' + st[3] + "</div>";
     // General rule (owner, 2026-10-15): every profile-analysis page can preview the FULL analysis with sample
     // data, in every state, even when this creator's own analysis is open or only partly filled.
     box.querySelector(".pp-req__side").appendChild(sampleButton());
@@ -507,7 +510,7 @@
      sharp; the contents are blurred and inert under one chip per section. */
   var LOCKED = null;                      // the gate, while the page shows sample data
   var LOCK_BODIES = ["pp-posts", "pp-real", "pp-perf", "pp-net", "pp-aud", "pp-tags"];
-  function veilText(g) { return g.state === "requested" ? hvi("clock") + "Being prepared" : hvi("lock") + "Locked"; }
+  function veilText() { return hvi("lock") + "Locked"; }
   function lockBody(el) {
     if (!LOCKED || !el || el.querySelector(":scope > .pp-lk__veil")) return;
     (function blur(node) {
