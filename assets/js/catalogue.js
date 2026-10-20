@@ -2240,7 +2240,7 @@
                         owner: b.owner || "", kam: b.kam || "", credits: b.credits, lifecycle: b.lifecycle || null,
                         canRename: !!b.can_rename,   // item 173: owner, its KAM, HelloVoice
                         // 0 while AI is free (active campaign); null only on an old server.
-                        replaceCost: b.replace_cost != null ? b.replace_cost : 2, moreCost: b.more_cost != null ? b.more_cost : 3,
+                        replaceCost: b.replace_cost != null ? b.replace_cost : 2,
                         alikeCost: b.alike_cost != null ? b.alike_cost : 2, aiFree: b.ai_free || null,
                         // No campaign objective yet: nothing is scored, the page asks for it.
                         needsObjective: !!b.needs_objective,
@@ -3729,7 +3729,12 @@
     all(".cat-back, .cat-tray__edit, .cat-close__actions a[href='../'], .cat-close__actions a[href='/']")
       .forEach(function (a) {
         a.href = new URL("../", location.href).href + carry;
-        if (a.classList.contains("cat-btn")) a.textContent = "Add more creators";
+        // On a saved selection, "Add creators with AI" in the header is the one way to add (item 178,
+        // Bido 2026-10-20): the footer's "Add more creators" is retired there. Unsaved lists keep it.
+        if (a.classList.contains("cat-btn")) {
+          if (CURATED && CURATED.token) a.hidden = true;
+          else a.textContent = "Add more creators";
+        }
       });
 
     // A colleague on the same company can view a selection but not ask for its quote: that is the

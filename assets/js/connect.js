@@ -11,7 +11,7 @@
  *    and the client's selection, the Selection quality, the gap in words and up to three ranked
  *    "Ways to improve". Results are RANGES. No budget, no cost per result, no market verdict,
  *    never a creator or HelloVoice price.
- *  - AI on selections: "Add more like these" and "Creators like this".
+ *  - AI on selections: "Creators like this" ("Add more like these" retired for item 178).
  *
  * Needs portal.js (window.hvPortal: h, api, icon, clip). Everything the server or
  * the client sends is put on the page as text, never as HTML.
@@ -844,12 +844,7 @@
         }
         return;
       }
-      if (!grid) return;
-      var tries = 0;
-      (function place() {
-        if (!document.getElementById("sel-statusbar") && tries++ < 30) { setTimeout(place, 150); return; }
-        grid.parentNode.insertBefore(moreCard(S), grid);
-      })();
+      // "Add more like these" was retired for "Add creators with AI" in the header (item 178, Bido 2026-10-20).
     }
     // What a colleague sees where the owner's AI card sits.
     function viewerNote(S) {
@@ -870,72 +865,6 @@
       var card = h("div", { class: "cx-viewer" }, h("div", { class: "cx-viewer__tx" }, h("h2", null, "Viewing a colleague’s selection"), msg, note), go);
       return h("section", { class: "cx-moresec", id: "cx-viewer" }, h("div", { class: "cat-pad" }, h("div", { class: "cat-container" }, card)));
     }
-    function moreCard(S) {
-      var cur = S.curated() || {};
-      var sec = h("section", { class: "cx-moresec", id: "cx-more", "aria-labelledby": "cx-more-t" });
-      var inner = h("div", { class: "cat-pad" });
-      var cont = h("div", { class: "cat-container" });
-      var card = h("div", { class: "cx-more" });
-      var count = 5, chips = {};
-      var approved = S.codes().filter(function (c) { return S.status(c).s === "approved"; });
-      var from = h("div", { class: "cx-more__from" });
-      approved.slice(0, 5).forEach(function (c) { var cr = S.creator(c); from.appendChild(h("span", { class: "cx-ph" }, initials(cr ? cr.name : c))); });
-      from.appendChild(h("span", null, approved.length ? "Based on your " + approved.length + " approved creator" + (approved.length === 1 ? "" : "s") : "Approve a few creators first, so Helvi knows what you like"));
-      // Helvi on his lime disc (fix batch 4), the AI shortlist card's clips: an easy loop at rest,
-      // a thumbs-up when a quick pick is tapped, the camera scan while he works, a cheer when the
-      // creators land.
-      var face = HV.lime ? HV.lime("loop", "cx-more__face") : clip("idle");
-      card.appendChild(face);
-      card.appendChild(h("div", null, h("h2", { id: "cx-more-t" }, "Add more like these", costTag(cur.moreCost)),
-        h("p", null, "Helvi studies the creators you approved, their audience, tone and platforms, and adds more that match to ", h("b", null, "Under review"), " for you to decide."), from));
-      var note = h("input", { class: "cx-briefin", type: "text", maxlength: "160", placeholder: "Anything to add? e.g. Jeddah-based, Arabic-first", "aria-label": "Anything to add for Helvi" });
-      var quick = h("div", { class: "cx-quick", role: "group", "aria-label": "Quick picks" });
-      [["doctors", "More doctors"], ["tiktok", "TikTok first"], ["under100k", "Under 100K followers"], ["women2534", "Women 25–34"]].forEach(function (c) {
-        var b = h("button", { type: "button", "aria-pressed": "false" }, c[1]);
-        b.addEventListener("click", function () {
-          chips[c[0]] = !chips[c[0]]; b.setAttribute("aria-pressed", String(!!chips[c[0]]));
-          if (chips[c[0]] && face.react && !card.classList.contains("is-cooking")) face.react("thumbs", "loop");
-        });
-        quick.appendChild(b);
-      });
-      var out = h("output", { "aria-live": "polite" }, "5");
-      var go = h("button", { class: "cx-btn", type: "button", html: ic("sparkle") + "<span>Add 5 creators</span>" });
-      function setN(d) { count = Math.max(1, Math.min(10, count + d)); out.textContent = String(count); go.lastChild.textContent = "Add " + count + " creator" + (count === 1 ? "" : "s"); }
-      var cnt = h("div", { class: "cx-cnt" }, h("button", { type: "button", "aria-label": "Fewer", html: ic("minus"), onclick: function () { setN(-1); } }), out,
-        h("button", { type: "button", "aria-label": "More", html: ic("plus"), onclick: function () { setN(1); } }));
-      var msg = h("p", { class: "cx-more__msg", role: "status" });
-      card.appendChild(h("div", { class: "cx-more__form" }, note, quick, h("div", { class: "cx-more__go" }, cnt, go)));
-      card.appendChild(msg);
-      go.addEventListener("click", function () {
-        go.disabled = true; msg.textContent = "";
-        // While Helvi works: the director's desk (thinking -> cards -> approve) and the step line.
-        var seeds = S.codes().filter(function (c) { return S.status(c).s === "approved"; }).length;
-        if (face.loop) face.loop("scan");
-        var cook = HV.cooking ? HV.cooking({ dark: true, list: true, helvy: !face.loop, title: "Helvi is finding " + count + " more",
-          steps: ["Studying your " + (seeds || "") + " approved creator" + (seeds === 1 ? "" : "s") + "…", "Reading their audience and tone…",
-                  "Flipping through the roster…", "Scoring each match…", "Adding the best " + count + " to Under review…"] }) : null;
-        if (cook) { card.classList.add("is-cooking"); card.appendChild(cook); cook.scrollIntoView({ block: "center", behavior: HV.reduce ? "auto" : "smooth" }); }
-        api("POST", "/api/selection/more", { token: S.token(), note: note.value, count: count,
-                                              chips: Object.keys(chips).filter(function (k) { return chips[k]; }) }).then(function (r) {
-          var ok = r.b && r.b.ok && (r.b.added || []).length;
-          return (cook && ok && cook.finish ? cook.finish() : Promise.resolve()).then(function () { return r; });
-        }).then(function (r) {
-          go.disabled = false;
-          if (cook) { cook.stop(); cook.remove(); card.classList.remove("is-cooking"); }
-          if (!r.b || !r.b.ok) { if (face.loop) face.loop("think"); msg.textContent = (r.b && r.b.message) || "Helvi couldn’t look just now. Please try again."; return; }
-          var codes = (r.b.added || []).map(function (c) { return c.code; });
-          if (!codes.length) { if (face.loop) face.loop("think"); msg.textContent = r.b.message || "Helvi found no one close enough."; return; }
-          if (face.react) face.react("cheer", "loop");
-          S.add(codes);
-          if (r.b.credits != null && HV.setCredits) HV.setCredits(r.b.credits);
-          msg.textContent = "Added " + codes.length + " creator" + (codes.length === 1 ? "" : "s") + " to Under review" + (r.b.spent ? " · " + r.b.spent + " credits used." : ".");
-          toast(msg.textContent);
-        });
-      });
-      cont.appendChild(card); inner.appendChild(cont); sec.appendChild(inner);
-      return sec;
-    }
-
     /* -- One side panel for Helvi's suggestions on a selection: "Creators like this" and, since
        fix batch 3, "Find a replacement" (which used to open a cramped list inside the rejected
        card). Photo, name, tier, followers, platform, city, why, View profile, Add. Added creators

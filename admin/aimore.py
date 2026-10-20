@@ -1,15 +1,17 @@
-"""AI on a selection (HELVi Connect, phase D): "Add more like these" and "Creators like this".
+"""AI on a selection (HELVi Connect, phase D): "Creators like this".
 
-Both stand on what already exists: discover.like() (who a creator resembles: topics,
+"Add more like these" (more(), /api/selection/more) was retired on 2026-10-20 for item 178,
+"Add creators with AI" (aiadd.py). Its table selection_more stays for the history it holds.
+
+It stands on what already exists: discover.like() (who a creator resembles: topics,
 size, place, platforms and, where both are measured, audience) and the matcher's
 scoring against the selection's own brief. Nothing here decides prices or reads a
 creator's fee, and the reasons quote only what a client already sees on a card
 (size, city, platforms, interests), never locked analysis figures.
 
-    more(sel, objective, target, note, chips, count)   creators to add, best first, with reasons
     alike(sel, code, again)                            three creators like one card (kept, so reopening is free)
 
-Costs (portal.costs): more 3, alike 2; free during an active campaign (portal.charge).
+Costs (portal.costs): alike 2; free during an active campaign (portal.charge).
 """
 import json
 import re
@@ -17,13 +19,6 @@ import re
 import db
 import discover
 
-QUICK = {  # chip id -> label, as the card shows them
-    "doctors": "More doctors",
-    "tiktok": "TikTok first",
-    "under100k": "Under 100K followers",
-    "women2534": "Women 25–34",
-}
-MAX_COUNT = 10
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS selection_alike (
@@ -90,88 +85,6 @@ def reason(pick, seed):
         return "Close to %s in content and audience." % (seed["name"] or seed["code"])
     text = "; ".join(bits[:3])
     return text[:1].upper() + text[1:] + "."
-
-
-def _seeds(sel):
-    import selstatus
-    codes = json.loads(sel["codes"] or "[]")
-    st = selstatus.of(sel["id"])
-    approved = [c for c in codes if (st.get(c) or {}).get("s") == "approved"]
-    rejected = {c for c in codes if (st.get(c) or {}).get("s") in ("rejected", "unavailable")}
-    seeds = approved or [c for c in codes if c not in rejected]
-    return seeds, set(codes), rejected
-
-
-def _read_note(note):
-    """The client's few extra words, read for free: cities and the brief keywords the matcher knows."""
-    import matcher
-    t = " " + " ".join(str(note or "").lower().split()) + " "
-    cities = [city for city, words in discover._CITY_WORDS.items() if any(w in t for w in words)]
-    answers, _ = matcher.guess(note or "")
-    return cities, answers
-
-
-def more(sel, objective, target, note="", chips=(), count=5):
-    """Creators to add to ``sel``: like its approved creators, fitting its brief and the extra
-    words. Returns ``(picks, error)``; picks are ``[{code, why}]``."""
-    import matcher
-    seeds, inside, rejected = _seeds(sel)
-    if not seeds:
-        return [], "no_seeds"
-    count = max(1, min(int(count or 5), MAX_COUNT))
-    chips = [c for c in (chips or []) if c in QUICK]
-    roster = {c["code"]: c for c in db.list_creators(active_only=True)}
-    like_score, best_seed = {}, {}
-    for s in seeds[:12]:
-        for rank, code in enumerate(discover.like(s, limit=60)):
-            if code in inside or code in rejected or code not in roster:
-                continue
-            pts = 60 - rank
-            like_score[code] = like_score.get(code, 0) + pts
-            if pts > best_seed.get(code, (0, None))[0]:
-                best_seed[code] = (pts, s)
-    if not like_score:
-        return [], "none"
-    cities, ans = _read_note(note)
-    brief_target = dict(target or {})
-    if ans.get("market"):
-        brief_target["country"] = "|".join(ans["market"]) if isinstance(ans["market"], list) else ans["market"]
-    if ans.get("gender"):
-        brief_target["gender"] = ans["gender"] if isinstance(ans["gender"], str) else "Any"
-    if ans.get("category"):
-        brief_target["category"] = "|".join(ans["category"])
-    if "women2534" in chips:
-        brief_target["gender"], brief_target["age"] = "Women", "25-34"
-    plats = ["TikTok"] if "tiktok" in chips else [p for p in (ans.get("platforms") or []) if p in matcher.PLATFORMS]
-    pool = set(like_score)
-    if "under100k" in chips:
-        pool = {c for c in pool if (roster[c]["followers"] or 0) < 100000}
-    if "doctors" in chips:
-        docs = {c for c in pool if _hcp(roster[c])}
-        pool = docs or pool
-    if cities:
-        near = {c for c in pool if any(x.lower() in str(roster[c]["city"] or "").lower() for x in cities)}
-        pool = near or pool
-    try:
-        scored = matcher.score_all({"objective": objective, "target": brief_target, "platforms": plats}, exclude=inside | rejected, only=pool)
-    except Exception:
-        scored = []
-    top_like = max(like_score.values()) or 1
-    fit_of = {i["code"]: i["rank_score"] for i in scored}
-    if plats:
-        pool = {c for c in pool if c in fit_of} or pool
-    ranked = sorted(pool, key=lambda c: -(0.55 * like_score[c] / top_like + 0.45 * (fit_of.get(c, 40) / 100.0)))
-    picks = []
-    for code in ranked[:count]:
-        seed = roster.get(best_seed.get(code, (0, seeds[0]))[1]) or roster.get(seeds[0])
-        picks.append({"code": code, "why": reason(roster[code], seed) if seed is not None else ""})
-    return picks, None
-
-
-def record_more(sel, code_id, note, chips, codes):
-    with db.connect() as conn:
-        conn.execute("INSERT INTO selection_more (selection_id, code_id, note, chips, added, at) VALUES (?,?,?,?,?,?)",
-                     (sel["id"], code_id, " ".join(str(note or "").split())[:200], json.dumps(list(chips or [])), json.dumps(codes), db.now()))
 
 
 def kept(sel_id, code):

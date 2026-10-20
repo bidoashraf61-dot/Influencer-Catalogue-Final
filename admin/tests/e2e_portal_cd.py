@@ -188,32 +188,14 @@ class CD(unittest.TestCase):
         self.assertEqual(o.get("/api/roi/vs")[1]["items"], [])
 
     # ------------------------------------------------------- AI on selections --
-    def test_05_add_more_like_these_and_creators_like_this(self):
+    def test_05_more_like_these_retired_and_creators_like_this(self):
         c, _ = self.signup("more@astra-test.com")
         u = portal.user_by_email("more@astra-test.com")
-        # every creator rejected: nothing to learn from, nothing charged
-        t0 = self.sel(c, "Nope", ["HV-MI-005"])
-        c.post("/api/selection/status", {"token": t0, "code": "HV-MI-005", "status": "rejected"})
-        bal = portal.balance(u["code_id"])
-        r = c.post("/api/selection/more", {"token": t0, "count": 2})[1]
-        self.assertEqual((r["added"], portal.balance(u["code_id"])), ([], bal))
-        self.assertIn("Approve a few creators", r["message"])
+        # "Add more like these" is retired (item 178): its route is gone
         tok = self.sel(c, "Skin", ["HV-MI-001", "HV-MD-004"])
         self.approve(c, tok, "HV-MI-001")
-        bal = portal.balance(u["code_id"])
-        s, r, _ = c.post("/api/selection/more", {"token": tok, "count": 2, "note": "Riyadh-based", "chips": ["under100k", "nope"]})
-        self.assertEqual(s, 200, r)
-        if r["added"]:
-            self.assertEqual(r["spent"], 3)
-            self.assertEqual(portal.balance(u["code_id"]), bal - 3)
-            added = [x["code"] for x in r["added"]]
-            sel = db.selection(token=tok)
-            self.assertTrue(set(added) <= set(json.loads(sel["codes"])))
-            st = selstatus.of(sel["id"])
-            self.assertTrue(all(st.get(a, {"s": "review"})["s"] == "review" for a in added))   # they arrive Under review
-            self.assertTrue(all(x["why"] for x in r["added"]))
-        else:
-            self.assertEqual(portal.balance(u["code_id"]), bal)                    # refunded when nobody fits
+        s, r, _ = c.post("/api/selection/more", {"token": tok, "count": 2})
+        self.assertNotEqual(s, 200, r)                                   # unknown route: the admin's sign-in redirect
         # Creators like this: 2 credits, reopening is free, "again" costs again
         bal = portal.balance(u["code_id"])
         r = c.post("/api/selection/alike", {"token": tok, "code": "HV-MI-001"})[1]
@@ -225,8 +207,8 @@ class CD(unittest.TestCase):
             self.assertEqual([x["code"] for x in r2["creators"]], [x["code"] for x in r["creators"]])
         # a colleague (same domain) can look but not add
         col, _ = self.signup("col@astra-test.com")
-        s, b, _ = col.post("/api/selection/more", {"token": tok})
-        self.assertEqual((s, b["reason"]), (403, "not_owner"))
+        s, b, _ = col.post("/api/selection/alike", {"token": tok, "code": "HV-MI-001"})
+        self.assertIn(s, (403, 404))
         # free during an active campaign
         k = db.create_campaign("Live one", "Astra", u["code_id"])
         db.save_campaign(k, status="live", starts_at=db.now() - DAY, ends_at=db.now() + DAY)
@@ -236,7 +218,8 @@ class CD(unittest.TestCase):
         p = c.get("/api/selection?s=" + tok)
         payload = p[1] if isinstance(p[1], dict) else {}
         if payload.get("ok"):
-            self.assertEqual((payload["more_cost"], payload["alike_cost"], payload["replace_cost"]), (0, 0, 0))
+            self.assertEqual((payload["alike_cost"], payload["replace_cost"]), (0, 0))
+        self.assertNotIn("more_cost", payload)                           # "Add more like these" is retired
 
     # ------------------------------------------------------------------ Helvi --
     def test_06_helvy_knowledge_and_no_prices(self):

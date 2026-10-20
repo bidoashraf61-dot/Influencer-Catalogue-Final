@@ -160,8 +160,7 @@ class Fixes3Gating(unittest.TestCase):
         tok = self.selection(c, "Alike", ["HV-MI-001", "HV-MD-004"])
         c.post("/api/selection/status", {"token": tok, "code": "HV-MI-001", "status": "approved"})
         roster_keys = set(c.get("/api/roster")[1]["roster"][0])
-        for path, body, key in (("/api/selection/alike", {"token": tok, "code": "HV-MD-004"}, "creators"),
-                                ("/api/selection/more", {"token": tok, "count": 3}, "added")):
+        for path, body, key in (("/api/selection/alike", {"token": tok, "code": "HV-MD-004"}, "creators"),):
             s, r, _ = c.post(path, body)
             self.assertEqual(s, 200, r)
             self.clean(r, path)
@@ -172,7 +171,7 @@ class Fixes3Gating(unittest.TestCase):
         self.assertEqual(s, 200, r)
         self.clean(r, "/api/selection/replace")
         for item in r["replacements"]:
-            self.assertTrue(set(item) <= roster_keys)
+            self.assertTrue(set(item) - roster_keys <= {"why"}, set(item) - roster_keys)   # card fields + a card-only reason
         # the AI shortlist: picks keep score, stamp and the free evidence
         s, r, _ = c.post("/api/brief/run", {"answers": dict(ANSWERS, count="5")})
         self.assertEqual(s, 200, r)
