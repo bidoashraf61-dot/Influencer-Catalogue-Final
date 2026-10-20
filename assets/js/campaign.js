@@ -82,33 +82,17 @@
 
   /* ---------------------------------------------------------------- gate */
 
-  var REFUSALS = { revoked: "This code has been withdrawn.", expired: "This code has expired.",
-    exhausted: "This code has been used up.", devices: "This code is already open on its maximum number of devices.",
-    otherlink: "That code is for a different campaign. Use the code that came with this link.",
-    unknown: "That code is not right." };
-
-  function lock(msg) {
-    $("cat-app").hidden = true; $("cat-gate").hidden = false;
+  // Not signed in (401): the gate, which portal.js turns into the email sign-in. There is no
+  // access-code form (item 181); after signing in the page reloads on the same link (#t=...), so a
+  // shared campaign link opens its report, or says it is not available to that account.
+  function lock() {
+    var gate = $("cat-gate");
+    $("cat-app").hidden = true; gate.hidden = false;
     document.body.classList.add("cat-locked");
-    if (msg) { $("cat-gate-error").textContent = msg; $("cat-gate-error").hidden = false; }
-    setTimeout(function () { $("cat-code").focus(); }, 50);
+    if (!gate.classList.contains("cx-gate")) document.body.classList.add("cat-checking");
+    try { document.dispatchEvent(new CustomEvent("cat:locked")); } catch (e) { /* old browser */ }
   }
-  function unlocked() { $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked"); }
-
-  $("cat-gate-form").addEventListener("submit", function (e) {
-    e.preventDefault();
-    var btn = this.querySelector("button");
-    btn.disabled = true; $("cat-gate-error").hidden = true;
-    fetch(API + "/api/unlock", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: $("cat-code").value.trim(), lite: true, link: token() ? "c:" + token() : "c:list" }) })
-      .then(function (r) { return r.json(); })
-      .then(function (b) {
-        if (!b || !b.ok) { lock(REFUSALS[b && b.reason] || REFUSALS.unknown); return; }
-        $("cat-code").value = ""; route();
-      })
-      .catch(function () { lock("Could not reach the server. Please try again."); })
-      .then(function () { btn.disabled = false; });
-  });
+  function unlocked() { $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked", "cat-checking"); }
 
   /* -------------------------------------------------------------- routing */
 
@@ -520,7 +504,8 @@
       }).catch(function () {});
     }).catch(function (err) {
       if (err && err.locked) return lock();
-      unlocked(); empty("This report is not available with your access code.");
+      unlocked(); empty(err && err.status === 404 ? "This report is not available to the account signed in here."
+        : "Could not load this report. Please try again in a moment.");
     });
   }
   window.addEventListener("hashchange", route);

@@ -31,20 +31,13 @@
 <script src="../assets/js/app.js" defer></script>
 <!-- /HELVi Connect app -->
 </head>
-<body class="cat-locked" data-page="selection">
+<body class="cat-locked cat-checking" data-page="selection">
 
 <div class="cat-gate" id="cat-gate">
   <div class="cat-gate__inner">
     <img class="cat-gate__logo" src="../assets/brand/logo-knockout.webp" alt="HelloVoice"/>
-    <p class="cat-gate__eyebrow">Confidential</p>
-    <h1 class="cat-gate__title">Selection</h1>
-    <p class="cat-gate__note">Enter the access code you were given.</p>
-    <form class="cat-gate__form" id="cat-gate-form" autocomplete="off">
-      <input type="password" id="cat-code" class="cat-gate__input" placeholder="Access code"
-             aria-label="Access code" autocomplete="off" spellcheck="false"/>
-      <button type="submit" class="cat-btn cat-btn--lime">Unlock</button>
-    </form>
-    <p class="cat-gate__error" id="cat-gate-error" role="alert" hidden>That code is not right.</p>
+    <!-- No access-code form (item 181): portal.js draws the email sign-in here. -->
+    <p class="cat-gate__note" id="cat-gate-note" role="status" hidden></p>
   </div>
 </div>
 
@@ -180,7 +173,6 @@
 
 <script>
   window.CATALOGUE_CONFIG = {
-    passHash: "760b5281",
     endpoint: "https://formsubmit.co/ajax/info@hellovoice.co.uk",
     api: "/admin",
     tierPrice: {"Nano": [435, 870], "Micro": [870, 1740], "Mid-Tier": [1450, 2900], "Macro": [2175, 4350]},

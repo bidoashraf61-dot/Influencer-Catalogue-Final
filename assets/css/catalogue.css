@@ -1039,6 +1039,10 @@ body[data-page="selection"] .cat-card__check { display: none; }
   animation: cat-breathe 1.4s ease-in-out infinite;
 }
 @keyframes cat-breathe { 50% { opacity: .35; } }
+/* Item 181: the gate never holds a code form; this line only says the sign-in or the server could
+   not be reached, with a Try again button. */
+.cat-gate__retry { margin-top: 20px; }
+.cat-loadfail { display: grid; justify-items: center; gap: 16px; grid-column: 1 / -1; padding: 48px 0; text-align: center; }
 
 @media screen and (max-width: 767px) {
   .cat-controls { padding: 32px 0 24px; }

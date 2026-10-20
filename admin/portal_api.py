@@ -238,8 +238,8 @@ class PortalMixin(connect_api.ConnectMixin):
         if path == "/api/me":
             cid, user, kind = self._identity()
             if cid is None:
-                # email_signin: only offer the email gate once mail can actually be sent,
-                # so clients with an access code never see a sign-in that cannot work yet.
+                # email_signin: whether mail can be sent. Pages no longer wait for it: the gate is
+                # always the email sign-in, never an access-code form (item 181, 2026-10-20).
                 self.send_json(200, {"ok": True, "signed_in": False, "ai": gemini.configured(),
                                      "signup": portal.signup_mode(),
                                      "email_signin": mailer.configured(),

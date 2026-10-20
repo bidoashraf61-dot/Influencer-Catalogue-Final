@@ -60,23 +60,15 @@
   function code() { var m = /(?:^|[#&])c=([A-Za-z0-9-]+)/.exec(location.hash || ""); return m ? decodeURIComponent(m[1]).toUpperCase() : ""; }
 
   /* gate */
-  var REFUSALS = { revoked: "This code has been withdrawn.", expired: "This code has expired.", exhausted: "This code has been used up.",
-    devices: "This code is already open on its maximum number of devices.", unknown: "That code is not right." };
-  function lock(msg) {
-    $("cat-app").hidden = true; $("cat-gate").hidden = false; document.body.classList.add("cat-locked");
-    if (msg) { $("cat-gate-error").textContent = msg; $("cat-gate-error").hidden = false; }
+  // Not signed in (401): the gate, which portal.js turns into the email sign-in. No access-code
+  // form any more (item 181).
+  function lock() {
+    var gate = $("cat-gate");
+    $("cat-app").hidden = true; gate.hidden = false; document.body.classList.add("cat-locked");
+    if (!gate.classList.contains("cx-gate")) document.body.classList.add("cat-checking");
+    try { document.dispatchEvent(new CustomEvent("cat:locked")); } catch (e) { /* old browser */ }
   }
-  function unlocked() { $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked"); }
-  $("cat-gate-form").addEventListener("submit", function (e) {
-    e.preventDefault();
-    var btn = this.querySelector("button"); btn.disabled = true;
-    fetch(API + "/api/unlock", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: $("cat-code").value.trim(), lite: true }) })
-      .then(function (r) { return r.json(); })
-      .then(function (b) { if (!b || !b.ok) lock(REFUSALS[b && b.reason] || REFUSALS.unknown); else { $("cat-code").value = ""; load(); } })
-      .catch(function () { lock("Could not reach the server. Please try again."); })
-      .then(function () { btn.disabled = false; });
-  });
+  function unlocked() { $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked", "cat-checking"); }
   if (document.referrer && document.referrer.indexOf(location.origin) === 0) {
     $("pp-back").addEventListener("click", function (e) { e.preventDefault(); history.back(); });
   }
@@ -100,7 +92,7 @@
     fetch(API + "/api/creator?c=" + encodeURIComponent(c), { credentials: "include", cache: "no-store" })
       .then(function (r) {
         if (r.status === 401) { lock(); return null; }
-        if (!r.ok) { unlocked(); $("pp-empty").textContent = "That creator is not in the catalogue."; $("pp-empty").hidden = false; return null; }
+        if (!r.ok) { unlocked(); $("pp-empty").textContent = r.status === 404 ? "That creator is not in the catalogue." : "Could not load this creator. Please try again."; $("pp-empty").hidden = false; return null; }
         return r.json();
       })
       .then(function (b) { if (b) { D = b; unlocked(); render(); } })

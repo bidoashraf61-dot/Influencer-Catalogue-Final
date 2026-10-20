@@ -96,7 +96,9 @@ def city_names(raw):
 # agency, not the client — the catalogue is a reusable HelloVoice asset.
 PREFIX = os.environ.get("CATALOGUE_PREFIX", "HV")
 
-PASSCODE = os.environ.get("CATALOGUE_PASSCODE", "Hellovoice123")
+# No passcode (item 181, 2026-10-20): everyone signs in with their work email (HELVi Connect).
+# The old CATALOGUE_PASSCODE / client-side hash check is gone; a build without CATALOGUE_API
+# opens only on this machine (localhost / file://) as a preview, see catalogue.js.
 # Where the quote request is POSTed. Empty string = the page shows a clear
 # "not configured yet" error instead of silently losing a submission.
 # FormSubmit relays the request to this inbox with no backend of our own.
@@ -719,22 +721,16 @@ def build():
 <script src="{stamp('/assets/js/app.js')}" defer></script>
 <!-- /HELVi Connect app -->
 </head>
-<body class="cat-locked" data-page="catalogue">
+<body class="cat-locked cat-checking" data-page="catalogue">
 
 <div class="cat-gate" id="cat-gate">
   <div class="cat-gate__inner">
     <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
          srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
          alt="HELVi Connect" width="320" height="160"/>
-    <p class="cat-gate__eyebrow">Confidential</p>
-    <h1 class="cat-gate__title">Influencer<br/>Catalogue</h1>
-    <p class="cat-gate__note">Enter the access code you were given.</p>
-    <form class="cat-gate__form" id="cat-gate-form" autocomplete="off">
-      <input type="password" id="cat-code" class="cat-gate__input" placeholder="Access code"
-             aria-label="Access code" autocomplete="off" spellcheck="false"/>
-      <button type="submit" class="cat-btn cat-btn--lime">Unlock</button>
-    </form>
-    <p class="cat-gate__error" id="cat-gate-error" role="alert" hidden>That code is not right.</p>
+    <!-- No access-code form (item 181): portal.js puts the email sign-in here. Until it has, only
+         the logo shows (cat-checking); cat-gate-note is for "could not load", never for a code. -->
+    <p class="cat-gate__note" id="cat-gate-note" role="status" hidden></p>
   </div>
 </div>
 
@@ -862,7 +858,7 @@ def build():
         <button type="submit" class="cat-btn cat-btn--lime cat-form__submit">Review selection</button>
       </form>
       <div id="cat-save-out" hidden>
-        <p class="cat-note cat-note--modal">Anyone with this link and the access code sees this selection.</p>
+        <p class="cat-note cat-note--modal">Anyone you send this link to signs in with their work email to open it.</p>
         <div class="cat-share">
           <input type="text" id="cat-share-url" class="cat-share__url" readonly aria-label="Selection link"/>
           <button type="button" class="cat-btn cat-btn--lime" id="cat-share-copy">Copy</button>
@@ -876,7 +872,6 @@ def build():
 
 <script>
   window.CATALOGUE_CONFIG = {{
-    passHash: "{simple_hash(PASSCODE)}",
     endpoint: {json.dumps(ENDPOINT)},
     api: {json.dumps(API)},
     tierPrice: {json.dumps({t: [m["from"], m["to"]] for t, m in TIERS.items()})},
@@ -935,22 +930,16 @@ def build():
 <script src="{stamp('/assets/js/app.js')}" defer></script>
 <!-- /HELVi Connect app -->
 </head>
-<body class="cat-locked" data-page="selection">
+<body class="cat-locked cat-checking" data-page="selection">
 
 <div class="cat-gate" id="cat-gate">
   <div class="cat-gate__inner">
     <img class="cat-gate__logo" src="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5"
          srcset="/assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, /assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x"
          alt="HELVi Connect" width="320" height="160"/>
-    <p class="cat-gate__eyebrow">Confidential</p>
-    <h1 class="cat-gate__title">Selection</h1>
-    <p class="cat-gate__note">Enter the access code you were given.</p>
-    <form class="cat-gate__form" id="cat-gate-form" autocomplete="off">
-      <input type="password" id="cat-code" class="cat-gate__input" placeholder="Access code"
-             aria-label="Access code" autocomplete="off" spellcheck="false"/>
-      <button type="submit" class="cat-btn cat-btn--lime">Unlock</button>
-    </form>
-    <p class="cat-gate__error" id="cat-gate-error" role="alert" hidden>That code is not right.</p>
+    <!-- No access-code form (item 181): portal.js puts the email sign-in here. Until it has, only
+         the logo shows (cat-checking); cat-gate-note is for "could not load", never for a code. -->
+    <p class="cat-gate__note" id="cat-gate-note" role="status" hidden></p>
   </div>
 </div>
 
@@ -1132,7 +1121,6 @@ def build():
 
 <script>
   window.CATALOGUE_CONFIG = {{
-    passHash: "{simple_hash(PASSCODE)}",
     endpoint: {json.dumps(ENDPOINT)},
     api: {json.dumps(API)},
     tierPrice: {json.dumps({t: [m["from"], m["to"]] for t, m in TIERS.items()})},
@@ -1159,7 +1147,7 @@ def build():
     print(f"private key    {OUT_PRIVATE.relative_to(ROOT)}")
     print(f"page           {OUT_HTML.relative_to(ROOT)}")
     print(f"selection page {OUT_SELECTION.relative_to(ROOT)}")
-    print(f"passcode       {PASSCODE if not API else '(checked by the admin service)'}")
+    print(f"sign-in        {'email (admin service)' if API else 'none: local preview only, never publish'}")
     print(f"api            {API or '(none — fully static build)'}")
     print(f"endpoint       {ENDPOINT or '(not configured — set CATALOGUE_ENDPOINT)'}")
     print(f"request email  {REQUEST_EMAIL}")
@@ -1176,16 +1164,6 @@ def build():
     else:
         print("interests      NO DATA — filter hidden. Add content/interests.json")
         print("               as {\"HV-MD-014\": \"Hair Care\"} to enable it.")
-
-
-def simple_hash(s):
-    """Small non-cryptographic hash so the passcode is not sitting in the page
-    as plain text. This is a lock on a glass door and is documented as such —
-    it stops the link being casually forwarded, nothing more."""
-    h = 5381
-    for ch in s:
-        h = ((h * 33) ^ ord(ch)) & 0xFFFFFFFF
-    return format(h, "08x")
 
 
 if __name__ == "__main__":

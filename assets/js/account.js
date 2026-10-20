@@ -1541,7 +1541,7 @@
   function load() {
     return api("GET", "/api/account").then(function (r) {
       if (r.s === 401) { closed("Please sign in", "Sign in on the catalogue to see your profile."); return; }
-      if (r.s === 403) { closed("Profiles are for signed-in clients", "You're using an access code. Your campaigns are in campaign tracking."); return; }
+      if (r.s === 403) { closed("Profiles are for signed-in clients", "You have guest access. Sign in with your work email for your own profile; your campaigns are in campaign tracking."); return; }
       if (!r.b.ok) { closed("Something went wrong", "Your profile couldn't be loaded. Please try again shortly."); return; }
       DATA = r.b;
       $("ac-loading").hidden = true;

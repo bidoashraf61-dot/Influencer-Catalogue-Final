@@ -1,4 +1,4 @@
-/* Influencer proposal catalogue — gate, filters, selection, request.
+/* Influencer proposal catalogue — sign-in check, filters, selection, request.
  *
  * On the security model, so nobody is misled later: the page now carries
  * names and exact follower counts, so the only withheld field is the @handle
@@ -83,13 +83,6 @@
   function $(id) { return document.getElementById(id); }
   function all(sel, root) { return Array.prototype.slice.call((root || document).querySelectorAll(sel)); }
 
-  // Mirrors simple_hash() in the Python builder (djb2-xor, 32-bit).
-  function hash(s) {
-    var h = 5381;
-    for (var i = 0; i < s.length; i++) h = (Math.imul(h, 33) ^ s.charCodeAt(i)) >>> 0;
-    return ("0000000" + h.toString(16)).slice(-8);
-  }
-
   /* ------------------------------------------------- remembering a unlock */
 
   // A session cookie, not sessionStorage. sessionStorage is scoped to ONE tab,
@@ -162,14 +155,38 @@
     app.hidden = false;
     if (PAGE === "catalogue" && !grid.children.length) grid.innerHTML = skeletons(8);
   }
-  function hideShell() {
-    if (unlocked || !document.body.classList.contains("cat-shell")) return;
+  // Not signed in (the server said 401/403): the gate, which portal.js turns into the email
+  // sign-in. There is no access-code form any more (item 181): until the sign-in is drawn the
+  // gate shows only the breathing logo (cat-checking), never a code field.
+  function showSignIn() {
+    if (unlocked) return;
     var app = $("cat-app"), grid = $("cat-grid"), gate = $("cat-gate");
     document.body.classList.remove("cat-shell");
     document.body.classList.add("cat-locked");
+    if (gate && !gate.classList.contains("cx-gate")) document.body.classList.add("cat-checking");
     if (grid) grid.innerHTML = "";
     if (app) app.hidden = true;
     if (gate) gate.hidden = false;
+    try { document.dispatchEvent(new CustomEvent("cat:locked")); } catch (e) { /* old browser */ }
+    // portal.js did not draw the sign-in (it failed to load): say so, never fall back to a code.
+    setTimeout(function () {
+      if (unlocked || !gate || gate.hidden || gate.classList.contains("cx-gate")) return;
+      gateNote("We couldn’t load the sign-in. Check your connection and reload the page.", true);
+    }, 12000);
+  }
+  // A line under the logo (and a Try again button) for "could not load", never for a code.
+  function gateNote(text, reload) {
+    var note = $("cat-gate-note");
+    if (!note) return;
+    document.body.classList.remove("cat-checking");
+    note.textContent = text;
+    if (reload) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "cat-btn cat-btn--lime cat-gate__retry"; b.textContent = "Try again";
+      b.addEventListener("click", function () { location.reload(); });
+      note.appendChild(document.createElement("br")); note.appendChild(b);
+    }
+    note.hidden = false;
   }
 
   /* -- the whole roster used to be kept for this tab (sessionStorage "hv-roster"); the page is
@@ -226,73 +243,12 @@
     place();
   }
 
-  function gateFail(message) {
-    var err = $("cat-gate-error");
-    err.textContent = message || "That code is not right.";
-    err.hidden = false;
-    $("cat-code").value = "";
-    $("cat-code").focus();
-  }
-
-  // What the server says when it refuses. "expired" is worth telling an honest
-  // client plainly — they can ask for a new code instead of retyping.
-  // Which shared link this page is: each one asks for its own access code once
-  // in this browser (a selection by its token, otherwise the catalogue).
+  // Which shared link this page is (a selection by its token, otherwise the catalogue): the
+  // server checks this browser's pass against it.
   var LINK = (function () {
     var m = /(?:^|[#&])s=([A-Za-z0-9_-]+)/.exec(location.hash || "");
     return /\/selection\/?/.test(location.pathname) && m ? "s:" + m[1] : "cat";
   })();
-
-  var REFUSALS = {
-    otherlink: "That code is for a different link. Use the code that came with this one.",
-    expired: "That code has expired. Ask us for a new one.",
-    revoked: "That code is no longer active. Ask us for a new one.",
-    exhausted: "That code has already been used its maximum number of times.",
-    // The code is fine but already open on as many devices as it allows —
-    // the usual sign it was passed on.
-    device_limit: "This code is already in use on its maximum number of devices. " +
-      "Please contact us for your own access code.",
-    unknown: "That code is not right."
-  };
-
-  var gateForm = $("cat-gate-form");
-  gateForm.addEventListener("submit", function (e) {
-    e.preventDefault();
-    var val = $("cat-code").value.trim();
-    var btn = gateForm.querySelector("button");
-
-    if (!CFG.api) {
-      if (hash(val) === CFG.passHash) {
-        remember();
-        unlock();
-      } else {
-        gateFail();
-      }
-      return;
-    }
-
-    btn.disabled = true;
-    fetch(CFG.api + "/api/unlock", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ code: val, link: LINK, lite: true })
-    })
-      .then(function (r) { return r.json().then(function (b) { return { r: r, b: b }; }); })
-      .then(function (res) {
-        if (!res.b || !res.b.ok) {
-          gateFail(REFUSALS[res.b && res.b.reason] || "That code is not right.");
-          return;
-        }
-        // The pass is set; the roster itself comes the same way as on any visit (bootApi).
-        remember();
-        bootApi(true);
-      })
-      .catch(function () {
-        gateFail("Could not reach the server. Please try again.");
-      })
-      .then(function () { btn.disabled = false; });
-  });
 
   // Survive a refresh and a hop to the selection page, not a browser restart.
   // The actual unlock happens at the very bottom of this file: everything it
@@ -1883,7 +1839,7 @@
         copyText(doneLink,
           function () {
             btn.textContent = "Copied";
-            note.textContent = "Anyone with this link and the access code sees this selection.";
+            note.textContent = "Anyone you send this link to signs in with their work email to open it.";
             setTimeout(function () { btn.textContent = "Copy selection link"; }, 2200);
           },
           function () { note.textContent = "Could not copy automatically: " + doneLink; });
@@ -3761,7 +3717,7 @@
       copyText(location.href,
         function () {
           copyBtn.textContent = "Copied";
-          if (note) note.textContent = "Link copied. Anyone with it and the access code sees this selection.";
+          if (note) note.textContent = "Link copied. Whoever opens it signs in with their work email.";
           setTimeout(function () { copyBtn.textContent = "Copy link"; }, 2200);
         },
         function () {
@@ -3802,10 +3758,17 @@
   function viewWaiting() {
     try { var k = JSON.parse(sessionStorage.getItem("hv-cat-view") || "null"); return !!(k && Date.now() - k.t < 30 * 60 * 1000); } catch (e) { return false; }
   }
+  // Never throws: a refused, failed or unreadable answer comes back as {ok: false, status}
+  // (status 0 = no answer at all), so the caller can tell "not signed in" (401/403) from "the
+  // server is busy or restarting" (0, 5xx, 429), which must never look like a sign-out.
   function apiJson(path, p) {
     return fetch(CFG.api + path + "?" + p.toString(), { credentials: "include" })
-      .then(function (r) { return r.ok ? r.json() : { ok: false, status: r.status }; });
+      .then(function (r) {
+        if (!r.ok) return { ok: false, status: r.status };
+        return r.json().catch(function () { return { ok: false, status: 0 }; });
+      }, function () { return { ok: false, status: 0 }; });
   }
+  function refusedAnswer(b) { return !!b && !b.ok && (b.status === 401 || b.status === 403); }
   // The named creators that are on the roster, in that order (at most 200 a call).
   function fetchCards(codes) {
     var list = (codes || []).filter(Boolean), out = [], calls = [];
@@ -3832,13 +3795,29 @@
     while (box.firstChild) { made.push(box.firstChild); grid.appendChild(box.firstChild); }
     return made;
   }
-  function bootApi(fromGate) {
+  // Item 181 (2026-10-20): the access-code page flashed up between pages. Two causes, both here:
+  //   1. any failed answer (a 502 while the admin service restarts, a 429, a dropped connection)
+  //      was treated as "not signed in": the pass hint was forgotten and the raw access-code form
+  //      put back, and portal.js never replaced it for a client it knew was signed in;
+  //   2. a signed-out visitor saw the code form between this answer and portal.js drawing the
+  //      email sign-in.
+  // Now only a 401/403 means "sign in", and the gate holds no code form at all (showSignIn); a
+  // failure is retried and then reported, with the page's shell and the pass hint kept.
+  var BOOT_RETRY_MS = [1500, 3000, 6000];
+  function bootApi(attempt) {
+    attempt = attempt || 0;
     var settle = function () { document.body.classList.remove("cat-checking"); };
-    var refused = function () { settle(); forget(); if (!fromGate) hideShell(); };
-    dropRoster();
-    if (!fromGate) {
-      // A browser that has been in before sees the page shell at once; a new one sees nothing
-      // until the server answers (never the gate flashing up).
+    var outcome = function (answers) {
+      if (answers.some(refusedAnswer)) { forget(); showSignIn(); return false; }
+      if (answers.every(function (b) { return b && b.ok; })) { settle(); return true; }
+      if (attempt < BOOT_RETRY_MS.length) setTimeout(function () { bootApi(attempt + 1); }, BOOT_RETRY_MS[attempt]);
+      else couldNotLoad();
+      return false;
+    };
+    if (!attempt) {
+      dropRoster();
+      // A browser that has been in before sees the page shell at once; a new one sees the logo
+      // alone until the server answers (never a sign-in or a code form flashing up).
       if (wasUnlocked || viewWaiting()) showShell(); else document.body.classList.add("cat-checking");
     }
     if (PAGE === "catalogue") {
@@ -3849,13 +3828,12 @@
       var skipFirst = viewWaiting() && !/[#&](c|s)=/.test(location.hash || "");
       if (skipFirst) fp.set("limit", "1");
       Promise.all([apiJson("/api/roster/page", fp), apiJson("/api/roster/facets", lp)]).then(function (res) {
-        settle();
+        if (!outcome(res)) return;
         var a = res[0], f = res[1];
-        if (!a || !a.ok || !f || !f.ok) { refused(); return; }
         if (skipFirst) fp.delete("limit");
         FEED = { first: skipFirst ? null : a, key: skipFirst ? "" : fp.toString(), facets: f.facets || {} };
         adoptTiers(a.tiers); adoptFx(a.fx); remember(); unlock();
-      }).catch(function () { settle(); if (!fromGate) hideShell(); });
+      });
       return;
     }
     // The selection page: the creators its link names now; the rest of the selection (a link that
@@ -3864,11 +3842,29 @@
     lp2.set("link", LINK);
     lp2.set("codes", readFragment().codes.slice(0, 200).join(","));
     apiJson("/api/roster/cards", lp2).then(function (b) {
-      settle();
-      if (!b || !b.ok) { refused(); return; }
+      if (!outcome([b])) return;
       ROSTER = b.cards || [];
       adoptTiers(b.tiers); adoptFx(b.fx); remember(); unlock();
-    }).catch(function () { settle(); if (!fromGate) hideShell(); });
+    });
+  }
+  // The server did not answer after a few tries. The visitor is NOT signed out (their pass hint is
+  // kept): say so where they are looking, with a way to try again.
+  function couldNotLoad() {
+    var msg = "We couldn’t reach HELVi Connect just now. Please try again in a moment.";
+    var grid = $("cat-grid");
+    if (document.body.classList.contains("cat-shell") && grid) {
+      grid.innerHTML = "";
+      var box = document.createElement("div");
+      box.className = "cat-empty cat-loadfail"; box.setAttribute("role", "alert");
+      var p = document.createElement("p"); p.textContent = msg; box.appendChild(p);
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "cat-btn cat-btn--lime"; b.textContent = "Try again";
+      b.addEventListener("click", function () { location.reload(); });
+      box.appendChild(b); grid.appendChild(box);
+      if (window.hvLoader) window.hvLoader.done();
+      return;
+    }
+    gateNote(msg, true);
   }
 
   /* --------------------------------------------------------- deterrence */
@@ -3908,16 +3904,18 @@
   if (CFG.api) {
     // Ask the server whether this browser is already in, every time — not
     // only when the page's own "unlocked" cookie survives. That one ends
-    // when the browser closes, while the server's pass lasts 12 hours, so a
-    // client coming back or hopping to the selection page was asked for a
-    // code the server would have accepted anyway. The server still decides:
-    // a revoked or expired code lands back on the gate.
+    // when the browser closes, while the server's pass lasts longer. The
+    // server still decides: an expired or revoked pass lands on the sign-in.
     //
-    // While asking, the gate form is hidden (cat-checking), so nobody sees
-    // an access-code screen flash up on every page change.
-    bootApi(false);
-  } else if (wasUnlocked) {
+    // While asking, only the logo shows (cat-checking). There is no access-code form: a browser
+    // the server does not know gets the email sign-in (portal.js), see bootApi.
+    bootApi(0);
+  } else if (location.protocol === "file:" || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+    // A build without CATALOGUE_API has no server to sign in against: it opens on this machine
+    // as a preview only. (The old client-side passcode check is gone, item 181.)
     unlock();
+  } else {
+    gateNote("This copy of the catalogue has no sign-in. Open it at influencer-catalogue.hellovoice.co.uk.", false);
   }
 
   /* ------------------------------------------- profile analysis side panel */
