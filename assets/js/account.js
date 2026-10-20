@@ -1848,6 +1848,7 @@
     if (can.indexOf("reactivate") >= 0) acts.appendChild(btn("Reactivate", "reactivate", true));
     if (can.indexOf("hold") >= 0) acts.appendChild(btn("Hold", "hold", false));
     var more = [];
+    if (st === "active") more.push(["Push to " + (p.name || p.email).split(" ")[0], "bell", function () { openCompose(co.key, co.name, { people: [p.id] }); }, false, true]);
     if (can.indexOf("suspend") >= 0) more.push(["Suspend account", "ban", function () { acctDo(p, co, "suspend"); }, true]);
     if (can.indexOf("credits") >= 0) more.push(["Change credits", "coin", function () { HUB.ctl = HUB.ctl === pk + ":cr" ? null : pk + ":cr"; renderSection(); }, false]);
     if (more.length) {
@@ -1858,7 +1859,7 @@
       if (open) {
         var pop = h("div", { class: "cc-pop", role: "menu" });
         more.forEach(function (m) {
-          pop.appendChild(h("button", { type: "button", role: "menuitem", class: m[3] ? "is-danger" : "", onclick: function () { HUB.ctl = null; m[2](); } }, icon(m[1]), m[0], h("span", { class: "cc-lockmark" }, icon("shield"), "Code")));
+          pop.appendChild(h("button", { type: "button", role: "menuitem", class: m[3] ? "is-danger" : "", onclick: function () { HUB.ctl = null; m[2](); } }, icon(m[1]), m[0], m[4] ? null : h("span", { class: "cc-lockmark" }, icon("shield"), "Code")));
         });
         pop.appendChild(h("small", null, "\"Code\" asks for a fresh emailed code. Every change is in History with undo."));
         acts.appendChild(pop);
@@ -2205,6 +2206,7 @@
         h("div", null, h("dt", null, "Next step"), h("dd", { class: "cc-nextedit" }, step, due, save))),
       h("div", { class: "cc-acts" },
         h("button", { class: "hc-btn hc-btn--sm", type: "button", onclick: function () { CRM.tab = "notes"; renderSection(); } }, icon("note"), "Add note"),
+        c.prospect ? null : h("button", { class: "hc-btn hc-btn--sm hc-btn--line", type: "button", onclick: function () { openCompose(c.key, c.name); } }, icon("bell"), "Push to this client"),
         DATA.cc && DATA.cc.admin_links && c.domain && !c.prospect ? h("a", { class: "cc-admin", href: adminUrl("/clients"), target: "_blank", rel: "noopener" }, "Open in admin ", icon("ext")) : null));
   }
   function peopleTab(c) {
@@ -2300,6 +2302,147 @@
         h("dt", null, "Credits left"), h("dd", null, credits == null ? "…" : String(credits)))));
     add(p, h("div", { class: "cc-split" }, h("section", { "aria-label": "Company details" }, body), rail));
     add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" })); hubSayAgain();
+  }
+
+
+  /* ------------------------------------------- Push composer (item 209 slice c) */
+  // A side sheet on a company page (or a person's menu): who gets it, the message, when, how many it will reach and a phone
+  // preview. The same queue as the admin's App & alerts, so it lands in each person's bell too; 10 people or more ask for the
+  // emailed code first. Everyone at a company, the people on a campaign, or chosen people; "every client" stays in the admin.
+  var COMPOSE = null;
+  function openCompose(key, name, preset) {
+    if (COMPOSE) return;
+    COMPOSE = { key: key, name: name, ctx: null, type: preset && preset.people ? "people" : "company", camps: [], people: preset && preset.people ? preset.people.slice() : [],
+                title: "", body: "", url: "/account/", when: "now", at: "", reach: null, msg: "", busy: false, timer: null };
+    var wrap = h("div", { class: "cc-sheet-wrap", role: "presentation" });
+    document.body.appendChild(wrap); document.body.classList.add("cc-sheet-open");
+    COMPOSE.wrap = wrap;
+    document.addEventListener("keydown", composeKey);
+    paintCompose();
+    api("GET", "/api/compose/context?k=" + encodeURIComponent(key)).then(function (r) {
+      if (!COMPOSE) return;
+      if (r.s !== 200) { COMPOSE.msg = "This company can't be pushed to from here."; paintCompose(); return; }
+      COMPOSE.ctx = r.b; paintCompose(); composeReach();
+    });
+  }
+  function composeKey(e) { if (e.key === "Escape") closeCompose(); }
+  function closeCompose() {
+    if (!COMPOSE) return;
+    document.removeEventListener("keydown", composeKey);
+    COMPOSE.wrap.remove(); COMPOSE = null; document.body.classList.remove("cc-sheet-open");
+  }
+  function composeAud() {
+    var C = COMPOSE;
+    return C.type === "company" ? { type: "company", key: C.key } : C.type === "campaign" ? { type: "campaign", campaigns: C.camps } : { type: "people", people: C.people };
+  }
+  function composeReach() {
+    var C = COMPOSE; if (!C) return;
+    clearTimeout(C.timer);
+    C.timer = setTimeout(function () {
+      if (C.type === "campaign" && !C.camps.length || C.type === "people" && !C.people.length) { C.reach = null; paintReach(); return; }
+      api("POST", "/api/compose/reach", { aud: composeAud() }).then(function (r) { if (COMPOSE !== C) return; C.reach = r.s === 200 ? r.b : null; paintReach(); });
+    }, 180);
+  }
+  function paintReach() {
+    var C = COMPOSE, el = C && C.wrap.querySelector(".cc-reach"); if (!el) return;
+    var r = C.reach; el.textContent = "";
+    if (!r) { el.appendChild(h("span", null, "Pick who gets it.")); return; }
+    el.appendChild(h("b", null, r.push_people + " of " + r.people));
+    el.appendChild(h("span", null, r.push_people === r.people ? "will get a phone alert." : "will get a phone alert; the rest see it in the bell."));
+    if (r.no_phone_n) el.appendChild(h("small", null, r.no_phone.join(", ") + (r.no_phone_n > r.no_phone.length ? " and " + (r.no_phone_n - r.no_phone.length) + " more" : "") + " have alerts off."));
+    if (r.needs_code) el.appendChild(h("small", null, "This is a big push, so you'll confirm with an emailed code."));
+  }
+  function composeSend(test) {
+    var C = COMPOSE; if (!C || C.busy) return;
+    var when = null;
+    if (!test && C.when === "later") {
+      when = C.at ? Math.floor(new Date(C.at).getTime() / 1000) : 0;
+      if (!when) { C.msg = "Pick the date and time to send."; paintCompose(); return; }
+    }
+    function go() {
+      C.busy = true; C.msg = ""; paintCompose();
+      return api("POST", "/api/compose/send", { aud: composeAud(), title: C.title, body: C.body, url: C.url, send_at: when, test: !!test }).then(function (r) {
+        C.busy = false;
+        if (r.s === 403 && r.b && r.b.reason === "stepup") {
+          return stepUp({ title: "Send this push?", why: "A push to " + (C.reach ? C.reach.people : "many") + " people can't be taken back.", what: C.title || "Push", sub: C.name, ok: "Send push" }).then(function (ok) {
+            if (ok) return go(); paintCompose();
+          });
+        }
+        if (r.s === 200) {
+          toast(0, r.b.message || "Sent.");
+          if (test) { C.msg = r.b.message; paintCompose(); } else closeCompose();
+        } else { C.msg = (r.b && r.b.message) || "That didn't send. Try again."; paintCompose(); }
+      });
+    }
+    return go();
+  }
+  function paintCompose() {
+    var C = COMPOSE; if (!C) return;
+    var ctx = C.ctx, wrap = C.wrap;
+    var keep = wrap.querySelector(".cc-sheet"), top = keep ? keep.scrollTop : 0;
+    var aud = h("div", { class: "cc-aud", role: "radiogroup", "aria-label": "Who gets it" });
+    function opt(type, title, sub, extra) {
+      var rd = h("input", { type: "radio", name: "aud", checked: C.type === type ? "" : null, onchange: function () { C.type = type; paintCompose(); composeReach(); } });
+      var lab = h("label", null, rd, h("div", null, h("b", null, title), h("small", null, sub)), h("span"));
+      var box = h("div", null, lab);
+      if (C.type === type && extra) box.appendChild(extra);
+      return box;
+    }
+    if (ctx) {
+      var camps = h("div", { class: "cc-aud__sub" });
+      ctx.campaigns.forEach(function (k) {
+        camps.appendChild(h("label", null, h("input", { type: "checkbox", checked: C.camps.indexOf(k.id) >= 0 ? "" : null,
+          onchange: function () { C.camps = C.camps.indexOf(k.id) >= 0 ? C.camps.filter(function (x) { return x !== k.id; }) : C.camps.concat(k.id);
+            if (C.camps.length === 1) { var kk = ctx.campaigns.filter(function (x) { return x.id === C.camps[0]; })[0]; C.url = "/campaign/dashboard/#t=" + kk.token; } else C.url = "/account/";
+            composeReach(); paintCompose(); } }), k.name, h("span", { class: "cc-mute" }, k.status)));
+      });
+      if (!ctx.campaigns.length) camps.appendChild(h("p", { class: "cc-mute" }, "This company has no campaigns."));
+      var ppl = h("div", { class: "cc-aud__sub" });
+      ctx.people.forEach(function (u) {
+        ppl.appendChild(h("label", null, h("input", { type: "checkbox", checked: C.people.indexOf(u.id) >= 0 ? "" : null,
+          onchange: function () { C.people = C.people.indexOf(u.id) >= 0 ? C.people.filter(function (x) { return x !== u.id; }) : C.people.concat(u.id); composeReach(); paintCompose(); } }),
+          u.name, h("span", { class: "cc-mute" }, u.phone ? "phone alerts on" : "bell only")));
+      });
+      aud.appendChild(opt("company", "Everyone at " + ctx.name, plural(ctx.people.length, "active person", "active people")));
+      aud.appendChild(opt("campaign", "People on a campaign", ctx.campaigns.length ? "Pick one or more campaigns" : "No campaigns yet", camps));
+      aud.appendChild(opt("people", "Choose people", "Pick from this company", ppl));
+      aud.appendChild(h("div", null, h("label", { class: "is-off" }, h("input", { type: "radio", disabled: "" }), h("div", null, h("b", null, "Every client"), h("small", null, "Admins only, from Control Centre · App & alerts")),
+        h("span", { class: "cc-lockmark" }, icon("lock"), "Admin"))));
+    } else aud.appendChild(h("p", { class: "ac-muted", role: "status" }, C.msg || "Loading…"));
+    var title = h("input", { type: "text", maxlength: "60", value: C.title, placeholder: "What should they see first?", "aria-label": "Title" });
+    var body = h("textarea", { maxlength: "180", "aria-label": "Message", placeholder: "One or two lines. No prices." }, C.body);
+    var cnt = h("span", null, C.body.length + " / 180");
+    title.addEventListener("input", function () { C.title = title.value; var t = C.wrap.querySelector(".cc-note b"); if (t) t.textContent = C.title || "Title"; });
+    body.addEventListener("input", function () { C.body = body.value; cnt.textContent = C.body.length + " / 180"; var t = C.wrap.querySelector(".cc-note p"); if (t) t.textContent = C.body; });
+    var opens = h("select", { "aria-label": "Opens" }, h("option", { value: "/account/" }, "My profile"));
+    if (ctx) ctx.campaigns.forEach(function (k) { opens.appendChild(h("option", { value: "/campaign/dashboard/#t=" + k.token }, k.name + " dashboard")); });
+    opens.value = C.url; opens.addEventListener("change", function () { C.url = opens.value; });
+    var whenNow = h("button", { class: "cc-chip", type: "button", "aria-pressed": C.when === "now" ? "true" : "false", onclick: function () { C.when = "now"; paintCompose(); } }, "Now");
+    var whenLater = h("button", { class: "cc-chip", type: "button", "aria-pressed": C.when === "later" ? "true" : "false", onclick: function () { C.when = "later"; paintCompose(); } }, icon("cal"), "Schedule");
+    var at = C.when === "later" ? h("input", { type: "datetime-local", value: C.at, "aria-label": "Send at", onchange: function (e) { C.at = e.target.value; } }) : null;
+    var sendB = h("button", { class: "hc-btn", type: "button", disabled: C.busy || !ctx || !C.title.trim() ? "" : null, onclick: function () { composeSend(false); } }, icon("bell"), C.busy ? "Sending…" : (C.when === "later" ? "Schedule push" : "Send push"));
+    var testB = h("button", { class: "hc-btn hc-btn--line", type: "button", disabled: C.busy || !C.title.trim() ? "" : null, onclick: function () { composeSend(true); } }, "Send a test to my phone");
+    title.addEventListener("input", function () { sendB.disabled = !C.title.trim() || C.busy || !ctx; testB.disabled = !C.title.trim() || C.busy; });
+    var phone = h("div", { class: "cc-phone", "aria-label": "iPhone preview" }, h("div", { class: "cc-phone__time" }, "09:41"), h("div", { class: "cc-phone__date" }, new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })),
+      h("div", { class: "cc-note" }, h("img", { src: ROOT + "assets/app/icon-192.png", alt: "" }), h("div", null, h("div", { class: "cc-note__top" }, h("span", null, "HELVi"), h("span", null, "now")),
+        h("b", null, C.title || "Title"), h("p", null, C.body || "Message"))));
+    var sheet = h("section", { class: "cc-sheet", role: "dialog", "aria-modal": "true", "aria-labelledby": "pu-h" },
+      h("div", { class: "cc-sheet__hd" }, h("div", null, h("h2", { id: "pu-h" }, "Push to " + C.name), h("p", null, "A phone alert and a bell note. Clients only get pushes about their own work.")),
+        h("button", { class: "cc-x", type: "button", "aria-label": "Close", onclick: closeCompose }, icon("x"))),
+      h("div", { class: "cc-compose" },
+        h("div", null, h("div", { class: "cc-field" }, h("span", null, "Who gets it"), aud),
+          h("label", { class: "cc-field" }, h("span", null, "Title"), title),
+          h("label", { class: "cc-field" }, h("span", null, "Message"), body, h("div", { class: "cc-field__count" }, h("span", null, "Never prices or costs."), cnt)),
+          h("label", { class: "cc-field" }, h("span", null, "Opens"), opens),
+          h("div", { class: "cc-field" }, h("span", null, "When"), h("div", { class: "cc-when" }, whenNow, whenLater), at),
+          h("div", { class: "cc-reach", "aria-live": "polite" })),
+        h("div", null, phone, h("p", { class: "cc-phone__cap" }, "Preview on iPhone. Android looks similar."))),
+      h("div", { class: "cc-sheet__go" }, sendB, testB, h("small", null, icon("clock"), "Quiet hours 23:00–08:00 Riyadh hold it until morning."), C.msg ? h("span", { class: "cc-msg", role: "status" }, C.msg) : null));
+    wrap.textContent = "";
+    wrap.appendChild(h("div", { class: "cc-scrim", onclick: closeCompose }));
+    wrap.appendChild(sheet);
+    sheet.scrollTop = top; paintReach();
+    var f = C.title ? null : title; if (f && !C._focused) { C._focused = true; f.focus(); }
   }
 
   function renderCompanies(p) {

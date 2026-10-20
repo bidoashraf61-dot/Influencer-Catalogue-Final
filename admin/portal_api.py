@@ -303,6 +303,20 @@ class PortalMixin(connect_api.ConnectMixin):
                         self.send_json(200, {"ok": True, "row": r, "notes": crm.notes(k), "quotes": crm.quotes(role, a, k)},
                                        self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/compose/context":
+            # Item 209 slice c: the push composer on a company page (owners, admins, and a KAM for her own clients).
+            who = self._need_account()
+            if who:
+                import hub, pushcomposer
+                role, a = hub.viewer(who[1])
+                got = pushcomposer.context(role, a, str(query.get("k") or "")) if role else None
+                if role is None:
+                    self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+                elif got is None:
+                    self.send_json(404, {"ok": False}, self.cors())
+                else:
+                    self.send_json(200, dict(got, ok=True), self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/edit/campaign":
             # Item 209 slice c: the dashboard's Edit mode (owners, admins, and a KAM for her own clients' campaigns).
             ctx = self._edit_ctx(str(query.get("t") or ""))
@@ -612,6 +626,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
             "/api/selection/merge": self.api_selection_merge,
             "/api/needs/approve": self.api_needs_approve, "/api/hub/account": self.api_hub_account,
+            "/api/compose/reach": self.api_compose_reach, "/api/compose/send": self.api_compose_send,
             "/api/edit/post": self.api_edit_post, "/api/edit/bulk": self.api_edit_bulk, "/api/edit/numbers": self.api_edit_numbers,
             "/api/edit/update": self.api_edit_update, "/api/edit/pending": self.api_edit_pending, "/api/edit/insight": self.api_edit_insight,
             "/api/crm/set": self.api_crm_set, "/api/crm/note": self.api_crm_note, "/api/crm/person": self.api_crm_person,
@@ -1324,6 +1339,28 @@ class PortalMixin(connect_api.ConnectMixin):
         code, got = peoplectl.act(role, a, who[1], b.get("id"), str(b.get("action") or ""), b.get("amount"), str(b.get("reason") or ""),
                                   stepup_open=stepup.active(who[1]) > 0)
         return self.send_json(code, got, self.cors())
+
+    def api_compose_reach(self):
+        w = self._crm_who()
+        if w:
+            import pushcomposer
+            code, got = pushcomposer.reach(w[0], w[1], self.json_body().get("aud") or {})
+            self.send_json(code, got, self.cors())
+
+    def api_compose_send(self):
+        who = self._need_account()
+        if not who:
+            return
+        import hub, pushcomposer, stepup
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        if self._throttled("compose:%d" % who[1]["id"], 30, 3600):
+            return
+        b = self.json_body()
+        code, got = pushcomposer.send(role, a, who[1]["email"], b.get("aud") or {}, b.get("title"), b.get("body"), b.get("url"),
+                                      b.get("send_at"), bool(b.get("test")), stepup_open=stepup.active(who[1]) > 0)
+        self.send_json(code, got, self.cors())
 
     def _edit_ctx(self, token):
         """(campaign, actor email) when this session may edit that campaign's content, else answers 401/403/404."""

@@ -1304,3 +1304,70 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
 .cc-phone-staff .hv-i { width: 13px; height: 13px; }
 
 .cc-t td[data-k="Accounts"] { white-space: nowrap; }
+
+
+/* Push composer on a company page (item 209 slice c, 2026-10-21). */
+.cc-notes { list-style: none; margin: 0; padding: 0; }
+.cc-notes li { padding: 10px 0; border-top: 1px solid var(--rule-soft); font-size: 14px; line-height: 1.45; }
+.cc-notes li:first-child { border-top: 0; padding-top: 0; }
+.cc-notes small { display: block; color: var(--gray); font-size: 12px; margin-top: 3px; }
+.cc-sheet-wrap { position: fixed; inset: 0; z-index: 80; display: flex; justify-content: flex-end; background: rgba(18,18,18,.45); }
+.cc-sheet { width: min(760px, 100vw); height: 100%; background: var(--white); overflow-y: auto; border-radius: 28px 0 0 28px; padding: 28px 30px; box-shadow: -20px 0 60px rgba(18,18,18,.2); }
+.cc-sheet__hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.cc-sheet__hd h2 { margin: 0; font: 400 40px/1 var(--heading); letter-spacing: .02em; }
+.cc-sheet__hd p { margin: 6px 0 0; color: var(--gray); font-size: 15px; }
+.cc-x { width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--rule); background: var(--white); display: grid; place-items: center; cursor: pointer; flex: none; }
+.cc-x .hv-i { width: 18px; height: 18px; }
+.cc-compose { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 26px; margin-top: 22px; align-items: start; }
+.cc-field { display: block; margin-top: 18px; }
+.cc-field:first-child { margin-top: 0; }
+.cc-field > span { display: block; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); margin-bottom: 8px; }
+.cc-field input[type="text"], .cc-field textarea { width: 100%; border: 1px solid rgba(18,18,18,.2); border-radius: 12px; padding: 12px 14px; font: 400 15px/1.45 var(--body); color: var(--ink); background: var(--white); }
+.cc-field textarea { min-height: 96px; resize: vertical; }
+.cc-field input:focus, .cc-field textarea:focus { outline: 3px solid var(--vivid-red); outline-offset: 1px; border-color: var(--ink); }
+.cc-field__count { display: flex; justify-content: space-between; font-size: 12px; color: var(--gray); margin-top: 6px; }
+.cc-aud { display: grid; gap: 8px; }
+.cc-aud label { display: grid; grid-template-columns: 22px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 18px; border: 1px solid var(--rule); cursor: pointer; }
+.cc-aud label:has(input:checked) { background: var(--lime); border-color: var(--lime); }
+.cc-aud input { width: 18px; height: 18px; accent-color: #121212; margin: 0; }
+.cc-aud b { display: block; font-size: 15px; }
+.cc-aud small { display: block; color: var(--gray); font-size: 13px; }
+.cc-aud label:has(input:checked) small { color: var(--ink); }
+.cc-aud .cc-lockmark { display: inline-flex; gap: 4px; align-items: center; font-size: 11px; font-weight: 700; color: var(--gray); }
+.cc-aud .cc-lockmark .hv-i { width: 13px; height: 13px; }
+.cc-aud label.is-off { opacity: .55; cursor: not-allowed; }
+.cc-reach { display: flex; gap: 10px; align-items: center; margin-top: 18px; padding: 12px 14px; border-radius: 12px; background: var(--linen); font-size: 14px; }
+.cc-reach b { font: 400 26px/1 var(--heading); letter-spacing: .02em; }
+.cc-when { display: flex; gap: 8px; flex-wrap: wrap; }
+.cc-sheet__go { display: flex; gap: 10px; align-items: center; margin-top: 24px; padding-top: 18px; border-top: 1px solid var(--rule); flex-wrap: wrap; }
+.cc-sheet__go small { color: var(--gray); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; }
+.cc-sheet__go small .hv-i { width: 15px; height: 15px; }
+.cc-phone { background: #1d1d1f; border-radius: 34px; padding: 14px; aspect-ratio: 9 / 17; display: flex; flex-direction: column; color: var(--white); position: sticky; top: 0; }
+.cc-phone__time { text-align: center; font: 300 46px/1 var(--body); margin-top: 26px; letter-spacing: -.02em; }
+.cc-phone__date { text-align: center; font-size: 13px; opacity: .8; margin-top: 4px; }
+.cc-note { margin-top: auto; background: rgba(245,245,247,.86); color: #121212; border-radius: 18px; padding: 10px 12px; display: grid; grid-template-columns: 34px 1fr; gap: 10px; }
+.cc-note img { width: 34px; height: 34px; border-radius: 8px; background: var(--lime); object-fit: cover; }
+.cc-note__top { display: flex; justify-content: space-between; font-size: 11px; color: #5c5c5c; text-transform: uppercase; letter-spacing: .04em; }
+.cc-note b { display: block; font-size: 13px; margin-top: 2px; }
+.cc-note p { margin: 2px 0 0; font-size: 13px; line-height: 1.35; }
+.cc-phone__cap { text-align: center; font-size: 12px; color: var(--gray); margin-top: 10px; }
+@media screen and (max-width: 760px) {
+  .cc-sheet { border-radius: 0; padding: 20px 16px 120px; }
+  .cc-compose { grid-template-columns: 1fr; }
+  .cc-phone { max-width: 240px; margin: 0 auto; position: static; }
+}
+.cc-sheet__hd { }
+.cc-aud__sub { margin: 8px 0 0 34px; display: grid; gap: 6px; }
+.cc-aud__sub label { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--rule); cursor: pointer; font-size: 14px; background: var(--white); }
+.cc-aud__sub input { width: 18px; height: 18px; accent-color: #121212; margin: 0; }
+.cc-aud__sub .cc-mute { margin-left: auto; font-size: 12px; color: var(--gray); }
+.cc-sheet .cc-msg { font-size: 14px; }
+.cc-field select { min-height: 44px; border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.2); padding: 0 16px; font: 400 15px var(--body); background: var(--white); width: 100%; }
+.cc-field input[type="datetime-local"] { min-height: 44px; border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.2); padding: 0 16px; font: 400 15px var(--body); background: var(--white); margin-top: 8px; max-width: 100%; }
+.cc-reach { flex-wrap: wrap; }
+.cc-reach small { display: block; color: var(--gray); font-size: 13px; width: 100%; }
+body.cc-sheet-open { overflow: hidden; }
+.cc-scrim { position: absolute; inset: 0; }
+.cc-sheet { position: relative; }
+.cc-sheet-wrap .cc-sheet__hd h2 { overflow-wrap: anywhere; }
+.cc-sheet-wrap { z-index: 9000; }
