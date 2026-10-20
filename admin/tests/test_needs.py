@@ -124,6 +124,44 @@ class Needs(unittest.TestCase):
         c.post("/api/auth/start", {"email": BOSS})
         self.assertNotEqual(c.post("/api/auth/verify", {"email": BOSS, "otp": code})[1].get("ok"), True)
 
+    def test_05_account_controls(self):
+        # hold -> reactivate by a KAM on her own client; suspend and credits need an admin and a code.
+        u = portal.user_by_email("waiting@polyco.com")
+        s, b, _ = self.kam.post("/api/hub/account", {"id": u["id"], "action": "hold"})
+        self.assertEqual(s, 200, b)
+        s, d, _ = self.boss.get("/api/hub/company?k=polyco.com")
+        st = {p["email"]: p for p in d["people"]}
+        self.assertEqual(st["waiting@polyco.com"]["state"], "held")
+        self.assertEqual(st["waiting@polyco.com"]["can"][0], "reactivate")
+        self.assertIn("credits", st["lead@polyco.com"])
+        g, _ = self.groups(self.boss)
+        self.assertNotIn("waiting@polyco.com", {i["sub"].split(" · ")[-1] for i in (g.get("signups") or {"items": []})["items"]})
+        self.assertEqual(self.kam.post("/api/hub/account", {"id": u["id"], "action": "reactivate"})[0], 200)
+        self.assertEqual(portal.user_by_email("waiting@polyco.com")["status"], "active")
+        lead = self.lead
+        self.assertEqual(self.kam.post("/api/hub/account", {"id": lead["id"], "action": "suspend"})[0], 403)      # KAM: admin only
+        self.assertEqual(self.kam.post("/api/hub/account", {"id": lead["id"], "action": "credits", "amount": 5})[0], 403)
+        rival = portal.user_by_email("waiting@rivalco.com")
+        self.assertEqual(self.kam.post("/api/hub/account", {"id": rival["id"], "action": "hold"})[0], 403)         # not her client
+        with db.connect() as conn:
+            conn.execute("DELETE FROM stepup_grants")                                                              # test_04 left a window open
+        s, b, _ = self.boss.post("/api/hub/account", {"id": lead["id"], "action": "credits", "amount": 5})
+        self.assertEqual((s, b.get("reason")), (403, "stepup"), b)                                                # needs the code
+        with db.connect() as conn:
+            conn.execute("UPDATE otp SET created_at = created_at - 100")                                            # past the resend cooldown
+        self.boss.post("/api/stepup/send", {}); code = mailer.OUTBOX[-1]["text"].split("code is ")[1][:6]
+        self.assertEqual(self.boss.post("/api/stepup/verify", {"code": code})[0], 200)
+        before = portal.balance(lead["code_id"])
+        s, b, _ = self.boss.post("/api/hub/account", {"id": lead["id"], "action": "credits", "amount": 5})
+        self.assertEqual((s, portal.balance(lead["code_id"])), (200, before + 5), b)
+        self.assertEqual(self.boss.post("/api/hub/account", {"id": lead["id"], "action": "credits", "amount": 0})[0], 400)
+        self.assertEqual(self.boss.post("/api/hub/account", {"id": lead["id"], "action": "suspend"})[0], 200)
+        self.assertEqual(portal.user_by_email("lead@polyco.com")["status"], "suspended")
+        self.assertEqual(self.boss.post("/api/hub/account", {"id": lead["id"], "action": "reactivate"})[0], 200)
+        s, d, _ = self.boss.get("/api/hub/companies")
+        pc = {c["domain"]: c for c in d["companies"]}["polyco.com"]
+        self.assertEqual((pc["waiting"], pc["blocked"]), (0, 0))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

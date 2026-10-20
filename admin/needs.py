@@ -34,7 +34,7 @@ def _today_start():
 def _signups(conn, scope, staff):
     out = []
     for u in conn.execute("SELECT id, email, name, company, job_title, domain, code_id, created_at FROM users "
-                          "WHERE status = 'pending' AND deleted_at IS NULL ORDER BY created_at"):
+                          "WHERE status = 'pending' AND held_at IS NULL AND deleted_at IS NULL ORDER BY created_at"):
         if (u["domain"] or "").lower() in staff:
             continue
         # A KAM's scope is her clients' codes; a brand-new sign-up on one of her domains counts as hers too.
@@ -127,7 +127,8 @@ GROUPS = [
 
 def queue(role, a, mine_only=False):
     """{"groups": [...], "total": n, "mine": n} for a staff viewer (role 'admin' or 'kam')."""
-    import hub
+    import hub, peoplectl
+    peoplectl.ensure()
     scope = _scope(role, a)
     staff = hub.staff_domains()
     with db.connect() as conn:
@@ -144,7 +145,8 @@ def queue(role, a, mine_only=False):
 
 def kpis(role, a):
     """The "This month" strip under the queue: live campaigns, open quotes, companies, credits used."""
-    import hub
+    import hub, peoplectl
+    peoplectl.ensure()
     scope = _scope(role, a)
     month = db.now() - 30 * 86400
     with db.connect() as conn:
@@ -165,18 +167,8 @@ def kpis(role, a):
 
 def approve(role, a, uid):
     """Approve a waiting sign-up from the queue (admins any, a KAM her own). (ok, message)."""
-    import history, hub, portal
-    u = portal.user_by_id(int(uid or 0))
-    if u is None or ("deleted_at" in u.keys() and u["deleted_at"]):
-        return False, "That sign-up is gone."
-    if u["status"] != "pending":
+    import peoplectl
+    code, got = peoplectl.act(role, a, None, uid, "approve")
+    if code == 400 and "not available" in got.get("message", ""):
         return False, "Already decided."
-    scope = _scope(role, a)
-    with db.connect() as conn:
-        mine = any(x["id"] == u["id"] for x in _signups(conn, scope, hub.staff_domains()))
-    if not mine:
-        return False, "Not one of your clients."
-    history.set_actor(a["email"])
-    with history.tracked("user", u["id"], "Approved " + (u["email"] or "a sign-up")):
-        portal.set_status(u["id"], "active")
-    return True, (u["name"] or u["email"]) + " can sign in now."
+    return code == 200, got.get("message", "")

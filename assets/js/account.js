@@ -1570,7 +1570,7 @@
   // Share panel: email a client, hand it to an account manager (admins), copy its link. Nothing priced
   // is shown. Companies load as a list; a company's people and items load when it is opened.
 
-  var HUB = { list: null, kams: [], role: "", err: null, q: "", f: "all", view: "companies", open: {}, openP: {}, detail: {}, share: null, shareMode: "all" };
+  var HUB = { ctl: null, list: null, kams: [], role: "", err: null, q: "", f: "all", view: "companies", open: {}, openP: {}, detail: {}, share: null, shareMode: "all" };
 
   function hubLoad() {
     return api("GET", "/api/hub/companies").then(function (r) {
@@ -1616,6 +1616,8 @@
     var q = HUB.q.trim().toLowerCase();
     if (q && (c.name + " " + c.domain).toLowerCase().indexOf(q) < 0) return false;
     if (HUB.f === "live") return c.live > 0;
+    if (HUB.f === "waiting") return c.waiting > 0;
+    if (HUB.f === "blocked") return c.blocked > 0;
     if (HUB.f === "nokam") return !c.kam.email && c.key !== "handed" && c.key !== "unassigned" && c.key !== "team";
     return true;
   }
@@ -1810,6 +1812,67 @@
     if (deleting) row.appendChild(deletePanel(kind, it, close));
     return row;
   }
+  /* Account controls on a person (item 209, slice b). Approve, hold and reactivate are one click; suspend and
+     credits ask for the emailed code first (admins only). The server decides who may do what (p.can). */
+  var STATE_LABEL = { waiting: "Waiting", active: "Active", held: "Held", suspended: "Suspended" };
+  function acctSay(msg, bad) { var el = $("hb-say"); if (el) { el.textContent = msg; el.className = "hb-say" + (bad ? " hb-say--bad" : "") + " is-on"; } toast(0, msg); }
+  function acctRefresh(co) { NEEDS.data = null; delete HUB.detail[co.key]; hubDetail(co.key); hubLoad(); if (DATA.cc) loadNeeds(); }
+  function acctDo(p, co, action, extra, nicely) {
+    var body = { id: p.id, action: action }; for (var k in (extra || {})) body[k] = extra[k];
+    return api("POST", "/api/hub/account", body).then(function (r) {
+      if (r.s === 403 && r.b && r.b.reason === "stepup") {
+        return stepUp({ title: action === "suspend" ? "Suspend this account?" : "Change credits",
+          why: action === "suspend" ? "Suspending signs this person out everywhere." : "A credit change is recorded under your name.",
+          what: (action === "suspend" ? "Suspend " : "Change credits for ") + (p.name || p.email), sub: co.name,
+          ok: action === "suspend" ? "Suspend account" : "Change credits", danger: action === "suspend" }).then(function (ok) {
+          return ok ? acctDo(p, co, action, extra, nicely) : null;
+        });
+      }
+      if (r.s === 200) { acctSay(r.b.message || "Done."); acctRefresh(co); if (nicely) nicely(); }
+      else acctSay((r.b && r.b.message) || "That didn't work. Try again.", true);
+    });
+  }
+  function acctControls(p, co) {
+    var can = p.can || [], pk = (co.key || "") + ":" + (p.id || p.email);
+    var st = p.state || "active";
+    var out = h("div", { class: "cc-ctl" }, h("span", { class: "cc-stat cc-stat--" + (st === "suspended" ? "susp" : st === "waiting" ? "wait" : st) }, STATE_LABEL[st] || st),
+      p.credits != null && p.id ? h("span", { class: "cc-cred", title: "Credits left" }, icon("coin"), String(p.credits)) : null);
+    var acts = h("div", { class: "cc-ctl__acts" });
+    function btn(label, action, primary) {
+      var b = h("button", { class: "hc-btn hc-btn--sm" + (primary ? "" : " hc-btn--line"), type: "button" }, label);
+      b.addEventListener("click", function () { b.disabled = true; acctDo(p, co, action).then(function () { b.disabled = false; }); });
+      return b;
+    }
+    if (can.indexOf("approve") >= 0) acts.appendChild(btn("Approve", "approve", true));
+    if (can.indexOf("reactivate") >= 0) acts.appendChild(btn("Reactivate", "reactivate", true));
+    if (can.indexOf("hold") >= 0) acts.appendChild(btn("Hold", "hold", false));
+    var more = [];
+    if (can.indexOf("suspend") >= 0) more.push(["Suspend account", "ban", function () { acctDo(p, co, "suspend"); }, true]);
+    if (can.indexOf("credits") >= 0) more.push(["Change credits", "coin", function () { HUB.ctl = HUB.ctl === pk + ":cr" ? null : pk + ":cr"; renderSection(); }, false]);
+    if (more.length) {
+      var open = HUB.ctl === pk + ":m";
+      var mb = h("button", { class: "cc-rowmenu-btn", type: "button", "aria-expanded": open ? "true" : "false", "aria-label": "More actions for " + (p.name || p.email),
+        onclick: function () { HUB.ctl = open ? null : pk + ":m"; renderSection(); } }, icon("dots"));
+      acts.appendChild(mb);
+      if (open) {
+        var pop = h("div", { class: "cc-pop", role: "menu" });
+        more.forEach(function (m) {
+          pop.appendChild(h("button", { type: "button", role: "menuitem", class: m[3] ? "is-danger" : "", onclick: function () { HUB.ctl = null; m[2](); } }, icon(m[1]), m[0], h("span", { class: "cc-lockmark" }, icon("shield"), "Code")));
+        });
+        pop.appendChild(h("small", null, "\"Code\" asks for a fresh emailed code. Every change is in History with undo."));
+        acts.appendChild(pop);
+      }
+    }
+    out.appendChild(acts);
+    if (HUB.ctl === pk + ":cr") {
+      var amt = h("input", { type: "number", min: "-1000", max: "1000", step: "1", placeholder: "+10 or -5", "aria-label": "Credits to add (negative removes)" });
+      var why = h("input", { type: "text", maxlength: "100", placeholder: "Reason (optional)", "aria-label": "Reason" });
+      var go = h("button", { class: "hc-btn hc-btn--sm", type: "button" }, "Change credits");
+      go.addEventListener("click", function () { go.disabled = true; acctDo(p, co, "credits", { amount: Number(amt.value), reason: why.value }, function () { HUB.ctl = null; }).then(function () { go.disabled = false; }); });
+      out.appendChild(h("div", { class: "cc-credform" }, amt, why, go, h("button", { class: "hc-more", type: "button", onclick: function () { HUB.ctl = null; renderSection(); } }, "Cancel")));
+    }
+    return out;
+  }
   function personBlock(p, co) {
     var admin = HUB.role === "admin";
     var pk = (co.key || "") + ":" + (p.id || p.email || p.name), open = !!HUB.openP[pk];
@@ -1824,11 +1887,12 @@
         co.kam && co.kam.email ? "Follows the company (" + kamName(co.kam.email) + ")" : "No account manager", function (v) {
           hubSetKam("person", p.id, v, function () { p.kam = v || (co.kam && co.kam.email) || ""; renderSection(); });
         })) : (p.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(p.kam)) : null));
+    var ctl = p.id && !p.staff && p.state ? acctControls(p, co) : null;
     var sels = h("ul", { class: "hb-items" }), camps = h("ul", { class: "hb-items" });
     var loose = p.selections.filter(function (x) { return !x.in_campaign; });
     loose.forEach(function (x) { sels.appendChild(itemRow("selection", x, co)); });
     p.campaigns.forEach(function (x) { camps.appendChild(itemRow("campaign", x, co)); });
-    return h("section", { class: "hb-p" + (open ? " is-open" : "") }, head, open ?
+    return h("section", { class: "hb-p" + (open ? " is-open" : "") }, head, ctl, open ?
       h("div", { class: "hb-p__cols" },
         h("div", null, h("h4", null, "Campaigns, each with its selection ", h("span", null, String(p.campaigns.length))), p.campaigns.length ? camps : h("p", { class: "hb-none" }, "No campaigns.")),
         h("div", null, h("h4", null, "Selections without a campaign ", h("span", null, String(loose.length))), loose.length ? sels : h("p", { class: "hb-none" }, "None."))) : null);
@@ -1838,7 +1902,8 @@
     var btn = h("button", { class: "hb-co__btn", type: "button", "aria-expanded": open ? "true" : "false", "aria-controls": "hb-" + c.key.replace(/[^a-z0-9]/gi, "_"),
       onclick: function () { HUB.open[c.key] = !open; if (!open && !HUB.detail[c.key]) hubDetail(c.key); renderSection(); } },
       h("span", { class: "hb-co__name" }, h("b", null, c.name), c.domain ? h("small", null, c.domain) : (c.note ? h("small", null, c.note) : null)),
-      h("span", { class: "hb-co__n" }, plural(c.people, "person", "people") + " · " + plural(c.selections, "selection") + " · " + plural(c.campaigns, "campaign") + (c.live ? " · " + c.live + " live" : "")),
+      h("span", { class: "hb-co__n" }, plural(c.people, "person", "people") + " · " + plural(c.selections, "selection") + " · " + plural(c.campaigns, "campaign") + (c.live ? " · " + c.live + " live" : ""),
+        c.waiting ? h("span", { class: "cc-badge" }, c.waiting + " waiting") : null, c.blocked ? h("span", { class: "cc-badge cc-badge--grey" }, c.blocked + " held or suspended") : null),
       h("span", { class: "hb-chev", "aria-hidden": "true", html: '<svg viewBox="0 0 12 12"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' }));
     var kam = admin && c.domain ? h("label", { class: "hb-lab" }, "KAM", kamSelect(c.kam.email, "Account manager for " + c.name, "No account manager", function (v) {
       hubSetKam("company", c.domain, v, function () { c.kam = { email: v, name: kamName(v) }; HUB.detail = {}; renderSection(); if (HUB.open[c.key]) hubDetail(c.key); });
@@ -1927,6 +1992,8 @@
     q.addEventListener("input", function () { HUB.q = q.value; var pos = q.selectionStart; renderSection(); var n = document.querySelector(".hb-search"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } });
     var bar = h("div", { class: "kc-filter", role: "group", "aria-label": "Show" });
     [["all", "All companies", HUB.list.length], ["live", "With a live campaign", HUB.list.filter(function (c) { return c.live > 0; }).length],
+     ["waiting", "Waiting approval", HUB.list.filter(function (c) { return c.waiting > 0; }).length],
+     ["blocked", "Held or suspended", HUB.list.filter(function (c) { return c.blocked > 0; }).length],
      ["nokam", "No account manager", HUB.list.filter(function (c) { return !c.kam.email && c.key !== "handed" && c.key !== "unassigned" && c.key !== "team"; }).length]].forEach(function (f) {
       bar.appendChild(h("button", { class: "kc-chip", type: "button", "aria-pressed": HUB.f === f[0] ? "true" : "false",
         onclick: function () { HUB.f = f[0]; renderSection(); } }, f[1], h("span", null, String(f[2]))));

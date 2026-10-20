@@ -1078,3 +1078,42 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
   .cc-code input { height: 52px; font-size: 28px; }
 }
 @media (prefers-reduced-motion: reduce) { .cc-skel { animation: none; } }
+
+/* Account controls on a person in the Companies hub (item 209, slice b). */
+.cc-ctl { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; position: relative; }
+.cc-ctl__acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.cc-ctl .hc-btn--sm { min-height: 40px; font-size: 17px; padding: 0 16px; }
+.cc-stat { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.cc-stat::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.cc-stat--wait { color: #8f4706; background: #fff1e2; }
+.cc-stat--active { color: #0e6b39; background: #e7f7ed; }
+.cc-stat--held { color: var(--gray); background: var(--stone); }
+.cc-stat--susp { color: #b00e0e; background: #fde9e9; }
+.cc-cred { display: inline-flex; align-items: center; gap: 5px; font-size: 13px; font-weight: 600; color: var(--gray); }
+.cc-cred .hv-i { width: 15px; height: 15px; }
+.cc-rowmenu-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--rule); background: var(--white); display: grid; place-items: center; cursor: pointer; color: var(--ink); }
+.cc-rowmenu-btn[aria-expanded="true"] { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.cc-rowmenu-btn:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.cc-rowmenu-btn .hv-i { width: 18px; height: 18px; }
+.cc-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: 268px; background: var(--white); border-radius: 18px; padding: 8px;
+  box-shadow: 0 24px 60px rgba(18,18,18,.22), 0 2px 8px rgba(18,18,18,.08); }
+.cc-pop button { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-sm); background: none;
+  font: 500 14px var(--body); color: var(--ink); cursor: pointer; text-align: left; }
+.cc-pop button:hover { background: var(--stone); }
+.cc-pop button:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 1px; }
+.cc-pop .hv-i { width: 18px; height: 18px; flex: none; }
+.cc-pop .is-danger { color: #b00e0e; }
+.cc-pop .cc-lockmark { margin-left: auto; display: inline-flex; gap: 4px; align-items: center; font-size: 11px; font-weight: 700; color: var(--gray); }
+.cc-pop .cc-lockmark .hv-i { width: 13px; height: 13px; }
+.cc-pop small { display: block; padding: 4px 12px 6px; font-size: 12px; color: var(--gray); }
+.cc-credform { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; width: 100%; padding: 10px 12px; border-radius: 18px; background: var(--linen); }
+.cc-credform input { min-height: 44px; border-radius: var(--r-pill); border: 1px solid rgba(18,18,18,.2); padding: 0 16px; font: 400 15px var(--body); background: var(--white); min-width: 0; }
+.cc-credform input[type="number"] { width: 130px; }
+.cc-credform input[type="text"] { flex: 1 1 180px; }
+.cc-credform input:focus { outline: 3px solid var(--vivid-red); outline-offset: 1px; border-color: var(--ink); }
+.cc-badge { display: inline-flex; align-items: center; font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: #fff1e2; color: #8f4706; white-space: nowrap; margin-left: 8px; }
+.cc-badge--grey { background: var(--stone); color: var(--gray); }
+@media screen and (max-width: 760px) {
+  .cc-ctl__acts { margin-left: 0; width: 100%; }
+  .cc-pop { left: 0; right: 0; width: auto; }
+}

@@ -585,7 +585,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/edit": self.api_board_edit, "/api/board/logo": self.api_board_logo,
             "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
             "/api/selection/merge": self.api_selection_merge,
-            "/api/needs/approve": self.api_needs_approve,
+            "/api/needs/approve": self.api_needs_approve, "/api/hub/account": self.api_hub_account,
             "/api/stepup/send": self.api_stepup_send, "/api/stepup/verify": self.api_stepup_verify,
         }
         fn = routes.get(path)
@@ -1278,6 +1278,22 @@ class PortalMixin(connect_api.ConnectMixin):
             return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
         ok, msg = needs.approve(role, a, self.json_body().get("id"))
         return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
+
+    def api_hub_account(self):
+        """Approve, hold, reactivate, suspend or change credits for a person on a company page. {id, action, amount?, reason?}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub, peoplectl, stepup
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        if self._throttled("hubacct:%d" % who[1]["id"], 120, 3600):
+            return
+        b = self.json_body()
+        code, got = peoplectl.act(role, a, who[1], b.get("id"), str(b.get("action") or ""), b.get("amount"), str(b.get("reason") or ""),
+                                  stepup_open=stepup.active(who[1]) > 0)
+        return self.send_json(code, got, self.cors())
 
     def api_stepup_send(self):
         """Email the signed-in team member a fresh confirmation code."""

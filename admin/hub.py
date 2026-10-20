@@ -218,6 +218,8 @@ def _name_of(key, g):
 
 
 def companies(role, a):
+    import peoplectl
+    peoplectl.ensure()
     groups, allu, scoped = _groups(role, a)
     dmap = kam_scope.domain_map()
     kam = _item_kams()
@@ -231,7 +233,9 @@ def companies(role, a):
         k_email = "" if key.startswith(FREE) else dmap.get(key, "")
         rows.append({"key": key, "name": _name_of(key, g), "domain": "" if key.startswith(FREE) else key,
                      "kam": {"email": k_email, "name": _kam_name(k_email) if k_email else ""},
-                     "people": len(g["users"]), "selections": sels, "campaigns": camps, "live": live})
+                     "people": len(g["users"]), "selections": sels, "campaigns": camps, "live": live,
+                     "waiting": sum(1 for u in g["users"] if peoplectl.state(u) == "waiting"),
+                     "blocked": sum(1 for u in g["users"] if peoplectl.state(u) in ("held", "suspended"))})
     handed_n = 0
     if role == "kam":
         hs, hc = _handed(a)
@@ -262,6 +266,8 @@ def companies(role, a):
 
 
 def company(role, a, key):
+    import peoplectl, portal
+    peoplectl.ensure()
     dmap = kam_scope.domain_map()
     kam = _item_kams()
     if key == "team" and role == "kam":
@@ -304,7 +310,9 @@ def company(role, a, key):
         s, c = items.get(u["code_id"], ([], []))
         out.append({"id": u["id"], "name": u["name"] or "", "email": u["email"], "job_title": u["job_title"] or "",
                     "company": u["company"] or "", "kam": _kam_of_user(u, dmap), "last_login_at": u["last_login_at"],
-                    "status": u["status"], "selections": [_sel_row(x, kam) for x in s], "campaigns": [_camp_row(x, kam) for x in c]})
+                    "status": u["status"], "state": peoplectl.state(u), "can": peoplectl.allowed(role, a, u),
+                    "credits": portal.balance(u["code_id"]) if u["code_id"] is not None else 0,
+                    "selections": [_sel_row(x, kam) for x in s], "campaigns": [_camp_row(x, kam) for x in c]})
     k_email = "" if key.startswith(FREE) else dmap.get(key, "")
     return {"key": key, "name": _name_of(key, g), "domain": "" if key.startswith(FREE) else key,
             "kam": {"email": k_email, "name": _kam_name(k_email) if k_email else ""}, "people": _annotate(role, a, out)}
