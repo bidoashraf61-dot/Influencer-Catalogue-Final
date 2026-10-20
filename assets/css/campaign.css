@@ -58,6 +58,8 @@
 .mx-camp__state--live::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--vivid-red); animation: mx-pulse 1.6s ease-in-out infinite; }
 .mx-camp__state--done { color: var(--go); }
 .mx-camp__state--done::before { content: "✓"; font-weight: 700; }
+.mx-camp__pin { display: inline-block; vertical-align: middle; margin-left: 8px; padding: 3px 10px; border-radius: var(--r-pill); font-size: 12px; font-weight: 600; letter-spacing: .02em; background: #ff691e; color: #fff; }
+.mx-camp--pinned { box-shadow: 0 0 0 2px #ff691e inset; }
 @keyframes mx-pulse { 50% { opacity: .35; } }
 
 .mx-camp__row { display: grid; grid-template-columns: 1fr auto; gap: 28px; align-items: center; }

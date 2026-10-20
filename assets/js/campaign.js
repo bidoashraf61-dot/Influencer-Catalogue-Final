@@ -193,9 +193,9 @@
       var now = Date.now() / 1000, span = c.starts_at && c.ends_at ? Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400)) : 0;
       var dn = span ? Math.min(span, Math.max(0, Math.ceil((now - c.starts_at) / 86400))) : 0;
       var when = !span ? "" : now < c.starts_at ? "Starts " + day(c.starts_at) : now <= c.ends_at ? "Day " + dn + " of " + span : "Ran " + span + " days";
-      return '<article class="mx-camp" data-i="' + i + '"><div class="mx-camp__head"><div class="mx-camp__logos">'
+      return '<article class="mx-camp' + (c.pinned ? " mx-camp--pinned" : "") + '" data-i="' + i + '"><div class="mx-camp__head"><div class="mx-camp__logos">'
         + (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("") + "</div>"
-        + '<div class="mx-camp__id"><h2 class="mx-camp__name">' + esc(c.name) + '</h2><div class="mx-camp__meta">'
+        + '<div class="mx-camp__id"><h2 class="mx-camp__name">' + esc(c.name) + (c.pinned ? ' <span class="mx-camp__pin" title="Pinned for the HelloVoice team">Pinned · Demo</span>' : "") + '</h2><div class="mx-camp__meta">'
         + esc([c.client, c.starts_at ? day(c.starts_at) + " – " + day(c.ends_at) : "", when].filter(Boolean).join(" · ")) + "</div></div>"
         + '<span class="mx-camp__state mx-camp__state--' + (c.draft ? "draft" : c.status === "live" ? "live" : "done") + '">' + (c.draft ? "Draft" : c.status === "live" ? "Live" : "Completed") + "</span></div>"
         + '<div class="mx-camp__row"><div class="mx-camp__prog">' + (c.draft
@@ -212,7 +212,7 @@
       if (c.draft) { if (!--left) $("mx-sum-totals").innerHTML = tile("People reached", num(agg.reach), "") + tile("Posts live", full(agg.posts), "") + tile("Engagement", num(agg.eng), ""); return; }
       get("/api/campaign?t=" + encodeURIComponent(c.token)).then(function (b) {
         var R = b.report, t = R.total || {}, card = document.querySelector('.mx-camp[data-i="' + i + '"]');
-        agg.reach += t.seen != null ? t.seen : (t.views || 0); agg.eng += t.engagement || 0; agg.posts += t.posts || 0; agg.clicks += t.clicks || 0;
+        if (!c.pinned) { agg.reach += t.seen != null ? t.seen : (t.views || 0); agg.eng += t.engagement || 0; agg.posts += t.posts || 0; agg.clicks += t.clicks || 0; }
         card.querySelector(".mx-camp__prog").innerHTML = progress(R, c.status === "ended");
       }).catch(function () { var card = document.querySelector('.mx-camp[data-i="' + i + '"]'); card.querySelector(".mx-camp__prog").innerHTML = '<p class="mx-camp__wait">Progress is not available right now.</p>'; })
         .then(function () {
