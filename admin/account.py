@@ -179,6 +179,11 @@ def _next_step(user, selections, analyses, comp, kam):
             "tail": ".", "cta": "Find creators", "href": ""}
 
 
+def _may_rename(code_id, sel):
+    import selrename
+    return selrename.client_may(code_id, sel, db.admin_code_id())
+
+
 def summary(user, code_id, secret=b""):
     """Everything /account/ shows, in one payload. Client-safe: no costs,
     margins or internal notes ever leave here."""
@@ -228,6 +233,8 @@ def summary(user, code_id, secret=b""):
                            # Only the client's own work can be deleted: not a colleague's, not HelloVoice's.
                            "can_delete": (s["origin"] or "admin") == "client" and code_id != db.admin_code_id()
                                          and portal.owns(code_id, s["code_id"]),
+                           # Rename (item 173): the owner, never a colleague or someone it was shared with.
+                           "can_rename": _may_rename(code_id, s),
                            "counts": selstatus.counts(codes, st, tiers),
                            "quote": lifecycle.chip(s)})
 

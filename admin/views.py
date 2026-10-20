@@ -2361,8 +2361,8 @@ def selections_page(sels, error=None, message=None, origin="", archived=False, n
         client = ("<span class='pill own'>" + e(x["code_label"]) + "</span>" if ("code_label" in x.keys() and x["code_label"])
                   else "<span class='pill warn'>No client</span>")
         rows.append(
-            "<tr><td><strong><a href='" + u("/selections/edit") + "?id=" + str(x["id"]) + "'>"
-            + e(x["name"]) + "</a></strong>" + client_deleted_pill(x)
+            "<tr><td><strong>" + _selrename.admin_name(x["id"], x["name"], u("/selections/edit") + "?id=" + str(x["id"]), u("/selections/rename"))
+            + "</strong>" + client_deleted_pill(x)
             + "</td><td>" + client + "</td><td>" + prog + "<span class='muted' style='font-size:var(--t-xs,12px)'>Next: " + nxt + "</span></td><td>" + str(n)
             + "</td><td>" + total + "</td><td class='muted'>" + ago(x["updated_at"])
             + "</td><td class='right nowrap'><a class='btn small' href='" + u("/selections/edit") + "?id="
@@ -5538,6 +5538,8 @@ EDITOR_VER = __import__("hashlib").sha256(EDITOR_JS.encode()).hexdigest()[:10]
 
 # Page-independent scripts join the cached /shell.js (round 4 follow-up).
 ui.add_shell_js(PULSE_JS, SCROLL_JS.replace("<script>", "").replace("</script>", ""))
+import selrename as _selrename  # noqa: E402  item 173: inline rename on the admin lists
+_selrename.register_admin_js()
 
 
 # ------------------------------------------------- key account managers --

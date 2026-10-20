@@ -2232,6 +2232,7 @@
                         platform: b.platform || "",
                         status: b.status || {}, statusCounts: b.status_counts || null, role: b.role || "viewer",
                         owner: b.owner || "", kam: b.kam || "", credits: b.credits, lifecycle: b.lifecycle || null,
+                        canRename: !!b.can_rename,   // item 173: owner, its KAM, HelloVoice
                         // 0 while AI is free (active campaign); null only on an old server.
                         replaceCost: b.replace_cost != null ? b.replace_cost : 2, moreCost: b.more_cost != null ? b.more_cost : 3,
                         alikeCost: b.alike_cost != null ? b.alike_cost : 2, aiFree: b.ai_free || null,
@@ -3387,6 +3388,14 @@
         });
         if (n) { render(); saveShortlist(); }
         return n;
+      },
+      // Item 173: the server renamed it (connect.js's inline editor); the page, the tab title and the link follow.
+      rename: function (name) {
+        if (!name) return;
+        selectionName = name;
+        if (CURATED) CURATED.name = name;
+        history.replaceState(null, "", buildFragment(selectionName, selected));
+        render();
       },
       toast: function (t) { stToast(t); },
       rerender: function () { render(); },

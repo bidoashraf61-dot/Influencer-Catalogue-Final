@@ -171,8 +171,9 @@ def _panel(r, back):
         code = conn.execute("SELECT * FROM codes WHERE id = ?", (r["code_id"],)).fetchone() if r["code_id"] else None
     tone = {"draft": "", "requested": "wait", "ready": "wait", "approved": "ok", "live": "ok", "completed": "code"}
     from views import open_link
-    sel_html = "".join("<div class='hb-mini'><a href='%s'>%s</a><span style='display:flex;gap:8px;align-items:center'>%s<span class='hb-st %s'>%s</span></span></div>" % (
-        u("/selections/edit") + "?id=%d" % s["id"], e(s["name"]), open_link("selection", s["token"], "Client view", "hb-mut"), tone.get(ch["key"], ""), e(ch["label"]))
+    import selrename                     # item 173: rename in place from the panel
+    sel_html = "".join("<div class='hb-mini'>%s<span style='display:flex;gap:8px;align-items:center'>%s<span class='hb-st %s'>%s</span></span></div>" % (
+        selrename.admin_name(s["id"], s["name"], u("/selections/edit") + "?id=%d" % s["id"], u("/selections/rename")), open_link("selection", s["token"], "Client view", "hb-mut"), tone.get(ch["key"], ""), e(ch["label"]))
         for s in sels for ch in [lifecycle.chip(s)]) or "<p class='hb-mut' style='margin:0'>No selections yet.</p>"
     live = sum(1 for s in sels if lifecycle.chip(s)["key"] == "live")
     kv = ("<div class='hb-kv'><div><b>%s</b><span>AI credits</span></div><div><b>%d</b><span>selection%s</span></div><div><b>%d</b><span>campaign%s live</span></div></div>" % (

@@ -320,7 +320,7 @@ _PORTAL_TABS = {"accounts", "briefs", "chats"}
 # POSTs with no client in them that a KAM may still make: herself, the copilot's read-only chat, creators.
 _POST_FREE = {"/access-requests", "/reauth", "/password", "/ai/chat", "/ai/dismiss", "/roster/save", "/roster/bulk", "/licences/save",
               "/licences/scan"}
-_POST_SELECTION = {"/selections/save", "/selections/delete", "/selections/status", "/quote/ready", "/quote/withdraw", "/selections/invite"}
+_POST_SELECTION = {"/selections/rename", "/selections/save", "/selections/delete", "/selections/status", "/quote/ready", "/quote/withdraw", "/selections/invite"}
 _POST_CAMPAIGN = {"/campaigns/comments", "/campaigns/save", "/campaigns/status", "/campaigns/delete", "/campaigns/link",
                   "/campaigns/content/add", "/campaigns/content/update", "/campaigns/content/group", "/campaigns/content/bulk",
                   "/campaigns/content/pending", "/campaigns/insights/decide", "/campaigns/insights/upload",

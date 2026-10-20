@@ -27,6 +27,122 @@
 
   function ready(fn) { if (HV.h) fn(); else setTimeout(function () { ready(fn); }, 40); }
 
+  /* ---------------------------------------------- rename a selection (item 173)
+   * One inline editor for every client door: the selection page's title and the rows of
+   * /account/'s Selections list. A "Rename" control sits beside the name; it opens a field in
+   * the name's own place and type. Enter or Save keeps it, Esc or Cancel puts the name back.
+   * The server decides who may (owner, its account manager, HelloVoice) and checks the name
+   * (1 to 80 characters); the page only shows the control when the server said can_rename. */
+  var RN_MAX = 80;
+  var RN_PEN = '<svg class="hv-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" ' +
+    'stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 19.5l1-4.2L15.8 5a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.7 18.5z"/><path d="M13.8 7l3.2 3.2M4.5 19.5h5"/></svg>';
+  function rnEl(tag, attrs, kids) {
+    var e = document.createElement(tag);
+    Object.keys(attrs || {}).forEach(function (k) {
+      if (k === "html") e.innerHTML = attrs[k];
+      else if (k === "text") e.textContent = attrs[k];
+      else if (attrs[k] != null) e.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) { if (c) e.appendChild(typeof c === "string" ? document.createTextNode(c) : c); });
+    return e;
+  }
+  function rnSay(text) {
+    var live = document.getElementById("hv-rn-live");
+    if (!live) { live = rnEl("p", { id: "hv-rn-live", class: "hv-rn-sr", role: "status", "aria-live": "polite" }); document.body.appendChild(live); }
+    live.textContent = ""; setTimeout(function () { live.textContent = text; }, 30);
+  }
+  // opts: shown (the element showing the name), token, name() -> current name, done(newName),
+  // label (accessible name of the control), size ("hero" takes the title's own type; "row" is compact).
+  function renameButton(opts) {
+    var btn = rnEl("button", { type: "button", class: "hv-rn-btn hv-rn-btn--" + (opts.size || "row"),
+      "aria-label": "Rename " + (opts.label || "selection"), title: "Rename",
+      html: RN_PEN + '<span class="hv-rn-btn__t">Rename</span>' });
+    btn.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); openRename(opts, btn); });
+    return btn;
+  }
+  function openRename(opts, btn) {
+    var shown = opts.shown, was = opts.name();
+    if (!shown || document.querySelector(".hv-rn[data-open]")) return;
+    var input = rnEl("input", { type: "text", class: "hv-rn__in", maxlength: String(RN_MAX + 20), value: was,
+      "aria-label": "Selection name", autocomplete: "off", spellcheck: "true", enterkeyhint: "done", autocapitalize: "sentences" });
+    input.value = was;
+    var count = rnEl("span", { class: "hv-rn__count", "aria-hidden": "true" });
+    var err = rnEl("p", { class: "hv-rn__err", role: "alert", hidden: "" });
+    var save = rnEl("button", { type: "submit", class: "hv-rn__save" }, ["Save"]);
+    var cancel = rnEl("button", { type: "button", class: "hv-rn__cancel" }, ["Cancel"]);
+    var form = rnEl("form", { class: "hv-rn hv-rn--" + (opts.size || "row"), "data-open": "1", novalidate: "" },
+      [input, rnEl("div", { class: "hv-rn__bar" }, [save, cancel, count]), err]);
+    if (opts.size === "hero") {
+      // The field takes the title's own lettering, so the name is edited where it reads.
+      var cs = getComputedStyle(shown);
+      ["fontFamily", "fontSize", "fontWeight", "letterSpacing", "textTransform", "color"].forEach(function (k) { input.style[k] = cs[k]; });
+      input.style.lineHeight = "1.1";
+      // Capped, so a long name still fits on one line while it is edited (the title itself runs huge).
+      input.style.fontSize = Math.min(parseFloat(cs.fontSize) || 56, 56) + "px";
+    }
+    function left() { return RN_MAX - input.value.trim().replace(/\s+/g, " ").length; }
+    function tick() {
+      var n = left();
+      count.textContent = n < 0 ? (-n) + " too many" : n + " left";
+      count.classList.toggle("is-near", n <= 15);
+      count.classList.toggle("is-over", n < 0);
+      err.hidden = true; input.removeAttribute("aria-invalid");
+    }
+    function close(focusBack) {
+      form.remove(); shown.hidden = false; btn.hidden = false;
+      document.removeEventListener("keydown", onKey, true);
+      if (focusBack) btn.focus();
+    }
+    function fail(msg) {
+      err.textContent = msg; err.hidden = false; input.setAttribute("aria-invalid", "true");
+      form.removeAttribute("aria-busy"); input.disabled = save.disabled = cancel.disabled = false; input.focus();
+    }
+    function onKey(e) {
+      if (e.key === "Escape" && form.contains(document.activeElement)) { e.preventDefault(); e.stopPropagation(); close(true); }
+    }
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      var name = input.value.trim().replace(/\s+/g, " ");
+      if (!name) return fail("Give the selection a name.");
+      if (name.length > RN_MAX) return fail("Keep the name to " + RN_MAX + " characters or fewer.");
+      if (name === was) { close(true); return; }
+      form.setAttribute("aria-busy", "true"); input.disabled = save.disabled = cancel.disabled = true;
+      save.textContent = "Saving";
+      HV.api("POST", "/api/selection/rename", { token: opts.token, name: name }).then(function (r) {
+        save.textContent = "Save";
+        if (!r.b || !r.b.ok) return fail((r.b && r.b.message) || (r.s === 0 ? "Could not reach the server. Please try again." : "Couldn't rename it. Please try again."));
+        close(false);
+        opts.done(r.b.name);
+        btn.focus();
+        rnSay("Renamed to " + r.b.name + ".");
+      });
+    });
+    cancel.addEventListener("click", function () { close(true); });
+    input.addEventListener("input", tick);
+    // Clicks inside the field never reach a row link or a card underneath.
+    form.addEventListener("click", function (e) { e.stopPropagation(); });
+    document.addEventListener("keydown", onKey, true);
+    shown.hidden = true; btn.hidden = true;
+    shown.parentNode.insertBefore(form, shown.nextSibling);
+    tick();
+    input.focus();
+    try { input.setSelectionRange(0, input.value.length); } catch (x) { /* old browser */ }
+  }
+  HV.renameButton = renameButton;
+
+  // The selection page: under the title, for the owner, its account manager and HelloVoice.
+  function mountRename() {
+    var S = window.hvSelection, title = document.getElementById("sel-title");
+    var cur = S && S.curated && S.curated();
+    if (!title || !cur || !cur.canRename || !cur.token || !S.rename || document.getElementById("hv-rn-sel")) return;
+    var b = renameButton({ shown: title, token: cur.token, size: "hero", label: "this selection",
+      name: function () { return S.name() || title.textContent; },
+      done: function (n) { S.rename(n); } });
+    b.id = "hv-rn-sel";
+    title.parentNode.insertBefore(b, title.nextSibling);
+  }
+
+
   ready(function () {
     var h = HV.h, api = HV.api, ROOT = HV.root;
     function ic(n, cls) { return HV.icon(n, "cx-i" + (cls ? " " + cls : "")); }
@@ -593,6 +709,7 @@
     }
     function mountSelection() {
       mountLifecycle();
+      mountRename();                 // item 173: rename the selection from its own page
       var S = window.hvSelection;
       if (!S || !S.token() || document.getElementById("cx-selact")) return;
       // Bottom row of the selection header, pushed to its right end (CSS), a lime primary button.
@@ -1251,6 +1368,7 @@
       if (PAGE === "creator") mountCreatorIdeas();
     }
     if (HV.me) onMe(); else document.addEventListener("hv:me", onMe);
+
     if (window.hvSelection) mountSelection();
     document.addEventListener("hv:selection", function () { setTimeout(mountSelection, 0); });
   });

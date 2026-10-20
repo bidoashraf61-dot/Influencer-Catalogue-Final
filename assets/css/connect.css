@@ -1002,3 +1002,49 @@
 /* Selection → its campaign: dashboard first, report beside it (owner, 2026-10-15). */
 .cx-lc__go { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
 @media (max-width: 560px) { .cx-lc__go .cx-btn { flex: 1 1 100%; justify-content: center; } }
+
+/* ------------------------------------------------ Rename a selection (item 173)
+   One control beside the name, one field in the name's own place. The field keeps the name's
+   lettering (the hero copies the title's computed type; a list row uses the row name's), and
+   a lime marker band under the text says "you are editing this". */
+.hv-rn-btn { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 12px;
+  border: 1px solid transparent; border-radius: var(--r-pill); background: none; color: var(--gray); font: 600 13.5px/1 var(--body);
+  cursor: pointer; transition: color .2s ease, border-color .2s ease, background-color .2s ease; }
+.hv-rn-btn .hv-i { width: 17px; height: 17px; }
+.hv-rn-btn:hover { color: var(--ink); border-color: rgba(18,18,18,.25); background: var(--linen); }
+.hv-rn-btn:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.hv-rn-btn--hero { margin: 2px 0 6px -12px; }
+.hv-rn-btn[hidden] { display: none; }
+.hc-row__tools { display: contents; }
+
+.hv-rn { position: relative; z-index: 2; display: grid; gap: 10px; width: 100%; max-width: 100%; margin: 0; }
+.hv-rn--hero { margin: 0 0 14px; padding-top: 22px; }
+.hv-rn__in { box-sizing: border-box; width: 100%; min-width: 0; margin: 0; border: 0; border-bottom: 2px solid var(--ink); border-radius: 0;
+  background: transparent; color: var(--ink); caret-color: var(--vivid-orange); padding: 0 0 4px; outline: none;
+  transition: box-shadow .2s cubic-bezier(.16,1,.3,1); }
+.hv-rn__in:focus { box-shadow: inset 0 -.22em 0 var(--lime); }
+.hv-rn__in[aria-invalid="true"] { border-bottom-color: #c01010; }
+.hv-rn__in:disabled { opacity: .65; }
+.hv-rn--row .hv-rn__in { font: 400 26px/1.1 var(--heading); letter-spacing: .01em; padding: 4px 0 6px; }
+.hv-rn__bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.hv-rn__save, .hv-rn__cancel { min-height: 44px; padding: 0 22px; border-radius: var(--r-pill); font: 400 18px/1 var(--heading); letter-spacing: .06em;
+  cursor: pointer; transition: background-color .2s ease, color .2s ease; }
+.hv-rn__save { border: 1.5px solid var(--lime); background: var(--lime); color: var(--ink); }
+.hv-rn__save:hover:not(:disabled) { background: var(--ink); border-color: var(--ink); color: var(--lime); }
+.hv-rn__cancel { border: 1.5px solid var(--ink); background: transparent; color: var(--ink); }
+.hv-rn__cancel:hover:not(:disabled) { background: var(--ink); color: var(--lime); }
+.hv-rn__save:focus-visible, .hv-rn__cancel:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.hv-rn__save:disabled, .hv-rn__cancel:disabled { opacity: .6; cursor: default; }
+.hv-rn__count { margin-left: auto; font: 500 12.5px/1.3 var(--body); color: var(--gray); font-variant-numeric: tabular-nums; }
+.hv-rn__count.is-near { color: #a85507; }
+.hv-rn__count.is-over { color: #c01010; font-weight: 700; }
+.hv-rn__err { margin: 0; font: 600 14px/1.4 var(--body); color: #c01010; }
+.hv-rn__err[hidden] { display: none; }
+.hv-rn-sr { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+@media (max-width: 640px) {
+  .hv-rn__save, .hv-rn__cancel { flex: 1 1 0; }
+  .hv-rn__count { flex: 1 0 100%; margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hv-rn-btn, .hv-rn__in, .hv-rn__save, .hv-rn__cancel { transition: none; }
+}
