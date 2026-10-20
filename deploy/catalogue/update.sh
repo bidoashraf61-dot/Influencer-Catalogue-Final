@@ -65,7 +65,8 @@ cp "$SRC/account/index.html"        "$DST/account/index.html"
 cp "$SRC/privacy/index.html"        "$DST/privacy/index.html"
 cp "$SRC/terms/index.html"          "$DST/terms/index.html"
 # "How HELVi works" (item 179): the onboarding film page, hand-written. The film itself is
-# assets/welcome/onboarding.mp4 (rsynced with the other assets above).
+# assets/welcome/onboarding-film.mp4, uploaded to the server by hand (not in git: it shows real
+# creators and the repo is public); rsync never deletes it.
 cp "$SRC/welcome/index.html"        "$DST/welcome/index.html"
 # HELVi Connect app (item 168): the service worker, manifest and offline page live at the site root.
 cp "$SRC/sw.js"                     "$DST/sw.js"

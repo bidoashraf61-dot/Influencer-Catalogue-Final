@@ -4,22 +4,25 @@
  * presses play or picks a chapter, so the page costs only its poster. Chapters are the notes
  * on what the portal does; once the real film is in, each one also jumps to its moment.
  *
- * When the final film lands at assets/welcome/onboarding.mp4: set each chapter's start (t, in
- * seconds) and TIMED = true. Until then the chapters play the film from the start and show no
- * times, so a placeholder never promises a moment it does not have.
+ * The film (Bido, 2026-10-20, 5:45) lives ONLY on the server at assets/welcome/onboarding-film.mp4:
+ * it shows real creators, and this repo is public, so it is gitignored. Chapter times (t, seconds)
+ * match that cut; re-time them if the film is re-edited.
  */
 (function () {
   "use strict";
-  var TIMED = false;
+  var TIMED = true;
   var CHAPTERS = [
-    { t: 0,  name: "Meet HELVi",        note: "HelloVoice's creator portal, and Helvi, the assistant who works it with you." },
-    { t: 10, name: "Brief Helvi",       note: "Type it, say it, or paste your product link. Helvi reads the brief and builds a shortlist of vetted creators." },
-    { t: 24, name: "Browse and filter", note: "Platform, size, city, audience and licence. Every creator is checked by HelloVoice." },
-    { t: 36, name: "Your shortlist",    note: "Approve or reject each creator, and Helvi finds a replacement in seconds." },
-    { t: 50, name: "Ask about a creator", note: "Your account manager tells you about a finalist's audience, past brand work and rates." },
-    { t: 62, name: "Request a quote",   note: "Your account manager replies within one working day, right in your bell." },
-    { t: 74, name: "Track results",     note: "Every post, its views and engagement, verdict first, updated every 24 hours." },
-    { t: 87, name: "Take it with you",  note: "Selections, campaigns and credits live in your profile, and on your phone as the HELVi app." }
+    { t: 0,   name: "Meet HELVi",               note: "Why finding the right creators is hard, and the portal that fixes it." },
+    { t: 49,  name: "One portal, five steps",   note: "Browse, shortlist, score, quote and track: from search to a live campaign." },
+    { t: 66,  name: "Browse and filter",        note: "Vetted creators across every platform. Filter by tier, platform, location, interest and licence." },
+    { t: 96,  name: "Look closer at a creator", note: "Followers by platform, recent posts and the audience behind them." },
+    { t: 132, name: "Build a shortlist with AI", note: "Answer a few questions and Helvi picks the creators that fit your brief." },
+    { t: 166, name: "Ask Helvi",                note: "Chat with Helvi to find creators, change your selection or ask for a quote." },
+    { t: 180, name: "Your selection",           note: "Approve creators, add more like them, and get content ideas for each one." },
+    { t: 204, name: "Market intelligence",      note: "See which creators work with your competitors, and the views they get." },
+    { t: 240, name: "Request a quote",          note: "Happy with the selection? Send it for one clear quote." },
+    { t: 252, name: "Track results",            note: "Every campaign gets its own dashboard: posts, views, engagement and top creators." },
+    { t: 282, name: "What people say",          note: "Comments read for mood and buying questions, and the full report against your goals." }
   ];
 
   var video = document.getElementById("wl-video");

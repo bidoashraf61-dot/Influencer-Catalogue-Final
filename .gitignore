@@ -57,3 +57,6 @@ admin/.mail-graph
 admin/profile_media/
 # Web Push (VAPID) signing key: HELVi Connect app pushes. Never commit.
 admin/.vapid-key
+
+# The onboarding film shows real creators; it lives only on the server (item 179).
+assets/welcome/onboarding-film.mp4

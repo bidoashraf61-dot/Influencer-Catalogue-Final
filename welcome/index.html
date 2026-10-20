@@ -26,11 +26,11 @@
 HELVi Connect: "How HELVi works" (portal item 179). Public page, no sign-in: the onboarding
 film with its chapters, then one way in. It replaces the old in-portal tour (item 180).
 
-THE FILM: drop the final file at assets/welcome/onboarding.mp4 (H.264 + AAC, 16:9, 1920x1080
-or 1280x720, "faststart"), replace assets/welcome/onboarding-poster.jpg with a frame from it if
-wanted, then set the chapter start times and timed: true in assets/js/welcome.js. update.sh
-stamps both files with ?v=<hash>, so a new file reaches every browser and the installed app.
-Until then the file there is a 6-second branded placeholder.
+THE FILM lives only on the server at site/assets/welcome/onboarding-film.mp4 (H.264 + AAC,
+1920x1080, faststart, ~67 MB; source "Server Access/Onboarding Video/"). It is NOT in git: it shows
+real creators and this repo is public. To replace it, upload a new file to that path and run
+update.sh (or stamp_assets.py): the ?v=<hash> stamp changes, so every browser and the installed
+app fetch the new film. The poster is a frame from it (assets/welcome/onboarding-poster.jpg).
 
 The film is never downloaded until someone presses play (preload="none", no src until then).
 -->
@@ -63,7 +63,7 @@ The film is never downloaded until someone presses play (preload="none", no src 
         <div class="wl-film" id="wl-film">
           <video id="wl-video" class="wl-video" playsinline preload="none"
                  poster="../assets/welcome/onboarding-poster.jpg"
-                 data-src="../assets/welcome/onboarding.mp4"
+                 data-src="../assets/welcome/onboarding-film.mp4"
                  aria-label="How HELVi works, the onboarding film"></video>
           <button class="wl-play" id="wl-play" type="button">
             <span class="wl-play__disc" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>

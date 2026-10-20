@@ -276,10 +276,12 @@ setup prompts (desktop QR welcome, phone Home Screen guide, alerts card) and any
 closed, and the app's prompts in turn wait for it (`.cx-hiw` is in app.js's busy check).
 Code: `connect.js` (HOW HELVi WORKS block), styles in `connect.css`.
 
-**The film file:** `assets/welcome/onboarding.mp4` is a 6-second branded placeholder until the
-final film arrives. Replace it (H.264 + AAC, 16:9, faststart), optionally replace
-`assets/welcome/onboarding-poster.jpg`, then deploy: `update.sh` stamps both with `?v=<hash>`
-(the poster inside `account.js` too), so every browser and the installed app get the new file.
+**The film file:** the final film (2026-10-20, 5:45, ~67 MB) lives only on the server at
+`site/assets/welcome/onboarding-film.mp4`. It is gitignored because it shows real creators and
+this repo is public. To replace it, upload a new H.264 + AAC faststart file to that path and run
+`update.sh` (or `stamp_assets.py`): the `?v=<hash>` stamp changes, so every browser and the
+installed app fetch it. Chapter times in `assets/js/welcome.js` match this cut; re-time them if
+the film is re-edited. The poster `assets/welcome/onboarding-poster.jpg` is a frame from it.
 The service worker does not cache `/assets/welcome/` (range requests go straight to the network).
 
 Server side is unchanged: `POST /api/tour` and the `users.tour` column stay (credits already paid
