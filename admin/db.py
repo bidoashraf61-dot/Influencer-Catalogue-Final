@@ -2988,18 +2988,38 @@ def sync_from_selection(cid):
 
 # --------------------------------------------------------------- settings --
 
+# Settings are read on every creator a shortlist scores (the score engine, the benchmarks): 10,500
+# reads and as many connections per brief, ~10 of its 15 seconds (2026-10-20). The raw value is
+# kept for a few seconds; every write in this process clears it, and each read still parses its
+# own copy, so a caller changing what it got back changes nothing else.
+_SETTING_TTL = 3.0
+_setting_cache = {}
+
+
 def setting(key, default=None):
-    with connect() as conn:
-        row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
-    if row is None or row["value"] is None:
+    import time as _t
+    hit = _setting_cache.get(key)
+    if hit is not None and _t.time() - hit[0] < _SETTING_TTL:
+        raw = hit[1]
+    else:
+        with connect() as conn:
+            row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
+        raw = None if row is None else row["value"]
+        _setting_cache[key] = (_t.time(), raw)
+    if raw is None:
         return default
     try:
-        return json.loads(row["value"])
+        return json.loads(raw)
     except ValueError:
-        return row["value"]
+        return raw
+
+
+def clear_setting_cache():
+    _setting_cache.clear()
 
 
 def set_setting(key, value):
+    _setting_cache.pop(key, None)
     with connect() as conn:
         conn.execute("INSERT INTO settings (key, value) VALUES (?, ?) "
                      "ON CONFLICT(key) DO UPDATE SET value = excluded.value",

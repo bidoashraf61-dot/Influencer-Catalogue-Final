@@ -721,6 +721,8 @@ body.has-previewbar { padding-top: 36px; }
 .ai-sl__st.is-done { color: var(--ai-lime); }
 .ai-sl__st.is-done .ai-sl__st-dot { background: var(--ai-lime); box-shadow: none; }
 .ai-sl__st.is-done .ai-sl__st-dot::after { content: ""; position: absolute; left: 7px; top: 4px; width: 6px; height: 10px; border: solid var(--ai-ink); border-width: 0 2.4px 2.4px 0; transform: rotate(45deg); }
+.ai-sl__meter { display: flex; align-items: center; gap: 12px; margin-top: 22px; }
+.ai-sl__meter .ai-sl__bar { flex: 1; margin: 0; }
 .ai-sl__count { margin-left: auto; font-family: Bebasneue, Arial, sans-serif; font-weight: 400; font-size: 26px; letter-spacing: .03em; color: var(--ai-lime); font-variant-numeric: tabular-nums; }
 .ai-sl__bar { margin-top: 22px; height: 8px; border-radius: 8px; background: rgba(255,255,255,.1); overflow: hidden; }
 .ai-sl__bar i { display: block; height: 100%; width: 4%; border-radius: 8px; background: linear-gradient(90deg, var(--ai-lime), #f6ffbf); transition: width .4s var(--ai-ease); }

@@ -4181,12 +4181,11 @@
       var counter = h("b", { class: "ai-sl__count" }, "0%");
       STAGES.forEach(function (t, i) {
         var li = h("li", { class: "ai-sl__st" }, h("span", { class: "ai-sl__st-dot", "aria-hidden": "true" }), h("span", null, t));
-        if (i === 1) li.appendChild(counter);
         list.appendChild(li);
       });
       side.appendChild(list);
       var bar = h("div", { class: "ai-sl__bar", "aria-hidden": "true" }, h("i"));
-      side.appendChild(bar);
+      side.appendChild(h("div", { class: "ai-sl__meter" }, bar, counter));   // overall progress, beside its bar
       p.appendChild(side);
       swap(p);
       var items = list.children, total = Math.max(roster, 1), t0 = Date.now(), done = false, at = 0;
@@ -4195,15 +4194,17 @@
         at = i;
       }
       mark(0);
+      // One estimate drives the steps, the label and the bar, so they never disagree. It eases
+      // towards 90% and only the real answer takes it to 100% (Bido, 2026-10-20: it said 100%
+      // while the last step was still spinning). Never the roster size.
+      function show(pc) { counter.textContent = pc + "%"; bar.firstChild.style.width = pc + "%"; }
       var timer = setInterval(function () {
-        var s = (Date.now() - t0) / 1000;
-        if (!done) {
-          if (s > 1.2 && at < 1) mark(1);
-          if (at === 1) counter.textContent = Math.round(100 * Math.min(1, (s - 1.2) / 4)) + "%";   // progress, never the roster size
-          if (s > 5.4 && at < 2) mark(2);
-          if (s > 7.4 && at < 3) mark(3);
-          bar.firstChild.style.width = Math.min(92, 8 + s * 4) + "%";
-        }
+        if (done) return;
+        var pc = Math.round(90 * (1 - Math.exp(-(Date.now() - t0) / 5000)));
+        if (pc >= 10 && at < 1) mark(1);
+        if (pc >= 40 && at < 2) mark(2);
+        if (pc >= 65 && at < 3) mark(3);
+        show(pc);
       }, 120);
       api("POST", "/api/brief/run", { answers: answers, name: name }).then(function (r) {
         done = true; clearInterval(timer); busy = false;
@@ -4213,8 +4214,7 @@
           err.appendChild(h("div", { class: "ai-sl__nav" }, h("button", { class: "ai-sl__next", type: "button", onclick: review }, "Change the brief")));
           swap(err); return;
         }
-        counter.textContent = "100%";
-        mark(STAGES.length); bar.firstChild.style.width = "100%";
+        mark(STAGES.length); show(100);
         setCredits(r.b.credits);
         last = r.b;
         setTimeout(function () { celebrate(r.b, name); }, reduce ? 0 : 500);

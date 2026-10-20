@@ -152,6 +152,7 @@ def _clear(conn, entity, key):
         conn.execute("DELETE FROM creators")
     elif entity == "settings":
         conn.execute("DELETE FROM settings")
+        db.clear_setting_cache()
 
 
 # Parents before children, so foreign keys are satisfied as rows go back.
@@ -160,6 +161,7 @@ _ORDER = ["campaigns", "codes", "tiers", "creators", "selections", "campaign_cre
 
 
 def _lay(conn, snap):
+    db.clear_setting_cache()                 # a restored settings row must be read afresh
     tables = sorted(snap, key=lambda t: _ORDER.index(t) if t in _ORDER else len(_ORDER))
     for t in tables:
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(%s)" % t)}
