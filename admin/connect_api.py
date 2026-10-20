@@ -9,6 +9,7 @@ Client routes
     GET  /api/roi/selections       the viewer's selections to save an estimate to (name, token)
     POST /api/selection/more       {token, note, chips, count}   Add more like these   (credits: more)
     POST /api/selection/alike      {token, code, again}          Creators like this    (credits: alike)
+    GET  /api/selection/ai-add, POST /api/selection/ai-add/find|add   Add creators with AI (aiadd_api.py)
 
 Every AI price goes through portal.charge, which makes it free while the client has an
 active campaign. The ROI Calculator is deterministic and free for everyone.
@@ -16,6 +17,7 @@ active campaign. The ROI Calculator is deterministic and free for everyone.
 import json
 
 import aimore
+import aiadd_api
 import lifecycle_api
 import phase_e_api
 import db
@@ -24,10 +26,12 @@ import rewards
 import roi
 
 
-class ConnectMixin(lifecycle_api.LifecycleMixin):
+class ConnectMixin(lifecycle_api.LifecycleMixin, aiadd_api.AiAddMixin):
 
     def connect_get(self, path, query):
         if self.phase_e_get(path, query):
+            return True
+        if self.aiadd_get(path, query):           # item 178: Add creators with AI
             return True
         if path == "/api/roi/saved":
             got = self._roi_selection(query.get("s") or "")
@@ -59,6 +63,8 @@ class ConnectMixin(lifecycle_api.LifecycleMixin):
         if self.lifecycle_post(path):
             return True
         if self.phase_e_post(path):
+            return True
+        if self.aiadd_post(path):                 # item 178: Add creators with AI
             return True
         fn = {"/api/tour": self.api_tour, "/api/roi/estimate": self.api_roi_estimate, "/api/roi/save": self.api_roi_save,
               "/api/selection/more": self.api_selection_more, "/api/selection/alike": self.api_selection_alike}.get(path)
