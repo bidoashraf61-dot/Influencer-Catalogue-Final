@@ -69,39 +69,17 @@ cp "$SRC/sw.js"                     "$DST/sw.js"
 cp "$SRC/manifest.webmanifest"      "$DST/manifest.webmanifest"
 cp "$SRC/offline.html"              "$DST/offline.html"
 
-# Stamp a ?v=<hash> onto the js/css URLs. The source templates carry one but
-# the dist build drops it, so catalogue.js sits at a URL that never changes —
-# and clients that had already loaded the site kept running an old build for
-# days, showing "Instagram, Snapchat 66" as one chip while the server held the
-# fixed file. The HTML is no-store, so a fresh page always names the current
-# hash and the browser cannot serve a stale copy of a URL it has never seen.
-python3 - "$DST" <<'PYSTAMP'
-import hashlib, re, pathlib, sys
-root = pathlib.Path(sys.argv[1])
-def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
-# The tour (tour.js / tour.css) is fetched by connect.js when a client starts it, not
-# named in any page: stamp it inside connect.js first, so connect.js's own hash changes too.
-cj = root / 'assets/js/connect.js'
-cs = cj.read_text()
-for n in ('js/tour.js', 'css/tour.css'):
-    cs = re.sub(r'(assets/' + re.escape(n) + r')(\?v=[0-9a-z]+)?', r'\1?v=' + h('assets/' + n), cs)
-cj.write_text(cs)
-names = ('js/catalogue.js', 'css/catalogue.css', 'js/portal.js', 'css/portal.css',
-         'js/campaign.js', 'css/campaign.css',
-         'js/creator.js', 'css/creator.css', 'js/hv-icons.js',
-         'js/dashboard.js', 'css/dashboard.css', 'js/account.js', 'css/account.css', 'js/hv-loader.js',
-         'js/connect.js', 'css/connect.css', 'js/evidence.js', 'css/evidence.css', 'js/app.js', 'css/app.css')
-stamp = {n: h('assets/' + n) for n in names}
-for page in ('index.html', 'selection/index.html', 'campaign/index.html',
-             'campaign/dashboard/index.html', 'creator/index.html', 'account/index.html', 'market/index.html',
-             'privacy/index.html', 'terms/index.html'):
-    f = root / page
-    s = f.read_text()
-    for n, v in stamp.items():
-        s = re.sub(r'((?:\.\./)*assets/' + re.escape(n) + r')(\?v=[0-9a-z]+)?', r'\1?v=' + v, s)
-    f.write_text(s)
-print("stamped " + " ".join("%s=%s" % (n.split('/')[-1], v) for n, v in stamp.items()))
-PYSTAMP
+# Stamp a ?v=<content hash> onto every js/css URL in every page, and a fresh
+# VERSION into sw.js (deploy/catalogue/stamp_assets.py, item 175). Stamped URLs are
+# served immutable for a year and the HELVi Connect service worker answers them
+# from its own cache, so a stamp that misses a change pins browsers AND installed
+# apps to the old file. History: on 2026-09-08 clients ran an old catalogue.js for
+# days ("Instagram, Snapchat 66" as one chip). The old inline stamper only knew a
+# fixed list of files and pages (hv-drag.js and any new page were never stamped).
+# The script covers every page and file, then --check proves nothing is stale.
+python3 "$SRC/deploy/catalogue/stamp_assets.py" "$DST"
+python3 "$SRC/deploy/catalogue/stamp_assets.py" "$DST" --check \
+  || echo "WARNING: stale ?v= stamps above: installed apps may keep old files" >&2
 
 # The banner failing is silent by design upstream, so check it here.
 LOGOS=$(grep -o 'cat-clients__logo' "$DST/index.html" | wc -l)

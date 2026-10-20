@@ -549,6 +549,15 @@
     if (FROM_UPDATE) { if ("serviceWorker" in navigator) ready().then(function (r) { r.update(); }).catch(function () {}); setTimeout(updatedToast, 600); }
     setInterval(checkVersion, 10 * 60 * 1000);
     document.addEventListener("visibilitychange", checkVersion);
+    // Item 175: an installed app can sit in memory for days (the iPhone resumes it as it was), and the
+    // version check above only sees scripts and styles, not page changes. Back after 6 hours away, it
+    // reloads onto the current pages (never while something is being typed).
+    var awayAt = 0;
+    document.addEventListener("visibilitychange", function () {
+      if (!STANDALONE) return;
+      if (document.hidden) { awayAt = Date.now(); return; }
+      if (awayAt && Date.now() - awayAt > 6 * 3600 * 1000 && !typing()) location.reload();
+    });
     window.addEventListener("beforeinstallprompt", function () { setTimeout(function () { var m = document.getElementById("pt-menu"); if (m) [].forEach.call(m.querySelectorAll(".hca-mi"), function (x) { x.remove(); }); mountMenu(); }, 50); });
     // The account page redraws its sections on every hash change: put the card back each time.
     var body = document.getElementById("hc-body");
