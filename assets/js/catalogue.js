@@ -723,8 +723,9 @@
   // filtering, sorting and grouping happen on the server; query() hands it the state.
   function Controls(host, cards, onChange, extras, facets) {
     // followers: [] for no limit, else [min, max] with either end null.
-    // The catalogue opens on "Recommended" (sort=daily, admin/paging.py): Mega, then doctors,
-    // then Macro, Micro, Nano, shuffled inside each group once a Riyadh day. A selection keeps
+    // The catalogue opens on "Recommended" (sort=daily, admin/paging.py): doctors, then Saudi
+    // celebrities (Mega), then creators already in a selection, then the rest by tier,
+    // shuffled inside each group once a Riyadh day. A selection keeps
     // the order its link gives ("" there).
     var DEFAULT_SORT = extras ? "" : "daily";
     var state = { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], followers: [], sort: DEFAULT_SORT, q: "" };

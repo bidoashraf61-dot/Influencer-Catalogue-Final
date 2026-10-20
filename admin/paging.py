@@ -45,10 +45,16 @@ SORTS = ("", "daily", "followers-desc", "followers-asc", "tier-desc", "tier-asc"
 GROUPS = ("tier", "platform", "country", "interest")
 # Labels the classification can return that are not an industry a client would book by.
 NOT_AN_INDUSTRY = ("General Lifestyle", "Unclassifiable")
-# "Recommended" (sort=daily, the catalogue's default since 2026-10-19): the biggest names first, then
-# doctors, then the tiers by size; random inside each group, the same random for everyone all day
-# (seeded by the Riyadh date), a new one the next day. Unknown or no tier goes last.
-DAILY_GROUPS = {"mega": 0, "hcp": 1, "macro": 2, "mid-tier": 3, "mid": 3, "micro": 4, "nano": 5}
+# "Recommended" (sort=daily, the catalogue's default since 2026-10-19; groups reset 2026-10-20):
+# doctors (any HCP tier) first, then Saudi celebrities (Mega tier, located in Saudi Arabia), then
+# creators already put in a selection, then everyone else by tier size. Random inside each group,
+# the same random for everyone all day (seeded by the Riyadh date), a new one the next day.
+# Unknown or no tier goes last.
+DAILY_GROUPS = {"mega": 3, "macro": 4, "mid-tier": 5, "mid": 5, "micro": 6, "nano": 7}
+G_HCP, G_CELEB, G_PICKED, G_OTHER = 0, 1, 2, 8
+CELEB_COUNTRY = "Saudi Arabia"
+PICKED_EVERY = 600         # seconds the "in a selection" set is reused before it is read again
+_picked = {"at": 0.0, "codes": frozenset(), "tag": ""}
 RIYADH_OFFSET = 3 * 3600    # Riyadh is UTC+3 all year (no daylight saving)
 
 
@@ -57,12 +63,41 @@ def riyadh_day(now=None):
     return time.strftime("%Y%m%d", time.gmtime((time.time() if now is None else now) + RIYADH_OFFSET))
 
 
-def daily_group(tier):
-    """0 Mega, 1 doctors (any HCP tier), 2 Macro, 3 Mid, 4 Micro, 5 Nano, 6 anything else."""
+def daily_group(tier, countries=(), picked=False):
+    """0 doctors (any HCP tier), 1 Saudi celebrities (Mega in Saudi Arabia), 2 in a selection,
+    3 other Mega, 4 Macro, 5 Mid, 6 Micro, 7 Nano, 8 anything else."""
     t = str(tier or "").strip().lower()
     if t.startswith("hcp"):
-        return 1
-    return DAILY_GROUPS.get(t, 6)
+        return G_HCP
+    if t == "mega" and CELEB_COUNTRY in (countries or ()):
+        return G_CELEB
+    if picked:
+        return G_PICKED
+    return DAILY_GROUPS.get(t, G_OTHER)
+
+
+def picked_codes():
+    """(codes, tag): every creator on a selection that is not deleted, archived ones included.
+    Read at most once every PICKED_EVERY seconds; the tag names the set for the result cache."""
+    now = time.time()
+    if _picked["tag"] and now - _picked["at"] < PICKED_EVERY:
+        return _picked["codes"], _picked["tag"]
+    codes = set()
+    try:
+        import db
+        with db.connect() as conn:
+            for (raw,) in conn.execute("SELECT codes FROM selections WHERE deleted_at IS NULL"):
+                try:
+                    codes.update(str(c) for c in json.loads(raw or "[]"))
+                except (ValueError, TypeError):
+                    pass
+    except Exception:
+        if _picked["tag"]:
+            return _picked["codes"], _picked["tag"]
+    codes = frozenset(codes)
+    tag = hashlib.sha1(",".join(sorted(codes)).encode()).hexdigest()[:10]
+    _picked.update(at=now, codes=codes, tag=tag)
+    return codes, tag
 
 
 def daily_key(day, code):
@@ -248,12 +283,13 @@ class Index:
         self._facets = None
         self._daily = (None, None)
 
-    def daily(self, day):
-        """(group, shuffle key) per card for ``day``; worked out once a day per index."""
-        got_day, keys = self._daily
-        if got_day != day:
-            keys = [(daily_group(self.tier[i]), daily_key(day, c.get("code") or "")) for i, c in enumerate(self.cards)]
-            self._daily = (day, keys)
+    def daily(self, day, picked=frozenset(), ptag=""):
+        """(group, shuffle key) per card for ``day``; worked out once per day and selection set."""
+        got, keys = self._daily
+        if got != (day, ptag):
+            keys = [(daily_group(self.tier[i], self.countries[i], (c.get("code") or "") in picked),
+                     daily_key(day, c.get("code") or "")) for i, c in enumerate(self.cards)]
+            self._daily = ((day, ptag), keys)
         return keys
 
     # -- the filter bar's options --
@@ -457,11 +493,18 @@ def _industry_level(idx, i, inds, subs):
     return level
 
 
-def ordered(idx, f, licences=None, discover=None, day=None):
+def ordered(idx, f, licences=None, discover=None, day=None, picked=None):
     """This query's Ordered answer, best first, and how many creators match. Cached for RESULT_TTL.
-    ``day`` ("YYYYMMDD", Riyadh) seeds the daily order; today when not given."""
+    ``day`` ("YYYYMMDD", Riyadh) seeds the daily order; today when not given. ``picked`` (codes on
+    a selection) lifts those creators in the daily order; read from the database when not given."""
+    ptag = ""
     if f["sort"] == "daily":
-        f = dict(f, day=day or riyadh_day())
+        if picked is None:
+            picked, ptag = picked_codes()
+        else:
+            picked = frozenset(picked)
+            ptag = hashlib.sha1(",".join(sorted(picked)).encode()).hexdigest()[:10]
+        f = dict(f, day=day or riyadh_day(), pk=ptag)
     key = _key(idx, f)
     now = time.time()
     with _lock:
@@ -506,7 +549,7 @@ def ordered(idx, f, licences=None, discover=None, day=None):
     s = f["sort"]
     fol, rank = idx.followers, idx.rank
     if s == "daily":
-        dk = idx.daily(f["day"])
+        dk = idx.daily(f["day"], picked, ptag)
         keep.sort(key=lambda i: dk[i])
     elif s == "followers-desc":
         keep.sort(key=lambda i: -fol[i])
