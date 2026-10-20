@@ -4779,6 +4779,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def api_campaign_logo(self, token, name):
         k, status = self.viewer_campaign(token)
+        if k is None:
+            # Item 214: whoever sees the card on the board sees its logo, drafts included (a client's draft
+            # report stays closed to them; its logo is not).
+            import board
+            k = board.campaign_for(self, token=token)[0] if token else None
         name = Path(name).name
         if k is None or ("upload/" + name) not in db.campaign_logos(k):
             return self.send(404, b"", "text/plain")

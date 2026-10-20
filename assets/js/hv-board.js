@@ -42,6 +42,14 @@
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
     search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
     flag: '<path d="M5 21V4h11l-1.5 4L16 12H5"/>',
+    // Item 219: the Activity control, and one drawn mark per stage (same 24 grid, 1.8 stroke as the rest).
+    history: '<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3 4.5v4h4"/><path d="M12 8v4.2l2.8 1.8"/>',
+    st_draft: '<path d="M4.5 19.5h15"/><path d="M14.6 4.6l3.8 3.8L9.6 17.2H5.8v-3.8z"/>',
+    st_shortlisting: '<path d="M4 5h16l-6.2 7.4v5.8l-3.6 1.8v-7.6z"/>',
+    st_review: '<path d="M2.5 12S6 5.8 12 5.8 21.5 12 21.5 12 18 18.2 12 18.2 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.7"/>',
+    st_approved: '<circle cx="12" cy="12" r="8.6"/><path d="M8.3 12.3l2.5 2.5 5-5.2"/>',
+    st_live: '<circle cx="12" cy="12" r="1.9"/><path d="M8.2 8.2a5.4 5.4 0 0 0 0 7.6M15.8 8.2a5.4 5.4 0 0 1 0 7.6M5.3 5.3a9.5 9.5 0 0 0 0 13.4M18.7 5.3a9.5 9.5 0 0 1 0 13.4"/>',
+    st_completed: '<path d="M8 4h8v5.2a4 4 0 0 1-8 0z"/><path d="M8 6H5.2a3 3 0 0 0 3.1 4M16 6h2.8a3 3 0 0 1-3.1 4M12 13.2V17M8.5 20h7M9.8 17h4.4"/>',
     grip: '<circle cx="9" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="17" r="1.2"/><circle cx="15" cy="17" r="1.2"/>'
   };
 
@@ -104,6 +112,11 @@
   var SIG = { good: "Strong", moderate: "Fair", low: "Low" };
   var TRACK = { good: "On track", moderate: "Slightly behind", low: "Behind target" };
   function ours(client) { return /^\s*hello\s*voice\b/i.test(client || ""); }
+  // Item 219: a stage's mark, a small disc in the stage's colour. Decorative: the stage name is always written beside it.
+  function stageIcon(key, cls) {
+    if (!ICON["st_" + key]) return null;
+    return h("span", { class: "hvb-stico hvb-lane--" + key + (cls ? " " + cls : ""), "aria-hidden": "true" }, svg("st_" + key));
+  }
 
   /* ------------------------------------------------------- normalised cards */
   // A campaign from /api/board.
@@ -160,7 +173,8 @@
   function brand(it) {
     var lock = h("span", { class: "hvb-brand" });
     lock.appendChild(h("img", { class: "hvb-brand__hv", src: HV_LOGO, alt: "HelloVoice", width: "84", height: "18", decoding: "async" }));
-    if (ours(it.client)) return lock;
+    // Item 214: our own work, or a card with no client known and no logo, shows HelloVoice once (no dangling ×).
+    if (ours(it.client) || (!it.client && !it.logos.length)) return lock;
     lock.appendChild(h("span", { class: "hvb-brand__x", "aria-hidden": "true" }, "×"));
     if (it.logos.length) {
       var img = h("img", { class: "hvb-brand__cl", src: it.logos[0], alt: it.client || it.name, loading: "lazy", decoding: "async" });
@@ -392,6 +406,82 @@
     });
   }
 
+  /* ------------------------------- item 219: the Activity panel (a card's full history, floating) */
+  var ACT = null;                                   // the open panel: {key, el, opener, close}
+  function dayOf(ts) {
+    var d = new Date(ts * 1000), t = new Date(), y = new Date(); y.setDate(t.getDate() - 1);
+    var same = function (a, b) { return a.toDateString() === b.toDateString(); };
+    if (same(d, t)) return "Today";
+    if (same(d, y)) return "Yesterday";
+    return d.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: d.getFullYear() === t.getFullYear() ? undefined : "numeric" });
+  }
+  function clock(ts) { return new Date(ts * 1000).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }); }
+  function activityPanel(it, B, opener) {
+    var key = B.noun + ":" + it.key;
+    if (ACT && ACT.key === key) { ACT.close(); return; }      // the same button shuts it
+    if (ACT) ACT.close(true);
+    var shut = h("button", { type: "button", class: "hvb-actp__x", "aria-label": "Close activity" }, svg("x"));
+    var body = h("div", { class: "hvb-actp__body", "aria-busy": "true" }, h("p", { class: "hvb-actp__state" }, "Loading the history…"));
+    var box = h("aside", { id: "hvb-actp", class: "hvb hvb-actp", role: "dialog", "aria-modal": "false", "aria-labelledby": "hvb-actp-t" },
+      h("header", { class: "hvb-actp__head" },
+        h("div", { class: "hvb-actp__who" }, brand(it), h("h2", { id: "hvb-actp-t", class: "hvb-actp__t" }, "Activity"),
+          h("p", { class: "hvb-actp__name" }, it.name)), shut),
+      body);
+    var scrim = h("div", { class: "hvb-actp-scrim" });
+    function setOpener(on) {
+      document.querySelectorAll(".hvb-actb.is-on").forEach(function (b) { b.classList.remove("is-on"); b.setAttribute("aria-expanded", "false"); });
+      if (on && opener) { opener.classList.add("is-on"); opener.setAttribute("aria-expanded", "true"); }
+    }
+    function close(quiet) {
+      document.removeEventListener("keydown", esc, true);
+      box.remove(); scrim.remove();
+      document.body.classList.remove("hvb-actp-open");
+      setOpener(false);
+      ACT = null;
+      if (!quiet && opener && document.contains(opener)) opener.focus();
+    }
+    function esc(e) { if (e.key === "Escape" && ACT && ACT.el === box) { e.preventDefault(); close(); } }
+    shut.addEventListener("click", function () { close(); });
+    scrim.addEventListener("click", function () { close(); });
+    document.addEventListener("keydown", esc, true);
+    document.body.appendChild(scrim);
+    document.body.appendChild(box);
+    document.body.classList.add("hvb-actp-open");
+    ACT = { key: key, el: box, opener: opener, close: close };
+    setOpener(true);
+    requestAnimationFrame(function () { shut.focus({ preventScroll: true }); });
+    var q = (B.noun === "selection" ? "s=" : "t=") + encodeURIComponent(it.key);
+    call("GET", "/api/board/activity?" + q).then(function (r) {
+      if (!ACT || ACT.el !== box) return;
+      body.textContent = "";
+      body.removeAttribute("aria-busy");
+      var items = (r.b && r.b.ok && r.b.items) || null;
+      if (!items) {
+        body.appendChild(h("p", { class: "hvb-actp__state is-bad", role: "status" },
+          r.s === 401 ? "Sign in again to see the history." : "Couldn’t load the history. Close this and try again."));
+        return;
+      }
+      if (!items.length) {
+        body.appendChild(h("p", { class: "hvb-actp__state" }, "Nothing has changed here yet. Every move and edit will be listed here, newest first."));
+        return;
+      }
+      body.appendChild(h("p", { class: "hvb-actp__count" }, items.length + (items.length === 1 ? " change" : " changes") + (items.length >= 200 ? " (the latest 200)" : "")));
+      var day = null, ol = null;
+      items.forEach(function (a) {
+        var d = dayOf(a.at);
+        if (d !== day) {
+          day = d;
+          body.appendChild(h("h3", { class: "hvb-actp__day" }, d));
+          ol = h("ol", { class: "hvb-actp__list" });
+          body.appendChild(ol);
+        }
+        ol.appendChild(h("li", null,
+          h("time", { datetime: new Date(a.at * 1000).toISOString(), title: ago(a.at) }, clock(a.at)),
+          h("span", { class: "hvb-actp__w" }, a.what), h("small", null, a.who)));
+      });
+    });
+  }
+
   function card(it, B) {
     var can = it.moves.length > 0;
     var open = B.isOpen(it.key);
@@ -410,9 +500,16 @@
         pin.disabled = true;
         B.opts.onPin(it, !it.pinned).then(function (j) { if (!(j && j.ok)) { pin.disabled = false; B.say("Couldn’t change that pin. Please try again.", true); } });
       });
-      top.appendChild(pin);
     }
-    if (can && B.drag) top.insertBefore(h("span", { class: "hvb-grip", title: "Drag to another stage" }, svg("grip")), top.firstChild.nextSibling);
+    // (Item 214: no grip in the top row any more; a movable card shows the grab cursor and lifts on hover.)
+    // Item 219: the card's history lives in its own floating panel, one tap away.
+    var actOn = ACT && ACT.key === B.noun + ":" + it.key;
+    var actB = h("button", { type: "button", class: "hvb-actb" + (actOn ? " is-on" : ""), "aria-label": "Activity: " + it.name, title: "Activity",
+                             "aria-haspopup": "dialog", "aria-expanded": actOn ? "true" : "false", "aria-controls": "hvb-actp" }, svg("history"));
+    actB.addEventListener("click", function () { activityPanel(it, B, actB); });
+    // Item 214: the top row is the logos and the arrow only, so HelloVoice × the client's logo always has room.
+    // Pin and Activity sit at the end of the button row instead.
+    var tools = h("span", { class: "hvb-card__tools" }, pin || null, actB);
     top.appendChild(tog);
     el.appendChild(top);
     el.appendChild(h("h3", { class: "hvb-card__name" }, it.href ? h("a", { href: it.href }, it.name) : it.name));
@@ -451,13 +548,6 @@
     } else if (it.empty) {
       put(h("p", { class: "hvb-none" }, it.empty));
     }
-    if (it.activity && it.activity.length) {
-      var al = h("ol", { class: "hvb-act", "aria-label": "Latest changes" });
-      it.activity.forEach(function (a) {
-        al.appendChild(h("li", null, h("span", { class: "hvb-act__w" }, a.what), h("small", null, a.who + " · " + ago(a.at))));
-      });
-      put(al);
-    }
     var foot = h("div", { class: "hvb-card__foot" },
       it.kam ? h("span", { class: "hvb-kam", title: "Account manager" }, h("span", { class: "hvb-kam__face", "aria-hidden": "true" }, initials(it.kam)), it.kam)
              : h("span", { class: "hvb-kam hvb-kam--none" }, "HelloVoice team"),
@@ -469,7 +559,7 @@
     if (x) acts.appendChild(x);
     if (acts.childNodes.length) put(acts);
     var go = goButtons(it, B);
-    if (go.length) el.appendChild(h("div", { class: "hvb-card__go" }, go));
+    el.appendChild(h("div", { class: "hvb-card__go" }, go, tools));
     if (can && B.drag) el.setAttribute("draggable", "true");
     return el;
   }
@@ -581,7 +671,7 @@
       var count = h("b", { class: "hvb-lane__n" });
       var cards = h("div", { class: "hvb-lane__cards" });
       var fold = h("button", { type: "button", class: "hvb-fold", "aria-label": "Fold the " + s.label + " column", title: "Fold column" }, svg("fold"));
-      var head = h("header", { class: "hvb-lane__head" },
+      var head = h("header", { class: "hvb-lane__head" }, stageIcon(s.key, "hvb-stico--head"),
         h("h2", { id: "hvb-h-" + noun + "-" + s.key }, s.label), count, fold,
         h("p", { class: "hvb-lane__hint" }, s.hint, isLock ? h("span", { class: "hvb-lane__lock" }, svg("lock"), "Set by HelloVoice") : null));
       var lane = h("section", { class: "hvb-lane hvb-lane--" + s.key + (isLock ? " is-locked" : ""), "data-stage": s.key, "data-drop": s.key, "data-i": i,
@@ -598,8 +688,8 @@
         if (lane.classList.contains("is-folded") && !e.target.closest("a, button, select")) setFold(false);
       });
       grid.appendChild(lane);
-      var tab = h("button", { type: "button", role: "tab", class: "hvb-tab" + (s.key === "live" ? " hvb-tab--live" : ""), "data-i": i, "aria-selected": i === 0 ? "true" : "false" },
-        s.label, h("b", null, "0"));
+      var tab = h("button", { type: "button", role: "tab", class: "hvb-tab" + (s.key === "live" ? " hvb-tab--live" : "") + (ICON["st_" + s.key] ? " has-ico" : ""), "data-i": i, "aria-selected": i === 0 ? "true" : "false" },
+        stageIcon(s.key, "hvb-stico--tab"), s.label, h("b", null, "0"));
       tab.addEventListener("click", function () { B.jump(i); });
       tabs[s.key] = tab;
       tabBar.appendChild(tab);
@@ -674,7 +764,7 @@
           var mine = c.items.filter(function (x) { return x.stage === s.key; });
           var cell = h("div", { class: "hvb-cell hvb-lane--" + s.key + (mine.length ? "" : " is-empty") + (FOLD[s.key] && (byStage[s.key] || []).length ? " is-folded" : ""),
                                 "data-drop": s.key, "data-stage": s.key },
-            h("span", { class: "hvb-cell__k" }, s.label));
+            h("span", { class: "hvb-cell__k" }, stageIcon(s.key, "hvb-stico--mini"), s.label));
           mine.forEach(function (it) { cell.appendChild(card(it, B)); });
           if (FOLD[s.key] && mine.length) cell.appendChild(h("span", { class: "hvb-cell__n" }, String(mine.length)));
           row.appendChild(cell);
@@ -703,7 +793,7 @@
             return h("span", { class: "hvb-t__name" }, it.href ? h("a", { href: it.href }, it.name) : it.name, it.demo ? h("span", { class: "hvb-tag hvb-tag--demo" }, "Demo") : null); } },
         { k: "stage", t: "Stage", v: function (it) { return STAGE_I[it.stage]; }, cell: function (it) {
             var lab = (opts.stages.filter(function (s) { return s.key === it.stage; })[0] || {}).label || it.stage;
-            var wrap = h("span", { class: "hvb-t__stage hvb-lane--" + it.stage }, h("i", { "aria-hidden": "true" }), lab);
+            var wrap = h("span", { class: "hvb-t__stage hvb-lane--" + it.stage }, stageIcon(it.stage, "hvb-stico--mini") || h("i", { "aria-hidden": "true" }), lab);
             if (!it.moves.length) return wrap;
             return h("span", { class: "hvb-t__stagecell" }, wrap, moveMenu(it, opts.stages, function (to) { B.move(it, to); })); } },
         { k: "kam", t: "KAM", v: function (it) { return (it.kam || "").toLowerCase(); }, cell: function (it) { return it.kam || "HelloVoice team"; } },

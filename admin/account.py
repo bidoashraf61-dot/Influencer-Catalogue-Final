@@ -257,7 +257,9 @@ def summary(user, code_id, secret=b"", logo_dir=None):
         held = [k for k in (db.campaign(i) for i in board.campaigns_holding(s["id"])) if k is not None]
         # Item 202: HelloVoice x the client's logo, from the catalogue's own set, else a campaign's client logo.
         logos = []
-        f = board.client_logo(s["company"] or s["code_label"] or "", logo_dir) if logo_dir is not None else None
+        # Item 214: the client's company, never an access-code label or our own (BlueHolding / HelloVoice) name.
+        sclient = board.clean_client(s["company"] or s["code_label"] or "")
+        f = (board.client_logo(sclient, logo_dir) or board.client_logo(s["name"] or "", logo_dir)) if logo_dir is not None else None
         if f:
             logos.append("/assets/clients/" + f)
         for k in held:
@@ -267,7 +269,7 @@ def summary(user, code_id, secret=b"", logo_dir=None):
                 if url not in logos:
                     logos.append(url)       # "@" = under the admin API (the page adds its own base)
         selections.append({"stage": stage, "moves": board.selection_moves(may, chip["key"], stage), "logos": logos[:1],
-                           "created_at": s["created_at"], "client": s["company"] or s["code_label"] or "",
+                           "created_at": s["created_at"], "client": sclient,
                            "kam": _kam_label(s["kam"]),
                            "campaigns": [{"name": k["name"], "token": k["token"], "live": k["status"] == "live"} for k in held][:3],
                            "name": s["name"], "token": s["token"], "creators": len(codes), "updated_at": s["updated_at"],

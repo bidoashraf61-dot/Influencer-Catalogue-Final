@@ -331,6 +331,12 @@ class PortalMixin(connect_api.ConnectMixin):
             else:
                 self.send_json(200, {"ok": True, "selections": board.attachable(self, k)}, self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/board/activity":
+            # Item 219: a card's full history for the Activity panel (?t= campaign, ?s= selection).
+            import board
+            st, got = board.history_of(self, token=str(query.get("t") or "") or None, sel_token=str(query.get("s") or "") or None)
+            self.send_json(st, got, self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path in ("/api/board", "/api/board/targets"):
             # The campaign board (item 174/176): admins every campaign, a KAM hers, a client their own (read-only).
             import board
