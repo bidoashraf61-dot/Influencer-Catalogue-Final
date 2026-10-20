@@ -504,10 +504,25 @@
     ]);
     document.body.appendChild(upbar);
   }
+  // The bar is for the installed app only. In a browser tab the next page load already gets the
+  // new files, so the site just refreshes the worker and reloads a tab nobody is looking at.
+  var stale = false;
+  function typing() {
+    var a = document.activeElement;
+    if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName)) return true;
+    return [].some.call(document.querySelectorAll("textarea"), function (x) { return !!x.value; });
+  }
+  function onNewVersion() {
+    if (STANDALONE) { showUpdateBar(); return; }
+    if (!stale) { stale = true; if ("serviceWorker" in navigator) ready().then(function (r) { r.update(); }).catch(function () {}); }
+    if (document.hidden && !typing()) location.reload();
+  }
   function checkVersion() {
-    if (!BOOT_V || document.hidden) return;
+    if (!BOOT_V) return;
+    if (stale) { if (document.hidden && !typing()) location.reload(); return; }
+    if (document.hidden && STANDALONE) return;
     fetch(API + "version", { credentials: "include", cache: "no-store" }).then(function (r) { return r.json(); })
-      .then(function (j) { if (j && j.v && j.v !== BOOT_V) showUpdateBar(); }).catch(function () {});
+      .then(function (j) { if (j && j.v && j.v !== BOOT_V) onNewVersion(); }).catch(function () {});
   }
   function updatedToast() {
     var t = el("div", { class: "hca-up hca-up--done", role: "status" }, [el("span", { html: svg("check") }), el("b", null, "You're on the latest version of HELVi")]);
