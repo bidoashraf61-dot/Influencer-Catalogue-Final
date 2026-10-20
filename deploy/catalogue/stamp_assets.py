@@ -12,8 +12,9 @@ app to the old file. The stamp must be the file's content hash, on every page, e
 What it stamps:
   1. Inside the js files, only the URLs that already carry a ?v= (a script that loads another
      script or style this way). Repeated until nothing changes, so a file's own hash includes its children's.
-  2. Every src= / href= in every .html page under the root (assets/ is skipped) that points
-     at an existing assets/js/*.js or assets/css/*.css: any page, any file, no list to keep.
+  2. Every src= / href= / poster= / data-src= in every .html page under the root (assets/ is
+     skipped) that points at an existing assets/js/*.js, assets/css/*.css or assets/welcome/ film
+     file: any page, any file, no list to keep.
   3. sw.js: VERSION becomes "hca-<hash of the app shell>", so any release that changes a
      script, a style, the offline page, the manifest or an app icon installs a new worker,
      which drops the old caches and takes over the open app at once.
@@ -26,11 +27,14 @@ import re
 import sys
 from pathlib import Path
 
-ASSET = r"assets/(?:js|css)/[A-Za-z0-9_.-]+\.(?:js|css)"
+# Scripts and styles, plus the onboarding film and its poster (assets/welcome/, item 179): nginx serves
+# everything under /assets/ "immutable" for 30 days, so replacing the placeholder film at the same
+# path would not reach anyone who had already seen it without a stamp that changes with the file.
+ASSET = r"assets/(?:(?:js|css)/[A-Za-z0-9_.-]+\.(?:js|css)|welcome/[A-Za-z0-9_.-]+\.(?:mp4|jpe?g|png|webp))"
 # A URL inside a js file that already carries a stamp: "assets/js/hv-drag.js?v=6a87b52e".
 JS_REF = re.compile(r"((?:\.\./|/)*(" + ASSET + r"))\?v=([0-9A-Za-z]+)")
 # A src/href attribute in a page, stamped or not.
-HTML_REF = re.compile(r"""((?:src|href)=["'])([^"'?#]*?(""" + ASSET + r"""))(?:\?v=([0-9A-Za-z]+))?(["'])""")
+HTML_REF = re.compile(r"""((?:src|href|poster|data-src)=["'])([^"'?#]*?(""" + ASSET + r"""))(?:\?v=([0-9A-Za-z]+))?(["'])""")
 SW_VERSION = re.compile(r'const VERSION = "hca-[0-9A-Za-z-]*";')
 
 

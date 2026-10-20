@@ -1165,7 +1165,7 @@
     // "later" once dismissed), so it never comes back on another device. It waits for the app's
     // own setup prompts (the desktop QR welcome, the phone's Home Screen guide, the alerts card)
     // and any other dialog to close first, and never sits on top of one.
-    var HIW_POSTER = "assets/welcome/onboarding-poster.jpg";
+    var HIW_POSTER = "assets/welcome/onboarding-poster.jpg?v=0";   // ?v= is rewritten to the file's hash at deploy
     function hiwBusy() {
       var q = ":popover-open, dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal, .hc-dlg-back, .ai-sl.ob";
       try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal, .hc-dlg-back"); }

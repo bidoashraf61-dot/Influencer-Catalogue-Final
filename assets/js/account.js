@@ -317,7 +317,7 @@
     var href = ROOT + "welcome/";
     return h("section", { class: "hc-how", "aria-labelledby": "hc-how-t" },
       h("a", { class: "hc-how__film", href: href, tabindex: "-1", "aria-hidden": "true" },
-        h("img", { src: ROOT + "assets/welcome/onboarding-poster.jpg", alt: "", loading: "lazy", decoding: "async", width: "640", height: "360" }),
+        h("img", { src: ROOT + "assets/welcome/onboarding-poster.jpg?v=0", alt: "", loading: "lazy", decoding: "async", width: "640", height: "360" }),
         h("span", { class: "hc-how__play", html: PLAY })),
       h("div", { class: "hc-how__txt" },
         h("h2", { class: "hc-h2", id: "hc-how-t" }, "How HELVi works"),
