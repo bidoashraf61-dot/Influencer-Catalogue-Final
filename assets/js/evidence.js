@@ -484,7 +484,7 @@
       .then(function (j) {
         if (j && j.ok && j.map) return go(j.map);
         body.textContent = "";
-        body.appendChild(el("p", "ev-mut", j && j.locked ? "Open this from your selection page first (it asks for your access code)." : "Market Intelligence is not available for this selection."));
+        body.appendChild(el("p", "ev-mut", j && j.locked ? "Sign in, then open this from your selection page." : "Market Intelligence is not available for this selection."));
       })
       .catch(function () { body.textContent = ""; body.appendChild(el("p", "ev-mut", "Could not load the map.")); });
   }

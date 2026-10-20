@@ -54,15 +54,8 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
 <div class="cat-gate" id="cat-gate" hidden>
   <div class="cat-gate__inner">
     <img class="cat-gate__logo" src="../../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5" srcset="../../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, ../../assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x" alt="HELVi Connect" width="320" height="160"/>
-    <p class="cat-gate__eyebrow">Confidential</p>
-    <h1 class="cat-gate__title">Campaign dashboard</h1>
-    <p class="cat-gate__note">Enter the access code you were given.</p>
-    <form class="cat-gate__form" id="cat-gate-form" autocomplete="off">
-      <input type="password" id="cat-code" class="cat-gate__input" placeholder="Access code"
-             aria-label="Access code" autocomplete="off" spellcheck="false"/>
-      <button type="submit" class="cat-btn cat-btn--lime">Unlock</button>
-    </form>
-    <p class="cat-gate__error" id="cat-gate-error" role="alert" hidden>That code is not right.</p>
+    <!-- No access-code form (item 181): portal.js draws the email sign-in here. -->
+    <p class="cat-gate__note" id="cat-gate-note" role="status" hidden></p>
   </div>
 </div>
 

@@ -59,20 +59,17 @@
   };
   function shareTok() { var m = /(?:^|[#&])share=([A-Za-z0-9_-]+)/.exec(location.hash || ""); return m ? m[1] : ""; }
   function token() { var m = /(?:^|[#&])t=([A-Za-z0-9_-]+)/.exec(location.hash || ""); return m ? m[1] : ""; }
-  function get(path) { return fetch(API + path, { credentials: "include", cache: "no-store" }).then(function (r) { if (r.status === 401) throw { locked: true }; if (!r.ok) throw {}; return r.json(); }); }
+  function get(path) { return fetch(API + path, { credentials: "include", cache: "no-store" }).then(function (r) { if (r.status === 401) throw { locked: true }; if (!r.ok) throw { status: r.status }; return r.json(); }); }
 
   /* --------------------------------------------------------------- gate */
-  function lock(msg) { $("cat-app").hidden = true; $("cat-gate").hidden = false; if (msg) { $("cat-gate-error").textContent = msg; $("cat-gate-error").hidden = false; } }
-  $("cat-gate-form").addEventListener("submit", function (e) {
-    e.preventDefault();
-    fetch(API + "/api/unlock", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ code: $("cat-code").value.trim(), lite: true, link: token() ? "c:" + token() : "c:list" }) })
-      .then(function (r) { return r.json(); })
-      .then(function (b) {
-        if (!b || !b.ok) lock(b && b.reason === "otherlink" ? "That code is for a different campaign. Use the code that came with this link." : "That code is not right.");
-        else { $("cat-code").value = ""; load(); } })
-      .catch(function () { lock("Could not reach the server. Please try again."); });
-  });
+  // Not signed in (401): the gate, which portal.js turns into the email sign-in. No access-code
+  // form any more (item 181); signing in reloads this same #t= link.
+  function lock() {
+    var gate = $("cat-gate");
+    $("cat-app").hidden = true; gate.hidden = false; document.body.classList.add("cat-locked");
+    if (!gate.classList.contains("cx-gate")) document.body.classList.add("cat-checking");
+    try { document.dispatchEvent(new CustomEvent("cat:locked")); } catch (e) { /* old browser */ }
+  }
 
   function load() {
     TOKEN = token();
@@ -85,14 +82,15 @@
     go.then(function (t) { TOKEN = t; return get("/api/campaign?t=" + encodeURIComponent(t) + (shareTok() ? "&share=" + encodeURIComponent(shareTok()) : "")); })
       .then(function (b) {
         R = b.report;
-        $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked");
+        $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked", "cat-checking");
         setupHeader(); setupFilters(); renderAll(); setupShare();
       })
       .catch(function (err) {
         if (err && err.locked) return lock();
         if (err && err.moved) return;
         $("cat-gate").hidden = true; $("db-empty").hidden = false;
-        $("db-empty").textContent = err && err.none ? "No campaign reports for this access code yet." : "This campaign is not available with your access code.";
+        $("db-empty").textContent = err && err.status === 404 ? "This campaign is not available to the account signed in here."
+          : "Could not load this campaign. Please try again in a moment.";
       });
   }
 

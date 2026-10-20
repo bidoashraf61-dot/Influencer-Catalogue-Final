@@ -1,7 +1,7 @@
 /* Client portal layer for the catalogue pages.
  *
  *  - Gate: email sign-in with a one-time code (company addresses only), then a
- *    one-time profile step. The old access-code form stays one click away.
+ *    one-time profile step. There is no access-code form any more (item 181).
  *    Success reloads the page; the page's own script then finds the session
  *    cookie and unlocks itself, so every page that has a gate works unchanged.
  *  - Account circle: initials top right, opening a menu (profile, campaigns,
@@ -474,8 +474,8 @@
   // standing on its top edge (a transparent cut-out, waving hello, then idling), and one small,
   // quiet row of client logos at the foot. Client sign-in only: work email -> 6-digit code ->
   // first-time name, company, job title. There is no team door; HelloVoice reaches the admin by
-  // its own address. A selection or campaign link that still needs its access code shows
-  // "Opened a shared link?" under the card, and ?access=code brings the same form up.
+  // its own address. No access codes (owner 2026-10-15, item 181 2026-10-20): a shared selection or
+  // campaign link signs in here too, and the page then opens it (or offers "Request access").
   // The sign-in "Trusted by" strip. The third number is each logo's drawn height in px (fix batch 4):
   // the same optical size for every logo, worked out once from the files in assets/clients/:
   // equal ink AREA (height = sqrt(2200 / aspect)), nudged by how dense the mark is (a solid
@@ -495,12 +495,8 @@
     gate.setAttribute("data-pt", "1");
     var inner = gate.querySelector(".cat-gate__inner");
     if (!inner) return;
-    var oldForm = inner.querySelector(".cat-gate__form");
-    var oldErr = inner.querySelector(".cat-gate__error");
-    var page = document.body.getAttribute("data-page");
-    // Passcodes off (owner, 2026-10-15): email and a one-time code only, no "Enter the code".
-    var sharedOk = !(info && info.passcodes === false) && (page !== "catalogue" || /[?&]access=code\b/.test(location.search || ""));
     gate.classList.add("cx-gate");
+    document.body.classList.remove("cat-checking");
 
     var scene = h("main", { class: "cx-scene" });
     scene.appendChild(h("div", { class: "cx-wall", "aria-hidden": "true" }));
@@ -519,12 +515,6 @@
     var pane = h("div", { id: "cx-pane", "aria-live": "polite" });
     var card = h("div", { class: "cx-door__card" }, pane);
     door.appendChild(helvy); door.appendChild(bubble); door.appendChild(card);
-    var sharedLine = null;
-    if (sharedOk && oldForm) {
-      sharedLine = h("p", { class: "cx-shared" }, "Opened a shared link with an access code? ",
-        h("button", { type: "button", class: "cx-link", onclick: function () { show("shared"); } }, "Enter the code"));
-      door.appendChild(sharedLine);
-    }
     wrap.appendChild(pitch); wrap.appendChild(door);
     scene.appendChild(wrap);
 
@@ -554,7 +544,7 @@
     /* -- the steps -- */
     var st = { step: "email", email: "", ticket: "", expires: 0, resendAt: 0, timer: null, company: "" };
     var SAY = { email: "Hi, I’m Helvi", blocked: "Work email, please", code: "It’s on its way",
-                details: "Nice to meet you", shared: "Got a code?", pending: "Almost there" };
+                details: "Nice to meet you", pending: "Almost there" };
     function setSay(k) { bubble.textContent = SAY[k] || SAY.email; }
     function errLine(text) { return h("p", { class: "cx-err", role: "alert", html: icon("info", "cx-i") }, h("span", null, text)); }
     function goBtn(label, ink) {
@@ -570,8 +560,7 @@
       st.step = step;
       setSay(opts.blocked ? "blocked" : step);
       pane.textContent = "";
-      ({ email: paneEmail, code: paneCode, details: paneDetails, shared: paneShared, pending: panePending }[step] || paneEmail)(opts);
-      if (sharedLine) sharedLine.hidden = step === "shared";
+      ({ email: paneEmail, code: paneCode, details: paneDetails, pending: panePending }[step] || paneEmail)(opts);
     }
 
     function paneEmail(opts) {
@@ -722,24 +711,12 @@
       setTimeout(function () { name.focus({ preventScroll: true }); }, 30);
     }
 
-    function paneShared() {
-      pane.appendChild(h("h2", { class: "cx-door__title" }, "Shared link"));
-      pane.appendChild(h("p", { class: "cx-door__lead" }, "This link was sent with its own access code. Enter it to open it. To keep everything in one place, sign in with your work email next time."));
-      var box = h("div", { class: "cx-codeform" });
-      if (oldForm) { oldForm.hidden = false; box.appendChild(oldForm); }
-      if (oldErr) box.appendChild(oldErr);
-      pane.appendChild(box);
-      pane.appendChild(h("p", { class: "cx-fine" }, h("button", { type: "button", class: "cx-link", onclick: function () { show("email"); } }, "Sign in with your work email instead")));
-      var inp = oldForm && oldForm.querySelector("input");
-      if (inp) setTimeout(function () { inp.focus({ preventScroll: true }); }, 30);
-    }
-
     function panePending(opts) {
       pane.appendChild(h("h2", { class: "cx-door__title" }, "Almost there"));
       pane.appendChild(h("p", { class: "cx-door__lead" }, opts.message || "Your account is waiting for approval by the HelloVoice team. We’ll email you as soon as it’s ready."));
     }
 
-    show(sharedOk && /[?&]access=code\b/.test(location.search || "") && oldForm ? "shared" : "email", { keepFocus: true });
+    show("email", { keepFocus: true });
   }
 
   // A colleague's invite link (?invite=...) is kept for this visit and sent with the new
@@ -4491,9 +4468,8 @@
     document.body.appendChild(box);
   }
 
-  // The page asks the server who is signed in and whether email sign-in is on. If the server is busy or just
-  // restarted (status 0 or a 5xx) ask again a few times before settling, so a visitor is never left on the
-  // plain access-code form because of a slow moment.
+  // The page asks the server who is signed in. If the server is busy or just restarted (status 0 or a 5xx)
+  // ask again a few times before settling.
   function me(tries) {
     return api("GET", "/api/me").then(function (r) {
       if ((r.s === 0 || r.s >= 500) && tries > 0) return new Promise(function (ok) { setTimeout(ok, 3000); }).then(function () { return me(tries - 1); });
@@ -4645,8 +4621,9 @@
         }, 1600);
         return;
       }
-      // Only replace the access-code gate once the server can actually send the email.
-      if (r.b && r.b.email_signin) enhanceGate(r.b);
+      // Not signed in (or the server never answered): the gate is the email sign-in, always. It used to
+      // wait for "email_signin" (mail key saved) and otherwise leave the access-code form up (item 181).
+      enhanceGate(r.b || {});
     });
   }
 
@@ -4654,4 +4631,8 @@
   // A passcode typed into the gate unlocks without a reload, so look again
   // then: the account circle and the assistant appear straight away.
   document.addEventListener("cat:unlocked", function () { if (!ME) boot(); });
+  // A page script found this browser has no valid pass (401) and showed the gate. Draw the sign-in
+  // there even when /api/me said "signed in" (a pass that just expired, a stale guest pass): signing
+  // in again mends it. Never leave the bare gate up (item 181).
+  document.addEventListener("cat:locked", function () { enhanceGate({}); });
 })();
