@@ -72,8 +72,12 @@ def author(platform, item, post_url=""):
         out["id"] = _s(item.get("ownerId") or ow.get("id")) or None
     elif platform == "Facebook":
         u = _s(item.get("authorUrl") or item.get("pageUrl") or item.get("ownerUrl"))
-        if u.lower().startswith("http") and "facebook.com" in u.lower():
-            out.update(handle=_s(item.get("authorName") or item.get("pageName")) or None, url=u)
+        slug = _s(item.get("pageName"))
+        if u.lower().startswith("http") and "facebook.com" in u.lower() and "/share/" not in u.lower():
+            out.update(handle=_s(item.get("authorName") or slug) or None, url=u)
+        elif re.fullmatch(r"[A-Za-z0-9.]{5,60}", slug):
+            # apify/facebook-posts-scraper on a share link: no author, but pageName is the page's own address
+            out.update(handle=slug, url="https://www.facebook.com/%s" % slug)
         out["followers"] = _n(item.get("authorFollowers") or item.get("pageFollowers") or item.get("followers"))
         out["id"] = _s(item.get("authorId") or item.get("pageId")) or None
     elif platform == "Snapchat":

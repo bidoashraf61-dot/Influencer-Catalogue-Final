@@ -112,6 +112,8 @@ class CampaignData(unittest.TestCase):
         self.assertIsNone(postprofiles.author("Facebook", {"author": "None", "authorUrl": "None"}))   # share link: needs a fetch
         fb = postprofiles.author("Facebook", {"authorUrl": "https://www.facebook.com/drtest", "authorName": "Dr Test", "authorId": "9"})
         self.assertEqual((fb["url"], fb["id"]), ("https://www.facebook.com/drtest", "9"))
+        pg = postprofiles.author("Facebook", {"facebookUrl": "https://www.facebook.com/share/r/X/", "pageName": "dr.test.page"})
+        self.assertEqual(pg["url"], "https://www.facebook.com/dr.test.page")
 
     def test_216b_gaps_and_fill(self):
         k = db.create_campaign("Jam test", client="Jam")
