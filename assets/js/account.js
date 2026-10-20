@@ -474,9 +474,9 @@
     for (var i = 0; i < arguments.length; i++) add(w, arguments[i]);
     return w;
   }
-  function renderSelectionBoard(p) {
+  function renderSelectionBoard(p, view) {
     HVBoard.mount(p, {
-      stages: SEL_STAGES, noun: "selection", locked: ["live", "completed"],
+      stages: SEL_STAGES, noun: "selection", locked: ["live", "completed"], view: view,
       items: DATA.selections.map(function (s) { return HVBoard.fromSelection(s, qchip(s.quote)); }),
       onMove: function (it, to) {
         return api("POST", "/api/board/selection-stage", { s: it.key, to: to }).then(function (r) {
@@ -492,12 +492,12 @@
 
   function renderSelections(p) {
     var view = boardOn() ? HVBoard.viewOf("selections") : "list";
-    add(p, head("Selections", view === "board"
+    add(p, head("Selections", view !== "list"
         ? "Every selection by where it stands. Drag one to another column, or use Move to. Your account manager sees every change."
         : "Approve the creators you want and reject the ones you don't. Your account manager sees every change and quotes the approved list.",
       headTools(DATA.selections.length ? viewHead("selections", renderSection) : null,
         h("a", { class: "hc-btn hc-btn--line hc-btn--sm", href: ROOT + "#cat-roster" }, "Browse creators"))));
-    if (DATA.selections.length && view === "board") { renderSelectionBoard(p); return; }
+    if (DATA.selections.length && view !== "list") { renderSelectionBoard(p, view); return; }
     if (!DATA.selections.length) {
       add(p, h("div", { class: "hc-empty" }, h("b", null, "No selections yet"),
         h("p", null, "Pick creators in the catalogue, or let Helvi build a scored shortlist from a short brief."),
@@ -766,7 +766,7 @@
     });
     return CBOARD.busy;
   }
-  function renderCampaignBoard(p) {
+  function renderCampaignBoard(p, view) {
     var B = CBOARD.data;
     if (!B) {
       var wait = h("p", { class: "hc-wait", role: "status" }, "Loading the board…");
@@ -781,7 +781,7 @@
     }
     if (!B.campaigns.length) return false;
     HVBoard.mount(p, {
-      stages: B.stages, noun: "campaign", locked: B.locked_stages || [],
+      stages: B.stages, noun: "campaign", locked: B.locked_stages || [], view: view,
       items: B.campaigns.map(HVBoard.fromCampaign),
       onMove: function (it, to) {
         return api("POST", "/api/board/stage", { t: it.key, to: to }).then(function (r) {
@@ -801,12 +801,12 @@
 
   function renderCampaigns(p) {
     var view = boardOn() ? HVBoard.viewOf("campaigns") : "list";
-    add(p, head("Campaigns", view === "board"
+    add(p, head("Campaigns", view !== "list"
         ? "Every campaign by stage, from the first draft to the final report. Live numbers refresh every 24 hours."
         : "Every campaign HelloVoice runs for your team, with its live report. Numbers refresh every 24 hours.",
       headTools(viewHead("campaigns", renderSection),
         h("a", { class: "hc-btn hc-btn--ink hc-btn--sm", href: ROOT + "campaign/" }, icon("chart"), " Campaign tracking"))));
-    if (view === "board" && renderCampaignBoard(p) !== false) return;
+    if (view !== "list" && renderCampaignBoard(p, view) !== false) return;
     var live = DATA.campaigns.filter(function (c) { return c.status === "live"; });
     var rest = DATA.campaigns.filter(function (c) { return c.status !== "live"; });
     live.forEach(function (c) { add(p, scorebug(c)); });

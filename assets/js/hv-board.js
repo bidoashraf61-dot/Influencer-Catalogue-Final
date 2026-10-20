@@ -321,8 +321,19 @@
       allBtn.textContent = expand ? "Collapse all" : "Expand all";
       draw();
     });
-    var tools = h("div", { class: "hvb-tools" }, allBtn);
+    // Item 200: Group by client — one band per client across the six stages (a toggle, remembered).
+    B.group = !!remember("hvb-group-" + noun, false);
+    var grpBtn = h("button", { type: "button", class: "hvb-tool hvb-tool--switch", "aria-pressed": B.group ? "true" : "false" }, h("i", { "aria-hidden": "true" }), "Group by client");
+    grpBtn.addEventListener("click", function () {
+      B.group = !B.group; keep("hvb-group-" + noun, B.group);
+      grpBtn.setAttribute("aria-pressed", B.group ? "true" : "false");
+      if (opts.view === "table") table(); else draw();
+    });
+    var tools = h("div", { class: "hvb-tools" });
     if (opts.tools) add(tools, opts.tools);
+    tools.appendChild(h("span", { class: "hvb-tools__gap" }));
+    tools.appendChild(grpBtn);
+    if (opts.view !== "table") tools.appendChild(allBtn);
     var tabBar = h("div", { class: "hvb-tabs", role: "tablist", "aria-label": "Stages" });
     var grid = h("div", { class: "hvb-grid" });
     opts.stages.forEach(function (s, i) {
@@ -333,7 +344,7 @@
       var head = h("header", { class: "hvb-lane__head" },
         h("h2", { id: "hvb-h-" + noun + "-" + s.key }, s.label), count, fold,
         h("p", { class: "hvb-lane__hint" }, s.hint, isLock ? h("span", { class: "hvb-lane__lock" }, svg("lock"), "Set by HelloVoice") : null));
-      var lane = h("section", { class: "hvb-lane hvb-lane--" + s.key + (isLock ? " is-locked" : ""), "data-stage": s.key, "data-i": i,
+      var lane = h("section", { class: "hvb-lane hvb-lane--" + s.key + (isLock ? " is-locked" : ""), "data-stage": s.key, "data-drop": s.key, "data-i": i,
                                 "aria-labelledby": "hvb-h-" + noun + "-" + s.key }, head, cards);
       lanes[s.key] = { el: lane, cards: cards, count: count };
       // Item 201: a column folds to a rail with its count; the rail (or its arrow) opens it again.
@@ -353,10 +364,14 @@
       tabs[s.key] = tab;
       tabBar.appendChild(tab);
     });
+    var bands = h("div", { class: "hvb-bands" });
+    var tbl = h("div", { class: "hvb-table" });
     root.appendChild(status);
     root.appendChild(tools);
     root.appendChild(tabBar);
-    root.appendChild(grid);
+    // One scroller holds the stage heads and the client bands, so they slide sideways together.
+    root.appendChild(h("div", { class: "hvb-scroll" }, grid, bands));
+    root.appendChild(tbl);
 
     function draw() {
       Object.keys(lanes).forEach(function (k) { lanes[k].cards.textContent = ""; });
@@ -380,8 +395,139 @@
         cols.push(list.length && !folded ? "minmax(248px, 1fr)" : "minmax(76px, .32fr)");
       });
       grid.style.setProperty("--hvb-cols", cols.join(" "));
+      root.classList.toggle("is-grouped", B.group);
+      bands.textContent = "";
+      if (B.group) drawBands(by, cols);
       if (B.drag) wireDrag();
       if (B.edges) requestAnimationFrame(B.edges);
+    }
+
+    // Swimlanes: the stage heads stay on top (the lanes, with their cards hidden), then a band per client.
+    var BANDS = remember("hvb-band-" + noun, {});
+    function clients() {
+      var order = [], by = {};
+      items.forEach(function (it) {
+        var c = it.client || "No client";
+        if (!by[c]) { by[c] = []; order.push(c); }
+        by[c].push(it);
+      });
+      order.sort(function (a, b) { return by[b].length - by[a].length || a.localeCompare(b); });
+      return order.map(function (c) { return { name: c, items: by[c] }; });
+    }
+    function drawBands(byStage, cols) {
+      bands.style.setProperty("--hvb-cols", cols.join(" "));
+      clients().forEach(function (c) {
+        var shut = !!BANDS[c.name];
+        var first = c.items[0];
+        var head = h("button", { type: "button", class: "hvb-band__head", "aria-expanded": shut ? "false" : "true" },
+          svg("chev"), brand({ client: c.name, name: c.name, logos: first.logos || [] }),
+          h("b", { class: "hvb-band__name" }, c.name),
+          h("span", { class: "hvb-band__n" }, c.items.length + " " + noun + (c.items.length === 1 ? "" : "s")),
+          h("span", { class: "hvb-band__dots", "aria-hidden": "true" }, opts.stages.map(function (s) {
+            var n = c.items.filter(function (x) { return x.stage === s.key; }).length;
+            return h("i", { class: "hvb-band__dot hvb-lane--" + s.key + (n ? " is-on" : ""), title: s.label + ": " + n }, n ? String(n) : "");
+          })));
+        var row = h("div", { class: "hvb-band__row" });
+        opts.stages.forEach(function (s) {
+          var mine = c.items.filter(function (x) { return x.stage === s.key; });
+          var cell = h("div", { class: "hvb-cell hvb-lane--" + s.key + (mine.length ? "" : " is-empty") + (FOLD[s.key] && (byStage[s.key] || []).length ? " is-folded" : ""),
+                                "data-drop": s.key, "data-stage": s.key },
+            h("span", { class: "hvb-cell__k" }, s.label));
+          mine.forEach(function (it) { cell.appendChild(card(it, B)); });
+          if (FOLD[s.key] && mine.length) cell.appendChild(h("span", { class: "hvb-cell__n" }, String(mine.length)));
+          row.appendChild(cell);
+        });
+        var band = h("section", { class: "hvb-band" + (shut ? " is-shut" : ""), "aria-label": c.name }, head, row);
+        head.addEventListener("click", function () {
+          if (BANDS[c.name]) delete BANDS[c.name]; else BANDS[c.name] = 1;
+          keep("hvb-band-" + noun, BANDS);
+          band.classList.toggle("is-shut", !!BANDS[c.name]);
+          head.setAttribute("aria-expanded", BANDS[c.name] ? "false" : "true");
+        });
+        bands.appendChild(band);
+      });
+    }
+
+    /* ------------------------------------------------- the CRM table (item 199) */
+    var SORT = remember("hvb-sort-" + noun, { k: "stage", d: 1 });
+    var STAGE_I = {};
+    opts.stages.forEach(function (s, i) { STAGE_I[s.key] = i; });
+    function cols() {
+      var camp = noun === "campaign";
+      var c = [
+        { k: "client", t: "Client", v: function (it) { return (it.client || "").toLowerCase(); }, cell: function (it) {
+            return h("span", { class: "hvb-t__client" }, brand(it), h("span", null, it.client || "–")); } },
+        { k: "name", t: camp ? "Campaign" : "Selection", v: function (it) { return it.name.toLowerCase(); }, cell: function (it) {
+            return h("span", { class: "hvb-t__name" }, it.href ? h("a", { href: it.href }, it.name) : it.name, it.demo ? h("span", { class: "hvb-tag hvb-tag--demo" }, "Demo") : null); } },
+        { k: "stage", t: "Stage", v: function (it) { return STAGE_I[it.stage]; }, cell: function (it) {
+            var lab = (opts.stages.filter(function (s) { return s.key === it.stage; })[0] || {}).label || it.stage;
+            var wrap = h("span", { class: "hvb-t__stage hvb-lane--" + it.stage }, h("i", { "aria-hidden": "true" }), lab);
+            if (!it.moves.length) return wrap;
+            return h("span", { class: "hvb-t__stagecell" }, wrap, moveMenu(it, opts.stages, function (to) { B.move(it, to); })); } },
+        { k: "kam", t: "KAM", v: function (it) { return (it.kam || "").toLowerCase(); }, cell: function (it) { return it.kam || "HelloVoice team"; } },
+        { k: "when", t: camp ? "Dates" : "Updated", v: function (it) { return camp ? (it.raw.starts_at || 0) : (it.updated || 0); }, cell: function (it) {
+            var range = it.raw.starts_at ? dm(it.raw.starts_at) + " – " + dm(it.raw.ends_at) : "–";
+            return camp ? h("span", null, range, it.when && it.when !== range ? h("small", null, it.when) : null) : ago(it.updated); } },
+        { k: "creators", t: "Creators", n: 1, v: function (it) { return num(it, "creators"); }, cell: function (it) { return String(num(it, "creators")); } },
+        { k: "approved", t: "Approved", n: 1, v: function (it) { return num(it, "approved"); }, cell: function (it) { return String(num(it, "approved")); } },
+        { k: "review", t: "To review", n: 1, v: function (it) { return num(it, "review"); }, cell: function (it) { return String(num(it, "review")); } }];
+      if (camp) c = c.concat([
+        { k: "views", t: "Views", n: 1, v: function (it) { return (it.raw.numbers || {}).views || 0; }, cell: function (it) { return it.raw.numbers ? big(it.raw.numbers.views) : "–"; } },
+        { k: "eng", t: "Engaged", n: 1, v: function (it) { return (it.raw.numbers || {}).engagement || 0; }, cell: function (it) { return it.raw.numbers ? big(it.raw.numbers.engagement) : "–"; } },
+        { k: "er", t: "Eng. rate", n: 1, v: function (it) { var n = it.raw.numbers; return n && n.er != null ? n.er : -1; }, cell: function (it) {
+            var n = it.raw.numbers; return n && n.er != null ? Number(n.er).toFixed(2) + "%" : "–"; } },
+        { k: "posts", t: "Posts live", n: 1, v: function (it) { return it.progress ? it.progress.done / it.progress.of : -1; }, cell: function (it) {
+            return it.progress ? it.progress.done + "/" + it.progress.of : "–"; } },
+        { k: "track", t: "On track", v: function (it) { return it.track ? ({ good: 0, moderate: 1, low: 2 })[it.track.grade] : 9; }, cell: function (it) {
+            return it.track ? trackPill(it.track) : "–"; } }]);
+      else c.push({ k: "camps", t: "Campaigns", v: function (it) { return it.links.length; }, cell: function (it) {
+            return it.links.length ? it.links.map(function (l) { return l.label; }).join(", ") : "–"; } });
+      c.push({ k: "go", t: "", cell: function (it) { return h("span", { class: "hvb-card__go" }, goButtons(it)); } });
+      return c;
+    }
+    function num(it, k) { var c = (it.raw && it.raw.counts) || {}; return c[k] || 0; }
+    function table() {
+      grid.hidden = tabBar.hidden = true;
+      bands.textContent = "";
+      tbl.textContent = "";
+      var C = cols();
+      var col = C.filter(function (c) { return c.k === SORT.k; })[0] || C[2];
+      var rows = items.slice().sort(function (a, b) {
+        var x = col.v(a), y = col.v(b);
+        return (x < y ? -1 : x > y ? 1 : 0) * SORT.d || STAGE_I[a.stage] - STAGE_I[b.stage] || a.name.localeCompare(b.name);
+      });
+      var t = h("table", { class: "hvb-t" });
+      var tr = h("tr");
+      C.forEach(function (c) {
+        if (!c.v) { tr.appendChild(h("th", { scope: "col" }, h("span", { class: "hvb-sr" }, "Open"))); return; }
+        var on = c.k === SORT.k;
+        var b = h("button", { type: "button", class: "hvb-t__sort" }, c.t, on ? svg("chev", SORT.d > 0 ? "is-up" : "is-down") : null);
+        b.addEventListener("click", function () {
+          SORT = { k: c.k, d: on ? -SORT.d : (c.n ? -1 : 1) }; keep("hvb-sort-" + noun, SORT); table();
+        });
+        tr.appendChild(h("th", { scope: "col", class: c.n ? "is-num" : null, "aria-sort": on ? (SORT.d > 0 ? "ascending" : "descending") : null }, b));
+      });
+      t.appendChild(h("thead", null, tr));
+      function body(list, label) {
+        var tb = h("tbody");
+        if (label) {
+          tb.appendChild(h("tr", { class: "hvb-t__group" }, h("th", { scope: "rowgroup", colspan: String(C.length) },
+            h("span", { class: "hvb-t__client" }, brand({ client: label, name: label, logos: list[0].logos || [] }), h("b", null, label)),
+            h("small", null, list.length + " " + noun + (list.length === 1 ? "" : "s")))));
+        }
+        list.forEach(function (it) {
+          var r = h("tr", { class: it.track ? "is-track-" + it.track.grade : null });
+          C.forEach(function (c, i) { r.appendChild(h(i === 1 ? "th" : "td", { scope: i === 1 ? "row" : null, class: c.n ? "is-num" : null }, c.cell(it))); });
+          tb.appendChild(r);
+        });
+        t.appendChild(tb);
+      }
+      if (B.group) {
+        var by = {};
+        rows.forEach(function (it) { var c = it.client || "No client"; (by[c] = by[c] || []).push(it); });
+        clients().forEach(function (c) { body(by[c.name], c.name); });
+      } else body(rows, null);
+      tbl.appendChild(h("div", { class: "hvb-t__wrap", tabindex: "0", role: "region", "aria-label": (noun === "campaign" ? "Campaigns" : "Selections") + " table" }, t));
     }
 
     // Optimistic: the card moves at once; the server's no puts it back with the reason.
@@ -390,46 +536,45 @@
       var from = it.stage, label = (opts.stages.filter(function (s) { return s.key === to; })[0] || {}).label || to;
       it.stage = to;
       it.moves = it.moves.filter(function (k) { return k !== to; }).concat([from]);
-      draw();
+      redraw();
       B.say("Moving " + it.name + " to " + label + "…");
       opts.onMove(it, to).then(function (j) {
         if (j && j.ok) { B.say(j.message || (it.name + " moved to " + label + ".")); return; }
         it.stage = from;
         it.moves = it.moves.filter(function (k) { return k !== from; }).concat([to]);
-        draw();
+        redraw();
         B.say((j && j.message) || ("Couldn’t move " + it.name + ". Please try again."), true);
       });
     };
 
     function wireDrag() {
-      var held = null;
-      grid.querySelectorAll(".hvb-card[draggable]").forEach(function (el) {
+      root.querySelectorAll(".hvb-card[draggable]").forEach(function (el) {
         el.addEventListener("dragstart", function (e) {
-          held = items.filter(function (x) { return x.key === el.getAttribute("data-key"); })[0];
+          var held = B.held = items.filter(function (x) { return x.key === el.getAttribute("data-key"); })[0];
           if (!held) return;
           el.classList.add("is-dragging");
           root.classList.add("is-dragging");
-          opts.stages.forEach(function (s) { lanes[s.key].el.classList.toggle("can-drop", held.moves.indexOf(s.key) >= 0); });
+          root.querySelectorAll("[data-drop]").forEach(function (t) { t.classList.toggle("can-drop", held.moves.indexOf(t.getAttribute("data-drop")) >= 0); });
           e.dataTransfer.effectAllowed = "move";
           try { e.dataTransfer.setData("text/plain", held.key); } catch (x) { /* old browsers */ }
         });
         el.addEventListener("dragend", function () {
-          el.classList.remove("is-dragging"); root.classList.remove("is-dragging"); held = null;
-          grid.querySelectorAll(".hvb-lane").forEach(function (l) { l.classList.remove("can-drop", "is-over"); });
+          el.classList.remove("is-dragging"); root.classList.remove("is-dragging"); B.held = null;
+          root.querySelectorAll("[data-drop]").forEach(function (l) { l.classList.remove("can-drop", "is-over"); });
         });
       });
-      opts.stages.forEach(function (s) {
-        var L = lanes[s.key].el;
+      root.querySelectorAll("[data-drop]").forEach(function (L) {
+        var key = L.getAttribute("data-drop");
         if (L.hvbWired) return;
         L.hvbWired = true;
         L.addEventListener("dragover", function (e) {
-          if (!held || held.moves.indexOf(s.key) < 0) return;
+          if (!B.held || B.held.moves.indexOf(key) < 0) return;
           e.preventDefault(); e.dataTransfer.dropEffect = "move"; L.classList.add("is-over");
         });
         L.addEventListener("dragleave", function (e) { if (!L.contains(e.relatedTarget)) L.classList.remove("is-over"); });
         L.addEventListener("drop", function (e) {
           e.preventDefault(); L.classList.remove("is-over");
-          if (held && held.moves.indexOf(s.key) >= 0) B.move(held, s.key);
+          if (B.held && B.held.moves.indexOf(key) >= 0) B.move(B.held, key);
         });
       });
     }
@@ -469,8 +614,10 @@
       }, 80);
     }, { passive: true });
 
-    draw();
+    function redraw() { if (opts.view === "table") table(); else draw(); }
+    redraw();
     host.appendChild(root);
+    if (opts.view === "table") return B;
     requestAnimationFrame(edges);
     // Open on the first column that holds something, so a phone never lands on an empty Draft.
     var firstFull = 0;
@@ -482,9 +629,11 @@
 
   /* ------------------------------------------------------- Board | List */
   // The view switch in a section head. The choice is remembered per section in this browser only.
-  function viewSwitch(key, current, onPick) {
+  // Board | Table | List (item 199). The choice is remembered per section in this browser only.
+  var VIEWS = [["board", "Board"], ["table", "Table"], ["list", "List"]];
+  function viewSwitch(key, current, onPick, only) {
     var wrap = h("div", { class: "hvb-view", role: "group", "aria-label": "View" });
-    [["board", "Board"], ["list", "List"]].forEach(function (v) {
+    VIEWS.filter(function (v) { return !only || only.indexOf(v[0]) >= 0; }).forEach(function (v) {
       wrap.appendChild(h("button", { type: "button", "aria-pressed": v[0] === current ? "true" : "false", onclick: function () {
         try { localStorage.setItem("hvb-view-" + key, v[0]); } catch (e) { /* private mode */ }
         onPick(v[0]);
@@ -492,8 +641,10 @@
     });
     return wrap;
   }
-  function viewOf(key) {
-    try { return localStorage.getItem("hvb-view-" + key) === "list" ? "list" : "board"; } catch (e) { return "board"; }
+  function viewOf(key, only) {
+    var v = null;
+    try { v = localStorage.getItem("hvb-view-" + key); } catch (e) { /* private mode */ }
+    return v && (!only || only.indexOf(v) >= 0) && VIEWS.some(function (x) { return x[0] === v; }) ? v : "board";
   }
 
   window.HVBoard = { mount: mount, fromCampaign: fromCampaign, fromSelection: fromSelection, viewSwitch: viewSwitch, viewOf: viewOf };
