@@ -4,9 +4,9 @@ One rule for every door (the selection page, the client's Selections list, the a
 selections list, the Clients hub and Helvi's ``rename_selection`` tool):
 
     who may      HelloVoice (admin, or a key account manager on her own client's selection),
-                 and the selection's owner (the account it is filed under, or a shared code
-                 HelloVoice linked onto that account). A colleague who can only look, and
-                 someone the selection was merely shared with (an invite), may not.
+                 the selection's owner (the account it is filed under, or a shared code
+                 HelloVoice linked onto that account), and someone HelloVoice invited to it
+                 (they get the client's own controls). A colleague who can only look may not.
     the name     trimmed, inner whitespace collapsed, no < or >, 1 to 80 characters.
     recorded     one History entry ("Renamed selection A to B"), so an admin can undo it.
 
@@ -48,6 +48,8 @@ def client_may(reader, sel, admin_code_id=None):
         return False
     if admin_code_id is not None and int(reader) == int(admin_code_id):
         return True
+    if db.selection_granted(sel["id"], reader):
+        return True                    # invited with the client's own controls (owner rule 2026-10-15; coordinator 2026-10-20)
     if sel["code_id"] is None:
         return False                   # unfiled: nobody to call owner, so only HelloVoice
     return portal.owns(int(reader), sel["code_id"])

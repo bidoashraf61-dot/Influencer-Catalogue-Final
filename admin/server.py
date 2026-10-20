@@ -6434,6 +6434,18 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "token": db.selection(sid)["token"]},
                                   self.cors())
 
+        # Item 173: the name. A page sends the name it loaded (loaded_name); unchanged there means "keep
+        # whatever it is now", so a stale tab never writes an old name back over a rename made elsewhere.
+        # A real change goes through the rename rule (1-80 characters, History); an invalid one is ignored.
+        import selrename
+        loaded = b.get("loaded_name")
+        if loaded is not None and name == (str(loaded).strip()[:120] or "Selection"):
+            name = sel["name"]
+        elif name != sel["name"]:
+            u_ = portal.user_for_code(int(viewer)) if int(viewer) != db.admin_code_id() else None
+            row, err = selrename.apply(sel, name, ("client: " + u_["email"]) if u_ is not None else None)
+            name = sel["name"] if err else row["name"]
+            sel = row if row is not None else sel
         prices = {k: v for k, v in json.loads(sel["prices"] or "{}").items() if k in codes}
         stored = json.loads(sel["codes"] or "[]")
         same = sorted(stored) == sorted(codes)

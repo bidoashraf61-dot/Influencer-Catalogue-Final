@@ -2,8 +2,9 @@
 
 - the owner renames from the selection page / profile (POST /api/selection/rename): the name is
   trimmed and checked (1 to 80 characters), History records it, the payloads carry can_rename;
-- a colleague who can only look, someone the selection was shared with (an invite), an outsider
+- someone invited to it (the client's own controls) may; a colleague who can only look, an outsider
   and a signed-out visitor cannot (403 / 401), and their payloads say can_rename false;
+- a stale tab re-saving with the name it loaded never writes the old name back;
 - a legacy quote request matched by the OLD name is pinned first, so the lifecycle survives;
 - HelloVoice renames from the admin lists (POST /selections/rename, JSON or a plain form), the lists
   draw the inline control, a read-only viewer gets none; a key account manager renames her own
@@ -125,13 +126,16 @@ class RenameSelection(unittest.TestCase):
         s, b, _ = col.post("/api/selection/rename", {"token": token, "name": "Hijacked"})
         self.assertEqual((s, b.get("reason")), (403, "forbidden"))
 
-        inv, _ = self.signup("guest@rename-invited.com")                # shared one by one (an invite)
+        # invited one by one: the client's own controls (2026-10-15), so they may rename (decision 2026-10-20)
+        inv, _ = self.signup("guest@rename-invited.com")
         db.grant_selection(sid, portal.user_by_email("guest@rename-invited.com")["code_id"], by="test")
         self.assertEqual(inv.get("/api/selection?s=" + token)[0], 200)
-        self.assertFalse(inv.get("/api/selection?s=" + token)[1]["can_rename"])
-        self.assertFalse(self.acct_row(inv, token)["can_rename"])
-        s, b, _ = inv.post("/api/selection/rename", {"token": token, "name": "Hijacked"})
-        self.assertEqual((s, b.get("reason")), (403, "forbidden"))
+        self.assertTrue(inv.get("/api/selection?s=" + token)[1]["can_rename"])
+        self.assertTrue(self.acct_row(inv, token)["can_rename"])
+        s, b, _ = inv.post("/api/selection/rename", {"token": token, "name": "Invitee named it"})
+        self.assertEqual((s, b.get("name")), (200, "Invitee named it"), b)
+        self.assertIn(("Renamed selection Team list to Invitee named it", "client: guest@rename-invited.com"), self.history_labels(sid))
+        c.post("/api/selection/rename", {"token": token, "name": "Team list"})
 
         out, _ = self.signup("x@rename-elsewhere.com")
         s, b, _ = out.post("/api/selection/rename", {"token": token, "name": "Hijacked"})
@@ -161,6 +165,30 @@ class RenameSelection(unittest.TestCase):
         after = db.selection(sel["id"])
         self.assertEqual(after["request_id"], rid)
         self.assertEqual(lifecycle.chip(after)["key"], "requested")
+
+    # -------------------------------------------------------- stale tab --
+    def test_05b_stale_tab_does_not_write_the_old_name_back(self):
+        c, _ = self.signup("owner@rename-stale.com")
+        token = self.sel(c, "Old name")
+        s, b, _ = c.post("/api/selection/rename", {"token": token, "name": "New name"})
+        self.assertEqual(s, 200, b)
+        # a tab that loaded "Old name" adds a creator: the creators change, the name stays new
+        s, b, _ = c.post("/api/selection", {"token": token, "name": "Old name", "loaded_name": "Old name",
+                                             "codes": ["HV-MI-001", "HV-MI-002", "HV-MD-003"]})
+        self.assertEqual((s, b.get("token")), (200, token), b)
+        row = db.selection(token=token)
+        self.assertEqual(row["name"], "New name")
+        self.assertEqual(len(__import__("json").loads(row["codes"])), 3)
+        # a name the person really changed on that page still applies, through the rename rule
+        s, b, _ = c.post("/api/selection", {"token": token, "name": "Typed on purpose", "loaded_name": "Old name",
+                                             "codes": ["HV-MI-001", "HV-MI-002", "HV-MD-003"]})
+        self.assertEqual(db.selection(token=token)["name"], "Typed on purpose")
+        self.assertIn(("Renamed selection New name to Typed on purpose", "client: owner@rename-stale.com"),
+                      self.history_labels(row["id"]))
+        # an invalid name in a save is ignored, the creators still save
+        c.post("/api/selection", {"token": token, "name": "q" * 100, "codes": ["HV-MI-001"]})
+        row = db.selection(token=token)
+        self.assertEqual((row["name"], __import__("json").loads(row["codes"])), ("Typed on purpose", ["HV-MI-001"]))
 
     # ------------------------------------------------------------ admin --
     def test_06_admin_renames_from_the_lists(self):

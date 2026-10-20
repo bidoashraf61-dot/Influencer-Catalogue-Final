@@ -2838,7 +2838,7 @@
              { label: "Get a quote for it", go: function () { quoteFor(s); } }]);
     }
     function saveSel(s, codes, name, msg) {
-      return api("POST", "/api/selection", { token: s.token, name: name || s.name, codes: codes }).then(function (r) {
+      return api("POST", "/api/selection", { token: s.token, name: name || s.name, loaded_name: s.name, codes: codes }).then(function (r) {
         if (!r.b.ok) { say(r.b.reason === "empty" ? "A selection needs at least one creator, so I left it as it was." : "I couldn't save that just now. Please try again."); return; }
         s.codes = codes; s.name = name || s.name; s.token = r.b.token || s.token;
         say(msg);
