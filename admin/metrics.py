@@ -1377,4 +1377,13 @@ def client_report(campaign, photo=None, photo_large=None):
             out["clicks"]["links"] = conn.execute(
                 "SELECT COUNT(*) FROM links WHERE campaign_id = ? AND active = 1", (k["id"],)).fetchone()[0]
         out["clicks"]["has_destination"] = bool(k["destination"])
+    # Clicks to sales (owner, 2026-10-20): promo-code / retailer sales for the campaign, stored as one client-safe
+    # summary in settings.campaign_sales {campaign id: {...}}; shown in the affiliate-clicks slot.
+    out["sales"] = None
+    if vis["clicks"]:
+        try:
+            sv = (db.setting("campaign_sales") or {}).get(str(k["id"]))
+            out["sales"] = sv if isinstance(sv, dict) and sv.get("totals") else None
+        except (AttributeError, TypeError, ValueError):
+            pass
     return out

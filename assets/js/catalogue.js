@@ -71,6 +71,7 @@
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (b) {
         var t = (b && b.ok && b.token) || "";
+        if (b && b.capped) { try { alert("A selection can hold up to " + b.capped + " creators. Only the first " + b.capped + " were saved."); } catch (e) { /* no dialogs */ } }
         // Tell the portal layer (portal.js) a shortlist was saved, so it can offer the brief questions.
         if (t) { try { window.dispatchEvent(new CustomEvent("hv:selection-saved", { detail: { token: t, name: name, codes: codes, lifecycle: (b && b.lifecycle) || null } })); } catch (e) { /* old browser */ } }
         return t;
@@ -1500,10 +1501,14 @@
     }
     function cardsByCode(codes) {
       if (!codes.length) return Promise.resolve([]);
-      var p = new URLSearchParams();
-      p.set("link", LINK);
-      p.set("codes", codes.slice(0, 200).join(","));
-      return feedGet("/api/roster/cards", p).then(function (b) { return (b && b.ok && b.cards) || []; });
+      var calls = [];
+      for (var i = 0; i < codes.length; i += 200) {
+        var p = new URLSearchParams();
+        p.set("link", LINK);
+        p.set("codes", codes.slice(i, i + 200).join(","));
+        calls.push(feedGet("/api/roster/cards", p).then(function (b) { return (b && b.ok && b.cards) || []; }));
+      }
+      return Promise.all(calls).then(function (lists) { return [].concat.apply([], lists); });
     }
     // portal.js reaches the server-side feed through this: the licence chips, the AI shortlist
     // (which shows only its picks, fetched by code), the assistant's "show me" and its counts.
@@ -3852,12 +3857,19 @@
     }
     // The selection page: the creators its link names now; the rest of the selection (a link that
     // is only a token) once /api/selection has answered (initSelection).
-    var lp2 = new URLSearchParams();
-    lp2.set("link", LINK);
-    lp2.set("codes", readFragment().codes.slice(0, 200).join(","));
-    apiJson("/api/roster/cards", lp2).then(function (b) {
-      if (!outcome([b])) return;
-      ROSTER = b.cards || [];
+    // 200 creators a call (main d53e289); the tiers and rates come with the first answer. Any 401/403
+    // goes to the email sign-in, anything else retries (item 181): outcome() decides for all of them.
+    var fcodes = readFragment().codes, fcalls = [];
+    for (var fi = 0; fi === 0 || fi < fcodes.length; fi += 200) {
+      var lp2 = new URLSearchParams();
+      lp2.set("link", LINK);
+      lp2.set("codes", fcodes.slice(fi, fi + 200).join(","));
+      fcalls.push(apiJson("/api/roster/cards", lp2));
+    }
+    Promise.all(fcalls).then(function (bs) {
+      if (!outcome(bs)) return;
+      var b = bs[0];
+      ROSTER = [].concat.apply([], bs.map(function (x) { return (x && x.ok && x.cards) || []; }));
       adoptTiers(b.tiers); adoptFx(b.fx); remember(); unlock();
     });
   }

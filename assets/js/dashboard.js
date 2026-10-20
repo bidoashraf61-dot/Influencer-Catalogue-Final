@@ -948,12 +948,100 @@
   }
 
   function renderClicks(cl) {
+    if (R.sales && R.sales.totals) return renderSales(cl);
     $("w-clicks").innerHTML = head(IC.clicks, "Affiliate clicks", "Taps on the creators' own tracking links — people only, not link previews or bots.", cl ? "clicks" : "")
       + '<div class="db-card__body">' + (cl ? '<div class="db-big">' + full(cl.clicks) + (cl.uniques != null ? "<small>" + full(cl.uniques) + " unique</small>" : "") + "</div>"
         + '<div style="margin-top:8px">' + bars((cl.by_app || []).slice(0, 3).map(function (r) { return { k: r.k, n: r.n, label: full(r.n) }; }), function (r) { return (ICONS[r.k] || "") + esc(r.k); }) + "</div>"
         + (cl.partial || F.platform ? '<p class="db-note">' + (F.platform ? "Clicks are per creator link, not per platform — showing all platforms." : "Apps show the whole campaign.") + "</p>" : "")
         : '<div class="db-na-card"><span class="db-na-card__icon">' + IC.clicks + '</span><span class="db-na">Not part of this campaign</span>'
           + "<p>This campaign does not contain affiliate links, so there are no clicks to show.</p></div>") + "</div>";
+  }
+
+  /* Clicks to sales (owner, 2026-10-20): when a campaign has sales data (R.sales: promo-code and retailer reports,
+     tracked links), the affiliate-clicks slot tells the sales story; the drawer keeps the click breakdowns at the end. */
+  var SLI = ico('<path d="M5 8h14l-1.2 11.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8z"/><path d="M9 8V6.5a3 3 0 0 1 6 0V8"/>');
+  var SLCOL = ["#121212", "#ff691e", "#14884a", "#b9d400", "#8a8278", "#d4560a"];
+  function money(v, cur) { return (cur || "SAR") + " " + num(v); }
+  function roasTxt(v) { return v == null ? "—" : v.toFixed(1) + "×"; }
+  function renderSales(cl) {
+    var S = R.sales, T = S.totals || {}, src = (S.sources || []).slice().sort(function (a, b) { return b.revenue - a.revenue; });
+    var tot = src.reduce(function (a, s) { return a + s.revenue; }, 0) || 1;
+    $("w-clicks").innerHTML = head(SLI, "Clicks to sales", "Sales the campaign drove: promo codes, retailer reports and the creators' tracked links. " + (S.basis || ""), "clicks")
+      + '<div class="db-card__body sl-card"><div class="sl-card__top"><div class="sl-card__rev"><b>' + money(T.revenue, S.currency) + "</b><span>in sales</span></div>"
+      + '<div class="sl-card__roas" title="Sales per riyal spent on the campaign"><b>' + roasTxt(T.roas) + "</b><span>return</span></div></div>"
+      + '<div class="sl-stack" role="img" aria-label="Sales by retailer: ' + esc(src.map(function (s) { return s.label + " " + Math.round(s.revenue / tot * 100) + "%"; }).join(", ")) + '">'
+      + src.map(function (s, i) { return '<i style="flex:' + s.revenue + ";background:" + SLCOL[i % SLCOL.length] + '"></i>'; }).join("") + "</div>"
+      + '<div class="sl-legend">' + src.slice(0, 3).map(function (s, i) { return '<span><i style="background:' + SLCOL[i] + '"></i>' + esc(s.label) + " <b>" + Math.round(s.revenue / tot * 100) + "%</b></span>"; }).join("") + "</div>"
+      + '<p class="sl-card__foot"><b>' + full(T.orders) + "</b> orders" + (T.conv != null ? " · <b>" + pct(T.conv, 1) + "</b> of link clicks bought" : "") + "</p></div>";
+  }
+  function salesDays() {
+    var S = R.sales, ds = S.days || [], W = 640, H = 230, L = 10, Rr = 10, T = 30, B = 34;
+    if (ds.length < 2) return "";
+    var mx = Math.max.apply(null, ds.map(function (d) { return d.revenue; })) || 1, n = ds.length;
+    var x = function (i) { return L + i * (W - L - Rr) / (n - 1); }, y = function (v) { return T + (1 - v / mx) * (H - T - B); };
+    var pts = ds.map(function (d, i) { return [x(i), y(d.revenue)]; }), line = cmCurve(pts);
+    var area = line + " L" + pts[n - 1][0].toFixed(1) + " " + (H - B) + " L" + pts[0][0].toFixed(1) + " " + (H - B) + " Z";
+    var first = ds.findIndex ? ds.findIndex(function (d) { return !d.before; }) : 0; if (first < 0) first = 0;
+    var postsBy = {}; posts().forEach(function (p) { if (p.posted_at) { var k = new Date((p.posted_at + 3 * 3600) * 1000).toISOString().slice(0, 10); postsBy[k] = (postsBy[k] || 0) + 1; } });
+    var pmx = Math.max.apply(null, Object.keys(postsBy).map(function (k) { return postsBy[k]; }).concat([1]));
+    var base = S.baseline && S.baseline.daily ? y(S.baseline.daily) : null, step = Math.ceil(n / 7), pk = 0;
+    ds.forEach(function (d, i) { if (d.revenue > ds[pk].revenue) pk = i; });
+    return '<div class="sl-days"><svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Sales per day: ' + esc(ds.map(function (d) { return day(d.d) + " " + money(d.revenue, S.currency); }).join(", ")) + '">'
+      + '<defs><linearGradient id="sl-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#14884a" stop-opacity=".22"/><stop offset="1" stop-color="#14884a" stop-opacity=".02"/></linearGradient></defs>'
+      + (first > 0 ? '<rect x="' + L + '" y="' + T + '" width="' + (x(first) - L).toFixed(1) + '" height="' + (H - T - B) + '" class="sl-days__before"/><text x="' + (L + 6) + '" y="' + (T + 14) + '" class="sl-days__lbl">Before the campaign</text>' : "")
+      + ds.map(function (d, i) { var c = postsBy[d.d]; return c ? '<rect class="sl-days__post" x="' + (x(i) - 2.5).toFixed(1) + '" y="' + (H - B - 4 - c / pmx * 26).toFixed(1) + '" width="5" height="' + (c / pmx * 26 + 4).toFixed(1) + '" rx="2"><title>' + day(d.d) + ": " + c + " videos posted</title></rect>" : ""; }).join("")
+      + '<line x1="' + L + '" y1="' + (H - B) + '" x2="' + (W - Rr) + '" y2="' + (H - B) + '" stroke="#e6e2db" stroke-width="1.5"/>'
+      + (base != null ? '<line x1="' + L + '" y1="' + base.toFixed(1) + '" x2="' + (W - Rr) + '" y2="' + base.toFixed(1) + '" class="sl-days__base"/><text x="' + (L + 6) + '" y="' + (base - 7).toFixed(1) + '" text-anchor="start" class="sl-days__lbl">Usual day: ' + money(S.baseline.daily, S.currency) + "</text>" : "")
+      + '<path d="' + area + '" fill="url(#sl-fill)"/><path d="' + line + '" fill="none" stroke="#14884a" stroke-width="3" stroke-linecap="round"/>'
+      + '<circle cx="' + pts[pk][0].toFixed(1) + '" cy="' + pts[pk][1].toFixed(1) + '" r="6" class="sl-days__pk"/><text x="' + Math.min(W - 60, Math.max(60, pts[pk][0])).toFixed(1) + '" y="' + (pts[pk][1] - 12).toFixed(1) + '" text-anchor="middle" class="sl-days__v">' + money(ds[pk].revenue, S.currency) + "</text>"
+      + ds.map(function (d, i) { if (i % step && i !== n - 1) return ""; if (i !== n - 1 && n - 1 - i < step * 0.8) return "";
+          return '<text x="' + x(i).toFixed(1) + '" y="' + (H - 10) + '" text-anchor="' + (i === 0 ? "start" : i === n - 1 ? "end" : "middle") + '" class="cmp-curve__d">' + day(d.d) + "</text>"; }).join("")
+      + "</svg></div>"
+      + '<p class="db-note"><span class="sl-key sl-key--line"></span>Sales per day <span class="sl-key sl-key--post"></span>Videos posted that day' + (base != null ? ' <span class="sl-key sl-key--base"></span>Usual day before the campaign' : "") + "</p>";
+  }
+  function salesPanel() {
+    var S = R.sales, T = S.totals || {}, cur = S.currency, cl = clicksFor();
+    var src = (S.sources || []).slice().sort(function (a, b) { return b.revenue - a.revenue; }), stot = src.reduce(function (a, s) { return a + s.revenue; }, 0) || 1;
+    var box = function (n, l, cls) { return '<div class="cmp-box' + (cls ? " " + cls : "") + '"><b>' + n + "</b><span>" + l + "</span></div>"; };
+    var lift = S.baseline && S.baseline.lift != null ? S.baseline.lift : null;
+    var out = '<div class="sl-hero"><span class="sl-hero__ic">' + SLI + '</span><div><p class="sl-hero__t">Every ' + esc(cur) + " 1 spent brought back <mark>" + esc(cur) + " " + (T.roas || 0).toFixed(2) + "</mark></p>"
+      + "<p>" + money(T.revenue, cur) + " in sales from " + full(T.orders) + " orders" + (lift != null ? ", <b>" + (lift >= 0 ? "+" : "") + Math.round(lift) + "%</b> above a usual day before the campaign" : "") + ".</p></div></div>"
+      + '<div class="cmp-boxes sl-boxes">' + box(money(T.revenue, cur), "sales", "is-hot") + box(full(T.orders), "orders") + box(roasTxt(T.roas), "return on spend")
+      + box(money(T.cpo, cur), "cost per order") + box(money(T.aov, cur), "average basket") + (T.new_share != null ? box(Math.round(T.new_share * 100) + "%", "new customers") : "") + "</div>";
+    var FN = S.funnel || [], fmx = Math.log10(Math.max.apply(null, FN.map(function (f) { return f.n; }).concat([10])));
+    if (FN.length) out += sec("sl-funnel", "From view to order", "Each step as people moved from a video to a purchase. Bars use a log scale so every step stays visible. Orders here are the ones tracked from a link; promo-code orders in stores are counted in the totals above.",
+      '<ol class="sl-funnel">' + FN.map(function (f, i) {
+        var prev = i ? FN[i - 1].n : null, r = prev ? f.n / prev * 100 : null;
+        return '<li style="--w:' + Math.max(6, Math.log10(Math.max(1, f.n)) / fmx * 100).toFixed(1) + '%"><span class="sl-funnel__k">' + esc(f.k) + "</span><i></i><b>" + num(f.n) + "</b>"
+          + (r != null ? '<small>' + (r < 1 ? r.toFixed(2) : r < 10 ? r.toFixed(1) : Math.round(r)) + "% of the step before</small>" : "<small>&nbsp;</small>") + "</li>"; }).join("") + "</ol>");
+    out += sec("sl-src", "Where people bought", "Revenue by store and how it was measured: promo-code reports, retailer attribution reports and tracked links.",
+      '<div class="sl-src">' + src.map(function (s, i) {
+        return '<div class="sl-src__r"><span class="sl-src__dot" style="background:' + SLCOL[i % SLCOL.length] + '"></span><div class="sl-src__n"><b>' + esc(s.label) + "</b><small>" + esc(s.via || "") + '</small></div>'
+          + '<div class="sl-src__bar"><i style="--w:' + (s.revenue / src[0].revenue * 100).toFixed(1) + "%;--c:" + SLCOL[i % SLCOL.length] + '"></i></div>'
+          + '<div class="sl-src__m"><b>' + money(s.revenue, cur) + "</b><small>" + full(s.orders) + " orders · " + Math.round(s.revenue / stot * 100) + "%</small></div></div>"; }).join("") + "</div>");
+    if ((S.days || []).length > 1) out += sec("sl-days", "Sales by day", "Daily sales across every store, with the days videos went live. The shaded part is the two weeks before the campaign.", salesDays());
+    var names = {}, pics = {}; (R.creators || []).forEach(function (c) { names[c.code] = c.name; pics[c.code] = c.photo; });
+    var cr = (S.creators || []).slice(0, 10), cmx = cr.length ? cr[0].revenue : 1;
+    if (cr.length) out += sec("sl-cr", "Creators who sold the most", "Sales from each creator's own promo code and tracking link.",
+      '<ol class="sl-cr">' + cr.map(function (c, i) {
+        return '<li><span class="sl-cr__i">' + (i + 1) + "</span>" + ava(pics[c.code]) + '<span class="sl-cr__n"><b>' + esc(names[c.code] || c.name || c.code) + '</b><small><span class="sl-code">' + esc(c.promo) + "</span>" + full(c.orders) + " orders</small></span>"
+          + '<span class="sl-cr__bar"><i style="--w:' + (c.revenue / cmx * 100).toFixed(1) + '%"></i></span><b class="sl-cr__v">' + money(c.revenue, cur) + "</b></li>"; }).join("") + "</ol>");
+    var C = S.customers || {}, ct = (C["new"] || 0) + (C.returning || 0) || 1;
+    var L = function (rows, fmt) { return (rows || []).map(function (r) { return { k: r.k, n: r.n, label: fmt(r.n) }; }); };
+    var hasC = (C["new"] || 0) + (C.returning || 0) > 0, hasCt = (S.cities || []).length > 0, hasP = (S.products || []).length > 0;
+    var who = (hasC || hasCt) ? sec("sl-who", "Who bought", "New customers had not bought the brand before, as the retailers report it.",
+        (hasC ? '<div class="sl-split"><i style="flex:' + (C["new"] || 0) + '"><b>' + Math.round((C["new"] || 0) / ct * 100) + '%</b> new</i><i style="flex:' + (C.returning || 0) + '"><b>' + Math.round((C.returning || 0) / ct * 100) + "%</b> returning</i></div>" : "")
+        + (hasCt ? "<h4 class=\"sl-h4\">Top cities</h4>" + bars(L(S.cities, function (n) { return money(n, cur); }), function (r) { return esc(r.k); }, function (i) { return SLCOL[i % SLCOL.length]; }) : "")) : "";
+    var sku = hasP ? sec("sl-sku", "What sold", "Revenue by product, from the retailers' reports.", bars(L(S.products, function (n) { return money(n, cur); }), function (r) { return esc(r.k); }, function (i) { return SLCOL[i % SLCOL.length]; })) : "";
+    if (who || sku) out += (who && sku ? '<div class="sl-two">' + who + sku + "</div>" : who + sku);
+    if (cl) {
+      var B = function (rows) { return (rows || []).map(function (r) { return { k: r.k, n: r.n, label: full(r.n) }; }); };
+      out += sec("sl-clk", "Link clicks", "Taps on the creators' own tracking links — people only, not link previews or bots.",
+        '<div class="db-big">' + full(cl.clicks) + " <small>clicks" + (cl.uniques != null ? " · " + full(cl.uniques) + " unique people" : "") + "</small></div>"
+        + '<div class="sl-two sl-two--flat"><div><h4 class="sl-h4">By app</h4>' + bars(B(cl.by_app), function (r) { return (ICONS[r.k] || "") + esc(r.k); })
+        + '</div><div><h4 class="sl-h4">By country</h4>' + bars(B((cl.by_country || []).slice(0, 6)), function (r) { return r.k && r.k.length === 2 ? flag(r.k) + esc(countryName(r.k)) : esc(r.k || "Unknown"); }) + "</div></div>");
+    }
+    return out + (S.basis ? '<p class="db-note">' + esc(S.basis) + "</p>" : "");
   }
 
   // People who saw a post: views for a video, reach for a photo or story.
@@ -994,7 +1082,8 @@
   function scoreBar(small) {
     var parts = scoreParts();
     return '<div class="db-scorebar' + (small ? " db-scorebar--s" : "") + '">' + parts.map(function (x) {
-      return '<i style="flex:' + x[1] + ";background:" + x[2] + '"><b>' + Math.round(x[1] * 100) + "</b></i>"; }).join("") + '</div><div class="db-scorekey' + (small ? " db-scorekey--s" : "") + '">'
+      // Text colour follows the segment (owner, 2026-10-20): ink only on the light lime, white on green, orange and black.
+      return '<i style="flex:' + x[1] + ";background:" + x[2] + '"><b' + (x[2] === SCORECOL.er ? ' class="is-ink"' : "") + ">" + Math.round(x[1] * 100) + "<small>%</small></b></i>"; }).join("") + '</div><div class="db-scorekey' + (small ? " db-scorekey--s" : "") + '">'
       + parts.map(function (x) { return '<div><i style="background:' + x[2] + '"></i><b>' + x[0] + "</b>" + (small ? "" : "<small>" + x[3] + "</small>") + "</div>"; }).join("") + "</div>";
   }
   // The campaign's objective as shares: how much of a creator's score is
@@ -1535,6 +1624,7 @@
         + '<p class="db-note">Views count videos; reach counts photo posts and stories, so the two are never added together. Engagement rate is engagement ÷ views.</p>';
     },
     clicks: function () {
+      if (R.sales && R.sales.totals) return salesPanel();
       var cl = clicksFor(); if (!cl) return '<div class="db-na-card"><span class="db-na-card__icon">' + IC.clicks + '</span><span class="db-na">Not part of this campaign</span><p>This campaign does not contain affiliate links, so there are no clicks to count.</p></div>';
       var L = function (rows) { return (rows || []).map(function (r) { return { k: r.k, n: r.n, label: full(r.n) }; }); };
       return '<div class="db-big">' + full(cl.clicks) + " <small>clicks" + (cl.uniques != null ? " · " + full(cl.uniques) + " unique people" : "") + "</small></div>"
@@ -1636,7 +1726,7 @@
   function openPanel(area) {
     if (!PANEL[area]) return;
     lastFocus = document.activeElement;
-    $("db-panel-title").textContent = TITLES[area] + (area === "kpi" ? (F.platform ? " · " + F.platform : "") : filtered() && area !== "stage" ? " · filtered" : "");
+    $("db-panel-title").textContent = (area === "clicks" && R.sales && R.sales.totals ? "Clicks to sales" : TITLES[area]) + (area === "kpi" ? (F.platform ? " · " + F.platform : "") : filtered() && area !== "stage" ? " · filtered" : "");
     $("db-scrim").hidden = false; $("db-panel").hidden = false;      // shown first: charts are drawn at the panel's real width
     $("db-panel-body").innerHTML = PANEL[area]();
     curArea = area;
