@@ -601,6 +601,29 @@ def migrate(conn):
     if "origin" not in camp_cols:
         # "client": started by the client from their account (a draft the account manager approves).
         conn.execute("ALTER TABLE campaigns ADD COLUMN origin TEXT")
+    if "stage" not in camp_cols:
+        # Campaign board (item 174): the stage an admin set (draft | shortlisting | review | approved).
+        # NULL = read from the campaign's status and its selections (admin/board.py), so existing
+        # campaigns land in the right column with no backfill. Live and Completed follow status.
+        conn.execute("ALTER TABLE campaigns ADD COLUMN stage TEXT")
+    # Item 174: a campaign holds many selections. campaigns.selection_id stays its first one; the rest
+    # are linked here. Item 182: campaigns a person pinned to the top of their board and switcher.
+    conn.executescript("""
+CREATE TABLE IF NOT EXISTS campaign_selections (
+    campaign_id  INTEGER NOT NULL,
+    selection_id INTEGER NOT NULL,
+    added_at     INTEGER NOT NULL,
+    added_by     TEXT,
+    PRIMARY KEY (campaign_id, selection_id)
+);
+CREATE INDEX IF NOT EXISTS campaign_selections_sel ON campaign_selections(selection_id);
+CREATE TABLE IF NOT EXISTS campaign_pins (
+    who         TEXT NOT NULL,
+    campaign_id INTEGER NOT NULL,
+    at          INTEGER NOT NULL,
+    PRIMARY KEY (who, campaign_id)
+);
+""")
     content_cols = {r["name"] for r in conn.execute("PRAGMA table_info(content)")}
     if content_cols and "piece" not in content_cols:
         # One video pushed to several platforms: the posts share a piece (the id of the first one).

@@ -4021,6 +4021,16 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         for p in rep["posts"]:
             p["thumb"] = self.thumb_url(p.get("thumb"), k["token"])
         role = self.campaign_role(k)
+        # Every selection the campaign holds (item 174), the ones this reader may open.
+        try:
+            import board
+            acct0 = self.signed_in_client()
+            rep["campaign"]["selections"] = [
+                {"token": s["token"], "name": s["name"], "creators": board._creators(s)}
+                for s in board._selections(board.selection_ids(k))
+                if role == "admin" or (acct0 is not None and portal.opens(int(acct0), s))]
+        except Exception:
+            rep["campaign"]["selections"] = []
         if role in ("view", "edit"):
             acct = self.signed_in_client()
             u = portal.user_for_code(acct) if acct is not None else None
@@ -4876,7 +4886,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         reader = self.selection_viewer(sel["token"])
-        if not (self.admin_like_for(sel["code_id"]) or self.selection_role(sel, reader) == "admin"):
+        if self.kam_clients() is not None or not (self.admin_like_for(sel["code_id"]) or self.selection_role(sel, reader) == "admin"):
+            # Never a key account manager (owner, 2026-10-20): scores and analysis are published by HelloVoice admins.
             return self.send_json(403, {"ok": False, "reason": "hv_only", "message": "Only HelloVoice publishes scores."}, self.cors())
         on = bool(b.get("publish"))
         # what: "scores" (default) or "analysis" (the creators' full profile analysis).
@@ -5305,8 +5316,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # has unlocked it for. Anyone else gets sample data drawn here, never the real values.
         # Never locked for anyone on the HelloVoice team (owner, 2026-10-15): an admin session, or a portal
         # sign-in with an admin email, sees every analysis without the "Show locked data" switch.
-        staff = (self.admin_like() or bool(self.admin()) or self.staff_viewer()
-                 or (self.kam_unlocked() and portal.unlock_creator(code)))
+        # A key account manager never sees a creator's locked analysis (owner, 2026-10-20, item 174).
+        staff = (self.admin_like() or bool(self.admin()) or self.staff_viewer()) and self.kam_clients() is None
         gate = {"state": "unlocked"} if staff else gating.state(code_id, code)
         gate["headline"] = gating.headline(card, every)
         import sample_analysis                       # item 39: is "See a sample full analysis" on?
@@ -5721,15 +5732,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # Scores gate (owner, 2026-10-15): on a selection HelloVoice made, the client sees no scores until
         # HelloVoice publishes them; HelloVoice (and the client's KAM) always see them, marked as a preview.
         reader0 = self.selection_viewer(sel["token"])
-        team = self.selection_role(sel, reader0) == "admin" or self.admin_like_for(sel["code_id"])
+        # Clients and key account managers never see scores, never preview them and never publish or hide
+        # them (owner, 2026-10-20, item 174): the scores are HelloVoice admins' alone, checked here.
+        team = (self.selection_role(sel, reader0) == "admin" or self.admin_like_for(sel["code_id"])) and self.kam_clients() is None
         gated = self.scores_gated(sel)
         out["scores_gate"] = {"applies": self.scores_gate_applies(sel), "published": not gated, "team": bool(team),
-                              "analysis": bool(sel["analysis_published"] if "analysis_published" in sel.keys() else 0)}
-        if gated and not team:
-            # No score and no fit badge (or its reason) for the client until published (owner, 2026-10-15).
-            # Without an objective the page still asks for one; with one it says the scores are coming.
+                              "analysis": bool(sel["analysis_published"] if "analysis_published" in sel.keys() else 0) if team else False}
+        if not team:
+            # No score and no fit badge (or its reason) for a client or a KAM, published or not (owner,
+            # 2026-10-20; it was "until published" since 2026-10-15).
             out["scores"] = {}
-            out["scores_pending"] = not out.get("needs_objective")
+            out["scores_pending"] = False
             out["verdicts"] = {k: {kk: vv for kk, vv in (v or {}).items() if kk not in ("fit", "reason")}
                                for k, v in (out.get("verdicts") or {}).items()}
         try:
@@ -5746,7 +5759,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         reader = self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.
-        open_ = None if self.admin_like() or portal.sample_member(reader, sel) or (self.kam_unlocked() and self.admin_like_for(sel["code_id"])) else gating.unlocked_set(reader, codes)
+        open_ = None if self.admin_like() or portal.sample_member(reader, sel) else gating.unlocked_set(reader, codes)
         if open_ is not None:
             out["scores"] = {k: (v if k in open_ else gating.redact_score(v)) for k, v in out["scores"].items()}
         out.update(self.selection_status_payload(sel, codes, reader, by))
