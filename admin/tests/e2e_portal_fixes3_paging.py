@@ -137,7 +137,9 @@ class Paging(unittest.TestCase):
         by = {r["code"]: r for r in full["roster"]}
         self.assertEqual(items[0], by[items[0]["code"]])
         # default order (2026-10-19): "Recommended", the daily order: tier groups biggest first, shuffled inside
-        groups = [paging.daily_group(c["tier"]) for c in items]
+        picked, _ = paging.picked_codes()
+        groups = [paging.daily_group(c["tier"], [paging.place(v)[0] for v in paging.values(c.get("city"))],
+                                     c["code"] in picked) for c in items]
         self.assertEqual(groups, sorted(groups))
         fs = [self.total(c) for c in self.walk(sort="followers-desc")[0]]
         self.assertEqual(fs, sorted(fs, reverse=True))
