@@ -1038,6 +1038,8 @@ class PortalMixin(connect_api.ConnectMixin):
 
     def _board_campaign(self, b):
         import board
+        import history
+        history.set_actor(board._me(self) or "client")       # the card's activity says who did it
         k, role = board.campaign_for(self, token=str(b.get("t") or "") or None, cid=b.get("id"))
         if role is None:
             self.send_json(401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."}, self.cors())
@@ -1157,6 +1159,8 @@ class PortalMixin(connect_api.ConnectMixin):
         if sel is None or sel["deleted_at"]:
             self.send_json(404, {"ok": False, "reason": "unknown", "message": "That selection is not here any more."}, self.cors())
             return
+        import history
+        history.set_actor(board._me(self) or "client")
         ok, msg, extra = board.move_selection(self, sel, str(b.get("to") or ""))
         self._board_done(ok, msg, extra)
 

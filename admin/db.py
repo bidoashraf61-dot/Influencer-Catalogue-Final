@@ -610,6 +610,10 @@ def migrate(conn):
         # NULL = read from the campaign's status and its selections (admin/board.py), so existing
         # campaigns land in the right column with no backfill. Live and Completed follow status.
         conn.execute("ALTER TABLE campaigns ADD COLUMN stage TEXT")
+    if "next_step" not in camp_cols:
+        # Board (item 205/206 extras, owner 2026-10-20): the one next step on the card and when it is due.
+        conn.execute("ALTER TABLE campaigns ADD COLUMN next_step TEXT")
+        conn.execute("ALTER TABLE campaigns ADD COLUMN next_due INTEGER")
     # Item 174: a campaign holds many selections. campaigns.selection_id stays its first one; the rest
     # are linked here. Item 182: campaigns a person pinned to the top of their board and switcher.
     conn.executescript("""
@@ -2480,7 +2484,8 @@ def save_campaign(cid, **fields):
     form cannot write a column it was never meant to."""
     allowed = {"name", "client", "code_id", "platform", "starts_at", "ends_at", "status",
                "rules", "destination", "cost", "notes", "emv", "visibility", "phase",
-               "status_note", "targets", "logos", "selection_id", "steps", "objective", "plan", "overrides", "weights"}
+               "status_note", "targets", "logos", "selection_id", "steps", "objective", "plan", "overrides", "weights",
+               "next_step", "next_due"}
     bad = set(fields) - allowed
     if bad:
         raise ValueError("not a campaign field: " + ", ".join(sorted(bad)))

@@ -44,7 +44,7 @@ KINDS = {
     "sel_feedback": "selections", "sel_shared": "selections", "sel_updated": "selections", "unavailable": "selections",
     "quote_requested": "selections", "quote_ready": "selections", "quote_approved": "selections",
     "camp_live": "campaigns", "camp_report": "campaigns", "camp_final": "campaigns",
-    "camp_shared": "campaigns",
+    "camp_shared": "campaigns", "camp_stage": "campaigns",
     "camp_weekly": "campaigns", "camp_next": "campaigns",
     "camp_goal": "campaigns", "camp_views": "campaigns", "camp_posts": "campaigns",   # milestones (push.milestones)
     "announce": "account",                                                             # a manual push from HelloVoice

@@ -360,10 +360,16 @@ def card(h, k, role, pins, logo_dir, staff, demo=frozenset(), who=None, team=Non
     out["kam"] = ({"email": kam, "name": _kam_name(kam)} if staff else {"name": _kam_name(kam)}) if kam else None
     out["moves"] = moves_for(h, role, who, k, stage, team)
     out["briefs"] = briefs_of(k, sels)
+    nd = k["next_due"] if "next_due" in k.keys() else None
+    ns = (k["next_step"] if "next_step" in k.keys() else None) or ""
+    out["next"] = {"text": ns, "due": nd, "overdue": bool(ns and nd and nd + 86400 <= now())} if (ns or nd) else None
+    out["activity"] = activity(k, sels, staff)
     # Item 197: who may edit it on the board, and what the edit panel starts from (never shown to clients).
     if role == "admin" or (role == "kam" and h.admin_like_for(k["code_id"], k["selection_id"], k["id"])):
         out["can_edit"] = True
         out["edit"] = {"objective": (k["objective"] if "objective" in k.keys() else None) or "balanced",
+                       "next": (k["next_step"] if "next_step" in k.keys() else None) or "",
+                       "due": k["next_due"] if "next_due" in k.keys() else None,
                        "targets": db.campaign_targets(k), "id": k["id"]}
     if staff:
         out["staged"] = bool(k["stage"] if "stage" in k.keys() else None)
@@ -385,12 +391,24 @@ def board(h, logo_dir):
     team = _own_team(who) if role == "client" else None
     cards = _order([card(h, k, role, pins, logo_dir, staff, demo, who, team) for k in _visible(h, role, who)])
     # can_move: this viewer may move at least one card; each card's "moves" says where. can_go_live: admins only.
-    return {"role": role, "can_move": any(c["moves"] for c in cards), "can_go_live": role == "admin",
+    me = _me(h)
+    return {"role": role, "me": me, "can_move": any(c["moves"] for c in cards), "can_go_live": role == "admin",
             "locked_stages": [] if role == "admin" else ["live", "completed"],
             # the account managers an admin can pick on a card (item 197)
             "kams": _kams() if role == "admin" else [],
             "can_start": role in ("admin", "kam") or _client_user(h, who) is not None,
             "stages": [{"key": s, "label": LABEL[s], "hint": HINT[s]} for s in STAGES], "campaigns": cards}
+
+
+def _me(h):
+    """This viewer's email (for the board's "Mine" filter), or ""."""
+    import portal
+    cid = h.viewer_cookie_id()
+    u = portal.user_for_code(cid) if cid is not None else None
+    if u is not None and u["email"]:
+        return u["email"].lower()
+    a = h.admin()
+    return (a["email"].lower() if a is not None and "email" in a.keys() and a["email"] else "")
 
 
 def _kams():
@@ -464,17 +482,20 @@ def move(h, k, to, actor=""):
             if k["status"] != "live":
                 db.save_campaign(k["id"], status="live")
             _set_stage(k["id"], None)
+        stage_alert(k, "live", client=False)
         return True, "%s is live: the client sees its report." % k["name"], {}
     if to == "completed":
         with history.tracked("campaign", k["id"], "Completed %s from the campaign board" % k["name"]):
             if k["status"] != "ended":
                 db.save_campaign(k["id"], status="ended")
             _set_stage(k["id"], None)
+        stage_alert(k, "completed", client=False)
         return True, "%s is completed." % k["name"], {}
     with history.tracked("campaign", k["id"], "Moved %s to %s on the campaign board" % (k["name"], LABEL[to])):
         if k["status"] != "draft":
             db.save_campaign(k["id"], status="draft")       # off the air: the client no longer sees the report
         _set_stage(k["id"], to)
+    stage_alert(k, to)
     return True, "%s moved to %s." % (k["name"], LABEL[to]), {}
 
 
@@ -777,6 +798,13 @@ def edit(h, k, b):
             if n:
                 out[key] = round(n, 2) if key == "er" else int(n)
         f["targets"] = out
+    if "next" in b:
+        f["next_step"] = " ".join(str(b.get("next") or "").split())[:140] or None
+    if "due" in b:
+        d = _day(b.get("due")) if b.get("due") else None
+        if b.get("due") and d is None:
+            return False, "That due date is not valid.", {}
+        f["next_due"] = d
     if not f:
         return False, "Nothing to change.", {}
     with history.tracked("campaign", k["id"], "Edited %s on the board" % k["name"]):
@@ -847,4 +875,53 @@ def briefs_of(k, sels=None):
                              "ORDER BY id DESC LIMIT 1", (s["id"],)).fetchone()
             out.append({"selection": s["token"], "selection_name": s["name"],
                         "brief": {"id": b["id"], "summary": b["summary"] or "", "objective": b["objective"] or "", "at": b["created_at"]} if b else None})
+    return out
+
+
+# ------------------------------------------------------------- extras (item 205) --
+
+CLIENT_ALERT = ("review", "approved")      # live / completed reach the client through the status bells
+
+
+def stage_alert(k, to, client=True):
+    """A stage change rings the client's team (Client review and Approved; Live and Completed have their own
+    bells) and the campaign's account manager (every change). Bell + phone push. Never raises."""
+    try:
+        import inbox
+        import portal
+        users = []
+        if client and to in CLIENT_ALERT and k["code_id"]:
+            users += inbox.for_codes([k["code_id"]])
+        kam = kam_for(k)
+        u = portal.user_by_email(kam) if kam else None
+        if u is not None and u["status"] == "active" and u["id"] not in users:
+            users.append(u["id"])
+        if users:
+            inbox.emit(users, "camp_stage", k["name"] + " moved to " + LABEL[to],
+                       body=HINT[to], href="campaign/", ref="stage:%d:%s:%d" % (k["id"], to, now() // 600), once=True)
+    except Exception:
+        pass
+
+
+def activity(k, sels=None, staff=False, n=3):
+    """The last few changes to the campaign and its selections, newest first: what, who, when."""
+    sels = sels if sels is not None else _selections(selection_ids(k))
+    keys = [("campaign", str(k["id"]))] + [("selection", str(s["id"])) for s in sels]
+    cond = " OR ".join("(entity = ? AND key = ?)" for _ in keys)
+    args = [x for kv in keys for x in kv]
+    try:
+        with db.connect() as conn:
+            rows = conn.execute("SELECT at, who, label FROM history WHERE (%s) AND undone_at IS NULL ORDER BY at DESC, id DESC LIMIT ?"
+                                % cond, args + [n]).fetchall()
+    except Exception:
+        return []
+    out = []
+    for r in rows:
+        who = (r["who"] or "").strip()
+        if who.startswith("client: "):
+            who = who[8:]
+        if "@" in who:
+            local, dom = who.split("@", 1)
+            who = "HelloVoice" if (not staff and dom.lower().endswith(("hellovoice.co.uk", "blueholding.com"))) else local.replace(".", " ").title()
+        out.append({"at": r["at"], "who": who or "HelloVoice", "what": r["label"] or "Changed"})
     return out

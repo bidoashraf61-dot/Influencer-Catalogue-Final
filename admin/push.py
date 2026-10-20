@@ -137,7 +137,7 @@ RULE_LABELS = {"camp_status": "Campaign live / ended / final report", "goals": "
                "team": "Team alerts", "update": "App updated", "manual": "Manual", "test": "Test"}
 # inbox kind -> rule. Kinds not listed never push (daily "report updated", ideas).
 KIND_RULE = {"camp_live": "camp_status", "camp_final": "camp_status", "camp_goal": "goals", "camp_views": "views",
-             "camp_posts": "posts", "camp_shared": "bell", "camp_weekly": "bell", "camp_next": "bell",
+             "camp_posts": "posts", "camp_shared": "bell", "camp_stage": "bell", "analysis_reply": "bell", "camp_weekly": "bell", "camp_next": "bell",
              "analysis_ready": "bell", "sel_feedback": "bell", "sel_shared": "bell", "sel_updated": "bell",
              "unavailable": "bell", "quote_requested": "bell", "quote_ready": "bell", "quote_approved": "bell",
              "credits_low": "bell", "credits_added": "bell", "colleague": "bell", "announce": "manual"}

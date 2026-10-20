@@ -781,7 +781,7 @@
     }
     if (!B.campaigns.length) return false;
     HVBoard.mount(p, {
-      stages: B.stages, noun: "campaign", locked: B.locked_stages || [], view: view, kams: B.kams || [],
+      stages: B.stages, noun: "campaign", locked: B.locked_stages || [], view: view, kams: B.kams || [], me: B.me || "",
       onChange: function () { CBOARD.data = null; renderSection(); },
       items: B.campaigns.map(HVBoard.fromCampaign),
       onMove: function (it, to) {

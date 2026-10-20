@@ -391,6 +391,32 @@ class Board(unittest.TestCase):
         self.assertEqual(board.selection_ids(db.campaign(k)), [a])                                 # the campaign holds A now
         self.assertEqual(self.lead.post("/api/selection/merge", {"s": A["token"], "from": Bs["token"]})[0], 400)  # archived already
 
+    # ------------------------------------- item 205: next step + due, activity, stage alerts
+    def test_11_next_step_activity_and_alerts(self):
+        k = db.create_campaign("Extras camp", client="Polyco", code_id=self.u_lead["code_id"], selection_id=self.s_full)
+        tok = db.campaign(k)["token"]
+        s, b, _ = self.kam.post("/api/board/edit", {"t": tok, "next": "Send the quote", "due": "2020-01-05"})
+        self.assertEqual(s, 200, b)
+        self.assertEqual(self.kam.post("/api/board/edit", {"t": tok, "due": "not-a-date"})[0], 400)
+        s, b, _ = self.lead.get("/api/board")
+        c = next(x for x in b["campaigns"] if x["token"] == tok)
+        self.assertEqual((c["next"]["text"], c["next"]["overdue"]), ("Send the quote", True))
+        self.assertTrue(c["activity"] and "Edited" in c["activity"][0]["what"], c["activity"])
+        self.assertNotIn("@", c["activity"][0]["who"])                       # names, never an email, on a card
+        u_kam = portal.user_by_email(KAM)
+        def bells(uid):
+            with db.connect() as conn:
+                return [r[0] for r in conn.execute("SELECT title FROM notifications WHERE user_id = ? AND kind = 'camp_stage' AND ref LIKE ?",
+                                                      (uid, "stage:%d:%%" % k))]
+        s, b, _ = self.lead.post("/api/board/stage", {"t": tok, "to": "review"})
+        self.assertEqual(s, 200, b)
+        self.assertEqual(len(bells(self.u_lead["id"])), 1)                    # the client: Client review rings
+        self.assertEqual(len(bells(u_kam["id"])), 1)                          # the KAM: every move rings
+        self.lead.post("/api/board/stage", {"t": tok, "to": "shortlisting"})
+        self.assertEqual(len(bells(self.u_lead["id"])), 1)                    # back to Shortlisting: client not rung
+        self.assertEqual(len(bells(u_kam["id"])), 2)
+        self.assertEqual(self.boss.get("/api/board")[1]["me"], BOSS)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

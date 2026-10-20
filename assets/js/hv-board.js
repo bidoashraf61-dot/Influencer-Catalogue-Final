@@ -40,6 +40,8 @@
     brief: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
     pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
     x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
+    flag: '<path d="M5 21V4h11l-1.5 4L16 12H5"/>',
     grip: '<circle cx="9" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="17" r="1.2"/><circle cx="15" cy="17" r="1.2"/>'
   };
 
@@ -125,6 +127,7 @@
       sels: (c.selections || []).map(function (s) { return { label: s.name, href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }; }),
       dash: c.report ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : "",
       briefs: c.briefs || [], canEdit: !!c.can_edit, edit: c.edit || null,
+      next: c.next || null, activity: c.activity || [], kamEmail: c.kam && c.kam.email ? c.kam.email.toLowerCase() : "",
       progress: p && p.planned ? { done: p.live || 0, of: p.planned } : null,
       links: (c.selections || []).map(function (s) {
         return { label: s.name, sub: s.creators + (s.creators === 1 ? " creator" : " creators"), href: ROOT + "selection/#s=" + encodeURIComponent(s.token) };
@@ -192,6 +195,12 @@
     return h("label", { class: "hvb-move" }, sel, svg("chev"));
   }
 
+  // Item 205: the one next step and when it is due; late ones turn red.
+  function nextLine(n) {
+    return h("p", { class: "hvb-next" + (n.overdue ? " is-late" : "") }, svg("flag"),
+      h("span", null, h("b", null, "Next: "), n.text || "Set a next step"),
+      n.due ? h("span", { class: "hvb-due" + (n.overdue ? " is-late" : "") }, (n.overdue ? "Was due " : "Due ") + dm(n.due)) : null);
+  }
   function trackPill(t) { return h("span", { class: "hvb-track hvb-track--" + t.grade, title: "Against the campaign's goal, as the dashboard reads it" }, t.label); }
   // Item 203: "Open selection" (a short list when the campaign holds several) and "Open dashboard".
   function goButtons(it, B) {
@@ -284,11 +293,15 @@
       f.client = h("input", { type: "text", value: c.client || "", maxlength: "120" });
       f.starts = h("input", { type: "date", value: ymd(c.starts_at) });
       f.ends = h("input", { type: "date", value: ymd(c.ends_at) });
+      f.next = h("input", { type: "text", value: (it.edit && it.edit.next) || "", maxlength: "140", placeholder: "e.g. Send the quote to the client" });
+      f.due = h("input", { type: "date", value: ymd(it.edit && it.edit.due) });
       var dsave = h("button", { type: "button", class: "hvb-btn" }, "Save details");
       var dsec = section("details", "Details", [field("Name", f.name), field("Client", f.client),
-        h("div", { class: "hvb-panel__two" }, field("First day", f.starts), field("Last day", f.ends)), dsave]);
+        h("div", { class: "hvb-panel__two" }, field("First day", f.starts), field("Last day", f.ends)),
+        field("Next step", f.next), field("Next step due", f.due), dsave]);
       dsave.addEventListener("click", function () {
-        save(dsec, "/api/board/edit", { t: c.token, name: f.name.value, client: f.client.value, starts: f.starts.value, ends: f.ends.value });
+        save(dsec, "/api/board/edit", { t: c.token, name: f.name.value, client: f.client.value, starts: f.starts.value, ends: f.ends.value,
+                                         next: f.next.value, due: f.due.value });
       });
       var ob = h("select", null, OBJ.map(function (o) { return h("option", { value: o[0], selected: (it.edit && it.edit.objective === o[0]) || null }, o[1]); }));
       var tg = {};
@@ -405,6 +418,7 @@
     el.appendChild(h("h3", { class: "hvb-card__name" }, it.href ? h("a", { href: it.href }, it.name) : it.name));
     // The one-line summary a collapsed card keeps: on-track colour or Live mark, the key number, the client.
     el.appendChild(h("p", { class: "hvb-card__sum" },
+      it.next && it.next.overdue ? h("span", { class: "hvb-due is-late" }, "Overdue") : null,
       it.track ? trackPill(it.track) : (it.live ? h("span", { class: "hvb-live" }, "Live") : null),
       it.key1 ? h("span", { class: "hvb-card__k" }, h("b", null, it.key1[0]), " " + it.key1[1]) : null,
       it.when ? h("span", null, it.when) : null));
@@ -419,6 +433,7 @@
         it.demo ? h("span", { class: "hvb-tag hvb-tag--demo", title: "The team’s demo campaign" }, "Demo") : null,
         it.badge, meta ? h("span", null, meta) : null));
     }
+    if (it.next) put(nextLine(it.next));
     put(figures(it));
     if (it.signal || it.progress) {
       put(h("div", { class: "hvb-card__perf" }, it.progress ? progress(it.progress) : null,
@@ -435,6 +450,13 @@
       put(ul);
     } else if (it.empty) {
       put(h("p", { class: "hvb-none" }, it.empty));
+    }
+    if (it.activity && it.activity.length) {
+      var al = h("ol", { class: "hvb-act", "aria-label": "Latest changes" });
+      it.activity.forEach(function (a) {
+        al.appendChild(h("li", null, h("span", { class: "hvb-act__w" }, a.what), h("small", null, a.who + " · " + ago(a.at))));
+      });
+      put(al);
     }
     var foot = h("div", { class: "hvb-card__foot" },
       it.kam ? h("span", { class: "hvb-kam", title: "Account manager" }, h("span", { class: "hvb-kam__face", "aria-hidden": "true" }, initials(it.kam)), it.kam)
@@ -500,6 +522,53 @@
       grpBtn.setAttribute("aria-pressed", B.group ? "true" : "false");
       if (opts.view === "table") table(); else draw();
     });
+    // Item 205: search and filters (this visit only): text, client, account manager, Mine, Pinned, Overdue.
+    var F = { q: "", client: "", kam: "", chips: {} };
+    try { F = JSON.parse(sessionStorage.getItem("hvb-filter-" + noun) || "null") || F; } catch (e) { /* blocked */ }
+    F.chips = F.chips || {};
+    function keepF() { try { sessionStorage.setItem("hvb-filter-" + noun, JSON.stringify(F)); } catch (e) { /* blocked */ } }
+    function uniq(f) { var o = {}; items.forEach(function (x) { var v = f(x); if (v) o[v] = 1; }); return Object.keys(o).sort(); }
+    var me = (opts.me || "").toLowerCase();
+    function shown() {
+      var q = (F.q || "").trim().toLowerCase();
+      return items.filter(function (it) {
+        if (q && (it.name + " " + (it.client || "") + " " + (it.kam || "")).toLowerCase().indexOf(q) < 0) return false;
+        if (F.client && (it.client || "") !== F.client) return false;
+        if (F.kam && (it.kam || "") !== F.kam) return false;
+        if (F.chips.mine && !(it.kamEmail && it.kamEmail === me)) return false;
+        if (F.chips.pinned && !it.pinned) return false;
+        if (F.chips.overdue && !(it.next && it.next.overdue)) return false;
+        return true;
+      });
+    }
+    B.shown = shown;
+    var search = h("input", { type: "search", class: "hvb-search__in", value: F.q || "", placeholder: "Search " + noun + "s, clients, KAMs",
+                              "aria-label": "Search " + noun + "s" });
+    var t0 = null;
+    search.addEventListener("input", function () { clearTimeout(t0); t0 = setTimeout(function () { F.q = search.value; keepF(); redraw(); }, 160); });
+    function picker(label, key, values) {
+      if (values.length < 2) return null;
+      var sel = h("select", { class: "hvb-filter", "aria-label": label },
+        [h("option", { value: "" }, label)].concat(values.map(function (v) { return h("option", { value: v, selected: F[key] === v || null }, v); })));
+      sel.addEventListener("change", function () { F[key] = sel.value; keepF(); redraw(); });
+      return sel;
+    }
+    function chip(key, label, show) {
+      if (!show) return null;
+      var b = h("button", { type: "button", class: "hvb-chipf", "aria-pressed": F.chips[key] ? "true" : "false" }, label);
+      b.addEventListener("click", function () {
+        F.chips[key] = !F.chips[key]; if (!F.chips[key]) delete F.chips[key]; keepF();
+        b.setAttribute("aria-pressed", F.chips[key] ? "true" : "false"); redraw();
+      });
+      return b;
+    }
+    var filters = h("div", { class: "hvb-filters" },
+      h("label", { class: "hvb-search" }, svg("search"), search),
+      picker("All clients", "client", uniq(function (x) { return x.client; })),
+      picker("All account managers", "kam", uniq(function (x) { return x.kam; })),
+      chip("mine", "Mine", !!me && items.some(function (x) { return x.kamEmail; })),
+      chip("pinned", "Pinned", !!opts.onPin),
+      chip("overdue", "Overdue", items.some(function (x) { return x.next && x.next.due; })));
     var tools = h("div", { class: "hvb-tools" });
     if (opts.tools) add(tools, opts.tools);
     tools.appendChild(h("span", { class: "hvb-tools__gap" }));
@@ -539,6 +608,7 @@
     var tbl = h("div", { class: "hvb-table" });
     root.appendChild(status);
     root.appendChild(tools);
+    root.appendChild(filters);
     root.appendChild(tabBar);
     // One scroller holds the stage heads and the client bands, so they slide sideways together.
     root.appendChild(h("div", { class: "hvb-scroll" }, grid, bands));
@@ -547,12 +617,13 @@
     function draw() {
       Object.keys(lanes).forEach(function (k) { lanes[k].cards.textContent = ""; });
       var by = {};
-      items.forEach(function (it) { (by[it.stage] = by[it.stage] || []).push(it); });
+      var list0 = shown();
+      list0.forEach(function (it) { (by[it.stage] = by[it.stage] || []).push(it); });
       var cols = [];
       opts.stages.forEach(function (s) {
         var L = lanes[s.key], list = by[s.key] || [];
         list.forEach(function (it) { L.cards.appendChild(card(it, B)); });
-        if (!list.length) L.cards.appendChild(h("p", { class: "hvb-empty" }, "No " + noun + "s here"));
+        if (!list.length) L.cards.appendChild(h("p", { class: "hvb-empty" }, list0.length < items.length ? "None match" : "No " + noun + "s here"));
         L.count.textContent = String(list.length);
         tabs[s.key].querySelector("b").textContent = String(list.length);
         var folded = !!FOLD[s.key];
@@ -577,7 +648,7 @@
     var BANDS = remember("hvb-band-" + noun, {});
     function clients() {
       var order = [], by = {};
-      items.forEach(function (it) {
+      shown().forEach(function (it) {
         var c = it.client || "No client";
         if (!by[c]) { by[c] = []; order.push(c); }
         by[c].push(it);
@@ -663,7 +734,7 @@
       tbl.textContent = "";
       var C = cols();
       var col = C.filter(function (c) { return c.k === SORT.k; })[0] || C[2];
-      var rows = items.slice().sort(function (a, b) {
+      var rows = shown().sort(function (a, b) {
         var x = col.v(a), y = col.v(b);
         return (x < y ? -1 : x > y ? 1 : 0) * SORT.d || STAGE_I[a.stage] - STAGE_I[b.stage] || a.name.localeCompare(b.name);
       });
