@@ -82,12 +82,13 @@ python3 - "$DST" <<'PYSTAMP'
 import hashlib, re, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
-# The onboarding film's poster is also named inside account.js (Account -> Overview, item 179):
-# stamp it there first, so account.js's own hash changes when the poster does.
-aj = root / 'assets/js/account.js'
-a_s = aj.read_text()
-a_s = re.sub(r'(assets/welcome/onboarding-poster\.jpg)(\?v=[0-9a-z]+)?', r'\1?v=' + h('assets/welcome/onboarding-poster.jpg'), a_s)
-aj.write_text(a_s)
+# The onboarding film's poster is also named inside account.js (Account -> Overview) and
+# connect.js (the one-time "Watch how it works" card), item 179: stamp it there first, so their
+# own hashes change when the poster does.
+for js in ('assets/js/account.js', 'assets/js/connect.js'):
+    f = root / js
+    t = re.sub(r'(assets/welcome/onboarding-poster\.jpg)(\?v=[0-9a-z]+)?', r'\1?v=' + h('assets/welcome/onboarding-poster.jpg'), f.read_text())
+    f.write_text(t)
 names = ('js/catalogue.js', 'css/catalogue.css', 'js/portal.js', 'css/portal.css',
          'js/campaign.js', 'css/campaign.css',
          'js/creator.js', 'css/creator.css', 'js/hv-icons.js',

@@ -268,6 +268,14 @@ Ways in: **"Watch how it works"** on the catalogue cover (`build/influencer_cata
 HELVi works"** in the profile menu (replaces "Take the tour") and the profile sidebar, and the ink
 **"How HELVi works"** card on Account -> Overview.
 
+**First sign-in card (Bido, 2026-10-20):** a one-time ink "Welcome, <name>. Watch how it works"
+card (bottom-left; on phones above the bottom bar) links to `/welcome/`. Once per account, kept on
+the server by reusing `users.tour` through `POST /api/tour` ("offered" when shown, "later" when
+dismissed), so accounts that already saw the old tour offer never get it. It waits until the app's
+setup prompts (desktop QR welcome, phone Home Screen guide, alerts card) and any dialog have
+closed, and the app's prompts in turn wait for it (`.cx-hiw` is in app.js's busy check).
+Code: `connect.js` (HOW HELVi WORKS block), styles in `connect.css`.
+
 **The film file:** `assets/welcome/onboarding.mp4` is a 6-second branded placeholder until the
 final film arrives. Replace it (H.264 + AAC, 16:9, faststart), optionally replace
 `assets/welcome/onboarding-poster.jpg`, then deploy: `update.sh` stamps both with `?v=<hash>`
@@ -275,7 +283,7 @@ final film arrives. Replace it (H.264 + AAC, 16:9, faststart), optionally replac
 The service worker does not cache `/assets/welcome/` (range requests go straight to the network).
 
 Server side is unchanged: `POST /api/tour` and the `users.tour` column stay (credits already paid
-for the tour are kept); nothing calls the endpoint any more. Helvi's knowledge line about the tour
+for the tour are kept) and now carry the first-sign-in card's once-per-account flag. Helvi's knowledge line about the tour
 now points to `/welcome/` (`admin/knowledge.py`, needs the usual manual copy to the admin).
 
 ## Phase E (branch `phase-e`, 2026-10-10)

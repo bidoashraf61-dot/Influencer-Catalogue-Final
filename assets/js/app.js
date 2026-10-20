@@ -38,10 +38,10 @@
   function put(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage off */ } }
   function sget(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
   function sput(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* storage off */ } }
-  // Another layer is open (Helvi's next-step bubble, a dialog): wait for it to close.
+  // Another layer is open (Helvi's next-step bubble, the "Watch how it works" card, a dialog): wait for it to close.
   function busy() {
-    var q = ":popover-open, dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal";
-    try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal"); }
+    var q = ":popover-open, dialog[open], .cx-hiw, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal";
+    try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .cx-hiw, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal"); }
   }
   function whenFree(fn, tries) {
     tries = tries == null ? 20 : tries;

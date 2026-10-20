@@ -1005,6 +1005,63 @@
       });
     }
 
+    /* ======================================================= HOW HELVi WORKS (item 179) */
+    // One card, once per account, after the first sign-in: "Watch how it works" -> /welcome/.
+    // The server keeps the flag (users.tour, reused from the old tour: "offered" once shown,
+    // "later" once dismissed), so it never comes back on another device. It waits for the app's
+    // own setup prompts (the desktop QR welcome, the phone's Home Screen guide, the alerts card)
+    // and any other dialog to close first, and never sits on top of one.
+    var HIW_POSTER = "assets/welcome/onboarding-poster.jpg";
+    function hiwBusy() {
+      var q = ":popover-open, dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal, .hc-dlg-back, .ai-sl.ob";
+      try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal, .hc-dlg-back"); }
+    }
+    function hiwWanted() {
+      var m = me();
+      return !!(m && m.kind === "user" && m.user && !m.tour && !m.as_client && !m.preview &&
+                (PAGE === "catalogue" || PAGE === "account") && !document.getElementById("cx-hiw"));
+    }
+    // The app decides its setup prompt about 3 s after load; start looking after that, then show only
+    // once the page has been free of dialogs for two checks in a row.
+    function offerWelcome(tries, calm) {
+      if (!hiwWanted()) return;
+      tries = tries || 0; calm = calm || 0;
+      if (document.documentElement.classList.contains("hv-loading") || hiwBusy()) calm = 0; else calm += 1;
+      if (calm < 2) { if (tries < 150) setTimeout(function () { offerWelcome(tries + 1, calm); }, 1500); return; }
+      showWelcomeCard();
+    }
+    function showWelcomeCard() {
+      var m = me();
+      m.tour = "offered";                                    // this page will not offer it twice either
+      api("POST", "/api/tour", { action: "offered" });
+      var href = ROOT + "welcome/";
+      var first = m.user && m.user.name ? m.user.name.split(" ")[0] : "";
+      var close = h("button", { class: "cx-hiw__x", type: "button", "aria-label": "Close" },
+        h("span", { "aria-hidden": "true", html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' }));
+      var later = h("button", { class: "cx-hiw__later", type: "button" }, "Not now");
+      var watch = h("a", { class: "cx-hiw__go", href: href }, "Watch the film");
+      var card = h("aside", { class: "cx-hiw", id: "cx-hiw", role: "dialog", "aria-modal": "false", "aria-labelledby": "cx-hiw-t", "aria-describedby": "cx-hiw-p" },
+        h("a", { class: "cx-hiw__film", href: href, tabindex: "-1", "aria-hidden": "true" },
+          h("img", { src: ROOT + HIW_POSTER, alt: "", width: "320", height: "180", decoding: "async" }),
+          h("span", { class: "cx-hiw__play", html: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>' })),
+        h("div", { class: "cx-hiw__in" },
+          h("h2", { class: "cx-hiw__t", id: "cx-hiw-t" }, (first ? "Welcome, " + first + "." : "Welcome.") + " Watch how it works"),
+          h("p", { id: "cx-hiw-p" }, "A short film: brief Helvi, shortlist creators, request a quote and follow every post."),
+          h("div", { class: "cx-hiw__acts" }, watch, later)),
+        close);
+      function bye() {
+        api("POST", "/api/tour", { action: "later" });
+        document.removeEventListener("keydown", onKey);
+        card.classList.add("is-out");
+        setTimeout(function () { card.remove(); }, HV.reduce ? 0 : 200);
+      }
+      function onKey(e) { if (e.key === "Escape" && card.contains(document.activeElement)) bye(); }
+      close.addEventListener("click", bye);
+      later.addEventListener("click", bye);
+      document.addEventListener("keydown", onKey);
+      document.body.appendChild(card);
+    }
+
     /* ================================================== quote lifecycle (fix batch 9, #42)
      * One chip says where a selection stands: Draft, Quote requested, Quote ready, Approved,
      * Campaign live, Completed. On the selection page it sits in the header and opens into a small
@@ -1153,6 +1210,7 @@
     function onMe() {
       if (started) return;
       started = true;
+      setTimeout(offerWelcome, 6000);
       if (PAGE === "campaign") {
         campaignVersus();
         window.addEventListener("hashchange", function () { setTimeout(campaignVersus, 600); setTimeout(campaignNextTime, 700); });
