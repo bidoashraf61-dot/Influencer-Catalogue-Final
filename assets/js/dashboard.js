@@ -1084,7 +1084,8 @@
   function scoreBar(small) {
     var parts = scoreParts();
     return '<div class="db-scorebar' + (small ? " db-scorebar--s" : "") + '">' + parts.map(function (x) {
-      return '<i style="flex:' + x[1] + ";background:" + x[2] + '"><b>' + Math.round(x[1] * 100) + "</b></i>"; }).join("") + '</div><div class="db-scorekey' + (small ? " db-scorekey--s" : "") + '">'
+      // Text colour follows the segment (owner, 2026-10-20): ink only on the light lime, white on green, orange and black.
+      return '<i style="flex:' + x[1] + ";background:" + x[2] + '"><b' + (x[2] === SCORECOL.er ? ' class="is-ink"' : "") + ">" + Math.round(x[1] * 100) + "<small>%</small></b></i>"; }).join("") + '</div><div class="db-scorekey' + (small ? " db-scorekey--s" : "") + '">'
       + parts.map(function (x) { return '<div><i style="background:' + x[2] + '"></i><b>' + x[0] + "</b>" + (small ? "" : "<small>" + x[3] + "</small>") + "</div>"; }).join("") + "</div>";
   }
   // The campaign's objective as shares: how much of a creator's score is

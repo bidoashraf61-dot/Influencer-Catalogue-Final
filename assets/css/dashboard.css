@@ -429,7 +429,8 @@
 .db-scorebar { display: flex; height: 34px; border-radius: 12px; overflow: hidden; gap: 2px; }
 .db-scorebar i { display: flex; align-items: center; padding-left: 10px; min-width: 34px; }
 .db-scorebar b { font: 400 22px/1 var(--heading); color: #fff; }
-.db-scorebar i:nth-child(3) b { color: var(--ink); }
+.db-scorebar b.is-ink { color: var(--ink); }
+.db-scorebar b small { font-size: .6em; margin-left: 1px; }
 .db-scorekey { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-top: 8px; }
 .db-scorekey div { display: grid; grid-template-columns: 10px 1fr; gap: 0 7px; align-items: center; }
 .db-scorekey i { width: 10px; height: 10px; border-radius: 3px; }
