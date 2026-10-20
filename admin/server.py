@@ -3916,7 +3916,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
                 d["draft"] = r["status"] == "draft"
                 d["has_selection"] = bool(r["selection_id"])
+                d["id"] = r["id"]
                 out.append(d)
+            out = self._pin_campaigns(out, code_id)
             return self.send_json(200, {"ok": True, "campaigns": out}, self.cors() + [("Cache-Control", "no-store")])
         with db.connect() as conn:
             rows = conn.execute(
@@ -3933,6 +3935,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             d["can_build"] = (not r["selection_id"]) and r["code_id"] in mine_team and portal.user_for_code(code_id) is not None
             d.pop("selection_id", None); d.pop("code_id", None)
             out.append(d)
+        out = self._pin_campaigns(out, code_id)
         return self.send_json(200, {"ok": True, "can_start": portal.user_for_code(code_id) is not None, "campaigns": out},
                               self.cors() + [("Cache-Control", "no-store")])
 
@@ -3974,6 +3977,39 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         u = portal.user_for_code(acct) if acct is not None else None
         return db.cinvite_role(k["id"], u["email"]) if u is not None else None
 
+    def _pin_campaigns(self, out, code_id):
+        """Pinned campaigns (setting pinned_campaigns, owner 2026-10-20: the Demo Campaign) lead the list of every
+        BlueHolding / HelloVoice account and of admins, marked pinned. Others see their list unchanged."""
+        try:
+            pins = [int(x) for x in (db.setting("pinned_campaigns") or [])]
+        except (TypeError, ValueError):
+            pins = []
+        u = portal.user_for_code(code_id) if code_id is not None else None
+        if not pins or not (self.admin_like() or (u is not None and (u["domain"] or "").lower() in portal.SAMPLE_DOMAINS)):
+            for d in out:
+                d.pop("id", None)
+            return out
+        have = {d.get("token") for d in out}
+        with db.connect() as conn:
+            rows = conn.execute("SELECT id, token, name, client, status, phase, starts_at, ends_at, logos, selection_id FROM campaigns "
+                                "WHERE id IN (%s) AND status != 'draft'" % ",".join("?" * len(pins)), pins).fetchall()
+        tokens = set()
+        for r in rows:
+            tokens.add(r["token"])
+            if r["token"] in have:
+                continue
+            d = {k: r[k] for k in ("token", "name", "client", "status", "phase", "starts_at", "ends_at")}
+            d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
+            d["draft"] = False
+            d["has_selection"] = bool(r["selection_id"])
+            out.append(d)
+        for d in out:
+            d.pop("id", None)
+            if d.get("token") in tokens:
+                d["pinned"] = True
+        order = {r["token"]: pins.index(r["id"]) for r in rows}
+        return sorted(out, key=lambda d: (0, order[d["token"]]) if d.get("pinned") else (1, 0))
+
     def api_campaign(self, token):
         k, status = self.viewer_campaign(token)
         if k is None:
@@ -4010,6 +4046,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if k is None:
             return self.send_json(status, {"ok": False, "signin": status == 401}, self.cors())
         team = self.campaign_role(k) in ("admin", "edit")
+        import comments as _cm
+        if _cm._is_sample(k):
+            # The demo campaign (owner, 2026-10-20): dummy data, nothing to fetch, no Apify spend.
+            if start:
+                return self.send_json(409, {"ok": False, "reason": "demo",
+                                            "message": "This is a demo campaign: its numbers are sample data, so there is nothing to update."}, self.cors())
+            return self.send_json(200, {"ok": True, "limit": 0, "used": 0, "unlimited": True, "left": None, "running": False,
+                                        "last_at": db.refresh_last(k["id"]), "demo": True}, self.cors() + [("Cache-Control", "no-store")])
         if start and k["status"] == "live":
             apify.ensure_campaign_jobs(k["id"])     # a campaign set live before 2026-10-19 gets its capture jobs here
         jobs = [j for j in apify.list_jobs() if j["source"] == "campaign:%d" % k["id"] and j["kind"] == "post_urls"

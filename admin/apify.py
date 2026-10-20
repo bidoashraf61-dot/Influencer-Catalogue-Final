@@ -1479,9 +1479,12 @@ def ensure_campaign_jobs(cid):
     already has a job, even a paused or manual one, is left as the team set it. Returns the ids created."""
     src = "campaign:%d" % int(cid)
     with db.connect() as conn:
-        k = conn.execute("SELECT name FROM campaigns WHERE id = ?", (int(cid),)).fetchone()
+        k = conn.execute("SELECT name, client FROM campaigns WHERE id = ?", (int(cid),)).fetchone()
         if k is None:
             return []
+        import comments
+        if comments._is_sample(k):
+            return []                   # the demo campaign holds dummy posts: nothing to capture (owner, 2026-10-20)
         have = {r["platform"] for r in conn.execute(
             "SELECT platform FROM api_jobs WHERE source = ? AND kind = 'post_urls'", (src,))}
     made = []

@@ -162,7 +162,7 @@ def _parse(item):
 
 def _is_sample(k):
     text = ("%s %s" % (k["name"] or "", k["client"] or "")).lower()
-    return text.startswith("sample") or "(demo)" in text or "dummy data" in text
+    return text.startswith("sample") or text.startswith("demo campaign") or "(demo)" in text or "dummy data" in text
 
 
 def weekly_until(now=None):

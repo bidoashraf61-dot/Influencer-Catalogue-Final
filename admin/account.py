@@ -233,6 +233,11 @@ def summary(user, code_id, secret=b""):
 
     campaigns, grades = [], []
     agg = {"exposure": 0, "reach": 0, "views": 0, "delivered": 0, "planned": 0}
+    try:
+        pins = [int(x) for x in (db.setting("pinned_campaigns") or [])]
+    except (TypeError, ValueError):
+        pins = []
+    camps = sorted(camps, key=lambda k: 0 if k["id"] in pins else 1)      # the pinned demo first (owner, 2026-10-20)
     for k in camps:
         try:
             rep = metrics.report(k)
@@ -252,8 +257,9 @@ def summary(user, code_id, secret=b""):
                # The dashboard's own goal grades, so the card says what the dashboard says.
                "goal_grades": {i.get("key"): i.get("grade") for i in ((rep or {}).get("progress") or {}).get("items") or [] if i.get("key")},
                "quote": (lifecycle.chip(db.selection(k["selection_id"])) if k["selection_id"] and db.selection(k["selection_id"]) is not None else None)}
+        row["pinned"] = k["id"] in pins
         campaigns.append(row)
-        if k["status"] == "live":
+        if k["status"] == "live" and not row["pinned"]:
             for key in ("exposure", "reach", "views", "delivered", "planned"):
                 agg[key] += row[key] or 0
             if row["er_grade"]:
