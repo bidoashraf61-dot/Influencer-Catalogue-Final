@@ -3605,13 +3605,21 @@
     nudge.addEventListener("click", function (e) { if (e.target.closest(".hv-nudge__x")) { hideNudge(true); return; } toggle(true); });
     var tip = TIPS[page], tipSeen = false;
     try { tipSeen = sessionStorage.getItem(tipKey) === "1"; } catch (e) { /* private */ }
+    // Item 210: the tip never lands on another layer (the app's prompts, "Watch how it works", a dialog,
+    // the board's panel); it waits for the page to be clear, and gives up after about a minute.
+    var TIP_LAYERS = "dialog[open], .cx-hiw, .cx-dr, .cx-sheet, .pt-scrim, .pt-modal, .hca-sheet, .hca-card, .hca-modal, .hvb-panel-back, .mx-cs__pop:not([hidden]), .ai-sl";
+    function tipBlocked() { try { return !!document.querySelector(TIP_LAYERS); } catch (e) { return false; } }
     if (tip && !tipSeen) {
-      setTimeout(function () {
+      setTimeout(function showTip(tries) {
         if (root.classList.contains("is-open")) return;
-        // The campaign page with no campaign to read says something else (its own empty state is up).
+        if (tipBlocked()) { if ((tries || 0) < 20) setTimeout(function () { showTip((tries || 0) + 1); }, 3000); return; }
+        // The campaign page with no campaign to read says something else (its own empty state is up);
+        // the tracking board (no report open) is about every campaign, not one report.
         var useTip = tip, empty = document.getElementById("db-empty");
         if (page === "campaign" && empty && !empty.hidden) {
           useTip = ["No campaign yet?", "When your first campaign goes live its results appear here. Ask me how tracking works."];
+        } else if (page === "campaign" && !/[#&]t=/.test(location.hash)) {
+          useTip = ["Following your campaigns?", "Ask me where any campaign stands or what happens next."];
         }
         nudgeText.innerHTML = "<b></b>";
         nudgeText.querySelector("b").textContent = useTip[0];

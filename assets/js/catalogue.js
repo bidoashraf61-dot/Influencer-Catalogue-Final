@@ -501,10 +501,12 @@
       // The creator's passport: their full analysis, or a locked page that
       // lets the client ask for one. Only where the server is behind the page
       // — the static build has no passport to open.
-      (CFG.api ? '<a class="cat-card__analysis' + (c.analysis || teamViewer() ? " is-ready" : "") + '" href="' +
+      // Item 210: clients and KAMs only open an analysis HelloVoice approved for them, so a card never
+      // promises one; the creator page says whether it is open to this person.
+      (CFG.api ? '<a class="cat-card__analysis' + (teamViewer() ? " is-ready" : "") + '" href="' +
         (document.body.getAttribute("data-page") === "selection" ? "../" : "") + "creator/#c=" +
         encodeURIComponent(c.code) + '" data-noselect data-analysis="' + esc(c.code) + '" data-name="' + esc(c.name) + '">' +
-        (c.analysis || teamViewer() ? "Profile analysis" : "Analysis — request") + ANALYSIS_ICON + "</a>" : "") +
+        (teamViewer() ? "Profile analysis" : "Analysis — request") + ANALYSIS_ICON + "</a>" : "") +
       "</div></article>";
   }
 

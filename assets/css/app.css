@@ -214,3 +214,7 @@
 /* Release r20 (item 183): the soft alerts card never sits on top of an open sheet or dialog
    (Helvi's studio, the campaign sheet, side panels); it is back once they close. */
 body:has(.ai-sl.ob, dialog[open], .cx-sheet, .cx-dr, .pt-scrim) .hca-card { display: none; }
+
+/* Item 210: a sheet opened while the alerts card is showing (campaign switcher, board panel, a dialog)
+   would sit under it; the card steps aside until the sheet closes. */
+body:has(.mx-cs__pop:not([hidden]), .hvb-panel-back, .pt-modal, dialog[open], .ai-sl) .hca-card { visibility: hidden; }
