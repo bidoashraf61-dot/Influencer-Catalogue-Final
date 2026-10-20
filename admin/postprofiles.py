@@ -183,8 +183,8 @@ def fill(rows, conn=None):
 
 
 def auto_on():
-    """The capture adds a missing profile on its own unless the owner turned it off."""
-    return db.setting("post_profiles_auto", True) is not False
+    """The capture adds a missing profile on its own only once the owner switched it on (off at deploy, 2026-10-21)."""
+    return db.setting("post_profiles_auto", False) is True
 
 
 def learn(conn, content_id, platform, item):

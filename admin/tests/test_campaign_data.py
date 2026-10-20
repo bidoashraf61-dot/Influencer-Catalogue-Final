@@ -147,6 +147,8 @@ class CampaignData(unittest.TestCase):
 
     def test_216c_capture_hook_and_another_creators_link(self):
         import apify
+        self.assertFalse(postprofiles.auto_on())                                                  # off until the owner says yes
+        db.set_setting("post_profiles_auto", True)
         k = db.create_campaign("Hook test", client="Hooks")
         db.add_campaign_creators(k, ["HV-MI-001", "HV-MD-004"])
         a = self._post(k, "HV-MI-001", "TikTok", "https://www.tiktok.com/@noha.tt/video/222")
