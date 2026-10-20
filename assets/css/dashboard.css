@@ -1630,3 +1630,9 @@ details[open] > summary > .cmp-chev { transform: rotate(-135deg); margin-top: 4p
   .db-more { position: relative; }
   .db-more::before { content: ""; position: absolute; inset: -9px -4px; }
 }
+
+/* Comments per day, many days (2026-10-20) */
+.cmp-curve__p.is-dense circle { stroke-width: 2; }
+.cmp-curve__p.is-dense.is-pk circle { stroke-width: 3; }
+.cmp-curve__p .cmp-curve__hit { fill: transparent; stroke: none; cursor: default; }
+.cmp-curve__p.is-dense:hover circle:not(.cmp-curve__hit) { r: 5; }

@@ -1461,10 +1461,29 @@
               + '<defs><linearGradient id="cm-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff691e" stop-opacity=".22"/><stop offset="1" stop-color="#ff691e" stop-opacity=".02"/></linearGradient></defs>'
               + '<line x1="' + L + '" y1="' + (H - B) + '" x2="' + (W - Rr) + '" y2="' + (H - B) + '" stroke="#e6e2db" stroke-width="1.5"/>'
               + '<path class="cmp-curve__a" d="' + area + '" fill="url(#cm-fill)"/><path class="cmp-curve__l" d="' + line + '" fill="none" stroke="#ff691e" stroke-width="3.5" stroke-linecap="round"/>'
-              + pts.map(function (p, i) { var d = ds[i], isPk = d === pk;
-                  return '<g class="cmp-curve__p' + (isPk ? " is-pk" : "") + '"><circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + (isPk ? 8 : 5.5) + '"/>'
-                    + '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] - 14).toFixed(1) + '" text-anchor="middle" class="cmp-curve__v">' + t.days[d] + "</text>"
-                    + '<text x="' + p[0].toFixed(1) + '" y="' + (H - 10) + '" text-anchor="middle" class="cmp-curve__d">' + day(d) + "</text></g>"; }).join("")
+              + (function () {
+                  // Many days (owner, 2026-10-20): numbers only on the top peaks, a date tick every few days,
+                  // small dots; every day keeps its number in a hover title. Up to 12 days: every label, as before.
+                  var n = ds.length, dense = n > 12, step = dense ? Math.ceil(n / 7) : 1, lab = {}, ticks = {};
+                  if (dense) {
+                    var gap = Math.max(2, Math.ceil(n / 6)), order = ds.map(function (d, i) { return i; })
+                      .sort(function (a, b) { return t.days[ds[b]] - t.days[ds[a]]; });
+                    order.forEach(function (i) {
+                      if (Object.keys(lab).length >= 3) return;
+                      if (Object.keys(lab).some(function (j) { return Math.abs(j - i) < gap; })) return;
+                      lab[i] = 1;
+                    });
+                    for (var i = 0; i < n; i += step) ticks[i] = 1;
+                    if (!ticks[n - 1]) { if ((n - 1) % step && (n - 1) % step < step * 0.8) delete ticks[(n - 1) - (n - 1) % step]; ticks[n - 1] = 1; }
+                  }
+                  return pts.map(function (p, i) { var d = ds[i], isPk = d === pk, showV = !dense || lab[i], showD = !dense || ticks[i];
+                    return '<g class="cmp-curve__p' + (isPk ? " is-pk" : "") + (dense ? " is-dense" : "") + '"><title>' + day(d) + ": " + t.days[d] + " comments</title>"
+                      + '<circle cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + (isPk ? (dense ? 6.5 : 8) : (dense ? 3 : 5.5)) + '"/>'
+                      + (dense ? '<circle class="cmp-curve__hit" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="' + Math.max(6, (W - L - Rr) / n / 2).toFixed(1) + '"/>' : "")
+                      + (showV ? '<text x="' + p[0].toFixed(1) + '" y="' + (p[1] - (dense ? 12 : 14)).toFixed(1) + '" text-anchor="middle" class="cmp-curve__v">' + t.days[d] + "</text>" : "")
+                      + (showD ? '<text x="' + p[0].toFixed(1) + '" y="' + (H - 10) + '" text-anchor="' + (dense && i === 0 ? "start" : dense && i === n - 1 ? "end" : "middle") + '" class="cmp-curve__d">' + day(d) + "</text>" : "")
+                      + "</g>"; }).join("");
+                })()
               + '</svg></div><p class="cmp-days__n">The conversation peaked on <b>' + day(pk) + "</b> with " + mx + " comments.</p>"; })() : "")
         + (quotes.length ? "<h3>In their words</h3>" + '<div class="cmp-quotes">' + quotes.map(function (q) {
             return '<article class="cmp-quote"><q dir="auto">' + esc(q.text) + "</q>" + ""
