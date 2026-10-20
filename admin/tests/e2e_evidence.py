@@ -397,9 +397,10 @@ class Evidence(unittest.TestCase):
             self.assertNotIn("HV-MI-005", gating.unlocked_set(self.mine["code_id"], ["HV-MI-005"]))
             s, j, _ = a.post("/api/selection/scores", {"token": self.token, "publish": True, "what": "analysis"})
             self.assertEqual((s, j.get("what")), (200, "analysis"), j)
-            self.assertIn("HV-MI-005", gating.unlocked_set(self.mine["code_id"], ["HV-MI-005"]))
-            self.assertTrue(gating.unlocked(self.mine["code_id"], "HV-MI-005"))
-            self.assertFalse(gating.unlocked(self.theirs["code_id"], "HV-MI-005"))    # another company: still locked
+            # Owner, 2026-10-20 (item 174): published or not, a client never gets the full analysis.
+            self.assertNotIn("HV-MI-005", gating.unlocked_set(self.mine["code_id"], ["HV-MI-005"]))
+            self.assertFalse(gating.unlocked(self.mine["code_id"], "HV-MI-005"))
+            self.assertFalse(gating.unlocked(self.theirs["code_id"], "HV-MI-005"))
             a.post("/api/selection/scores", {"token": self.token, "publish": False, "what": "analysis"})
             self.assertFalse(gating.unlocked(self.mine["code_id"], "HV-MI-005"))
         finally:

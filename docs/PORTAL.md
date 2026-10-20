@@ -484,5 +484,8 @@ with no migration writes. Logic in `admin/board.py`; routes in `portal_api.py`.
 
 UI: board and switcher in `assets/js/campaign.js` / `campaign.css` (`mx-bd-*`, `mx-cs-*`); the selection dialog in
 `connect.js` / `connect.css` (`cx-camp*`); stage + Live / Unlive on hub campaign rows in `account.js` (`hubStage`).
-Scores: a client or KAM never receives scores, fit badges or the publish switch on a selection, published or not; a
-KAM's scope no longer unlocks a creator's analysis. Tests: `python3 admin/tests/test_board.py`.
+Scores: a client or KAM never receives scores, fit badges or the publish switch on a selection, published or not.
+Profile analysis: never for a client or KAM either (`gating.CLIENTS_SEE_ANALYSIS = False`; grants and publish flags stay
+in the database untouched, so flipping it back restores them). Going Live rings the client's bell and push (the existing
+`camp_live`); Unlive is silent. Admins on a desktop can also drag a card to another lane; the stage menu stays.
+Tests: `python3 admin/tests/test_board.py`.

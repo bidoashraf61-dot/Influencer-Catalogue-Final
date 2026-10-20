@@ -187,7 +187,7 @@
         + (c.status === "live" ? '<button type="button" class="mx-bd-live is-on" data-live="0" data-t="' + esc(c.token) + '">Unlive</button>'
           : (c.status === "draft" ? '<button type="button" class="mx-bd-live" data-live="1" data-t="' + esc(c.token) + '">Go live</button>' : "")) + "</div>";
     }
-    return '<article class="mx-bd-card' + (c.my_pin ? " is-pinned" : "") + (c.demo ? " is-demo" : "") + '" data-token="' + esc(c.token) + '">'
+    return '<article class="mx-bd-card' + (c.my_pin ? " is-pinned" : "") + (c.demo ? " is-demo" : "") + '" data-token="' + esc(c.token) + '" data-stage-now="' + esc(c.stage) + '"' + (can ? ' draggable="true"' : "") + ">"
       + '<div class="mx-bd-card__top">' + brand(c) + '<button type="button" class="mx-bd-pin' + (c.my_pin ? " is-on" : "") + '" data-pin="' + esc(c.token) + '" aria-pressed="' + (c.my_pin ? "true" : "false")
       + '" title="' + (c.my_pin ? "Unpin" : "Pin to the top") + '" aria-label="' + (c.my_pin ? "Unpin " : "Pin ") + esc(c.name) + '">' + SVG.pin + "</button></div>"
       + '<h3 class="mx-bd-card__name">' + (href ? '<a href="' + href + '">' + esc(c.name) + "</a>" : esc(c.name)) + "</h3>"
@@ -268,6 +268,40 @@
     if (LANE && matchMedia("(max-width: 899px)").matches) {
       var lane = bd.querySelector('.mx-bd-lane[data-i="' + LANE + '"]');
       if (lane) bd.scrollLeft = lane.offsetLeft - bd.offsetLeft;
+    }
+    // Admins on a desktop drag a card to another lane (owner, 2026-10-20); the stage menu stays for keyboard and phones.
+    if (BOARD.can_move && matchMedia("(min-width: 900px) and (pointer: fine)").matches) {
+      var dragging = null;
+      bd.querySelectorAll(".mx-bd-card[draggable]").forEach(function (card) {
+        card.addEventListener("dragstart", function (e) {
+          dragging = card; card.classList.add("is-dragging");
+          e.dataTransfer.effectAllowed = "move";
+          try { e.dataTransfer.setData("text/plain", card.getAttribute("data-token")); } catch (x) { /* old browsers */ }
+        });
+        card.addEventListener("dragend", function () {
+          card.classList.remove("is-dragging"); dragging = null;
+          bd.querySelectorAll(".mx-bd-lane.is-drop").forEach(function (l) { l.classList.remove("is-drop"); });
+        });
+      });
+      bd.querySelectorAll(".mx-bd-lane").forEach(function (lane, i) {
+        var key = BOARD.stages[i].key;
+        lane.addEventListener("dragover", function (e) {
+          if (!dragging || dragging.getAttribute("data-stage-now") === key) return;
+          e.preventDefault(); e.dataTransfer.dropEffect = "move"; lane.classList.add("is-drop");
+        });
+        lane.addEventListener("dragleave", function (e) { if (!lane.contains(e.relatedTarget)) lane.classList.remove("is-drop"); });
+        lane.addEventListener("drop", function (e) {
+          e.preventDefault(); lane.classList.remove("is-drop");
+          if (!dragging || dragging.getAttribute("data-stage-now") === key) return;
+          var card = dragging, tok = card.getAttribute("data-token");
+          card.classList.add("is-moving");
+          lane.querySelector(".mx-bd-lane__cards").insertBefore(card, lane.querySelector(".mx-bd-lane__cards").firstChild);
+          post("/api/board/stage", { t: tok, to: key }).then(function (j) {
+            if (j && j.ok) { reloadBoard(esc(j.message)); return; }
+            reloadBoard(esc((j && j.message) || "Couldn't move that campaign.") + (j && j.setup ? ' <a href="' + esc(j.setup) + '">Open its setup</a>' : ""), true);
+          });
+        });
+      });
     }
     host.querySelectorAll("[data-pin]").forEach(function (b) {
       b.addEventListener("click", function () {

@@ -913,3 +913,9 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
   .mx-bd-lane--live .mx-bd-lane__head h2::before { animation: none; }
 }
 @media print { .mx-bd-admin, .mx-bd-pin, .mx-cs, .mx-bd-tabs { display: none !important; } .mx-bd { display: block; } .mx-bd-lane { margin-bottom: 12px; break-inside: avoid; } }
+/* Drag between lanes (admins, desktop). */
+.mx-bd-card[draggable="true"] { cursor: grab; }
+.mx-bd-card.is-dragging { opacity: .45; cursor: grabbing; }
+.mx-bd-card.is-moving { opacity: .6; pointer-events: none; }
+.mx-bd-lane.is-drop { box-shadow: inset 0 0 0 2px var(--ink); background: #e2d3c7; }
+@media (prefers-reduced-motion: reduce) { .mx-bd-card.is-dragging, .mx-bd-card.is-moving { transition: none; } }

@@ -137,7 +137,13 @@ class Board(unittest.TestCase):
         db.save_campaign(self.k_draft, starts_at=1, ends_at=int(time.time()) + 86400)
         s, b, _ = self.boss.post("/api/board/live", {"t": tok, "on": True})
         self.assertEqual((s, db.campaign(self.k_draft)["status"], b["stage"]), (200, "live", "live"), b)
+        def bells():
+            with db.connect() as conn:
+                return conn.execute("SELECT kind FROM notifications WHERE user_id = ? AND ref LIKE ?",
+                                    (self.u_lead["id"], "%%:%d" % self.k_draft)).fetchall()
+        self.assertEqual([r[0] for r in bells()], ["camp_live"])          # Live: the client's bell (and push) ring
         s, b, _ = self.boss.post("/api/board/live", {"t": tok, "on": False})
+        self.assertEqual(len(bells()), 1)                                  # Unlive: silent
         k = db.campaign(self.k_draft)
         self.assertEqual((s, k["status"], board.stage_of(k)), (200, "draft", "approved"))
         s, b, _ = self.boss.post("/api/board/stage", {"id": self.k_draft, "to": "completed"})
@@ -237,8 +243,16 @@ class Board(unittest.TestCase):
             self.assertEqual(s, 403, b)
         s, b, _ = self.boss.get("/api/selection?s=" + tok)
         self.assertTrue(b["scores_gate"]["team"])
-        # the KAM's scope no longer unlocks a creator's analysis
+        # a client never gets a full analysis, even one HelloVoice granted or published (owner, 2026-10-20)
         import gating
+        with db.connect() as conn:
+            conn.execute("INSERT OR IGNORE INTO analysis_grants (code_id, code, granted_at, granted_by) VALUES (?,?,?,?)",
+                         (self.u_lead["code_id"], "HV-MI-001", 1, "test"))
+        self.assertFalse(gating.unlocked(self.u_lead["code_id"], "HV-MI-001"))
+        self.assertEqual(gating.unlocked_set(self.u_lead["code_id"], ["HV-MI-001", "HV-MI-002"]), set())
+        s, b, _ = self.lead.get("/api/creator?c=HV-MI-001")
+        self.assertNotEqual(b["gate"]["state"], "unlocked")
+        # the KAM's scope no longer unlocks a creator's analysis
         portal.unlock_begin(True, scope=frozenset({self.u_lead["code_id"]}))
         try:
             self.assertFalse(gating.unlocked(portal.user_by_email(KAM)["code_id"], "HV-MD-004"))

@@ -32,6 +32,7 @@ TWO = {"goal": ["awareness", "engagement"], "platforms": ["Instagram"], "market"
 
 class Fixes3(unittest.TestCase):
     signup = base.Portal.signup
+    admin = base.Portal.admin
 
     @classmethod
     def setUpClass(cls):
@@ -76,6 +77,8 @@ class Fixes3(unittest.TestCase):
         s, b, _ = c.get("/api/selection?s=" + token)
         self.assertNotIn("needs_objective", b)
         self.assertEqual(b["brief"]["objective"], "Awareness+Engagement")
+        self.assertEqual(b["scores"], {})                                  # never for a client (owner, 2026-10-20)
+        b = self.admin().get("/api/selection?s=" + token)[1]               # HelloVoice reads them
         self.assertTrue(set(b["codes"]) <= set(b["scores"]))
         one = next(v for v in b["scores"].values() if v["score"] is not None)
         self.assertEqual(one["objective"], "Awareness+Engagement")
