@@ -1539,6 +1539,7 @@
     gender: ["Audience", '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c.6-3.8 3.3-6 7-6s6.4 2.2 7 6"/>'],
     age: ["Age", '<rect x="4" y="5" width="16" height="15" rx="2.5"/><path d="M4 10h16M9 3v4M15 3v4"/>'],
     category: ["Space", '<path d="M3.5 12.5l8-8h7v7l-8 8z"/><circle cx="15" cy="9" r="1.3"/>'],
+    mix: ["Mix", '<circle cx="7" cy="15" r="3.5"/><circle cx="15" cy="11" r="5.5"/><circle cx="20" cy="18" r="1.8"/>'],
     budget: ["Budget", '<rect x="3.5" y="6" width="17" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.5"/><path d="M7 12h.01M17 12h.01"/>'],
     count: ["Creators", '<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.5-3.2 2.8-5 5.5-5s5 1.8 5.5 5"/><circle cx="17" cy="9.5" r="2.2"/><path d="M16.5 14.2c2.4.2 4 1.8 4.5 4.3"/>']
   };
@@ -1563,7 +1564,11 @@
     loadQuestions().then(function (all) {
       // Gender and age are power-ups now (item 172); the tour's demo, which has none, keeps them here.
       // Budget left the brief for the creator mix (item 172, D5); scoring a selection needs neither.
-      var qs = all.filter(function (q) { return q.required || (!POWER && (q.id === "gender" || q.id === "age" || q.id === "budget")) || q.id === "count"; });
+      // Item 178, "Add creators with AI": the AI shortlist's core questions (Creator mix too); how
+      // many comes after the power-ups, as its own step.
+      var ADD = !!start.add;
+      var qs = ADD ? all.filter(function (q) { return q.required || (POWER && q.id === "mix"); })
+        : all.filter(function (q) { return q.required || (!POWER && (q.id === "gender" || q.id === "age" || q.id === "budget")) || q.id === "count"; });
       var core = {}; all.forEach(function (q) { core[q.id] = q; });
       var pwFields = {};
       if (POWER) POWER.cards.forEach(function (c) { c.fields.forEach(function (f) { pwFields[f] = 1; }); });
@@ -1576,8 +1581,10 @@
       var x = h("button", { class: "ai-sl__quit ob__x", type: "button", "aria-label": "Close" });
       x.innerHTML = aiSvg('<path d="M6 6l12 12M18 6L6 18"/>', 18);
       card.appendChild(h("header", { class: "ob__hd" },
-        h("div", null, h("h2", { class: "ai-sl__title", id: "ob-t" }, start.edit ? "Edit this selection’s objective" : "Score this selection"),
-          h("p", { class: "ob__lead" }, "Helvi scores the " + (nIn ? nIn + " creator" + (nIn === 1 ? "" : "s") + " already in " : "creators already in ") + "“" + selName +
+        h("div", null, h("h2", { class: "ai-sl__title", id: "ob-t" }, ADD ? "Add creators with AI" : start.edit ? "Edit this selection’s objective" : "Score this selection"),
+          h("p", { class: "ob__lead" }, ADD ? (start.prefilled ? "Your brief for “" + selName + "” is filled in. Sharpen it if you like, choose how many, and Helvi finds creators who aren’t in it yet. You pick who joins."
+            : "A few quick questions about the campaign, then Helvi finds creators for “" + selName + "” who aren’t in it yet. You pick who joins.")
+            : "Helvi scores the " + (nIn ? nIn + " creator" + (nIn === 1 ? "" : "s") + " already in " : "creators already in ") + "“" + selName +
             "” against your campaign. Nothing is added, removed or changed. Free.")), x));
       var run = h("div", { class: "ai-sl__run ob__run" });
       var coach = h("div", { class: "ai-sl__coach", "aria-hidden": "true" });
@@ -1725,7 +1732,7 @@
         back.addEventListener("click", function () { show(step - 1); react("point"); });
         if (step === 0) back.hidden = true;
         var last = step === qs.length - 1;
-        var next = h("button", { class: "ai-sl__next", type: "button" }, last && !POWER ? "Score this selection" : q.required ? "Next" : "Next / skip");
+        var next = h("button", { class: "ai-sl__next", type: "button" }, last && !POWER && !ADD ? "Score this selection" : q.required ? "Next" : "Next / skip");
         next.disabled = q.required && !answered(q);
         next.addEventListener("click", advance);
         nav.appendChild(back); nav.appendChild(next);
@@ -1756,19 +1763,20 @@
         if (q.required && !answered(q)) return;
         if (step < qs.length - 1) { show(step + 1); if (!celebrating) react("point"); return; }
         if (POWER) { sharpenOb(); return; }
+        if (ADD) { addCount(); return; }
         finish();
       }
       // Item 172: the optional power-ups, then score.
       function sharpenOb(openId) {
         step = qs.length;
         stage.textContent = "";
-        var panel = powerStage({ answers: answers, core: core, openId: openId, ready: "score", buildLabel: "Score this selection",
+        var panel = powerStage({ answers: answers, core: core, openId: openId, ready: ADD ? "find creators" : "score", buildLabel: ADD ? "Next: how many" : "Score this selection",
           onChange: function (gain, said) {
             paintPower(gain);
             if (gain) { react("cheer"); say(said || "Sharper"); }
           },
           onBack: function () { show(qs.length - 1); },
-          onBuild: finish });
+          onBuild: ADD ? function () { addCount(); } : finish });
         stage.appendChild(h("div", { class: "ai-sl__panel ai-sl__q" }, panel));
         paintPower(false);
       }
@@ -1836,9 +1844,190 @@
         }
       }
 
-      react("point"); say(start.edit ? "Let’s tweak it" : "Let’s score it");
-      // Edit opens on the first question, answers filled in, the meter already up.
-      show(0);
+      /* -- item 178: how many, the search, the preview to tick -- */
+      var addN = Math.max(1, Math.min(start.max || 50, start.n || 8));
+      function addCostLine() {
+        if (start.free || !start.cost) return start.role === "owner" ? "Free with your active campaign." : "Free for the HelloVoice team.";
+        return start.cost + " credit" + (start.cost === 1 ? "" : "s") + ", the same as an AI shortlist. Charged only if Helvi finds someone new.";
+      }
+      function addLit() {
+        [].forEach.call(track.querySelectorAll(".ai-sl__node"), function (li, i) {
+          li.classList.remove("is-now");
+          li.classList.toggle("is-done", qs[i] ? answered(qs[i]) : pwCount(answers) > 0);
+        });
+        fill.style.setProperty("--p", "100%");
+      }
+      function addCount() {
+        var miss = qs.filter(function (q) { return q.required && !answered(q); })[0];
+        if (miss) { show(qs.indexOf(miss)); return; }
+        step = qs.length + 1;
+        stage.textContent = "";
+        paintPower(false); addLit();
+        var panel = h("div", { class: "ai-sl__panel ai-sl__q aa-count" });
+        panel.appendChild(h("p", { class: "ob__count" }, "Last step"));
+        panel.appendChild(h("h3", { class: "ai-sl__ask", id: "aa-n-q" }, "How many creators should Helvi find?"));
+        panel.appendChild(h("p", { class: "ai-sl__hint" }, "Anyone already in “" + selName + "” is skipped. You see them first and tick who joins."));
+        var out = h("output", { class: "aa-n__v", "aria-live": "polite", id: "aa-n-v" }, String(addN));
+        var minus = h("button", { class: "aa-n__b", type: "button", "aria-label": "Fewer", html: aiSvg('<path d="M6 12h12"/>', 22) });
+        var plusB = h("button", { class: "aa-n__b", type: "button", "aria-label": "More", html: aiSvg('<path d="M12 6v12M6 12h12"/>', 22) });
+        var quick = h("div", { class: "ai-sl__opts aa-n__quick", role: "radiogroup", "aria-labelledby": "aa-n-q" });
+        var go = h("button", { class: "ai-sl__next aa-go", type: "button" });
+        function setN(v) {
+          addN = Math.max(1, Math.min(start.max || 50, v));
+          out.textContent = String(addN);
+          minus.disabled = addN <= 1; plusB.disabled = addN >= (start.max || 50);
+          [].forEach.call(quick.children, function (b) { var on = Number(b.dataset.n) === addN; b.setAttribute("aria-checked", String(on)); b.setAttribute("aria-pressed", String(on)); });
+          go.textContent = "Find " + addN + " creator" + (addN === 1 ? "" : "s");
+          if (start.cost && !start.free) go.appendChild(h("small", null, start.cost + " credits"));
+        }
+        minus.addEventListener("click", function () { setN(addN - 1); });
+        plusB.addEventListener("click", function () { setN(addN + 1); });
+        [3, 5, 10, 20].forEach(function (v) {
+          var b = h("button", { class: "ai-sl__opt", type: "button", role: "radio", "data-n": String(v) }, String(v));
+          b.addEventListener("click", function () { setN(v); react("yes"); });
+          quick.appendChild(b);
+        });
+        panel.appendChild(h("div", { class: "aa-n" }, minus, out, plusB));
+        panel.appendChild(quick);
+        panel.appendChild(h("p", { class: "aa-cost" }, addCostLine()));
+        var nav = h("div", { class: "ai-sl__nav" });
+        var back = h("button", { class: "ai-sl__back", type: "button" }, POWER ? "Back to power-ups" : "Back");
+        back.addEventListener("click", function () { if (POWER) sharpenOb(); else show(qs.length - 1); });
+        go.addEventListener("click", function () { addFind(); });
+        nav.appendChild(back); nav.appendChild(go);
+        panel.appendChild(nav);
+        stage.appendChild(panel);
+        setN(addN);
+        go.focus({ preventScroll: true });
+      }
+      function addFind() {
+        busy = true; x.disabled = true;
+        power.querySelector("b").textContent = "1000"; power.querySelector("i").style.width = "100%";
+        power.querySelector(".ai-sl__pw-lvl").textContent = "Full power"; power.classList.add("is-full");
+        react("think", false, COOK_SEQ); say("On it");
+        var STEPS = ["Reading your brief…", nIn ? "Setting aside the " + nIn + " already in…" : "Checking who’s already in…", "Scoring creators against it…", "Picking your " + addN + "…"];
+        stage.textContent = "";
+        var list = h("ol", { class: "ai-sl__list ob__steps", "aria-live": "polite" });
+        STEPS.forEach(function (t) { list.appendChild(h("li", { class: "ai-sl__st" }, h("span", { class: "ai-sl__st-dot" }), h("span", null, t))); });
+        var bar = h("div", { class: "ai-sl__bar" }, h("i"));
+        stage.appendChild(h("div", { class: "ai-sl__panel ob__wait", role: "status" },
+          h("h3", { class: "ai-sl__ask" }, "Finding " + addN + " creator" + (addN === 1 ? "" : "s")), h("p", { class: "ai-sl__hint" }, "For “" + selName + "”. Nothing joins until you tick it."), list, bar));
+        var k = 0, res = null;
+        function light() {
+          [].forEach.call(list.children, function (li, i) { li.className = "ai-sl__st" + (i < k ? " is-done" : i === k ? " is-now" : ""); });
+          bar.firstChild.style.width = Math.max(4, Math.round(k / STEPS.length * 90)) + "%";
+        }
+        light();
+        var tick = setInterval(function () {
+          if (k < STEPS.length - 1) { k++; light(); }
+          else if (res) { clearInterval(tick); k = STEPS.length; light(); land(); }
+        }, reduce ? 250 : 650);
+        api("POST", "/api/selection/ai-add/find", { token: token, answers: answers, n: addN }).then(function (r) {
+          res = r;
+          if (!r.b || !r.b.ok) { clearInterval(tick); land(); }
+        });
+        function land() {
+          busy = false; x.disabled = false;
+          var r = res;
+          if (r.b && r.b.credits != null) setCredits(r.b.credits);
+          if (!r.b || !r.b.ok || !(r.b.picks || []).length) {
+            stage.textContent = "";
+            var again = h("button", { class: "ai-sl__next", type: "button" }, r.b && r.b.ok ? "Change the brief" : "Try again");
+            again.addEventListener("click", function () { if (r.b && r.b.ok) { if (POWER) sharpenOb(); else show(0); } else addFind(); });
+            var back = h("button", { class: "ai-sl__back", type: "button" }, "Back");
+            back.addEventListener("click", addCount);
+            stage.appendChild(h("div", { class: "ai-sl__panel" },
+              h("h3", { class: "ai-sl__ask" }, r.b && r.b.ok ? "No one new this time" : "That didn’t go through"),
+              h("p", { class: "ai-sl__hint" }, (r.b && r.b.message) || (r.s === 429 ? "Too many tries. Please wait a few minutes." : "Nothing was charged. Please try again.")),
+              h("div", { class: "ai-sl__nav" }, back, again)));
+            react("idle", true);
+            return;
+          }
+          react("cheer"); say("Found them");
+          addPreview(r.b);
+        }
+      }
+      function addPreview(res) {
+        var picks = res.picks, on = {};
+        picks.forEach(function (p) { on[p.code] = true; });
+        stage.textContent = "";
+        var panel = h("div", { class: "ai-sl__panel aa-prev" });
+        var short = picks.length < res.asked;
+        panel.appendChild(h("h3", { class: "ai-sl__ask" }, short ? "Helvi found " + picks.length + " of the " + res.asked + " you asked for" : "Helvi found " + picks.length + " for you"));
+        panel.appendChild(h("p", { class: "ai-sl__hint" }, "Best fit first. Untick anyone you don’t want: nothing joins “" + selName + "” until you add it."));
+        var all = h("button", { class: "aa-all", type: "button" });
+        var ul = h("ul", { class: "aa-list", role: "group", "aria-label": "Creators Helvi found" });
+        var add = h("button", { class: "ai-sl__next aa-add", type: "button" });
+        function count() { return picks.filter(function (p) { return on[p.code]; }).length; }
+        function paint() {
+          var n = count();
+          add.textContent = n ? "Add " + n + " to selection" : "Tick at least one";
+          add.disabled = !n;
+          all.textContent = n === picks.length ? "Untick all" : "Tick all";
+        }
+        picks.forEach(function (p) {
+          var c = p.creator || {};
+          var row = h("button", { class: "aa-row", type: "button", role: "checkbox", "aria-checked": "true" });
+          var ph = h("span", { class: "aa-ph", "aria-hidden": "true" }, c.photo_url ? "" : pwInitials(c.name));
+          if (c.photo_url) bg(ph, c.photo_url);
+          var meta = [c.tier, String(c.city || "").split(",")[0]].filter(Boolean).join(" · ");
+          var chips = h("span", { class: "aa-chips" });
+          (p.chips || []).forEach(function (w) { chips.appendChild(h("span", { class: "aa-chip" }, w)); });
+          row.appendChild(ph);
+          row.appendChild(h("span", { class: "aa-tx" }, h("span", { class: "aa-nm" }, c.name || p.code), meta ? h("span", { class: "aa-meta" }, meta) : null, chips));
+          row.appendChild(h("span", { class: "aa-tick", "aria-hidden": "true", html: aiSvg(PW_TICK, 18) }));
+          row.addEventListener("click", function () {
+            on[p.code] = !on[p.code];
+            row.setAttribute("aria-checked", String(!!on[p.code]));
+            paint();
+          });
+          ul.appendChild(h("li", null, row));
+        });
+        all.addEventListener("click", function () {
+          var to = count() !== picks.length;
+          picks.forEach(function (p) { on[p.code] = to; });
+          [].forEach.call(ul.querySelectorAll(".aa-row"), function (b) { b.setAttribute("aria-checked", String(to)); });
+          paint();
+        });
+        panel.appendChild(h("div", { class: "aa-bar" }, h("span", { class: "aa-spent" }, res.spent ? res.spent + " credits used" : "No credits used"), all));
+        panel.appendChild(ul);
+        var again = h("button", { class: "ai-sl__back", type: "button" }, "Search again");
+        again.addEventListener("click", addCount);
+        var msg = h("p", { class: "aa-msg", role: "status" });
+        add.addEventListener("click", function () {
+          var codes = picks.filter(function (p) { return on[p.code]; }).map(function (p) { return p.code; });
+          if (!codes.length) return;
+          add.disabled = true; again.disabled = true; msg.textContent = "";
+          api("POST", "/api/selection/ai-add/add", { token: token, run: res.run, codes: codes }).then(function (r) {
+            if (!r.b || !r.b.ok) {
+              add.disabled = false; again.disabled = false;
+              msg.textContent = (r.b && r.b.message) || "Couldn’t add them just now. Please try again.";
+              return;
+            }
+            var got = r.b.added || [];
+            react("cheer"); say("Added!");
+            var text = got.length ? "Added " + got.length + " creator" + (got.length === 1 ? "" : "s") + " to “" + selName + "”." : (r.b.message || "They’re already in this selection.");
+            if (S && S.add && got.length) S.add(got);
+            setTimeout(function () {
+              close();
+              if (S && S.toast) S.toast(text);
+              if (!(S && S.add)) location.reload();
+            }, reduce ? 150 : 700);
+          });
+        });
+        panel.appendChild(h("div", { class: "ai-sl__nav aa-foot" }, again, add));
+        panel.appendChild(msg);
+        stage.appendChild(panel);
+        paint();
+        add.focus({ preventScroll: true });
+      }
+
+      react("point"); say(ADD ? (start.prefilled ? "Brief’s ready" : "Let’s find them") : start.edit ? "Let’s tweak it" : "Let’s score it");
+      // Edit opens on the first question, answers filled in, the meter already up. Add with a
+      // brief on file opens on the power-ups (or how many); every node on the track goes back.
+      var ready = qs.every(function (q) { return !q.required || answered(q); });
+      if (ADD && start.prefilled && ready) { if (POWER) sharpenOb(); else addCount(); }
+      else show(0);
     });
   }
   // The selection page's "Add your campaign objective" action, and Edit on its done state.
@@ -1851,6 +2040,37 @@
       objectiveStudio(token, { edit: true, answers: (r.b && r.b.brief && r.b.brief.answers) || {} });
     });
   };
+
+  // Item 178: "Add creators with AI" on a selection page. The selection's brief opens filled in
+  // (power-ups and how many to adjust); without one, the same questions come first. Helvi
+  // previews creators not in the selection yet, with why-chips in words, and only the ticked
+  // ones join. Owners pay the AI shortlist's price; HelloVoice and the client's KAM do not.
+  HV.addCreators = function (token) {
+    if (!token) return;
+    api("GET", "/api/selection/ai-add?s=" + encodeURIComponent(token)).then(function (r) {
+      var S = window.hvSelection;
+      if (!r.b || !r.b.ok) { if (S && S.toast) S.toast((r.b && r.b.message) || "Couldn’t open this just now. Please try again."); return; }
+      var b = r.b.brief;
+      objectiveStudio(token, { add: true, prefilled: !!b, answers: b ? b.answers : {}, n: r.b.n, max: r.b.max,
+                               cost: r.b.cost, free: r.b.free, role: r.b.role });
+    });
+  };
+  function mountAiAdd(tries) {
+    var S = window.hvSelection;
+    if (!S || !S.token() || document.getElementById("aa-btn")) return;
+    var role = S.role();
+    if (role !== "owner" && role !== "admin") return;
+    var row = document.getElementById("cx-selact");
+    var foot = document.querySelector(".cat-selhead__foot") || document.querySelector(".cat-selhead");
+    // connect.js draws the header's action row a moment later; wait for it, then sit first in it.
+    if (!row && (tries || 0) < 30) { setTimeout(function () { mountAiAdd((tries || 0) + 1); }, 150); return; }
+    var b = h("button", { class: "cx-btn aa-btn", id: "aa-btn", type: "button", html: aiSvg(PW_SPARK, 20) + "<span>Add creators with AI</span>" });
+    b.addEventListener("click", function () { HV.addCreators(S.token()); });
+    if (row) row.insertBefore(b, row.firstChild);
+    else if (foot) foot.appendChild(h("div", { class: "cx-selact" }, b));
+  }
+  if (window.hvSelection) setTimeout(mountAiAdd, 0);
+  document.addEventListener("hv:selection", function () { setTimeout(mountAiAdd, 0); });
 
   // No fit scores on the catalogue (client, 2026-10-10): scoring happens only inside a selection,
   // once its campaign objective is set, on the round stamp. The catalogue used to paint a

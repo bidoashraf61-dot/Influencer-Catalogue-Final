@@ -83,6 +83,9 @@ def brief_count(answers):
 
 SIZE_WORDS = {"nano": "Nano creator", "micro": "Micro creator", "mid": "Mid-size creator",
               "macro": "Macro creator", "mega": "Mega creator"}
+SPACE_WORDS = {"health care": "Healthcare", "food": "Food", "travel": "Travel", "entertainment": "Entertainment",
+               "e-commerce": "E-commerce", "music & art": "Music and art", "home & interior": "Home and interior",
+               "technology": "Tech", "finance": "Finance", "fitness": "Fitness"}
 _DIGIT = re.compile(r"\d")
 
 
@@ -119,14 +122,17 @@ def why_words(item, brief, c=None):
         # The power-up chips are written as words (ages read "25–34", never a share).
         if "%" not in str(w) and "/100" not in str(w):
             add(str(w)[:40])
+    hcp_said = any(w in ("Doctor", "Pharmacist", "Dermatology & aesthetics") for w in out)
     for s in item.get("strengths") or []:
-        add(_strength_word(s))
+        w = _strength_word(s)
+        if not (hcp_said and w == "Healthcare professional"):     # "Doctor" already says it
+            add(w)
     cats = [x for x in str((brief.get("target") or {}).get("category") or "").split("|") if x and x.lower() != "any"]
     if c is not None and cats and len(out) < 4:
         hit = [x for x in cats if matcher._tagged(c, [x])]
         if hit:
             q = matcher._BY_ID["category"]
-            label = dict(q["options"]).get(hit[0], hit[0])
+            label = SPACE_WORDS.get(hit[0]) or dict(q["options"]).get(hit[0], hit[0])
             add("Posts about " + label[:1].lower() + label[1:])
     if len(out) < 2:
         add(SIZE_WORDS.get(item.get("band") or (metrics.band_of(c["followers"]) if c is not None else None)))
