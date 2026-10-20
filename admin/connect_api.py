@@ -7,7 +7,6 @@ Client routes
     GET  /api/roi/saved?s=token    the latest estimate kept with a selection
     GET  /api/roi/vs[?t=token]     saved estimate against the live report, per campaign the viewer may see
     GET  /api/roi/selections       the viewer's selections to save an estimate to (name, token)
-    POST /api/selection/more       {token, note, chips, count}   Add more like these   (credits: more)
     POST /api/selection/alike      {token, code, again}          Creators like this    (credits: alike)
     GET  /api/selection/ai-add, POST /api/selection/ai-add/find|add   Add creators with AI (aiadd_api.py)
 
@@ -67,7 +66,7 @@ class ConnectMixin(lifecycle_api.LifecycleMixin, aiadd_api.AiAddMixin):
         if self.aiadd_post(path):                 # item 178: Add creators with AI
             return True
         fn = {"/api/tour": self.api_tour, "/api/roi/estimate": self.api_roi_estimate, "/api/roi/save": self.api_roi_save,
-              "/api/selection/more": self.api_selection_more, "/api/selection/alike": self.api_selection_alike}.get(path)
+              "/api/selection/alike": self.api_selection_alike}.get(path)
         if not fn:
             return False
         fn()
@@ -235,45 +234,6 @@ class ConnectMixin(lifecycle_api.LifecycleMixin, aiadd_api.AiAddMixin):
                                  "message": "You're out of credits. Request more from your profile."}, self.cors())
             return False, 0
         return True, cost
-
-    def api_selection_more(self):
-        """Add more like these: Helvi studies the approved creators and adds more that match
-        to Under review, for the owner to decide."""
-        b = self.json_body()
-        got = self._ai_target(b)
-        if not got:
-            return
-        sel, reader, role = got
-        if self._throttled("more:%d" % reader, 20, 3600):
-            return
-        note = " ".join(str(b.get("note") or "").split())[:160]
-        chips = [c for c in (b.get("chips") or []) if c in aimore.QUICK][:4]
-        count = max(1, min(self._int(b.get("count"), 5), aimore.MAX_COUNT))
-        ok, cost = self._charged(reader, role, "more", "Helvi: add more like these")
-        if not ok:
-            return
-        try:
-            picks, err = aimore.more(sel, self.selection_objective(sel), self.selection_target(sel), note, chips, count)
-        except Exception:
-            picks, err = [], "failed"
-        if not picks:
-            portal.refund(reader, cost, "no creators added")
-            msg = {"no_seeds": "Approve a few creators first, so Helvi knows what you like."}.get(
-                err, "Helvi found no one close enough. Try fewer filters, or ask your account manager.")
-            return self.send_json(200, {"ok": True, "added": [], "message": msg, "spent": 0,
-                                        "credits": portal.balance(reader) if role == "owner" else None}, self.cors())
-        sel = db.selection(sel["id"])
-        codes = json.loads(sel["codes"] or "[]")
-        new = [p["code"] for p in picks if p["code"] not in codes]
-        import assistant
-        assistant._save_codes(sel, codes + new)
-        aimore.record_more(sel, reader, note, chips, new)
-        db.log("shortlist", reader, self.client_ip(), self.headers.get("User-Agent"), "more:%d" % len(new))
-        shown = {r["code"]: r for r in self.roster_payload(only=set(new))}
-        why = {p["code"]: p["why"] for p in picks}
-        return self.send_json(200, {"ok": True, "added": [dict(shown[c], why=why.get(c, "")) for c in new if c in shown],
-                                    "spent": cost, "free": portal.ai_free(reader) is not None,
-                                    "credits": portal.balance(reader) if role == "owner" else None}, self.cors())
 
     def api_selection_alike(self):
         """Creators like this: three look-alikes of one card. Kept, so reopening is free;

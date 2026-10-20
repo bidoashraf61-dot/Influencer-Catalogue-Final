@@ -86,17 +86,6 @@ class Fixes2(unittest.TestCase):
         self.assertTrue(b.get("needs_objective"))
         self.assertEqual(b["scores"], {})
         self.assertIsNone(b["brief"]["objective"])
-        # Add more like these: the creators it adds are not scored either
-        s, st, _ = c.post("/api/selection/status", {"token": token, "code": "HV-MI-001", "status": "approved"})
-        self.assertTrue(st.get("ok"), st)
-        s, more, _ = c.post("/api/selection/more", {"token": token, "count": 3})
-        self.assertEqual(s, 200, more)
-        added = [a["code"] for a in more.get("added") or []]
-        b = self.scores(c, token)
-        self.assertTrue(b.get("needs_objective"))
-        self.assertEqual(b["scores"], {}, added)
-        for a in more.get("added") or []:
-            self.assertNotIn("score", a)
         # the free brief questions give the selection its objective: now it is scored
         s, att, _ = c.post("/api/brief/attach", {"token": token, "answers": ANSWERS})
         self.assertTrue(att.get("ok"), att)

@@ -5780,7 +5780,6 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "owner": (owner["name"] if owner is not None else None),
                 "kam": ((owner["kam"] or "").split("<")[0].strip() if owner is not None and owner["kam"] else None),
                 "replace_cost": portal.price_of(int(reader), "replace") if reader is not None else portal.costs().get("replace", 2),
-                "more_cost": portal.price_of(int(reader), "more") if reader is not None else portal.costs().get("more", 3),
                 "alike_cost": portal.price_of(int(reader), "alike") if reader is not None else portal.costs().get("alike", 2),
                 "ai_free": portal.ai_free(int(reader)) if reader is not None and role != "admin" else None,
                 "credits": portal.balance(int(reader)) if reader is not None and role != "admin" else None}
