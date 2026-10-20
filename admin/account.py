@@ -265,6 +265,9 @@ def summary(user, code_id, secret=b""):
                "goal_grades": {i.get("key"): i.get("grade") for i in ((rep or {}).get("progress") or {}).get("items") or [] if i.get("key")},
                "quote": (lifecycle.chip(db.selection(k["selection_id"])) if k["selection_id"] and db.selection(k["selection_id"]) is not None else None)}
         row["pinned"] = k["id"] in pins
+        # The card shows HelloVoice × the campaign's own client logo (owner, 2026-10-20), not the account's logo.
+        row["client"] = k["client"]
+        row["logos"] = db.campaign_logos(k)[:2]
         campaigns.append(row)
         if k["status"] == "live" and not row["pinned"]:
             for key in ("exposure", "reach", "views", "delivered", "planned"):
