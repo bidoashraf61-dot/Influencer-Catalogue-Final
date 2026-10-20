@@ -858,10 +858,10 @@
     } else if (ME.kind === "admin") {
       rule();
       item("Preview as client", { go: openAccount });
-      item("My campaigns", { href: ROOT + "campaign/dashboard/" });
+      item("My campaigns", { href: ROOT + "campaign/" });
     } else {
       // Access-code guests: no profile for now, just their campaigns and credits.
-      item("My campaigns", { href: ROOT + "campaign/dashboard/" });
+      item("My campaigns", { href: ROOT + "campaign/" });
       if (credits) item("AI credits", { go: openAccount }, credits);
       rule();
     }
@@ -2122,7 +2122,7 @@
     }
 
     body.appendChild(h("div", { class: "pt-sec" }, h("h3", null, "My campaigns"),
-      h("p", { class: "pt-sub", style: "margin:0" }, h("a", { href: ROOT + "campaign/dashboard/" }, "Open campaign tracking"), " to see results for the campaigns we run for you.")));
+      h("p", { class: "pt-sub", style: "margin:0" }, h("a", { href: ROOT + "campaign/" }, "Open campaign tracking"), " to see results for the campaigns we run for you.")));
 
     if (u) {
       var f = {}; var form = h("form", { class: "pt-sec" }, h("h3", null, "My details"));

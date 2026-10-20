@@ -464,3 +464,25 @@ unavailable), carried costs, default capture rules (`#<client>`; disclosure `#ad
 `POST /campaigns/setup` calls the existing `db.create_campaign` (creators, costs, tracking links) and `db.save_campaign`:
 the result is a **draft** linked to the selection. Going live and ending are the existing actions; the chip follows them
 and the owner's bell rings (`camp_live` / `camp_final`). There is no client-side create button.
+
+## Campaign board (items 174, 176, 177, 182; 2026-10-20, branch `feature/r20-campaign-board`)
+
+Campaign first: a campaign is run by a KAM, filed under a client, and holds many selections (`campaigns.selection_id` is
+its first; the rest are in `campaign_selections`). Six stages: Draft, Shortlisting, Client review, Approved, Live,
+Completed. Live and Completed are the campaign's status; the four before are `campaigns.stage`, and a campaign nobody
+staged is read from its selections (quote approved, requested or ready, creators picked, nothing) so existing data maps
+with no migration writes. Logic in `admin/board.py`; routes in `portal_api.py`.
+
+| Route | Who | What |
+|---|---|---|
+| `GET /api/board` | admin all, KAM hers, client own team's (read-only) | stages + cards (logos, selections, pins; KAM for staff). Never scores, costs or analysis |
+| `GET /api/board/targets?s=` | anyone who may file that selection | the campaigns it can go into (pinned first) |
+| `POST /api/board/attach {s, t or name}` | same | add the selection to a campaign, or start a Draft with it; the client's KAM holds it and is told (email + bell) |
+| `POST /api/board/stage {t or id, to}` | **admins only** (403 otherwise) | move between stages; Live needs dates and a client |
+| `POST /api/board/live {t or id, on}` | **admins only** | Live / Unlive (Unlive = back to Approved, off the air) |
+| `POST /api/board/pin {t, on}` | anyone who sees it | per-person pin (`campaign_pins`, field `my_pin`; not the team's demo `pinned_campaigns`) |
+
+UI: board and switcher in `assets/js/campaign.js` / `campaign.css` (`mx-bd-*`, `mx-cs-*`); the selection dialog in
+`connect.js` / `connect.css` (`cx-camp*`); stage + Live / Unlive on hub campaign rows in `account.js` (`hubStage`).
+Scores: a client or KAM never receives scores, fit badges or the publish switch on a selection, published or not; a
+KAM's scope no longer unlocks a creator's analysis. Tests: `python3 admin/tests/test_board.py`.

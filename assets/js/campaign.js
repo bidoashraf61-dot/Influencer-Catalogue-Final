@@ -124,14 +124,245 @@
   function route() {
     var t = token();
     if (t) return openReport(t);
-    get("/api/campaigns").then(function (b) {
+    // Item 176: campaign tracking opens on the board (owner, 2026-10-20). /api/campaigns still says whether this
+    // reader may start a campaign themselves; the board is /api/board.
+    Promise.all([get("/api/board"), get("/api/campaigns").catch(function () { return {}; })]).then(function (r) {
       unlocked();
-      var list = b.campaigns || [];
-      CAN_START = !!b.can_start;
+      CAN_START = !!r[1].can_start && r[0].role === "client";
       $("mx-all").hidden = true;
-      // The list always shows, even for one campaign: list, then dashboard, then report.
-      showList(list);
+      BOARD = r[0];
+      showBoard();
     }).catch(function (err) { if (err && err.locked) lock(); else empty("Could not load your campaigns. Please try again."); });
+  }
+
+  /* ------------------------------------------------------- campaign board */
+  // Items 174, 176, 177, 182 (owner, 2026-10-20). Six columns, one card per campaign with its client's logo and the
+  // selections it holds. Admins move a campaign between columns and set it Live / Unlive; everyone else reads.
+  // Pins are per person and float a campaign to the top of its column and of the switcher.
+  var BOARD = null, LANE = 0;
+  var SVG = {
+    pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5z"/><path d="M12 14v6"/></svg>',
+    chev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
+    arrow: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+    search: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/></svg>',
+    list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>'
+  };
+  function initials(s) {
+    return String(s || "?").trim().split(/\s+/).slice(0, 2).map(function (w) { return w.charAt(0); }).join("").toUpperCase() || "?";
+  }
+  function brand(c, size) {
+    var cls = "mx-bd-logo" + (size ? " mx-bd-logo--" + size : "");
+    if (c.logos && c.logos.length) {
+      return '<span class="' + cls + '"><img src="' + esc(c.logos[0]) + '" alt="' + esc(c.client || c.name) + '" loading="lazy" '
+        + 'onerror="this.parentNode.classList.add(\'is-mono\');this.parentNode.textContent=\'' + esc(initials(c.client || c.name)) + '\'"></span>';
+    }
+    return '<span class="' + cls + ' is-mono" aria-hidden="true">' + esc(initials(c.client || c.name)) + "</span>";
+  }
+  function stageLabel(key) {
+    var s = (BOARD.stages || []).filter(function (x) { return x.key === key; })[0];
+    return s ? s.label : key;
+  }
+  function when(c) {
+    if (!c.starts_at || !c.ends_at) return "";
+    var now = Date.now() / 1000, span = Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400));
+    if (now < c.starts_at) return "Starts " + day(c.starts_at, false);
+    if (now <= c.ends_at) return "Day " + Math.min(span, Math.max(1, Math.ceil((now - c.starts_at) / 86400))) + " of " + span;
+    return day(c.starts_at, false) + " – " + day(c.ends_at, false);
+  }
+  function openHref(c) {
+    if (c.report) return "dashboard/#t=" + encodeURIComponent(c.token);
+    return c.selections.length ? "../selection/#s=" + encodeURIComponent(c.selections[0].token) : "";
+  }
+  function bdCard(c) {
+    var href = openHref(c), can = BOARD.can_move;
+    var sels = c.selections.length ? '<ul class="mx-bd-sels" aria-label="Selections in ' + esc(c.name) + '">' + c.selections.map(function (s) {
+      return '<li><a href="../selection/#s=' + encodeURIComponent(s.token) + '"><span class="mx-bd-sel__n">' + esc(s.name) + "</span>"
+        + '<span class="mx-bd-sel__c">' + s.creators + (s.creators === 1 ? " creator" : " creators") + "</span></a></li>";
+    }).join("") + "</ul>" : '<p class="mx-bd-none">No selection yet.</p>';
+    var meta = [c.client, when(c)].filter(Boolean).join(" · ");
+    var admin = "";
+    if (can) {
+      var opts = BOARD.stages.map(function (s) { return '<option value="' + s.key + '"' + (s.key === c.stage ? " selected" : "") + ">" + esc(s.label) + "</option>"; }).join("");
+      admin = '<div class="mx-bd-admin"><label class="mx-bd-move"><span class="mx-sr">Stage of ' + esc(c.name) + '</span><select data-stage="' + esc(c.token) + '">' + opts + "</select>" + SVG.chev + "</label>"
+        + (c.status === "live" ? '<button type="button" class="mx-bd-live is-on" data-live="0" data-t="' + esc(c.token) + '">Unlive</button>'
+          : (c.status === "draft" ? '<button type="button" class="mx-bd-live" data-live="1" data-t="' + esc(c.token) + '">Go live</button>' : "")) + "</div>";
+    }
+    return '<article class="mx-bd-card' + (c.my_pin ? " is-pinned" : "") + (c.demo ? " is-demo" : "") + '" data-token="' + esc(c.token) + '">'
+      + '<div class="mx-bd-card__top">' + brand(c) + '<button type="button" class="mx-bd-pin' + (c.my_pin ? " is-on" : "") + '" data-pin="' + esc(c.token) + '" aria-pressed="' + (c.my_pin ? "true" : "false")
+      + '" title="' + (c.my_pin ? "Unpin" : "Pin to the top") + '" aria-label="' + (c.my_pin ? "Unpin " : "Pin ") + esc(c.name) + '">' + SVG.pin + "</button></div>"
+      + '<h3 class="mx-bd-card__name">' + (href ? '<a href="' + href + '">' + esc(c.name) + "</a>" : esc(c.name)) + "</h3>"
+      + (meta ? '<p class="mx-bd-card__meta">' + esc(meta) + "</p>" : "")
+      + (c.demo ? '<span class="mx-bd-tag mx-bd-tag--demo" title="The team\'s demo campaign">Demo</span>' : "")
+      + (c.kam ? '<p class="mx-bd-card__kam">KAM ' + esc(c.kam.name || c.kam.email) + "</p>" : "")
+      + sels + admin
+      + (c.report ? '<a class="mx-bd-open" href="dashboard/#t=' + encodeURIComponent(c.token) + '">Open dashboard ' + SVG.arrow + "</a>" : "")
+      + "</article>";
+  }
+  function showBoard() {
+    document.title = "My campaigns — HELVi Connect";
+    var list = BOARD.campaigns || [];
+    if (!list.length) { showNone(); return; }
+    $("mx-list-lede").textContent = BOARD.role === "client"
+      ? "Every campaign HelloVoice runs for you, from the first draft to the final report. Pin the ones you follow most."
+      : BOARD.can_move ? "Every campaign, by stage. Move a campaign with its stage menu; Go live and Unlive are yours alone."
+        : "Your clients' campaigns, by stage. HelloVoice admins move them between stages.";
+    var by = {};
+    BOARD.stages.forEach(function (s) { by[s.key] = []; });
+    list.forEach(function (c) { (by[c.stage] || (by[c.stage] = [])).push(c); });
+    var tabs = '<div class="mx-bd-tabs" role="tablist" aria-label="Stages">' + BOARD.stages.map(function (s, i) {
+      return '<button type="button" role="tab" class="mx-bd-tab' + (s.key === "live" ? " mx-bd-tab--live" : "") + '" data-lane="' + i + '" aria-selected="' + (i === LANE ? "true" : "false") + '">'
+        + esc(s.label) + "<b>" + by[s.key].length + "</b></button>";
+    }).join("") + "</div>";
+    var lanes = '<div class="mx-bd" id="mx-bd">' + BOARD.stages.map(function (s, i) {
+      var cards = by[s.key];
+      return '<section class="mx-bd-lane mx-bd-lane--' + s.key + '" data-i="' + i + '" aria-labelledby="mx-bd-h-' + s.key + '">'
+        + '<header class="mx-bd-lane__head"><h2 id="mx-bd-h-' + s.key + '">' + esc(s.label) + "</h2><b>" + cards.length + "</b>"
+        + '<p class="mx-bd-lane__hint">' + esc(s.hint) + "</p></header>"
+        + '<div class="mx-bd-lane__cards">' + (cards.length ? cards.map(bdCard).join("") : '<p class="mx-bd-empty">Nothing here.</p>') + "</div></section>";
+    }).join("") + "</div>";
+    $("mx-list-sum").innerHTML = "";
+    $("mx-list-items").innerHTML = '<div class="mx-bd-bar" id="mx-bd-bar">' + startPanel() + "</div>"
+      + '<p class="mx-bd-say" id="mx-bd-say" role="status" aria-live="polite"></p>' + tabs + lanes;
+    show("list");
+    wireStart();
+    wireBoard();
+    mountSwitcher(list, "");
+  }
+  function say(text, bad) {
+    var el = $("mx-bd-say"); if (!el) return;
+    el.innerHTML = text; el.className = "mx-bd-say is-on" + (bad ? " is-bad" : "");
+    clearTimeout(say.t); say.t = setTimeout(function () { el.className = "mx-bd-say"; }, 6000);
+  }
+  function reloadBoard(msg, bad) {
+    get("/api/board").then(function (b) { BOARD = b; showBoard(); if (msg) say(msg, bad); });
+  }
+  function wireBoard() {
+    var bd = $("mx-bd"), host = $("mx-list-items");
+    // Phones: the lanes swipe; the stage tabs follow the swipe and jump to a lane.
+    host.querySelectorAll(".mx-bd-tab").forEach(function (b) {
+      b.addEventListener("click", function () {
+        LANE = +b.getAttribute("data-lane");
+        var lane = bd.querySelector('.mx-bd-lane[data-i="' + LANE + '"]');
+        jumping = Date.now();
+        bd.scrollLeft = lane.offsetLeft - bd.offsetLeft;
+        mark();
+      });
+    });
+    function mark() {
+      host.querySelectorAll(".mx-bd-tab").forEach(function (b) {
+        var on = +b.getAttribute("data-lane") === LANE;
+        b.setAttribute("aria-selected", on ? "true" : "false");
+        if (on && b.parentNode.scrollWidth > b.parentNode.clientWidth) b.parentNode.scrollLeft = b.offsetLeft - b.parentNode.offsetLeft - 16;
+      });
+    }
+    var tick = null, jumping = 0;
+    bd.addEventListener("scroll", function () {
+      clearTimeout(tick);
+      tick = setTimeout(function () {
+        if (Date.now() - jumping < 900) return;          // a tab jump is still gliding there
+        var w = bd.querySelector(".mx-bd-lane").offsetWidth || 1;
+        var i = Math.round(bd.scrollLeft / (w + 12));
+        if (i !== LANE) { LANE = Math.max(0, Math.min(5, i)); mark(); }
+      }, 80);
+    }, { passive: true });
+    if (LANE && matchMedia("(max-width: 899px)").matches) {
+      var lane = bd.querySelector('.mx-bd-lane[data-i="' + LANE + '"]');
+      if (lane) bd.scrollLeft = lane.offsetLeft - bd.offsetLeft;
+    }
+    host.querySelectorAll("[data-pin]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        var on = b.getAttribute("aria-pressed") !== "true";
+        b.disabled = true;
+        post("/api/board/pin", { t: b.getAttribute("data-pin"), on: on }).then(function (j) {
+          if (j && j.ok) reloadBoard(on ? "Pinned to the top." : "Unpinned.");
+          else { b.disabled = false; say("Couldn't change that pin. Please try again.", true); }
+        });
+      });
+    });
+    host.querySelectorAll("[data-stage]").forEach(function (sel) {
+      var was = sel.value;
+      sel.addEventListener("change", function () {
+        sel.disabled = true;
+        post("/api/board/stage", { t: sel.getAttribute("data-stage"), to: sel.value }).then(function (j) {
+          if (j && j.ok) { reloadBoard(esc(j.message)); return; }
+          sel.disabled = false; sel.value = was;
+          say(esc((j && j.message) || "Couldn't move that campaign.") + (j && j.setup ? ' <a href="' + esc(j.setup) + '">Open its setup</a>' : ""), true);
+        });
+      });
+    });
+    host.querySelectorAll("[data-live]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        b.disabled = true;
+        post("/api/board/live", { t: b.getAttribute("data-t"), on: b.getAttribute("data-live") === "1" }).then(function (j) {
+          if (j && j.ok) { reloadBoard(esc(j.message)); return; }
+          b.disabled = false;
+          say(esc((j && j.message) || "Couldn't change that.") + (j && j.setup ? ' <a href="' + esc(j.setup) + '">Open its setup</a>' : ""), true);
+        });
+      });
+    });
+  }
+
+  /* ------------------------------------------------------ campaign switcher */
+  function reportBar() {
+    var bar = $("mx-csbar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.className = "cat-pad mx-csbar";
+      bar.innerHTML = '<div class="cat-container mx-csbar__in" id="mx-csbar"><a class="mx-csbar__back" href="#list">' + SVG.arrow + "Campaign board</a></div>";
+      var bug = document.querySelector("#mx-report .mx-bug");
+      bug.parentNode.insertBefore(bar, bug);
+      bar = $("mx-csbar");
+    }
+    return bar;
+  }
+  // Item 176: jump between my campaigns from the board or from inside a report. Pinned first, then by stage order.
+  function mountSwitcher(list, current) {
+    var old = $("mx-cs"); if (old) old.remove();
+    var links = current ? reportBar() : $("mx-bd-bar");
+    if (!links || !list.length) return;
+    var order = { live: 0, approved: 1, review: 2, shortlisting: 3, draft: 4, completed: 5 };
+    var items = list.slice().sort(function (a, b) {
+      return (a.my_pin ? 0 : 1) - (b.my_pin ? 0 : 1) || (order[a.stage] - order[b.stage]);
+    });
+    var cur = items.filter(function (c) { return c.token === current; })[0];
+    var wrap = document.createElement("div");
+    wrap.className = "mx-cs"; wrap.id = "mx-cs";
+    wrap.innerHTML = '<button type="button" class="mx-link mx-cs__btn" aria-haspopup="dialog" aria-expanded="false" aria-controls="mx-cs-pop">'
+      + (cur ? brand(cur, "xs") + '<span class="mx-cs__cur">' + esc(cur.name) + "</span>" : SVG.list + "<span>Switch campaign</span>") + SVG.chev + "</button>"
+      + '<div class="mx-cs__pop" id="mx-cs-pop" role="dialog" aria-label="Switch campaign" hidden>'
+      + '<label class="mx-cs__q">' + SVG.search + '<input type="search" placeholder="Find a campaign" aria-label="Find a campaign" autocomplete="off"></label>'
+      + '<ul class="mx-cs__list"></ul>'
+      + '<a class="mx-cs__all" href="#list">All campaigns on the board ' + SVG.arrow + "</a></div>";
+    links.appendChild(wrap);
+    var btn = wrap.querySelector(".mx-cs__btn"), pop = wrap.querySelector(".mx-cs__pop"), q = wrap.querySelector("input"), ul = wrap.querySelector("ul");
+    function draw() {
+      var v = q.value.trim().toLowerCase();
+      var hits = items.filter(function (c) { return !v || (c.name + " " + c.client).toLowerCase().indexOf(v) >= 0; });
+      ul.innerHTML = hits.length ? hits.map(function (c) {
+        var href = c.report ? "#t=" + encodeURIComponent(c.token) : openHref(c);
+        return '<li><a href="' + esc(href || "#list") + '"' + (c.token === current ? ' aria-current="true"' : "") + ">" + brand(c, "xs")
+          + '<span class="mx-cs__n"><b>' + esc(c.name) + "</b><small>" + esc([c.client, stageLabel(c.stage)].filter(Boolean).join(" · ")) + "</small></span>"
+          + (c.my_pin ? '<span class="mx-cs__pin" title="Pinned">' + SVG.pin + "</span>" : "")
+          + (c.stage === "live" ? '<span class="mx-cs__live" aria-label="Live"></span>' : "") + "</a></li>";
+      }).join("") : '<li class="mx-cs__none">No campaign matches.</li>';
+    }
+    function open(on) {
+      pop.hidden = !on; btn.setAttribute("aria-expanded", on ? "true" : "false");
+      if (on) { q.value = ""; draw(); setTimeout(function () { q.focus(); }, 0); }
+    }
+    btn.addEventListener("click", function () { open(pop.hidden); });
+    q.addEventListener("input", draw);
+    wrap.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { open(false); btn.focus(); }
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        var as = [].slice.call(ul.querySelectorAll("a")); if (!as.length) return;
+        var i = as.indexOf(document.activeElement), dir = e.key === "ArrowDown" ? 1 : -1;
+        e.preventDefault();
+        as[i < 0 ? (dir > 0 ? 0 : as.length - 1) : (i + dir + as.length) % as.length].focus();
+      }
+    });
+    ul.addEventListener("click", function () { open(false); });
+    document.addEventListener("click", function (e) { if (!wrap.contains(e.target)) open(false); });
   }
 
   // Start a campaign (owner, 2026-10-17): a signed-in client names it; it lands as a draft their
@@ -182,45 +413,6 @@
     });
   }
 
-  function showList(list) {
-    document.title = "My campaigns — HELVi Connect";
-    if (!list.length) { showNone(); return; }
-    var live = list.filter(function (c) { return c.status === "live"; }).length;
-    var drafts = list.filter(function (c) { return c.draft; }).length;
-    $("mx-list-sum").innerHTML = tile("Campaigns", list.length, "") + tile("Live now", live, live ? "go" : "")
-      + tile("Completed", list.length - live - drafts, "") + '<span id="mx-sum-totals" class="mx-sum__rest"></span>';
-    $("mx-list-items").innerHTML = startPanel() + list.map(function (c, i) {
-      var now = Date.now() / 1000, span = c.starts_at && c.ends_at ? Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400)) : 0;
-      var dn = span ? Math.min(span, Math.max(0, Math.ceil((now - c.starts_at) / 86400))) : 0;
-      var when = !span ? "" : now < c.starts_at ? "Starts " + day(c.starts_at) : now <= c.ends_at ? "Day " + dn + " of " + span : "Ran " + span + " days";
-      return '<article class="mx-camp' + (c.pinned ? " mx-camp--pinned" : "") + '" data-i="' + i + '"><div class="mx-camp__head"><div class="mx-camp__logos">'
-        + (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("") + "</div>"
-        + '<div class="mx-camp__id"><h2 class="mx-camp__name">' + esc(c.name) + (c.pinned ? ' <span class="mx-camp__pin" title="Pinned for the HelloVoice team">Pinned · Demo</span>' : "") + '</h2><div class="mx-camp__meta">'
-        + esc([c.client, c.starts_at ? day(c.starts_at) + " – " + day(c.ends_at) : "", when].filter(Boolean).join(" · ")) + "</div></div>"
-        + '<span class="mx-camp__state mx-camp__state--' + (c.draft ? "draft" : c.status === "live" ? "live" : "done") + '">' + (c.draft ? "Draft" : c.status === "live" ? "Live" : "Completed") + "</span></div>"
-        + '<div class="mx-camp__row"><div class="mx-camp__prog">' + (c.draft
-            ? '<p class="mx-camp__wait">Waiting for your account manager to set it up and approve it.' + (c.can_build ? " You can start choosing creators meanwhile." : "") + "</p>"
-            : '<p class="mx-camp__wait">Loading progress…</p>') + "</div>"
-        + '<div class="mx-camp__acts">' + (c.can_build ? '<button type="button" class="mx-camp__go mx-camp__go--alt" data-build="' + esc(c.token) + '">Build your selection →</button>' : "")
-        + (c.draft ? "" : '<a class="mx-camp__go" href="dashboard/#t=' + esc(c.token) + '">Open dashboard →</a>') + "</div></div></article>";
-    }).join("");
-    show("list");
-    wireStart();
-    window.scrollTo(0, 0);
-    var agg = { reach: 0, eng: 0, posts: 0, clicks: 0 }, left = list.length;
-    list.forEach(function (c, i) {
-      if (c.draft) { if (!--left) $("mx-sum-totals").innerHTML = tile("People reached", num(agg.reach), "") + tile("Posts live", full(agg.posts), "") + tile("Engagement", num(agg.eng), ""); return; }
-      get("/api/campaign?t=" + encodeURIComponent(c.token)).then(function (b) {
-        var R = b.report, t = R.total || {}, card = document.querySelector('.mx-camp[data-i="' + i + '"]');
-        if (!c.pinned) { agg.reach += t.seen != null ? t.seen : (t.views || 0); agg.eng += t.engagement || 0; agg.posts += t.posts || 0; agg.clicks += t.clicks || 0; }
-        card.querySelector(".mx-camp__prog").innerHTML = progress(R, c.status === "ended");
-      }).catch(function () { var card = document.querySelector('.mx-camp[data-i="' + i + '"]'); card.querySelector(".mx-camp__prog").innerHTML = '<p class="mx-camp__wait">Progress is not available right now.</p>'; })
-        .then(function () {
-          if (--left) return;
-          $("mx-sum-totals").innerHTML = tile("People reached", num(agg.reach), "") + tile("Posts live", full(agg.posts), "") + tile("Engagement", num(agg.eng), "");
-        });
-    });
-  }
   // No campaigns yet: say what will appear here and how to get started,
   // with a full-strength preview of a campaign card.
   function showNone() {
@@ -287,7 +479,11 @@
       show("report");
       pollReport();
       if (!same) window.scrollTo(0, 0);
-      get("/api/campaigns").then(function (x) { $("mx-all").hidden = !(x.campaigns || []).length; }).catch(function () {});
+      get("/api/board").then(function (x) {
+        BOARD = x;
+        $("mx-all").hidden = !(x.campaigns || []).length;
+        mountSwitcher(x.campaigns || [], t);
+      }).catch(function () {});
     }).catch(function (err) {
       if (err && err.locked) return lock();
       unlocked(); empty("This report is not available with your access code.");
@@ -463,6 +659,12 @@
     $("mx-brands").innerHTML = logos ? logos + '<span class="mx-bug__x" aria-hidden="true">×</span><img class="mx-bug__hv" src="../assets/brand/logo.png" alt="HelloVoice">' : "";
     $("mx-title").textContent = c.name;
     $("mx-sub").textContent = [c.client, c.platform ? c.platform + " campaign" : ""].filter(Boolean).join(" · ");
+    // Every selection the campaign holds (item 174), one tap away.
+    var sl = $("mx-sels") || (function () { var p = document.createElement("p"); p.id = "mx-sels"; p.className = "mx-bug__sels"; $("mx-sub").insertAdjacentElement("afterend", p); return p; })();
+    sl.innerHTML = (c.selections || []).length ? '<span>' + ((c.selections.length === 1) ? "Selection" : "Selections") + "</span>" + c.selections.map(function (x) {
+      return '<a href="../selection/#s=' + encodeURIComponent(x.token) + '">' + esc(x.name) + "</a>";
+    }).join("") : "";
+    sl.hidden = !(c.selections || []).length;
     var start = c.starts_at, end = c.ends_at, now = Date.now() / 1000, bits = [];
     if (c.status === "live") bits.push('<span class="mx-live">Live</span>');
     else if (c.status === "ended") bits.push("<span>Completed</span>");
@@ -854,7 +1056,7 @@
     if (sum) mix.push('<div class="mx-panel"><h3>What people did</h3><div class="mx-stack" role="img" aria-label="Interactions breakdown">'
       + parts.map(function (p) { return '<i style="width:' + (p[1] / sum * 100) + "%;background:" + p[2] + '"></i>'; }).join("")
       + '</div><div class="mx-key">' + parts.map(function (p) {
-        return '<div><span class="mx-sw" style="background:' + p[2] + '"></span>' + p[0] + "<b>" + full(p[1]) + "</b></div>";
+        return '<div><span class="mx-cs" style="background:' + p[2] + '"></span>' + p[0] + "<b>" + full(p[1]) + "</b></div>";
       }).join("") + "</div></div>");
     if (R.audience && R.audience.countries.length) {
       mix.push('<div class="mx-panel"><h3>Creators\' audience</h3>' + (R.audience ? '<p class="aud-target">' + (R.audience.target ? flag(R.audience.target.code) + '<span>Target market <b>' + esc(countryName(R.audience.target.code)) + '</b></span>' : '<span>Target market</span>') + '</p>' + '<div class="aud-stamp" role="img" aria-label="Audience not analysed yet"><span>Not analysed</span><span>yet</span></div>' : '') + '</div>');

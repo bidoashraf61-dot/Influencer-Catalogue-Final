@@ -898,3 +898,11 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
   .ac-bug { padding: 14px 14px 16px; }
   .ac-scoreline dd { font-size: 1.7rem; }
 }
+
+/* Item 177: board stage + Live / Unlive on each campaign row (admins); others see the stage. */
+.hb-it__grp--stage { gap: 8px; }
+.hb-it__grp--stage .hb-lab { display: inline-flex; align-items: center; gap: 8px; }
+.hb-stage { min-width: 150px; }
+.hb-chip--stage { color: var(--ink, #121212); border-color: rgba(18,18,18,.2); background: #fff; }
+.hb-livebtn.is-primary { background: var(--lime, #e8ff76); border-color: var(--ink, #121212); color: var(--ink, #121212); }
+.hb-livebtn:disabled, .hb-stage:disabled { opacity: .5; cursor: progress; }

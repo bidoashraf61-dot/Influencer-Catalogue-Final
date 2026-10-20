@@ -110,9 +110,9 @@
   function tabs() {
     var u = ME && ME.user, kind = ME && ME.kind;
     if (u) return [["home", "Home", "/account/#overview", "home"], ["grid", "Catalogue", "/", "cat"],
-      ["list", "Selections", "/account/#selections", "sel"], ["camp", "Campaigns", "/account/#campaigns", "camp"],
+      ["list", "Selections", "/account/#selections", "sel"], ["camp", "Campaigns", "/campaign/", "camp"],
       ["bell", "Alerts", "/account/#notifications", "alerts"]];
-    var out = [["grid", "Catalogue", "/", "cat"], ["camp", "Campaigns", "/campaign/dashboard/", "camp"]];
+    var out = [["grid", "Catalogue", "/", "cat"], ["camp", "Campaigns", "/campaign/", "camp"]];
     if (kind === "admin" || (ME && ME.staff)) out.push(["admin", "Admin", ((window.CATALOGUE_CONFIG && window.CATALOGUE_CONFIG.api) || "/admin") + "/", "admin"]);
     else out.push(["help", "Help", null, "help"]);
     return out;

@@ -542,7 +542,7 @@
   }
   function renderCampaigns(p) {
     add(p, head("Campaigns", "Every campaign HelloVoice runs for your team, with its live report. Numbers refresh every 24 hours.",
-      h("a", { class: "hc-btn hc-btn--ink hc-btn--sm", href: ROOT + "campaign/dashboard/" }, icon("chart"), " Campaign tracking")));
+      h("a", { class: "hc-btn hc-btn--ink hc-btn--sm", href: ROOT + "campaign/" }, icon("chart"), " Campaign board")));
     var live = DATA.campaigns.filter(function (c) { return c.status === "live"; });
     var rest = DATA.campaigns.filter(function (c) { return c.status !== "live"; });
     live.forEach(function (c) { add(p, scorebug(c)); });
@@ -1273,6 +1273,34 @@
       h("div", { class: "hb-share__col" }, h("b", null, "Assign a KAM to this " + kind), h("small", null, "Choose the BlueHolding account manager who will hold it."), list, confirmBox, msg),
       h("button", { class: "hb-share__x", type: "button", "aria-label": "Close", onclick: closeFn }, "×"));
   }
+  // Item 177 (owner, 2026-10-20): an admin sets any campaign's board stage and takes it Live / Unlive from here.
+  // The server checks the role (POST /api/board/stage and /api/board/live answer 403 to anyone else).
+  var STAGES = [["draft", "Draft"], ["shortlisting", "Shortlisting"], ["review", "Client review"], ["approved", "Approved"], ["live", "Live"], ["completed", "Completed"]];
+  function hubAfterStage(r) {
+    var ok = !!(r.b && r.b.ok);
+    if (ok) { HUB.detail = {}; HUB.list = null; ALLC.items = null; renderSection(); }
+    else renderSection();
+    // The list reloads after a change, so the message is kept for a few seconds and shown again on each redraw.
+    HUB.say = { text: ((r.b && r.b.message) || (ok ? "Saved." : "Couldn't change that.")) + (!ok && r.b && r.b.setup ? " Set its dates on the campaign's Setup tab in the admin." : ""),
+                bad: !ok, until: Date.now() + 4000 };
+    hubSay(HUB.say.text, HUB.say.bad);
+  }
+  function hubSayAgain() { if (HUB.say && HUB.say.until > Date.now()) setTimeout(function () { hubSay(HUB.say.text, HUB.say.bad); }, 0); }
+  function hubStage(it) {
+    if (!it.stage) return null;
+    if (!it.can_stage) return h("div", { class: "hb-it__grp hb-it__grp--stage" }, h("span", { class: "hb-chip hb-chip--stage" }, it.stage.label));
+    var sel = h("select", { class: "hb-kam hb-stage", "aria-label": "Board stage of " + it.name });
+    STAGES.forEach(function (s) { sel.appendChild(h("option", { value: s[0] }, s[1])); });
+    sel.value = it.stage.key;
+    sel.addEventListener("change", function () {
+      sel.disabled = true;
+      api("POST", "/api/board/stage", { id: it.id, to: sel.value }).then(hubAfterStage);
+    });
+    var live = it.status === "live";
+    var btn = it.status === "ended" ? null : h("button", { class: "hb-assignbtn hb-livebtn" + (live ? "" : " is-primary"), type: "button",
+      onclick: function () { btn.disabled = true; api("POST", "/api/board/live", { id: it.id, on: !live }).then(hubAfterStage); } }, live ? "Unlive" : "Go live");
+    return h("div", { class: "hb-it__grp hb-it__grp--stage" }, h("label", { class: "hb-lab" }, "Stage", sel), btn);
+  }
   // One card per campaign, with its selection inside it: they are one package (move, assign, share and delete act on both).
   function itemRow(kind, it, co) {
     var key = kind + ":" + it.id, mode = HUB.share === key ? HUB.shareMode : "";
@@ -1286,6 +1314,7 @@
     var shareBtn = h("button", { class: "hb-sharebtn", type: "button", "aria-expanded": shown ? "true" : "false", onclick: toggle("all") }, icon("link"), "Share");
     var delBtn = (kind === "campaign" || (kind === "selection" && HUB.role === "admin")) ? h("button", { class: "hb-delbtn", type: "button", "aria-expanded": deleting ? "true" : "false", onclick: toggle("delete") }, "Delete") : null;
     var pkg = kind === "campaign" && it.package;
+    var stageCtl = kind === "campaign" ? hubStage(it) : null;
     var row = h("li", { class: "hb-it" },
       h("div", { class: "hb-it__main" },
         h("b", null, it.name), itemStatus(kind, it),
@@ -1296,6 +1325,7 @@
         h("span", { class: "hb-chip hb-chip--" + (pkg.status.key || "draft") }, pkg.status.label || "")) : null,
       h("div", { class: "hb-it__act" },
         h("div", { class: "hb-it__grp hb-it__grp--view" }, open, openSel),
+        stageCtl,
         h("div", { class: "hb-it__grp hb-it__grp--manage" }, kamBtn, assignBtn, shareBtn),
         delBtn ? h("div", { class: "hb-it__grp hb-it__grp--danger" }, delBtn) : null));
     var close = function () { HUB.share = null; renderSection(); };
@@ -1372,7 +1402,7 @@
       ALLC.timer = setTimeout(function () { ALLC.items = null; ALLC.refocus = true; renderSection(); }, 300);
     });
     add(p, h("div", { class: "hb-tools" }, q));
-    add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" }));
+    add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" })); hubSayAgain();
     if (ALLC.refocus) { ALLC.refocus = false; setTimeout(function () { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }, 0); }
     if (!ALLC.items) {
       add(p, h("div", { class: "kc-skel", "aria-hidden": "true" }, h("i"), h("i"), h("i")));
@@ -1427,7 +1457,7 @@
         onclick: function () { HUB.f = f[0]; renderSection(); } }, f[1], h("span", null, String(f[2]))));
     });
     add(p, h("div", { class: "hb-tools" }, q, bar));
-    add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" }));
+    add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" })); hubSayAgain();
     var shown = HUB.list.filter(hubFilter);
     var list = h("ul", { class: "hb-list" });
     shown.forEach(function (c) { list.appendChild(companyBlock(c)); });
