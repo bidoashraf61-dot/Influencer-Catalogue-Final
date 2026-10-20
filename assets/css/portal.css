@@ -1783,3 +1783,16 @@ body.sel-scores-off .cat-card .cat-score, body.sel-scores-off .cat-card .cat-pla
   .aa-foot { bottom: 0; padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)); }
   .ai-sl.ob { max-height: calc(100dvh - 16px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); }
 }
+
+/* Item 207: Merge selections dialog. */
+.pt-merge__what { margin: 0 0 14px; font-size: 14px; line-height: 1.6; color: var(--gray, #383838); max-width: 62ch; }
+.pt-merge__list { display: grid; gap: 8px; max-height: 46vh; overflow-y: auto; }
+.pt-merge__row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; min-height: 52px; padding: 0 16px;
+  border-radius: 12px; background: var(--linen); cursor: pointer; }
+.pt-merge__row input { width: 18px; height: 18px; accent-color: #121212; }
+.pt-merge__row.is-on { background: var(--lime); }
+.pt-merge__n { font-weight: 700; overflow-wrap: anywhere; }
+.pt-merge__row small { font-size: 12px; color: var(--gray, #383838); white-space: nowrap; }
+.pt-merge__msg { margin: 12px 0 0; font-size: 14px; font-weight: 600; color: #c01010; }
+.pt-merge__msg:empty { display: none; }
+.pt-merge__msg.is-ok { color: #14884a; }

@@ -2050,6 +2050,75 @@
   if (window.hvSelection) setTimeout(mountAiAdd, 0);
   document.addEventListener("hv:selection", function () { setTimeout(mountAiAdd, 0); });
 
+  // Item 207 (owner, 2026-10-20): "Merge" on a selection page. Another selection of the same client joins
+  // this one: its creators come after this one's, this one's approvals and notes win, the other is archived
+  // (History brings it back) and its campaigns now hold this one. The server checks both (selmerge.py).
+  function mergeDialog(token) {
+    var S = window.hvSelection;
+    var modal = h("div", { class: "pt-modal pt-merge", role: "dialog", "aria-modal": "true", "aria-labelledby": "pt-merge-t" });
+    var close = function () {};
+    var x = h("button", { class: "pt-x", type: "button", "aria-label": "Close", onclick: function () { close(); } }, "×");
+    modal.appendChild(h("div", { class: "pt-head" }, h("h2", { class: "pt-title", id: "pt-merge-t" }, "Merge another selection into this one"), x));
+    var body = h("div", { class: "pt-body" });
+    var list = h("div", { class: "pt-merge__list", role: "radiogroup", "aria-label": "Selections" }, h("p", { class: "pt-muted" }, "Loading your other selections…"));
+    var what = h("p", { class: "pt-merge__what" }, "Pick one. Its creators join this selection; where a creator is in both, this selection’s approval, price and notes stay. The other selection is archived, so it leaves your lists (HelloVoice can bring it back), and any campaign using it uses this one instead.");
+    var msg = h("p", { class: "pt-merge__msg", role: "alert" });
+    body.appendChild(what); body.appendChild(list); body.appendChild(msg);
+    modal.appendChild(body);
+    var go = h("button", { class: "pt-btn pt-btn--lime", type: "button", disabled: true }, "Merge into this selection");
+    var cancel = h("button", { class: "pt-btn pt-btn--ghost", type: "button", onclick: function () { close(); } }, "Cancel");
+    modal.appendChild(h("div", { class: "pt-bar" }, cancel, go));
+    var picked = null;
+    api("GET", "/api/selection/mergeable?s=" + encodeURIComponent(token)).then(function (r) {
+      var rows = (r.b && r.b.selections) || [];
+      list.textContent = "";
+      if (!rows.length) { list.appendChild(h("p", { class: "pt-muted" }, "There is no other selection of yours to merge with this one.")); return; }
+      rows.forEach(function (sel, i) {
+        var id = "pt-merge-" + i;
+        var input = h("input", { type: "radio", name: "pt-merge", id: id, value: sel.token });
+        input.addEventListener("change", function () {
+          picked = sel; go.disabled = false;
+          go.textContent = "Merge " + sel.name;
+          list.querySelectorAll(".pt-merge__row").forEach(function (rw) { rw.classList.toggle("is-on", rw.contains(input)); });
+        });
+        list.appendChild(h("label", { class: "pt-merge__row", for: id }, input,
+          h("span", { class: "pt-merge__n" }, sel.name), h("small", null, sel.creators + (sel.creators === 1 ? " creator" : " creators"))));
+      });
+    });
+    go.addEventListener("click", function () {
+      if (!picked) return;
+      go.disabled = cancel.disabled = true; msg.textContent = "";
+      api("POST", "/api/selection/merge", { s: token, from: picked.token }).then(function (r) {
+        if (r.b && r.b.ok) {
+          msg.className = "pt-merge__msg is-ok"; msg.textContent = r.b.message;
+          setTimeout(function () { location.reload(); }, 900);
+          return;
+        }
+        go.disabled = cancel.disabled = false;
+        msg.className = "pt-merge__msg"; msg.textContent = (r.b && r.b.message) || "Couldn’t merge them. Please try again.";
+      });
+    });
+    close = layer(modal);
+    x.focus();
+  }
+  HV.mergeSelections = mergeDialog;
+  function mountMerge(tries) {
+    var S = window.hvSelection;
+    if (!S || !S.token() || document.getElementById("mg-btn")) return;
+    var role = S.role();
+    if (role !== "owner" && role !== "admin") return;
+    var row = document.getElementById("cx-selact");
+    if (!row && (tries || 0) < 30) { setTimeout(function () { mountMerge((tries || 0) + 1); }, 150); return; }
+    if (!row) return;
+    var b = h("button", { class: "cx-btn cx-btn--line mg-btn", id: "mg-btn", type: "button", title: "Merge another selection into this one",
+      html: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 4v5a6 6 0 0 0 6 6h0a6 6 0 0 1 6 6"/><path d="M18 4v5a6 6 0 0 1-3 5.2"/><path d="M3 7l3-3 3 3M15 7l3-3 3 3"/></svg><span>Merge</span>' });
+    b.addEventListener("click", function () { mergeDialog(S.token()); });
+    var ai = document.getElementById("aa-btn");
+    if (ai && ai.parentNode === row) row.insertBefore(b, ai.nextSibling); else row.appendChild(b);
+  }
+  if (window.hvSelection) setTimeout(mountMerge, 0);
+  document.addEventListener("hv:selection", function () { setTimeout(mountMerge, 0); });
+
   // No fit scores on the catalogue (client, 2026-10-10): scoring happens only inside a selection,
   // once its campaign objective is set, on the round stamp. The catalogue used to paint a
   // "FIT x%" pill on every card for the last brief (a MutationObserver repainting them on every

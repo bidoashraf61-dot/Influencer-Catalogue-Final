@@ -366,6 +366,31 @@ class Board(unittest.TestCase):
         self.assertEqual(s, 200, b)
         self.assertTrue(db.campaign_logos(db.campaign(self.k_short))[0].startswith("upload/"))
 
+    # ----------------------------------------------------------- item 207: merge selections
+    def test_10_merge_selections(self):
+        import selstatus
+        lc = self.u_lead["code_id"]
+        a = db.save_selection(None, "Merge A", ["HV-MI-001", "HV-MI-002"], {}, None, None, code_id=lc)
+        b = db.save_selection(None, "Merge B", ["HV-MI-002", "HV-MD-003"], {}, None, None, code_id=lc)
+        A, Bs = db.selection(a), db.selection(b)
+        selstatus.set_status(A, "HV-MI-002", "approved", "client", "Lead")
+        selstatus.set_status(Bs, "HV-MI-002", "rejected", "client", "Lead", reason="price")
+        selstatus.set_status(Bs, "HV-MD-003", "approved", "client", "Lead")
+        k = db.create_campaign("Merge camp", client="Polyco", code_id=lc, selection_id=b)
+        s, r, _ = self.lead.get("/api/selection/mergeable?s=" + A["token"])
+        self.assertEqual(s, 200, r)
+        self.assertIn("Merge B", [x["name"] for x in r["selections"]])
+        self.assertNotIn("Rival list", [x["name"] for x in r["selections"]])
+        self.assertEqual(self.rival.post("/api/selection/merge", {"s": A["token"], "from": Bs["token"]})[0], 403)
+        s, r, _ = self.lead.post("/api/selection/merge", {"s": A["token"], "from": Bs["token"]})
+        self.assertEqual((s, r["creators"]), (200, 3), r)
+        self.assertEqual(json.loads(db.selection(a)["codes"]), ["HV-MI-001", "HV-MI-002", "HV-MD-003"])
+        st = selstatus.of(a)
+        self.assertEqual((st["HV-MI-002"]["s"], st["HV-MD-003"]["s"]), ("approved", "approved"))   # this one's status wins
+        self.assertIsNotNone(db.selection(b)["archived_at"])
+        self.assertEqual(board.selection_ids(db.campaign(k)), [a])                                 # the campaign holds A now
+        self.assertEqual(self.lead.post("/api/selection/merge", {"s": A["token"], "from": Bs["token"]})[0], 400)  # archived already
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

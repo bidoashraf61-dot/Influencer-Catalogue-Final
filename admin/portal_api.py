@@ -310,6 +310,18 @@ class PortalMixin(connect_api.ConnectMixin):
                     else:
                         self.send_json(200, dict(got, ok=True, role=role), self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/selection/mergeable":
+            # Item 207: the other selections this reader may merge into this one.
+            import selmerge
+            tok = str(query.get("s") or "")[:80]
+            sel = db.selection(token=tok) if tok else None
+            reader = self.selection_viewer(tok) if sel is not None else None
+            if sel is None or reader is None:
+                self.send_json(404 if sel is None else 401, {"ok": False}, self.cors())
+            else:
+                self.send_json(200, {"ok": True, "selections": selmerge.candidates(reader, sel, db.admin_code_id())},
+                               self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/board/attachable":
             # Item 206: the client's other selections that could join this campaign (admins, KAMs).
             import board
@@ -544,6 +556,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/analysis/decide": self.api_analysis_decide,
             "/api/board/edit": self.api_board_edit, "/api/board/logo": self.api_board_logo,
             "/api/board/detach": self.api_board_detach,
+            "/api/selection/merge": self.api_selection_merge,
         }
         fn = routes.get(path)
         if not fn:
@@ -1049,6 +1062,27 @@ class PortalMixin(connect_api.ConnectMixin):
         if ok:
             extra["stage"] = board.stage_of(db.campaign(k["id"]))
         self._board_done(ok, msg, extra)
+
+    def api_selection_merge(self):
+        """{s, from}: merge the selection ``from`` into ``s`` (item 207). Both must be the reader's to change."""
+        import selmerge
+        b = self.json_body() or {}
+        tok, other_tok = str(b.get("s") or "")[:80], str(b.get("from") or "")[:80]
+        into = db.selection(token=tok) if tok else None
+        other = db.selection(token=other_tok) if other_tok else None
+        reader = self.selection_viewer(tok) if into is not None else None
+        if into is None or other is None:
+            self.send_json(404, {"ok": False, "message": "That selection is not here any more."}, self.cors())
+            return
+        if reader is None:
+            self.send_json(401, {"ok": False, "message": "Sign in first."}, self.cors())
+            return
+        if self._throttled("selmerge:%s" % reader, 30, 3600):
+            return
+        who = "HelloVoice" if int(reader) == int(db.admin_code_id()) else "client: %s" % reader
+        ok, msg, row = selmerge.merge(reader, into, other, db.admin_code_id(), who)
+        self.send_json(200 if ok else (403 if "only merge" in msg else 400),
+                       {"ok": ok, "message": msg, "creators": len(json.loads(row["codes"] or "[]")) if row else None}, self.cors())
 
     def api_board_edit(self):
         """{t, name?, client?, starts?, ends?, objective?, targets?}: edit a campaign from its card (admins, KAMs)."""
