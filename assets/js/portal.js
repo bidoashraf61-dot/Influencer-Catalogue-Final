@@ -2806,7 +2806,7 @@
     // code (/api/roster/cards), and typed names are searched on the server (/api/roster/page?q=).
     function roster(codes, words) {
       var calls = [];
-      if (codes && codes.length) calls.push(api("GET", "/api/roster/cards?codes=" + encodeURIComponent(codes.slice(0, 200).join(","))).then(function (r) { return (r.b && r.b.cards) || []; }));
+      for (var ci = 0; codes && ci < codes.length; ci += 200) calls.push(api("GET", "/api/roster/cards?codes=" + encodeURIComponent(codes.slice(ci, ci + 200).join(","))).then(function (r) { return (r.b && r.b.cards) || []; }));
       (words || []).slice(0, 12).forEach(function (w) {
         calls.push(api("GET", "/api/roster/page?limit=20&sort=name&q=" + encodeURIComponent(w)).then(function (r) { return (r.b && r.b.items) || []; }));
       });

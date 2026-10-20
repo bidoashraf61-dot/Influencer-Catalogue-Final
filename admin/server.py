@@ -200,6 +200,10 @@ def _json_list(raw):
         return []
 
 
+# The most creators one selection can hold (cards are still fetched 200 per call).
+SELECTION_MAX = 1000
+
+
 class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     server_version = "hv-catalogue"
 
@@ -6135,7 +6139,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                             "message": "Only the person who owns this selection can request its quote."}, self.cors())
         rid = db.create_request(
             code_id, b.get("name"), b.get("company"), b.get("email"), b.get("phone"),
-            b.get("selection_name"), [str(c)[:40] for c in selection[:200]],
+            b.get("selection_name"), [str(c)[:40] for c in selection[:SELECTION_MAX]],
         )
         db.log("request", code_id, self.client_ip(), self.headers.get("User-Agent"), str(rid))
         if tok and sel is not None:
@@ -6362,7 +6366,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         name = (str(b.get("name") or "Selection")).strip()[:120] or "Selection"
         known = {c["code"] for c in db.list_creators(active_only=True)}
         codes, seen = [], set()
-        for c in (b.get("codes") or [])[:200]:
+        asked = b.get("codes") or []
+        for c in asked[:SELECTION_MAX]:
             c = str(c).strip().upper()
             if c in known and c not in seen:
                 seen.add(c); codes.append(c)
@@ -6377,7 +6382,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             sel = db.selection_for_link(name, codes, viewer)
         if sel is None:
             sid = db.save_selection(None, name, codes, {}, None, None, None, viewer, origin="client")
-            return self.send_json(200, {"ok": True, "token": db.selection(sid)["token"]},
+            return self.send_json(200, {"ok": True, "token": db.selection(sid)["token"],
+                                        "capped": SELECTION_MAX if len(asked) > SELECTION_MAX else None},
                                   self.cors())
 
         prices = {k: v for k, v in json.loads(sel["prices"] or "{}").items() if k in codes}
@@ -6392,7 +6398,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # single-platform mark the shortlist was saved with stays as it was.
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to,
                           platform=sel["platform"] if same else None)
-        out = {"ok": True, "token": sel["token"]}
+        out = {"ok": True, "token": sel["token"], "capped": SELECTION_MAX if len(asked) > SELECTION_MAX else None}
         if not same and int(viewer) != db.admin_code_id():
             # A quote may already exist: the change is recorded, the account manager told, the page warns.
             import lifecycle
