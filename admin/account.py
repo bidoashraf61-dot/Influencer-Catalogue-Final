@@ -184,6 +184,18 @@ def _may_rename(code_id, sel):
     return selrename.client_may(code_id, sel, db.admin_code_id())
 
 
+def _kam_label(email):
+    """The account manager's name for a card (never the email to a client)."""
+    if not email:
+        return None
+    try:
+        import hub
+        n = hub._kam_name(email)
+    except Exception:
+        n = ""
+    return n if n and "@" not in n else (str(email).split("@")[0].replace(".", " ").title() or None)
+
+
 def summary(user, code_id, secret=b""):
     """Everything /account/ shows, in one payload. Client-safe: no costs,
     margins or internal notes ever leave here."""
@@ -192,15 +204,22 @@ def summary(user, code_id, secret=b""):
     import rewards
     import selstatus
     import lifecycle
+    import board
     team = set(portal.team_codes(code_id))
+    own_team = set(team)
     is_admin = False
+    kam_sc = None
     # An owner or admin also sees, in their own Selections and Campaigns, everything filed under team accounts or
     # plain access codes (owner, 2026-10-18), so work like "Jamjoom" is never out of sight.
     try:
         import hub
-        if hub.viewer(user)[0] == "admin":
+        role, adm = hub.viewer(user)
+        if role == "admin":
             is_admin = True
             team |= hub.unfiled_code_ids()
+        elif role == "kam":
+            import kam_scope
+            kam_sc = kam_scope.clients(adm)
     except Exception:
         pass
     team = sorted(team)
@@ -209,7 +228,8 @@ def summary(user, code_id, secret=b""):
     gq = ",".join("?" * len(granted))
     with db.connect() as conn:
         sels = conn.execute(
-            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, s.request_id, s.created_at, u.name owner, c.label code_label FROM selections s "
+            "SELECT s.id, s.name, s.token, s.codes, s.updated_at, s.code_id, s.origin, s.request_id, s.created_at, s.stage, "
+            "u.name owner, u.company company, u.kam kam, c.label code_label FROM selections s "
             "LEFT JOIN users u ON u.code_id = s.code_id LEFT JOIN codes c ON c.id = s.code_id "
             "WHERE (s.code_id IN (%s) OR s.id IN (%s)) AND s.archived_at IS NULL ORDER BY s.updated_at DESC LIMIT 60"
             % (",".join("?" * len(team)), gq), team + granted).fetchall()
@@ -228,7 +248,17 @@ def summary(user, code_id, secret=b""):
         if s["code_id"] == code_id:
             shortlisted.update(codes)
         st = selstatus.of(s["id"])
-        selections.append({"name": s["name"], "token": s["token"], "creators": len(codes), "updated_at": s["updated_at"],
+        chip = lifecycle.chip(s)
+        stage = board.selection_stage(s, chip["key"], len(codes))
+        # Item 194: who may drag it between the planning columns (board.may_move_selection, the same rule).
+        may = is_admin or (s["code_id"] is not None and s["code_id"] in own_team) or (
+            kam_sc is not None and ((s["code_id"] is not None and int(s["code_id"]) in kam_sc) or s["id"] in kam_sc.sel_ids))
+        held = [k for k in (db.campaign(i) for i in board.campaigns_holding(s["id"])) if k is not None]
+        selections.append({"stage": stage, "moves": board.selection_moves(may, chip["key"], stage),
+                           "created_at": s["created_at"], "client": s["company"] or s["code_label"] or "",
+                           "kam": _kam_label(s["kam"]),
+                           "campaigns": [{"name": k["name"], "token": k["token"], "live": k["status"] == "live"} for k in held][:3],
+                           "name": s["name"], "token": s["token"], "creators": len(codes), "updated_at": s["updated_at"],
                            "id": s["id"], "admin_delete": is_admin, "mine": s["code_id"] == code_id, "owner": None if s["code_id"] == code_id else (s["owner"] or s["code_label"] or "A colleague"),
                            # Only the client's own work can be deleted: not a colleague's, not HelloVoice's.
                            "can_delete": (s["origin"] or "admin") == "client" and code_id != db.admin_code_id()
@@ -236,7 +266,7 @@ def summary(user, code_id, secret=b""):
                            # Rename (item 173): the owner, never a colleague or someone it was shared with.
                            "can_rename": _may_rename(code_id, s),
                            "counts": selstatus.counts(codes, st, tiers),
-                           "quote": lifecycle.chip(s)})
+                           "quote": chip})
 
     campaigns, grades = [], []
     agg = {"exposure": 0, "reach": 0, "views": 0, "delivered": 0, "planned": 0}

@@ -24,13 +24,21 @@ migration writes nothing:
 Who sees what: an admin every campaign; a key account manager hers (her clients and what was handed
 to her); a client their own team's campaigns as a read-only board (campaigns opened to them by a
 grant, an invite or a share link show once they are no longer drafts, as before). Anyone may start
-a campaign or add a selection to one; ONLY an admin moves a stage or sets Live / Unlive, and that is
-checked here, on the server, not only by hiding buttons. Nothing on a card is a score or an analysis.
+a campaign or add a selection to one. Moving between the four planning stages (draft .. approved) is open to
+everyone inside their own access (item 194, owner 2026-10-20): an admin any campaign, a KAM hers, a client their
+own team's (not one only shared with them); Live, Completed and taking a campaign off the air stay admin-only.
+All of it is checked here, on the server, not only by hiding buttons. Nothing on a card is a score or an analysis.
+
+Selections sit on the same six columns on the account page (item 194): read from their quote, or the planning
+column someone dragged them to (selections.stage). Live and Completed come from their campaign, never a drag.
 
     viewer(h)                 (role, who) for a request: admin | team | kam | client | None
     stage_of(k, sels)         the column a campaign sits in
     board(h)                  the payload of GET /api/board
-    move(h, k, to)            an admin moves a campaign (live / completed also change its status)
+    moves_for(h, role, who, k, stage)   the columns this viewer may move a campaign to
+    move(h, k, to)            move a campaign (live / completed, admins only, also change its status)
+    selection_stage(sel, chip)          the column a selection sits in
+    selection_moves(...) / move_selection(h, sel, to)   the same for a selection
     set_live(h, k, on)        Live / Unlive
     pin(h, k, on)             per person
     attach(h, sel, ...)       "Create campaign with this selection": add it to a campaign or start one
@@ -257,9 +265,58 @@ def _visible(h, role, who):
     return []
 
 
-def card(h, k, role, pins, logo_dir, staff, demo=frozenset()):
+def _own_team(who):
+    import portal
+    try:
+        return set(portal.team_codes(int(who))) if who is not None else set()
+    except (TypeError, ValueError):
+        return set()
+
+
+def moves_for(h, role, who, k, stage, team=None):
+    """The columns this viewer may move campaign ``k`` (now in ``stage``) to (item 194).
+
+    admin   any other column (Live checks dates and client in move())
+    kam     her campaigns (the board only lists hers), between the four planning columns
+    client  their own team's campaigns, between the four planning columns
+    A campaign that is live or completed leaves those columns only by an admin's hand."""
+    if role == "admin":
+        return [s for s in STAGES if s != stage]
+    if stage not in DRAFT_STAGES or k["status"] != "draft":
+        return []
+    if role == "kam":
+        code = k["code_id"] if k["code_id"] is not None else None
+        if not h.admin_like_for(code, k["selection_id"], k["id"]):
+            return []
+    elif role == "client":
+        if k["code_id"] not in (team if team is not None else _own_team(who)):
+            return []
+    else:
+        return []
+    return [s for s in DRAFT_STAGES if s != stage]
+
+
+def _numbers(k):
+    """Live and completed campaigns: what the dashboard says (views, engagement, rate, posts). Never a score."""
+    if k["status"] not in ("live", "ended"):
+        return None, None
+    try:
+        import metrics
+        rep = metrics.report(k)
+    except Exception:
+        return None, None
+    t = (rep or {}).get("total") or {}
+    er = t.get("video_er") if t.get("video_er") is not None else t.get("er")
+    grades = {i.get("key"): i.get("grade") for i in ((rep or {}).get("progress") or {}).get("items") or [] if i.get("key")}
+    return ({"views": t.get("views") or 0, "engagement": t.get("engagement") or 0, "er": er,
+             "er_grade": grades.get("er") or t.get("er_grade")},
+            {"live": t.get("delivered") or 0, "planned": t.get("planned") or 0})
+
+
+def card(h, k, role, pins, logo_dir, staff, demo=frozenset(), who=None, team=None):
     """One campaign card. Never a score, a cost or an analysis."""
     import lifecycle
+    import selstatus
     sels = _selections(selection_ids(k))
     chips = [lifecycle.chip(s) for s in sels]
     stage = stage_of(k, sels, [c["key"] for c in chips])
@@ -279,9 +336,27 @@ def card(h, k, role, pins, logo_dir, staff, demo=frozenset()):
            "updated_at": k["updated_at"],
            "selections": [{"token": s["token"], "name": s["name"], "creators": _creators(s), "chip": c}
                           for s, c in zip(sels, chips)]}
+    # Item 194: what the card shows at a glance. Creators across its selections and where the client is with
+    # them (approved / still to review), posts live against plan, and the dashboard's own numbers once live.
+    tally = {"creators": 0, "approved": 0, "review": 0}
+    for s in sels:
+        try:
+            codes = json.loads(s["codes"] or "[]")
+        except (TypeError, ValueError):
+            codes = []
+        st = selstatus.of(s["id"])
+        tally["creators"] += len(codes)
+        for c in codes:
+            got = (st.get(c) or {}).get("s", "review")
+            if got in ("approved", "review"):
+                tally[got] += 1
+    out["counts"] = tally
+    out["numbers"], out["posts"] = _numbers(k)
+    kam = kam_for(k)
+    # Everyone sees who runs it; the email stays with the team.
+    out["kam"] = ({"email": kam, "name": _kam_name(kam)} if staff else {"name": _kam_name(kam)}) if kam else None
+    out["moves"] = moves_for(h, role, who, k, stage, team)
     if staff:
-        kam = kam_for(k)
-        out["kam"] = {"email": kam, "name": _kam_name(kam)} if kam else None
         out["staged"] = bool(k["stage"] if "stage" in k.keys() else None)
     return out
 
@@ -298,8 +373,11 @@ def board(h, logo_dir):
     staff = role in ("admin", "team", "kam")
     pins = _pins(pin_key(h))
     demo = _demo_ids()
-    cards = _order([card(h, k, role, pins, logo_dir, staff, demo) for k in _visible(h, role, who)])
-    return {"role": role, "can_move": role == "admin", "can_start": role in ("admin", "kam") or _client_user(h, who) is not None,
+    team = _own_team(who) if role == "client" else None
+    cards = _order([card(h, k, role, pins, logo_dir, staff, demo, who, team) for k in _visible(h, role, who)])
+    # can_move: this viewer may move at least one card; each card's "moves" says where. can_go_live: admins only.
+    return {"role": role, "can_move": any(c["moves"] for c in cards), "can_go_live": role == "admin",
+            "locked_stages": [] if role == "admin" else ["live", "completed"], "can_start": role in ("admin", "kam") or _client_user(h, who) is not None,
             "stages": [{"key": s, "label": LABEL[s], "hint": HINT[s]} for s in STAGES], "campaigns": cards}
 
 
@@ -345,13 +423,18 @@ def _set_stage(cid, stage):
 
 
 def move(h, k, to, actor=""):
-    """An admin moves a campaign to another column. (ok, message, extra)."""
+    """Move a campaign to another column. (ok, message, extra). Who may go where: moves_for()."""
     import history
-    role, _who = viewer(h)
-    if role != "admin":
-        return False, "Only a HelloVoice admin can move a campaign between stages.", {"status": 403}
+    role, who = viewer(h)
     if to not in STAGES:
         return False, "Unknown stage.", {}
+    if role != "admin":
+        if k["id"] not in {r["id"] for r in _visible(h, role, who)}:
+            return False, "That campaign is not yours to move.", {"status": 403}
+        if to not in moves_for(h, role, who, k, stage_of(k)):
+            if to in ("live", "completed") or k["status"] != "draft":
+                return False, "HelloVoice sets a campaign Live or Completed. Ask your account manager.", {"status": 403}
+            return False, "That campaign is not yours to move.", {"status": 403}
     if to == "live":
         missing = [w for w, ok in (("the first and last day", k["starts_at"] and k["ends_at"]), ("the client", k["code_id"])) if not ok]
         if missing:
@@ -542,3 +625,68 @@ def tell_kam(k, sel, actor, created):
                        ref="board:%d:%d" % (k["id"], sel["id"]), once=True)
     except Exception:
         pass
+
+
+# ------------------------------------------------------------ selections --
+# Item 194 (owner, 2026-10-20): the account page shows selections on the same six columns. A selection's
+# column is read from its quote; while its quote is still open (draft, requested, ready) anyone who may
+# work on it can drag it between the four planning columns, and that choice is kept in selections.stage.
+# Approved, Live and Completed always come from the quote and its campaign: a drag never claims them.
+
+_SEL_FROM_QUOTE = {"approved": "approved", "live": "live", "completed": "completed"}
+_SEL_OPEN = ("draft", "requested", "ready")
+
+
+def selection_stage(sel, chip_key, creators=None):
+    """The column a selection sits in."""
+    if chip_key in _SEL_FROM_QUOTE:
+        return _SEL_FROM_QUOTE[chip_key]
+    st = sel["stage"] if "stage" in sel.keys() else None
+    if st in DRAFT_STAGES:
+        return st
+    if chip_key in ("requested", "ready"):
+        return "review"
+    n = creators if creators is not None else _creators(sel)
+    return "shortlisting" if n else "draft"
+
+
+def selection_moves(may, chip_key, stage):
+    """Where a selection may be dragged: the planning columns, while its quote is open and ``may`` is true."""
+    if not may or chip_key not in _SEL_OPEN:
+        return []
+    return [s for s in DRAFT_STAGES if s != stage]
+
+
+def may_move_selection(h, sel):
+    """An admin any selection; a KAM her clients' or one handed to her; a client their own team's."""
+    role, who = viewer(h)
+    if role == "admin":
+        return True
+    if role == "kam":
+        return h.admin_like_for(sel["code_id"], sel["id"], None)
+    if role == "client":
+        return sel["code_id"] is not None and sel["code_id"] in _own_team(who)
+    return False
+
+
+def move_selection(h, sel, to):
+    """Drag a selection to another planning column. (ok, message, extra)."""
+    import history
+    import lifecycle
+    if viewer(h)[0] is None:
+        return False, "Sign in with your work email first.", {"status": 401}
+    if to not in STAGES:
+        return False, "Unknown stage.", {}
+    if not may_move_selection(h, sel):
+        return False, "That selection is not yours to move.", {"status": 403}
+    key = lifecycle.chip(sel)["key"]
+    if to == selection_stage(sel, key):
+        return True, "%s is already in %s." % (sel["name"], LABEL[to]), {"stage": to}
+    if to not in DRAFT_STAGES:
+        return False, "A selection reaches %s with its campaign, not by a drag." % LABEL[to], {"status": 403}
+    if key not in _SEL_OPEN:
+        return False, "%s's quote is approved: it moves with its campaign now." % sel["name"], {"status": 403}
+    with history.tracked("selection", sel["id"], "Moved %s to %s on the board" % (sel["name"], LABEL[to])):
+        with db.connect() as conn:
+            conn.execute("UPDATE selections SET stage = ? WHERE id = ?", (to, int(sel["id"])))
+    return True, "%s moved to %s." % (sel["name"], LABEL[to]), {"stage": to}

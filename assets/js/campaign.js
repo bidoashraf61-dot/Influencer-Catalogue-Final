@@ -123,7 +123,7 @@
   // Items 174, 176, 177, 182 (owner, 2026-10-20). Six columns, one card per campaign with its client's logo and the
   // selections it holds. Admins move a campaign between columns and set it Live / Unlive; everyone else reads.
   // Pins are per person and float a campaign to the top of its column and of the switcher.
-  var BOARD = null, LANE = 0;
+  var BOARD = null;
   var SVG = {
     pin: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5z"/><path d="M12 14v6"/></svg>',
     chev: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>',
@@ -146,70 +146,64 @@
     var s = (BOARD.stages || []).filter(function (x) { return x.key === key; })[0];
     return s ? s.label : key;
   }
-  function when(c) {
-    if (!c.starts_at || !c.ends_at) return "";
-    var now = Date.now() / 1000, span = Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400));
-    if (now < c.starts_at) return "Starts " + day(c.starts_at, false);
-    if (now <= c.ends_at) return "Day " + Math.min(span, Math.max(1, Math.ceil((now - c.starts_at) / 86400))) + " of " + span;
-    return day(c.starts_at, false) + " – " + day(c.ends_at, false);
-  }
   function openHref(c) {
     if (c.report) return "dashboard/#t=" + encodeURIComponent(c.token);
     return c.selections.length ? "../selection/#s=" + encodeURIComponent(c.selections[0].token) : "";
   }
-  function bdCard(c) {
-    var href = openHref(c), can = BOARD.can_move;
-    var sels = c.selections.length ? '<ul class="mx-bd-sels" aria-label="Selections in ' + esc(c.name) + '">' + c.selections.map(function (s) {
-      return '<li><a href="../selection/#s=' + encodeURIComponent(s.token) + '"><span class="mx-bd-sel__n">' + esc(s.name) + "</span>"
-        + '<span class="mx-bd-sel__c">' + s.creators + (s.creators === 1 ? " creator" : " creators") + "</span></a></li>";
-    }).join("") + "</ul>" : '<p class="mx-bd-none">No selection yet.</p>';
-    var meta = [c.client, when(c)].filter(Boolean).join(" · ");
-    var admin = "";
-    if (can) {
-      var opts = BOARD.stages.map(function (s) { return '<option value="' + s.key + '"' + (s.key === c.stage ? " selected" : "") + ">" + esc(s.label) + "</option>"; }).join("");
-      admin = '<div class="mx-bd-admin"><label class="mx-bd-move"><span class="mx-sr">Stage of ' + esc(c.name) + '</span><select data-stage="' + esc(c.token) + '">' + opts + "</select>" + SVG.chev + "</label>"
-        + (c.status === "live" ? '<button type="button" class="mx-bd-live is-on" data-live="0" data-t="' + esc(c.token) + '">Unlive</button>'
-          : (c.status === "draft" ? '<button type="button" class="mx-bd-live" data-live="1" data-t="' + esc(c.token) + '">Go live</button>' : "")) + "</div>";
-    }
-    return '<article class="mx-bd-card' + (c.my_pin ? " is-pinned" : "") + (c.demo ? " is-demo" : "") + '" data-token="' + esc(c.token) + '" data-stage-now="' + esc(c.stage) + '"' + (can ? ' draggable="true"' : "") + ">"
-      + '<div class="mx-bd-card__top">' + brand(c) + '<button type="button" class="mx-bd-pin' + (c.my_pin ? " is-on" : "") + '" data-pin="' + esc(c.token) + '" aria-pressed="' + (c.my_pin ? "true" : "false")
-      + '" title="' + (c.my_pin ? "Unpin" : "Pin to the top") + '" aria-label="' + (c.my_pin ? "Unpin " : "Pin ") + esc(c.name) + '">' + SVG.pin + "</button></div>"
-      + '<h3 class="mx-bd-card__name">' + (href ? '<a href="' + href + '">' + esc(c.name) + "</a>" : esc(c.name)) + "</h3>"
-      + (meta ? '<p class="mx-bd-card__meta">' + esc(meta) + "</p>" : "")
-      + (c.demo ? '<span class="mx-bd-tag mx-bd-tag--demo" title="The team\'s demo campaign">Demo</span>' : "")
-      + (c.kam ? '<p class="mx-bd-card__kam">KAM ' + esc(c.kam.name || c.kam.email) + "</p>" : "")
-      + sels + admin
-      + (c.report ? '<a class="mx-bd-open" href="dashboard/#t=' + encodeURIComponent(c.token) + '">Open dashboard ' + SVG.arrow + "</a>" : "")
-      + "</article>";
+  // Item 194: the lanes and cards are the shared board (assets/js/hv-board.js): HelloVoice × client logo,
+  // creators / approved / to review (views, engagement and rate once live), posts against plan, the KAM, and a
+  // Move to menu plus desktop drag for everyone inside their own access. Go live / Unlive stay the admin's.
+  function liveButton(it) {
+    var c = it.raw;
+    if (!BOARD.can_go_live || (c.status !== "live" && c.status !== "draft")) return null;
+    var b = document.createElement("button");
+    b.type = "button";
+    b.className = "mx-bd-live" + (c.status === "live" ? " is-on" : "");
+    b.textContent = c.status === "live" ? "Unlive" : "Go live";
+    b.addEventListener("click", function () {
+      b.disabled = true;
+      post("/api/board/live", { t: c.token, on: c.status !== "live" }).then(function (j) {
+        if (j && j.ok) { reloadBoard(esc(j.message)); return; }
+        b.disabled = false;
+        say(esc((j && j.message) || "Couldn't change that.") + (j && j.setup ? ' <a href="' + esc(j.setup) + '">Open its setup</a>' : ""), true);
+      });
+    });
+    return b;
   }
   function showBoard() {
     document.title = "My campaigns — HELVi Connect";
     var list = BOARD.campaigns || [];
     if (!list.length) { showNone(); return; }
     $("mx-list-lede").textContent = BOARD.role === "client"
-      ? "Every campaign HelloVoice runs for you, from the first draft to the final report. Pin the ones you follow most."
-      : BOARD.can_move ? "Every campaign, by stage. Move a campaign with its stage menu; Go live and Unlive are yours alone."
-        : "Your clients' campaigns, by stage. HelloVoice admins move them between stages.";
-    var by = {};
-    BOARD.stages.forEach(function (s) { by[s.key] = []; });
-    list.forEach(function (c) { (by[c.stage] || (by[c.stage] = [])).push(c); });
-    var tabs = '<div class="mx-bd-tabs" role="tablist" aria-label="Stages">' + BOARD.stages.map(function (s, i) {
-      return '<button type="button" role="tab" class="mx-bd-tab' + (s.key === "live" ? " mx-bd-tab--live" : "") + '" data-lane="' + i + '" aria-selected="' + (i === LANE ? "true" : "false") + '">'
-        + esc(s.label) + "<b>" + by[s.key].length + "</b></button>";
-    }).join("") + "</div>";
-    var lanes = '<div class="mx-bd" id="mx-bd">' + BOARD.stages.map(function (s, i) {
-      var cards = by[s.key];
-      return '<section class="mx-bd-lane mx-bd-lane--' + s.key + '" data-i="' + i + '" aria-labelledby="mx-bd-h-' + s.key + '">'
-        + '<header class="mx-bd-lane__head"><h2 id="mx-bd-h-' + s.key + '">' + esc(s.label) + "</h2><b>" + cards.length + "</b>"
-        + '<p class="mx-bd-lane__hint">' + esc(s.hint) + "</p></header>"
-        + '<div class="mx-bd-lane__cards">' + (cards.length ? cards.map(bdCard).join("") : '<p class="mx-bd-empty">Nothing here.</p>') + "</div></section>";
-    }).join("") + "</div>";
+      ? "Every campaign HelloVoice runs for you, from the first draft to the final report. Drag a draft to where it stands; HelloVoice sets Live and Completed."
+      : BOARD.role === "admin" ? "Every campaign, by stage. Drag a card or use Move to; Go live and Unlive are yours alone."
+        : "Your clients' campaigns, by stage. Move drafts between the planning stages; HelloVoice admins set Live and Completed.";
     $("mx-list-sum").innerHTML = "";
-    $("mx-list-items").innerHTML = '<div class="mx-bd-bar" id="mx-bd-bar">' + startPanel() + "</div>"
-      + '<p class="mx-bd-say" id="mx-bd-say" role="status" aria-live="polite"></p>' + tabs + lanes;
+    var host = $("mx-list-items");
+    host.innerHTML = '<div class="mx-bd-bar" id="mx-bd-bar">' + startPanel() + "</div>"
+      + '<p class="mx-bd-say" id="mx-bd-say" role="status" aria-live="polite"></p>';
     show("list");
     wireStart();
-    wireBoard();
+    if (window.HVBoard) {
+      HVBoard.mount(host, {
+        stages: BOARD.stages, noun: "campaign", locked: BOARD.locked_stages || [],
+        items: list.map(HVBoard.fromCampaign), extra: liveButton,
+        say: function (text, bad) { say(esc(text), bad); },
+        onMove: function (it, to) {
+          return post("/api/board/stage", { t: it.key, to: to }).then(function (j) {
+            if (j && j.ok) { get("/api/board").then(function (b) { BOARD = b; mountSwitcher(BOARD.campaigns || [], ""); }); return j; }
+            if (j && j.setup) setTimeout(function () { say(esc(j.message) + ' <a href="' + esc(j.setup) + '">Open its setup</a>', true); }, 0);
+            return j || {};
+          });
+        },
+        onPin: function (it, on) {
+          return post("/api/board/pin", { t: it.key, on: on }).then(function (j) {
+            if (j && j.ok) reloadBoard(on ? "Pinned to the top." : "Unpinned.");
+            return j || {};
+          });
+        }
+      });
+    }
     mountSwitcher(list, "");
   }
   function say(text, bad) {
@@ -219,105 +213,6 @@
   }
   function reloadBoard(msg, bad) {
     get("/api/board").then(function (b) { BOARD = b; showBoard(); if (msg) say(msg, bad); });
-  }
-  function wireBoard() {
-    var bd = $("mx-bd"), host = $("mx-list-items");
-    // Phones: the lanes swipe; the stage tabs follow the swipe and jump to a lane.
-    host.querySelectorAll(".mx-bd-tab").forEach(function (b) {
-      b.addEventListener("click", function () {
-        LANE = +b.getAttribute("data-lane");
-        var lane = bd.querySelector('.mx-bd-lane[data-i="' + LANE + '"]');
-        jumping = Date.now();
-        bd.scrollLeft = lane.offsetLeft - bd.offsetLeft;
-        mark();
-      });
-    });
-    function mark() {
-      host.querySelectorAll(".mx-bd-tab").forEach(function (b) {
-        var on = +b.getAttribute("data-lane") === LANE;
-        b.setAttribute("aria-selected", on ? "true" : "false");
-        if (on && b.parentNode.scrollWidth > b.parentNode.clientWidth) b.parentNode.scrollLeft = b.offsetLeft - b.parentNode.offsetLeft - 16;
-      });
-    }
-    var tick = null, jumping = 0;
-    bd.addEventListener("scroll", function () {
-      clearTimeout(tick);
-      tick = setTimeout(function () {
-        if (Date.now() - jumping < 900) return;          // a tab jump is still gliding there
-        var w = bd.querySelector(".mx-bd-lane").offsetWidth || 1;
-        var i = Math.round(bd.scrollLeft / (w + 12));
-        if (i !== LANE) { LANE = Math.max(0, Math.min(5, i)); mark(); }
-      }, 80);
-    }, { passive: true });
-    if (LANE && matchMedia("(max-width: 899px)").matches) {
-      var lane = bd.querySelector('.mx-bd-lane[data-i="' + LANE + '"]');
-      if (lane) bd.scrollLeft = lane.offsetLeft - bd.offsetLeft;
-    }
-    // Admins on a desktop drag a card to another lane (owner, 2026-10-20); the stage menu stays for keyboard and phones.
-    if (BOARD.can_move && matchMedia("(min-width: 900px) and (pointer: fine)").matches) {
-      var dragging = null;
-      bd.querySelectorAll(".mx-bd-card[draggable]").forEach(function (card) {
-        card.addEventListener("dragstart", function (e) {
-          dragging = card; card.classList.add("is-dragging");
-          e.dataTransfer.effectAllowed = "move";
-          try { e.dataTransfer.setData("text/plain", card.getAttribute("data-token")); } catch (x) { /* old browsers */ }
-        });
-        card.addEventListener("dragend", function () {
-          card.classList.remove("is-dragging"); dragging = null;
-          bd.querySelectorAll(".mx-bd-lane.is-drop").forEach(function (l) { l.classList.remove("is-drop"); });
-        });
-      });
-      bd.querySelectorAll(".mx-bd-lane").forEach(function (lane, i) {
-        var key = BOARD.stages[i].key;
-        lane.addEventListener("dragover", function (e) {
-          if (!dragging || dragging.getAttribute("data-stage-now") === key) return;
-          e.preventDefault(); e.dataTransfer.dropEffect = "move"; lane.classList.add("is-drop");
-        });
-        lane.addEventListener("dragleave", function (e) { if (!lane.contains(e.relatedTarget)) lane.classList.remove("is-drop"); });
-        lane.addEventListener("drop", function (e) {
-          e.preventDefault(); lane.classList.remove("is-drop");
-          if (!dragging || dragging.getAttribute("data-stage-now") === key) return;
-          var card = dragging, tok = card.getAttribute("data-token");
-          card.classList.add("is-moving");
-          lane.querySelector(".mx-bd-lane__cards").insertBefore(card, lane.querySelector(".mx-bd-lane__cards").firstChild);
-          post("/api/board/stage", { t: tok, to: key }).then(function (j) {
-            if (j && j.ok) { reloadBoard(esc(j.message)); return; }
-            reloadBoard(esc((j && j.message) || "Couldn't move that campaign.") + (j && j.setup ? ' <a href="' + esc(j.setup) + '">Open its setup</a>' : ""), true);
-          });
-        });
-      });
-    }
-    host.querySelectorAll("[data-pin]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        var on = b.getAttribute("aria-pressed") !== "true";
-        b.disabled = true;
-        post("/api/board/pin", { t: b.getAttribute("data-pin"), on: on }).then(function (j) {
-          if (j && j.ok) reloadBoard(on ? "Pinned to the top." : "Unpinned.");
-          else { b.disabled = false; say("Couldn't change that pin. Please try again.", true); }
-        });
-      });
-    });
-    host.querySelectorAll("[data-stage]").forEach(function (sel) {
-      var was = sel.value;
-      sel.addEventListener("change", function () {
-        sel.disabled = true;
-        post("/api/board/stage", { t: sel.getAttribute("data-stage"), to: sel.value }).then(function (j) {
-          if (j && j.ok) { reloadBoard(esc(j.message)); return; }
-          sel.disabled = false; sel.value = was;
-          say(esc((j && j.message) || "Couldn't move that campaign.") + (j && j.setup ? ' <a href="' + esc(j.setup) + '">Open its setup</a>' : ""), true);
-        });
-      });
-    });
-    host.querySelectorAll("[data-live]").forEach(function (b) {
-      b.addEventListener("click", function () {
-        b.disabled = true;
-        post("/api/board/live", { t: b.getAttribute("data-t"), on: b.getAttribute("data-live") === "1" }).then(function (j) {
-          if (j && j.ok) { reloadBoard(esc(j.message)); return; }
-          b.disabled = false;
-          say(esc((j && j.message) || "Couldn't change that.") + (j && j.setup ? ' <a href="' + esc(j.setup) + '">Open its setup</a>' : ""), true);
-        });
-      });
-    });
   }
 
   /* ------------------------------------------------------ campaign switcher */

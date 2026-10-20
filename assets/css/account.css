@@ -926,3 +926,9 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
 .hb-chip--stage { color: var(--ink, #121212); border-color: rgba(18,18,18,.2); background: #fff; }
 .hb-livebtn.is-primary { background: var(--lime, #e8ff76); border-color: var(--ink, #121212); color: var(--ink, #121212); }
 .hb-livebtn:disabled, .hb-stage:disabled { opacity: .5; cursor: progress; }
+
+/* Item 194: the section head carries Board | List beside its action; the board sits 28px under the head. */
+.hc-head__tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.hc-head + .hvb { margin-top: 28px; }
+.hc-wait { margin: 28px 0 0; font-size: 15px; color: var(--gray); }
+@media screen and (max-width: 767px) { .hc-head__tools { width: 100%; justify-content: space-between; } }

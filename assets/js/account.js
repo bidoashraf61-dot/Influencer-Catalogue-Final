@@ -455,9 +455,49 @@
     var f = HV().lifecycleChip;
     return f ? f(q) : h("span", { class: "lc-chip lc-chip--" + q.key }, h("i", { "aria-hidden": "true" }), q.label);
   }
+  /* ------------------------------------------- the board (item 194, owner 2026-10-20) */
+  // Selections and Campaigns open on a six-column board (window.HVBoard, assets/js/hv-board.js), with List
+  // beside it. Everyone drags what is theirs between the planning columns; the server decides (admin/board.py).
+  var SEL_STAGES = [
+    { key: "draft", label: "Draft", hint: "Named, no creators yet" },
+    { key: "shortlisting", label: "Shortlisting", hint: "Creators being chosen" },
+    { key: "review", label: "Client review", hint: "Being decided, quote asked" },
+    { key: "approved", label: "Approved", hint: "Agreed, being set up" },
+    { key: "live", label: "Live", hint: "Its campaign is running" },
+    { key: "completed", label: "Completed", hint: "Its campaign has ended" }];
+  function boardOn() { return !!window.HVBoard; }
+  function viewHead(key, rerender) {
+    return boardOn() ? HVBoard.viewSwitch(key, HVBoard.viewOf(key), function () { rerender(); }) : null;
+  }
+  function headTools() {
+    var w = h("div", { class: "hc-head__tools" });
+    for (var i = 0; i < arguments.length; i++) add(w, arguments[i]);
+    return w;
+  }
+  function renderSelectionBoard(p) {
+    HVBoard.mount(p, {
+      stages: SEL_STAGES, noun: "selection", locked: ["live", "completed"],
+      items: DATA.selections.map(function (s) { return HVBoard.fromSelection(s, qchip(s.quote)); }),
+      onMove: function (it, to) {
+        return api("POST", "/api/board/selection-stage", { s: it.key, to: to }).then(function (r) {
+          if (r.b && r.b.ok) {
+            var s = DATA.selections.filter(function (x) { return x.token === it.key; })[0];
+            if (s) { s.stage = to; s.moves = it.moves.slice(); }
+          }
+          return r.b || {};
+        });
+      }
+    });
+  }
+
   function renderSelections(p) {
-    add(p, head("Selections", "Approve the creators you want and reject the ones you don't. Your account manager sees every change and quotes the approved list.",
-      h("a", { class: "hc-btn hc-btn--line hc-btn--sm", href: ROOT + "#cat-roster" }, "Browse creators")));
+    var view = boardOn() ? HVBoard.viewOf("selections") : "list";
+    add(p, head("Selections", view === "board"
+        ? "Every selection by where it stands. Drag one to another column, or use Move to. Your account manager sees every change."
+        : "Approve the creators you want and reject the ones you don't. Your account manager sees every change and quotes the approved list.",
+      headTools(DATA.selections.length ? viewHead("selections", renderSection) : null,
+        h("a", { class: "hc-btn hc-btn--line hc-btn--sm", href: ROOT + "#cat-roster" }, "Browse creators"))));
+    if (DATA.selections.length && view === "board") { renderSelectionBoard(p); return; }
     if (!DATA.selections.length) {
       add(p, h("div", { class: "hc-empty" }, h("b", null, "No selections yet"),
         h("p", null, "Pick creators in the catalogue, or let Helvi build a scored shortlist from a short brief."),
@@ -575,9 +615,58 @@
         p && c.status === "live" ? sig(p.grade, p.label) : null),
       h("span", { class: "ac-item__go" }, "Open report →"));
   }
+  // The campaign board's own data (/api/board): every stage, drafts included, scoped to this person.
+  var CBOARD = { data: null, busy: null };
+  function loadCampaignBoard() {
+    if (CBOARD.busy) return CBOARD.busy;
+    CBOARD.busy = api("GET", "/api/board").then(function (r) {
+      CBOARD.busy = null;
+      if (r.b && r.b.stages) CBOARD.data = r.b;
+      return CBOARD.data;
+    });
+    return CBOARD.busy;
+  }
+  function renderCampaignBoard(p) {
+    var B = CBOARD.data;
+    if (!B) {
+      var wait = h("p", { class: "hc-wait", role: "status" }, "Loading the board…");
+      add(p, wait);
+      loadCampaignBoard().then(function (b) {
+        if (SECTION !== "campaigns" || !document.contains(wait)) return;
+        if (b) { renderSection(); return; }
+        wait.textContent = "Couldn't load the board. ";
+        wait.appendChild(h("button", { class: "hc-more", type: "button", onclick: function () { CBOARD.data = null; renderSection(); } }, "Try again"));
+      });
+      return;
+    }
+    if (!B.campaigns.length) return false;
+    HVBoard.mount(p, {
+      stages: B.stages, noun: "campaign", locked: B.locked_stages || [],
+      items: B.campaigns.map(HVBoard.fromCampaign),
+      onMove: function (it, to) {
+        return api("POST", "/api/board/stage", { t: it.key, to: to }).then(function (r) {
+          if (r.b && r.b.ok) CBOARD.data = null;            // the next visit reads the stages fresh
+          return r.b || {};
+        });
+      },
+      onPin: function (it, on) {
+        return api("POST", "/api/board/pin", { t: it.key, on: on }).then(function (r) {
+          if (r.b && r.b.ok) { CBOARD.data = null; renderSection(); }
+          return r.b || {};
+        });
+      }
+    });
+    return true;
+  }
+
   function renderCampaigns(p) {
-    add(p, head("Campaigns", "Every campaign HelloVoice runs for your team, with its live report. Numbers refresh every 24 hours.",
-      h("a", { class: "hc-btn hc-btn--ink hc-btn--sm", href: ROOT + "campaign/" }, icon("chart"), " Campaign board")));
+    var view = boardOn() ? HVBoard.viewOf("campaigns") : "list";
+    add(p, head("Campaigns", view === "board"
+        ? "Every campaign by stage, from the first draft to the final report. Live numbers refresh every 24 hours."
+        : "Every campaign HelloVoice runs for your team, with its live report. Numbers refresh every 24 hours.",
+      headTools(viewHead("campaigns", renderSection),
+        h("a", { class: "hc-btn hc-btn--ink hc-btn--sm", href: ROOT + "campaign/" }, icon("chart"), " Campaign tracking"))));
+    if (view === "board" && renderCampaignBoard(p) !== false) return;
     var live = DATA.campaigns.filter(function (c) { return c.status === "live"; });
     var rest = DATA.campaigns.filter(function (c) { return c.status !== "live"; });
     live.forEach(function (c) { add(p, scorebug(c)); });

@@ -518,6 +518,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/notifications/read": self.api_notifications_read,
             "/api/board/stage": self.api_board_stage, "/api/board/live": self.api_board_live,
             "/api/board/pin": self.api_board_pin, "/api/board/attach": self.api_board_attach,
+            "/api/board/selection-stage": self.api_board_selection_stage,
         }
         fn = routes.get(path)
         if not fn:
@@ -1022,6 +1023,18 @@ class PortalMixin(connect_api.ConnectMixin):
         ok, msg, extra = board.move(self, k, str(b.get("to") or ""))
         if ok:
             extra["stage"] = board.stage_of(db.campaign(k["id"]))
+        self._board_done(ok, msg, extra)
+
+    def api_board_selection_stage(self):
+        """{s, to}: drag a selection between the planning columns of the account board (item 194).
+        board.move_selection checks who may, so a hidden handle is never the only guard."""
+        import board
+        b = self.json_body() or {}
+        sel = db.selection(token=str(b.get("s") or "")) if b.get("s") else None
+        if sel is None or sel["deleted_at"]:
+            self.send_json(404, {"ok": False, "reason": "unknown", "message": "That selection is not here any more."}, self.cors())
+            return
+        ok, msg, extra = board.move_selection(self, sel, str(b.get("to") or ""))
         self._board_done(ok, msg, extra)
 
     def api_board_live(self):

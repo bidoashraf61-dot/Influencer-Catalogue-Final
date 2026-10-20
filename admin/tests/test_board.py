@@ -101,31 +101,54 @@ class Board(unittest.TestCase):
         self.assertTrue({"Poly draft", "Poly live", "Rival draft"} <= names)
         self.assertEqual([x["key"] for x in b["stages"]], list(board.STAGES))
         s, b, _ = self.kam.get("/api/board")
-        self.assertEqual((s, b["role"], b["can_move"]), (200, "kam", False))
+        self.assertEqual((s, b["role"], b["can_move"]), (200, "kam", True))          # item 194: her drafts
+        self.assertEqual(b["locked_stages"], ["live", "completed"])
         names = {c["name"] for c in b["campaigns"]}
         self.assertIn("Poly draft", names)
         self.assertNotIn("Rival draft", names)                        # another KAM's client
         s, b, _ = self.lead.get("/api/board")
-        self.assertEqual((s, b["role"], b["can_move"]), (200, "client", False))
+        self.assertEqual((s, b["role"], b["can_move"]), (200, "client", True))       # item 194: their team's drafts
         names = {c["name"] for c in b["campaigns"]}
         self.assertTrue({"Poly draft", "Poly shortlist", "Poly live", "Poly done"} <= names)   # drafts included
         self.assertNotIn("Rival draft", names)
         c = next(x for x in b["campaigns"] if x["name"] == "Poly shortlist")
         self.assertEqual(c["selections"][0]["name"], "Glow list")
-        self.assertNotIn("kam", c)                                     # the team's fields stay with the team
+        self.assertNotIn("email", c["kam"] or {})                      # the KAM's name only; the email stays with the team
+        self.assertNotIn("staged", c)
+        self.assertEqual(set(c["counts"]), {"creators", "approved", "review"})
+        self.assertEqual(c["counts"]["creators"], 2)
+        self.assertEqual(sorted(c["moves"]), ["approved", "draft", "review"])
+        live = next(x for x in b["campaigns"] if x["name"] == "Poly live")
+        self.assertEqual((live["moves"], set(live["numbers"] or {}) >= {"views", "engagement", "er"}), ([], True))
         blob = json.dumps(b)
         for word in ("score", "cost", "analysis"):
             self.assertNotIn('"%s' % word, blob)
         self.assertEqual(base.Client(self.base).get("/api/board")[0], 401)
 
     # ---------------------------------------------------------- admin-only moves
-    def test_03_only_admins_move_and_set_live(self):
+    def test_03_planning_moves_for_all_live_for_admins(self):
         tok = db.campaign(self.k_draft)["token"]
+        # Item 194: a client and a KAM move their own drafts between the planning columns...
+        for who, to in ((self.lead, "review"), (self.kam, "shortlisting")):
+            s, b, _ = who.post("/api/board/stage", {"t": tok, "to": to})
+            self.assertEqual((s, b.get("stage")), (200, to), b)
+        # ...never to Live or Completed, never Live / Unlive, and never a live campaign out of Live
         for who in (self.lead, self.kam):
-            s, b, _ = who.post("/api/board/stage", {"t": tok, "to": "review"})
-            self.assertEqual(s, 403, b)
+            for to in ("live", "completed"):
+                s, b, _ = who.post("/api/board/stage", {"t": tok, "to": to})
+                self.assertEqual(s, 403, b)
             s, b, _ = who.post("/api/board/live", {"t": tok, "on": True})
             self.assertEqual(s, 403, b)
+            s, b, _ = who.post("/api/board/stage", {"t": db.campaign(self.k_live)["token"], "to": "approved"})
+            self.assertEqual(s, 403, b)
+        self.assertEqual(db.campaign(self.k_live)["status"], "live")
+        # a colleague's campaign shared to another client is not theirs to move
+        s, b, _ = self.rival.post("/api/board/stage", {"t": db.campaign(self.k_rival)["token"], "to": "review"})
+        self.assertEqual(s, 200, b)                                    # their own
+        s, b, _ = self.lead.post("/api/board/stage", {"t": db.campaign(self.k_rival)["token"], "to": "review"})
+        self.assertEqual(s, 404)
+        with db.connect() as conn:
+            conn.execute("UPDATE campaigns SET stage = NULL WHERE id IN (?, ?)", (self.k_draft, self.k_rival))
         self.assertIsNone(db.campaign(self.k_draft)["stage"])
         s, b, _ = self.rival.post("/api/board/stage", {"t": tok, "to": "review"})
         self.assertEqual(s, 404)                                       # not even visible
@@ -258,6 +281,42 @@ class Board(unittest.TestCase):
             self.assertFalse(gating.unlocked(portal.user_by_email(KAM)["code_id"], "HV-MD-004"))
         finally:
             portal.unlock_begin(False)
+
+    # ----------------------------------------------------- item 194: selections on the board
+    def test_08_selection_columns_and_moves(self):
+        sel = db.selection(self.s_more)
+        tok = sel["token"]
+        self.assertEqual(board.selection_stage(sel, lifecycle.chip(sel)["key"]), "shortlisting")
+        self.assertEqual(board.selection_stage(db.selection(self.s_empty), "draft"), "draft")
+        # the account page carries the column and where it may go
+        s, b, _ = self.lead.get("/api/account")
+        row = next(x for x in b["selections"] if x["token"] == tok)
+        self.assertEqual((row["stage"], sorted(row["moves"])), ("shortlisting", ["approved", "draft", "review"]), row)
+        # the owner's team drags it; a rival client and a stranger cannot
+        s, b, _ = self.mate.post("/api/board/selection-stage", {"s": tok, "to": "review"})
+        self.assertEqual((s, b.get("stage")), (200, "review"), b)
+        self.assertEqual(db.selection(self.s_more)["stage"], "review")
+        self.assertEqual(self.rival.post("/api/board/selection-stage", {"s": tok, "to": "draft"})[0], 403)
+        self.assertEqual(base.Client(self.base).post("/api/board/selection-stage", {"s": tok, "to": "draft"})[0], 401)
+        # never by a drag into Live or Completed
+        for to in ("live", "completed"):
+            self.assertEqual(self.lead.post("/api/board/selection-stage", {"s": tok, "to": to})[0], 403)
+        # the KAM for her client, an admin for anyone
+        self.assertEqual(self.kam.post("/api/board/selection-stage", {"s": tok, "to": "approved"})[0], 200)
+        self.assertEqual(self.boss.post("/api/board/selection-stage", {"s": db.selection(self.s_rival)["token"], "to": "review"})[0], 200)
+        self.assertEqual(self.kam.post("/api/board/selection-stage", {"s": db.selection(self.s_rival)["token"], "to": "draft"})[0], 403)
+        # an approved quote decides the column and locks the drag
+        sel = db.selection(self.s_more)
+        lifecycle.mark_requested(sel, by_name="Lead"); lifecycle.set_ready(sel, "", "", "HV"); lifecycle.approve(sel, None, "Lead")
+        self.assertEqual(board.selection_stage(db.selection(self.s_more), lifecycle.chip(db.selection(self.s_more))["key"]), "approved")
+        s, b, _ = self.lead.post("/api/board/selection-stage", {"s": tok, "to": "draft"})
+        self.assertEqual(s, 403, b)
+        s, b, _ = self.lead.get("/api/account")
+        row = next(x for x in b["selections"] if x["token"] == tok)
+        self.assertEqual((row["stage"], row["moves"]), ("approved", []))
+        with db.connect() as conn:
+            conn.execute("DELETE FROM selection_quote WHERE selection_id = ?", (self.s_more,))
+            conn.execute("UPDATE selections SET stage = NULL WHERE id IN (?, ?)", (self.s_more, self.s_rival))
 
 
 if __name__ == "__main__":

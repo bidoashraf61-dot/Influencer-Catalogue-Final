@@ -497,6 +497,10 @@ def migrate(conn):
         # selection from its page. Kept apart from `tags` so an admin saving the
         # selection never overwrites them.
         conn.execute("ALTER TABLE selections ADD COLUMN client_tags TEXT")
+    if "stage" not in sel_cols:
+        # Account board (item 194): the board column someone dragged the selection to (draft | shortlisting |
+        # review | approved). NULL = read from its quote (admin/board.py selection_stage), so no backfill.
+        conn.execute("ALTER TABLE selections ADD COLUMN stage TEXT")
     if "platforms" not in sel_cols:
         # {code: "Instagram" | "TikTok" | "Both"}: the platform each creator will deliver on in
         # THIS selection, which the matching score is read from. Empty = best score.
