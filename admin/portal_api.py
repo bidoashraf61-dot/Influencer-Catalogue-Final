@@ -266,10 +266,23 @@ class PortalMixin(connect_api.ConnectMixin):
                 cid, user = who
                 a = kam_scope.admin_for_email(user["email"])
                 import hub
+                role, team_row = hub.viewer(user)
                 self.send_json(200, dict(account.summary(user, cid, self._srv().SECRET, getattr(self._srv(), "CLIENT_LOGOS", None)), ok=True,
                                          is_kam=bool(a is not None and kam_scope.is_kam(a) and not a["disabled_at"]),
-                                         hub=hub.viewer(user)[0]),
+                                         hub=role, cc=self._cc_block(role, team_row, user)),
                                self.cors() + [("Cache-Control", "no-store")])
+            return True
+        if path == "/api/needs":
+            # Item 209: the team's "Needs you" queue and "This month" strip on the profile Overview.
+            who = self._need_account()
+            if who:
+                import hub, needs
+                role, a = hub.viewer(who[1])
+                if role is None:
+                    self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+                else:
+                    self.send_json(200, dict(needs.queue(role, a), ok=True, kpis=needs.kpis(role, a)),
+                                   self.cors() + [("Cache-Control", "no-store")])
             return True
         if path == "/api/hub/campaigns":
             who = self._need_account()
@@ -572,6 +585,8 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/edit": self.api_board_edit, "/api/board/logo": self.api_board_logo,
             "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
             "/api/selection/merge": self.api_selection_merge,
+            "/api/needs/approve": self.api_needs_approve,
+            "/api/stepup/send": self.api_stepup_send, "/api/stepup/verify": self.api_stepup_verify,
         }
         fn = routes.get(path)
         if not fn:
@@ -1240,6 +1255,58 @@ class PortalMixin(connect_api.ConnectMixin):
             return self.send_json(400, {"ok": False, "message": msg}, self.cors())
         return self.send_json(200, {"ok": True, "message": msg, "created": created,
                                     "campaign": {"token": k["token"], "name": k["name"], "stage": board.stage_of(k)}}, self.cors())
+
+    # ------------------------------------------------- Control Centre (item 209) --
+
+    def _cc_block(self, role, team_row, user):
+        """What the profile shows a team member: the queue (admins, KAMs) and the Control Centre links
+        (owners and admins only: they open admin pages that a KAM's session cannot use)."""
+        if role is None:
+            return None
+        import stepup, team
+        return {"role": role, "team_role": team.role_of(team_row), "admin_links": role == "admin",
+                "stepup": stepup.active(user)}
+
+    def api_needs_approve(self):
+        """Approve a waiting sign-up from the "Needs you" queue. {id}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub, needs
+        role, a = hub.viewer(who[1])
+        if role is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        ok, msg = needs.approve(role, a, self.json_body().get("id"))
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
+
+    def api_stepup_send(self):
+        """Email the signed-in team member a fresh confirmation code."""
+        who = self._need_account()
+        if not who:
+            return
+        import hub, stepup
+        if hub.viewer(who[1])[0] is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        if self._throttled("stepup:%d" % who[1]["id"], 8, 3600):
+            return
+        ok, why = stepup.send(who[1], self.client_ip())
+        msg = {"wait": "A code was just sent. Wait a minute before asking again.",
+               "mail": "The email could not be sent. Try again in a minute."}.get(why, "")
+        return self.send_json(200 if ok else 429 if why == "wait" else 502,
+                              {"ok": ok, "reason": why, "message": msg, "to": who[1]["email"], "minutes": portal.OTP_MINUTES}, self.cors())
+
+    def api_stepup_verify(self):
+        """Check the code; a right one opens a 10-minute window. {code}"""
+        who = self._need_account()
+        if not who:
+            return
+        import hub, stepup
+        if hub.viewer(who[1])[0] is None:
+            return self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+        ok, why = stepup.verify(who[1], self.json_body().get("code"))
+        msg = {"invalid": "That code is not right.", "expired": "That code has expired. Send a new one.",
+               "locked": "Too many tries. Send a new code."}.get(why, "")
+        return self.send_json(200 if ok else 400, {"ok": ok, "reason": why, "message": msg, "seconds": stepup.active(who[1])}, self.cors())
 
     def api_hub_kam(self):
         """Set the account manager of a company, a person, a selection or a campaign (admins only). {kind, ref, kam}"""

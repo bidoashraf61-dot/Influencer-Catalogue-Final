@@ -116,6 +116,7 @@
   }
   function pending() { return DATA.analyses.filter(function (a) { return a.state === "requested"; }); }
   function countFor(key) {
+    if (key === "overview") return DATA.cc && NEEDS.data ? NEEDS.data.total || null : null;
     if (key === "selections") return DATA.selections.length || null;
     if (key === "analyses") return staffInbox() ? (AINBOX.data ? AINBOX.data.filter(function (x) { return x.state === "open"; }).length || null : null) : pending().length || null;
     if (key === "campaigns") return DATA.insights.live_campaigns || null;
@@ -146,16 +147,31 @@
                        "aria-disabled": lockd ? "true" : null, title: lockd ? "Coming soon: the ROI Calculator is being improved." : null },
                   icon(lockd ? "lock" : it[2]), it[1]);
       if (lockd) a.appendChild(h("span", { class: "n", style: "font-size:11px" }, "Soon"));
-      if (n != null) a.appendChild(h("span", { class: "n" + (it[0] === "notifications" ? " n--new" : it[0] === "credits" ? " n--credit" : ""), "data-count": it[0] }, String(n)));
+      if (n != null) a.appendChild(h("span", { class: "n" + (it[0] === "notifications" || it[0] === "overview" ? " n--new" : it[0] === "credits" ? " n--credit" : ""), "data-count": it[0] }, String(n)));
+      else if (it[0] === "overview" && DATA.cc) a.appendChild(h("span", { class: "n n--new", "data-count": "overview", hidden: "" }, ""));
       nav.appendChild(a);
     });
     side.appendChild(nav);
+    if (DATA.cc && DATA.cc.admin_links) side.appendChild(controlCentre());
     var out = h("button", { class: "hc-more", type: "button", onclick: signOut }, icon("out"), "Sign out");
     // The onboarding film (item 179) replaces the old 3-minute tour.
     var how = h("a", { class: "hc-more", href: ROOT + "welcome/" }, icon("help"), "How HELVi works");
     side.appendChild(h("div", { class: "hc-out" }, how, out));
     var cur = nav.querySelector('[aria-current="page"]');
     if (cur && window.matchMedia("(max-width: 1100px)").matches) cur.scrollIntoView({ block: "nearest", inline: "center" });
+  }
+  // Item 209: the system controls stay in the admin, one click from the profile (owners and admins).
+  var CC_LINKS = [["Creators", "users", "/roster"], ["Scoring rules", "target", "/reference"], ["Settings and keys", "gear", "/settings"],
+                  ["People and access", "key", "/team"], ["History and undo", "redo", "/history"]];
+  function controlCentre() {
+    var links = h("div", { class: "cc-cc__links" });
+    CC_LINKS.forEach(function (c) {
+      links.appendChild(h("a", { href: adminUrl(c[2]), target: "_blank", rel: "noopener" }, icon(c[1]), h("span", null, c[0]), icon("ext")));
+    });
+    return h("section", { class: "cc-cc", "aria-label": "Control Centre" },
+      h("a", { class: "cc-cc__open", href: adminUrl("/"), target: "_blank", rel: "noopener" }, icon("grid"),
+        h("span", null, h("b", null, "Control Centre"), h("small", null, "System controls open in the admin")), icon("ext")),
+      links);
   }
   function signOut() { (function () { try { sessionStorage.removeItem("hv-roster"); } catch (e) { /* blocked */ } })(), api("POST", "/api/auth/logout", {}).then(function (r) { if (r.b && r.b.admin_session) { try { sessionStorage.setItem("hv-admin-still", "1"); } catch (e) { /* blocked */ } } location.href = ROOT; }); }
 
@@ -324,7 +340,201 @@
         h("p", null, "A short film, start to finish: brief Helvi, shortlist creators, request a quote and follow every post."),
         h("a", { class: "hc-btn", href: href }, "Watch the film")));
   }
+  /* ------------------------------------- the team's Overview (item 209, slice a) */
+
+  // Admins and KAMs land on what is waiting for them; clients keep the Overview above.
+  var NEEDS = { data: null, busy: null, err: false, mine: false };
+  var NEED_IC = { signups: "users", overdue: "cal", quotes: "brief", analyses: "scan", access: "lock" };
+  function adminUrl(path) { return API + path; }
+  function loadNeeds() {
+    if (NEEDS.busy) return NEEDS.busy;
+    NEEDS.busy = api("GET", "/api/needs").then(function (r) {
+      NEEDS.busy = null;
+      if (r.s !== 200) { NEEDS.err = true; return; }
+      NEEDS.err = false; NEEDS.data = r.b;
+      var n = document.querySelector('[data-count="overview"]');
+      if (n) { n.textContent = String(r.b.total || ""); n.hidden = !r.b.total; }
+      if (SECTION === "overview") renderSection();
+    });
+    return NEEDS.busy;
+  }
+  function ageOf(ts) {
+    if (!ts) return "";
+    var s = Date.now() / 1000 - ts;
+    return s < 3600 ? Math.max(1, Math.floor(s / 60)) + "m" : s < 86400 ? Math.floor(s / 3600) + "h" : Math.floor(s / 86400) + "d";
+  }
+  function monogram(name) {
+    return h("span", { class: "cc-mono", "aria-hidden": "true" }, initials(name || "?"));
+  }
+  function teamGreet() {
+    var u = DATA.user, q = NEEDS.data, n = q ? q.total : null, first_g = q && q.groups[0];
+    var line = n == null ? "Checking what needs you…" : !n ? "Nothing is waiting on you right now." :
+      (n === 1 ? "1 thing needs you today." : n + " things need you today.");
+    var hi = h("h1", null, greeting() + ", ", h("span", null, first(u.name) || "there"),
+      h("small", { class: "hc-admintag" }, DATA.cc.team_role === "owner" ? "Owner" : DATA.cc.role === "kam" ? "Account manager" : "Administrator"));
+    var tail = first_g ? " Start with " + first_g.title.toLowerCase() + "." : "";
+    var go = first_g ? h("div", { class: "cc-greet__go" }, h("a", { class: "hc-btn", href: "#needs-" + first_g.key,
+      onclick: function (e) { var t = document.getElementById("needs-" + first_g.key); if (t) { e.preventDefault(); t.scrollIntoView({ behavior: "smooth", block: "start" }); } } },
+      "Start here ", icon("arrow"))) : null;
+    var img = h("img", { src: HV().helvy || ROOT + "assets/brand/helvy.webp?v=c2", alt: "", width: "84", height: "84" });
+    return h("section", { class: "cc-greet", "aria-label": "Today" }, img,
+      h("div", null, hi, h("p", null, h("b", null, line), tail)), go);
+  }
+  function needAction(g, it) {
+    if (g.key === "signups") {
+      var msg = h("span", { class: "cc-msg", role: "status" });
+      var b = h("button", { class: "hc-btn hc-btn--sm", type: "button" }, "Approve");
+      b.addEventListener("click", function () {
+        b.disabled = true; b.textContent = "Approving…";
+        api("POST", "/api/needs/approve", { id: it.id }).then(function (r) {
+          if (r.s === 200) { toast(0, r.b.message || "Approved."); NEEDS.data = null; loadNeeds(); }
+          else { b.disabled = false; b.textContent = "Approve"; msg.textContent = (r.b && r.b.message) || "Could not approve. Try again."; }
+        });
+      });
+      return h("div", { class: "cc-act" }, b, msg);
+    }
+    if (g.key === "overdue") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: ROOT + "campaign/#t=" + encodeURIComponent(it.token || "") }, "Open the campaign"));
+    if (g.key === "analyses") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: "#analyses" }, "Open the inbox"));
+    if (it.href && DATA.cc.admin_links) return h("div", { class: "cc-act" },
+      h("a", { class: "cc-admin", href: adminUrl(it.href), target: "_blank", rel: "noopener" }, "Answer in admin ", icon("ext")));
+    return h("div", { class: "cc-act" }, h("span", { class: "ac-muted" }, "An admin answers this"));
+  }
+  function needsQueue() {
+    var q = NEEDS.data;
+    var sec = h("section", { "aria-labelledby": "q-h" });
+    var seg = h("div", { class: "cc-seg", role: "group", "aria-label": "Whose items" });
+    var hd = h("div", { class: "cc-qhead" }, h("div", null, h("h2", { class: "hc-h2", id: "q-h" }, "Needs you"),
+      h("p", null, DATA.cc.role === "kam" ? "Your clients only. Oldest first inside each group." : "Every client. Oldest first inside each group.")));
+    add(sec, hd);
+    if (!q) {
+      add(sec, NEEDS.err ? h("div", { class: "hc-empty" }, h("b", null, "The queue did not load."),
+        h("p", null, h("button", { class: "hc-more", type: "button", onclick: function () { NEEDS.err = false; loadNeeds(); renderSection(); } }, "Try again")))
+        : h("div", { class: "cc-q cc-q--loading", "aria-busy": "true" }, h("div", { class: "cc-skel" }), h("div", { class: "cc-skel" }), h("div", { class: "cc-skel" })));
+      return sec;
+    }
+    if (!q.groups.length) {
+      add(sec, h("div", { class: "hc-empty" }, h("b", null, "All clear."),
+        h("p", null, "New sign-ups, overdue next steps, unanswered quotes and analysis requests land here as they come in.")));
+      return sec;
+    }
+    var box = h("div", { class: "cc-q" });
+    q.groups.forEach(function (g) {
+      var ic = h("span", { class: "cc-q__ic" + (g.key === "signups" ? " cc-q__ic--hot" : g.key === "overdue" ? " cc-q__ic--red" : "") }, icon(NEED_IC[g.key] || "bell"));
+      var rows = h("ul", { class: "cc-q__rows" });
+      g.items.forEach(function (it) {
+        var late = it.at && (Date.now() / 1000 - it.at) > (g.key === "overdue" ? 0 : 86400);
+        rows.appendChild(h("li", null, monogram(it.company || it.title),
+          h("div", { class: "cc-q__what" }, h("b", null, it.title), h("small", null, it.sub || "")),
+          h("span", { class: "cc-age" + (late ? " cc-age--late" : ""), title: g.key === "overdue" ? "Days late" : "Waiting" }, icon("clock"), ageOf(it.at)),
+          needAction(g, it)));
+      });
+      var more = g.count > g.items.length ? h("p", { class: "cc-q__more ac-muted" }, (g.count - g.items.length) + " more in this group") : null;
+      box.appendChild(h("div", { class: "cc-q__grp", id: "needs-" + g.key },
+        h("div", { class: "cc-q__hd" }, ic, h("div", null, h("h3", null, g.title), h("small", null, g.hint)), h("span", { class: "cc-q__n" }, String(g.count))),
+        rows, more));
+    });
+    add(sec, box);
+    return sec;
+  }
+  function teamStrip() {
+    var k = NEEDS.data && NEEDS.data.kpis;
+    if (!k) return null;
+    function cell(term, fig, sub, link) {
+      return h("div", null, h("dt", null, term), h("dd", { class: "hc-score__fig" }, fig), h("dd", { class: "hc-score__sub" }, sub),
+        h("dd", { class: "hc-score__go" }, link));
+    }
+    var adminLink = DATA.cc.admin_links ? h("a", { class: "cc-admin", href: adminUrl("/portal"), target: "_blank", rel: "noopener" }, "Usage in admin ", icon("ext")) : null;
+    return h("section", { "aria-labelledby": "k-h" },
+      h("div", { class: "hc-sechd" }, h("h2", { class: "hc-h2", id: "k-h" }, "This month"), DATA.hub ? h("a", { class: "hc-more", href: "#companies" }, "All companies") : null),
+      h("dl", { class: "hc-score hc-score--4" },
+        cell("Live campaigns", String(k.live), "Running now", h("a", { class: "hc-more", href: ROOT + "campaign/" }, "Open the board")),
+        cell("Open quotes", String(k.quotes), k.quotes ? "Waiting for an answer" : "None waiting", DATA.cc.admin_links ? h("a", { class: "cc-admin", href: adminUrl("/requests"), target: "_blank", rel: "noopener" }, "Quotes in admin ", icon("ext")) : null),
+        cell("Companies", String(k.companies), k.waiting ? [h("b", null, String(k.waiting)), " sign-ups waiting"] : "No sign-ups waiting", h("a", { class: "hc-more", href: "#companies" }, "Open the list")),
+        cell("Client credits used", String(k.credits_used), "Last 30 days · " + plural(k.credit_people, "client"), adminLink)));
+  }
+  function renderTeamOverview(p) {
+    if (!NEEDS.data && !NEEDS.err) loadNeeds();
+    add(p, teamGreet());
+    add(p, needsQueue());
+    add(p, teamStrip());
+    add(p, latest());
+  }
+
+  /* Step-up (item 209): a fresh emailed code before a sensitive change (suspend, credits, a large push).
+     hvStepUp({title, what, sub, ok}) resolves true once the code is right (or the 10-minute window is
+     still open), false when the person cancels. Used by the account controls (slice b). */
+  function stepUp(o) {
+    o = o || {};
+    if (DATA.cc && DATA.cc.stepup > 0 && DATA.cc.stepup_at && (Date.now() - DATA.cc.stepup_at) / 1000 < DATA.cc.stepup) return Promise.resolve(true);
+    return new Promise(function (resolve) {
+      var dlg = h("dialog", { class: "cc-dlg", "aria-labelledby": "su-h" });
+      var boxes = [], msg = h("p", { class: "cc-dlg__err", role: "alert" }), timer = h("span", null, "");
+      var okBtn = h("button", { class: "hc-btn " + (o.danger ? "hc-btn--danger" : ""), type: "button", disabled: "" }, o.ok || "Confirm");
+      var cancel = h("button", { class: "hc-btn hc-btn--line", type: "button" }, "Cancel");
+      var resend = h("button", { type: "button" }, "Send a new code");
+      var codeRow = h("div", { class: "cc-code", role: "group", "aria-label": "6-digit code" });
+      for (var i = 0; i < 6; i++) {
+        var inp = h("input", { inputmode: "numeric", autocomplete: i === 0 ? "one-time-code" : "off", maxlength: "6", "aria-label": "Digit " + (i + 1) });
+        boxes.push(inp); codeRow.appendChild(inp);
+      }
+      function code() { return boxes.map(function (b) { return b.value; }).join(""); }
+      boxes.forEach(function (b, i) {
+        b.addEventListener("input", function () {
+          var v = b.value.replace(/\D/g, "");
+          if (v.length > 1) { v.split("").slice(0, 6 - i).forEach(function (d, j) { boxes[i + j].value = d; }); }   // a pasted code fills the row
+          else b.value = v;
+          var nx = boxes[Math.min(5, i + Math.max(1, v.length))];
+          if (v && nx) nx.focus();
+          okBtn.disabled = code().length !== 6;
+        });
+        b.addEventListener("keydown", function (e) { if (e.key === "Backspace" && !b.value && boxes[i - 1]) boxes[i - 1].focus(); });
+      });
+      var left = 0, tick = null;
+      function startClock(min) {
+        left = (min || 10) * 60; clearInterval(tick);
+        tick = setInterval(function () {
+          left -= 1;
+          timer.textContent = left > 0 ? "Code works for " + Math.floor(left / 60) + ":" + ("0" + (left % 60)).slice(-2) : "This code has expired";
+          if (left <= 0) clearInterval(tick);
+        }, 1000);
+      }
+      function send() {
+        msg.textContent = ""; resend.disabled = true;
+        api("POST", "/api/stepup/send", {}).then(function (r) {
+          resend.disabled = false;
+          if (r.s === 200) { to.textContent = r.b.to; startClock(r.b.minutes); boxes[0].focus(); }
+          else msg.textContent = (r.b && r.b.message) || "The code could not be sent. Try again.";
+        });
+      }
+      function close(v) { clearInterval(tick); dlg.close(); dlg.remove(); resolve(v); }
+      okBtn.addEventListener("click", function () {
+        okBtn.disabled = true; msg.textContent = "";
+        api("POST", "/api/stepup/verify", { code: code() }).then(function (r) {
+          if (r.s === 200) { DATA.cc.stepup = r.b.seconds; DATA.cc.stepup_at = Date.now(); close(true); }
+          else { okBtn.disabled = false; msg.textContent = (r.b && r.b.message) || "That code is not right."; boxes.forEach(function (b) { b.value = ""; }); boxes[0].focus(); okBtn.disabled = true; }
+        });
+      });
+      cancel.addEventListener("click", function () { close(false); });
+      resend.addEventListener("click", send);
+      dlg.addEventListener("cancel", function (e) { e.preventDefault(); close(false); });
+      var to = h("b", null, DATA.user.email);
+      dlg.appendChild(h("div", { class: "cc-dlg__in" },
+        h("span", { class: "cc-dlg__ic" }, icon("shield")),
+        h("h2", { id: "su-h" }, o.title || "Confirm it's you"),
+        h("p", null, (o.why ? o.why + " " : "") + "We emailed a 6-digit code to ", to, "."),
+        o.what ? h("div", { class: "cc-what" }, h("div", null, h("b", null, o.what), o.sub ? h("small", null, o.sub) : null)) : null,
+        codeRow, h("div", { class: "cc-codemeta" }, timer, resend), msg,
+        h("div", { class: "cc-dlg__act" }, cancel, okBtn),
+        h("p", { class: "cc-dlg__fine" }, icon("redo"), "Saved in History with undo. One code covers 10 minutes of changes.")));
+      document.body.appendChild(dlg);
+      dlg.showModal();
+      send();
+    });
+  }
+  window.hvStepUp = function (o) { return DATA && DATA.cc ? stepUp(o) : Promise.resolve(false); };
+
   function renderOverview(p) {
+    if (DATA.cc) { renderTeamOverview(p); return; }
     add(p, greet());
     add(p, scoreline());
     add(p, h("div", { class: "hc-cols" }, latest(), finish()));
@@ -1787,6 +1997,7 @@
       if (r.s === 403) { closed("Profiles are for signed-in clients", "You have guest access. Sign in with your work email for your own profile; your campaigns are in campaign tracking."); return; }
       if (!r.b.ok) { closed("Something went wrong", "Your profile couldn't be loaded. Please try again shortly."); return; }
       DATA = r.b;
+      if (DATA.cc) DATA.cc.stepup_at = Date.now();      // the step-up window is counted from this answer
       $("ac-loading").hidden = true;
       $("hc-acc").hidden = false;
       // The bell and this page stay in step.
@@ -1801,6 +2012,7 @@
       route(false);
       if (DATA.is_kam) loadClients();          // the side nav's count, and the page if it is open
       if (staffInbox()) loadInbox();           // the Analyses count: requests waiting for HelloVoice (item 195)
+      if (DATA.cc) loadNeeds();                // the Overview count: what is waiting on the team (item 209)
     });
   }
 

@@ -4655,7 +4655,7 @@ SCROLL_JS = """<script>
 
 
 HISTORY_KINDS = [("", "Everything"), ("trash", "Trash (deleted)"), ("creator", "Creators"),
-                 ("campaign", "Campaigns"), ("selection", "Selections"), ("code", "Access codes"),
+                 ("campaign", "Campaigns"), ("selection", "Selections"), ("code", "Access codes"), ("user", "Client accounts"),
                  ("tiers", "Tiers"), ("roster", "Roster imports")]
 
 

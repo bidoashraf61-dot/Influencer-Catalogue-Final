@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS history (
   at         INTEGER NOT NULL,
   who        TEXT,
   action     TEXT NOT NULL,        -- created | edited | deleted | imported | undo
-  entity     TEXT NOT NULL,        -- creator | selection | campaign | code | tiers | roster
+  entity     TEXT NOT NULL,        -- creator | selection | campaign | code | user | tiers | roster
   key        TEXT,
   label      TEXT,
   before     TEXT,                 -- JSON snapshot, NULL = did not exist
@@ -125,6 +125,15 @@ def snapshot(entity, key, conn=None):
         if ids:
             out["snapshots"] = _rows(conn, "snapshots", "content_id IN (%s)" % ",".join("?" * len(ids)), ids)
         return out
+    if entity == "user":
+        # A portal account (item 209): its row, plus whether its personal code is revoked (status changes
+        # revoke or lift it). The code row itself is not laid back: codes own selections and campaigns.
+        rows = _rows(conn, "users", "id = ?", (int(key),))
+        if not rows:
+            return None
+        c = rows[0].get("code_id")
+        rev = conn.execute("SELECT id, revoked_at FROM codes WHERE id = ?", (c,)).fetchone() if c is not None else None
+        return {"users": rows, "_code_revoked": [{"id": rev["id"], "revoked_at": rev["revoked_at"]}] if rev else []}
     if entity == "tiers":
         return {"tiers": _rows(conn, "tiers", "1", ()), "creators": _rows(conn, "creators", "1", ())}
     if entity == "roster":
@@ -145,6 +154,8 @@ def _clear(conn, entity, key):
         conn.execute("DELETE FROM codes WHERE id = ?", (int(key),))
     elif entity == "campaign":
         conn.execute("DELETE FROM campaigns WHERE id = ?", (int(key),))   # cascades
+    elif entity == "user":
+        pass                                     # users rows are replaced in place; nothing hangs off them
     elif entity == "tiers":
         conn.execute("DELETE FROM tiers")
         conn.execute("DELETE FROM creators")
@@ -164,6 +175,10 @@ def _lay(conn, snap):
     db.clear_setting_cache()                 # a restored settings row must be read afresh
     tables = sorted(snap, key=lambda t: _ORDER.index(t) if t in _ORDER else len(_ORDER))
     for t in tables:
+        if t == "_code_revoked":                 # the "user" entity: only the revocation stamp goes back
+            for row in snap[t]:
+                conn.execute("UPDATE codes SET revoked_at = ? WHERE id = ?", (row["revoked_at"], row["id"]))
+            continue
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(%s)" % t)}
         for row in snap[t]:
             keep = [c for c in row if c in cols]

@@ -67,6 +67,11 @@
     help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2.1-2.4 3.6M12 17v.2"/>',
     minus: '<path d="M5 12h14"/>', chat: '<path d="M4.5 5.5h15v10.5h-8.2l-4.3 3.5V16h-2.5z"/><path d="M8.5 10.8h.01M12 10.8h.01M15.5 10.8h.01"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/>',
     filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
+    // Control Centre (item 209)
+    ext: '<path d="M13.5 4.5h6v6M19.5 4.5L11 13"/><path d="M17 14v5.5H4.5V7H10"/>',
+    grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M6 18l1.6-1.6M16.4 7.6L18 6"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l8.5-8.5M16.5 6.5l2 2M14 9l2 2"/>',
     // HELVi Connect phase E
     upload: '<path d="M12 15.5V4.5M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v4.5h15V15"/>',
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M7.5 14h3v3h-3z"/>',
