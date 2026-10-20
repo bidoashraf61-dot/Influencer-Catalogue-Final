@@ -1339,13 +1339,22 @@
 
   var SW = { met: ["good", "Met"], close: ["moderate", "Close"], behind: ["low", "Behind"], ontrack: ["good", "On track"] };
   function platChip(p) { return '<span class="db-pc">' + (ICONS[p.platform] || "") + "<b>" + num(p.followers) + "</b></span>"; }
+  // Item 217: a creator's results count on every platform they posted on; the line under the result says where.
+  function bySplit(c) {
+    var sp = c.by_platform || [];
+    if (!sp.length || (sp.length === 1 && sp[0].booked)) return "";
+    return '<span class="db-cb__split">' + sp.map(function (p) {
+      return '<span class="db-cb__sp' + (p.booked ? "" : " is-bonus") + '" title="' + esc(p.platform + ": " + num(p.views) + " views, " + num(p.engagement) + " engagement, " + p.videos + (p.videos === 1 ? " video" : " videos") + (p.booked ? "" : " (not booked here, still counted)")) + '">'
+        + (ICONS[p.platform] || "") + "<b>" + num(p.views) + "</b>" + (p.booked ? "" : "<i>+</i>") + "</span>";
+    }).join("") + "</span>";
+  }
   // One row per creator: their size, what creators like them typically get per video, and what they got.
   function creatorBench() {
     var g = GL(); if (!g || !g.creators.length) return "";
     var rows = g.creators.map(function (c) {
       var soon = !c.live, st = c.status && SW[c.status], when = c.next && c.next.at ? day(c.next.at) : "";
       var res = soon ? '<span class="db-cb__soon">Coming soon · ' + (when ? esc(when) : "date to be confirmed") + "</span>"
-        : '<strong>' + num(c.views_per_video) + "</strong><small>views per video</small>";
+        : '<strong>' + num(c.views_per_video) + "</strong><small>views per video" + (bySplit(c) ? ", all platforms" : "") + "</small>" + bySplit(c);
       var link = who({ code: c.code, name: c.name });
       return '<div class="db-cb__row' + (soon ? " is-soon" : "") + '"><div class="db-cb__who">' + ava(c.photo) + "<span><b>" + link + "</b><small>" + (c.live || 0) + " of " + (c.planned || "?") + ((c.planned || 0) === 1 ? " video live" : " videos live") + "</small></span></div>"
         + '<div class="db-cb__size"><span class="db-cb__lbl">Followers</span><span class="db-cb__chips">' + c.platforms.map(platChip).join("") + "</span><small>" + esc(c.size) + "</small></div>"

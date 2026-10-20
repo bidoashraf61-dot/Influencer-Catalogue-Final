@@ -421,7 +421,9 @@
       body: "It leaves your profile and its link stops opening, for you and your colleagues. Your approvals and notes on it go too. HelloVoice keeps a copy for your account manager.",
       run: function () {
         return api("POST", "/api/selection/delete", { token: s.token }).then(function (r) {
-          if (!r.b.ok) return r.s === 403 ? "Only selections you made can be deleted." : "Couldn't delete it. Please try again.";
+          if (!r.b.ok) return r.s === 403 ? "Only selections you made can be deleted."
+            : r.b.reason === "in_campaign" ? "The campaign " + (r.b.campaigns || []).map(function (n) { return "“" + n + "”"; }).join(", ") + " uses this selection, so it stays. Ask your account manager to take it out of the campaign first."
+            : "Couldn't delete it. Please try again.";
           DATA.selections = DATA.selections.filter(function (x) { return x.token !== s.token; });
           DATA.briefs.forEach(function (b) { if (b.selection === s.token) { b.selection = null; b.selection_name = null; } });
           afterDelete("Selection deleted.");

@@ -999,6 +999,9 @@ def ingest_posts(run, job, items, hmap, store_raw=True):
                 if row is not None and not row["caption"] and cap:
                     _sec, disc = db.match_rules(db.rules_of(row), cap)
                     conn.execute("UPDATE content SET caption = ?, disclosure_ok = ? WHERE id = ?", (cap, disc, int(cid)))
+                # Item 216: a post on a platform the creator has no profile for adds that profile (History, undoable).
+                import postprofiles
+                postprofiles.learn(conn, int(cid), job["platform"], it)
             if vals:
                 db.add_snapshot(int(cid), vals, "apify", conn)
                 saved += 1

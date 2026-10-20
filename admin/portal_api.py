@@ -888,6 +888,13 @@ class PortalMixin(connect_api.ConnectMixin):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         if not self._may_delete_selection(sel, cid):
             return self.send_json(403, {"ok": False, "reason": "not_yours"}, self.cors())
+        # Item 215 (2026-10-21): a selection a campaign holds stays, as in the admin; deleting it left the
+        # Ivatherm campaign showing "No selection yet" while its creators and posts carried on.
+        import board
+        held = board.campaigns_holding(sel["id"])
+        if held and not sel["deleted_at"]:
+            names = [k["name"] for k in (db.campaign(i) for i in held) if k is not None]
+            return self.send_json(409, {"ok": False, "reason": "in_campaign", "campaigns": names}, self.cors())
         if not sel["deleted_at"]:
             db.client_delete_selection(sel["id"], cid)
             db.log("selection_deleted", cid, self.client_ip(), self._ua(), sel["name"][:80])
