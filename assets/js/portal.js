@@ -854,7 +854,7 @@
       item("Account", { href: ACC + "#account" });
       rule();
       item("Help", { go: function () { if (HV.talk) HV.talk(); else location.href = ACC + "#overview"; } });
-      item("Take the tour", { go: function () { if (HV.tour) HV.tour(true); } });
+      item("How HELVi works", { href: ROOT + "welcome/" });
     } else if (ME.kind === "admin") {
       rule();
       item("Preview as client", { go: openAccount });
@@ -1004,7 +1004,7 @@
     if (QUESTIONS) return Promise.resolve(QUESTIONS);
     return api("GET", "/api/brief/questions").then(function (r) {
       QUESTIONS = localise(r.b.questions || []);
-      POWER = r.b.powerups && r.b.powerups.cards ? r.b.powerups : null;     // item 172; the tour's demo has none
+      POWER = r.b.powerups && r.b.powerups.cards ? r.b.powerups : null;     // item 172
       return QUESTIONS;
     });
   }
@@ -1561,7 +1561,7 @@
     var selName = S && S.name ? S.name() : "this selection";
     var nIn = S && S.codes ? S.codes().length : 0;
     loadQuestions().then(function (all) {
-      // Gender and age are power-ups now (item 172); the tour's demo, which has none, keeps them here.
+      // Gender and age are power-ups now (item 172); without power-ups they stay here.
       // Budget left the brief for the creator mix (item 172, D5); scoring a selection needs neither.
       var qs = all.filter(function (q) { return q.required || (!POWER && (q.id === "gender" || q.id === "age" || q.id === "budget")) || q.id === "count"; });
       var core = {}; all.forEach(function (q) { core[q.id] = q; });
@@ -2186,8 +2186,7 @@
     var page = document.body.getAttribute("data-page");
     if (!VOICE_PAGES[page] || $("hv-voice")) return;
     // Inside the profile-analysis side panel (an iframe of the creator page) the page around it already has the assistant.
-    // The onboarding tour plays this page in a demo frame (tour.js): there the chat runs, on demo answers.
-    if ((window.self !== window.top && !window.hvDemo) || /[?&]embed=1\b/.test(location.search)) return;
+    if (window.self !== window.top || /[?&]embed=1\b/.test(location.search)) return;
     var first = ME && ME.user ? ME.user.name.split(" ")[0] : "";
     // One conversation per access (signed-in client or access code), carried across pages for a week.
     var STORE = "hv-chat:" + ((ME && ME.chat_key) || (ME && ME.user ? ME.user.email : ME && ME.kind) || "guest");
@@ -3245,23 +3244,6 @@
     minBtn.addEventListener("click", function () { toggle(false); });
     // The account page's "Message your account manager" opens straight onto the hand-off.
     HV.talk = function () { toggle(true); setTimeout(flowHuman, 400); };
-    // Tour demo only: Helvi is briefed on screen, letter by letter, then answers from the demo world.
-    if (window.hvDemo) {
-      HV.voiceDemo = function (text, fresh) {
-        var wasOpen = root.classList.contains("is-open");
-        toggle(true);
-        if (fresh) { log.innerHTML = ""; msgs = []; queue = Promise.resolve(); }
-        var i = 0;
-        (function type() {
-          if (busy) { setTimeout(type, 200); return; }
-          if (i === 0 && fresh && !wasOpen) { i = -1; setTimeout(type, reduce ? 0 : 1300); return; }
-          if (i < 0) i = 0;
-          if (i <= text.length) { ta.value = text.slice(0, i); grow(); i += 1; setTimeout(type, reduce ? 0 : 26); return; }
-          setTimeout(function () { submit(); ta.blur(); }, reduce ? 0 : 260);
-        })();
-      };
-      HV.voiceClose = function () { if (root.classList.contains("is-open")) toggle(false); };
-    }
     freshBtn.addEventListener("click", function () {
       msgs = []; thread = null; save(); expecting = null; ta.placeholder = "Type a message…"; ta.value = ""; grow();
       picked = []; drawPicks(); log.innerHTML = ""; queue = Promise.resolve(); greet();
@@ -3813,19 +3795,6 @@
     host.appendChild(card);
 
     var qs = null, byId = {}, answers = {}, step = 0, busy = false, last = null, srcRes = null;
-    // Tour demo only: skip the six taps and go straight to the director's desk.
-    // opts.ask = n opens the card on question n with the answers already ticked (tour v3 shows the
-    // multi-goal and multi-country questions); without it the card goes straight to the build.
-    if (window.hvDemo) HV.aiDemo = function (ans, name, opts) {
-      answers = ans || {}; card.classList.add("is-open"); intro.hidden = true; run.hidden = false; run.classList.remove("is-staging");
-      if (opts && opts.ask != null) {
-        shown = 0;
-        loadQuestions().then(function (list) { qs = list; byId = {}; qs.forEach(function (q) { byId[q.id] = q; }); ask(opts.ask); });
-        return;
-      }
-      go(name);
-    };
-
     /* -- the game layer: coach animations and campaign power -- */
     // The coach: idle poses loop; reactions (thumbs, cheer, point) play once, in full, then hand
     // over to whatever is waiting, so a tap is always answered before the next pose.

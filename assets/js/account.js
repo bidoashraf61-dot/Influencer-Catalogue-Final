@@ -151,9 +151,9 @@
     });
     side.appendChild(nav);
     var out = h("button", { class: "hc-more", type: "button", onclick: signOut }, icon("out"), "Sign out");
-    // The 3-minute tour, replayable any time (HELVi Connect phase C).
-    var tourB = h("button", { class: "hc-more", type: "button", onclick: function () { if (HV().tour) HV().tour(); } }, icon("help"), "Take the tour");
-    side.appendChild(h("div", { class: "hc-out" }, tourB, out));
+    // The onboarding film (item 179) replaces the old 3-minute tour.
+    var how = h("a", { class: "hc-more", href: ROOT + "welcome/" }, icon("help"), "How HELVi works");
+    side.appendChild(h("div", { class: "hc-out" }, how, out));
     var cur = nav.querySelector('[aria-current="page"]');
     if (cur && window.matchMedia("(max-width: 1100px)").matches) cur.scrollIntoView({ block: "nearest", inline: "center" });
   }
@@ -310,10 +310,25 @@
         h("p", { class: "hc-invite__fine" }, "Same company email domain · up to " + inv.max + " paid invites" + (inv.paid ? " · " + inv.left + " left" : ""))),
       h("div", { class: "hc-invite__act" }, h("span", { class: "hc-invite__big", "aria-hidden": "true" }, "+" + inv.credits), btn));
   }
+  // "How HELVi works" (item 179): the onboarding film's poster, one line, a way in. The film
+  // itself plays on /welcome/, which loads it only when asked.
+  var PLAY = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>';
+  function howBand() {
+    var href = ROOT + "welcome/";
+    return h("section", { class: "hc-how", "aria-labelledby": "hc-how-t" },
+      h("a", { class: "hc-how__film", href: href, tabindex: "-1", "aria-hidden": "true" },
+        h("img", { src: ROOT + "assets/welcome/onboarding-poster.jpg", alt: "", loading: "lazy", decoding: "async", width: "640", height: "360" }),
+        h("span", { class: "hc-how__play", html: PLAY })),
+      h("div", { class: "hc-how__txt" },
+        h("h2", { class: "hc-h2", id: "hc-how-t" }, "How HELVi works"),
+        h("p", null, "A short film, start to finish: brief Helvi, shortlist creators, check the analysis, request a quote and follow every post."),
+        h("a", { class: "hc-btn", href: href }, "Watch the film")));
+  }
   function renderOverview(p) {
     add(p, greet());
     add(p, scoreline());
     add(p, h("div", { class: "hc-cols" }, latest(), finish()));
+    add(p, howBand());
     if (DATA.invite.left > 0) add(p, inviteBand());
   }
 

@@ -1,4 +1,4 @@
-/* HELVi Connect, phases C + D: sign-in scene, onboarding tour, ROI Calculator,
+/* HELVi Connect, phases C + D: sign-in scene, ROI Calculator,
    AI on selections and Helvi's states. Built from the approved mockups in
    .impeccable/mockups/portal-v3-cd/ (cd.css) on top of the catalogue world:
    ink / lime / linen, Bebas for names, numbers and actions, DM Sans for
@@ -40,14 +40,14 @@
 .cx-btn--ghost { background: transparent; color: var(--white); border-color: rgba(255,255,255,.35); }
 .cx-btn--ghost:hover { color: var(--lime); border-color: var(--lime); background: transparent; }
 .cx-btn[disabled] { cursor: not-allowed; background: var(--cx-stone); color: #6b6b6b; border-color: var(--cx-stone); }
-/* The credit cost, one look everywhere (selection, chat, tour, AI cards): vivid orange with ink
+/* The credit cost, one look everywhere (selection, chat, AI cards): vivid orange with ink
    text and a coin, so it reads on lime buttons, on ink cards and on white (ink on orange 6:1). */
 .hv-cost, .cx-btn .cx-cost, .cx-tag--cost { display: inline-flex; align-items: center; gap: 4px; flex: none; font-family: var(--body); font-size: 12px; font-weight: 800; letter-spacing: .01em;
   line-height: 1.2; text-transform: none; white-space: nowrap; padding: 4px 9px 4px 6px; border-radius: 999px; background: var(--vivid-orange, #ff691e); color: var(--ink);
   box-shadow: inset 0 0 0 1px rgba(18,18,18,.18); }
 .hv-cost .hv-i, .cx-tag--cost .hv-i, .cx-cost .hv-i { width: 14px; height: 14px; stroke-width: 2.2; }
 .hv-cost--free { background: var(--go-soft); color: #0e6b39; padding-left: 9px; }
-/* Credit tokens, shared by every credit number (account, tour, menu, AI cards): the chip's
+/* Credit tokens, shared by every credit number (account, menu, AI cards): the chip's
    orange with ink text (6.9:1); on ink, the chip as it is or --hv-credit-on-ink text (9:1);
    --hv-credit-soft + --hv-credit-deep for a quiet "already earned" (7:1). */
 :root { --hv-credit: #ff691e; --hv-credit-text: #121212; --hv-credit-on-ink: #ff9a5c; --hv-credit-soft: #ffe4d3; --hv-credit-deep: #8a3a08;
@@ -62,7 +62,7 @@
 .cx-x { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(18,18,18,.15); background: var(--white); display: grid; place-items: center; cursor: pointer; color: var(--ink); flex: none; }
 .cx-x:hover { background: var(--ink); color: var(--lime); }
 .cx-label { font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--cx-mute); }
-:where(.cx-scene, .cx-dr, .cx-sheet, .cx-offer, .cx-more) :focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+:where(.cx-scene, .cx-dr, .cx-sheet, .cx-more) :focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
 
 /* signals (the report's grades: good / moderate / low) */
 .cx-sig { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; padding: 4px 11px 4px 9px; border-radius: 999px; white-space: nowrap; line-height: 1.3; }
@@ -181,46 +181,6 @@
 .cx-codeform .cat-gate__input { flex: 1; min-width: 180px; min-height: 54px; border-radius: 999px; border: 1.5px solid rgba(18,18,18,.22); padding: 0 22px; font: inherit; font-size: 16px; color: var(--ink); background: var(--white); }
 .cx-codeform .cat-gate__error { color: var(--cx-red-text); font-size: 13.5px; font-weight: 600; margin: 10px 0 0; }
 
-
-/* ================================================================== TOUR */
-/* The opener: "Take the 3-minute tour?" with the four chapters (each one jumps straight to it).
-   The tour itself is styled by tour.css, fetched when it starts. */
-.cx-offer-scrim { position: fixed; inset: 0; z-index: 389; background: rgba(18,18,18,.56); animation: cx-fade .3s ease both; }
-.cx-offer { position: fixed; z-index: 390; left: 50%; top: 50%; width: 520px; max-width: calc(100vw - 24px); box-sizing: border-box; transform: translate(-50%, -44%);
-  background: var(--ink); color: var(--white); border-radius: 28px; padding: 34px 32px 24px; font-family: var(--body); text-align: left;
-  box-shadow: 0 40px 90px rgba(0,0,0,.42); animation: cx-offer-in .5s var(--cx-ease) both; }
-.cx-offer.is-out, .cx-offer-scrim.is-out { opacity: 0; transition: opacity .18s ease; }
-@keyframes cx-fade { from { opacity: 0; } }
-@keyframes cx-offer-in { from { opacity: 0; transform: translate(-50%, -38%) scale(.97); } to { opacity: 1; transform: translate(-50%, -44%); } }
-@keyframes cx-offer-up { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
-/* Helvi stands on the card's top edge, his waist cut on the edge */
-.cx-offer__helvy { position: absolute; right: 26px; bottom: calc(100% - 2px); pointer-events: none; }
-.cx-offer__helvy .cx-hd { width: 150px; height: 150px; }
-.cx-offer h2 { margin: 0; padding-right: 120px; font-family: var(--heading); font-weight: 400; font-size: 46px; line-height: .92; letter-spacing: .01em; color: var(--lime); text-transform: none; text-wrap: balance; }
-.cx-offer__lead { margin: 10px 0 0; font-size: 15px; line-height: 1.5; color: rgba(255,255,255,.82); max-width: 40ch; }
-.cx-offer__chaps { list-style: none; margin: 20px 0 0; padding: 0; border-top: 1px solid rgba(255,255,255,.12); }
-.cx-offer__chaps li { border-bottom: 1px solid rgba(255,255,255,.12); }
-.cx-offer__chap { width: 100%; display: grid; grid-template-columns: 40px minmax(0, 1fr) 20px; gap: 14px; align-items: center; padding: 11px 6px 11px 2px; min-height: 64px;
-  border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; border-radius: 14px; transition: background .2s ease; }
-.cx-offer__chap:hover { background: rgba(255,255,255,.06); }
-.cx-offer__ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: rgba(232,255,118,.12); color: var(--lime); }
-.cx-offer__ic .cx-i { width: 21px; height: 21px; }
-.cx-offer__chap b { display: block; font-size: 16px; font-weight: 700; line-height: 1.25; color: var(--white); }
-.cx-offer__chap small { display: block; margin-top: 2px; font-size: 13.5px; line-height: 1.35; color: rgba(255,255,255,.7); }
-.cx-offer__go-i { width: 18px !important; height: 18px !important; color: var(--lime); opacity: 0; transform: translateX(-6px); transition: opacity .2s ease, transform .2s var(--cx-ease); }
-.cx-offer__chap:hover .cx-offer__go-i, .cx-offer__chap:focus-visible .cx-offer__go-i { opacity: 1; transform: none; }
-/* seven chapters on a short screen (a laptop at 768, a small phone): names only, so the card always fits */
-@media (max-height: 820px) {
-  .cx-offer__chaps { margin-top: 14px; }
-  .cx-offer__chap { min-height: 48px; padding-top: 6px; padding-bottom: 6px; }
-  .cx-offer__chap small { display: none; }
-}
-.cx-offer__go { display: flex; gap: 10px; align-items: center; margin-top: 20px; flex-wrap: wrap; }
-.cx-offer__go .cx-btn:first-child { flex: 1 1 220px; }
-.cx-btn .cx-cost--prize { background: var(--hv-credit, #ff691e); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(18,18,18,.18); padding: 4px 10px; }
-.cx-btn:hover .cx-cost--prize { background: var(--hv-credit, #ff691e); color: var(--ink); }
-.cx-nowrap { white-space: nowrap; }
-.cx-offer__fine { margin: 12px 0 0; font-size: 12.5px; color: rgba(255,255,255,.62); }
 
 /* ============================================================== ROI (D) */
 .cx-dr { position: fixed; z-index: 300; top: 0; right: 0; bottom: 0; width: min(1040px, 94vw); background: var(--white); display: flex; flex-direction: column;
@@ -515,17 +475,6 @@
   .cx-logos__track img { height: calc(var(--h, 22px) * .8); }
   .cx-scene__foot .cx-wrap { justify-content: center; text-align: center; }
 
-  .cx-offer { left: 10px; right: 10px; top: auto; bottom: 10px; width: auto; max-width: none; transform: none; padding: 26px 18px 16px; border-radius: 24px;
-    animation-name: cx-offer-up; }
-  .cx-offer__helvy { right: 14px; }
-  .cx-offer__helvy .cx-hd { width: 112px; height: 112px; }
-  .cx-offer h2 { font-size: 36px; padding-right: 92px; }
-  .cx-offer__chap { min-height: 56px; padding: 9px 4px 9px 0; gap: 12px; }
-  .cx-offer__go { flex-wrap: nowrap; }
-  .cx-offer__go .cx-btn { min-height: 46px; }
-  .cx-offer__go .cx-btn:first-child { flex: 1 1 auto; min-width: 0; padding: 0 16px; }
-  .cx-offer__go .cx-btn--ghost { padding: 0 18px; }
-
   .cx-dr { width: 100vw; }
   .cx-dr__body { padding: 16px 16px 24px; }
   .cx-dr__ft { padding: 12px 14px; }
@@ -552,7 +501,7 @@
   .cx-sheet__ft .cx-btn { margin-left: 0; width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cx-wall::before, .cx-think__now, .cx-door__helvy, .cx-door__say, .cx-offer, .cx-offer-scrim, .cx-dr, .cx-sheet,
+  .cx-wall::before, .cx-think__now, .cx-door__helvy, .cx-door__say, .cx-dr, .cx-sheet,
   .hv-chips.cx-stagger .hv-chip { animation: none !important; }
 }
 
@@ -596,7 +545,6 @@
 .cat-footer__legal, .hc-foot__legal { margin: 0; font-size: 13px; color: rgba(255,255,255,.7); }
 .cat-footer__legal a, .hc-foot__legal a { color: inherit; text-underline-offset: 3px; }
 .cat-footer__legal a:hover, .hc-foot__legal a:hover { color: var(--lime); }
-.cx-offer:focus { outline: none; }
 
 /* ---- "Cooking": Helvi at the director's desk while the AI works (portal.js HV.cooking) */
 .cx-cook { display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 16px; align-items: center; text-align: left; font-family: var(--body); color: var(--ink); }

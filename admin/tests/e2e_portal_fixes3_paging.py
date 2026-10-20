@@ -9,7 +9,7 @@
 - the gate is /api/roster's: a locked browser gets nothing, a link needs its own code;
 - /api/roster/cards returns only creators on the roster (active), in the order asked;
 - /api/roster/facets lists options, no counts;
-- the onboarding tour's demo world answers the new endpoints.
+- catalogue.js asks for batches, never the whole roster.
 
 Same harness as e2e_portal.py (a throwaway copy of admin/*.py, an empty database).
 
@@ -309,11 +309,8 @@ class Paging(unittest.TestCase):
         finally:
             server.Handler._roster_build = orig
 
-    # --------------------------------------------------------------------- tour --
-    def test_10_tour_demo_answers_the_new_endpoints(self):
-        js = (ROOT / "assets" / "js" / "tour.js").read_text()
-        for path in ('"/api/roster/page"', '"/api/roster/facets"', '"/api/roster/cards"'):
-            self.assertIn("p === " + path, js)
+    # ---------------------------------------------------------------- the page --
+    def test_10_catalogue_asks_for_batches(self):
         cat = (ROOT / "assets" / "js" / "catalogue.js").read_text()
         for path in ("/api/roster/page", "/api/roster/facets", "/api/roster/cards"):
             self.assertIn(path, cat)

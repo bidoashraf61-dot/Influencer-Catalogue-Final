@@ -176,10 +176,6 @@
 .hca-qcard__acts { display: grid; gap: 8px; justify-items: end; }
 .hca-qcard .hca-btn--line { min-height: 38px; font-size: 17px; }
 
-.hca-tour { display: grid; grid-template-columns: auto 1fr; gap: 18px; align-items: center; background: #e9dcd2; border-radius: 20px; padding: 16px; margin-top: 14px; }
-.hca-tour b { display: block; font: 400 24px/1 Bebasneue, "Bebas Neue", Arial, sans-serif; margin-bottom: 4px; }
-.hca-tour span { font-size: 13.5px; color: #3d3a36; line-height: 1.45; }
-
 .hca-mi { display: flex; align-items: center; justify-content: flex-start; gap: 10px; width: 100%; text-align: left; border: 0; background: none; font: inherit; cursor: pointer; }
 .hca-mi__ic { display: none; }                     /* the portal's menu has no icons */
 .hca-mi__note { margin-left: auto; font-style: normal; font-size: 11.5px; font-weight: 700; color: #5a5a58; }

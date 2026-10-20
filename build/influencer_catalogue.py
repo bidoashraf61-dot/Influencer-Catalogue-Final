@@ -772,10 +772,17 @@ def build():
         </h1>
         <p class="cat-cover__sub">Your next influencer campaign, <span class="cat-cover__hi">all in one place.</span></p>
         <p class="cat-cover__sign">We talk to reach.</p>
-        <a class="cat-cover__cta cat-cover__cue" href="#cat-roster">
-          Browse creators
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
-        </a>
+        <div class="cat-cover__acts">
+          <a class="cat-cover__cta cat-cover__cue" href="#cat-roster">
+            Browse creators
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+          </a>
+          <!-- Portal item 179: the onboarding film on its own page (welcome/index.html). -->
+          <a class="cat-cover__watch" href="/welcome/">
+            <span class="cat-cover__watch-i" aria-hidden="true"><svg viewBox="0 0 24 24" width="14" height="14"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+            Watch how it works
+          </a>
+        </div>
       </div>
     </div></div></div>
     <nav class="cat-journey" aria-label="How it works"><div class="cat-pad"><div class="cat-container">

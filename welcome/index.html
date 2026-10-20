@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<meta name="robots" content="noindex, nofollow, noarchive, noimageindex"/>
+<meta name="referrer" content="no-referrer"/>
+<title>How HELVi works — HELVi Connect</title>
+<meta name="description" content="A short film on how HELVi Connect works: brief Helvi, shortlist creators, check the analysis, request a quote and follow every post."/>
+<script src="../assets/js/hv-loader.js" data-tone="light"></script>
+<link rel="icon" href="../assets/brand/helvy-connect/helvy-icon-32.png?v=c4" type="image/png"/>
+<link rel="apple-touch-icon" href="/assets/app/apple-touch-icon.png"/>
+<link rel="manifest" href="/manifest.webmanifest"/>
+<meta name="theme-color" content="#ffffff"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-title" content="HELVi"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<link rel="preload" as="image" href="../assets/welcome/onboarding-poster.jpg"/>
+<link rel="stylesheet" href="../assets/css/catalogue.css"/>
+<link rel="stylesheet" href="../assets/css/account.css"/>
+<link rel="stylesheet" href="../assets/css/welcome.css"/>
+</head>
+<body data-page="welcome">
+<!--
+HELVi Connect: "How HELVi works" (portal item 179). Public page, no sign-in: the onboarding
+film with its chapters, then one way in. It replaces the old in-portal tour (item 180).
+
+THE FILM: drop the final file at assets/welcome/onboarding.mp4 (H.264 + AAC, 16:9, 1920x1080
+or 1280x720, "faststart"), replace assets/welcome/onboarding-poster.jpg with a frame from it if
+wanted, then set the chapter start times and timed: true in assets/js/welcome.js. update.sh
+stamps both files with ?v=<hash>, so a new file reaches every browser and the installed app.
+Until then the file there is a 6-second branded placeholder.
+
+The film is never downloaded until someone presses play (preload="none", no src until then).
+-->
+
+<header class="hc-bar">
+  <div class="cat-pad"><div class="cat-container cat-topbar hc-bar__in">
+    <a class="hc-mark" href="../" aria-label="HELVi Connect, back to the catalogue">
+      <img class="hc-mark__logo" src="../assets/brand/helvy-connect/helvy-connect-light-320.webp?v=c5" srcset="../assets/brand/helvy-connect/helvy-connect-light-320.webp?v=c5 1x, ../assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c5 2x" alt="HELVi Connect" width="320" height="160"/>
+      <span class="hc-mark__tag">Connecting Brands with the Right Voices</span>
+    </a>
+    <div class="cat-topbar__links">
+      <a class="hc-link" href="../">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        Catalogue
+      </a>
+      <a class="hc-link hc-link--hide" href="../account/">My profile</a>
+    </div>
+  </div></div>
+</header>
+
+<main class="wl" id="wl-main">
+  <section class="wl-stage" aria-labelledby="wl-title">
+    <div class="cat-pad"><div class="wl-wrap">
+      <div class="wl-head">
+        <h1 class="wl-title" id="wl-title"><span class="wl-pill">Welcome</span><span class="wl-title__line">How HELVi works</span></h1>
+        <p class="wl-lede">One short film, from your brief to live results. Watch it straight through, or jump to the part you need.</p>
+      </div>
+
+      <div class="wl-player">
+        <div class="wl-film" id="wl-film">
+          <video id="wl-video" class="wl-video" playsinline preload="none"
+                 poster="../assets/welcome/onboarding-poster.jpg"
+                 data-src="../assets/welcome/onboarding.mp4"
+                 aria-label="How HELVi works, the onboarding film"></video>
+          <button class="wl-play" id="wl-play" type="button">
+            <span class="wl-play__disc" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg></span>
+            <span class="wl-play__t">Play the film</span>
+          </button>
+          <p class="wl-film__err" id="wl-err" role="alert" hidden>
+            The film didn't load. Check your connection, then <button type="button" id="wl-retry">try again</button>.
+          </p>
+        </div>
+
+        <nav class="wl-chaps" aria-labelledby="wl-chaps-t">
+          <h2 class="wl-chaps__t" id="wl-chaps-t">In this film</h2>
+          <ol class="wl-chaps__list" id="wl-chaps"></ol>
+        </nav>
+      </div>
+    </div></div>
+  </section>
+
+  <section class="wl-next" aria-labelledby="wl-next-t">
+    <div class="cat-pad"><div class="wl-wrap wl-next__in">
+      <div>
+        <h2 class="wl-next__t" id="wl-next-t">Ready when you are</h2>
+        <p>Start with a brief, or browse on your own. Stuck? Ask Helvi in the corner of the catalogue or your profile, and your account manager replies within one working day.</p>
+      </div>
+      <div class="wl-next__go">
+        <a class="hc-btn" href="../">Open the catalogue</a>
+        <a class="hc-btn hc-btn--line" href="../account/">Go to my profile</a>
+      </div>
+    </div></div>
+  </section>
+</main>
+
+<footer class="hc-foot">
+  <div class="cat-pad"><div class="cat-container hc-foot__in">
+    <img class="hc-foot__logo" src="../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5" srcset="../assets/brand/helvy-connect/helvy-connect-dark-320.webp?v=c5 1x, ../assets/brand/helvy-connect/helvy-connect-dark-640.webp?v=c5 2x" alt="HELVi Connect" width="320" height="160" loading="lazy"/>
+    <span class="hc-foot__by"><span>Powered by</span><img src="../assets/brand/logo-knockout.webp" alt="HelloVoice" width="112" height="25" loading="lazy"/><span>A BlueHolding Company</span></span>
+    <span class="hc-foot__legal"><a href="../privacy/">Privacy</a> · <a href="../terms/">Terms</a></span>
+  </div></div>
+</footer>
+
+<script src="../assets/js/welcome.js" defer></script>
+</body>
+</html>

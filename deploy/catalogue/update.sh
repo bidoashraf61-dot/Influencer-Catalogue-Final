@@ -52,7 +52,7 @@ cp "$SRC/dist/index.html"           "$DST/index.html"
 cp "$SRC/dist/selection/index.html" "$DST/selection/index.html"
 # The campaign report is hand-written in the repo, not built.
 # The campaign report and the creator passport are hand-written, not built.
-mkdir -p "$DST/campaign/dashboard" "$DST/creator" "$DST/account" "$DST/privacy" "$DST/terms"
+mkdir -p "$DST/campaign/dashboard" "$DST/creator" "$DST/account" "$DST/privacy" "$DST/terms" "$DST/welcome"
 cp "$SRC/campaign/index.html"       "$DST/campaign/index.html"
 cp "$SRC/campaign/dashboard/index.html" "$DST/campaign/dashboard/index.html"
 cp "$SRC/creator/index.html"        "$DST/creator/index.html"
@@ -64,6 +64,9 @@ cp "$SRC/account/index.html"        "$DST/account/index.html"
 # HELVi Connect privacy notice and terms (drafts pending legal review), hand-written.
 cp "$SRC/privacy/index.html"        "$DST/privacy/index.html"
 cp "$SRC/terms/index.html"          "$DST/terms/index.html"
+# "How HELVi works" (item 179): the onboarding film page, hand-written. The film itself is
+# assets/welcome/onboarding.mp4 (rsynced with the other assets above).
+cp "$SRC/welcome/index.html"        "$DST/welcome/index.html"
 # HELVi Connect app (item 168): the service worker, manifest and offline page live at the site root.
 cp "$SRC/sw.js"                     "$DST/sw.js"
 cp "$SRC/manifest.webmanifest"      "$DST/manifest.webmanifest"
@@ -79,22 +82,22 @@ python3 - "$DST" <<'PYSTAMP'
 import hashlib, re, pathlib, sys
 root = pathlib.Path(sys.argv[1])
 def h(p): return hashlib.md5((root / p).read_bytes()).hexdigest()[:8]
-# The tour (tour.js / tour.css) is fetched by connect.js when a client starts it, not
-# named in any page: stamp it inside connect.js first, so connect.js's own hash changes too.
-cj = root / 'assets/js/connect.js'
-cs = cj.read_text()
-for n in ('js/tour.js', 'css/tour.css'):
-    cs = re.sub(r'(assets/' + re.escape(n) + r')(\?v=[0-9a-z]+)?', r'\1?v=' + h('assets/' + n), cs)
-cj.write_text(cs)
+# The onboarding film's poster is also named inside account.js (Account -> Overview, item 179):
+# stamp it there first, so account.js's own hash changes when the poster does.
+aj = root / 'assets/js/account.js'
+a_s = aj.read_text()
+a_s = re.sub(r'(assets/welcome/onboarding-poster\.jpg)(\?v=[0-9a-z]+)?', r'\1?v=' + h('assets/welcome/onboarding-poster.jpg'), a_s)
+aj.write_text(a_s)
 names = ('js/catalogue.js', 'css/catalogue.css', 'js/portal.js', 'css/portal.css',
          'js/campaign.js', 'css/campaign.css',
          'js/creator.js', 'css/creator.css', 'js/hv-icons.js',
          'js/dashboard.js', 'css/dashboard.css', 'js/account.js', 'css/account.css', 'js/hv-loader.js',
-         'js/connect.js', 'css/connect.css', 'js/evidence.js', 'css/evidence.css', 'js/app.js', 'css/app.css')
+         'js/connect.js', 'css/connect.css', 'js/evidence.js', 'css/evidence.css', 'js/app.js', 'css/app.css',
+         'js/welcome.js', 'css/welcome.css', 'welcome/onboarding.mp4', 'welcome/onboarding-poster.jpg')
 stamp = {n: h('assets/' + n) for n in names}
 for page in ('index.html', 'selection/index.html', 'campaign/index.html',
              'campaign/dashboard/index.html', 'creator/index.html', 'account/index.html', 'market/index.html',
-             'privacy/index.html', 'terms/index.html'):
+             'privacy/index.html', 'terms/index.html', 'welcome/index.html'):
     f = root / page
     s = f.read_text()
     for n, v in stamp.items():

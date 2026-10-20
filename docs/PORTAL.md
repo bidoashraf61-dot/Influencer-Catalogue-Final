@@ -226,7 +226,7 @@ Tests: `python3 admin/tests/e2e_portal_v3.py` and `e2e_portal_fixes3_gating.py` 
 | Sign-in code email | `admin/mailer.py` (`OTP_HTML`) | 600px table, inline styles, PNGs on the catalogue host (`assets/brand/email/`), VML button, dark mode. |
 | Access codes → accounts | `admin/codelinks.py`, Client portal → **Access codes → accounts** | Invite a shared code's client to an email account: the account sees and owns the code's selections and campaigns (`portal.team_codes` / `portal.owns`). Codes are never revoked or moved here. |
 | AI free during a campaign | `portal.charge` / `portal.active_campaign` | Every AI action is free from a (team) campaign's start date to its end date + 30 days. `/api/me` → `ai_free`. |
-| Tour (v3) | `assets/js/connect.js` (opener + loader), `assets/js/tour.js` + `assets/css/tour.css` (fetched on start), `assets/demo/` (portraits + `demo-roster.json`), `tools/gen_demo_roster.py`, `admin/rewards.py` | Offered once (`users.tour`), replay from Help / profile; +5 once (`reward:tour`). `POST /api/tour`. See *Onboarding tour v3* below. |
+| How HELVi works (item 179; the tour was removed in item 180) | `welcome/index.html`, `assets/js/welcome.js`, `assets/css/welcome.css`, `assets/welcome/` (film + poster); Account -> Overview card in `assets/js/account.js` | Public page, no sign-in. See "How HELVi works" below |
 | ROI Calculator | `admin/roi.py`, `admin/connect_api.py`, `connect.js` | Deterministic, free. `plans.LIBRARY` (+ house results, + creators' own averages), grades good / moderate / low. Table `roi_estimates`; estimate vs actual per campaign. Routes `/api/roi/*`. |
 | AI on selections | `admin/aimore.py` | `/api/selection/more` (3 credits), `/api/selection/alike` (2, kept so reopening is free). Tables `selection_more`, `selection_alike`. |
 | Helvi knowledge | `admin/helvy_kb.py`, `admin/occasions.py`, `assistant.py`, `knowledge.py`, `faq.py` | Tools `campaign_results` (own, named via Settings, or aggregates over 3+ campaigns), `occasions`, `my_decisions`, `roi_estimate`; KSA rules; **no prices ever** (price tool removed, prices stripped from creator views, FAQ routes to a quote). |
@@ -250,78 +250,33 @@ Tests: `python3 admin/tests/e2e_portal_cd.py`, `python3 admin/tests/test_roi.py`
 Tests: `python3 admin/tests/e2e_portal_fixes2.py`.
 
 
-## Onboarding tour v3 (2026-10-11, item 40; replaces v2)
+## How HELVi works: the onboarding film (2026-10-20, items 179 + 180)
 
-"Take the 3-minute tour?" is **one client's first campaign, from brief to results**, played on
-the real pages (no screenshots) on an invented roster. Seven chapters, 22 steps, one sentence and
-one action per step; the opener lists the chapters (jump to any), the top bar keeps them, a
-progress bar counts the steps, Skip tour is on every card, Esc exits, arrow keys step.
+The in-portal tour (v3, item 40: `tour.js`, `tour.css`, `assets/demo/`, the demo frame hooks in
+`hv-loader.js` and `portal.js`, the first-sign-in "Take the 3-minute tour?" opener) was **removed**
+in item 180. Onboarding is now one short film on its own page, **`/welcome/`** (public, no sign-in):
 
-| # | Chapter | Page | What is shown |
-|---|---|---|---|
-| 1 | Brief | catalogue | The AI shortlist card on its goal question with **Awareness + Engagement** both ticked, then the countries with **Saudi Arabia + UAE** (several goals, several countries). |
-| 2 | Shortlist | catalogue, selection | Helvi builds the shortlist (the staged wait, scores per platform, "Open as selection"); on the selection the fit score's tooltip with its **confidence** ("High confidence · 26 posts") and then a creator whose tooltip says **Limited data**. |
-| 3 | Check a creator | creator | A locked profile: headline numbers free, the rest locked; the **"See a sample full analysis"** hover card; the anonymised sample opened and walked (authenticity, audience, posts). |
-| 4 | Plan | selection | The **ROI calculator** (v4.1): the client chooses **how many creators** (15), the recommended structure, **Selection quality** with each goal's own % and the **gap**, then up to three **ways to improve**, one tapped and the quality updating. No budget, price, CPM or market anywhere. |
-| 5 | Ask Helvi | selection chat | "Why did Dr. Ghada score 88?" (explain a score, with the working note: dots + one typed line), "Compare Lulwa and Nada", and a question Helvi refuses (rates) that ends in the **one-tap hand-off** to the account manager. |
-| 6 | Quote | selection | The quote request form, then the **lifecycle chip** and its timeline: Quote requested, Quote ready (account manager's note, bell), the owner approves, Campaign live. |
-| 7 | Follow | campaign, profile | The report's verdict, **estimate vs actual**, then the profile (selections, campaigns, credits, invites). +5 credits once on finishing. |
+- the film with a branded poster and a lime play control; it is **lazy** (`preload="none"`, no
+  `src` until play or a chapter is pressed), `playsinline`, native controls once playing, so it
+  works in the installed app and on phones; it pauses when the page goes to the background;
+- beside it (under it below 1100px) the **chapters**, which double as the notes on what the portal
+  does. Once the real film is in, set each chapter's start time and `TIMED = true` in
+  `assets/js/welcome.js`: chapters then show their time, jump to it, and light up as the film plays;
+- a closing band: Open the catalogue / Go to my profile.
 
-How it works: the tour opens a frame over the page and plays the **real** pages in it
-(catalogue, selection, creator, campaign, account, Helvi's chat, the ROI drawer). `hv-loader.js`
-(the first script on every page) sees the frame belongs to a running tour
-(`top.hvTourDemo.active`) and calls `hvTourDemo.install(window)` before any page script runs.
-From then on, in the frame:
+Ways in: **"Watch how it works"** on the catalogue cover (`build/influencer_catalogue.py`), **"How
+HELVi works"** in the profile menu (replaces "Take the tour") and the profile sidebar, and the ink
+**"How HELVi works"** card on Account -> Overview.
 
-- every `/api/` call is answered by `tour.js` from the demo world: nothing reaches the server,
-  nothing is saved, no AI call is made, no credit is used. `hvTourDemo.answer(method, path, query,
-  body)` is the one place that world lives (the tests ask it what the pages ask);
-- any other cross-origin call (the quote form's mail endpoint) is answered with an OK in the
-  frame, so a demo request can never send an email;
-- `localStorage`, `sessionStorage` and `document.cookie` are in-memory, outside links and new
-  windows are blocked, the "Paused" privacy cover and the showreel are off.
+**The film file:** `assets/welcome/onboarding.mp4` is a 6-second branded placeholder until the
+final film arrives. Replace it (H.264 + AAC, 16:9, faststart), optionally replace
+`assets/welcome/onboarding-poster.jpg`, then deploy: `update.sh` stamps both with `?v=<hash>`
+(the poster inside `account.js` too), so every browser and the installed app get the new file.
+The service worker does not cache `/assets/welcome/` (range requests go straight to the network).
 
-**The demo roster** is `assets/demo/demo-roster.json`, written by `python3 tools/gen_demo_roster.py`
-(`--check` fails when the file is stale). Eight invented creators `DEMO-01..08` on the eight
-AI-generated portraits in `assets/demo/`: realistic numbers (followers, engagement, audience
-splits, posts measured, fit-score parts) drawn from the shape of the real roster, names from one
-invented list, handles that are not real accounts. The generator reads no database and no private
-file; this repository is public. Brand: Northwind Pharma - Ramadan Skincare. Two creators carry
-the story: Dr. Ghada (88, high confidence) and Rana (79, **limited data**, 6 posts).
-
-**The demo's answers use the live shapes**: `/api/roi/estimate` is a JavaScript port of
-`admin/roi.py` v4.1 (the recommended shapes, largest-remainder counts, quality with by-goal,
-gap words, ways to improve by re-running the estimate) so changing the count or applying a way
-really recomputes; `lifecycle` has the server's six steps and `can_approve`;
-`/api/analysis/sample` has `sample_analysis.anonymise()`'s allow-list; the brief questions are
-`matcher.public_questions()` verbatim; the chat streams `step* delta* done` with `cards`,
-`roi` and `handoff`. `admin/tests/e2e_tour_v3.py` runs the tour's JavaScript under node and
-compares every one of them with the server's own answers.
-
-`portal.js` exposes hooks only inside a demo frame (`window.hvDemo`): `HV.voiceDemo` (types a
-message into the real chat) and `HV.aiDemo(answers, name, {ask: n})` (opens the AI card on
-question n with the answers ticked, or runs the build). The tour's real calls are `POST /api/tour`
-and one GET of the static roster file.
-
-Look: an ink bar (Demo badge, seven chapter chips: icon + number, the current one named, Exit);
-a lime-ringed spotlight with a **numbered pin**; a **ghost cursor** that glides to the next tap,
-presses and the page answers (the tour never acts unseen); a **chapter card** (big numeral, name,
-one line, on ink) between chapters while the next page loads; Helvi on the card's top edge,
-facing the lit area, with a notch pointing at it, changing pose when something happens (hello,
-thinking while he works, approve when the quote is approved, celebrate at the end). Reduced
-motion: no glide, no card animation, no transitions. Phone: the card docks at the bottom and the
-page scrolls the lit area into the space above it.
-
-Versioning: connect.js names `tour.js?v=...` / `tour.css?v=...`; `update.sh` rewrites both to the
-files' hash inside connect.js before it hashes connect.js itself. The roster file is fetched with
-`cache: "no-cache"`, so a changed file is picked up without a version bump.
-
-Tests: `python3 admin/tests/e2e_tour_v3.py` (reward once, loading, story and chapters, fictional
-roster, every target exists in the page sources, live shapes). The on-screen walk (every step lit,
-no page error, nothing leaves the demo frame, optional screenshots, desktop and phone):
-`node admin/tests/tour_walk.mjs --base <dev server> --mail <captured mail file> [--shots DIR]`.
-
-Admin Python changed with this item: `admin/knowledge.py` (Helvi's own line about the tour).
+Server side is unchanged: `POST /api/tour` and the `users.tour` column stay (credits already paid
+for the tour are kept); nothing calls the endpoint any more. Helvi's knowledge line about the tour
+now points to `/welcome/` (`admin/knowledge.py`, needs the usual manual copy to the admin).
 
 ## Phase E (branch `phase-e`, 2026-10-10)
 

@@ -38,6 +38,6 @@ iPhone: push only from the Home Screen app on iOS 16.4+; Safari shows the Add to
 
 ## Setup prompts (item 169)
 
-- **Desktop, once:** a welcome dialog with a personal QR (Account holders, first computer visit, never over the tour or another dialog). Then a quiet "HELVi on your phone" card on Account → Overview until a phone has the app with alerts on, the QR on the tour's finish card, and "Get the app on your phone" / "Install on this computer" (Chrome, Edge) / "Alerts on this computer" in the account menu.
+- **Desktop, once:** a welcome dialog with a personal QR (Account holders, first computer visit, never over another dialog). Then a quiet "HELVi on your phone" card on Account → Overview until a phone has the app with alerts on, and "Get the app on your phone" / "Install on this computer" (Chrome, Edge) / "Alerts on this computer" in the account menu.
 - **The QR** (`admin/qr.py`, stdlib, checked against the qrcode package) points at `/admin/api/push/qr?h=<token>`: one use, 15 minutes, max 20 an hour per person, signs that phone in (same pass as email sign-in, counted against the device limit) and lands on `/account/?src=qr`.
 - **Phones:** after a QR scan the Home Screen guide opens at once (iPhone: Safari Share steps; Android: Chrome's install, or the ⋮ → Add to Home screen steps). Always reachable from the account menu ("Add HELVi to Home Screen") and Account → Notifications.

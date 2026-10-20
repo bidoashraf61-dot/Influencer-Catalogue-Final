@@ -48,15 +48,6 @@
   var T0 = Date.now();
   var SHOW_AFTER = 600, GONE_BY = 1500;
 
-  /* The onboarding tour (tour.js) plays the real pages in a frame on demo data. The frame
-     is handed to the tour before any other script runs: from here every /api/ call is
-     answered from the demo world and storage stays in memory, so nothing is saved. */
-  var DEMO = false;
-  try {
-    var top_ = window.top;
-    if (top_ !== window && top_.hvTourDemo && top_.hvTourDemo.active) { top_.hvTourDemo.install(window); DEMO = true; }
-  } catch (e) { DEMO = false; }
-
   /* ================================================================ Helvi */
   var HELVi = window.HVHelvy = (function () {
     var dir = base + "assets/brand/helvy/";
@@ -290,8 +281,7 @@
     if (!loaded || inflight > 0 || Date.now() - lastEnd < 250) { setTimeout(check, 100); return; }
     done();
   }
-  // In the tour's demo frame the tour draws its own cover while the page loads.
-  if (DEMO) ready = true; else arm(T0);
+  arm(T0);
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", function () { setTimeout(check, 30); });
   else setTimeout(check, 30);
 
