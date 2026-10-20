@@ -117,7 +117,7 @@
   function pending() { return DATA.analyses.filter(function (a) { return a.state === "requested"; }); }
   function countFor(key) {
     if (key === "selections") return DATA.selections.length || null;
-    if (key === "analyses") return pending().length || null;
+    if (key === "analyses") return staffInbox() ? (AINBOX.data ? AINBOX.data.filter(function (x) { return x.state === "open"; }).length || null : null) : pending().length || null;
     if (key === "campaigns") return DATA.insights.live_campaigns || null;
     if (key === "notifications") return DATA.notifications.unread || null;
     if (key === "credits") return DATA.credits != null ? DATA.credits : null;
@@ -529,13 +529,151 @@
 
   /* -------------------------------------------------------------- analyses */
 
+  /* -------------------------------- the admin's analysis inbox (item 195, owner 2026-10-20) */
+  // Admins (every client) and KAMs (their clients) get the requests, not their own: grouped client, then the
+  // campaign (or selection) the creator sits in. Approve opens the analysis to the person who asked, only them;
+  // Reject tells them, with an optional note. The server checks both (portal_api /api/analysis/*).
+  var AINBOX = { data: null, busy: null, filter: "open", err: false };
+  function staffInbox() { return DATA.hub === "admin" || DATA.hub === "kam" || DATA.is_kam; }
+  function loadInbox() {
+    if (AINBOX.busy) return AINBOX.busy;
+    AINBOX.busy = api("GET", "/api/analysis/inbox").then(function (r) {
+      AINBOX.busy = null;
+      AINBOX.err = !(r.b && r.b.ok);
+      if (!AINBOX.err) AINBOX.data = r.b.requests;
+      var n = document.querySelector('[data-nav="analyses"]');
+      if (n && AINBOX.data) {
+        var open = AINBOX.data.filter(function (x) { return x.state === "open"; }).length;
+        var b = n.querySelector(".n");
+        if (!b && open) { b = h("span", { class: "n n--new" }); n.appendChild(b); }
+        if (b) { b.textContent = String(open); b.hidden = !open; }
+      }
+      return AINBOX.data;
+    });
+    return AINBOX.busy;
+  }
+  var INBOX_STATES = [["open", "Waiting"], ["approved", "Approved"], ["rejected", "Rejected"], ["all", "All"]];
+  function inboxRow(r) {
+    var note = h("p", { class: "ai-row__msg", role: "status", "aria-live": "polite" });
+    var acts = h("div", { class: "ai-row__acts" });
+    function done(b, msg) {
+      note.textContent = msg || "";
+      note.className = "ai-row__msg" + (b ? "" : " is-bad");
+      if (b) { AINBOX.data = null; setTimeout(function () { if (SECTION === "analyses") renderSection(); }, 900); }
+    }
+    if (r.state === "open") {
+      var yes = h("button", { type: "button", class: "hc-btn hc-btn--sm", disabled: !r.has_analysis || null,
+        title: r.has_analysis ? "Open " + r.creator + "'s full analysis to " + r.user : "No analysis on file yet" }, "Approve");
+      var no = h("button", { type: "button", class: "hc-btn hc-btn--line hc-btn--sm" }, "Reject");
+      yes.addEventListener("click", function () {
+        yes.disabled = no.disabled = true;
+        api("POST", "/api/analysis/decide", { id: r.id, ok: true }).then(function (x) {
+          if (!(x.b && x.b.ok)) { yes.disabled = no.disabled = false; }
+          done(x.b && x.b.ok, (x.b && x.b.message) || "Couldn't approve it. Please try again.");
+        });
+      });
+      no.addEventListener("click", function () {
+        if (acts.querySelector("textarea")) return;
+        var ta = h("textarea", { class: "ai-row__note", rows: "2", maxlength: "300", "aria-label": "A note for " + r.user + " (optional)",
+                                 placeholder: "A note for " + (r.user || "them") + " (optional)" });
+        var send = h("button", { type: "button", class: "hc-btn hc-btn--ink hc-btn--sm" }, "Send rejection");
+        var back = h("button", { type: "button", class: "hc-more" }, "Cancel");
+        var form = h("div", { class: "ai-row__reject" }, ta, h("div", { class: "ai-row__reject-go" }, send, back));
+        acts.appendChild(form); ta.focus();
+        back.addEventListener("click", function () { form.remove(); no.focus(); });
+        send.addEventListener("click", function () {
+          send.disabled = yes.disabled = no.disabled = true;
+          api("POST", "/api/analysis/decide", { id: r.id, ok: false, note: ta.value }).then(function (x) {
+            if (!(x.b && x.b.ok)) send.disabled = yes.disabled = no.disabled = false;
+            done(x.b && x.b.ok, (x.b && x.b.message) || "Couldn't send it. Please try again.");
+          });
+        });
+      });
+      add(acts, [yes, no]);
+      if (!r.has_analysis) acts.appendChild(h("a", { class: "ai-row__up", href: API + "/analysis?q=" + encodeURIComponent(r.code) }, "Upload the analysis first ", icon("arrow")));
+    }
+    var status = r.state === "open"
+      ? h("span", { class: "hc-sig hc-sig--wait" }, "Due " + shortDay(r.ready_by))
+      : r.state === "approved" ? h("span", { class: "hc-sig hc-sig--ok" }, "Approved " + dm(r.handled_at))
+        : r.state === "rejected" ? h("span", { class: "hc-sig hc-sig--no" }, "Rejected " + dm(r.handled_at))
+          : h("span", { class: "hc-sig hc-sig--off" }, "Closed " + dm(r.handled_at));
+    return h("li", { class: "ai-row" + (r.state === "open" ? " is-open" : "") },
+      h("span", { class: "ai-row__face", "aria-hidden": "true" }, initials(r.creator)),
+      h("div", { class: "ai-row__body" },
+        h("a", { class: "ai-row__name", href: ROOT + "creator/#c=" + encodeURIComponent(r.code) }, r.creator),
+        h("div", { class: "hc-row__meta" },
+          h("span", null, r.code + (r.platform ? " · " + r.platform : "")),
+          h("span", null, "Asked by ", h("b", null, r.user || "a client"), " · " + ago(r.at)),
+          status),
+        r.note && r.state === "rejected" ? h("p", { class: "ai-row__said" }, "Note sent: " + r.note) : null,
+        note),
+      acts);
+  }
+  function renderInbox(p) {
+    var lead = "Clients asking for a creator's full analysis. Approve opens it to the person who asked, only them. Reject tells them.";
+    add(p, head("Analyses", lead));
+    if (!AINBOX.data) {
+      var wait = h("p", { class: "hc-wait", role: "status" }, AINBOX.err ? "Couldn't load the requests. " : "Loading requests…");
+      if (AINBOX.err) wait.appendChild(h("button", { class: "hc-more", type: "button", onclick: function () { AINBOX.err = false; renderSection(); } }, "Try again"));
+      add(p, wait);
+      if (!AINBOX.err) loadInbox().then(function () { if (SECTION === "analyses") renderSection(); });
+      return;
+    }
+    var all = AINBOX.data;
+    var chips = h("div", { class: "hc-chips", role: "group", "aria-label": "Show" });
+    INBOX_STATES.forEach(function (c) {
+      var n = c[0] === "all" ? all.length : all.filter(function (x) { return x.state === c[0]; }).length;
+      chips.appendChild(h("button", { class: "hc-chip", type: "button", "aria-pressed": String(AINBOX.filter === c[0]),
+        onclick: function () { AINBOX.filter = c[0]; renderSection(); } }, c[1], " ", h("b", null, String(n))));
+    });
+    add(p, chips);
+    var shown = all.filter(function (x) { return AINBOX.filter === "all" || x.state === AINBOX.filter; });
+    if (!shown.length) {
+      add(p, h("div", { class: "hc-empty" }, h("b", null, AINBOX.filter === "open" ? "Nothing waiting" : "Nothing here yet"),
+        h("p", null, AINBOX.filter === "open" ? "When a client asks for a creator's full analysis from one of their selections, it lands here for you to approve or reject."
+          : "Answered requests from the last 30 days show here.")));
+      return;
+    }
+    // client -> campaign (or selection, or neither) -> rows
+    var groups = [], byClient = {};
+    shown.forEach(function (r) {
+      var g = byClient[r.client];
+      if (!g) { g = byClient[r.client] = { client: r.client, subs: [], by: {}, open: 0 }; groups.push(g); }
+      if (r.state === "open") g.open++;
+      var where = r.campaigns.length ? ["campaign", r.campaigns[0].name, r.campaigns[0].status === "live"]
+        : r.selections.length ? ["selection", r.selections[0].name, false] : ["none", "Not in a selection now", false];
+      var key = where.join("|");
+      var sub = g.by[key];
+      if (!sub) { sub = g.by[key] = { where: where, rows: [] }; g.subs.push(sub); }
+      sub.rows.push(r);
+    });
+    groups.sort(function (a, b) { return b.open - a.open || a.client.localeCompare(b.client); });
+    groups.forEach(function (g) {
+      var sec = h("section", { class: "ai-client", "aria-label": g.client },
+        h("header", { class: "ai-client__head" },
+          h("span", { class: "ai-client__mono", "aria-hidden": "true" }, initials(g.client)),
+          h("h2", { class: "ai-client__name" }, g.client),
+          g.open ? h("span", { class: "ai-client__n" }, g.open + " waiting") : null));
+      g.subs.forEach(function (sub) {
+        var w = sub.where;
+        sec.appendChild(h("h3", { class: "ai-where" + (w[2] ? " is-live" : "") },
+          h("span", { class: "ai-where__k" }, w[0] === "campaign" ? "Campaign" : w[0] === "selection" ? "Selection" : ""), w[1]));
+        var ul = h("ul", { class: "ai-rows" });
+        sub.rows.forEach(function (r) { ul.appendChild(inboxRow(r)); });
+        sec.appendChild(ul);
+      });
+      add(p, sec);
+    });
+  }
+
   function renderAnalyses(p) {
+    if (staffInbox()) { renderInbox(p); return; }
     // Clients never get the full profile analysis now (owner, 2026-10-20): this tab lists the creators
     // they asked their account manager about, from the creator page's "Ask your account manager" button.
-    add(p, head("Analyses", "The creators you asked your account manager about. They reply to you directly."));
+    add(p, head("Analyses", "Full analyses you requested. HelloVoice reviews each request, usually within one working day."));
     if (!DATA.analyses.length) {
-      add(p, h("div", { class: "hc-empty" }, h("b", null, "No questions yet"),
-        h("p", null, "Open a creator from one of your selections and press Ask your account manager about this creator."),
+      add(p, h("div", { class: "hc-empty" }, h("b", null, "No requests yet"),
+        h("p", null, "Open a creator from one of your selections and press Request the full analysis."),
         h("a", { class: "hc-btn", href: "#selections" }, "Go to my selections")));
       return;
     }
@@ -545,8 +683,10 @@
       list.appendChild(h("li", null, h("a", { class: "hc-row", href: ROOT + "creator/#c=" + encodeURIComponent(a.code) },
         h("div", null, h("span", { class: "hc-row__name" }, a.name),
           h("div", { class: "hc-row__meta" }, h("span", null, a.code),
-            open ? h("span", { class: "hc-sig hc-sig--ok" }, "Unlocked " + dm(a.at))
-                 : h("span", { class: "hc-sig hc-sig--wait" }, "Asked " + dm(a.at)))),
+            open ? h("span", { class: "hc-sig hc-sig--ok" }, "Approved " + dm(a.at))
+                 : a.state === "declined" ? h("span", { class: "hc-sig hc-sig--no" }, "Not available")
+                   : h("span", { class: "hc-sig hc-sig--wait" }, "Asked " + dm(a.at))),
+          a.state === "declined" && a.note ? h("p", { class: "ac-muted" }, a.note) : null),
         h("span", { class: "hc-row__go" }, open ? "View full analysis" : "Open creator", " ", icon("arrow")))));
     });
     add(p, list);
@@ -1659,6 +1799,7 @@
       hv.onReadAll = function () { if (DATA) { DATA.notifications.items.forEach(function (x) { x.unread = false; }); if (SECTION === "notifications" || SECTION === "overview") renderSection(); } };
       route(false);
       if (DATA.is_kam) loadClients();          // the side nav's count, and the page if it is open
+      if (staffInbox()) loadInbox();           // the Analyses count: requests waiting for HelloVoice (item 195)
     });
   }
 

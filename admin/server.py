@@ -5420,12 +5420,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             u = portal.user_for_code(code_id)
             sels = gating.selections_with(code_id, code)
             import notify
-            # Owner, 2026-10-20: the creator page's button is now "Ask your account manager about this
-            # creator" (clients never get the full analysis); the KAM is told exactly as before.
-            notify.send("analysis", ["%s asked their account manager about %s (%s)." % (
+            # Item 195 (owner, 2026-10-20): the request waits in the Analyses inbox on /account/ for an
+            # admin to approve (opens it to this person only) or reject; the KAM is told as before.
+            notify.send("analysis", ["%s requested the full analysis of %s (%s)." % (
                 ((u["name"] or u["email"]) + ", " + (u["company"] or "")) if u else "A client", c["name"], code),
                 "In: %s" % ", ".join(x["name"] for x in sels[:3]),
-                "Reply to them directly. The full profile analysis is not shown to clients."],
+                "Approve or reject it in Analyses on your HELVi Connect profile."],
                 kam=u["kam"] if u is not None else None)
         return self.send_json(200, {"ok": True, "gate": gating.state(code_id, code)}, self.cors())
 

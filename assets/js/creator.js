@@ -388,19 +388,19 @@
     box.id = "pp-gate-band";
     box.setAttribute("aria-live", "polite");
     var sels = (g.selections || []).map(function (x) { return x.name; });
-    // Owner, 2026-10-20 (round 3): clients and KAMs never get the full profile analysis, so the
-    // band no longer promises one. It asks the account manager about this creator instead; the
-    // request still reaches the KAM exactly as the old "Request full analysis" did.
-    var ASK = "Ask your account manager about this creator";
+    // Item 195 (owner, 2026-10-20): a request goes to HelloVoice's Analyses inbox; an admin approves it and
+    // the full analysis opens to the person who asked, only them. (Round 3's "ask your account manager"
+    // wording is gone: approval now really opens it.)
+    var ASK = "Request the full analysis";
     var st = {
-      locked: ["chat", "Questions about " + esc(c.name) + "?", "Your account manager knows this creator's audience, past brand work and rates" +
-        (sels.length ? " (they are in <b>" + esc(sels[0]) + "</b>)" : "") + ". Ask, and they will get back to you.",
-        '<button type="button" class="pp-gbtn" id="pp-ask-full">' + hvi("chat") + ASK + "</button>"],
-      requested: ["chat", "Your account manager has your question", "You asked about " + esc(c.name) + " on <b>" + esc(when(g.requested_at)) +
-        "</b>. Your account manager will get back to you.", '<button type="button" class="pp-gbtn" disabled>' + hvi("chat") + "Asked</button>"],
-      outside: ["chat", "Questions about " + esc(c.name) + "?", "Add this creator to one of your selections, then ask your account manager about them.",
-        '<button type="button" class="pp-gbtn is-off" aria-disabled="true" title="Add this creator to a selection first.">' + hvi("chat") + ASK + "</button>"],
-      unlocked: ["unlock", "Full analysis ready", (g.granted_at ? "Opened <b>" + esc(when(g.granted_at)) + "</b> for your team. " : "") +
+      locked: ["lock", "Full analysis of " + esc(c.name), "Audience, authenticity, content and brand history" +
+        (sels.length ? " for a creator in <b>" + esc(sels[0]) + "</b>" : "") + ". HelloVoice reviews each request, usually within one working day.",
+        '<button type="button" class="pp-gbtn" id="pp-ask-full">' + hvi("unlock") + ASK + "</button>"],
+      requested: ["lock", "Request sent", "You asked for " + esc(c.name) + "'s full analysis on <b>" + esc(when(g.requested_at)) +
+        "</b>. HelloVoice is reviewing it; your bell tells you when it opens.", '<button type="button" class="pp-gbtn" disabled>' + hvi("unlock") + "Requested</button>"],
+      outside: ["lock", "Full analysis of " + esc(c.name), "Add this creator to one of your selections, then request the full analysis.",
+        '<button type="button" class="pp-gbtn is-off" aria-disabled="true" title="Add this creator to a selection first.">' + hvi("unlock") + ASK + "</button>"],
+      unlocked: ["unlock", "Full analysis ready", (g.granted_at ? "Opened for you on <b>" + esc(when(g.granted_at)) + "</b>. " : "") +
         "Every section is live: audience, authenticity, content and brand history, and the PDF.", '<button type="button" class="pp-gbtn" id="pp-view-full">' + hvi("unlock") + "View full analysis</button>"]
     }[g.state] || ["lock", "Full analysis", "", ""];
     box.innerHTML = '<span class="pp-req__lock">' + hvi(st[0]) + '</span><div><h2 class="pp-req__h">' + st[1] + "</h2><p>" + st[2] + '</p><p class="pp-req__err" role="alert" hidden></p></div><div class="pp-req__side">' + st[3] + "</div>";

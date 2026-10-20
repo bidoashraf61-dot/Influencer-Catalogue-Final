@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS notif_ref ON notifications(user_id, kind, ref);
 
 # kind -> group. The group is what a toggle controls.
 KINDS = {
-    "analysis_ready": "analysis",
+    "analysis_ready": "analysis", "analysis_reply": "analysis",
     "sel_feedback": "selections", "sel_shared": "selections", "sel_updated": "selections", "unavailable": "selections",
     "quote_requested": "selections", "quote_ready": "selections", "quote_approved": "selections",
     "camp_live": "campaigns", "camp_report": "campaigns", "camp_final": "campaigns",

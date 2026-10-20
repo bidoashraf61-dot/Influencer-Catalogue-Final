@@ -932,3 +932,46 @@ body[data-page="account"] .hc-main { flex: 1 0 auto; }
 .hc-head + .hvb { margin-top: 28px; }
 .hc-wait { margin: 28px 0 0; font-size: 15px; color: var(--gray); }
 @media screen and (max-width: 767px) { .hc-head__tools { width: 100%; justify-content: space-between; } }
+
+/* Item 195: the admin's analysis inbox. One linen band per client, the campaign (or selection) as a ruled
+   sub-head, then a row per request with Approve / Reject. */
+.hc-chips + .ai-client, .hc-chips + .hc-empty { margin-top: 22px; }
+.ai-client { margin-top: 18px; padding: 20px 22px 8px; border-radius: var(--r-md); background: var(--linen); }
+.ai-client__head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.ai-client__mono { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--ink); color: var(--lime);
+  font: 400 18px/1 var(--heading); letter-spacing: .04em; flex: none; }
+.ai-client__name { margin: 0; font: 400 34px/1 var(--heading); letter-spacing: .01em; }
+.ai-client__n { padding: 4px 12px; border-radius: var(--r-pill); background: var(--lime); font-size: 12px; font-weight: 700; color: var(--ink); }
+.ai-where { display: flex; align-items: baseline; gap: 10px; margin: 18px 0 0; padding-bottom: 8px; border-bottom: 1px solid rgba(18,18,18,.12);
+  font: 600 15px/1.35 var(--body); color: var(--ink); }
+.ai-where__k { font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--gray); }
+.ai-where.is-live::after { content: "Live"; display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; font: 400 15px/1 var(--heading); letter-spacing: .08em; color: var(--vivid-red); }
+.ai-rows { list-style: none; margin: 0; padding: 0; }
+.ai-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 0; border-bottom: 1px solid rgba(18,18,18,.07); }
+.ai-row:last-child { border-bottom: 0; }
+.ai-row__face { display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--white);
+  font: 400 18px/1 var(--heading); letter-spacing: .04em; color: var(--ink); }
+.ai-row.is-open .ai-row__face { background: var(--lime); }
+.ai-row__body { min-width: 0; }
+.ai-row__name { font-size: 16px; font-weight: 700; color: var(--ink); text-decoration: none; overflow-wrap: anywhere; }
+.ai-row__name:hover { text-decoration: underline; text-underline-offset: 3px; }
+.ai-row__body .hc-row__meta b { font-weight: 600; color: var(--ink); }
+.ai-row__said { margin: 6px 0 0; font-size: 13px; color: var(--gray); max-width: 62ch; }
+.ai-row__msg { margin: 6px 0 0; font-size: 13px; font-weight: 600; color: #0e6b39; min-height: 0; }
+.ai-row__msg:empty { display: none; }
+.ai-row__msg.is-bad { color: var(--red-text, #c01010); }
+.ai-row__acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; max-width: 360px; }
+.ai-row__acts .hc-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.ai-row__up { display: inline-flex; align-items: center; gap: 4px; min-height: 44px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.ai-row__reject { flex: 1 1 100%; display: grid; gap: 8px; }
+.ai-row__note { width: 100%; min-height: 64px; padding: 10px 14px; border: 1px solid rgba(18,18,18,.2); border-radius: var(--r-sm); background: var(--white);
+  font: 400 14px/1.5 var(--body); color: var(--ink); resize: vertical; }
+.ai-row__note:focus { outline: none; border-color: var(--ink); }
+.ai-row__reject-go { display: flex; align-items: center; justify-content: flex-end; gap: 12px; }
+@media screen and (max-width: 767px) {
+  .ai-client { padding: 16px 14px 4px; }
+  .ai-client__name { font-size: 28px; }
+  .ai-row { grid-template-columns: 40px minmax(0, 1fr); }
+  .ai-row__face { width: 40px; height: 40px; }
+  .ai-row__acts { grid-column: 1 / -1; justify-content: flex-start; max-width: none; }
+}

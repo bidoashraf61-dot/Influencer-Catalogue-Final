@@ -247,6 +247,19 @@ class PortalMixin(connect_api.ConnectMixin):
             else:
                 self.send_json(200, dict(self._me_payload(cid, user, kind), ok=True), self.cors())
             return True
+        if path == "/api/analysis/inbox":
+            # Item 195: the admin's Analyses tab. Admins every request, a KAM her clients'; nobody else.
+            who = self._need_account()
+            if who:
+                import gating as _gating, hub as _hub, kam_scope as _ks
+                role, a = _hub.viewer(who[1])
+                if role not in ("admin", "kam"):
+                    self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+                else:
+                    scope = None if role == "admin" else (_ks.clients(a) or frozenset())
+                    self.send_json(200, {"ok": True, "role": role, "requests": _gating.inbox(scope)},
+                                   self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/account":
             who = self._need_account()
             if who:
@@ -519,6 +532,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/stage": self.api_board_stage, "/api/board/live": self.api_board_live,
             "/api/board/pin": self.api_board_pin, "/api/board/attach": self.api_board_attach,
             "/api/board/selection-stage": self.api_board_selection_stage,
+            "/api/analysis/decide": self.api_analysis_decide,
         }
         fn = routes.get(path)
         if not fn:
@@ -1024,6 +1038,30 @@ class PortalMixin(connect_api.ConnectMixin):
         if ok:
             extra["stage"] = board.stage_of(db.campaign(k["id"]))
         self._board_done(ok, msg, extra)
+
+    def api_analysis_decide(self):
+        """{id, ok, note}: Approve opens the analysis to the person who asked; Reject tells them (item 195)."""
+        import gating, hub, kam_scope
+        who = self._need_account()
+        if not who:
+            return
+        role, a = hub.viewer(who[1])
+        if role not in ("admin", "kam"):
+            self.send_json(403, {"ok": False, "message": "Only HelloVoice can answer analysis requests."}, self.cors())
+            return
+        b = self.json_body() or {}
+        try:
+            rid = int(b.get("id"))
+        except (TypeError, ValueError):
+            self.send_json(400, {"ok": False, "message": "Which request?"}, self.cors())
+            return
+        with db.connect() as conn:
+            r = conn.execute("SELECT code_id FROM analysis_requests WHERE id = ?", (rid,)).fetchone()
+        if r is None or (role == "kam" and (r["code_id"] is None or int(r["code_id"]) not in (kam_scope.clients(a) or frozenset()))):
+            self.send_json(404, {"ok": False, "message": "That request is not here any more."}, self.cors())
+            return
+        ok, msg = gating.decide(rid, bool(b.get("ok")), (a["email"] if a is not None and "email" in a.keys() else "admin"), b.get("note") or "")
+        self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
 
     def api_board_selection_stage(self):
         """{s, to}: drag a selection between the planning columns of the account board (item 194).

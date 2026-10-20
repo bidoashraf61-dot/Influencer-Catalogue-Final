@@ -12,7 +12,9 @@ them.
     state(code_id, code)        unlocked | requested | locked | outside
     selections_with(code_id, code)   the client's selections holding the creator
     request(code_id, code, platform) the client asks (only from inside a selection)
-    fulfil(request_id, who)     unlock for that client and ring their bell
+    fulfil(request_id, who)     approve: unlock for the person who asked and ring their bell
+    decide(request_id, ok, ...) the admin inbox's Approve / Reject (item 195)
+    inbox(role, scope)          open and recent requests, grouped client -> campaign / selection
     headline(card, analyses)    the free layer
     sample(code, platform)      the stand-in analysis the locked sections are drawn from
     redact_score(score)         strip locked evidence out of a fit score
@@ -51,6 +53,15 @@ def init():
             conn.execute("INSERT OR IGNORE INTO analysis_grants (code_id, code, granted_at, granted_by, request_id) "
                          "SELECT code_id, code, COALESCE(handled_at, at), 'before gating', id FROM analysis_requests "
                          "WHERE handled_at IS NOT NULL AND code_id IS NOT NULL")
+        # Item 195 (owner, 2026-10-20): an admin's Approve opens the analysis to THAT person only.
+        # personal = 1 marks those grants; they open even while CLIENTS_SEE_ANALYSIS is off.
+        gcols = {r[1] for r in conn.execute("PRAGMA table_info(analysis_grants)")}
+        if "personal" not in gcols:
+            conn.execute("ALTER TABLE analysis_grants ADD COLUMN personal INTEGER")
+        rcols = {r[1] for r in conn.execute("PRAGMA table_info(analysis_requests)")}
+        for col in ("outcome", "handled_by", "note"):
+            if col not in rcols:
+                conn.execute("ALTER TABLE analysis_requests ADD COLUMN " + col + " TEXT")
     if not db.setting("gating_migrated", False):
         db.set_setting("gating_migrated", True)
     db.on("analysis_saved", _answered_by_upload)
@@ -99,11 +110,22 @@ def published_codes(code_id):
 CLIENTS_SEE_ANALYSIS = False
 
 
+def _personal(code_id, code=None):
+    """Creators an admin opened to this one person from the inbox (item 195)."""
+    with db.connect() as conn:
+        if code is not None:
+            return bool(conn.execute("SELECT 1 FROM analysis_grants WHERE code_id = ? AND code = ? AND personal = 1 LIMIT 1",
+                                     (int(code_id), code)).fetchone())
+        return {r[0] for r in conn.execute("SELECT code FROM analysis_grants WHERE code_id = ? AND personal = 1", (int(code_id),))}
+
+
 def unlocked(code_id, code):
     if code_id is None:
         return False
     if code_id == db.admin_code_id() or _unlock_all():
         return True
+    if _personal(code_id, code):
+        return True                                    # approved for this person from the admin inbox
     if not CLIENTS_SEE_ANALYSIS:
         return False
     # A key account manager's scope never unlocks an analysis (owner, 2026-10-20, item 174).
@@ -121,12 +143,13 @@ def unlocked_set(code_id, codes=None):
         return set()
     if code_id == db.admin_code_id() or _unlock_all():
         return None
+    mine = _personal(code_id)
     if not CLIENTS_SEE_ANALYSIS:
-        return set()
+        return mine if codes is None else mine & set(codes)
     team = _team(code_id)
     with db.connect() as conn:
         rows = conn.execute("SELECT code FROM analysis_grants WHERE code_id IN (%s)" % ",".join("?" * len(team)), list(team)).fetchall()
-    got = {r["code"] for r in rows} | published_codes(code_id)
+    got = {r["code"] for r in rows} | published_codes(code_id) | mine
     return got if codes is None else got & set(codes)
 
 
@@ -196,8 +219,8 @@ def has_analysis(code):
 
 
 def fulfil(request_id, who="", conn=None):
-    """Unlock a request's creator for that client, close every open request the team
-    has for that creator, and ring the bell. Returns the request row or None. Pass
+    """Approve a request (item 195): open the creator's analysis to the person who asked (a personal grant),
+    close their open requests for that creator, and ring their bell. Returns the request row or None. Pass
     ``conn`` to do it inside a transaction that is already open."""
     if conn is None:
         with db.connect() as own:
@@ -205,18 +228,79 @@ def fulfil(request_id, who="", conn=None):
     r = conn.execute("SELECT * FROM analysis_requests WHERE id = ?", (request_id,)).fetchone()
     if r is None or r["code_id"] is None:
         return None
-    team = _team(r["code_id"])
-    conn.execute("INSERT OR IGNORE INTO analysis_grants (code_id, code, granted_at, granted_by, request_id) VALUES (?,?,?,?,?)",
+    conn.execute("INSERT INTO analysis_grants (code_id, code, granted_at, granted_by, request_id, personal) VALUES (?,?,?,?,?,1) "
+                 "ON CONFLICT(code_id, code) DO UPDATE SET personal = 1, granted_at = excluded.granted_at, "
+                 "granted_by = excluded.granted_by, request_id = excluded.request_id",
                  (r["code_id"], r["code"], db.now(), who, r["id"]))
-    conn.execute("UPDATE analysis_requests SET handled_at = ? WHERE code = ? AND handled_at IS NULL AND code_id IN (%s)"
-                 % ",".join("?" * len(team)), [db.now(), r["code"]] + list(team))
+    conn.execute("UPDATE analysis_requests SET handled_at = ?, outcome = 'approved', handled_by = ? "
+                 "WHERE code = ? AND handled_at IS NULL AND code_id = ?", (db.now(), who, r["code"], r["code_id"]))
     _ring(conn, r["code_id"], r["code"])
     return r
 
 
+def decide(request_id, ok, who="", note=""):
+    """(ok, message): the inbox's Approve / Reject. Approve needs an analysis on file to open."""
+    with db.connect() as conn:
+        r = conn.execute("SELECT * FROM analysis_requests WHERE id = ?", (int(request_id),)).fetchone()
+        if r is None or r["code_id"] is None:
+            return False, "That request is not here any more."
+        c = conn.execute("SELECT name FROM creators WHERE code = ?", (r["code"],)).fetchone()
+        name = (c["name"] if c else r["code"]) or r["code"]
+        if r["handled_at"] is not None:
+            return False, "That request was already answered."
+        if ok:
+            if not has_analysis(r["code"]):
+                return False, "Upload %s's analysis first, then approve." % name
+            fulfil(r["id"], who, conn)
+            return True, "Approved: %s's analysis is open to them now." % name
+        note = " ".join(str(note or "").split())[:300]
+        conn.execute("UPDATE analysis_requests SET handled_at = ?, outcome = 'rejected', handled_by = ?, note = ? "
+                     "WHERE code = ? AND handled_at IS NULL AND code_id = ?", (db.now(), who, note or None, r["code"], r["code_id"]))
+        import inbox
+        u = conn.execute("SELECT id, status FROM users WHERE code_id = ?", (r["code_id"],)).fetchone()
+        if u is not None and u["status"] == "active":
+            inbox.emit([u["id"]], "analysis_reply", "Your account manager replied about", rest=" " + name,
+                       body=note or "The full analysis isn't available for this creator. Your account manager will be in touch.",
+                       href="creator/#c=" + r["code"], ref="analysis-no:%d" % r["id"], once=True, conn=conn)
+        return True, "Rejected. They have been told."
+
+
+def inbox(scope=None, days=30):
+    """The admin Analyses tab (item 195): open requests and the last ``days`` of answers.
+    ``scope`` None = every client (admins); else a KAM's client code ids (with .sel_ids)."""
+    since = db.now() - days * 86400
+    with db.connect() as conn:
+        rows = conn.execute(
+            "SELECT a.*, r.name creator_name, r.photo, u.name user_name, u.email user_email, u.company, c.label code_label "
+            "FROM analysis_requests a LEFT JOIN creators r ON r.code = a.code LEFT JOIN users u ON u.code_id = a.code_id "
+            "LEFT JOIN codes c ON c.id = a.code_id WHERE a.code_id IS NOT NULL AND (a.handled_at IS NULL OR a.handled_at >= ?) "
+            "ORDER BY a.at DESC LIMIT 400", (since,)).fetchall()
+        have = {x["code"] for x in conn.execute("SELECT DISTINCT code FROM creator_analysis")}
+    import board
+    out = []
+    for r in rows:
+        if scope is not None and int(r["code_id"]) not in scope:
+            continue
+        sels = selections_with(r["code_id"], r["code"])
+        camps = []
+        for s in sels:
+            sel = db.selection(token=s["token"])
+            for cid in (board.campaigns_holding(sel["id"]) if sel is not None else []):
+                k = db.campaign(cid)
+                if k is not None and not any(x["token"] == k["token"] for x in camps):
+                    camps.append({"name": k["name"], "token": k["token"], "status": k["status"]})
+        state = "open" if r["handled_at"] is None else (r["outcome"] or "approved")
+        if r["handled_by"] == "upload" or (r["handled_at"] is not None and not r["outcome"]):
+            state = "closed"
+        out.append({"id": r["id"], "code": r["code"], "creator": r["creator_name"] or r["code"], "photo": bool(r["photo"]),
+                    "platform": r["platform"] or "", "at": r["at"], "ready_by": ready_by(r["at"]),
+                    "client": r["company"] or r["code_label"] or "Unfiled", "user": r["user_name"] or r["user_email"] or r["code_label"] or "",
+                    "state": state, "handled_at": r["handled_at"], "handled_by": r["handled_by"] or "", "note": r["note"] or "",
+                    "has_analysis": r["code"] in have, "selections": sels[:3], "campaigns": camps[:3]})
+    return out
+
+
 def _ring(conn, code_id, code):
-    if not CLIENTS_SEE_ANALYSIS:
-        return                       # nothing opens for the client, so no "Full analysis ready" bell
     import inbox
     c = conn.execute("SELECT name FROM creators WHERE code = ?", (code,)).fetchone()
     name = (c["name"] if c else code) or code
@@ -228,8 +312,11 @@ def _ring(conn, code_id, code):
 
 
 def _answered_by_upload(conn, code, platform):
-    """An analysis uploaded for a creator answers that creator's open requests:
-    each client who asked gets it unlocked and a bell."""
+    """An analysis uploaded for a creator used to answer that creator's open requests by itself. Since item 195
+    an admin approves each one from the inbox, so while clients don't see analyses by default the requests
+    stay open (with the analysis now on file, ready to approve)."""
+    if not CLIENTS_SEE_ANALYSIS:
+        return
     rows = conn.execute("SELECT id FROM analysis_requests WHERE code = ? AND handled_at IS NULL "
                         "AND (platform IS NULL OR platform = ?)", (code, platform)).fetchall()
     for r in rows:
@@ -262,13 +349,15 @@ def for_client(code_id):
         return []
     ph = ",".join("?" * len(team))
     with db.connect() as conn:
-        reqs = conn.execute("SELECT a.code, a.at, a.handled_at, r.name, r.photo FROM analysis_requests a "
+        reqs = conn.execute("SELECT a.code, a.at, a.handled_at, a.outcome, a.note, a.code_id, r.name, r.photo FROM analysis_requests a "
                             "LEFT JOIN creators r ON r.code = a.code WHERE a.code_id IN (%s) ORDER BY a.at DESC" % ph, list(team)).fetchall()
         gr = conn.execute("SELECT g.code, g.granted_at, r.name FROM analysis_grants g LEFT JOIN creators r ON r.code = g.code "
                           "WHERE g.code_id IN (%s) ORDER BY g.granted_at DESC" % ph, list(team)).fetchall()
     out, seen = [], set()
     if not CLIENTS_SEE_ANALYSIS:
-        gr = []                      # a grant opens nothing for clients now, so it is not listed as "unlocked"
+        # only what an admin approved for this person opens (item 195); old team grants stay closed
+        mine = _personal(code_id)
+        gr = [g for g in gr if g["code"] in mine]
     for g in gr:
         if g["code"] in seen:
             continue
@@ -281,6 +370,9 @@ def for_client(code_id):
         if r["handled_at"] is None:
             out.append({"code": r["code"], "name": r["name"] or r["code"], "state": "requested", "at": r["at"],
                         "ready_by": ready_by(r["at"])})
+        elif r["outcome"] == "rejected" and r["code_id"] == code_id:
+            seen.add(r["code"])
+            out.append({"code": r["code"], "name": r["name"] or r["code"], "state": "declined", "at": r["handled_at"], "note": r["note"] or ""})
     return out
 
 
