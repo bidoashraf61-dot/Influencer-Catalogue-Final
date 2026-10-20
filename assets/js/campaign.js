@@ -460,7 +460,9 @@
 
   function renderBug(c) {
     var logos = (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="Brand logo">'; }).join("");
-    $("mx-brands").innerHTML = logos ? logos + '<span class="mx-bug__x" aria-hidden="true">×</span><img class="mx-bug__hv" src="../assets/brand/logo.png" alt="HelloVoice">' : "";
+    // HelloVoice's own campaigns (e.g. the Demo Campaign, owner 2026-10-20): their logo already is ours, so no "× HelloVoice".
+    var ours = /^\s*hello\s*voice\b/i.test(c.client || "");
+    $("mx-brands").innerHTML = logos ? logos + (ours ? "" : '<span class="mx-bug__x" aria-hidden="true">×</span><img class="mx-bug__hv" src="../assets/brand/logo.png" alt="HelloVoice">') : "";
     $("mx-title").textContent = c.name;
     $("mx-sub").textContent = [c.client, c.platform ? c.platform + " campaign" : ""].filter(Boolean).join(" · ");
     var start = c.starts_at, end = c.ends_at, now = Date.now() / 1000, bits = [];
