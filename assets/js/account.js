@@ -510,9 +510,20 @@
   }
   function scorebug(c) {
     var u = DATA.user, p = pace(c), gg = c.goal_grades || {};
-    var brands = h("div", { class: "ac-bug__brands" });
-    if (u.logo) { brands.appendChild(h("img", { src: imgUrl("logo", u.logo), alt: u.company || "" })); brands.appendChild(h("span", { class: "ac-bug__x", "aria-hidden": "true" }, "×")); }
+    // HelloVoice × the campaign's client logo (owner, 2026-10-20). HelloVoice's own campaigns show our logo once;
+    // a campaign with no logo of its own falls back to the account's company logo.
+    var brands = h("div", { class: "ac-bug__brands" }), ours = /^\s*hello\s*voice\b/i.test(c.client || "");
+    var clientLogos = (c.logos || []).map(function (ref) {
+      var n = String(ref).split("/").pop();
+      return String(ref).indexOf("clients/") === 0 ? ROOT + "assets/clients/" + n
+        : API + "/api/campaign-logo?t=" + encodeURIComponent(c.token) + "&n=" + encodeURIComponent(n);
+    });
+    if (!clientLogos.length && u.logo && !ours) clientLogos = [imgUrl("logo", u.logo)];
     brands.appendChild(h("img", { class: "ac-bug__hv", src: ROOT + "assets/brand/logo.png", alt: "HelloVoice" }));
+    if (!ours && clientLogos.length) {
+      brands.appendChild(h("span", { class: "ac-bug__x", "aria-hidden": "true" }, "×"));
+      clientLogos.forEach(function (src) { brands.appendChild(h("img", { src: src, alt: c.client || "Client logo" })); });
+    }
     return h("section", { class: "ac-bug", "aria-label": c.name },
       h("div", { class: "ac-bug__top" }, brands, h("span", { class: "ac-live" }, "Live"),
         h("span", { class: "ac-muted" }, [day(c.starts_at), day(c.ends_at)].filter(Boolean).join(" – "))),
