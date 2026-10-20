@@ -272,13 +272,14 @@
       var n = sec.querySelector(".hvb-panel__msg");
       n.textContent = text || ""; n.className = "hvb-panel__msg" + (bad ? " is-bad" : "");
     }
-    function section(key, title, kids) {
-      var sec = h("section", { class: "hvb-panel__sec", "data-sec": key }, h("h3", null, title));
+    function section(key, title, kids, lead) {
+      var sec = h("section", { class: "hvb-panel__sec", "data-sec": key }, h("h3", null, title), lead ? h("p", { class: "hvb-panel__lead" }, lead) : null);
       add(sec, kids);
       sec.appendChild(h("p", { class: "hvb-panel__msg", role: "status", "aria-live": "polite" }));
       bodyEl.appendChild(sec);
       return sec;
     }
+    // Logo and selections act at once (an upload, a link); everything else waits for the one Save.
     function save(sec, path, payload, okText) {
       note(sec, "Saving…");
       return call("POST", path, payload).then(function (r) {
@@ -288,58 +289,260 @@
         return ok;
       });
     }
-    // Brief: the newest brief on each of the campaign's selections; Edit opens the brief studio (portal.js).
-    var bl = h("ul", { class: "hvb-panel__briefs" });
-    (it.briefs || []).forEach(function (x) {
-      var hv = window.hvPortal || {};
-      var act = hv.scoreBrief ? h("button", { type: "button", class: "hvb-go" }, svg(x.brief ? "pen" : "brief"), x.brief ? "Edit brief" : "Add brief") : null;
-      if (act) act.addEventListener("click", function () { close(); hv.scoreBrief(x.selection, { edit: !!x.brief }); });
-      bl.appendChild(h("li", null,
-        h("div", { class: "hvb-panel__bt" }, h("b", null, x.selection_name), x.brief && x.brief.objective ? h("span", { class: "hvb-chip" }, x.brief.objective) : null),
-        x.brief ? h("p", null, x.brief.summary || "A brief with no summary yet.") : h("p", { class: "is-muted" }, "No brief on this selection yet."),
-        h("div", { class: "hvb-panel__row" }, act, h("a", { class: "hvb-go", href: ROOT + "selection/#s=" + encodeURIComponent(x.selection) }, svg("list"), "Open selection"))));
+    function field(label, input, hint) { return h("label", { class: "hvb-field" }, h("span", null, label), input, hint || null); }
+
+    /* -- items 211-213: one brief per campaign, every question the AI shortlister asks -- */
+    var S = { q: null, ans: {}, ans0: {}, sug: {}, plan: null, tg: {}, tg0: {}, typed: {}, typed0: {}, d: {}, d0: {} };
+    var tgSec = it.canEdit ? section("goal", "Objective and targets", h("p", { class: "is-muted" }, "Working out the targets…")) : null;
+    var briefSec = section("brief", "Brief", h("p", { class: "is-muted" }, "Opening the brief…"));
+    var bar = null, barText = null, barBtn = null, savedAt = null, touched = false;
+    box.addEventListener("input", function () { touched = true; }, true);
+    box.addEventListener("click", function (e) { if (e.target.closest && e.target.closest(".hvb-opt, .hvb-sug, .hvb-goal__o, .hvb-go--ai, .hvb-link--ink")) touched = true; }, true);
+
+    function same(a, b) { return JSON.stringify(a == null ? null : a) === JSON.stringify(b == null ? null : b); }
+    function list(v) { return v == null || v === "" ? [] : Array.isArray(v) ? v : [v]; }
+    function labelOf(q, v) {
+      var m = {}; (q.options || []).forEach(function (o) { m[o.value] = o.label; });
+      return list(v).map(function (x) { return m[x] || String(x).replace(/^other:/, ""); }).join(", ");
+    }
+    function num(v) { return v == null || v === "" ? "" : Number(v).toLocaleString("en-US"); }
+
+    function dirty() {
+      var n = 0;
+      Object.keys(S.d0).forEach(function (k) { if (!same(S.d[k], S.d0[k])) n++; });
+      var qs = {}; Object.keys(S.ans).concat(Object.keys(S.ans0)).forEach(function (k) { qs[k] = 1; });
+      Object.keys(qs).forEach(function (k) { if (!same(list(S.ans[k]), list(S.ans0[k]))) n++; });
+      TGT.forEach(function (t) { if (!same(S.tg[t[0]] || null, S.tg0[t[0]] || null)) n++; });
+      return n;
+    }
+    function paint(state, text) {
+      if (!bar) return;
+      var n = dirty();
+      bar.className = "hvb-savebar" + (state ? " is-" + state : n ? " is-dirty" : " is-clean");
+      var onlyAi = n && !touched;
+      barText.textContent = text || (onlyAi ? "Helvi filled the targets. Save to keep them." : n ? n + " unsaved change" + (n === 1 ? "" : "s")
+        : savedAt ? "All changes saved · " + savedAt : "No changes yet");
+      barBtn.disabled = state === "busy" || !n;
+      barBtn.textContent = state === "busy" ? "Saving…" : !n && savedAt ? "Saved" : "Save changes";
+    }
+
+    function chip(q, value, label, on, single) {
+      var b = h("button", { type: "button", class: "hvb-opt", "aria-pressed": on ? "true" : "false" }, label);
+      b.addEventListener("click", function () {
+        var cur = list(S.ans[q.id]);
+        if (single) cur = on ? [] : [value];
+        else cur = on ? cur.filter(function (x) { return x !== value; }) : cur.concat([value]);
+        S.ans[q.id] = q.type === "many" ? cur : (cur[0] || null);
+        if (!list(S.ans[q.id]).length) delete S.ans[q.id];
+        answered(q);
+      });
+      return b;
+    }
+    // One question as a row: its answer at a glance; open it to pick, or take Helvi's suggestion.
+    var rows = {};
+    function row(q) {
+      var r = rows[q.id] = h("div", { class: "hvb-q", "data-q": q.id });
+      var head = h("button", { type: "button", class: "hvb-q__head", "aria-expanded": "false" });
+      var body = h("div", { class: "hvb-q__body", hidden: true });
+      r.appendChild(head); r.appendChild(body);
+      head.addEventListener("click", function () {
+        var open = head.getAttribute("aria-expanded") !== "true";
+        head.setAttribute("aria-expanded", open ? "true" : "false");
+        body.hidden = !open;
+      });
+      draw(q);
+      return r;
+    }
+    function draw(q) {
+      var r = rows[q.id]; if (!r) return;
+      var head = r.firstChild, body = r.lastChild, v = S.ans[q.id], sg = S.sug[q.id];
+      var has = list(v).length > 0, ro = !it.canEdit;
+      var sugSame = sg && same(list(sg.value).slice().sort(), list(v).slice().sort());
+      r.classList.toggle("is-set", has);
+      head.textContent = "";
+      add(head, [h("span", { class: "hvb-q__l" }, q.label, q.required ? h("i", { class: "hvb-q__req", title: "Needed to update the selections" }, " *") : null),
+        h("span", { class: "hvb-q__a" + (has ? "" : " is-empty") }, has ? (q.type === "text" ? String(v) : labelOf(q, v))
+          : sg && !ro ? [h("i", { class: "hvb-q__hv" }, "Helvi"), " " + labelOf(q, sg.value)] : "Not set"),
+        ro ? null : svg("chev", "hvb-q__chev")]);
+      if (ro) { head.disabled = true; return; }
+      body.textContent = "";
+      if (sg && !sugSame) {
+        var take = h("button", { type: "button", class: "hvb-sug" }, h("b", null, "Use Helvi’s: " + labelOf(q, sg.value)), h("small", null, sg.why));
+        take.addEventListener("click", function () { S.ans[q.id] = Array.isArray(sg.value) || q.type !== "many" ? sg.value : [sg.value]; answered(q); });
+        body.appendChild(take);
+      } else if (sg) body.appendChild(h("p", { class: "hvb-q__why" }, "Matches Helvi: " + sg.why));
+      if (q.type === "text") {
+        var inp = h("input", { type: "text", value: v || "", maxlength: String(q.max || 200), "aria-label": q.label });
+        inp.addEventListener("input", function () { if (inp.value.trim()) S.ans[q.id] = inp.value; else delete S.ans[q.id]; paint(); var a = head.querySelector(".hvb-q__a"); a.textContent = inp.value.trim() || "Not set"; a.classList.toggle("is-empty", !inp.value.trim()); });
+        body.appendChild(inp);
+      } else {
+        var opts = h("div", { class: "hvb-opts", role: "group", "aria-label": q.label });
+        var cur = list(v);
+        q.options.forEach(function (o) { opts.appendChild(chip(q, o.value, o.label, cur.indexOf(o.value) >= 0, q.type === "one")); });
+        body.appendChild(opts);
+      }
+    }
+    function answered(q) {
+      draw(q);
+      var r = rows[q.id];
+      if (r) { r.firstChild.setAttribute("aria-expanded", "true"); r.lastChild.hidden = false; }
+      if (q.id === "goal") drawGoal();
+      if (["goal", "platforms", "category"].indexOf(q.id) >= 0) replan();
+      paint();
+    }
+
+    function drawBrief(b) {
+      briefSec.textContent = "";
+      briefSec.appendChild(h("h3", null, "Brief"));
+      if (!it.canEdit) {
+        if (!b.answers || !b.answers.length) briefSec.appendChild(h("p", { class: "is-muted" }, "No brief yet. Your account manager adds it here."));
+        (b.answers || []).forEach(function (g) {
+          briefSec.appendChild(h("h4", { class: "hvb-qg" }, g.label));
+          g.items.forEach(function (x) { briefSec.appendChild(h("div", { class: "hvb-q is-set" }, h("div", { class: "hvb-q__head" }, h("span", { class: "hvb-q__l" }, x.label), h("span", { class: "hvb-q__a" }, x.answer)))); });
+        });
+        return;
+      }
+      var open = S.q.reduce(function (n, g) { return n + g.items.filter(function (q) { return q.id !== "goal" && !list(S.ans[q.id]).length && S.sug[q.id]; }).length; }, 0);
+      var lead = h("div", { class: "hvb-brief__lead" },
+        h("p", null, b.meta && b.meta.seeded ? "Started from this campaign’s selections. Tap a question to change it." : "Tap a question to change it."));
+      if (open) {
+        var all = h("button", { type: "button", class: "hvb-go hvb-go--ai" }, "Use Helvi’s suggestions (" + open + ")");
+        all.addEventListener("click", function () {
+          S.q.forEach(function (g) { g.items.forEach(function (q) { if (q.id !== "goal" && !list(S.ans[q.id]).length && S.sug[q.id]) { S.ans[q.id] = S.sug[q.id].value; draw(q); } }); });
+          all.remove(); replan(); paint();
+        });
+        lead.appendChild(all);
+      }
+      briefSec.appendChild(lead);
+      S.q.forEach(function (g) {
+        var qs = g.items.filter(function (q) { return q.id !== "goal"; });        // the goal is the objective, below
+        if (!qs.length) return;
+        briefSec.appendChild(h("h4", { class: "hvb-qg" }, g.label));
+        qs.forEach(function (q) { briefSec.appendChild(row(q)); });
+      });
+      briefSec.appendChild(h("p", { class: "hvb-panel__msg", role: "status", "aria-live": "polite" }));
+    }
+
+    /* -- item 211: the objective fills the targets; any number can be typed over -- */
+    var goalQ = null, tIn = {};
+    function drawGoal() {
+      var g = tgSec.querySelector(".hvb-goal"); if (!g || !goalQ) return;
+      g.textContent = "";
+      var cur = list(S.ans.goal);
+      goalQ.options.forEach(function (o) {
+        var on = cur.indexOf(o.value) >= 0;
+        var b = h("button", { type: "button", class: "hvb-goal__o", "aria-pressed": on ? "true" : "false" }, h("b", null, o.label), o.hint ? h("small", null, o.hint) : null);
+        b.addEventListener("click", function () {
+          var now = list(S.ans.goal);
+          S.ans.goal = on ? now.filter(function (x) { return x !== o.value; }) : now.concat([o.value]);
+          answered(goalQ);
+        });
+        g.appendChild(b);
+      });
+    }
+    function drawTargets() {
+      var grid = tgSec.querySelector(".hvb-tg"); if (!grid) return;
+      grid.textContent = "";
+      var P = S.plan || { targets: {}, likely: {}, why: {}, headline: [] };
+      var keys = TGT.map(function (t) { return t[0]; }).filter(function (k) { return P.targets[k] != null || S.tg[k] != null; });
+      keys.sort(function (a, b) { return (P.headline.indexOf(a) < 0) - (P.headline.indexOf(b) < 0); });
+      if (!keys.length) { grid.appendChild(h("p", { class: "is-muted" }, (P.why && P.why.posts) || "Pick an objective to fill the targets.")); return; }
+      keys.forEach(function (k) {
+        var lab = TGT.filter(function (t) { return t[0] === k; })[0][1], ai = P.targets[k];
+        var inp = tIn[k] = h("input", { type: "number", min: "0", step: k === "er" ? "0.01" : "1", inputmode: "decimal", value: S.tg[k] != null ? String(S.tg[k]) : "", "aria-label": lab });
+        var mine = S.typed[k] && ai != null && Number(S.tg[k]) !== Number(ai);
+        var tag = h("span", { class: "hvb-tgt__tag" + (mine ? " is-mine" : "") }, mine ? "Your number" : "Helvi");
+        var useAi = mine ? h("button", { type: "button", class: "hvb-link hvb-link--ink" }, "Use Helvi’s: " + num(ai) + (k === "er" ? "%" : "")) : null;
+        if (useAi) useAi.addEventListener("click", function () { S.tg[k] = ai; delete S.typed[k]; drawTargets(); paint(); });
+        inp.addEventListener("input", function () {
+          S.tg[k] = inp.value === "" ? null : Number(inp.value);
+          if (ai != null && Number(inp.value) === Number(ai)) delete S.typed[k]; else S.typed[k] = 1;
+          var m = S.typed[k] && ai != null;
+          tag.textContent = m ? "Your number" : "Helvi"; tag.classList.toggle("is-mine", !!m);
+          paint();
+        });
+        var why = P.why[k] ? h("details", { class: "hvb-tgt__why" }, h("summary", null, "Where this comes from"), h("p", null, P.why[k])) : null;
+        grid.appendChild(h("div", { class: "hvb-tgt" + (P.headline.indexOf(k) >= 0 ? " is-lead" : "") },
+          h("div", { class: "hvb-tgt__top" }, h("span", { class: "hvb-tgt__l" }, lab), tag),
+          inp,
+          P.likely && P.likely[k] != null ? h("small", { class: "hvb-tgt__likely" }, "Likely " + num(P.likely[k]) + (k === "er" ? "%" : "")) : null,
+          useAi, why));
+      });
+    }
+    // Helvi's numbers follow the objective, the platforms and the space; typed ones stay.
+    var planSeq = 0, planT = null;
+    function applyPlan(p, first) {
+      S.plan = p;
+      TGT.forEach(function (t) {
+        var k = t[0];
+        if (S.typed[k]) return;
+        if (first && S.tg0[k] != null) return;          // a saved target the page has no reason to touch
+        if (p.targets[k] != null) S.tg[k] = p.targets[k]; else delete S.tg[k];
+      });
+      drawTargets(); paint();
+    }
+    function replan() {
+      if (!tgSec) return;
+      clearTimeout(planT);
+      var seq = ++planSeq;
+      planT = setTimeout(function () {
+        tgSec.classList.add("is-busy");
+        call("POST", "/api/board/plan", { t: c.token, answers: S.ans }).then(function (r) {
+          if (seq !== planSeq) return;
+          tgSec.classList.remove("is-busy");
+          if (r.b && r.b.ok) applyPlan(r.b);
+          else note(tgSec, (r.b && r.b.message) || "Couldn’t work out the targets just now.", true);
+        });
+      }, 250);
+    }
+
+    call("GET", "/api/board/brief?t=" + encodeURIComponent(c.token)).then(function (r) {
+      var b = r.b || {};
+      if (!b.ok) { briefSec.textContent = ""; briefSec.appendChild(h("h3", null, "Brief")); briefSec.appendChild(h("p", { class: "is-muted" }, "Couldn’t open the brief just now. Close and try again.")); return; }
+      if (!it.canEdit) { drawBrief(b); return; }
+      S.q = b.questions; S.sug = b.suggest || {};
+      S.ans = JSON.parse(JSON.stringify(b.answers || {})); S.ans0 = JSON.parse(JSON.stringify(b.answers || {}));
+      S.tg = JSON.parse(JSON.stringify(b.targets || {})); S.tg0 = JSON.parse(JSON.stringify(b.targets || {}));
+      ((b.meta && b.meta.typed) || []).forEach(function (k) { S.typed[k] = 1; });
+      S.typed0 = JSON.parse(JSON.stringify(S.typed));
+      if (b.meta && b.meta.saved_at) savedAt = when(b.meta.saved_at);
+      S.q.forEach(function (g) { g.items.forEach(function (q) { if (q.id === "goal") goalQ = q; }); });
+      drawBrief(b);
+      tgSec.textContent = "";
+      add(tgSec, [h("h3", null, "Objective and targets"),
+        h("p", { class: "hvb-panel__lead" }, "Pick the objective. Helvi fills the targets from this campaign’s creators; change any number you like."),
+        h("div", { class: "hvb-goal", role: "group", "aria-label": "Objective" }),
+        h("div", { class: "hvb-tg" }),
+        h("p", { class: "hvb-panel__msg", role: "status", "aria-live": "polite" })]);
+      drawGoal();
+      applyPlan(b.plan || { targets: {}, likely: {}, why: {}, headline: [] }, true);
     });
-    section("brief", "Brief", (it.briefs || []).length ? bl : h("p", { class: "is-muted" }, "Add a selection to this campaign first; its brief shows here."));
+    function when(ts) { var d = new Date(ts * 1000); return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) + (new Date().toDateString() === d.toDateString() ? "" : ", " + d.toLocaleDateString([], { day: "numeric", month: "short" })); }
+
     if (it.canEdit) {
       var f = {};
-      function field(label, input) { return h("label", { class: "hvb-field" }, h("span", null, label), input); }
       f.name = h("input", { type: "text", value: it.name, maxlength: "120", required: true });
       f.client = h("input", { type: "text", value: c.client || "", maxlength: "120" });
       f.starts = h("input", { type: "date", value: ymd(c.starts_at) });
       f.ends = h("input", { type: "date", value: ymd(c.ends_at) });
       f.next = h("input", { type: "text", value: (it.edit && it.edit.next) || "", maxlength: "140", placeholder: "e.g. Send the quote to the client" });
       f.due = h("input", { type: "date", value: ymd(it.edit && it.edit.due) });
-      var dsave = h("button", { type: "button", class: "hvb-btn" }, "Save details");
-      var dsec = section("details", "Details", [field("Name", f.name), field("Client", f.client),
+      section("details", "Details", [field("Name", f.name), field("Client", f.client),
         h("div", { class: "hvb-panel__two" }, field("First day", f.starts), field("Last day", f.ends)),
-        field("Next step", f.next), field("Next step due", f.due), dsave]);
-      dsave.addEventListener("click", function () {
-        save(dsec, "/api/board/edit", { t: c.token, name: f.name.value, client: f.client.value, starts: f.starts.value, ends: f.ends.value,
-                                         next: f.next.value, due: f.due.value });
-      });
-      var ob = h("select", null, OBJ.map(function (o) { return h("option", { value: o[0], selected: (it.edit && it.edit.objective === o[0]) || null }, o[1]); }));
-      var tg = {};
-      var tgrid = h("div", { class: "hvb-panel__targets" }, TGT.map(function (t) {
-        tg[t[0]] = h("input", { type: "number", min: "0", step: t[0] === "er" ? "0.01" : "1", inputmode: "decimal",
-          value: it.edit && it.edit.targets && it.edit.targets[t[0]] != null ? String(it.edit.targets[t[0]]) : "", placeholder: "–" });
-        return field(t[1], tg[t[0]]);
-      }));
-      var gsave = h("button", { type: "button", class: "hvb-btn" }, "Save goal");
-      var gsec = section("goal", "Objective and targets", [field("Objective", ob), tgrid, gsave]);
-      gsave.addEventListener("click", function () {
-        var t = {}; Object.keys(tg).forEach(function (k) { t[k] = tg[k].value; });
-        save(gsec, "/api/board/edit", { t: c.token, objective: ob.value, targets: t });
-      });
+        field("Next step", f.next), field("Next step due", f.due)]);
       if (B.opts.kams && B.opts.kams.length) {
-        var km = h("select", null, [h("option", { value: "" }, "No account manager")].concat(B.opts.kams.map(function (k) {
+        f.kam = h("select", null, [h("option", { value: "" }, "No account manager")].concat(B.opts.kams.map(function (k) {
           return h("option", { value: k.email, selected: (c.kam && c.kam.email === k.email) || null }, k.name);
         })));
-        var ksave = h("button", { type: "button", class: "hvb-btn" }, "Save account manager");
-        var ksec = section("kam", "Account manager", [field("Account manager", km), ksave]);
-        ksave.addEventListener("click", function () { save(ksec, "/api/hub/kam", { kind: "campaign", ref: it.edit.id, kam: km.value }); });
+        section("kam", "Account manager", [field("Account manager", f.kam)]);
       }
+      Object.keys(f).forEach(function (k) {
+        S.d0[k] = S.d[k] = f[k].value;
+        f[k].addEventListener(f[k].tagName === "SELECT" ? "change" : "input", function () { S.d[k] = f[k].value; paint(); });
+      });
       var file = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp" });
-      var lsec = section("logo", "Client logo", [h("div", { class: "hvb-panel__logo" }, brand(it)), field("Upload a new logo (PNG, JPG or WebP)", file)]);
+      var lsec = section("logo", "Client logo", [h("div", { class: "hvb-panel__logo" }, brand(it)), field("Upload a new logo (PNG, JPG or WebP)", file)],
+        "Saves as soon as you pick a file.");
       file.addEventListener("change", function () {
         var fl = file.files && file.files[0];
         if (!fl) return;
@@ -355,49 +558,104 @@
         var li = h("li", null, h("a", { href: ROOT + "selection/#s=" + encodeURIComponent(x.token) }, x.name), h("small", null, x.creators + " creators"), rm);
         rm.addEventListener("click", function () {
           rm.disabled = true;
-          save(ssec, "/api/board/detach", { t: c.token, s: x.token }).then(function (ok) { if (ok) li.remove(); else rm.disabled = false; });
+          save(ssec, "/api/board/detach", { t: c.token, s: x.token }).then(function (ok) { if (ok) { li.remove(); replan(); } else rm.disabled = false; });
         });
         cur.appendChild(li);
       });
       var pick = h("select", { "aria-label": "A selection to add" }, h("option", { value: "" }, "Loading the client's selections…"));
-      var addB = h("button", { type: "button", class: "hvb-btn" }, "Add to campaign");
-      var ssec = section("sels", "Selections", [cur, h("div", { class: "hvb-panel__row" }, pick, addB)]);
+      var addB = h("button", { type: "button", class: "hvb-btn hvb-btn--ghost" }, "Add to campaign");
+      var ssec = section("sels", "Selections", [cur, h("div", { class: "hvb-panel__row" }, pick, addB)], "Adding or removing one saves at once and updates Helvi’s targets.");
       call("GET", "/api/board/attachable?t=" + encodeURIComponent(c.token)).then(function (r) {
-        var list = (r.b && r.b.selections) || [];
+        var lst = (r.b && r.b.selections) || [];
         pick.textContent = "";
-        pick.appendChild(h("option", { value: "" }, list.length ? "Pick a selection" : "No other selections for this client"));
-        list.forEach(function (x) { pick.appendChild(h("option", { value: x.token }, x.name + " · " + x.creators + " creators")); });
+        pick.appendChild(h("option", { value: "" }, lst.length ? "Pick a selection" : "No other selections for this client"));
+        lst.forEach(function (x) { pick.appendChild(h("option", { value: x.token }, x.name + " · " + x.creators + " creators")); });
       });
       addB.addEventListener("click", function () {
         if (!pick.value) { note(ssec, "Pick a selection first.", true); return; }
         var label = pick.options[pick.selectedIndex].textContent.split(" · ")[0];
         save(ssec, "/api/board/attach", { s: pick.value, t: c.token }).then(function (ok) {
-          if (ok) { cur.appendChild(h("li", null, h("span", null, label), h("small", null, "added"))); pick.remove(pick.selectedIndex); }
+          if (ok) { cur.appendChild(h("li", null, h("span", null, label), h("small", null, "added"))); pick.remove(pick.selectedIndex); replan(); }
         });
+      });
+
+      // Item 212: one Save for everything above, with a state that always says where the panel is.
+      barText = h("p", { class: "hvb-savebar__t", role: "status", "aria-live": "polite" });
+      barBtn = h("button", { type: "button", class: "hvb-btn hvb-savebar__go" }, "Save changes");
+      bar = h("footer", { class: "hvb-savebar is-clean" }, barText, barBtn);
+      box.appendChild(bar);
+      box.classList.add("has-bar");
+      barBtn.addEventListener("click", saveAll);
+    }
+    var D_KEY = { name: "name", client: "client", starts: "starts", ends: "ends", next: "next", due: "due" };
+    function saveAll() {
+      if (!dirty()) return;
+      unask();
+      var p = { t: c.token };
+      Object.keys(D_KEY).forEach(function (k) { if (!same(S.d[k], S.d0[k])) p[D_KEY[k]] = S.d[k]; });
+      if ((p.starts != null || p.ends != null)) { p.starts = S.d.starts; p.ends = S.d.ends; }
+      if (S.d0.kam != null && !same(S.d.kam, S.d0.kam)) p.kam = S.d.kam;
+      var qs = {}; Object.keys(S.ans).concat(Object.keys(S.ans0)).forEach(function (k) { qs[k] = 1; });
+      var briefChanged = Object.keys(qs).some(function (k) { return !same(list(S.ans[k]), list(S.ans0[k])); });
+      var tgChanged = TGT.some(function (t) { return !same(S.tg[t[0]] || null, S.tg0[t[0]] || null); });
+      if (briefChanged) { p.brief = { answers: S.ans }; }
+      if (tgChanged || briefChanged) {
+        p.targets = {}; TGT.forEach(function (t) { if (S.tg[t[0]] != null) p.targets[t[0]] = S.tg[t[0]]; });
+        p.typed = Object.keys(S.typed);
+      }
+      paint("busy", "Saving…");
+      call("POST", "/api/board/save", p).then(function (r) {
+        var ok = r.b && r.b.ok;
+        if (!ok) {
+          paint("bad", (r.b && r.b.message) || "Couldn’t save. Nothing was changed; please try again.");
+          var fk = r.b && r.b.field, at = fk === "goal" ? tgSec : fk === "kam" ? bodyEl.querySelector('[data-sec="kam"]') : null;
+          if (at) at.scrollIntoView({ block: "start", behavior: "smooth" });
+          return;
+        }
+        changed = true;
+        S.d0 = JSON.parse(JSON.stringify(S.d)); S.ans0 = JSON.parse(JSON.stringify(S.ans));
+        S.tg0 = JSON.parse(JSON.stringify(S.tg)); S.typed0 = JSON.parse(JSON.stringify(S.typed));
+        savedAt = when((r.b && r.b.saved_at) || Date.now() / 1000);
+        paint("saved", r.b.message && r.b.message !== "Saved." ? r.b.message + " · " + savedAt : "All changes saved · " + savedAt);
+        if (p.name) { box.querySelector(".hvb-panel__t").textContent = p.name; }
       });
     }
     back.appendChild(box);
-    function close() {
+    function close(force) {
+      if (bar && !force && dirty()) { ask(); return; }
       document.removeEventListener("keydown", key, true);
       back.remove();
       document.body.classList.remove("hvb-panel-open");
       if (changed && B.opts.onChange) B.opts.onChange();
       else if (opener && document.contains(opener)) opener.focus();
     }
+    // Closing with unsaved edits asks once, in the bar, never in a browser dialog.
+    function ask() {
+      if (bar.querySelector(".hvb-savebar__ask")) return;
+      var keep = h("button", { type: "button", class: "hvb-btn hvb-btn--ghost" }, "Keep editing");
+      var drop = h("button", { type: "button", class: "hvb-link" }, "Discard");
+      var q = h("div", { class: "hvb-savebar__ask", role: "alertdialog", "aria-label": "Unsaved changes" }, h("p", null, "Close without saving " + dirty() + " change" + (dirty() === 1 ? "" : "s") + "?"), keep, drop, barBtn);
+      bar.textContent = ""; bar.className = "hvb-savebar is-ask"; bar.appendChild(q);
+      keep.addEventListener("click", function () { unask(); barBtn.focus(); });
+      drop.addEventListener("click", function () { close(true); });
+      keep.focus();
+    }
+    function unask() { if (!bar.querySelector(".hvb-savebar__ask")) return; bar.textContent = ""; bar.appendChild(barText); bar.appendChild(barBtn); paint(); }
     function key(e) {
       if (e.key === "Escape") { e.preventDefault(); close(); return; }
       if (e.key !== "Tab") return;
-      var f = box.querySelectorAll("button, a[href], input, select, textarea");
+      var f = box.querySelectorAll("button:not([disabled]), a[href], input, select, textarea, summary");
       if (!f.length) return;
       var first = f[0], last = f[f.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
-    shut.addEventListener("click", close);
+    shut.addEventListener("click", function () { close(); });
     back.addEventListener("click", function (e) { if (e.target === back) close(); });
     document.addEventListener("keydown", key, true);
     document.body.classList.add("hvb-panel-open");
     document.body.appendChild(back);
+    paint();
     var target = bodyEl.querySelector('[data-sec="' + focus + '"]') || bodyEl.firstChild;
     requestAnimationFrame(function () {
       target.scrollIntoView({ block: "start" });

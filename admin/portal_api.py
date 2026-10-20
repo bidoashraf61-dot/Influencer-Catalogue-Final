@@ -337,6 +337,15 @@ class PortalMixin(connect_api.ConnectMixin):
             st, got = board.history_of(self, token=str(query.get("t") or "") or None, sel_token=str(query.get("s") or "") or None)
             self.send_json(st, got, self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/board/brief":
+            # Items 211-213: the campaign brief on the card (staff: questions, suggestions, planned targets).
+            import board
+            k, role = board.campaign_for(self, token=str(query.get("t") or "") or None)
+            if k is None:
+                self.send_json(401 if role is None else 404, {"ok": False}, self.cors())
+            else:
+                self.send_json(200, dict(board.brief_view(self, k), ok=True), self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path in ("/api/board", "/api/board/targets"):
             # The campaign board (item 174/176): admins every campaign, a KAM hers, a client their own (read-only).
             import board
@@ -561,7 +570,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/selection-stage": self.api_board_selection_stage,
             "/api/analysis/decide": self.api_analysis_decide,
             "/api/board/edit": self.api_board_edit, "/api/board/logo": self.api_board_logo,
-            "/api/board/detach": self.api_board_detach,
+            "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
             "/api/selection/merge": self.api_selection_merge,
         }
         fn = routes.get(path)
@@ -1101,6 +1110,29 @@ class PortalMixin(connect_api.ConnectMixin):
             return
         ok, msg, extra = board.edit(self, k, b)
         self._board_done(ok, msg, extra)
+
+    def api_board_save(self):
+        """{t, ...changed fields, brief?: {answers}, typed?, kam?}: the card panel's one Save (item 212)."""
+        import board
+        b = self.json_body() or {}
+        k = self._board_campaign(b)
+        if k is None:
+            return
+        _cid, user, _kind = self._identity()
+        ok, msg, extra = board.save_all(self, k, {x: v for x, v in b.items() if x not in ("t", "id")}, user)
+        self._board_done(ok, msg, extra)
+
+    def api_board_plan(self):
+        """{t, answers}: the planned targets for answers not saved yet (items 211)."""
+        import board
+        b = self.json_body() or {}
+        k = self._board_campaign(b)
+        if k is None:
+            return
+        got = board.plan_for(self, k, b.get("answers") or {})
+        if got is None:
+            return self.send_json(403, {"ok": False, "message": "Only HelloVoice can plan this campaign."}, self.cors())
+        self.send_json(200, dict(got, ok=True), self.cors())
 
     def api_board_logo(self):
         """{t, data: "data:image/...;base64,..."}: a new client logo for the campaign."""

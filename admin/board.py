@@ -806,6 +806,19 @@ def _day(text):
 def edit(h, k, b):
     """{name, client, starts, ends (YYYY-MM-DD or ""), objective, targets {key: n}}. (ok, message, extra)."""
     import history
+    ok, msg, f = edit_fields(h, k, b)
+    if not ok:
+        return False, msg, f
+    if not f:
+        return False, "Nothing to change.", {}
+    with history.tracked("campaign", k["id"], "Edited %s on the board" % k["name"]):
+        db.save_campaign(k["id"], **f)
+    return True, "Saved.", {}
+
+
+def edit_fields(h, k, b):
+    """The columns ``b`` changes, every one checked before anything is written: (True, "", fields), or
+    (False, message, extra) and nothing to write."""
     import metrics
     if not may_edit(h, k):
         return False, "Only HelloVoice can change this campaign.", {"status": 403}
@@ -831,7 +844,7 @@ def edit(h, k, b):
         f["starts_at"], f["ends_at"] = s, e
     if "objective" in b:
         o = str(b.get("objective") or "").lower()
-        if o not in metrics.OBJECTIVES or o == "custom":
+        if not metrics.valid_objective(o) or o == "custom":
             return False, "Pick an objective from the list.", {}
         f["objective"], f["weights"] = o, None
     if "targets" in b:
@@ -857,11 +870,74 @@ def edit(h, k, b):
         if b.get("due") and d is None:
             return False, "That due date is not valid.", {}
         f["next_due"] = d
-    if not f:
+    return True, "", f
+
+
+def brief_view(h, k):
+    """The card's Brief section (items 211-213): staff get the questions, Helvi's suggestions and the
+    planned targets; anyone else who sees the card gets the brief in words."""
+    import cbrief
+    return cbrief.payload(k, _selections(selection_ids(k)), may_edit(h, k))
+
+
+def plan_for(h, k, answers):
+    """Targets for answers not saved yet (the panel recalculates as the goal or platforms change)."""
+    import cbrief
+    if not may_edit(h, k):
+        return None
+    return cbrief.targets(_selections(selection_ids(k)), cbrief.clean(answers))
+
+
+def save_all(h, k, b, user=None):
+    """The panel's one Save (item 212): details, objective, targets, the brief and the account manager,
+    all checked first and then written together, so a save never lands half done.
+    ``b``: the changed fields only, as edit() takes them, plus brief {answers}, typed [target keys], kam."""
+    import cbrief
+    import history
+    import hub
+    import metrics
+    if not may_edit(h, k):
+        return False, "Only HelloVoice can change this campaign.", {"status": 403}
+    b = dict(b)
+    answers = None
+    if "brief" in b:
+        answers = cbrief.clean((b.get("brief") or {}).get("answers") if isinstance(b.get("brief"), dict) else {})
+        goal = answers.get("goal") or []
+        key = metrics.blend_key(goal if isinstance(goal, list) else [goal])
+        if not key:
+            return False, "Pick at least one goal for the campaign.", {"field": "goal"}
+        b["objective"] = key
+    kam = None
+    if "kam" in b:
+        role, a = hub.viewer(user) if user is not None else (None, None)
+        kam = hub._valid_kam(str(b.get("kam") or ""))
+        if kam is None:
+            return False, "Pick an account manager from the list.", {"field": "kam"}
+        if not hub._can_kam(role, a, k["code_id"], db.kam_of_item("campaign", k["id"])):
+            return False, "Only HelloVoice admins can change the account manager.", {"status": 403}
+    ok, msg, f = edit_fields(h, k, b)
+    if not ok:
+        return False, msg, f
+    if not f and answers is None and kam is None and "typed" not in b:
         return False, "Nothing to change.", {}
-    with history.tracked("campaign", k["id"], "Edited %s on the board" % k["name"]):
-        db.save_campaign(k["id"], **f)
-    return True, "Saved.", {}
+    pushed, miss = 0, []
+    with history.tracked("campaign", k["id"], "Saved %s from the board" % k["name"]):
+        if f:
+            db.save_campaign(k["id"], **f)
+        typed = [x for x in (b.get("typed") or []) if isinstance(x, str)]
+        if answers is not None:
+            pushed, miss = cbrief.save(db.campaign(k["id"]), _selections(selection_ids(k)), answers, typed, _actor(h))
+        elif "typed" in b:
+            cbrief.set_typed(db.campaign(k["id"]), typed)
+    if kam is not None:
+        hub.set_kam(role, a, "campaign", k["id"], kam, (a["email"] if a is not None else ""))
+    text = "Saved."
+    if pushed:
+        text += " The brief now drives %s." % ("its selection" if pushed == 1 else "its %d selections" % pushed)
+    elif miss:
+        names = {"goal": "goal", "platforms": "platforms", "market": "countries", "category": "space"}
+        text += " Add the %s to update the selections too." % " and ".join(names[m] for m in miss)
+    return True, text, {"saved_at": db.now()}
 
 
 def set_logo(h, k, data, logo_dir):
