@@ -2196,18 +2196,26 @@ def refresh_count(cid):
         return conn.execute("SELECT COUNT(*) FROM campaign_updates WHERE campaign_id = ? AND by_admin = 0", (int(cid),)).fetchone()[0]
 
 
-def refresh_last(cid):
+def _update_kind(conn):
+    """Item 223 (2026-10-21): posts and comments are fetched by separate buttons; the free count stays shared."""
+    conn.executescript(UPDATE_SCHEMA)
+    if "kind" not in {r["name"] for r in conn.execute("PRAGMA table_info(campaign_updates)")}:
+        conn.execute("ALTER TABLE campaign_updates ADD COLUMN kind TEXT NOT NULL DEFAULT 'posts'")
+
+
+def refresh_last(cid, kind=None):
     with connect() as conn:
-        conn.executescript(UPDATE_SCHEMA)
-        r = conn.execute("SELECT MAX(at) FROM campaign_updates WHERE campaign_id = ?", (int(cid),)).fetchone()
+        _update_kind(conn)
+        r = conn.execute("SELECT MAX(at) FROM campaign_updates WHERE campaign_id = ?" + (" AND kind = ?" if kind else ""),
+                         (int(cid),) + ((kind,) if kind else ())).fetchone()
         return r[0] if r else None
 
 
-def refresh_log(cid, code_id, by_admin, jobs):
+def refresh_log(cid, code_id, by_admin, jobs, kind="posts"):
     with connect() as conn:
-        conn.executescript(UPDATE_SCHEMA)
-        conn.execute("INSERT INTO campaign_updates (campaign_id, code_id, by_admin, at, jobs) VALUES (?,?,?,?,?)",
-                     (int(cid), code_id, 1 if by_admin else 0, now(), int(jobs)))
+        _update_kind(conn)
+        conn.execute("INSERT INTO campaign_updates (campaign_id, code_id, by_admin, at, jobs, kind) VALUES (?,?,?,?,?,?)",
+                     (int(cid), code_id, 1 if by_admin else 0, now(), int(jobs), kind))
 
 
 def share_get(cid):

@@ -198,5 +198,50 @@ class CampaignData(unittest.TestCase):
         self.assertEqual(c["by_platform"][0]["engagement"], 50 + 5 + 2 + 1)
 
 
+    # ------------------------------------------------------------------ 223
+    def test_223_posts_and_comments_fetch_separately_with_one_shared_count(self):
+        import comments as cm
+        cm.init()
+        lead, _ = self.signup("lead@cmtco.com")
+        cid = portal.user_by_email("lead@cmtco.com")["code_id"]
+        now = int(time.time())
+        k = db.create_campaign("Two buttons", client="Cmtco", code_id=cid)
+        db.save_campaign(k, status="live", starts_at=now - 10 * DAY, ends_at=now + 20 * DAY)
+        db.add_campaign_creators(k, ["HV-MI-001"])
+        a = self._post(k, "HV-MI-001", "Instagram", "https://www.instagram.com/reel/C223a/")
+        self._post(k, "HV-MI-001", "TikTok", "https://www.tiktok.com/@noha/video/223")
+        with db.connect() as conn:
+            conn.execute("INSERT INTO comment_reads (content_id,campaign_id,platform,read_no,due_at,status,finished_at) VALUES (?,?,?,?,?,?,?)",
+                         (a, k, "Instagram", 1, now - 5 * DAY, "done", now - 5 * DAY))
+        tok = db.campaign(k)["token"]
+        s, b, _ = lead.get("/api/campaign/refresh?t=" + tok)
+        self.assertEqual(s, 200, b)
+        self.assertTrue(b["posts"]["schedule"].startswith("Every day at"), b["posts"])
+        self.assertTrue(b["comments"]["schedule"].startswith("Read 2 and 7 days"), b["comments"])
+        self.assertNotIn("est", b["posts"]); self.assertNotIn("est", b["comments"])          # no dollars for clients
+        import comments
+        orig = comments._kick
+        comments._kick = lambda: None                                                        # no Apify in tests
+        try:
+            s, b, _ = lead.post("/api/campaign/refresh", {"t": tok, "what": "comments"})
+            self.assertEqual((s, b.get("started"), b.get("left")), (200, 2, 9), b)          # both videos queued; one free fetch used
+            with db.connect() as conn:
+                due = conn.execute("SELECT COUNT(*) FROM comment_reads WHERE campaign_id = ? AND status = 'due' AND due_at <= ?",
+                                   (k, db.now())).fetchone()[0]
+            self.assertEqual(due, 2)
+            self.assertEqual(b["comments"]["last_at"], now - 5 * DAY)                       # the last read survives the re-queue
+            s, b, _ = lead.post("/api/campaign/refresh", {"t": tok, "what": "comments"})
+            self.assertEqual((s, b.get("reason")), (429, "wait"))                             # a minute between two comment fetches
+            self.assertEqual(db.refresh_last(k, "posts"), None)                               # posts have their own clock
+        finally:
+            comments._kick = orig
+        with db.connect() as conn:
+            conn.execute("UPDATE campaign_updates SET at = at - 200 WHERE campaign_id = ?", (k,))
+            for _ in range(9):
+                conn.execute("INSERT INTO campaign_updates (campaign_id, code_id, by_admin, at, jobs, kind) VALUES (?,?,0,?,1,'posts')", (k, cid, now - 300))
+        s, b, _ = lead.post("/api/campaign/refresh", {"t": tok, "what": "comments"})
+        self.assertEqual((s, b.get("reason")), (429, "limit"))                                # the 10 are shared
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
