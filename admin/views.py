@@ -1921,9 +1921,9 @@ def date_carry(dates):
     return out
 
 
-def duplicate_group_card(group):
+def duplicate_group_card(group, back=None):
     """One set of creators that look like the same person, with a Combine button
-    on each: choosing one combines the others into it."""
+    on each: choosing one combines the others into it. ``back`` = the page to return to."""
     members = ""
     for c in group:
         others = [x["code"] for x in group if x["code"] != c["code"]]
@@ -1934,6 +1934,7 @@ def duplicate_group_card(group):
             + ui.compact(c["followers"]) + " followers · " + e(c["platform"] or "") + "</span></div></div>"
             "<form method='post' action='" + u("/roster/merge") + "' data-confirm='Combine the records into " + e(c["code"]) + "? Both are kept as one creator, nothing is lost.'>"
             "<input type='hidden' name='keep' value='" + e(c["code"]) + "'>"
+            + ("<input type='hidden' name='back' value='" + e(back) + "'>" if back else "")
             + "".join("<input type='hidden' name='drop' value='" + e(o) + "'>" for o in others)
             + "<button class='btn small lime'>" + ui.icon("merge", 15) + " Combine into this one</button></form></div>")
     return "<div class='card dups'>" + members + "</div>"
@@ -2143,6 +2144,8 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
                      "Every merge can be undone from History.</p>" + dgroups)
     else:
         dup_panel = ui.empty("check", "No duplicates found", "Creators are checked by profile link and handle. Nothing looks doubled.")
+    dup_panel += ("<p class='price-hint'>Cards that share a handle written differently, or the same handle on Instagram and TikTok, are under "
+                  "<a href='" + u("/roster/quality") + "?tab=pairs'>Out of scope › Same-handle pairs</a>.</p>")
 
     panels = {"all": all_panel, "add": add_panel, "import": import_panel,
               "tiers": tiers_section(tiers, used), "dupes": dup_panel}
@@ -2151,7 +2154,8 @@ def roster_page(creators, error=None, message=None, cities=None, tiers=None,
         suggestions
         + reach_script(bands or [], [t["name"] for t in tiers if not t["auto"]])
         + ui.header("Creators", "Everyone clients can pick from. Hidden creators stay in the database but never reach a client.",
-                    actions="<a class='btn lime' href='#rt=add' data-go-tab='rt:add'>" + ui.icon("plus", 16) + " Add a creator</a>")
+                    actions="<a class='btn ghost' href='" + u("/roster/quality") + "'>" + ui.icon("flag", 16) + " Out of scope</a>"
+                    "<a class='btn lime' href='#rt=add' data-go-tab='rt:add'>" + ui.icon("plus", 16) + " Add a creator</a>")
         + err
         + ui.tabset("rt", [("all", "Everyone", len(creators) if not filtered else None), ("add", "Add a creator", None),
                            ("import", "Import", None), ("tiers", "Tiers & pricing", None),
@@ -4655,7 +4659,7 @@ SCROLL_JS = """<script>
 
 
 HISTORY_KINDS = [("", "Everything"), ("trash", "Trash (deleted)"), ("creator", "Creators"),
-                 ("campaign", "Campaigns"), ("selection", "Selections"), ("code", "Access codes"),
+                 ("campaign", "Campaigns"), ("selection", "Selections"), ("code", "Access codes"), ("user", "Client accounts"), ("company", "Companies"),
                  ("tiers", "Tiers"), ("roster", "Roster imports")]
 
 

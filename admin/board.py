@@ -228,7 +228,59 @@ def client_logo(name, folder):
         cand = "-".join(words[:n])
         if len(cand) >= 3 and cand in stems:
             return stems[cand]
-    return None
+    # Item 214: "Jamjoom Wave 1" -> jamjoom-pharma.webp, when exactly one logo starts with that first word.
+    first = [st for st in stems if len(words[0]) >= 4 and st.startswith(words[0] + "-")]
+    return stems[first[0]] if len(first) == 1 else None
+
+
+_STAFF = re.compile(r"^\s*(blue\s*holding|hello\s*voice)\b", re.I)
+
+
+def _account_company(code_id):
+    """The company on the account behind ``code_id``, unless it is our own (BlueHolding / HelloVoice staff)."""
+    if code_id is None:
+        return ""
+    try:
+        import portal
+        u = portal.user_for_code(int(code_id))
+    except Exception:
+        u = None
+    if u is None:
+        return ""
+    co = ((u["company"] if "company" in u.keys() else "") or "").strip()
+    dom = ((u["email"] or "").rsplit("@", 1)[-1]).lower()
+    if not co or _STAFF.match(co) or dom.endswith(("blueholding.co.uk", "blueholding.com", "hellovoice.co.uk")):
+        return ""
+    return co
+
+
+def clean_client(name):
+    """A client name fit for a card: "" for an access-code label ("Client: x@y"), an email or our own company."""
+    v = (name or "").strip()
+    if not v or "@" in v or v.lower().startswith("client:") or _STAFF.match(v):
+        return ""
+    return v
+
+
+def client_of(k, sels=(), logo_dir=None):
+    """Item 214 (owner 2026-10-21): the campaign's real client for the card. The client field is often empty or
+    holds an access-code label ("Client: someone@blueholding.co.uk") when the team started the campaign, so
+    fall back to the owning account's company, then a linked selection's, then a client logo the campaign's
+    name points to ("Penduline Influencer Campaign 01"). "" = no client known: the card shows HelloVoice alone."""
+    given = ((k["client"] if "client" in k.keys() else "") or "").strip()
+    if _STAFF.match(given):
+        return "HelloVoice"         # our own campaign (the demo too): the card shows our logo once (29c2171)
+    raw = clean_client(given)
+    if raw:
+        return raw
+    for code in [k["code_id"]] + [s["code_id"] for s in sels]:
+        co = _account_company(code)
+        if co:
+            return co
+    f = client_logo(k["name"] or "", logo_dir)
+    if f:
+        return f.rsplit(".", 1)[0].replace("-", " ").title()
+    return ""
 
 
 def _pins(who):
@@ -323,15 +375,15 @@ def card(h, k, role, pins, logo_dir, staff, demo=frozenset(), who=None, team=Non
     sels = _selections(selection_ids(k))
     chips = [lifecycle.chip(s) for s in sels]
     stage = stage_of(k, sels, [c["key"] for c in chips])
-    logos = []
-    for ref in db.campaign_logos(k):
-        if ref.startswith("clients/") or k["status"] != "draft" or staff:
-            logos.append(h.logo_url(ref, k["token"]))
+    # Item 214: HelloVoice x the client's logo. The campaign's own logo (uploaded on the board or picked in the
+    # admin) for everyone who sees the card, drafts included; else the catalogue's logo for its client.
+    client = client_of(k, sels, logo_dir)
+    logos = [h.logo_url(ref, k["token"]) for ref in db.campaign_logos(k)]
     if not logos:
-        f = client_logo(k["client"] or "", logo_dir)
+        f = client_logo(client, logo_dir) or client_logo(k["name"] or "", logo_dir)
         if f:
             logos.append("/assets/clients/" + f)
-    out = {"id": k["id"], "token": k["token"], "name": k["name"], "client": k["client"] or "",
+    out = {"id": k["id"], "token": k["token"], "name": k["name"], "client": client,
            "stage": stage, "status": k["status"], "starts_at": k["starts_at"], "ends_at": k["ends_at"],
            "logos": logos[:3], "my_pin": k["id"] in pins, "pinned_at": pins.get(k["id"]), "demo": k["id"] in demo,
            "report": k["status"] != "draft",
@@ -789,6 +841,19 @@ def _day(text):
 def edit(h, k, b):
     """{name, client, starts, ends (YYYY-MM-DD or ""), objective, targets {key: n}}. (ok, message, extra)."""
     import history
+    ok, msg, f = edit_fields(h, k, b)
+    if not ok:
+        return False, msg, f
+    if not f:
+        return False, "Nothing to change.", {}
+    with history.tracked("campaign", k["id"], "Edited %s on the board" % k["name"]):
+        db.save_campaign(k["id"], **f)
+    return True, "Saved.", {}
+
+
+def edit_fields(h, k, b):
+    """The columns ``b`` changes, every one checked before anything is written: (True, "", fields), or
+    (False, message, extra) and nothing to write."""
     import metrics
     if not may_edit(h, k):
         return False, "Only HelloVoice can change this campaign.", {"status": 403}
@@ -814,7 +879,7 @@ def edit(h, k, b):
         f["starts_at"], f["ends_at"] = s, e
     if "objective" in b:
         o = str(b.get("objective") or "").lower()
-        if o not in metrics.OBJECTIVES or o == "custom":
+        if not metrics.valid_objective(o) or o == "custom":
             return False, "Pick an objective from the list.", {}
         f["objective"], f["weights"] = o, None
     if "targets" in b:
@@ -840,11 +905,74 @@ def edit(h, k, b):
         if b.get("due") and d is None:
             return False, "That due date is not valid.", {}
         f["next_due"] = d
-    if not f:
+    return True, "", f
+
+
+def brief_view(h, k):
+    """The card's Brief section (items 211-213): staff get the questions, Helvi's suggestions and the
+    planned targets; anyone else who sees the card gets the brief in words."""
+    import cbrief
+    return cbrief.payload(k, _selections(selection_ids(k)), may_edit(h, k))
+
+
+def plan_for(h, k, answers):
+    """Targets for answers not saved yet (the panel recalculates as the goal or platforms change)."""
+    import cbrief
+    if not may_edit(h, k):
+        return None
+    return cbrief.targets(_selections(selection_ids(k)), cbrief.clean(answers))
+
+
+def save_all(h, k, b, user=None):
+    """The panel's one Save (item 212): details, objective, targets, the brief and the account manager,
+    all checked first and then written together, so a save never lands half done.
+    ``b``: the changed fields only, as edit() takes them, plus brief {answers}, typed [target keys], kam."""
+    import cbrief
+    import history
+    import hub
+    import metrics
+    if not may_edit(h, k):
+        return False, "Only HelloVoice can change this campaign.", {"status": 403}
+    b = dict(b)
+    answers = None
+    if "brief" in b:
+        answers = cbrief.clean((b.get("brief") or {}).get("answers") if isinstance(b.get("brief"), dict) else {})
+        goal = answers.get("goal") or []
+        key = metrics.blend_key(goal if isinstance(goal, list) else [goal])
+        if not key:
+            return False, "Pick at least one goal for the campaign.", {"field": "goal"}
+        b["objective"] = key
+    kam = None
+    if "kam" in b:
+        role, a = hub.viewer(user) if user is not None else (None, None)
+        kam = hub._valid_kam(str(b.get("kam") or ""))
+        if kam is None:
+            return False, "Pick an account manager from the list.", {"field": "kam"}
+        if not hub._can_kam(role, a, k["code_id"], db.kam_of_item("campaign", k["id"])):
+            return False, "Only HelloVoice admins can change the account manager.", {"status": 403}
+    ok, msg, f = edit_fields(h, k, b)
+    if not ok:
+        return False, msg, f
+    if not f and answers is None and kam is None and "typed" not in b:
         return False, "Nothing to change.", {}
-    with history.tracked("campaign", k["id"], "Edited %s on the board" % k["name"]):
-        db.save_campaign(k["id"], **f)
-    return True, "Saved.", {}
+    pushed, miss = 0, []
+    with history.tracked("campaign", k["id"], "Saved %s from the board" % k["name"]):
+        if f:
+            db.save_campaign(k["id"], **f)
+        typed = [x for x in (b.get("typed") or []) if isinstance(x, str)]
+        if answers is not None:
+            pushed, miss = cbrief.save(db.campaign(k["id"]), _selections(selection_ids(k)), answers, typed, _actor(h))
+        elif "typed" in b:
+            cbrief.set_typed(db.campaign(k["id"]), typed)
+    if kam is not None:
+        hub.set_kam(role, a, "campaign", k["id"], kam, (a["email"] if a is not None else ""))
+    text = "Saved."
+    if pushed:
+        text += " The brief now drives %s." % ("its selection" if pushed == 1 else "its %d selections" % pushed)
+    elif miss:
+        names = {"goal": "goal", "platforms": "platforms", "market": "countries", "category": "space"}
+        text += " Add the %s to update the selections too." % " and ".join(names[m] for m in miss)
+    return True, text, {"saved_at": db.now()}
 
 
 def set_logo(h, k, data, logo_dir):
@@ -938,10 +1066,13 @@ def stage_alert(k, to, client=True):
         pass
 
 
-def activity(k, sels=None, staff=False, n=3):
-    """The last few changes to the campaign and its selections, newest first: what, who, when."""
-    sels = sels if sels is not None else _selections(selection_ids(k))
-    keys = [("campaign", str(k["id"]))] + [("selection", str(s["id"])) for s in sels]
+def activity(k, sels=None, staff=False, n=3, sel=None):
+    """Changes to the campaign and its selections (or, with ``sel``, to one selection), newest first: what, who, when."""
+    if sel is not None:
+        keys = [("selection", str(sel["id"]))]
+    else:
+        sels = sels if sels is not None else _selections(selection_ids(k))
+        keys = [("campaign", str(k["id"]))] + [("selection", str(s["id"])) for s in sels]
     cond = " OR ".join("(entity = ? AND key = ?)" for _ in keys)
     args = [x for kv in keys for x in kv]
     try:
@@ -957,6 +1088,39 @@ def activity(k, sels=None, staff=False, n=3):
             who = who[8:]
         if "@" in who:
             local, dom = who.split("@", 1)
-            who = "HelloVoice" if (not staff and dom.lower().endswith(("hellovoice.co.uk", "blueholding.com"))) else local.replace(".", " ").title()
+            who = "HelloVoice" if (not staff and dom.lower().endswith(("hellovoice.co.uk", "blueholding.com", "blueholding.co.uk"))) else local.replace(".", " ").title()
         out.append({"at": r["at"], "who": who or "HelloVoice", "what": r["label"] or "Changed"})
     return out
+
+
+def may_see_selection(h, sel):
+    """Item 219: who may read a selection's history: HelloVoice, its KAM, the client's team, a granted colleague."""
+    import portal
+    role, _ = viewer(h)
+    if role is None or sel is None or sel["deleted_at"]:
+        return False
+    if role in ("admin", "team") or h.admin_like_for(sel["code_id"], sel["id"]):
+        return True
+    reader = h.signed_in_client() or h.viewer_code_id()
+    if reader is None:
+        return False
+    if sel["code_id"] is not None and (portal.owns(int(reader), sel["code_id"]) or int(sel["code_id"]) in portal.team_codes(int(reader))):
+        return True                  # theirs, or a colleague's (the account board lists the team's selections)
+    return bool(db.selection_granted(sel["id"], reader))
+
+
+def history_of(h, token=None, sel_token=None, n=200):
+    """Item 219 (owner 2026-10-21): the full history behind a card's Activity panel. (status, payload)."""
+    role, _ = viewer(h)
+    if role is None:
+        return 401, {"ok": False, "reason": "signin"}
+    staff = role in ("admin", "team", "kam")
+    if sel_token:
+        s = db.selection(token=str(sel_token))
+        if not may_see_selection(h, s):
+            return 404, {"ok": False, "reason": "unknown"}
+        return 200, {"ok": True, "name": s["name"], "items": activity(None, staff=staff, n=n, sel=s)}
+    k, _ = campaign_for(h, token=token)
+    if k is None:
+        return 404, {"ok": False, "reason": "unknown"}
+    return 200, {"ok": True, "name": k["name"], "items": activity(k, staff=staff, n=n)}

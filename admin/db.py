@@ -614,6 +614,9 @@ def migrate(conn):
         # Board (item 205/206 extras, owner 2026-10-20): the one next step on the card and when it is due.
         conn.execute("ALTER TABLE campaigns ADD COLUMN next_step TEXT")
         conn.execute("ALTER TABLE campaigns ADD COLUMN next_due INTEGER")
+    if "brief" not in camp_cols:
+        # Items 211-213 (owner 2026-10-21): the campaign's own brief, JSON {answers, typed, saved_at, saved_by} (admin/cbrief.py).
+        conn.execute("ALTER TABLE campaigns ADD COLUMN brief TEXT")
     # Item 174: a campaign holds many selections. campaigns.selection_id stays its first one; the rest
     # are linked here. Item 182: campaigns a person pinned to the top of their board and switcher.
     conn.executescript("""
@@ -2493,7 +2496,7 @@ def save_campaign(cid, **fields):
     allowed = {"name", "client", "code_id", "platform", "starts_at", "ends_at", "status",
                "rules", "destination", "cost", "notes", "emv", "visibility", "phase",
                "status_note", "targets", "logos", "selection_id", "steps", "objective", "plan", "overrides", "weights",
-               "next_step", "next_due"}
+               "next_step", "next_due", "brief"}
     bad = set(fields) - allowed
     if bad:
         raise ValueError("not a campaign field: " + ", ".join(sorted(bad)))

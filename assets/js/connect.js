@@ -1167,7 +1167,7 @@
     // and any other dialog to close first, and never sits on top of one.
     var HIW_POSTER = "assets/welcome/onboarding-poster.jpg?v=0";   // ?v= is rewritten to the file's hash at deploy
     function hiwBusy() {
-      var q = ":popover-open, dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal, .hc-dlg-back, .ai-sl.ob";
+      var q = ":popover-open, dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .pt-modal, .hca-sheet, .hca-bar, .hca-card, .hca-modal, .hc-dlg-back, .ai-sl.ob, .hv-nudge.is-in, .hvb-panel-back, .mx-cs__pop:not([hidden])";
       try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal, .hc-dlg-back"); }
     }
     function hiwWanted() {

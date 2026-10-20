@@ -67,6 +67,19 @@
     help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.5a2.5 2.5 0 0 1 4.8.8c0 1.7-2.4 2.1-2.4 3.6M12 17v.2"/>',
     minus: '<path d="M5 12h14"/>', chat: '<path d="M4.5 5.5h15v10.5h-8.2l-4.3 3.5V16h-2.5z"/><path d="M8.5 10.8h.01M12 10.8h.01M15.5 10.8h.01"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/>',
     filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
+    // Control Centre (item 209)
+    star: '<path d="M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4 5.7-.8z"/>',
+    seed: '<path d="M12 20.5v-7"/><path d="M12 13.5c0-4 2.5-6.5 7-6.5 0 4.2-2.6 6.5-7 6.5zM12 15c0-3.2-2-5-5.5-5 0 3.2 2 5 5.5 5z"/>',
+    quote: '<path d="M5 4.5h14v15H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h3.5"/>',
+    live: '<circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.5"/>',
+    moon: '<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>',
+    note: '<path d="M5 3.5h10l4 4v13H5z"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/>',
+    dots: '<circle cx="5.5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="18.5" cy="12" r="1.4" fill="currentColor"/>',
+    pen: '<path d="M4.5 19.5l1-4L16 5a2 2 0 0 1 3 3L8.5 18.5z"/><path d="M14 7l3 3"/>',
+    ext: '<path d="M13.5 4.5h6v6M19.5 4.5L11 13"/><path d="M17 14v5.5H4.5V7H10"/>',
+    grid: '<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3.5v2.2M12 18.3v2.2M3.5 12h2.2M18.3 12h2.2M6 6l1.6 1.6M16.4 16.4L18 18M6 18l1.6-1.6M16.4 7.6L18 6"/>',
+    key: '<circle cx="8" cy="15" r="4"/><path d="M11 12l8.5-8.5M16.5 6.5l2 2M14 9l2 2"/>',
     // HELVi Connect phase E
     upload: '<path d="M12 15.5V4.5M7.5 9L12 4.5 16.5 9"/><path d="M4.5 15v4.5h15V15"/>',
     cal: '<rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M7.5 14h3v3h-3z"/>',
@@ -3605,13 +3618,21 @@
     nudge.addEventListener("click", function (e) { if (e.target.closest(".hv-nudge__x")) { hideNudge(true); return; } toggle(true); });
     var tip = TIPS[page], tipSeen = false;
     try { tipSeen = sessionStorage.getItem(tipKey) === "1"; } catch (e) { /* private */ }
+    // Item 210: the tip never lands on another layer (the app's prompts, "Watch how it works", a dialog,
+    // the board's panel); it waits for the page to be clear, and gives up after about a minute.
+    var TIP_LAYERS = "dialog[open], .cx-hiw, .cx-dr, .cx-sheet, .pt-scrim, .pt-modal, .hca-sheet, .hca-card, .hca-modal, .hvb-panel-back, .mx-cs__pop:not([hidden]), .ai-sl";
+    function tipBlocked() { try { return !!document.querySelector(TIP_LAYERS); } catch (e) { return false; } }
     if (tip && !tipSeen) {
-      setTimeout(function () {
+      setTimeout(function showTip(tries) {
         if (root.classList.contains("is-open")) return;
-        // The campaign page with no campaign to read says something else (its own empty state is up).
+        if (tipBlocked()) { if ((tries || 0) < 20) setTimeout(function () { showTip((tries || 0) + 1); }, 3000); return; }
+        // The campaign page with no campaign to read says something else (its own empty state is up);
+        // the tracking board (no report open) is about every campaign, not one report.
         var useTip = tip, empty = document.getElementById("db-empty");
         if (page === "campaign" && empty && !empty.hidden) {
           useTip = ["No campaign yet?", "When your first campaign goes live its results appear here. Ask me how tracking works."];
+        } else if (page === "campaign" && !/[#&]t=/.test(location.hash)) {
+          useTip = ["Following your campaigns?", "Ask me where any campaign stands or what happens next."];
         }
         nudgeText.innerHTML = "<b></b>";
         nudgeText.querySelector("b").textContent = useTip[0];
