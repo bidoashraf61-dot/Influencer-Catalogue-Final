@@ -968,6 +968,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 tab=query.get("tab"), dupes=db.duplicate_groups(),
                 page_no=page, pages=pages, total=total, per_page=ROSTER_PAGE,
                 dates=(d_from if t_from is not None else "", d_to if t_to is not None else "")))
+        if path == "/roster/quality":
+            return self.roster_quality(query)
         if path == "/roster/review":
             country = query.get("country") if query.get("country") in industry.COUNTRIES else None
             row = industry.next_in_queue(country, query.get("after"))
@@ -1606,6 +1608,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_roster_bulk()
         if path == "/roster/merge":
             return self.post_roster_merge()
+        if path == "/roster/quality/run":
+            return self.post_roster_quality_run()
+        if path == "/roster/quality/decide":
+            return self.post_roster_quality_decide()
         if path == "/roster/import":
             return self.post_roster_import()
         if path == "/roster/photos":
@@ -2868,8 +2874,77 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 continue
             self.merge_one(keep, d)
             done.append(d)
-        return self.redirect("/roster?tab=dupes&ok=" + urllib.parse.quote(
+        Handler._pairs_cache = (0, None)
+        back = (f.get("back") or "").strip()
+        back = back if back.startswith("/roster/quality") else "/roster?tab=dupes"
+        return self.redirect(back + ("&" if "?" in back else "?") + "ok=" + urllib.parse.quote(
             "Combined %s into %s: every platform, link, analysis, selection and campaign is kept on %s. Undo from History if it was a mistake." % (", ".join(done) or "nothing", keep, keep)))
+
+    # --------------------------------------------- roster quality (items 224-225) --
+
+    _pairs_cache = (0, None)
+
+    def roster_quality(self, query):
+        import rosterq, rosterq_views
+        tab = query.get("tab") if query.get("tab") in ("open", "kept", "archived", "pairs") else "open"
+        reason = query.get("reason") if query.get("reason") in list(rosterq.REASONS) + ["unclear"] else None
+        asked = (query.get("page") or "1").strip()
+        page_no = int(asked) if asked.isdigit() and int(asked) > 0 else 1
+        if tab == "pairs":
+            at, groups = Handler._pairs_cache
+            if groups is None or time.time() - at > 300:       # 14k rows: once per 5 minutes, not per page view
+                known = {c["code"] for g in db.duplicate_groups() for c in g}
+                groups = rosterq.dupe_candidates(known=known)
+                Handler._pairs_cache = (time.time(), groups)
+            return self.send(200, rosterq_views.quality_page(tab, None, groups, {}, 1, None, rosterq.JOB, query.get("ok"), query.get("e")))
+        rows = rosterq.queue(None if tab != "open" else reason, status=tab)
+        counts = rosterq.counts() if tab == "open" else {}
+        counts["total"] = len(rosterq.queue(status="open")) if tab == "open" and reason else len(rows) if tab == "open" else 0
+        with db.connect() as conn:
+            rosterq.init(conn)
+            counts["unclear_unread"] = conn.execute("SELECT COUNT(*) FROM roster_flags WHERE unclear = 1 AND ai_verdict IS NULL "
+                                                    "AND status = 'open'").fetchone()[0]
+        pages = max(1, -(-len(rows) // rosterq_views.PER))
+        return self.send(200, rosterq_views.quality_page(tab, reason, rows, counts, min(page_no, pages),
+                                                         db.setting("roster_quality_last"), rosterq.JOB, query.get("ok"), query.get("e")))
+
+    def post_roster_quality_run(self):
+        import rosterq
+        kind = (self.form_body().get("kind") or "").strip()
+        if kind not in ("scan", "ai"):
+            return self.redirect("/roster/quality?e=" + urllib.parse.quote("Unknown job."))
+        who = self.admin()
+        if kind == "ai":
+            import gemini
+            if not gemini.configured():
+                return self.redirect("/roster/quality?e=" + urllib.parse.quote("Gemini is not set up: save its key in Client portal › Settings & keys."))
+        if not rosterq.start(kind, (who["email"] if who else "") or ""):
+            return self.redirect("/roster/quality?e=" + urllib.parse.quote("A roster-quality job is already running. Refresh in a minute."))
+        return self.redirect("/roster/quality?ok=" + urllib.parse.quote(
+            "Scan started: about a minute. Refresh to see it." if kind == "scan" else "AI read started in the background: a few minutes. Refresh to see the verdicts."))
+
+    def post_roster_quality_decide(self):
+        import rosterq
+        f = self.form_body(multi=("codes",))
+        raw = f.get("codes") or []
+        codes = [c.strip().upper() for c in ([raw] if isinstance(raw, str) else raw) if c.strip()]
+        back = (f.get("back") or "").strip()
+        back = back if back.startswith("/roster/quality") else "/roster/quality"
+        sep = "&" if "?" in back else "?"
+        if not codes:
+            return self.redirect(back + sep + "e=" + urllib.parse.quote("Tick at least one creator first."))
+        who = self.admin()
+        name = (who["email"] if who else "") or ""
+        if f.get("do") == "archive":
+            done, skipped = rosterq.archive(codes, name)
+            msg = "%d archived: hidden from the catalogue and every client view. Undo any of them from History." % len(done)
+            if skipped:
+                msg += " %d skipped: on a selection or campaign." % len(skipped)
+            return self.redirect(back + sep + "ok=" + urllib.parse.quote(msg))
+        if f.get("do") == "keep":
+            n = rosterq.keep(codes, name)
+            return self.redirect(back + sep + "ok=" + urllib.parse.quote("%d kept: off this list until new evidence appears." % n))
+        return self.redirect(back + sep + "e=" + urllib.parse.quote("Choose Archive or Keep."))
 
     def merge_one(self, keep, drop):
         label = "Merged duplicate %s into %s" % (drop, keep)
