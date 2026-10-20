@@ -3705,11 +3705,11 @@
     all(".cat-back, .cat-tray__edit, .cat-close__actions a[href='../'], .cat-close__actions a[href='/']")
       .forEach(function (a) {
         a.href = new URL("../", location.href).href + carry;
-        // On a saved selection, "Add creators with AI" in the header is the one way to add (item 178,
-        // Bido 2026-10-20): the footer's "Add more creators" is retired there. Unsaved lists keep it.
+        // The footer's "Add more creators" is back on saved selections (Bido 2026-10-20): the manual
+        // way to add, beside "Add creators with AI" in the header. View-only colleagues can't add.
         if (a.classList.contains("cat-btn")) {
-          if (CURATED && CURATED.token) a.hidden = true;
-          else a.textContent = "Add more creators";
+          a.textContent = "Add more creators";
+          a.hidden = !mayEdit();
         }
       });
 
