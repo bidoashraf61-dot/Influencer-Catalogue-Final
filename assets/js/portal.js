@@ -68,6 +68,12 @@
     minus: '<path d="M5 12h14"/>', chat: '<path d="M4.5 5.5h15v10.5h-8.2l-4.3 3.5V16h-2.5z"/><path d="M8.5 10.8h.01M12 10.8h.01M15.5 10.8h.01"/>', search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.4-4.4"/>',
     filter: '<path d="M4 6h16M7 12h10M10 18h4"/>',
     // Control Centre (item 209)
+    star: '<path d="M12 3.8l2.5 5.2 5.7.8-4.1 4 1 5.6-5.1-2.7-5.1 2.7 1-5.6-4.1-4 5.7-.8z"/>',
+    seed: '<path d="M12 20.5v-7"/><path d="M12 13.5c0-4 2.5-6.5 7-6.5 0 4.2-2.6 6.5-7 6.5zM12 15c0-3.2-2-5-5.5-5 0 3.2 2 5 5.5 5z"/>',
+    quote: '<path d="M5 4.5h14v15H5z"/><path d="M8.5 9h7M8.5 12.5h7M8.5 16h3.5"/>',
+    live: '<circle cx="12" cy="12" r="3.2" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="7.5"/>',
+    moon: '<path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5z"/>',
+    note: '<path d="M5 3.5h10l4 4v13H5z"/><path d="M8.5 11h7M8.5 14.5h7M8.5 18h4"/>',
     dots: '<circle cx="5.5" cy="12" r="1.4" fill="currentColor"/><circle cx="12" cy="12" r="1.4" fill="currentColor"/><circle cx="18.5" cy="12" r="1.4" fill="currentColor"/>',
     pen: '<path d="M4.5 19.5l1-4L16 5a2 2 0 0 1 3 3L8.5 18.5z"/><path d="M14 7l3 3"/>',
     ext: '<path d="M13.5 4.5h6v6M19.5 4.5L11 13"/><path d="M17 14v5.5H4.5V7H10"/>',

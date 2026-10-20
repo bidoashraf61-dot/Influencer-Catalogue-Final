@@ -344,7 +344,7 @@
 
   // Admins and KAMs land on what is waiting for them; clients keep the Overview above.
   var NEEDS = { data: null, busy: null, err: false, mine: false };
-  var NEED_IC = { signups: "users", overdue: "cal", quotes: "brief", analyses: "scan", access: "lock" };
+  var NEED_IC = { signups: "users", overdue: "cal", quotes: "brief", analyses: "scan", access: "lock", red: "flag" };
   function adminUrl(path) { return API + path; }
   function loadNeeds() {
     if (NEEDS.busy) return NEEDS.busy;
@@ -393,6 +393,7 @@
       });
       return h("div", { class: "cc-act" }, b, msg);
     }
+    if (it.act === "company") return h("div", { class: "cc-act" }, h("button", { class: "hc-more", type: "button", onclick: function () { openCompany(it.key); } }, "Open the company"));
     if (g.key === "overdue") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: ROOT + "campaign/#t=" + encodeURIComponent(it.token || "") }, "Open the campaign"));
     if (g.key === "analyses") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: "#analyses" }, "Open the inbox"));
     if (it.href && DATA.cc.admin_links) return h("div", { class: "cc-act" },
@@ -419,7 +420,7 @@
     }
     var box = h("div", { class: "cc-q" });
     q.groups.forEach(function (g) {
-      var ic = h("span", { class: "cc-q__ic" + (g.key === "signups" ? " cc-q__ic--hot" : g.key === "overdue" ? " cc-q__ic--red" : "") }, icon(NEED_IC[g.key] || "bell"));
+      var ic = h("span", { class: "cc-q__ic" + (g.key === "signups" ? " cc-q__ic--hot" : g.key === "overdue" || g.key === "red" ? " cc-q__ic--red" : "") }, icon(NEED_IC[g.key] || "bell"));
       var rows = h("ul", { class: "cc-q__rows" });
       g.items.forEach(function (it) {
         var late = it.at && (Date.now() / 1000 - it.at) > (g.key === "overdue" ? 0 : 86400);
@@ -1816,7 +1817,7 @@
      credits ask for the emailed code first (admins only). The server decides who may do what (p.can). */
   var STATE_LABEL = { waiting: "Waiting", active: "Active", held: "Held", suspended: "Suspended" };
   function acctSay(msg, bad) { var el = $("hb-say"); if (el) { el.textContent = msg; el.className = "hb-say" + (bad ? " hb-say--bad" : "") + " is-on"; } toast(0, msg); }
-  function acctRefresh(co) { NEEDS.data = null; delete HUB.detail[co.key]; hubDetail(co.key); hubLoad(); if (DATA.cc) loadNeeds(); }
+  function acctRefresh(co) { crmReload(); NEEDS.data = null; delete HUB.detail[co.key]; hubDetail(co.key); hubLoad(); if (DATA.cc) loadNeeds(); }
   function acctDo(p, co, action, extra, nicely) {
     var body = { id: p.id, action: action }; for (var k in (extra || {})) body[k] = extra[k];
     return api("POST", "/api/hub/account", body).then(function (r) {
@@ -1888,6 +1889,12 @@
           hubSetKam("person", p.id, v, function () { p.kam = v || (co.kam && co.kam.email) || ""; renderSection(); });
         })) : (p.kam ? h("small", { class: "hb-it__kam" }, "KAM " + kamName(p.kam)) : null));
     var ctl = p.id && !p.staff && p.state ? acctControls(p, co) : null;
+    if (ctl && (p.phone || true)) {
+      var dm_ = h("button", { class: "cc-dm" + (p.decision_maker ? " is-on" : ""), type: "button", "aria-pressed": p.decision_maker ? "true" : "false",
+        title: "Mark as a decision maker", onclick: function () { api("POST", "/api/crm/person", { id: p.id, decision_maker: !p.decision_maker }).then(function (r) { if (r.s === 200) { p.decision_maker = !p.decision_maker; renderSection(); } }); } },
+        icon("star"), p.decision_maker ? "Decision maker" : "Mark decision maker");
+      ctl.insertBefore(h("span", { class: "cc-contact" }, dm_, p.phone ? h("span", { class: "cc-phone-staff", title: "Staff only" }, icon("lock"), p.phone) : null), ctl.querySelector(".cc-ctl__acts"));
+    }
     var sels = h("ul", { class: "hb-items" }), camps = h("ul", { class: "hb-items" });
     var loose = p.selections.filter(function (x) { return !x.in_campaign; });
     loose.forEach(function (x) { sels.appendChild(itemRow("selection", x, co)); });
@@ -1968,8 +1975,336 @@
     return bar;
   }
 
+
+  /* ------------------------------------------- Companies as an account CRM (items 209 + 220) */
+  // A table of every company (board by stage as the other view); a row opens the company page: header (KAM, stage,
+  // health, next step), then People (with the account controls), Work, Quotes, Notes. Staff only; money, notes, health and
+  // phone numbers never reach a client. The server scopes everything; a KAM sees her own companies.
+  var CRM = { data: null, kams: [], err: false, busy: false, q: "", f: "all", kam: "", stage: "", health: "", view: "table", sort: "name", dir: 1,
+              page: null, tab: "people", det: null, adding: false, say: "" };
+  var STAGE_IC = { lead: "seed", engaged: "chat", quote: "quote", active: "live", repeat: "redo", dormant: "moon" };
+  var STAGE_HINT = { lead: "Added by us, or signed up with nothing yet", engaged: "A selection or an AI brief", quote: "An open quote request",
+                     active: "A campaign is live", repeat: "A second campaign started", dormant: "90 days with no activity" };
+  var HEALTH_LABEL = { good: "Healthy", moderate: "Watch", low: "At risk", none: "No signal yet" };
+  function crmLoad(force) {
+    if (CRM.busy || (CRM.data && !force)) return;
+    CRM.busy = true;
+    api("GET", "/api/crm/companies").then(function (r) {
+      CRM.busy = false;
+      if (r.s === 200) { CRM.data = r.b; CRM.err = false; if (r.b.kams) HUB.kams = r.b.kams; }
+      else CRM.err = true;
+      if (SECTION === "companies") renderSection();
+    });
+  }
+  function crmReload() { CRM.data = null; crmLoad(true); }
+  function sar(n) { return n ? big(n) + " SAR" : "—"; }
+  function stagePill(c) {
+    var s = c.stage;
+    return h("span", { class: "cc-st cc-st--" + s, title: STAGE_HINT[s] + (c.stage_override ? " (set by hand)" : "") }, icon(STAGE_IC[s]),
+      (CRM.data.stages.filter(function (x) { return x.key === s; })[0] || {}).label || s, c.stage_override ? h("span", { class: "cc-st__ov" }, "set") : null);
+  }
+  function healthPill(c) {
+    var g = c.health;
+    return h("span", { class: "ac-sig ac-sig--" + (g === "none" ? "none" : g), title: c.why || "" }, HEALTH_LABEL[g] || g);
+  }
+  function kamDisc(c) {
+    var e = c.kam && c.kam.email;
+    return e ? h("span", { class: "cc-kam", title: c.kam.name || e }, initials(c.kam.name || e)) : h("span", { class: "cc-dim" }, "—");
+  }
+  function logoFor(c, big_) {
+    return h("span", { class: "cc-logo" + (big_ ? " cc-logo--lg" : "") }, h("span", null, initials(c.name)));
+  }
+  function crmFilter(c) {
+    var q = CRM.q.trim().toLowerCase();
+    if (q && (c.name + " " + c.domain).toLowerCase().indexOf(q) < 0) return false;
+    if (CRM.kam === "none" ? !!(c.kam && c.kam.email) : CRM.kam && (c.kam && c.kam.email) !== CRM.kam) return false;
+    if (CRM.stage && c.stage !== CRM.stage) return false;
+    if (CRM.health && c.health !== CRM.health) return false;
+    var me = (DATA.user.email || "").toLowerCase();
+    switch (CRM.f) {
+      case "mine": return (c.kam && (c.kam.email || "").toLowerCase()) === me;
+      case "red": return c.health === "low";
+      case "quotes": return c.open_n > 0;
+      case "waiting": return c.waiting > 0;
+      case "blocked": return c.blocked > 0;
+      case "prospects": return c.prospect;
+      case "overdue": return c.overdue;
+      case "live": return c.live > 0;
+    }
+    return true;
+  }
+  var HEALTH_RANK = { low: 0, moderate: 1, good: 2, none: 3 };
+  function crmSort(a, b) {
+    var k = CRM.sort, d = CRM.dir, r;
+    if (k === "stage") r = CRM.data.stages.map(function (x) { return x.key; }).indexOf(a.stage) - CRM.data.stages.map(function (x) { return x.key; }).indexOf(b.stage);
+    else if (k === "health") r = HEALTH_RANK[a.health] - HEALTH_RANK[b.health];
+    else if (k === "last") r = (a.last || 0) - (b.last || 0);
+    else if (k === "approved") r = a.approved_sar - b.approved_sar;
+    else if (k === "open") r = a.open_sar - b.open_sar;
+    else if (k === "next") r = (a.next_due || 9e12) - (b.next_due || 9e12);
+    else r = (a.name || "").toLowerCase() < (b.name || "").toLowerCase() ? -1 : 1;
+    return r * d;
+  }
+  function openCompany(key, tab) {
+    CRM.page = key; CRM.tab = tab || "people"; CRM.det = null; CRM.say = "";
+    if (!HUB.detail[key] || HUB.detail[key] === "error") hubDetail(key);
+    api("GET", "/api/crm/company?k=" + encodeURIComponent(key)).then(function (r) {
+      if (CRM.page !== key) return;
+      CRM.det = r.s === 200 ? r.b : "error";
+      if (SECTION === "companies") renderSection();
+    });
+    if (location.hash !== "#companies") location.hash = "#companies"; else renderSection();
+  }
+  function closeCompany() { CRM.page = null; CRM.det = null; renderSection(); window.scrollTo(0, 0); }
+
+  function crmToolbar() {
+    var d = CRM.data.rows;
+    var me = (DATA.user.email || "").toLowerCase();
+    var seg = h("div", { class: "cc-seg", role: "group", "aria-label": "View" });
+    [["table", "Table", "filter"], ["board", "Board", "grid"]].forEach(function (v) {
+      seg.appendChild(h("button", { type: "button", "aria-pressed": CRM.view === v[0] ? "true" : "false",
+        onclick: function () { CRM.view = v[0]; renderSection(); } }, icon(v[2]), v[1]));
+    });
+    var views = h("div", { class: "cc-views", role: "group", "aria-label": "Saved views" });
+    [["all", "All", d.length], ["mine", "Mine", d.filter(function (c) { return (c.kam && (c.kam.email || "").toLowerCase()) === me; }).length],
+     ["red", "At risk", d.filter(function (c) { return c.health === "low"; }).length],
+     ["quotes", "Quotes waiting", d.filter(function (c) { return c.open_n > 0; }).length],
+     ["waiting", "Waiting approval", d.filter(function (c) { return c.waiting > 0; }).length],
+     ["blocked", "Held or suspended", d.filter(function (c) { return c.blocked > 0; }).length],
+     ["overdue", "Overdue", d.filter(function (c) { return c.overdue; }).length],
+     ["live", "Has a live campaign", d.filter(function (c) { return c.live > 0; }).length],
+     ["prospects", "Prospects", d.filter(function (c) { return c.prospect; }).length]].forEach(function (v) {
+      views.appendChild(h("button", { class: "cc-chip", type: "button", "aria-pressed": CRM.f === v[0] ? "true" : "false",
+        onclick: function () { CRM.f = v[0]; renderSection(); } }, v[1], h("em", null, String(v[2]))));
+    });
+    var q = h("input", { type: "search", placeholder: "Search a company or domain", "aria-label": "Search companies", value: CRM.q });
+    q.addEventListener("input", function () { CRM.q = q.value; var pos = q.selectionStart; renderSection(); var n = document.querySelector(".cc-search input"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } });
+    function pick(label, cur, opts, on) {
+      var sel = h("select", { class: "cc-select", "aria-label": label });
+      opts.forEach(function (o) { sel.appendChild(h("option", { value: o[0] }, o[1])); });
+      sel.value = cur; sel.addEventListener("change", function () { on(sel.value); renderSection(); });
+      return sel;
+    }
+    var kamOpts = [["", "Any account manager"], ["none", "No account manager"]].concat(HUB.kams.map(function (k) { return [k.email, k.name || k.email]; }));
+    var filters = h("div", { class: "cc-filters" }, h("label", { class: "cc-search" }, icon("search"), q),
+      pick("Account manager", CRM.kam, kamOpts, function (v) { CRM.kam = v; }),
+      pick("Stage", CRM.stage, [["", "Any stage"]].concat(CRM.data.stages.map(function (x) { return [x.key, x.label]; })), function (v) { CRM.stage = v; }),
+      pick("Health", CRM.health, [["", "Any health"], ["good", "Healthy"], ["moderate", "Watch"], ["low", "At risk"]], function (v) { CRM.health = v; }));
+    var add_ = h("button", { class: "hc-btn hc-btn--sm", type: "button", onclick: function () { CRM.adding = !CRM.adding; renderSection(); } }, icon("plus"), "Add prospect");
+    return [h("div", { class: "cc-tools" }, seg, add_), views, filters];
+  }
+  function prospectForm() {
+    var name = h("input", { type: "text", maxlength: "120", placeholder: "Company name", "aria-label": "Company name" });
+    var dom = h("input", { type: "text", placeholder: "Website, like avalonpharma.com", "aria-label": "Company website domain" });
+    var step = h("input", { type: "text", maxlength: "200", placeholder: "Next step (optional)", "aria-label": "Next step" });
+    var due = h("input", { type: "date", "aria-label": "Due date" });
+    var msg = h("p", { class: "cc-msg", role: "status" });
+    var go = h("button", { class: "hc-btn hc-btn--sm", type: "button" }, "Add as a lead");
+    go.addEventListener("click", function () {
+      go.disabled = true; msg.textContent = "";
+      api("POST", "/api/crm/prospect", { name: name.value, domain: dom.value, next_step: step.value, next_due: due.value ? Math.floor(new Date(due.value + "T00:00:00").getTime() / 1000) : null }).then(function (r) {
+        go.disabled = false;
+        if (r.s === 200) { CRM.adding = false; toast(0, r.b.message); crmReload(); }
+        else msg.textContent = (r.b && r.b.message) || "Could not add it. Try again.";
+      });
+    });
+    return h("form", { class: "cc-credform cc-prosp", onsubmit: function (e) { e.preventDefault(); } }, name, dom, step, due, go,
+      h("button", { class: "hc-more", type: "button", onclick: function () { CRM.adding = false; renderSection(); } }, "Cancel"), msg);
+  }
+  function crmTable(rows) {
+    var cols = [["name", "Company"], [null, "KAM"], ["stage", "Stage"], ["health", "Health"], [null, "Accounts"],
+                ["open", "Open quotes"], ["approved", "Approved, 12 months"], ["last", "Last activity"], ["next", "Next step"]];
+    var tr = h("tr");
+    cols.forEach(function (c) {
+      var th = h("th", { scope: "col", "aria-sort": c[0] && CRM.sort === c[0] ? (CRM.dir > 0 ? "ascending" : "descending") : null });
+      if (c[0]) th.appendChild(h("button", { type: "button", onclick: function () { if (CRM.sort === c[0]) CRM.dir = -CRM.dir; else { CRM.sort = c[0]; CRM.dir = 1; } renderSection(); } },
+        c[1], CRM.sort === c[0] ? icon("down") : null));
+      else th.textContent = c[1];
+      tr.appendChild(th);
+    });
+    var tb = h("tbody");
+    rows.forEach(function (c) {
+      var link = h("a", { href: "#companies", onclick: function (e) { e.preventDefault(); openCompany(c.key); } },
+        h("b", null, c.name), c.prospect ? h("span", { class: "cc-prospect" }, "Prospect") : null, h("small", null, c.domain));
+      var next = c.next_step ? h("div", { class: "cc-next" }, h("b", null, c.next_step), c.next_due ? h("small", { class: c.overdue ? "late" : "" }, (c.overdue ? "Late · " : "") + dm(c.next_due)) : null)
+        : h("div", { class: "cc-next" }, h("b", { class: "cc-dim" }, "No next step"));
+      var row = h("tr", { onclick: function (e) { if (!e.target.closest("a,button")) openCompany(c.key); } },
+        h("td", { class: "cc-m-full" }, h("div", { class: "cc-co" }, logoFor(c), link)),
+        h("td", { "data-k": "KAM" }, kamDisc(c)), h("td", { "data-k": "Stage" }, stagePill(c)), h("td", { "data-k": "Health" }, healthPill(c)),
+        h("td", { "data-k": "Accounts" }, c.prospect ? h("span", { class: "cc-dim" }, "None yet") : [String(c.people), c.waiting ? h("span", { class: "cc-badge" }, c.waiting + " waiting") : null,
+          c.blocked ? h("span", { class: "cc-badge cc-badge--grey" }, c.blocked + " held") : null]),
+        h("td", { class: "num", "data-k": "Open quotes" }, c.open_n ? h("span", { class: "cc-sar" }, c.open_sar ? big(c.open_sar) : "?", h("small", null, "SAR")) : h("span", { class: "cc-dim" }, "—")),
+        h("td", { class: "num cc-m-hide" }, c.approved_sar ? h("span", { class: "cc-sar" }, big(c.approved_sar), h("small", null, "SAR")) : h("span", { class: "cc-dim" }, "—")),
+        h("td", { class: "cc-m-hide cc-dim" }, c.last ? ago(c.last) : "—"),
+        h("td", { class: "cc-m-full", "data-k": "Next step" }, next));
+      tb.appendChild(row);
+    });
+    return h("div", { class: "cc-twrap" }, h("table", { class: "cc-t" }, h("thead", null, tr), tb));
+  }
+  function crmBoard(rows) {
+    var board = h("div", { class: "cc-board" });
+    CRM.data.stages.forEach(function (st) {
+      var mine = rows.filter(function (c) { return c.stage === st.key; });
+      var lane = h("section", { class: "cc-lane cc-lane--" + st.key }, h("div", { class: "cc-lane__hd" }, icon(STAGE_IC[st.key]), h("h3", null, st.label), h("span", null, String(mine.length))),
+        h("p", { class: "cc-lane__hint" }, STAGE_HINT[st.key]));
+      mine.forEach(function (c) {
+        lane.appendChild(h("div", { class: "cc-card", tabindex: "0", role: "button", "aria-label": "Open " + c.name,
+          onclick: function () { openCompany(c.key); }, onkeydown: function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openCompany(c.key); } } },
+          h("div", { class: "cc-card__top" }, logoFor(c), h("b", null, c.name)),
+          h("div", { class: "cc-card__meta" }, c.open_n ? h("span", null, (c.open_sar ? big(c.open_sar) + " SAR" : "Quote") + " open") : healthPill(c), kamDisc(c))));
+      });
+      board.appendChild(lane);
+    });
+    return board;
+  }
+  function renderCrm(p) {
+    if (CRM.err) { add(p, h("div", { class: "hc-empty" }, h("b", null, "The companies did not load."), h("p", null, h("button", { class: "hc-more", type: "button", onclick: function () { CRM.err = false; crmLoad(true); renderSection(); } }, "Try again")))); return; }
+    if (!CRM.data) { add(p, h("div", { class: "kc-skel", "aria-hidden": "true" }, h("i"), h("i"), h("i"))); add(p, h("p", { class: "hc-sr", role: "status" }, "Loading the companies")); crmLoad(); return; }
+    crmToolbar().forEach(function (n) { add(p, n); });
+    if (CRM.adding) add(p, prospectForm());
+    add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" })); hubSayAgain();
+    var rows = CRM.data.rows.filter(crmFilter).sort(crmSort);
+    if (!rows.length) { add(p, h("div", { class: "hc-empty" }, h("b", null, "No company matches"), h("p", null, "Try another search, or show all companies."))); return; }
+    add(p, CRM.view === "board" ? crmBoard(rows) : crmTable(rows));
+    add(p, h("div", { class: "cc-tfoot" }, h("span", null, "Showing " + rows.length + " of " + CRM.data.rows.length + " companies"),
+      h("span", null, "Money is from portal quotes only, before VAT. Only admins and the company's KAM see it.")));
+  }
+
+  /* ---- the company page */
+  function crmSave(key, fields, then) {
+    return api("POST", "/api/crm/set", Object.assign({ key: key }, fields)).then(function (r) {
+      if (r.s === 200) { var i = CRM.data ? CRM.data.rows.map(function (x) { return x.key; }).indexOf(key) : -1; if (i >= 0 && r.b.row) CRM.data.rows[i] = r.b.row; if (CRM.det && CRM.det.row && r.b.row) CRM.det.row = r.b.row; toast(0, "Saved."); if (then) then(); renderSection(); }
+      else toast(0, (r.b && r.b.message) || "Could not save that.");
+    });
+  }
+  function companyHeader(c) {
+    var admin = HUB.role === "admin";
+    var stageSel = h("select", { class: "cc-select cc-select--tight", "aria-label": "Stage" });
+    stageSel.appendChild(h("option", { value: "" }, "Automatic: " + ((CRM.data.stages.filter(function (x) { return x.key === c.stage_auto; })[0] || {}).label || c.stage_auto)));
+    CRM.data.stages.forEach(function (x) { stageSel.appendChild(h("option", { value: x.key }, x.label)); });
+    stageSel.value = c.stage_override ? c.stage : "";
+    stageSel.addEventListener("change", function () { crmSave(c.key, { stage: stageSel.value }); });
+    var step = h("input", { type: "text", maxlength: "200", value: c.next_step, placeholder: "What happens next?", "aria-label": "Next step" });
+    var due = h("input", { type: "date", "aria-label": "Due date", value: c.next_due ? new Date(c.next_due * 1000).toISOString().slice(0, 10) : "" });
+    var save = h("button", { class: "hc-btn hc-btn--sm", type: "button" }, "Save");
+    save.addEventListener("click", function () {
+      save.disabled = true;
+      crmSave(c.key, { next_step: step.value, next_due: due.value ? Math.floor(new Date(due.value + "T00:00:00").getTime() / 1000) : null }).then(function () { save.disabled = false; });
+    });
+    var kam = admin && c.domain && !c.prospect ? kamSelect(c.kam.email, "Account manager for " + c.name, "No account manager", function (v) {
+      hubSetKam("company", c.domain, v, function () { crmReload(); delete HUB.detail[c.key]; hubDetail(c.key); });
+    }) : (c.kam && c.kam.email ? h("span", { class: "cc-pickpill" }, kamDisc(c), c.kam.name || c.kam.email) : h("span", { class: "cc-dim" }, "No account manager"));
+    return h("section", { class: "cc-acct", "aria-labelledby": "cc-name" },
+      h("div", { class: "cc-acct__top" }, logoFor(c, true),
+        h("div", { class: "cc-acct__name" }, h("h1", { id: "cc-name" }, c.name),
+          h("p", null, c.domain ? h("span", { class: "cc-dom" }, c.domain) : null, h("span", null, c.prospect ? "Prospect · nobody has signed up yet" : plural(c.people, "person", "people"))))),
+      h("dl", { class: "cc-acct__fields" },
+        h("div", null, h("dt", null, "Account manager"), h("dd", null, kam)),
+        h("div", null, h("dt", null, "Stage"), h("dd", null, stagePill(c), stageSel)),
+        h("div", null, h("dt", null, "Health"), h("dd", { class: "cc-health" }, healthPill(c), h("p", null, c.why || ""))),
+        h("div", null, h("dt", null, "Next step"), h("dd", { class: "cc-nextedit" }, step, due, save))),
+      h("div", { class: "cc-acts" },
+        h("button", { class: "hc-btn hc-btn--sm", type: "button", onclick: function () { CRM.tab = "notes"; renderSection(); } }, icon("note"), "Add note"),
+        DATA.cc && DATA.cc.admin_links && c.domain && !c.prospect ? h("a", { class: "cc-admin", href: adminUrl("/clients"), target: "_blank", rel: "noopener" }, "Open in admin ", icon("ext")) : null));
+  }
+  function peopleTab(c) {
+    var det = HUB.detail[c.key];
+    if (c.prospect) return h("div", { class: "hc-empty" }, h("b", null, "Nobody has signed up yet"), h("p", null, "When someone from " + c.domain + " signs up, this lead becomes an account and their people appear here."));
+    if (det === "loading" || !det) return h("p", { class: "hb-none", role: "status" }, "Loading…");
+    if (det === "error") return h("p", { class: "hb-none" }, "The people couldn't be loaded. Please try again.");
+    var wrap = h("div", { class: "cc-people" });
+    det.people.forEach(function (pp) { wrap.appendChild(personBlock(pp, det)); });
+    return det.people.length ? wrap : h("p", { class: "hb-none" }, "No people yet.");
+  }
+  function workTab(c) {
+    var det = HUB.detail[c.key];
+    if (!det || det === "loading") return h("p", { class: "hb-none", role: "status" }, "Loading…");
+    if (det === "error") return h("p", { class: "hb-none" }, "This could not be loaded.");
+    var camps = h("ul", { class: "hb-items" }), sels = h("ul", { class: "hb-items" }), nc = 0, ns = 0;
+    det.people.forEach(function (pp) {
+      pp.campaigns.forEach(function (x) { nc++; camps.appendChild(itemRow("campaign", x, det)); });
+      pp.selections.filter(function (x) { return !x.in_campaign; }).forEach(function (x) { ns++; sels.appendChild(itemRow("selection", x, det)); });
+    });
+    return h("div", { class: "hb-p__cols" },
+      h("div", null, h("h4", null, "Campaigns, each with its selection ", h("span", null, String(nc))), nc ? camps : h("p", { class: "hb-none" }, "No campaigns.")),
+      h("div", null, h("h4", null, "Selections without a campaign ", h("span", null, String(ns))), ns ? sels : h("p", { class: "hb-none" }, "None.")));
+  }
+  function quotesTab(c) {
+    var d = CRM.det;
+    if (!d) return h("p", { class: "hb-none", role: "status" }, "Loading…");
+    if (d === "error") return h("p", { class: "hb-none" }, "The quotes could not be loaded.");
+    if (!d.quotes.length) return h("div", { class: "hc-empty" }, h("b", null, "No quote requests yet"), h("p", null, "When this company asks for a quote from a selection, it shows here. Type the value when you send it and the approved value when they say yes."));
+    var wrap = h("div", { class: "cc-people" });
+    d.quotes.forEach(function (q) {
+      var v = h("input", { type: "number", min: "0", step: "1", value: q.value_sar == null ? "" : q.value_sar, placeholder: "Quote, SAR", "aria-label": "Quote value in SAR" });
+      var ap = h("input", { type: "number", min: "0", step: "1", value: q.approved_sar == null ? "" : q.approved_sar, placeholder: "Approved, SAR", "aria-label": "Approved value in SAR" });
+      var msg = h("span", { class: "cc-msg", role: "status" });
+      var sv = h("button", { class: "hc-btn hc-btn--sm hc-btn--line", type: "button" }, "Save");
+      sv.addEventListener("click", function () {
+        sv.disabled = true;
+        api("POST", "/api/crm/quote", { id: q.id, value_sar: v.value, approved_sar: ap.value }).then(function (r) {
+          sv.disabled = false;
+          if (r.s === 200) { toast(0, "Quote saved."); crmReload(); api("GET", "/api/crm/company?k=" + encodeURIComponent(c.key)).then(function (x) { if (x.s === 200) { CRM.det = x.b; renderSection(); } }); }
+          else msg.textContent = (r.b && r.b.message) || "Could not save.";
+        });
+      });
+      wrap.appendChild(h("div", { class: "cc-quote" },
+        h("div", { class: "cc-q__what" }, h("b", null, (q.selection || "A selection") + (q.creators ? ", " + plural(q.creators, "creator") : "")),
+          h("small", null, "Asked " + day(q.at) + (q.who ? " by " + q.who : "") + " · " + (q.handled ? "answered" : "waiting for an answer") + (q.set_by ? " · figures by " + q.set_by : ""))),
+        h("div", { class: "cc-quote__f" }, v, ap, sv, msg)));
+    });
+    return wrap;
+  }
+  function notesTab(c) {
+    var d = CRM.det;
+    if (!d) return h("p", { class: "hb-none", role: "status" }, "Loading…");
+    if (d === "error") return h("p", { class: "hb-none" }, "The notes could not be loaded.");
+    var text = h("textarea", { maxlength: "2000", placeholder: "What happened, what was agreed, what to remember", "aria-label": "Note", rows: "3" });
+    var kind = h("select", { class: "cc-select", "aria-label": "Type" }, h("option", { value: "note" }, "Note"), h("option", { value: "call" }, "Call"));
+    var msg = h("span", { class: "cc-msg", role: "status" });
+    var add_ = h("button", { class: "hc-btn hc-btn--sm", type: "button" }, "Add note");
+    add_.addEventListener("click", function () {
+      add_.disabled = true;
+      api("POST", "/api/crm/note", { key: c.key, text: text.value, kind: kind.value }).then(function (r) {
+        add_.disabled = false;
+        if (r.s === 200) { d.notes = r.b.notes; text.value = ""; renderSection(); } else msg.textContent = (r.b && r.b.message) || "Could not add it.";
+      });
+    });
+    var list = h("ul", { class: "cc-notes" });
+    d.notes.forEach(function (n) { list.appendChild(h("li", null, n.text, h("small", null, [n.author, n.kind === "call" ? "call" : "note", day(n.at)].filter(Boolean).join(" · ")))); });
+    return h("div", null, h("div", { class: "cc-noteform" }, text, h("div", { class: "cc-noteform__go" }, kind, add_, msg)),
+      d.notes.length ? list : h("p", { class: "hb-none" }, "No notes yet."),
+      h("p", { class: "cc-private" }, icon("lock"), "Team only. Clients never see notes, money or phone numbers."));
+  }
+  function renderCompanyPage(p) {
+    if (!CRM.data) { add(p, h("p", { class: "hc-sr", role: "status" }, "Loading the company")); crmLoad(); return; }
+    var c = CRM.data.rows.filter(function (x) { return x.key === CRM.page; })[0];
+    if (!c) { CRM.page = null; renderSection(); return; }
+    if (CRM.det && CRM.det.row && CRM.det.row.key === c.key) c = CRM.det.row;
+    add(p, h("nav", { class: "cc-crumb", "aria-label": "Breadcrumb" }, h("a", { href: "#companies", onclick: function (e) { e.preventDefault(); closeCompany(); } }, "Companies"), icon("arrow"), h("span", null, c.name)));
+    add(p, companyHeader(c));
+    var det = HUB.detail[c.key], nq = CRM.det && CRM.det.quotes ? CRM.det.quotes.length : null, nn = CRM.det && CRM.det.notes ? CRM.det.notes.length : null;
+    var tabs = h("div", { class: "cc-tabs", role: "tablist", "aria-label": "Company" });
+    [["people", "People", c.waiting ? c.waiting + " waiting" : (det && det.people ? det.people.length : null), !!c.waiting], ["work", "Work", c.selections + c.campaigns || null],
+     ["quotes", "Quotes", nq], ["notes", "Notes", nn]].forEach(function (t) {
+      tabs.appendChild(h("button", { class: "cc-tab", role: "tab", type: "button", "aria-selected": CRM.tab === t[0] ? "true" : "false",
+        onclick: function () { CRM.tab = t[0]; renderSection(); } }, t[1], t[2] != null ? h("em", { class: t[3] ? "hot" : "" }, String(t[2])) : null));
+    });
+    add(p, tabs);
+    var body = CRM.tab === "work" ? workTab(c) : CRM.tab === "quotes" ? quotesTab(c) : CRM.tab === "notes" ? notesTab(c) : peopleTab(c);
+    var credits = det && det.people ? det.people.reduce(function (n, x) { return n + (x.credits || 0); }, 0) : null;
+    var rail = h("aside", { class: "cc-rail", "aria-label": "At a glance" }, h("section", { class: "hc-panel" }, h("h3", null, "At a glance"),
+      h("dl", { class: "cc-dl" }, h("dt", null, "Selections"), h("dd", null, String(c.selections)), h("dt", null, "Campaigns"), h("dd", null, c.campaigns + (c.live ? " · " + c.live + " live" : "")),
+        h("dt", null, "Open quotes"), h("dd", null, c.open_n ? (c.open_sar ? big(c.open_sar) + " SAR" : c.open_n + " unpriced") : "None"),
+        h("dt", null, "Approved, 12 months"), h("dd", null, c.approved_sar ? big(c.approved_sar) + " SAR" : "—"),
+        h("dt", null, "Credits left"), h("dd", null, credits == null ? "…" : String(credits)))));
+    add(p, h("div", { class: "cc-split" }, h("section", { "aria-label": "Company details" }, body), rail));
+    add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" })); hubSayAgain();
+  }
+
   function renderCompanies(p) {
     if (!DATA.hub) { renderOverview(p); return; }
+    if (CRM.page && HUB.view === "companies") { renderCompanyPage(p); return; }
     add(p, head("Companies", "Every company, its people, and their campaigns with their selections. Open anything as the client sees it, assign it to a client, share it, or hand it to an account manager."));
     add(p, hubViewBar());
     if (HUB.view === "campaigns") { renderAllCampaigns(p); return; }
@@ -1980,30 +2315,15 @@
       hubLoad();
       return;
     }
-    var all = HUB.list.filter(function (c) { return c.key !== "handed" && c.key !== "unassigned" && c.key !== "team"; });
-    var stats = { people: 0, sel: 0, camp: 0, live: 0 };
-    all.forEach(function (c) { stats.people += c.people; stats.sel += c.selections; stats.camp += c.campaigns; stats.live += c.live; });
-    add(p, h("dl", { class: "hc-score hc-score--4" },
-      kStat("Companies", String(all.length), plural(stats.people, "person", "people")),
-      kStat("Selections", String(stats.sel), "Across every company"),
-      kStat("Campaigns", String(stats.camp), "All statuses"),
-      kStat("Live now", String(stats.live), stats.live ? "Results refresh every 24 hours" : "None live")));
-    var q = h("input", { class: "hb-search", type: "search", placeholder: "Search companies or domains", "aria-label": "Search companies", value: HUB.q });
-    q.addEventListener("input", function () { HUB.q = q.value; var pos = q.selectionStart; renderSection(); var n = document.querySelector(".hb-search"); if (n) { n.focus(); n.setSelectionRange(pos, pos); } });
-    var bar = h("div", { class: "kc-filter", role: "group", "aria-label": "Show" });
-    [["all", "All companies", HUB.list.length], ["live", "With a live campaign", HUB.list.filter(function (c) { return c.live > 0; }).length],
-     ["waiting", "Waiting approval", HUB.list.filter(function (c) { return c.waiting > 0; }).length],
-     ["blocked", "Held or suspended", HUB.list.filter(function (c) { return c.blocked > 0; }).length],
-     ["nokam", "No account manager", HUB.list.filter(function (c) { return !c.kam.email && c.key !== "handed" && c.key !== "unassigned" && c.key !== "team"; }).length]].forEach(function (f) {
-      bar.appendChild(h("button", { class: "kc-chip", type: "button", "aria-pressed": HUB.f === f[0] ? "true" : "false",
-        onclick: function () { HUB.f = f[0]; renderSection(); } }, f[1], h("span", null, String(f[2]))));
-    });
-    add(p, h("div", { class: "hb-tools" }, q, bar));
-    add(p, h("p", { class: "hb-say", id: "hb-say", role: "status" })); hubSayAgain();
-    var shown = HUB.list.filter(hubFilter);
-    var list = h("ul", { class: "hb-list" });
-    shown.forEach(function (c) { list.appendChild(companyBlock(c)); });
-    add(p, shown.length ? list : h("div", { class: "hc-empty" }, h("b", null, "No company matches"), h("p", null, "Try another search, or show all companies.")));
+    renderCrm(p);
+    // Work that is not filed under a client (a KAM's handed items, the team's, loose access codes) keeps its own list.
+    var other = HUB.list.filter(function (c) { return c.key === "handed" || c.key === "unassigned" || c.key === "team"; });
+    if (other.length) {
+      var list = h("ul", { class: "hb-list" });
+      other.forEach(function (c) { list.appendChild(companyBlock(c)); });
+      add(p, h("div", { class: "hc-sechd" }, h("h2", { class: "hc-h2" }, "Not filed under a client")));
+      add(p, list);
+    }
   }
 
   /* ---------------------------------------------------------------- routing */

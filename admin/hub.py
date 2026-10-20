@@ -266,8 +266,9 @@ def companies(role, a):
 
 
 def company(role, a, key):
-    import peoplectl, portal
+    import crm, peoplectl, portal
     peoplectl.ensure()
+    crm.ensure()
     dmap = kam_scope.domain_map()
     kam = _item_kams()
     if key == "team" and role == "kam":
@@ -310,6 +311,7 @@ def company(role, a, key):
         s, c = items.get(u["code_id"], ([], []))
         out.append({"id": u["id"], "name": u["name"] or "", "email": u["email"], "job_title": u["job_title"] or "",
                     "company": u["company"] or "", "kam": _kam_of_user(u, dmap), "last_login_at": u["last_login_at"],
+                    "decision_maker": bool("decision_maker" in u.keys() and u["decision_maker"]), "phone": u["phone"] or "",
                     "status": u["status"], "state": peoplectl.state(u), "can": peoplectl.allowed(role, a, u),
                     "credits": portal.balance(u["code_id"]) if u["code_id"] is not None else 0,
                     "selections": [_sel_row(x, kam) for x in s], "campaigns": [_camp_row(x, kam) for x in c]})

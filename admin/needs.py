@@ -116,12 +116,25 @@ def _company(conn, code_id):
     return (c["label"] if c else "") or ""
 
 
+def _company_steps(role, a):
+    """Overdue next steps typed on a company, and companies in the red (the CRM, item 220)."""
+    import crm
+    rows = crm.rows(role, a)["rows"]
+    steps = [{"id": r["key"], "title": r["next_step"], "sub": r["name"], "at": r["next_due"], "company": r["name"], "act": "company", "key": r["key"]}
+             for r in rows if r["overdue"]]
+    red = [{"id": r["key"], "title": r["name"], "sub": r["why"], "at": r["last"], "company": r["name"], "act": "company", "key": r["key"]}
+           for r in rows if r["health"] == "low" and not r["prospect"]]
+    steps.sort(key=lambda x: x["at"] or 0)
+    return steps, red
+
+
 GROUPS = [
     ("signups", "Sign-ups waiting for approval", "They can't open the catalogue until someone approves them"),
-    ("overdue", "Overdue next steps", "From the campaign board"),
+    ("overdue", "Overdue next steps", "From the campaign board and the Companies list"),
     ("quotes", "Quotes without a reply", "Requested from a selection; answered in the admin"),
     ("analyses", "Analysis requests", "Approve opens the analysis for the person who asked"),
     ("access", "Access requests", "Someone asked to open a selection; answered in the admin"),
+    ("red", "Accounts at risk", "The worst signal decides; the reason is on each row"),
 ]
 
 
@@ -135,6 +148,9 @@ def queue(role, a, mine_only=False):
         found = {"signups": _signups(conn, scope, staff), "overdue": _overdue(conn, scope),
                  "quotes": _quotes(conn, scope), "access": _access(conn, scope)}
     found["analyses"] = _analyses(scope)
+    steps, red = _company_steps(role, a)
+    found["overdue"] = sorted(found["overdue"] + steps, key=lambda x: x["at"] or 0)
+    found["red"] = red
     groups = []
     for key, title, hint in GROUPS:
         rows = found.get(key) or []

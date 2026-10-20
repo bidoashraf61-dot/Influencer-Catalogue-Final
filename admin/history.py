@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS history (
   at         INTEGER NOT NULL,
   who        TEXT,
   action     TEXT NOT NULL,        -- created | edited | deleted | imported | undo
-  entity     TEXT NOT NULL,        -- creator | selection | campaign | code | user | tiers | roster
+  entity     TEXT NOT NULL,        -- creator | selection | campaign | code | user | company | tiers | roster
   key        TEXT,
   label      TEXT,
   before     TEXT,                 -- JSON snapshot, NULL = did not exist
@@ -134,6 +134,10 @@ def snapshot(entity, key, conn=None):
         c = rows[0].get("code_id")
         rev = conn.execute("SELECT id, revoked_at FROM codes WHERE id = ?", (c,)).fetchone() if c is not None else None
         return {"users": rows, "_code_revoked": [{"id": rev["id"], "revoked_at": rev["revoked_at"]}] if rev else []}
+    if entity == "company":
+        # A company's CRM row (stage override, next step, prospect). Notes are a log, not part of the snapshot.
+        rows = _rows(conn, "companies", "key = ?", (str(key),))
+        return {"companies": rows} if rows else None
     if entity == "tiers":
         return {"tiers": _rows(conn, "tiers", "1", ()), "creators": _rows(conn, "creators", "1", ())}
     if entity == "roster":
@@ -154,6 +158,8 @@ def _clear(conn, entity, key):
         conn.execute("DELETE FROM codes WHERE id = ?", (int(key),))
     elif entity == "campaign":
         conn.execute("DELETE FROM campaigns WHERE id = ?", (int(key),))   # cascades
+    elif entity == "company":
+        conn.execute("DELETE FROM companies WHERE key = ?", (str(key),))
     elif entity == "user":
         pass                                     # users rows are replaced in place; nothing hangs off them
     elif entity == "tiers":

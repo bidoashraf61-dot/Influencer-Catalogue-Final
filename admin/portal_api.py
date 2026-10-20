@@ -284,6 +284,25 @@ class PortalMixin(connect_api.ConnectMixin):
                     self.send_json(200, dict(needs.queue(role, a), ok=True, kpis=needs.kpis(role, a)),
                                    self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path in ("/api/crm/companies", "/api/crm/company"):
+            # Items 209 + 220: the account CRM behind the Companies tab (staff only; a KAM sees her own companies).
+            who = self._need_account()
+            if who:
+                import crm, hub
+                role, a = hub.viewer(who[1])
+                if role is None:
+                    self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
+                elif path == "/api/crm/companies":
+                    self.send_json(200, dict(crm.rows(role, a), ok=True, kams=hub.kam_options()), self.cors() + [("Cache-Control", "no-store")])
+                else:
+                    k = str(query.get("k") or "")
+                    r = crm.row(role, a, k)
+                    if r is None:
+                        self.send_json(404, {"ok": False}, self.cors())
+                    else:
+                        self.send_json(200, {"ok": True, "row": r, "notes": crm.notes(k), "quotes": crm.quotes(role, a, k)},
+                                       self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/hub/campaigns":
             who = self._need_account()
             if who:
@@ -586,6 +605,8 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
             "/api/selection/merge": self.api_selection_merge,
             "/api/needs/approve": self.api_needs_approve, "/api/hub/account": self.api_hub_account,
+            "/api/crm/set": self.api_crm_set, "/api/crm/note": self.api_crm_note, "/api/crm/person": self.api_crm_person,
+            "/api/crm/quote": self.api_crm_quote, "/api/crm/prospect": self.api_crm_prospect,
             "/api/stepup/send": self.api_stepup_send, "/api/stepup/verify": self.api_stepup_verify,
         }
         fn = routes.get(path)
@@ -1294,6 +1315,60 @@ class PortalMixin(connect_api.ConnectMixin):
         code, got = peoplectl.act(role, a, who[1], b.get("id"), str(b.get("action") or ""), b.get("amount"), str(b.get("reason") or ""),
                                   stepup_open=stepup.active(who[1]) > 0)
         return self.send_json(code, got, self.cors())
+
+    def _crm_who(self):
+        who = self._need_account()
+        if not who:
+            return None
+        import hub
+        role, a = hub.viewer(who[1])
+        if role is None:
+            self.send_json(403, {"ok": False, "message": "Not allowed."}, self.cors())
+            return None
+        if self._throttled("crm:%d" % who[1]["id"], 240, 3600):
+            return None
+        return role, a
+
+    def api_crm_set(self):
+        """Next step, due date or stage override on a company. {key, next_step?, next_due?, stage?}"""
+        w = self._crm_who()
+        if w:
+            import crm
+            b = self.json_body()
+            code, got = crm.set_fields(w[0], w[1], str(b.get("key") or ""), {k: b[k] for k in ("next_step", "next_due", "stage") if k in b})
+            self.send_json(code, got, self.cors())
+
+    def api_crm_note(self):
+        w = self._crm_who()
+        if w:
+            import crm
+            b = self.json_body()
+            code, got = crm.add_note(w[0], w[1], str(b.get("key") or ""), b.get("text"), str(b.get("kind") or "note"))
+            self.send_json(code, got, self.cors())
+
+    def api_crm_person(self):
+        w = self._crm_who()
+        if w:
+            import crm
+            b = self.json_body()
+            code, got = crm.set_person(w[0], w[1], b.get("id"), bool(b.get("decision_maker")))
+            self.send_json(code, got, self.cors())
+
+    def api_crm_quote(self):
+        w = self._crm_who()
+        if w:
+            import crm
+            b = self.json_body()
+            code, got = crm.set_quote(w[0], w[1], b.get("id"), b.get("value_sar"), b.get("approved_sar"))
+            self.send_json(code, got, self.cors())
+
+    def api_crm_prospect(self):
+        w = self._crm_who()
+        if w:
+            import crm
+            b = self.json_body()
+            code, got = crm.add_prospect(w[0], w[1], b.get("name"), b.get("domain"), str(b.get("kam") or ""), b.get("next_step") or "", b.get("next_due"))
+            self.send_json(code, got, self.cors())
 
     def api_stepup_send(self):
         """Email the signed-in team member a fresh confirmation code."""
