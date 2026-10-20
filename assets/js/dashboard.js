@@ -1009,9 +1009,9 @@
     var out = '<div class="sl-hero"><span class="sl-hero__ic">' + SLI + '</span><div><p class="sl-hero__t">Every ' + esc(cur) + " 1 spent brought back <mark>" + esc(cur) + " " + (T.roas || 0).toFixed(2) + "</mark></p>"
       + "<p>" + money(T.revenue, cur) + " in sales from " + full(T.orders) + " orders" + (lift != null ? ", <b>" + (lift >= 0 ? "+" : "") + Math.round(lift) + "%</b> above a usual day before the campaign" : "") + ".</p></div></div>"
       + '<div class="cmp-boxes sl-boxes">' + box(money(T.revenue, cur), "sales", "is-hot") + box(full(T.orders), "orders") + box(roasTxt(T.roas), "return on spend")
-      + box(money(T.cpo, cur), "cost per order") + box(money(T.aov, cur), "average basket") + box(Math.round((T.new_share || 0) * 100) + "%", "new customers") + "</div>";
+      + box(money(T.cpo, cur), "cost per order") + box(money(T.aov, cur), "average basket") + (T.new_share != null ? box(Math.round(T.new_share * 100) + "%", "new customers") : "") + "</div>";
     var FN = S.funnel || [], fmx = Math.log10(Math.max.apply(null, FN.map(function (f) { return f.n; }).concat([10])));
-    out += sec("sl-funnel", "From view to order", "Each step as people moved from a video to a purchase. Bars use a log scale so every step stays visible. Orders here are the ones tracked from a link; promo-code orders in stores are counted in the totals above.",
+    if (FN.length) out += sec("sl-funnel", "From view to order", "Each step as people moved from a video to a purchase. Bars use a log scale so every step stays visible. Orders here are the ones tracked from a link; promo-code orders in stores are counted in the totals above.",
       '<ol class="sl-funnel">' + FN.map(function (f, i) {
         var prev = i ? FN[i - 1].n : null, r = prev ? f.n / prev * 100 : null;
         return '<li style="--w:' + Math.max(6, Math.log10(Math.max(1, f.n)) / fmx * 100).toFixed(1) + '%"><span class="sl-funnel__k">' + esc(f.k) + "</span><i></i><b>" + num(f.n) + "</b>"
@@ -1021,19 +1021,21 @@
         return '<div class="sl-src__r"><span class="sl-src__dot" style="background:' + SLCOL[i % SLCOL.length] + '"></span><div class="sl-src__n"><b>' + esc(s.label) + "</b><small>" + esc(s.via || "") + '</small></div>'
           + '<div class="sl-src__bar"><i style="--w:' + (s.revenue / src[0].revenue * 100).toFixed(1) + "%;--c:" + SLCOL[i % SLCOL.length] + '"></i></div>'
           + '<div class="sl-src__m"><b>' + money(s.revenue, cur) + "</b><small>" + full(s.orders) + " orders · " + Math.round(s.revenue / stot * 100) + "%</small></div></div>"; }).join("") + "</div>");
-    out += sec("sl-days", "Sales by day", "Daily sales across every store, with the days videos went live. The shaded part is the two weeks before the campaign.", salesDays());
+    if ((S.days || []).length > 1) out += sec("sl-days", "Sales by day", "Daily sales across every store, with the days videos went live. The shaded part is the two weeks before the campaign.", salesDays());
     var names = {}, pics = {}; (R.creators || []).forEach(function (c) { names[c.code] = c.name; pics[c.code] = c.photo; });
     var cr = (S.creators || []).slice(0, 10), cmx = cr.length ? cr[0].revenue : 1;
-    out += sec("sl-cr", "Creators who sold the most", "Sales from each creator's own promo code and tracking link.",
+    if (cr.length) out += sec("sl-cr", "Creators who sold the most", "Sales from each creator's own promo code and tracking link.",
       '<ol class="sl-cr">' + cr.map(function (c, i) {
         return '<li><span class="sl-cr__i">' + (i + 1) + "</span>" + ava(pics[c.code]) + '<span class="sl-cr__n"><b>' + esc(names[c.code] || c.name || c.code) + '</b><small><span class="sl-code">' + esc(c.promo) + "</span>" + full(c.orders) + " orders</small></span>"
           + '<span class="sl-cr__bar"><i style="--w:' + (c.revenue / cmx * 100).toFixed(1) + '%"></i></span><b class="sl-cr__v">' + money(c.revenue, cur) + "</b></li>"; }).join("") + "</ol>");
     var C = S.customers || {}, ct = (C["new"] || 0) + (C.returning || 0) || 1;
     var L = function (rows, fmt) { return (rows || []).map(function (r) { return { k: r.k, n: r.n, label: fmt(r.n) }; }); };
-    out += '<div class="sl-two">' + sec("sl-who", "Who bought", "New customers had not bought the brand before, as the retailers report it.",
-        '<div class="sl-split"><i style="flex:' + (C["new"] || 0) + '"><b>' + Math.round((C["new"] || 0) / ct * 100) + '%</b> new</i><i style="flex:' + (C.returning || 0) + '"><b>' + Math.round((C.returning || 0) / ct * 100) + "%</b> returning</i></div>"
-        + "<h4 class=\"sl-h4\">Top cities</h4>" + bars(L(S.cities, function (n) { return money(n, cur); }), function (r) { return esc(r.k); }, function (i) { return SLCOL[i % SLCOL.length]; }))
-      + sec("sl-sku", "What sold", "Revenue by product, from the retailers' reports.", bars(L(S.products, function (n) { return money(n, cur); }), function (r) { return esc(r.k); }, function (i) { return SLCOL[i % SLCOL.length]; })) + "</div>";
+    var hasC = (C["new"] || 0) + (C.returning || 0) > 0, hasCt = (S.cities || []).length > 0, hasP = (S.products || []).length > 0;
+    var who = (hasC || hasCt) ? sec("sl-who", "Who bought", "New customers had not bought the brand before, as the retailers report it.",
+        (hasC ? '<div class="sl-split"><i style="flex:' + (C["new"] || 0) + '"><b>' + Math.round((C["new"] || 0) / ct * 100) + '%</b> new</i><i style="flex:' + (C.returning || 0) + '"><b>' + Math.round((C.returning || 0) / ct * 100) + "%</b> returning</i></div>" : "")
+        + (hasCt ? "<h4 class=\"sl-h4\">Top cities</h4>" + bars(L(S.cities, function (n) { return money(n, cur); }), function (r) { return esc(r.k); }, function (i) { return SLCOL[i % SLCOL.length]; }) : "")) : "";
+    var sku = hasP ? sec("sl-sku", "What sold", "Revenue by product, from the retailers' reports.", bars(L(S.products, function (n) { return money(n, cur); }), function (r) { return esc(r.k); }, function (i) { return SLCOL[i % SLCOL.length]; })) : "";
+    if (who || sku) out += (who && sku ? '<div class="sl-two">' + who + sku + "</div>" : who + sku);
     if (cl) {
       var B = function (rows) { return (rows || []).map(function (r) { return { k: r.k, n: r.n, label: full(r.n) }; }); };
       out += sec("sl-clk", "Link clicks", "Taps on the creators' own tracking links — people only, not link previews or bots.",

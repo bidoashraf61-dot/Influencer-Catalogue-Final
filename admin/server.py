@@ -1031,6 +1031,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/campaigns/comments":
             import comments
             return comments.admin_get(self, query)
+        if path == "/campaigns/sales":
+            import sales
+            return sales.admin_get(self, query)
+        if path == "/campaigns/sales/template.xlsx":
+            import sales
+            return sales.template_get(self)
         if path == "/campaigns/setup":
             return self.get_campaign_setup(query)
         if path == "/campaigns/template.xlsx":
@@ -1506,6 +1512,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/campaigns/comments":
             import comments
             return comments.admin_post(self)
+        if path == "/campaigns/sales":
+            import sales
+            return sales.admin_post(self)
         if path == "/campaigns/status":
             return self.post_campaign_status()
         if path == "/campaigns/delete":
@@ -6443,6 +6452,7 @@ TRACKED = {
     "/campaigns/content/pending": ("campaign", "id", "Updated who is still to post"),
     "/campaigns/insights/decide": ("campaign", "id", "Reviewed insights"),
     "/campaigns/insights/upload": ("campaign", "id", "Uploaded insights"),
+    "/campaigns/sales": ("campaign", "id", "Changed campaign sales"),
     "/campaigns/sync": ("campaign", "id", "Synced campaign creators"),
     "/codes/new": ("code", None, "Created access code"),
     "/codes/revoke": ("code", "id", "Revoked access code"),

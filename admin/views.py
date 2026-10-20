@@ -3581,6 +3581,7 @@ CAMP_TABS = [("setup", "/campaigns/edit", "Setup", "Dates, creators, rules and t
              ("links", "/campaigns/links", "Tracking links", "Link clicks, per creator"),
              ("plan", "/calculator", "Goals & ROI", "What the campaign should achieve"),
              ("comments", "/campaigns/comments", "Comments", "What viewers wrote under the videos, read by AI"),
+             ("sales", "/campaigns/sales", "Sales", "Promo-code and store sales, return on spend"),
              ("report", "/campaigns/report", "Report", "What the client sees")]
 
 

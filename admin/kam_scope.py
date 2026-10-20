@@ -309,19 +309,19 @@ def source_ok(src, scope):
 _GET_FREE = {"/", "/reauth", "/selections", "/campaigns", "/clients", "/clients/preview/exit", "/requests",
              "/api/pulse", "/api/search", "/codes", "/open-catalogue", "/roster", "/roster/export",
              "/roster/template.xlsx", "/roster/template", "/licences", "/analysis", "/analysis/find",
-             "/analysis/template.xlsx", "/campaigns/thumb", "/campaigns/logo", "/calculator", "/ai",
+             "/analysis/template.xlsx", "/campaigns/sales/template.xlsx", "/campaigns/thumb", "/campaigns/logo", "/calculator", "/ai",
              "/ai/history", "/selections/suggest", "/team", "/evidence", "/access-requests"}
 _GET_SELECTION = {"/selections/edit": "id", "/selections/fit": "id", "/campaigns/setup": "selection", "/portal/quote": "sel"}
 _GET_CAMPAIGN = {"/campaigns/content", "/campaigns/report", "/campaigns/insights", "/campaigns/export.xlsx",
                  "/campaigns/export.csv", "/campaigns/insight-file", "/campaigns/links", "/campaigns/clicks.csv",
-                 "/campaigns/edit", "/campaigns/comments"}
+                 "/campaigns/edit", "/campaigns/comments", "/campaigns/sales"}
 _PORTAL_TABS = {"accounts", "briefs", "chats"}
 
 # POSTs with no client in them that a KAM may still make: herself, the copilot's read-only chat, creators.
 _POST_FREE = {"/access-requests", "/reauth", "/password", "/ai/chat", "/ai/dismiss", "/roster/save", "/roster/bulk", "/licences/save",
               "/licences/scan"}
 _POST_SELECTION = {"/selections/save", "/selections/delete", "/selections/status", "/quote/ready", "/quote/withdraw", "/selections/invite"}
-_POST_CAMPAIGN = {"/campaigns/comments", "/campaigns/save", "/campaigns/status", "/campaigns/delete", "/campaigns/link",
+_POST_CAMPAIGN = {"/campaigns/comments", "/campaigns/sales", "/campaigns/save", "/campaigns/status", "/campaigns/delete", "/campaigns/link",
                   "/campaigns/content/add", "/campaigns/content/update", "/campaigns/content/group", "/campaigns/content/bulk",
                   "/campaigns/content/pending", "/campaigns/insights/decide", "/campaigns/insights/upload",
                   "/campaigns/sync", "/campaigns/link/custom", "/campaigns/link/toggle", "/planner/apply",
