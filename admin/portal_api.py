@@ -266,7 +266,7 @@ class PortalMixin(connect_api.ConnectMixin):
                 cid, user = who
                 a = kam_scope.admin_for_email(user["email"])
                 import hub
-                self.send_json(200, dict(account.summary(user, cid, self._srv().SECRET), ok=True,
+                self.send_json(200, dict(account.summary(user, cid, self._srv().SECRET, getattr(self._srv(), "CLIENT_LOGOS", None)), ok=True,
                                          is_kam=bool(a is not None and kam_scope.is_kam(a) and not a["disabled_at"]),
                                          hub=hub.viewer(user)[0]),
                                self.cors() + [("Cache-Control", "no-store")])

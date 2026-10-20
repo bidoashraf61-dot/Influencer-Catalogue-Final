@@ -308,8 +308,11 @@ def _numbers(k):
     t = (rep or {}).get("total") or {}
     er = t.get("video_er") if t.get("video_er") is not None else t.get("er")
     grades = {i.get("key"): i.get("grade") for i in ((rep or {}).get("progress") or {}).get("items") or [] if i.get("key")}
+    v = (rep or {}).get("verdict") or {}
     return ({"views": t.get("views") or 0, "engagement": t.get("engagement") or 0, "er": er,
-             "er_grade": grades.get("er") or t.get("er_grade")},
+             "er_grade": grades.get("er") or t.get("er_grade"),
+             # item 208: the dashboard's overall verdict, the board's on-track colour
+             "verdict": {"grade": v.get("grade"), "label": v.get("label")} if v.get("grade") else None},
             {"live": t.get("delivered") or 0, "planned": t.get("planned") or 0})
 
 

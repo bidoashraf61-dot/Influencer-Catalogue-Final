@@ -27,11 +27,16 @@
 
   var ROOT = "../";
   var HV_LOGO = ROOT + "assets/brand/logo.png";
+  var API_BASE = (((window.CATALOGUE_CONFIG || {}).api != null ? window.CATALOGUE_CONFIG.api : "/admin") + "").replace(/\/$/, "");
   var ICON = {
     pin: '<path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5z"/><path d="M12 14v6"/>',
     chev: '<path d="M6 9l6 6 6-6"/>',
     arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
     lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+    fold: '<path d="M15 6l-6 6 6 6"/>',
+    unfold: '<path d="M9 6l6 6-6 6"/>',
+    chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    list: '<path d="M4 6h16M4 12h16M4 18h10"/>',
     grip: '<circle cx="9" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="17" r="1.2"/><circle cx="15" cy="17" r="1.2"/>'
   };
 
@@ -92,6 +97,7 @@
     return dm(a) + " – " + dm(b);
   }
   var SIG = { good: "Strong", moderate: "Fair", low: "Low" };
+  var TRACK = { good: "On track", moderate: "Slightly behind", low: "Behind target" };
   function ours(client) { return /^\s*hello\s*voice\b/i.test(client || ""); }
 
   /* ------------------------------------------------------- normalised cards */
@@ -109,6 +115,12 @@
       when: when(c.starts_at, c.ends_at), kam: c.kam ? c.kam.name || c.kam.email : "",
       pinned: !!c.my_pin, demo: !!c.demo, live: c.status === "live",
       figures: figs, signal: n && n.er_grade ? { grade: n.er_grade, label: SIG[n.er_grade] } : null,
+      // Item 208: the dashboard's own verdict as an on-track colour (green / amber / red) on live cards.
+      track: c.status === "live" && n && n.verdict && n.verdict.grade ? { grade: n.verdict.grade, label: TRACK[n.verdict.grade] || n.verdict.label } : null,
+      key1: n ? [big(n.views), "views"] : [String(k.creators || 0), (k.creators === 1 ? "creator" : "creators")],
+      // Item 203: every campaign card opens its selection(s) and its dashboard.
+      sels: (c.selections || []).map(function (s) { return { label: s.name, href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }; }),
+      dash: c.report ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : "",
       progress: p && p.planned ? { done: p.live || 0, of: p.planned } : null,
       links: (c.selections || []).map(function (s) {
         return { label: s.name, sub: s.creators + (s.creators === 1 ? " creator" : " creators"), href: ROOT + "selection/#s=" + encodeURIComponent(s.token) };
@@ -121,8 +133,12 @@
   function fromSelection(s, badge) {
     var k = s.counts || {};
     return {
-      key: s.token, name: s.name, stage: s.stage, moves: s.moves || [], client: s.client || "", logos: [],
+      key: s.token, name: s.name, stage: s.stage, moves: s.moves || [], client: s.client || "",
+      logos: (s.logos || []).map(function (u) { return u.charAt(0) === "@" ? API_BASE + u.slice(1) : u; }),
       href: ROOT + "selection/#s=" + encodeURIComponent(s.token), open: s.mine && k.review ? "Review" : "Open selection",
+      key1: [String(k.creators || 0), k.creators === 1 ? "creator" : "creators"],
+      sels: [{ label: s.name, button: s.mine && k.review ? "Review" : "Open", href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }],
+      dash: (s.campaigns || []).filter(function (c) { return c.live; }).map(function (c) { return ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token); })[0] || "",
       when: s.owner ? s.owner + "’s" : "", kam: s.kam || "", badge: badge || null,
       figures: [["Creators", String(k.creators || 0)], ["Approved", String(k.approved || 0)], ["To review", String(k.review || 0)]],
       links: (s.campaigns || []).map(function (c) {
@@ -172,10 +188,36 @@
     return h("label", { class: "hvb-move" }, sel, svg("chev"));
   }
 
+  function trackPill(t) { return h("span", { class: "hvb-track hvb-track--" + t.grade, title: "Against the campaign's goal, as the dashboard reads it" }, t.label); }
+  // Item 203: "Open selection" (a short list when the campaign holds several) and "Open dashboard".
+  function goButtons(it) {
+    var out = [];
+    if (it.sels && it.sels.length === 1) {
+      out.push(h("a", { class: "hvb-go", href: it.sels[0].href }, svg("list"), it.sels[0].button || "Selection",
+        h("span", { class: "hvb-sr" }, ": " + it.name)));
+    } else if (it.sels && it.sels.length > 1) {
+      var d = h("details", { class: "hvb-pick" });
+      d.appendChild(h("summary", { class: "hvb-go" }, svg("list"), "Selections", h("b", null, String(it.sels.length))));
+      var ul = h("ul", { class: "hvb-pick__list" });
+      it.sels.forEach(function (x) { ul.appendChild(h("li", null, h("a", { href: x.href }, x.label))); });
+      d.appendChild(ul);
+      document.addEventListener("click", function (e) { if (d.open && !d.contains(e.target)) d.open = false; });
+      out.push(d);
+    }
+    if (it.dash) out.push(h("a", { class: "hvb-go hvb-go--dash", href: it.dash }, svg("chart"), "Dashboard", h("span", { class: "hvb-sr" }, ": " + it.name)));
+    return out;
+  }
+
   function card(it, B) {
     var can = it.moves.length > 0;
-    var el = h("article", { class: "hvb-card" + (it.pinned ? " is-pinned" : "") + (it.demo ? " is-demo" : "") + (can ? " can-move" : ""),
+    var open = B.isOpen(it.key);
+    var bodyId = "hvb-b-" + B.noun + "-" + String(it.key).replace(/[^A-Za-z0-9_-]/g, "");
+    var el = h("article", { class: "hvb-card" + (it.pinned ? " is-pinned" : "") + (it.demo ? " is-demo" : "") + (can ? " can-move" : "") + (open ? "" : " is-collapsed")
+                              + (it.track ? " is-track-" + it.track.grade : ""),
                             "data-key": it.key, "data-stage": it.stage, "aria-label": it.name });
+    var tog = h("button", { type: "button", class: "hvb-tog", "aria-expanded": open ? "true" : "false", "aria-controls": bodyId,
+                            "aria-label": (open ? "Collapse " : "Expand ") + it.name, title: open ? "Show less" : "Show details" }, svg("chev"));
+    tog.addEventListener("click", function () { B.toggle(it.key, el, tog); });
     var top = h("div", { class: "hvb-card__top" }, brand(it));
     if (B.opts.onPin) {
       var pin = h("button", { type: "button", class: "hvb-pin" + (it.pinned ? " is-on" : ""), "aria-pressed": it.pinned ? "true" : "false",
@@ -187,18 +229,28 @@
       top.appendChild(pin);
     }
     if (can && B.drag) top.insertBefore(h("span", { class: "hvb-grip", title: "Drag to another stage" }, svg("grip")), top.firstChild.nextSibling);
+    top.appendChild(tog);
     el.appendChild(top);
     el.appendChild(h("h3", { class: "hvb-card__name" }, it.href ? h("a", { href: it.href }, it.name) : it.name));
+    // The one-line summary a collapsed card keeps: on-track colour or Live mark, the key number, the client.
+    el.appendChild(h("p", { class: "hvb-card__sum" },
+      it.track ? trackPill(it.track) : (it.live ? h("span", { class: "hvb-live" }, "Live") : null),
+      it.key1 ? h("span", { class: "hvb-card__k" }, h("b", null, it.key1[0]), " " + it.key1[1]) : null,
+      it.when ? h("span", null, it.when) : null));
+    var body = h("div", { class: "hvb-card__body", id: bodyId });
+    el.appendChild(body);
+    var put = function (x) { body.appendChild(x); };
     var meta = [it.client && !ours(it.client) ? it.client : "", it.when].filter(Boolean).join(" · ");
-    if (meta || it.badge || it.live || it.demo) {
-      el.appendChild(h("div", { class: "hvb-card__meta" },
+    if (meta || it.badge || it.live || it.demo || it.track) {
+      put(h("div", { class: "hvb-card__meta" },
         it.live ? h("span", { class: "hvb-live" }, "Live") : null,
+        it.track ? trackPill(it.track) : null,
         it.demo ? h("span", { class: "hvb-tag hvb-tag--demo", title: "The team’s demo campaign" }, "Demo") : null,
         it.badge, meta ? h("span", null, meta) : null));
     }
-    el.appendChild(figures(it));
+    put(figures(it));
     if (it.signal || it.progress) {
-      el.appendChild(h("div", { class: "hvb-card__perf" }, it.progress ? progress(it.progress) : null,
+      put(h("div", { class: "hvb-card__perf" }, it.progress ? progress(it.progress) : null,
         it.signal ? h("span", { class: "hvb-sig hvb-sig--" + it.signal.grade, title: "Engagement rate against the campaign goal" }, it.signal.label) : null));
     }
     if (it.links.length) {
@@ -209,21 +261,22 @@
           h("span", { class: "hvb-links__c" }, l.sub))));
       });
       if (it.links.length > shown.length) ul.appendChild(h("li", { class: "hvb-links__more" }, "+" + (it.links.length - shown.length) + " more"));
-      el.appendChild(ul);
+      put(ul);
     } else if (it.empty) {
-      el.appendChild(h("p", { class: "hvb-none" }, it.empty));
+      put(h("p", { class: "hvb-none" }, it.empty));
     }
     var foot = h("div", { class: "hvb-card__foot" },
       it.kam ? h("span", { class: "hvb-kam", title: "Account manager" }, h("span", { class: "hvb-kam__face", "aria-hidden": "true" }, initials(it.kam)), it.kam)
              : h("span", { class: "hvb-kam hvb-kam--none" }, "HelloVoice team"),
       it.updated ? h("span", { class: "hvb-ago" }, "Updated " + ago(it.updated)) : null);
-    el.appendChild(foot);
+    put(foot);
     var acts = h("div", { class: "hvb-card__acts" });
     if (can) acts.appendChild(moveMenu(it, B.opts.stages, function (to, sel) { B.move(it, to, sel); }));
     var x = B.opts.extra ? B.opts.extra(it) : null;
     if (x) acts.appendChild(x);
-    if (it.open && it.href) acts.appendChild(h("a", { class: "hvb-open", href: it.href }, it.open, h("span", { class: "hvb-sr" }, " " + it.name), svg("arrow")));
-    if (acts.childNodes.length) el.appendChild(acts);
+    if (acts.childNodes.length) put(acts);
+    var go = goButtons(it);
+    if (go.length) el.appendChild(h("div", { class: "hvb-card__go" }, go));
     if (can && B.drag) el.setAttribute("draggable", "true");
     return el;
   }
@@ -233,6 +286,23 @@
     var B = { opts: opts, drag: matchMedia("(min-width: 900px) and (pointer: fine)").matches, lane: 0 };
     var locked = opts.locked || [];
     var noun = opts.noun || "item";
+    B.noun = noun;
+    // Items 197/198: cards open collapsed to one line; the arrow opens one. What is open, and which columns are
+    // folded (item 201), is remembered in this browser only.
+    function remember(k, fallback) { try { return JSON.parse(localStorage.getItem(k) || "null") || fallback; } catch (e) { return fallback; } }
+    function keep(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* private mode */ } }
+    var OPEN = remember("hvb-open-" + noun, {}), FOLD = remember("hvb-fold-" + noun, {});
+    B.isOpen = function (key) { return !!OPEN[key]; };
+    B.toggle = function (key, el, tog) {
+      var on = !OPEN[key];
+      if (on) OPEN[key] = 1; else delete OPEN[key];
+      keep("hvb-open-" + noun, OPEN);
+      el.classList.toggle("is-collapsed", !on);
+      tog.setAttribute("aria-expanded", on ? "true" : "false");
+      tog.setAttribute("aria-label", (on ? "Collapse " : "Expand ") + el.getAttribute("aria-label"));
+      tog.title = on ? "Show less" : "Show details";
+      allBtn.textContent = items.every(function (x) { return OPEN[x.key]; }) ? "Collapse all" : "Expand all";
+    };
     var status = h("p", { class: "hvb-say", role: "status", "aria-live": "polite" });
     B.say = function (text, bad) {
       if (opts.say) { opts.say(text, bad); return; }
@@ -243,18 +313,39 @@
     var lanes = {}, tabs = {};
 
     var root = h("div", { class: "hvb" });
+    var allBtn = h("button", { type: "button", class: "hvb-tool" }, items.length && items.every(function (x) { return OPEN[x.key]; }) ? "Collapse all" : "Expand all");
+    allBtn.addEventListener("click", function () {
+      var expand = allBtn.textContent === "Expand all";
+      items.forEach(function (x) { if (expand) OPEN[x.key] = 1; else delete OPEN[x.key]; });
+      keep("hvb-open-" + noun, OPEN);
+      allBtn.textContent = expand ? "Collapse all" : "Expand all";
+      draw();
+    });
+    var tools = h("div", { class: "hvb-tools" }, allBtn);
+    if (opts.tools) add(tools, opts.tools);
     var tabBar = h("div", { class: "hvb-tabs", role: "tablist", "aria-label": "Stages" });
     var grid = h("div", { class: "hvb-grid" });
     opts.stages.forEach(function (s, i) {
       var isLock = locked.indexOf(s.key) >= 0;
       var count = h("b", { class: "hvb-lane__n" });
       var cards = h("div", { class: "hvb-lane__cards" });
+      var fold = h("button", { type: "button", class: "hvb-fold", "aria-label": "Fold the " + s.label + " column", title: "Fold column" }, svg("fold"));
       var head = h("header", { class: "hvb-lane__head" },
-        h("h2", { id: "hvb-h-" + noun + "-" + s.key }, s.label), count,
+        h("h2", { id: "hvb-h-" + noun + "-" + s.key }, s.label), count, fold,
         h("p", { class: "hvb-lane__hint" }, s.hint, isLock ? h("span", { class: "hvb-lane__lock" }, svg("lock"), "Set by HelloVoice") : null));
       var lane = h("section", { class: "hvb-lane hvb-lane--" + s.key + (isLock ? " is-locked" : ""), "data-stage": s.key, "data-i": i,
                                 "aria-labelledby": "hvb-h-" + noun + "-" + s.key }, head, cards);
       lanes[s.key] = { el: lane, cards: cards, count: count };
+      // Item 201: a column folds to a rail with its count; the rail (or its arrow) opens it again.
+      function setFold(on) {
+        if (on) FOLD[s.key] = 1; else delete FOLD[s.key];
+        keep("hvb-fold-" + noun, FOLD);
+        draw();
+      }
+      fold.addEventListener("click", function (e) { e.stopPropagation(); setFold(!FOLD[s.key]); });
+      lane.addEventListener("click", function (e) {
+        if (lane.classList.contains("is-folded") && !e.target.closest("a, button, select")) setFold(false);
+      });
       grid.appendChild(lane);
       var tab = h("button", { type: "button", role: "tab", class: "hvb-tab" + (s.key === "live" ? " hvb-tab--live" : ""), "data-i": i, "aria-selected": i === 0 ? "true" : "false" },
         s.label, h("b", null, "0"));
@@ -263,6 +354,7 @@
       tabBar.appendChild(tab);
     });
     root.appendChild(status);
+    root.appendChild(tools);
     root.appendChild(tabBar);
     root.appendChild(grid);
 
@@ -277,8 +369,15 @@
         if (!list.length) L.cards.appendChild(h("p", { class: "hvb-empty" }, "No " + noun + "s here"));
         L.count.textContent = String(list.length);
         tabs[s.key].querySelector("b").textContent = String(list.length);
+        var folded = !!FOLD[s.key];
         L.el.classList.toggle("is-empty", !list.length);
-        cols.push(list.length ? "minmax(248px, 1fr)" : "minmax(76px, .32fr)");
+        L.el.classList.toggle("is-folded", folded && !!list.length);
+        var fb = L.el.querySelector(".hvb-fold");
+        fb.innerHTML = ""; fb.appendChild(svg(folded ? "unfold" : "fold"));
+        fb.setAttribute("aria-label", (folded ? "Open the " : "Fold the ") + s.label + " column");
+        fb.setAttribute("aria-expanded", folded ? "false" : "true");
+        fb.title = folded ? "Open column" : "Fold column";
+        cols.push(list.length && !folded ? "minmax(248px, 1fr)" : "minmax(76px, .32fr)");
       });
       grid.style.setProperty("--hvb-cols", cols.join(" "));
       if (B.drag) wireDrag();

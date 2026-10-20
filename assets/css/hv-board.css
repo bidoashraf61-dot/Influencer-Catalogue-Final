@@ -41,12 +41,16 @@
 
 /* An empty column folds to a rail on a desktop: its name reads up the side, the count stays on top. */
 @media (min-width: 900px) {
-  .hvb-lane.is-empty { grid-template-rows: auto 1fr; justify-items: center; padding: 14px 6px; min-height: 260px; }
-  .hvb-lane.is-empty .hvb-lane__head { grid-template-columns: 1fr; justify-items: center; gap: 10px; padding: 0; }
-  .hvb-lane.is-empty .hvb-lane__head h2 { order: 2; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 20px; color: var(--gray); }
-  .hvb-lane.is-empty .hvb-lane__n { order: 1; font-size: 20px; }
-  .hvb-lane.is-empty .hvb-lane__hint, .hvb-lane.is-empty .hvb-empty { display: none; }
-  .hvb-lane.is-empty.is-locked .hvb-lane__head::after { content: ""; order: 3; width: 13px; height: 13px; opacity: .6;
+  .hvb-lane:is(.is-empty, .is-folded) { grid-template-rows: auto 1fr; justify-items: center; padding: 14px 6px; min-height: 260px; }
+  .hvb-lane:is(.is-empty, .is-folded) .hvb-lane__head { grid-template-columns: 1fr; justify-items: center; gap: 10px; padding: 0; }
+  .hvb-lane:is(.is-empty, .is-folded) .hvb-lane__head h2 { order: 2; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 20px; color: var(--gray); }
+  .hvb-lane:is(.is-empty, .is-folded) .hvb-lane__n { order: 1; font-size: 20px; }
+  .hvb-lane:is(.is-empty, .is-folded) .hvb-lane__hint, .hvb-lane:is(.is-empty, .is-folded) .hvb-empty,
+  .hvb-lane.is-folded .hvb-lane__cards { display: none; }
+  .hvb-lane.is-folded { cursor: pointer; }
+  .hvb-lane.is-empty .hvb-fold { display: none; }
+  .hvb-lane:is(.is-empty, .is-folded) .hvb-fold { order: 0; margin: 0; }
+  .hvb-lane:is(.is-empty, .is-folded).is-locked .hvb-lane__head::after { content: ""; order: 3; width: 13px; height: 13px; opacity: .6;
     background: currentColor; -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Crect x='5' y='11' width='14' height='9' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E") center / contain no-repeat;
             mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2'%3E%3Crect x='5' y='11' width='14' height='9' rx='2'/%3E%3Cpath d='M8 11V8a4 4 0 0 1 8 0v3'/%3E%3C/svg%3E") center / contain no-repeat; }
 }
@@ -61,7 +65,7 @@
 /* While a card is held: columns it can go to open up, the rest step back. */
 .hvb.is-dragging .hvb-lane:not(.can-drop) { opacity: .45; }
 .hvb.is-dragging .hvb-lane.can-drop { box-shadow: inset 0 0 0 1px var(--ink); }
-.hvb-lane.is-over { background: var(--lime); box-shadow: inset 0 0 0 2px var(--ink); }
+.hvb-lane.is-over { background: linear-gradient(var(--hvb-strip), var(--hvb-strip)) top / 100% 6px no-repeat, var(--lime); box-shadow: inset 0 0 0 2px var(--ink); }
 .hvb-lane.is-over .hvb-lane__n, .hvb-lane.is-over .hvb-lane__head h2 { color: var(--ink); }
 
 /* --------------------------------------------------------------- cards */
@@ -193,3 +197,81 @@
   .hvb-grid { display: block; overflow: visible; }
   .hvb-lane { margin-bottom: 12px; break-inside: avoid; }
 }
+
+/* ---------------------------------------------------- round r21 (items 196-203, 208) */
+/* Stage colours: each lane a soft tint of its stage, with a solid strip across the top of its head.
+   Amber and red stay out: they mean verdicts. Draft stone, Shortlisting sand, Client review blue-lilac,
+   Approved lime, Live green, Completed ink. */
+.hvb-lane--draft        { --hvb-lane: #efede8; --hvb-strip: #a79e90; }
+.hvb-lane--shortlisting { --hvb-lane: #ecdfd3; --hvb-strip: #b88a64; }
+.hvb-lane--review       { --hvb-lane: #e7e8f7; --hvb-strip: #5a62c4; }
+.hvb-lane--approved     { --hvb-lane: #f3fbd0; --hvb-strip: #b9d400; }
+.hvb-lane--live         { --hvb-lane: #e3f4e9; --hvb-strip: #14884a; }
+.hvb-lane--completed    { --hvb-lane: #ebebea; --hvb-strip: #121212; }
+.hvb-lane { position: relative; padding-top: 20px;
+  background: linear-gradient(var(--hvb-strip), var(--hvb-strip)) top / 100% 6px no-repeat, var(--hvb-lane); }
+.hvb-tab::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: var(--hvb-strip, var(--gray)); }
+.hvb-tabs .hvb-tab--live::before { background: var(--vivid-red); }
+.hvb-tab[data-i="0"] { --hvb-strip: #a79e90; } .hvb-tab[data-i="1"] { --hvb-strip: #b88a64; } .hvb-tab[data-i="2"] { --hvb-strip: #5a62c4; }
+.hvb-tab[data-i="3"] { --hvb-strip: #b9d400; } .hvb-tab[data-i="5"] { --hvb-strip: #121212; }
+
+/* The column fold (desktop): a small arrow in the head; the folded column is a rail like an empty one. */
+.hvb-fold { display: none; place-items: center; width: 32px; height: 32px; margin: -4px -6px 0 0; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--gray); cursor: pointer; }
+.hvb-fold:hover { background: rgba(255,255,255,.7); color: var(--ink); }
+.hvb-lane__head { grid-template-columns: minmax(0, 1fr) auto auto; }
+@media (min-width: 900px) { .hvb-fold { display: inline-grid; } }
+.hvb-lane.is-folded:hover { box-shadow: inset 0 0 0 1px rgba(18,18,18,.25); }
+.hvb.is-dragging .hvb-lane.is-folded.can-drop { box-shadow: inset 0 0 0 2px var(--ink); }
+
+/* Toolbar above the board: Expand all, then whatever the page adds (views, grouping). */
+.hvb-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; margin: 0 0 12px; }
+.hvb-tool { min-height: 40px; padding: 0 16px; border: 1px solid var(--hvb-line); border-radius: var(--r-pill); background: var(--white); color: var(--ink);
+  font: 500 14px/1 var(--body); cursor: pointer; }
+.hvb-tool:hover { border-color: var(--ink); }
+.hvb-tool:focus-visible, .hvb-fold:focus-visible, .hvb-tog:focus-visible, .hvb-go:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+
+/* Collapsed cards (items 197, 198): logo row, name, one summary line, the go buttons. The arrow opens the rest. */
+.hvb-tog { display: inline-grid; place-items: center; flex: none; width: 36px; height: 36px; margin: -4px -6px -4px 0; padding: 0; border: 0; border-radius: 50%;
+  background: var(--linen); color: var(--ink); cursor: pointer; transition: transform .2s cubic-bezier(.2,.8,.2,1), background-color .15s ease; }
+.hvb-tog:hover { background: var(--lime); }
+.hvb-tog[aria-expanded="true"] svg { transform: rotate(180deg); }
+.hvb-tog svg { transition: transform .2s cubic-bezier(.2,.8,.2,1); }
+.hvb-brand + .hvb-tog, .hvb-grip + .hvb-tog { margin-left: auto; }
+.hvb-pin + .hvb-tog { margin-left: 2px; }
+.hvb-card__body { display: grid; gap: 10px; min-width: 0; }
+.hvb-card.is-collapsed { gap: 6px; padding: 12px 14px 10px; }
+.hvb-card.is-collapsed .hvb-card__body { display: none; }
+.hvb-card.is-collapsed .hvb-card__name { font-size: 22px; }
+.hvb-card.is-collapsed .hvb-brand__cl { max-height: 26px; }
+.hvb-card.is-collapsed .hvb-brand__mono { width: 26px; height: 26px; font-size: 13px; }
+.hvb-card__sum { display: none; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; font-size: 12px; color: var(--gray); }
+.hvb-card.is-collapsed .hvb-card__sum { display: flex; }
+.hvb-card__k b { font: 400 18px/1 var(--heading); color: var(--ink); letter-spacing: .02em; }
+
+/* On track (item 208): the dashboard's verdict, as a pill; a collapsed card also carries a hairline in its colour. */
+.hvb-track { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: var(--r-pill); font-size: 12px; font-weight: 700; line-height: 1.3; }
+.hvb-track::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.hvb-track--good { background: var(--go-soft); color: var(--go); }
+.hvb-track--moderate { background: var(--hvb-amber-soft); color: var(--hvb-amber-text); }
+.hvb-track--low { background: var(--hvb-red-soft); color: var(--hvb-red-text); }
+.hvb-card.is-track-good { border-color: rgba(20,136,74,.45); }
+.hvb-card.is-track-moderate { border-color: rgba(226,120,15,.5); }
+.hvb-card.is-track-low { border-color: rgba(238,21,21,.45); }
+
+/* Open selection / Open dashboard (item 203), on every card, open or collapsed. */
+.hvb-card__go { display: flex; flex-wrap: wrap; gap: 6px; }
+.hvb-go { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: var(--r-pill); border: 1px solid var(--hvb-line);
+  background: var(--white); color: var(--ink); text-decoration: none; font: 400 16px/1 var(--heading); letter-spacing: .05em; cursor: pointer; list-style: none; }
+.hvb-go::-webkit-details-marker { display: none; }
+.hvb-go:hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.hvb-go--dash { background: var(--lime); border-color: var(--lime); }
+.hvb-go b { font-weight: 400; padding: 1px 7px; border-radius: var(--r-pill); background: var(--linen); color: var(--ink); font-size: 13px; }
+.hvb-pick { position: relative; }
+.hvb-pick__list { position: absolute; z-index: 5; left: 0; top: calc(100% + 6px); min-width: 220px; max-width: 280px; margin: 0; padding: 6px; list-style: none;
+  border-radius: var(--r-sm); background: var(--white); box-shadow: 0 24px 60px rgba(18,18,18,.22), 0 2px 8px rgba(18,18,18,.08); }
+.hvb-pick__list a { display: block; padding: 10px 12px; border-radius: 8px; color: var(--ink); text-decoration: none; font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.hvb-pick__list a:hover { background: var(--linen); }
+@media (max-width: 899px) { .hvb-go { min-height: 44px; } .hvb-tog { width: 44px; height: 44px; margin: -8px -8px -8px 0; } }
+@media (prefers-reduced-motion: reduce) { .hvb-tog, .hvb-tog svg { transition: none; } }
+@media print { .hvb-tools, .hvb-tog, .hvb-fold, .hvb-card__go { display: none !important; } .hvb-card.is-collapsed .hvb-card__body { display: grid; } }

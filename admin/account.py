@@ -17,6 +17,7 @@ They are only ever served through the API to the signed-in owner (or an
 admin), never by a public URL.
 """
 import json
+import urllib.parse
 import os
 import secrets
 from pathlib import Path
@@ -196,7 +197,7 @@ def _kam_label(email):
     return n if n and "@" not in n else (str(email).split("@")[0].replace(".", " ").title() or None)
 
 
-def summary(user, code_id, secret=b""):
+def summary(user, code_id, secret=b"", logo_dir=None):
     """Everything /account/ shows, in one payload. Client-safe: no costs,
     margins or internal notes ever leave here."""
     import gating
@@ -254,7 +255,18 @@ def summary(user, code_id, secret=b""):
         may = is_admin or (s["code_id"] is not None and s["code_id"] in own_team) or (
             kam_sc is not None and ((s["code_id"] is not None and int(s["code_id"]) in kam_sc) or s["id"] in kam_sc.sel_ids))
         held = [k for k in (db.campaign(i) for i in board.campaigns_holding(s["id"])) if k is not None]
-        selections.append({"stage": stage, "moves": board.selection_moves(may, chip["key"], stage),
+        # Item 202: HelloVoice x the client's logo, from the catalogue's own set, else a campaign's client logo.
+        logos = []
+        f = board.client_logo(s["company"] or s["code_label"] or "", logo_dir) if logo_dir is not None else None
+        if f:
+            logos.append("/assets/clients/" + f)
+        for k in held:
+            for ref in db.campaign_logos(k):
+                url = ("/assets/" + ref) if ref.startswith("clients/") else (
+                    "@/api/campaign-logo?t=%s&n=%s" % (urllib.parse.quote(k["token"]), urllib.parse.quote(ref.rsplit("/", 1)[-1])))
+                if url not in logos:
+                    logos.append(url)       # "@" = under the admin API (the page adds its own base)
+        selections.append({"stage": stage, "moves": board.selection_moves(may, chip["key"], stage), "logos": logos[:1],
                            "created_at": s["created_at"], "client": s["company"] or s["code_label"] or "",
                            "kam": _kam_label(s["kam"]),
                            "campaigns": [{"name": k["name"], "token": k["token"], "live": k["status"] == "live"} for k in held][:3],
