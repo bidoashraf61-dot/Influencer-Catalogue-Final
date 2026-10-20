@@ -597,6 +597,41 @@ def link_selection(cid, sid, by=""):
     return new
 
 
+def selection_from_campaign(cid, by=""):
+    """Item 215 (owner, 2026-10-21): a campaign whose creators were added straight to it, with no selection
+    holding them (or whose selection was deleted since), gets one made from its own creators, in its order.
+    It becomes the campaign's first selection when the one it pointed at is gone, else it is linked beside it.
+    Prices are left empty: a campaign's fees are internal and never a client price. Both changes go to History.
+    Returns the new selection id, or None when there is nothing to do."""
+    import history
+    k = db.campaign(int(cid))
+    if k is None:
+        return None
+    codes = [m["cc_code"] for m in db.campaign_creators(int(cid))]
+    if not codes:
+        return None
+    held = set()
+    for s in _selections(selection_ids(k)):
+        try:
+            held.update(json.loads(s["codes"] or "[]"))
+        except (TypeError, ValueError):
+            pass
+    if all(c in held for c in codes):
+        return None
+    with history.tracked("campaign", int(cid), "Made a selection from the creators of %s" % k["name"]):
+        sid = db.save_selection(None, k["name"], codes, {}, None, None, code_id=k["code_id"])
+        first = db.selection(int(k["selection_id"]), deleted=True) if k["selection_id"] else None
+        with db.connect() as conn:
+            if first is None or first["deleted_at"]:
+                conn.execute("UPDATE campaigns SET selection_id = ?, updated_at = ? WHERE id = ?", (sid, now(), int(cid)))
+            else:
+                conn.execute("INSERT OR IGNORE INTO campaign_selections (campaign_id, selection_id, added_at, added_by) "
+                             "VALUES (?,?,?,?)", (int(cid), sid, now(), by))
+    history.record("created", "selection", sid, "Created selection %s from its campaign" % k["name"],
+                   None, history.snapshot("selection", sid))
+    return sid
+
+
 def _may_file(h, role, who, sel):
     """May this viewer put this selection into a campaign? Staff for what they reach; a client for a selection
     they own or can edit."""

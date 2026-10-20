@@ -242,6 +242,81 @@ def read_now(cid):
                      (db.now(), int(cid), int(cid)))
 
 
+def _videos(conn, cid):
+    return conn.execute("SELECT id, platform FROM content WHERE campaign_id = ? AND hidden = 0 AND section = 'campaign'",
+                        (int(cid),)).fetchall()
+
+
+def fetch_estimate(cid):
+    """USD a manual fetch of every video's comments would cost at most (comments per post as last captured)."""
+    with db.connect() as conn:
+        return round(sum(_expected(conn, v["id"]) * ACTORS[v["platform"]][1] for v in _videos(conn, cid) if v["platform"] in ACTORS), 2)
+
+
+def fetch_now(cid):
+    """Dashboard "Update comments" (item 223, owner 2026-10-21): every video of the campaign is read again now.
+    Comments are kept by their id, so only new ones are added. A video already read has its latest read sent again
+    (the day-7 read, when still to come, stays on its date); one never read has its first read brought forward.
+    Returns how many videos were queued."""
+    init()
+    ensure_reads(cid)
+    t, n = db.now(), 0
+    with db.connect() as conn:
+        for v in _videos(conn, cid):
+            if v["platform"] not in ACTORS:
+                continue
+            reads = conn.execute("SELECT id, status FROM comment_reads WHERE content_id = ? ORDER BY read_no", (v["id"],)).fetchall()
+            if any(r["status"] == "running" for r in reads):
+                continue
+            done = [r for r in reads if r["status"] == "done"]
+            pick = done[-1] if done else next((r for r in reads if r["status"] in ("due", "failed", "skipped")), None)
+            if pick is None:
+                cur = conn.execute("INSERT OR IGNORE INTO comment_reads (content_id, campaign_id, platform, read_no, due_at, status) "
+                                   "VALUES (?,?,?,1,?, 'due')", (v["id"], int(cid), v["platform"], t))
+                n += cur.rowcount
+                continue
+            conn.execute("UPDATE comment_reads SET status = 'due', due_at = ?, message = NULL WHERE id = ?", (t, pick["id"]))
+            n += 1
+    if n:
+        threading.Thread(target=_kick, daemon=True).start()
+    return n
+
+
+def _kick():
+    try:
+        with _lock:
+            start_due()
+    except Exception as exc:
+        print("comments: manual fetch failed to start:", repr(exc)[:160], flush=True)
+
+
+def schedule_info(k, since=None):
+    """What the dashboard says about comment reads: the schedule in words, last and next read, whether one is running,
+    and (for a manual fetch made at `since`) what its runs cost."""
+    init()
+    weekly = weekly_until().get(int(k["id"]))
+    words = "Read 2 and 7 days after each video goes up"
+    if weekly:
+        words += ", then every week until " + time.strftime("%-d %b", time.gmtime(weekly))
+    with db.connect() as conn:
+        # a read sent again keeps its last finish time, so "last update" survives a manual fetch
+        last = conn.execute("SELECT MAX(finished_at) FROM comment_reads WHERE campaign_id = ? AND status != 'failed'", (k["id"],)).fetchone()[0]
+        nxt = conn.execute("SELECT MIN(due_at) FROM comment_reads WHERE campaign_id = ? AND status = 'due'", (k["id"],)).fetchone()[0]
+        running = bool(conn.execute("SELECT 1 FROM comment_reads WHERE campaign_id = ? AND status = 'running'", (k["id"],)).fetchone())
+        if weekly and not nxt and last:
+            nxt = last + 7 * 86400
+        cost = None
+        if since:
+            r = conn.execute("SELECT SUM(cost) FROM api_runs WHERE id IN (SELECT DISTINCT run_row FROM comment_reads "
+                             "WHERE campaign_id = ? AND started_at >= ?)", (k["id"], since)).fetchone()
+            cost = round(r[0], 3) if r and r[0] is not None else None
+    if nxt and nxt < db.now():
+        nxt = db.now() + INTERVAL            # due already: the next pass of the loop takes it
+    if nxt and k["ends_at"] and nxt > k["ends_at"] + 7 * 86400 and not weekly:
+        nxt = None
+    return {"schedule": words, "last_at": last, "next_at": nxt, "running": running, "cost": cost}
+
+
 def _expected(conn, content_id):
     r = conn.execute("SELECT comments FROM snapshots WHERE content_id = ? AND comments IS NOT NULL ORDER BY at DESC LIMIT 1",
                      (content_id,)).fetchone()

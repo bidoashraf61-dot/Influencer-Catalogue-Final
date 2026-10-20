@@ -39,9 +39,11 @@
   function sget(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
   function sput(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* storage off */ } }
   // Another layer is open (Helvi's next-step bubble, the "Watch how it works" card, a dialog): wait for it to close.
+  // Item 210: the board's card panel, the campaign switcher, portal dialogs, the AI studio and Helvi's tip count too.
+  var LAYERS = "dialog[open], .cx-hiw, .cx-dr, .cx-sheet, .pt-scrim, .pt-modal, .hca-sheet, .hca-bar, .hca-card, .hca-modal, " +
+               ".hvb-panel-back, .mx-cs__pop:not([hidden]), .ai-sl, .hv-nudge.is-in";
   function busy() {
-    var q = ":popover-open, dialog[open], .cx-hiw, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal";
-    try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .cx-hiw, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal"); }
+    try { return !!document.querySelector(":popover-open, " + LAYERS); } catch (e) { return !!document.querySelector(LAYERS); }
   }
   function whenFree(fn, tries) {
     tries = tries == null ? 20 : tries;

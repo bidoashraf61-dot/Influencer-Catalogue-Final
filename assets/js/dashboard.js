@@ -144,22 +144,114 @@
     mountUpdate(el);
   }
 
-  // "Update now": runs the campaign's capture jobs for the posts it has, with Helvi on screen while the numbers come in,
-  // a green tick when they are in, the balance of free updates, and a request for more when they are used up.
+  /* "Update posts" and "Update comments" (item 223, owner 2026-10-21; was one "Update now"): post numbers and comments are
+     fetched on different schedules, so each has its own control. A control opens a small panel with the schedule in plain
+     words, the last and next run, and Fetch now. Clients share one count of free fetches across both; the team has no
+     limit and sees what a fetch costs on Apify. Posts keep Helvi's fetch screen; comments are read in the background. */
+  var UPD_IC = {
+    posts: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.5-4.2M4 4v3.8h3.8"/><path d="M4 13a8 8 0 0 0 14.5 4.2M20 20v-3.8h-3.8"/></svg>',
+    comments: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12.5a7.5 7.5 0 0 1-11 6.6L4 20.5l1.4-4.6A7.5 7.5 0 1 1 20 12.5z"/><path d="M9 11.5h6M9 14.5h3.5"/></svg>'
+  };
+  var UPD_W = { posts: ["Update posts", "Post numbers", "Views, likes, comments, shares and saves on every post."],
+                comments: ["Update comments", "Comments", "What people write under the videos, read and sorted into moods and topics."] };
+  function riyadh(t, withDay) {
+    var d = new Date(t * 1000), o = { timeZone: "Asia/Riyadh", hour: "numeric", minute: "2-digit", hour12: true };
+    var hm = d.toLocaleTimeString("en-US", o).replace(/\s?([AP])M$/i, function (_m, x) { return " " + x.toLowerCase() + "m"; }), k = function (x) { return new Date(x * 1000).toLocaleDateString("en-CA", { timeZone: "Asia/Riyadh" }); };
+    var now = Date.now() / 1000, dd = k(t) === k(now) ? "Today" : k(t) === k(now + 86400) ? "Tomorrow" : d.toLocaleDateString("en-GB", { timeZone: "Asia/Riyadh", weekday: "short", day: "numeric", month: "short" });
+    return (withDay === false ? "" : dd + ", ") + hm;
+  }
+  function soon(t) { var s = t - Date.now() / 1000; return s <= 60 ? "any minute" : s < 3600 ? "in " + Math.round(s / 60) + " min" : s < 86400 ? "in " + Math.round(s / 3600) + " h" : "in " + Math.round(s / 86400) + " days"; }
+  function usd(v) { return "$" + (v < 0.1 ? v.toFixed(3).replace(/0$/, "") : v.toFixed(2)); }
   function mountUpdate(host) {
-    var box = document.createElement("span"); box.className = "db-upd";
-    box.innerHTML = '<button type="button" class="db-upd__btn" id="db-upd"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.5-4.2M4 4v3.8h3.8"/><path d="M4 13a8 8 0 0 0 14.5 4.2M20 20v-3.8h-3.8"/></svg><span>Update now</span></button><small class="db-upd__left"></small>';
+    var box = document.createElement("div"); box.className = "db-upd";
+    box.innerHTML = '<div class="db-upd__cap" role="group" aria-label="Update the data">' + ["posts", "comments"].map(function (w) {
+      return '<button type="button" class="db-upd__side" data-upd="' + w + '" aria-haspopup="dialog" aria-expanded="false">' + UPD_IC[w]
+        + '<span class="db-upd__t"><b>' + UPD_W[w][0] + '</b><small data-upd-line="' + w + '">&nbsp;</small></span></button>'; }).join("") + "</div>";
     host.appendChild(box);
-    var btn = box.querySelector("button"), label = btn.querySelector("span"), left = box.querySelector("small"), S = null;
+    var S = null, pop = null, openW = "", cpoll = null;
+    var btn = box.querySelector('[data-upd="posts"]'), label = {};      // request() writes "Request sent" here; the panel says it instead
+    function out() { return S && !S.unlimited && S.left === 0; }
     function leftText() { return !S || S.unlimited ? "" : S.left + " of " + S.limit + " free updates left"; }
+    function line(w) {
+      var x = S && S[w]; if (S && S.demo) return "Sample data";
+      if (!x) return "";
+      if (x.running) return w === "posts" ? "Updating now…" : "Reading now…";
+      return x.next_at ? "Next " + soon(x.next_at) : x.last_at ? "Last " + ago(x.last_at) : "Not scheduled";
+    }
     function paint(s) {
       if (!s) return; S = s;
-      left.textContent = s.unlimited ? "Unlimited for you" : leftText();
-      var out = !s.unlimited && s.left === 0;
-      btn.classList.toggle("is-out", out); label.textContent = out ? "Request more updates" : "Update now";
+      ["posts", "comments"].forEach(function (w) {
+        var b = box.querySelector('[data-upd="' + w + '"]'), x = s[w] || {};
+        box.querySelector('[data-upd-line="' + w + '"]').textContent = line(w);
+        b.classList.toggle("is-busy", !!x.running); b.classList.toggle("is-out", out());
+      });
+      if (pop && openW) fill(openW);
     }
     function state() { return get("/api/campaign/refresh?t=" + encodeURIComponent(TOKEN)).then(function (s) { paint(s); return s; }); }
     state().catch(function () {});
+    function shut() {
+      if (!pop) return; pop.remove(); pop = null;
+      var b = box.querySelector('[data-upd="' + openW + '"]'); if (b) { b.setAttribute("aria-expanded", "false"); b.focus({ preventScroll: true }); }
+      openW = "";
+    }
+    function place(b) {
+      if (!pop) return;
+      if (window.innerWidth < 600) { pop.classList.add("is-sheet"); pop.style.left = pop.style.top = ""; return; }
+      pop.classList.remove("is-sheet");
+      var r = b.getBoundingClientRect(), w = pop.offsetWidth;
+      pop.style.left = Math.max(12, Math.min(window.innerWidth - w - 12, r.left + r.width / 2 - w / 2)) + "px";
+      pop.style.top = Math.min(r.bottom + 10, window.innerHeight - pop.offsetHeight - 12) + "px";
+    }
+    function fill(w) {
+      var x = (S && S[w]) || {}, team = S && S.unlimited && !S.demo, busy = !!x.running, msg = pop.querySelector(".db-pop__msg"), keep = msg ? msg.textContent : "";
+      var go = S && S.demo ? '<p class="db-pop__note">This is a demo campaign: its numbers are sample data, so there is nothing to fetch.</p>'
+        : out() ? '<button type="button" class="db-upd__btn db-pop__go" data-go="more">Request more updates</button>'
+        : '<button type="button" class="db-upd__btn db-pop__go" data-go="' + w + '"' + (busy ? " disabled" : "") + ">" + UPD_IC[w]
+          + "<span>" + (busy ? (w === "posts" ? "Updating…" : "Reading comments…") : "Fetch now") + "</span></button>";
+      pop.innerHTML = '<div class="db-pop__h">' + UPD_IC[w] + "<h3>" + UPD_W[w][1] + '</h3><button type="button" class="db-pop__x" aria-label="Close">×</button></div>'
+        + '<p class="db-pop__what">' + UPD_W[w][2] + "</p>"
+        + '<p class="db-pop__s">' + esc(x.schedule || "Not scheduled") + "</p>"
+        + '<dl class="db-pop__dl"><div><dt>Last update</dt><dd>' + (x.last_at ? esc(riyadh(x.last_at)) + "<small>" + esc(ago(x.last_at)) + "</small>" : "Not yet") + "</dd></div>"
+        + "<div><dt>Next update</dt><dd>" + (busy ? "Running now" : x.next_at ? esc(riyadh(x.next_at)) + "<small>" + esc(soon(x.next_at)) + "</small>" : "Nothing planned") + "</dd></div></dl>"
+        + (team && x.est != null ? '<p class="db-pop__cost">Fetching now costs about <b>' + usd(x.est) + "</b> on Apify" + (x.cost != null ? ". Last manual fetch: <b>" + usd(x.cost) + "</b>." : ".") + "</p>" : "")
+        + (S && !S.unlimited && !S.demo ? '<p class="db-pop__left"><b>' + S.left + " of " + S.limit + "</b> free updates left, shared by posts and comments.</p>" : "")
+        + go + '<p class="db-pop__msg" role="status">' + esc(keep) + "</p>";
+    }
+    function openPop(w, b) {
+      if (pop && openW === w) return shut();
+      shut();
+      pop = document.createElement("div"); pop.className = "db-pop"; pop.setAttribute("role", "dialog"); pop.setAttribute("aria-label", UPD_W[w][0]);
+      document.body.appendChild(pop); openW = w; b.setAttribute("aria-expanded", "true");
+      fill(w); place(b);
+      var f = pop.querySelector(".db-pop__go") || pop.querySelector(".db-pop__x"); if (f) f.focus({ preventScroll: true });
+      state().catch(function () {});
+    }
+    function say(t) { var m = pop && pop.querySelector(".db-pop__msg"); if (m) m.textContent = t; }
+    function comments() {
+      var g = pop && pop.querySelector(".db-pop__go"); if (g) { g.disabled = true; g.querySelector("span").textContent = "Starting…"; }
+      postJSON("/api/campaign/refresh", { t: TOKEN, what: "comments" }).then(function (r) {
+        if (!r.b || !r.b.ok) { if (g) { g.disabled = false; g.querySelector("span").textContent = "Fetch now"; } return say((r.b && r.b.message) || "Could not start. Try again."); }
+        paint(r.b);
+        say(r.b.started ? "Reading the comments on " + r.b.started + (r.b.started === 1 ? " video" : " videos") + ". New ones show here within about 15 minutes." : "Already reading the comments.");
+        clearInterval(cpoll); var t0 = Date.now();
+        cpoll = setInterval(function () {
+          state().then(function (s) {
+            if (s.comments && !s.comments.running && Date.now() - t0 > 60000) { clearInterval(cpoll); CMB.items = null; load(); }
+            else if (Date.now() - t0 > 25 * 60000) clearInterval(cpoll);
+          }).catch(function () {});
+        }, 30000);
+      }).catch(function () { if (g) g.disabled = false; say("Could not reach the server. Try again."); });
+    }
+    box.addEventListener("click", function (e) { var b = e.target.closest("[data-upd]"); if (b) openPop(b.getAttribute("data-upd"), b); });
+    document.addEventListener("click", function (e) {
+      if (!pop) return;
+      if (e.target.closest(".db-pop__x")) return shut();
+      var go = e.target.closest(".db-pop__go");
+      if (go) { var w = go.getAttribute("data-go"); if (w === "more") { shut(); request(); } else if (w === "posts") { shut(); run(); } else if (w === "comments") comments(); return; }
+      if (!e.target.closest(".db-pop") && !e.target.closest("[data-upd]")) shut();
+    });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pop) shut(); });
+    window.addEventListener("resize", function () { if (pop) place(box.querySelector('[data-upd="' + openW + '"]')); });
     function modal(extra) {
       var o = document.createElement("div"); o.className = "db-fetch"; o.setAttribute("role", "dialog"); o.setAttribute("aria-modal", "true");
       var card = document.createElement("div"); card.className = "db-fetch__card" + (extra ? " " + extra : ""); o.appendChild(card);
@@ -211,7 +303,7 @@
           }, 500);
         })();
       }
-      postJSON("/api/campaign/refresh", { t: TOKEN }).then(function (r) {
+      postJSON("/api/campaign/refresh", { t: TOKEN, what: "posts" }).then(function (r) {
         if (!r.b || !r.b.ok) return fail((r.b && r.b.message) || "Could not start the update. Try again.");
         paint(r.b); bal.textContent = leftText();
         poll = setInterval(function () {
@@ -240,10 +332,6 @@
         }).catch(function () { send.classList.remove("is-busy"); msg.textContent = "Could not reach the server. Try again."; });
       });
     }
-    btn.addEventListener("click", function () {
-      if (btn.classList.contains("is-busy")) return;
-      if (btn.classList.contains("is-out")) request(); else run();
-    });
   }
 
   /* -------------------------------------------------------------- share */
@@ -776,7 +864,7 @@
   }
   /* The comment browser (owner, 2026-10-19; v15): every comment in its own language, grouped by doctor then video,
      filtered by doctor, video, mood, platform (icons), topic, buying questions and search, and exported as CSV. */
-  var CMB = { closed: {}, items: null, busy: false, waits: [], f: { doc: "", vid: "", mood: "", plat: "", theme: "", buy: false, q: "" }, open: {} };
+  var CMB = { closed: {}, items: null, busy: false, waits: [], f: { doc: "", vid: "", mood: "", plat: "", platPrev: "", theme: "", buy: false, q: "" }, open: {} };
   var CM_MOOD = { p: "pos", n: "neu", x: "neg" }, CM_MOOD_W = { p: "Positive", n: "Neutral", x: "Negative" };
   var CM_HEART = ico('<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>');
   var CM_CHEV = '<i class="cmp-chev" aria-hidden="true"></i>';
@@ -788,6 +876,7 @@
       out += '<details class="cmp-sec" open><summary><span>' + parts[i].slice(0, j) + "</span>" + CM_CHEV + '</summary><div class="cmp-sec__b">' + parts[i].slice(j + 5) + "</div></details>"; }
     return out;
   }
+  var CM_LOCK = ico('<rect x="5" y="11" width="14" height="9.5" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/>');
   var CM_DL = ico('<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 19.5h14"/>');
   function cmLoad(cb) {
     if (CMB.items) return cb();
@@ -843,9 +932,30 @@
       + '<ul class="cmv__list" role="listbox" aria-label="Doctors" hidden><li role="option" aria-selected="' + (!f.doc) + '"><button type="button" data-docpick="">' + allCard + "</button></li>"
       + docKeys.map(function (c) { return '<li role="option" aria-selected="' + (f.doc === c) + '"><button type="button" data-docpick="' + esc(c) + '">' + card(c) + "</button></li>"; }).join("") + "</ul></div>";
   }
+  // Item 222 (owner, 2026-10-21): a video lives on one platform, so picking it sets the platform filter to that platform and
+  // locks the others (with a note); "All videos" unlocks it and puts back the platform chosen before. Counts follow the picks.
+  function cmVidPlat(id) {
+    var p = cmPosts()[id]; if (p && p.platform) return p.platform;
+    var it = (CMB.items || []).filter(function (x) { return String(x[0]) === String(id); })[0];
+    return it ? it[2] : "";
+  }
+  function cmPickVid(id) {
+    var f = CMB.f;
+    if (id && !f.vid) f.platPrev = f.plat;
+    f.vid = id;
+    f.plat = id ? cmVidPlat(id) : (f.platPrev || "");
+    if (!id) f.platPrev = "";
+  }
   function cmFilters() {
     var f = CMB.f, all = (CMB.items || []).filter(cmInPage), P = cmPeople(), posts = cmPosts(), docs = {}, vids = {}, th = {}, pl = {};
-    all.forEach(function (it) { docs[it[1]] = (docs[it[1]] || 0) + 1; if (!f.doc || it[1] === f.doc) vids[it[0]] = (vids[it[0]] || 0) + 1; if (it[5]) th[it[5]] = (th[it[5]] || 0) + 1; pl[it[2]] = (pl[it[2]] || 0) + 1; });
+    var lock = f.vid ? cmVidPlat(f.vid) : "";
+    all.forEach(function (it) {
+      docs[it[1]] = (docs[it[1]] || 0) + 1;
+      var inDoc = !f.doc || it[1] === f.doc;
+      if (inDoc && (lock || !f.plat || it[2] === f.plat)) vids[it[0]] = (vids[it[0]] || 0) + 1;
+      if (inDoc && (!f.vid || String(it[0]) === String(f.vid))) pl[it[2]] = (pl[it[2]] || 0) + 1;
+      if (it[5]) th[it[5]] = (th[it[5]] || 0) + 1;
+    });
     var moods = [["", "All"], ["p", "Positive"], ["n", "Neutral"], ["x", "Negative"]];
     var docKeys = Object.keys(docs).sort(function (a, b) { return docs[b] - docs[a]; });
     return '<div class="cmb-f">'
@@ -853,9 +963,10 @@
       + cmVidPicker(vids, all, P, posts) + "</div>"
       + '<div class="cmb-f__row"><div class="cmb-seg" role="group" aria-label="Mood">' + moods.map(function (m) {
           return '<button type="button" data-mood="' + m[0] + '" aria-pressed="' + (f.mood === m[0]) + '"' + (m[0] ? ' title="' + m[1] + '"' : "") + ">" + (m[0] ? '<i class="cm-face" style="--c:' + CM_COL[CM_MOOD[m[0]]] + '">' + CM_FACE[CM_MOOD[m[0]]] + '</i><span class="cmb-seg__t">' + m[1] + "</span>" : m[1]) + "</button>"; }).join("") + "</div>"
-      + '<div class="cmb-seg cmb-seg--pl" role="group" aria-label="Platform"><button type="button" data-plat="" aria-pressed="' + (!f.plat) + '">All</button>'
-      + Object.keys(pl).sort(function (a, b) { return pl[b] - pl[a]; }).map(function (k) { return '<button type="button" data-plat="' + esc(k) + '" aria-pressed="' + (f.plat === k) + '" title="' + esc(k) + " · " + pl[k] + ' comments" aria-label="' + esc(k) + '">' + (ICONS[k] || esc(k)) + "<small>" + pl[k] + "</small></button>"; }).join("") + "</div>"
+      + '<div class="cmb-seg cmb-seg--pl' + (lock ? " is-locked" : "") + '" role="group" aria-label="Platform"' + (lock ? ' aria-describedby="cmb-lock"' : "") + '><button type="button" data-plat="" aria-pressed="' + (!f.plat) + '"' + (lock ? " disabled" : "") + ">All</button>"
+      + Object.keys(pl).sort(function (a, b) { return pl[b] - pl[a]; }).map(function (k) { var off = lock && k !== lock; return '<button type="button" data-plat="' + esc(k) + '" aria-pressed="' + (f.plat === k) + '"' + (off ? " disabled" : "") + ' title="' + esc(k) + " · " + pl[k] + ' comments" aria-label="' + esc(k) + " · " + pl[k] + ' comments">' + (ICONS[k] || esc(k)) + "<small>" + pl[k] + "</small></button>"; }).join("") + "</div>"
       + '<button type="button" class="cmb-export" data-export="1">' + CM_DL + "Export CSV</button></div>"
+      + (lock ? '<p class="cmb-lock" id="cmb-lock">' + CM_LOCK + "<span>Showing <b>" + esc(lock) + "</b> only: this video is on " + esc(lock) + '. <button type="button" data-vid="">Show all videos</button> to choose another platform.</span></p>' : "")
       + '<div class="cmb-f__row"><select data-f="theme" aria-label="Topic"><option value="">All topics</option>' + Object.keys(th).sort(function (a, b) { return th[b] - th[a]; }).map(function (q) { return '<option value="' + esc(q) + '"' + (f.theme === q ? " selected" : "") + ">" + esc(q) + " (" + th[q] + ")</option>"; }).join("") + "</select>"
       + '<label class="cmb-f__buy"><input type="checkbox" data-f="buy"' + (f.buy ? " checked" : "") + "> Buying questions only</label>"
       + '<input type="search" data-f="q" placeholder="Search the comments" value="' + esc(f.q) + '" aria-label="Search the comments"></div></div>';
@@ -904,10 +1015,10 @@
       box.addEventListener("click", function (e) {
         var tv = e.target.closest("[data-cmv]"), dc = e.target.closest("[data-docpick]"), ov = e.target.closest("[data-vid]"), b = e.target.closest("[data-mood]"), pl = e.target.closest("[data-plat]"), m = e.target.closest("[data-more]");
         if (tv) { var ul = tv.parentNode.querySelector(".cmv__list"), was = ul.hidden; [].forEach.call(box.querySelectorAll(".cmv__list"), function (x) { x.hidden = true; x.parentNode.querySelector(".cmv__btn").setAttribute("aria-expanded", "false"); }); if (was) { ul.hidden = false; tv.setAttribute("aria-expanded", "true"); } return; }
-        if (dc) { CMB.f.doc = dc.getAttribute("data-docpick"); CMB.f.vid = ""; draw(); return; }
-        if (ov) { CMB.f.vid = ov.getAttribute("data-vid"); draw(); return; }
+        if (dc) { CMB.f.doc = dc.getAttribute("data-docpick"); if (CMB.f.vid) cmPickVid(""); draw(); return; }
+        if (ov) { cmPickVid(ov.getAttribute("data-vid")); draw(); return; }
         if (b) { CMB.f.mood = b.getAttribute("data-mood"); draw(); return; }
-        if (pl) { CMB.f.plat = pl.getAttribute("data-plat"); draw(); return; }
+        if (pl) { if (pl.disabled) return; CMB.f.plat = pl.getAttribute("data-plat"); draw(); return; }
         if (m) { var v = m.getAttribute("data-more"); CMB.open[v] = !CMB.open[v]; list(); return; }
         if (e.target.closest("[data-export]")) cmExport();
       });
@@ -1339,13 +1450,22 @@
 
   var SW = { met: ["good", "Met"], close: ["moderate", "Close"], behind: ["low", "Behind"], ontrack: ["good", "On track"] };
   function platChip(p) { return '<span class="db-pc">' + (ICONS[p.platform] || "") + "<b>" + num(p.followers) + "</b></span>"; }
+  // Item 217: a creator's results count on every platform they posted on; the line under the result says where.
+  function bySplit(c) {
+    var sp = c.by_platform || [];
+    if (!sp.length || (sp.length === 1 && sp[0].booked)) return "";
+    return '<span class="db-cb__split">' + sp.map(function (p) {
+      return '<span class="db-cb__sp' + (p.booked ? "" : " is-bonus") + '" title="' + esc(p.platform + ": " + num(p.views) + " views, " + num(p.engagement) + " engagement, " + p.videos + (p.videos === 1 ? " video" : " videos") + (p.booked ? "" : " (not booked here, still counted)")) + '">'
+        + (ICONS[p.platform] || "") + "<b>" + num(p.views) + "</b>" + (p.booked ? "" : "<i>+</i>") + "</span>";
+    }).join("") + "</span>";
+  }
   // One row per creator: their size, what creators like them typically get per video, and what they got.
   function creatorBench() {
     var g = GL(); if (!g || !g.creators.length) return "";
     var rows = g.creators.map(function (c) {
       var soon = !c.live, st = c.status && SW[c.status], when = c.next && c.next.at ? day(c.next.at) : "";
       var res = soon ? '<span class="db-cb__soon">Coming soon · ' + (when ? esc(when) : "date to be confirmed") + "</span>"
-        : '<strong>' + num(c.views_per_video) + "</strong><small>views per video</small>";
+        : '<strong>' + num(c.views_per_video) + "</strong><small>views per video" + (bySplit(c) ? ", all platforms" : "") + "</small>" + bySplit(c);
       var link = who({ code: c.code, name: c.name });
       return '<div class="db-cb__row' + (soon ? " is-soon" : "") + '"><div class="db-cb__who">' + ava(c.photo) + "<span><b>" + link + "</b><small>" + (c.live || 0) + " of " + (c.planned || "?") + ((c.planned || 0) === 1 ? " video live" : " videos live") + "</small></span></div>"
         + '<div class="db-cb__size"><span class="db-cb__lbl">Followers</span><span class="db-cb__chips">' + c.platforms.map(platChip).join("") + "</span><small>" + esc(c.size) + "</small></div>"

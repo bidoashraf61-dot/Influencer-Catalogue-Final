@@ -1326,7 +1326,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/api/campaign/share":
             return self.api_campaign_share()
         if path == "/api/campaign/refresh":
-            return self.api_campaign_refresh((self.json_body().get("t") or ""), True)
+            b = self.json_body()
+            return self.api_campaign_refresh((b.get("t") or ""), True, "comments" if b.get("what") == "comments" else "posts")
         if path == "/api/campaign/refresh-request":
             return self.api_campaign_refresh_request()
         if path == "/api/campaign/start":
@@ -4170,9 +4171,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     REFRESH_LIMIT = 10          # "Update now" presses a client may use per campaign; the team has no limit
     REFRESH_WAIT = 90           # seconds between two updates of one campaign
 
-    def api_campaign_refresh(self, token, start):
-        """The dashboard's Update now: run the campaign's capture jobs (the ones that fit the posts it has) so the
-        numbers are fresh. GET = the state ({left, running, last_at}); POST = start the run."""
+    def api_campaign_refresh(self, token, start, what="posts"):
+        """The dashboard's Update posts / Update comments (item 223, 2026-10-21; was one Update now): run the
+        campaign's capture jobs (the ones that fit the posts it has) so the numbers are fresh, or read every video's
+        comments again. GET = the state ({left, running, last_at, posts{...}, comments{...}}); POST {what} = start.
+        Clients share one count of free fetches across both; the team has no limit and sees the Apify cost."""
         import apify
         k, status = self.viewer_campaign(token)
         if k is None:
@@ -4199,6 +4202,37 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return bool(conn.execute("SELECT 1 FROM api_runs WHERE status IN ('QUEUED','RUNNING') AND job_id IN (%s)"
                                          % ",".join("?" * len(ids)), ids).fetchone())
 
+        def plain_time(hhmm):
+            try:
+                hh, mm = (int(x) for x in hhmm.split(":"))
+            except (ValueError, AttributeError):
+                return None
+            return "%d:%02d %s" % ((hh % 12) or 12, mm, "am" if hh < 12 else "pm")
+
+        def sides(team):
+            import metrics
+            times = sorted({plain_time(j["at_time"]) for j in jobs if j["schedule"] == "daily"} - {None})
+            posts = {"schedule": ("Every day at %s (Riyadh time)" % " and ".join(times)) if times else "Not scheduled",
+                     "next_at": metrics.next_capture(k), "running": running(), "last_at": None}
+            with db.connect() as conn:
+                if ids:
+                    r = conn.execute("SELECT MAX(finished_at) FROM api_runs WHERE status = 'SUCCEEDED' AND job_id IN (%s)"
+                                     % ",".join("?" * len(ids)), ids).fetchone()
+                    posts["last_at"] = r[0] if r else None
+                pressed = db.refresh_last(k["id"], "posts")
+                if team and ids:
+                    posts["est"] = round(sum(apify.estimate_job(i)[1] for i in ids), 2)
+                    if pressed:
+                        r = conn.execute("SELECT SUM(cost) FROM api_runs WHERE started_at >= ? AND job_id IN (%s)"
+                                         % ",".join("?" * len(ids)), [pressed] + ids).fetchone()
+                        posts["cost"] = round(r[0], 3) if r and r[0] is not None else None
+            cm = _cm.schedule_info(k, since=db.refresh_last(k["id"], "comments"))
+            if not team:
+                cm.pop("cost", None)
+            else:
+                cm["est"] = _cm.fetch_estimate(k["id"])
+            return {"posts": posts, "comments": cm}
+
         def state(**more):
             used = db.refresh_count(k["id"])
             try:
@@ -4208,6 +4242,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             limit = self.REFRESH_LIMIT + max(0, extra)         # a team-granted extra comes on top of the free ones
             d = {"ok": True, "limit": limit, "used": used, "unlimited": team,
                  "left": None if team else max(0, limit - used), "running": running(), "last_at": db.refresh_last(k["id"])}
+            d.update(sides(team))
             d.update(more)
             return self.send_json(200, d, self.cors() + [("Cache-Control", "no-store")])
         if not start:
@@ -4226,9 +4261,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             extra = 0
         if not team and db.refresh_count(k["id"]) >= self.REFRESH_LIMIT + max(0, extra):
             return self.send_json(429, {"ok": False, "reason": "limit", "message": "You have used all your free updates for this campaign."}, self.cors())
-        last = db.refresh_last(k["id"])
+        last = db.refresh_last(k["id"], what)
         if last and db.now() - last < self.REFRESH_WAIT:
             return self.send_json(429, {"ok": False, "reason": "wait", "message": "Updated a moment ago. Try again in a minute."}, self.cors())
+        if what == "comments":
+            if _cm.schedule_info(k)["running"]:
+                return state(what="comments")
+            n = _cm.fetch_now(k["id"])
+            if not n:
+                return self.send_json(502, {"ok": False, "reason": "none", "message": "There are no videos to read comments from yet."}, self.cors())
+            db.refresh_log(k["id"], self.signed_in_client(), team, n, "comments")
+            return state(started=n, what="comments")
         started, t0 = 0, db.now()
         for j in jobs:
             if apify._post_pairs(j):
@@ -4240,8 +4283,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         lt = time.gmtime(t0 + 3 * 3600)
         with db.connect() as conn:
             conn.execute("UPDATE api_jobs SET at_time = ? WHERE id IN (%s)" % ",".join("?" * len(ids)), ["%02d:%02d" % (lt.tm_hour, lt.tm_min)] + ids)
-        db.refresh_log(k["id"], self.signed_in_client(), team, started)
-        return state(started=started)
+        db.refresh_log(k["id"], self.signed_in_client(), team, started, "posts")
+        return state(started=started, what="posts")
 
     def api_campaign_refresh_request(self):
         """A viewer who used all their free updates asks the team for more: the account manager and the owners are emailed."""

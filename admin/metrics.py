@@ -356,7 +356,10 @@ def report(campaign, internal=False, raw=False):
         delivered = len({p["pk"] for p in mine})
         # Graded on the followers of the campaign's platform when the creator has them there (a TikTok-sized
         # count made an Instagram creator "mega", 2026-10-19), else on their main count.
-        followers = (foll_by.get(code) or {}).get(campaign["platform"]) or m["followers"]
+        # A multi-platform campaign grades each creator on the platform they post on there (plan.creator_platforms,
+        # else their posts here), 2026-10-20 Ivatherm.
+        plat_here = campaign["platform"] or ((plans.plan_of(campaign) or {}).get("creator_platforms") or {}).get(code)             or (mine[0]["platform"] if mine else None)
+        followers = (foll_by.get(code) or {}).get(plat_here) or m["followers"]
         row = {"code": code, "name": m["name"] or code, "photo": m["photo"],
                "followers": followers, "planned": m["planned"], "delivered": delivered,
                "pending_status": (m["pending_status"] if "pending_status" in m.keys() else None),
@@ -950,12 +953,19 @@ def goals_view(campaign, r, photo=None):
     creators, tot_v, tot_e = [], [0.0, 0.0], [0.0, 0.0]
     plat_exp = {pl: {"views": [0.0, 0.0], "engagement": [0.0, 0.0], "videos": 0} for pl in gp}
     sched, window = _pacing_dates(campaign, r["creators"])
+    booked_by = plan.get("creator_platforms") or {}
+    missing = []
     for c in r["creators"]:
         m = by_code.get(c["code"])
         foll = creator_followers(m) if m is not None else {}
         n = int(c.get("planned") or 0) or 1
+        # Item 217 (owner, 2026-10-21): the target is set on the platform the creator was booked for
+        # (plan.creator_platforms, else every goal platform), and what they got counts on every platform they posted on.
+        booked = [booked_by[c["code"]]] if booked_by.get(c["code"]) in gp else list(gp)
         pv, pe, plats, bands = [0.0, 0.0], [0.0, 0.0], [], []
-        for pl in gp:
+        if any(not foll.get(pl) for pl in booked):
+            missing.append(c["name"])
+        for pl in booked:
             f = foll.get(pl)
             if not f:
                 continue
@@ -971,21 +981,29 @@ def goals_view(campaign, r, photo=None):
         for i in (0, 1):
             tot_v[i] += pv[i] * n
             tot_e[i] += pe[i] * n
-        mine = [p for p in camp if p["code"] == c["code"] and p["platform"] in gp]
+        mine = [p for p in camp if p["code"] == c["code"]]
         pieces = len({p["pk"] for p in mine})
         views = sum(p.get("views") or 0 for p in mine)
         eng = sum(p.get("engagement") or 0 for p in mine)
         got = int(c.get("delivered") or 0)
-        live = min(pieces or got, n) if (pieces or got) else 0
-        avg_v = views / float(pieces) if pieces else None
+        # The booked videos done so far: the ones on a booked platform (a copy pushed elsewhere adds its views to
+        # them, it is not another video), or whatever went live when nothing is on a booked platform yet.
+        done = min(len({p["pk"] for p in mine if p["platform"] in booked}) or pieces, n)
+        avg_v = views / float(done) if done else None
         ratio = (avg_v / pv[0]) if (avg_v is not None and pv[0]) else None
+        split = []
+        for pl in sorted({p["platform"] for p in mine}, key=lambda x: (x not in booked, x)):
+            q = [p for p in mine if p["platform"] == pl]
+            split.append({"platform": pl, "booked": pl in booked, "videos": len({p["pk"] for p in q}),
+                          "views": sum(p.get("views") or 0 for p in q), "engagement": sum(p.get("engagement") or 0 for p in q)})
         status = None if ratio is None else ("met" if ratio >= 1 else "close" if ratio >= 0.7 else "behind")
         nxt = next(((t, conf) for (i, t, conf) in sched.get(c["code"], [])), None)
         creators.append({"code": c["code"], "name": c["name"], "photo": c.get("photo"), "planned": int(c.get("planned") or 0),
                          "live": got, "platforms": plats, "size": (bands[0][1] if len({b for _, b in bands}) == 1 else " · ".join("%s %s" % (pl, b.replace(" followers", "")) for pl, b in bands)) if bands else "",
                          "exp_views": [_ri(pv[0], -2), _ri(pv[1], -2)] if pv[1] else None,
                          "views_per_video": round(avg_v) if avg_v is not None else None,
-                         "eng_per_video": round(eng / pieces) if pieces else None,
+                         "eng_per_video": round(eng / float(done)) if done else None,
+                         "views": views, "engagement": eng, "booked": booked, "by_platform": split,
                          "status": status, "ratio": ratio,
                          "next": ({"at": nxt[0], "confirmed": nxt[1]} if (nxt and not pieces) else None)})
     # ---- platform split
@@ -1060,12 +1078,14 @@ def goals_view(campaign, r, photo=None):
     if G.get("likes_hidden"):
         notes.append("%d of %d posts hide likes, so engagement on those is comments only and they are left out of the engagement rate."
                      % (G["likes_hidden"], G["posts"]))
-    missing = [c["name"] for c in creators if len(c["platforms"]) < len(gp)]
     if missing:
         notes.append("Follower counts are missing on a goal platform for %s, so their benchmark is partial." % ", ".join(missing))
     addons = [p["platform"] for p in platforms if not p["goal"]]
     if addons:
         notes.append("%s %s tracked as a bonus: no goal, and not counted in the targets." % (" and ".join(addons) if len(addons) < 3 else ", ".join(addons), "is" if len(addons) == 1 else "are"))
+    if any(len(c["by_platform"]) > 1 or any(not x["booked"] for x in c["by_platform"]) for c in creators):
+        notes.append("A creator's results count on every platform they posted on, so a video also pushed to another "
+                     "platform adds its views and engagement to their target.")
     if any(p["kind"] == "story" for p in camp):
         notes.append("Stories are tracked as posts but have no view-based goal.")
     else:

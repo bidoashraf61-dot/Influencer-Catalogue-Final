@@ -235,7 +235,9 @@ def track(ident, body, ua=""):
     with db.connect() as conn:
         row = conn.execute("SELECT * FROM app_clients WHERE device_key = ?", (key,)).fetchone()
         if row is None:
-            conn.execute("INSERT INTO app_clients (device_key, first_seen, last_seen, launches) VALUES (?, ?, ?, 0)", (key, now, now))
+            # OR IGNORE (item 210): the app sends two events at once on a new device's first page; the second
+            # insert used to fail on the unique key and drop that request.
+            conn.execute("INSERT OR IGNORE INTO app_clients (device_key, first_seen, last_seen, launches) VALUES (?, ?, ?, 0)", (key, now, now))
             row = conn.execute("SELECT * FROM app_clients WHERE device_key = ?", (key,)).fetchone()
         sets = {"last_seen": now, "platform": plat, "os": _clean(body.get("os"), 30) or row["os"],
                 "browser": _clean(body.get("br"), 30) or row["browser"]}
