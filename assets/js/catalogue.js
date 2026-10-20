@@ -497,6 +497,7 @@
       '<span class="cat-card__check" aria-hidden="true"></span></div>' +
       '<div class="cat-card__body"><p class="cat-card__code">' + esc(c.code) + "</p>" +
       '<h3 class="cat-card__name">' + esc(c.name) + "</h3>" +
+      (c.ta && c.ta.length ? '<p class="cat-card__aud">Top audience: <b>' + esc(c.ta.map(function (k) { return AUD_NAME[k] || k; }).join(", ")) + "</b></p>" : "") +
       '<ul class="cat-card__meta">' + metaRows(c, label) + "</ul>" +
       // The creator's passport: their full analysis, or a locked page that
       // lets the client ask for one. Only where the server is behind the page
@@ -511,6 +512,8 @@
   // The first screen of cards at once, the rest in small slices while the browser is idle,
   // then `done` (filters, sort and selection are wired on the full set). On the selection
   // page every card starts hidden: only the selection's own are shown, by initSelection.
+  // "Audience in" (item 226): the market codes the server tags a card with while that filter is on.
+  var AUD_NAME = { SA: "Saudi Arabia", AE: "UAE", EG: "Egypt", KW: "Kuwait", QA: "Qatar", BH: "Bahrain", OM: "Oman" };
   var FIRST = 48;
   function renderRoster(list, done) {
     var grid = $("cat-grid");
@@ -1306,7 +1309,7 @@
        profile lands on the same card. */
     var feed = { gen: 0, cursor: null, more: false, busy: false, n: 0, match: null, v: "", seen: {}, lastG: null, lastInner: null,
                  pinned: null, waiters: [] };
-    var EXTRA = { lic: [], disc: null, dplat: null };
+    var EXTRA = { lic: [], aud: [], disc: null, dplat: null };
     var VIEW = "hv-cat-view", VIEW_TTL = 30 * 60 * 1000;
     function feedParams() {
       var st = controls ? controls.query() : { industry: [], sub: [], tier: [], platform: [], place: [], interest: [], followers: [], sort: "daily", q: "" };
@@ -1319,6 +1322,7 @@
       p.set("sort", st.sort || "");
       if (gBy) p.set("group", gBy);
       EXTRA.lic.forEach(function (v) { p.append("lic", v); });
+      (EXTRA.aud || []).forEach(function (v) { p.append("aud", v); });
       if (EXTRA.disc) { p.set("disc", JSON.stringify(EXTRA.disc)); if (EXTRA.dplat) p.set("dplat", EXTRA.dplat); }
       return p;
     }
@@ -1745,7 +1749,7 @@
     var plain = SERVER ? feedParams().toString() : "";
     if (kept) {
       if (controls && kept.q) controls.restore(kept.q);
-      if (kept.x) { EXTRA.lic = kept.x.lic || []; EXTRA.disc = kept.x.disc || null; EXTRA.dplat = kept.x.dplat || null; }
+      if (kept.x) { EXTRA.lic = kept.x.lic || []; EXTRA.aud = kept.x.aud || []; EXTRA.disc = kept.x.disc || null; EXTRA.dplat = kept.x.dplat || null; }
       if (kept.g !== undefined && kept.g !== gBy) {
         gBy = kept.g || "";
         var gSel = document.querySelector(".cat-group-by select");

@@ -47,6 +47,12 @@ def _shares(items, key="name"):
     return out
 
 
+def _top(shares):
+    """The audience's biggest country (code); every one tied at the top. Empty when unknown."""
+    best = max(shares.values()) if shares else 0
+    return {k for k, v in shares.items() if best > 0 and v == best}
+
+
 def _growth(d):
     g = _num(d.get("followers_change_pct"))
     if g is not None:
@@ -94,6 +100,7 @@ def summary(d, platform):
         "brands": {str(b.get("name")).strip() for b in d.get("brands") or [] if isinstance(b, dict) and b.get("name")},
         "topics": {str(t).strip() for t in d.get("creator_interests") or [] if str(t).strip()},
         "countries": _shares(au.get("countries"), "code"),
+        "top": _top(_shares(au.get("countries"), "code")),
         "cities": _shares(au.get("cities")),
         "female": _num(gender.get("female")),
         "male": _num(gender.get("male")),
@@ -285,6 +292,49 @@ def match(raw, platform=None, free_only=False):
             if _passes(s, f):
                 out.append(code)
                 break
+    return out
+
+
+# "Audience in" (item 226, Bido 2026-10-21): a creator is in a market when that country is the single
+# biggest audience country on ANY of their analysed platforms. GCC = Kuwait, Qatar, Bahrain, Oman.
+MARKETS = {"SA": "Saudi Arabia", "AE": "UAE", "EG": "Egypt", "KW": "Kuwait", "QA": "Qatar", "BH": "Bahrain", "OM": "Oman"}
+GCC = ("KW", "QA", "BH", "OM")
+
+
+def markets_of(picked):
+    """The market codes a filter asks for: known codes kept, "GCC" opened into its four countries."""
+    out = []
+    for v in picked or []:
+        for c in (GCC if v == "GCC" else (v,)):
+            if c in MARKETS and c not in out:
+                out.append(c)
+    return out
+
+
+def top_markets():
+    """{code: set of MARKETS codes that are the top audience country on one of the creator's platforms}.
+    Only creators with at least one such market are listed. Country names only ever leave as labels."""
+    out = {}
+    for code, lst in _load().items():
+        got = set()
+        for s in lst:
+            got |= s.get("top", set()) & MARKETS.keys()
+        if got:
+            out[code] = got
+    return out
+
+
+def market_counts():
+    """Staff only (admin Reference): creators per top-audience market, GCC as one group too."""
+    tops = top_markets()
+    out = {k: 0 for k in MARKETS}
+    gcc = 0
+    for got in tops.values():
+        for k in got:
+            out[k] += 1
+        if got & set(GCC):
+            gcc += 1
+    out["GCC"] = gcc
     return out
 
 

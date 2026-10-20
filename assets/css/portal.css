@@ -893,6 +893,18 @@ body.has-previewbar { padding-top: 36px; }
 .lic-filter__note { font-size: 13px; color: #383838; margin-left: 4px; }
 .cat-grid .cat-card.lic-out { display: none !important; }
 
+/* "Audience in" (item 226): same chips as the licence row; the GCC sits as one bracketed group whose
+   first chip ticks its four countries together (aria-pressed "mixed" when only some are on). */
+.aud-gcc { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 3px; border-radius: 999px; border: 1px dashed rgba(18,18,18,.28); }
+.aud-gcc .lic-chip { border-color: transparent; background: transparent; }
+.aud-gcc .lic-chip:hover { border-color: #121212; }
+.aud-gcc .aud-gcc__all { background: #fff; border-color: rgba(18,18,18,.22); font-weight: 700; letter-spacing: .04em; }
+.aud-gcc .lic-chip[aria-pressed="true"] { background: #121212; color: #e8ff76; border-color: #121212; }
+.aud-gcc .aud-gcc__all[aria-pressed="mixed"] { background: #e8ff76; color: #121212; border-color: #121212; }
+.cat-card__aud { margin: 2px 0 6px; font-size: 12.5px; line-height: 1.3; color: #383838; }
+.cat-card__aud b { color: #121212; font-weight: 600; }
+@media (max-width: 520px) { .aud-gcc { flex-basis: 100%; border-radius: 22px; } .aud-filter .lic-filter__label { flex-basis: 100%; } }
+
 /* ======================================================= compact toolbar */
 /* The setup panel as one compact toolbar (Bido, 2026-10-08):
      row 1  search ........................ [ (face) Build a shortlist with AI  Start → ]
@@ -909,7 +921,7 @@ body.has-previewbar { padding-top: 36px; }
 
 .ai-host {
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "search ai" "row row" "active active" "lic lic" "open open";
+  grid-template-areas: "search ai" "row row" "active active" "lic lic" "aud aud" "open open";
   gap: 12px 20px; align-items: center;
 }
 .ai-host > .cat-bar { display: contents; }
@@ -918,6 +930,7 @@ body.has-previewbar { padding-top: 36px; }
 .ai-host .cat-bar__row { grid-area: row; }
 .ai-host .cat-active { grid-area: active; }
 .ai-host > #lic-filter { grid-area: lic; margin: 0; }
+.ai-host > #aud-filter { grid-area: aud; margin: 0; }
 .ai-host > .ai-sl { grid-area: ai; grid-column: auto; grid-row: auto; }
 .ai-host > .ai-sl.is-open { grid-area: open; }
 
@@ -974,7 +987,7 @@ body.has-previewbar { padding-top: 36px; }
 .lic-chip { min-height: 36px; padding: 6px 14px; font-size: 13px; border-width: 1px; }
 
 @media (max-width: 900px) {
-  .ai-host { grid-template-columns: minmax(0, 1fr); grid-template-areas: "search" "ai" "row" "active" "lic" "open"; }
+  .ai-host { grid-template-columns: minmax(0, 1fr); grid-template-areas: "search" "ai" "row" "active" "lic" "aud" "open"; }
   .ai-sl:not(.is-open) .ai-sl__title { white-space: normal; }
 }
 @media (max-width: 520px) {

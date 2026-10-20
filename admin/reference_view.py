@@ -451,6 +451,24 @@ def structure_tab(q):
 
 # -------------------------------------------------------------- roster tab --
 
+def _markets_card():
+    """Creators per top-audience market (item 226): the catalogue's "Audience in" filter, counted. Staff only."""
+    try:
+        import discover
+        n = discover.market_counts()
+    except Exception:
+        return ""
+    rows = [("SA", "Saudi Arabia"), ("AE", "UAE"), ("EG", "Egypt"), ("GCC", "GCC (any of the four below)"),
+            ("KW", "Kuwait"), ("QA", "Qatar"), ("BH", "Bahrain"), ("OM", "Oman")]
+    trs = "".join("<tr><th scope='row'>" + ("&nbsp;&nbsp;" if k in discover.GCC else "") + e(label) + "</th><td><b>"
+                  + e("{:,}".format(n.get(k, 0))) + "</b></td></tr>" for k, label in rows)
+    return ("<section class='card'><div class='hd'><h2>Audience markets</h2>" + pill("Measured", "live")
+            + " <span class='muted'>the catalogue's \"Audience in\" filter: the country is the biggest audience country on any analysed platform."
+              " A creator can count in two markets. Staff only, never shown to clients.</span></div><div class='rf-scroll'>"
+              "<table class='rf-table' data-nosort data-nocols><thead><tr><th>Market</th><th>Creators</th></tr></thead><tbody>"
+            + trs + "</tbody></table></div></section>")
+
+
 def roster_tab(q):
     rows = benchmarks.table()
     ref = {"title": "Our roster, measured now",
@@ -467,7 +485,7 @@ def roster_tab(q):
         by.setdefault(r["platform"], {}).setdefault(r["size"], {})[r["metric"]] = r
     if not by:
         return intro(ref) + ("<section class='card'>" + ui.empty("bars", "No analyses yet", "Upload creator analyses and the cells appear here.") + "</section>")
-    out = [intro(ref)]
+    out = [intro(ref), _markets_card()]
     used = pill("Used by the calculator", "live")
     for plat in sorted(by):
         trs = ""

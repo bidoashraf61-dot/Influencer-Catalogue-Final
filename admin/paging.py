@@ -421,6 +421,7 @@ def clean_query(q):
         "industry": many("industry"), "sub": many("sub", 80),
         "fmin": num("fmin"), "fmax": num("fmax"),
         "lic": [v for v in many("lic") if v in ("SA", "AE", "EG")],
+        "aud": _aud(many("aud")),
         "sort": sort if sort in SORTS else "daily",
         "group": one("group", 20) if one("group", 20) in GROUPS else "",
         "disc": None, "dplat": None,
@@ -439,10 +440,23 @@ def clean_query(q):
     return out
 
 
+AUD = ("SA", "AE", "EG", "KW", "QA", "BH", "OM")    # discover.MARKETS; "GCC" opens into the last four
+AUD_GCC = ("KW", "QA", "BH", "OM")
+
+
+def _aud(vals):
+    out = []
+    for v in vals:
+        for c in (AUD_GCC if v == "GCC" else (v,)):
+            if c in AUD and c not in out:
+                out.append(c)
+    return out
+
+
 def filtering(f):
     """True when the reader has narrowed the roster: only then is a "match" count sent."""
     return bool(f["q"] or f["tier"] or f["platform"] or f["place"] or f["interest"] or f["industry"] or f["sub"] or f["fmin"] or f["fmax"]
-                or f["lic"] or f["disc"])
+                or f["lic"] or f["disc"] or f.get("aud"))
 
 
 def _key(idx, f):
@@ -493,7 +507,7 @@ def _industry_level(idx, i, inds, subs):
     return level
 
 
-def ordered(idx, f, licences=None, discover=None, day=None, picked=None):
+def ordered(idx, f, licences=None, discover=None, day=None, picked=None, audience=None):
     """This query's Ordered answer, best first, and how many creators match. Cached for RESULT_TTL.
     ``day`` ("YYYYMMDD", Riyadh) seeds the daily order; today when not given. ``picked`` (codes on
     a selection) lifts those creators in the daily order; read from the database when not given."""
@@ -517,6 +531,12 @@ def ordered(idx, f, licences=None, discover=None, day=None, picked=None):
         allow = {code for code, ls in lic.items() if any(l.get("country") in f["lic"] for l in ls)}
     if f["disc"]:
         codes = set(discover(f["disc"], f["dplat"]) if discover else [])
+        allow = codes if allow is None else (allow & codes)
+    if f.get("aud"):
+        # "Audience in" (item 226): ``audience()`` is {code: top-audience market codes}.
+        want = set(f["aud"])
+        tops = audience() if audience else {}
+        codes = {code for code, got in tops.items() if got & want}
         allow = codes if allow is None else (allow & codes)
     sets = {d: set(f[d]) for d in ("tier", "platform", "place", "interest") if f[d]}
     ind_set, sub_set = set(f["industry"]), set(f["sub"])
@@ -619,7 +639,7 @@ def _grouped(idx, keep, dim):
     return Ordered(at, gid, names)
 
 
-def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
+def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None, audience=None):
     """One batch. The cursor is "<version tag>.<offset>": a version still held keeps
     its order, so a list never shifts under someone scrolling it. The daily order adds
     ".<day>", so someone scrolling across Riyadh midnight keeps the day they started on."""
@@ -639,8 +659,11 @@ def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
     limit = max(1, min(MAX_LIMIT, int(limit or BATCH)))
     if f["sort"] == "daily" and day is None:
         day = riyadh_day()
-    seq, matched = ordered(idx, f, licences, discover, day)
+    seq, matched = ordered(idx, f, licences, discover, day, audience=audience)
     chunk = seq.slice(start, start + limit)
+    # While "Audience in" is on, each card says which of the asked markets is its top audience
+    # ("ta": codes, never a share), so the card can show "Top audience: Kuwait".
+    tops = (audience() if audience else {}) if f.get("aud") else None
     items = []
     for i, g, pm in chunk:
         c = idx.cards[i]
@@ -648,6 +671,10 @@ def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None):
             c = dict(c, g=g)
         if pm:
             c = dict(c, pm=1)
+        if tops is not None:
+            ta = [k for k in AUD if k in f["aud"] and k in tops.get(c.get("code"), ())]
+            if ta:
+                c = dict(c, ta=ta)
         items.append(c)
     end = start + len(chunk)
     more = end < len(seq)

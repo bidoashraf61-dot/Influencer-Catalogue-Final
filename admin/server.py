@@ -6062,7 +6062,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def api_roster_paged(self, job, q):
         """The catalogue one batch at a time (see admin/paging.py).
 
-        GET /api/roster/page?link=&q=&tier=&platform=&place=&interest=&fmin=&fmax=&lic=&disc=&dplat=
+        GET /api/roster/page?link=&q=&tier=&platform=&place=&interest=&fmin=&fmax=&lic=&aud=&disc=&dplat=
                             &sort=&group=&cursor=&limit=
             -> {ok, items: [card], has_more, cursor, v, match?}; the first batch (no cursor)
                also carries tiers, fx and exp, so the page needs nothing else to draw.
@@ -6099,7 +6099,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         def disc(filters, plat):
             import discover
             return discover.match(filters, plat)
-        out = paging.page(idx, f, one("cursor")[:80] or None, limit, lic, disc)
+
+        def aud():
+            import discover
+            return discover.top_markets()
+        out = paging.page(idx, f, one("cursor")[:80] or None, limit, lic, disc, aud)
         if not one("cursor"):
             out.update(tiers=self.tier_payload(), fx=fx.rates(), exp=links.expires_at())
         return self.send_json(200, out, head)
@@ -6164,7 +6168,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 " (SELECT group_concat(name || ':' || coalesce(price_from, '') || ':' || coalesce(price_to, '')) FROM tiers)").fetchone())
 
     def _roster_build(self, platform=None, only=None):
-        land = db.setting("portal_countries", ["Saudi Arabia", "UAE", "Egypt"]) if only is None else None
+        land = db.setting("portal_countries", db.PORTAL_COUNTRIES) if only is None else None
         bands = db.tier_prices()
         analysed = db.analysis_codes()
         def accounts(r):
@@ -6206,13 +6210,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         ]
 
     def _in_markets(self, r, land=None):
-        """portal_countries (owner, 2026-10-12): the portal browses Saudi Arabia, UAE and Egypt only.
+        """portal_countries (owner, 2026-10-12; GCC added 2026-10-21, item 226): the portal browses Saudi Arabia,
+        UAE, Egypt, Kuwait, Qatar, Bahrain and Oman only.
         A creator whose city names another country is hidden from browsing (still in the admin and on
         selections already made); a city not set yet stays, since the country is unknown.
         ``land`` is the setting read once by the caller (a build checks 14,000+ creators)."""
         import paging
         if land is None:
-            land = db.setting("portal_countries", ["Saudi Arabia", "UAE", "Egypt"])
+            land = db.setting("portal_countries", db.PORTAL_COUNTRIES)
         if not land:
             return True
         country, label, _key = paging.place(r["city"])

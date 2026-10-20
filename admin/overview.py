@@ -139,7 +139,7 @@ def live_campaigns():
 def control_counts():
     """The one live number per Control Centre tile. Every figure falls back to 0 rather than breaking the page."""
     out = {"creators": 0, "review": 0, "analysis_open": 0, "clients": 0, "pending": 0, "credit_reqs": 0, "quotes": 0, "live": 0,
-           "fake_limit": 30, "markets": ["Saudi Arabia", "UAE", "Egypt"], "keys": [], "people": 0, "owners": 0}
+           "fake_limit": 30, "markets": list(db.PORTAL_COUNTRIES), "keys": [], "people": 0, "owners": 0}
     with db.connect() as conn:
         out["creators"] = _count(conn, "SELECT COUNT(*) FROM creators WHERE active = 1")
         out["review"] = _count(conn, "SELECT COUNT(*) FROM creators WHERE active = 1 AND industry_tier = 'Review'")

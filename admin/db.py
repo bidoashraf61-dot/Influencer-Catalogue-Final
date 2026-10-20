@@ -3031,6 +3031,10 @@ _SETTING_TTL = 3.0
 _setting_cache = {}
 
 
+# The countries the portal browses (setting "portal_countries" overrides). GCC added 2026-10-21 (item 226).
+PORTAL_COUNTRIES = ["Saudi Arabia", "UAE", "Egypt", "Kuwait", "Qatar", "Bahrain", "Oman"]
+
+
 def setting(key, default=None):
     import time as _t
     hit = _setting_cache.get(key)
