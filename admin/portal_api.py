@@ -22,7 +22,9 @@ Public (client) routes
     POST /api/me/signout-others  every other browser on their account loses access
     POST /api/team/invite        ask HelloVoice to give a colleague access
     POST /api/brief/parse        free text -> MCQ answers   (credits)
-    POST /api/brief/run          MCQ answers -> scored selection (credits)
+    POST /api/brief/run          MCQ answers -> scored selection (credits); {defer_reasons: true} answers
+                                 without the written reasons, which /api/brief/reasons then adds
+    POST /api/brief/reasons      {brief_id} -> {summary, reasons} for a deferred shortlist
     POST /api/chat               ask the assistant          (credits)
 
 Admin routes (signed-in admin only)
@@ -32,6 +34,7 @@ Admin routes (signed-in admin only)
 """
 import json
 import sys
+import threading
 import time
 import urllib.parse
 
@@ -55,6 +58,23 @@ import portal_views
 import rewards
 
 _score_cache = {}          # brief id -> (time, scores) for the catalogue's fit badges
+
+# Shortlists whose written reasons come in a second call (Bido, 2026-10-20: show the picks in
+# ~2 s, Helvi's reasons a few seconds later). brief id -> what narrate() needs plus the AI part
+# of the price, which is refunded if the reasons fail or are never asked for.
+_pending = {}
+_pending_lock = threading.Lock()
+PENDING_SECONDS = 600
+
+
+def _sweep_pending():
+    now = time.time()
+    with _pending_lock:
+        old = [k for k, v in _pending.items() if now - v["at"] > PENDING_SECONDS]
+        gone = [_pending.pop(k) for k in old]
+    for v in gone:
+        if v["refund"] > 0:
+            portal.refund(v["cid"], v["refund"], "shortlist reasons never fetched")
 
 REASON_TEXT = {
     "invalid": "Enter a valid work email address.",
@@ -472,7 +492,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/auth/start": self.api_auth_start, "/api/auth/verify": self.api_auth_verify,
             "/api/auth/profile": self.api_auth_profile, "/api/auth/logout": self.api_auth_logout,
             "/api/me/unlock": self.api_me_unlock, "/api/me/as-client": self.api_me_as_client, "/api/me/update": self.api_me_update, "/api/brief/parse": self.api_brief_parse,
-            "/api/brief/run": self.api_brief_run, "/api/chat": self.api_chat, "/api/chat/stream": self.api_chat_stream,
+            "/api/brief/run": self.api_brief_run, "/api/brief/reasons": self.api_brief_reasons, "/api/chat": self.api_chat, "/api/chat/stream": self.api_chat_stream,
             "/api/chat/confirm": self.api_chat_confirm, "/api/chat/dismiss": self.api_chat_dismiss,
             "/api/brief/guess": self.api_brief_guess, "/api/brief/attach": self.api_brief_attach,
             "/api/brief/claim": self.api_brief_claim,
@@ -1135,7 +1155,8 @@ class PortalMixin(connect_api.ConnectMixin):
                                             "No creators matched. Try fewer filters or another platform.",
                                             "credits": portal.balance(cid)}, self.cors())
             summary, reasons, narrated = "", {}, False
-            if kind_paid == "brief":
+            defer = bool(b.get("defer_reasons")) and kind_paid == "brief"
+            if kind_paid == "brief" and not defer:
                 try:
                     nar = matcher.narrate(matcher.describe(answers) + ((". " + answers["notes"]) if answers.get("notes") else ""), result, cid)
                     summary, reasons, narrated = nar["summary"], nar["reasons"], True
@@ -1158,6 +1179,12 @@ class PortalMixin(connect_api.ConnectMixin):
         text = matcher.describe(answers)
         brief_id = portal.save_brief(cid, user["id"] if user else None, "mcq", answers, text, brief["objective"], brief["target"], sid,
                                      {"codes": codes, "summary": summary})
+        if defer:
+            _sweep_pending()
+            with _pending_lock:
+                _pending[brief_id] = {"cid": cid, "at": time.time(), "result": {"picks": result["picks"]},
+                                      "text": text + ((". " + answers["notes"]) if answers.get("notes") else ""),
+                                      "refund": max(0, cost - costs["search"])}
         db.log("brief", cid, self.client_ip(), self._ua(), text[:80])
         notify.send("brief", ["%s ran an AI shortlist (%d creators)." % ((user["company"] or user["email"]) if user else "A client", len(codes)),
                               text, ("Notes: " + answers["notes"]) if answers.get("notes") else ""], kam=user["kam"] if user else None)
@@ -1174,6 +1201,7 @@ class PortalMixin(connect_api.ConnectMixin):
                 continue
         return self.send_json(200, {
             "ok": True, "token": token, "name": name, "summary": summary, "narrated": narrated, "brief": text, "brief_id": brief_id,
+            "reasons_pending": defer,
             "objective": brief["objective"], "totals": result["totals"], "pool": result["pool"],
             "picks": [dict(p, why=reasons.get(p["code"], ""), creator=shown.get(p["code"])) for p in result["picks"]],
             "alternates": [dict({k: a[k] for k in ("code", "score", "tag", "basis", "price")}, creator=shown.get(a["code"]))
@@ -1182,6 +1210,40 @@ class PortalMixin(connect_api.ConnectMixin):
             # Phase E timing advisor: the launch windows that suit this brief (free, no prices).
             "timing": __import__("occasions").advise(answers.get("category") or [], matcher.timing_market(answers.get("market")), answers.get("timing")),
             "spent": cost, "credits": bal if kind != "admin" else None}, self.cors())
+
+    def api_brief_reasons(self):
+        """The written reasons for a shortlist run with defer_reasons. Already paid for: a failure
+        refunds the AI part, and each shortlist is narrated once."""
+        who = self._need_viewer()
+        if not who:
+            return
+        cid, kind = who[0], who[2]
+        bid = self._int(self.json_body().get("brief_id"))
+        with _pending_lock:
+            job = _pending.get(bid)
+            if job and job["cid"] == cid:
+                _pending.pop(bid)
+            else:
+                job = None
+        if not job:
+            return self.send_json(404, {"ok": False, "reason": "gone"}, self.cors())
+        try:
+            nar = matcher.narrate(job["text"], job["result"], cid)
+        except gemini.AIError:
+            if job["refund"] > 0:
+                portal.refund(cid, job["refund"], "shortlist without AI text")
+            return self.send_json(200, {"ok": False, "reason": "ai", "credits": portal.balance(cid) if kind != "admin" else None}, self.cors())
+        row = portal.brief(bid)
+        if row:
+            try:
+                res = json.loads(row["result"] or "{}")
+            except ValueError:
+                res = {}
+            res["summary"] = nar["summary"]
+            with db.connect() as conn:
+                conn.execute("UPDATE briefs SET result = ? WHERE id = ?", (json.dumps(res), bid))
+        return self.send_json(200, {"ok": True, "summary": nar["summary"], "reasons": nar["reasons"],
+                                    "credits": portal.balance(cid) if kind != "admin" else None}, self.cors())
 
     # ------------------------------------------------------------------ chat --
 

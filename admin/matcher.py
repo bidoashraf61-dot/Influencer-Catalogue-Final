@@ -808,7 +808,7 @@ def narrate(brief_text, result, code_id=None):
     # Capped well inside the 60-second proxy limit in front of the admin: a slow model answer
     # falls back to the scored shortlist without written reasons rather than a timed-out page.
     data = gemini.generate_json(prompt, schema, system=system, temperature=0.3, max_tokens=4096,
-                                kind="brief", code_id=code_id, credits=costs_of("brief"), timeout=32)
+                                kind="brief", code_id=code_id, credits=costs_of("brief"), timeout=32, think=0)
     valid = {p["code"] for p in picks}
     reasons = {r["code"]: " ".join(str(r["why"]).split())[:220] for r in data.get("reasons", [])
                if isinstance(r, dict) and r.get("code") in valid and r.get("why")}

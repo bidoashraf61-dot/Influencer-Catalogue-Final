@@ -199,7 +199,7 @@ def record(kind, code_id, mdl, prompt_tokens, out_tokens, credits, ok, latency_m
 
 
 def generate(contents, *, system=None, schema=None, tools=None, temperature=0.4, max_tokens=4096,
-             kind="chat", code_id=None, credits=0, timeout=45, model_name=None):
+             kind="chat", code_id=None, credits=0, timeout=45, model_name=None, think=None):
     """One model call. Returns ``{"text", "calls", "parts", "usage"}``.
 
     ``contents`` is a list of Gemini content dicts (``{"role", "parts"}``) or a
@@ -225,6 +225,8 @@ def generate(contents, *, system=None, schema=None, tools=None, temperature=0.4,
         body["generationConfig"]["responseSchema"] = schema
     if tools:
         body["tools"] = [{"functionDeclarations": tools}]
+    if think is not None:                    # 0 = answer without thinking: the shortlist reasons, 8.6 s -> 4.4 s (2026-10-20)
+        body["generationConfig"]["thinkingConfig"] = {"thinkingBudget": int(think)}
 
     first = model_name or model()
     chain = [first] + [m for m in FALLBACKS if m != first]
@@ -309,7 +311,7 @@ STREAM_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/{mode
 
 
 def generate_stream(contents, *, on_text=None, system=None, tools=None, temperature=0.4, max_tokens=4096,
-                    kind="chat", code_id=None, credits=0, timeout=45, model_name=None):
+                    kind="chat", code_id=None, credits=0, timeout=45, model_name=None, think=None):
     """Like ``generate`` but the reply's text arrives piece by piece through
     ``on_text(delta)`` as the model writes it. Returns the same dict. Falls
     back to the whole answer at once (still through ``on_text``) when the

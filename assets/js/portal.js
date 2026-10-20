@@ -3677,6 +3677,7 @@
     var tg = h("button", { class: "ai-why__b", type: "button", "aria-expanded": "false", html: aiSvg(PW_INFO, 15) + "<span>Why Helvi picked them</span>" });
     var panel = h("div", { class: "ai-why__panel", hidden: "" });
     panel.appendChild(h("p", { class: "ai-why__h" }, "How they fit your brief"));
+    if (p.why) panel.appendChild(h("p", { class: "ai-why__say" }, p.why));
     var ul = h("ul");
     var LV = { strong: "Strong", good: "Good", weak: "Weak", none: "Not measured" };
     (p.fit_items || []).forEach(function (it) {
@@ -4206,7 +4207,8 @@
         if (pc >= 65 && at < 3) mark(3);
         show(pc);
       }, 120);
-      api("POST", "/api/brief/run", { answers: answers, name: name }).then(function (r) {
+      // The picks come back in ~2 s; Helvi's written reasons follow in a second call (Bido, 2026-10-20).
+      api("POST", "/api/brief/run", { answers: answers, name: name, defer_reasons: true }).then(function (r) {
         done = true; clearInterval(timer); busy = false;
         if (!r.b.ok || r.b.empty || !(r.b.picks || []).length) {
           var err = h("div", { class: "ai-sl__q" }, h("p", { class: "ai-sl__ask" }, r.b.empty ? "No creators matched that brief." : "That didn't work."),
@@ -4217,6 +4219,7 @@
         mark(STAGES.length); show(100);
         setCredits(r.b.credits);
         last = r.b;
+        if (r.b.reasons_pending) fetchReasons(r.b);
         setTimeout(function () { celebrate(r.b, name); }, reduce ? 0 : 500);
       });
     }
@@ -4255,6 +4258,44 @@
     }
     // The catalogue is served in batches, so the picks may not be on the page yet: it is asked
     // to show exactly them (fetched by code, in rank order), then they are marked as before.
+    function fetchReasons(res) {
+      api("POST", "/api/brief/reasons", { brief_id: res.brief_id }).then(function (r) {
+        res.reasons_pending = false;
+        if (r.b && r.b.credits != null) setCredits(r.b.credits);
+        if (r.b && r.b.ok) {
+          var by = r.b.reasons || {};
+          res.summary = r.b.summary || res.summary; res.narrated = true;
+          res.picks.forEach(function (p) { if (by[p.code]) p.why = by[p.code]; });
+        }
+        applyReasons(res);
+      });
+    }
+    // Fills the written reasons into a shortlist already on screen (or clears the "writing" note
+    // when they could not be made). Safe to call before the grid is painted: paintResult reads res.
+    function applyReasons(res) {
+      var bar = $("ai-result");
+      if (bar) {
+        var sum = bar.querySelector(".ai-result__sum");
+        if (sum && res.summary) sum.textContent = res.summary;
+        var note = bar.querySelector(".ai-result__pending");
+        if (note) note.remove();
+      }
+      var why = {};
+      res.picks.forEach(function (p) { why[p.code] = p.why || ""; });
+      Array.prototype.forEach.call(document.querySelectorAll("#cat-grid .cat-card.ai-pick[data-code]"), function (c) {
+        var w = why[c.getAttribute("data-code")];
+        if (!w) return;
+        var rk = c.querySelector(".ai-rank");
+        if (rk) rk.title = w;
+        var panel = c.querySelector(".ai-why__panel");
+        if (panel) sayWhy(panel, w);
+      });
+    }
+    function sayWhy(panel, text) {
+      var say = panel.querySelector(".ai-why__say");
+      if (!say) { say = h("p", { class: "ai-why__say" }); panel.insertBefore(say, panel.querySelector(".ai-why__h").nextSibling); }
+      say.textContent = text;
+    }
     function showResult(res, name) {
       if (window.hvCatalogue && window.hvCatalogue.server) {
         clearResult(true);
@@ -4295,6 +4336,7 @@
       var txt = h("div", { class: "ai-result__txt" });
       txt.appendChild(h("p", { class: "ai-result__name" }, name));
       txt.appendChild(h("p", { class: "ai-result__sum" }, res.summary || (res.picks.length + " creators match your brief, best fit first.")));
+      if (res.reasons_pending) txt.appendChild(h("p", { class: "ai-result__pending", role: "status" }, h("i", { "aria-hidden": "true" }), "Helvi is writing why each creator fits…"));
       var tlb = timingLine(res.timing, { short: true });
       if (tlb) txt.appendChild(tlb);
       bar.appendChild(txt);

@@ -229,6 +229,46 @@ class Portal(unittest.TestCase):
         s, sel2, _ = other.get("/api/selection?s=" + b["token"])
         self.assertNotEqual(s, 200)
 
+    def test_5b_deferred_reasons(self):
+        # The AI card asks for the picks first and the written reasons in a second call.
+        # A fixed ranking: this suite's fixture roster no longer matches briefs (see test_5), and this
+        # test is about the two-call flow, not the scores.
+        import matcher
+        from unittest import mock
+        pick = lambda code, sc: {"code": code, "score": sc, "basis": "roster", "strengths": ["skincare"], "watchouts": [],
+                                 "tag": "", "price": None, "chips": [], "fit_items": [], "perf": None, "fit": None}
+        fixed = {"picks": [pick("HV-MI-001", 88), pick("HV-MI-002", 74)], "alternates": [], "totals": {}, "pool": 2}
+        p = mock.patch.object(matcher, "rank", lambda brief: {k: (list(v) if isinstance(v, list) else v) for k, v in fixed.items()})
+        p.start(); self.addCleanup(p.stop)
+        c, _ = self.signup("later@abbott.com")
+        ans = {"goal": "awareness", "platforms": ["Instagram"], "market": "SA", "category": ["skincare"], "count": "5"}
+        s, b, _ = c.post("/api/brief/run", {"answers": ans, "defer_reasons": True})
+        self.assertEqual(s, 200, b)
+        self.assertTrue(b.get("reasons_pending"), b)
+        self.assertFalse(b["narrated"] or any(p["why"] for p in b["picks"]))
+        self.assertEqual((b["spent"], b["credits"]), (5, 45))            # paid once, at the full price
+        other, _ = self.signup("nosy@gsk.com")
+        s, r, _ = other.post("/api/brief/reasons", {"brief_id": b["brief_id"]})
+        self.assertEqual(s, 404)                                          # not theirs
+        s, r, _ = c.post("/api/brief/reasons", {"brief_id": b["brief_id"]})
+        self.assertEqual(s, 200, r)
+        self.assertTrue(r["ok"] and r["summary"] and r["reasons"].get(b["picks"][0]["code"]))
+        self.assertEqual(r["credits"], 45)                                # nothing more charged
+        s, r, _ = c.post("/api/brief/reasons", {"brief_id": b["brief_id"]})
+        self.assertEqual(s, 404)                                          # narrated once
+        s, briefs, _ = c.get("/api/briefs")
+        self.assertTrue(briefs["briefs"][0]["summary"])
+        # never fetched: the AI part comes back when the pending entry expires
+        import portal_api
+        db.set_setting("ai_costs", {"brief": 5, "parse": 1, "chat": 1, "search": 2})
+        self.addCleanup(db.set_setting, "ai_costs", None)
+        s, b2, _ = c.post("/api/brief/run", {"answers": ans, "defer_reasons": True})
+        uid = portal.user_by_email("later@abbott.com")["code_id"]
+        self.assertEqual(portal.balance(uid), 40)
+        portal_api._pending[b2["brief_id"]]["at"] -= portal_api.PENDING_SECONDS + 1
+        portal_api._sweep_pending()
+        self.assertEqual(portal.balance(uid), 43)
+
     def test_6_credits_run_out_and_refund(self):
         # With the plain shortlist priced (an admin can set it), running out blocks it.
         db.set_setting("ai_costs", {"brief": 5, "parse": 1, "chat": 1, "search": 2})
