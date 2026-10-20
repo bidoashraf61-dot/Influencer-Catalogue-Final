@@ -765,7 +765,7 @@
     if (u && u.photo) setPhoto(u.photo);
     var menu = h("div", { class: "pt-menu", id: "pt-menu", role: "menu", "aria-labelledby": "pt-avatar", hidden: true });
     var head = h("div", { class: "pt-menu__head" }, h("b", { class: "pt-menu__name" }, name));
-    var sub = u ? [u.job_title, u.company].filter(Boolean).join(" · ") || u.email : ME.kind === "admin" ? "Administrator" : "Signed in with an access code";
+    var sub = u ? [u.job_title, u.company].filter(Boolean).join(" · ") || u.email : ME.kind === "admin" ? "Administrator" : "Guest access";
     // A person with admin access is just a label on their own account: same profile, same data.
     if (ME.staff) sub = "Administrator" + (sub ? " · " + sub : "");
     if (sub) head.appendChild(h("span", { class: "pt-menu__sub" }, sub));
@@ -2041,7 +2041,7 @@
     var body = h("div", { class: "pt-body" });
     modal.appendChild(body);
     if (u) body.appendChild(h("p", { class: "pt-sub" }, [u.company, u.email].filter(Boolean).join(" · ")));
-    else body.appendChild(h("p", { class: "pt-sub" }, ME.kind === "admin" ? "You're viewing as an administrator. AI is free for you." : "You're using an access code. Sign in with your work email for your own profile, campaigns and credits."));
+    else body.appendChild(h("p", { class: "pt-sub" }, ME.kind === "admin" ? "You're viewing as an administrator. AI is free for you." : "Guest access. Sign in with your work email for your own profile, campaigns and credits."));
 
     if (ME.credits != null) {
       var bal = h("div", { class: "pt-sec" }, h("h3", null, "AI credits"),

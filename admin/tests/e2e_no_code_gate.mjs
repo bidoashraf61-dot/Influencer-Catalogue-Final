@@ -149,6 +149,9 @@ await run("campaign link: signed out", { me: { delay: 600 }, roster: [{ status: 
 await run("campaign dashboard: signed out", { me: {}, roster: [{ status: 401 }], campaign: { status: 401 } }, "/campaign/dashboard/#t=tok123", { watch: W },
   (l) => (l.signIn ? [] : ["the email sign-in never appeared"]));
 
+// A dashboard share link (#t=..&share=..) needs a sign-in first (the server answers 401): sign-in, then the same link.
+await run("dashboard share link: signed out", { me: { delay: 400 }, roster: [{ status: 401 }], campaign: { status: 401 } }, "/campaign/dashboard/#t=tok123&share=sh456", { watch: W },
+  (l) => (l.signIn ? [] : ["the email sign-in never appeared"]));
 await run("creator page: signed out", { me: { delay: 600 }, roster: [{ status: 401 }], campaign: { status: 401 } }, "/creator/#c=HV-MI-001", { watch: W },
   (l) => (l.signIn ? [] : ["the email sign-in never appeared"]));
 
