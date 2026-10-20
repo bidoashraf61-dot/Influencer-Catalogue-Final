@@ -10,8 +10,8 @@ So a stamp that is not bumped when the file changes pins every browser and every
 app to the old file. The stamp must be the file's content hash, on every page, every time.
 
 What it stamps:
-  1. Inside the js files, only the URLs that already carry a ?v= (connect.js loads the tour
-     this way). Repeated until nothing changes, so a file's own hash includes its children's.
+  1. Inside the js files, only the URLs that already carry a ?v= (a script that loads another
+     script or style this way). Repeated until nothing changes, so a file's own hash includes its children's.
   2. Every src= / href= in every .html page under the root (assets/ is skipped) that points
      at an existing assets/js/*.js or assets/css/*.css: any page, any file, no list to keep.
   3. sw.js: VERSION becomes "hca-<hash of the app shell>", so any release that changes a
@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 ASSET = r"assets/(?:js|css)/[A-Za-z0-9_.-]+\.(?:js|css)"
-# A URL inside a js file that already carries a stamp: "assets/js/tour.js?v=6a87b52e".
+# A URL inside a js file that already carries a stamp: "assets/js/hv-drag.js?v=6a87b52e".
 JS_REF = re.compile(r"((?:\.\./|/)*(" + ASSET + r"))\?v=([0-9A-Za-z]+)")
 # A src/href attribute in a page, stamped or not.
 HTML_REF = re.compile(r"""((?:src|href)=["'])([^"'?#]*?(""" + ASSET + r"""))(?:\?v=([0-9A-Za-z]+))?(["'])""")

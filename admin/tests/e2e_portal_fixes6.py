@@ -31,6 +31,7 @@ BASIC = {"followers": 38000, "er": 3.1, "avg_views": 5000, "basic": True, "sampl
 
 class Fixes6(unittest.TestCase):
     signup = base.Portal.signup
+    admin = base.Portal.admin
 
     @classmethod
     def setUpClass(cls):
@@ -103,7 +104,8 @@ class Fixes6(unittest.TestCase):
         c, _ = self.signup("score6@glowderma.com")
         tok = self.selection(c, "Scored", ["HV-MI-001", "HV-MI-002"])
         db.set_scores_published(tok)                                      # published by HelloVoice (gate, 2026-10-15)
-        s, sel, _ = c.get("/api/selection?s=" + tok)
+        self.assertEqual(c.get("/api/selection?s=" + tok)[1]["scores"], {})   # the client never gets a score
+        s, sel, _ = self.admin().get("/api/selection?s=" + tok)   # scores are HelloVoice admins' alone (owner, 2026-10-20, item 174)
         for code in ("HV-MI-001", "HV-MI-002"):
             sc = sel["scores"][code]
             self.assertIn(sc["confidence"]["level"], ("high", "medium", "low"))

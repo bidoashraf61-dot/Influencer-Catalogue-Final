@@ -92,6 +92,8 @@ class Fixes2(unittest.TestCase):
         b = self.scores(c, token)
         self.assertNotIn("needs_objective", b)
         self.assertEqual(b["brief"]["objective"], "Engagement")
+        self.assertEqual(b["scores"], {})                            # the client never gets a score
+        b = self.scores(self.admin(), token)   # scores are HelloVoice admins' alone (owner, 2026-10-20, item 174)
         self.assertIsNotNone(b["scores"]["HV-MI-001"]["score"])
         self.assertTrue(set(b["codes"]) <= set(b["scores"]))       # added creators included
 
@@ -108,7 +110,8 @@ class Fixes2(unittest.TestCase):
         db.save_campaign(k, selection_id=sel2["id"], objective="engagement")
         b = self.scores(c, token2)
         self.assertNotIn("needs_objective", b)
-        self.assertIn("HV-MD-004", b["scores"])
+        self.assertEqual(b["scores"], {})                            # the client never gets a score
+        self.assertIn("HV-MD-004", self.scores(self.admin(), token2)["scores"])   # scores are HelloVoice admins' alone (owner, 2026-10-20, item 174)
 
     # -------------------------------------------- #9 the reject reason pop-up --
     def test_03_reject_reason_is_given_after_the_rejection(self):

@@ -257,7 +257,8 @@ class Fixes3Account(unittest.TestCase):
         self.assertTrue(att.get("ok"), att)
         b = c.get("/api/selection?s=" + token)[1]
         self.assertNotIn("needs_objective", b)
-        self.assertTrue(b["scores"])
+        self.assertEqual(b["scores"], {})                            # the client never gets a score
+        self.assertTrue(self.admin().get("/api/selection?s=" + token)[1]["scores"])   # scores are HelloVoice admins' alone (owner, 2026-10-20, item 174)
         briefs = self.account(c)["briefs"]
         self.assertEqual(briefs[0]["id"], att["brief_id"])
         self.assertTrue(briefs[0]["can_delete"])
