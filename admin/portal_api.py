@@ -303,6 +303,13 @@ class PortalMixin(connect_api.ConnectMixin):
                         self.send_json(200, {"ok": True, "row": r, "notes": crm.notes(k), "quotes": crm.quotes(role, a, k)},
                                        self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/edit/campaign":
+            # Item 209 slice c: the dashboard's Edit mode (owners, admins, and a KAM for her own clients' campaigns).
+            ctx = self._edit_ctx(str(query.get("t") or ""))
+            if ctx:
+                import contentedit
+                self.send_json(200, dict(contentedit.view(ctx[0]), ok=True), self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/hub/campaigns":
             who = self._need_account()
             if who:
@@ -605,6 +612,8 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/detach": self.api_board_detach, "/api/board/save": self.api_board_save, "/api/board/plan": self.api_board_plan,
             "/api/selection/merge": self.api_selection_merge,
             "/api/needs/approve": self.api_needs_approve, "/api/hub/account": self.api_hub_account,
+            "/api/edit/post": self.api_edit_post, "/api/edit/bulk": self.api_edit_bulk, "/api/edit/numbers": self.api_edit_numbers,
+            "/api/edit/update": self.api_edit_update, "/api/edit/pending": self.api_edit_pending, "/api/edit/insight": self.api_edit_insight,
             "/api/crm/set": self.api_crm_set, "/api/crm/note": self.api_crm_note, "/api/crm/person": self.api_crm_person,
             "/api/crm/quote": self.api_crm_quote, "/api/crm/prospect": self.api_crm_prospect,
             "/api/stepup/send": self.api_stepup_send, "/api/stepup/verify": self.api_stepup_verify,
@@ -1315,6 +1324,67 @@ class PortalMixin(connect_api.ConnectMixin):
         code, got = peoplectl.act(role, a, who[1], b.get("id"), str(b.get("action") or ""), b.get("amount"), str(b.get("reason") or ""),
                                   stepup_open=stepup.active(who[1]) > 0)
         return self.send_json(code, got, self.cors())
+
+    def _edit_ctx(self, token):
+        """(campaign, actor email) when this session may edit that campaign's content, else answers 401/403/404."""
+        who = self._need_account()
+        if not who:
+            return None
+        import board
+        k, role = board.campaign_for(self, token=token or None)
+        if role not in ("admin", "kam"):
+            self.send_json(403, {"ok": False, "message": "Only the HelloVoice team edits a campaign."}, self.cors())
+            return None
+        if k is None:
+            self.send_json(404, {"ok": False, "message": "That campaign is not available."}, self.cors())
+            return None
+        if self._throttled("edit:%d" % who[1]["id"], 400, 3600):
+            return None
+        return k, who[1]["email"]
+
+    def _edit_call(self, fn, *keys):
+        b = self.json_body()
+        ctx = self._edit_ctx(str(b.get("t") or ""))
+        if ctx:
+            code, got = fn(ctx[0], ctx[1], *[b.get(x) for x in keys])
+            self.send_json(code, got, self.cors())
+
+    def api_edit_post(self):
+        import contentedit
+        b = self.json_body()
+        ctx = self._edit_ctx(str(b.get("t") or ""))
+        if ctx:
+            code, got = contentedit.add_post(ctx[0], ctx[1], b.get("code"), b.get("url"), str(b.get("platform") or ""), str(b.get("kind") or ""),
+                                             b.get("caption") or "", b.get("posted") or "", {m: b.get(m) for m in ("likes", "comments", "views", "shares", "saves")})
+            self.send_json(code, got, self.cors())
+
+    def api_edit_bulk(self):
+        import contentedit
+        self._edit_call(contentedit.bulk_links, "code", "text", "platform")
+
+    def api_edit_numbers(self):
+        import contentedit
+        b = self.json_body()
+        ctx = self._edit_ctx(str(b.get("t") or ""))
+        if ctx:
+            code, got = contentedit.set_numbers(ctx[0], ctx[1], b.get("post"), {m: b.get(m) for m in ("likes", "comments", "views", "shares", "saves")})
+            self.send_json(code, got, self.cors())
+
+    def api_edit_update(self):
+        import contentedit
+        self._edit_call(contentedit.update_post, "post", "do")
+
+    def api_edit_pending(self):
+        import contentedit
+        self._edit_call(contentedit.set_pending, "code", "status", "date")
+
+    def api_edit_insight(self):
+        import contentedit
+        b = self.json_body()
+        ctx = self._edit_ctx(str(b.get("t") or ""))
+        if ctx:
+            code, got = contentedit.decide_insight(ctx[0], ctx[1], b.get("id"), str(b.get("do") or ""), b.get("post"), b.get("values") or {})
+            self.send_json(code, got, self.cors())
 
     def _crm_who(self):
         who = self._need_account()
