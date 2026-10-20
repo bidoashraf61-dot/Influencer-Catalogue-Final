@@ -359,6 +359,12 @@ def card(h, k, role, pins, logo_dir, staff, demo=frozenset(), who=None, team=Non
     # Everyone sees who runs it; the email stays with the team.
     out["kam"] = ({"email": kam, "name": _kam_name(kam)} if staff else {"name": _kam_name(kam)}) if kam else None
     out["moves"] = moves_for(h, role, who, k, stage, team)
+    out["briefs"] = briefs_of(k, sels)
+    # Item 197: who may edit it on the board, and what the edit panel starts from (never shown to clients).
+    if role == "admin" or (role == "kam" and h.admin_like_for(k["code_id"], k["selection_id"], k["id"])):
+        out["can_edit"] = True
+        out["edit"] = {"objective": (k["objective"] if "objective" in k.keys() else None) or "balanced",
+                       "targets": db.campaign_targets(k), "id": k["id"]}
     if staff:
         out["staged"] = bool(k["stage"] if "stage" in k.keys() else None)
     return out
@@ -380,8 +386,19 @@ def board(h, logo_dir):
     cards = _order([card(h, k, role, pins, logo_dir, staff, demo, who, team) for k in _visible(h, role, who)])
     # can_move: this viewer may move at least one card; each card's "moves" says where. can_go_live: admins only.
     return {"role": role, "can_move": any(c["moves"] for c in cards), "can_go_live": role == "admin",
-            "locked_stages": [] if role == "admin" else ["live", "completed"], "can_start": role in ("admin", "kam") or _client_user(h, who) is not None,
+            "locked_stages": [] if role == "admin" else ["live", "completed"],
+            # the account managers an admin can pick on a card (item 197)
+            "kams": _kams() if role == "admin" else [],
+            "can_start": role in ("admin", "kam") or _client_user(h, who) is not None,
             "stages": [{"key": s, "label": LABEL[s], "hint": HINT[s]} for s in STAGES], "campaigns": cards}
+
+
+def _kams():
+    try:
+        import hub
+        return [{"name": k["name"] or k["email"], "email": k["email"]} for k in hub.kam_options()]
+    except Exception:
+        return []
 
 
 def _demo_ids():
@@ -693,3 +710,141 @@ def move_selection(h, sel, to):
         with db.connect() as conn:
             conn.execute("UPDATE selections SET stage = ? WHERE id = ?", (to, int(sel["id"])))
     return True, "%s moved to %s." % (sel["name"], LABEL[to]), {"stage": to}
+
+
+# ------------------------------------------------------- editing on the card --
+# Item 197/204/206 (owner, 2026-10-20): every campaign edit happens on the board (profile and campaign
+# tracking). Admins edit any campaign, a KAM hers; clients read. The admin's Setup page stays as it was.
+
+def may_edit(h, k):
+    role, _who = viewer(h)
+    if role == "admin":
+        return True
+    if role == "kam":
+        return h.admin_like_for(k["code_id"], k["selection_id"], k["id"])
+    return False
+
+
+def _day(text):
+    t = db.day_bounds(str(text or ""), None) if text else None
+    return t
+
+
+def edit(h, k, b):
+    """{name, client, starts, ends (YYYY-MM-DD or ""), objective, targets {key: n}}. (ok, message, extra)."""
+    import history
+    import metrics
+    if not may_edit(h, k):
+        return False, "Only HelloVoice can change this campaign.", {"status": 403}
+    f = {}
+    if "name" in b:
+        name = " ".join(str(b.get("name") or "").split())
+        if not NAME_MIN <= len(name) <= NAME_MAX:
+            return False, "A name needs %d to %d characters." % (NAME_MIN, NAME_MAX), {}
+        f["name"] = name
+    if "client" in b:
+        f["client"] = " ".join(str(b.get("client") or "").split())[:120] or None
+    if "starts" in b or "ends" in b:
+        s = _day(b.get("starts")) if "starts" in b else k["starts_at"]
+        e = _day(b.get("ends")) if "ends" in b else k["ends_at"]
+        if ("starts" in b and b.get("starts") and s is None) or ("ends" in b and b.get("ends") and e is None):
+            return False, "That date is not valid.", {}
+        if "ends" in b and e is not None:
+            e += 86400 - 1                                  # the last day counts in full
+        if s is not None and e is not None and e < s:
+            return False, "The last day is before the first day.", {}
+        if k["status"] == "live" and (s is None or e is None):
+            return False, "A live campaign needs its first and last day.", {}
+        f["starts_at"], f["ends_at"] = s, e
+    if "objective" in b:
+        o = str(b.get("objective") or "").lower()
+        if o not in metrics.OBJECTIVES or o == "custom":
+            return False, "Pick an objective from the list.", {}
+        f["objective"], f["weights"] = o, None
+    if "targets" in b:
+        t = b.get("targets") or {}
+        out = {}
+        for key in db.TARGET_KEYS:
+            v = t.get(key)
+            if v in (None, ""):
+                continue
+            try:
+                n = float(v)
+            except (TypeError, ValueError):
+                return False, "Targets are numbers.", {}
+            if n < 0:
+                return False, "Targets can't be negative.", {}
+            if n:
+                out[key] = round(n, 2) if key == "er" else int(n)
+        f["targets"] = out
+    if not f:
+        return False, "Nothing to change.", {}
+    with history.tracked("campaign", k["id"], "Edited %s on the board" % k["name"]):
+        db.save_campaign(k["id"], **f)
+    return True, "Saved.", {}
+
+
+def set_logo(h, k, data, logo_dir):
+    """Replace the campaign's client logo with an uploaded PNG / JPG / WebP (3 MB at most)."""
+    import history
+    import secrets as _s
+    import uploads
+    if not may_edit(h, k):
+        return False, "Only HelloVoice can change this campaign.", {"status": 403}
+    kind = uploads.image_kind(data or b"")
+    if kind not in ("png", "jpg", "webp") or len(data) > 3 * 1024 * 1024:
+        return False, "Use a PNG, JPG or WebP logo under 3 MB.", {}
+    logo_dir.mkdir(exist_ok=True)
+    name = _s.token_hex(10) + "." + kind
+    (logo_dir / name).write_bytes(data)
+    with history.tracked("campaign", k["id"], "New logo for %s from the board" % k["name"]):
+        db.save_campaign(k["id"], logos=["upload/" + name])
+    return True, "Logo saved.", {}
+
+
+def detach(h, k, sel):
+    """Take a selection out of a campaign (its creators stay on the campaign's own list)."""
+    import history
+    if not may_edit(h, k):
+        return False, "Only HelloVoice can change this campaign.", {"status": 403}
+    ids = selection_ids(k)
+    if sel["id"] not in ids:
+        return False, "%s is not in this campaign." % sel["name"], {}
+    with history.tracked("campaign", k["id"], "Took %s out of %s on the board" % (sel["name"], k["name"])):
+        with db.connect() as conn:
+            conn.execute("DELETE FROM campaign_selections WHERE campaign_id = ? AND selection_id = ?", (k["id"], sel["id"]))
+            if k["selection_id"] and int(k["selection_id"]) == sel["id"]:
+                rest = [i for i in ids if i != sel["id"]]
+                conn.execute("UPDATE campaigns SET selection_id = ?, updated_at = ? WHERE id = ?", (rest[0] if rest else None, now(), k["id"]))
+                if rest:
+                    conn.execute("DELETE FROM campaign_selections WHERE campaign_id = ? AND selection_id = ?", (k["id"], rest[0]))
+            else:
+                conn.execute("UPDATE campaigns SET updated_at = ? WHERE id = ?", (now(), k["id"]))
+    return True, "%s is out of %s." % (sel["name"], k["name"]), {}
+
+
+def attachable(h, k):
+    """Selections that may join this campaign: the same client's, not in it already, newest first."""
+    import portal
+    if not may_edit(h, k) or k["code_id"] is None:
+        return []
+    team = sorted(portal.team_codes(int(k["code_id"])))
+    have = set(selection_ids(k))
+    with db.connect() as conn:
+        rows = conn.execute("SELECT id, name, token, codes, updated_at FROM selections WHERE code_id IN (%s) AND deleted_at IS NULL "
+                            "AND archived_at IS NULL ORDER BY updated_at DESC LIMIT 40" % ",".join("?" * len(team)), team).fetchall()
+    return [{"token": r["token"], "name": r["name"], "creators": _creators(r), "updated_at": r["updated_at"]}
+            for r in rows if r["id"] not in have]
+
+
+def briefs_of(k, sels=None):
+    """The newest brief on each of the campaign's selections (item 204): what it is for, at a glance."""
+    sels = sels if sels is not None else _selections(selection_ids(k))
+    out = []
+    with db.connect() as conn:
+        for s in sels:
+            b = conn.execute("SELECT id, summary, objective, created_at FROM briefs WHERE selection_id = ? AND deleted_at IS NULL "
+                             "ORDER BY id DESC LIMIT 1", (s["id"],)).fetchone()
+            out.append({"selection": s["token"], "selection_name": s["name"],
+                        "brief": {"id": b["id"], "summary": b["summary"] or "", "objective": b["objective"] or "", "at": b["created_at"]} if b else None})
+    return out

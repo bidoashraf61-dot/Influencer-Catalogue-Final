@@ -188,7 +188,8 @@
       // Item 199: Board or Table here too (List lives on the profile).
       var view = HVBoard.viewOf("tracking", ["board", "table"]);
       HVBoard.mount(host, {
-        stages: BOARD.stages, noun: "campaign", locked: BOARD.locked_stages || [], view: view,
+        stages: BOARD.stages, noun: "campaign", locked: BOARD.locked_stages || [], view: view, kams: BOARD.kams || [],
+        onChange: function () { reloadBoard("Saved."); },
         tools: HVBoard.viewSwitch("tracking", view, function () { showBoard(); }, ["board", "table"]),
         items: list.map(HVBoard.fromCampaign), extra: liveButton,
         say: function (text, bad) { say(esc(text), bad); },

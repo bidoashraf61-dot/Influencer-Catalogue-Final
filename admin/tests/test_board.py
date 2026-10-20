@@ -318,6 +318,54 @@ class Board(unittest.TestCase):
             conn.execute("DELETE FROM selection_quote WHERE selection_id = ?", (self.s_more,))
             conn.execute("UPDATE selections SET stage = NULL WHERE id IN (?, ?)", (self.s_more, self.s_rival))
 
+    # ------------------------------------------- item 197/204/206: edits on the card
+    def test_09_edit_from_the_card(self):
+        k = db.campaign(self.k_short)
+        tok = k["token"]
+        # clients read; their card has no edit block
+        s, b, _ = self.lead.get("/api/board")
+        c = next(x for x in b["campaigns"] if x["token"] == tok)
+        self.assertNotIn("can_edit", c)
+        self.assertEqual(c["briefs"][0]["selection_name"], "Glow list")
+        self.assertEqual(self.lead.post("/api/board/edit", {"t": tok, "name": "Hacked"})[0], 403)
+        # the KAM edits her client's campaign
+        s, b, _ = self.kam.post("/api/board/edit", {"t": tok, "name": "Poly shortlist v2", "client": "Polyco KSA",
+                                                     "starts": "2026-11-01", "ends": "2026-11-30"})
+        self.assertEqual(s, 200, b)
+        k = db.campaign(self.k_short)
+        self.assertEqual((k["name"], k["client"]), ("Poly shortlist v2", "Polyco KSA"))
+        self.assertEqual(k["ends_at"] - k["starts_at"], 30 * 86400 - 1)
+        self.assertEqual(self.kam.post("/api/board/edit", {"t": tok, "starts": "2026-12-01", "ends": "2026-11-01"})[0], 400)
+        self.assertEqual(self.kam.post("/api/board/edit", {"t": tok, "name": "x"})[0], 400)
+        s, b, _ = self.boss.post("/api/board/edit", {"t": tok, "objective": "awareness", "targets": {"views": "250000", "er": "3.5", "posts": ""}})
+        self.assertEqual(s, 200, b)
+        self.assertEqual(db.campaign_targets(db.campaign(self.k_short)), {"views": 250000, "er": 3.5})
+        self.assertEqual(self.boss.post("/api/board/edit", {"t": tok, "objective": "custom"})[0], 400)
+        # admin card carries the edit block and the KAM list
+        s, b, _ = self.boss.get("/api/board")
+        c = next(x for x in b["campaigns"] if x["token"] == tok)
+        self.assertEqual((c["can_edit"], c["edit"]["objective"]), (True, "awareness"))
+        self.assertTrue(any(x["email"] == KAM for x in b["kams"]))
+        # selections: attachable lists the client's others, detach takes one out (the first one moves up)
+        s, b, _ = self.boss.get("/api/board/attachable?t=" + tok)
+        self.assertEqual(s, 200, b)
+        names = {x["name"] for x in b["selections"]}
+        self.assertNotIn("Rival list", names)
+        before = board.selection_ids(db.campaign(self.k_short))
+        first = db.selection(before[0])
+        self.assertEqual(self.lead.post("/api/board/detach", {"t": tok, "s": first["token"]})[0], 403)
+        s, b, _ = self.kam.post("/api/board/detach", {"t": tok, "s": first["token"]})
+        self.assertEqual(s, 200, b)
+        after = board.selection_ids(db.campaign(self.k_short))
+        self.assertEqual(after, before[1:])
+        self.assertEqual(db.campaign(self.k_short)["selection_id"], before[1] if len(before) > 1 else None)
+        # logo: images only
+        self.assertEqual(self.boss.post("/api/board/logo", {"t": tok, "data": "data:text/plain;base64,aGVsbG8="})[0], 400)
+        png = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+        s, b, _ = self.boss.post("/api/board/logo", {"t": tok, "data": png})
+        self.assertEqual(s, 200, b)
+        self.assertTrue(db.campaign_logos(db.campaign(self.k_short))[0].startswith("upload/"))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=1)

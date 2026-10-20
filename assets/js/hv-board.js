@@ -37,6 +37,9 @@
     unfold: '<path d="M9 6l6 6-6 6"/>',
     chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     list: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    brief: '<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h6"/>',
+    pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/>',
+    x: '<path d="M6 6l12 12M18 6L6 18"/>',
     grip: '<circle cx="9" cy="7" r="1.2"/><circle cx="15" cy="7" r="1.2"/><circle cx="9" cy="12" r="1.2"/><circle cx="15" cy="12" r="1.2"/><circle cx="9" cy="17" r="1.2"/><circle cx="15" cy="17" r="1.2"/>'
   };
 
@@ -121,6 +124,7 @@
       // Item 203: every campaign card opens its selection(s) and its dashboard.
       sels: (c.selections || []).map(function (s) { return { label: s.name, href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }; }),
       dash: c.report ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : "",
+      briefs: c.briefs || [], canEdit: !!c.can_edit, edit: c.edit || null,
       progress: p && p.planned ? { done: p.live || 0, of: p.planned } : null,
       links: (c.selections || []).map(function (s) {
         return { label: s.name, sub: s.creators + (s.creators === 1 ? " creator" : " creators"), href: ROOT + "selection/#s=" + encodeURIComponent(s.token) };
@@ -190,7 +194,7 @@
 
   function trackPill(t) { return h("span", { class: "hvb-track hvb-track--" + t.grade, title: "Against the campaign's goal, as the dashboard reads it" }, t.label); }
   // Item 203: "Open selection" (a short list when the campaign holds several) and "Open dashboard".
-  function goButtons(it) {
+  function goButtons(it, B) {
     var out = [];
     if (it.sels && it.sels.length === 1) {
       out.push(h("a", { class: "hvb-go", href: it.sels[0].href }, svg("list"), it.sels[0].button || "Selection",
@@ -205,7 +209,174 @@
       out.push(d);
     }
     if (it.dash) out.push(h("a", { class: "hvb-go hvb-go--dash", href: it.dash }, svg("chart"), "Dashboard", h("span", { class: "hvb-sr" }, ": " + it.name)));
+    // Item 204: the brief, anchored to the campaign card; item 197: every edit from the card.
+    if (B && it.briefs && it.briefs.length) {
+      var has = it.briefs.some(function (x) { return x.brief; });
+      var bb = h("button", { type: "button", class: "hvb-go" + (has ? "" : " is-missing"), title: has ? "Read or edit the brief" : "No brief yet" },
+        svg("brief"), "Brief", h("span", { class: "hvb-sr" }, ": " + it.name));
+      bb.addEventListener("click", function () { panel(it, B, "brief", bb); });
+      out.push(bb);
+    }
+    if (B && it.canEdit) {
+      var eb = h("button", { type: "button", class: "hvb-go hvb-go--edit", "aria-label": "Edit " + it.name, title: "Edit this campaign" }, svg("pen"), "Edit");
+      eb.addEventListener("click", function () { panel(it, B, "details", eb); });
+      out.push(eb);
+    }
     return out;
+  }
+
+  /* --------------------------------- the campaign panel: brief + edits (items 197, 204, 206) */
+  function call(method, path, body) {
+    return fetch(API_BASE + path, { method: method, credentials: "include", cache: "no-store",
+      headers: body ? { "Content-Type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (b) { return { s: r.status, b: b }; }); },
+            function () { return { s: 0, b: {} }; });
+  }
+  function ymd(ts) { if (!ts) return ""; var d = new Date(ts * 1000); return d.toISOString().slice(0, 10); }
+  var OBJ = [["balanced", "Balanced"], ["awareness", "Awareness"], ["engagement", "Engagement"], ["traffic", "Traffic"]];
+  var TGT = [["posts", "Posts"], ["views", "Views"], ["reach", "Reach"], ["engagement", "Engagement"], ["er", "Eng. rate %"], ["clicks", "Clicks"]];
+  function panel(it, B, focus, opener) {
+    var old = document.querySelector(".hvb-panel-back"); if (old) old.remove();
+    var c = it.raw, changed = false;
+    var back = h("div", { class: "hvb hvb-panel-back" });         // .hvb: the board's tokens and icon strokes
+    var box = h("aside", { class: "hvb-panel", role: "dialog", "aria-modal": "true", "aria-labelledby": "hvb-panel-t" });
+    var shut = h("button", { type: "button", class: "hvb-panel__x", "aria-label": "Close" }, svg("x"));
+    box.appendChild(h("header", { class: "hvb-panel__head" }, brand(it),
+      h("h2", { id: "hvb-panel-t", class: "hvb-panel__t" }, it.name), shut));
+    var bodyEl = h("div", { class: "hvb-panel__body" });
+    box.appendChild(bodyEl);
+    function note(sec, text, bad) {
+      var n = sec.querySelector(".hvb-panel__msg");
+      n.textContent = text || ""; n.className = "hvb-panel__msg" + (bad ? " is-bad" : "");
+    }
+    function section(key, title, kids) {
+      var sec = h("section", { class: "hvb-panel__sec", "data-sec": key }, h("h3", null, title));
+      add(sec, kids);
+      sec.appendChild(h("p", { class: "hvb-panel__msg", role: "status", "aria-live": "polite" }));
+      bodyEl.appendChild(sec);
+      return sec;
+    }
+    function save(sec, path, payload, okText) {
+      note(sec, "Saving…");
+      return call("POST", path, payload).then(function (r) {
+        var ok = r.b && r.b.ok;
+        note(sec, ok ? (okText || r.b.message || "Saved.") : ((r.b && r.b.message) || "Couldn't save that. Please try again."), !ok);
+        if (ok) changed = true;
+        return ok;
+      });
+    }
+    // Brief: the newest brief on each of the campaign's selections; Edit opens the brief studio (portal.js).
+    var bl = h("ul", { class: "hvb-panel__briefs" });
+    (it.briefs || []).forEach(function (x) {
+      var hv = window.hvPortal || {};
+      var act = hv.scoreBrief ? h("button", { type: "button", class: "hvb-go" }, svg(x.brief ? "pen" : "brief"), x.brief ? "Edit brief" : "Add brief") : null;
+      if (act) act.addEventListener("click", function () { close(); hv.scoreBrief(x.selection, { edit: !!x.brief }); });
+      bl.appendChild(h("li", null,
+        h("div", { class: "hvb-panel__bt" }, h("b", null, x.selection_name), x.brief && x.brief.objective ? h("span", { class: "hvb-chip" }, x.brief.objective) : null),
+        x.brief ? h("p", null, x.brief.summary || "A brief with no summary yet.") : h("p", { class: "is-muted" }, "No brief on this selection yet."),
+        h("div", { class: "hvb-panel__row" }, act, h("a", { class: "hvb-go", href: ROOT + "selection/#s=" + encodeURIComponent(x.selection) }, svg("list"), "Open selection"))));
+    });
+    section("brief", "Brief", (it.briefs || []).length ? bl : h("p", { class: "is-muted" }, "Add a selection to this campaign first; its brief shows here."));
+    if (it.canEdit) {
+      var f = {};
+      function field(label, input) { return h("label", { class: "hvb-field" }, h("span", null, label), input); }
+      f.name = h("input", { type: "text", value: it.name, maxlength: "120", required: true });
+      f.client = h("input", { type: "text", value: c.client || "", maxlength: "120" });
+      f.starts = h("input", { type: "date", value: ymd(c.starts_at) });
+      f.ends = h("input", { type: "date", value: ymd(c.ends_at) });
+      var dsave = h("button", { type: "button", class: "hvb-btn" }, "Save details");
+      var dsec = section("details", "Details", [field("Name", f.name), field("Client", f.client),
+        h("div", { class: "hvb-panel__two" }, field("First day", f.starts), field("Last day", f.ends)), dsave]);
+      dsave.addEventListener("click", function () {
+        save(dsec, "/api/board/edit", { t: c.token, name: f.name.value, client: f.client.value, starts: f.starts.value, ends: f.ends.value });
+      });
+      var ob = h("select", null, OBJ.map(function (o) { return h("option", { value: o[0], selected: (it.edit && it.edit.objective === o[0]) || null }, o[1]); }));
+      var tg = {};
+      var tgrid = h("div", { class: "hvb-panel__targets" }, TGT.map(function (t) {
+        tg[t[0]] = h("input", { type: "number", min: "0", step: t[0] === "er" ? "0.01" : "1", inputmode: "decimal",
+          value: it.edit && it.edit.targets && it.edit.targets[t[0]] != null ? String(it.edit.targets[t[0]]) : "", placeholder: "–" });
+        return field(t[1], tg[t[0]]);
+      }));
+      var gsave = h("button", { type: "button", class: "hvb-btn" }, "Save goal");
+      var gsec = section("goal", "Objective and targets", [field("Objective", ob), tgrid, gsave]);
+      gsave.addEventListener("click", function () {
+        var t = {}; Object.keys(tg).forEach(function (k) { t[k] = tg[k].value; });
+        save(gsec, "/api/board/edit", { t: c.token, objective: ob.value, targets: t });
+      });
+      if (B.opts.kams && B.opts.kams.length) {
+        var km = h("select", null, [h("option", { value: "" }, "No account manager")].concat(B.opts.kams.map(function (k) {
+          return h("option", { value: k.email, selected: (c.kam && c.kam.email === k.email) || null }, k.name);
+        })));
+        var ksave = h("button", { type: "button", class: "hvb-btn" }, "Save account manager");
+        var ksec = section("kam", "Account manager", [field("Account manager", km), ksave]);
+        ksave.addEventListener("click", function () { save(ksec, "/api/hub/kam", { kind: "campaign", ref: it.edit.id, kam: km.value }); });
+      }
+      var file = h("input", { type: "file", accept: "image/png,image/jpeg,image/webp" });
+      var lsec = section("logo", "Client logo", [h("div", { class: "hvb-panel__logo" }, brand(it)), field("Upload a new logo (PNG, JPG or WebP)", file)]);
+      file.addEventListener("change", function () {
+        var fl = file.files && file.files[0];
+        if (!fl) return;
+        if (fl.size > 700 * 1024) { note(lsec, "Use a logo under 700 KB.", true); return; }
+        var rd = new FileReader();
+        rd.onload = function () { save(lsec, "/api/board/logo", { t: c.token, data: rd.result }, "Logo saved. It shows on the card when you close this."); };
+        rd.readAsDataURL(fl);
+      });
+      // Selections: take one out, or add another of the client's.
+      var cur = h("ul", { class: "hvb-panel__sels" });
+      (c.selections || []).forEach(function (x) {
+        var rm = h("button", { type: "button", class: "hvb-link" }, "Remove");
+        var li = h("li", null, h("a", { href: ROOT + "selection/#s=" + encodeURIComponent(x.token) }, x.name), h("small", null, x.creators + " creators"), rm);
+        rm.addEventListener("click", function () {
+          rm.disabled = true;
+          save(ssec, "/api/board/detach", { t: c.token, s: x.token }).then(function (ok) { if (ok) li.remove(); else rm.disabled = false; });
+        });
+        cur.appendChild(li);
+      });
+      var pick = h("select", { "aria-label": "A selection to add" }, h("option", { value: "" }, "Loading the client's selections…"));
+      var addB = h("button", { type: "button", class: "hvb-btn" }, "Add to campaign");
+      var ssec = section("sels", "Selections", [cur, h("div", { class: "hvb-panel__row" }, pick, addB)]);
+      call("GET", "/api/board/attachable?t=" + encodeURIComponent(c.token)).then(function (r) {
+        var list = (r.b && r.b.selections) || [];
+        pick.textContent = "";
+        pick.appendChild(h("option", { value: "" }, list.length ? "Pick a selection" : "No other selections for this client"));
+        list.forEach(function (x) { pick.appendChild(h("option", { value: x.token }, x.name + " · " + x.creators + " creators")); });
+      });
+      addB.addEventListener("click", function () {
+        if (!pick.value) { note(ssec, "Pick a selection first.", true); return; }
+        var label = pick.options[pick.selectedIndex].textContent.split(" · ")[0];
+        save(ssec, "/api/board/attach", { s: pick.value, t: c.token }).then(function (ok) {
+          if (ok) { cur.appendChild(h("li", null, h("span", null, label), h("small", null, "added"))); pick.remove(pick.selectedIndex); }
+        });
+      });
+    }
+    back.appendChild(box);
+    function close() {
+      document.removeEventListener("keydown", key, true);
+      back.remove();
+      document.body.classList.remove("hvb-panel-open");
+      if (changed && B.opts.onChange) B.opts.onChange();
+      else if (opener && document.contains(opener)) opener.focus();
+    }
+    function key(e) {
+      if (e.key === "Escape") { e.preventDefault(); close(); return; }
+      if (e.key !== "Tab") return;
+      var f = box.querySelectorAll("button, a[href], input, select, textarea");
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+    shut.addEventListener("click", close);
+    back.addEventListener("click", function (e) { if (e.target === back) close(); });
+    document.addEventListener("keydown", key, true);
+    document.body.classList.add("hvb-panel-open");
+    document.body.appendChild(back);
+    var target = bodyEl.querySelector('[data-sec="' + focus + '"]') || bodyEl.firstChild;
+    requestAnimationFrame(function () {
+      target.scrollIntoView({ block: "start" });
+      var first = target.querySelector("input, select, button, a[href]");
+      (first || shut).focus({ preventScroll: true });
+    });
   }
 
   function card(it, B) {
@@ -275,7 +446,7 @@
     var x = B.opts.extra ? B.opts.extra(it) : null;
     if (x) acts.appendChild(x);
     if (acts.childNodes.length) put(acts);
-    var go = goButtons(it);
+    var go = goButtons(it, B);
     if (go.length) el.appendChild(h("div", { class: "hvb-card__go" }, go));
     if (can && B.drag) el.setAttribute("draggable", "true");
     return el;
@@ -482,7 +653,7 @@
             return it.track ? trackPill(it.track) : "–"; } }]);
       else c.push({ k: "camps", t: "Campaigns", v: function (it) { return it.links.length; }, cell: function (it) {
             return it.links.length ? it.links.map(function (l) { return l.label; }).join(", ") : "–"; } });
-      c.push({ k: "go", t: "", cell: function (it) { return h("span", { class: "hvb-card__go" }, goButtons(it)); } });
+      c.push({ k: "go", t: "", cell: function (it) { return h("span", { class: "hvb-card__go" }, goButtons(it, B)); } });
       return c;
     }
     function num(it, k) { var c = (it.raw && it.raw.counts) || {}; return c[k] || 0; }

@@ -310,6 +310,15 @@ class PortalMixin(connect_api.ConnectMixin):
                     else:
                         self.send_json(200, dict(got, ok=True, role=role), self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/board/attachable":
+            # Item 206: the client's other selections that could join this campaign (admins, KAMs).
+            import board
+            k, role = board.campaign_for(self, token=str(query.get("t") or "") or None)
+            if k is None:
+                self.send_json(401 if role is None else 404, {"ok": False}, self.cors())
+            else:
+                self.send_json(200, {"ok": True, "selections": board.attachable(self, k)}, self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path in ("/api/board", "/api/board/targets"):
             # The campaign board (item 174/176): admins every campaign, a KAM hers, a client their own (read-only).
             import board
@@ -533,6 +542,8 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/board/pin": self.api_board_pin, "/api/board/attach": self.api_board_attach,
             "/api/board/selection-stage": self.api_board_selection_stage,
             "/api/analysis/decide": self.api_analysis_decide,
+            "/api/board/edit": self.api_board_edit, "/api/board/logo": self.api_board_logo,
+            "/api/board/detach": self.api_board_detach,
         }
         fn = routes.get(path)
         if not fn:
@@ -1037,6 +1048,46 @@ class PortalMixin(connect_api.ConnectMixin):
         ok, msg, extra = board.move(self, k, str(b.get("to") or ""))
         if ok:
             extra["stage"] = board.stage_of(db.campaign(k["id"]))
+        self._board_done(ok, msg, extra)
+
+    def api_board_edit(self):
+        """{t, name?, client?, starts?, ends?, objective?, targets?}: edit a campaign from its card (admins, KAMs)."""
+        import board
+        b = self.json_body() or {}
+        k = self._board_campaign(b)
+        if k is None:
+            return
+        ok, msg, extra = board.edit(self, k, b)
+        self._board_done(ok, msg, extra)
+
+    def api_board_logo(self):
+        """{t, data: "data:image/...;base64,..."}: a new client logo for the campaign."""
+        import base64
+        import board
+        b = self.json_body() or {}
+        k = self._board_campaign(b)
+        if k is None:
+            return
+        raw = str(b.get("data") or "")
+        try:
+            data = base64.b64decode(raw.split(",", 1)[1] if raw.startswith("data:") else raw, validate=False)
+        except (ValueError, IndexError):
+            data = b""
+        ok, msg, extra = board.set_logo(self, k, data, self._srv().LOGO_DIR)
+        self._board_done(ok, msg, extra)
+
+    def api_board_detach(self):
+        """{t, s}: take a selection out of a campaign."""
+        import board
+        b = self.json_body() or {}
+        k = self._board_campaign(b)
+        if k is None:
+            return
+        sel = db.selection(token=str(b.get("s") or "")) if b.get("s") else None
+        if sel is None:
+            self.send_json(404, {"ok": False, "message": "That selection is not here any more."}, self.cors())
+            return
+        ok, msg, extra = board.detach(self, k, sel)
         self._board_done(ok, msg, extra)
 
     def api_analysis_decide(self):
