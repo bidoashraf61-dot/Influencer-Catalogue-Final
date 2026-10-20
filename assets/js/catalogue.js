@@ -14,6 +14,9 @@
   var PAGE = document.body.getAttribute("data-page") || "catalogue";
   var selected = [];
   var selectionName = "";
+  // The name as this page last loaded it from the server or a link (item 173). Saves send it, and the
+  // server keeps the current name when ours is unchanged, so a stale tab never undoes a rename.
+  var loadedName = null;
   var ROSTER = null;
 
   // A selection travels entirely in the URL fragment — #n=<name>&c=<codes>.
@@ -62,7 +65,8 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ name: name, codes: codes, token: token || "" })
+      body: JSON.stringify(token && loadedName !== null ? { name: name, codes: codes, token: token, loaded_name: loadedName }
+                                                         : { name: name, codes: codes, token: token || "" })
     })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (b) {
@@ -1758,6 +1762,7 @@
         renderTray();
       });
       selectionName = name || "";
+      loadedName = selectionName;
       CARRIED_TOKEN = token || "";
       selected.forEach(function (c) {
         var card = byCode(c);
@@ -1786,6 +1791,7 @@
       }
       selected = (kept.sel || []).slice();
       selectionName = kept.name || "";
+      loadedName = selectionName;
       CARRIED_TOKEN = kept.tok || "";
       var nf = $("cat-save-form") && $("cat-save-form").querySelector("[name=selname]");
       if (nf && selectionName) nf.value = selectionName;
@@ -2232,6 +2238,7 @@
                         platform: b.platform || "",
                         status: b.status || {}, statusCounts: b.status_counts || null, role: b.role || "viewer",
                         owner: b.owner || "", kam: b.kam || "", credits: b.credits, lifecycle: b.lifecycle || null,
+                        canRename: !!b.can_rename,   // item 173: owner, its KAM, HelloVoice
                         // 0 while AI is free (active campaign); null only on an old server.
                         replaceCost: b.replace_cost != null ? b.replace_cost : 2, moreCost: b.more_cost != null ? b.more_cost : 3,
                         alikeCost: b.alike_cost != null ? b.alike_cost : 2, aiFree: b.ai_free || null,
@@ -2266,6 +2273,7 @@
 
     var frag = readFragment();
     selectionName = frag.name || (CURATED && CURATED.name) || "Selection";
+    loadedName = selectionName;
     // A link is now usually just a token, and the creators come back from the
     // service with it. The fragment still wins when it lists them: that is a
     // client who went back to the catalogue and added someone, and their list
@@ -3388,6 +3396,14 @@
         if (n) { render(); saveShortlist(); }
         return n;
       },
+      // Item 173: the server renamed it (connect.js's inline editor); the page, the tab title and the link follow.
+      rename: function (name) {
+        if (!name) return;
+        selectionName = name; loadedName = name;
+        if (CURATED) CURATED.name = name;
+        history.replaceState(null, "", buildFragment(selectionName, selected));
+        render();
+      },
       toast: function (t) { stToast(t); },
       rerender: function () { render(); },
       // After the objective studio: the selection's scores, objective and statuses again, then
@@ -3752,7 +3768,7 @@
       // Moving between a prepared selection and any other link changes where
       // the prices come from; start the page over rather than patch the cards.
       if ((f.token || "") !== (CURATED ? CURATED.token : "")) { location.reload(); return; }
-      selectionName = f.name || "Selection";
+      selectionName = f.name || "Selection"; loadedName = selectionName;
       selected = f.codes.filter(function (c) { return !!byCode[c]; });
       render();
     });

@@ -1325,6 +1325,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_reason()
         if path == "/api/selection/replace":
             return self.api_selection_replace()
+        if path == "/api/selection/rename":
+            return self.api_selection_rename()
         if path == "/api/selection":
             return self.api_selection_save()
         if path == "/api/creator/request":
@@ -1399,6 +1401,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect(back + "&ok=" + urllib.parse.quote(
                 "%s can now open this campaign and its selection." % f.get("email").strip() if state == "granted"
                 else "Invited. It opens for %s when they sign in with that email." % f.get("email").strip()))
+        if path == "/selections/rename":
+            return self.post_selection_rename(who)
         if path == "/selections/invite":
             import access
             f = self.form_body()
@@ -1650,6 +1654,36 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                     headers, extra = list(headers or []) + extra, []
                 self.send(code, body, ctype, headers)
         return out
+
+    def post_selection_rename(self, who):
+        """Rename a selection from the admin (portal item 173): the selections list, the Clients hub and
+        the selection's own page. Inline edits post with ``X-HV-Rename: 1`` and get JSON back; a plain
+        form gets a redirect to ``back``. A key account manager reaches here only for her own clients
+        (kam_scope._POST_SELECTION); History records the change, so it can be undone."""
+        import selrename
+        f = self.form_body()
+        js = self.headers.get("X-HV-Rename") == "1"
+        sid = (f.get("id") or "").strip()
+        sel = db.selection(int(sid)) if sid.isdigit() else None
+        back = f.get("back") or ""
+        if not back.startswith("/") or back.startswith("//"):
+            back = "/selections"
+        err = None
+        if sel is None:
+            err = "missing"
+        elif sel["code_id"] is not None and not self.admin_like_for(sel["code_id"], sel["id"]):
+            err = "forbidden"
+        if err is None:
+            row, err = selrename.apply(sel, f.get("name"), allow_deleted=True)
+        if js:
+            if err:
+                return self.send_json(403 if err == "forbidden" else 404 if err == "missing" else 400,
+                                      {"ok": False, "reason": err, "message": selrename.MESSAGES[err]})
+            return self.send_json(200, {"ok": True, "id": row["id"], "name": row["name"]})
+        sep = "&" if "?" in back else "?"
+        if err:
+            return self.redirect(back + sep + "e=" + urllib.parse.quote(selrename.MESSAGES[err]))
+        return self.redirect(back + sep + "ok=" + urllib.parse.quote("Renamed to %s." % row["name"]))
 
     def post_campaign_status(self):
         """Go live / take offline from the campaigns list."""
@@ -5763,6 +5797,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if open_ is not None:
             out["scores"] = {k: (v if k in open_ else gating.redact_score(v)) for k, v in out["scores"].items()}
         out.update(self.selection_status_payload(sel, codes, reader, by))
+        import selrename        # item 173: who may rename (owner, KAM, HelloVoice; never a colleague or an invitee)
+        out["can_rename"] = bool(sel["token"]) and selrename.client_may(reader, sel, db.admin_code_id())
         return self.send_json(200, out, self.cors())
 
     def selection_role(self, sel, reader):
@@ -6354,6 +6390,33 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         everyone = db.set_client_tags(sel["id"], code, mine)
         return self.send_json(200, {"ok": True, "tags": mine, "client_tags": everyone}, self.cors())
 
+    def api_selection_rename(self):
+        """POST {token, name} (portal item 173): rename from the selection page or /account/.
+        Owner, HelloVoice and the client's key account manager only (selrename.client_may)."""
+        import selrename
+        b = self.json_body()
+        token = str(b.get("token") or "").strip()[:80]
+        if self._throttled("selren:%s" % self.client_ip(), 60, 3600):
+            return
+        sel = db.selection(token=token) if token else None
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "missing", "message": selrename.MESSAGES["missing"]}, self.cors())
+        viewer = self.selection_viewer(token)
+        admin_id = db.admin_code_id()
+        if not selrename.client_may(viewer, sel, admin_id):
+            return self.send_json(403 if viewer else 401, {"ok": False, "reason": "forbidden",
+                                                           "message": selrename.MESSAGES["forbidden"]}, self.cors())
+        if viewer is not None and int(viewer) == int(admin_id):
+            a = self.admin()
+            who = (a["email"] if a is not None and "email" in a.keys() else None) or "HelloVoice"
+        else:
+            u = portal.user_for_code(int(viewer))
+            who = "client: " + ((u["email"] if u is not None else None) or "code %s" % viewer)
+        row, err = selrename.apply(sel, b.get("name"), who)
+        if err:
+            return self.send_json(400, {"ok": False, "reason": err, "message": selrename.MESSAGES[err]}, self.cors())
+        return self.send_json(200, {"ok": True, "token": row["token"], "name": row["name"]}, self.cors())
+
     def api_selection_save(self):
         """A client naming a shortlist. It is recorded here so it appears in
         the dashboard by itself, ready to be priced, instead of an admin having
@@ -6384,6 +6447,18 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "token": db.selection(sid)["token"]},
                                   self.cors())
 
+        # Item 173: the name. A page sends the name it loaded (loaded_name); unchanged there means "keep
+        # whatever it is now", so a stale tab never writes an old name back over a rename made elsewhere.
+        # A real change goes through the rename rule (1-80 characters, History); an invalid one is ignored.
+        import selrename
+        loaded = b.get("loaded_name")
+        if loaded is not None and name == (str(loaded).strip()[:120] or "Selection"):
+            name = sel["name"]
+        elif name != sel["name"]:
+            u_ = portal.user_for_code(int(viewer)) if int(viewer) != db.admin_code_id() else None
+            row, err = selrename.apply(sel, name, ("client: " + u_["email"]) if u_ is not None else None)
+            name = sel["name"] if err else row["name"]
+            sel = row if row is not None else sel
         prices = {k: v for k, v in json.loads(sel["prices"] or "{}").items() if k in codes}
         stored = json.loads(sel["codes"] or "[]")
         same = sorted(stored) == sorted(codes)

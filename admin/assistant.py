@@ -1413,17 +1413,24 @@ def x_sel_remove(a, ctx):
 
 
 def d_sel_rename(a, ctx):
-    sel = _open_sel(ctx); name = " ".join(str(a.get("name") or "").split())[:120]
-    if not name:
-        raise ValueError("Give the new name.")
+    import selrename                     # item 173: one name rule for every door
+    sel = _open_sel(ctx); name, err = selrename.clean(a.get("name"))
+    if err:
+        raise ValueError(selrename.MESSAGES[err])
     a["name"] = name
     return "Rename “%s” to “%s”" % (sel["name"], name)
 
 
 def x_sel_rename(a, ctx):
-    sel = _open_sel(ctx); _own(sel, ctx["code_id"])
-    _save_codes(sel, json.loads(sel["codes"] or "[]"), a["name"])
-    return {"ok": True, "message": "Renamed to “%s”." % a["name"], "reload": True}
+    import selrename
+    sel = _open_sel(ctx)
+    if not selrename.client_may(ctx["code_id"], sel, db.admin_code_id()):
+        raise ValueError(selrename.MESSAGES["forbidden"])
+    u = portal.user_for_code(ctx["code_id"])
+    row, err = selrename.apply(sel, a["name"], "client: " + ((u["email"] if u is not None else None) or "Helvi"))
+    if err:
+        raise ValueError(selrename.MESSAGES[err])
+    return {"ok": True, "message": "Renamed to “%s”." % row["name"], "reload": True}
 
 
 def d_sel_tag(a, ctx):

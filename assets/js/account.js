@@ -455,8 +455,15 @@
       // Delete only on the client's own selections: never a colleague's or one HelloVoice shared.
       var del = s.can_delete ? delBtn("Delete " + s.name, function () { deleteSelection(s, this); })
         : (s.admin_delete ? delBtn("Delete " + s.name, function () { adminDeleteSelection(s, this); }) : null);
+      // Rename in place (item 173): the owner only; connect.js draws the control and the field.
+      var nm = h("span", { class: "hc-row__name" }, s.name);
+      var ren = s.can_rename && HV().renameButton ? HV().renameButton({ shown: nm, token: s.token, size: "row", label: s.name,
+        name: function () { return s.name; },
+        done: function (n) { s.name = n; DATA.briefs.forEach(function (b) { if (b.selection === s.token) b.selection_name = n; }); nm.textContent = n;
+          var sr = nm.closest(".hc-row") && nm.closest(".hc-row").querySelector(".hc-row__link .hc-sr"); if (sr) sr.textContent = " " + n; } }) : null;
+      if (ren || del) del = h("span", { class: "hc-row__tools" }, ren, del);
       list.appendChild(h("li", null, actRow(ROOT + "selection/#s=" + encodeURIComponent(s.token),
-        h("div", null, h("span", { class: "hc-row__name" }, s.name), " ", qchip(s.quote),
+        h("div", null, nm, " ", qchip(s.quote),
           h("div", { class: "hc-row__meta" },
             h("span", null, plural(c.creators, "creator") + (c.doctors ? " · " + plural(c.doctors, "doctor") : "")),
             statusSigs(c), h("span", null, (s.owner ? s.owner + "'s · " : "") + "updated " + ago(s.updated_at)))),
