@@ -635,3 +635,21 @@ div.hvb-q__head { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); cursor
 .hvb-lane__head { column-gap: 8px; }
 .hvb-stico--head { width: 28px; height: 28px; }
 @media (min-width: 900px) { .hvb-lane__head h2 { font-size: 24px; } .hvb-lane__n { font-size: 24px; } }
+
+/* Item 221 (owner 2026-10-21): Group by client names every stage. Each cell carries its stage's mark and name;
+   the summary in a client's row is the marks with counts (empty stages faint), each with a tooltip and screen-reader text. */
+.hvb .hvb-cell__k { display: flex; align-items: center; gap: 7px; min-height: 22px; padding: 0 2px; font-size: 11px; font-weight: 700;
+  letter-spacing: .08em; text-transform: uppercase; color: var(--ink); }
+.hvb-cell__k b { margin-left: auto; font: 400 16px/1 var(--heading); letter-spacing: .02em; color: var(--gray); }
+.hvb-cell.is-empty .hvb-cell__k { color: var(--gray); }
+.hvb-cell.is-empty .hvb-cell__k .hvb-stico { opacity: .5; }
+.hvb-band__dots { gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.hvb-band__dot { display: inline-flex; align-items: center; gap: 4px; min-width: 0; height: auto; padding: 2px 8px 2px 2px; border-radius: var(--r-pill);
+  background: var(--hvb-lane); color: var(--ink); opacity: 1; font: 400 15px/1 var(--heading); letter-spacing: .02em; }
+.hvb-band__dot.is-on { background: var(--hvb-lane); color: var(--ink); box-shadow: inset 0 0 0 1px var(--hvb-strip); }
+.hvb-band__dot:not(.is-on) { padding-right: 2px; background: transparent; }
+.hvb-band__dot:not(.is-on) .hvb-stico { opacity: .35; }
+.hvb-band__dot.hvb-lane--approved.is-on { color: var(--ink); }
+@media (max-width: 899px) { .hvb-band__dots { display: inline-flex; } .hvb-band__dot:not(.is-on) { display: none; } .hvb-cell.is-empty { display: none; } }
+.hvb-band__dots { margin-left: 6px; justify-content: flex-start; }
+.hvb-band__head { flex-wrap: wrap; row-gap: 8px; text-align: left; }

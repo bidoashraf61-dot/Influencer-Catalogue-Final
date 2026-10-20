@@ -1013,16 +1013,19 @@
           svg("chev"), brand({ client: c.name, name: c.name, logos: first.logos || [] }),
           h("b", { class: "hvb-band__name" }, c.name),
           h("span", { class: "hvb-band__n" }, c.items.length + " " + noun + (c.items.length === 1 ? "" : "s")),
-          h("span", { class: "hvb-band__dots", "aria-hidden": "true" }, opts.stages.map(function (s) {
+          // Item 221: each stage named, never colour alone: its mark, the count, a tooltip and screen-reader text.
+          h("span", { class: "hvb-band__dots" }, opts.stages.map(function (s) {
             var n = c.items.filter(function (x) { return x.stage === s.key; }).length;
-            return h("i", { class: "hvb-band__dot hvb-lane--" + s.key + (n ? " is-on" : ""), title: s.label + ": " + n }, n ? String(n) : "");
+            return h("span", { class: "hvb-band__dot hvb-lane--" + s.key + (n ? " is-on" : ""), title: s.label + ": " + n },
+              stageIcon(s.key, "hvb-stico--mini"), n ? h("b", { "aria-hidden": "true" }, String(n)) : null,
+              h("span", { class: "hvb-sr" }, ", " + s.label + " " + n));
           })));
         var row = h("div", { class: "hvb-band__row" });
         opts.stages.forEach(function (s) {
           var mine = c.items.filter(function (x) { return x.stage === s.key; });
           var cell = h("div", { class: "hvb-cell hvb-lane--" + s.key + (mine.length ? "" : " is-empty") + (FOLD[s.key] && (byStage[s.key] || []).length ? " is-folded" : ""),
                                 "data-drop": s.key, "data-stage": s.key },
-            h("span", { class: "hvb-cell__k" }, stageIcon(s.key, "hvb-stico--mini"), s.label));
+            h("span", { class: "hvb-cell__k" }, stageIcon(s.key, "hvb-stico--mini"), s.label, mine.length ? h("b", null, String(mine.length)) : null));
           mine.forEach(function (it) { cell.appendChild(card(it, B)); });
           if (FOLD[s.key] && mine.length) cell.appendChild(h("span", { class: "hvb-cell__n" }, String(mine.length)));
           row.appendChild(cell);
