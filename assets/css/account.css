@@ -376,6 +376,26 @@ button.hc-step:hover { background: var(--stone); }
   background: var(--hv-credit); color: var(--hv-credit-text); padding: 8px 16px 2px; border-radius: 18px; box-shadow: var(--hv-credit-ring); }
 .hc-invite .hc-btn--ink:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
 
+/* How HELVi works (item 179): an ink screening band with the film's poster and one way in. */
+.hc-how { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 20px 32px; align-items: center;
+  background: var(--ink); color: var(--white); border-radius: var(--r-md); padding: 18px 28px 18px 18px; }
+.hc-how__film { position: relative; display: block; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #262626; }
+.hc-how__film img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .5s cubic-bezier(.2,.8,.2,1); }
+.hc-how__play { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--lime); color: var(--ink); box-shadow: 0 10px 26px rgba(0,0,0,.35); transition: transform .25s ease; }
+.hc-how__play svg { width: 24px; height: 24px; margin-left: 3px; }
+.hc-how:hover .hc-how__film img { transform: scale(1.03); }
+.hc-how:hover .hc-how__play { transform: scale(1.06); }
+.hc-how .hc-h2 { color: var(--white); }
+.hc-how p { margin: 6px 0 16px; font-size: 14.5px; line-height: 1.55; color: rgba(255,255,255,.8); max-width: 56ch; }
+.hc-how .hc-btn:hover { background: var(--white); color: var(--ink); border-color: var(--white); }
+.hc-how .hc-btn:focus-visible { outline-color: var(--lime); }
+@media screen and (max-width: 767px) {
+  .hc-how { grid-template-columns: 1fr; padding: 14px 14px 20px; }
+  .hc-how__txt { padding: 0 6px; }
+}
+@media (prefers-reduced-motion: reduce) { .hc-how__film img, .hc-how__play { transition: none; } }
+
 /* ------------------------------------------------------ Selections, lists */
 .hc-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
 .hc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 20px; align-items: center; padding: 18px 20px; border-radius: var(--r-md);

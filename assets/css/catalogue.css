@@ -1632,6 +1632,19 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
   min-height: 52px; transition: background .2s ease, color .2s ease;
 }
 .cat-cover__cta.cat-cover__cue:hover { background: var(--white); color: var(--ink); }
+/* Beside it, the quieter way in (portal item 179): a ghost pill on the film, a lime play disc. */
+.cat-cover__acts { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 14px; margin-top: 20px; }
+.cat-cover__acts .cat-cover__cta.cat-cover__cue { margin-top: 0; }
+.cat-cover__watch {
+  display: inline-flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 24px 0 12px; border-radius: var(--r-pill);
+  border: 1px solid rgba(255,255,255,.4); background: rgba(18,18,18,.28); color: var(--white); text-decoration: none;
+  font-family: var(--heading); font-size: 20px; letter-spacing: .07em; line-height: 1;
+  transition: border-color .2s ease, color .2s ease, background .2s ease;
+}
+.cat-cover__watch-i { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--lime); color: var(--ink); }
+.cat-cover__watch-i svg { margin-left: 2px; }
+.cat-cover__watch:hover { border-color: var(--lime); color: var(--lime); background: rgba(18,18,18,.5); }
+.cat-cover__watch:focus-visible { outline: 3px solid var(--lime); outline-offset: 4px; }
 
 /* The journey along the foot of the cover: five steps from browsing to
    tracking, joined by one hairline. The first is lit in lime as where the
@@ -1778,7 +1791,7 @@ ul.cat-places__cities li { background: rgba(255,255,255,.55); border-radius: var
   .cat-hero--cover .cat-hero__lead { font-size: 16px; line-height: 1.6; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .cat-cover__cue svg { transition: none; }
+  .cat-cover__cue svg, .cat-cover__watch { transition: none; }
 }
 
 

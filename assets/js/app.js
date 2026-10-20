@@ -38,10 +38,10 @@
   function put(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage off */ } }
   function sget(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
   function sput(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* storage off */ } }
-  // Another layer is open (the tour, Helvi's next-step bubble, a dialog): wait for it to close.
+  // Another layer is open (Helvi's next-step bubble, the "Watch how it works" card, a dialog): wait for it to close.
   function busy() {
-    var q = ":popover-open, dialog[open], .tv, .cx-offer, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal";
-    try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .tv, .cx-offer, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal"); }
+    var q = ":popover-open, dialog[open], .cx-hiw, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal";
+    try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .cx-hiw, .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal"); }
   }
   function whenFree(fn, tries) {
     tries = tries == null ? 20 : tries;
@@ -477,13 +477,6 @@
     items.forEach(function (a) { menu.insertBefore(a, before); });
   }
 
-  // The tour's finish card ends with the same QR (desktop, account holders).
-  function tourBlock() {
-    if (PLATFORM !== "desktop" || !(ME && ME.user)) return null;
-    return el("div", { class: "hca-tour" }, [qrBox(112), el("div", null, [el("b", null, "Take it with you"),
-      el("span", null, "Scan with your phone's camera to save HELVi as an icon on your Home Screen, then turn on alerts.")])]);
-  }
-
   // ----------------------------------------------------- new app version --
   // The update push opens the app with ?update=1; a release that lands while the app is open
   // shows a bar. Either way the worker and the page reload onto the new files.
@@ -570,7 +563,7 @@
     // The bell elsewhere on the page marks things read: follow it.
     document.addEventListener("click", function (e) { if (e.target.closest && e.target.closest(".hv-bell, .hv-note, .pt-bell")) setTimeout(pollUnread, 1200); });
   }
-  window.HCApp = { enable: enable, perm: perm, standalone: STANDALONE, platform: PLATFORM, tourBlock: function () { return tourBlock(); },
+  window.HCApp = { enable: enable, perm: perm, standalone: STANDALONE, platform: PLATFORM,
     phone: function () { showPhoneModal(false); }, guide: function () { openGuide(false); } };
   var hv = window.hvPortal;
   if (hv && hv.me) boot(hv.me);

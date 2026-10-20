@@ -52,7 +52,7 @@ cp "$SRC/dist/index.html"           "$DST/index.html"
 cp "$SRC/dist/selection/index.html" "$DST/selection/index.html"
 # The campaign report is hand-written in the repo, not built.
 # The campaign report and the creator passport are hand-written, not built.
-mkdir -p "$DST/campaign/dashboard" "$DST/creator" "$DST/account" "$DST/privacy" "$DST/terms"
+mkdir -p "$DST/campaign/dashboard" "$DST/creator" "$DST/account" "$DST/privacy" "$DST/terms" "$DST/welcome"
 cp "$SRC/campaign/index.html"       "$DST/campaign/index.html"
 cp "$SRC/campaign/dashboard/index.html" "$DST/campaign/dashboard/index.html"
 cp "$SRC/creator/index.html"        "$DST/creator/index.html"
@@ -64,6 +64,9 @@ cp "$SRC/account/index.html"        "$DST/account/index.html"
 # HELVi Connect privacy notice and terms (drafts pending legal review), hand-written.
 cp "$SRC/privacy/index.html"        "$DST/privacy/index.html"
 cp "$SRC/terms/index.html"          "$DST/terms/index.html"
+# "How HELVi works" (item 179): the onboarding film page, hand-written. The film itself is
+# assets/welcome/onboarding.mp4 (rsynced with the other assets above).
+cp "$SRC/welcome/index.html"        "$DST/welcome/index.html"
 # HELVi Connect app (item 168): the service worker, manifest and offline page live at the site root.
 cp "$SRC/sw.js"                     "$DST/sw.js"
 cp "$SRC/manifest.webmanifest"      "$DST/manifest.webmanifest"

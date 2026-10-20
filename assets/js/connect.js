@@ -1,9 +1,5 @@
 /* HELVi Connect, phases C + D (approved mockups .impeccable/mockups/portal-v3-cd/).
  *
- *  - The onboarding tour's opener ("Take the 3-minute tour?", four chapters), offered
- *    once after the first sign-in and replayable from Help and the profile. The tour
- *    itself (tour.js / tour.css, loaded on start) plays the real pages on demo data;
- *    finishing pays +5 credits once (server-enforced).
  *  - The ROI Calculator (v4, structure vs performance): a drawer inside a selection (its
  *    creators' own numbers), a page in the profile (a mix of sizes), a compact card in
  *    Helvi's chat, the "Download PDF" and estimate vs actual on the campaign report. A
@@ -19,7 +15,7 @@
 (function () {
   "use strict";
   // Pages name this file AND portal.js adds it when it runs first: run once, or every
-  // listener here (the look-alike and ideas sheets, the tour) would fire twice.
+  // listener here (the look-alike and ideas sheets) would fire twice.
   if (window.__hvConnect) return;
   window.__hvConnect = true;
   var HV = window.hvPortal = window.hvPortal || {};
@@ -1163,86 +1159,61 @@
       });
     }
 
-    /* ================================================================ TOUR */
-    // Tour v3 lives in tour.js + tour.css, fetched only when the client starts it (the demo
-    // photos and the invented roster load with the demo pages). Here: the opener card and the loader.
-    var TOUR_JS = "assets/js/tour.js?v=6a87b52e", TOUR_CSS = "assets/css/tour.css?v=de5abd66";
-    var tourLoad = null;
-    function loadTour() {
-      if (window.hvTour) return Promise.resolve(window.hvTour);
-      if (tourLoad) return tourLoad;
-      tourLoad = new Promise(function (ok, no) {
-        var left = 2, fail = function () { tourLoad = null; no(); };
-        var one = function () { if (--left === 0) ok(window.hvTour); };
-        var l = document.createElement("link"); l.rel = "stylesheet"; l.href = ROOT + TOUR_CSS; l.onload = one; l.onerror = one;
-        var sc = document.createElement("script"); sc.src = ROOT + TOUR_JS; sc.onload = one; sc.onerror = fail;
-        document.head.appendChild(l); document.head.appendChild(sc);
-      });
-      return tourLoad;
+    /* ======================================================= HOW HELVi WORKS (item 179) */
+    // One card, once per account, after the first sign-in: "Watch how it works" -> /welcome/.
+    // The server keeps the flag (users.tour, reused from the old tour: "offered" once shown,
+    // "later" once dismissed), so it never comes back on another device. It waits for the app's
+    // own setup prompts (the desktop QR welcome, the phone's Home Screen guide, the alerts card)
+    // and any other dialog to close first, and never sits on top of one.
+    var HIW_POSTER = "assets/welcome/onboarding-poster.jpg";
+    function hiwBusy() {
+      var q = ":popover-open, dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal, .hc-dlg-back, .ai-sl.ob";
+      try { return !!document.querySelector(q); } catch (e) { return !!document.querySelector("dialog[open], .cx-dr, .cx-sheet, .pt-scrim, .hca-sheet, .hca-bar, .hca-card, .hca-modal, .hc-dlg-back"); }
     }
-    // HV.tour() from Help, the profile and the opener; a chapter number jumps straight to it.
-    HV.tour = function (chapter) {
-      loadTour().then(function (t) { if (t) t.start(typeof chapter === "number" ? chapter : null); })
-        .catch(function () { toast("The tour didn't load. Please try again."); });
-    };
-    // One client's first campaign, from brief to results: the opener lists the seven chapters (jump to any).
-    var CHAPTERS = [["chat", "Brief", "Tell Helvi the goals and countries"],
-                    ["list", "Shortlist", "Scored picks, and how much data stands behind them"],
-                    ["shield", "Check a creator", "What is open, what is locked, a sample analysis"],
-                    ["calc", "Plan", "The ROI calculator: structure, quality, the gap"],
-                    ["sparkle", "Ask Helvi", "Explain a score, compare, hand off to a person"],
-                    ["mail", "Quote", "Request it, approve it, go live"],
-                    ["chart", "Follow", "The verdict, estimate vs actual, your profile"]];
-
-    function offerTour() {
+    function hiwWanted() {
       var m = me();
-      var shown = false;
-      try { shown = sessionStorage.getItem("cx-offer-shown") === "1"; } catch (e) { shown = false; }
-      if (!m || m.kind !== "user" || m.tour || document.getElementById("cx-offer") || shown) return;
-      if (PAGE !== "catalogue" && PAGE !== "account") return;
-      try { sessionStorage.setItem("cx-offer-shown", "1"); } catch (e) { /* blocked */ }
+      return !!(m && m.kind === "user" && m.user && !m.tour && !m.as_client && !m.preview &&
+                (PAGE === "catalogue" || PAGE === "account") && !document.getElementById("cx-hiw"));
+    }
+    // The app decides its setup prompt about 3 s after load; start looking after that, then show only
+    // once the page has been free of dialogs for two checks in a row.
+    function offerWelcome(tries, calm) {
+      if (!hiwWanted()) return;
+      tries = tries || 0; calm = calm || 0;
+      if (document.documentElement.classList.contains("hv-loading") || hiwBusy()) calm = 0; else calm += 1;
+      if (calm < 2) { if (tries < 150) setTimeout(function () { offerWelcome(tries + 1, calm); }, 1500); return; }
+      showWelcomeCard();
+    }
+    function showWelcomeCard() {
+      var m = me();
+      m.tour = "offered";                                    // this page will not offer it twice either
       api("POST", "/api/tour", { action: "offered" });
+      var href = ROOT + "welcome/";
       var first = m.user && m.user.name ? m.user.name.split(" ")[0] : "";
-      var prev = document.activeElement;
-      var scrim = h("div", { class: "cx-offer-scrim" });
-      function close(then) {
-        box.classList.add("is-out"); scrim.classList.add("is-out");
-        document.removeEventListener("keydown", onKey, true);
-        setTimeout(function () { box.remove(); scrim.remove(); if (then) then(); else if (prev && prev.focus) prev.focus({ preventScroll: true }); }, HV.reduce ? 0 : 180);
+      var close = h("button", { class: "cx-hiw__x", type: "button", "aria-label": "Close" },
+        h("span", { "aria-hidden": "true", html: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>' }));
+      var later = h("button", { class: "cx-hiw__later", type: "button" }, "Not now");
+      var watch = h("a", { class: "cx-hiw__go", href: href }, "Watch the film");
+      var card = h("aside", { class: "cx-hiw", id: "cx-hiw", role: "dialog", "aria-modal": "false", "aria-labelledby": "cx-hiw-t", "aria-describedby": "cx-hiw-p" },
+        h("a", { class: "cx-hiw__film", href: href, tabindex: "-1", "aria-hidden": "true" },
+          h("img", { src: ROOT + HIW_POSTER, alt: "", width: "320", height: "180", decoding: "async" }),
+          h("span", { class: "cx-hiw__play", html: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>' })),
+        h("div", { class: "cx-hiw__in" },
+          h("h2", { class: "cx-hiw__t", id: "cx-hiw-t" }, (first ? "Welcome, " + first + "." : "Welcome.") + " Watch how it works"),
+          h("p", { id: "cx-hiw-p" }, "A short film: brief Helvi, shortlist creators, request a quote and follow every post."),
+          h("div", { class: "cx-hiw__acts" }, watch, later)),
+        close);
+      function bye() {
+        api("POST", "/api/tour", { action: "later" });
+        document.removeEventListener("keydown", onKey);
+        card.classList.add("is-out");
+        setTimeout(function () { card.remove(); }, HV.reduce ? 0 : 200);
       }
-      function later() { api("POST", "/api/tour", { action: "later" }); close(); }
-      function go(ch) { close(function () { HV.tour(ch); }); }
-      var list = h("ol", { class: "cx-offer__chaps", "aria-label": "Chapters. Pick one to jump straight to it." });
-      CHAPTERS.forEach(function (c, i) {
-        var b = h("button", { type: "button", class: "cx-offer__chap", html: '<span class="cx-offer__ic">' + ic(c[0]) + "</span><span><b></b><small></small></span>" + ic("arrow", "cx-offer__go-i") });
-        b.querySelector("b").textContent = (i + 1) + " · " + c[1];
-        b.querySelector("small").textContent = c[2];
-        b.addEventListener("click", function () { go(i); });
-        list.appendChild(h("li", null, b));
-      });
-      var start = h("button", { class: "cx-btn", type: "button", html: "<span>Start the tour</span>" + '<span class="cx-cost cx-cost--prize">+5 credits</span>' });
-      var no = h("button", { class: "cx-btn cx-btn--ghost", type: "button" }, "Later");
-      var box = h("aside", { class: "cx-offer", id: "cx-offer", role: "dialog", "aria-modal": "true", "aria-labelledby": "cx-of-t", "aria-describedby": "cx-of-p" },
-        h("div", { class: "cx-offer__helvy" }, clip("hello", "cx-hd--edge", { once: true, then: "idle" })),
-        h("div", { class: "cx-offer__in" },
-          h("h2", { id: "cx-of-t" }, "Take the ", h("span", { class: "cx-nowrap" }, "3-minute"), " tour?"),
-          h("p", { id: "cx-of-p", class: "cx-offer__lead" }, (first ? "Welcome, " + first + ". " : "") + "One sample campaign, brief to results, in seven short chapters. Nothing you do in it is saved."),
-          list,
-          h("div", { class: "cx-offer__go" }, start, no),
-          h("p", { class: "cx-offer__fine" }, "Replay it any time from Help or your profile.")));
-      start.addEventListener("click", function () { go(null); });
-      no.addEventListener("click", later);
-      scrim.addEventListener("click", later);
-      function onKey(e) {
-        if (e.key === "Escape") { e.preventDefault(); later(); return; }
-        if (e.key !== "Tab") return;
-        var f = [].slice.call(box.querySelectorAll("button")), i = f.indexOf(document.activeElement);
-        if (e.shiftKey && i <= 0) { e.preventDefault(); f[f.length - 1].focus(); }
-        else if (!e.shiftKey && i === f.length - 1) { e.preventDefault(); f[0].focus(); }
-      }
-      document.addEventListener("keydown", onKey, true);
-      document.body.appendChild(scrim); document.body.appendChild(box);
-      start.focus({ preventScroll: true, focusVisible: false });
+      function onKey(e) { if (e.key === "Escape" && card.contains(document.activeElement)) bye(); }
+      close.addEventListener("click", bye);
+      later.addEventListener("click", bye);
+      document.addEventListener("keydown", onKey);
+      document.body.appendChild(card);
     }
 
     /* ================================================== quote lifecycle (fix batch 9, #42)
@@ -1393,9 +1364,7 @@
     function onMe() {
       if (started) return;
       started = true;
-      // Wait for the page loader to lift before offering the tour.
-      var waitLoader = function (fn, n) { if (document.documentElement.classList.contains("hv-loading") && (n || 0) < 100) setTimeout(function () { waitLoader(fn, (n || 0) + 1); }, 200); else fn(); };
-      waitLoader(function () { setTimeout(offerTour, 900); });
+      setTimeout(offerWelcome, 6000);
       if (PAGE === "campaign") {
         campaignVersus();
         window.addEventListener("hashchange", function () { setTimeout(campaignVersus, 600); setTimeout(campaignNextTime, 700); });

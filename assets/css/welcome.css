@@ -1,0 +1,116 @@
+/* HELVi Connect: "How HELVi works" (/welcome/, portal item 179).
+   A screening room in the catalogue's own world: an ink stage holding the film and its
+   chapters, the rotated lime pill from the catalogue cover as the one pressed mark, then a
+   white band with the way in. Bebas for names and numbers, DM Sans for every sentence. */
+
+.wl { background: var(--white); }
+.wl-wrap { max-width: 1280px; margin: 0 auto; }
+
+/* ------------------------------------------------------------ the stage */
+.wl-stage { background: var(--ink); color: var(--white); padding: clamp(40px, 6vw, 76px) 0 clamp(44px, 6vw, 80px); }
+.wl-head { max-width: 900px; margin-bottom: clamp(26px, 3.4vw, 40px); }
+.wl-title { margin: 0; font-weight: 400; display: flex; flex-direction: column; align-items: flex-start; }
+.wl-pill {
+  display: inline-block; font-family: var(--heading); font-size: clamp(1rem, .8rem + .6vw, 1.35rem); letter-spacing: .08em; line-height: 1;
+  background: var(--lime); color: var(--ink); border-radius: var(--r-pill); padding: 8px 20px 6px;
+  transform: rotate(-4deg); margin: 0 0 .35rem .1rem; box-shadow: 0 8px 24px rgba(0,0,0,.35); position: relative; z-index: 1;
+}
+.wl-title__line {
+  font-family: var(--heading); font-size: clamp(2.75rem, 1.6rem + 3.6vw, 5.5rem); line-height: .9; letter-spacing: .01em; color: var(--white);
+  text-wrap: balance;
+}
+.wl-lede { margin: 16px 0 0; max-width: 56ch; font-size: 17px; line-height: 1.6; color: rgba(255,255,255,.8); }
+
+/* The film beside its chapters; the chapters drop under it on narrower screens. */
+.wl-player { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: clamp(20px, 2.6vw, 36px); align-items: start; }
+
+.wl-film { position: sticky; top: 20px; aspect-ratio: 16 / 9; border-radius: var(--r-lg); overflow: hidden; background: var(--ink);
+  box-shadow: 0 30px 70px rgba(0,0,0,.45), 0 0 0 1px rgba(255,255,255,.08); }
+.wl-video { position: absolute; inset: 0; width: 100%; height: 100%; display: block; background: #000; object-fit: contain; }
+.wl-video:focus { outline: none; }
+.wl-video:focus-visible { outline: 3px solid var(--lime); outline-offset: -3px; }
+
+/* The play control sits on the poster: a lime disc and the action in Bebas. */
+.wl-play {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  border: 0; padding: 0; margin: 0; cursor: pointer; color: var(--white); font: inherit;
+  background: radial-gradient(60% 70% at 50% 50%, rgba(18,18,18,.38) 0%, rgba(18,18,18,0) 70%);
+  transition: opacity .35s ease, visibility .35s;
+}
+.wl-play__disc { width: clamp(64px, 7vw, 92px); height: clamp(64px, 7vw, 92px); border-radius: 50%; display: grid; place-items: center;
+  background: var(--lime); color: var(--ink); box-shadow: 0 14px 34px rgba(0,0,0,.4); transition: transform .3s cubic-bezier(.2,.8,.2,1); }
+.wl-play__disc svg { width: 42%; height: 42%; margin-left: 6%; }
+.wl-play__t { font-family: var(--heading); font-size: clamp(18px, 1rem + .5vw, 22px); letter-spacing: .07em; line-height: 1;
+  background: var(--ink); color: var(--white); border-radius: var(--r-pill); padding: 9px 16px 7px; box-shadow: 0 8px 22px rgba(0,0,0,.35); }
+.wl-play:hover .wl-play__disc { transform: scale(1.07); }
+.wl-play:focus-visible { outline: 3px solid var(--lime); outline-offset: -6px; border-radius: var(--r-lg); }
+.wl-film.is-on .wl-play { opacity: 0; visibility: hidden; }
+
+/* Waiting for the first frames: a thin lime ring turns where the disc was. */
+.wl-film.is-loading::after {
+  content: ""; position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%;
+  border: 3px solid rgba(232,255,118,.25); border-top-color: var(--lime); animation: wl-spin .9s linear infinite; pointer-events: none;
+}
+@keyframes wl-spin { to { transform: rotate(360deg); } }
+
+.wl-film__err {
+  position: absolute; left: 16px; right: 16px; bottom: 16px; margin: 0; padding: 12px 16px; border-radius: var(--r-sm);
+  background: var(--white); color: var(--ink); font-size: 14px; line-height: 1.45;
+}
+.wl-film__err button { font: inherit; font-weight: 700; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer;
+  text-decoration: underline; text-decoration-color: var(--vivid-red); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.wl-film__err button:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; border-radius: 4px; }
+
+/* ------------------------------------------------------------ chapters */
+.wl-chaps__t { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.62); }
+.wl-chaps__list { list-style: none; margin: 0; padding: 0; border-top: 1px solid rgba(255,255,255,.14); }
+.wl-chap { border-bottom: 1px solid rgba(255,255,255,.14); }
+.wl-chap__b {
+  width: 100%; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 12px; align-items: start; text-align: left;
+  padding: 12px 10px 12px 4px; margin: 0; border: 0; border-radius: 14px; background: none; color: inherit; font: inherit; cursor: pointer;
+  transition: background .2s ease;
+}
+.wl-chap__b:hover { background: rgba(255,255,255,.06); }
+.wl-chap__b:focus-visible { outline: 3px solid var(--lime); outline-offset: -3px; }
+.wl-chap__n { font-family: var(--heading); font-size: 30px; line-height: .9; color: rgba(255,255,255,.4); padding-top: 1px; transition: color .2s ease; }
+.wl-chap__top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.wl-chap__name { font-family: var(--heading); font-weight: 400; font-size: 22px; line-height: 1.05; letter-spacing: .03em; color: var(--white); }
+.wl-chap__time { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; color: rgba(255,255,255,.62); }
+.wl-chap__note { display: block; margin-top: 3px; font-size: 13.5px; line-height: 1.45; color: rgba(255,255,255,.72); }
+.wl-chap__b:hover .wl-chap__n { color: var(--lime); }
+.wl-chap__b.is-now { background: rgba(232,255,118,.1); }
+.wl-chap__b.is-now .wl-chap__n, .wl-chap__b.is-now .wl-chap__name { color: var(--lime); }
+
+/* ------------------------------------------------------------ the way in */
+.wl-next { padding: clamp(40px, 5vw, 64px) 0 clamp(48px, 6vw, 80px); }
+.wl-next__in { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 20px 40px; align-items: center; }
+.wl-next__t { margin: 0; font-family: var(--heading); font-weight: 400; font-size: clamp(2.2rem, 1.5rem + 2vw, 3.4rem); line-height: .95; letter-spacing: .01em; }
+.wl-next p { margin: 10px 0 0; max-width: 60ch; font-size: 15.5px; line-height: 1.6; color: var(--gray); }
+.wl-next__go { display: flex; flex-wrap: wrap; gap: 12px; }
+
+/* The shared footer's legal links (connect.css styles them on other pages; it is not loaded here). */
+.hc-foot__legal a { color: inherit; text-underline-offset: 3px; }
+.hc-foot__legal a:hover { color: var(--lime); }
+.hc-foot__legal a:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; border-radius: 4px; }
+
+/* ------------------------------------------------------------ responsive */
+@media screen and (max-width: 1100px) {
+  .wl-player { grid-template-columns: 1fr; }
+  .wl-film { position: relative; top: auto; }
+  .wl-chaps__list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 24px; }
+}
+@media screen and (max-width: 767px) {
+  .wl-stage { padding-top: 32px; }
+  .wl-film { border-radius: var(--r-md); margin: 0 calc(-1 * var(--pad) * .5); }
+
+  .wl-chaps__list { grid-template-columns: 1fr; }
+  .wl-next__in { grid-template-columns: 1fr; }
+  .wl-next__go .hc-btn { flex: 1 1 220px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wl-play, .wl-play__disc, .wl-chap__b, .wl-chap__n { transition: none; }
+  .wl-film.is-loading::after { animation-duration: 2.4s; }
+}
+@media print {
+  .wl-play, .wl-next__go { display: none; }
+}
