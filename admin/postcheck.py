@@ -4,8 +4,11 @@ rules and brief, and the account manager is told about the ones that need a look
 Two layers, one result per post (``content_checks``):
 
     rules (free, always on)    the required disclosure is missing (campaigns.rules.disclosure, as the capture
-                               already marks it in content.disclosure_ok); a required #hashtag or @mention is
-                               missing; no caption or on-screen text was captured, so nothing could be read.
+                               already marks it in content.disclosure_ok); none of the campaign's #hashtags, or
+                               none of its @mentions, is there (any one is enough: the lists hold alternative
+                               spellings, the same any-of logic as the capture, Bido 2026-10-21); no caption or
+                               on-screen text was captured, so nothing could be read.
+    Demo and sample campaigns (client "(demo)", "sample", "dummy data": comments._is_sample) are never checked.
     AI (switch "compliance")   Gemini reads the caption (a story's sticker / on-screen text arrives as its caption)
                                with the brief's product, main claim and "health claim" answer, and flags wording
                                that over-promises (cure, guarantee, dosage, off-label use, before/after promises,
@@ -94,10 +97,21 @@ def rules_check(k, item):
         out.append({"kind": "disclosure", "level": "fail",
                     "text": "Required disclosure missing (%s)." % " ".join(rules["disclosure"][:3])})
     tags = _tags(text)
-    miss = [t for t in rules["hashtags"] + rules["mentions"] if t.lower() not in tags]
-    if miss and item["section"] == "campaign":
-        out.append({"kind": "tags", "level": "warn", "text": "Missing %s." % ", ".join(miss[:4])})
+    if item["section"] == "campaign":
+        for key, what in (("hashtags", "No campaign hashtag"), ("mentions", "Brand not tagged")):
+            want = rules[key]
+            if want and not any(t.lower() in tags for t in want):
+                out.append({"kind": "tags", "level": "warn",
+                            "text": "%s (%s%s)." % (what, "one of " if len(want) > 1 else "", ", ".join(want[:3]))})
     return out
+
+
+def is_demo(k):
+    try:
+        import comments
+        return comments._is_sample(k)
+    except Exception:
+        return "(demo)" in ("%s %s" % (k["name"] or "", k["client"] or "")).lower()
 
 
 def _brief(k):
@@ -154,6 +168,8 @@ def check(item, k=None, force=False, quiet=False):
     """Check one post (a content row). Returns the stored result as a dict. ``quiet`` stores it without the KAM's bell."""
     init()
     k = k or db.campaign(item["campaign_id"])
+    if is_demo(k):
+        return None
     with db.connect() as conn:
         old = conn.execute("SELECT * FROM content_checks WHERE content_id = ?", (item["id"],)).fetchone()
     transcript = old["transcript"] if old is not None else None
@@ -276,10 +292,11 @@ def pending(limit=BATCH):
     since = db.now() - 30 * 86400
     with db.connect() as conn:
         rows = conn.execute(
-            "SELECT c.* FROM content c JOIN campaigns k ON k.id = c.campaign_id LEFT JOIN content_checks x ON x.content_id = c.id "
+            "SELECT c.*, k.name k_name, k.client k_client FROM content c JOIN campaigns k ON k.id = c.campaign_id "
+            "LEFT JOIN content_checks x ON x.content_id = c.id "
             "WHERE c.hidden = 0 AND k.status <> 'draft' AND (k.status = 'live' OR COALESCE(k.ends_at, 0) >= ?) "
             "ORDER BY x.content_id IS NOT NULL, c.created_at DESC LIMIT ?", (since, limit * 5)).fetchall()
-    return rows
+    return [r for r in rows if not is_demo({"name": r["k_name"], "client": r["k_client"]})]
 
 
 SEEDED = "postcheck_seeded"

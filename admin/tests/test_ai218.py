@@ -115,7 +115,7 @@ class TeamAI(unittest.TestCase):
         self.assertEqual(r["status"], "fail")
         self.assertIn("disclosure", r["reasons"][0]["text"].lower())
         r = self.check(self.p_notag)
-        self.assertEqual((r["status"], r["reasons"][0]["kind"]), ("warn", "tags"))
+        self.assertEqual(r["status"], "pass", "one of the campaign hashtags is enough")
         self.assertEqual(self.check(self.p_empty)["status"], "none")
         self.assertEqual(CALLS, [], "no Gemini call while the helper is off")
         # The KAM heard about the failing post, once.
@@ -227,6 +227,22 @@ class TeamAI(unittest.TestCase):
         self.assertEqual(before, after, "no bells on the first pass")
         self.assertEqual(postcheck.of_campaign(TeamAI.k1)[cid]["status"], "fail")
         self.assertTrue(db.setting(postcheck.SEEDED, False))
+
+    def test_13_any_of_tags_and_demo_skipped(self):
+        cid = self._post("HV-MI-002", "https://www.instagram.com/p/mention-only/", "Hi @polyco #ad")
+        with db.connect() as conn:
+            conn.execute("UPDATE campaigns SET rules = ? WHERE id = ?", (json.dumps({"hashtags": ["#polyco", "#glowup"], "mentions": ["@polyco"],
+                         "keywords": [], "disclosure": ["#ad"]}), TeamAI.k1))
+            conn.execute("UPDATE content SET section = 'campaign' WHERE id = ?", (cid,))
+        r = self.check(cid)
+        self.assertEqual((r["status"], r["reasons"][0]["text"]), ("warn", "No campaign hashtag (one of #polyco, #glowup)."))
+        d = db.create_campaign("Demo Campaign", client="HelloVoice (demo)", code_id=TeamAI.lead["code_id"])
+        db.save_campaign(d, status="live")
+        db.add_campaign_creators(d, ["HV-MI-001"])
+        did, _ = db.add_content(d, {"code": "HV-MI-001", "platform": "Instagram", "kind": "post", "url": "https://www.instagram.com/p/demo1/",
+                                    "posted_at": db.now(), "caption": "no tags at all"})
+        self.assertIsNone(postcheck.check(db.content_item(did)))
+        self.assertNotIn(did, [x["id"] for x in postcheck.pending()])
 
     def test_10_due_at_nine_riyadh(self):
         import calendar
