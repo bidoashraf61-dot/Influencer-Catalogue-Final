@@ -228,27 +228,12 @@
       state().catch(function () {});
     }
     function say(t) { var m = pop && pop.querySelector(".db-pop__msg"); if (m) m.textContent = t; }
-    function comments() {
-      var g = pop && pop.querySelector(".db-pop__go"); if (g) { g.disabled = true; g.querySelector("span").textContent = "Starting…"; }
-      postJSON("/api/campaign/refresh", { t: TOKEN, what: "comments" }).then(function (r) {
-        if (!r.b || !r.b.ok) { if (g) { g.disabled = false; g.querySelector("span").textContent = "Fetch now"; } return say((r.b && r.b.message) || "Could not start. Try again."); }
-        paint(r.b);
-        say(r.b.started ? "Reading the comments on " + r.b.started + (r.b.started === 1 ? " video" : " videos") + ". New ones show here within about 15 minutes." : "Already reading the comments.");
-        clearInterval(cpoll); var t0 = Date.now();
-        cpoll = setInterval(function () {
-          state().then(function (s) {
-            if (s.comments && !s.comments.running && Date.now() - t0 > 60000) { clearInterval(cpoll); CMB.items = null; load(); }
-            else if (Date.now() - t0 > 25 * 60000) clearInterval(cpoll);
-          }).catch(function () {});
-        }, 30000);
-      }).catch(function () { if (g) g.disabled = false; say("Could not reach the server. Try again."); });
-    }
     box.addEventListener("click", function (e) { var b = e.target.closest("[data-upd]"); if (b) openPop(b.getAttribute("data-upd"), b); });
     document.addEventListener("click", function (e) {
       if (!pop) return;
       if (e.target.closest(".db-pop__x")) return shut();
       var go = e.target.closest(".db-pop__go");
-      if (go) { var w = go.getAttribute("data-go"); if (w === "more") { shut(); request(); } else if (w === "posts") { shut(); run(); } else if (w === "comments") comments(); return; }
+      if (go) { var w = go.getAttribute("data-go"); if (w === "more") { shut(); request(); } else if (w === "posts" || w === "comments") { shut(); run(w); } return; }
       if (!e.target.closest(".db-pop") && !e.target.closest("[data-upd]")) shut();
     });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape" && pop) shut(); });
@@ -259,16 +244,28 @@
       document.body.appendChild(o);
       return { card: card, close: function () { o.remove(); } };
     }
-    var STEPS = ["Finding the posts on this campaign…", "Asking Instagram, TikTok and Facebook…", "Asking YouTube and Snapchat…", "Adding up the numbers…"];
+    // The wait, for both kinds: Helvi, the steps, a real progress bar, the green tick (comments: owner, 2026-10-21).
+    var RUN = {
+      posts: { title: "Helvi is fetching the latest numbers", plain: "Fetching the latest numbers…", tau: 18000, max: 5,
+               steps: ["Finding the posts on this campaign…", "Asking Instagram, TikTok and Facebook…", "Asking YouTube and Snapchat…", "Adding up the numbers…"],
+               busy: function (s) { return s.running; }, ok: "Numbers updated successfully",
+               late: "Still working. The new numbers will appear on their own." },
+      comments: { title: "Helvi is reading the new comments", plain: "Reading the new comments…", tau: 70000, max: 8,
+               steps: ["Asking Instagram, TikTok, YouTube and Facebook…", "Collecting the new comments…", "Reading moods, topics and buying questions…", "Adding them to your dashboard…"],
+               busy: function (s) { return s.comments && (s.comments.running || s.comments.pending_ai > 0); }, ok: "Comments updated successfully",
+               late: "Still reading. The new comments will appear on their own in a few minutes." }
+    };
     function postJSON(path, body) {
       return fetch(API + path, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
         .then(function (r) { return r.json().then(function (b) { return { s: r.status, b: b }; }); });
     }
     // The wait: Helvi, the steps, the balance.
-    function run() {
-      var m = modal(), cook = null, t0 = Date.now(), poll = null;
-      try { if (window.hvPortal && window.hvPortal.cooking) cook = window.hvPortal.cooking({ list: true, dark: false, title: "Helvi is fetching the latest numbers", steps: STEPS }); } catch (e) { cook = null; }
-      if (cook) m.card.appendChild(cook); else m.card.innerHTML = '<p class="db-fetch__plain">Fetching the latest numbers…</p>';
+    function run(kind) {
+      kind = kind === "comments" ? "comments" : "posts";
+      var K = RUN[kind], m = modal(), cook = null, t0 = Date.now(), poll = null, before = S && S.comments ? S.comments.stored : null;
+      var btn = box.querySelector('[data-upd="' + kind + '"]');
+      try { if (window.hvPortal && window.hvPortal.cooking) cook = window.hvPortal.cooking({ list: true, dark: false, title: K.title, steps: K.steps }); } catch (e) { cook = null; }
+      if (cook) m.card.appendChild(cook); else m.card.innerHTML = '<p class="db-fetch__plain">' + K.plain + "</p>";
       // A real progress bar: it fills as the update runs and reaches 100% when the numbers are in.
       if (cook && cook.stop) cook.stop();                // the steps are lit from the percentage, below
       var prog = document.createElement("div"); prog.className = "db-prog";
@@ -279,19 +276,24 @@
         var items = cook ? cook.querySelectorAll(".ai-sl__st") : [], cuts = [0, 22, 50, 78];
         [].forEach.call(items, function (li, i) { li.className = "ai-sl__st" + (P >= (cuts[i + 1] == null ? 101 : cuts[i + 1]) ? " is-done" : P >= cuts[i] ? " is-now" : ""); });
       }
-      var tick = setInterval(function () { if (!finishing) show(95 * (1 - Math.exp(-(Date.now() - t0) / 18000))); }, 120);
+      var tick = setInterval(function () { if (!finishing) show(95 * (1 - Math.exp(-(Date.now() - t0) / K.tau))); }, 120);
       show(0);
       var msg = document.createElement("p"); msg.className = "db-fetch__msg"; msg.setAttribute("role", "status"); m.card.appendChild(msg);
       var bal = document.createElement("p"); bal.className = "db-fetch__bal"; bal.textContent = leftText(); m.card.appendChild(bal);
       btn.classList.add("is-busy");
-      function leave(reload) { clearInterval(tick); if (cook && cook.stop) cook.stop(); m.close(); btn.classList.remove("is-busy"); if (reload) load(); else state().catch(function () {}); }
+      function leave(reload) {
+        clearInterval(tick); if (cook && cook.stop) cook.stop(); m.close(); btn.classList.remove("is-busy");
+        if (reload) { if (kind === "comments") CMB.items = null; load(); } else state().catch(function () {});
+      }
       function fail(text) {
         if (poll) clearInterval(poll); clearInterval(tick);
         prog.hidden = true; bal.hidden = true; if (cook) cook.hidden = true;        // nothing is running: say why, plainly
         msg.className = "db-fetch__msg db-fetch__msg--big"; msg.textContent = text; setTimeout(function () { leave(false); }, 2800);
       }
-      function done() {
+      var got = null;
+      function done(s) {
         if (poll) clearInterval(poll); finishing = true;
+        if (kind === "comments" && s && s.comments && before != null) got = Math.max(0, s.comments.stored - before);
         var from = P, t1 = Date.now();
         (function ramp() {
           var k = Math.min(1, (Date.now() - t1) / 900); show(from + (100 - from) * k);
@@ -299,20 +301,21 @@
           clearInterval(tick);
           setTimeout(function () {
             m.card.innerHTML = '<div class="db-ok"><svg class="db-ok__tick" viewBox="0 0 52 52" aria-hidden="true"><circle class="db-ok__c" cx="26" cy="26" r="23"/><path class="db-ok__p" d="M15 27.5l8 8 14.5-17"/></svg>'
-              + '<h3 role="status">Numbers updated successfully</h3>' + (leftText() ? "<p>" + esc(leftText()) + "</p>" : "") + "</div>";
+              + '<h3 role="status">' + K.ok + "</h3>" + (got != null ? "<p>" + (got > 0 ? full(got) + " new comment" + (got === 1 ? "" : "s") : "No new comments since the last read") + "</p>" : "")
+              + (leftText() ? "<p>" + esc(leftText()) + "</p>" : "") + "</div>";
             setTimeout(function () { leave(true); }, 2400);
           }, 500);
         })();
       }
-      postJSON("/api/campaign/refresh", { t: TOKEN, what: "posts" }).then(function (r) {
+      postJSON("/api/campaign/refresh", { t: TOKEN, what: kind }).then(function (r) {
         if (!r.b || !r.b.ok) return fail((r.b && r.b.message) || "Could not start the update. Try again.");
         paint(r.b); bal.textContent = leftText();
         poll = setInterval(function () {
           get("/api/campaign/refresh?t=" + encodeURIComponent(TOKEN)).then(function (s) {
             paint(s); bal.textContent = leftText();
-            if (!s.running) done(); else if (Date.now() - t0 > 5 * 60 * 1000) fail("Still working. The new numbers will appear on their own.");
+            if (!K.busy(s)) done(s); else if (Date.now() - t0 > K.max * 60 * 1000) fail(K.late);
           }).catch(function () {});
-        }, 3000);
+        }, kind === "comments" ? 5000 : 3000);
       }).catch(function () { fail("Could not reach the server. Try again."); });
     }
     // All free updates used: ask the team for more.

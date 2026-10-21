@@ -342,6 +342,8 @@ def schedule_info(k, since=None):
         last = conn.execute("SELECT MAX(finished_at) FROM comment_reads WHERE campaign_id = ? AND status != 'failed'", (k["id"],)).fetchone()[0]
         nxt = conn.execute("SELECT MIN(due_at) FROM comment_reads WHERE campaign_id = ? AND status = 'due'", (k["id"],)).fetchone()[0]
         running = bool(conn.execute("SELECT 1 FROM comment_reads WHERE campaign_id = ? AND status = 'running'", (k["id"],)).fetchone())
+        stored = conn.execute("SELECT COUNT(*) FROM comments WHERE campaign_id = ?", (k["id"],)).fetchone()[0]
+        pending_ai = conn.execute("SELECT COUNT(*) FROM comments WHERE campaign_id = ? AND sentiment IS NULL", (k["id"],)).fetchone()[0]
         if weekly and not nxt and last:
             nxt = last + 7 * 86400
         cost = None
@@ -353,7 +355,8 @@ def schedule_info(k, since=None):
         nxt = db.now() + INTERVAL            # due already: the next pass of the loop takes it
     if nxt and k["ends_at"] and nxt > k["ends_at"] + 7 * 86400 and not weekly:
         nxt = None
-    return {"schedule": words, "last_at": last, "next_at": nxt, "running": running, "cost": cost}
+    return {"schedule": words, "last_at": last, "next_at": nxt, "running": running, "cost": cost,
+            "stored": stored, "pending_ai": pending_ai}
 
 
 def _expected(conn, content_id):
@@ -612,6 +615,25 @@ def translate_labels():
 
 
 # --------------------------------------------------------------------------------- loop --
+
+def catch_up():
+    """A dashboard is waiting on a manual fetch (owner, 2026-10-21): collect the finished runs and read the new
+    comments now instead of at the next 15-minute pass. Skipped when a pass is already working."""
+    if not _lock.acquire(blocking=False):
+        return False
+
+    def work():
+        try:
+            poll_runs()
+            classify_pending()
+            translate_labels()
+        except Exception as exc:
+            print("comments: catch-up failed:", repr(exc)[:160], flush=True)
+        finally:
+            _lock.release()
+    threading.Thread(target=work, daemon=True, name="comments-catch-up").start()
+    return True
+
 
 def tick():
     with _lock:

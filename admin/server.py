@@ -4227,6 +4227,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                          % ",".join("?" * len(ids)), [pressed] + ids).fetchone()
                         posts["cost"] = round(r[0], 3) if r and r[0] is not None else None
             cm = _cm.schedule_info(k, since=db.refresh_last(k["id"], "comments"))
+            if cm.get("running") or cm.get("pending_ai"):
+                _cm.catch_up()                   # someone may be watching the fetch: finish it without waiting for the loop
             if not team:
                 cm.pop("cost", None)
             else:
