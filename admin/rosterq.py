@@ -369,16 +369,42 @@ AI_SYSTEM = (
     "person's name, looks, ethnicity, religion or nationality. A creator living in the region whose audience "
     "is local is IN even if they are an expat. Answer OUT only when the evidence shows the account serves a "
     "market outside the region, or is not a real creator (a shop, a fan page, a placeholder). If the evidence "
-    "is thin, answer UNSURE. Give a reason of at most 15 words naming the evidence.")
+    "is thin, answer UNSURE. Give a reason of at most 15 words naming the evidence. 'modash_audience_search' means "
+    "the creator was exported from a Modash search filtered by AUDIENCE location in that country, so the audience is "
+    "local: answer IN unless the other evidence clearly shows a market outside the region or a non-creator account. "
+    "'country_on_import' is a weaker hint.")
 AI_SCHEMA = {"type": "OBJECT", "properties": {"items": {"type": "ARRAY", "items": {
     "type": "OBJECT", "properties": {"i": {"type": "INTEGER"}, "verdict": {"type": "STRING", "enum": ["in", "out", "unsure"]},
                                      "reason": {"type": "STRING"}}, "required": ["i", "verdict", "reason"]}}},
     "required": ["items"]}
 
 
+_PHONE = re.compile(r"(?:\+|wa\.me/%2B|wa\.me/|00)(966|971|20|965|974|973|968)\d")
+
+
 def evidence(creator, analyses):
-    """What the AI may see: no name, no photo."""
+    """What the AI may see: no name, no photo. Since 2026-10-21 also the free signals we already hold
+    (owner: no paid fetch): the Modash audience-location search the creator was exported from, Arabic
+    script in the bio, phone country codes and hashtags."""
     ev = {"platform": creator["platform"], "followers": creator["followers"], "city_on_record": creator["city"]}
+    city = creator["city"] or ""
+    if city.endswith("Not Specified yet"):
+        # "UAE Not Specified yet" = imported from a search for that country; the Modash export (Oct 2026) was
+        # filtered by AUDIENCE location (owner, 2026-10-21), so it says where the audience is.
+        country = city[:-len("Not Specified yet")].strip()
+        modash = any(str((d or {}).get("source") or "").startswith("Modash") for d in (analyses or {}).values())
+        if country:
+            ev["modash_audience_search" if modash else "country_on_import"] = country
+    text = " ".join(str((d or {}).get("bio") or "") + " " + str((d or {}).get("external_url") or "") for d in (analyses or {}).values())
+    if re.search("[\u0600-\u06FF]", text):
+        ev["arabic_script_in_bio"] = True
+    codes = sorted(set(_PHONE.findall(text)))
+    if codes:
+        ev["phone_country_codes"] = codes
+    tags = [h if isinstance(h, str) else str((h or {}).get("name") or "") for d in (analyses or {}).values()
+            for h in ((d or {}).get("hashtags") or [])][:8]
+    if tags:
+        ev["hashtags"] = tags
     for pl, d in (analyses or {}).items():
         d = d or {}
         loc = d.get("location")

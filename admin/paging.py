@@ -684,8 +684,18 @@ def page(idx, f, cursor=None, limit=BATCH, licences=None, discover=None, audienc
         out["match"] = matched
     # The roster's size, rounded DOWN to the thousand and shown as "14,000+" (owner, 2026-10-13): the exact
     # number is never sent.
-    out["plus"] = (len(idx.cards) // 1000) * 1000
+    out["plus"] = max((len(idx.cards) // 1000) * 1000, roster_plus_floor())
     return out
+
+
+def roster_plus_floor():
+    """Owner, 2026-10-21: the out-of-scope clean-up archives creators, but the public figure stays "14,000+".
+    Setting roster_plus_floor (a whole thousand) is the least the catalogue shows; 0 = the real rounded size."""
+    try:
+        import db
+        return max(0, int(db.setting("roster_plus_floor", 0) or 0)) // 1000 * 1000
+    except Exception:
+        return 0
 
 
 def cards(idx, codes):

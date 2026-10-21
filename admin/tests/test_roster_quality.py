@@ -241,5 +241,32 @@ class Pairs(unittest.TestCase):
         self.assertFalse(any({c["code"] for c in g["creators"]} == {"HV-P-001", "HV-P-002"} for g in groups))
 
 
+class FreeEvidence(unittest.TestCase):
+    """2026-10-21: the AI sees the Modash audience search, Arabic bio, phone codes and hashtags; the catalogue's
+    "N,000+" never drops below roster_plus_floor."""
+    def test_modash_audience_search(self):
+        row = {"platform": "TikTok", "followers": 30000, "city": "UAE Not Specified yet"}
+        ev = rosterq.evidence(row, {"TikTok": {"source": "Modash Oct 2026", "bio": "مرحبا wa.me/971501234567",
+                                               "hashtags": ["dubai", {"name": "uae"}]}})
+        self.assertEqual(ev["modash_audience_search"], "UAE")
+        self.assertTrue(ev["arabic_script_in_bio"])
+        self.assertEqual(ev["phone_country_codes"], ["971"])
+        self.assertEqual(ev["hashtags"], ["dubai", "uae"])
+        ev = rosterq.evidence(row, {"TikTok": {"bio": "hello"}})
+        self.assertEqual(ev.get("country_on_import"), "UAE")
+        self.assertNotIn("modash_audience_search", ev)
+        self.assertNotIn("arabic_script_in_bio", ev)
+        ev = rosterq.evidence(dict(row, city="Riyadh"), {})
+        self.assertNotIn("country_on_import", ev)
+
+    def test_plus_floor(self):
+        import paging
+        db.set_setting("roster_plus_floor", 0)
+        self.assertEqual(paging.roster_plus_floor(), 0)
+        db.set_setting("roster_plus_floor", 14500)
+        self.assertEqual(paging.roster_plus_floor(), 14000)
+        db.set_setting("roster_plus_floor", 0)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
