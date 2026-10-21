@@ -262,6 +262,15 @@ class TeamAI(unittest.TestCase):
         finally:
             aifeatures.save("nextstep", on=False)
 
+    def test_11_admin_card_and_save(self):
+        import portal_views
+        html = portal_views.team_ai_card()
+        for label in ("Report writer", "Post checks", "Next-step digest", "tai_on_report", "tai_cap_compliance"):
+            self.assertIn(label, html)
+        aifeatures.save("compliance", on=True, cap=7)
+        self.assertEqual(aifeatures.conf("compliance"), {"on": True, "cap": 7.0})
+        aifeatures.save("compliance", on=False, cap=15)
+
     def test_10_due_at_nine_riyadh(self):
         import calendar
         nine = calendar.timegm((2026, 10, 22, 6, 0, 0)) + 60        # 09:01 Riyadh

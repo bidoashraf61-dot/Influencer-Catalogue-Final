@@ -202,7 +202,7 @@ def _tell_kam(k, item, reasons):
         if u is not None and u["status"] == "active":
             first = next((r["text"] for r in reasons if r["level"] == "fail"), "")
             inbox.emit([u["id"]], "team_flag", "A post needs a look:", rest=" " + k["name"], body=first[:280],
-                       href="campaign/#t=%s&edit=checks" % k["token"], ref="flag:%d" % item["id"], once=True)
+                       href="campaign/dashboard/#t=%s&edit=checks" % k["token"], ref="flag:%d" % item["id"], once=True)
         with db.connect() as conn:
             conn.execute("UPDATE content_checks SET told_at = ? WHERE content_id = ?", (db.now(), item["id"]))
     except Exception:

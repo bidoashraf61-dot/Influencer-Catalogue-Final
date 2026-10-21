@@ -397,8 +397,8 @@
     if (g.key === "overdue") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: ROOT + "campaign/#t=" + encodeURIComponent(it.token || "") }, "Open the campaign"));
     if (g.key === "analyses") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: "#analyses" }, "Open the inbox"));
     // Item 218: report drafts and flagged posts open the campaign dashboard's Edit mode on the right tab.
-    if (g.key === "reports") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: ROOT + "campaign/#t=" + encodeURIComponent(it.token || "") + "&edit=report" }, "Read and approve"));
-    if (g.key === "flags") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: ROOT + "campaign/#t=" + encodeURIComponent(it.token || "") + "&edit=checks" }, "Review the posts"));
+    if (g.key === "reports") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: ROOT + "campaign/dashboard/#t=" + encodeURIComponent(it.token || "") + "&edit=report" }, "Read and approve"));
+    if (g.key === "flags") return h("div", { class: "cc-act" }, h("a", { class: "hc-more", href: ROOT + "campaign/dashboard/#t=" + encodeURIComponent(it.token || "") + "&edit=checks" }, "Review the posts"));
     if (it.href && DATA.cc.admin_links) return h("div", { class: "cc-act" },
       h("a", { class: "cc-admin", href: adminUrl(it.href), target: "_blank", rel: "noopener" }, "Answer in admin ", icon("ext")));
     return h("div", { class: "cc-act" }, h("span", { class: "ac-muted" }, "An admin answers this"));

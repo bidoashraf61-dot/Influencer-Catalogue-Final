@@ -6,6 +6,10 @@
  * numbers, hide, delete, who is still to post) and Insights (approve or reject the numbers creators sent). Every
  * change saves at once and shows "Saved"; closing the sheet reloads the report once, if anything changed.
  * Everything from the server goes on the page with textContent, never HTML.
+ *
+ * Item 218 adds two tabs: Report (Helvi's draft of the weekly / final report; the KAM edits and approves it before the
+ * client sees it) and Checks (posts flagged for disclosure, tags or claim wording; clients never see flags). A link
+ * with #t=<token>&edit=report or &edit=checks opens the sheet on that tab.
  */
 (function () {
   "use strict";
@@ -103,17 +107,19 @@
   }
   function paint() {
     var fix = toFix(), ni = D.insights.filter(function (i) { return i.status !== "approved"; }).length;
+    var nr = ((D.reports || {}).reports || []).filter(function (r) { return r.status === "draft"; }).length, nf = flagCount();
     var tabs = h("div", { class: "dbe-tabs", role: "tablist", "aria-label": "Edit" });
-    [["content", "Content", fix ? fix + " to fix" : null], ["insights", "Insights", ni ? String(ni) : null]].forEach(function (t) {
+    [["content", "Content", fix ? fix + " to fix" : null], ["insights", "Insights", ni ? String(ni) : null],
+     ["report", "Report", nr ? "To approve" : null], ["checks", "Checks", nf ? nf + " flagged" : null]].forEach(function (t) {
       tabs.appendChild(h("button", { class: "dbe-tab", role: "tab", type: "button", "aria-selected": TAB === t[0] ? "true" : "false",
         onclick: function () { TAB = t[0]; paint(); } }, t[1], t[2] ? h("em", null, t[2]) : null));
     });
     SAY = h("span", { class: "dbe-say", role: "status" });
     var bar = h("div", { class: "dbe-bar" }, h("b", null, icon("pen"), "Edit mode"), h("span", null, "Team only. Clients see the report without these controls."), SAY,
       h("div", { class: "dbe-bar__go" },
-        h("button", { class: "dbe-btn dbe-btn--ghost", type: "button", onclick: function () { OPEN_PASTE = !OPEN_PASTE; paint(); } }, icon("link"), "Paste many links"),
+        TAB === "content" ? h("button", { class: "dbe-btn dbe-btn--ghost", type: "button", onclick: function () { OPEN_PASTE = !OPEN_PASTE; paint(); } }, icon("link"), "Paste many links") : null,
         h("button", { class: "dbe-btn", type: "button", onclick: closeSheet }, "Done editing")));
-    var body = TAB === "insights" ? insightsTab() : contentTab();
+    var body = TAB === "insights" ? insightsTab() : TAB === "report" ? reportTab() : TAB === "checks" ? checksTab() : contentTab();
     var sheet = h("section", { class: "dbe-sheet", role: "dialog", "aria-modal": "true", "aria-label": "Edit " + D.campaign.name },
       h("div", { class: "dbe-hd" }, h("div", null, h("h2", null, D.campaign.name), h("p", null, "Fix the posts and numbers behind this report.")),
         h("button", { class: "dbe-x", type: "button", "aria-label": "Close edit mode", onclick: closeSheet }, icon("x"))),
@@ -123,6 +129,8 @@
     WRAP.appendChild(h("div", { class: "dbe-scrim", onclick: closeSheet }));
     WRAP.appendChild(sheet);
     sheet.scrollTop = top; show();
+    var on = tabs.querySelector('[aria-selected="true"]');      // the chosen tab stays in sight on a phone
+    if (on) tabs.scrollLeft = Math.max(0, on.offsetLeft - tabs.offsetLeft - 16);
   }
 
   /* ---------------------------------------------------------------- content */
@@ -204,7 +212,7 @@
     }
     drawMore();
     add(row, [h("span", { class: "dbe-plat", title: p.platform }, pic ? icon(pic) : icon("link")),
-      h("div", { class: "dbe-post__link" }, h("a", { href: p.url, target: "_blank", rel: "noopener" }, short(p.url)),
+      h("div", { class: "dbe-post__link" }, h("a", { href: p.url, target: "_blank", rel: "noopener" }, short(p.url)), checkPill(p.check),
         h("small", null, [p.platform, p.kind !== "post" ? p.kind : "", p.posted_at ? "posted " + dayStr(p.posted_at) : "", p.hidden ? "hidden from the report" : (p.views == null && p.likes == null ? "numbers missing" : "numbers " + (p.source === "manual" ? "typed" : "captured"))].filter(Boolean).join(" · "))),
       nums, save, more]);
     return row;
@@ -242,6 +250,152 @@
     return box;
   }
 
+  /* ----------------------------------------------------------- checks (218) */
+  var CHECK_WORD = { fail: "Needs a look", warn: "Worth a glance", ok: "Marked OK", pass: "Passes", none: "Nothing to read" };
+  function flagCount() {
+    var n = 0;
+    D.creators.forEach(function (c) { c.posts.forEach(function (p) { if (!p.hidden && p.check && p.check.status === "fail") n++; }); });
+    return n;
+  }
+  function checkPill(c) {
+    if (!c || c.status === "pass") return null;
+    return h("button", { class: "dbe-chk dbe-chk--" + c.status, type: "button", title: (c.reasons[0] || {}).text || "",
+      onclick: function () { TAB = "checks"; paint(); } }, CHECK_WORD[c.status] || c.status);
+  }
+  function checksTab() {
+    var box = h("div", { class: "dbe-body" });
+    var groups = { fail: [], warn: [], ok: [] }, fine = 0, unread = 0, blank = 0;
+    D.creators.forEach(function (c) {
+      c.posts.forEach(function (p) {
+        if (p.hidden) return;
+        var st = p.check ? p.check.status : null;
+        if (st && groups[st]) groups[st].push({ c: c, p: p });
+        else if (st === "pass") fine++;
+        else if (st === "none") blank++;
+        else unread++;
+      });
+    });
+    var ai = D.checks_on || {};
+    box.appendChild(h("div", { class: "dbe-tally", role: "status" },
+      h("span", { class: "dbe-tally__n dbe-tally__n--fail" }, h("b", null, String(groups.fail.length)), "need a look"),
+      h("span", { class: "dbe-tally__n dbe-tally__n--warn" }, h("b", null, String(groups.warn.length)), "worth a glance"),
+      h("span", { class: "dbe-tally__n dbe-tally__n--pass" }, h("b", null, String(fine)), "pass"),
+      h("p", { class: "dbe-tally__note" }, icon("shield"),
+        "Disclosure and required tags are checked on every post. " + (ai.ai ? "Helvi also reads each caption for claim wording."
+          : "Claim wording is not being read (" + (ai.why_not || "switched off") + "). An admin turns it on in Admin, Client portal, Settings & keys, Team AI.")
+        + (blank ? " " + plural(blank, "post") + " had no caption or on-screen text to read." : "")
+        + (unread ? " " + plural(unread, "post") + " still to check; checks run every 10 minutes." : ""))));
+    if (!groups.fail.length && !groups.warn.length && !groups.ok.length) {
+      box.appendChild(h("p", { class: "dbe-none" }, "No flags. Every checked post passes."));
+      return box;
+    }
+    [["fail", "Needs a look"], ["warn", "Worth a glance"], ["ok", "Marked OK"]].forEach(function (g) {
+      if (!groups[g[0]].length) return;
+      box.appendChild(h("h3", { class: "dbe-h3" }, g[1], h("em", null, String(groups[g[0]].length))));
+      var list = h("ul", { class: "dbe-flags" });
+      groups[g[0]].forEach(function (x) { list.appendChild(flagRow(x.c, x.p, g[0])); });
+      box.appendChild(list);
+    });
+    return box;
+  }
+  function flagRow(c, p, st) {
+    var pic = PIC[p.platform];
+    var reasons = h("ul", { class: "dbe-why" });
+    (p.check.reasons || []).forEach(function (r) {
+      reasons.appendChild(h("li", { class: "dbe-why--" + (r.level || "warn") }, r.text));
+    });
+    var go = h("div", { class: "dbe-flag__go" });
+    if (st === "ok") {
+      go.appendChild(h("span", { class: "dbe-flag__by" }, "OK'd by " + (p.check.cleared_by || "the team") + (p.check.cleared_at ? " · " + dayStr(p.check.cleared_at) : "")));
+      go.appendChild(h("button", { class: "dbe-link", type: "button", onclick: function () { act("/api/edit/check", { post: p.id, do: "undo" }); } }, "Flag again"));
+    } else {
+      go.appendChild(h("button", { class: "dbe-btn dbe-btn--sm", type: "button", onclick: function () { act("/api/edit/check", { post: p.id, do: "clear" }); } }, icon("check"), "OK as is"));
+      go.appendChild(h("button", { class: "dbe-btn dbe-btn--sm dbe-btn--ghost", type: "button", onclick: function () { act("/api/edit/check", { post: p.id, do: "recheck" }); } }, icon("redo"), "Check again"));
+    }
+    return h("li", { class: "dbe-flag dbe-flag--" + st },
+      h("span", { class: "dbe-plat", title: p.platform }, pic ? icon(pic) : icon("link")),
+      h("div", { class: "dbe-flag__main" },
+        h("div", { class: "dbe-flag__hd" }, h("b", null, c.name), h("a", { href: p.url, target: "_blank", rel: "noopener" }, short(p.url))),
+        reasons, go));
+  }
+
+  /* ----------------------------------------------------------- report (218) */
+  var OPEN_REP = null;
+  function reportTab() {
+    var box = h("div", { class: "dbe-body" });
+    var R = D.reports || { reports: [] };
+    var list = R.reports || [];
+    if (!R.on) {
+      box.appendChild(h("div", { class: "dbe-off" }, icon("sparkle"),
+        h("div", null, h("b", null, "The report writer is " + (R.why_not || "off") + "."),
+          h("p", null, "When it runs, Helvi drafts each live week's report and the final one from this dashboard's own numbers. You edit and approve; the client sees nothing before that. An admin switches it on in Admin, Client portal, Settings & keys, Team AI."))));
+    }
+    if (!list.length) {
+      if (R.on) {
+        var mk = h("button", { class: "dbe-btn", type: "button" }, icon("sparkle"), "Write a draft now");
+        mk.addEventListener("click", function () { mk.disabled = true; act("/api/edit/report", { do: "make" }).then(function () { mk.disabled = false; }); });
+        box.appendChild(h("div", { class: "dbe-off dbe-off--on" }, icon("sparkle"),
+          h("div", null, h("b", null, "No draft yet."), h("p", null, "Helvi writes one after each campaign week once posts are live. You can ask for this week's now.")), mk));
+      }
+      return box;
+    }
+    if (OPEN_REP == null) OPEN_REP = (list.filter(function (r) { return r.status === "draft"; })[0] || list[0]).period;
+    list.forEach(function (r) { box.appendChild(r.period === OPEN_REP ? reportCard(r, R.on) : reportLine(r)); });
+    return box;
+  }
+  var REP_STATE = { draft: ["Waiting for you", "draft"], approved: ["On the client's report", "ok"], dismissed: ["Dismissed", "off"] };
+  function reportLine(r) {
+    var st = REP_STATE[r.status] || [r.status, "off"];
+    return h("button", { class: "dbe-repline", type: "button", onclick: function () { OPEN_REP = r.period; paint(); } },
+      h("b", null, r.label), h("span", { class: "dbe-state dbe-state--" + st[1] }, st[0]), h("small", null, dayStr(r.at)));
+  }
+  function reportCard(r, on) {
+    var st = REP_STATE[r.status] || [r.status, "off"];
+    var src = r.body || r.draft || { summary: "", worked: [], improve: [], next: [] };
+    var by = r.status === "approved" ? "Approved by " + (r.approved_by || "the team") + " · " + dayStr(r.approved_at)
+      : "Drafted by Helvi · " + dayStr(r.at) + (r.status === "draft" ? " · " + plural(r.tries_left, "fresh draft") + " left" : "");
+    var card = h("article", { class: "dbe-rep dbe-rep--" + r.status, "aria-label": r.label },
+      h("div", { class: "dbe-rep__hd" }, h("div", null, h("h3", null, r.label), h("small", null, icon("sparkle"), by)),
+        h("span", { class: "dbe-stamp dbe-stamp--" + st[1] }, st[0])));
+    if (r.status === "approved") {
+      card.appendChild(h("p", { class: "dbe-rep__sum" }, src.summary));
+      var cols = h("div", { class: "dbe-rep__cols" });
+      [["worked", "What worked"], ["improve", "To improve"], ["next", "Next steps"]].forEach(function (f) {
+        if (!(src[f[0]] || []).length) return;
+        var ul = h("ul", null); src[f[0]].forEach(function (x) { ul.appendChild(h("li", null, x)); });
+        cols.appendChild(h("div", { class: "dbe-rep__col dbe-rep__col--" + f[0] }, h("b", null, f[1]), ul));
+      });
+      card.appendChild(cols);
+      return card;
+    }
+    var sum = h("textarea", { class: "dbe-input dbe-rep__in", rows: "4", maxlength: "600", "aria-label": "Summary" });
+    sum.value = src.summary || "";
+    var fields = {};
+    var grid = h("div", { class: "dbe-rep__cols" });
+    [["worked", "What worked", 3], ["improve", "To improve", 3], ["next", "Next steps", 3]].forEach(function (f) {
+      var ta = h("textarea", { class: "dbe-input dbe-rep__in", rows: "6", "aria-label": f[1] + ", one per line" });
+      ta.value = (src[f[0]] || []).join("\n");
+      fields[f[0]] = ta;
+      grid.appendChild(h("label", { class: "dbe-rep__col dbe-rep__col--" + f[0] }, h("b", null, f[1]), ta, h("small", null, "One per line, up to " + f[2])));
+    });
+    card.appendChild(h("label", { class: "dbe-rep__lbl" }, h("b", null, "Summary"), sum));
+    card.appendChild(grid);
+    var approve = h("button", { class: "dbe-btn", type: "button" }, icon("check"), "Approve and show the client");
+    approve.addEventListener("click", function () {
+      approve.disabled = true;
+      act("/api/edit/report", { do: "approve", period: r.period, summary: sum.value, worked: fields.worked.value, improve: fields.improve.value, next: fields.next.value })
+        .then(function () { approve.disabled = false; });
+    });
+    var redo = h("button", { class: "dbe-btn dbe-btn--ghost", type: "button", disabled: !on || !r.tries_left }, icon("redo"), "New draft");
+    redo.addEventListener("click", function () { redo.disabled = true; say("Helvi is writing…"); act("/api/edit/report", { do: "redo", period: r.period }).then(function () { redo.disabled = false; }); });
+    var go = h("div", { class: "dbe-rep__go" }, approve, redo);
+    if (r.status === "draft") go.appendChild(h("button", { class: "dbe-link dbe-link--danger", type: "button",
+      onclick: function () { act("/api/edit/report", { do: "dismiss", period: r.period }); } }, "Dismiss"));
+    card.appendChild(go);
+    card.appendChild(h("p", { class: "dbe-rep__note" }, "The client sees this as “Summary from HelloVoice” on the report, and gets one notification. Prices, costs and scores are refused."));
+    return card;
+  }
+
   /* ------------------------------------------------------------------- boot */
   function mount() {
     var host = document.querySelector(".db-head__actions");
@@ -250,10 +404,16 @@
     b.addEventListener("click", function () { load().then(function (ok) { if (ok) open(); }); });
     host.insertBefore(b, host.firstChild);
   }
+  function wanted() { var m = /[#&]edit=(report|checks|insights|content)/.exec(location.hash || ""); return m ? m[1] : null; }
   function start() {
     TOKEN = token();
     if (!TOKEN) return;
-    api("GET", "/api/edit/campaign?t=" + encodeURIComponent(TOKEN)).then(function (r) { if (r.s === 200) { D = r.b; mount(); } });
+    api("GET", "/api/edit/campaign?t=" + encodeURIComponent(TOKEN)).then(function (r) {
+      if (r.s !== 200) return;
+      D = r.b; mount();
+      var w = wanted();                       // a "Needs you" or bell link: open straight on that tab
+      if (w) { TAB = w; open(); }
+    });
   }
   // The report draws after the campaign loads; the header is there once #cat-app is shown.
   var app = $("cat-app");

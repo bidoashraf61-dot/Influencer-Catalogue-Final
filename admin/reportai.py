@@ -207,7 +207,7 @@ def _tell_kam(k, period):
         if u is not None and u["status"] == "active":
             inbox.emit([u["id"]], "team_report", "%s draft ready to approve:" % label(period), rest=" " + k["name"],
                        body="Read it, edit if needed, then approve to show it to the client.",
-                       href="campaign/#t=%s&edit=report" % k["token"], ref="rep:%d:%s" % (k["id"], period), once=True)
+                       href="campaign/dashboard/#t=%s&edit=report" % k["token"], ref="rep:%d:%s" % (k["id"], period), once=True)
     except Exception:
         pass
 

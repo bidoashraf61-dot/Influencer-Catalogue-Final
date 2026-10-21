@@ -29,6 +29,7 @@
   var HV_LOGO = ROOT + "assets/brand/logo.png";
   var API_BASE = (((window.CATALOGUE_CONFIG || {}).api != null ? window.CATALOGUE_CONFIG.api : "/admin") + "").replace(/\/$/, "");
   var ICON = {
+    spark: '<path d="M12 3.5l1.9 5.1 5.1 1.9-5.1 1.9-1.9 5.1-1.9-5.1-5.1-1.9 5.1-1.9z"/><path d="M18.5 16l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z"/>',
     pin: '<path d="M9 4h6l-1 5 3 3v2H7v-2l3-3-1-5z"/><path d="M12 14v6"/>',
     chev: '<path d="M6 9l6 6 6-6"/>',
     arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
@@ -140,7 +141,7 @@
       sels: (c.selections || []).map(function (s) { return { label: s.name, href: ROOT + "selection/#s=" + encodeURIComponent(s.token) }; }),
       dash: c.report ? ROOT + "campaign/dashboard/#t=" + encodeURIComponent(c.token) : "",
       briefs: c.briefs || [], canEdit: !!c.can_edit, edit: c.edit || null,
-      next: c.next || null, activity: c.activity || [], kamEmail: c.kam && c.kam.email ? c.kam.email.toLowerCase() : "",
+      next: c.next || null, suggest: c.suggest || null, activity: c.activity || [], kamEmail: c.kam && c.kam.email ? c.kam.email.toLowerCase() : "",
       progress: p && p.planned ? { done: p.live || 0, of: p.planned } : null,
       links: (c.selections || []).map(function (s) {
         return { label: s.name, sub: s.creators + (s.creators === 1 ? " creator" : " creators"), href: ROOT + "selection/#s=" + encodeURIComponent(s.token) };
@@ -214,6 +215,23 @@
     return h("p", { class: "hvb-next" + (n.overdue ? " is-late" : "") }, svg("flag"),
       h("span", null, h("b", null, "Next: "), n.text || "Set a next step"),
       n.due ? h("span", { class: "hvb-due" + (n.overdue ? " is-late" : "") }, (n.overdue ? "Was due " : "Due ") + dm(n.due)) : null);
+  }
+  // Item 218: a next step the rules suggest (team only). "Use" makes it the card's own next step, with its due date.
+  function suggestLine(it, B) {
+    var s = it.suggest;
+    var use = h("button", { type: "button", class: "hvb-sug__use", "aria-label": "Use as next step: " + s.text }, "Use");
+    var line = h("p", { class: "hvb-sug" }, svg("spark"),
+      h("span", { class: "hvb-sug__t" }, h("b", null, "Suggested: "), s.text, s.why ? h("small", null, s.why) : null), use);
+    use.addEventListener("click", function () {
+      use.disabled = true; use.textContent = "Saving…";
+      call("POST", "/api/board/edit", { t: it.raw.token, next: s.text, due: ymd(s.due) }).then(function (r) {
+        if (r.b && r.b.ok) {
+          line.classList.add("is-done"); use.textContent = "Saved";
+          if (B && B.opts && B.opts.onChange) B.opts.onChange();
+        } else { use.disabled = false; use.textContent = "Use"; line.title = (r.b && r.b.message) || "Could not save. Try again."; }
+      });
+    });
+    return line;
   }
   function trackPill(t) { return h("span", { class: "hvb-track hvb-track--" + t.grade, title: "Against the campaign's goal, as the dashboard reads it" }, t.label); }
   // Item 203: "Open selection" (a short list when the campaign holds several) and "Open dashboard".
@@ -789,6 +807,7 @@
         it.badge, meta ? h("span", null, meta) : null));
     }
     if (it.next) put(nextLine(it.next));
+    if (it.suggest && it.canEdit && it.suggest.key !== "overdue") put(suggestLine(it, B));
     put(figures(it));
     if (it.signal || it.progress) {
       put(h("div", { class: "hvb-card__perf" }, it.progress ? progress(it.progress) : null,

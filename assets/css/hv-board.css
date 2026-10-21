@@ -655,3 +655,17 @@ div.hvb-q__head { grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); cursor
 @media (max-width: 899px) { .hvb-band__dots { display: inline-flex; } .hvb-band__dot:not(.is-on) { display: none; } .hvb-cell.is-empty { display: none; } }
 .hvb-band__dots { margin-left: 6px; justify-content: flex-start; }
 .hvb-band__head { flex-wrap: wrap; row-gap: 8px; text-align: left; }
+
+/* ---------------------------------------------- item 218: a suggested next step (team only) */
+.hvb-sug { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; margin: 6px 0 0; padding: 8px 8px 8px 10px;
+  border-radius: 10px; border: 1px dashed rgba(18,18,18,.22); background: #fff; font-size: 13px; line-height: 1.4; color: var(--ink); }
+.hvb-sug svg { width: 16px; height: 16px; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linejoin: round; }
+.hvb-sug__t b { font-weight: 700; }
+.hvb-sug__t small { display: block; margin-top: 2px; font-size: 12px; color: var(--gray); }
+.hvb-sug__use { grid-column: 2; justify-self: start; min-height: 32px; padding: 0 12px; border-radius: var(--r-pill, 999px); border: 1px solid var(--lime); background: var(--lime); color: var(--ink);
+  font: 400 16px/1 var(--heading, Bebasneue, Arial, sans-serif); letter-spacing: .06em; cursor: pointer; white-space: nowrap; }
+.hvb-sug__use:hover { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.hvb-sug__use:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.hvb-sug__use[disabled] { cursor: default; opacity: .7; }
+.hvb-sug.is-done { border-style: solid; border-color: #14884a; background: #e7f7ed; }
+.hvb-sug.is-done .hvb-sug__use { background: transparent; border-color: transparent; color: #0f6b3a; opacity: 1; }

@@ -119,6 +119,20 @@
     $("db-pdf").href = "../#t=" + TOKEN;
     $("db-pdf").addEventListener("click", function () { try { sessionStorage.setItem("hv_print", "1"); } catch (e) {} });
     renderFresh();
+    renderSummary();
+  }
+
+  // Item 218: the account manager's approved summary (Helvi drafts it, HelloVoice approves it). One line on the
+  // board; the whole text opens in the side panel. Nothing shows until a summary has been approved.
+  function renderSummary() {
+    var S = R.summary, el = $("db-summary");
+    if (!el) return;
+    if (!S || !S.summary) { el.hidden = true; return; }
+    var first = String(S.summary).split(/(?<=[.!?])\s+/)[0];
+    el.innerHTML = '<span class="db-said__tag">From HelloVoice<small>' + esc(S.label) + (S.at ? " · " + day(S.at) : "") + "</small></span>"
+      + '<p class="db-said__line">' + esc(first) + "</p>"
+      + '<button type="button" class="db-said__go" data-area="summary">Read the summary<span aria-hidden="true"> ›</span></button>';
+    el.hidden = false;
   }
 
   // When the data was last captured, and a live countdown to the next capture.
@@ -1533,6 +1547,16 @@
   }
 
   var PANEL = {
+    summary: function () {
+      var S = R.summary || {};
+      function list(key, title) {
+        var xs = S[key] || [];
+        return xs.length ? '<section class="db-sum__col db-sum__col--' + key + '"><h3>' + title + "</h3><ul>" + xs.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul></section>" : "";
+      }
+      return '<article class="db-sum"><p class="db-sum__by">' + esc(S.label || "Summary") + (S.at ? " · approved " + day(S.at) : "") + " · from your HelloVoice team</p>"
+        + '<p class="db-sum__lead">' + esc(S.summary || "") + "</p>"
+        + '<div class="db-sum__cols">' + list("worked", "What worked") + list("improve", "To improve") + list("next", "Next steps") + "</div></article>";
+    },
     kpi: function () {
       var sc = scope(), P = SP() || {}, items = P.items || [], t = R.total, plan = R.plan || {}, pb = sc.mode === "plat" ? (sc.bp.bench || {}) : (plan.benchmark || {}), g = GL();
       var o = R.objective || {}, lead = o.kpis || [];
@@ -1841,7 +1865,7 @@
       + (p.caption ? '<p class="db-post__cap">' + esc(p.caption) + "</p>" : "")
       + '<div class="db-post__stats">' + stats(p).map(function (x) { return "<div><small>" + x[0] + "</small><b>" + x[1] + "</b></div>"; }).join("") + "</div></a>";
   }
-  var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "What people say", plat: "Platforms", clicks: "Affiliate clicks" };
+  var TITLES = { summary: "Summary from HelloVoice", kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "What people say", plat: "Platforms", clicks: "Affiliate clicks" };
   var lastFocus = null, curArea = null;
   function openPanel(area) {
     if (!PANEL[area]) return;

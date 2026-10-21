@@ -101,7 +101,7 @@ def suggest(k, stage, numbers=None, posts=None, now=None):
                     "why": "Ended %d days ago" % max(0, int((now - k["ends_at"]) // DAY))}
     if stage in ("draft", "shortlisting") and quiet >= QUIET_DAYS:
         return {"key": "quiet", "text": "Follow up: nothing has moved for %d days" % quiet, "due": today + _days(1),
-                "why": "Still at %s" % stage}
+                "why": "Still in %s" % stage.capitalize()}
     return None
 
 
