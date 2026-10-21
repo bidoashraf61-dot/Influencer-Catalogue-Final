@@ -1206,7 +1206,10 @@ def refresh_all():
         return 0
     try:
         with db.connect() as conn:
-            live = conn.execute("SELECT * FROM api_runs WHERE status = 'RUNNING' AND apify_run IS NOT NULL").fetchall()
+            # Comment runs belong to comments.py, which reads them and never keeps the commenters (2026-10-21: this
+            # poller used to take them first, keep the raw items with commenter names and leave the comments unread).
+            live = conn.execute("SELECT * FROM api_runs WHERE status = 'RUNNING' AND apify_run IS NOT NULL "
+                                "AND NOT (job_id IS NULL AND job_name LIKE 'Comments ·%')").fetchall()
         for r in live:
             refresh_run(r)
         pump()
