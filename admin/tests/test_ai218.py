@@ -154,6 +154,7 @@ class TeamAI(unittest.TestCase):
             aifeatures.save("compliance", on=False)
 
     def test_04_job_and_needs_queue(self):
+        db.set_setting(postcheck.SEEDED, True)
         postcheck.tick()
         g = {x["key"]: x for x in self.kam.get("/api/needs")[1]["groups"]}
         self.assertIn("flags", g)
@@ -214,6 +215,18 @@ class TeamAI(unittest.TestCase):
         aifeatures.save("compliance", on=True, cap=7)
         self.assertEqual(aifeatures.conf("compliance"), {"on": True, "cap": 7.0})
         aifeatures.save("compliance", on=False, cap=15)
+
+    def test_12_first_pass_is_quiet(self):
+        cid = self._post("HV-MI-001", "https://www.instagram.com/p/old-nodisc/", "Old post #polyco #glowup")
+        db.set_setting(postcheck.SEEDED, False)
+        with db.connect() as conn:
+            before = conn.execute("SELECT COUNT(*) FROM notifications WHERE kind = 'team_flag'").fetchone()[0]
+        postcheck.tick()
+        with db.connect() as conn:
+            after = conn.execute("SELECT COUNT(*) FROM notifications WHERE kind = 'team_flag'").fetchone()[0]
+        self.assertEqual(before, after, "no bells on the first pass")
+        self.assertEqual(postcheck.of_campaign(TeamAI.k1)[cid]["status"], "fail")
+        self.assertTrue(db.setting(postcheck.SEEDED, False))
 
     def test_10_due_at_nine_riyadh(self):
         import calendar

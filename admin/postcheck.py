@@ -150,8 +150,8 @@ def _status(reasons):
     return max((r["level"] for r in reasons if r["level"] != "none"), key=lambda lv: LEVEL[lv])
 
 
-def check(item, k=None, force=False):
-    """Check one post (a content row). Returns the stored result as a dict."""
+def check(item, k=None, force=False, quiet=False):
+    """Check one post (a content row). Returns the stored result as a dict. ``quiet`` stores it without the KAM's bell."""
     init()
     k = k or db.campaign(item["campaign_id"])
     with db.connect() as conn:
@@ -181,7 +181,11 @@ def check(item, k=None, force=False):
              old["told_at"] if same_text else None))
         row = conn.execute("SELECT * FROM content_checks WHERE content_id = ?", (item["id"],)).fetchone()
     if status == "fail" and not row["told_at"] and not row["cleared_at"]:
-        _tell_kam(k, item, reasons)
+        if quiet:
+            with db.connect() as conn:
+                conn.execute("UPDATE content_checks SET told_at = ? WHERE content_id = ?", (db.now(), item["id"]))
+        else:
+            _tell_kam(k, item, reasons)
     return _shape(row)
 
 
@@ -278,8 +282,24 @@ def pending(limit=BATCH):
     return rows
 
 
+SEEDED = "postcheck_seeded"
+
+
 def tick():
+    """One pass. The very first pass after deploy is quiet: posts already up get their check stored without a
+    bell (old news), so turning this on never floods the account managers; only new posts ring."""
     init()
+    quiet = not db.setting(SEEDED, False)
+    if quiet:
+        done = 0
+        for item in pending(limit=100000):
+            try:
+                check(item, quiet=True)
+                done += 1
+            except Exception as exc:
+                print("postcheck: seed %s %s" % (item["id"], repr(exc)[:160]), flush=True)
+        db.set_setting(SEEDED, True)
+        return done
     import aifeatures
     want_ai = aifeatures.allowed("compliance")
     done = 0
