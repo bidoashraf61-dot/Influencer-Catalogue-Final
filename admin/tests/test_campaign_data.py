@@ -245,5 +245,50 @@ class CampaignData(unittest.TestCase):
         self.assertEqual((s, b.get("reason")), (429, "limit"))                                # the 10 are shared
 
 
+    # ------------------------------------------------- comments: new only (owner, 2026-10-21)
+    def test_comments_new_only_and_new_actors(self):
+        import comments as cm
+        cm.init()
+        now = int(time.time())
+        k = db.create_campaign("New only", client="NewOnly")
+        db.save_campaign(k, status="live", starts_at=now - 10 * DAY, ends_at=now + 20 * DAY)
+        db.add_campaign_creators(k, ["HV-MI-001"])
+        ig = self._post(k, "HV-MI-001", "Instagram", "https://www.instagram.com/reel/NEWONLY1/")
+        tt = self._post(k, "HV-MI-001", "TikTok", "https://www.tiktok.com/@noha/video/7700000000000000001")
+        yt = self._post(k, "HV-MI-001", "YouTube", "https://www.youtube.com/shorts/NEWONLYyt1")
+        with db.connect() as conn:
+            for cid in (ig, tt, yt):
+                conn.execute("INSERT INTO snapshots (content_id, at, comments) VALUES (?,?,?)", (cid, now, 100))
+            # never read: everything is read in full
+            self.assertEqual(cm._plan(conn, "Instagram", [ig])[:2], (100, None))
+            for cid, plat in ((ig, "Instagram"), (tt, "TikTok"), (yt, "YouTube")):
+                conn.execute("INSERT INTO comment_reads (content_id,campaign_id,platform,read_no,due_at,status,finished_at) "
+                             "VALUES (?,?,?,?,?,?,?)", (cid, k, plat, 1, now - 3 * DAY, "done", now - 3 * DAY))
+                for i in range(90):
+                    conn.execute("INSERT INTO comments (content_id,campaign_id,code,platform,ext_id,text,read_at) VALUES (?,?,?,?,?,?,?)",
+                                 (cid, k, "HV-MI-001", plat, "x%d" % i, "c%d" % i, now))
+            n, since, est = cm._plan(conn, "Instagram", [ig])
+            self.assertEqual((n, since), (10 + cm.MARGIN, None))                    # 10 new + margin, newest first
+            n, since, est = cm._plan(conn, "YouTube", [yt])
+            self.assertEqual((n, since), (cm.MAX_PER_POST, 4))                      # only comments since the last read
+            n, since, est = cm._plan(conn, "TikTok", [tt])
+            self.assertEqual((n, since), (100, None))                               # no date filter: full, cheap
+            self.assertAlmostEqual(est, 100 * 0.0003)
+        b = cm.ACTORS["Instagram"][2](["u1", "u2"], 25, None)
+        self.assertEqual((b["maxCommentsPerPost"], b["sortOrder"]), (25, "recent"))
+        self.assertEqual(cm.ACTORS["TikTok"][2](["u1", "u2"], 100, None)["maxItems"], 200)
+        self.assertIn("oldestCommentDate", cm.ACTORS["YouTube"][2](["u"], 300, 4))
+        self.assertEqual(cm.ACTORS["Facebook"][2](["u"], 300, 4)["onlyCommentsNewerThan"], "4 days")
+        # the new actors' items parse, map to their post and keep the old comment ids
+        it = {"postUrl": "https://www.instagram.com/reel/NEWONLY1/", "commentId": "1786", "text": "hi", "timestamp": 1792310082, "likesCount": 1}
+        self.assertEqual(cm._parse(it), ("1786", "hi", 1792310082, 1))
+        self.assertIn("NEWONLY1", cm._item_keys("Instagram", it))
+        it = {"inputSource": "https://www.tiktok.com/@noha/video/7700000000000000001", "id": "7698", "text": "yo",
+              "createdAt": "2026-10-19T13:34:36.000Z", "likeCount": 2}
+        ext, text, when, likes = cm._parse(it)
+        self.assertEqual((ext, likes), ("7698", 2)); self.assertTrue(when > 1.7e9)
+        self.assertIn("7700000000000000001", cm._item_keys("TikTok", it))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

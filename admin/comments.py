@@ -34,18 +34,26 @@ MIN_SAMPLE = 30              # under this the client sees counts, not percentage
 MAX_QUOTES = 6
 WEEKLY_KEY = "comments_weekly"   # setting {campaign id: "YYYY-MM-DD"}: re-read every video weekly until that day
 
-# platform: (actor, USD per comment at the account's tier, input builder)
+# platform: (actor, USD per comment at the account's tier, input builder(urls, n, since)). Owner, 2026-10-21:
+# a re-read pays only for what is new where the platform allows it. Instagram: newest first, n = the new comments
+# expected (+ a margin); YouTube and Facebook: only comments after the last read (since = a date / "N days");
+# TikTok has no date filter, so the full thread is read with a 4x cheaper actor. maxItems there is the run total.
+# Tested on Jamjoom 2026-10-21: comment ids match the old actors' ids, so nothing is stored twice.
 ACTORS = {
-    "Instagram": ("apify~instagram-comment-scraper", 0.0026,
-                  lambda urls, n, since: {"directUrls": urls, "resultsLimit": n}),
-    "TikTok": ("clockworks~tiktok-comments-scraper", 0.00125,
-               lambda urls, n, since: {"postURLs": urls, "commentsPerPost": n, "maxRepliesPerComment": 0}),
+    "Instagram": ("scrapesmith~instagram-comments-scraper", 0.0005,
+                  lambda urls, n, since: {"postUrls": urls, "maxCommentsPerPost": n, "sortOrder": "recent"}),
+    "TikTok": ("apidojo~tiktok-comments-scraper", 0.0003,
+               lambda urls, n, since: {"startUrls": urls, "includeReplies": False, "maxItems": n * len(urls)}),
     "Facebook": ("apify~facebook-comments-scraper", 0.0025,
                  lambda urls, n, since: dict({"startUrls": [{"url": x} for x in urls], "resultsLimit": n},
-                                             **({"onlyCommentsNewerThan": since} if since else {}))),
+                                             **({"onlyCommentsNewerThan": "%d days" % since} if since else {}))),
     "YouTube": ("streamers~youtube-comments-scraper", 0.002,
-                lambda urls, n, since: {"startUrls": [{"url": x} for x in urls], "maxComments": n}),
+                lambda urls, n, since: dict({"startUrls": [{"url": x} for x in urls], "maxComments": n, "sortCommentsBy": "NEWEST_FIRST"},
+                                            **({"oldestCommentDate": time.strftime("%Y-%m-%d", time.gmtime(time.time() - since * 86400))}
+                                               if since else {}))),
 }
+NEW_ONLY = ("Instagram", "Facebook", "YouTube")
+MARGIN = 15                  # extra newest comments read on Instagram, for counts that lag
 FLAGS = {"complaint": "Complaint", "side_effect": "Side-effect claim", "misinformation": "Misinformation",
          "regulatory": "Regulatory risk", "abuse": "Abuse"}
 
@@ -122,7 +130,7 @@ def post_key(platform, url):
     return re.sub(r"^https?://(www\.|m\.)?", "", u.lower()).split("#")[0].rstrip("/")
 
 
-_URL_FIELDS = ("postUrl", "inputUrl", "videoWebUrl", "submittedVideoUrl", "pageUrl", "facebookUrl", "url", "videoUrl")
+_URL_FIELDS = ("postUrl", "inputUrl", "inputSource", "videoWebUrl", "submittedVideoUrl", "pageUrl", "facebookUrl", "url", "videoUrl")
 
 
 def _item_keys(platform, item):
@@ -135,7 +143,10 @@ def _item_keys(platform, item):
 
 
 def _when(item):
-    for f in ("timestamp", "createTimeISO", "date", "publishedAt", "postedAt"):
+    v = item.get("timestamp")
+    if isinstance(v, (int, float)) and v > 1e9:
+        return int(v)
+    for f in ("timestamp", "createTimeISO", "createdAt", "date", "publishedAt", "postedAt"):
         v = item.get(f)
         if isinstance(v, str) and len(v) >= 10:
             try:
@@ -154,7 +165,7 @@ def _parse(item):
     text = item.get("text") if isinstance(item.get("text"), str) else item.get("comment")
     if not ext or not isinstance(text, str) or not text.strip():
         return None
-    likes = next((item.get(f) for f in ("likesCount", "diggCount", "voteCount", "likes") if isinstance(item.get(f), int)), None)
+    likes = next((item.get(f) for f in ("likesCount", "likeCount", "diggCount", "voteCount", "likes") if isinstance(item.get(f), int)), None)
     return str(ext)[:120], text.strip()[:1000], _when(item), likes
 
 
@@ -247,10 +258,38 @@ def _videos(conn, cid):
                         (int(cid),)).fetchall()
 
 
+def _need(conn, content_id):
+    """(comments expected, comments already stored, last read finished at) for one post."""
+    stored = conn.execute("SELECT COUNT(*) FROM comments WHERE content_id = ?", (content_id,)).fetchone()[0]
+    last = conn.execute("SELECT MAX(finished_at) FROM comment_reads WHERE content_id = ? AND finished_at IS NOT NULL",
+                        (content_id,)).fetchone()[0]
+    return _expected(conn, content_id), stored, last
+
+
+def _plan(conn, platform, content_ids):
+    """(n, since_days, est_usd) for one run over these posts. A post never read is read in full; once every
+    post has been read, the platforms that allow it ask only for what came since."""
+    each = ACTORS[platform][1]
+    needs = [_need(conn, c) for c in content_ids]
+    if platform in NEW_ONLY and needs and all(last for _, _, last in needs):
+        new = [max(0, exp - got) for exp, got, _ in needs]
+        if platform == "Instagram":
+            n = min(MAX_PER_POST, max(new) + MARGIN)
+            return n, None, n * len(needs) * each
+        since = max(1, int((time.time() - min(last for _, _, last in needs)) // 86400) + 1)
+        return MAX_PER_POST, since, (sum(new) + len(needs)) * each
+    n = min(MAX_PER_POST, max(exp for exp, _, _ in needs)) if needs else MAX_PER_POST
+    return n, None, sum(exp for exp, _, _ in needs) * each
+
+
 def fetch_estimate(cid):
-    """USD a manual fetch of every video's comments would cost at most (comments per post as last captured)."""
+    """USD a manual fetch of every video's comments would cost (new comments only where the platform allows it)."""
     with db.connect() as conn:
-        return round(sum(_expected(conn, v["id"]) * ACTORS[v["platform"]][1] for v in _videos(conn, cid) if v["platform"] in ACTORS), 2)
+        by = {}
+        for v in _videos(conn, cid):
+            if v["platform"] in ACTORS:
+                by.setdefault(v["platform"], []).append(v["id"])
+        return round(sum(_plan(conn, p, ids)[2] for p, ids in by.items()), 2)
 
 
 def fetch_now(cid):
@@ -340,16 +379,15 @@ def start_due(now=None):
     for (platform, no), reads in groups.items():
         actor, each, build = ACTORS[platform]
         with db.connect() as conn:
-            est = sum(_expected(conn, r["content_id"]) for r in reads) * each
+            n, since, est = _plan(conn, platform, list(dict.fromkeys(r["content_id"] for r in reads)))
         if apify.spent_this_month() + est > apify.budget():
             with db.connect() as conn:
                 conn.executemany("UPDATE comment_reads SET message = ? WHERE id = ?",
                                  [("Waiting: the monthly Apify budget would be passed.", r["id"]) for r in reads])
             continue
         urls = list(dict.fromkeys(r["url"] for r in reads))
-        since = "6 days" if platform == "Facebook" and no == 2 else None
         try:
-            d = apify.call("POST", "/acts/%s/runs" % actor, build(urls, MAX_PER_POST, since),
+            d = apify.call("POST", "/acts/%s/runs" % actor, build(urls, n, since),
                            params={"maxTotalChargeUsd": "%.2f" % max(0.5, est * 1.5)}).get("data") or {}
         except Exception as exc:
             with db.connect() as conn:
