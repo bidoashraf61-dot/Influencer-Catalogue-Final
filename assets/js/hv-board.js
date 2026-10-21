@@ -1229,6 +1229,7 @@
     function redraw() { if (opts.view === "table") table(); else draw(); }
     redraw();
     host.appendChild(root);
+    dockRoom(root, tools);
     if (opts.view === "table") return B;
     requestAnimationFrame(edges);
     // Open on the first column that holds something, so a phone never lands on an empty Draft.
@@ -1238,6 +1239,36 @@
     else mark();
     return B;
   }
+
+  /* ------------------------------------------------ room for the floating dock (item 210) */
+  // Pages with the floating bell + avatar dock (campaign tracking) keep the board's tools in a sticky
+  // top bar that leaves the dock's corner free, so the dock never covers Group by client / Expand all
+  // and no card scrolls under it. Measured from the dock itself; a dock dragged away frees the room.
+  function dockRoom(root, tools) {
+    var dock = document.querySelector(".pt-dock--fixed");
+    if (!dock) return;
+    root.classList.add("has-dock");
+    tools.appendChild(h("span", { class: "hvb-tools__dock", "aria-hidden": "true" }));
+    tools.appendChild(h("span", { class: "hvb-tools__br", "aria-hidden": "true" }));
+    function fit() {
+      var b = dock.getBoundingClientRect(), vw = document.documentElement.clientWidth;
+      var inCorner = b.width > 0 && b.top < 120 && vw - b.right < 60;
+      var tb = tools.getBoundingClientRect();
+      tools.style.setProperty("--hvb-dock-w", inCorner ? Math.max(0, Math.ceil(tb.right - b.left + 8)) + "px" : "0px");
+      tools.style.setProperty("--hvb-dock-h", inCorner ? Math.ceil(b.bottom + 8) + "px" : "0px");
+    }
+    fit();
+    setTimeout(fit, 600);                                          // the dock fills in after /api/me
+    // The board remounts on every reload: one set of listeners, always fitting the newest board.
+    DOCK_FIT = fit;
+    if (dockWired) return;
+    dockWired = true;
+    var again = function () { setTimeout(function () { if (DOCK_FIT) DOCK_FIT(); }, 50); };
+    window.addEventListener("resize", again, { passive: true });
+    document.addEventListener("pointerup", again, { passive: true });
+    if (window.ResizeObserver) new ResizeObserver(again).observe(dock);
+  }
+  var DOCK_FIT = null, dockWired = false;
 
   /* ------------------------------------------------------- Board | List */
   // The view switch in a section head. The choice is remembered per section in this browser only.
