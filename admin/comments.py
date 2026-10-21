@@ -288,8 +288,8 @@ def fetch_estimate(cid):
         by = {}
         for v in _videos(conn, cid):
             if v["platform"] in ACTORS:
-                by.setdefault(v["platform"], []).append(v["id"])
-        return round(sum(_plan(conn, p, ids)[2] for p, ids in by.items()), 2)
+                by.setdefault((v["platform"], bool(_need(conn, v["id"])[2])), []).append(v["id"])
+        return round(sum(_plan(conn, p, ids)[2] for (p, _), ids in by.items()), 2)
 
 
 def fetch_now(cid):
@@ -374,9 +374,12 @@ def start_due(now=None):
         due = conn.execute("SELECT r.*, c.url FROM comment_reads r JOIN content c ON c.id = r.content_id "
                            "WHERE r.status = 'due' AND r.due_at <= ? ORDER BY r.due_at LIMIT 200", (now,)).fetchall()
     groups = {}
-    for r in due:
-        groups.setdefault((r["platform"], r["read_no"]), []).append(r)
-    for (platform, no), reads in groups.items():
+    with db.connect() as conn:
+        for r in due:
+            # posts read before and posts never read go in separate runs, so the first can ask for new comments only
+            seen = bool(_need(conn, r["content_id"])[2])
+            groups.setdefault((r["platform"], r["read_no"], seen), []).append(r)
+    for (platform, no, _seen), reads in groups.items():
         actor, each, build = ACTORS[platform]
         with db.connect() as conn:
             n, since, est = _plan(conn, platform, list(dict.fromkeys(r["content_id"] for r in reads)))
