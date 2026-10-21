@@ -134,7 +134,6 @@ GROUPS = [
     ("quotes", "Quotes without a reply", "Requested from a selection; answered in the admin"),
     ("analyses", "Analysis requests", "Approve opens the analysis for the person who asked"),
     ("access", "Access requests", "Someone asked to open a selection; answered in the admin"),
-    ("reports", "Reports to approve", "Helvi drafted them; the client sees each one once you approve"),
     ("flags", "Posts flagged", "Disclosure, missing tags or claim wording; clients never see flags"),
     ("red", "Accounts at risk", "The worst signal decides; the reason is on each row"),
 ]
@@ -153,10 +152,9 @@ def queue(role, a, mine_only=False):
     steps, red = _company_steps(role, a)
     found["overdue"] = sorted(found["overdue"] + steps, key=lambda x: x["at"] or 0)
     found["red"] = red
-    # Item 218: report drafts and flagged posts, in the same scope as the board.
-    import postcheck, reportai
+    # Item 218: flagged posts, in the same scope as the board.
+    import postcheck
     ok = lambda r: _mine(scope, r["code_id"]) or (scope is not None and r["cid"] in (getattr(scope, "camp_ids", None) or ()))
-    found["reports"] = reportai.waiting(ok)
     found["flags"] = postcheck.flagged(ok)
     groups = []
     for key, title, hint in GROUPS:

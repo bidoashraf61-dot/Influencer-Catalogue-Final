@@ -333,7 +333,7 @@ def team_ai_card():
                  % (r["key"], " checked" if r["on"] else "", e(r["label"]), e(state), e(r["hint"]), r["key"], r["cap"], r["spent"], r["cap"]))
     return ("<div class='card'><h2>Team AI</h2><p class='sec-desc'>Helpers for the HelloVoice team (item 218). Free for staff, never "
             "charged to a client. Each one stops on its own when its cap is reached; the monthly AI budget below still applies. "
-            "The free rule checks (missing disclosure or tags, overdue steps, the 9:00 digest) run whether these are on or not.</p>"
+            "The free rule checks (missing disclosure or tags, overdue steps, the 9:00 digest itself) run whether these are on or not.</p>"
             "<input type='hidden' name='team_ai_form' value='1'>" + rows + "</div>")
 
 

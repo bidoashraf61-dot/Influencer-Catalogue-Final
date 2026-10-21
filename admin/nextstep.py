@@ -2,12 +2,12 @@
 
 Suggestions are rules, free and instant: each staff card on the campaign board gets one suggested next step
 with a due date, read from what the board already knows (stage, how long nothing moved, posts against plan,
-the dashboard's verdict) plus the report drafts and post flags waiting. "Use" copies it into the card's own
+the dashboard's verdict) plus the post flags waiting. "Use" copies it into the card's own
 next step (the existing board edit), so nothing changes until someone presses it. Clients never see these.
 
 The digest: once a day at 9:00 Riyadh time, every active admin and account manager with something waiting gets
 one bell + phone push (``team_digest``) listing their top five, worst first: overdue steps, flagged posts,
-report drafts, then the suggestions. Admins see every client, a KAM her own (the same scope as "Needs you").
+then the suggestions. Admins see every client, a KAM her own (the same scope as "Needs you").
 The lines are rule-written; when the "nextstep" AI helper is on, one light Gemini call per person rewords them
 into a friendlier message (never adds or drops an item).
 """
@@ -25,7 +25,7 @@ TOP = 5
 QUIET_DAYS = 7          # a planning card with no change for this long gets a nudge
 _started = False
 
-PRIORITY = {"overdue": 0, "flags": 1, "report": 2, "behind": 3, "chase_posts": 4, "review": 5, "golive": 6, "wrapup": 7, "quiet": 8}
+PRIORITY = {"overdue": 0, "flags": 1, "behind": 3, "chase_posts": 4, "review": 5, "golive": 6, "wrapup": 7, "quiet": 8}
 
 
 def _days(n):
@@ -39,37 +39,28 @@ def _today_end(now=None):
     return int((datetime.datetime(d.year, d.month, d.day) - datetime.datetime(1970, 1, 1)).total_seconds()) - RIYADH + DAY - 1
 
 
-def _waiting(cid):
-    """(report drafts waiting, flagged posts) for one campaign. Cheap: two counts."""
+def _flags(cid):
+    """Flagged posts waiting for one campaign. Cheap: one count."""
     import postcheck
-    import reportai
-    reportai.init()
     postcheck.init()
     with db.connect() as conn:
-        rep = conn.execute("SELECT period FROM campaign_reports WHERE campaign_id = ? AND status = 'draft' ORDER BY created_at DESC LIMIT 1",
-                           (cid,)).fetchone()
-        flags = conn.execute("SELECT COUNT(*) FROM content_checks x JOIN content c ON c.id = x.content_id AND c.hidden = 0 "
-                             "WHERE x.campaign_id = ? AND x.status = 'fail' AND x.cleared_at IS NULL", (cid,)).fetchone()[0]
-    return (rep["period"] if rep else None), flags
+        return conn.execute("SELECT COUNT(*) FROM content_checks x JOIN content c ON c.id = x.content_id AND c.hidden = 0 "
+                            "WHERE x.campaign_id = ? AND x.status = 'fail' AND x.cleared_at IS NULL", (cid,)).fetchone()[0]
 
 
 def suggest(k, stage, numbers=None, posts=None, now=None):
     """One suggestion for a campaign card: {"key", "text", "due", "why"}, or None. Rules only."""
-    import reportai
     now = now or db.now()
     today = _today_end(now)
     ns = (k["next_step"] if "next_step" in k.keys() else None) or ""
     nd = k["next_due"] if "next_due" in k.keys() else None
-    rep, flags = _waiting(k["id"])
+    flags = _flags(k["id"])
     if ns and nd and nd + DAY <= now:
         late = int((now - nd) // DAY)
         return {"key": "overdue", "text": ns, "due": today, "why": "Overdue by %d day%s" % (late, "" if late == 1 else "s")}
     if flags:
         return {"key": "flags", "text": "Check %d flagged post%s" % (flags, "" if flags == 1 else "s"), "due": today,
                 "why": "Disclosure, tags or claim wording"}
-    if rep:
-        return {"key": "report", "text": "Approve the %s" % reportai.label(rep).lower(), "due": today,
-                "why": "Helvi wrote a draft; the client sees it once approved"}
     quiet = int((now - (k["updated_at"] or now)) // DAY)
     if stage == "live":
         v = ((numbers or {}).get("verdict") or {}).get("grade")
@@ -92,13 +83,8 @@ def suggest(k, stage, numbers=None, posts=None, now=None):
         return {"key": "golive", "text": "Set the start date and go live", "due": today + _days(2),
                 "why": "Agreed but not live yet"}
     if stage == "completed" and k["ends_at"] and now - k["ends_at"] <= _days(21):
-        try:
-            final = reportai.row(k["id"], "final")
-        except Exception:
-            final = None
-        if final is None or final["status"] != "approved":
-            return {"key": "wrapup", "text": "Send the final report and pitch the next campaign", "due": today + _days(3),
-                    "why": "Ended %d days ago" % max(0, int((now - k["ends_at"]) // DAY))}
+        return {"key": "wrapup", "text": "Share the final report and pitch the next campaign", "due": today + _days(3),
+                "why": "Ended %d days ago" % max(0, int((now - k["ends_at"]) // DAY))}
     if stage in ("draft", "shortlisting") and quiet >= QUIET_DAYS:
         return {"key": "quiet", "text": "Follow up: nothing has moved for %d days" % quiet, "due": today + _days(1),
                 "why": "Still in %s" % stage.capitalize()}

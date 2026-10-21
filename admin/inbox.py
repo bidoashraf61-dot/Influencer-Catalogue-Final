@@ -46,7 +46,7 @@ KINDS = {
     "camp_live": "campaigns", "camp_report": "campaigns", "camp_final": "campaigns",
     "camp_shared": "campaigns", "camp_stage": "campaigns",
     "camp_weekly": "campaigns", "camp_next": "campaigns",
-    "team_report": "campaigns", "team_flag": "campaigns", "team_digest": "campaigns",   # staff only (item 218)
+    "team_flag": "campaigns", "team_digest": "campaigns",   # staff only (item 218)
     "camp_goal": "campaigns", "camp_views": "campaigns", "camp_posts": "campaigns",   # milestones (push.milestones)
     "announce": "account",                                                             # a manual push from HelloVoice
     "credits_low": "account", "credits_monthly": "account", "credits_added": "account", "colleague": "account",

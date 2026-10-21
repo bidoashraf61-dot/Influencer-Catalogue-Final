@@ -5,7 +5,6 @@ Staff never pay credits for these. Each helper has an on/off switch and a monthl
 from ``ai_audit`` by the helper's own ``kind``, so the cap is the real bill, and the shared monthly budget in
 gemini.generate still applies on top. Every helper ships OFF: nothing is spent until Bido switches it on.
 
-    report       the weekly / final campaign report draft the KAM approves       kind "report_ai"
     compliance   the claim / brief check on each new post's caption               kind "post_check"
     nextstep     the wording of the daily next-step digest for each KAM           kind "next_step_ai"
 
@@ -17,8 +16,6 @@ Requirements: Portal Programme/BRIEF-ai-journey-2026-10-21.md.
 import db
 
 FEATURES = {
-    "report": {"label": "Report writer", "kind": "report_ai", "cap": 10.0,
-               "hint": "Drafts each live campaign's weekly report and the final one; the account manager approves it."},
     "compliance": {"label": "Post checks", "kind": "post_check", "cap": 15.0,
                    "hint": "Reads each new post's caption for health-claim risk and the brief's rules."},
     "nextstep": {"label": "Next-step digest", "kind": "next_step_ai", "cap": 5.0,

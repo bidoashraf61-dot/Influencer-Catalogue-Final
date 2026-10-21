@@ -324,17 +324,13 @@ def tick(now=None):
     """One pass over every campaign. Safe to run any number of times."""
     now = now or db.now()
     sent, nexts = 0, 0
-    import reportai
     for k in db.list_campaigns():
         try:
-            wk = weekly(k, now)
-            if wk:
+            if weekly(k, now):
                 sent += 1
-                reportai.on_week(k, wk)          # item 218: the KAM's AI draft of this week's report (when switched on)
             if ended(k, now) and (not k["ends_at"] or now <= k["ends_at"] + NEXT_WINDOW_DAYS * 86400):
                 if next_time(k, notify=True, now=now) is not None:
                     nexts += 1
-                    reportai.on_end(k)
         except Exception as ex:                    # one bad campaign must not stop the rest
             print("weekly: campaign %s: %s %s" % (k["id"], type(ex).__name__, ex), flush=True)
     db.set_setting("weekly_last_tick", now)

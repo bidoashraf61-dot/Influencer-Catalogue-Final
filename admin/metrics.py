@@ -1379,12 +1379,6 @@ def client_report(campaign, photo=None, photo_large=None):
             out["comments"] = comments.client_view(k)
         except Exception as exc:
             print("comments: client view skipped:", repr(exc)[:160], flush=True)
-    # Item 218: the account manager's approved "Summary from HelloVoice" (an AI draft she edited). None until approved.
-    try:
-        import reportai
-        out["summary"] = reportai.client_view(k)
-    except Exception:
-        out["summary"] = None
     out["goals"] = goals_view(campaign, r)
     for g in (out["goals"] or {}).get("creators", []):
         g["photo"] = pics.get(g["code"])

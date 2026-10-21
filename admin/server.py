@@ -6772,8 +6772,7 @@ def main():
     # What people said (2026-10-19): campaign comments read 2 and 7 days after each video.
     import comments
     comments.start()
-    import postcheck, nextstep, reportai     # item 218: post checks, 9:00 digest, report drafts
-    reportai.init()
+    import postcheck, nextstep               # item 218: post checks and the 9:00 digest
     postcheck.start()
     nextstep.start()
     # HELVY Connect app (item 168): phone pushes from the bell, team alerts, milestones and manual sends.

@@ -629,7 +629,7 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/compose/reach": self.api_compose_reach, "/api/compose/send": self.api_compose_send,
             "/api/edit/post": self.api_edit_post, "/api/edit/bulk": self.api_edit_bulk, "/api/edit/numbers": self.api_edit_numbers,
             "/api/edit/update": self.api_edit_update, "/api/edit/pending": self.api_edit_pending, "/api/edit/insight": self.api_edit_insight,
-            "/api/edit/report": self.api_edit_report, "/api/edit/check": self.api_edit_check,
+            "/api/edit/check": self.api_edit_check,
             "/api/crm/set": self.api_crm_set, "/api/crm/note": self.api_crm_note, "/api/crm/person": self.api_crm_person,
             "/api/crm/quote": self.api_crm_quote, "/api/crm/prospect": self.api_crm_prospect,
             "/api/stepup/send": self.api_stepup_send, "/api/stepup/verify": self.api_stepup_verify,
@@ -1430,27 +1430,6 @@ class PortalMixin(connect_api.ConnectMixin):
         if ctx:
             code, got = contentedit.decide_insight(ctx[0], ctx[1], b.get("id"), str(b.get("do") or ""), b.get("post"), b.get("values") or {})
             self.send_json(code, got, self.cors())
-
-    def api_edit_report(self):
-        """Item 218: the Report tab. do = approve | redo | dismiss | make, for one period."""
-        import reportai
-        b = self.json_body()
-        ctx = self._edit_ctx(str(b.get("t") or ""))
-        if not ctx:
-            return
-        k, actor = ctx
-        do, period = str(b.get("do") or ""), str(b.get("period") or "")
-        if do == "make":
-            code, got = reportai.make_now(k)
-        elif do == "approve":
-            code, got = reportai.approve(k, actor, period, b)
-        elif do == "redo":
-            code, got = reportai.redo(k, period)
-        elif do == "dismiss":
-            code, got = reportai.dismiss(k, actor, period)
-        else:
-            code, got = 400, {"ok": False, "message": "Unknown action."}
-        self.send_json(code, got, self.cors())
 
     def api_edit_check(self):
         """Item 218: a post check. do = clear | undo | recheck."""

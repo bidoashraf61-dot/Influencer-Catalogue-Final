@@ -141,7 +141,7 @@ KIND_RULE = {"camp_live": "camp_status", "camp_final": "camp_status", "camp_goal
              "analysis_ready": "bell", "sel_feedback": "bell", "sel_shared": "bell", "sel_updated": "bell",
              "unavailable": "bell", "quote_requested": "bell", "quote_ready": "bell", "quote_approved": "bell",
              "credits_low": "bell", "credits_added": "bell", "colleague": "bell", "announce": "manual",
-             "team_report": "team", "team_flag": "team", "team_digest": "team"}
+             "team_flag": "team", "team_digest": "team"}
 RIYADH = 3 * 3600
 TICK = 5                            # seconds between queue passes
 MILESTONE_EVERY = 600

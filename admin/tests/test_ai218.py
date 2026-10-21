@@ -1,5 +1,5 @@
-"""Team AI, phase 1 (item 218, 2026-10-21): switches and caps, post checks, report drafts the KAM approves,
-next-step suggestions and the 9:00 digest. Gemini is scripted (no paid call).
+"""Team AI, phase 1 (item 218, 2026-10-21): switches and caps, post checks, next-step suggestions and the
+9:00 digest. (The report writer was dropped by Bido on 2026-10-21.) Gemini is scripted (no paid call).
 
     python3 admin/tests/test_ai218.py
 """
@@ -14,7 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import e2e_portal as base  # noqa: E402
 
 import db, gemini, guard, mailer, portal, server, views  # noqa: E402
-import aifeatures, nextstep, postcheck, reportai  # noqa: E402
+import aifeatures, nextstep, postcheck  # noqa: E402
 from http.server import ThreadingHTTPServer  # noqa: E402
 
 KAM, BOSS = "mariam.k@hvkam.com", "boss@hellovoice.co.uk"
@@ -29,9 +29,6 @@ def stub(body):
     if "risk" in props:
         out = ({"risk": "high", "issues": [{"kind": "claim", "quote": "cures acne", "why": "Promises a cure."}]}
                if "cures" in text else {"risk": "none", "issues": []})
-    elif "worked" in props:
-        out = {"summary": "Polyco wave is on track with strong engagement." + (" It cost SAR 900." if "PRICEY" in text else ""),
-               "worked": ["Reels beat photos"], "improve": ["Two creators are late"], "next": ["Chase late posts", "Boost the top reel", "Add a story"]}
     elif "lines" in props:
         lines = json.loads(text.split("Lines:\n", 1)[1])
         out = {"lines": ["Friendly: " + l[:80] for l in lines]}
@@ -57,7 +54,7 @@ class TeamAI(unittest.TestCase):
         cls.base = "http://127.0.0.1:%d" % cls.httpd.server_address[1]
         db.set_setting("domain_kam", {"polyco.com": KAM})
         db.set_setting("kams", ["Mariam K <%s>" % KAM])
-        reportai.init(); postcheck.init()
+        postcheck.init()
         cls.ready = False
 
     @classmethod
@@ -105,9 +102,10 @@ class TeamAI(unittest.TestCase):
             self.assertFalse(aifeatures.conf(name)["on"])
             self.assertFalse(aifeatures.allowed(name))
             self.assertEqual(aifeatures.why_not(name), "switched off")
-        aifeatures.save("report", on=True, cap=0.0)
-        self.assertEqual(aifeatures.why_not("report"), "this month's cap is used")
-        aifeatures.save("report", on=False, cap=10)
+        self.assertNotIn("report", aifeatures.FEATURES)           # dropped 2026-10-21
+        aifeatures.save("compliance", on=True, cap=0.0)
+        self.assertEqual(aifeatures.why_not("compliance"), "this month's cap is used")
+        aifeatures.save("compliance", on=False, cap=15)
 
     # --------------------------------------------------------- post checks --
     def test_02_rules_are_free_and_always_on(self):
@@ -161,66 +159,11 @@ class TeamAI(unittest.TestCase):
         self.assertIn("flags", g)
         self.assertEqual(g["flags"]["items"][0]["token"], TeamAI.k()["token"])
 
-    # ------------------------------------------------------------- reports --
-    def test_05_report_needs_the_switch(self):
-        self.assertIsNone(reportai.draft(TeamAI.k(), "w1"))
-        self.assertIsNone(reportai.row(TeamAI.k1, "w1"))
-
-    def test_06_draft_approve_and_client_view(self):
-        aifeatures.save("report", on=True)
-        try:
-            got = reportai.draft(TeamAI.k(), "w1")
-            self.assertEqual(got["status"], "draft")
-            self.assertEqual(len(got["draft"]["next"]), 3)
-            self.assertIsNone(reportai.client_view(TeamAI.k()), "nothing for the client before approval")
-            kam = portal.user_by_email(KAM)
-            with db.connect() as conn:
-                self.assertEqual(conn.execute("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND kind = 'team_report'",
-                                              (kam["id"],)).fetchone()[0], 1)
-            # In the Edit mode and the queue.
-            s, b, _ = self.kam.get("/api/edit/campaign?t=" + TeamAI.k()["token"])
-            self.assertEqual(s, 200)
-            self.assertEqual(b["reports"]["reports"][0]["period"], "w1")
-            self.assertIn("check", b["creators"][0]["posts"][0])
-            self.assertEqual(self.client.get("/api/edit/campaign?t=" + TeamAI.k()["token"])[0], 403)
-            g = {x["key"]: x for x in self.kam.get("/api/needs")[1]["groups"]}
-            self.assertIn("reports", g)
-            # A price in the KAM's text is refused.
-            t = TeamAI.k()["token"]
-            s, b, _ = self.kam.post("/api/edit/report", {"t": t, "do": "approve", "period": "w1", "summary": "Fees were SAR 400.",
-                                                          "worked": [], "improve": [], "next": ["x"]})
-            self.assertEqual(s, 400)
-            s, b, _ = self.kam.post("/api/edit/report", {"t": t, "do": "approve", "period": "w1", "summary": "On track, edited by Mariam.",
-                                                          "worked": ["Reels"], "improve": [], "next": "Chase late posts\nBoost the top reel"})
-            self.assertEqual(s, 200, b)
-            cv = reportai.client_view(TeamAI.k())
-            self.assertEqual(cv["summary"], "On track, edited by Mariam.")
-            self.assertEqual(cv["next"], ["Chase late posts", "Boost the top reel"])
-            with db.connect() as conn:
-                self.assertEqual(conn.execute("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND kind = 'camp_report' AND ref LIKE 'repok:%'",
-                                              (TeamAI.lead["id"],)).fetchone()[0], 1)
-            # A client cannot approve.
-            self.assertEqual(self.client.post("/api/edit/report", {"t": t, "do": "dismiss", "period": "w1"})[0], 403)
-        finally:
-            aifeatures.save("report", on=False)
-
-    def test_07_redo_limit_and_banned_drafts(self):
-        aifeatures.save("report", on=True)
-        try:
-            reportai.draft(TeamAI.k(), "w2", notify=False)
-            for _ in range(reportai.MAX_TRIES - 1):
-                self.assertEqual(reportai.redo(TeamAI.k(), "w2")[0], 200)
-            self.assertEqual(reportai.redo(TeamAI.k(), "w2")[0], 400)
-            self.assertIsNone(reportai._clean({"summary": "It cost SAR 900.", "worked": [], "improve": [], "next": ["a"]}))
-            self.assertIsNone(reportai._clean({"summary": "Top creator scored 88.", "worked": [], "improve": [], "next": ["a"]}))
-        finally:
-            aifeatures.save("report", on=False)
-
     # ----------------------------------------------------------- next step --
     def test_08_suggestions(self):
         k = TeamAI.k()
         s = nextstep.suggest(k, "live")
-        self.assertIn(s["key"], ("flags", "report"))
+        self.assertEqual(s["key"], "flags")
         with db.connect() as conn:
             conn.execute("UPDATE campaigns SET next_step = 'Send wave 2', next_due = ? WHERE id = ?", (db.now() - 3 * 86400, TeamAI.k1))
         s = nextstep.suggest(TeamAI.k(), "live")
@@ -265,7 +208,8 @@ class TeamAI(unittest.TestCase):
     def test_11_admin_card_and_save(self):
         import portal_views
         html = portal_views.team_ai_card()
-        for label in ("Report writer", "Post checks", "Next-step digest", "tai_on_report", "tai_cap_compliance"):
+        self.assertNotIn("Report writer", html)
+        for label in ("Post checks", "Next-step digest", "tai_on_nextstep", "tai_cap_compliance"):
             self.assertIn(label, html)
         aifeatures.save("compliance", on=True, cap=7)
         self.assertEqual(aifeatures.conf("compliance"), {"on": True, "cap": 7.0})
@@ -279,6 +223,19 @@ class TeamAI(unittest.TestCase):
         self.assertTrue(nextstep.due(nine))
         db.set_setting("digest_last_day", "2026-10-22")
         self.assertFalse(nextstep.due(nine))
+
+
+
+
+class NoReportWriter(unittest.TestCase):
+    def test_client_facing_parts_untouched(self):
+        import metrics, weekly
+        src = Path(__file__).resolve().parents[2]
+        self.assertFalse((src / "admin" / "reportai.py").exists())
+        for f in ("assets/js/dashboard.js", "assets/css/dashboard.css", "campaign/dashboard/index.html"):
+            self.assertNotIn("db-said", (src / f).read_text(), f)
+        self.assertNotIn("reportai", (src / "admin" / "weekly.py").read_text())
+        self.assertNotIn("reportai", (src / "admin" / "metrics.py").read_text())
 
 
 if __name__ == "__main__":
