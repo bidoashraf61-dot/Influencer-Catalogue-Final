@@ -761,7 +761,8 @@ def admin_page(k, error=None, message=None):
              + ("" if apify.get_token() else "<p class='err'>No Apify token is saved, so comments cannot be fetched.</p>")
              + "<div style='margin-top:10px'>" + form("read_now", "Read comments now", "btn small lime")
              + " <span class='price-hint'>Comments are read 2 and 7 days after each video (up to %d per post). This brings the "
-               "next read forward.</span></div></div>" % MAX_PER_POST)
+               "next read forward. A full update of every video (new comments only where the platform allows it) costs about "
+               "<b>$%.2f</b> on Apify.</span></div></div>" % (MAX_PER_POST, fetch_estimate(k["id"])))
 
     def who(r):
         return "<b>%s</b> <span class='muted'>· %s</span>" % (e(r["name"] or r["code"] or ""), e(r["platform"]))

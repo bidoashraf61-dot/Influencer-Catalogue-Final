@@ -207,13 +207,14 @@
       var go = S && S.demo ? '<p class="db-pop__note">This is a demo campaign: its numbers are sample data, so there is nothing to fetch.</p>'
         : out() ? '<button type="button" class="db-upd__btn db-pop__go" data-go="more">Request more updates</button>'
         : '<button type="button" class="db-upd__btn db-pop__go" data-go="' + w + '"' + (busy ? " disabled" : "") + ">" + UPD_IC[w]
-          + "<span>" + (busy ? (w === "posts" ? "Updating…" : "Reading comments…") : "Fetch now") + "</span></button>";
+          + "<span>" + (busy ? (w === "posts" ? "Updating…" : "Reading comments…") : "Fetch now" + (team && x.est != null ? " · about " + usd(x.est) : "")) + "</span></button>";
       pop.innerHTML = '<div class="db-pop__h">' + UPD_IC[w] + "<h3>" + UPD_W[w][1] + '</h3><button type="button" class="db-pop__x" aria-label="Close">×</button></div>'
         + '<p class="db-pop__what">' + UPD_W[w][2] + "</p>"
         + '<p class="db-pop__s">' + esc(x.schedule || "Not scheduled") + "</p>"
         + '<dl class="db-pop__dl"><div><dt>Last update</dt><dd>' + (x.last_at ? esc(riyadh(x.last_at)) + "<small>" + esc(ago(x.last_at)) + "</small>" : "Not yet") + "</dd></div>"
         + "<div><dt>Next update</dt><dd>" + (busy ? "Running now" : x.next_at ? esc(riyadh(x.next_at)) + "<small>" + esc(soon(x.next_at)) + "</small>" : "Nothing planned") + "</dd></div></dl>"
-        + (team && x.est != null ? '<p class="db-pop__cost">Fetching now costs about <b>' + usd(x.est) + "</b> on Apify" + (x.cost != null ? ". Last manual fetch: <b>" + usd(x.cost) + "</b>." : ".") + "</p>" : "")
+        + (team && x.est != null ? '<p class="db-pop__cost">Fetching now costs about <b>' + usd(x.est) + "</b> on Apify" + (x.cost != null ? ". Last manual fetch: <b>" + usd(x.cost) + "</b>." : ".")
+          + (x.budget_left != null ? " Apify budget left this month: <b>" + usd(x.budget_left) + "</b>" + (x.est > x.budget_left ? " — not enough, the fetch would wait for next month." : ".") : "") + "</p>" : "")
         + (S && !S.unlimited && !S.demo ? '<p class="db-pop__left"><b>' + S.left + " of " + S.limit + "</b> free updates left, shared by posts and comments.</p>" : "")
         + go + '<p class="db-pop__msg" role="status">' + esc(keep) + "</p>";
     }

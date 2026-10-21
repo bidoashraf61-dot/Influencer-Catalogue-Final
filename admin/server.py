@@ -4231,6 +4231,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 cm.pop("cost", None)
             else:
                 cm["est"] = _cm.fetch_estimate(k["id"])
+                cm["budget_left"] = round(max(0.0, apify.budget() - apify.spent_this_month()), 2)
             return {"posts": posts, "comments": cm}
 
         def state(**more):
