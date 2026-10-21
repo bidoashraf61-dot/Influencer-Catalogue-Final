@@ -63,9 +63,21 @@ def view(k):
         ins.append({"id": i["id"], "code": i["code"], "name": names.get(i["code"]) or i["code"], "status": i["status"],
                     "values": ext, "content_id": i["content_id"], "post_url": i["post_url"] or i["content_url"] or "",
                     "uploaded_at": i["uploaded_at"], "note": i["note"] or ""})
+    import postcheck
+    import reportai
+    checks = postcheck.of_campaign(k["id"])                 # item 218: each post's check, and the report drafts
+    for c in out:
+        for p in c["posts"]:
+            p["check"] = checks.get(p["id"])
     return {"campaign": {"id": k["id"], "name": k["name"], "token": k["token"], "status": k["status"]}, "creators": out,
+            "reports": reportai.team_view(k), "checks_on": postcheck_on(),
             "insights": ins, "statuses": db.PENDING_STATUSES, "platforms": db.PLATFORMS, "kinds": db.KINDS,
             "metrics": db.METRICS, "insight_fields": db.INSIGHT_FIELDS}
+
+
+def postcheck_on():
+    import aifeatures
+    return {"ai": aifeatures.allowed("compliance"), "why_not": aifeatures.why_not("compliance")}
 
 
 def _creator_codes(k):

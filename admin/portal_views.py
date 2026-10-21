@@ -319,6 +319,24 @@ def usage_csv():
     return buf.getvalue()
 
 
+def team_ai_card():
+    """Item 218: the team's AI helpers. Free for staff; each has a switch and its own monthly cap (USD)."""
+    import aifeatures
+    rows = ""
+    for r in aifeatures.status():
+        state = "Running" if r["on"] and not r["why_not"] else ("Off" if not r["on"] else "Paused: " + r["why_not"])
+        rows += ("<div class='card' style='margin:10px 0;padding:14px'><label style='display:flex;gap:8px;align-items:center'>"
+                 "<input type='checkbox' name='tai_on_%s'%s> <b>%s</b> <span class='muted'>· %s</span></label>"
+                 "<p class='muted' style='margin:6px 0 10px'>%s</p><div class='fgrid'><div><label>Monthly cap (USD)</label>"
+                 "<input type='number' min='0' max='500' step='1' name='tai_cap_%s' value='%g'></div>"
+                 "<div><label>Spent this month</label><p style='margin:8px 0 0'><b>$%.2f</b> of $%g</p></div></div></div>"
+                 % (r["key"], " checked" if r["on"] else "", e(r["label"]), e(state), e(r["hint"]), r["key"], r["cap"], r["spent"], r["cap"]))
+    return ("<div class='card'><h2>Team AI</h2><p class='sec-desc'>Helpers for the HelloVoice team (item 218). Free for staff, never "
+            "charged to a client. Each one stops on its own when its cap is reached; the monthly AI budget below still applies. "
+            "The free rule checks (missing disclosure or tags, overdue steps, the 9:00 digest) run whether these are on or not.</p>"
+            "<input type='hidden' name='team_ai_form' value='1'>" + rows + "</div>")
+
+
 def _settings_tab():
     allow, block = portal.domain_lists()
     costs = portal.costs()
@@ -374,6 +392,7 @@ def _settings_tab():
         + "<div><label>Monthly credits per client</label><input type='number' min='0' name='monthly_credits' value='%s'>"
           "<div class='price-hint'>Each month a client is topped back up to this. 0 = off. A client's own page can override it.</div></div>"
           % e(db.setting("monthly_credits", 0) or 0) + "</div></div>"
+        + team_ai_card()
         + roi_card()
         + sample_card()
         + "<div class='card'><h2>AI &amp; email</h2><div class='fgrid'>"

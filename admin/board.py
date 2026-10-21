@@ -423,6 +423,9 @@ def card(h, k, role, pins, logo_dir, staff, demo=frozenset(), who=None, team=Non
                        "next": (k["next_step"] if "next_step" in k.keys() else None) or "",
                        "due": k["next_due"] if "next_due" in k.keys() else None,
                        "targets": db.campaign_targets(k), "id": k["id"]}
+    if out.get("can_edit"):
+        import nextstep          # item 218: a rule-made next step to adopt with one tap (team only)
+        out["suggest"] = nextstep.for_card(k, stage, out["numbers"], out["posts"])
     if staff:
         out["staged"] = bool(k["stage"] if "stage" in k.keys() else None)
     return out
