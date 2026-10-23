@@ -1918,7 +1918,7 @@
   /* What people did ring (2026-10-23): the report's "What people did" stack as a ring (owner). Likes, comments,
      saves and shares of the posts in the current view, each in its fixed colour; the drawer splits them by
      platform and by creator. A platform that does not show a number (saves on Facebook and YouTube) reads "—". */
-  var DID = [["likes", "Likes", "#14884a"], ["comments", "Comments", "#ff691e"], ["saves", "Saves", "#b9d400"], ["shares", "Shares", "#8a7a68"]];
+  var DID = [["likes", "Likes", "#14884a"], ["comments", "Comments", "#ff691e"], ["saves", "Saves", "#b9d400"], ["shares", "Shares", "#7048e8"]];
   var DID_IC = ico('<path d="M7 11V5.5a1.5 1.5 0 0 1 3 0V11M10 10V4a1.5 1.5 0 0 1 3 0v6M13 10V5.5a1.5 1.5 0 0 1 3 0V13a7 7 0 0 1-7 7h-.5A5.5 5.5 0 0 1 4 16l-1-3.5a1.5 1.5 0 0 1 2.7-1.2L7 13"/>');
   var DID_TIP = "Everything people did on the posts in this view: likes, comments, saves and shares, the four parts of engagement. The ring shows each one's share; the middle is the total.";
   function didSum(list) {

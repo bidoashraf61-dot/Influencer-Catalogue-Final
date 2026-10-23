@@ -4683,60 +4683,8 @@
     });
     bar.parentNode.insertBefore(box, bar.nextSibling);
   }
-  // "Audience in" (item 226, Bido 2026-10-21): creators whose biggest audience country, on any analysed
-  // platform, is the market picked. Saudi Arabia, UAE, Egypt, then the GCC as one group whose chip ticks
-  // Kuwait, Qatar, Bahrain and Oman together (each can also be picked alone). Server-side only; no counts.
-  var AUD_CORE = [["SA", "Saudi Arabia"], ["AE", "UAE"], ["EG", "Egypt"]];
-  var AUD_GCC = [["KW", "Kuwait"], ["QA", "Qatar"], ["BH", "Bahrain"], ["OM", "Oman"]];
-  function mountAudFilter(tries) {
-    if (document.body.getAttribute("data-page") !== "catalogue" || $("aud-filter")) return;
-    var bar = document.querySelector(".cat-controls .cat-bar");
-    if (bar && window.hvCatalogue && !window.hvCatalogue.server) return;     // needs the server-side feed
-    if (!bar || !window.hvCatalogue) { if ((tries || 0) < 80) setTimeout(function () { mountAudFilter((tries || 0) + 1); }, 250); return; }
-    var want = {};
-    (window.hvCatalogue.get("aud") || []).forEach(function (k) {
-      if (k === "GCC") AUD_GCC.forEach(function (o) { want[o[0]] = true; }); else want[k] = true;
-    });
-    var box = h("div", { id: "aud-filter", class: "lic-filter aud-filter", role: "group", "aria-labelledby": "aud-filter-l" });
-    box.appendChild(h("span", { class: "lic-filter__label", id: "aud-filter-l" }, "Audience in"));
-    var chips = {};
-    function chip(code, label, cls) {
-      var b = h("button", { class: "lic-chip" + (cls ? " " + cls : ""), type: "button", "aria-pressed": "false", "data-aud": code }, label);
-      chips[code] = b;
-      return b;
-    }
-    function gccOn() { return AUD_GCC.filter(function (o) { return want[o[0]]; }).length; }
-    function paint() {
-      Object.keys(chips).forEach(function (k) { if (k !== "GCC") chips[k].setAttribute("aria-pressed", String(!!want[k])); });
-      var n = gccOn();
-      chips.GCC.setAttribute("aria-pressed", n === AUD_GCC.length ? "true" : n ? "mixed" : "false");
-    }
-    function send() {
-      var out = AUD_CORE.filter(function (o) { return want[o[0]]; }).map(function (o) { return o[0]; });
-      if (gccOn() === AUD_GCC.length) out.push("GCC");
-      else AUD_GCC.forEach(function (o) { if (want[o[0]]) out.push(o[0]); });
-      window.hvCatalogue.filter("aud", out);
-    }
-    AUD_CORE.forEach(function (o) { box.appendChild(chip(o[0], o[1])); });
-    var gcc = h("div", { class: "aud-gcc", role: "group", "aria-label": "GCC" });
-    gcc.appendChild(chip("GCC", "GCC", "aud-gcc__all"));
-    AUD_GCC.forEach(function (o) { gcc.appendChild(chip(o[0], o[1], "aud-gcc__one")); });
-    box.appendChild(gcc);
-    box.addEventListener("click", function (e) {
-      var b = e.target.closest && e.target.closest("[data-aud]");
-      if (!b) return;
-      var k = b.getAttribute("data-aud");
-      if (k === "GCC") { var all = gccOn() !== AUD_GCC.length; AUD_GCC.forEach(function (o) { want[o[0]] = all; }); }
-      else want[k] = !want[k];
-      paint();
-      send();
-    });
-    paint();
-    var after = $("lic-filter") || bar;
-    after.parentNode.insertBefore(box, after.nextSibling);
-  }
+  // "Audience in" (item 226) was removed from the catalogue by the owner on 2026-10-23; the server still accepts `aud`.
   function mountLicences() {
-    mountAudFilter();
     var page = document.body.getAttribute("data-page");
     if (page !== "catalogue" && page !== "selection") return;
     api("GET", "/api/licences").then(function (r) {

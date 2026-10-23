@@ -1027,7 +1027,7 @@
     var kinds = Object.keys(byKind).map(function (k) { return { k: k, n: byKind[k], label: byKind[k] + (byKind[k] === 1 ? " post" : " posts") }; })
       .sort(function (a, b) { return b.n - a.n; });
     if (kinds.length) mix.push('<div class="mx-panel"><h3>Content mix</h3>' + bars(kinds, function (r) { return esc(KIND[r.k] || r.k); }) + "</div>");
-    var t = R.total, parts = [["Likes", t.likes, "#14884a"], ["Comments", t.comments, "#ff691e"], ["Saves", t.saves, "#b9d400"], ["Shares", t.shares, "#8a7a68"]]
+    var t = R.total, parts = [["Likes", t.likes, "#14884a"], ["Comments", t.comments, "#ff691e"], ["Saves", t.saves, "#b9d400"], ["Shares", t.shares, "#7048e8"]]
       .filter(function (p) { return p[1]; });
     var sum = parts.reduce(function (s, p) { return s + p[1]; }, 0);
     if (sum) mix.push('<div class="mx-panel"><h3>What people did</h3><div class="mx-stack" role="img" aria-label="Interactions breakdown">'

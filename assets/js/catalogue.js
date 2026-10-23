@@ -1751,7 +1751,7 @@
     var plain = SERVER ? feedParams().toString() : "";
     if (kept) {
       if (controls && kept.q) controls.restore(kept.q);
-      if (kept.x) { EXTRA.lic = kept.x.lic || []; EXTRA.aud = kept.x.aud || []; EXTRA.disc = kept.x.disc || null; EXTRA.dplat = kept.x.dplat || null; }
+      if (kept.x) { EXTRA.lic = kept.x.lic || []; EXTRA.aud = []; EXTRA.disc = kept.x.disc || null; EXTRA.dplat = kept.x.dplat || null; }
       if (kept.g !== undefined && kept.g !== gBy) {
         gBy = kept.g || "";
         var gSel = document.querySelector(".cat-group-by select");

@@ -921,7 +921,7 @@ body.has-previewbar { padding-top: 36px; }
 
 .ai-host {
   grid-template-columns: minmax(0, 1fr) auto;
-  grid-template-areas: "search ai" "row row" "active active" "lic lic" "aud aud" "open open";
+  grid-template-areas: "search ai" "row row" "active active" "lic lic" "open open";
   gap: 12px 20px; align-items: center;
 }
 .ai-host > .cat-bar { display: contents; }
@@ -930,7 +930,6 @@ body.has-previewbar { padding-top: 36px; }
 .ai-host .cat-bar__row { grid-area: row; }
 .ai-host .cat-active { grid-area: active; }
 .ai-host > #lic-filter { grid-area: lic; margin: 0; }
-.ai-host > #aud-filter { grid-area: aud; margin: 0; }
 .ai-host > .ai-sl { grid-area: ai; grid-column: auto; grid-row: auto; }
 .ai-host > .ai-sl.is-open { grid-area: open; }
 
