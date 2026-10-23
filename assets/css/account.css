@@ -1371,3 +1371,52 @@ body.cc-sheet-open { overflow: hidden; }
 .cc-sheet { position: relative; }
 .cc-sheet-wrap .cc-sheet__hd h2 { overflow-wrap: anywhere; }
 .cc-sheet-wrap { z-index: 9000; }
+
+/* Activity log (item 237, owner 2026-10-23): the Control Centre side sheet, read top to bottom — who and their
+   state with the stop buttons, four facts, the devices, the filter, then the day-by-day log. */
+.al .cc-sheet__hd { margin-bottom: 18px; }
+.al-acts { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-bottom: 18px; border-bottom: 1px solid var(--rule); }
+.al-acts .cc-stat { margin-right: auto; }
+.al-acts .hc-btn--sm { min-height: 40px; font-size: 17px; padding: 0 16px; }
+.al-acts .al-danger { background: #b00e0e; border-color: #b00e0e; color: var(--white); }
+.al-acts .al-danger:hover { background: #8f0b0b; border-color: #8f0b0b; }
+.al-facts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin: 20px 0 0; }
+.al-facts > div { padding: 2px 14px; border-left: 1px solid var(--rule); }
+.al-facts > div:first-child { padding-left: 0; border-left: 0; }
+.al-facts dt { font-size: 12px; font-weight: 700; color: var(--gray); }
+.al-facts dd { margin: 4px 0 0; font: 400 26px/1.05 var(--heading); letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.al-facts > div:first-child dd { font: 700 15px/1.3 var(--body, "DM Sans", sans-serif); letter-spacing: 0; padding-top: 4px; }
+.al-facts .is-bad dd { color: #b00e0e; }
+.al-devs { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; }
+.al-devs li { display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 12px; background: var(--stone); font-size: 13px; }
+.al-devs li .hv-i { width: 15px; height: 15px; color: var(--gray); }
+.al-devs small { color: var(--gray); }
+.al-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; }
+.al-tz { margin: 10px 0 0; font-size: 13px; color: var(--gray); }
+.al-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.al-day h3 { margin: 22px 0 6px; font: 400 22px/1 var(--heading); letter-spacing: .03em; position: sticky; top: -28px; background: var(--white); padding: 8px 0 6px; z-index: 1; }
+.al-row { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 14px; padding: 11px 0; border-top: 1px solid var(--rule-soft); }
+.al-row time { font-size: 13px; font-weight: 700; color: var(--gray); font-variant-numeric: tabular-nums; padding-top: 2px; position: relative; padding-left: 14px; }
+.al-row time::before { content: ""; position: absolute; left: 0; top: 8px; width: 7px; height: 7px; border-radius: 50%; background: var(--stone-2); }
+.al-row--browse time::before { background: #a29d93; }
+.al-row--signin time::before { background: #0e6b39; }
+.al-row--ai time::before { background: var(--lime, #e8ff76); box-shadow: inset 0 0 0 1px rgba(18,18,18,.35); }
+.al-row--work time::before { background: #ff691e; }
+.al-row--account time::before { background: var(--ink); }
+.al-row.is-bad time::before { background: #ee1515; }
+.al-row__b p { margin: 0; font-size: 15px; line-height: 1.45; overflow-wrap: anywhere; }
+.al-row__b p span { color: var(--graphite, #383838); }
+.al-row__b em { font-style: normal; font-size: 12px; font-weight: 700; margin-left: 8px; padding: 2px 7px; border-radius: 999px; background: var(--stone); white-space: nowrap; }
+.al-row.is-bad .al-row__b b { color: #b00e0e; }
+.al-row__b small { display: block; margin-top: 3px; font-size: 12.5px; color: var(--gray); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.al-empty { margin: 28px 0; color: var(--gray); font-size: 15px; }
+.al-older { margin: 18px 0 8px; }
+.al-skel { display: grid; gap: 10px; margin-top: 18px; }
+.al-skel i { display: block; height: 46px; border-radius: 12px; background: linear-gradient(90deg, var(--stone) 0 40%, #f6f4f0 50%, var(--stone) 60% 100%); background-size: 300% 100%; animation: al-sh 1.4s linear infinite; }
+@keyframes al-sh { to { background-position: -150% 0; } }
+@media (prefers-reduced-motion: reduce) { .al-skel i { animation: none; } }
+@media (max-width: 640px) {
+  .al-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 14px; }
+  .al-facts > div:nth-child(3) { padding-left: 0; border-left: 0; }
+  .al-day h3 { top: -20px; }
+}

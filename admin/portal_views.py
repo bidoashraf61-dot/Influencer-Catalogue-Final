@@ -631,6 +631,7 @@ def user_page(usr, ok=None, err=None):
            "".join("<li>%s%s <span class='muted'>%s</span></li>" % (e(b["summary"]), views.client_deleted_pill(b), e(ago(b["created_at"])))
                    for b in portal.briefs_for(cid, 10, deleted=True)) or "<li class='muted'>none</li>",
            "".join("<li>%s × %d <span class='muted'>last %s</span></li>" % (e(r["kind"]), r["n"], e(ago(r["last"]))) for r in ev) or "<li class='muted'>none</li>"))
+    log = _activity_card(usr)
     reqs = [r for r in portal.open_credit_requests(cid) if not r["handled_at"]]
     req_html = "".join(
         "<div class='note'><strong>Asked for %d credits</strong> %s · %s <form method='post' action='%s' class='inline'>%s%s"
@@ -649,7 +650,26 @@ def user_page(usr, ok=None, err=None):
               "<button class='btn small danger'>Delete account</button></form></details>" % (u("/portal/user/delete"), hid("id", usr["id"]), back))
     return page(usr["email"], STAT_CSS + ui.header(usr["name"] or usr["email"], "%s · %s" % (usr["company"] or "no company", usr["email"]),
                 crumbs=[("Client portal", u("/portal")), (usr["email"], None)], actions=status_btns + _status_pill(usr["status"]))
-                + _banner(ok, err) + req_html + profile + credits + work + extra + danger, "/portal")
+                + _banner(ok, err) + req_html + profile + credits + work + log + extra + danger, "/portal")
+
+
+def _activity_card(usr):
+    """Item 237: the account's dated activity log (newest 100 lines, Riyadh time, IP and device). The same log opens
+    in HELVi Connect's Control Centre from the person menu, with filters and older pages."""
+    import activity
+    S, page_ = activity.summary(usr), activity.timeline(usr)
+    riy = lambda t: time.strftime("%a %-d %b %Y, %H:%M", time.gmtime(t + 3 * 3600))
+    facts = "Last seen %s · %d sign-ins and %d refused in 30 days · %d IP addresses · devices: %s" % (
+        e(riy(S["last_at"])) if S["last_at"] else "never", S["signins"], S["refused"], S["ips"],
+        e(", ".join(d["device"] for d in S["devices"]) or "none"))
+    rows = "".join("<tr%s><td class='muted' style='white-space:nowrap'>%s</td><td><strong>%s</strong> %s%s</td><td class='muted'>%s</td><td class='muted'>%s</td></tr>" % (
+        " style='color:#b00e0e'" if x["bad"] else "", e(riy(x["at"])), e(x["what"]), e(x["detail"]),
+        (" <span class='pill'>×%d</span>" % x["n"]) if x["n"] > 1 else "", e(x["device"] or "—"),
+        e(" · ".join(v for v in (x["ip"], ("by " + x["by"]) if x.get("by") else "") if v) or "—")) for x in page_["lines"])
+    return ("<div class='card'><h2>Activity log</h2><p class='sec-desc'>%s. Times in Riyadh; repeats from the same device within "
+            "30 minutes are one line.%s</p><table><thead><tr><th>When</th><th>What</th><th>Device</th><th>IP · by</th></tr></thead><tbody>%s</tbody></table></div>"
+            % (facts, " Showing the newest 100 lines; older ones are in HELVi Connect → Companies → this person → Activity log." if page_["more"] else "",
+               rows or "<tr><td colspan='4' class='muted'>No activity recorded yet.</td></tr>"))
 
 
 # ----------------------------------------------------------------- copilot --

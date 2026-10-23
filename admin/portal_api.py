@@ -303,6 +303,19 @@ class PortalMixin(connect_api.ConnectMixin):
                         self.send_json(200, {"ok": True, "row": r, "notes": crm.notes(k), "quotes": crm.quotes(role, a, k)},
                                        self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/hub/activity":
+            # Item 237: one client account's dated activity log (owners and admins only).
+            who = self._need_account()
+            if who:
+                import activity, hub
+                role, _a = hub.viewer(who[1])
+                try:
+                    uid, before = int(query.get("id") or 0), int(query.get("before") or 0) or None
+                except ValueError:
+                    uid, before = 0, None
+                code, got = activity.for_viewer(role, uid, before, str(query.get("g") or "") or None, first=before is None)
+                self.send_json(code, got, self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/compose/context":
             # Item 209 slice c: the push composer on a company page (owners, admins, and a KAM for her own clients).
             who = self._need_account()

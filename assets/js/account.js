@@ -1853,6 +1853,7 @@
     if (can.indexOf("hold") >= 0) acts.appendChild(btn("Hold", "hold", false));
     var more = [];
     if (st === "active") more.push(["Push to " + (p.name || p.email).split(" ")[0], "bell", function () { openCompose(co.key, co.name, { people: [p.id] }); }, false, true]);
+    if (HUB.role === "admin" && p.id) more.push(["Activity log", "clock", function () { openActivity(p, co); }, false, true]);
     if (can.indexOf("suspend") >= 0) more.push(["Suspend account", "ban", function () { acctDo(p, co, "suspend"); }, true]);
     if (can.indexOf("credits") >= 0) more.push(["Change credits", "coin", function () { HUB.ctl = HUB.ctl === pk + ":cr" ? null : pk + ":cr"; renderSection(); }, false]);
     if (more.length) {
@@ -1878,6 +1879,107 @@
       out.appendChild(h("div", { class: "cc-credform" }, amt, why, go, h("button", { class: "hc-more", type: "button", onclick: function () { HUB.ctl = null; renderSection(); } }, "Cancel")));
     }
     return out;
+  }
+  /* Activity log (item 237, owner 2026-10-23): one client's dated activity, newest first, with IP and device, for
+     owners and admins only (the server refuses everyone else). Opens in the Control Centre side sheet from the
+     person menu; Hold and Suspend sit in its header so a stop is one step from the evidence. */
+  var ACT = null;
+  function actKey(e) { if (e.key === "Escape") closeActivity(); }
+  function closeActivity() {
+    if (!ACT) return;
+    document.removeEventListener("keydown", actKey);
+    ACT.wrap.remove(); document.body.classList.remove("cc-sheet-open");
+    var back = ACT.back; ACT = null; if (back && back.focus) back.focus({ preventScroll: true });
+  }
+  function openActivity(p, co) {
+    if (ACT) closeActivity();
+    var wrap = h("div", { class: "cc-sheet-wrap", role: "presentation" });
+    document.body.appendChild(wrap); document.body.classList.add("cc-sheet-open");
+    ACT = { p: p, co: co, wrap: wrap, g: "", lines: [], before: null, more: false, busy: true, err: "", sum: null, groups: [], back: document.activeElement };
+    document.addEventListener("keydown", actKey);
+    paintActivity(); actLoad(false);
+  }
+  function actLoad(older) {
+    var A = ACT; if (!A) return;
+    A.busy = true; if (older) paintActivity();
+    var q = "/api/hub/activity?id=" + A.p.id + (A.g ? "&g=" + A.g : "") + (older && A.before ? "&before=" + A.before : "");
+    api("GET", q).then(function (r) {
+      if (ACT !== A) return;
+      A.busy = false;
+      if (r.s !== 200) { A.err = (r.b && r.b.message) || "The log didn't load. Try again."; paintActivity(); return; }
+      A.err = ""; A.lines = older ? A.lines.concat(r.b.lines) : r.b.lines; A.more = r.b.more; A.before = r.b.before;
+      if (r.b.summary) A.sum = r.b.summary;
+      if (r.b.groups) A.groups = r.b.groups;
+      paintActivity();
+    });
+  }
+  var RIY = { timeZone: "Asia/Riyadh" };
+  function actDay(t) {
+    var k = function (x) { return new Date(x * 1000).toLocaleDateString("en-CA", RIY); }, now = Date.now() / 1000;
+    return k(t) === k(now) ? "Today" : k(t) === k(now - 86400) ? "Yesterday"
+      : new Date(t * 1000).toLocaleDateString("en-GB", { timeZone: "Asia/Riyadh", weekday: "short", day: "numeric", month: "short", year: k(t).slice(0, 4) === k(now).slice(0, 4) ? undefined : "numeric" });
+  }
+  function actTime(t) { return new Date(t * 1000).toLocaleTimeString("en-GB", { timeZone: "Asia/Riyadh", hour: "2-digit", minute: "2-digit" }); }
+  function paintActivity() {
+    var A = ACT; if (!A) return;
+    var p = A.p, st = p.state || "active", can = p.can || [], top = A.wrap.querySelector(".cc-sheet") ? A.wrap.querySelector(".cc-sheet").scrollTop : 0;
+    var acts = h("div", { class: "al-acts" }, h("span", { class: "cc-stat cc-stat--" + (st === "suspended" ? "susp" : st === "waiting" ? "wait" : st) }, STATE_LABEL[st] || st));
+    function act(label, action, cls) {
+      var b = h("button", { class: "hc-btn hc-btn--sm " + cls, type: "button" }, label);
+      b.addEventListener("click", function () {
+        // Suspend asks for an emailed code in a dialog that sits under this sheet: close the sheet first.
+        if (action === "suspend") { closeActivity(); acctDo(p, A.co, action); return; }
+        b.disabled = true;
+        acctDo(p, A.co, action, null, function () { closeActivity(); }).then(function () { b.disabled = false; });
+      });
+      return b;
+    }
+    if (can.indexOf("reactivate") >= 0) acts.appendChild(act("Reactivate", "reactivate", ""));
+    if (can.indexOf("hold") >= 0) acts.appendChild(act("Hold", "hold", "hc-btn--line"));
+    if (can.indexOf("suspend") >= 0) acts.appendChild(act("Suspend", "suspend", "al-danger"));
+    var S = A.sum, facts = null;
+    if (S) {
+      facts = h("dl", { class: "al-facts" },
+        h("div", null, h("dt", null, "Last seen"), h("dd", null, S.last_at ? actDay(S.last_at) + ", " + actTime(S.last_at) : "Never")),
+        h("div", null, h("dt", null, "Sign-ins, 30 days"), h("dd", null, String(S.signins))),
+        h("div", { class: S.refused ? "is-bad" : "" }, h("dt", null, "Refused, 30 days"), h("dd", null, String(S.refused))),
+        h("div", null, h("dt", null, "IP addresses, 30 days"), h("dd", null, String(S.ips))));
+    }
+    var devs = S && S.devices.length ? h("ul", { class: "al-devs", "aria-label": "Devices in the last 30 days" }, S.devices.map(function (d) {
+      return h("li", null, icon("shield"), h("b", null, d.device), h("small", null, ago(d.last_at) + (d.ips > 1 ? " · " + d.ips + " IPs" : "")));
+    })) : null;
+    var chips = h("div", { class: "al-chips", role: "group", "aria-label": "Show" }, [{ k: "", label: "Everything" }].concat(A.groups).map(function (g) {
+      return h("button", { class: "cc-chip", type: "button", "aria-pressed": A.g === g.k ? "true" : "false",
+        onclick: function () { if (A.g === g.k) return; A.g = g.k; A.lines = []; A.before = null; actLoad(false); paintActivity(); } }, g.label);
+    }));
+    var list = h("ol", { class: "al-list" }), lastDay = "";
+    A.lines.forEach(function (x) {
+      var d = actDay(x.at);
+      if (d !== lastDay) { list.appendChild(h("li", { class: "al-day" }, h("h3", null, d))); lastDay = d; }
+      var meta = [x.device, x.ip, x.by ? "by " + x.by : ""].filter(Boolean).join(" · ");
+      list.appendChild(h("li", { class: "al-row" + (x.bad ? " is-bad" : "") + " al-row--" + x.g },
+        h("time", { datetime: new Date(x.at * 1000).toISOString() }, actTime(x.at)),
+        h("div", { class: "al-row__b" },
+          h("p", null, h("b", null, x.what), x.detail ? h("span", null, " " + x.detail) : null, x.n > 1 ? h("em", { title: "Repeated from " + actTime(x.first) + " to " + actTime(x.at) }, "×" + x.n) : null),
+          meta ? h("small", null, meta) : null)));
+    });
+    var body = A.err ? h("p", { class: "ac-note ac-note--bad", role: "alert" }, A.err)
+      : !A.lines.length && A.busy ? h("div", { class: "al-skel", "aria-hidden": "true" }, h("i"), h("i"), h("i"), h("i"))
+      : !A.lines.length ? h("p", { class: "al-empty" }, A.g ? "Nothing of this kind yet." : "No activity recorded for this account yet.")
+      : list;
+    var older = A.more ? h("button", { class: "hc-btn hc-btn--line al-older", type: "button", disabled: A.busy ? "" : null, onclick: function () { actLoad(true); } }, A.busy ? "Loading…" : "Show older activity") : null;
+    var sheet = h("section", { class: "cc-sheet al", role: "dialog", "aria-modal": "true", "aria-labelledby": "al-h" },
+      h("div", { class: "cc-sheet__hd" }, h("div", null, h("h2", { id: "al-h" }, "Activity"),
+          h("p", null, [p.name, p.email].filter(Boolean).join(" · ") + (A.co && A.co.name ? " — " + A.co.name : ""))),
+        h("button", { class: "cc-x", type: "button", "aria-label": "Close", onclick: closeActivity }, icon("x"))),
+      acts, facts, devs, chips,
+      h("p", { class: "al-tz" }, "Times in Riyadh. Repeats from the same device within 30 minutes are folded into one line."),
+      body, older, h("p", { class: "hc-sr", role: "status" }, A.busy ? "Loading activity" : A.lines.length + " lines shown"));
+    A.wrap.textContent = "";
+    A.wrap.appendChild(h("div", { class: "cc-scrim", onclick: closeActivity }));
+    A.wrap.appendChild(sheet);
+    sheet.scrollTop = top;
+    if (!A._focused) { A._focused = true; sheet.querySelector(".cc-x").focus({ preventScroll: true }); }
   }
   function personBlock(p, co) {
     var admin = HUB.role === "admin";
