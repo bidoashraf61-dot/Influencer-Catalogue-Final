@@ -183,7 +183,7 @@
     var now = Date.now() / 1000, dd = k(t) === k(now) ? "Today" : k(t) === k(now + 86400) ? "Tomorrow" : d.toLocaleDateString("en-GB", { timeZone: "Asia/Riyadh", weekday: "short", day: "numeric", month: "short" });
     return (withDay === false ? "" : dd + ", ") + hm;
   }
-  function soon(t) { var s = t - Date.now() / 1000; return s <= 60 ? "any minute" : s < 3600 ? "in " + Math.round(s / 60) + " min" : s < 86400 ? "in " + Math.round(s / 3600) + " h" : "in " + Math.round(s / 86400) + " days"; }
+  function soon(t) { var s = t - Date.now() / 1000; return s <= 60 ? "any minute" : s < 3600 ? "in " + Math.round(s / 60) + " min" : s < 86400 ? "in " + Math.round(s / 3600) + " h" : (Math.round(s / 86400) === 1 ? "tomorrow" : "in " + Math.round(s / 86400) + " days"); }
   function usd(v) { return "$" + (v < 0.1 ? v.toFixed(3).replace(/0$/, "") : v.toFixed(2)); }
   function mountUpdate(host) {
     var box = document.createElement("div"); box.className = "db-upd";
@@ -199,6 +199,7 @@
       var x = S && S[w]; if (S && S.demo) return "Sample data";
       if (!x) return "";
       if (x.running) return w === "posts" ? "Updating now…" : "Reading now…";
+      if (w === "comments" && x.next_at) return "Weekly · next " + soon(x.next_at);     // read once a week (owner, 2026-10-23)
       return x.next_at ? "Next " + soon(x.next_at) : x.last_at ? "Last " + ago(x.last_at) : "Not scheduled";
     }
     function paint(s) {
