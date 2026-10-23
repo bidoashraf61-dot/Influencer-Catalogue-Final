@@ -936,3 +936,94 @@ button.mx-camp__go { cursor: pointer; font: inherit; font-family: var(--heading)
   .mx-cs__list { flex: 1 1 auto; min-height: 0; max-height: none; }
   .mx-cs__q { min-height: 44px; }
 }
+
+/* Report redesign (2026-10-23): creator cards, post links, the comments section. Comes last so it wins. */
+/* creator cards: a roster that fills the row, names whole, videos as lines, what is still to come folded into one */
+.mx-carousel__track { grid-auto-columns: minmax(232px, 1fr); align-items: stretch; }
+.mx-cc { background: var(--linen); }
+.mx-cc__photo { position: relative; aspect-ratio: 4 / 3; }
+.mx-cc__photo img { object-position: center 15%; }
+.mx-cc__medal { position: absolute; left: 12px; bottom: -14px; width: 30px; height: 38px; z-index: 1; }
+.mx-cc__medal svg { width: 100%; height: 100%; display: block; }
+.mx-cc__body { padding: 20px 16px 16px; gap: 6px; flex: 1; }
+.mx-cc__name { font-size: 24px; line-height: 1; overflow-wrap: anywhere; }
+.mx-cc__ar { text-align: left; font-size: 13px; line-height: 1.35; color: var(--graphite, #383838); margin-top: -2px; }
+.mx-cc__meta { font-size: 12.5px; }
+.mx-cc__live { display: grid; grid-template-columns: auto auto 1fr; align-items: center; gap: 8px; margin-top: 4px; padding: 8px 10px; border-radius: 12px; background: var(--white); font-size: 12.5px; }
+.mx-cc__live b { font-weight: 700; white-space: nowrap; }
+.mx-cc__views { justify-self: end; font-family: var(--heading); font-size: 20px; line-height: 1; white-space: nowrap; }
+.mx-cc__pips { display: inline-flex; gap: 3px; }
+.mx-cc__pips i { width: 8px; height: 8px; border-radius: 50%; background: #d8cfc4; }
+.mx-cc__pips i.on { background: var(--go, #14884a); }
+.mx-cc__vids { gap: 0; margin: 4px 0 0; }
+.mx-cc__vid { display: block; padding: 9px 0 8px; border-top: 1px solid var(--rule, rgba(18,18,18,.12)); }
+.mx-cc__vh { display: grid; grid-template-columns: auto 1fr auto; align-items: baseline; gap: 8px; font-size: 12.5px; }
+.mx-cc__vh span { color: var(--graphite, #383838); }
+.mx-cc__vh strong { font-family: var(--heading); font-weight: 400; font-size: 18px; line-height: 1; }
+.mx-cc__chips { margin-top: 6px; gap: 4px; }
+.mx-cc__chips a { gap: 4px; padding: 3px 8px 3px 6px; background: var(--white); border-color: transparent; font-size: 11.5px; }
+.mx-cc__chips a span { font-variant-numeric: tabular-nums; }
+.mx-cc__owed { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 9px 0 2px; border-top: 1px dashed rgba(18,18,18,.2); font-size: 12.5px; color: var(--graphite, #383838); }
+.mx-cc__owed em { font-style: normal; font-weight: 600; color: var(--ink); white-space: nowrap; }
+.mx-cc .mx-tc__links { margin-top: auto; padding-top: 10px; }
+
+/* post cards: no thumbnail = the creator's photo; links are one compact row of chips, never stacked lime bars */
+.mx-post__media img.hv-face { object-fit: cover; object-position: center 15%; }
+.mx-post--nothumb .mx-post__media { aspect-ratio: 4 / 3; }
+.mx-post--nothumb .mx-post__media img.hv-fill { filter: blur(18px) brightness(.9) saturate(.9); }
+.mx-post__plate { display: none; }
+.mx-post__tag { top: auto; bottom: 12px; max-width: calc(100% - 24px); padding: 5px 10px 5px 7px; }
+.mx-post__plats-ic { display: inline-flex; gap: 3px; }
+.mx-post__plats-ic svg { width: 16px; height: 16px; }
+.mx-post__sig { top: 12px; right: 12px; }
+.mx-post__go { min-height: 42px; font-size: 17px; letter-spacing: .05em; }
+.mx-post__links { margin-top: auto; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.mx-post__lbl { width: 100%; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--graphite, #383838); }
+.mx-post__lk { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px 0 9px; border-radius: 999px; background: var(--lime); color: var(--ink);
+  font-size: 13px; font-weight: 600; text-decoration: none; transition: background .2s ease, color .2s ease; }
+.mx-post__lk svg { width: 15px; height: 15px; }
+.mx-post__lk b { font-weight: 700; font-variant-numeric: tabular-nums; }
+.mx-post__lk:hover { background: var(--ink); color: var(--lime); }
+.mx-post__lk:focus-visible { outline: 3px solid var(--vivid-red); outline-offset: 2px; }
+.mx-post__plats { display: none; }
+
+/* what people say */
+.mx-say__top { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; align-items: stretch; }
+.mx-say__helvi { display: flex; align-items: center; gap: 16px; padding: 18px 22px; border-radius: var(--r-md); background: var(--ink); color: #fff; }
+.mx-say__helvi img { width: 56px; height: 56px; border-radius: 50%; background: var(--lime); flex: none; }
+.mx-say__helvi p { margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--lime); font-weight: 600; }
+.mx-say__helvi b { display: block; font-family: var(--heading); font-weight: 400; font-size: clamp(28px, 1.6rem + 1vw, 40px); line-height: 1; margin: 4px 0; }
+.mx-say__helvi span { font-size: 13.5px; color: rgba(255,255,255,.8); }
+.mx-say__nums { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
+.mx-say__nums div { padding: 12px 14px; border-radius: 14px; background: var(--linen); }
+.mx-say__nums dt { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--graphite, #383838); }
+.mx-say__nums dd { margin: 2px 0 0; font-family: var(--heading); font-size: 30px; line-height: 1; }
+.mx-say__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0 28px; }
+.mx-mood { display: flex; height: 26px; border-radius: 999px; overflow: hidden; background: #efece6; margin: 4px 0 14px; }
+.mx-mood i { display: grid; place-items: center; font-style: normal; font-size: 11.5px; font-weight: 700; color: #fff; }
+.mx-bar__k small { color: var(--graphite, #383838); font-size: .92em; }
+.mx-quotes { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.mx-q { margin: 0; padding: 16px 18px; border-radius: var(--r-md); background: var(--white); border: 1px solid var(--line); border-left: 5px solid var(--c); display: flex; flex-direction: column; gap: 6px; }
+.mx-q q { font-size: 15px; line-height: 1.55; quotes: "“" "”"; }
+.mx-q__en { margin: 0; font-size: 13px; color: var(--graphite, #383838); font-style: italic; }
+.mx-q__m { margin: auto 0 0; padding-top: 6px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12px; color: var(--graphite, #383838); }
+.mx-q__m svg { width: 14px; height: 14px; }
+.mx-q__m em { font-style: normal; font-weight: 700; }
+.mx-q__l { margin-left: auto; }
+.mx-saybox__go { display: inline-block; margin-top: 12px; font-weight: 700; font-size: 13.5px; color: var(--ink); }
+@media (max-width: 760px) { .mx-say__top, .mx-say__grid { grid-template-columns: 1fr; } }
+
+/* the report printed with the browser's own Print (the PDF button builds the full PDF on the dashboard): no URL footer */
+@media print {
+  @page { size: A4; margin: 0; }
+  body { padding: 12mm 0; }
+  .mx-carousel__track { grid-template-columns: repeat(3, 1fr) !important; gap: 10px !important; }
+  .mx-cc__body { padding: 16px 12px 12px !important; }
+  .mx-cc__name { font-size: 20px !important; }
+  .mx-cc__meta { font-size: 11px !important; }
+  .mx-wall { grid-template-columns: repeat(3, 1fr) !important; }
+  .mx-post__go, .mx-post__links { display: flex !important; }
+  .mx-post__media { aspect-ratio: 16 / 10 !important; }
+  .mx-q, .mx-say__top, .mx-say__grid > div { break-inside: avoid; }
+}
+/* end report redesign */

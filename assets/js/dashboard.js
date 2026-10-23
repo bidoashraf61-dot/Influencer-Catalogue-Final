@@ -12,7 +12,7 @@
   ICONS = (function (base) { var o = {}, k; for (k in base) o[k] = base[k]; for (k in BRAND) o[k] = BRAND[k]; return o; })(ICONS);
   if (document.body && !document.getElementById("hv-ig")) document.body.insertAdjacentHTML("beforeend", "<svg width=\"0\" height=\"0\" style=\"position:absolute\" aria-hidden=\"true\"><defs><linearGradient id=\"hv-ig\" x1=\"0\" y1=\"1\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#feda75\"/><stop offset=\".25\" stop-color=\"#fa7e1e\"/><stop offset=\".5\" stop-color=\"#d62976\"/><stop offset=\".75\" stop-color=\"#962fbf\"/><stop offset=\"1\" stop-color=\"#4f5bd5\"/></linearGradient></defs></svg>");
   var LINK = (window.HV_ICONS || {}).link || "";
-  var R = null, TOKEN = "";
+  var R = null, TOKEN = "", PRINT_W = 0;
   var F = { platform: "", range: "all", from: "", to: "", creators: [] };
   var ONE = { post: "Photo", reel: "Reel", story: "Story", video: "Video", short: "Short" };
   var KIND = { post: "Photo posts", reel: "Reels", story: "Stories", video: "Videos", short: "Shorts" };
@@ -104,6 +104,8 @@
         R = b.report;
         $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked", "cat-checking");
         setupHeader(); setupFilters(); renderAll(); setupShare(); watch();
+        // The report's "Download PDF" comes here with &pdf=1: the PDF is built from this page's panels.
+        if (/[#&]pdf=1/.test(location.hash)) { history.replaceState(null, "", location.pathname + location.hash.replace(/&pdf=1/, "")); printAll(); }
       })
       .catch(function (err) {
         if (err && err.locked) return lock();
@@ -136,8 +138,9 @@
     $("db-verdict").innerHTML = v.label ? '<span class="db-verdict' + (v.grade ? " db-verdict--" + v.grade : "") + '" role="status" title="How the campaign is doing against its targets today">'
       + esc(v.label) + (pc != null ? '<b class="db-verdict__pct">' + pc + "%</b>" : "") + "</span>" : "";
     $("db-report").href = "../#t=" + TOKEN;
-    $("db-pdf").href = "../#t=" + TOKEN;
-    $("db-pdf").addEventListener("click", function () { try { sessionStorage.setItem("hv_print", "1"); } catch (e) {} });
+    // The PDF is built here, from every panel of this dashboard, so it always holds all of it (2026-10-23).
+    $("db-pdf").href = "#t=" + TOKEN;
+    if (!$("db-pdf").getAttribute("data-wired")) { $("db-pdf").setAttribute("data-wired", "1"); $("db-pdf").addEventListener("click", function (e) { e.preventDefault(); printAll(); }); }
     renderFresh();
   }
 
@@ -635,6 +638,7 @@
 
   // The width the panel's content really has, so a chart drawn for it is not stretched.
   function panelW() {
+    if (PRINT_W) return PRINT_W;     // the PDF draws every chart at the A4 column width (2026-10-23)
     var b = $("db-panel-body"), cs = getComputedStyle(b), w = b.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     return Math.max(280, Math.round(w) || 600);
   }
@@ -1611,7 +1615,7 @@
         + rows.map(function (c, i) { var x = filtered() ? (by[c.code] || {}) : { posts: c.delivered, views: c.views, reach: c.reach, eng: c.engagement };
           var n = filtered() ? i + 1 : c.rank;
           return '<tr' + (n && n <= 3 ? ' class="is-top"' : "") + "><td>" + (n && n <= 3 ? '<span class="db-medal">' + medal(n) + "</span>" : (n || "—")) + '</td><td><span class="db-who">' + ava(c.photo) + "<b>" + who(c) + "</b></span></td><td>" + (x.posts || 0) + (c.planned && !filtered() ? "/" + c.planned : "") + "</td><td>" + num(x.views) + (R.visibility.reach === false ? "" : "</td><td>" + num(x.reach)) + "</td><td>" + num(x.eng)
-            + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.er != null ? c.er : c.video_er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (filtered() && viewScore[c.code] != null ? scoreTxt(viewScore[c.code]) : scoreTxt(c.score)) + "</td></tr>"; }).join("")
+            + "</td><td>" + share(x.views, tot.v) + "</td><td>" + share(x.eng, tot.e) + "</td><td>" + pct(c.video_er != null ? c.video_er : c.er) + "</td>" + (R.visibility.clicks && R.objective.links ? "<td>" + full(c.clicks) + "</td>" : "") + "<td>" + (filtered() && viewScore[c.code] != null ? scoreTxt(viewScore[c.code]) : scoreTxt(c.score)) + "</td></tr>"; }).join("")
         + '</tbody></table><p class="db-note" style="margin-top:10px">' + esc(scoreTip()) + "</p>" + videosByCreator(list, rows)
         + (filtered() ? "" : '<h3>Score breakdown</h3><table class="db-table"><thead><tr><th>Creator</th><th>Views</th><th>Engagement</th>' + (weights().er > 0 ? "<th>Eng. rate</th>" : "") + '' + (weights().clicks > 0 ? "<th>Clicks</th>" : "") + '<th>Score</th></tr></thead><tbody>'
           + R.creators.filter(function (c) { return c.parts; }).map(function (c) { var q = c.parts; return "<tr><td>" + esc(c.name) + "</td><td>" + q.exposure.toFixed(0) + "</td><td>" + q.engagement.toFixed(0) + "</td>" + (weights().er > 0 ? "<td>" + q.er.toFixed(0) + "</td>" : "") + (weights().clicks > 0 ? "<td>" + q.clicks.toFixed(0) + "</td>" : "") + "<td><b>" + scoreTxt(c.score) + "</b></td></tr>"; }).join("")
@@ -1866,7 +1870,8 @@
       + '<span class="db-pbadge" style="color:' + (PCOL[p.platform] || "#121212") + '" title="Published on ' + esc(p.platform) + '">' + (ICONS[p.platform] || "") + "</span>"
       + '</div><div class="db-post__body"><b>' + esc(p.creator) + '</b><span class="db-post__on"><i style="color:' + (PCOL[p.platform] || "#121212") + '">' + (ICONS[p.platform] || "") + "</i>" + esc(p.platform) + " · " + esc(day(p.posted_at, true)) + "</span></div>"
       + (p.caption ? '<p class="db-post__cap">' + esc(p.caption) + "</p>" : "")
-      + '<div class="db-post__stats">' + stats(p).map(function (x) { return "<div><small>" + x[0] + "</small><b>" + x[1] + "</b></div>"; }).join("") + "</div></a>";
+      + '<div class="db-post__stats">' + stats(p).map(function (x) { return "<div><small>" + x[0] + "</small><b>" + x[1] + "</b></div>"; }).join("") + "</div>"
+      + '<span class="db-post__open">Open on ' + esc(p.platform) + " ↗</span></a>";      // shown in the PDF, where the card is a link
   }
   var TITLES = { kpi: "Goals & benchmarks", trend: "Views & engagement", creators: "All creators", stage: "Campaign stage", mix: "Content by format", posts: "All posts", geo: "What people say", plat: "Platforms", clicks: "Affiliate clicks" };
   var lastFocus = null, curArea = null;
@@ -1972,6 +1977,172 @@
   };
   TITLES.did = "What people did";
   /* end What people did ring */
+
+  /* PDF print (2026-10-23): the PDF is built from this dashboard, every panel opened out behind a cover, so it holds
+     all the data the dashboard can show. A4, no browser header or footer (page margin 0); a table's repeating head and
+     foot keep the space for our own running header and footer on every page. Post and video links stay clickable. */
+  var PP_LOGO = "../../assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c5";
+  var PP_ICON = "../../assets/brand/helvy-connect/helvy-icon-180.png";
+  function ppName(n) {   // "Dr Name | د. الاسم" → the Latin part leads, the Arabic part is kept beside it
+    var s = String(n || ""), i = s.search(/[؀-ۿ]/);
+    if (i <= 0) return { en: s.replace(/\s*\|\s*$/, ""), ar: "" };
+    return { en: s.slice(0, i).replace(/[\s|]+$/, ""), ar: s.slice(i).trim() };
+  }
+  function ppSec(n, title, lede, body, cls) {
+    return '<section class="pp-sec' + (cls ? " " + cls : "") + '"><header class="pp-h"><span class="pp-h__n">' + n + "</span><div><h2>" + esc(title) + "</h2>"
+      + (lede ? "<p>" + lede + "</p>" : "") + '</div></header><div class="db-panel__body pp-b">' + body + "</div></section>";
+  }
+  // A client field holding an email (an admin's note, not a brand) is not printed as the client's name.
+  function ppClient() { var x = String((R.campaign || {}).client || "").trim(); return /@/.test(x) ? "" : x.replace(/^client:\s*/i, ""); }
+  function ppCover() {
+    var c = R.campaign, t = R.total || {}, v = R.verdict || {}, P = R.progress || {}, items = P.items || [], o = R.objective || {};
+    var g = {}; items.forEach(function (i) { g[i.key] = i; });
+    var now = Date.now() / 1000, when = "";
+    if (c.starts_at && c.ends_at) {
+      var total = Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400)), dn = Math.min(total, Math.max(1, Math.ceil((now - c.starts_at) / 86400)));
+      when = day(c.starts_at) + " – " + day(c.ends_at, true) + " · " + (now < c.starts_at ? "starts " + day(c.starts_at) : now <= c.ends_at ? "day " + dn + " of " + total : "ran " + total + " days");
+    }
+    var plats = {}; (R.posts || []).forEach(function (p) { if (p.section === "campaign") plats[p.platform] = 1; });
+    var done = items.length ? Math.round(P.all_met ? 100 : Math.min(99, P.overall || 0)) : null, due = P.due != null ? Math.round(P.due) : null;
+    var logos = (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("");
+    var ours = /^\s*hello\s*voice\b/i.test(c.client || "");
+    var erItem = g.er, er = erItem ? erItem.actual : t.video_er != null ? t.video_er : t.er;
+    var cl = clicksFor();
+    function kpi(label, val, k, fallback) {
+      return '<div class="pp-kpi"><span>' + label + "</span><b>" + val + "</b>" + (g[k] ? sig(g[k].grade, "") + '<small>goal ' + (k === "er" ? pct(g[k].goal, 1) : num(g[k].goal)) + "</small>" : fallback || "") + "</div>";
+    }
+    var kpis = kpi("Posts live", full(t.delivered) + (t.planned ? "<small>/" + t.planned + "</small>" : ""), "posts")
+      + kpi("Views", num(t.views), "views")
+      + (R.visibility.reach === false || t.reach == null ? "" : kpi("Reach", num(t.reach), "reach"))
+      + kpi("Engagement", num(t.engagement), "engagement")
+      + kpi("Eng. rate", pct(er), "er", sig(t.er_grade, ""))
+      + (cl ? kpi("Link clicks", num(cl.clicks), "clicks", sig(t.ctr_grade, "")) : "");
+    var ct = cmPick(), say = "";
+    if (R.comments && ct.n) {
+      var share = ct.intent / ct.n, p = ct.pos / ct.n, z = ct.neg / ct.n, th = cmTop(ct.themes);
+      var head1 = ct.small ? "Only " + ct.n + " comments so far" : share >= 0.15 ? "1 in " + Math.max(2, Math.round(1 / share)) + " want to buy" : z >= 0.3 ? "Viewers are divided" : p >= 0.6 ? "Viewers love it" : "Mostly neutral";
+      say = '<aside class="pp-say"><img src="' + PP_ICON + '" alt="" width="56" height="56"><div><p class="pp-say__k">Helvi read ' + full(ct.n) + " comments</p><p class=\"pp-say__t\">" + esc(head1) + "</p>"
+        + '<p class="pp-say__s">' + cmPct(ct.pos, ct.n) + "% positive · " + cmPct(ct.intent, ct.n) + "% ask how to buy" + (th[0] ? " · most talk about " + esc(th[0].toLowerCase()) : "") + "</p></div></aside>";
+    }
+    var crew = (R.creators || []).slice().sort(function (a, b) { return (a.rank == null) - (b.rank == null) || (a.rank || 0) - (b.rank || 0); }).map(function (k) {
+      var nm = ppName(k.name), pic = k.photo_large || k.photo;
+      return '<div class="pp-crew__c">' + '<span class="pp-crew__pic">' + (pic ? '<img src="' + esc(pic) + '" alt="">' : "") + (k.rank && k.rank <= 3 ? '<i class="pp-crew__m">' + medal(k.rank) + "</i>" : "") + "</span>"
+        + "<b>" + esc(nm.en) + "</b>" + (nm.ar ? '<span class="pp-ar" dir="rtl" lang="ar">' + esc(nm.ar) + "</span>" : "")
+        + "<small>" + (k.delivered || 0) + (k.planned ? "/" + k.planned : "") + " videos · " + num(k.seen != null ? k.seen : k.views) + " views</small></div>";
+    }).join("");
+    return '<section class="pp-cover">'
+      + '<div class="pp-cover__top"><img class="pp-cover__logo" src="' + PP_LOGO + '" alt="HELVi Connect"><span class="pp-cover__kind">Campaign report</span></div>'
+      + (logos ? '<div class="pp-cover__brands">' + logos + (ours ? "" : '<span aria-hidden="true">×</span><img src="../../assets/brand/logo.png" alt="HelloVoice">') + "</div>" : "")
+      + '<h1 class="pp-cover__title">' + esc(c.name) + "</h1>"
+      + '<p class="pp-cover__sub">' + esc([ppClient(), Object.keys(plats).join(", "), when].filter(Boolean).join(" · ")) + "</p>"
+      + '<div class="pp-cover__score"><span class="pp-verdict' + (v.grade ? " pp-verdict--" + v.grade : "") + '">' + esc(v.label || "In progress") + "</span>"
+      + (done != null ? '<div class="pp-cover__pct"><b>' + done + "%</b><span>of all targets achieved" + (due != null ? "<br>Where it should be today: " + due + "%" : "") + "<br>Objective: " + esc(o.label || "Balanced") + "</span></div>" : "") + "</div>"
+      + (done != null ? '<div class="pp-obj"><i class="pp-obj__fill ' + (v.grade || "") + '" style="width:' + done + '%"></i>' + (due != null ? '<i class="pp-obj__due" style="left:' + Math.min(100, due) + '%"><span>today</span></i>' : "") + "</div>"
+        + '<div class="pp-obj__parts">' + items.map(function (i) { return '<span class="' + (i.actual >= i.goal ? "met" : "") + '">' + KEYN[i.key] + " <b>" + Math.round(i.pct) + "%</b></span>"; }).join("") + "</div>" : "")
+      + '<div class="pp-kpis">' + kpis + "</div>" + say
+      + '<h3 class="pp-cover__h">Creators in this campaign</h3><div class="pp-crew">' + crew + "</div>"
+      + '<p class="pp-cover__foot">Data captured every 24 hours' + (R.updated_at ? " · last capture " + day(R.updated_at, true) : "") + " · report made " + day(Date.now() / 1000, true) + "</p></section>";
+  }
+  function ppPodium() {
+    var top = (R.creators || []).filter(function (c) { return c.rank; }).slice(0, 3);
+    if (!top.length) return "";
+    var order = top.length === 3 ? [top[1], top[0], top[2]] : top;
+    return '<div class="pp-pod">' + order.map(function (c) {
+      var nm = ppName(c.name), pic = c.photo_large || c.photo;
+      return '<div class="pp-pod__c pp-pod__c--' + c.rank + '"><span class="pp-pod__pic">' + (pic ? '<img src="' + esc(pic) + '" alt="">' : "") + '<i>' + medal(c.rank) + "</i></span>"
+        + "<b>" + esc(nm.en) + "</b>" + (nm.ar ? '<span class="pp-ar" dir="rtl" lang="ar">' + esc(nm.ar) + "</span>" : "")
+        + '<strong>' + scoreTxt(c.score) + "</strong><small>" + num(c.seen != null ? c.seen : c.views) + " views · " + num(c.engagement) + " engagements</small></div>";
+    }).join("") + "</div>";
+  }
+  // Comment highlights: the most-liked comments, with the buying questions among them, each with its English line.
+  function ppHighlights() {
+    var items = (CMB.items || []).filter(function (it) { return it[7] && it[7].length >= 12 && it[7].length <= 280; });
+    if (!items.length) return "";
+    var byLikes = items.slice().sort(function (a, b) { return (b[9] || 0) - (a[9] || 0); });
+    var pick = [], seen = {};
+    var per = {};      // at most two per creator, so the highlights speak for the whole campaign
+    function add(list, n) { list.forEach(function (it) { if (n > 0 && !seen[it[0] + it[7]] && (per[it[1]] || 0) < 2) { seen[it[0] + it[7]] = 1; per[it[1]] = (per[it[1]] || 0) + 1; pick.push(it); n--; } }); }
+    add(byLikes.filter(function (it) { return it[3] === "p"; }), 4);
+    add(byLikes.filter(function (it) { return it[4]; }), 2);
+    add(byLikes, 8 - pick.length); if (pick.length < 8) { per = {}; add(byLikes, 8 - pick.length); }
+    var P = cmPeople();
+    return '<div class="pp-quotes">' + pick.slice(0, 8).map(function (it) {
+      var m = CM_MOOD[it[3]] || "neu", nm = ppName(P.names[it[1]] || "");
+      return '<article class="pp-q" style="--c:' + CM_COL[m] + '"><i class="cm-face" style="--c:' + CM_COL[m] + '">' + CM_FACE[m] + '</i><div><q dir="auto">' + esc(it[7]) + "</q>"
+        + (it[8] && it[8] !== it[7] ? '<p class="pp-q__en">' + esc(it[8]) + "</p>" : "")
+        + '<p class="pp-q__m">' + (ICONS[it[2]] || "") + "<span>" + esc(nm.en || it[2]) + "</span>" + (it[4] ? '<em>Asks to buy</em>' : "") + (it[9] ? '<span class="pp-q__l">' + CM_HEART + it[9] + "</span>" : "") + "</p></div></article>";
+    }).join("") + "</div>";
+  }
+  // Every campaign video with its link, so the PDF opens each one.
+  function ppLinks() {
+    var list = R.posts.filter(function (p) { return p.section === "campaign" && p.url; }).sort(function (a, b) { return (a.creator || "").localeCompare(b.creator || "") || (a.posted_at || 0) - (b.posted_at || 0); });
+    if (!list.length) return "";
+    return '<table class="db-table pp-links"><thead><tr><th>Creator</th><th>Platform</th><th>Posted</th><th>Views</th><th>Open</th></tr></thead><tbody>' + list.map(function (p) {
+      var u = String(p.url), short = u.replace(/^https?:\/\/(www\.)?/, "").replace(/\?.*$/, ""); if (short.length > 46) short = short.slice(0, 44) + "…";
+      return "<tr><td>" + esc(ppName(p.creator).en) + '</td><td><span class="pp-links__p">' + (ICONS[p.platform] || "") + esc(p.platform) + "</span></td><td>" + esc(day(p.posted_at, true)) + "</td><td>"
+        + (p.views_hidden ? "—" : num(seen(p))) + '</td><td><a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(short) + " ↗</a></td></tr>";
+    }).join("") + "</tbody></table>";
+  }
+  function printAll() {
+    if (!R) return;
+    var keep = { platform: F.platform, range: F.range, from: F.from, to: F.to, creators: F.creators.slice() };
+    F.platform = ""; F.range = "all"; F.from = ""; F.to = ""; F.creators = [];      // the PDF is always the whole campaign
+    PRINT_W = 660;
+    var old = $("pp"); if (old) old.remove();
+    document.body.classList.add("pp-busy");
+    cmLoad(function () {
+      var n = 0, num2 = function () { n++; return (n < 10 ? "0" : "") + n; };
+      var mixT = (function () { var by = {}; posts().forEach(function (p) { by[p.kind] = (by[p.kind] || 0) + 1; });
+        var parts = Object.keys(by).map(function (k) { return { k: k, n: by[k] }; }).sort(function (a, b) { return b.n - a.n; });
+        return parts.length ? '<div class="db-donut pp-mix">' + donut(parts) + '<div class="db-key">' + parts.map(function (p, i) { return '<div><span class="db-sw" style="background:' + COL[i % COL.length] + '"></span>' + esc(KIND[p.k] || p.k) + "<b>" + p.n + "</b></div>"; }).join("") + "</div></div>" : ""; })();
+      var geo = R.comments && cmPick().n ? PANEL.geo() : "";
+      var body = ppCover()
+        + ppSec(num2(), "Goals & benchmarks", "Every target, where it should be today, the forecast and the benchmarks for creators of this size.", PANEL.kpi())
+        + ppSec(num2(), "Creators leaderboard", "Score out of 100 for the campaign's objective, what each creator delivered and every video.", ppPodium() + PANEL.creators())
+        + ppSec(num2(), "Views & engagement", "How the campaign grew, day by day.", PANEL.trend())
+        + (PANEL.did ? ppSec(num2(), "What people did", "Likes, comments, saves and shares, by platform and by creator.", PANEL.did()) : "")
+        + ppSec(num2(), "Platforms & content", "Views, reach and engagement rate on each platform, and the formats published.", PANEL.plat() + (mixT ? "<h3>Content mix</h3>" + mixT : ""))
+        + (geo ? ppSec(num2(), "What people say", "Viewers' comments under the campaign videos, read by AI. Commenters' names are never stored.", geo + (ppHighlights() ? "<h3>Comment highlights</h3>" + ppHighlights() : ""), "pp-sec--geo") : "")
+        + ppSec(num2(), "Every post", "Each creator's posts with their numbers. Every card opens the post.", PANEL.posts())
+        + (R.visibility.clicks === false || (!clicksFor() && !(R.sales && R.sales.totals)) ? "" : ppSec(num2(), R.sales && R.sales.totals ? "Clicks to sales" : "Affiliate clicks", "", PANEL.clicks()))
+        + ppSec(num2(), "Campaign stage", "The scope of work, step by step.", PANEL.stage())
+        + (ppLinks() ? ppSec(num2(), "Video links", "Open any campaign video straight from this PDF.", ppLinks()) : "");
+      var c = R.campaign;
+      var wrap = document.createElement("div"); wrap.id = "pp"; wrap.className = "pp";
+      wrap.innerHTML = '<div class="pp-run pp-run--h"><img src="' + PP_LOGO + '" alt=""><span>' + esc(c.name) + " · Campaign report</span><span>" + esc(day(Date.now() / 1000, true)) + "</span></div>"
+        + '<div class="pp-run pp-run--f"><span>HelloVoice · hellovoice.co.uk · info@hellovoice.co.uk</span><span>Confidential' + (ppClient() ? ": prepared for " + esc(ppClient()) : "") + "</span></div>"
+        + '<table class="pp-frame"><thead><tr><td><div class="pp-sp pp-sp--h"></div></td></tr></thead><tfoot><tr><td><div class="pp-sp pp-sp--f"></div></td></tr></tfoot><tbody><tr><td>' + body + "</td></tr></tbody></table>";
+      document.body.appendChild(wrap);
+      // drawers that open on a tap are opened: pace charts drawn, every section and topic shown, the comment browser left out
+      var it = {}; (SP().items || []).forEach(function (i) { it[i.key] = i; });
+      wrap.querySelectorAll(".db-tv__row").forEach(function (row) { var pace = row.querySelector(".db-tv__pace"), k = row.getAttribute("data-k");
+        if (pace && it[k]) { pace.hidden = false; pace.innerHTML = tvPace(it[k], PRINT_W - 40); } });
+      wrap.querySelectorAll("details").forEach(function (d) { d.open = true; });
+      var cmb = wrap.querySelector("#cmb"); if (cmb) { var d = cmb.closest("details") || cmb; d.remove(); }
+      var tv = wrap.querySelector("#db-tv"); if (tv) { tv.id = "pp-tv"; tv.classList.add("is-in"); }
+      cmSamples();
+      wrap.querySelectorAll("img").forEach(function (i) { i.loading = "eager"; });
+      var waits = [].slice.call(wrap.querySelectorAll("img")).filter(function (i) { return !i.complete; }).map(function (i) {
+        return new Promise(function (ok) { i.addEventListener("load", ok); i.addEventListener("error", function () { i.remove(); ok(); }); }); });
+      if (document.fonts && document.fonts.ready) waits.push(document.fonts.ready);
+      var done = false, title = document.title;
+      function go() {
+        if (done) return; done = true;
+        document.body.classList.remove("pp-busy"); document.body.classList.add("pp-on");
+        document.title = c.name + " — Campaign report";        // the PDF's file name
+        window.print();
+      }
+      window.addEventListener("afterprint", function once() {
+        window.removeEventListener("afterprint", once);
+        document.body.classList.remove("pp-on"); document.title = title; PRINT_W = 0;
+        F.platform = keep.platform; F.range = keep.range; F.from = keep.from; F.to = keep.to; F.creators = keep.creators;
+        var w = $("pp"); if (w && !window.__ppKeep) w.remove();
+      });
+      Promise.all(waits).then(go, go); setTimeout(go, 12000);
+    });
+  }
+  window.__hvPrintAll = printAll;
+  /* end PDF print */
 
   load();
 })();

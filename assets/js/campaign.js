@@ -41,6 +41,8 @@
   }
   function full(v) { return v == null ? "—" : Math.round(v).toLocaleString("en-US"); }
   function pct(v, d) { return v == null ? "—" : v.toFixed(d == null ? 2 : d) + "%"; }
+  // A benchmark as people write it: 5.52, 8.28, 1 (stored values carry float noise such as 5.5200000000000005).
+  function bmf(v) { return v == null ? "—" : String(Math.round(v * 100) / 100); }
   function day(t, withYear) {
     if (!t) return "";
     var d = typeof t === "number" ? new Date(t * 1000) : new Date(t + "T00:00:00Z");
@@ -461,10 +463,11 @@
     app: ico('<rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/>'),
     unique: ico('<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/><path d="M17 3.5l1.5 1.5 3-3"/>'),
     ctr: ico('<path d="M4 20L20 4M8 4h12v12"/>'),
-    chart: ico('<path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/>')
+    chart: ico('<path d="M3 20h18"/><path d="M4 16l5-6 4 3 7-8"/>'),
+    say: ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>')
   };
   // Panel and bench titles get the matching mark.
-  var H3IC = { "Reached by platform": "platform", "Content mix": "mix", "What people did": "did", "Who was reached": "country",
+  var H3IC = { "What people say": "say", "Reached by platform": "platform", "Content mix": "mix", "What people did": "did", "Who was reached": "country",
     "By creator": "creator", "By app": "app", "By country": "country", "By device": "device",
     "Engagement rate": "er", "Video engagement": "views", "Click-through": "ctr" };
   function h3ic(title) { return IC[H3IC[title]] ? IC[H3IC[title]] : ""; }
@@ -473,7 +476,7 @@
 
   // Every section is on the page; the bar only scrolls to one. It must not
   // touch the URL hash, which carries the report token.
-  var SECS = ["overview", "leaderboard", "content", "performance", "clicks", "timeline"];
+  var SECS = ["overview", "leaderboard", "content", "performance", "say", "clicks", "timeline"];
   var LOCK = 0;
   SECS.forEach(function (k) {
     var a = $("tab-" + k); if (a && !a.querySelector(".mx-ico")) a.insertAdjacentHTML("afterbegin", IC[k]);
@@ -527,34 +530,48 @@
 
   /* ---------------------------------------------------------- carousel */
 
-  // One row per video the creator published, a chip for each platform it went out on, nothing counted twice.
+  // "Dr Name | د. الاسم": the Latin part leads in Bebas, the Arabic part sits under it (2026-10-23).
+  function splitName(n) {
+    var x = String(n || ""), i = x.search(/[؀-ۿ]/);
+    if (i <= 0) return { en: x.replace(/\s*\|\s*$/, ""), ar: "" };
+    return { en: x.slice(0, i).replace(/[\s|]+$/, ""), ar: x.slice(i).trim() };
+  }
+  // A creator's videos: one line per live video (date, views, a small chip per platform it went out on, each a link),
+  // then the videos still to come folded into one line, so a card never fills with "Not published yet".
   function creatorVideos(c) {
     var mine = mergePieces((R.posts || []).filter(function (p) { return p.code === c.code && p.section === "campaign"; }))
       .sort(function (a, b) { return (a.posted_at || 0) - (b.posted_at || 0); });
     function v(p) { return p.exposure != null ? p.exposure : (p.video ? (p.views || 0) : (p.reach || 0)); }
     var rows = mine.map(function (p, i) {
-      return '<div class="mx-cc__vid"><b>Video ' + (i + 1) + (c.planned ? " of " + c.planned : "") + "</b><span>" + num(v(p)) + ' views</span><div class="mx-cc__chips">'
+      return '<div class="mx-cc__vid"><div class="mx-cc__vh"><b>Video ' + (i + 1) + "</b><span>" + esc(day(p.posted_at, false)) + "</span><strong>" + num(v(p)) + '</strong></div><div class="mx-cc__chips">'
         + (p.parts || [p]).map(function (x) {
-          return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener" aria-label="' + esc(x.platform) + '">' + icon(x.platform) + num(v(x)) + "</a>";
+          return '<a href="' + esc(x.url) + '" target="_blank" rel="noopener" title="Open on ' + esc(x.platform) + '" aria-label="Open on ' + esc(x.platform) + '">' + icon(x.platform) + "<span>" + num(v(x)) + "</span></a>";
         }).join("") + "</div></div>";
     });
-    for (var i = mine.length; i < (c.planned || 0); i++) rows.push('<div class="mx-cc__vid is-owed"><b>Video ' + (i + 1) + " of " + c.planned + "</b><span>Not published yet</span></div>");
+    var owed = (c.planned || 0) - mine.length;
+    if (owed > 0) rows.push('<div class="mx-cc__owed"><span>' + (owed === 1 ? "Video " + (mine.length + 1) : "Videos " + (mine.length + 1) + "–" + c.planned)
+      + "</span><em>" + (c.pending_date ? "Expected " + esc(day(c.pending_date, false)) : "Coming soon") + "</em></div>");
     return rows.length ? '<div class="mx-cc__vids">' + rows.join("") + "</div>" : "";
   }
   function renderCarousel() {
-    var cs = R.creators || [];
+    var cs = (R.creators || []).slice().sort(function (a, b) { return (a.rank == null) - (b.rank == null) || (a.rank || 0) - (b.rank || 0); });
     $("mx-carousel-wrap").hidden = !cs.length;
     $("mx-carousel").innerHTML = cs.map(function (c) {
       var marks = (c.profiles || []).filter(function (p) { return p.url; }).map(function (p) {
         return '<a href="' + esc(p.url) + '" target="_blank" rel="noopener" aria-label="' + esc(c.name) + " on " + esc(p.platform) + '">' + icon(p.platform) + "</a>";
       }).join("");
+      var nm = splitName(c.name), live = c.delivered || 0, plan = c.planned || 0, pips = "";
+      for (var i = 0; i < Math.max(plan, live); i++) pips += '<i class="' + (i < live ? "on" : "") + '"></i>';
+      var seen = c.seen != null ? c.seen : (c.views || 0);
       return '<article class="mx-cc"><a class="mx-cc__photo" href="../creator/#c=' + encodeURIComponent(c.code) + '">'
         + (c.photo_large || c.photo ? '<img src="' + esc(c.photo_large || c.photo) + '" alt="" loading="lazy" referrerpolicy="no-referrer">' : "")
-        + '</a><div class="mx-cc__body"><a class="mx-cc__name" href="../creator/#c=' + encodeURIComponent(c.code) + '">' + esc(c.name) + "</a>"
-        + '<span class="mx-cc__meta">' + esc((R.benchmarks.bands[c.band] || "").replace(/ \(.*/, "")) + (c.followers ? " · " + num(c.followers) + " followers" : "")
-        + '</span><span class="mx-cc__meta">' + c.delivered + (c.planned ? " of " + c.planned : "") + " videos live</span>"
+        + (c.badge ? '<span class="mx-cc__medal">' + medal(c.badge, c.rank) + "</span>" : "")
+        + '</a><div class="mx-cc__body"><a class="mx-cc__name" href="../creator/#c=' + encodeURIComponent(c.code) + '">' + esc(nm.en) + "</a>"
+        + (nm.ar ? '<span class="mx-cc__ar" dir="rtl" lang="ar">' + esc(nm.ar) + "</span>" : "")
+        + '<span class="mx-cc__meta">' + esc((R.benchmarks.bands[c.band] || "").replace(/ \(.*/, "")) + (c.followers ? " · " + num(c.followers) + " followers" : "") + "</span>"
+        + '<div class="mx-cc__live"><span class="mx-cc__pips" aria-hidden="true">' + pips + "</span><b>" + live + (plan ? " of " + plan : "") + ' live</b><span class="mx-cc__views">' + (seen ? num(seen) + " views" : "") + "</span></div>"
         + creatorVideos(c)
-        + '<div class="mx-tc__links">' + marks + "</div></div></article>";
+        + (marks ? '<div class="mx-tc__links">' + marks + "</div>" : "") + "</div></article>";
     }).join("");
   }
   function slide(dir) {
@@ -575,6 +592,7 @@
     renderCharts();
     renderClicks();
     renderCarousel();
+    renderSay();
     $("tab-clicks").hidden = !R.visibility.clicks;
     markTab("overview");
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
@@ -717,7 +735,7 @@
     cells.push(["Engagement", num(t.engagement) + est("engagement"), goal("engagement"), "engagement"]);
     cells.push(["Avg eng. rate", pct(g.er ? g.er.actual : t.video_er != null ? t.video_er : t.er) + est("er"), g.er ? goal("er") : sig(t.er_grade, "Against each creator's tier benchmark"), "er"]);
     if (vis.clicks && R.clicks && R.clicks.links && R.clicks.has_destination)
-      cells.push(["Link clicks", num(t.clicks) + est("clicks"), g.clicks ? goal("clicks") : sig(t.ctr_grade, "Strong from " + bm.ctr[0] + "% click-through"), "clicks"]);
+      cells.push(["Link clicks", num(t.clicks) + est("clicks"), g.clicks ? goal("clicks") : sig(t.ctr_grade, "Strong from " + bmf(bm.ctr[0]) + "% click-through"), "clicks"]);
     $("mx-scoreline").innerHTML = cells.map(function (c) {
       return "<div><dt>" + (c[3] ? IC[c[3]] : "") + esc(c[0]) + "</dt><dd>" + c[1] + "</dd>" + (c[2] ? "<div class=\"mx-score-line__sig\">" + c[2] + "</div>" : "") + "</div>";
     }).join("");
@@ -748,7 +766,7 @@
 
   function healthTitle(h) {
     if (!h || h.value == null || !h.benchmark) return "";
-    return h.metric + " " + h.value.toFixed(2) + "% — strong from " + h.benchmark[0] + "%, fair from " + h.benchmark[1] + "%"
+    return h.metric + " " + h.value.toFixed(2) + "% — strong from " + bmf(h.benchmark[0]) + "%, fair from " + bmf(h.benchmark[1]) + "%"
       + (h.band ? " for " + (R.benchmarks.bands[h.band] || h.band) + " creators" : "");
   }
 
@@ -775,6 +793,11 @@
       m.reach_real = g.every(function (x) { return x.reach_real; });
       var ers = g.map(function (x) { return m.video ? x.video_er : x.er; }).filter(function (v) { return v != null; });
       m.er = m.video_er = ers.length ? ers.reduce(function (a, b) { return a + b; }, 0) / ers.length : null;
+      // One video on several platforms is judged on its platforms' mean rate, against the campaign's ER goal when it has one
+      // (as the dashboard does), not on its first platform's grade (2026-10-23).
+      var gl = (R.benchmarks || {}).er_goal, v = m.er;      // the mean of its platforms' rates, as the ER goal is measured
+      if (v != null) { m.health = Object.assign({}, lead.health || {}, { value: v,
+        grade: gl ? (v >= gl ? "good" : v >= 0.7 * gl ? "moderate" : "low") : (lead.health || {}).grade }); }
       return m;
     });
   }
@@ -797,22 +820,28 @@
       if (!p.story) n.push([p.video ? "Video ER" : "ER", pct(p.video ? p.video_er : p.er)]);
       if (p.saves) n.push(["Saves", num(p.saves)]);
       if (p.shares) n.push(["Shares", num(p.shares)]);
-      var h = p.health || {};
-      // Never cropped: the whole frame fitted over a blurred copy of itself.
-      var img = p.thumb ? '<img class="hv-fill" src="' + esc(p.thumb) + '" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
-        + '<img class="hv-fit" src="' + esc(p.thumb) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "";
-      return '<article class="mx-post"><div class="mx-post__media"><div class="mx-post__plate">' + icon(p.platform) + "</div>" + img
-        + '<span class="mx-post__tag">' + (p.parts ? p.parts.map(function (x) { return icon(x.platform); }).join("") + "<span class=\"mx-post__one\">One video · </span>" + p.parts.length + " platforms"
-          : icon(p.platform) + esc(KIND[p.kind] || p.kind)) + '</span><span class="mx-post__sig">'
+      var h = p.health || {}, parts = p.parts || [p];
+      var cr = (R.creators || []).filter(function (c) { return c.code === p.code; })[0] || {};
+      // Never cropped: the whole frame fitted over a blurred copy of itself. A post captured without its picture shows
+      // the creator's photo, never a giant platform logo (2026-10-23).
+      var pic = p.thumb || cr.photo_large || cr.photo || p.photo;
+      var img = pic ? '<img class="hv-fill" src="' + esc(pic) + '" alt="" aria-hidden="true" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">'
+        + '<img class="' + (p.thumb ? "hv-fit" : "hv-face") + '" src="' + esc(pic) + '" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">' : "";
+      var plats = '<span class="mx-post__plats-ic">' + parts.map(function (x) { return icon(x.platform); }).join("") + "</span>";
+      // One link per platform it went out on: a compact row of chips, each with that platform's views (2026-10-23).
+      var links = parts.length === 1
+        ? '<a class="mx-post__go" href="' + esc(p.url) + '" target="_blank" rel="noopener">Watch on ' + esc(p.platform)
+          + ' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>'
+        : '<div class="mx-post__links"><span class="mx-post__lbl">Watch on</span>' + parts.map(function (x) {
+            return '<a class="mx-post__lk" href="' + esc(x.url) + '" target="_blank" rel="noopener">' + icon(x.platform) + "<span>" + esc(x.platform) + "</span>"
+              + (x.video && x.views != null ? "<b>" + num(x.views) + "</b>" : "") + "</a>";
+          }).join("") + "</div>";
+      return '<article class="mx-post' + (p.thumb ? "" : " mx-post--nothumb") + '"><div class="mx-post__media"><div class="mx-post__plate"></div>' + img
+        + '<span class="mx-post__tag">' + plats + "<span>" + (p.parts ? p.parts.length + " platforms" : esc(KIND[p.kind] || p.kind)) + '</span></span><span class="mx-post__sig">'
         + sig(h.grade, healthTitle(h)) + '</span></div><div class="mx-post__body"><div class="mx-who">' + ava(p.photo)
-        + "<div><b>" + esc(p.creator) + "</b><span>" + esc(day(p.posted_at)) + '</span></div></div><dl class="mx-nums">'
+        + "<div><b>" + esc(splitName(p.creator).en) + "</b><span>" + esc(day(p.posted_at)) + (p.parts ? " · one video" : "") + '</span></div></div><dl class="mx-nums">'
         + n.slice(0, 6).map(function (x) { return "<div><dt>" + x[0] + "</dt><dd>" + x[1] + "</dd></div>"; }).join("")
-        + '</dl>' + (p.parts ? '<p class="mx-post__plats">Combined across ' + p.parts.map(function (x) { return esc(x.platform); }).join(", ") + "</p>" : "")
-        + (p.parts || [p]).map(function (x) {
-          return '<a class="mx-post__go" href="' + esc(x.url) + '" target="_blank" rel="noopener">View on ' + esc(x.platform)
-            + (p.parts && x.video && x.views != null ? " · " + num(x.views) + " views" : "")
-            + ' <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17L17 7M9 7h8v8"/></svg></a>';
-        }).join("") + '</div></article>';
+        + "</dl>" + links + "</div></article>";
     }).join("") + (list.length && owed.length ? pendingStrip(owed) : "");
   }
 
@@ -894,8 +923,7 @@
     var head = ["#", "Creator", "Posts", "Views"].concat(vis.reach ? ["Reach"] : []).concat(["Engagement", "Eng. rate"])
       .concat(vis.clicks ? ["Clicks"] : []).concat(["Score"]);
     var rows = cs.map(function (c) {
-      var rate = c.er != null ? c.er : c.video_er, g = c.er != null ? c.er_grade : c.video_er_grade;
-      var bench = c.er != null ? bm.er[c.band] : bm.video_er;
+      var rate = c.video_er != null ? c.video_er : c.er;      // reactions per view, the rate the campaign goal measures
       var tds = ['<td class="mx-rank">' + (c.badge ? medal(c.badge, c.rank) : (c.rank || "—")) + "</td>",
         '<td><div class="mx-tc">' + ava(c.photo) + "<div>" + creatorLink(c, "mx-tc__name") + '<div class="mx-tc__links">' + profileLinks(c) + "</div></div></div></td>",
         "<td>" + c.delivered + (c.planned ? " / " + c.planned : "") + "</td>", "<td>" + full(c.views) + "</td>"];
@@ -930,10 +958,10 @@
     // One rule: with a campaign ER goal, the card grades against it, like the score line (owner, 2026-10-19).
     var erT = (p.items || []).filter(function (i) { return i.key === "er"; })[0];
     // With a goal: one card, the rate the goal measures (as on the score line and the dashboard), graded on it.
-    if (erT) ex.push(["Engagement rate", erT.actual, erT.grade, "Against the campaign goal of " + pct(erT.goal, 1) + " · industry guide " + bm.er.micro[0] + "% (micro creators)"]);
-    else ex.push(["Engagement rate", t.er, t.er_grade, "Strong from " + bm.er.micro[0] + "% (micro creators)"]);
-    if (t.video_er != null && !erT) ex.push(["Video engagement", t.video_er, t.video_er_grade, "Strong from " + bm.video_er[0] + "%"]);
-    if (R.visibility.clicks && t.ctr != null && R.clicks && R.clicks.links) ex.push(["Click-through", t.ctr, t.ctr_grade, "Strong from " + bm.ctr[0] + "%"]);
+    if (erT) ex.push(["Engagement rate", erT.actual, erT.grade, "Against the campaign goal of " + pct(erT.goal, 1) + " · industry guide " + bmf(bm.er.micro[0]) + "% (micro creators)"]);
+    else ex.push(["Engagement rate", t.er, t.er_grade, "Strong from " + bmf(bm.er.micro[0]) + "% (micro creators)"]);
+    if (t.video_er != null && !erT) ex.push(["Video engagement", t.video_er, t.video_er_grade, "Strong from " + bmf(bm.video_er[0]) + "%"]);
+    if (R.visibility.clicks && t.ctr != null && R.clicks && R.clicks.links) ex.push(["Click-through", t.ctr, t.ctr_grade, "Strong from " + bmf(bm.ctr[0]) + "%"]);
     $("mx-bench").innerHTML = ex.map(function (x) {
       return '<div class="mx-bench__item"><h3>' + h3ic(x[0]) + x[0] + '</h3><div class="mx-bench__val">' + pct(x[1]) + " " + sig(x[2]) + "</div><p>" + x[3] + "</p></div>";
     }).join("");
@@ -1007,11 +1035,75 @@
       + '</div><div class="mx-key">' + parts.map(function (p) {
         return '<div><span class="mx-cs" style="background:' + p[2] + '"></span>' + p[0] + "<b>" + full(p[1]) + "</b></div>";
       }).join("") + "</div></div>");
-    if (R.audience && R.audience.countries.length) {
-      mix.push('<div class="mx-panel"><h3>Creators\' audience</h3>' + (R.audience ? '<p class="aud-target">' + (R.audience.target ? flag(R.audience.target.code) + '<span>Target market <b>' + esc(countryName(R.audience.target.code)) + '</b></span>' : '<span>Target market</span>') + '</p>' + '<div class="aud-stamp" role="img" aria-label="Audience not analysed yet"><span>Not analysed</span><span>yet</span></div>' : '') + '</div>');
-    }
+    // The comments take the old audience slot (owner, 2026-10-23): the mood and what viewers ask, with the full read below.
+    var ct = sayTotals();
+    if (ct && ct.n) mix.push('<div class="mx-panel mx-saybox"><h3>What people say</h3>' + moodBar(ct)
+      + '<div class="mx-key">' + [["Comments read", full(ct.n)], ["Positive", sayPct(ct.pos, ct.n)], ["Ask how to buy", sayPct(ct.intent, ct.n)]].map(function (x) {
+        return "<div>" + x[0] + "<b>" + x[1] + "</b></div>"; }).join("") + '</div><a class="mx-saybox__go" href="#sec-say">Read the highlights ›</a></div>');
     $("mx-mix").innerHTML = mix.join("");
     decorateH3("mx-mix");
+  }
+
+  /* ------------------------------------------------------ what people say */
+
+  // Totals across the comment buckets (one per creator and platform) the report carries.
+  function sayTotals() {
+    var C = R.comments; if (!C || !C.buckets) return null;
+    var t = { n: 0, pos: 0, neu: 0, neg: 0, intent: 0, videos: 0, themes: {} };
+    C.buckets.forEach(function (b) {
+      ["n", "pos", "neu", "neg", "intent", "videos"].forEach(function (k) { t[k] += b[k] || 0; });
+      Object.keys(b.themes || {}).forEach(function (q) { t.themes[q] = (t.themes[q] || 0) + b.themes[q]; });
+    });
+    return t;
+  }
+  function sayPct(x, n) { if (!n) return "0%"; var v = x / n * 100; return x && v < 1 ? "<1%" : Math.round(v) + "%"; }
+  var MOOD = [["pos", "Positive", "#14884a"], ["neu", "Neutral", "#ff691e"], ["neg", "Negative", "#ee1515"]];
+  function moodBar(t) {
+    return '<div class="mx-mood" role="img" aria-label="' + MOOD.map(function (m) { return sayPct(t[m[0]], t.n) + " " + m[1].toLowerCase(); }).join(", ") + '">'
+      + MOOD.map(function (m) { var w = t.n ? t[m[0]] / t.n * 100 : 0; return w ? '<i style="width:' + w.toFixed(1) + "%;background:" + m[2] + '">' + (w >= 9 ? Math.round(w) + "%" : "") + "</i>" : ""; }).join("")
+      + "</div>";
+  }
+  var SAY_ITEMS = null;
+  function renderSay() {
+    var t = sayTotals(), C = R.comments || {};
+    $("sec-say").hidden = $("tab-say").hidden = !(t && t.n);
+    if (!t || !t.n) return;
+    var share = t.intent / t.n, p = t.pos / t.n, z = t.neg / t.n, th = Object.keys(t.themes).sort(function (a, b) { return t.themes[b] - t.themes[a]; });
+    var head = t.n < (C.min_sample || 30) ? "Only " + t.n + " comments so far" : share >= 0.15 ? "1 in " + Math.max(2, Math.round(1 / share)) + " want to buy"
+      : z >= 0.3 ? "Viewers are divided" : p >= 0.6 ? "Viewers love it" : "Mostly neutral";
+    var AR = C.theme_ar || {}, peak = th.length ? t.themes[th[0]] : 1;
+    var topics = th.slice(0, 6).map(function (q, i) {
+      return '<div class="mx-bar"><span class="mx-bar__k">' + esc(q) + (AR[q] ? ' <small dir="rtl" lang="ar">' + esc(AR[q]) + "</small>" : "") + '</span><i style="--w:' + (t.themes[q] / peak * 100).toFixed(1)
+        + "%;--c:" + PALETTE[i % PALETTE.length] + '"></i><b>' + sayPct(t.themes[q], t.n) + "</b></div>";
+    }).join("");
+    $("mx-say").innerHTML = '<div class="mx-say__top"><aside class="mx-say__helvi"><img src="../assets/brand/helvy-connect/helvy-icon-180.png" alt="" width="56" height="56"><div><p>Helvi read ' + full(t.n) + " comments</p><b>" + esc(head) + "</b>"
+      + (th[0] ? "<span>Most of the talk is about " + esc(th[0].toLowerCase()) + "</span>" : "") + "</div></aside>"
+      + '<dl class="mx-say__nums"><div><dt>Comments read</dt><dd>' + full(t.n) + "</dd></div><div><dt>Positive</dt><dd>" + sayPct(t.pos, t.n) + "</dd></div><div><dt>Ask how to buy</dt><dd>" + sayPct(t.intent, t.n)
+      + "</dd></div><div><dt>Videos</dt><dd>" + t.videos + "</dd></div></dl></div>"
+      + '<div class="mx-say__grid"><div class="mx-panel"><h3>' + IC.say + "The mood</h3>" + moodBar(t) + '<div class="mx-key">' + MOOD.map(function (m) {
+          return '<div><span class="mx-cs" style="background:' + m[2] + '"></span>' + m[1] + "<b>" + full(t[m[0]]) + "</b></div>"; }).join("") + "</div></div>"
+      + '<div class="mx-panel"><h3>What they talk about</h3>' + (topics || '<p class="mx-panel__note">Topics appear once the comments are read.</p>') + "</div></div>"
+      + '<h3 class="mx-table-title">Comment highlights</h3><div class="mx-quotes" id="mx-quotes"><p class="mx-panel__note">Loading the comments…</p></div>';
+    var draw = function () { $("mx-quotes") && ($("mx-quotes").innerHTML = quotes()); };
+    if (SAY_ITEMS) return draw();
+    get("/api/campaign/comments?t=" + encodeURIComponent(R._t)).then(function (b) { SAY_ITEMS = b.items || []; draw(); }).catch(function () { SAY_ITEMS = []; draw(); });
+  }
+  // The comments that stood out: the most-liked positive ones and buying questions, each with its English line.
+  function quotes() {
+    var items = (SAY_ITEMS || []).filter(function (it) { return it[7] && it[7].length >= 12 && it[7].length <= 280; });
+    if (!items.length) return '<p class="mx-panel__note">No comments to show yet.</p>';
+    var by = items.slice().sort(function (a, b) { return (b[9] || 0) - (a[9] || 0); }), pick = [], seen = {};
+    var per = {};      // at most two per creator, so the highlights speak for the whole campaign
+    function add(list, n) { list.forEach(function (it) { var k = it[0] + it[7]; if (n > 0 && !seen[k] && (per[it[1]] || 0) < 2) { seen[k] = 1; per[it[1]] = (per[it[1]] || 0) + 1; pick.push(it); n--; } }); }
+    add(by.filter(function (it) { return it[3] === "p"; }), 3); add(by.filter(function (it) { return it[4]; }), 2); add(by, 6 - pick.length); if (pick.length < 6) { per = {}; add(by, 6 - pick.length); }
+    var names = {}; (R.creators || []).forEach(function (c) { names[c.code] = splitName(c.name).en; });
+    var M = { p: MOOD[0], n: MOOD[1], x: MOOD[2] };
+    return pick.slice(0, 6).map(function (it) {
+      var m = M[it[3]] || MOOD[1];
+      return '<article class="mx-q" style="--c:' + m[2] + '"><q dir="auto">' + esc(it[7]) + "</q>" + (it[8] && it[8] !== it[7] ? '<p class="mx-q__en">' + esc(it[8]) + "</p>" : "")
+        + '<p class="mx-q__m">' + icon(it[2]) + "<span>" + esc(names[it[1]] || it[2]) + "</span>" + '<em style="color:' + m[2] + '">' + m[1] + "</em>" + (it[4] ? "<em>Asks to buy</em>" : "")
+        + (it[9] ? '<span class="mx-q__l">♥ ' + it[9] + "</span>" : "") + "</p></article>";
+    }).join("");
   }
 
   /* ----------------------------------------------------------- clicks */
@@ -1046,6 +1138,7 @@
     });
   }
 
-  $("mx-print").addEventListener("click", printWhenReady);
+  // The PDF is built on the dashboard from every one of its panels, so it holds all the data (2026-10-23).
+  $("mx-print").addEventListener("click", function () { if (R && R._t) location.href = "dashboard/#t=" + encodeURIComponent(R._t) + "&pdf=1"; else printWhenReady(); });
   route();
 })();
