@@ -1978,7 +1978,7 @@
   TITLES.did = "What people did";
   /* end What people did ring */
 
-  /* PDF print (2026-10-23): the PDF is built from this dashboard, every panel opened out behind a cover, so it holds
+  /* PDF print (2026-10-23): the client field stays on the dashboard and report, never in the PDF (owner). The PDF is built from this dashboard, every panel opened out behind a cover, so it holds
      all the data the dashboard can show. A4, no browser header or footer (page margin 0); a table's repeating head and
      foot keep the space for our own running header and footer on every page. Post and video links stay clickable. */
   var PP_LOGO = "../../assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c5";
@@ -1992,8 +1992,6 @@
     return '<section class="pp-sec' + (cls ? " " + cls : "") + '"><header class="pp-h"><span class="pp-h__n">' + n + "</span><div><h2>" + esc(title) + "</h2>"
       + (lede ? "<p>" + lede + "</p>" : "") + '</div></header><div class="db-panel__body pp-b">' + body + "</div></section>";
   }
-  // A client field holding an email (an admin's note, not a brand) is not printed as the client's name.
-  function ppClient() { var x = String((R.campaign || {}).client || "").trim(); return /@/.test(x) ? "" : x.replace(/^client:\s*/i, ""); }
   function ppCover() {
     var c = R.campaign, t = R.total || {}, v = R.verdict || {}, P = R.progress || {}, items = P.items || [], o = R.objective || {};
     var g = {}; items.forEach(function (i) { g[i.key] = i; });
@@ -2034,7 +2032,7 @@
       + '<div class="pp-cover__top"><img class="pp-cover__logo" src="' + PP_LOGO + '" alt="HELVi Connect"><span class="pp-cover__kind">Campaign report</span></div>'
       + (logos ? '<div class="pp-cover__brands">' + logos + (ours ? "" : '<span aria-hidden="true">×</span><img src="../../assets/brand/logo.png" alt="HelloVoice">') + "</div>" : "")
       + '<h1 class="pp-cover__title">' + esc(c.name) + "</h1>"
-      + '<p class="pp-cover__sub">' + esc([ppClient(), Object.keys(plats).join(", "), when].filter(Boolean).join(" · ")) + "</p>"
+      + '<p class="pp-cover__sub">' + esc([Object.keys(plats).join(", "), when].filter(Boolean).join(" · ")) + "</p>"
       + '<div class="pp-cover__score"><span class="pp-verdict' + (v.grade ? " pp-verdict--" + v.grade : "") + '">' + esc(v.label || "In progress") + "</span>"
       + (done != null ? '<div class="pp-cover__pct"><b>' + done + "%</b><span>of all targets achieved" + (due != null ? "<br>Where it should be today: " + due + "%" : "") + "<br>Objective: " + esc(o.label || "Balanced") + "</span></div>" : "") + "</div>"
       + (done != null ? '<div class="pp-obj"><i class="pp-obj__fill ' + (v.grade || "") + '" style="width:' + done + '%"></i>' + (due != null ? '<i class="pp-obj__due" style="left:' + Math.min(100, due) + '%"><span>today</span></i>' : "") + "</div>"
@@ -2110,7 +2108,7 @@
       var c = R.campaign;
       var wrap = document.createElement("div"); wrap.id = "pp"; wrap.className = "pp";
       wrap.innerHTML = '<div class="pp-run pp-run--h"><img src="' + PP_LOGO + '" alt=""><span>' + esc(c.name) + " · Campaign report</span><span>" + esc(day(Date.now() / 1000, true)) + "</span></div>"
-        + '<div class="pp-run pp-run--f"><span>HelloVoice · hellovoice.co.uk · info@hellovoice.co.uk</span><span>Confidential' + (ppClient() ? ": prepared for " + esc(ppClient()) : "") + "</span></div>"
+        + '<div class="pp-run pp-run--f"><span>HelloVoice · hellovoice.co.uk · info@hellovoice.co.uk</span><span>Confidential</span></div>'
         + '<table class="pp-frame"><thead><tr><td><div class="pp-sp pp-sp--h"></div></td></tr></thead><tfoot><tr><td><div class="pp-sp pp-sp--f"></div></td></tr></tfoot><tbody><tr><td>' + body + "</td></tr></tbody></table>";
       document.body.appendChild(wrap);
       // drawers that open on a tap are opened: pace charts drawn, every section and topic shown, the comment browser left out
