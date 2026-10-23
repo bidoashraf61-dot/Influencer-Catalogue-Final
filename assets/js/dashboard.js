@@ -593,6 +593,7 @@
     renderStage();
     renderMix(list);
     renderGeo();
+    renderDid(list);   // What people did ring (2026-10-23)
     renderPlat(list);
     renderClicks(cl);
     renderPosts(list);
@@ -1907,6 +1908,70 @@
   $("db-panel-close").addEventListener("click", closePanel);
   $("db-scrim").addEventListener("click", closePanel);
   document.addEventListener("keydown", function (e) { if (e.key !== "Escape") return; if (tipEl) { hideTip(); return; } if (!$("db-panel").hidden) closePanel(); });
+
+  /* What people did ring (2026-10-23): the report's "What people did" stack as a ring (owner). Likes, comments,
+     saves and shares of the posts in the current view, each in its fixed colour; the drawer splits them by
+     platform and by creator. A platform that does not show a number (saves on Facebook and YouTube) reads "—". */
+  var DID = [["likes", "Likes", "#14884a"], ["comments", "Comments", "#ff691e"], ["saves", "Saves", "#b9d400"], ["shares", "Shares", "#8a7a68"]];
+  var DID_IC = ico('<path d="M7 11V5.5a1.5 1.5 0 0 1 3 0V11M10 10V4a1.5 1.5 0 0 1 3 0v6M13 10V5.5a1.5 1.5 0 0 1 3 0V13a7 7 0 0 1-7 7h-.5A5.5 5.5 0 0 1 4 16l-1-3.5a1.5 1.5 0 0 1 2.7-1.2L7 13"/>');
+  var DID_TIP = "Everything people did on the posts in this view: likes, comments, saves and shares, the four parts of engagement. The ring shows each one's share; the middle is the total.";
+  function didSum(list) {
+    var t = { likes: 0, comments: 0, saves: 0, shares: 0, n: 0, seen: {} };
+    list.forEach(function (p) { DID.forEach(function (d) { var v = p[d[0]]; if (v != null && !(d[0] === "likes" && p.likes_hidden)) { t[d[0]] += v; t.seen[d[0]] = 1; } }); });
+    t.n = t.likes + t.comments + t.saves + t.shares;
+    return t;
+  }
+  function didPct(v, n) { if (!n || !v) return "0%"; var x = v / n * 100; return x < 1 ? "<1%" : Math.round(x) + "%"; }
+  function didRing(t, cls) {
+    // a hair of white between the parts, so four colours read as four parts and not as one band
+    var off = 25, live = DID.filter(function (d) { return t[d[0]] > 0; }), gap = live.length > 1 ? 0.6 : 0;
+    var segs = live.map(function (d) {
+      var s = t[d[0]] / t.n * 100, c = '<circle cx="21" cy="21" r="15.915" fill="none" stroke="' + d[2] + '" stroke-width="5.6" stroke-dasharray="' + Math.max(0.3, s - gap).toFixed(2) + " " + (100 - Math.max(0.3, s - gap)).toFixed(2) + '" stroke-dashoffset="' + off.toFixed(2) + '"><title>' + d[1] + ": " + full(t[d[0]]) + " (" + didPct(t[d[0]], t.n) + ")</title></circle>";
+      off -= s; return c; }).join("");
+    return '<div class="wpd-ring' + (cls ? " " + cls : "") + '"><svg viewBox="0 0 42 42" role="img" aria-label="' + esc(DID.map(function (d) { return d[1] + " " + full(t[d[0]]) + ", " + didPct(t[d[0]], t.n); }).join("; ")) + '">'
+      + '<circle cx="21" cy="21" r="15.915" fill="none" stroke="#efece6" stroke-width="5.6"/>' + segs + "</svg><span><b>" + num(t.n) + "</b>interactions</span></div>";
+  }
+  function didLegend(t) {
+    return '<div class="wpd-legend">' + DID.map(function (d) {
+      return '<div class="wpd-legend__r" style="--c:' + d[2] + '"><i></i><span>' + d[1] + "</span><b>" + (t.seen[d[0]] ? full(t[d[0]]) : "—") + "</b><small>" + (t.seen[d[0]] ? didPct(t[d[0]], t.n) : "") + "</small></div>"; }).join("") + "</div>";
+  }
+  function renderDid(list) {
+    var t = didSum(list), el = $("w-did"); if (!el) return;
+    el.innerHTML = head(DID_IC, "What people did", DID_TIP, t.n ? "did" : null)
+      + '<div class="db-card__body">' + (t.n ? '<div class="wpd-hero">' + didRing(t, "wpd-ring--card") + didLegend(t) + "</div>"
+        : '<p class="db-note wpd-none">No likes, comments, saves or shares in this view yet.</p>') + "</div>";
+  }
+  // One row per platform or creator: a stacked bar against the biggest row, the total, then the four numbers.
+  function didRows(groups, label, peak) {
+    return '<div class="wpd-rows">' + groups.map(function (g) {
+      var t = g.t;
+      return '<div class="wpd-row"><div class="wpd-row__top"><span class="wpd-row__who">' + label(g) + "</span><b>" + full(t.n) + "</b></div>"
+        + '<div class="wpd-row__bar" style="--w:' + (t.n / peak * 100).toFixed(1) + '%">' + DID.map(function (d) { return t[d[0]] ? '<i style="flex-grow:' + t[d[0]] + ";background:" + d[2] + '" title="' + d[1] + ": " + full(t[d[0]]) + '"></i>' : ""; }).join("") + "</div>"
+        + '<dl class="wpd-row__nums">' + DID.map(function (d) { return '<div style="--c:' + d[2] + '"><dt>' + d[1] + "</dt><dd>" + (t.seen[d[0]] ? num(t[d[0]]) : '<span title="Not shown by this platform">—</span>') + "</dd></div>"; }).join("") + "</dl></div>";
+    }).join("") + "</div>";
+  }
+  function didGroup(list, key) {
+    var by = {}, order = [];
+    list.forEach(function (p) { var k = p[key]; if (!by[k]) { by[k] = []; order.push(k); } by[k].push(p); });
+    var out = order.map(function (k) { return { k: k, p: by[k][0], t: didSum(by[k]) }; }).sort(function (a, b) { return b.t.n - a.t.n; });
+    return { rows: out, peak: Math.max.apply(null, out.map(function (g) { return g.t.n; }).concat([1])) };
+  }
+  PANEL.did = function () {
+    var list = posts(), t = didSum(list);
+    if (!t.n) return '<p class="db-note">No likes, comments, saves or shares in this view yet.</p>';
+    var hid = list.filter(function (p) { return p.likes_hidden; }).length;
+    var per = t.likes ? "For every <mark>100 likes</mark>, people left <b>" + Math.round(t.comments / t.likes * 100) + "</b> comments, saved <b>" + Math.round(t.saves / t.likes * 100) + "</b> times and shared <b>" + Math.round(t.shares / t.likes * 100) + "</b> times." : "";
+    var keep = t.saves + t.shares, ks = keep / t.n;
+    var why = keep ? " Saves and shares are <mark>" + didPct(keep, t.n) + "</mark> of everything: " + (ks >= 0.2 ? "people kept the videos or passed them on, a strong sign." : "most people stopped at a like.") : "";
+    var pl = didGroup(list, "platform"), cr = didGroup(list, "code");
+    return '<div class="wpd-panel-hero">' + didRing(t, "wpd-ring--hero") + didLegend(t) + "</div>"
+      + (per || why ? '<p class="wpd-insight">' + per + why + "</p>" : "")
+      + "<h3>By platform</h3>" + didRows(pl.rows, function (g) { return '<i class="wpd-ic" style="color:' + (PCOL[g.k] || "#121212") + '">' + (ICONS[g.k] || "") + "</i>" + esc(g.k); }, pl.peak)
+      + "<h3>By creator</h3>" + didRows(cr.rows, function (g) { return ava(g.p.photo) + who({ code: g.k, name: g.p.creator }); }, cr.peak)
+      + '<p class="db-note wpd-foot">Engagement counts all four. A dash means the platform does not show that number' + (hid ? "; " + hid + " post" + (hid === 1 ? " hides its" : "s hide their") + " likes, so those likes are not counted" : "") + ".</p>";
+  };
+  TITLES.did = "What people did";
+  /* end What people did ring */
 
   load();
 })();
