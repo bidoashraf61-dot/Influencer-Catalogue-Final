@@ -415,17 +415,23 @@
   window.addEventListener("hashchange", route);
   // New numbers appear without a reload (owner, 2026-10-18): while the report is open and visible it asks for the
   // report every five minutes, and redraws it only when something changed (the reader's filters and place are kept).
+  // The server's rev fingerprints everything the page shows (targets, estimates, steps, comments, sales, not only the
+  // numbers), so any change made from the dashboard or the admin redraws it (2026-10-23). Back on this tab, or the
+  // dashboard in another tab saying it changed this campaign, checks at once.
   var POLL_ID = null;
   function pollReport() {
     if (POLL_ID) return;
-    POLL_ID = setInterval(function () {
+    function check() {
       if (document.hidden || !R || !R._t) return;
       get("/api/campaign?t=" + encodeURIComponent(R._t)).then(function (b) {
         var n = b && b.report; if (!n) return;
-        var sig = function (r) { return [r.updated_at, r.total && r.total.views, r.total && r.total.likes, r.total && r.total.comments, (r.posts || []).length].join("|"); };
+        var sig = function (r) { return r.rev || [r.updated_at, r.total && r.total.views, r.total && r.total.likes, r.total && r.total.comments, (r.posts || []).length].join("|"); };
         if (sig(n) !== sig(R)) openReport(R._t);
       }).catch(function () {});
-    }, window.__pollMs || 300000);
+    }
+    POLL_ID = setInterval(check, window.__pollMs || 300000);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
+    window.addEventListener("storage", function (e) { if (e.key === "hv_campaign_changed" && R && String(e.newValue || "").split("|")[0] === R._t) check(); });
   }
 
   /* ---------------------------------------------------------------- render */
@@ -574,8 +580,24 @@
     $("mx-csv").href = API + "/api/campaign.csv?t=" + encodeURIComponent(t);
     $("mx-dash").href = $("mx-dash-end").href = "dashboard/#t=" + encodeURIComponent(t); $("mx-dash").hidden = false;
     // Arriving from the dashboard's "Download PDF": open the print dialog.
-    try { if (sessionStorage.getItem("hv_print")) { sessionStorage.removeItem("hv_print"); setTimeout(function () { window.print(); }, 900); } } catch (e) {}
+    try { if (sessionStorage.getItem("hv_print")) { sessionStorage.removeItem("hv_print"); printWhenReady(); } } catch (e) {}
   }
+
+  // The PDF is this page printed: print once its pictures and fonts are in (lazy pictures are made eager first, or they
+  // print blank) and the page loader has gone, never later than 10 s (2026-10-23).
+  function printWhenReady() {
+    var imgs = [].slice.call(document.querySelectorAll("#mx-report img"));
+    imgs.forEach(function (i) { i.loading = "eager"; });
+    var waits = imgs.filter(function (i) { return !i.complete; }).map(function (i) {
+      return new Promise(function (ok) { i.addEventListener("load", ok); i.addEventListener("error", ok); });
+    });
+    if (document.fonts && document.fonts.ready) waits.push(document.fonts.ready);
+    waits.push(new Promise(function (ok) { setTimeout(ok, Math.max(900, 1700 - performance.now())); }));
+    var done = false;
+    function go() { if (!done) { done = true; window.print(); } }
+    Promise.all(waits).then(go, go); setTimeout(go, 10000);
+  }
+  window.addEventListener("beforeprint", function () { [].forEach.call(document.querySelectorAll("#mx-report img"), function (i) { i.loading = "eager"; }); });
 
   function renderBug(c) {
     var logos = (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="Brand logo">'; }).join("");
@@ -693,7 +715,7 @@
     cells.push(["Views", num(t.views) + est("views"), goal("views"), "views"]);
     if (vis.reach && t.reach != null) cells.push(["Reach" + (t.real_share >= 0.999 || adj.indexOf("reach") >= 0 ? "" : " (est.)"), num(t.reach) + est("reach"), goal("reach"), "reach"]);
     cells.push(["Engagement", num(t.engagement) + est("engagement"), goal("engagement"), "engagement"]);
-    cells.push(["Avg eng. rate", pct(t.er) + est("er"), g.er ? goal("er") : sig(t.er_grade, "Against each creator's tier benchmark"), "er"]);
+    cells.push(["Avg eng. rate", pct(g.er ? g.er.actual : t.video_er != null ? t.video_er : t.er) + est("er"), g.er ? goal("er") : sig(t.er_grade, "Against each creator's tier benchmark"), "er"]);
     if (vis.clicks && R.clicks && R.clicks.links && R.clicks.has_destination)
       cells.push(["Link clicks", num(t.clicks) + est("clicks"), g.clicks ? goal("clicks") : sig(t.ctr_grade, "Strong from " + bm.ctr[0] + "% click-through"), "clicks"]);
     $("mx-scoreline").innerHTML = cells.map(function (c) {
@@ -907,8 +929,10 @@
     var ex = [];
     // One rule: with a campaign ER goal, the card grades against it, like the score line (owner, 2026-10-19).
     var erT = (p.items || []).filter(function (i) { return i.key === "er"; })[0];
-    ex.push(["Engagement rate", t.er, erT ? erT.grade : t.er_grade, erT ? "Against the campaign goal of " + pct(erT.goal, 1) + " · industry guide " + bm.er.micro[0] + "% (micro creators)" : "Strong from " + bm.er.micro[0] + "% (micro creators)"]);
-    if (t.video_er != null) ex.push(["Video engagement", t.video_er, t.video_er_grade, "Strong from " + bm.video_er[0] + "%"]);
+    // With a goal: one card, the rate the goal measures (as on the score line and the dashboard), graded on it.
+    if (erT) ex.push(["Engagement rate", erT.actual, erT.grade, "Against the campaign goal of " + pct(erT.goal, 1) + " · industry guide " + bm.er.micro[0] + "% (micro creators)"]);
+    else ex.push(["Engagement rate", t.er, t.er_grade, "Strong from " + bm.er.micro[0] + "% (micro creators)"]);
+    if (t.video_er != null && !erT) ex.push(["Video engagement", t.video_er, t.video_er_grade, "Strong from " + bm.video_er[0] + "%"]);
     if (R.visibility.clicks && t.ctr != null && R.clicks && R.clicks.links) ex.push(["Click-through", t.ctr, t.ctr_grade, "Strong from " + bm.ctr[0] + "%"]);
     $("mx-bench").innerHTML = ex.map(function (x) {
       return '<div class="mx-bench__item"><h3>' + h3ic(x[0]) + x[0] + '</h3><div class="mx-bench__val">' + pct(x[1]) + " " + sig(x[2]) + "</div><p>" + x[3] + "</p></div>";
@@ -956,7 +980,7 @@
   }
 
   function renderCharts() {
-    var h = (R.history || []).map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; });
+    var h = (R.history || []).map(function (d) { return { d: d.d, views: d.views, eng: d.engagement != null ? d.engagement : d.likes + d.comments }; });
     $("mx-charts").innerHTML = h.length
       ? '<div class="mx-chart"><h3>' + IC.views + 'Views so far</h3>' + area(h, "views", "#14884a", "Views so far") + "</div>"
         + '<div class="mx-chart"><h3>' + IC.engagement + 'Engagement so far</h3>' + area(h, "eng", "#ff691e", "Engagement so far") + "</div>"
@@ -1022,6 +1046,6 @@
     });
   }
 
-  $("mx-print").addEventListener("click", function () { window.print(); });
+  $("mx-print").addEventListener("click", printWhenReady);
   route();
 })();

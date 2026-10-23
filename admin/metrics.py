@@ -242,6 +242,77 @@ def _avg(values):
     return (sum(vals) / len(vals)) if vals else None
 
 
+def goal_grade(value, goal):
+    """A rate against the campaign's own goal, on the same steps as target_progress: at or over it "good",
+    from 70% of it "moderate", else "low"."""
+    if value is None or not goal:
+        return None
+    return "good" if value >= goal else ("moderate" if value >= 0.7 * goal else "low")
+
+
+def goal_grading(targets, total, creators, posts, progress=None):
+    """One rule for every ER verdict (owner, 2026-10-19; extended 2026-10-23): when the campaign has an ER goal,
+    the campaign's, each creator's and each post's engagement rate are graded against that goal, not the tier
+    benchmarks, so the dashboard, the report and its PDF cannot read Strong in one place and Fair in another.
+    The campaign's own rate is the one its ER target measures (goal platforms only, progress item "er"), so the
+    headline rate and its grade are the same number on every page. Changes the grades in place and returns the
+    goal (None when there is none)."""
+    goal = targets.get("er") if targets else None
+    if not isinstance(goal, (int, float)) or goal <= 0:
+        return None
+    pair = [goal, round(0.7 * goal, 4)]
+    item = next((i for i in (progress or {}).get("items", []) if i["key"] == "er"), None)
+    rate = item["actual"] if item else (total.get("video_er") if total.get("video_er") is not None else total.get("er"))
+    total["er_grade"] = total["video_er_grade"] = goal_grade(rate, goal)
+    for c in creators:
+        c["er_grade"] = goal_grade(c.get("er"), goal)
+        c["video_er_grade"] = goal_grade(c.get("video_er"), goal)
+    for p in posts:
+        h = p.get("health")
+        if not h or p.get("story"):
+            continue                       # a story is judged on its reach rate, which has no goal
+        h["grade"] = goal_grade(h.get("value"), goal)
+        h["benchmark"] = pair
+        h["band"] = None
+        h["goal"] = goal
+    return goal
+
+
+def history_to_now(history, total):
+    """The "so far" charts end on the numbers the page shows: the last day carries the campaign totals
+    (approved insights, shares and saves, and HelloVoice's estimates included), so the curve cannot end below
+    the Views or Engagement figure above it. Earlier days stay the captured snapshots."""
+    if not history:
+        return history
+    last = dict(history[-1])
+    for k in ("likes", "comments", "views", "shares", "saves", "engagement"):
+        if total.get(k) is not None:
+            last[k] = total[k]
+    return history[:-1] + [last]
+
+
+def report_rev(rep):
+    """A short fingerprint of everything a client page shows, so the report and the dashboard can tell a real
+    change (new numbers, targets, estimates, steps, visibility, comments, sales) from an unchanged answer.
+    Leaves out what moves with the clock (elapsed share, expected-by-today, next capture) and the signed query
+    strings on pictures, which are re-signed daily."""
+    import hashlib
+    clock = {"elapsed", "expected", "due", "next_update_at", "next_at", "next_read", "pace", "share", "selections"}
+
+    def clean(v, key=None):
+        if isinstance(v, dict):
+            return {k: clean(x, k) for k, x in v.items() if k not in clock}
+        if isinstance(v, list):
+            return [clean(x, key) for x in v]
+        if isinstance(v, str) and key in ("photo", "photo_large", "thumb", "logos"):
+            return v.split("?", 1)[0]
+        if isinstance(v, float):
+            return round(v, 6)
+        return v
+    raw = json.dumps(clean(rep), sort_keys=True, default=str, separators=(",", ":"))
+    return hashlib.sha1(raw.encode()).hexdigest()[:12]
+
+
 def report(campaign, internal=False, raw=False):
     """The whole report for one campaign as plain data. `internal` adds cost,
     CPM and cost per click — never set for the client's page."""
@@ -264,8 +335,8 @@ def report(campaign, internal=False, raw=False):
         f = up.get(platform, 1.0)
         if f == 1.0:
             return bm0
-        return dict(bm0, er={b: [v * f for v in pair] for b, pair in bm0["er"].items()},
-                    video_er=[v * f for v in bm0["video_er"]])
+        return dict(bm0, er={b: [round(v * f, 2) for v in pair] for b, pair in bm0["er"].items()},
+                    video_er=[round(v * f, 2) for v in bm0["video_er"]])     # rounded: the pages print them as is
 
     # A post that carries no follower count of its own takes the creator's followers on that platform, so
     # its view rate can be worked out (the benchmark gauge read "Typical" without it).
@@ -408,6 +479,7 @@ def report(campaign, internal=False, raw=False):
     total["er_grade"] = _avg_grade([c["er_grade"] for c in creators if c["posts"]])
     total["ctr_grade"] = grade(total["ctr"], bm["ctr"])
     total["video_er_grade"] = grade(total["video_er"], bm["video_er"])
+    er_goal = goal_grading(targets, total, creators, posts, progress)
     verdict = overall_verdict(progress, total)
 
     out = {"campaign": {"id": cid, "name": campaign["name"], "client": campaign["client"],
@@ -416,11 +488,13 @@ def report(campaign, internal=False, raw=False):
            "total": total, "creators": creators, "posts": posts,
            "history": db.content_history(cid), "clicks": clicks,
            "emv_set": bool(rates), "visibility": vis, "factors": f,
-           "benchmarks": bm, "targets": targets, "targets_auto": targets_auto, "progress": progress, "verdict": verdict,
+           "benchmarks": dict(bm, er_goal=er_goal), "targets": targets, "targets_auto": targets_auto,
+           "progress": progress, "verdict": verdict,
            "objective": {"key": objective, "label": objective_info(objective)[0], "kpis": objective_info(objective)[2],
                          "weights": dict(zip(("exposure", "engagement", "er", "clicks"), w)), "links": links_on},
            "gaps": data_gaps(camp),
            "updated_at": max([p["metrics_at"] or 0 for p in posts] + [0]) or None}
+    out["history"] = history_to_now(out["history"], total)
     if internal:
         exposure = total["exposure"]
         out["internal"] = {
@@ -1362,7 +1436,8 @@ def client_report(campaign, photo=None, photo_large=None):
                                                                       if i["key"] not in ("reach",)]},
            "benchmarks": {"er": r["benchmarks"]["er"], "video_er": r["benchmarks"]["video_er"],
                           "view_rate": r["benchmarks"]["view_rate"], "story_rate": r["benchmarks"]["story_rate"],
-                          "ctr": r["benchmarks"]["ctr"], "bands": BAND_LABEL}}
+                          "ctr": r["benchmarks"]["ctr"], "bands": BAND_LABEL,
+                          "er_goal": r["benchmarks"].get("er_goal")}}
     if not vis["clicks"]:
         out["progress"]["items"] = [i for i in out["progress"]["items"] if i["key"] != "clicks"]
     its = out["progress"]["items"]
@@ -1406,4 +1481,5 @@ def client_report(campaign, photo=None, photo_large=None):
             out["sales"] = sv if isinstance(sv, dict) and sv.get("totals") else None
         except (AttributeError, TypeError, ValueError):
             pass
+    out["rev"] = report_rev(out)
     return out

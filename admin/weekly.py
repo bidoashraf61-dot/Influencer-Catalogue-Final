@@ -119,7 +119,12 @@ def verdict(k, r=None):
     # 2. engagement against the benchmark
     bm = r["benchmarks"]
     word = {"good": "strong", "moderate": "fair", "low": "low"}
-    if t.get("video_er") is not None:
+    goal = bm.get("er_goal")
+    rate = items["er"]["actual"] if "er" in items else (t.get("video_er") if t.get("video_er") is not None else t.get("er"))
+    if goal and rate is not None:
+        # with an ER goal every ER verdict is against it, on the rate the goal measures (metrics.goal_grading), as on the report
+        l2 = "Engagement rate %.1f%%: %s against the campaign goal of %.1f%%." % (rate, word.get(metrics.goal_grade(rate, goal), "not graded"), goal)
+    elif t.get("video_er") is not None:
         g = metrics.grade(t["video_er"], bm["video_er"])
         l2 = "Video engagement %.1f%%: %s against the %.1f%%+ benchmark." % (t["video_er"], word.get(g, "not graded"), bm["video_er"][0])
     elif t.get("er") is not None:
@@ -196,6 +201,8 @@ def recommend(r):
         rate = c.get("video_er") if video else c.get("er")
         grade = c.get("video_er_grade") if video else c.get("er_grade")
         pair = bm["video_er"] if video else bm["er"].get(c.get("band") or "micro", bm["er"]["micro"])
+        if bm.get("er_goal"):
+            pair = [bm["er_goal"], 0.7 * bm["er_goal"]]
         why = []
         if posts and c.get("rank"):
             why.append("#%d of %d on results" % (c["rank"], n))
@@ -211,7 +218,7 @@ def recommend(r):
         elif planned and posts < planned * 0.5:
             bucket, lead = "replace", "Delivered under half of the posts booked"
         elif grade == "low" and (bottom or n < 3):
-            bucket, lead = "replace", "Engagement below the benchmark for their size"
+            bucket, lead = "replace", "Engagement below the campaign goal" if bm.get("er_goal") else "Engagement below the benchmark for their size"
         elif posts and (grade == "good" or (top and grade != "low")) and not short:
             bucket, lead = "rebook", "Top results" if top else "Strong engagement"
         elif not posts:

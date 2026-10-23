@@ -61,6 +61,26 @@
   function token() { var m = /(?:^|[#&])t=([A-Za-z0-9_-]+)/.exec(location.hash || ""); return m ? m[1] : ""; }
   function get(path) { return fetch(API + path, { credentials: "include", cache: "no-store" }).then(function (r) { if (r.status === 401) throw { locked: true }; if (!r.ok) throw { status: r.status }; return r.json(); }); }
 
+  // Report sync (2026-10-23). The server's rev fingerprints everything the page shows: while the dashboard is open it
+  // checks every five minutes and when its tab comes back, and redraws only on a change. A change made here (an
+  // update, the team's edits) is announced to the report open in another tab, which then checks at once.
+  var WATCH = null;
+  function watch() {
+    if (WATCH) return;
+    function check() {
+      if (document.hidden || !R || !TOKEN) return;
+      get("/api/campaign?t=" + encodeURIComponent(TOKEN) + (shareTok() ? "&share=" + encodeURIComponent(shareTok()) : "")).then(function (b) {
+        if (b && b.report && b.report.rev && b.report.rev !== R.rev) { CMB.items = null; load(); }
+      }).catch(function () {});
+    }
+    WATCH = setInterval(check, window.__pollMs || 300000);
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) check(); });
+  }
+  function changed() { try { localStorage.setItem("hv_campaign_changed", TOKEN + "|" + Date.now()); } catch (e) {} }
+  // With an ER goal every ER verdict grades against it, as the server grades the creators and posts (metrics.goal_grading).
+  function erGoal() { var sc = scope(), it = sc.mode === "plat" ? (sc.bp.progress.items || []).filter(function (i) { return i.key === "er"; })[0] : null; return it ? it.goal : (R.benchmarks || {}).er_goal || null; }
+  function goalGrade(v) { var gl = erGoal(); return v == null || !gl ? null : v >= gl ? "good" : v >= 0.7 * gl ? "moderate" : "low"; }
+
   /* --------------------------------------------------------------- gate */
   // Not signed in (401): the gate, which portal.js turns into the email sign-in. No access-code
   // form any more (item 181); signing in reloads this same #t= link.
@@ -83,7 +103,7 @@
       .then(function (b) {
         R = b.report;
         $("cat-gate").hidden = true; $("cat-app").hidden = false; document.body.classList.remove("cat-locked", "cat-checking");
-        setupHeader(); setupFilters(); renderAll(); setupShare();
+        setupHeader(); setupFilters(); renderAll(); setupShare(); watch();
       })
       .catch(function (err) {
         if (err && err.locked) return lock();
@@ -283,7 +303,7 @@
       btn.classList.add("is-busy");
       function leave(reload) {
         clearInterval(tick); if (cook && cook.stop) cook.stop(); m.close(); btn.classList.remove("is-busy");
-        if (reload) { if (kind === "comments") CMB.items = null; load(); } else state().catch(function () {});
+        if (reload) { if (kind === "comments") CMB.items = null; changed(); load(); } else state().catch(function () {});
       }
       function fail(text) {
         if (poll) clearInterval(poll); clearInterval(tick);
@@ -532,7 +552,9 @@
     if (isAdj("views")) t.views = R.total.views;
     if (isAdj("reach")) t.reach = R.total.reach;
     if (isAdj("engagement")) t.engagement = R.total.engagement;
-    if (isAdj("er")) t.er = R.total.er;
+    // Unfiltered, the server's rate, as on the report: the one the ER goal measures, else the campaign's video ER / ER.
+    var erItem = ((R.progress || {}).items || []).filter(function (i) { return i.key === "er"; })[0];
+    if (!filtered()) t.er = erItem ? erItem.actual : R.total.video_er != null ? R.total.video_er : R.total.er;
     if (isAdj("clicks") && cl) cl = Object.assign({}, cl, { clicks: R.total.clicks });
     var whole = !filtered() ? R.total : null;
     renderObjective();
@@ -640,7 +662,7 @@
 
   function renderTrend(s) {
     var useHist = !filtered() && R.history && R.history.length > 1;
-    var pts = fromStart(useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s);
+    var pts = fromStart(useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.engagement != null ? d.engagement : d.likes + d.comments }; }) : s);
     $("w-trend").innerHTML = head(IC.trend, "Views & engagement", "Total views (green) and engagement — likes and comments (orange) — growing over the campaign. Each line has its own scale.", "trend")
       + '<div class="db-legend"><span><i style="background:' + COL[0] + '"></i>Views</span><span><i style="background:' + COL[1] + '"></i>Engagement</span></div>'
       + '<div class="db-card__body">' + areaChart(pts, "views", "eng", 640, 200) + "</div>";
@@ -1565,7 +1587,7 @@
       var links = (R.objective || {}).links;
       var gauges = pb.view_rate ? '<div class="db-gauges">'
         + gauge("Views per video", "% of followers", pb.view_rate, vrNow, gr(vrNow, pb.view_rate))
-        + gauge("Engagement rate", "% of views", pb.eng_rate, erNow, gr(erNow, pb.eng_rate))
+        + gauge("Engagement rate", "% of views", pb.eng_rate, erNow, erGoal() ? goalGrade(erNow) : gr(erNow, pb.eng_rate))
         + (links && pb.ctr && sc.mode !== "plat" ? gauge("Click-through", "% of views", pb.ctr, t.ctr, gr(t.ctr, pb.ctr)) : "")
         + '</div><div class="db-legend2"><span><i class="sw band"></i>Normal range for creators this size</span><span><i class="dot"></i>This campaign now</span></div>' : "";
       var cb = creatorBench();
@@ -1574,7 +1596,7 @@
     },
     trend: function () {
       var s = series(posts()), useHist = !filtered() && R.history && R.history.length > 1;
-      var pts = fromStart(useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.likes + d.comments }; }) : s);
+      var pts = fromStart(useHist ? R.history.map(function (d) { return { d: d.d, views: d.views, eng: d.engagement != null ? d.engagement : d.likes + d.comments }; }) : s);
       return "<h3>Views & engagement over time</h3><div class=\"db-trendbox\">" + areaChart(pts, "views", "eng", panelW(), 240) + "</div>"
         + '<h3>Day by day</h3><table class="db-table"><thead><tr><th>Day</th><th></th><th>Views</th><th>Engagement</th></tr></thead><tbody>'
         + pts.map(function (d) { return "<tr><td>" + esc(day(d.d, true)) + "</td><td></td><td>" + full(d.views) + "</td><td>" + full(d.eng) + "</td></tr>"; }).join("") + "</tbody></table>";
@@ -1732,7 +1754,7 @@
         + rows.map(function (x) { var s = share(x); return s ? '<i data-p="' + esc(x.k) + '" style="flex:' + s + ";--c:" + (PCOL[x.k] || COL[0]) + '">' + (s >= 22 ? "<span>" + esc(x.k) + " " + s + "%</span>" : "") + "</i>" : ""; }).join("") + "</div>";
       var list = rows.map(function (x) {
         var s = share(x), er = x.shown && x.views ? x.eng / x.views * 100 : null, b = band(x.k);
-        var grade = er == null || !b ? null : er >= b[1] ? "good" : er >= b[0] ? "moderate" : "low";
+        var grade = er == null ? null : erGoal() ? goalGrade(er) : !b ? null : er >= b[1] ? "good" : er >= b[0] ? "moderate" : "low";
         var c = PCOL[x.k] || COL[0];
         return '<article class="db-pl" style="--c:' + c + '">'
           + '<header class="db-pl__h"><span class="db-pl__ic" aria-hidden="true">' + (ICONS[x.k] || "") + '</span><span class="db-pl__nm"><b>' + esc(x.k) + "</b><small>" + x.posts + (x.posts === 1 ? " post" : " posts") + "</small></span>"

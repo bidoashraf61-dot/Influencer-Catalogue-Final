@@ -3195,10 +3195,11 @@ def campaign_content(cid, include_hidden=True):
 
 def content_history(cid):
     """Daily totals across the campaign: for each day, the latest numbers of
-    every post known by then, summed. Drives the "over time" chart."""
+    every post known by then, summed. Drives the "over time" chart. Engagement is
+    likes + comments + shares + saves, as everywhere else on the report."""
     with connect() as conn:
         rows = conn.execute(
-            "SELECT s.content_id, date(s.at,'unixepoch') d, s.likes, s.comments, s.views "
+            "SELECT s.content_id, date(s.at,'unixepoch') d, s.likes, s.comments, s.views, s.shares, s.saves "
             "FROM snapshots s JOIN content c ON c.id = s.content_id "
             "WHERE c.campaign_id = ? AND c.hidden = 0 AND c.section = 'campaign' "
             "ORDER BY s.at", (cid,)).fetchall()
@@ -3206,8 +3207,9 @@ def content_history(cid):
     for r in rows:
         latest[r["content_id"]] = r
         days[r["d"]] = {k: sum((v[k] or 0) for v in latest.values())
-                        for k in ("likes", "comments", "views")}
-    return [dict(d=d, **v) for d, v in sorted(days.items())]
+                        for k in ("likes", "comments", "views", "shares", "saves")}
+    return [dict(d=d, engagement=v["likes"] + v["comments"] + v["shares"] + v["saves"], **v)
+            for d, v in sorted(days.items())]
 
 
 def platform_followers(code, platform):

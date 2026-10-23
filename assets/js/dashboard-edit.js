@@ -97,7 +97,10 @@
     document.removeEventListener("keydown", onKey);
     WRAP.remove(); WRAP = null; SAY = null; OPEN_PASTE = false;
     document.body.classList.remove("dbe-open");
-    if (CHANGED) location.reload();
+    if (CHANGED) {                            // the report open in another tab redraws at once (2026-10-23)
+      try { localStorage.setItem("hv_campaign_changed", TOKEN + "|" + Date.now()); } catch (e) {}
+      location.reload();
+    }
   }
   function toFix() {
     var n = 0;
