@@ -762,10 +762,10 @@
     var t = a && a.target; if (!t) return "";
     return '<p class="db-note db-note--target"><b>Target market: ' + esc(countryName(t.code)) + "</b> · " + t.pct.toFixed(0) + "% of these creators' audience" + (t.rank ? " (#" + t.rank + ")" : "") + "</p>";
   }
-  /* What people said (owner, 2026-10-19; v20 same day): viewers' comments, read by AI 2 and 7 days after each video.
+  /* What people said (owner, 2026-10-19; v20 same day): viewers' comments, read by AI once a week (every 7 days from the first video, since 2026-10-23).
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
-  var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI 2 and 7 days after each video. Commenters' names are never stored.";
+  var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI once a week, every 7 days from the first video. Commenters' names are never stored.";
   var CM_COL = { pos: "#14884a", neu: "#ff691e", neg: "#ee1515" };
   // One drawn icon per theme, picked from the words of the AI's label.
   var CM_TI = [
@@ -836,10 +836,11 @@
   function cmDay(t) { return t ? day(t) : "—"; }
   function cmWait(C) {
     if (C.status === "none" || !C.first_post) return '<div class="cm-wait"><p>No videos are live yet. Once creators post, the comments under them are read here.</p></div>';
-    var now = Date.now() / 1000, d = C.read_days || [2, 7], fp = C.first_post, r1 = C.next_read || fp + d[0] * 86400, r2 = C.final_read || fp + d[1] * 86400;
-    return '<div class="cm-wait"><p>Comments are read ' + d[0] + " and " + d[1] + " days after each video. The first reading lands on <b>" + cmDay(r1) + "</b>.</p>"
-      + '<div class="cm-steps"><div class="on"><b>Posted</b>' + cmDay(fp) + '</div><div class="' + (now >= r1 ? "on" : "next") + '"><b>First read</b>' + cmDay(r1)
-      + '</div><div class="' + (now >= r1 ? "next" : "") + '"><b>Final read</b>' + cmDay(r2) + "</div></div></div>";
+    // Read once a week (owner, 2026-10-23): every 7 days from the first video, all videos together.
+    var now = Date.now() / 1000, fp = C.first_post, wk = 7 * 86400, r1 = fp + wk, nx = C.next_read || C.next_week || r1;
+    return '<div class="cm-wait"><p>Comments are read once a week, every 7 days from the first video. The ' + (now >= r1 ? "next" : "first") + " reading lands on <b>" + cmDay(nx) + "</b>.</p>"
+      + '<div class="cm-steps"><div class="on"><b>First video</b>' + cmDay(fp) + '</div><div class="' + (now >= r1 ? "on" : "next") + '"><b>Week 1 read</b>' + cmDay(r1)
+      + '</div><div class="' + (now >= r1 ? "next" : "") + '"><b>Then weekly</b>' + (now >= r1 ? cmDay(nx) : cmDay(r1 + wk)) + "</div></div></div>";
   }
   function renderGeo() {
     var C = R.comments, t = cmPick(), body;
@@ -1982,7 +1983,6 @@
      all the data the dashboard can show. A4, no browser header or footer (page margin 0); a table's repeating head and
      foot keep the space for our own running header and footer on every page. Post and video links stay clickable. */
   var PP_LOGO = "../../assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c5";
-  var PP_ICON = "../../assets/brand/helvy-connect/helvy-icon-180.png";
   function ppName(n) {   // "Dr Name | د. الاسم" → the Latin part leads, the Arabic part is kept beside it
     var s = String(n || ""), i = s.search(/[؀-ۿ]/);
     if (i <= 0) return { en: s.replace(/\s*\|\s*$/, ""), ar: "" };
@@ -1991,55 +1991,6 @@
   function ppSec(n, title, lede, body, cls) {
     return '<section class="pp-sec' + (cls ? " " + cls : "") + '"><header class="pp-h"><span class="pp-h__n">' + n + "</span><div><h2>" + esc(title) + "</h2>"
       + (lede ? "<p>" + lede + "</p>" : "") + '</div></header><div class="db-panel__body pp-b">' + body + "</div></section>";
-  }
-  function ppCover() {
-    var c = R.campaign, t = R.total || {}, v = R.verdict || {}, P = R.progress || {}, items = P.items || [], o = R.objective || {};
-    var g = {}; items.forEach(function (i) { g[i.key] = i; });
-    var now = Date.now() / 1000, when = "";
-    if (c.starts_at && c.ends_at) {
-      var total = Math.max(1, Math.round((c.ends_at - c.starts_at) / 86400)), dn = Math.min(total, Math.max(1, Math.ceil((now - c.starts_at) / 86400)));
-      when = day(c.starts_at) + " – " + day(c.ends_at, true) + " · " + (now < c.starts_at ? "starts " + day(c.starts_at) : now <= c.ends_at ? "day " + dn + " of " + total : "ran " + total + " days");
-    }
-    var plats = {}; (R.posts || []).forEach(function (p) { if (p.section === "campaign") plats[p.platform] = 1; });
-    var done = items.length ? Math.round(P.all_met ? 100 : Math.min(99, P.overall || 0)) : null, due = P.due != null ? Math.round(P.due) : null;
-    var logos = (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("");
-    var ours = /^\s*hello\s*voice\b/i.test(c.client || "");
-    var erItem = g.er, er = erItem ? erItem.actual : t.video_er != null ? t.video_er : t.er;
-    var cl = clicksFor();
-    function kpi(label, val, k, fallback) {
-      return '<div class="pp-kpi"><span>' + label + "</span><b>" + val + "</b>" + (g[k] ? sig(g[k].grade, "") + '<small>goal ' + (k === "er" ? pct(g[k].goal, 1) : num(g[k].goal)) + "</small>" : fallback || "") + "</div>";
-    }
-    var kpis = kpi("Posts live", full(t.delivered) + (t.planned ? "<small>/" + t.planned + "</small>" : ""), "posts")
-      + kpi("Views", num(t.views), "views")
-      + (R.visibility.reach === false || t.reach == null ? "" : kpi("Reach", num(t.reach), "reach"))
-      + kpi("Engagement", num(t.engagement), "engagement")
-      + kpi("Eng. rate", pct(er), "er", sig(t.er_grade, ""))
-      + (cl ? kpi("Link clicks", num(cl.clicks), "clicks", sig(t.ctr_grade, "")) : "");
-    var ct = cmPick(), say = "";
-    if (R.comments && ct.n) {
-      var share = ct.intent / ct.n, p = ct.pos / ct.n, z = ct.neg / ct.n, th = cmTop(ct.themes);
-      var head1 = ct.small ? "Only " + ct.n + " comments so far" : share >= 0.15 ? "1 in " + Math.max(2, Math.round(1 / share)) + " want to buy" : z >= 0.3 ? "Viewers are divided" : p >= 0.6 ? "Viewers love it" : "Mostly neutral";
-      say = '<aside class="pp-say"><img src="' + PP_ICON + '" alt="" width="56" height="56"><div><p class="pp-say__k">Helvi read ' + full(ct.n) + " comments</p><p class=\"pp-say__t\">" + esc(head1) + "</p>"
-        + '<p class="pp-say__s">' + cmPct(ct.pos, ct.n) + "% positive · " + cmPct(ct.intent, ct.n) + "% ask how to buy" + (th[0] ? " · most talk about " + esc(th[0].toLowerCase()) : "") + "</p></div></aside>";
-    }
-    var crew = (R.creators || []).slice().sort(function (a, b) { return (a.rank == null) - (b.rank == null) || (a.rank || 0) - (b.rank || 0); }).map(function (k) {
-      var nm = ppName(k.name), pic = k.photo_large || k.photo;
-      return '<div class="pp-crew__c">' + '<span class="pp-crew__pic">' + (pic ? '<img src="' + esc(pic) + '" alt="">' : "") + (k.rank && k.rank <= 3 ? '<i class="pp-crew__m">' + medal(k.rank) + "</i>" : "") + "</span>"
-        + "<b>" + esc(nm.en) + "</b>" + (nm.ar ? '<span class="pp-ar" dir="rtl" lang="ar">' + esc(nm.ar) + "</span>" : "")
-        + "<small>" + (k.delivered || 0) + (k.planned ? "/" + k.planned : "") + " videos · " + num(k.seen != null ? k.seen : k.views) + " views</small></div>";
-    }).join("");
-    return '<section class="pp-cover">'
-      + '<div class="pp-cover__top"><img class="pp-cover__logo" src="' + PP_LOGO + '" alt="HELVi Connect"><span class="pp-cover__kind">Campaign report</span></div>'
-      + (logos ? '<div class="pp-cover__brands">' + logos + (ours ? "" : '<span aria-hidden="true">×</span><img src="../../assets/brand/logo.png" alt="HelloVoice">') + "</div>" : "")
-      + '<h1 class="pp-cover__title">' + esc(c.name) + "</h1>"
-      + '<p class="pp-cover__sub">' + esc([Object.keys(plats).join(", "), when].filter(Boolean).join(" · ")) + "</p>"
-      + '<div class="pp-cover__score"><span class="pp-verdict' + (v.grade ? " pp-verdict--" + v.grade : "") + '">' + esc(v.label || "In progress") + "</span>"
-      + (done != null ? '<div class="pp-cover__pct"><b>' + done + "%</b><span>of all targets achieved" + (due != null ? "<br>Where it should be today: " + due + "%" : "") + "<br>Objective: " + esc(o.label || "Balanced") + "</span></div>" : "") + "</div>"
-      + (done != null ? '<div class="pp-obj"><i class="pp-obj__fill ' + (v.grade || "") + '" style="width:' + done + '%"></i>' + (due != null ? '<i class="pp-obj__due" style="left:' + Math.min(100, due) + '%"><span>today</span></i>' : "") + "</div>"
-        + '<div class="pp-obj__parts">' + items.map(function (i) { return '<span class="' + (i.actual >= i.goal ? "met" : "") + '">' + KEYN[i.key] + " <b>" + Math.round(i.pct) + "%</b></span>"; }).join("") + "</div>" : "")
-      + '<div class="pp-kpis">' + kpis + "</div>" + say
-      + '<h3 class="pp-cover__h">Creators in this campaign</h3><div class="pp-crew">' + crew + "</div>"
-      + '<p class="pp-cover__foot">Data captured every 24 hours' + (R.updated_at ? " · last capture " + day(R.updated_at, true) : "") + " · report made " + day(Date.now() / 1000, true) + "</p></section>";
   }
   function ppPodium() {
     var top = (R.creators || []).filter(function (c) { return c.rank; }).slice(0, 3);
@@ -2094,8 +2045,8 @@
         var parts = Object.keys(by).map(function (k) { return { k: k, n: by[k] }; }).sort(function (a, b) { return b.n - a.n; });
         return parts.length ? '<div class="db-donut pp-mix">' + donut(parts) + '<div class="db-key">' + parts.map(function (p, i) { return '<div><span class="db-sw" style="background:' + COL[i % COL.length] + '"></span>' + esc(KIND[p.k] || p.k) + "<b>" + p.n + "</b></div>"; }).join("") + "</div></div>" : ""; })();
       var geo = R.comments && cmPick().n ? PANEL.geo() : "";
-      var body = ppCover()
-        + ppSec(num2(), "Goals & benchmarks", "Every target, where it should be today, the forecast and the benchmarks for creators of this size.", PANEL.kpi())
+      // No cover page (owner, 2026-10-23): the PDF opens on its first section; every section starts on a new page.
+      var body = ppSec(num2(), "Goals & benchmarks", "Every target, where it should be today, the forecast and the benchmarks for creators of this size.", PANEL.kpi())
         + ppSec(num2(), "Creators leaderboard", "Score out of 100 for the campaign's objective, what each creator delivered and every video.", ppPodium() + PANEL.creators())
         + ppSec(num2(), "Views & engagement", "How the campaign grew, day by day.", PANEL.trend())
         + (PANEL.did ? ppSec(num2(), "What people did", "Likes, comments, saves and shares, by platform and by creator.", PANEL.did()) : "")

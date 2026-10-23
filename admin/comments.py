@@ -1,5 +1,5 @@
 """What people said (owner, 2026-10-19): the comments under each campaign video, fetched through Apify
-twice per video (2 and 7 days after it is posted, up to 300 per post) and read by Gemini for mood,
+once a week for every campaign video (every 7 days from the first video, up to 300 per post; before 2026-10-23: 2 and 7 days after each video) and read by Gemini for mood,
 buying questions, themes and red flags. Replaces the "Creators' audience countries" card on the client's
 campaign dashboard. Brief: Portal Programme/BRIEF-comment-insights-2026-10-19.md (item 152).
 
@@ -25,7 +25,9 @@ import urllib.parse
 
 import db
 
-READ_DAYS = (2, 7)
+READ_DAYS = (2, 7)            # the old per-video schedule (before 2026-10-23); kept only to label its rows
+WEEK = 7 * 86400              # owner, 2026-10-23: comments are read once a week, every video of the campaign together
+WEEK_NO = 100                 # weekly reads are read_no 101, 102, ... (week 1, 2, ...), clear of the old 1 / 2
 MAX_PER_POST = 300
 FRESH_DAYS = 30              # posts older than this when first seen are not read
 INTERVAL = 900
@@ -63,7 +65,7 @@ CREATE TABLE IF NOT EXISTS comment_reads (
   content_id  INTEGER NOT NULL,
   campaign_id INTEGER NOT NULL,
   platform    TEXT NOT NULL,
-  read_no     INTEGER NOT NULL,                 -- 1 = day 2, 2 = day 7
+  read_no     INTEGER NOT NULL,                 -- 1 = day 2, 2 = day 7 (old schedule); 101, 102... = week 1, 2... (since 2026-10-23)
   due_at      INTEGER NOT NULL,
   status      TEXT NOT NULL DEFAULT 'due',      -- due | running | done | failed | skipped
   apify_run   TEXT,
@@ -209,48 +211,71 @@ def weekly_rereads(now=None):
     return n
 
 
+def _week_end(k, weekly):
+    """When a campaign's weekly reads stop: 7 days after it ends, or later if the owner set a weekly end date."""
+    end = (k["ends_at"] + WEEK) if k["ends_at"] else None
+    if int(k["id"]) in weekly:
+        end = max(end or 0, weekly[int(k["id"])])
+    return end
+
+
 def ensure_reads(cid=None, now=None):
-    """Two reads per campaign video on a live campaign: 2 and 7 days after it went up. A post first seen after
-    its second read was due gets that read only; one older than FRESH_DAYS is not read."""
+    """Weekly reads (owner, 2026-10-23; before: each video 2 and 7 days after it went up, which ran almost daily).
+    Every 7 days, counted from the campaign's first video, every video of a live campaign is read in one pass
+    (comments are kept by their id, so only new ones are added and, where the platform allows, paid for), until 7
+    days after the campaign ends. A week's reads are queued at the start of that week for the videos up by then."""
     init()
     now = now or db.now()
     added = 0
     weekly = weekly_until(now)
     with db.connect() as conn:
+        # the old schedule's reads still to come are replaced by the weekly read
+        conn.execute("UPDATE comment_reads SET status = 'skipped', message = 'Replaced by the weekly read' "
+                     "WHERE status = 'due' AND read_no < ?", (WEEK_NO,))
         camps = conn.execute("SELECT * FROM campaigns WHERE status = 'live'" + (" AND id = %d" % int(cid) if cid else "")).fetchall()
         for k in camps:
             if _is_sample(k):
                 continue
-            rows = conn.execute("SELECT id, platform, posted_at FROM content WHERE campaign_id = ? AND hidden = 0 "
-                                "AND section = 'campaign' AND posted_at IS NOT NULL", (k["id"],)).fetchall()
-            for c in rows:
-                old = now - c["posted_at"] > FRESH_DAYS * 86400
-                if c["platform"] not in ACTORS or (old and k["id"] not in weekly):
-                    continue
-                d1, d2 = (c["posted_at"] + d * 86400 for d in READ_DAYS)
-                for no, due in ((1, d1), (2, d2)):
-                    st = "skipped" if no == 1 and now >= d2 else "due"
-                    if old and no == 2 and conn.execute("SELECT 1 FROM comment_reads WHERE content_id = ? AND read_no = 1 "
-                                                        "AND status != 'skipped'", (c["id"],)).fetchone():
-                        st = "skipped"         # an old video read on read 1 needs no second read now; weekly re-reads follow
+            rows = [c for c in conn.execute("SELECT id, platform, posted_at FROM content WHERE campaign_id = ? AND hidden = 0 "
+                                            "AND section = 'campaign' AND posted_at IS NOT NULL", (k["id"],)).fetchall()
+                    if c["platform"] in ACTORS]
+            if not rows:
+                continue
+            first, end = min(c["posted_at"] for c in rows), _week_end(k, weekly)
+            week = max(1, int((now - first) // WEEK))       # the latest weekly read day (in the first week, the coming one)
+            for wk in (week, week + 1):                     # this week's read and the next one
+                due = first + wk * WEEK
+                if end and due > end:
+                    break
+                for c in rows:
+                    if c["posted_at"] > due:
+                        continue                            # posted after this read day: it joins the next week's read
+                    if due <= now and conn.execute("SELECT 1 FROM comment_reads WHERE content_id = ? AND finished_at >= ?",
+                                                   (c["id"], due)).fetchone():
+                        continue                            # already read since this read day
                     cur = conn.execute("INSERT OR IGNORE INTO comment_reads (content_id, campaign_id, platform, read_no, due_at, status) "
-                                       "VALUES (?,?,?,?,?,?)", (c["id"], k["id"], c["platform"], no, due, st))
+                                       "VALUES (?,?,?,?,?, 'due')", (c["id"], k["id"], c["platform"], WEEK_NO + wk, due))
                     added += cur.rowcount
     return added
 
 
-def read_now(cid):
-    """Admin "Read comments now": every unread read of this campaign is due at once (the day-7 read stays)."""
-    init()
-    ensure_reads(cid)
+def next_week_read(k, now=None):
+    """The day of a campaign's next weekly read, or None when its reads have ended."""
+    now = now or db.now()
     with db.connect() as conn:
-        conn.execute("UPDATE comment_reads SET due_at = ? WHERE campaign_id = ? AND status IN ('due','failed') AND read_no = 1",
-                     (db.now(), int(cid)))
-        conn.execute("UPDATE comment_reads SET status = 'due' WHERE campaign_id = ? AND status = 'failed'", (int(cid),))
-        # posts whose first read was skipped (first seen late) and have never been read: read them now as well
-        conn.execute("UPDATE comment_reads SET due_at = ? WHERE campaign_id = ? AND status = 'due' AND read_no = 2 AND content_id NOT IN "
-                     "(SELECT content_id FROM comment_reads WHERE campaign_id = ? AND read_no = 1 AND status = 'done')",
-                     (db.now(), int(cid), int(cid)))
+        first = conn.execute("SELECT MIN(posted_at) FROM content WHERE campaign_id = ? AND hidden = 0 AND section = 'campaign' "
+                             "AND posted_at IS NOT NULL", (k["id"],)).fetchone()[0]
+    if not first:
+        return None
+    t = first + max(1, int((now - first) // WEEK) + (1 if now >= first + WEEK else 0)) * WEEK
+    end = _week_end(k, weekly_until(now))
+    return None if end and t > end else t
+
+
+def read_now(cid):
+    """Admin "Read comments now": every video of the campaign is read now, like the dashboard's Update comments
+    (the weekly schedule carries on as before)."""
+    return fetch_now(cid)
 
 
 def _videos(conn, cid):
@@ -333,10 +358,8 @@ def schedule_info(k, since=None):
     """What the dashboard says about comment reads: the schedule in words, last and next read, whether one is running,
     and (for a manual fetch made at `since`) what its runs cost."""
     init()
-    weekly = weekly_until().get(int(k["id"]))
-    words = "Read 2 and 7 days after each video goes up"
-    if weekly:
-        words += ", then every week until " + time.strftime("%-d %b", time.gmtime(weekly))
+    end = _week_end(k, weekly_until())
+    words = "Read once a week, every 7 days from the first video" + (", until " + time.strftime("%-d %b", time.gmtime(end)) if end else "")
     with db.connect() as conn:
         # a read sent again keeps its last finish time, so "last update" survives a manual fetch
         last = conn.execute("SELECT MAX(finished_at) FROM comment_reads WHERE campaign_id = ? AND status != 'failed'", (k["id"],)).fetchone()[0]
@@ -344,8 +367,8 @@ def schedule_info(k, since=None):
         running = bool(conn.execute("SELECT 1 FROM comment_reads WHERE campaign_id = ? AND status = 'running'", (k["id"],)).fetchone())
         stored = conn.execute("SELECT COUNT(*) FROM comments WHERE campaign_id = ?", (k["id"],)).fetchone()[0]
         pending_ai = conn.execute("SELECT COUNT(*) FROM comments WHERE campaign_id = ? AND sentiment IS NULL", (k["id"],)).fetchone()[0]
-        if weekly and not nxt and last:
-            nxt = last + 7 * 86400
+        if not nxt:
+            nxt = next_week_read(k)
         cost = None
         if since:
             r = conn.execute("SELECT SUM(cost) FROM api_runs WHERE id IN (SELECT DISTINCT run_row FROM comment_reads "
@@ -353,7 +376,7 @@ def schedule_info(k, since=None):
             cost = round(r[0], 3) if r and r[0] is not None else None
     if nxt and nxt < db.now():
         nxt = db.now() + INTERVAL            # due already: the next pass of the loop takes it
-    if nxt and k["ends_at"] and nxt > k["ends_at"] + 7 * 86400 and not weekly:
+    if nxt and end and nxt > end:
         nxt = None
     return {"schedule": words, "last_at": last, "next_at": nxt, "running": running, "cost": cost,
             "stored": stored, "pending_ai": pending_ai}
@@ -637,8 +660,7 @@ def catch_up():
 
 def tick():
     with _lock:
-        ensure_reads()
-        weekly_rereads()
+        ensure_reads()                 # weekly reads cover every campaign now (weekly_rereads is no longer run)
         saved = poll_runs()
         started = start_due()
         read, _ = classify_pending()
@@ -718,7 +740,7 @@ def client_view(k):
             "first_post": first_post, "next_read": min(pending) if pending else None,
             "last_read": max(done) if done else None,
             "final_read": max([r["due_at"] for r in reads] or [0]) or None,
-            "read_days": list(READ_DAYS)}
+            "next_week": next_week_read(k), "read_every": 7}
 
 
 def client_list(k):
@@ -782,7 +804,7 @@ def admin_page(k, error=None, message=None):
                  tot["unread"], "" if gemini.configured() else " Gemini is not set up (Client portal → Settings & keys)") if tot["unread"] else "")
              + ("" if apify.get_token() else "<p class='err'>No Apify token is saved, so comments cannot be fetched.</p>")
              + "<div style='margin-top:10px'>" + form("read_now", "Read comments now", "btn small lime")
-             + " <span class='price-hint'>Comments are read 2 and 7 days after each video (up to %d per post). This brings the "
+             + " <span class='price-hint'>Comments are read once a week, every 7 days from the first video (up to %d per post). This brings the "
                "next read forward. A full update of every video (new comments only where the platform allows it) costs about "
                "<b>$%.2f</b> on Apify.</span></div></div>" % (MAX_PER_POST, fetch_estimate(k["id"])))
 
@@ -812,10 +834,10 @@ def admin_page(k, error=None, message=None):
                   "(the Arabic and its English meaning). Nothing is shown until you pick it.</p><div class='card'>" % MAX_QUOTES
                   + ("<table><tbody>" + quote_rows + "</tbody></table>" if quote_rows else "<p class='muted'>No comments read yet.</p>") + "</div>")
 
-    st_word = {"due": "Due", "running": "Reading…", "done": "Done", "failed": "Failed", "skipped": "Skipped (posted earlier)"}
+    st_word = {"due": "Due", "running": "Reading…", "done": "Done", "failed": "Failed", "skipped": "Skipped"}
     read_rows = "".join(
-        "<tr><td>%s</td><td><a href='%s' target='_blank' rel='noopener'>%s</a></td><td>Day %d</td><td>%s</td><td>%s</td><td class='muted'>%s</td></tr>" % (
-            who(r), e(r["url"]), e(post_key(r["platform"], r["url"])[:24]), READ_DAYS[r["read_no"] - 1], _fmt_day(r["due_at"]),
+        "<tr><td>%s</td><td><a href='%s' target='_blank' rel='noopener'>%s</a></td><td>%s</td><td>%s</td><td>%s</td><td class='muted'>%s</td></tr>" % (
+            who(r), e(r["url"]), e(post_key(r["platform"], r["url"])[:24]), ("Week %d" % (r["read_no"] - WEEK_NO)) if r["read_no"] > WEEK_NO else ("Day %d" % READ_DAYS[min(r["read_no"], 2) - 1]), _fmt_day(r["due_at"]),
             e(st_word.get(r["status"], r["status"])) + (" · %d" % r["found"] if r["status"] == "done" else ""), e(r["message"] or ""))
         for r in reads)
     read_card = ("<h2>Reading schedule</h2><div class='card'>"
