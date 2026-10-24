@@ -1315,6 +1315,15 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_evidence_add()
         if path == "/api/evidence/request":
             return self.api_evidence_request()
+        if path == "/api/selection/status/bulk":           # item 242
+            import selfilters
+            return selfilters.api_bulk(self)
+        if path == "/api/selection/tags/bulk":
+            import selfilters
+            return selfilters.api_bulk_tags(self)
+        if path == "/api/selection/views":
+            import selfilters
+            return selfilters.api_views(self)
         if path == "/api/selection/status":
             return self.api_selection_status()
         if path == "/api/selection/scores":
@@ -5938,6 +5947,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if open_ is not None:
             out["scores"] = {k: (v if k in open_ else gating.redact_score(v)) for k, v in out["scores"].items()}
         out.update(self.selection_status_payload(sel, codes, reader, by))
+        try:                                    # item 242: what the new selection filters read
+            import selfilters
+            out["facts"] = selfilters.facts(codes, by, bool(team))
+        except Exception:
+            out["facts"] = {}
         import selrename        # item 173: who may rename (owner, KAM, HelloVoice; never a colleague or an invitee)
         out["can_rename"] = bool(sel["token"]) and selrename.client_may(reader, sel, db.admin_code_id())
         return self.send_json(200, out, self.cors())

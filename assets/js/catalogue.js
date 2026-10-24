@@ -52,6 +52,8 @@
   // A selection prepared and priced in the dashboard. Set on the selection
   // page when its link carries a token; its prices beat everything else.
   var CURATED = null;
+  // Item 242: the filters, chips and groups a link carries ("&v=…"), read before the link is tidied.
+  var INITIAL_VIEW = "";
 
   // The shortlist being edited, when the client came back from its page to add
   // or remove creators. Saving again updates that shortlist.
@@ -933,6 +935,7 @@
     }
 
     function labelOf(dim, v) {
+      if (extras && extras.label) { var xl = extras.label(dim, v); if (xl) return xl; }
       if (dim === "place") return v.split("|")[1] === "City not specified"
         ? v.split("|")[0] : v.split("|")[1];
       if (dim === "tier") return /^hcp/i.test(v) ? "HCP " + tierLabel(v.replace(/^hcp\s*-\s*/i, "")) : tierLabel(v);
@@ -972,7 +975,8 @@
         box.indeterminate = on > 0 && on < cities.length;
       });
       ddList().forEach(function (dd) {
-        var n = state[dd.dataset.dim].length + (dd.dataset.dim === "industry" ? state.sub.length : 0);
+        var n = dd.dataset.dims ? dd.dataset.dims.split(",").reduce(function (t, d) { return t + (state[d] || []).length; }, 0)
+          : state[dd.dataset.dim].length + (dd.dataset.dim === "industry" ? state.sub.length : 0);
         dd.classList.toggle("has-value", n > 0);
         // How many options are picked, inside the button: "Tier 2".
         var btn = dd.querySelector(".cat-dd__btn"), badge = btn && btn.querySelector(".cat-dd__n");
@@ -1021,8 +1025,9 @@
       }
       if (e.target.closest(".cat-dd__done, .cat-dd__close")) { close(e.target.closest(".cat-dd")); return; }
       if (e.target.closest(".cat-dd__clear")) {
-        var cdim = e.target.closest(".cat-dd").dataset.dim;
-        state[cdim] = [];
+        var cdd = e.target.closest(".cat-dd"), cdim = cdd.dataset.dim;
+        if (cdd.dataset.dims) cdd.dataset.dims.split(",").forEach(function (d) { state[d] = []; });
+        else state[cdim] = [];
         if (cdim === "industry") state.sub = [];
         changed(); return;
       }
@@ -1103,26 +1108,85 @@
 
     sync();
 
+    function pass(card, skip) {
+      if (state.q && skip !== "q") {
+        if (card._search === undefined) {
+          card._search = fold((card.dataset.name || "") + " " + (card.dataset.code || ""));
+        }
+        if (card._search.indexOf(state.q) === -1) return false;
+      }
+      if (state.followers.length && skip !== "followers") {
+        var f = Number(card.dataset.followers) || 0;
+        if (state.followers[0] && f < state.followers[0]) return false;
+        if (state.followers[1] && f > state.followers[1]) return false;
+      }
+      if (!["tier", "platform", "place", "interest"].every(function (dim) {
+        if (!state[dim].length || dim === skip) return true;
+        return card["_" + dim].some(function (v) { return state[dim].indexOf(v) !== -1; });
+      })) return false;
+      return xdims.every(function (dim) {
+        if (!state[dim].length || dim === skip) return true;
+        return extras.of(card, dim).some(function (v) { return state[dim].indexOf(v) !== -1; });
+      });
+    }
+
     return {
-      matches: function (card) {
-        if (state.q) {
-          if (card._search === undefined) {
-            card._search = fold((card.dataset.name || "") + " " + (card.dataset.code || ""));
-          }
-          if (card._search.indexOf(state.q) === -1) return false;
-        }
-        if (state.followers.length) {
-          var f = Number(card.dataset.followers) || 0;
-          if (state.followers[0] && f < state.followers[0]) return false;
-          if (state.followers[1] && f > state.followers[1]) return false;
-        }
-        if (!["tier", "platform", "place", "interest"].every(function (dim) {
-          if (!state[dim].length) return true;
-          return card["_" + dim].some(function (v) { return state[dim].indexOf(v) !== -1; });
-        })) return false;
-        return xdims.every(function (dim) {
-          if (!state[dim].length) return true;
-          return extras.of(card, dim).some(function (v) { return state[dim].indexOf(v) !== -1; });
+      matches: function (card) { return pass(card, ""); },
+      // Item 242: every filter except `skip` (a dim name): an option's live count.
+      matchesExcept: function (card, skip) { return pass(card, skip); },
+      // The whole state, for the link and saved views; set() puts one back.
+      get: function () {
+        var o = { sort: state.sort, text: (bar.querySelector(".cat-search__input") || {}).value || "" };
+        ["tier", "platform", "place", "interest"].concat(xdims).forEach(function (d) { if (state[d].length) o[d] = state[d].slice(); });
+        if (state.followers.length) o.followers = state.followers.map(function (v) { return v == null ? "" : String(v); });
+        return o;
+      },
+      set: function (o) {
+        o = o || {};
+        ["tier", "platform", "place", "interest"].concat(xdims).forEach(function (d) { state[d] = Array.isArray(o[d]) ? o[d].map(String) : []; });
+        state.followers = Array.isArray(o.followers) && o.followers.length ? o.followers.map(function (v) { return v === "" || v == null ? null : Number(v); }) : [];
+        state.sort = typeof o.sort === "string" ? o.sort : DEFAULT_SORT;
+        var sbox = bar.querySelector(".cat-search__input");
+        if (sbox) sbox.value = typeof o.text === "string" ? o.text : "";
+        state.q = fold(sbox ? sbox.value : "");
+        var sel = bar.querySelector(".cat-sort:not(.cat-group-by) .cat-sort__select");
+        if (sel) sel.value = state.sort;
+        sync();
+      },
+      count: function () {
+        return ["tier", "platform", "place", "interest"].concat(xdims).reduce(function (t, d) { return t + state[d].length; }, 0) +
+          (state.followers.length ? 1 : 0) + (state.q ? 1 : 0);
+      },
+      clear: function () {
+        state.tier = []; state.platform = []; state.place = []; state.interest = []; state.followers = [];
+        xdims.forEach(function (d) { state[d] = []; });
+        state.q = "";
+        var sbox = bar.querySelector(".cat-search__input");
+        if (sbox) sbox.value = "";
+        sync();
+      },
+      // Live counts on every option (selection page): how many creators it would leave, the
+      // other filters as they are. `extraOk(card)` is the page's own filters (chips) on top.
+      facetCounts: function (list, extraOk) {
+        var dims = ["tier", "platform", "place", "interest"].concat(xdims);
+        var n = {};
+        dims.forEach(function (dim) {
+          var t = n[dim] = {};
+          list.forEach(function (card) {
+            if (!pass(card, dim) || (extraOk && !extraOk(card))) return;
+            var vals = xdims.indexOf(dim) > -1 ? extras.of(card, dim) : card["_" + dim];
+            vals.forEach(function (v) { t[v] = (t[v] || 0) + 1; });
+          });
+        });
+        all("input[data-dim]", bar).forEach(function (box) {
+          var t = n[box.dataset.dim];
+          if (!t) return;
+          var lab = box.closest(".cat-opt");
+          var span = lab.querySelector(".cat-opt__n");
+          if (!span) { span = document.createElement("span"); span.className = "cat-opt__n"; lab.appendChild(span); }
+          var c = t[box.value] || 0;
+          span.textContent = String(c);
+          lab.classList.toggle("is-zero", !c && !box.checked);
         });
       },
       filtering: function () {
@@ -1135,26 +1199,46 @@
         if (!extras) return;
         var holder = bar.querySelector(".cat-bar__match");
         var any = false;
-        xdims.forEach(function (dim) {
-          var vals = extras.values(dim);
-          state[dim] = state[dim].filter(function (v) { return vals.some(function (x) { return x[0] === v; }); });
-          var body = vals.length ? '<div class="cat-dd__group">' + vals.map(function (x) {
-            return '<label class="cat-opt"><input type="checkbox" data-dim="' + dim + '" value="' + esc(x[0]) +
-              '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
-              (extras.dot && extras.dot(dim, x[0]) ? '<i class="cat-dot cat-dot--' + extras.dot(dim, x[0]) + '"></i>' : "") +
-              '<span class="cat-opt__label">' + esc(x[0]) + '</span><span class="cat-opt__n">' + x[1] + "</span></label>";
-          }).join("") + "</div>" : "";
-          var dd = holder.querySelector('.cat-dd[data-dim="' + dim + '"]');
-          if (!vals.length) { if (dd) dd.remove(); return; }
+        // Item 242: several filters can share one dropdown ("Decision": reason, decided by, more),
+        // each under its own small title. A dim in no panel gets a dropdown of its own.
+        var panels = (extras.panels || []).slice(), inPanel = {};
+        panels.forEach(function (pn) { pn.dims.forEach(function (d) { inPanel[d] = 1; }); });
+        xdims.forEach(function (d) { if (!inPanel[d]) panels.push({ id: d, title: extras.titles[d], dims: [d] }); });
+        var order = panels.map(function (pn) { return pn.id; });
+        panels.forEach(function (pn) {
+          var nOpts = 0;
+          var parts = pn.dims.map(function (dim) {
+            var vals = extras.values(dim);
+            state[dim] = state[dim].filter(function (v) { return vals.some(function (x) { return x[0] === v; }); });
+            if (!vals.length) return "";
+            nOpts += vals.length;
+            return (pn.dims.length > 1 ? '<p class="cat-dd__title">' + esc(extras.titles[dim]) + "</p>" : "") +
+              '<div class="cat-dd__group">' + vals.map(function (x) {
+                return '<label class="cat-opt"><input type="checkbox" data-dim="' + dim + '" value="' + esc(x[0]) +
+                  '"/><span class="cat-opt__box" aria-hidden="true"></span>' +
+                  (extras.dot && extras.dot(dim, x[0]) ? '<i class="cat-dot cat-dot--' + extras.dot(dim, x[0]) + '"></i>' : "") +
+                  '<span class="cat-opt__label">' + esc(x[0]) + '</span><span class="cat-opt__n">' + x[1] + "</span></label>";
+              }).join("") + "</div>";
+          });
+          var body = parts.join("");
+          var dd = holder.querySelector('.cat-dd[data-dim="' + pn.id + '"]');
+          if (!nOpts) { if (dd) dd.remove(); return; }
           any = true;
+          // The signature leaves the counts out: facetCounts() keeps those current without
+          // rewriting the options under a finger (that loses focus).
+          var sig = body.replace(/<span class="cat-opt__n">\d+<\/span>/g, "");
           if (!dd) {
-            holder.insertAdjacentHTML("beforeend", dropdown(dim, extras.titles[dim], body, vals.length > 8, "cat-dd--match"));
-          } else if (dd.dataset.sig !== body) {
-            // Only when the options really changed: rewriting them under a finger loses focus.
+            if (!state[pn.id]) state[pn.id] = [];
+            holder.insertAdjacentHTML("beforeend", dropdown(pn.id, pn.title, body, nOpts > 8 || pn.dims.length > 1, "cat-dd--match"));
+            dd = holder.querySelector('.cat-dd[data-dim="' + pn.id + '"]');
+            if (pn.dims.length > 1 || pn.id !== pn.dims[0]) dd.dataset.dims = pn.dims.join(",");
+          } else if (dd.dataset.sig !== sig) {
             dd.querySelector(".cat-dd__body").innerHTML = body;
           }
-          holder.querySelector('.cat-dd[data-dim="' + dim + '"]').dataset.sig = body;
+          dd.dataset.sig = sig;
         });
+        // Keep the dropdowns in the order the page asked for, whatever order they appeared in.
+        order.forEach(function (id) { var el = holder.querySelector('.cat-dd[data-dim="' + id + '"]'); if (el) holder.appendChild(el); });
         holder.hidden = !any;
         bar.querySelector(".cat-bar__sep").hidden = !any;
         sync();
@@ -2183,6 +2267,8 @@
 
   function initSelection() {
     var frag = readFragment();
+    var vm = /(?:^#|&)v=([A-Za-z0-9_-]+)/.exec(location.hash || "");
+    INITIAL_VIEW = vm ? vm[1] : "";
     var token = frag.token;
     // Ask whether this selection has been priced for the client — by token,
     // or, for the link the client made themselves, by its name and creators.
@@ -2213,7 +2299,8 @@
                         // No campaign objective yet: nothing is scored, the page asks for it.
                         needsObjective: !!b.needs_objective,
                         // Scores gate (owner, 2026-10-15): HelloVoice publishes a selection's scores to the client.
-                        scoresGate: b.scores_gate || null, scoresPending: !!b.scores_pending };
+                        scoresGate: b.scores_gate || null, scoresPending: !!b.scores_pending,
+                        facts: b.facts || null };
             history.replaceState(null, "", buildFragment(b.name, CURATED.codes));
           }
           withCards(startSelection);
@@ -2252,29 +2339,114 @@
     selected = want.filter(function (code) { return !!byCode[code]; });
     var dropped = want.length - selected.length;
 
+    // ---- Item 242 (2026-10-24): what each creator is, for the selection's filters and groups. ----
+    var XDIMS = ["fit", "role", "tag", "reason", "decided", "flags", "licence", "gender", "nat", "ver", "price", "er", "views", "data", "aud", "audg"];
+    var XTITLES = { fit: "Fit", role: "Role", tag: "Tags", reason: "Rejection reason", decided: "Decided by", flags: "More",
+                    licence: "Licence", gender: "Gender", nat: "Nationality", ver: "Account",
+                    price: "Price per creator", er: "Engagement rate", views: "Average views", data: "Data",
+                    aud: "Top audience country", audg: "Audience" };
+    // Pills say which filter a value belongs to when the value alone is ambiguous ("Under 10K").
+    var XPILL = { price: "Price", er: "Engagement", views: "Views", reason: "Reason", decided: "Decided by", aud: "Audience in", nat: "Nationality" };
+    var PRICE_STEPS = [2000, 5000, 10000, 25000], ER_STEPS = [1, 3, 6], VIEW_STEPS = [10000, 50000, 200000];
+    function curK(sar) { return compact(Math.round(inCur(sar))); }
+    function priceBands() {
+      return ["Under " + curK(PRICE_STEPS[0]) + " " + CURRENCY].concat(PRICE_STEPS.slice(1).map(function (t, i) {
+        return curK(PRICE_STEPS[i]) + "–" + curK(t) + " " + CURRENCY; }), [curK(PRICE_STEPS[3]) + "+ " + CURRENCY]);
+    }
+    var ER_BANDS = ["Under 1%", "1–3%", "3–6%", "6% and more"];
+    var VIEW_BANDS = ["Under 10K", "10K–50K", "50K–200K", "200K and more"];
+    function band(v, steps, names) { for (var i = 0; i < steps.length; i++) if (v < steps[i]) return names[i]; return names[steps.length]; }
+    var XORDER = {
+      fit: function () { return ["Strong fit", "Good fit", "Possible fit", "Not recommended", "Matching"]; },
+      role: function () { return ["Awareness", "Engagement", "Conversion", "UGC content"]; },
+      reason: function () { return REASONS.map(function (r) { return r[1]; }); },
+      decided: function () { return ["Client", "HelloVoice"]; },
+      flags: function () { return ["With track record", "Has a replacement", "Has a note"]; },
+      licence: function () { return ["Mawthooq licence", "UAE licence", "No licence listed"]; },
+      ver: function () { return ["Verified account"]; },
+      price: priceBands,
+      er: function () { return ER_BANDS; },
+      views: function () { return VIEW_BANDS; },
+      data: function () { return ["Full analysis", "Public metrics", "No data yet"]; },
+      audg: function () { return ["Mostly women", "Mixed", "Mostly men"]; }
+    };
+    var COUNTRY_NAME = { SA: "Saudi Arabia", AE: "UAE", EG: "Egypt", KW: "Kuwait", QA: "Qatar", BH: "Bahrain", OM: "Oman",
+                         JO: "Jordan", LB: "Lebanon", IQ: "Iraq", MA: "Morocco", US: "United States", GB: "United Kingdom", IN: "India" };
+    function factsOf(code) { return (CURATED && CURATED.facts && CURATED.facts[code]) || {}; }
+    function xval(code, dim) {
+      var f, st;
+      switch (dim) {
+        case "fit": return fitOf(code) ? [fitOf(code)] : [];
+        case "role": return rolesOf(code);
+        case "tag": return allTagsOf(code);
+        case "kind": return [isDoctor(code) ? "Doctors" : "Influencers"];
+        case "status": return [stLabel(statusOf(code).s)];
+        case "reason":
+          st = statusOf(code);
+          if (st.s !== "rejected" || !st.reason) return [];
+          return [(REASONS.filter(function (r) { return r[0] === st.reason; })[0] || ["", "Other"])[1]];
+        case "decided":
+          st = statusOf(code);
+          return st.s !== "review" && st.at ? [st.hv ? "HelloVoice" : "Client"] : [];
+        case "flags":
+          st = statusOf(code);
+          return [].concat(TRACK[code] ? ["With track record"] : [], (st.replacements || []).length ? ["Has a replacement"] : [],
+                           st.note ? ["Has a note"] : []);
+        case "licence":
+          f = factsOf(code);
+          if (!f.lic || !f.lic.length) return CURATED && CURATED.facts ? ["No licence listed"] : [];
+          return f.lic.map(function (c) { return c === "SA" ? "Mawthooq licence" : c === "AE" ? "UAE licence" : c + " licence"; });
+        case "gender": f = factsOf(code); return f.g ? [f.g] : [];
+        case "nat": f = factsOf(code); return f.nat ? [f.nat] : [];
+        case "ver": return factsOf(code).ver ? ["Verified account"] : [];
+        case "price":
+          var p = priceOf(code, byCode[code]);
+          return p && p[0] ? [band(p[0], PRICE_STEPS, priceBands())] : [];
+        case "er": f = factsOf(code); return f.er != null ? [band(f.er, ER_STEPS, ER_BANDS)] : [];
+        case "views":
+          f = factsOf(code);
+          var v = f.v || 0;
+          if (!v && CURATED && CURATED.reach && CURATED.reach[code] && !CURATED.reach[code][2]) v = CURATED.reach[code][0];
+          return v ? [band(v, VIEW_STEPS, VIEW_BANDS)] : [];
+        case "data":
+          f = factsOf(code);
+          if (!CURATED || !CURATED.facts) return [];
+          return f.an ? ["Full analysis"] : f.m ? ["Public metrics"] : ["No data yet"];
+        case "aud": f = factsOf(code); return f.ac ? [COUNTRY_NAME[f.ac] || f.ac] : [];
+        case "audg":
+          f = factsOf(code);
+          return f.af == null ? [] : [f.af >= 60 ? "Mostly women" : f.af <= 40 ? "Mostly men" : "Mixed"];
+      }
+      return [];
+    }
+
     // The same filters and sort as the catalogue, offered over the creators
     // in this selection only. Filtering narrows what is on screen; it does not
     // take anyone out of the selection or change its total.
     var host = document.querySelector(".cat-controls .cat-container");
     var controls = (host && selected.length > 1)
       ? Controls(host, selected.map(function (c) { return byCode[c]; }), function () { render(); }, {
-          dims: ["fit", "role", "tag"],
-          titles: { fit: "Fit", role: "Role", tag: "Tags" },
-          of: function (card, dim) {
-            var code = card.dataset.code;
-            return dim === "fit" ? (fitOf(code) ? [fitOf(code)] : []) : dim === "role" ? rolesOf(code) : allTagsOf(code);
-          },
+          // Item 242: the selection's own filters. Each is a list of values per creator (xval); several
+          // share a dropdown. A filter with no values on this selection never shows.
+          dims: XDIMS,
+          titles: XTITLES,
+          panels: [{ id: "p-fit", title: "Fit", dims: ["fit", "role"] },
+                   { id: "p-decision", title: "Decision", dims: ["reason", "decided", "flags"] },
+                   { id: "p-profile", title: "Profile", dims: ["licence", "gender", "nat", "ver"] },
+                   { id: "p-perf", title: "Performance", dims: ["price", "er", "views", "data"] },
+                   { id: "p-aud", title: "Audience", dims: ["aud", "audg"] }],
+          of: function (card, dim) { return xval(card.dataset.code, dim); },
+          label: function (dim, v) { return XPILL[dim] ? XPILL[dim] + ": " + v : ""; },
           values: function (dim) {
             var n = {}, order = [];
             selected.forEach(function (code) {
-              (dim === "fit" ? (fitOf(code) ? [fitOf(code)] : []) : dim === "role" ? rolesOf(code) : allTagsOf(code)).forEach(function (v) {
+              xval(code, dim).forEach(function (v) {
                 if (!n[v]) { n[v] = 0; order.push(v); }
                 n[v]++;
               });
             });
-            var fixed = dim === "fit" ? ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
-              : dim === "role" ? ["Awareness", "Engagement", "Conversion", "UGC content"] : null;
-            var list = fixed ? fixed.filter(function (v) { return n[v]; })
+            var fixed = XORDER[dim] ? XORDER[dim]() : null;
+            var list = fixed ? fixed.filter(function (v) { return n[v]; }).concat(order.filter(function (v) { return fixed.indexOf(v) < 0; }))
               : order.sort(function (a, b) { return a.toLowerCase().localeCompare(b.toLowerCase()); });
             return list.map(function (v) { return [v, n[v]]; });
           },
@@ -2284,12 +2456,17 @@
       : null;
     if (!controls && host) host.closest(".cat-controls").hidden = true;
 
-    // Group by: the same creators split into sections by one parameter. The
-    // admin picks how the page opens; the client can switch or turn it off.
-    var GROUP_DIMS = [["", "None"], ["segment", "Segment"], ["tier", "Creator size"], ["platform", "Platform"],
-                      ["country", "Country"], ["interest", "Interest"], ["fit", "Fit"], ["role", "Role"], ["tag", "Tags"]];
+    // Group by: the same creators split into sections by one parameter, and (item 242) optionally
+    // a second one inside each section ("Then by"). The admin picks how the page opens; the client
+    // can switch or turn it off. Status is in this menu now; the old "Group by status" switch is gone.
+    var GROUP_DIMS = [["", "None"], ["status", "Status"], ["kind", "Creator type"], ["segment", "Segment"], ["tag", "Tags"],
+                      ["fit", "Fit"], ["role", "Role"], ["tier", "Creator size"], ["platform", "Platform"], ["country", "Country"],
+                      ["interest", "Interest"], ["decided", "Decided by"], ["reason", "Rejection reason"], ["licence", "Licence"],
+                      ["price", "Price"], ["er", "Engagement rate"], ["views", "Average views"], ["aud", "Top audience country"]];
     var NONE_LABEL = { segment: "No segment", country: "Location not specified", interest: "No interest listed",
-                       fit: "Not rated", role: "No role set", tag: "Untagged", platform: "No platform", tier: "No tier" };
+                       fit: "Not rated", role: "No role set", tag: "Untagged", platform: "No platform", tier: "No tier",
+                       decided: "Not decided yet", reason: "No reason given", licence: "No licence listed", price: "No price",
+                       er: "No engagement data", views: "No view data", aud: "No audience data", status: "", kind: "" };
     function groupKeys(code, dim) {
       var card = byCode[code], out = [];
       if (!card) return out;
@@ -2297,57 +2474,69 @@
       else if (dim === "tier") out = card.dataset.tier ? [card.dataset.tier] : [];
       else if (dim === "platform") out = values(card.dataset.platform);
       else if (dim === "interest") out = values(card.dataset.interest);
-      else if (dim === "fit") out = fitOf(code) ? [fitOf(code)] : [];
-      else if (dim === "role") out = rolesOf(code);
-      else if (dim === "tag") out = allTagsOf(code);
-      else if (dim === "status") out = [stLabel(statusOf(code).s)];
       else if (dim === "country") {
         values(card.dataset.city).forEach(function (v) {
           if (/^unspecified$/i.test(v)) return;
           var c = place(v).country;
           if (out.indexOf(c) < 0) out.push(c);
         });
-      }
+      } else if (dim === "reason") out = statusOf(code).s === "rejected" ? xval(code, "reason") : [];
+      else out = xval(code, dim).filter(function (v) { return v !== "No licence listed"; });
+      if (dim === "reason" && statusOf(code).s !== "rejected") return ["Not rejected"];
       return out.length ? out : [NONE_LABEL[dim]];
     }
     function groupHas(dim) {
       if (!dim) return true;
-      return selected.some(function (code) { return groupKeys(code, dim)[0] !== NONE_LABEL[dim]; });
+      if (dim === "status") return STATUS_ON;
+      if (dim === "kind") return selected.some(isDoctor) && !selected.every(isDoctor);
+      return selected.some(function (code) { var k = groupKeys(code, dim)[0]; return k !== NONE_LABEL[dim] && k !== "Not rejected"; });
     }
     var groupKey = "hv-group:" + ((CURATED && CURATED.token) || selectionName);
-    var groupBy = (CURATED && CURATED.groupBy) || "";
-    try { var gb = sessionStorage.getItem(groupKey); if (gb !== null) groupBy = gb; } catch (e) {}
-    if (!groupHas(groupBy)) groupBy = "";
-    var groupSel = null;
+    var groupBy = (CURATED && CURATED.groupBy) || "", groupBy2 = "";
+    try { var gb = sessionStorage.getItem(groupKey); if (gb !== null) { groupBy = gb.split(">")[0]; groupBy2 = gb.split(">")[1] || ""; } } catch (e) {}
+    var groupSel = null, groupSel2 = null, collapsed = {};
+    function groupStore() { try { sessionStorage.setItem(groupKey, groupBy + (groupBy2 ? ">" + groupBy2 : "")); } catch (e) {} }
+    function groupOptions(sel, current, skip) {
+      sel.innerHTML = GROUP_DIMS.filter(function (d) { return (!d[0] || groupHas(d[0])) && (!skip || d[0] !== skip); })
+        .map(function (d) { return '<option value="' + d[0] + '"' + (d[0] === current ? " selected" : "") + ">" + (d[0] || !skip ? d[1] : "Nothing") + "</option>"; }).join("");
+    }
+    function syncGroupMenus() {
+      if (!groupSel) return;
+      if (!groupHas(groupBy)) groupBy = "";
+      if (!groupBy || groupBy2 === groupBy || !groupHas(groupBy2)) groupBy2 = "";
+      groupOptions(groupSel, groupBy);
+      groupOptions(groupSel2, groupBy2, groupBy || "-");
+      groupSel2.closest(".cat-group-by").hidden = !groupBy;
+    }
     if (controls) {
       var row = document.querySelector(".cat-bar__row");
-      var sortEl = row && row.querySelector(".cat-sort");
-      var opts = GROUP_DIMS.filter(function (d) { return !d[0] || groupHas(d[0]); });
-      if (row && opts.length > 1) {
-        var lab = document.createElement("label");
-        lab.className = "cat-sort cat-group-by";
-        lab.innerHTML = '<span class="cat-sort__label">Group</span><select class="cat-sort__select" aria-label="Group creators by">' +
-          opts.map(function (d) { return '<option value="' + d[0] + '"' + (d[0] === groupBy ? " selected" : "") + ">" + d[1] + "</option>"; }).join("") +
-          "</select>" + CHEVRON + "";
+      var sortEl = row && row.querySelector(".cat-sort:not(.cat-group-by)");
+      if (row) {
+        var mk = function (label, aria) {
+          var lab = document.createElement("label");
+          lab.className = "cat-sort cat-group-by";
+          lab.innerHTML = '<span class="cat-sort__label">' + label + '</span><select class="cat-sort__select" aria-label="' + aria + '"></select>' + CHEVRON;
+          return lab;
+        };
+        var lab1 = mk("Group", "Group creators by"), lab2 = mk("Then by", "Then group each section by");
+        lab2.classList.add("cat-group-by--then");
         var order = document.createElement("div");
         order.className = "cat-bar__order";
-        if (sortEl) { row.insertBefore(order, sortEl); order.appendChild(lab); order.appendChild(sortEl); }
-        else { order.appendChild(lab); row.appendChild(order); }
-        groupSel = lab.querySelector("select");
-        groupSel.addEventListener("change", function () {
-          groupBy = groupSel.value;
-          try { sessionStorage.setItem(groupKey, groupBy); } catch (e) {}
-          render();
-        });
+        if (sortEl) { row.insertBefore(order, sortEl); order.appendChild(lab1); order.appendChild(lab2); order.appendChild(sortEl); }
+        else { order.appendChild(lab1); order.appendChild(lab2); row.appendChild(order); }
+        groupSel = lab1.querySelector("select"); groupSel2 = lab2.querySelector("select");
+        groupSel.addEventListener("change", function () { groupBy = groupSel.value; collapsed = {}; syncGroupMenus(); groupStore(); render(); });
+        groupSel2.addEventListener("change", function () { groupBy2 = groupSel2.value; syncGroupMenus(); groupStore(); render(); });
       }
     }
     function groupOrder(dim, names, count) {
       var fixed = dim === "tier" ? Object.keys(TIER_PRICE)
         : dim === "status" ? ST_ORDER.map(function (k) { return ST_LABEL[k]; })
-        : dim === "fit" ? ["Strong fit", "Good fit", "Possible fit", "Not recommended"]
-        : dim === "country" ? COUNTRY_ORDER : null;
+        : dim === "kind" ? ["Influencers", "Doctors"]
+        : dim === "country" ? COUNTRY_ORDER
+        : XORDER[dim] ? XORDER[dim]() : null;
       return names.sort(function (a, b) {
-        var na = a === NONE_LABEL[dim], nb = b === NONE_LABEL[dim];
+        var na = a === NONE_LABEL[dim] || a === "Not rejected", nb = b === NONE_LABEL[dim] || b === "Not rejected";
         if (na !== nb) return na ? 1 : -1;
         if (fixed) {
           var ia = fixed.indexOf(a), ib = fixed.indexOf(b);
@@ -2356,48 +2545,86 @@
         return (count[b] - count[a]) || a.localeCompare(b);
       });
     }
+    function split(list, dim) {
+      var members = {}, count = {};
+      list.forEach(function (card) {
+        groupKeys(card.dataset.code, dim).forEach(function (k) {
+          (members[k] = members[k] || []).push(card);
+          count[k] = (count[k] || 0) + 1;
+        });
+      });
+      return { keys: groupOrder(dim, Object.keys(members), count), members: members, count: count };
+    }
+    function groupHead(dim, k, n, pct, lvl, id) {
+      var flag = dim === "country" && k !== NONE_LABEL.country ? flagOf(k) : "";
+      var mark = dim === "platform" && ICONS[k] ? '<span class="cat-places__mark ' + (BRAND[k] || "") + '">' + ICONS[k] + "</span>" : "";
+      var name = dim === "tier" ? (/^hcp/i.test(k) ? "HCP " + tierLabel(k.replace(/^hcp\s*-\s*/i, "")) : tierLabel(k)) : k;
+      var sub = dim === "status" && ST_SUB[ST_KEY[k]] ? '<p class="cat-group__sub">' + esc(ST_SUB[ST_KEY[k]]()) + "</p>" : "";
+      var open = !collapsed[id];
+      return '<header class="cat-group__head' + (lvl ? " cat-group__head--sub" : "") + '">' + flag + mark +
+        '<h' + (lvl ? 3 : 2) + ' class="cat-group__name"><button type="button" class="cat-group__tog" data-group-id="' + esc(id) +
+        '" aria-expanded="' + open + '">' + esc(name) + CHEVRON + "</button></h" + (lvl ? 3 : 2) + ">" +
+        '<span class="cat-group__n">' + n + (n === 1 ? " creator" : " creators") + "</span>" +
+        (pct != null ? '<span class="cat-group__pct">' + pct + "% of the selection</span>" : "") + sub + "</header>";
+    }
     // Lay the visible cards out in sections. A creator in two groups shows in
     // both (the second is a copy); clicks are handled on the grid, so copies work.
     function layoutGroups(grid, ordered) {
       all(".cat-group", grid).forEach(function (g) { g.remove(); });
       grid.classList.toggle("is-grouped", !!groupBy);
       if (!groupBy) return;
-      var members = {}, count = {};
-      ordered.forEach(function (card) {
-        if (card.hidden) return;
-        groupKeys(card.dataset.code, groupBy).forEach(function (k) {
-          (members[k] = members[k] || []).push(card);
-          count[k] = (count[k] || 0) + 1;
-        });
-      });
+      var visible = ordered.filter(function (card) { return !card.hidden; });
       var placed = {};
       var total = selected.length;
-      groupOrder(groupBy, Object.keys(members), count).forEach(function (k) {
-        var sec = document.createElement("section");
-        sec.className = "cat-group";
-        var pct = total ? Math.round(100 * count[k] / total) : 0;
-        var flag = groupBy === "country" && k !== NONE_LABEL.country ? flagOf(k) : "";
-        var mark = groupBy === "platform" && ICONS[k] ? '<span class="cat-places__mark ' + (BRAND[k] || "") + '">' + ICONS[k] + "</span>" : "";
-        if (groupBy === "status") {
-          // Under review 4 · Waiting for your yes or no.
-          sec.className = "cat-group sel-grp";
-          sec.innerHTML = '<header class="sel-grp__hd"><h2>' + esc(k) + '</h2><span class="sel-grp__n">' + count[k] + "</span><p>" +
-            esc(ST_SUB[ST_KEY[k]] ? ST_SUB[ST_KEY[k]]() : "") + "</p></header>";
-        } else
-        sec.innerHTML = '<header class="cat-group__head">' + flag + mark + '<h2 class="cat-group__name">' + esc(k) + "</h2>" +
-          '<span class="cat-group__n">' + count[k] + (count[k] === 1 ? " creator" : " creators") + "</span>" +
-          '<span class="cat-group__pct">' + pct + "% of the selection</span></header>";
-        var inner = document.createElement("div");
-        inner.className = "cat-grid cat-group__grid";
-        members[k].forEach(function (card) {
+      function put(inner, list) {
+        list.forEach(function (card) {
           var code = card.dataset.code;
           if (!placed[code]) { placed[code] = true; inner.appendChild(card); }
           else { var cp = card.cloneNode(true); cp.classList.add("cat-card--copy"); cp.removeAttribute("id"); inner.appendChild(cp); }
         });
-        sec.appendChild(inner);
+      }
+      var top = split(visible, groupBy);
+      top.keys.forEach(function (k) {
+        var id = groupBy + ":" + k;
+        var sec = document.createElement("section");
+        sec.className = "cat-group" + (groupBy === "status" ? " cat-group--status cat-group--st-" + (ST_KEY[k] || "x") : "");
+        sec.innerHTML = groupHead(groupBy, k, top.count[k], total ? Math.round(100 * top.count[k] / total) : 0, 0, id);
+        var body = document.createElement("div");
+        body.className = "cat-group__body";
+        body.hidden = !!collapsed[id];
+        if (groupBy2) {
+          var sub = split(top.members[k], groupBy2);
+          sub.keys.forEach(function (k2) {
+            var id2 = id + ">" + groupBy2 + ":" + k2;
+            var s2 = document.createElement("section");
+            s2.className = "cat-group cat-group--sub";
+            s2.innerHTML = groupHead(groupBy2, k2, sub.count[k2], null, 1, id2);
+            var inner2 = document.createElement("div");
+            inner2.className = "cat-grid cat-group__grid";
+            inner2.hidden = !!collapsed[id2];
+            put(inner2, sub.members[k2]);
+            s2.appendChild(inner2);
+            body.appendChild(s2);
+          });
+        } else {
+          var inner = document.createElement("div");
+          inner.className = "cat-grid cat-group__grid";
+          put(inner, top.members[k]);
+          body.appendChild(inner);
+        }
+        sec.appendChild(body);
         grid.appendChild(sec);
       });
     }
+    $("cat-grid").addEventListener("click", function (e) {
+      var t = e.target.closest && e.target.closest(".cat-group__tog");
+      if (!t) return;
+      var id = t.getAttribute("data-group-id"), sec = t.closest(".cat-group");
+      collapsed[id] = !collapsed[id];
+      t.setAttribute("aria-expanded", String(!collapsed[id]));
+      var body = sec.querySelector(":scope > .cat-group__body, :scope > .cat-group__grid");
+      if (body) body.hidden = !!collapsed[id];
+    });
 
     // Where the creators in this selection are: each country with how many
     // creators, and the cities under it. A creator serving two cities counts
@@ -2918,7 +3145,10 @@
       unavailable: function () { return "Set by HelloVoice when a creator can't take the job."; }
     };
     var STATUS_ON = !!(CURATED && CURATED.token && CFG.api && CURATED.status);
-    var stFilter = "";               // "", a status, "influencers", "doctors" or "track"
+    // Item 242: the chips stack. Inside a row they are OR (Approved or Rejected), across rows and
+    // with every dropdown they are AND (Doctors and Approved and tagged Dermactive).
+    var chips = { kind: [], st: [], tr: false };
+    function chipsOn() { return !!(chips.kind.length || chips.st.length || chips.tr); }
     // Creators with posts for this brand's competitors (owner, 2026-10-15), set by evidence.js.
     var TRACK = {};
     function stLabel(k) { return { review: "Under review", approved: "Approved", rejected: "Rejected", unavailable: "Unavailable" }[k] || k; }
@@ -2931,17 +3161,24 @@
       if (s < 120) return "just now";
       return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" }) + (s < 86400 * 2 ? ", " + d.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }) : "");
     }
-    function stCounts() {
-      var n = { creators: selected.length, influencers: 0, doctors: 0, track: 0, review: 0, approved: 0, rejected: 0, unavailable: 0 };
-      selected.forEach(function (code) { n[statusOf(code).s]++; n[isDoctor(code) ? "doctors" : "influencers"]++; if (TRACK[code]) n.track++; });
-      return n;
+    function stMatches(code, skip) {
+      if (skip !== "kind" && chips.kind.length && chips.kind.indexOf(isDoctor(code) ? "doctors" : "influencers") < 0) return false;
+      if (skip !== "st" && chips.st.length && chips.st.indexOf(statusOf(code).s) < 0) return false;
+      if (skip !== "tr" && chips.tr && !TRACK[code]) return false;
+      return true;
     }
-    function stMatches(code) {
-      if (!stFilter) return true;
-      if (stFilter === "doctors") return isDoctor(code);
-      if (stFilter === "influencers") return !isDoctor(code);
-      if (stFilter === "track") return !!TRACK[code];
-      return statusOf(code).s === stFilter;
+    // Live chip counts: each chip counts the creators it would show with every OTHER filter as it is.
+    function chipCounts() {
+      var n = { kind: {}, st: {}, tr: 0, shown: 0 };
+      selected.forEach(function (code) {
+        var card = byCode[code], c = !controls || controls.matches(card);
+        if (!c) return;
+        if (stMatches(code, "kind")) { var k = isDoctor(code) ? "doctors" : "influencers"; n.kind[k] = (n.kind[k] || 0) + 1; }
+        if (stMatches(code, "st")) { var s0 = statusOf(code).s; n.st[s0] = (n.st[s0] || 0) + 1; }
+        if (stMatches(code, "tr") && TRACK[code]) n.tr++;
+        if (stMatches(code)) n.shown++;
+      });
+      return n;
     }
     // A decision shows at once (fix batch 3): the card is redrawn before the server answers, and
     // put back if the save fails. Before, every Approve / Reject / Undo waited a full round trip
@@ -3187,8 +3424,7 @@
       if (!host) {
         host = document.createElement("section");
         host.id = "sel-share"; host.className = "sel-share"; host.setAttribute("aria-label", "Share this selection");
-        var anchor = document.querySelector(".cat-grid-section");
-        anchor.parentNode.insertBefore(host, anchor);
+        underNotes().appendChild(host);
         host.addEventListener("click", function (e) {
           if (e.target.closest(".sel-share__toggle")) { SHARE.open = !SHARE.open; SHARE.msg = ""; renderShare();
             var f = $("sel-share-email"); if (SHARE.open && f) f.focus(); return; }
@@ -3241,8 +3477,8 @@
       if (!host) {
         host = document.createElement("section");
         host.id = "sel-objective"; host.setAttribute("aria-label", "Campaign objective");
-        var anchor = document.querySelector(".cat-grid-section");
-        anchor.parentNode.insertBefore(host, anchor);
+        var under = underNotes();
+        under.insertBefore(host, under.firstChild);
         host.addEventListener("click", function (e) {
           var go = e.target.closest(".sel-obj__go, .sel-obj__edit");
           var pub = e.target.closest(".sel-obj__pub");
@@ -3299,42 +3535,334 @@
                              : "The selection’s owner adds the campaign objective.") + "</span></p>") +
         (canAct ? '<button type="button" class="sel-obj__go">Add objective' + hvIcon("arrow") + "</button>" : "") + "</div></div>";
     }
+    // Under the "Please note" box (Bido, 2026-10-24): the objective bar, then the share bar.
+    function underNotes() {
+      var box = $("sel-under-notes");
+      if (box) return box;
+      box = document.createElement("div");
+      box.id = "sel-under-notes"; box.className = "sel-under-notes";
+      var summary = document.querySelector(".cat-summary") || document.querySelector(".cat-grid-section");
+      summary.parentNode.insertBefore(box, summary.nextSibling);
+      return box;
+    }
+
+    // ---- the view: filters + chips + groups + sort, in the link and in saved views (item 242) ----
+    function viewGet() {
+      var o = controls ? controls.get() : {};
+      if (!o.sort) delete o.sort;
+      if (!o.text) delete o.text;
+      if (chips.kind.length) o.kind = chips.kind.slice();
+      if (chips.st.length) o.st = chips.st.slice();
+      if (chips.tr) o.tr = "1";
+      o.g = groupBy || "-";
+      if (groupBy2) o.g2 = groupBy2;
+      return o;
+    }
+    function viewApply(o) {
+      o = o || {};
+      if (controls) controls.set(o);
+      chips = { kind: Array.isArray(o.kind) ? o.kind.slice() : [], st: Array.isArray(o.st) ? o.st.slice() : [], tr: o.tr === "1" };
+      if (typeof o.g === "string") { groupBy = o.g === "-" ? "" : o.g; groupBy2 = typeof o.g2 === "string" ? o.g2 : ""; syncGroupMenus(); groupStore(); }
+    }
+    function viewEncode(o) {
+      try { return btoa(unescape(encodeURIComponent(JSON.stringify(o)))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+      catch (e) { return ""; }
+    }
+    function viewDecode(t) {
+      try { t = t.replace(/-/g, "+").replace(/_/g, "/"); return JSON.parse(decodeURIComponent(escape(atob(t)))); }
+      catch (e) { return null; }
+    }
+    // Only what differs from how the page opens goes in the link.
+    function viewParam() {
+      var o = viewGet(), def = (CURATED && CURATED.groupBy) || (STATUS_ON ? "status" : "");
+      if (o.g === (def || "-") && !o.g2) delete o.g;
+      return Object.keys(o).length ? "&v=" + viewEncode(o) : "";
+    }
+    var PENDING_VIEW = INITIAL_VIEW ? viewDecode(INITIAL_VIEW) : null;
+    function copyViewLink(btn) {
+      var url = location.href;
+      var done = function () { stToast(anyFilter() || groupBy2 ? "Link copied. It opens with these filters and groups." : "Link copied."); };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, function () { window.prompt("Copy this link", url); });
+      else window.prompt("Copy this link", url);
+    }
+
+    var VIEWS = [], viewsOpen = false, viewsMsg = "";
+    var canSaveViews = !!(CURATED && CURATED.token) && (ROLE === "owner" || ROLE === "admin");
+    function viewsCall(body) {
+      body.token = CURATED.token;
+      return fetch(CFG.api + "/api/selection/views", { method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); });
+    }
+    if (CURATED && CURATED.token && CFG.api) {
+      viewsCall({ op: "list" }).then(function (b) { if (b && b.ok) { VIEWS = b.views || []; renderStatusBar(); } }, function () {});
+    }
+    function toggleViews() { viewsOpen = !viewsOpen; viewsMsg = ""; renderStatusBar(); }
+    function drawViews() {
+      var wrap = document.querySelector("#sel-statusbar .sel-views");
+      if (!wrap) return;
+      var list = VIEWS.map(function (v) {
+        return '<li><button type="button" class="sel-views__go" data-view="' + esc(v.id) + '">' + esc(v.name) + "</button>" +
+          (canSaveViews ? '<button type="button" class="sel-views__rm" data-view-rm="' + esc(v.id) + '" aria-label="Delete the view ' + esc(v.name) + '">' + CROSS + "</button>" : "") + "</li>";
+      }).join("");
+      var panel = document.createElement("div");
+      panel.className = "sel-views__panel";
+      panel.setAttribute("role", "dialog"); panel.setAttribute("aria-label", "Saved views");
+      panel.innerHTML = '<p class="sel-views__title">Saved views</p>' +
+        (list ? '<ul class="sel-views__list">' + list + "</ul>" : '<p class="sel-views__empty">No saved views yet. Set the filters and groups you want, then save them here to open them in one click.</p>') +
+        (canSaveViews ? '<form class="sel-views__form" novalidate><label for="sel-view-name">Save what you see now</label><div class="sel-views__row">' +
+          '<input id="sel-view-name" type="text" maxlength="40" placeholder="e.g. Approved doctors" autocomplete="off"/>' +
+          '<button type="submit" class="sel-views__save">Save view</button></div></form>' : "") +
+        (viewsMsg ? '<p class="sel-views__msg" role="status">' + esc(viewsMsg) + "</p>" : "");
+      wrap.appendChild(panel);
+      panel.addEventListener("click", function (e) {
+        var go = e.target.closest("[data-view]"), rm = e.target.closest("[data-view-rm]");
+        if (go) {
+          var v = VIEWS.filter(function (x) { return x.id === go.getAttribute("data-view"); })[0];
+          if (v) { viewApply(v.view); viewsOpen = false; render(); stToast("Showing “" + v.name + "”."); }
+          return;
+        }
+        if (rm) {
+          viewsCall({ op: "delete", id: rm.getAttribute("data-view-rm") }).then(function (b) {
+            if (b && b.ok) { VIEWS = b.views || []; viewsMsg = "View deleted."; } else viewsMsg = (b && b.message) || "That didn't save. Please try again.";
+            renderStatusBar();
+          });
+        }
+      });
+      panel.querySelector("form") && panel.querySelector("form").addEventListener("submit", function (e) {
+        e.preventDefault();
+        var name = (panel.querySelector("#sel-view-name").value || "").trim();
+        if (!name) { panel.querySelector("#sel-view-name").focus(); return; }
+        viewsCall({ op: "save", name: name, view: viewGet() }).then(function (b) {
+          if (b && b.ok) { VIEWS = b.views || []; viewsMsg = "Saved. Everyone who opens this selection can use it."; }
+          else viewsMsg = (b && b.message) || "That didn't save. Please try again.";
+          renderStatusBar();
+        }, function () { viewsMsg = "Couldn't reach the server. Please try again."; renderStatusBar(); });
+      });
+    }
+    document.addEventListener("click", function (e) {
+      if (viewsOpen && e.target.closest && !e.target.closest(".sel-views")) { viewsOpen = false; renderStatusBar(); }
+    });
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && viewsOpen) { viewsOpen = false; renderStatusBar(); }
+      if (e.key === "Escape" && document.body.classList.contains("sel-fsheet-open")) closeFilterSheet();
+    });
+
+    // ---- phones: every filter in one sheet, opened from the sticky bar (item 242) ----
+    function openFilterSheet() {
+      var bar = document.querySelector(".cat-controls--selection .cat-bar") || document.querySelector(".cat-controls .cat-bar");
+      if (!bar) return;
+      if (window.innerWidth > 767) { bar.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+      if (!bar.querySelector(".sel-fsheet__head")) {
+        bar.insertAdjacentHTML("afterbegin", '<div class="sel-fsheet__head"><span>Filters</span><button type="button" class="sel-fsheet__x" aria-label="Close filters">' + CROSS + "</button></div>");
+        bar.insertAdjacentHTML("beforeend", '<div class="sel-fsheet__foot"><button type="button" class="sel-fsheet__clear">Clear all</button><button type="button" class="sel-fsheet__go">Show creators</button></div>');
+        bar.addEventListener("click", function (e) {
+          if (e.target.closest(".sel-fsheet__x, .sel-fsheet__go")) closeFilterSheet();
+          if (e.target.closest(".sel-fsheet__clear")) clearAll();
+        });
+      }
+      bar.classList.add("is-sheet");
+      bar.setAttribute("role", "dialog"); bar.setAttribute("aria-label", "Filters"); bar.setAttribute("aria-modal", "true");
+      document.body.classList.add("sel-fsheet-open");
+      syncSheetGo();
+      var x = bar.querySelector(".sel-fsheet__x"); if (x) x.focus();
+    }
+    function closeFilterSheet() {
+      var bar = document.querySelector(".cat-bar.is-sheet");
+      if (bar) { bar.classList.remove("is-sheet"); bar.removeAttribute("role"); bar.removeAttribute("aria-modal"); }
+      document.body.classList.remove("sel-fsheet-open");
+      var t = document.querySelector("#sel-statusbar .sel-tool--filters"); if (t) t.focus();
+    }
+    function syncSheetGo() {
+      var go = document.querySelector(".cat-bar.is-sheet .sel-fsheet__go");
+      if (go) { var n = all(".cat-card:not(.cat-card--copy)", $("cat-grid")).filter(function (c) { return !c.hidden; }).length; go.textContent = "Show " + n + " creator" + (n === 1 ? "" : "s"); }
+    }
+
+    // ---- bulk: tick creators (or every one shown), then decide or tag them all at once (item 242) ----
+    var picking = false, picked = {};
+    function pickedCodes() { return selected.filter(function (c) { return picked[c]; }); }
+    function shownCodes() { return selected.filter(function (c) { return byCode[c] && !byCode[c].hidden; }); }
+    function setPicking(on) {
+      picking = on;
+      if (!on) picked = {};
+      document.body.classList.toggle("sel-picking", on);
+      render();
+    }
+    function paintPicks() {
+      all(".cat-card", $("cat-grid")).forEach(function (card) {
+        var box = card.querySelector(":scope > .sel-pick");
+        if (!picking) { if (box) box.remove(); card.classList.remove("is-picked"); return; }
+        if (!box) {
+          box = document.createElement("button");
+          box.type = "button"; box.className = "sel-pick";
+          card.insertBefore(box, card.firstChild);
+        }
+        var on = !!picked[card.dataset.code];
+        box.setAttribute("aria-pressed", String(on));
+        box.setAttribute("aria-label", (on ? "Unselect " : "Select ") + ((card.dataset.name || card.dataset.code)));
+        box.innerHTML = on ? hvIcon("check") : "";
+        card.classList.toggle("is-picked", on);
+      });
+      renderBulkBar();
+    }
+    $("cat-grid").addEventListener("click", function (e) {
+      if (!picking) return;
+      var card = e.target.closest && e.target.closest(".cat-card");
+      if (!card || (e.target.closest("a, .sel-st, [data-st-set], [data-st-whyq]") && !e.target.closest(".sel-pick"))) return;
+      e.preventDefault(); e.stopPropagation();
+      var code = card.dataset.code;
+      if (picked[code]) delete picked[code]; else picked[code] = 1;
+      paintPicks();
+    }, true);
+    var bulkBusy = false;
+    function renderBulkBar() {
+      var bar = $("sel-bulk");
+      if (!picking) { if (bar) bar.hidden = true; return; }
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "sel-bulk"; bar.className = "sel-bulk"; bar.setAttribute("role", "region"); bar.setAttribute("aria-label", "Change many creators at once");
+        document.body.appendChild(bar);
+        bar.addEventListener("click", function (e) {
+          var t = e.target.closest("button");
+          if (!t || bulkBusy) return;
+          var act = t.getAttribute("data-bulk");
+          if (act === "all") { shownCodes().forEach(function (c) { picked[c] = 1; }); paintPicks(); return; }
+          if (act === "none") { picked = {}; paintPicks(); return; }
+          if (act === "done") { setPicking(false); return; }
+          if (act === "approved" || act === "review" || act === "unavailable") { bulkStatus(act); return; }
+          if (act === "rejected") { bulkStatus("rejected", (bar.querySelector(".sel-bulk__reason") || {}).value || ""); return; }
+          if (act === "tag-add" || act === "tag-rm") {
+            var tg = (bar.querySelector(".sel-bulk__tag").value || "").trim();
+            if (!tg) { bar.querySelector(".sel-bulk__tag").focus(); return; }
+            bulkTag(act === "tag-add" ? { add: tg } : { remove: tg });
+          }
+        });
+      }
+      bar.hidden = false;
+      var n = pickedCodes().length, shown = shownCodes().length, tagVal = (bar.querySelector(".sel-bulk__tag") || {}).value || "";
+      var dis = n ? "" : " disabled";
+      bar.innerHTML = '<div class="sel-bulk__in"><p class="sel-bulk__n"><b>' + n + "</b> selected</p>" +
+        '<div class="sel-bulk__pick"><button type="button" data-bulk="all">Select all ' + shown + " shown</button>" +
+        (n ? '<button type="button" data-bulk="none">Clear</button>' : "") + "</div>" +
+        '<div class="sel-bulk__acts">' +
+        '<button type="button" class="sel-bulk__b sel-bulk__b--yes" data-bulk="approved"' + dis + ">" + hvIcon("check") + "Approve</button>" +
+        '<span class="sel-bulk__rej"><select class="sel-bulk__reason" aria-label="Reason for rejecting"' + dis + '><option value="">No reason</option>' +
+        REASONS.map(function (r) { return '<option value="' + r[0] + '">' + esc(r[1]) + "</option>"; }).join("") + "</select>" +
+        '<button type="button" class="sel-bulk__b sel-bulk__b--no" data-bulk="rejected"' + dis + ">" + hvIcon("x") + "Reject</button></span>" +
+        '<button type="button" class="sel-bulk__b" data-bulk="review"' + dis + ">" + hvIcon("clock") + "Back to review</button>" +
+        (ROLE === "admin" ? '<button type="button" class="sel-bulk__b" data-bulk="unavailable"' + dis + ">" + hvIcon("ban") + "Unavailable</button>" : "") +
+        '<span class="sel-bulk__tagbox"><input class="sel-bulk__tag" type="text" maxlength="24" placeholder="Tag" aria-label="Tag to add or remove" value="' + esc(tagVal) + '"' + dis + "/>" +
+        '<button type="button" class="sel-bulk__b" data-bulk="tag-add"' + dis + ">Add tag</button>" +
+        '<button type="button" class="sel-bulk__b sel-bulk__b--ghost" data-bulk="tag-rm"' + dis + ">Remove</button></span>" +
+        "</div>" +
+        '<button type="button" class="sel-bulk__done" data-bulk="done">Done</button></div>';
+    }
+    function bulkPost(path, body) {
+      body.token = CURATED.token;
+      bulkBusy = true;
+      return fetch(CFG.api + path, { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (b) { bulkBusy = false; return b; }, function () { bulkBusy = false; return { message: "Couldn't reach the server. Please try again." }; });
+    }
+    function bulkStatus(status, reason) {
+      var codes = pickedCodes();
+      if (!codes.length) return;
+      var before = codes.map(function (c) { var st = statusOf(c); return { code: c, status: st.s, reason: st.reason || null, note: st.note || null }; });
+      bulkPost("/api/selection/status/bulk", { codes: codes, status: status, reason: reason || null }).then(function (b) {
+        if (!b || !b.ok) { stToast((b && b.message) || "That didn't save. Please try again."); return; }
+        Object.keys(b.rows || {}).forEach(function (c) { var keep = (CURATED.status[c] || {}).replacements; CURATED.status[c] = b.rows[c]; if (keep && keep.length && !(b.rows[c].replacements || []).length) CURATED.status[c].replacements = keep; });
+        picked = {};
+        render();
+        var n = Object.keys(b.rows || {}).length;
+        bulkToast(n + " creator" + (n === 1 ? "" : "s") + " " + ({ approved: "approved", rejected: "rejected", review: "set back to review", unavailable: "marked unavailable" }[status] || "changed") + ".", function () {
+          bulkPost("/api/selection/status/bulk", { items: before }).then(function (u) {
+            if (u && u.ok) { Object.keys(u.rows || {}).forEach(function (c) { CURATED.status[c] = u.rows[c]; }); render(); stToast("Undone."); }
+            else stToast((u && u.message) || "Couldn't undo. Please try again.");
+          });
+        });
+      });
+    }
+    function bulkTag(op) {
+      var codes = pickedCodes();
+      if (!codes.length) return;
+      op.codes = codes;
+      bulkPost("/api/selection/tags/bulk", op).then(function (b) {
+        if (!b || !b.ok) { stToast((b && b.message) || "That didn't save. Please try again."); return; }
+        CURATED.clientTags = b.client_tags || CURATED.clientTags;
+        render();
+        stToast((op.add ? "Tagged " : "Tag removed from ") + codes.length + " creator" + (codes.length === 1 ? "" : "s") + ".");
+      });
+    }
+    function bulkToast(text, undo) {
+      stToast(text);
+      if (!toastEl || !undo) return;
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "sel-toast__undo"; b.textContent = "Undo";
+      b.addEventListener("click", function () { toastEl.hidden = true; undo(); });
+      toastEl.appendChild(b);
+      clearTimeout(toastEl._t); toastEl._t = setTimeout(function () { toastEl.hidden = true; }, 9000);
+    }
+
+    function anyFilter() { return chipsOn() || !!(controls && controls.filtering()); }
+    function clearAll() { chips = { kind: [], st: [], tr: false }; if (controls) controls.clear(); render(); }
     function renderStatusBar() {
       var host = $("sel-statusbar");
-      if (!STATUS_ON || !selected.length) { if (host) host.hidden = true; return; }
+      if (!selected.length || !controls) { if (host) host.hidden = true; return; }
       if (!host) {
         host = document.createElement("section");
-        host.id = "sel-statusbar"; host.className = "sel-sbar"; host.setAttribute("aria-label", "Creators by status");
+        host.id = "sel-statusbar"; host.className = "sel-sbar"; host.setAttribute("aria-label", "Show and arrange creators");
         var anchor = document.querySelector(".cat-grid-section");
         anchor.parentNode.insertBefore(host, anchor);
         host.addEventListener("click", function (e) {
           var b = e.target.closest("[data-st-filter]");
-          if (b) { var v = b.getAttribute("data-st-filter"); stFilter = stFilter === v ? "" : v; render(); return; }
-          var g = e.target.closest("[data-st-group]");
-          if (g) {
-            groupBy = groupBy === "status" ? "" : "status";
-            try { sessionStorage.setItem(groupKey, groupBy); } catch (x) {}
-            if (groupSel) groupSel.value = groupBy === "status" ? "" : groupBy;
-            render();
+          if (b) {
+            var v = b.getAttribute("data-st-filter"), row = b.getAttribute("data-st-row");
+            if (!row) chips = { kind: [], st: [], tr: false };
+            else if (row === "tr") chips.tr = !chips.tr;
+            else { var l = chips[row], at = l.indexOf(v); if (at < 0) l.push(v); else l.splice(at, 1); }
+            render(); return;
           }
+          if (e.target.closest(".sel-shown__clear")) { clearAll(); return; }
+          if (e.target.closest(".sel-tool--filters")) { openFilterSheet(); return; }
+          if (e.target.closest(".sel-tool--link")) { copyViewLink(e.target.closest(".sel-tool--link")); return; }
+          if (e.target.closest(".sel-tool--views")) { toggleViews(e.target.closest(".sel-tool--views")); return; }
+          if (e.target.closest(".sel-tool--pick")) { setPicking(!picking); return; }
         });
       }
       host.hidden = false;
-      var n = stCounts();
-      var chip = function (key, label, ico, all) {
-        if (!all && !n[key] && key !== "approved" && key !== "review") return "";
-        return '<button type="button" class="sel-chip' + (all ? " sel-chip--all" : "") + (ico ? " sel-chip--" + key : "") + '" aria-pressed="' + (all ? !stFilter : stFilter === key) + '" data-st-filter="' + (all ? "" : key) + '">' +
-          (ico ? '<span class="sel-ci">' + hvIcon(ico) + "</span>" : "") + label + "</button>";
+      var n = chipCounts();
+      var both = selected.some(isDoctor) && !selected.every(isDoctor);
+      var chip = function (row, key, count, label, ico) {
+        var on = row === "tr" ? chips.tr : chips[row].indexOf(key) > -1;
+        return '<button type="button" class="sel-chip' + (ico ? " sel-chip--" + key : "") + (count || on ? "" : " is-zero") + '" aria-pressed="' + on +
+          '" data-st-row="' + row + '" data-st-filter="' + key + '">' + (ico ? '<span class="sel-ci">' + hvIcon(ico) + "</span>" : "") +
+          '<span class="sel-chip__n">' + count + "</span> " + label + "</button>";
       };
-      var kinds = (n.doctors && n.influencers) ? chip("influencers", n.influencers + " influencer" + (n.influencers === 1 ? "" : "s"), "user") + chip("doctors", n.doctors + " doctor" + (n.doctors === 1 ? "" : "s"), "steth") : "";
+      var kinds = both ? chip("kind", "influencers", n.kind.influencers || 0, "influencer" + (n.kind.influencers === 1 ? "" : "s"), "user") +
+        chip("kind", "doctors", n.kind.doctors || 0, "doctor" + (n.kind.doctors === 1 ? "" : "s"), "steth") : "";
+      var hasTrack = Object.keys(TRACK).length > 0;
+      var sts = STATUS_ON ? ["approved", "rejected", "review", "unavailable"].filter(function (k) { return k === "approved" || k === "review" || stCountsAll[k]; }).map(function (k) {
+        var lab = { review: "under review", approved: "approved", rejected: "rejected", unavailable: "unavailable" }[k];
+        return chip("st", k, n.st[k] || 0, lab, ST_ICON[k]);
+      }).join("") : "";
+      var filt = anyFilter();
+      var canPick = STATUS_ON && (ROLE === "owner" || ROLE === "admin");
+      var nf = (controls ? controls.count() : 0);
       host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-sbar__in"><div class="sel-sum" role="group" aria-label="Show">' +
-        chip("", n.creators + " creator" + (n.creators === 1 ? "" : "s"), null, true) + kinds +
-        (n.track ? chip("track", n.track + " with track record", "target") : "") +
-        '<span class="sel-sum__sep" aria-hidden="true"></span>' +
-        chip("approved", n.approved + " approved", "check") + chip("rejected", n.rejected + " rejected", "x") +
-        chip("review", n.review + " under review", "clock") + chip("unavailable", n.unavailable + " unavailable", "ban") +
-        '</div><div class="sel-sbar__tools"><button type="button" class="sel-swrow" data-st-group role="switch" aria-checked="' + (groupBy === "status") + '"><span class="sel-sw" aria-hidden="true"></span>Group by status</button></div></div></div>';
+        '<button type="button" class="sel-chip sel-chip--all" aria-pressed="' + !chipsOn() + '" data-st-filter="">' + selected.length + " creator" + (selected.length === 1 ? "" : "s") + "</button>" +
+        kinds + (hasTrack ? chip("tr", "track", n.tr, "with track record", "target") : "") +
+        (sts ? '<span class="sel-sum__sep" aria-hidden="true"></span>' + sts : "") + "</div>" +
+        '<div class="sel-sbar__tools">' +
+        '<button type="button" class="sel-tool sel-tool--filters" aria-haspopup="dialog">' + hvIcon("filter") + "Filters" + (nf ? ' <b class="sel-tool__n">' + nf + "</b>" : "") + "</button>" +
+        '<div class="sel-views"><button type="button" class="sel-tool sel-tool--views" aria-expanded="' + viewsOpen + '" aria-haspopup="true">' + hvIcon("save") + "Views" + (VIEWS.length ? ' <b class="sel-tool__n">' + VIEWS.length + "</b>" : "") + "</button></div>" +
+        '<button type="button" class="sel-tool sel-tool--link">' + hvIcon("copy") + "Copy link</button>" +
+        (canPick ? '<button type="button" class="sel-tool sel-tool--pick" aria-pressed="' + picking + '">' + hvIcon("check") + (picking ? "Done selecting" : "Select") + "</button>" : "") +
+        "</div></div>" +
+        '<div class="cat-container sel-shown"' + (filt ? "" : " hidden") + ' role="status"><span><b>' + n.shown + "</b> of " + selected.length + " shown</span>" +
+        '<button type="button" class="sel-shown__clear">Clear all filters</button></div></div>';
+      if (viewsOpen) drawViews();
     }
+    var stCountsAll = {};
     // HELVi Connect phase D (assets/js/connect.js): the ROI Calculator, "Add more like these"
     // and "Creators like this" read the selection through this small hook and add creators
     // the same way the replacement's Add button does.
@@ -3346,7 +3874,7 @@
       codes: function () { return selected.slice(); },
       setTrack: function (codes) {
         TRACK = {}; (codes || []).forEach(function (c) { TRACK[c] = 1; });
-        if (stFilter === "track" && !codes.length) stFilter = "";
+        if (chips.tr && !codes.length) chips.tr = false;
         render();
       },
       status: function (code) { return statusOf(code); },
@@ -3399,6 +3927,7 @@
             CURATED.scores = b.scores || {}; CURATED.brief = b.brief || null; CURATED.verdicts = b.verdicts || CURATED.verdicts;
             CURATED.needsObjective = !!b.needs_objective;
             if (b.status) CURATED.status = b.status;
+            if (b.facts) CURATED.facts = b.facts;
             if (b.lifecycle) CURATED.lifecycle = b.lifecycle;
             render();
           })
@@ -3412,6 +3941,7 @@
       try { gbStored = sessionStorage.getItem(groupKey); } catch (e) {}
       if (gbStored === null && !(CURATED && CURATED.groupBy)) groupBy = "status";
     }
+    syncGroupMenus();
     $("cat-grid").addEventListener("click", function (e) {
       var t = e.target.closest && e.target.closest("[data-st-set], [data-st-whyq], [data-st-repl], [data-st-add]");
       if (!t || !STATUS_ON) return;
@@ -3554,12 +4084,17 @@
       var inOrder = selCards();
       inOrder.forEach(addRemove);
       renderTags();
+      if (PENDING_VIEW) { var pv = PENDING_VIEW; PENDING_VIEW = null; viewApply(pv); }
       var shown = 0;
       inOrder.forEach(function (c) {
         var ok = (!controls || controls.matches(c)) && stMatches(c.dataset.code);
         c.hidden = !ok;
         if (ok) shown++;
       });
+      // Item 242: every option counts what it would show, the other filters as they are.
+      if (controls) controls.facetCounts(inOrder, function (c) { return stMatches(c.dataset.code); });
+      stCountsAll = {};
+      selected.forEach(function (code) { var k = statusOf(code).s; stCountsAll[k] = (stCountsAll[k] || 0) + 1; });
 
       // Order the visible cards the way the link lists them, or by the sort
       // the client picked.
@@ -3567,12 +4102,13 @@
       inOrder.forEach(function (card) { grid.appendChild(card); });   // back out of any sections first
       ordered.forEach(function (card) { grid.appendChild(card); });
       layoutGroups(grid, ordered);
+      paintPicks();
 
       $("sel-title").textContent = selectionName;
       document.title = selectionName + " — HELVi Connect";
       if (REFUSED && !selected.length) { if (!$("cat-empty").querySelector(".sel-reqaccess")) refusedPanel($("cat-empty")); }
       else $("cat-empty").textContent = selected.length
-        ? (stFilter ? "No creators in this selection are " + (ST_LABEL[stFilter] || stFilter).toLowerCase() + " right now." : "No creators in this selection match those filters.")
+        ? "No creators in this selection match those filters. Clear a filter or two to see more."
         : "This link does not name any creators.";
       $("cat-empty").hidden = shown !== 0;
 
@@ -3620,12 +4156,15 @@
       renderStatusBar();
       renderObjective();
       renderShare();
+      syncSheetGo();
 
       // keep the URL in step so what they see is what they can re-share
       // The short link only while the server holds exactly these creators.
+      // (item 242) compared over the creators this page can show: one creator who left the roster
+      // no longer turns the short link into a 4,000-character list of codes.
       var saved = CURATED && CURATED.codes &&
-        CURATED.codes.slice().sort().join() === selected.slice().sort().join();
-      var want = buildFragment(selectionName, selected, !saved);
+        CURATED.codes.filter(function (c) { return !!byCode[c]; }).sort().join() === selected.slice().sort().join();
+      var want = buildFragment(selectionName, selected, !saved) + viewParam();
       if (location.hash !== want) history.replaceState(null, "", want);
       // The link back into the catalogue carries the codes, not just the
       // token: it has to arrive with these creators already picked, and the
