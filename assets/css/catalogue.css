@@ -2529,3 +2529,5 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
 /* the primary must out-rank connect.css / portal.css, which load after this file */
 body[data-page="selection"] .cx-selact .aa-btn { min-height: 56px; padding: 0 30px; font-size: 23px; }
 body[data-page="selection"] .cx-selact .mg-btn { min-height: 46px; }
+/* Item 266: the header's own back link is gone (the top-right Full catalogue button stays) */
+.cat-selhead .cat-back[hidden] { display: none !important; }
