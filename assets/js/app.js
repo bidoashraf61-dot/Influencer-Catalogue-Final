@@ -26,6 +26,9 @@
   var ME = null, deferred = null, reg = null;
   var FROM_QR = /[?&]src=qr/.test(location.search), QR_BAD = (/[?&]qr=(expired|devices)/.exec(location.search) || [])[1];
   var FROM_UPDATE = /[?&]update=1/.test(location.search);
+  // The address loses ?update=1 at once, and signing in reloads the page: remember the update until
+  // it is applied, so the "Update now" bar is there after sign-in (Bido 2026-10-24).
+  if (FROM_UPDATE) try { localStorage.setItem("hca-update-due", String(Date.now())); } catch (e) { /* storage off */ }
   if (FROM_UPDATE && history.replaceState) {
     try { history.replaceState(null, "", location.pathname + "?src=app" + location.hash); } catch (e) { /* ignore */ }
   }
@@ -484,6 +487,8 @@
   // shows a bar. Either way the worker and the page reload onto the new files.
   var BOOT_V = null, upbar;
   function applyUpdate() {
+    try { localStorage.removeItem("hca-update-due"); } catch (e) { /* storage off */ }
+    sput("hca-updated", "1");
     var go = function () { location.reload(); };
     ready().then(function (r) {
       return r.update().then(function () {
@@ -541,7 +546,15 @@
     setTimeout(maybeWelcome, 2500);
     setTimeout(mountMenu, 300);
     state().then(function (st) { BOOT_V = st && st.v; });
-    if (FROM_UPDATE) { if ("serviceWorker" in navigator) ready().then(function (r) { r.update(); }).catch(function () {}); setTimeout(updatedToast, 600); }
+    // Update push: once signed in, the bar asks to update; after "Update now" reloads, the toast confirms it.
+    // Not signed in yet: nothing shows, the sign-in reload brings the bar. An update older than a day is dropped.
+    var due = +get("hca-update-due") || 0;
+    if (due && Date.now() - due > DAY) { try { localStorage.removeItem("hca-update-due"); } catch (e) { /* storage off */ } due = 0; }
+    if (sget("hca-updated")) { try { sessionStorage.removeItem("hca-updated"); } catch (e) { /* storage off */ } setTimeout(updatedToast, 600); }
+    else if (due) {
+      if ("serviceWorker" in navigator) ready().then(function (r) { r.update(); }).catch(function () {});
+      if (ME.user) setTimeout(showUpdateBar, 600);
+    }
     setInterval(checkVersion, 10 * 60 * 1000);
     document.addEventListener("visibilitychange", checkVersion);
     // Item 175: an installed app can sit in memory for days (the iPhone resumes it as it was), and the
