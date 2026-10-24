@@ -561,8 +561,14 @@
   }
   var FLAGS = {
     "Egypt": bands("#ce1126", "#fff", "#111") + '<circle cx="15" cy="10" r="2" fill="#c09300"/>',
-    "Saudi Arabia": '<rect width="30" height="20" fill="#006c35"/><rect x="8" y="6.5" width="14" height="1.7" rx=".8" fill="#fff"/>' +
-      '<rect x="9" y="12" width="12" height="1" fill="#fff"/><rect x="20" y="11.2" width="1.2" height="2.6" fill="#fff"/>',
+    // Item 261: the real flag: the Shahada in white script (system Arabic fonts render it on Mac, Windows and
+    // phones; no emoji, Windows has none for flags) over the sword.
+    "Saudi Arabia": '<rect width="30" height="20" fill="#006c35"/>' +
+      '<text x="15" y="10" text-anchor="middle" direction="rtl" font-size="5" textLength="21" lengthAdjust="spacingAndGlyphs" fill="#fff" ' +
+      'font-family="\'Geeza Pro\',\'Traditional Arabic\',\'Arabic Typesetting\',\'Noto Naskh Arabic\',\'Segoe UI\',Tahoma,serif">' +
+      "\u0644\u0627 \u0625\u0644\u0647 \u0625\u0644\u0627 \u0627\u0644\u0644\u0647 \u0645\u062d\u0645\u062f \u0631\u0633\u0648\u0644 \u0627\u0644\u0644\u0647</text>" +
+      '<path d="M7.6 13.4 C 11 14.4, 18 14.4, 22 13.6" fill="none" stroke="#fff" stroke-width=".85" stroke-linecap="round"/>' +
+      '<path d="M20.6 12.5 L21.4 14.6" stroke="#fff" stroke-width=".8" stroke-linecap="round"/><path d="M22 13.6 L23.4 13.1" stroke="#fff" stroke-width=".7" stroke-linecap="round"/>',
     "UAE": bands("#00732f", "#fff", "#111") + '<rect width="8" height="20" fill="#ff0000"/>',
     "Kuwait": bands("#007a3d", "#fff", "#ce1126") + '<polygon points="0,0 8,6.7 8,13.3 0,20" fill="#111"/>',
     "Qatar": serrated("#8a1538", 9),
@@ -2960,7 +2966,8 @@
       // Item 249: every city shows, as ranked bars under its country (no Details). Colours from the catalogue palette.
       // Item 254: cities in one hue, darker = bigger; City not set stays grey.
       // Item 259 (Bido: "all green grades"): the catalogue greens, darkest for the biggest city.
-      var CITY_COL = ["#0c5a2d", "#14884a", "#1b9b52", "#4fb57a", "#84cda1", "#b5e2c6", "#d3eedd", "#e3f6ea"];
+      // Item 261 (Bido: "different colors per city"): a distinct catalogue hue per city, by rank.
+      var CITY_COL = ["#1b9b52", "#ff691e", "#8b4ae0", "#2f6fe0", "#d6a400", "#e0365c", "#0c5a2d", "#53219c"];
       var maxCity = 1;
       names.forEach(function (name) { Object.keys(countries[name].cities).forEach(function (c) { maxCity = Math.max(maxCity, countries[name].cities[c]); }); });
       box.hidden = !names.length;

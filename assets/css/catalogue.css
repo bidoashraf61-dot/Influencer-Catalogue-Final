@@ -2447,3 +2447,5 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
 .sel-donut__legend li { display: flex; align-items: center; gap: 8px; }
 .sel-donut__legend li .sel-donut__name { flex: 1; min-width: 0; }
 .sel-donut__legend li .sel-num { margin-left: auto; }
+/* Item 261: the country flag reads as a flag, a little larger in the ring heading */
+.sel-geo__head .cat-flag { width: 30px; height: 20px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(18,18,18,.12); }
