@@ -2347,3 +2347,58 @@ body[data-page="selection"] .cat-close__copied { grid-column: 1 / -1; margin: 0;
   body[data-page="selection"] .cat-close .cat-container { grid-template-columns: 1fr; }
   body[data-page="selection"] .cat-close__actions { grid-column: 1; grid-row: auto; justify-content: flex-start; margin-top: 6px; }
 }
+
+/* ---- Item 255: the count line as clear chips; the creator grid and cards, spacing and hierarchy ---- */
+.sel-tb__quick { display: none !important; }
+.sel-line__in { gap: 8px; padding: 16px 0 8px; }
+.sel-line__dot { display: none; }
+.sel-line__b { min-height: 36px; padding: 0 14px; border: 1px solid rgba(18,18,18,.14); border-radius: var(--r-pill); background: var(--white);
+  color: var(--gray); transition: border-color .15s ease, background .15s ease, color .15s ease; }
+.sel-line__b:hover { border-color: var(--ink); background: var(--white); color: var(--ink); }
+.sel-line__b[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--white); }
+.sel-line__b[aria-pressed="true"]:not(.sel-line__b--all)::after { content: "×"; margin-left: 4px; font-size: 16px; line-height: 1; color: var(--lime); }
+.sel-line__b--all { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { .sel-line__b { transition: none; } }
+
+body[data-page="selection"] .cat-grid { gap: 24px; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); }
+body[data-page="selection"] .cat-card { border: 1px solid rgba(18,18,18,.08); box-shadow: 0 1px 2px rgba(18,18,18,.04); }
+body[data-page="selection"] .cat-card__body { padding: 18px 20px 20px; }
+body[data-page="selection"] .cat-card__code { font-size: 11px; margin-bottom: 4px; }
+body[data-page="selection"] .cat-card__name { font-size: 27px; margin-bottom: 12px; }
+/* Facts: quiet labels, firm values; the key numbers lead */
+body[data-page="selection"] .cat-card__meta { margin-bottom: 4px; }
+body[data-page="selection"] .cat-card__meta li { padding: 7px 0; font-size: 13.5px; align-items: center; }
+body[data-page="selection"] .cat-card__meta span { font-size: 13px; }
+body[data-page="selection"] .cat-card__meta strong { font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+body[data-page="selection"] .cat-card__meta li.is-key strong { font-size: 16px; font-weight: 700; }
+body[data-page="selection"] .cat-card__meta li.is-key span { color: var(--ink); font-weight: 600; }
+/* Tags: a lighter label, even spacing */
+body[data-page="selection"] .cat-tags { margin: 12px 0 14px; padding-top: 12px; gap: 6px; }
+body[data-page="selection"] .cat-tags__label { margin-bottom: 4px; }
+/* Profile analysis and Track record as one pair of full-width actions */
+body[data-page="selection"] .cat-card__analysis { align-self: stretch; justify-content: center; min-height: 42px; margin-top: auto; }
+body[data-page="selection"] .ev-tr { min-height: 42px; margin: 8px 0 0; }
+/* Decision: its own soft panel; Approve leads, Reject is clear but secondary */
+body[data-page="selection"] .cat-card__body .sel-st { margin-top: 16px; padding: 14px; border-top: 0; border-radius: 16px; background: #f6f2ee; }
+body[data-page="selection"] .sel-st__by { font-size: 12.5px; }
+body[data-page="selection"] .sel-dec--yes { background: var(--ink); border-color: var(--ink); color: var(--white); }
+body[data-page="selection"] .sel-dec--yes .hv-i { color: var(--lime); }
+body[data-page="selection"] .sel-dec--yes:hover { background: var(--go); border-color: var(--go); }
+body[data-page="selection"] .sel-dec--yes:hover .hv-i { color: var(--white); }
+body[data-page="selection"] .sel-dec--no { background: var(--white); border-color: rgba(192,16,16,.35); color: #c01010; }
+body[data-page="selection"] .sel-st__acts { margin-top: 12px; }
+/* Group headers: a calmer rule, one line of name · count · share · Collapse */
+body[data-page="selection"] .cat-group + .cat-group { margin-top: 48px; }
+body[data-page="selection"] .cat-group__head { gap: 8px 14px; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 1px solid rgba(18,18,18,.18); }
+body[data-page="selection"] .cat-group__name { font-size: 36px; }
+body[data-page="selection"] .cat-group__n { font-size: 16px; padding: 4px 11px 3px; }
+body[data-page="selection"] .cat-group__pct { font-size: 12.5px; }
+body[data-page="selection"] .cat-group__sub { order: 9; font-size: 13.5px; }
+body[data-page="selection"] .cat-group__head--sub .cat-group__name { font-size: 26px; }
+@media screen and (max-width: 767px) {
+  body[data-page="selection"] .cat-grid { gap: 16px; }
+  body[data-page="selection"] .cat-group__name { font-size: 30px; }
+  .sel-line__in { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .sel-line__in::-webkit-scrollbar { display: none; }
+  .sel-line__b { flex: none; }
+}

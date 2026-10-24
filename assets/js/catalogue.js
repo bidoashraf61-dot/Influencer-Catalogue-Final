@@ -3220,6 +3220,13 @@
         }
       });
       unlockAnalysisLinks();
+      // Item 255: the rows that carry the key numbers lead the card (Total reach, Views / post).
+      selCards().forEach(function (c) {
+        all(".cat-card__meta > li", c).forEach(function (li) {
+          var k = li.querySelector("span");
+          if (k && /^(total reach|views \/ post|eng\. \/ post)$/i.test(k.textContent.trim())) li.classList.add("is-key");
+        });
+      });
       if (controls) controls.refresh();
     }
 
@@ -4071,14 +4078,8 @@
       var tb = ensureToolbar();
       if (!tb) return;
       var n = chipCounts();
-      var both = selected.some(isDoctor) && !selected.every(isDoctor);
-      var chip = function (row, key, count, label, ico) {
-        var on = row === "tr" ? chips.tr : chips[row].indexOf(key) > -1;
-        return '<button type="button" class="sel-chip sel-chip--quick' + (ico ? " sel-chip--" + key : "") + (count || on ? "" : " is-zero") + '" aria-pressed="' + on +
-          '" data-st-row="' + row + '" data-st-filter="' + key + '">' + (ico ? '<span class="sel-ci">' + hvIcon(ico) + "</span>" : "") + label + "</button>";
-      };
-      setIH(tb.querySelector(".sel-tb__quick"), (both ? chip("kind", "doctors", n.kind.doctors || 0, "Doctors", "steth") : "") +
-        (STATUS_ON ? chip("st", "approved", n.st.approved || 0, "Approved", "check") + chip("st", "review", n.st.review || 0, "Under review", "clock") : ""));
+      // Item 255 (Bido): no quick-filter buttons in the toolbar; the count line under it is the one place for them.
+      tb.querySelector(".sel-tb__quick").hidden = true;
       var nf = (controls ? controls.count() : 0) + chips.kind.length + chips.st.length + (chips.tr ? 1 : 0);
       setIH(tb.querySelector(".sel-tool--filters"), hvIcon("filter") + '<span class="sel-tool__tx">Filters</span>' + (nf ? ' <b class="sel-tool__n">' + nf + "</b>" : ""));
       var canPick = STATUS_ON && (ROLE === "owner" || ROLE === "admin");
