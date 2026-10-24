@@ -2782,7 +2782,8 @@
       // Item 244: one stacked bar (influencers in ink, doctors in blue, darker = bigger) and a legend.
       var hcpList = names.filter(function (t) { return /hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
       var plainList = names.filter(function (t) { return !/hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
-      var INF = ["#e8ff76", "#b8d43a", "#6f8a1f", "#3b4a12", "#121212"], DOC = ["#cfdcf7", "#93b2ee", "#5583dd", "#2f5fc4", "#15306e"];
+      // Item 249 (Bido: "multiple colors all took from catalogue colors"): the tag palette and brand tokens only.
+      var INF = ["#d6a400", "#ff691e", "#e0365c", "#8b4ae0", "#121212"], DOC = ["#1b9b52", "#2f6fe0", "#163f91", "#53219c", "#0c5a2d"];
       var shade = function (t, hcp) { var i = Math.min(rank(t), 4); return (hcp ? DOC : INF)[i]; };
       var all_ = plainList.map(function (t) { return [t, false]; }).concat(hcpList.map(function (t) { return [t, true]; }));
       var label = function (t, hcp) { var x = t.replace(/^\s*hcp\s*[-–—:]?\s*/i, ""); return hcp ? "HCP " + x : x; };
@@ -2868,15 +2869,29 @@
         });
         return cities.length ? "<li><b>" + esc(cname(name)) + "</b> " + cities.map(function (city) { return esc(city) + " " + c.cities[city]; }).join(" · ") + "</li>" : "";
       }).join("");
+      // Item 249: every city shows, as ranked bars under its country (no Details). Colours from the catalogue palette.
+      var CITY_COL = ["#2f6fe0", "#8b4ae0", "#1b9b52", "#ff691e", "#e0365c", "#d6a400", "#163f91", "#53219c"];
+      var maxCity = 1;
+      names.forEach(function (name) { Object.keys(countries[name].cities).forEach(function (c) { maxCity = Math.max(maxCity, countries[name].cities[c]); }); });
       box.hidden = !names.length;
-      box.innerHTML = '<p class="sel-viz__title">Where they are</p><ul class="cat-places__list sel-viz__rows">' +
-        names.slice(0, 4).map(function (name) { return row(flagOf(name), cname(name), countries[name].n, "sel-bar sel-bar--country"); }).join("") + "</ul>" +
-        more("places", (names.length > 4 ? '<ul class="cat-places__list sel-viz__rows">' + names.slice(4).map(function (name) {
-            return row(flagOf(name), cname(name), countries[name].n, "sel-bar sel-bar--country"); }).join("") + "</ul>" : "") +
-          (cityLines ? '<ul class="sel-viz__cities">' + cityLines + "</ul>" : "") +
-          ((several || multiCity) ? '<p class="cat-places__note">' +
-            (several ? several + (several === 1 ? " creator works" : " creators work") + " in more than one country, so counted in each. " : "") +
-            (multiCity ? "A creator listed in more than one city is counted in each city." : "") + "</p>" : ""));
+      box.innerHTML = '<p class="sel-viz__title">Where they are</p>' + names.map(function (name) {
+        var c = countries[name], pc = selected.length ? Math.round(100 * c.n / selected.length) : 0;
+        var cities = Object.keys(c.cities).sort(function (a, b) {
+          var na = a === "City not specified", nb = b === "City not specified";
+          return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
+        });
+        var shown = cities.slice(0, 8), rest = cities.slice(8).reduce(function (t, x) { return t + c.cities[x]; }, 0);
+        return '<div class="sel-geo"><p class="sel-geo__head">' + flagOf(name) + "<span>" + esc(cname(name)) + "</span><b>" + c.n + '</b><small class="sel-bar__pct">' + pc + "%</small></p>" +
+          (shown.length ? '<ul class="sel-geo__cities">' + shown.map(function (city, i) {
+            var n = c.cities[city], none = city === "City not specified";
+            return '<li><span class="sel-geo__city">' + esc(none ? "City not set" : city) + '</span><span class="sel-geo__bar"><i style="width:' +
+              Math.max(2, Math.round(100 * n / maxCity)) + "%;background:" + (none ? "rgba(18,18,18,.22)" : CITY_COL[i % CITY_COL.length]) + '"></i></span><b>' + n + "</b></li>";
+          }).join("") + (rest ? '<li class="sel-geo__more"><span class="sel-geo__city">' + (cities.length - 8) + ' more cities</span><span class="sel-geo__bar"></span><b>' + rest + "</b></li>" : "") + "</ul>" : "") +
+          "</div>";
+      }).join("") +
+        ((several || multiCity) ? '<p class="cat-places__note">' +
+          (several ? several + (several === 1 ? " creator works" : " creators work") + " in more than one country, so counted in each. " : "") +
+          (multiCity ? "A creator listed in more than one city is counted in each city." : "") + "</p>" : "");
     }
 
     // What the admin said about each creator of this selection: how well they
