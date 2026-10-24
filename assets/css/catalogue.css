@@ -2477,3 +2477,16 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
 .sel-geo__sub .cat-flag { width: 22px; height: 15px; }
 .sel-geo__sub b { color: var(--ink); }
 @media screen and (max-width: 767px) { .sel-geo__chips { width: 100%; } }
+
+/* Item 264: the country heading in Where they are reads as a section heading, flag ~36 px */
+.sel-geo__head .cat-flag { width: 36px; height: 24px; border-radius: 4px; }
+.sel-geo__head > span { font-family: var(--heading); font-weight: 400; font-size: 26px; line-height: 1; letter-spacing: .02em; }
+.sel-geo__head { gap: 12px; margin-bottom: 14px; }
+.sel-geo__head b.sel-num { font-size: 18px; }
+.sel-geo__line > span { font-family: var(--body); font-weight: 700; font-size: 15px; letter-spacing: 0; }
+.sel-geo__line .cat-flag { width: 30px; height: 20px; }
+.sel-geo__chip .cat-flag { width: 30px; height: 20px; border-radius: 3px; }
+.sel-geo__chip span { font-size: 15px; }
+.sel-geo__sub { font-size: 15px; gap: 9px; }
+.sel-geo__sub .cat-flag { width: 30px; height: 20px; border-radius: 3px; }
+.sel-geo__sub b { font-family: var(--heading); font-weight: 400; font-size: 22px; letter-spacing: .02em; }
