@@ -2061,3 +2061,8 @@ body.sel-picking #cat-tray { visibility: hidden; }
   .sel-picking .sel-toast { bottom: 150px; }
 }
 @media (prefers-reduced-motion: reduce) { .cat-group__tog svg, .sel-tool { transition: none; } }
+/* Rejected creators, at the bottom in their own section (item 242). Ungrouped, the section spans the grid. */
+#cat-grid:not(.is-grouped) > .cat-group--rejected { grid-column: 1 / -1; margin-top: 40px; }
+.cat-group--rejected > .cat-group__head { border-bottom-color: #c01010; }
+.cat-group--rejected .cat-card { opacity: .82; }
+.cat-group--rejected .cat-card:hover, .cat-group--rejected .cat-card:focus-within { opacity: 1; }

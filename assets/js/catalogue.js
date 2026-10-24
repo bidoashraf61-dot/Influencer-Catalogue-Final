@@ -2569,13 +2569,36 @@
     }
     // Lay the visible cards out in sections. A creator in two groups shows in
     // both (the second is a copy); clicks are handled on the grid, so copies work.
+    // Rejected creators leave their group for one section at the bottom (Bido, 2026-10-24: "when I reject
+    // someone it goes down under a separate section, not beside the approved ones"). Whatever the grouping
+    // or sort; grouped by Status they already have their own section.
+    function rejectedOut() { return STATUS_ON && groupBy !== "status"; }
+    function rejectedSection(grid, list, put) {
+      if (!list.length) return;
+      var id = "rejected-bottom";
+      var sec = document.createElement("section");
+      sec.className = "cat-group cat-group--rejected cat-group--st-rejected";
+      sec.innerHTML = groupHead("status", "Rejected", list.length, null, 0, id);
+      var inner = document.createElement("div");
+      inner.className = "cat-grid cat-group__grid";
+      inner.hidden = !!collapsed[id];
+      put(inner, list);
+      sec.appendChild(inner);
+      grid.appendChild(sec);
+    }
     function layoutGroups(grid, ordered) {
       all(".cat-group", grid).forEach(function (g) { g.remove(); });
       grid.classList.toggle("is-grouped", !!groupBy);
-      if (!groupBy) return;
       var visible = ordered.filter(function (card) { return !card.hidden; });
       var placed = {};
       var total = selected.length;
+      var rejected = rejectedOut() ? visible.filter(function (c) { return statusOf(c.dataset.code).s === "rejected"; }) : [];
+      if (rejected.length) visible = visible.filter(function (c) { return statusOf(c.dataset.code).s !== "rejected"; });
+      if (!groupBy) {
+        // Not grouped: the cards stay in the grid itself and the rejected ones go below, in their own section.
+        rejectedSection(grid, rejected, function (inner, list) { list.forEach(function (card) { inner.appendChild(card); }); });
+        return;
+      }
       function put(inner, list) {
         list.forEach(function (card) {
           var code = card.dataset.code;
@@ -2615,6 +2638,7 @@
         sec.appendChild(body);
         grid.appendChild(sec);
       });
+      rejectedSection(grid, rejected, put);
     }
     $("cat-grid").addEventListener("click", function (e) {
       var t = e.target.closest && e.target.closest(".cat-group__tog");
