@@ -3766,8 +3766,9 @@
     }
     function toggleViews() { viewsOpen = !viewsOpen; viewsMsg = ""; renderStatusBar(); }
     function drawViews() {
-      var wrap = document.querySelector("#sel-statusbar .sel-views");
+      var wrap = document.querySelector(".sel-tb .sel-views");
       if (!wrap) return;
+      all(".sel-views__panel", wrap).forEach(function (x) { x.remove(); });
       var list = VIEWS.map(function (v) {
         return '<li><button type="button" class="sel-views__go" data-view="' + esc(v.id) + '">' + esc(v.name) + "</button>" +
           (canSaveViews ? '<button type="button" class="sel-views__rm" data-view-rm="' + esc(v.id) + '" aria-label="Delete the view ' + esc(v.name) + '">' + CROSS + "</button>" : "") + "</li>";
@@ -3812,36 +3813,45 @@
     });
     document.addEventListener("keydown", function (e) {
       if (e.key === "Escape" && viewsOpen) { viewsOpen = false; renderStatusBar(); }
-      if (e.key === "Escape" && document.body.classList.contains("sel-fsheet-open")) closeFilterSheet();
+      if (e.key === "Escape" && document.querySelector(".cat-bar.is-drawer")) closeFilterSheet();
     });
 
-    // ---- phones: every filter in one sheet, opened from the sticky bar (item 242) ----
+    // ---- Item 253: every filter lives in one drawer (a side panel; a bottom sheet on phones) ----
+    function filterBar() { return document.querySelector(".cat-controls--selection .cat-bar") || document.querySelector(".cat-controls .cat-bar"); }
     function openFilterSheet() {
-      var bar = document.querySelector(".cat-controls--selection .cat-bar") || document.querySelector(".cat-controls .cat-bar");
+      var bar = filterBar();
       if (!bar) return;
-      if (window.innerWidth > 767) { bar.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
-      if (!bar.querySelector(".sel-fsheet__head")) {
-        bar.insertAdjacentHTML("afterbegin", '<div class="sel-fsheet__head"><span>Filters</span><button type="button" class="sel-fsheet__x" aria-label="Close filters">' + CROSS + "</button></div>");
-        bar.insertAdjacentHTML("beforeend", '<div class="sel-fsheet__foot"><button type="button" class="sel-fsheet__clear">Clear all</button><button type="button" class="sel-fsheet__go">Show creators</button></div>');
-        bar.addEventListener("click", function (e) {
+      var row = bar.querySelector(".cat-bar__row");
+      if (!row) return;
+      if (!row.querySelector(".sel-fsheet__head")) {
+        row.insertAdjacentHTML("afterbegin", '<div class="sel-fsheet__head"><span>Filters</span><button type="button" class="sel-fsheet__x" aria-label="Close filters">' + CROSS + "</button></div>");
+        row.insertAdjacentHTML("beforeend", '<div class="sel-fsheet__foot"><button type="button" class="sel-fsheet__clear">Clear all</button><button type="button" class="sel-fsheet__go">Show creators</button></div>');
+        row.addEventListener("click", function (e) {
           if (e.target.closest(".sel-fsheet__x, .sel-fsheet__go")) closeFilterSheet();
           if (e.target.closest(".sel-fsheet__clear")) clearAll();
         });
+        document.addEventListener("click", function (e) {
+          if (!bar.classList.contains("is-drawer") || !e.target.closest) return;
+          if (!e.target.closest(".cat-bar__row, .sel-tool--filters, .cat-dd")) closeFilterSheet();
+        });
       }
-      bar.classList.add("is-sheet");
-      bar.setAttribute("role", "dialog"); bar.setAttribute("aria-label", "Filters"); bar.setAttribute("aria-modal", "true");
+      bar.classList.add("is-drawer");
+      row.setAttribute("role", "dialog"); row.setAttribute("aria-label", "Filters"); row.setAttribute("aria-modal", "true");
       document.body.classList.add("sel-fsheet-open");
       syncSheetGo();
-      var x = bar.querySelector(".sel-fsheet__x"); if (x) x.focus();
+      var x = row.querySelector(".sel-fsheet__x"); if (x) x.focus();
     }
     function closeFilterSheet() {
-      var bar = document.querySelector(".cat-bar.is-sheet");
-      if (bar) { bar.classList.remove("is-sheet"); bar.removeAttribute("role"); bar.removeAttribute("aria-modal"); }
-      document.body.classList.remove("sel-fsheet-open");
-      var t = document.querySelector("#sel-statusbar .sel-tool--filters"); if (t) t.focus();
+      var bar = document.querySelector(".cat-bar.is-drawer");
+      if (!bar) return;
+      bar.classList.remove("is-drawer");
+      var row = bar.querySelector(".cat-bar__row");
+      if (row) { row.removeAttribute("role"); row.removeAttribute("aria-modal"); }
+      document.body.classList.remove("sel-fsheet-open", "cat-sheet-open");
+      var t = document.querySelector(".sel-tb .sel-tool--filters"); if (t) t.focus();
     }
     function syncSheetGo() {
-      var go = document.querySelector(".cat-bar.is-sheet .sel-fsheet__go");
+      var go = document.querySelector(".cat-bar.is-drawer .sel-fsheet__go");
       if (go) { var n = all(".cat-card:not(.cat-card--copy)", $("cat-grid")).filter(function (c) { return !c.hidden; }).length; go.textContent = "Show " + n + " creator" + (n === 1 ? "" : "s"); }
     }
 
@@ -3974,77 +3984,145 @@
 
     function anyFilter() { return chipsOn() || !!(controls && controls.filtering()); }
     function clearAll() { chips = { kind: [], st: [], tr: false }; if (controls) controls.clear(); render(); }
-    function renderStatusBar() {
-      var host = $("sel-statusbar");
-      if (!selected.length || !controls) { if (host) host.hidden = true; return; }
-      if (!host) {
-        host = document.createElement("section");
-        host.id = "sel-statusbar"; host.className = "sel-sbar"; host.setAttribute("aria-label", "Show and arrange creators");
-        var anchor = document.querySelector(".cat-grid-section");
-        anchor.parentNode.insertBefore(host, anchor);
-        host.addEventListener("click", function (e) {
-          var b = e.target.closest("[data-st-filter]");
-          if (b) {
-            var v = b.getAttribute("data-st-filter"), row = b.getAttribute("data-st-row");
-            if (!row) chips = { kind: [], st: [], tr: false };
-            else if (row === "tr") chips.tr = !chips.tr;
-            else { var l = chips[row], at = l.indexOf(v); if (at < 0) l.push(v); else l.splice(at, 1); }
-            render(); return;
-          }
-          if (e.target.closest(".sel-shown__clear")) { clearAll(); return; }
-          if (e.target.closest(".sel-tool--filters")) { openFilterSheet(); return; }
-          if (e.target.closest(".sel-tool--link")) { copyViewLink(e.target.closest(".sel-tool--link")); return; }
-          if (e.target.closest(".sel-tool--views")) { toggleViews(e.target.closest(".sel-tool--views")); return; }
-          if (e.target.closest(".sel-tool--pick")) { setPicking(!picking); return; }
-          var fb = e.target.closest(".sel-tool--fold");
-          if (fb) {
-            var closeAll = fb.getAttribute("data-fold") === "close";
-            all("#cat-grid .cat-group", document).forEach(function (sec) {
-              var b = sec.querySelector(":scope > .cat-group__head [data-group-id]");
-              if (b) setFold(sec, b.getAttribute("data-group-id"), closeAll);
-            });
-            saveFolds(); renderStatusBar(); return;
-          }
-        });
-      }
-      host.hidden = false;
+    // Item 253 (Bido, 2026-10-24: "a lot of buttons… separated into 2 sections"): one slim sticky toolbar
+    // (search, three quick chips, Filters, View, Select, More, "N match"), every filter in the drawer, the
+    // counts as one quiet line under it. Same state and handlers as before.
+    function toggleChip(b) {
+      var v = b.getAttribute("data-st-filter"), row = b.getAttribute("data-st-row");
+      if (!row) chips = { kind: [], st: [], tr: false };
+      else if (row === "tr") chips.tr = !chips.tr;
+      else { var l = chips[row], at = l.indexOf(v); if (at < 0) l.push(v); else l.splice(at, 1); }
+      render();
+    }
+    var tbMenu = "";      // "", "view" or "more"
+    function foldAllNow(closeIt) {
+      all("#cat-grid .cat-group", document).forEach(function (sec) {
+        var b = sec.querySelector(":scope > .cat-group__head [data-group-id]");
+        if (b) setFold(sec, b.getAttribute("data-group-id"), closeIt);
+      });
+      saveFolds();
+    }
+    function ensureToolbar() {
+      var bar = filterBar();
+      if (!bar) return null;
+      var tb = bar.querySelector(".sel-tb");
+      if (tb) return tb;
+      tb = document.createElement("div");
+      tb.className = "sel-tb";
+      tb.innerHTML = '<div class="sel-tb__search"></div><div class="sel-tb__quick" role="group" aria-label="Quick filters"></div>' +
+        '<div class="sel-tb__acts">' +
+        '<button type="button" class="sel-tool sel-tool--search" aria-label="Search creators" aria-expanded="false">' + hvIcon("search") + "</button>" +
+        '<button type="button" class="sel-tool sel-tool--filters" aria-haspopup="dialog"></button>' +
+        '<div class="sel-tb__menu sel-tb__menu--view"><button type="button" class="sel-tool sel-tool--view" aria-haspopup="true" aria-expanded="false">' + hvIcon("grid") + '<span class="sel-tool__tx">View</span>' + CHEVRON + "</button>" +
+        '<div class="sel-tb__pop sel-tb__pop--view" role="group" aria-label="Group and sort" hidden></div></div>' +
+        '<button type="button" class="sel-tool sel-tool--pick" hidden></button>' +
+        '<div class="sel-tb__menu sel-views"><button type="button" class="sel-tool sel-tool--more" aria-haspopup="true" aria-expanded="false" aria-label="More">' + hvIcon("dots") + "</button>" +
+        '<div class="sel-tb__pop sel-tb__pop--more" role="menu" hidden></div></div>' +
+        '<p class="sel-tb__match" role="status"></p></div>';
+      bar.insertBefore(tb, bar.firstChild);
+      var search = bar.querySelector(".cat-search");
+      if (search) tb.querySelector(".sel-tb__search").appendChild(search);
+      var order = bar.querySelector(".cat-bar__order");
+      if (order) tb.querySelector(".sel-tb__pop--view").appendChild(order);
+      tb.addEventListener("click", function (e) {
+        var b = e.target.closest("[data-st-filter]");
+        if (b) { toggleChip(b); return; }
+        if (e.target.closest(".sel-tool--filters")) { tbMenu = ""; paintMenus(); openFilterSheet(); return; }
+        var sb = e.target.closest(".sel-tool--search");
+        if (sb) {
+          // Phones: the search field opens from an icon so the sticky bar stays one row.
+          var on = !tb.classList.contains("is-searching");
+          tb.classList.toggle("is-searching", on); sb.setAttribute("aria-expanded", String(on));
+          var inp = tb.querySelector(".cat-search__input"); if (on && inp) inp.focus();
+          return;
+        }
+        if (e.target.closest(".sel-tool--view")) { tbMenu = tbMenu === "view" ? "" : "view"; viewsOpen = false; paintMenus(); return; }
+        if (e.target.closest(".sel-tool--more")) { tbMenu = tbMenu === "more" ? "" : "more"; viewsOpen = false; renderToolbar(); return; }
+        if (e.target.closest(".sel-tool--pick")) { setPicking(!picking); return; }
+        if (e.target.closest(".sel-tb__clear")) { clearAll(); return; }
+        if (e.target.closest(".sel-more__views")) { tbMenu = ""; viewsOpen = true; viewsMsg = ""; renderToolbar(); return; }
+        if (e.target.closest(".sel-more__link")) { tbMenu = ""; paintMenus(); copyViewLink(); return; }
+        var fb = e.target.closest(".sel-more__fold");
+        if (fb) { tbMenu = ""; foldAllNow(fb.getAttribute("data-fold") === "close"); renderToolbar(); return; }
+      });
+      document.addEventListener("click", function (e) {
+        if (tbMenu && e.target.closest && !e.target.closest(".sel-tb__menu")) { tbMenu = ""; paintMenus(); }
+      });
+      document.addEventListener("keydown", function (e) { if (e.key === "Escape" && tbMenu) { tbMenu = ""; paintMenus(); } });
+      return tb;
+    }
+    function paintMenus() {
+      var tb = document.querySelector(".sel-tb");
+      if (!tb) return;
+      [["view", ".sel-tool--view", ".sel-tb__pop--view"], ["more", ".sel-tool--more", ".sel-tb__pop--more"]].forEach(function (m) {
+        var on = tbMenu === m[0];
+        tb.querySelector(m[1]).setAttribute("aria-expanded", String(on));
+        tb.querySelector(m[2]).hidden = !on;
+      });
+    }
+    function renderToolbar() {
+      var tb = ensureToolbar();
+      if (!tb) return;
       var n = chipCounts();
       var both = selected.some(isDoctor) && !selected.every(isDoctor);
       var chip = function (row, key, count, label, ico) {
         var on = row === "tr" ? chips.tr : chips[row].indexOf(key) > -1;
-        return '<button type="button" class="sel-chip' + (ico ? " sel-chip--" + key : "") + (count || on ? "" : " is-zero") + '" aria-pressed="' + on +
-          '" data-st-row="' + row + '" data-st-filter="' + key + '">' + (ico ? '<span class="sel-ci">' + hvIcon(ico) + "</span>" : "") +
-          '<span class="sel-chip__n">' + count + "</span> " + label + "</button>";
+        return '<button type="button" class="sel-chip sel-chip--quick' + (ico ? " sel-chip--" + key : "") + (count || on ? "" : " is-zero") + '" aria-pressed="' + on +
+          '" data-st-row="' + row + '" data-st-filter="' + key + '">' + (ico ? '<span class="sel-ci">' + hvIcon(ico) + "</span>" : "") + label + "</button>";
       };
-      var kinds = both ? chip("kind", "influencers", n.kind.influencers || 0, "influencer" + (n.kind.influencers === 1 ? "" : "s"), "user") +
-        chip("kind", "doctors", n.kind.doctors || 0, "doctor" + (n.kind.doctors === 1 ? "" : "s"), "steth") : "";
-      var hasTrack = Object.keys(TRACK).length > 0;
-      var sts = STATUS_ON ? ["approved", "rejected", "review", "unavailable"].filter(function (k) { return k === "approved" || k === "review" || stCountsAll[k]; }).map(function (k) {
-        var lab = { review: "under review", approved: "approved", rejected: "rejected", unavailable: "unavailable" }[k];
-        return chip("st", k, n.st[k] || 0, lab, ST_ICON[k]);
-      }).join("") : "";
-      var filt = anyFilter();
+      setIH(tb.querySelector(".sel-tb__quick"), (both ? chip("kind", "doctors", n.kind.doctors || 0, "Doctors", "steth") : "") +
+        (STATUS_ON ? chip("st", "approved", n.st.approved || 0, "Approved", "check") + chip("st", "review", n.st.review || 0, "Under review", "clock") : ""));
+      var nf = (controls ? controls.count() : 0) + chips.kind.length + chips.st.length + (chips.tr ? 1 : 0);
+      setIH(tb.querySelector(".sel-tool--filters"), hvIcon("filter") + '<span class="sel-tool__tx">Filters</span>' + (nf ? ' <b class="sel-tool__n">' + nf + "</b>" : ""));
       var canPick = STATUS_ON && (ROLE === "owner" || ROLE === "admin");
-      var nf = (controls ? controls.count() : 0);
-      host.innerHTML = '<div class="cat-pad"><div class="cat-container sel-sbar__in"><div class="sel-sum" role="group" aria-label="Show">' +
-        '<button type="button" class="sel-chip sel-chip--all" aria-pressed="' + !chipsOn() + '" data-st-filter="">' + selected.length + " creator" + (selected.length === 1 ? "" : "s") + "</button>" +
-        kinds + (hasTrack ? chip("tr", "track", n.tr, "with track record", "target") : "") +
-        (sts ? '<span class="sel-sum__sep" aria-hidden="true"></span>' + sts : "") + "</div>" +
-        '<div class="sel-sbar__tools">' +
-        '<button type="button" class="sel-tool sel-tool--filters" aria-haspopup="dialog">' + hvIcon("filter") + "Filters" + (nf ? ' <b class="sel-tool__n">' + nf + "</b>" : "") + "</button>" +
-        '<div class="sel-views"><button type="button" class="sel-tool sel-tool--views" aria-expanded="' + viewsOpen + '" aria-haspopup="true">' + hvIcon("save") + "Views" + (VIEWS.length ? ' <b class="sel-tool__n">' + VIEWS.length + "</b>" : "") + "</button></div>" +
-        '<button type="button" class="sel-tool sel-tool--link">' + hvIcon("copy") + "Copy link</button>" +
-        (groupBy ? (function () {
-          // "Collapse all" while any group is open; "Expand all" once every group is closed.
-          var anyOpen = all("#cat-grid > .cat-group", document).some(function (sec) { return !sec.hidden && !sec.classList.contains("is-collapsed"); });
-          return '<button type="button" class="sel-tool sel-tool--fold" data-fold="' + (anyOpen ? "close" : "open") + '">' +
-            hvIcon("minus") + (anyOpen ? "Collapse all" : "Expand all") + "</button>";
-        })() : "") +
-        (canPick ? '<button type="button" class="sel-tool sel-tool--pick" aria-pressed="' + picking + '">' + hvIcon("check") + (picking ? "Done selecting" : "Select") + "</button>" : "") +
-        "</div></div>" +
-        '<div class="cat-container sel-shown"' + (filt ? "" : " hidden") + ' role="status"><span><b>' + n.shown + "</b> of " + selected.length + " shown</span>" +
-        '<button type="button" class="sel-shown__clear">Clear all filters</button></div></div>';
+      var pick = tb.querySelector(".sel-tool--pick");
+      pick.hidden = !canPick;
+      pick.setAttribute("aria-pressed", String(picking));
+      setIH(pick, hvIcon("check") + '<span class="sel-tool__tx">' + (picking ? "Done" : "Select") + "</span>");
+      pick.setAttribute("aria-label", picking ? "Done selecting" : "Select creators");
+      var anyOpen = all("#cat-grid > .cat-group", document).some(function (sec) { return !sec.hidden && !sec.classList.contains("is-collapsed"); });
+      setIH(tb.querySelector(".sel-tb__pop--more"),
+        '<button type="button" role="menuitem" class="sel-more__views">' + hvIcon("save") + "Saved views" + (VIEWS.length ? " <b>" + VIEWS.length + "</b>" : "") + "</button>" +
+        '<button type="button" role="menuitem" class="sel-more__link">' + hvIcon("copy") + "Copy link</button>" +
+        (groupBy ? '<button type="button" role="menuitem" class="sel-more__fold" data-fold="' + (anyOpen ? "close" : "open") + '">' + hvIcon("minus") +
+          (anyOpen ? "Collapse all groups" : "Expand all groups") + "</button>" : ""));
+      var filt = anyFilter();
+      setIH(tb.querySelector(".sel-tb__match"), filt ? "<b>" + n.shown + "</b> match" + ' <button type="button" class="sel-tb__clear">Clear</button>'
+        : "<b>" + selected.length + "</b> creators");
+      paintMenus();
+      all(".sel-views__panel", tb).forEach(function (x) { x.remove(); });
       if (viewsOpen) drawViews();
+    }
+    function renderStatusBar() {
+      renderToolbar();
+      var host = $("sel-statusbar");
+      if (!selected.length || !controls) { if (host) host.hidden = true; return; }
+      if (!host) {
+        host = document.createElement("section");
+        host.id = "sel-statusbar"; host.className = "sel-sbar sel-line"; host.setAttribute("aria-label", "Creators in this selection");
+        var anchor = document.querySelector(".cat-grid-section");
+        anchor.parentNode.insertBefore(host, anchor);
+        host.addEventListener("click", function (e) {
+          var b = e.target.closest("[data-st-filter]");
+          if (b) toggleChip(b);
+        });
+      }
+      host.hidden = false;
+      // One quiet line; every part still filters.
+      var n = chipCounts();
+      var both = selected.some(isDoctor) && !selected.every(isDoctor);
+      var part = function (row, key, count, label, ico) {
+        var on = row === "tr" ? chips.tr : chips[row].indexOf(key) > -1;
+        return '<span class="sel-line__dot" aria-hidden="true">·</span><button type="button" class="sel-line__b' + (ico ? " sel-line__b--" + key : "") + (count || on ? "" : " is-zero") +
+          '" aria-pressed="' + on + '" data-st-row="' + row + '" data-st-filter="' + key + '">' + (ico ? hvIcon(ico) : "") + "<b>" + count + "</b> " + label + "</button>";
+      };
+      var html = '<button type="button" class="sel-line__b sel-line__b--all" aria-pressed="' + !chipsOn() + '" data-st-filter=""><b>' + selected.length + "</b> creator" + (selected.length === 1 ? "" : "s") + "</button>" +
+        (both ? part("kind", "influencers", n.kind.influencers || 0, "influencer" + (n.kind.influencers === 1 ? "" : "s"), "") + part("kind", "doctors", n.kind.doctors || 0, "doctor" + (n.kind.doctors === 1 ? "" : "s"), "") : "") +
+        (Object.keys(TRACK).length ? part("tr", "track", n.tr, "with track record", "target") : "") +
+        (STATUS_ON ? ["approved", "rejected", "review", "unavailable"].filter(function (k) { return k === "approved" || k === "review" || stCountsAll[k]; }).map(function (k) {
+          return part("st", k, n.st[k] || 0, { review: "under review", approved: "approved", rejected: "rejected", unavailable: "unavailable" }[k], ST_ICON[k]);
+        }).join("") : "");
+      setIH(host, '<div class="cat-pad"><div class="cat-container sel-line__in" role="group" aria-label="Show">' + html + "</div></div>");
     }
     var stCountsAll = {}, lastSaved = true;
     function syncLink() {
@@ -4916,6 +4994,8 @@
     lab.textContent = n === 1 ? "creator matches" : "creators match";
   }
   function mount() {
+    // The selection page has its own count in the toolbar (item 253) and keeps Group / Sort in its View menu.
+    if (document.body.getAttribute("data-page") === "selection") return true;
     var row = document.querySelector(".cat-bar__row");
     var grid = document.getElementById("cat-grid");
     var order = document.querySelector(".cat-bar__order") || (row && row.querySelector(".cat-sort"));
