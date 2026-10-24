@@ -876,7 +876,7 @@ def _post_key(url):
                r"[?&]v=([a-z0-9_\-]+)", r"/spotlight/([a-z0-9_\-]{16,})", r"/share/(?:r|v|p)/([a-z0-9_\-]+)"):
         m = re.search(rx, u)
         if m:
-            return m.group(1)[:24]
+            return m.group(1)
     return None
 
 
@@ -976,7 +976,12 @@ def ingest_posts(run, job, items, hmap, store_raw=True):
             if not isinstance(it, dict):
                 continue
             text = json.dumps(it, default=str).lower()
-            cid = next((c for _u, (c, k) in keys.items() if k and k in text), None)
+            # The whole link id first: Snapchat spotlight ids of one creator share their first 24 characters,
+            # so a shortened id sent one post's numbers to the other. The first 24 only when no whole id matches
+            # and they name a single post.
+            whole = sorted(((len(k), c) for _u, (c, k) in keys.items() if k and k in text), reverse=True)
+            part = {c for _u, (c, k) in keys.items() if k and k[:24] in text}
+            cid = whole[0][1] if whole else (next(iter(part)) if len(part) == 1 else None)
             if cid is None and len(keys) == 1:
                 cid = next(iter(keys.values()))[0]
             if store_raw:
