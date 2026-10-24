@@ -2821,21 +2821,31 @@
               Math.max(3, Math.round(100 * tiers[t] / max)) + '%"></i></i></li>';
           }).join("") + "</ul></div>";
       };
-      // Item 244: one stacked bar (influencers in ink, doctors in blue, darker = bigger) and a legend.
+      // Item 251 (Bido, 2026-10-24: "pure analytics about HCPs clear here"): influencers and HCPs in two
+      // blocks, each with its own bar and tiers, shares of that group. Influencers in the warm catalogue
+      // colours, HCPs in the catalogue blues. One block, full width, when the selection has only one kind.
       var hcpList = names.filter(function (t) { return /hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
       var plainList = names.filter(function (t) { return !/hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
-      // Item 249 (Bido: "multiple colors all took from catalogue colors"): the tag palette and brand tokens only.
-      var INF = ["#d6a400", "#ff691e", "#e0365c", "#8b4ae0", "#121212"], DOC = ["#1b9b52", "#2f6fe0", "#163f91", "#53219c", "#0c5a2d"];
-      var shade = function (t, hcp) { var i = Math.min(rank(t), 4); return (hcp ? DOC : INF)[i]; };
-      var all_ = plainList.map(function (t) { return [t, false]; }).concat(hcpList.map(function (t) { return [t, true]; }));
-      var label = function (t, hcp) { var x = t.replace(/^\s*hcp\s*[-–—:]?\s*/i, ""); return hcp ? "HCP " + x : x; };
-      box.innerHTML = '<p class="sel-viz__title">Creator size</p>' +
-        '<div class="sel-stack" role="img" aria-label="' + esc(all_.map(function (x) { return label(x[0], x[1]) + " " + tiers[x[0]]; }).join(", ")) + '">' +
-        all_.map(function (x) { return '<i style="flex-grow:' + tiers[x[0]] + ";background:" + shade(x[0], x[1]) + '"></i>'; }).join("") + "</div>" +
-        '<ul class="sel-legend">' + all_.map(function (x) {
-          return '<li><i style="background:' + shade(x[0], x[1]) + '" aria-hidden="true"></i><span>' + esc(label(x[0], x[1])) + "</span><b>" + tiers[x[0]] +
-            "</b><small>" + Math.round(100 * tiers[x[0]] / total) + "%</small></li>";
-        }).join("") + "</ul>";
+      var INF = ["#d6a400", "#ff691e", "#e0365c", "#8b4ae0", "#121212"], DOC = ["#e0ecff", "#2f6fe0", "#2f5fc4", "#163f91", "#15306e"];
+      var block = function (title, list, hcp) {
+        if (!list.length) return "";
+        var sum = list.reduce(function (t, x) { return t + tiers[x]; }, 0);
+        var col = function (t) { return (hcp ? DOC : INF)[Math.min(rank(t), 4)]; };
+        var label = function (t) { return t.replace(/^\s*hcp\s*[-–—:]?\s*/i, ""); };
+        return '<div class="sel-size' + (hcp ? " sel-size--hcp" : "") + '"><p class="sel-size__head"><span>' + title + "</span><b>" + sum +
+          '</b><small>' + Math.round(100 * sum / total) + "% of the selection</small></p>" +
+          '<div class="sel-stack" role="img" aria-label="' + esc(title + ": " + list.map(function (t) { return label(t) + " " + tiers[t]; }).join(", ")) + '">' +
+          list.map(function (t) { return '<i style="flex-grow:' + tiers[t] + ";background:" + col(t) + '"></i>'; }).join("") + "</div>" +
+          '<ul class="sel-legend">' + list.map(function (t) {
+            return '<li><i style="background:' + col(t) + '" aria-hidden="true"></i><span>' + esc(label(t)) + "</span><b>" + tiers[t] +
+              "</b><small>" + Math.round(100 * tiers[t] / sum) + "%</small></li>";
+          }).join("") + "</ul></div>";
+      };
+      var two = plainList.length && hcpList.length;
+      box.classList.toggle("has-two", !!two);
+      box.innerHTML = '<p class="sel-viz__title">Creator size</p><div class="sel-sizes">' +
+        block("Influencers", plainList, false) + block("HCPs", hcpList, true) + "</div>" +
+        (two ? '<p class="cat-places__note">Shares are of each group: HCP Micro 50% means half of the HCPs.</p>' : "");
     }
 
     function renderPlaces() {
