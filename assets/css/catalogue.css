@@ -2490,3 +2490,42 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
 .sel-geo__sub { font-size: 15px; gap: 9px; }
 .sel-geo__sub .cat-flag { width: 30px; height: 20px; border-radius: 3px; }
 .sel-geo__sub b { font-family: var(--heading); font-weight: 400; font-size: 22px; letter-spacing: .02em; }
+
+/* ---- Hero hierarchy (item 265): one primary, outlined secondaries, a ghost "soon" chip, a back link ---- */
+.cat-hero--cover .cat-back.cat-back--link { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; margin: 0 0 10px; padding: 0;
+  background: none; border: 0; box-shadow: none; color: rgba(255,255,255,.75); font: 600 14px var(--body); letter-spacing: 0; text-transform: none; }
+.cat-hero--cover .cat-back.cat-back--link:hover { background: none; color: var(--lime); }
+.cat-hero--cover .cat-back.cat-back--link svg { width: 14px; height: 14px; }
+.cx-selact { align-items: center; gap: 10px 12px; }
+.cx-selact .aa-btn { order: 1; min-height: 56px; padding: 0 28px; font-size: 23px; }
+.cx-selact #ev-mi-btn, .cx-selact .mg-btn { min-height: 46px; margin: 0; padding: 0 18px; border-radius: 999px; background: transparent;
+  border: 1px solid rgba(255,255,255,.55); color: var(--white); font-family: var(--heading); font-size: 18px; letter-spacing: .05em; box-shadow: none; }
+.cx-selact #ev-mi-btn { order: 2; gap: 8px; }
+.cx-selact .mg-btn { order: 3; }
+.cx-selact #ev-mi-btn:hover, .cx-selact .mg-btn:hover { background: rgba(255,255,255,.1); border-color: var(--white); color: var(--white); }
+.cx-selact #ev-mi-btn .hv-i { width: 18px; height: 18px; }
+.cx-selact .cx-btn--roi, .cx-selact .cx-btn--roi.is-locked { order: 4; min-height: 34px; padding: 0 12px; border: 1px dashed rgba(255,255,255,.3);
+  background: transparent; color: rgba(255,255,255,.6); box-shadow: none; opacity: 1; font: 600 13px var(--body); letter-spacing: 0; }
+.cx-selact .cx-btn--roi.is-locked small { font-size: 11px; opacity: .8; }
+.cx-selact .cx-btn--roi svg { width: 14px; height: 14px; }
+/* The objective as a quiet info strip; its actions are icon buttons at the right */
+.cat-hero--cover .cat-selhead__brief:not([hidden]) { padding: 8px 10px 8px 8px; border-radius: 18px; background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12); gap: 8px 16px; }
+.cat-selhead__fact { display: inline-flex; align-items: center; gap: 6px; }
+.cat-selhead__fact + .cat-selhead__fact::before { display: none; }
+.sel-fact__ic { display: inline-flex; opacity: .65; }
+.sel-fact__ic svg { width: 15px; height: 15px; }
+.cat-hero--cover .cat-selhead__brief .sel-brief__acts { order: 20; margin-left: auto; gap: 6px; }
+.cat-hero--cover .cat-selhead__brief .cat-selhead__note { order: 30; flex-basis: 100%; }
+.sel-vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.sel-brief__edit, .sel-brief__menu-btn { min-height: 38px; padding: 0 11px; gap: 4px; }
+.sel-brief__edit { background: transparent; color: var(--white); border-color: rgba(255,255,255,.35); }
+.sel-brief__edit:hover { background: rgba(255,255,255,.12); border-color: var(--white); color: var(--white); }
+.sel-brief__edit .hv-i, .sel-brief__menu-btn .hv-i { width: 17px; height: 17px; }
+@media screen and (max-width: 767px) {
+  .cx-selact .aa-btn { flex: 1 1 100%; justify-content: center; }
+  .cat-hero--cover .cat-selhead__brief .sel-brief__acts { margin-left: auto; }
+}
+/* the primary must out-rank connect.css / portal.css, which load after this file */
+body[data-page="selection"] .cx-selact .aa-btn { min-height: 56px; padding: 0 30px; font-size: 23px; }
+body[data-page="selection"] .cx-selact .mg-btn { min-height: 46px; }

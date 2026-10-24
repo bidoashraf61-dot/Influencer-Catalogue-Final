@@ -2738,9 +2738,11 @@
               var v = document.createElement("strong"); v.textContent = c[1];
               el.appendChild(k); el.appendChild(v);
             } else {
+              // Item 265: each fact leads with a small icon (market, audience, age, category).
               el.className = "cat-selhead__fact";
               el.title = c[0];
-              el.textContent = c[1];
+              var FICON = { Market: ICON_GLOBE, Audience: hvIcon("user"), Age: hvIcon("cal"), Category: hvIcon("grid") };
+              el.innerHTML = '<span class="sel-fact__ic" aria-hidden="true">' + (FICON[c[0]] || "") + "</span>" + esc(c[1]);
             }
             bx.appendChild(el);
           });
@@ -3679,6 +3681,17 @@
     // block: "Edit objective", and for HelloVoice a "Client sees" menu with the two switches that used to fill
     // a bar of their own.
     var objMenuOpen = false;
+    var EYE_ICON = '<svg class="hv-i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 12s3.5-6.5 9.5-6.5S21.5 12 21.5 12s-3.5 6.5-9.5 6.5S2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg>';
+    // Item 265: the header's buttons in three weights. The back link sits above the title; Market
+    // Intelligence gets a drawn icon (it had a text glyph). Run on every draw: the buttons arrive late.
+    function heroPolish() {
+      var back = document.querySelector(".cat-selhead__foot > .cat-back"), lock = document.querySelector(".cat-selhead__lock");
+      if (back && lock) { back.classList.add("cat-back--link"); lock.insertBefore(back, lock.firstChild); }
+      var mi = document.querySelector("#ev-mi-btn .ev-mi-btn__ic");
+      if (mi && !mi.querySelector("svg")) mi.innerHTML = hvIcon("target");
+      if ((!mi || !back) && heroTries++ < 8) setTimeout(heroPolish, 900);
+    }
+    var heroTries = 0;
     function briefActions(canAct) {
       var bx = $("sel-brief");
       if (!bx || bx.hidden) return;
@@ -3710,9 +3723,9 @@
       var acts = document.createElement("span");
       acts.className = "sel-brief__acts";
       acts.innerHTML = (pending ? '<span class="sel-brief__pending">' + hvIcon("clock") + "Scores coming soon</span>" : "") +
-        (canAct ? '<button type="button" class="sel-brief__edit">' + hvIcon("pen") + "Edit objective</button>" : "") +
+        (canAct ? '<button type="button" class="sel-brief__edit" title="Edit objective" aria-label="Edit objective">' + hvIcon("pen") + '<span class="sel-vh">Edit objective</span></button>' : "") +
         (menu ? '<span class="sel-brief__menu"><button type="button" class="sel-brief__menu-btn" aria-expanded="' + objMenuOpen +
-          '" aria-haspopup="true" aria-controls="sel-brief-pop">' + hvIcon("user") + "Client sees" + CHEVRON + "</button></span>" : "");
+          '" aria-haspopup="true" aria-controls="sel-brief-pop" title="What the client sees" aria-label="What the client sees">' + EYE_ICON + '<span class="sel-vh">Client sees</span>' + CHEVRON + "</button></span>" : "");
       if (!acts.children.length) return;
       var obj = bx.querySelector(".cat-selhead__obj");
       if (obj) obj.insertAdjacentElement("afterend", acts); else bx.appendChild(acts);
@@ -4512,6 +4525,7 @@
     }
     function render() {
       layoutPage();
+      heroPolish();
       if (window.hvGateQuote) window.hvGateQuote();
       if (typeof hideWhyTip === "function") hideWhyTip();
       var grid = $("cat-grid");
