@@ -2069,7 +2069,7 @@ body.sel-picking #cat-tray { visibility: hidden; }
 
 /* ---- Selection page layout (portal item 244, 2026-10-24) ---- */
 /* Objective controls inside the dark campaign-objective block */
-.sel-brief__acts { display: inline-flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.sel-brief__acts { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .sel-brief__edit, .sel-brief__menu-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px;
   border-radius: var(--r-pill); border: 1px solid rgba(255,255,255,.35); background: transparent; color: var(--white);
   font: 600 14px var(--body); cursor: pointer; transition: border-color .15s ease, background .15s ease; }
@@ -2081,7 +2081,7 @@ body.sel-picking #cat-tray { visibility: hidden; }
 .sel-brief__menu-btn[aria-expanded="true"] svg:last-child { transform: rotate(180deg); }
 .sel-brief__edit:focus-visible, .sel-brief__menu-btn:focus-visible { outline: 3px solid var(--lime); outline-offset: 2px; }
 .sel-brief__menu { position: relative; }
-.sel-brief__pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; display: flex; flex-direction: column; gap: 4px;
+.sel-brief__pop { position: fixed; z-index: 140; display: flex; flex-direction: column; gap: 4px;
   min-width: 260px; padding: 10px 14px; border-radius: var(--r-md); background: var(--white); color: var(--ink);
   box-shadow: 0 20px 50px rgba(18,18,18,.35); }
 .sel-brief__pop[hidden] { display: none; }
@@ -2187,3 +2187,28 @@ body.sel-compact .cat-card__meta.cf-show { margin-top: 2px; }
 .sel-tool--cards[aria-pressed="false"] { background: var(--white); color: var(--ink); }
 .sel-tool--cards[aria-pressed="true"] { background: var(--white); color: var(--ink); border-color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { .cf-row svg { transition: none; } }
+
+/* At a glance colours (item 245, 2026-10-24): bars on a visible track; countries in ink, each platform in its
+   own brand colour; no orange everywhere. */
+.sel-viz .cat-meter { height: 8px; background: rgba(18,18,18,.08); }
+.sel-viz .cat-meter i { background: var(--ink); }
+.sel-viz .cat-meter__pct { color: var(--gray); font-weight: 600; min-width: 34px; }
+.sel-bar--instagram .cat-meter i { background: #d62976; }
+.sel-bar--tiktok .cat-meter i { background: #00b7c3; }
+.sel-bar--snapchat .cat-meter i { background: #f2d600; }
+.sel-bar--youtube .cat-meter i { background: #e62117; }
+.sel-bar--x .cat-meter i { background: #121212; }
+.sel-bar--facebook .cat-meter i { background: #1877f2; }
+.sel-bar--country .cat-meter i { background: #2c2c2c; }
+.sel-stack { height: 22px; gap: 3px; }
+.sel-stack i:first-child { border-radius: var(--r-pill) 0 0 var(--r-pill); }
+.sel-legend li i { width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(18,18,18,.12); }
+.cat-summary--glance .cat-stat:first-child { background: var(--ink); color: var(--white); }
+.cat-summary--glance .cat-stat:first-child dt { color: rgba(255,255,255,.7); }
+.cat-summary--glance .cat-stat:first-child dd { color: var(--lime); }
+.cat-summary--glance .cat-stat:first-child .cat-stat__icon { background: var(--lime); color: var(--ink); }
+.sel-viz .cat-places__bar { flex-wrap: nowrap; }
+.sel-viz .cat-places__bar .cat-meter { flex: 1 1 auto; }
+.sel-viz .cat-meter__pct { display: none; }
+.sel-bar__pct { min-width: 36px; text-align: right; font: 600 13px var(--body); color: var(--gray); font-variant-numeric: tabular-nums; }
+.sel-viz .cat-places__country b + .sel-bar__pct { margin-left: 6px; }

@@ -2782,7 +2782,8 @@
       // Item 244: one stacked bar (influencers in ink, doctors in blue, darker = bigger) and a legend.
       var hcpList = names.filter(function (t) { return /hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
       var plainList = names.filter(function (t) { return !/hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
-      var shade = function (t, hcp) { var a = .25 + .15 * Math.min(rank(t), 5); return hcp ? "rgba(47,95,196," + a + ")" : "rgba(18,18,18," + a + ")"; };
+      var INF = ["#e8ff76", "#b8d43a", "#6f8a1f", "#3b4a12", "#121212"], DOC = ["#cfdcf7", "#93b2ee", "#5583dd", "#2f5fc4", "#15306e"];
+      var shade = function (t, hcp) { var i = Math.min(rank(t), 4); return (hcp ? DOC : INF)[i]; };
       var all_ = plainList.map(function (t) { return [t, false]; }).concat(hcpList.map(function (t) { return [t, true]; }));
       var label = function (t, hcp) { var x = t.replace(/^\s*hcp\s*[-–—:]?\s*/i, ""); return hcp ? "HCP " + x : x; };
       box.innerHTML = '<p class="sel-viz__title">Creator size</p>' +
@@ -2843,15 +2844,18 @@
         return (plats[b] - plats[a]) || a.localeCompare(b);
       });
       // Item 244: platforms get their own small visual; countries show the top four, the rest under Details.
-      var row = function (mark, name, n) {
-        return '<li><p class="cat-places__country">' + mark + "<span>" + esc(name) + "</span><b>" + n + "</b></p>" +
+      var row = function (mark, name, n, cls) {
+        var pc = selected.length ? Math.round(100 * n / selected.length) : 0;
+        return '<li' + (cls ? ' class="' + cls + '"' : "") + '><p class="cat-places__country">' + mark + "<span>" + esc(name) + "</span><b>" + n +
+          '</b><small class="sel-bar__pct">' + pc + "%</small></p>" +
           '<div class="cat-places__bar">' + shareBar(n, selected.length) + "</div></li>";
       };
       var pbox = $("sel-plats");
       if (pbox) {
         pbox.hidden = !platNames.length;
         pbox.innerHTML = '<p class="sel-viz__title">On each platform</p><ul class="cat-places__list sel-viz__rows">' +
-          platNames.map(function (pl) { return row('<span class="cat-places__mark ' + (BRAND[pl] || "") + '">' + (ICONS[pl] || ICON_LINK) + "</span>", pl, plats[pl]); }).join("") + "</ul>" +
+          platNames.map(function (pl) { return row('<span class="cat-places__mark ' + (BRAND[pl] || "") + '">' + (ICONS[pl] || ICON_LINK) + "</span>", pl, plats[pl],
+            "sel-bar sel-bar--" + pl.toLowerCase().replace(/[^a-z]/g, "")); }).join("") + "</ul>" +
           (multiPlat ? '<p class="cat-places__note">' + multiPlat + (multiPlat === 1 ? " creator is" : " creators are") +
             " on more than one platform, so counted on each.</p>" : "");
       }
@@ -2866,9 +2870,9 @@
       }).join("");
       box.hidden = !names.length;
       box.innerHTML = '<p class="sel-viz__title">Where they are</p><ul class="cat-places__list sel-viz__rows">' +
-        names.slice(0, 4).map(function (name) { return row(flagOf(name), cname(name), countries[name].n); }).join("") + "</ul>" +
+        names.slice(0, 4).map(function (name) { return row(flagOf(name), cname(name), countries[name].n, "sel-bar sel-bar--country"); }).join("") + "</ul>" +
         more("places", (names.length > 4 ? '<ul class="cat-places__list sel-viz__rows">' + names.slice(4).map(function (name) {
-            return row(flagOf(name), cname(name), countries[name].n); }).join("") + "</ul>" : "") +
+            return row(flagOf(name), cname(name), countries[name].n, "sel-bar sel-bar--country"); }).join("") + "</ul>" : "") +
           (cityLines ? '<ul class="sel-viz__cities">' + cityLines + "</ul>" : "") +
           ((several || multiCity) ? '<p class="cat-places__note">' +
             (several ? several + (several === 1 ? " creator works" : " creators work") + " in more than one country, so counted in each. " : "") +
@@ -3518,6 +3522,9 @@
           if (objMenuOpen && e.target.closest && !e.target.closest(".sel-brief__acts")) { objMenuOpen = false; renderHeadOnly(); }
         });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape" && objMenuOpen) { objMenuOpen = false; renderHeadOnly(); } });
+        var shut = function () { if (objMenuOpen) { objMenuOpen = false; renderHeadOnly(); } };
+        window.addEventListener("scroll", shut, { passive: true });
+        window.addEventListener("resize", shut);
       }
       var sw = function (what, on, label) {
         return '<button type="button" class="sel-swrow sel-obj__pub sel-obj__sw" role="switch" aria-checked="' + on + '" data-what="' + what +
@@ -3534,7 +3541,18 @@
           hvIcon("user") + "Client sees" + CHEVRON + "</button>" +
           '<span class="sel-brief__pop" role="group" aria-label="What the client sees"' + (objMenuOpen ? "" : " hidden") + ">" +
           sw("scores", !!gate.published, "Scores &amp; fit") + sw("analysis", !!gate.analysis, "Profile analysis") + "</span></span>" : "");
-      if (acts.children.length) bx.appendChild(acts);
+      if (!acts.children.length) return;
+      var obj = bx.querySelector(".cat-selhead__obj");
+      if (obj) obj.insertAdjacentElement("afterend", acts); else bx.appendChild(acts);
+      // The header clips what overflows it (its video): the menu is placed on the page, under its button.
+      var pop = acts.querySelector(".sel-brief__pop"), btn = acts.querySelector(".sel-brief__menu-btn");
+      if (pop && btn && !pop.hidden) {
+        var r = btn.getBoundingClientRect();
+        pop.style.position = "fixed";
+        pop.style.top = Math.round(r.bottom + 8) + "px";
+        pop.style.left = Math.max(12, Math.round(Math.min(r.left, window.innerWidth - pop.offsetWidth - 12))) + "px";
+        pop.style.right = "auto";
+      }
     }
     function renderHeadOnly() { renderHead(); renderObjective(); }
     function renderObjective() {
@@ -3625,14 +3643,14 @@
       if (chips.tr) o.tr = "1";
       o.g = groupBy || "-";
       if (groupBy2) o.g2 = groupBy2;
-      if (!compactCards) o.cards = "full";
+      if (compactCards) o.cards = "compact";
       return o;
     }
     function viewApply(o) {
       o = o || {};
       if (controls) controls.set(o);
       chips = { kind: Array.isArray(o.kind) ? o.kind.slice() : [], st: Array.isArray(o.st) ? o.st.slice() : [], tr: o.tr === "1" };
-      if (o.cards === "full" || o.cards === "compact") setCompact(o.cards === "compact");
+      setCompact(o.cards === "compact");
       if (typeof o.g === "string") { groupBy = o.g === "-" ? "" : o.g; groupBy2 = typeof o.g2 === "string" ? o.g2 : ""; syncGroupMenus(); groupStore(); }
     }
     function viewEncode(o) {
@@ -3879,7 +3897,8 @@
     // switch in the bar (remembered on this device, carried in the link and saved views). Nothing is moved:
     // a row is put in front of each block and the block hides, so the renderers that rebuild them keep working.
     var CARDS_KEY = "hv-sel-cards", compactCards = true, cfOpen = {};
-    try { compactCards = localStorage.getItem(CARDS_KEY) !== "full"; } catch (e) { /* private mode */ }
+    compactCards = false;   // Full by default (Bido, 2026-10-24: compact rethink pending)
+    try { compactCards = localStorage.getItem(CARDS_KEY) === "compact"; } catch (e) { /* private mode */ }
     function setCompact(on) {
       compactCards = on;
       try { localStorage.setItem(CARDS_KEY, on ? "compact" : "full"); } catch (e) { /* private mode */ }
