@@ -2425,3 +2425,20 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
   body[data-page="selection"] .cat-group__head .cat-group__pct { margin-left: 0; flex-basis: auto; }
   body[data-page="selection"] .cat-group__head .cat-group__fold { margin-left: auto; }
 }
+
+/* Rings (item 258): platforms and places as donuts with a legend beside them */
+.sel-donut { display: grid; grid-template-columns: 148px minmax(0, 1fr); gap: 18px; align-items: center; }
+.sel-donut__svg { width: 148px; height: 148px; display: block; }
+.sel-donut__big { font: 400 30px var(--heading); fill: var(--ink); letter-spacing: .02em; }
+.sel-donut__small { font: 600 10.5px var(--body); fill: var(--gray); letter-spacing: .06em; text-transform: uppercase; }
+.sel-donut__legend { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.sel-donut__legend li { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; font-size: 14px; }
+.sel-donut__legend .cat-places__mark svg { width: 22px; height: 22px; padding: 3px; }
+.sel-donut__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-geo__head em { font-style: normal; font-weight: 600; font-size: 12.5px; color: var(--gray); }
+.sel-geo .sel-donut { margin-top: 4px; }
+.sel-geo__line { margin: 14px 0 0; padding-top: 12px; border-top: 1px solid rgba(18,18,18,.08); }
+@media screen and (max-width: 767px) {
+  .sel-donut { grid-template-columns: 1fr; justify-items: center; gap: 12px; }
+  .sel-donut__legend { width: 100%; }
+}

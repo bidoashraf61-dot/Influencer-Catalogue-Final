@@ -2852,6 +2852,33 @@
         (two ? '<p class="cat-places__note">Shares are of each group: HCP Micro 50% means half of the HCPs.</p>' : "");
     }
 
+    // Item 258 (Bido: "circle infographic instead of bars"): one ring drawing for platforms and places.
+    // items: [{label, n, color, mark}]; tiny slices keep a sliver (1.5% of the ring) so they stay visible.
+    function donutSvg(items, big, small, aria) {
+      var R = 52, SW = 18, C = 2 * Math.PI * R, sum = items.reduce(function (t, x) { return t + x.n; }, 0) || 1;
+      var minArc = C * 0.015, gap = items.length > 1 ? 1.6 : 0;
+      var arcs = items.map(function (x) { return Math.max(minArc, C * x.n / sum); });
+      var extra = arcs.reduce(function (t, a) { return t + a; }, 0) - C, big0 = 0;
+      arcs.forEach(function (a, i) { if (a > arcs[big0]) big0 = i; });
+      arcs[big0] -= extra;
+      var off = 0, rings = items.map(function (x, i) {
+        var len = Math.max(0.5, arcs[i] - gap);
+        var el = '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="' + x.color + '" stroke-width="' + SW + '" stroke-dasharray="' + len.toFixed(2) + " " + C.toFixed(2) +
+          '" stroke-dashoffset="' + (-off).toFixed(2) + '" transform="rotate(-90 70 70)"><title>' + esc(x.label + ": " + x.n) + "</title></circle>";
+        off += arcs[i];
+        return el;
+      }).join("");
+      return '<svg class="sel-donut__svg" viewBox="0 0 140 140" role="img" aria-label="' + esc(aria) + '">' +
+        '<circle cx="70" cy="70" r="' + R + '" fill="none" stroke="rgba(18,18,18,.06)" stroke-width="' + SW + '"/>' + rings +
+        '<text x="70" y="68" text-anchor="middle" class="sel-donut__big">' + esc(big) + '</text><text x="70" y="86" text-anchor="middle" class="sel-donut__small">' + esc(small) + "</text></svg>";
+    }
+    function donutBlock(items, big, small, aria, pctOf) {
+      var sum = pctOf || items.reduce(function (t, x) { return t + x.n; }, 0) || 1;
+      return '<div class="sel-donut">' + donutSvg(items, big, small, aria) + '<ul class="sel-donut__legend">' + items.map(function (x) {
+        return "<li>" + (x.mark || '<i class="sel-dot" style="background:' + x.color + '" aria-hidden="true"></i>') + '<span class="sel-donut__name">' + esc(x.label) +
+          '</span><b class="sel-num">' + x.n + "<em> · " + (x.n && Math.round(100 * x.n / sum) === 0 ? "<1" : Math.round(100 * x.n / sum)) + "%</em></b></li>";
+      }).join("") + "</ul></div>";
+    }
     function renderPlaces() {
       var box = $("sel-places");
       if (!box) {
@@ -2910,11 +2937,15 @@
       var pbox = $("sel-plats");
       if (pbox) {
         pbox.hidden = !platNames.length;
-        pbox.innerHTML = '<p class="sel-viz__title">On each platform</p><ul class="cat-places__list sel-viz__rows">' +
-          platNames.map(function (pl) { return row('<span class="cat-places__mark ' + (BRAND[pl] || "") + '">' + (ICONS[pl] || ICON_LINK) + "</span>", pl, plats[pl],
-            "sel-bar sel-bar--" + pl.toLowerCase().replace(/[^a-z]/g, "")); }).join("") + "</ul>" +
-          (multiPlat ? '<p class="cat-places__note">' + multiPlat + (multiPlat === 1 ? " creator is" : " creators are") +
-            " on more than one platform, so counted on each.</p>" : "");
+        var PCOL = { Instagram: "#e0365c", TikTok: "#121212", Snapchat: "#d6a400", YouTube: "#ee1515", X: "#383838", Facebook: "#2f6fe0" };
+        var accounts = platNames.reduce(function (t, pl) { return t + plats[pl]; }, 0);
+        pbox.innerHTML = '<p class="sel-viz__title">On each platform</p>' +
+          donutBlock(platNames.map(function (pl) {
+            return { label: pl, n: plats[pl], color: PCOL[pl] || "#8b4ae0",
+                     mark: '<span class="cat-places__mark ' + (BRAND[pl] || "") + '">' + (ICONS[pl] || ICON_LINK) + "</span>" };
+          }), String(accounts), "accounts", "Accounts by platform: " + platNames.map(function (pl) { return pl + " " + plats[pl]; }).join(", ")) +
+          '<p class="cat-places__note">Shares are of the ' + accounts + " accounts, not of creators" +
+          (multiPlat ? ": " + multiPlat + (multiPlat === 1 ? " creator is" : " creators are") + " on more than one platform, so counted on each." : ".") + "</p>";
       }
       var cname = function (name) { return name === "Other" ? "Location not set" : name; };
       var cityLines = names.map(function (name) {
@@ -2937,16 +2968,18 @@
           var na = a === "City not specified", nb = b === "City not specified";
           return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
         });
+        if (!cities.length) {
+          // No city data (e.g. "Location not specified"): one line, no ring.
+          return '<p class="sel-geo__head sel-geo__line">' + flagOf(name) + "<span>" + esc(cname(name)) + '</span><b class="sel-num">' + c.n + "<em> · " + pc + "%</em></b></p>";
+        }
         var shown = cities.slice(0, 8), rest = cities.slice(8).reduce(function (t, x) { return t + c.cities[x]; }, 0);
-        return '<div class="sel-geo"><p class="sel-geo__head">' + flagOf(name) + "<span>" + esc(cname(name)) + '</span><b class="sel-num">' + c.n + "<em> · " + pc + "%</em></b></p>" +
-          (shown.length ? '<ul class="sel-geo__cities">' + shown.map(function (city, i) {
-            var n = c.cities[city], none = city === "City not specified";
-            var colr = none ? "rgba(18,18,18,.28)" : CITY_COL[Math.min(i, CITY_COL.length - 1)];
-            return '<li><span class="sel-geo__city"><i class="sel-dot" style="background:' + colr + '" aria-hidden="true"></i>' + esc(none ? "City not set" : city) +
-              '</span><span class="sel-geo__bar"><i style="width:' + Math.max(2, Math.round(100 * n / maxCity)) + "%;background:" + colr + '"></i></span>' +
-              '<b class="sel-num">' + n + "<em> · " + (c.n ? Math.round(100 * n / c.n) : 0) + "%</em></b></li>";
-          }).join("") + (rest ? '<li class="sel-geo__more"><span class="sel-geo__city">' + (cities.length - 8) + ' more cities</span><span class="sel-geo__bar"></span><b>' + rest + "</b></li>" : "") + "</ul>" : "") +
-          "</div>";
+        var items = shown.map(function (city, i) {
+          var none = city === "City not specified";
+          return { label: none ? "City not set" : city, n: c.cities[city], color: none ? "#c9c2bb" : CITY_COL[Math.min(i, CITY_COL.length - 1)] };
+        });
+        if (rest) items.push({ label: (cities.length - 8) + " more cities", n: rest, color: "#e0ecff" });
+        return '<div class="sel-geo"><p class="sel-geo__head">' + flagOf(name) + "<span>" + esc(cname(name)) + '</span><b class="sel-num">' + c.n + "<em> · " + pc + "% of the selection</em></b></p>" +
+          donutBlock(items, String(c.n), name.length > 14 ? "creators" : cname(name), cname(name) + ": " + items.map(function (x) { return x.label + " " + x.n; }).join(", "), c.n) + "</div>";
       }).join("") +
         ((several || multiCity) ? '<p class="cat-places__note">' +
           (several ? several + (several === 1 ? " creator works" : " creators work") + " in more than one country, so counted in each. " : "") +
