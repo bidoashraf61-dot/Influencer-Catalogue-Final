@@ -3643,14 +3643,12 @@
       if (chips.tr) o.tr = "1";
       o.g = groupBy || "-";
       if (groupBy2) o.g2 = groupBy2;
-      if (compactCards) o.cards = "compact";
       return o;
     }
     function viewApply(o) {
       o = o || {};
       if (controls) controls.set(o);
       chips = { kind: Array.isArray(o.kind) ? o.kind.slice() : [], st: Array.isArray(o.st) ? o.st.slice() : [], tr: o.tr === "1" };
-      setCompact(o.cards === "compact");
       if (typeof o.g === "string") { groupBy = o.g === "-" ? "" : o.g; groupBy2 = typeof o.g2 === "string" ? o.g2 : ""; syncGroupMenus(); groupStore(); }
     }
     function viewEncode(o) {
@@ -3797,7 +3795,7 @@
     $("cat-grid").addEventListener("click", function (e) {
       if (!picking) return;
       var card = e.target.closest && e.target.closest(".cat-card");
-      if (!card || (e.target.closest("a, .sel-st, .cf-row, [data-st-set], [data-st-whyq]") && !e.target.closest(".sel-pick"))) return;
+      if (!card || (e.target.closest("a, .sel-st, .slim-more, [data-st-set], [data-st-whyq]") && !e.target.closest(".sel-pick"))) return;
       e.preventDefault(); e.stopPropagation();
       var code = card.dataset.code;
       if (picked[code]) delete picked[code]; else picked[code] = 1;
@@ -3892,19 +3890,13 @@
       clearTimeout(toastEl._t); toastEl._t = setTimeout(function () { toastEl.hidden = true; }, 9000);
     }
 
-    // ---- Item 243 (Bido, 2026-10-24): compact cards. Photo, name, platforms, tier and status always show;
-    // Details, Tags, Track record and Decision fold to one-line rows that open on their own. A Compact / Full
-    // switch in the bar (remembered on this device, carried in the link and saved views). Nothing is moved:
-    // a row is put in front of each block and the block hides, so the renderers that rebuild them keep working.
-    var CARDS_KEY = "hv-sel-cards", compactCards = true, cfOpen = {};
-    compactCards = false;   // Full by default (Bido, 2026-10-24: compact rethink pending)
-    try { compactCards = localStorage.getItem(CARDS_KEY) === "compact"; } catch (e) { /* private mode */ }
-    function setCompact(on) {
-      compactCards = on;
-      try { localStorage.setItem(CARDS_KEY, on ? "compact" : "full"); } catch (e) { /* private mode */ }
-      document.body.classList.toggle("sel-compact", on);
-    }
+    // ---- Item 246 (Bido, 2026-10-24): the slim card. Nothing folds (the compact sections of item 243 were
+    // confusing); the card is trimmed instead: one line of platforms + city, one line of reach and views,
+    // tags on one line with "+N" that opens the rest, Analysis and Track record side by side, and the tools
+    // under the status as small icon buttons. The blocks the other renderers rebuild are restyled, not
+    // rewritten; only the two buttons and the tools are wrapped, again on every draw.
     var PLAT_NAMES = ["Instagram", "TikTok", "Snapchat", "YouTube", "X", "Facebook"];
+    var tagsOpen = {};
     function cfNum(t) { var n = Number(String(t || "").replace(/[^0-9.]/g, "")); return n ? compact(n) : String(t || "").trim(); }
     function metaRows(card) {
       return all(".cat-card__meta > li", card).map(function (li) {
@@ -3912,81 +3904,95 @@
         return [k ? k.textContent.trim() : "", v ? v.textContent.trim() : ""];
       });
     }
-    function cfSummary(card, key) {
-      if (key === "details") {
-        var rows = metaRows(card), get = function (name) { var r = rows.filter(function (x) { return x[0].toLowerCase() === name; })[0]; return r ? r[1] : ""; };
-        return [get("total reach") ? "Reach " + cfNum(get("total reach")) : "", get("city"), get("views / post") ? cfNum(get("views / post")) + " views/post" : ""]
-          .filter(Boolean).join(" · ");
-      }
-      if (key === "tags") {
-        var tags = all(".cat-tags .cat-tag:not(.cat-tag--add)", card).map(function (t) { return t.textContent.trim(); }).filter(Boolean);
-        return tags.length ? tags[0] + (tags.length > 1 ? " +" + (tags.length - 1) : "") : "None yet";
-      }
-      if (key === "track") { var n = card.querySelector(".ev-tr__n"); return n ? n.textContent.trim() : ""; }
-      if (key === "decision") {
-        var st = statusOf(card.dataset.code);
-        return st.at ? (st.by || (st.hv ? "HelloVoice" : "Client")) + " · " + stDay(st.at) : "Helvi tools";
-      }
-      return "";
-    }
-    var CF = [["details", "Details", ".cat-card__meta"], ["tags", "Tags", ".cat-tags"], ["track", "Track record", ".ev-tr"],
-              ["decision", "Decision", ".sel-st__by, .sel-alike, .sel-ideas, .sel-repl"]];
-    function foldCard(card) {
+    function setHtml(el, html) { if (el.getAttribute("data-sig") !== html) { el.innerHTML = html; el.setAttribute("data-sig", html); } }
+    function slimCard(card) {
       var code = card.dataset.code, body = card.querySelector(".cat-card__body");
       if (!code || !body) return;
-      // Platforms with followers, on one line under the name.
-      var name = body.querySelector(".cat-card__name"), line = body.querySelector(".cf-plats");
-      var plats = metaRows(card).filter(function (r) { return PLAT_NAMES.indexOf(r[0]) > -1; });
-      var html = plats.map(function (r) { return '<span class="cf-plat ' + (BRAND[r[0]] || "") + '" title="' + esc(r[0]) + '">' + (ICONS[r[0]] || "") + "<b>" + esc(cfNum(r[1])) + "</b></span>"; }).join("");
-      if (name && plats.length) {
-        if (!line) { line = document.createElement("p"); line.className = "cf-plats"; name.insertAdjacentElement("afterend", line); }
-        if (line.innerHTML !== html) line.innerHTML = html;
+      var rows = metaRows(card), get = function (name) { var r = rows.filter(function (x) { return x[0].toLowerCase() === name; })[0]; return r ? r[1] : ""; };
+      var name = body.querySelector(".cat-card__name"), meta = body.querySelector(".cat-card__meta");
+      // Line 1: platforms with followers, then the city. Line 2: reach and views per post.
+      var l1 = body.querySelector(".slim-l1"), l2 = body.querySelector(".slim-l2");
+      if (name && meta) {
+        if (!l1) { l1 = document.createElement("p"); l1.className = "slim-l1"; meta.parentNode.insertBefore(l1, meta); }
+        if (!l2) { l2 = document.createElement("p"); l2.className = "slim-l2"; meta.parentNode.insertBefore(l2, meta); }
+        var plats = rows.filter(function (r) { return PLAT_NAMES.indexOf(r[0]) > -1; });
+        setHtml(l1, plats.map(function (r) { return '<span class="slim-plat ' + (BRAND[r[0]] || "") + '" title="' + esc(r[0]) + '">' + (ICONS[r[0]] || "") + "<b>" + esc(cfNum(r[1])) + "</b></span>"; }).join("") +
+          (get("city") ? '<span class="slim-city">' + esc(get("city")) + "</span>" : ""));
+        var st2 = [get("total reach") ? "Reach <b>" + esc(cfNum(get("total reach"))) + "</b>" : "",
+                   get("views / post") ? "<b>" + esc(cfNum(get("views / post"))) + "</b> views / post" : ""].filter(Boolean);
+        setHtml(l2, st2.join('<i aria-hidden="true">·</i>'));
+        l2.hidden = !st2.length;
       }
-      CF.forEach(function (sec) {
-        var key = sec[0], targets = all(sec[2], body);
-        var row = body.querySelector('.cf-row[data-cf-row="' + key + '"]');
-        if (!targets.length) { if (row) row.remove(); return; }
-        var auto = key === "track" && chips.tr;
-        var open = cfOpen[code + ":" + key] != null ? cfOpen[code + ":" + key] : auto;
-        if (!row) {
-          row = document.createElement("button");
-          row.type = "button"; row.className = "cf-row"; row.setAttribute("data-cf-row", key); row.setAttribute("data-noselect", "");
+      // Tags on one line: the first two, then "+N" opens the rest and the + Tag field.
+      var tagBox = body.querySelector(".cat-tags");
+      if (tagBox) {
+        var tags = all(".cat-tag:not(.cat-tag--add)", tagBox), extra = Math.max(0, tags.length - 2), open = !!tagsOpen[code];
+        tags.forEach(function (t, i) { t.classList.toggle("slim-off", i >= 2 && !open); });
+        tagBox.classList.toggle("is-open", open);
+        var add = tagBox.querySelector(".cat-tag--add");
+        if (add) add.classList.toggle("slim-off", extra > 0 && !open);
+        var more = tagBox.querySelector(".slim-more");
+        if (extra) {
+          if (!more) { more = document.createElement("button"); more.type = "button"; more.className = "slim-more"; more.setAttribute("data-noselect", ""); tagBox.appendChild(more); }
+          var lab = open ? "Less" : "+" + extra;
+          if (more.textContent !== lab) more.textContent = lab;
+          more.setAttribute("aria-expanded", String(open));
+          more.setAttribute("aria-label", open ? "Show fewer tags" : "Show " + extra + " more tags");
+        } else if (more) more.remove();
+      }
+      // Analysis and Track record side by side.
+      var an = body.querySelector("a.cat-card__analysis"), tr = body.querySelector(".ev-tr");
+      if (an || tr) {
+        var pair = body.querySelector(".slim-pair");
+        var st = body.querySelector(".sel-st");
+        if (!pair) { pair = document.createElement("div"); pair.className = "slim-pair"; if (st) body.insertBefore(pair, st); else body.appendChild(pair); }
+        if (an && an.parentNode !== pair) pair.appendChild(an);
+        if (tr && tr.parentNode !== pair) pair.appendChild(tr);
+        if (an && tr && pair.firstChild !== an) pair.insertBefore(an, tr);
+        var trn = tr && tr.querySelector(".ev-tr__n");
+        if (trn) { var nb = (trn.textContent.match(/\d+/) || [""])[0]; if (tr.getAttribute("data-n") !== nb) tr.setAttribute("data-n", nb); tr.title = "Track record: " + trn.textContent.trim(); }
+      }
+      // The tools under the status: small icon buttons in one row (Find a replacement keeps its words).
+      var box = body.querySelector(".sel-st");
+      if (box) {
+        var tools = all(":scope > .sel-alike, :scope > .sel-ideas", box);
+        if (tools.length) {
+          var row = box.querySelector(":scope > .slim-tools");
+          if (!row) { row = document.createElement("div"); row.className = "slim-tools"; box.appendChild(row); }
+          tools.forEach(function (t) {
+            var label = (t.querySelector("span") || t).textContent.trim();
+            if (!t.getAttribute("aria-label")) t.setAttribute("aria-label", label);
+            t.setAttribute("data-tip", label);
+            row.appendChild(t);
+          });
         }
-        if (row.nextElementSibling !== targets[0]) targets[0].parentNode.insertBefore(row, targets[0]);
-        var sum = cfSummary(card, key);
-        var inner = '<span class="cf-row__k">' + sec[1] + '</span><span class="cf-row__v">' + esc(sum) + "</span>" + CHEVRON;
-        if (row.getAttribute("data-sig") !== inner) { row.innerHTML = inner; row.setAttribute("data-sig", inner); }
-        if (row.getAttribute("aria-expanded") !== String(open)) row.setAttribute("aria-expanded", String(open));
-        targets.forEach(function (t) { t.setAttribute("data-cf", key); t.classList.toggle("cf-show", open); });
-      });
+      }
     }
-    var folding = false;
-    function foldCards() {
-      if (folding) return;
-      folding = true;
-      document.body.classList.toggle("sel-compact", compactCards);
-      all(".cat-card", $("cat-grid")).forEach(foldCard);
-      folding = false;
+    var slimming = false;
+    function slimCards() {
+      if (slimming) return;
+      slimming = true;
+      document.body.classList.add("sel-slim");
+      all(".cat-card", $("cat-grid")).forEach(slimCard);
+      slimming = false;
     }
-    // The track-record script adds its button after the page draws: fold whatever it adds.
-    var foldTimer = null;
+    // The track-record script adds its button after the page draws: tidy whatever it adds.
+    var slimTimer = null;
     try {
       new MutationObserver(function (list) {
-        if (folding) return;
-        var hit = list.some(function (m) { return [].some.call(m.addedNodes, function (n) { return n.nodeType === 1 && n.classList && (n.classList.contains("ev-tr") || n.classList.contains("sel-st")); }); });
+        if (slimming) return;
+        var hit = list.some(function (m) { return [].some.call(m.addedNodes, function (n) { return n.nodeType === 1 && n.classList && (n.classList.contains("ev-tr") || n.classList.contains("sel-st") || n.classList.contains("cat-tag")); }); });
         if (!hit) return;
-        clearTimeout(foldTimer); foldTimer = setTimeout(foldCards, 60);
+        clearTimeout(slimTimer); slimTimer = setTimeout(slimCards, 60);
       }).observe($("cat-grid"), { childList: true, subtree: true });
-    } catch (e) { /* old browser: folds on the next draw */ }
+    } catch (e) { /* old browser: tidied on the next draw */ }
     $("cat-grid").addEventListener("click", function (e) {
-      var row = e.target.closest && e.target.closest(".cf-row");
-      if (!row) return;
+      var more = e.target.closest && e.target.closest(".slim-more");
+      if (!more) return;
       e.preventDefault(); e.stopPropagation();
-      var card = row.closest(".cat-card"), key = row.getAttribute("data-cf-row"), id = card.dataset.code + ":" + key;
-      var now = row.getAttribute("aria-expanded") !== "true";
-      cfOpen[id] = now;
-      // The card and its copy in another group open together.
-      all('.cat-card[data-code="' + card.dataset.code + '"]', $("cat-grid")).forEach(foldCard);
+      var card = more.closest(".cat-card"), code = card.dataset.code;
+      tagsOpen[code] = !tagsOpen[code];
+      all('.cat-card[data-code="' + code + '"]', $("cat-grid")).forEach(slimCard);
     });
 
     function anyFilter() { return chipsOn() || !!(controls && controls.filtering()); }
@@ -4013,7 +4019,6 @@
           if (e.target.closest(".sel-tool--link")) { copyViewLink(e.target.closest(".sel-tool--link")); return; }
           if (e.target.closest(".sel-tool--views")) { toggleViews(e.target.closest(".sel-tool--views")); return; }
           if (e.target.closest(".sel-tool--pick")) { setPicking(!picking); return; }
-          if (e.target.closest(".sel-tool--cards")) { setCompact(!compactCards); renderStatusBar(); syncLink(); return; }
         });
       }
       host.hidden = false;
@@ -4043,8 +4048,6 @@
         '<button type="button" class="sel-tool sel-tool--filters" aria-haspopup="dialog">' + hvIcon("filter") + "Filters" + (nf ? ' <b class="sel-tool__n">' + nf + "</b>" : "") + "</button>" +
         '<div class="sel-views"><button type="button" class="sel-tool sel-tool--views" aria-expanded="' + viewsOpen + '" aria-haspopup="true">' + hvIcon("save") + "Views" + (VIEWS.length ? ' <b class="sel-tool__n">' + VIEWS.length + "</b>" : "") + "</button></div>" +
         '<button type="button" class="sel-tool sel-tool--link">' + hvIcon("copy") + "Copy link</button>" +
-        '<button type="button" class="sel-tool sel-tool--cards" aria-pressed="' + compactCards + '" title="Compact cards fold Details, Tags, Track record and Decision into one-line rows">' +
-          hvIcon("grid") + (compactCards ? "Compact cards" : "Full cards") + "</button>" +
         (canPick ? '<button type="button" class="sel-tool sel-tool--pick" aria-pressed="' + picking + '">' + hvIcon("check") + (picking ? "Done selecting" : "Select") + "</button>" : "") +
         "</div></div>" +
         '<div class="cat-container sel-shown"' + (filt ? "" : " hidden") + ' role="status"><span><b>' + n.shown + "</b> of " + selected.length + " shown</span>" +
@@ -4356,7 +4359,7 @@
       inOrder.forEach(function (card) { grid.appendChild(card); });   // back out of any sections first
       ordered.forEach(function (card) { grid.appendChild(card); });
       layoutGroups(grid, ordered);
-      foldCards();
+      slimCards();
       paintPicks();
 
       $("sel-title").textContent = selectionName;
