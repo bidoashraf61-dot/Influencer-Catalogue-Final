@@ -67,16 +67,38 @@ def candidates(post_url, platform, hint=None):
     if m:
         out.append("https://i.ytimg.com/vi/%s/hqdefault.jpg" % m.group(1))
     if not out and u.startswith("http"):
-        try:
-            html = _get(u, ua="facebookexternalhit/1.1").decode("utf-8", "replace")
-            m = re.search(r'property="og:image"\s+content="([^"]+)"', html)
-            if m:
-                out.append(m.group(1).replace("&amp;", "&"))
-        except Exception:
-            pass
+        img = _og_image(u)
+        if img:
+            out.append(img)
     if hint and str(hint).startswith("http"):
         out.append(hint)
     return out
+
+
+def _og_image(url):
+    """The page's og:image. A Facebook share link often lands on the login
+    page; the post it names is then read at /<owner>/posts/<id>/, which opens
+    without a login."""
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "facebookexternalhit/1.1", "Accept": "*/*"})
+        with urllib.request.urlopen(req, timeout=15) as r:
+            final, html = r.geturl(), r.read(MAX + 1).decode("utf-8", "replace")
+        m = re.search(r'property="og:image"\s+content="([^"]+)"', html)
+        if m:
+            return m.group(1).replace("&amp;", "&")
+        if "facebook.com/login" not in final:
+            return None
+        nxt = urllib.parse.unquote(urllib.parse.parse_qs(urllib.parse.urlsplit(final).query).get("next", [""])[0])
+        q = urllib.parse.parse_qs(urllib.parse.urlsplit(nxt).query)
+        post, owner = q.get("story_fbid", [""])[0], q.get("id", [""])[0]
+        if not (post.isdigit() and owner.isdigit()):
+            return None
+        html = _get("https://www.facebook.com/%s/posts/%s/" % (owner, post),
+                    ua="facebookexternalhit/1.1").decode("utf-8", "replace")
+        m = re.search(r'property="og:image"\s+content="([^"]+)"', html)
+        return m.group(1).replace("&amp;", "&") if m else None
+    except Exception:
+        return None
 
 
 def store(content_id, post_url, platform, hint=None):
