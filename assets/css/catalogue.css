@@ -2442,3 +2442,8 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
   .sel-donut { grid-template-columns: 1fr; justify-items: center; gap: 12px; }
   .sel-donut__legend { width: 100%; }
 }
+/* Item 260: one swatch style for every legend (Creator size, Where they are, On each platform) */
+.sel-swatch { flex: none; width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(18,18,18,.12); }
+.sel-donut__legend li { display: flex; align-items: center; gap: 8px; }
+.sel-donut__legend li .sel-donut__name { flex: 1; min-width: 0; }
+.sel-donut__legend li .sel-num { margin-left: auto; }

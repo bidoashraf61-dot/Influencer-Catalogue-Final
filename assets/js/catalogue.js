@@ -2875,7 +2875,8 @@
     function donutBlock(items, big, small, aria, pctOf) {
       var sum = pctOf || items.reduce(function (t, x) { return t + x.n; }, 0) || 1;
       return '<div class="sel-donut">' + donutSvg(items, big, small, aria) + '<ul class="sel-donut__legend">' + items.map(function (x) {
-        return "<li>" + (x.mark || '<i class="sel-dot" style="background:' + x.color + '" aria-hidden="true"></i>') + '<span class="sel-donut__name">' + esc(x.label) +
+        // Item 260: a square swatch in the slice's exact colour on every row (the logo stays beside it).
+        return '<li><i class="sel-swatch" style="background:' + x.color + '" aria-hidden="true"></i>' + (x.mark || "") + '<span class="sel-donut__name">' + esc(x.label) +
           '</span><b class="sel-num">' + x.n + "<em> · " + (x.n && Math.round(100 * x.n / sum) === 0 ? "<1" : Math.round(100 * x.n / sum)) + "%</em></b></li>";
       }).join("") + "</ul></div>";
     }
