@@ -2449,3 +2449,17 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
 .sel-donut__legend li .sel-num { margin-left: auto; }
 /* Item 261: the country flag reads as a flag, a little larger in the ring heading */
 .sel-geo__head .cat-flag { width: 30px; height: 20px; border-radius: 3px; box-shadow: 0 0 0 1px rgba(18,18,18,.12); }
+
+/* Item 262: decision notes behind an (i), opened by hover, keyboard focus or tap; kept inside the card */
+.sel-info { display: inline; }
+.sel-info__btn { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: 4px; padding: 0; vertical-align: -3px;
+  border: 1px solid rgba(18,18,18,.35); border-radius: 50%; background: var(--white); color: var(--ink);
+  font: italic 700 11px Georgia, serif; cursor: pointer; }
+.sel-info__btn:hover, .sel-info.is-open .sel-info__btn { background: var(--ink); color: var(--lime); border-color: var(--ink); }
+.sel-info__btn:focus-visible { outline: 3px solid var(--vivid-orange); outline-offset: 2px; }
+.sel-info__pop { position: absolute; left: 10px; right: 10px; bottom: calc(100% - 6px); z-index: 20; display: none;
+  padding: 10px 12px; border-radius: 12px; background: var(--ink); color: var(--white); font-size: 12.5px; line-height: 1.45; font-style: normal;
+  box-shadow: 0 12px 30px rgba(18,18,18,.3); }
+.sel-info__pop b { display: block; margin-bottom: 3px; color: var(--lime); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+@media (hover: hover) { .sel-info:hover .sel-info__pop { display: block; } }
+.sel-info:focus-within .sel-info__pop, .sel-info.is-open .sel-info__pop { display: block; }

@@ -3376,11 +3376,18 @@
       toastEl.textContent = text; toastEl.hidden = false;
       clearTimeout(toastEl._t); toastEl._t = setTimeout(function () { toastEl.hidden = true; }, 4200);
     }
+    // Item 262 (Bido: "make any reasons on (i) hover for more details, not written like this"): the card keeps
+    // "by Name · date"; any note sits behind an (i) that opens on hover, focus or tap. Rejection reasons keep
+    // their own "?" (it also edits the reason).
     function whoLine(st) {
       if (!st.at) return st.s === "review" ? (ROLE === "owner" ? "Your call." : "Not decided yet.") : "";
-      var by = st.hv ? "<b>" + esc(st.by || "HelloVoice") + "</b> · HelloVoice" : "<b>" + esc(st.by || "Client") + "</b>";
       var lead = st.s === "review" ? "Set back by " : st.s === "unavailable" ? "Marked by " : "by ";
-      return lead + by + " · " + esc(stDay(st.at)) + (st.s === "review" && st.note ? " · " + esc(st.note) : "");
+      return lead + "<b>" + esc(st.by || (st.hv ? "HelloVoice" : "Client")) + "</b> · " + esc(stDay(st.at)) + infoTip(st);
+    }
+    function infoTip(st) {
+      if (!st.note || st.s === "rejected") return "";
+      return ' <span class="sel-info"><button type="button" class="sel-info__btn" aria-label="More details" aria-expanded="false" data-noselect>i</button>' +
+        '<span class="sel-info__pop" role="tooltip">' + (st.hv ? "<b>HelloVoice note</b>" : "<b>Note</b>") + esc(st.note) + "</span></span>";
     }
     function replButton(code, st) {
       var have = (st.replacements || []).length;
@@ -3516,7 +3523,6 @@
         "</div>";
       var who = whoLine(st);
       if (who) html += '<p class="sel-st__by">' + who + "</p>";
-      if (st.s === "unavailable" && st.note) html += '<p class="sel-offnote">' + esc(st.note) + "</p>";
       if (canDecide && st.s === "review") {
         html += '<div class="sel-st__acts"><button type="button" class="sel-dec sel-dec--yes" data-st-set="approved" data-st-code="' + esc(code) + '">' + hvIcon("check") + " Approve</button>" +
           '<button type="button" class="sel-dec sel-dec--no" data-st-set="rejected" data-st-code="' + esc(code) + '">' + hvIcon("x") + " Reject</button></div>";
@@ -4258,6 +4264,17 @@
       if (gbStored === null && !(CURATED && CURATED.groupBy)) groupBy = "status";
     }
     syncGroupMenus();
+    // The (i) on a decision: tap toggles it (touch has no hover); Esc or a tap elsewhere closes it.
+    function closeInfos(except) { all(".sel-info.is-open").forEach(function (x) { if (x !== except) { x.classList.remove("is-open"); var b = x.querySelector(".sel-info__btn"); if (b) b.setAttribute("aria-expanded", "false"); } }); }
+    document.addEventListener("click", function (e) {
+      var b = e.target.closest && e.target.closest(".sel-info__btn");
+      if (!b) { if (!(e.target.closest && e.target.closest(".sel-info__pop"))) closeInfos(null); return; }
+      e.preventDefault(); e.stopPropagation();
+      var w = b.closest(".sel-info"), on = !w.classList.contains("is-open");
+      closeInfos(w);
+      w.classList.toggle("is-open", on); b.setAttribute("aria-expanded", String(on));
+    }, true);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeInfos(null); });
     $("cat-grid").addEventListener("click", function (e) {
       var t = e.target.closest && e.target.closest("[data-st-set], [data-st-whyq], [data-st-repl], [data-st-add]");
       if (!t || !STATUS_ON) return;
