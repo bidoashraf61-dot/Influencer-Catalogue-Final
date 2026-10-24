@@ -2724,6 +2724,7 @@
       var have = Object.keys(FX);
       var box = $("sel-currency");
       if (have.length < 2) { if (box) box.hidden = true; return; }
+      if (box) box.hidden = false;
       if (!box) {
         box = document.createElement("div");
         box.id = "sel-currency"; box.className = "cat-cur"; box.setAttribute("role", "group");
@@ -2778,10 +2779,19 @@
               Math.max(3, Math.round(100 * tiers[t] / max)) + '%"></i></i></li>';
           }).join("") + "</ul></div>";
       };
-      var hcpList = names.filter(function (t) { return /hcp/i.test(t); });
-      var plainList = names.filter(function (t) { return !/hcp/i.test(t); });
-      box.innerHTML = '<p class="cat-places__label">Creator size</p><div class="cat-tiers__panels">' +
-        panel("Influencers", plainList, false) + panel("HCPs", hcpList, true) + "</div>";
+      // Item 244: one stacked bar (influencers in ink, doctors in blue, darker = bigger) and a legend.
+      var hcpList = names.filter(function (t) { return /hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
+      var plainList = names.filter(function (t) { return !/hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
+      var shade = function (t, hcp) { var a = .25 + .15 * Math.min(rank(t), 5); return hcp ? "rgba(47,95,196," + a + ")" : "rgba(18,18,18," + a + ")"; };
+      var all_ = plainList.map(function (t) { return [t, false]; }).concat(hcpList.map(function (t) { return [t, true]; }));
+      var label = function (t, hcp) { var x = t.replace(/^\s*hcp\s*[-–—:]?\s*/i, ""); return hcp ? "HCP " + x : x; };
+      box.innerHTML = '<p class="sel-viz__title">Creator size</p>' +
+        '<div class="sel-stack" role="img" aria-label="' + esc(all_.map(function (x) { return label(x[0], x[1]) + " " + tiers[x[0]]; }).join(", ")) + '">' +
+        all_.map(function (x) { return '<i style="flex-grow:' + tiers[x[0]] + ";background:" + shade(x[0], x[1]) + '"></i>'; }).join("") + "</div>" +
+        '<ul class="sel-legend">' + all_.map(function (x) {
+          return '<li><i style="background:' + shade(x[0], x[1]) + '" aria-hidden="true"></i><span>' + esc(label(x[0], x[1])) + "</span><b>" + tiers[x[0]] +
+            "</b><small>" + Math.round(100 * tiers[x[0]] / total) + "%</small></li>";
+        }).join("") + "</ul>";
     }
 
     function renderPlaces() {
@@ -2832,42 +2842,37 @@
       var platNames = Object.keys(plats).sort(function (a, b) {
         return (plats[b] - plats[a]) || a.localeCompare(b);
       });
-      var platHtml = platNames.length
-        ? '<p class="cat-places__label cat-places__label--next">On each platform</p>' +
-          '<ul class="cat-places__list cat-places__list--platforms">' +
-          platNames.map(function (pl) {
-            return '<li><p class="cat-places__country"><span class="cat-places__mark ' +
-              (BRAND[pl] || "") + '">' + (ICONS[pl] || ICON_LINK) + "</span><span>" + esc(pl) +
-              "</span><b>" + plats[pl] + "</b></p>" +
-              '<div class="cat-places__bar">' + shareBar(plats[pl], selected.length) + "</div></li>";
-          }).join("") + "</ul>" +
-          (multiPlat ? '<p class="cat-places__note">' + multiPlat +
-            (multiPlat === 1 ? " creator is" : " creators are") +
-            " on more than one platform, so " + (multiPlat === 1 ? "is" : "are") +
-            " counted on each.</p>" : "")
-        : "";
-      box.hidden = !names.length && !platNames.length;
-      box.innerHTML = '<p class="cat-places__label">Where they are</p><ul class="cat-places__list">' +
-        names.map(function (name) {
-          var c = countries[name];
-          var cities = Object.keys(c.cities).sort(function (a, b) {
-            var na = a === "City not specified", nb = b === "City not specified";
-            return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
-          });
-          return '<li><p class="cat-places__country">' + flagOf(name) + "<span>" +
-            esc(name === "Other" ? "Location not set" : name) + "</span><b>" + c.n + "</b></p>" +
-            '<div class="cat-places__bar">' + shareBar(c.n, selected.length) + "</div>" +
-            (cities.length ? '<ul class="cat-places__cities">' + cities.map(function (city) {
-              return "<li>" + esc(city) + " <b>" + c.cities[city] + "</b></li>";
-            }).join("") + "</ul>" : "") + "</li>";
-        }).join("") + "</ul>" +
-        // Say why the counts add up to more than the selection, when they do.
-        ((several || multiCity) ? '<p class="cat-places__note">' +
-          (several ? several + (several === 1 ? " creator works" : " creators work") +
-            " in more than one country, so " + (several === 1 ? "is" : "are") +
-            " counted in each. " : "") +
-          (multiCity ? "A creator listed in more than one city is counted in each city." : "") +
-          "</p>" : "") + platHtml;
+      // Item 244: platforms get their own small visual; countries show the top four, the rest under Details.
+      var row = function (mark, name, n) {
+        return '<li><p class="cat-places__country">' + mark + "<span>" + esc(name) + "</span><b>" + n + "</b></p>" +
+          '<div class="cat-places__bar">' + shareBar(n, selected.length) + "</div></li>";
+      };
+      var pbox = $("sel-plats");
+      if (pbox) {
+        pbox.hidden = !platNames.length;
+        pbox.innerHTML = '<p class="sel-viz__title">On each platform</p><ul class="cat-places__list sel-viz__rows">' +
+          platNames.map(function (pl) { return row('<span class="cat-places__mark ' + (BRAND[pl] || "") + '">' + (ICONS[pl] || ICON_LINK) + "</span>", pl, plats[pl]); }).join("") + "</ul>" +
+          (multiPlat ? '<p class="cat-places__note">' + multiPlat + (multiPlat === 1 ? " creator is" : " creators are") +
+            " on more than one platform, so counted on each.</p>" : "");
+      }
+      var cname = function (name) { return name === "Other" ? "Location not set" : name; };
+      var cityLines = names.map(function (name) {
+        var c = countries[name];
+        var cities = Object.keys(c.cities).sort(function (a, b) {
+          var na = a === "City not specified", nb = b === "City not specified";
+          return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
+        });
+        return cities.length ? "<li><b>" + esc(cname(name)) + "</b> " + cities.map(function (city) { return esc(city) + " " + c.cities[city]; }).join(" · ") + "</li>" : "";
+      }).join("");
+      box.hidden = !names.length;
+      box.innerHTML = '<p class="sel-viz__title">Where they are</p><ul class="cat-places__list sel-viz__rows">' +
+        names.slice(0, 4).map(function (name) { return row(flagOf(name), cname(name), countries[name].n); }).join("") + "</ul>" +
+        more("places", (names.length > 4 ? '<ul class="cat-places__list sel-viz__rows">' + names.slice(4).map(function (name) {
+            return row(flagOf(name), cname(name), countries[name].n); }).join("") + "</ul>" : "") +
+          (cityLines ? '<ul class="sel-viz__cities">' + cityLines + "</ul>" : "") +
+          ((several || multiCity) ? '<p class="cat-places__note">' +
+            (several ? several + (several === 1 ? " creator works" : " creators work") + " in more than one country, so counted in each. " : "") +
+            (multiCity ? "A creator listed in more than one city is counted in each city." : "") + "</p>" : ""));
     }
 
     // What the admin said about each creator of this selection: how well they
@@ -3493,6 +3498,45 @@
         var f = $("sel-share-email"); if (f && body.do === "add") f.focus();
       }).catch(function () { SHARE.busy = false; SHARE.msg = "Couldn’t reach the server. Please try again."; renderShare(); });
     }
+    // Item 244 (Bido, 2026-10-24): once the objective is set, its controls sit in the dark campaign-objective
+    // block: "Edit objective", and for HelloVoice a "Client sees" menu with the two switches that used to fill
+    // a bar of their own.
+    var objMenuOpen = false;
+    function briefActions(canAct) {
+      var bx = $("sel-brief");
+      if (!bx || bx.hidden) return;
+      var gate = CURATED && CURATED.scoresGate, team = !!(gate && gate.team);
+      if (!bx.dataset.wired) {
+        bx.dataset.wired = "1";
+        bx.addEventListener("click", function (e) {
+          var pub = e.target.closest(".sel-obj__pub");
+          if (pub) { publishScores(pub); return; }
+          if (e.target.closest(".sel-brief__menu-btn")) { objMenuOpen = !objMenuOpen; renderHeadOnly(); return; }
+          if (e.target.closest(".sel-brief__edit") && window.hvPortal && window.hvPortal.scoreBrief) window.hvPortal.scoreBrief(CURATED.token, { edit: true });
+        });
+        document.addEventListener("click", function (e) {
+          if (objMenuOpen && e.target.closest && !e.target.closest(".sel-brief__acts")) { objMenuOpen = false; renderHeadOnly(); }
+        });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && objMenuOpen) { objMenuOpen = false; renderHeadOnly(); } });
+      }
+      var sw = function (what, on, label) {
+        return '<button type="button" class="sel-swrow sel-obj__pub sel-obj__sw" role="switch" aria-checked="' + on + '" data-what="' + what +
+          '" data-publish="' + (on ? "0" : "1") + '"><span class="sel-sw" aria-hidden="true"></span>' + label +
+          '<small class="sel-obj__swst">' + (on ? "On for client" : "Off for client") + "</small></button>";
+      };
+      var menu = gate && gate.applies && team;
+      var pending = CURATED && CURATED.scoresPending && !team;
+      var acts = document.createElement("span");
+      acts.className = "sel-brief__acts";
+      acts.innerHTML = (pending ? '<span class="sel-brief__pending">' + hvIcon("clock") + "Scores coming soon</span>" : "") +
+        (canAct ? '<button type="button" class="sel-brief__edit">' + hvIcon("pen") + "Edit objective</button>" : "") +
+        (menu ? '<span class="sel-brief__menu"><button type="button" class="sel-brief__menu-btn" aria-expanded="' + objMenuOpen + '" aria-haspopup="true">' +
+          hvIcon("user") + "Client sees" + CHEVRON + "</button>" +
+          '<span class="sel-brief__pop" role="group" aria-label="What the client sees"' + (objMenuOpen ? "" : " hidden") + ">" +
+          sw("scores", !!gate.published, "Scores &amp; fit") + sw("analysis", !!gate.analysis, "Profile analysis") + "</span></span>" : "");
+      if (acts.children.length) bx.appendChild(acts);
+    }
+    function renderHeadOnly() { renderHead(); renderObjective(); }
     function renderObjective() {
       var host = $("sel-objective");
       var need = !!(CURATED && CURATED.needsObjective && selected.length);
@@ -3512,6 +3556,7 @@
         });
       }
       var canAct = ROLE === "owner" || ROLE === "admin";
+      if (have) { host.remove(); briefActions(canAct); return; }
       host.className = "sel-obj" + (have ? " sel-obj--done" : "");
       var gate = CURATED && CURATED.scoresGate;
       // Clients and key account managers never see scores (owner, 2026-10-20, item 174): for them the
@@ -4098,7 +4143,68 @@
       }, function () { then(); });
     }
     function selCards() { return selected.map(function (code) { return byCode[code]; }).filter(Boolean); }
+    // ---- Item 244 (Bido, 2026-10-24): page layout, done once ----
+    var laidOut = false, vizOpen = {};
+    function layoutPage() {
+      if (laidOut) return;
+      laidOut = true;
+      // The client logos close the page, just above the footer, instead of opening it.
+      var logos = document.querySelector(".cat-clients"), foot = document.querySelector("footer, .cat-footer");
+      if (logos && foot && foot.parentNode) foot.parentNode.insertBefore(logos, foot);
+      // "Please note" leaves its own section for one line in the selection tray; (i) opens the full text.
+      var note = document.querySelector(".cat-summary .cat-price-notice"), trayIn = document.querySelector("#cat-tray .cat-tray__inner");
+      if (note && trayIn) {
+        var list = note.querySelector("ul");
+        var wrap = document.createElement("div");
+        wrap.className = "cat-tray__note";
+        wrap.innerHTML = '<span class="cat-tray__note-tx">Indicative prices · excl. VAT · excl. logistics</span>' +
+          '<button type="button" class="cat-tray__info" aria-expanded="false" aria-controls="cat-tray-pop">' + hvIcon("help") +
+          '<span class="cat-tray__info-tx">Price notes</span></button>' +
+          '<div class="cat-tray__pop" id="cat-tray-pop" role="dialog" aria-label="Please note" hidden><p class="cat-tray__pop-title">Please note</p></div>';
+        if (list) wrap.querySelector(".cat-tray__pop").appendChild(list);
+        var acts = trayIn.querySelector(".cat-tray__actions");
+        trayIn.insertBefore(wrap, acts);
+        note.remove();
+        var btn = wrap.querySelector(".cat-tray__info"), pop = wrap.querySelector(".cat-tray__pop");
+        var set = function (on) { pop.hidden = !on; btn.setAttribute("aria-expanded", String(on)); };
+        btn.addEventListener("click", function (e) { e.stopPropagation(); set(pop.hidden); });
+        document.addEventListener("click", function (e) { if (!pop.hidden && !wrap.contains(e.target)) set(false); });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && !pop.hidden) { set(false); btn.focus(); } });
+      }
+      // The numbers become one panel: key figures, then three small visuals side by side.
+      var sum = $("sel-summary"), sec = document.querySelector(".cat-summary");
+      if (sum && sec) {
+        sec.classList.add("cat-summary--glance");
+        var head = document.createElement("div");
+        head.className = "sel-glance__head";
+        head.innerHTML = '<h2 class="sel-glance__title">At a glance</h2>';
+        var cur = document.createElement("div");
+        cur.id = "sel-currency"; cur.className = "cat-cur"; cur.setAttribute("role", "group"); cur.setAttribute("aria-label", "Currency");
+        cur.hidden = true;
+        cur.addEventListener("click", function (e) {
+          var b = e.target.closest("button[data-cur]"); if (!b) return;
+          CURRENCY = b.getAttribute("data-cur");
+          try { sessionStorage.setItem(curKey, CURRENCY); } catch (x) {}
+          render();
+        });
+        head.appendChild(cur);
+        sum.parentNode.insertBefore(head, sum);
+        var viz = document.createElement("div");
+        viz.className = "sel-glance__viz";
+        viz.innerHTML = '<div id="sel-tiers" class="cat-tiers sel-viz"></div><div id="sel-places" class="cat-places sel-viz"></div>' +
+          '<div id="sel-plats" class="cat-places sel-viz"></div>';
+        sum.insertAdjacentElement("afterend", viz);
+        viz.addEventListener("toggle", function (e) {
+          var d = e.target; if (d && d.dataset && d.dataset.viz) vizOpen[d.dataset.viz] = d.open;
+        }, true);
+      }
+    }
+    function more(key, inner) {
+      if (!inner) return "";
+      return '<details class="sel-viz__more" data-viz="' + key + '"' + (vizOpen[key] ? " open" : "") + "><summary>Details" + CHEVRON + "</summary>" + inner + "</details>";
+    }
     function render() {
+      layoutPage();
       if (window.hvGateQuote) window.hvGateQuote();
       if (typeof hideWhyTip === "function") hideWhyTip();
       var grid = $("cat-grid");
