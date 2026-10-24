@@ -2957,8 +2957,9 @@
         return cities.length ? "<li><b>" + esc(cname(name)) + "</b> " + cities.map(function (city) { return esc(city) + " " + c.cities[city]; }).join(" · ") + "</li>" : "";
       }).join("");
       // Item 249: every city shows, as ranked bars under its country (no Details). Colours from the catalogue palette.
-      // Item 254: cities in one hue (catalogue blue), darker = bigger; City not set stays grey.
-      var CITY_COL = ["#163f91", "#2f5fc4", "#2f6fe0", "#5b8ae6", "#8aaced", "#b4cbf3", "#cfdcf7", "#e0ecff"];
+      // Item 254: cities in one hue, darker = bigger; City not set stays grey.
+      // Item 259 (Bido: "all green grades"): the catalogue greens, darkest for the biggest city.
+      var CITY_COL = ["#0c5a2d", "#14884a", "#1b9b52", "#4fb57a", "#84cda1", "#b5e2c6", "#d3eedd", "#e3f6ea"];
       var maxCity = 1;
       names.forEach(function (name) { Object.keys(countries[name].cities).forEach(function (c) { maxCity = Math.max(maxCity, countries[name].cities[c]); }); });
       box.hidden = !names.length;
@@ -2977,7 +2978,7 @@
           var none = city === "City not specified";
           return { label: none ? "City not set" : city, n: c.cities[city], color: none ? "#c9c2bb" : CITY_COL[Math.min(i, CITY_COL.length - 1)] };
         });
-        if (rest) items.push({ label: (cities.length - 8) + " more cities", n: rest, color: "#e0ecff" });
+        if (rest) items.push({ label: (cities.length - 8) + " more cities", n: rest, color: "#e7f7ed" });
         return '<div class="sel-geo"><p class="sel-geo__head">' + flagOf(name) + "<span>" + esc(cname(name)) + '</span><b class="sel-num">' + c.n + "<em> · " + pc + "% of the selection</em></b></p>" +
           donutBlock(items, String(c.n), name.length > 14 ? "creators" : cname(name), cname(name) + ": " + items.map(function (x) { return x.label + " " + x.n; }).join(", "), c.n) + "</div>";
       }).join("") +
