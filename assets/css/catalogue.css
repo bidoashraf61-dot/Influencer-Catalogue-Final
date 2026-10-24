@@ -2402,3 +2402,26 @@ body[data-page="selection"] .cat-group__head--sub .cat-group__name { font-size: 
   .sel-line__in::-webkit-scrollbar { display: none; }
   .sel-line__b { flex: none; }
 }
+
+/* Item 256: room and rhythm between the toolbar, the count chips, the first group and the cards */
+#sel-statusbar.sel-line { background: var(--linen); }
+.sel-line__in { gap: 10px; padding: 22px 0 10px; }
+.sel-line__b { min-height: 40px; padding: 0 16px; font-size: 14.5px; }
+.sel-line__b .hv-i { width: 15px; height: 15px; }
+body[data-page="selection"] .cat-grid-section { padding-top: 28px; }
+body[data-page="selection"] #cx-viewer + .cat-grid-section { padding-top: 20px; }
+body[data-page="selection"] #cat-grid > .cat-group:first-child { margin-top: 0; }
+/* Group header: one centred line (name · count · share · Collapse), the status hint on its own line under it */
+body[data-page="selection"] .cat-group__head { align-items: center; row-gap: 6px; padding-bottom: 14px; margin-bottom: 22px; }
+body[data-page="selection"] .cat-group__name { line-height: 1; }
+body[data-page="selection"] .cat-group__head .cat-group__pct { margin-left: auto; align-self: center; }
+body[data-page="selection"] .cat-group__head .cat-group__fold { margin-left: 4px; align-self: center; }
+body[data-page="selection"] .cat-group__head:not(:has(.cat-group__pct)) .cat-group__fold { margin-left: auto; }
+body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margin-top: 2px; }
+@media screen and (max-width: 767px) {
+  .sel-line__in { padding: 16px 0 8px; gap: 8px; }
+  .sel-line__b { min-height: 38px; padding: 0 14px; }
+  body[data-page="selection"] .cat-grid-section { padding-top: 20px; }
+  body[data-page="selection"] .cat-group__head .cat-group__pct { margin-left: 0; flex-basis: auto; }
+  body[data-page="selection"] .cat-group__head .cat-group__fold { margin-left: auto; }
+}
