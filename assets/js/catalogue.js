@@ -2826,7 +2826,7 @@
       // colours, HCPs in the catalogue blues. One block, full width, when the selection has only one kind.
       var hcpList = names.filter(function (t) { return /hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
       var plainList = names.filter(function (t) { return !/hcp/i.test(t); }).sort(function (a, b) { return rank(a) - rank(b); });
-      var INF = ["#d6a400", "#ff691e", "#e0365c", "#8b4ae0", "#121212"], DOC = ["#e0ecff", "#2f6fe0", "#2f5fc4", "#163f91", "#15306e"];
+      var INF = ["#d6a400", "#ff691e", "#e0365c", "#8b4ae0", "#1b9b52"], DOC = ["#e0ecff", "#2f6fe0", "#2f5fc4", "#163f91", "#15306e"];
       var block = function (title, list, hcp) {
         if (!list.length) return "";
         var sum = list.reduce(function (t, x) { return t + tiers[x]; }, 0);
