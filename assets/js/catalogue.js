@@ -2338,6 +2338,7 @@
     // creator who has since left the roster should drop that card, not break.
     selected = want.filter(function (code) { return !!byCode[code]; });
     var dropped = want.length - selected.length;
+    var typeTimer = null;
 
     // ---- Item 242 (2026-10-24): what each creator is, for the selection's filters and groups. ----
     var XDIMS = ["fit", "role", "tag", "reason", "decided", "flags", "licence", "gender", "nat", "ver", "price", "er", "views", "data", "aud", "audg"];
@@ -2425,7 +2426,11 @@
     // take anyone out of the selection or change its total.
     var host = document.querySelector(".cat-controls .cat-container");
     var controls = (host && selected.length > 1)
-      ? Controls(host, selected.map(function (c) { return byCode[c]; }), function () { render(); }, {
+      ? Controls(host, selected.map(function (c) { return byCode[c]; }), function () {
+          var a = document.activeElement;
+          clearTimeout(typeTimer);
+          if (a && a.classList && a.classList.contains("cat-search__input")) typeTimer = setTimeout(render, 150); else render();
+        }, {
           // Item 242: the selection's own filters. Each is a list of values per creator (xval); several
           // share a dropdown. A filter with no values on this selection never shows.
           dims: XDIMS,
@@ -2495,6 +2500,9 @@
     var groupBy = (CURATED && CURATED.groupBy) || "", groupBy2 = "";
     try { var gb = sessionStorage.getItem(groupKey); if (gb !== null) { groupBy = gb.split(">")[0]; groupBy2 = gb.split(">")[1] || ""; } } catch (e) {}
     var groupSel = null, groupSel2 = null, collapsed = {};
+    // Collapsed groups are remembered on this device, per selection, and travel in the link (item 250).
+    var foldKey = "hv-sel-folds:" + ((CURATED && CURATED.token) || selectionName);
+    try { (JSON.parse(localStorage.getItem(foldKey) || "[]") || []).forEach(function (id) { collapsed[id] = true; }); } catch (e) { /* private mode */ }
     function groupStore() { try { sessionStorage.setItem(groupKey, groupBy + (groupBy2 ? ">" + groupBy2 : "")); } catch (e) {} }
     function groupOptions(sel, current, skip) {
       sel.innerHTML = GROUP_DIMS.filter(function (d) { return (!d[0] || groupHas(d[0])) && (!skip || d[0] !== skip); })
@@ -2525,7 +2533,7 @@
         if (sortEl) { row.insertBefore(order, sortEl); order.appendChild(lab1); order.appendChild(lab2); order.appendChild(sortEl); }
         else { order.appendChild(lab1); order.appendChild(lab2); row.appendChild(order); }
         groupSel = lab1.querySelector("select"); groupSel2 = lab2.querySelector("select");
-        groupSel.addEventListener("change", function () { groupBy = groupSel.value; collapsed = {}; syncGroupMenus(); groupStore(); render(); });
+        groupSel.addEventListener("change", function () { groupBy = groupSel.value; syncGroupMenus(); groupStore(); render(); });
         groupSel2.addEventListener("change", function () { groupBy2 = groupSel2.value; syncGroupMenus(); groupStore(); render(); });
       }
     }
@@ -2561,11 +2569,14 @@
       var name = dim === "tier" ? (/^hcp/i.test(k) ? "HCP " + tierLabel(k.replace(/^hcp\s*-\s*/i, "")) : tierLabel(k)) : k;
       var sub = dim === "status" && ST_SUB[ST_KEY[k]] ? '<p class="cat-group__sub">' + esc(ST_SUB[ST_KEY[k]]()) + "</p>" : "";
       var open = !collapsed[id];
+      // Item 250: a clear Collapse / Expand control on every header; the count stays while collapsed.
       return '<header class="cat-group__head' + (lvl ? " cat-group__head--sub" : "") + '">' + flag + mark +
         '<h' + (lvl ? 3 : 2) + ' class="cat-group__name"><button type="button" class="cat-group__tog" data-group-id="' + esc(id) +
         '" aria-expanded="' + open + '">' + esc(name) + CHEVRON + "</button></h" + (lvl ? 3 : 2) + ">" +
         '<span class="cat-group__n">' + n + (n === 1 ? " creator" : " creators") + "</span>" +
-        (pct != null ? '<span class="cat-group__pct">' + pct + "% of the selection</span>" : "") + sub + "</header>";
+        (pct != null ? '<span class="cat-group__pct">' + pct + "% of the selection</span>" : "") +
+        '<button type="button" class="cat-group__fold" data-group-id="' + esc(id) + '" aria-expanded="' + open + '">' + (open ? "Collapse" : "Expand") + CHEVRON + "</button>" +
+        sub + "</header>";
     }
     // Lay the visible cards out in sections. A creator in two groups shows in
     // both (the second is a copy); clicks are handled on the grid, so copies work.
@@ -2589,7 +2600,8 @@
     function layoutGroups(grid, ordered) {
       all(".cat-group", grid).forEach(function (g) { g.remove(); });
       grid.classList.toggle("is-grouped", !!groupBy);
-      var visible = ordered.filter(function (card) { return !card.hidden; });
+      // Item 250: every card goes in (a filter only hides cards); refreshGroups() keeps counts right.
+      var visible = ordered.slice();
       var placed = {};
       var total = selected.length;
       var rejected = rejectedOut() ? visible.filter(function (c) { return statusOf(c.dataset.code).s === "rejected"; }) : [];
@@ -2640,15 +2652,45 @@
       });
       rejectedSection(grid, rejected, put);
     }
+    function setFold(sec, id, closed) {
+      collapsed[id] = closed;
+      if (!closed) delete collapsed[id];
+      all(":scope > .cat-group__head [data-group-id]", sec).forEach(function (b) {
+        b.setAttribute("aria-expanded", String(!closed));
+        if (b.classList.contains("cat-group__fold")) b.firstChild.nodeValue = closed ? "Expand" : "Collapse";
+      });
+      sec.classList.toggle("is-collapsed", closed);
+      var body = sec.querySelector(":scope > .cat-group__body, :scope > .cat-group__grid");
+      if (body) body.hidden = closed;
+    }
+    function saveFolds() {
+      try { localStorage.setItem(foldKey, JSON.stringify(Object.keys(collapsed))); } catch (e) { /* private mode */ }
+      syncLink();
+    }
     $("cat-grid").addEventListener("click", function (e) {
-      var t = e.target.closest && e.target.closest(".cat-group__tog");
+      var t = e.target.closest && e.target.closest(".cat-group__tog, .cat-group__fold");
       if (!t) return;
       var id = t.getAttribute("data-group-id"), sec = t.closest(".cat-group");
-      collapsed[id] = !collapsed[id];
-      t.setAttribute("aria-expanded", String(!collapsed[id]));
-      var body = sec.querySelector(":scope > .cat-group__body, :scope > .cat-group__grid");
-      if (body) body.hidden = !!collapsed[id];
+      setFold(sec, id, !collapsed[id]);
+      saveFolds();
+      renderStatusBar();
     });
+    // Counts, shares and empty sections follow the filters without rebuilding anything.
+    function refreshGroups() {
+      var grid = $("cat-grid");
+      all(".cat-card--copy", grid).forEach(function (cp) { var o = byCode[cp.dataset.code]; cp.hidden = !o || o.hidden; });
+      var total = selected.length;
+      all(".cat-group", grid).forEach(function (sec) {
+        var n = all(".cat-card:not([hidden])", sec).length;
+        var nb = sec.querySelector(":scope > .cat-group__head .cat-group__n"), pb = sec.querySelector(":scope > .cat-group__head .cat-group__pct");
+        var nt = n + (n === 1 ? " creator" : " creators");
+        if (nb && nb.textContent !== nt) nb.textContent = nt;
+        var pt = (total ? Math.round(100 * n / total) : 0) + "% of the selection";
+        if (pb && pb.textContent !== pt) pb.textContent = pt;
+        sec.hidden = n === 0;
+        sec.classList.toggle("is-collapsed", !!collapsed[sec.querySelector("[data-group-id]") ? sec.querySelector("[data-group-id]").getAttribute("data-group-id") : ""]);
+      });
+    }
 
     // Where the creators in this selection are: each country with how many
     // creators, and the cities under it. A creator serving two cities counts
@@ -3090,9 +3132,9 @@
         box.setAttribute("aria-label", "Platform this creator is scored on");
         body.insertBefore(box, body.firstChild);
       }
-      box.innerHTML = '<span class="cat-plat__label">Score on</span>' + have.concat(["Both"]).map(function (pl) {
+      setIH(box, '<span class="cat-plat__label">Score on</span>' + have.concat(["Both"]).map(function (pl) {
         return '<button type="button" data-plat="' + esc(pl) + '" aria-pressed="' + (pl === shown) + '"' + (mayEdit() ? "" : ' disabled title="Only the selection’s owner can change this"') + ">" + esc(pl) + "</button>";
-      }).join("");
+      }).join(""));
     }
     window.addEventListener("scroll", hideTip, { passive: true });
 
@@ -3105,6 +3147,9 @@
     // Colleagues on the same company see a selection but never change it: tags, the "score on"
     // platform and the objective belong to its owner (and HelloVoice). Unsaved local lists are theirs.
     function mayEdit() { return !(CURATED && CURATED.token) || CURATED.role === "owner" || CURATED.role === "admin"; }
+    // Item 250 (speed): a filter click used to rewrite every card's tags, stamps and status block. Now a
+    // block is written only when its HTML really changed, so filtering touches no card content.
+    function setIH(el, html) { if (el._ih !== html) { el.innerHTML = html; el._ih = html; } }
     function renderTags() {
       var back = (CURATED && CURATED.platform) ? "&p=" + encodeURIComponent(CURATED.platform) : "";
       selCards().forEach(function (c) {
@@ -3126,10 +3171,10 @@
             box.className = "cat-verdict";
             body.insertBefore(box, body.firstChild);
           }
-          box.innerHTML = '<div class="cat-verdict__chips">' +
+          setIH(box, '<div class="cat-verdict__chips">' +
             (fitNow ? '<span class="cat-fit cat-fit--' + (FIT_CLASS[fitNow] || "maybe") + '">' + esc(fitNow) + "</span>" : "") +
             ((v && v.roles) || []).map(function (r) { return '<span class="cat-role">' + esc(r) + "</span>"; }).join("") + "</div>" +
-            (why ? '<p class="cat-verdict__why">' + esc(why) + "</p>" : "");
+            (why ? '<p class="cat-verdict__why">' + esc(why) + "</p>" : ""));
         }
         var pill = box && box.querySelector(".cat-fit");
         if (pill && sc && sc.score != null) {
@@ -3149,12 +3194,12 @@
           if (lk) lk.insertAdjacentElement("beforebegin", tbox); else body.appendChild(tbox);
         }
         if (!typing) {
-          tbox.innerHTML = '<span class="cat-tags__label">Tags</span>' + mine.map(function (t) {
+          setIH(tbox, '<span class="cat-tags__label">Tags</span>' + mine.map(function (t) {
             return '<span class="cat-tag cat-tag--t' + tone(t) + '"><i></i>' + esc(t) + "</span>";
           }).join("") + mt.map(function (t) {
             return '<span class="cat-tag cat-tag--mine cat-tag--t' + tone(t) + '"><i></i>' + esc(t) + (mayEdit() ? '<button type="button" data-tag-x="' + esc(t) +
               '" aria-label="Remove tag ' + esc(t) + '">&times;</button>' : "") + "</span>";
-          }).join("") + (mt.length < 8 && mayEdit() ? '<button type="button" class="cat-tag cat-tag--add" data-tag-add>+ Tag</button>' : "");
+          }).join("") + (mt.length < 8 && mayEdit() ? '<button type="button" class="cat-tag cat-tag--add" data-tag-add>+ Tag</button>' : ""));
         }
       });
       unlockAnalysisLinks();
@@ -3385,7 +3430,7 @@
       if (!li) { li = document.createElement("li"); li.className = "sel-vpp"; meta.appendChild(li); }
       var unit = eng ? "engagements (likes + comments)" : "views";
       li.title = r[2] ? "Estimated from followers: no " + unit + " numbers yet" : "Typical " + unit + " per post; best recent post " + compact(r[1]);
-      li.innerHTML = "<span>" + (eng ? "Eng. / post" : "Views / post") + "</span><strong><b>" + (r[2] ? "~" : "") + compact(r[0]) + "</b></strong>";
+      setIH(li, "<span>" + (eng ? "Eng. / post" : "Views / post") + "</span><strong><b>" + (r[2] ? "~" : "") + compact(r[0]) + "</b></strong>");
     }
     function renderStatus(card) {
       renderPerPost(card);
@@ -3424,7 +3469,7 @@
         html += '<button type="button" class="sel-ideas" data-ideas="' + esc(code) + '" title="Opens once your campaign has started; see an example">' +
           hvIcon("lock") + "<span>Content ideas</span></button>";
       }
-      box.innerHTML = html;
+      setIH(box, html);
     }
     // The selection's campaign objective, in one bar above the creators. Without one nothing is
     // scored (the server sends no scores) and the bar asks for it: Helvi's objective studio
@@ -3665,12 +3710,15 @@
       if (chips.tr) o.tr = "1";
       o.g = groupBy || "-";
       if (groupBy2) o.g2 = groupBy2;
+      var folds = Object.keys(collapsed);
+      if (folds.length) o.c = folds.slice(0, 40);
       return o;
     }
     function viewApply(o) {
       o = o || {};
       if (controls) controls.set(o);
       chips = { kind: Array.isArray(o.kind) ? o.kind.slice() : [], st: Array.isArray(o.st) ? o.st.slice() : [], tr: o.tr === "1" };
+      if (Array.isArray(o.c)) { collapsed = {}; o.c.forEach(function (id) { collapsed[id] = true; }); lastLayout = ""; }
       if (typeof o.g === "string") { groupBy = o.g === "-" ? "" : o.g; groupBy2 = typeof o.g2 === "string" ? o.g2 : ""; syncGroupMenus(); groupStore(); }
     }
     function viewEncode(o) {
@@ -3995,7 +4043,7 @@
       if (slimming) return;
       slimming = true;
       document.body.classList.add("sel-slim");
-      all(".cat-card", $("cat-grid")).forEach(slimCard);
+      all(".cat-card:not([hidden])", $("cat-grid")).forEach(slimCard);
       slimming = false;
     }
     // The track-record script adds its button after the page draws: tidy whatever it adds.
@@ -4041,6 +4089,15 @@
           if (e.target.closest(".sel-tool--link")) { copyViewLink(e.target.closest(".sel-tool--link")); return; }
           if (e.target.closest(".sel-tool--views")) { toggleViews(e.target.closest(".sel-tool--views")); return; }
           if (e.target.closest(".sel-tool--pick")) { setPicking(!picking); return; }
+          var fb = e.target.closest(".sel-tool--fold");
+          if (fb) {
+            var closeAll = fb.getAttribute("data-fold") === "close";
+            all("#cat-grid .cat-group", document).forEach(function (sec) {
+              var b = sec.querySelector(":scope > .cat-group__head [data-group-id]");
+              if (b) setFold(sec, b.getAttribute("data-group-id"), closeAll);
+            });
+            saveFolds(); renderStatusBar(); return;
+          }
         });
       }
       host.hidden = false;
@@ -4070,6 +4127,12 @@
         '<button type="button" class="sel-tool sel-tool--filters" aria-haspopup="dialog">' + hvIcon("filter") + "Filters" + (nf ? ' <b class="sel-tool__n">' + nf + "</b>" : "") + "</button>" +
         '<div class="sel-views"><button type="button" class="sel-tool sel-tool--views" aria-expanded="' + viewsOpen + '" aria-haspopup="true">' + hvIcon("save") + "Views" + (VIEWS.length ? ' <b class="sel-tool__n">' + VIEWS.length + "</b>" : "") + "</button></div>" +
         '<button type="button" class="sel-tool sel-tool--link">' + hvIcon("copy") + "Copy link</button>" +
+        (groupBy ? (function () {
+          // "Collapse all" while any group is open; "Expand all" once every group is closed.
+          var anyOpen = all("#cat-grid > .cat-group", document).some(function (sec) { return !sec.hidden && !sec.classList.contains("is-collapsed"); });
+          return '<button type="button" class="sel-tool sel-tool--fold" data-fold="' + (anyOpen ? "close" : "open") + '">' +
+            hvIcon("minus") + (anyOpen ? "Collapse all" : "Expand all") + "</button>";
+        })() : "") +
         (canPick ? '<button type="button" class="sel-tool sel-tool--pick" aria-pressed="' + picking + '">' + hvIcon("check") + (picking ? "Done selecting" : "Select") + "</button>" : "") +
         "</div></div>" +
         '<div class="cat-container sel-shown"' + (filt ? "" : " hidden") + ' role="status"><span><b>' + n.shown + "</b> of " + selected.length + " shown</span>" +
@@ -4292,6 +4355,7 @@
       }, function () { then(); });
     }
     function selCards() { return selected.map(function (code) { return byCode[code]; }).filter(Boolean); }
+    var lastLayout = "";
     // ---- Item 244 (Bido, 2026-10-24): page layout, done once ----
     var laidOut = false, vizOpen = {};
     function layoutPage() {
@@ -4378,9 +4442,20 @@
       // Order the visible cards the way the link lists them, or by the sort
       // the client picked.
       var ordered = controls ? controls.order(inOrder) : inOrder;
-      inOrder.forEach(function (card) { grid.appendChild(card); });   // back out of any sections first
-      ordered.forEach(function (card) { grid.appendChild(card); });
-      layoutGroups(grid, ordered);
+      // Item 250: the cards are only moved when the order, the grouping or the group members changed;
+      // a filter just hides and shows them.
+      var lsig = (groupBy || "") + ">" + (groupBy2 || "") + "|" + ordered.map(function (c) {
+        var code = c.dataset.code;
+        return code + (STATUS_ON ? statusOf(code).s.charAt(0) : "") + (groupBy ? ":" + groupKeys(code, groupBy).join(";") : "") +
+          (groupBy2 ? "/" + groupKeys(code, groupBy2).join(";") : "");
+      }).join(",");
+      if (lsig !== lastLayout || !grid.contains(ordered[0] || grid)) {
+        lastLayout = lsig;
+        inOrder.forEach(function (card) { grid.appendChild(card); });   // back out of any sections first
+        ordered.forEach(function (card) { grid.appendChild(card); });
+        layoutGroups(grid, ordered);
+      }
+      refreshGroups();
       slimCards();
       paintPicks();
 

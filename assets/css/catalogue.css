@@ -2242,3 +2242,17 @@ body.sel-slim .cat-tags .slim-more { flex: none; }
 .sel-geo__bar i { display: block; height: 100%; border-radius: inherit; }
 .sel-geo__cities b { text-align: right; font-variant-numeric: tabular-nums; }
 .sel-geo__more .sel-geo__city { color: var(--gray); }
+
+/* Group collapse (item 250): a clear Collapse / Expand control on every group header */
+.cat-group__fold { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; margin-left: auto; padding: 0 14px; border-radius: var(--r-pill);
+  border: 1px solid rgba(18,18,18,.25); background: var(--white); color: var(--ink); font: 600 13px var(--body); cursor: pointer; }
+.cat-group__fold:hover { border-color: var(--ink); }
+.cat-group__fold:focus-visible { outline: 3px solid var(--vivid-orange); outline-offset: 2px; }
+.cat-group__fold svg { width: 12px; height: 12px; transition: transform .15s ease; }
+.cat-group__fold[aria-expanded="false"] svg { transform: rotate(-90deg); }
+.cat-group__pct + .cat-group__fold { margin-left: 12px; }
+.cat-group__head:not(:has(.cat-group__pct)) .cat-group__fold { margin-left: auto; }
+.cat-group.is-collapsed > .cat-group__head { margin-bottom: 0; }
+.cat-group[hidden] { display: none; }
+@media screen and (max-width: 767px) { .cat-group__fold { margin-left: auto; } }
+@media (prefers-reduced-motion: reduce) { .cat-group__fold svg { transition: none; } }
