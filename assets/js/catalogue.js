@@ -2835,10 +2835,14 @@
         return '<div class="sel-size' + (hcp ? " sel-size--hcp" : "") + '"><p class="sel-size__head"><span>' + title + "</span><b>" + sum +
           '</b><small>' + Math.round(100 * sum / total) + "% of the selection</small></p>" +
           '<div class="sel-stack" role="img" aria-label="' + esc(title + ": " + list.map(function (t) { return label(t) + " " + tiers[t]; }).join(", ")) + '">' +
-          list.map(function (t) { return '<i style="flex-grow:' + tiers[t] + ";background:" + col(t) + '"></i>'; }).join("") + "</div>" +
+          list.map(function (t) {
+            // Item 254: the count rides on its segment when there is room; light segments take ink text.
+            var share = tiers[t] / sum, light = /^#(e0ecff|d6a400|ff691e)$/i.test(col(t));
+            return '<i style="flex-grow:' + tiers[t] + ";background:" + col(t) + (light ? ";color:#121212" : "") + '">' + (share >= 0.09 ? "<b>" + tiers[t] + "</b>" : "") + "</i>";
+          }).join("") + "</div>" +
           '<ul class="sel-legend">' + list.map(function (t) {
-            return '<li><i style="background:' + col(t) + '" aria-hidden="true"></i><span>' + esc(label(t)) + "</span><b>" + tiers[t] +
-              "</b><small>" + Math.round(100 * tiers[t] / sum) + "%</small></li>";
+            return '<li><i style="background:' + col(t) + '" aria-hidden="true"></i><span>' + esc(label(t)) + '</span><b class="sel-num">' + tiers[t] +
+              '<em> · ' + Math.round(100 * tiers[t] / sum) + "%</em></b></li>";
           }).join("") + "</ul></div>";
       };
       var two = plainList.length && hcpList.length;
@@ -2899,8 +2903,8 @@
       // Item 244: platforms get their own small visual; countries show the top four, the rest under Details.
       var row = function (mark, name, n, cls) {
         var pc = selected.length ? Math.round(100 * n / selected.length) : 0;
-        return '<li' + (cls ? ' class="' + cls + '"' : "") + '><p class="cat-places__country">' + mark + "<span>" + esc(name) + "</span><b>" + n +
-          '</b><small class="sel-bar__pct">' + pc + "%</small></p>" +
+        return '<li' + (cls ? ' class="' + cls + '"' : "") + '><p class="cat-places__country">' + mark + "<span>" + esc(name) + '</span><b class="sel-num">' + n +
+          "<em> · " + pc + "%</em></b></p>" +
           '<div class="cat-places__bar">' + shareBar(n, selected.length) + "</div></li>";
       };
       var pbox = $("sel-plats");
@@ -2922,7 +2926,8 @@
         return cities.length ? "<li><b>" + esc(cname(name)) + "</b> " + cities.map(function (city) { return esc(city) + " " + c.cities[city]; }).join(" · ") + "</li>" : "";
       }).join("");
       // Item 249: every city shows, as ranked bars under its country (no Details). Colours from the catalogue palette.
-      var CITY_COL = ["#2f6fe0", "#8b4ae0", "#1b9b52", "#ff691e", "#e0365c", "#d6a400", "#163f91", "#53219c"];
+      // Item 254: cities in one hue (catalogue blue), darker = bigger; City not set stays grey.
+      var CITY_COL = ["#163f91", "#2f5fc4", "#2f6fe0", "#5b8ae6", "#8aaced", "#b4cbf3", "#cfdcf7", "#e0ecff"];
       var maxCity = 1;
       names.forEach(function (name) { Object.keys(countries[name].cities).forEach(function (c) { maxCity = Math.max(maxCity, countries[name].cities[c]); }); });
       box.hidden = !names.length;
@@ -2933,11 +2938,13 @@
           return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
         });
         var shown = cities.slice(0, 8), rest = cities.slice(8).reduce(function (t, x) { return t + c.cities[x]; }, 0);
-        return '<div class="sel-geo"><p class="sel-geo__head">' + flagOf(name) + "<span>" + esc(cname(name)) + "</span><b>" + c.n + '</b><small class="sel-bar__pct">' + pc + "%</small></p>" +
+        return '<div class="sel-geo"><p class="sel-geo__head">' + flagOf(name) + "<span>" + esc(cname(name)) + '</span><b class="sel-num">' + c.n + "<em> · " + pc + "%</em></b></p>" +
           (shown.length ? '<ul class="sel-geo__cities">' + shown.map(function (city, i) {
             var n = c.cities[city], none = city === "City not specified";
-            return '<li><span class="sel-geo__city">' + esc(none ? "City not set" : city) + '</span><span class="sel-geo__bar"><i style="width:' +
-              Math.max(2, Math.round(100 * n / maxCity)) + "%;background:" + (none ? "rgba(18,18,18,.22)" : CITY_COL[i % CITY_COL.length]) + '"></i></span><b>' + n + "</b></li>";
+            var colr = none ? "rgba(18,18,18,.28)" : CITY_COL[Math.min(i, CITY_COL.length - 1)];
+            return '<li><span class="sel-geo__city"><i class="sel-dot" style="background:' + colr + '" aria-hidden="true"></i>' + esc(none ? "City not set" : city) +
+              '</span><span class="sel-geo__bar"><i style="width:' + Math.max(2, Math.round(100 * n / maxCity)) + "%;background:" + colr + '"></i></span>' +
+              '<b class="sel-num">' + n + "<em> · " + (c.n ? Math.round(100 * n / c.n) : 0) + "%</em></b></li>";
           }).join("") + (rest ? '<li class="sel-geo__more"><span class="sel-geo__city">' + (cities.length - 8) + ' more cities</span><span class="sel-geo__bar"></span><b>' + rest + "</b></li>" : "") + "</ul>" : "") +
           "</div>";
       }).join("") +
@@ -4347,7 +4354,8 @@
       if (laidOut) return;
       laidOut = true;
       // The client logos close the page, just above the footer, instead of opening it.
-      var logos = document.querySelector(".cat-clients"), foot = document.querySelector("footer, .cat-footer");
+      // Item 254 (Bido): the logos sit above "Happy with this selection", not under it.
+      var logos = document.querySelector(".cat-clients"), foot = $("cat-close") || document.querySelector("footer, .cat-footer");
       if (logos && foot && foot.parentNode) foot.parentNode.insertBefore(logos, foot);
       // "Please note" leaves its own section for one line in the selection tray; (i) opens the full text.
       var note = document.querySelector(".cat-summary .cat-price-notice"), trayIn = document.querySelector("#cat-tray .cat-tray__inner");
