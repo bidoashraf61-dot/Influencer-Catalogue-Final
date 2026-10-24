@@ -5071,6 +5071,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if self.kam_clients() is not None or not (self.admin_like_for(sel["code_id"]) or self.selection_role(sel, reader) == "admin"):
             # Never a key account manager (owner, 2026-10-20): scores and analysis are published by HelloVoice admins.
             return self.send_json(403, {"ok": False, "reason": "hv_only", "message": "Only HelloVoice publishes scores."}, self.cors())
+        import selfilters as _sf
+        if not _sf.can_publish(self):
+            # Item 248 (Bido, 2026-10-24): only HelloVoice owner and admin accounts.
+            return self.send_json(403, {"ok": False, "reason": "hv_admin_only", "message": "Only HelloVoice owners and admins change what the client sees."}, self.cors())
         on = bool(b.get("publish"))
         # what: "scores" (default) or "analysis" (the creators' full profile analysis).
         col = "analysis_published" if b.get("what") == "analysis" else "scores_published"
@@ -5922,6 +5926,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         gated = self.scores_gated(sel)
         out["scores_gate"] = {"applies": self.scores_gate_applies(sel), "published": not gated, "team": bool(team),
                               "analysis": bool(sel["analysis_published"] if "analysis_published" in sel.keys() else 0) if team else False}
+        import selfilters as _sf             # item 248: the "Client sees" switches, owner and admin accounts only
+        out["scores_gate"]["can_publish"] = bool(team) and _sf.can_publish(self)
         if not team:
             # No score and no fit badge (or its reason) for a client or a KAM, published or not (owner,
             # 2026-10-20; it was "until published" since 2026-10-15).

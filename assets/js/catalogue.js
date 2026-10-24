@@ -3519,7 +3519,7 @@
           if (e.target.closest(".sel-brief__edit") && window.hvPortal && window.hvPortal.scoreBrief) window.hvPortal.scoreBrief(CURATED.token, { edit: true });
         });
         document.addEventListener("click", function (e) {
-          if (objMenuOpen && e.target.closest && !e.target.closest(".sel-brief__acts")) { objMenuOpen = false; renderHeadOnly(); }
+          if (objMenuOpen && e.target.closest && !e.target.closest(".sel-brief__acts, #sel-brief-pop")) { objMenuOpen = false; renderHeadOnly(); }
         });
         document.addEventListener("keydown", function (e) { if (e.key === "Escape" && objMenuOpen) { objMenuOpen = false; renderHeadOnly(); } });
         var shut = function () { if (objMenuOpen) { objMenuOpen = false; renderHeadOnly(); } };
@@ -3531,28 +3531,35 @@
           '" data-publish="' + (on ? "0" : "1") + '"><span class="sel-sw" aria-hidden="true"></span>' + label +
           '<small class="sel-obj__swst">' + (on ? "On for client" : "Off for client") + "</small></button>";
       };
-      var menu = gate && gate.applies && team;
+      // Item 248 (Bido, 2026-10-24): HelloVoice owner and admin accounts only (the server says so: can_publish).
+      var menu = !!(gate && gate.applies && team && gate.can_publish);
       var pending = CURATED && CURATED.scoresPending && !team;
       var acts = document.createElement("span");
       acts.className = "sel-brief__acts";
       acts.innerHTML = (pending ? '<span class="sel-brief__pending">' + hvIcon("clock") + "Scores coming soon</span>" : "") +
         (canAct ? '<button type="button" class="sel-brief__edit">' + hvIcon("pen") + "Edit objective</button>" : "") +
-        (menu ? '<span class="sel-brief__menu"><button type="button" class="sel-brief__menu-btn" aria-expanded="' + objMenuOpen + '" aria-haspopup="true">' +
-          hvIcon("user") + "Client sees" + CHEVRON + "</button>" +
-          '<span class="sel-brief__pop" role="group" aria-label="What the client sees"' + (objMenuOpen ? "" : " hidden") + ">" +
-          sw("scores", !!gate.published, "Scores &amp; fit") + sw("analysis", !!gate.analysis, "Profile analysis") + "</span></span>" : "");
+        (menu ? '<span class="sel-brief__menu"><button type="button" class="sel-brief__menu-btn" aria-expanded="' + objMenuOpen +
+          '" aria-haspopup="true" aria-controls="sel-brief-pop">' + hvIcon("user") + "Client sees" + CHEVRON + "</button></span>" : "");
       if (!acts.children.length) return;
       var obj = bx.querySelector(".cat-selhead__obj");
       if (obj) obj.insertAdjacentElement("afterend", acts); else bx.appendChild(acts);
-      // The header clips what overflows it (its video): the menu is placed on the page, under its button.
-      var pop = acts.querySelector(".sel-brief__pop"), btn = acts.querySelector(".sel-brief__menu-btn");
-      if (pop && btn && !pop.hidden) {
-        var r = btn.getBoundingClientRect();
-        pop.style.position = "fixed";
-        pop.style.top = Math.round(r.bottom + 8) + "px";
-        pop.style.left = Math.max(12, Math.round(Math.min(r.left, window.innerWidth - pop.offsetWidth - 12))) + "px";
-        pop.style.right = "auto";
+      // The menu lives on the page body (item 248): inside the header it sat under the next section,
+      // whatever its z-index, because the header is its own stacking layer and clips its video.
+      var pop = $("sel-brief-pop"), btn = acts.querySelector(".sel-brief__menu-btn");
+      if (!pop && menu) {
+        pop = document.createElement("div");
+        pop.id = "sel-brief-pop"; pop.className = "sel-brief__pop"; pop.setAttribute("role", "group"); pop.setAttribute("aria-label", "What the client sees");
+        pop.hidden = true;
+        pop.addEventListener("click", function (e) { var pub = e.target.closest(".sel-obj__pub"); if (pub) publishScores(pub); });
+        document.body.appendChild(pop);
       }
+      if (!pop) return;
+      if (!menu || !objMenuOpen || !btn) { pop.hidden = true; return; }
+      pop.innerHTML = sw("scores", !!gate.published, "Scores &amp; fit") + sw("analysis", !!gate.analysis, "Profile analysis");
+      pop.hidden = false;
+      var r = btn.getBoundingClientRect();
+      pop.style.top = Math.round(r.bottom + 8) + "px";
+      pop.style.left = Math.max(12, Math.round(Math.min(r.left, window.innerWidth - pop.offsetWidth - 12))) + "px";
     }
     function renderHeadOnly() { renderHead(); renderObjective(); }
     function renderObjective() {

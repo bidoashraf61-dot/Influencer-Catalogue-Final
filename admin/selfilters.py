@@ -257,3 +257,20 @@ def api_views(h):
             views = [v for v in views if v.get("id") != vid]
         db.set_setting("sel_views:%d" % sel["id"], views)
     return h.send_json(200, {"ok": True, "views": views}, h.cors())
+
+
+# ----------------------------------------------- who may publish scores --
+
+def can_publish(h):
+    """The "Client sees" switches (scores and fit, profile analysis) are for HelloVoice owner and admin
+    accounts only (Bido, 2026-10-24): never a key account manager, an admin-role viewer, a client, an
+    owner of the selection or a colleague. Signed in to the admin, or to the portal with an admin email."""
+    import team
+    import portal
+    if h.kam_clients() is not None:
+        return False
+    a = h.admin()
+    if a is None:
+        u = portal.user_for_code(h.viewer_cookie_id())
+        a = db.admin_by_email(u["email"]) if u is not None and u["email"] else None
+    return a is not None and team.role_of(a) in ("owner", "admin")
