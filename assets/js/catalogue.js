@@ -2886,6 +2886,7 @@
           '</span><b class="sel-num">' + x.n + "<em> · " + (x.n && Math.round(100 * x.n / sum) === 0 ? "<1" : Math.round(100 * x.n / sum)) + "%</em></b></li>";
       }).join("") + "</ul></div>";
     }
+    var geoPick = "";
     function renderPlaces() {
       var box = $("sel-places");
       if (!box) {
@@ -2971,25 +2972,65 @@
       var maxCity = 1;
       names.forEach(function (name) { Object.keys(countries[name].cities).forEach(function (c) { maxCity = Math.max(maxCity, countries[name].cities[c]); }); });
       box.hidden = !names.length;
-      box.innerHTML = '<p class="sel-viz__title">Where they are</p>' + names.map(function (name) {
-        var c = countries[name], pc = selected.length ? Math.round(100 * c.n / selected.length) : 0;
+      // Item 263 (Bido: "Country ring + city drill-down"): with two or more countries that have city data,
+      // one ring of countries (selection total in the centre), a chip per country, and the cities of the
+      // picked country (the top one by default). One country keeps its own ring of cities.
+      var COUNTRY_COL = ["#1b9b52", "#2f6fe0", "#ff691e", "#8b4ae0", "#d6a400", "#e0365c", "#0c5a2d", "#163f91"];
+      var real = names.filter(function (name) { return Object.keys(countries[name].cities).length; });
+      var noCity = names.filter(function (name) { return !Object.keys(countries[name].cities).length; });
+      var cityItems = function (c) {
         var cities = Object.keys(c.cities).sort(function (a, b) {
           var na = a === "City not specified", nb = b === "City not specified";
           return (na - nb) || (c.cities[b] - c.cities[a]) || a.localeCompare(b);
         });
-        if (!cities.length) {
-          // No city data (e.g. "Location not specified"): one line, no ring.
-          return '<p class="sel-geo__head sel-geo__line">' + flagOf(name) + "<span>" + esc(cname(name)) + '</span><b class="sel-num">' + c.n + "<em> · " + pc + "%</em></b></p>";
-        }
         var shown = cities.slice(0, 8), rest = cities.slice(8).reduce(function (t, x) { return t + c.cities[x]; }, 0);
         var items = shown.map(function (city, i) {
           var none = city === "City not specified";
           return { label: none ? "City not set" : city, n: c.cities[city], color: none ? "#c9c2bb" : CITY_COL[Math.min(i, CITY_COL.length - 1)] };
         });
         if (rest) items.push({ label: (cities.length - 8) + " more cities", n: rest, color: "#e7f7ed" });
-        return '<div class="sel-geo"><p class="sel-geo__head">' + flagOf(name) + "<span>" + esc(cname(name)) + '</span><b class="sel-num">' + c.n + "<em> · " + pc + "% of the selection</em></b></p>" +
-          donutBlock(items, String(c.n), name.length > 14 ? "creators" : cname(name), cname(name) + ": " + items.map(function (x) { return x.label + " " + x.n; }).join(", "), c.n) + "</div>";
-      }).join("") +
+        return items;
+      };
+      var noCityLines = noCity.map(function (name) {
+        var c = countries[name], pc = selected.length ? Math.round(100 * c.n / selected.length) : 0;
+        return '<p class="sel-geo__head sel-geo__line">' + flagOf(name) + "<span>" + esc(cname(name)) + '</span><b class="sel-num">' + c.n + "<em> · " + pc + "%</em></b></p>";
+      }).join("");
+      var html;
+      if (real.length >= 2) {
+        if (real.indexOf(geoPick) < 0) geoPick = real[0];
+        var placed = real.reduce(function (t, n) { return t + countries[n].n; }, 0);
+        var ring = real.map(function (name, i) { return { label: cname(name), n: countries[name].n, color: COUNTRY_COL[i % COUNTRY_COL.length] }; });
+        var pick = countries[geoPick];
+        var cl = cityItems(pick);
+        html = '<div class="sel-geo sel-geo--multi">' +
+          '<div class="sel-donut">' + donutSvg(ring, String(placed), "creators", "Creators by country: " + ring.map(function (x) { return x.label + " " + x.n; }).join(", ")) +
+          '<div class="sel-geo__chips" role="group" aria-label="Pick a country">' + real.map(function (name, i) {
+            var pc = selected.length ? Math.round(100 * countries[name].n / selected.length) : 0;
+            return '<button type="button" class="sel-geo__chip" data-geo="' + esc(name) + '" aria-pressed="' + (name === geoPick) + '">' +
+              '<i class="sel-swatch" style="background:' + COUNTRY_COL[i % COUNTRY_COL.length] + '" aria-hidden="true"></i>' + flagOf(name) +
+              '<span>' + esc(cname(name)) + '</span><b class="sel-num">' + countries[name].n + "<em> · " + pc + "%</em></b></button>";
+          }).join("") + "</div></div>" +
+          '<p class="sel-geo__sub">Cities in ' + flagOf(geoPick) + "<b>" + esc(cname(geoPick)) + "</b> · " + pick.n + "</p>" +
+          '<ul class="sel-donut__legend">' + cl.map(function (x) {
+            return '<li><i class="sel-swatch" style="background:' + x.color + '" aria-hidden="true"></i><span class="sel-donut__name">' + esc(x.label) +
+              '</span><b class="sel-num">' + x.n + "<em> · " + (x.n && Math.round(100 * x.n / pick.n) === 0 ? "<1" : Math.round(100 * x.n / pick.n)) + "%</em></b></li>";
+          }).join("") + "</ul></div>";
+      } else {
+        html = real.map(function (name) {
+          var c = countries[name], pc = selected.length ? Math.round(100 * c.n / selected.length) : 0;
+          var items = cityItems(c);
+          return '<div class="sel-geo"><p class="sel-geo__head">' + flagOf(name) + "<span>" + esc(cname(name)) + '</span><b class="sel-num">' + c.n + "<em> · " + pc + "% of the selection</em></b></p>" +
+            donutBlock(items, String(c.n), name.length > 14 ? "creators" : cname(name), cname(name) + ": " + items.map(function (x) { return x.label + " " + x.n; }).join(", "), c.n) + "</div>";
+        }).join("");
+      }
+      if (!box.dataset.geoWired) {
+        box.dataset.geoWired = "1";
+        box.addEventListener("click", function (e) {
+          var ch = e.target.closest && e.target.closest("[data-geo]");
+          if (ch) { geoPick = ch.getAttribute("data-geo"); renderPlaces(); }
+        });
+      }
+      box.innerHTML = '<p class="sel-viz__title">Where they are</p>' + html + noCityLines +
         ((several || multiCity) ? '<p class="cat-places__note">' +
           (several ? several + (several === 1 ? " creator works" : " creators work") + " in more than one country, so counted in each. " : "") +
           (multiCity ? "A creator listed in more than one city is counted in each city." : "") + "</p>" : "");

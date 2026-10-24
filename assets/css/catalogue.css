@@ -2463,3 +2463,17 @@ body[data-page="selection"] .cat-group__sub { flex-basis: 100%; order: 10; margi
 .sel-info__pop b { display: block; margin-bottom: 3px; color: var(--lime); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
 @media (hover: hover) { .sel-info:hover .sel-info__pop { display: block; } }
 .sel-info:focus-within .sel-info__pop, .sel-info.is-open .sel-info__pop { display: block; }
+
+/* Where they are with several countries (item 263): country ring, a chip per country, the picked country's cities */
+.sel-geo__chips { display: grid; gap: 6px; align-content: center; }
+.sel-geo__chip { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border: 1px solid rgba(18,18,18,.14); border-radius: 12px;
+  background: var(--white); color: var(--ink); font: 600 14px var(--body); text-align: left; cursor: pointer; }
+.sel-geo__chip span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-geo__chip .cat-flag { width: 22px; height: 15px; }
+.sel-geo__chip:hover { border-color: var(--ink); }
+.sel-geo__chip[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); background: #f6f2ee; }
+.sel-geo__chip:focus-visible { outline: 3px solid var(--vivid-orange); outline-offset: 2px; }
+.sel-geo__sub { display: flex; align-items: center; gap: 7px; margin: 16px 0 8px; padding-top: 12px; border-top: 1px solid rgba(18,18,18,.08); font-size: 13.5px; color: var(--gray); }
+.sel-geo__sub .cat-flag { width: 22px; height: 15px; }
+.sel-geo__sub b { color: var(--ink); }
+@media screen and (max-width: 767px) { .sel-geo__chips { width: 100%; } }
