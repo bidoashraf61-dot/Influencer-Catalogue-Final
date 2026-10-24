@@ -3875,7 +3875,7 @@
     $("cat-grid").addEventListener("click", function (e) {
       if (!picking) return;
       var card = e.target.closest && e.target.closest(".cat-card");
-      if (!card || (e.target.closest("a, .sel-st, .slim-more, [data-st-set], [data-st-whyq]") && !e.target.closest(".sel-pick"))) return;
+      if (!card || (e.target.closest("a, .sel-st, [data-st-set], [data-st-whyq]") && !e.target.closest(".sel-pick"))) return;
       e.preventDefault(); e.stopPropagation();
       var code = card.dataset.code;
       if (picked[code]) delete picked[code]; else picked[code] = 1;
@@ -3970,110 +3970,7 @@
       clearTimeout(toastEl._t); toastEl._t = setTimeout(function () { toastEl.hidden = true; }, 9000);
     }
 
-    // ---- Item 246 (Bido, 2026-10-24): the slim card. Nothing folds (the compact sections of item 243 were
-    // confusing); the card is trimmed instead: one line of platforms + city, one line of reach and views,
-    // tags on one line with "+N" that opens the rest, Analysis and Track record side by side, and the tools
-    // under the status as small icon buttons. The blocks the other renderers rebuild are restyled, not
-    // rewritten; only the two buttons and the tools are wrapped, again on every draw.
-    var PLAT_NAMES = ["Instagram", "TikTok", "Snapchat", "YouTube", "X", "Facebook"];
-    var tagsOpen = {};
-    function cfNum(t) { var n = Number(String(t || "").replace(/[^0-9.]/g, "")); return n ? compact(n) : String(t || "").trim(); }
-    function metaRows(card) {
-      return all(".cat-card__meta > li", card).map(function (li) {
-        var k = li.querySelector("span"), v = li.querySelector("strong b") || li.querySelector("strong");
-        return [k ? k.textContent.trim() : "", v ? v.textContent.trim() : ""];
-      });
-    }
-    function setHtml(el, html) { if (el.getAttribute("data-sig") !== html) { el.innerHTML = html; el.setAttribute("data-sig", html); } }
-    function slimCard(card) {
-      var code = card.dataset.code, body = card.querySelector(".cat-card__body");
-      if (!code || !body) return;
-      var rows = metaRows(card), get = function (name) { var r = rows.filter(function (x) { return x[0].toLowerCase() === name; })[0]; return r ? r[1] : ""; };
-      var name = body.querySelector(".cat-card__name"), meta = body.querySelector(".cat-card__meta");
-      // Line 1: platforms with followers, then the city. Line 2: reach and views per post.
-      var l1 = body.querySelector(".slim-l1"), l2 = body.querySelector(".slim-l2");
-      if (name && meta) {
-        if (!l1) { l1 = document.createElement("p"); l1.className = "slim-l1"; meta.parentNode.insertBefore(l1, meta); }
-        if (!l2) { l2 = document.createElement("p"); l2.className = "slim-l2"; meta.parentNode.insertBefore(l2, meta); }
-        var plats = rows.filter(function (r) { return PLAT_NAMES.indexOf(r[0]) > -1; });
-        setHtml(l1, plats.map(function (r) { return '<span class="slim-plat ' + (BRAND[r[0]] || "") + '" title="' + esc(r[0]) + '">' + (ICONS[r[0]] || "") + "<b>" + esc(cfNum(r[1])) + "</b></span>"; }).join("") +
-          (get("city") ? '<span class="slim-city">' + esc(get("city")) + "</span>" : ""));
-        var st2 = [get("total reach") ? "Reach <b>" + esc(cfNum(get("total reach"))) + "</b>" : "",
-                   get("views / post") ? "<b>" + esc(cfNum(get("views / post"))) + "</b> views / post" : ""].filter(Boolean);
-        setHtml(l2, st2.join('<i aria-hidden="true">·</i>'));
-        l2.hidden = !st2.length;
-      }
-      // Tags on one line: the first two, then "+N" opens the rest and the + Tag field.
-      var tagBox = body.querySelector(".cat-tags");
-      if (tagBox) {
-        var tags = all(".cat-tag:not(.cat-tag--add)", tagBox), extra = Math.max(0, tags.length - 2), open = !!tagsOpen[code];
-        tags.forEach(function (t, i) { t.classList.toggle("slim-off", i >= 2 && !open); });
-        tagBox.classList.toggle("is-open", open);
-        var add = tagBox.querySelector(".cat-tag--add");
-        if (add) add.classList.toggle("slim-off", extra > 0 && !open);
-        var more = tagBox.querySelector(".slim-more");
-        if (extra) {
-          if (!more) { more = document.createElement("button"); more.type = "button"; more.className = "slim-more"; more.setAttribute("data-noselect", ""); tagBox.appendChild(more); }
-          var lab = open ? "Less" : "+" + extra;
-          if (more.textContent !== lab) more.textContent = lab;
-          more.setAttribute("aria-expanded", String(open));
-          more.setAttribute("aria-label", open ? "Show fewer tags" : "Show " + extra + " more tags");
-        } else if (more) more.remove();
-      }
-      // Analysis and Track record side by side.
-      var an = body.querySelector("a.cat-card__analysis"), tr = body.querySelector(".ev-tr");
-      if (an || tr) {
-        var pair = body.querySelector(".slim-pair");
-        var st = body.querySelector(".sel-st");
-        if (!pair) { pair = document.createElement("div"); pair.className = "slim-pair"; if (st) body.insertBefore(pair, st); else body.appendChild(pair); }
-        if (an && an.parentNode !== pair) pair.appendChild(an);
-        if (tr && tr.parentNode !== pair) pair.appendChild(tr);
-        if (an && tr && pair.firstChild !== an) pair.insertBefore(an, tr);
-        var trn = tr && tr.querySelector(".ev-tr__n");
-        if (trn) { var nb = (trn.textContent.match(/\d+/) || [""])[0]; if (tr.getAttribute("data-n") !== nb) tr.setAttribute("data-n", nb); tr.title = "Track record: " + trn.textContent.trim(); }
-      }
-      // The tools under the status: small icon buttons in one row (Find a replacement keeps its words).
-      var box = body.querySelector(".sel-st");
-      if (box) {
-        var tools = all(":scope > .sel-alike, :scope > .sel-ideas", box);
-        if (tools.length) {
-          var row = box.querySelector(":scope > .slim-tools");
-          if (!row) { row = document.createElement("div"); row.className = "slim-tools"; box.appendChild(row); }
-          tools.forEach(function (t) {
-            var label = (t.querySelector("span") || t).textContent.trim();
-            if (!t.getAttribute("aria-label")) t.setAttribute("aria-label", label);
-            t.setAttribute("data-tip", label);
-            row.appendChild(t);
-          });
-        }
-      }
-    }
-    var slimming = false;
-    function slimCards() {
-      if (slimming) return;
-      slimming = true;
-      document.body.classList.add("sel-slim");
-      all(".cat-card:not([hidden])", $("cat-grid")).forEach(slimCard);
-      slimming = false;
-    }
-    // The track-record script adds its button after the page draws: tidy whatever it adds.
-    var slimTimer = null;
-    try {
-      new MutationObserver(function (list) {
-        if (slimming) return;
-        var hit = list.some(function (m) { return [].some.call(m.addedNodes, function (n) { return n.nodeType === 1 && n.classList && (n.classList.contains("ev-tr") || n.classList.contains("sel-st") || n.classList.contains("cat-tag")); }); });
-        if (!hit) return;
-        clearTimeout(slimTimer); slimTimer = setTimeout(slimCards, 60);
-      }).observe($("cat-grid"), { childList: true, subtree: true });
-    } catch (e) { /* old browser: tidied on the next draw */ }
-    $("cat-grid").addEventListener("click", function (e) {
-      var more = e.target.closest && e.target.closest(".slim-more");
-      if (!more) return;
-      e.preventDefault(); e.stopPropagation();
-      var card = more.closest(".cat-card"), code = card.dataset.code;
-      tagsOpen[code] = !tagsOpen[code];
-      all('.cat-card[data-code="' + code + '"]', $("cat-grid")).forEach(slimCard);
-    });
+    // Item 252 (Bido, 2026-10-24): the full card is back; the slim card (246) and the compact sections (243) are gone.
 
     function anyFilter() { return chipsOn() || !!(controls && controls.filtering()); }
     function clearAll() { chips = { kind: [], st: [], tr: false }; if (controls) controls.clear(); render(); }
@@ -4466,7 +4363,6 @@
         layoutGroups(grid, ordered);
       }
       refreshGroups();
-      slimCards();
       paintPicks();
 
       $("sel-title").textContent = selectionName;
