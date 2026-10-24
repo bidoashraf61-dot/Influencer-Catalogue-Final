@@ -3625,12 +3625,14 @@
       if (chips.tr) o.tr = "1";
       o.g = groupBy || "-";
       if (groupBy2) o.g2 = groupBy2;
+      if (!compactCards) o.cards = "full";
       return o;
     }
     function viewApply(o) {
       o = o || {};
       if (controls) controls.set(o);
       chips = { kind: Array.isArray(o.kind) ? o.kind.slice() : [], st: Array.isArray(o.st) ? o.st.slice() : [], tr: o.tr === "1" };
+      if (o.cards === "full" || o.cards === "compact") setCompact(o.cards === "compact");
       if (typeof o.g === "string") { groupBy = o.g === "-" ? "" : o.g; groupBy2 = typeof o.g2 === "string" ? o.g2 : ""; syncGroupMenus(); groupStore(); }
     }
     function viewEncode(o) {
@@ -3777,7 +3779,7 @@
     $("cat-grid").addEventListener("click", function (e) {
       if (!picking) return;
       var card = e.target.closest && e.target.closest(".cat-card");
-      if (!card || (e.target.closest("a, .sel-st, [data-st-set], [data-st-whyq]") && !e.target.closest(".sel-pick"))) return;
+      if (!card || (e.target.closest("a, .sel-st, .cf-row, [data-st-set], [data-st-whyq]") && !e.target.closest(".sel-pick"))) return;
       e.preventDefault(); e.stopPropagation();
       var code = card.dataset.code;
       if (picked[code]) delete picked[code]; else picked[code] = 1;
@@ -3872,6 +3874,102 @@
       clearTimeout(toastEl._t); toastEl._t = setTimeout(function () { toastEl.hidden = true; }, 9000);
     }
 
+    // ---- Item 243 (Bido, 2026-10-24): compact cards. Photo, name, platforms, tier and status always show;
+    // Details, Tags, Track record and Decision fold to one-line rows that open on their own. A Compact / Full
+    // switch in the bar (remembered on this device, carried in the link and saved views). Nothing is moved:
+    // a row is put in front of each block and the block hides, so the renderers that rebuild them keep working.
+    var CARDS_KEY = "hv-sel-cards", compactCards = true, cfOpen = {};
+    try { compactCards = localStorage.getItem(CARDS_KEY) !== "full"; } catch (e) { /* private mode */ }
+    function setCompact(on) {
+      compactCards = on;
+      try { localStorage.setItem(CARDS_KEY, on ? "compact" : "full"); } catch (e) { /* private mode */ }
+      document.body.classList.toggle("sel-compact", on);
+    }
+    var PLAT_NAMES = ["Instagram", "TikTok", "Snapchat", "YouTube", "X", "Facebook"];
+    function cfNum(t) { var n = Number(String(t || "").replace(/[^0-9.]/g, "")); return n ? compact(n) : String(t || "").trim(); }
+    function metaRows(card) {
+      return all(".cat-card__meta > li", card).map(function (li) {
+        var k = li.querySelector("span"), v = li.querySelector("strong b") || li.querySelector("strong");
+        return [k ? k.textContent.trim() : "", v ? v.textContent.trim() : ""];
+      });
+    }
+    function cfSummary(card, key) {
+      if (key === "details") {
+        var rows = metaRows(card), get = function (name) { var r = rows.filter(function (x) { return x[0].toLowerCase() === name; })[0]; return r ? r[1] : ""; };
+        return [get("total reach") ? "Reach " + cfNum(get("total reach")) : "", get("city"), get("views / post") ? cfNum(get("views / post")) + " views/post" : ""]
+          .filter(Boolean).join(" · ");
+      }
+      if (key === "tags") {
+        var tags = all(".cat-tags .cat-tag:not(.cat-tag--add)", card).map(function (t) { return t.textContent.trim(); }).filter(Boolean);
+        return tags.length ? tags[0] + (tags.length > 1 ? " +" + (tags.length - 1) : "") : "None yet";
+      }
+      if (key === "track") { var n = card.querySelector(".ev-tr__n"); return n ? n.textContent.trim() : ""; }
+      if (key === "decision") {
+        var st = statusOf(card.dataset.code);
+        return st.at ? (st.by || (st.hv ? "HelloVoice" : "Client")) + " · " + stDay(st.at) : "Helvi tools";
+      }
+      return "";
+    }
+    var CF = [["details", "Details", ".cat-card__meta"], ["tags", "Tags", ".cat-tags"], ["track", "Track record", ".ev-tr"],
+              ["decision", "Decision", ".sel-st__by, .sel-alike, .sel-ideas, .sel-repl"]];
+    function foldCard(card) {
+      var code = card.dataset.code, body = card.querySelector(".cat-card__body");
+      if (!code || !body) return;
+      // Platforms with followers, on one line under the name.
+      var name = body.querySelector(".cat-card__name"), line = body.querySelector(".cf-plats");
+      var plats = metaRows(card).filter(function (r) { return PLAT_NAMES.indexOf(r[0]) > -1; });
+      var html = plats.map(function (r) { return '<span class="cf-plat ' + (BRAND[r[0]] || "") + '" title="' + esc(r[0]) + '">' + (ICONS[r[0]] || "") + "<b>" + esc(cfNum(r[1])) + "</b></span>"; }).join("");
+      if (name && plats.length) {
+        if (!line) { line = document.createElement("p"); line.className = "cf-plats"; name.insertAdjacentElement("afterend", line); }
+        if (line.innerHTML !== html) line.innerHTML = html;
+      }
+      CF.forEach(function (sec) {
+        var key = sec[0], targets = all(sec[2], body);
+        var row = body.querySelector('.cf-row[data-cf-row="' + key + '"]');
+        if (!targets.length) { if (row) row.remove(); return; }
+        var auto = key === "track" && chips.tr;
+        var open = cfOpen[code + ":" + key] != null ? cfOpen[code + ":" + key] : auto;
+        if (!row) {
+          row = document.createElement("button");
+          row.type = "button"; row.className = "cf-row"; row.setAttribute("data-cf-row", key); row.setAttribute("data-noselect", "");
+        }
+        if (row.nextElementSibling !== targets[0]) targets[0].parentNode.insertBefore(row, targets[0]);
+        var sum = cfSummary(card, key);
+        var inner = '<span class="cf-row__k">' + sec[1] + '</span><span class="cf-row__v">' + esc(sum) + "</span>" + CHEVRON;
+        if (row.getAttribute("data-sig") !== inner) { row.innerHTML = inner; row.setAttribute("data-sig", inner); }
+        if (row.getAttribute("aria-expanded") !== String(open)) row.setAttribute("aria-expanded", String(open));
+        targets.forEach(function (t) { t.setAttribute("data-cf", key); t.classList.toggle("cf-show", open); });
+      });
+    }
+    var folding = false;
+    function foldCards() {
+      if (folding) return;
+      folding = true;
+      document.body.classList.toggle("sel-compact", compactCards);
+      all(".cat-card", $("cat-grid")).forEach(foldCard);
+      folding = false;
+    }
+    // The track-record script adds its button after the page draws: fold whatever it adds.
+    var foldTimer = null;
+    try {
+      new MutationObserver(function (list) {
+        if (folding) return;
+        var hit = list.some(function (m) { return [].some.call(m.addedNodes, function (n) { return n.nodeType === 1 && n.classList && (n.classList.contains("ev-tr") || n.classList.contains("sel-st")); }); });
+        if (!hit) return;
+        clearTimeout(foldTimer); foldTimer = setTimeout(foldCards, 60);
+      }).observe($("cat-grid"), { childList: true, subtree: true });
+    } catch (e) { /* old browser: folds on the next draw */ }
+    $("cat-grid").addEventListener("click", function (e) {
+      var row = e.target.closest && e.target.closest(".cf-row");
+      if (!row) return;
+      e.preventDefault(); e.stopPropagation();
+      var card = row.closest(".cat-card"), key = row.getAttribute("data-cf-row"), id = card.dataset.code + ":" + key;
+      var now = row.getAttribute("aria-expanded") !== "true";
+      cfOpen[id] = now;
+      // The card and its copy in another group open together.
+      all('.cat-card[data-code="' + card.dataset.code + '"]', $("cat-grid")).forEach(foldCard);
+    });
+
     function anyFilter() { return chipsOn() || !!(controls && controls.filtering()); }
     function clearAll() { chips = { kind: [], st: [], tr: false }; if (controls) controls.clear(); render(); }
     function renderStatusBar() {
@@ -3896,6 +3994,7 @@
           if (e.target.closest(".sel-tool--link")) { copyViewLink(e.target.closest(".sel-tool--link")); return; }
           if (e.target.closest(".sel-tool--views")) { toggleViews(e.target.closest(".sel-tool--views")); return; }
           if (e.target.closest(".sel-tool--pick")) { setPicking(!picking); return; }
+          if (e.target.closest(".sel-tool--cards")) { setCompact(!compactCards); renderStatusBar(); syncLink(); return; }
         });
       }
       host.hidden = false;
@@ -3925,13 +4024,19 @@
         '<button type="button" class="sel-tool sel-tool--filters" aria-haspopup="dialog">' + hvIcon("filter") + "Filters" + (nf ? ' <b class="sel-tool__n">' + nf + "</b>" : "") + "</button>" +
         '<div class="sel-views"><button type="button" class="sel-tool sel-tool--views" aria-expanded="' + viewsOpen + '" aria-haspopup="true">' + hvIcon("save") + "Views" + (VIEWS.length ? ' <b class="sel-tool__n">' + VIEWS.length + "</b>" : "") + "</button></div>" +
         '<button type="button" class="sel-tool sel-tool--link">' + hvIcon("copy") + "Copy link</button>" +
+        '<button type="button" class="sel-tool sel-tool--cards" aria-pressed="' + compactCards + '" title="Compact cards fold Details, Tags, Track record and Decision into one-line rows">' +
+          hvIcon("grid") + (compactCards ? "Compact cards" : "Full cards") + "</button>" +
         (canPick ? '<button type="button" class="sel-tool sel-tool--pick" aria-pressed="' + picking + '">' + hvIcon("check") + (picking ? "Done selecting" : "Select") + "</button>" : "") +
         "</div></div>" +
         '<div class="cat-container sel-shown"' + (filt ? "" : " hidden") + ' role="status"><span><b>' + n.shown + "</b> of " + selected.length + " shown</span>" +
         '<button type="button" class="sel-shown__clear">Clear all filters</button></div></div>';
       if (viewsOpen) drawViews();
     }
-    var stCountsAll = {};
+    var stCountsAll = {}, lastSaved = true;
+    function syncLink() {
+      var want = buildFragment(selectionName, selected, !lastSaved) + viewParam();
+      if (location.hash !== want) history.replaceState(null, "", want);
+    }
     // HELVi Connect phase D (assets/js/connect.js): the ROI Calculator, "Add more like these"
     // and "Creators like this" read the selection through this small hook and add creators
     // the same way the replacement's Add button does.
@@ -4232,6 +4337,7 @@
       inOrder.forEach(function (card) { grid.appendChild(card); });   // back out of any sections first
       ordered.forEach(function (card) { grid.appendChild(card); });
       layoutGroups(grid, ordered);
+      foldCards();
       paintPicks();
 
       $("sel-title").textContent = selectionName;
@@ -4295,6 +4401,7 @@
       var saved = CURATED && CURATED.codes &&
         CURATED.codes.filter(function (c) { return !!byCode[c]; }).sort().join() === selected.slice().sort().join();
       var want = buildFragment(selectionName, selected, !saved) + viewParam();
+      lastSaved = saved;
       if (location.hash !== want) history.replaceState(null, "", want);
       // The link back into the catalogue carries the codes, not just the
       // token: it has to arrive with these creators already picked, and the

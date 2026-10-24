@@ -2165,3 +2165,25 @@ body[data-page="selection"] .cat-tray__codes { display: none; }
 .sel-viz .cat-flag { width: 22px; height: 15px; flex: none; }
 .sel-viz .cat-places__bar { margin: 6px 0 0; gap: 8px; font-size: 12px; }
 .sel-viz__rows { gap: 10px; }
+
+/* ---- Compact selection cards (portal item 243, 2026-10-24) ---- */
+.cf-row, .cf-plats { display: none; }
+body.sel-compact .cat-card [data-cf]:not(.cf-show) { display: none !important; }
+body.sel-compact .cf-plats { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 6px 0 4px; }
+.cf-plat { display: inline-flex; align-items: center; gap: 6px; font: 600 14px var(--body); color: var(--ink); }
+.cf-plat svg { width: 18px; height: 18px; }
+.cf-plat b { font-variant-numeric: tabular-nums; }
+body.sel-compact .cf-row { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 44px; margin: 0; padding: 0 2px;
+  border: 0; border-top: 1px solid rgba(18,18,18,.08); background: none; color: var(--ink); font: 14px var(--body); text-align: left; cursor: pointer; }
+body.sel-compact .cf-row:hover { background: rgba(18,18,18,.03); }
+body.sel-compact .cf-row:focus-visible { outline: 3px solid var(--vivid-orange); outline-offset: -3px; border-radius: 8px; }
+.cf-row__k { font-weight: 700; flex: none; }
+.cf-row__v { flex: 1; min-width: 0; color: var(--gray); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cf-row svg { flex: none; width: 14px; height: 14px; opacity: .6; transition: transform .15s ease; }
+.cf-row[aria-expanded="true"] svg { transform: rotate(180deg); }
+body.sel-compact .cat-card [data-cf].cf-show { margin-top: 4px; margin-bottom: 8px; }
+/* In compact mode the platform rows already read on the line under the name. */
+body.sel-compact .cat-card__meta.cf-show { margin-top: 2px; }
+.sel-tool--cards[aria-pressed="false"] { background: var(--white); color: var(--ink); }
+.sel-tool--cards[aria-pressed="true"] { background: var(--white); color: var(--ink); border-color: var(--ink); }
+@media (prefers-reduced-motion: reduce) { .cf-row svg { transition: none; } }
