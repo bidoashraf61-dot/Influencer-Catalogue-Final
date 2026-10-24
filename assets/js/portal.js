@@ -430,7 +430,20 @@
   function $(id) { return document.getElementById(id); }
   function bg(node, url) { if (url) node.style.backgroundImage = 'url("' + String(url).replace(/"/g, "%22") + '")'; }
 
-  function api(method, path, body) {
+  // Sign-in calls try again for ~15 s when the server can't be reached or the proxy says it is down
+  // (a deploy restarts the admin for a few seconds), so the person sees a slow button, not an error.
+  var RETRY = { "/api/auth/start": 1, "/api/auth/verify": 1 };
+  function api(method, path, body, tries) {
+    if (tries == null) tries = RETRY[path] ? 6 : 0;
+    return api1(method, path, body).then(function (r) {
+      if (tries > 0 && (r.s === 0 || r.s === 502 || r.s === 503 || r.s === 504))
+        return new Promise(function (ok) { setTimeout(ok, 2500); }).then(function () { return api(method, path, body, tries - 1); });
+      if (RETRY[path] && (r.s === 502 || r.s === 503 || r.s === 504)) r.b = { message: "Could not reach the server. Please try again." };
+      return r;
+    });
+  }
+
+  function api1(method, path, body) {
     var opts = { method: method, credentials: "include", headers: {} };
     if (body !== undefined) {
       opts.headers["Content-Type"] = "application/json";
