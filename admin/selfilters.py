@@ -90,6 +90,27 @@ def facts(codes, by, team=False):
     for f in out.values():
         for k in ("_pf", "_af", "_cf"):
             f.pop(k, None)
+    # Audience share filters (Bido, 2026-10-25), for clients too: each creator's highest share per
+    # country, gender and age band across their analysed platforms. A client gets each share rounded
+    # DOWN to 5 points: the filter's steps are 5 points, so every "at least N%" still answers exactly,
+    # and the page never prints these numbers.
+    try:
+        import discover
+        best = discover.audience_best()
+    except Exception:
+        best = {}
+    step = 1 if team else 5
+    cut = lambda v: int(v) - int(v) % step
+    for c in codes:
+        b = best.get(c)
+        if not b:
+            continue
+        au = {"c": {k: cut(v) for k, v in sorted(b["c"].items(), key=lambda kv: -kv[1])[:6] if v >= 5},
+              "a": {k: cut(v) for k, v in b["a"].items() if v >= 5}}
+        for g in ("f", "m"):
+            if g in b:
+                au[g] = cut(b[g])
+        out[c]["au"] = au
     return {c: f for c, f in out.items() if f}
 
 

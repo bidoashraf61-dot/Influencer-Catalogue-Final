@@ -422,6 +422,7 @@ def clean_query(q):
         "fmin": num("fmin"), "fmax": num("fmax"),
         "lic": [v for v in many("lic") if v in ("SA", "AE", "EG")],
         "aud": _aud(many("aud")),
+        "ash": _ash(one),
         "sort": sort if sort in SORTS else "daily",
         "group": one("group", 20) if one("group", 20) in GROUPS else "",
         "disc": None, "dplat": None,
@@ -453,10 +454,49 @@ def _aud(vals):
     return out
 
 
+AGE_BANDS = ("13-17", "18-24", "25-34", "35-44", "45-64")
+
+
+def _ash(one):
+    """Audience share filters (Bido, 2026-10-25): an audience country, a gender and an age band, each
+    with the share it must reach on at least one of the creator's analysed platforms. Shares are whole
+    percents in 5-point steps; a value without its share uses the control's own starting point."""
+    def pct(k, dflt):
+        try:
+            n = int(float(one(k, 6)))
+        except ValueError:
+            return dflt
+        return max(5, min(95, n - n % 5))
+    out = {}
+    c = one("ac", 4).upper()
+    if re.fullmatch(r"[A-Z]{2}", c):
+        out["c"], out["cp"] = c, pct("acp", 30)
+    g = one("ag", 8).lower()
+    if g in ("female", "male"):
+        out["g"], out["gp"] = g, pct("agp", 60)
+    a = one("aa", 8)
+    if a in AGE_BANDS:
+        out["a"], out["ap"] = a, pct("aap", 30)
+    return out
+
+
+def ash_match(b, ash):
+    """True when audience shares ``b`` (discover.audience_best: one creator) meet every asked share."""
+    if not b:
+        return False
+    if "c" in ash and b["c"].get(ash["c"], 0) < ash["cp"]:
+        return False
+    if "g" in ash and b.get(ash["g"][0], 0) < ash["gp"]:
+        return False
+    if "a" in ash and b["a"].get(ash["a"], 0) < ash["ap"]:
+        return False
+    return True
+
+
 def filtering(f):
     """True when the reader has narrowed the roster: only then is a "match" count sent."""
     return bool(f["q"] or f["tier"] or f["platform"] or f["place"] or f["interest"] or f["industry"] or f["sub"] or f["fmin"] or f["fmax"]
-                or f["lic"] or f["disc"] or f.get("aud"))
+                or f["lic"] or f["disc"] or f.get("aud") or f.get("ash"))
 
 
 def _key(idx, f):
@@ -537,6 +577,10 @@ def ordered(idx, f, licences=None, discover=None, day=None, picked=None, audienc
         want = set(f["aud"])
         tops = audience() if audience else {}
         codes = {code for code, got in tops.items() if got & want}
+        allow = codes if allow is None else (allow & codes)
+    if f.get("ash"):
+        import discover as _disc        # the parameter ``discover`` above is the AI-shortlist callable
+        codes = {code for code, b in _disc.audience_best().items() if ash_match(b, f["ash"])}
         allow = codes if allow is None else (allow & codes)
     sets = {d: set(f[d]) for d in ("tier", "platform", "place", "interest") if f[d]}
     ind_set, sub_set = set(f["industry"]), set(f["sub"])

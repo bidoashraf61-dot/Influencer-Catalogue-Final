@@ -677,6 +677,45 @@
   var CHEVRON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
   var CROSS = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
+  // Audience filters (Bido, 2026-10-25): a country, a gender and an age band, each with the share of the
+  // audience it must reach on one of the creator's analysed platforms. The roster asks the server; a
+  // selection reads its own facts. Shares move in 5-point steps; no share is ever printed on a card.
+  var AUD_KEYS = ["c", "g", "a"];
+  var AUD_START = { c: 30, g: 60, a: 30 };
+  var AUD_MARKETS = [["SA", "Saudi Arabia"], ["AE", "UAE"], ["EG", "Egypt"], ["KW", "Kuwait"], ["QA", "Qatar"], ["BH", "Bahrain"], ["OM", "Oman"]];
+  var AUD_GENDER = [["female", "Women"], ["male", "Men"]];
+  var AUD_AGE = [["13-17", "13–17"], ["18-24", "18–24"], ["25-34", "25–34"], ["35-44", "35–44"], ["45-64", "45+"]];
+  var AUD_TITLE = { c: "Audience country", g: "Audience gender", a: "Audience age" };
+  function audRegion(code) {
+    for (var i = 0; i < AUD_MARKETS.length; i++) if (AUD_MARKETS[i][0] === code) return AUD_MARKETS[i][1];
+    try { return new Intl.DisplayNames(["en"], { type: "region" }).of(code) || code; } catch (e) { return code; }
+  }
+  function audValueLabel(key, v) {
+    var list = key === "g" ? AUD_GENDER : key === "a" ? AUD_AGE : null;
+    if (!list) return audRegion(v);
+    for (var i = 0; i < list.length; i++) if (list[i][0] === v) return list[i][1];
+    return v;
+  }
+  // "Saudi Arabia · 40%+ of audience", "Women · 60%+", "Ages 25–34 · 30%+".
+  function audPill(key, v, pct) {
+    if (key === "c") return audRegion(v) + " · " + pct + "%+ of audience";
+    if (key === "g") return audValueLabel("g", v) + " · " + pct + "%+ of audience";
+    return "Ages " + audValueLabel("a", v) + " · " + pct + "%+";
+  }
+  function audRow(key, opts) {
+    var start = AUD_START[key];
+    return '<div class="cat-aud__row" data-aud="' + key + '">' +
+      '<p class="cat-dd__title" id="aud-t-' + key + '">' + AUD_TITLE[key] + "</p>" +
+      '<div class="cat-aud__chips" role="group" aria-labelledby="aud-t-' + key + '">' + opts.map(function (o) {
+        return '<button type="button" class="cat-aud__chip" data-aud-key="' + key + '" data-aud-val="' + esc(o[0]) +
+          '" aria-pressed="false">' + esc(o[1]) + "</button>";
+      }).join("") + "</div>" +
+      '<label class="cat-aud__min"><span class="cat-aud__lead">At least</span>' +
+      '<input type="range" class="cat-aud__slider" min="5" max="90" step="5" value="' + start + '" data-aud-min="' + key +
+      '" disabled aria-label="' + AUD_TITLE[key] + ', at least this share of the audience"/>' +
+      '<output class="cat-aud__val" aria-hidden="true">' + start + "%</output></label></div>";
+  }
+
   var SORTS = [
     ["", "Recommended"],
     ["followers-desc", "Most followers"],
@@ -746,6 +785,21 @@
     // role, tags), and the matching score to sort on.
     var xdims = extras ? extras.dims : [];
     xdims.forEach(function (d) { state[d] = []; });
+    // Audience shares: the roster's server answers them; a selection gives each card's own (extras.aud).
+    var audOf = extras && extras.aud ? extras.aud : null;
+    state.aud = { c: "", g: "", a: "", cp: AUD_START.c, gp: AUD_START.g, ap: AUD_START.a };
+    function audOn() { return AUD_KEYS.filter(function (k) { return !!state.aud[k]; }).length; }
+    function audReset() { state.aud = { c: "", g: "", a: "", cp: AUD_START.c, gp: AUD_START.g, ap: AUD_START.a }; }
+    // A saved view or a link puts the audience back; anything malformed starts clean.
+    function audSet(o) {
+      audReset();
+      if (!o || typeof o !== "object") return;
+      AUD_KEYS.forEach(function (k) {
+        if (typeof o[k] === "string") state.aud[k] = o[k].slice(0, 8);
+        var p = Number(o[k + "p"]);
+        if (p >= 5 && p <= 90) state.aud[k + "p"] = p - p % 5;
+      });
+    }
 
     cards.forEach(function (card) {
       card._tier = card.dataset.tier ? [card.dataset.tier] : [];
@@ -889,8 +943,29 @@
         intKeys.length > 8);
     }
 
+    // Audience: on the roster the GCC markets and Egypt; on a selection the countries its creators'
+    // audiences actually reach, most common first. Shown only where there is audience data to read.
+    var audCountries = null;
+    if (facets) audCountries = AUD_MARKETS;
+    else if (audOf) {
+      var cn = {};
+      cards.forEach(function (card) {
+        var au = audOf(card);
+        if (au && au.c) Object.keys(au.c).forEach(function (k) { if (au.c[k] >= 10) cn[k] = (cn[k] || 0) + 1; });
+      });
+      var ck = Object.keys(cn).sort(function (a, b) { return cn[b] - cn[a] || audRegion(a).localeCompare(audRegion(b)); }).slice(0, 8);
+      if (ck.length) audCountries = ck.map(function (k) { return [k, audRegion(k)]; });
+    }
+    if (audCountries) {
+      html += dropdown("audience", "Audience", '<div class="cat-aud">' +
+        '<p class="cat-aud__note">Pick what the audience should be. A creator matches when one of their analysed accounts reaches the share.</p>' +
+        audRow("c", audCountries) + audRow("g", AUD_GENDER) + audRow("a", AUD_AGE) + "</div>", false, "cat-dd--aud");
+    }
+
     // Date added is known on the server only, so it is offered on the catalogue, not on a selection.
-    var sortList = extras ? SORTS.concat([["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]])
+    var sortList = extras ? SORTS.concat([["views-desc", "Most views"], ["views-asc", "Fewest views"],
+      ["er-desc", "Highest engagement"], ["er-asc", "Lowest engagement"], ["price-asc", "Lowest price"], ["price-desc", "Highest price"],
+      ["fit-desc", "Best fit first"], ["fit-asc", "Lowest fit first"]])
       : [["daily", "Recommended"]].concat(SORTS.slice(1), [["added-desc", "Newest added"], ["added-asc", "Oldest added"]]);
     var sort = '<label class="cat-sort"><span class="cat-sort__label">Sort</span>' +
       '<select class="cat-sort__select" aria-label="Sort creators">' +
@@ -980,8 +1055,25 @@
         box.checked = on > 0 && on === cities.length;
         box.indeterminate = on > 0 && on < cities.length;
       });
+      // Audience: the picked chip in each row, and its slider woken (asleep until a value is picked).
+      AUD_KEYS.forEach(function (k) {
+        var on = state.aud[k], pct = state.aud[k + "p"];
+        all('.cat-aud__chip[data-aud-key="' + k + '"]', bar).forEach(function (chip) {
+          chip.setAttribute("aria-pressed", String(chip.dataset.audVal === on));
+        });
+        var row = bar.querySelector('.cat-aud__row[data-aud="' + k + '"]');
+        if (!row) return;
+        row.classList.toggle("is-on", !!on);
+        var sl = row.querySelector(".cat-aud__slider"), out = row.querySelector(".cat-aud__val");
+        sl.disabled = !on;
+        if (sl !== document.activeElement) sl.value = pct;
+        sl.style.setProperty("--fill", ((pct - 5) / 85 * 100) + "%");
+        sl.setAttribute("aria-valuetext", pct + "% or more");
+        out.textContent = pct + "%";
+      });
       ddList().forEach(function (dd) {
-        var n = dd.dataset.dims ? dd.dataset.dims.split(",").reduce(function (t, d) { return t + (state[d] || []).length; }, 0)
+        var n = dd.dataset.dim === "audience" ? audOn()
+          : dd.dataset.dims ? dd.dataset.dims.split(",").reduce(function (t, d) { return t + (state[d] || []).length; }, 0)
           : state[dd.dataset.dim].length + (dd.dataset.dim === "industry" ? state.sub.length : 0);
         dd.classList.toggle("has-value", n > 0);
         // How many options are picked, inside the button: "Tier 2".
@@ -1015,6 +1107,12 @@
         pills.push('<button type="button" class="cat-pill-x" data-range-pill="1">' +
           esc(rangeLabel(state.followers)) + CROSS + "</button>");
       }
+      AUD_KEYS.forEach(function (k) {
+        if (!state.aud[k]) return;
+        var t = audPill(k, state.aud[k], state.aud[k + "p"]);
+        pills.push('<button type="button" class="cat-pill-x" data-aud-pill="' + k + '" aria-label="Remove ' + esc(t) + '">' +
+          esc(t) + CROSS + "</button>");
+      });
       active.hidden = !pills.length;
       active.innerHTML = pills.join("") +
         (pills.length ? '<button type="button" class="cat-active__clear">Clear all</button>' : "");
@@ -1032,7 +1130,8 @@
       if (e.target.closest(".cat-dd__done, .cat-dd__close")) { close(e.target.closest(".cat-dd")); return; }
       if (e.target.closest(".cat-dd__clear")) {
         var cdd = e.target.closest(".cat-dd"), cdim = cdd.dataset.dim;
-        if (cdd.dataset.dims) cdd.dataset.dims.split(",").forEach(function (d) { state[d] = []; });
+        if (cdim === "audience") audReset();
+        else if (cdd.dataset.dims) cdd.dataset.dims.split(",").forEach(function (d) { state[d] = []; });
         else state[cdim] = [];
         if (cdim === "industry") state.sub = [];
         changed(); return;
@@ -1042,8 +1141,18 @@
         setRange(Number(preset.dataset.min) || null, Number(preset.dataset.max) || null);
         return;
       }
+      // An audience chip: one value per row; tapping the picked one lets it go.
+      var achip = e.target.closest(".cat-aud__chip");
+      if (achip) {
+        var ak = achip.dataset.audKey;
+        state.aud[ak] = state.aud[ak] === achip.dataset.audVal ? "" : achip.dataset.audVal;
+        changed();
+        if (state.aud[ak]) { var asl = achip.closest(".cat-aud__row").querySelector(".cat-aud__slider"); if (asl) asl.focus({ preventScroll: true }); }
+        return;
+      }
       var pill = e.target.closest(".cat-pill-x");
       if (pill && pill.dataset.rangePill) { state.followers = []; changed(); return; }
+      if (pill && pill.dataset.audPill) { state.aud[pill.dataset.audPill] = ""; changed(); return; }
       if (pill) {
         if (pill.dataset.country) {
           var group = bar.querySelector('input[data-country="' + pill.dataset.country + '"]')
@@ -1060,6 +1169,7 @@
       if (e.target.closest(".cat-active__clear")) {
         state.industry = []; state.sub = []; state.tier = []; state.platform = []; state.place = []; state.interest = [];
         state.followers = []; xdims.forEach(function (d) { state[d] = []; });
+        audReset();
         state.q = "";
         var sbox = bar.querySelector(".cat-search__input");
         if (sbox) sbox.value = "";
@@ -1067,6 +1177,7 @@
       }
     });
 
+    var audTimer = null;
     function setRange(min, max) {
       if (min && max && max < min) { var t = min; min = max; max = t; }
       state.followers = (min || max) ? [min || null, max || null] : [];
@@ -1077,6 +1188,15 @@
       if (e.target.classList && e.target.classList.contains("cat-search__input")) {
         state.q = fold(e.target.value);
         onChange();
+        return;
+      }
+      // A share slider: the number follows the thumb at once; the creators follow when it settles.
+      if (e.target.dataset && e.target.dataset.audMin) {
+        var mk = e.target.dataset.audMin;
+        state.aud[mk + "p"] = Number(e.target.value) || AUD_START[mk];
+        sync();
+        clearTimeout(audTimer);
+        audTimer = setTimeout(onChange, 260);
         return;
       }
       if (!e.target.dataset || !e.target.dataset.range) return;
@@ -1126,6 +1246,13 @@
         if (state.followers[0] && f < state.followers[0]) return false;
         if (state.followers[1] && f > state.followers[1]) return false;
       }
+      if (audOf && audOn() && skip !== "audience") {
+        var au = audOf(card);
+        if (!au) return false;
+        if (state.aud.c && ((au.c || {})[state.aud.c] || 0) < state.aud.cp) return false;
+        if (state.aud.g && (au[state.aud.g.charAt(0)] || 0) < state.aud.gp) return false;
+        if (state.aud.a && ((au.a || {})[state.aud.a] || 0) < state.aud.ap) return false;
+      }
       if (!["tier", "platform", "place", "interest"].every(function (dim) {
         if (!state[dim].length || dim === skip) return true;
         return card["_" + dim].some(function (v) { return state[dim].indexOf(v) !== -1; });
@@ -1145,12 +1272,14 @@
         var o = { sort: state.sort, text: (bar.querySelector(".cat-search__input") || {}).value || "" };
         ["tier", "platform", "place", "interest"].concat(xdims).forEach(function (d) { if (state[d].length) o[d] = state[d].slice(); });
         if (state.followers.length) o.followers = state.followers.map(function (v) { return v == null ? "" : String(v); });
+        if (audOn()) o.aud = JSON.parse(JSON.stringify(state.aud));
         return o;
       },
       set: function (o) {
         o = o || {};
         ["tier", "platform", "place", "interest"].concat(xdims).forEach(function (d) { state[d] = Array.isArray(o[d]) ? o[d].map(String) : []; });
         state.followers = Array.isArray(o.followers) && o.followers.length ? o.followers.map(function (v) { return v === "" || v == null ? null : Number(v); }) : [];
+        audSet(o.aud);
         state.sort = typeof o.sort === "string" ? o.sort : DEFAULT_SORT;
         var sbox = bar.querySelector(".cat-search__input");
         if (sbox) sbox.value = typeof o.text === "string" ? o.text : "";
@@ -1161,11 +1290,12 @@
       },
       count: function () {
         return ["tier", "platform", "place", "interest"].concat(xdims).reduce(function (t, d) { return t + state[d].length; }, 0) +
-          (state.followers.length ? 1 : 0) + (state.q ? 1 : 0);
+          (state.followers.length ? 1 : 0) + (state.q ? 1 : 0) + audOn();
       },
       clear: function () {
         state.tier = []; state.platform = []; state.place = []; state.interest = []; state.followers = [];
         xdims.forEach(function (d) { state[d] = []; });
+        audReset();
         state.q = "";
         var sbox = bar.querySelector(".cat-search__input");
         if (sbox) sbox.value = "";
@@ -1197,7 +1327,7 @@
       },
       filtering: function () {
         return !!(state.industry.length || state.sub.length || state.tier.length || state.platform.length || state.place.length ||
-                  state.interest.length || state.followers.length || !!state.q ||
+                  state.interest.length || state.followers.length || !!state.q || audOn() > 0 ||
                   xdims.some(function (d) { return state[d].length; }));
       },
       // Rebuild the extra dropdowns from what the cards say now (scores load late, tags change).
@@ -1268,6 +1398,16 @@
             if (sb == null) return -1;
             return s === "fit-desc" ? sb - sa : sa - sb;
           }
+          // Selection sorts on its own numbers (Bido, 2026-10-25): views, engagement, price. A creator
+          // without the number goes last either way; ties fall back to followers.
+          var m = extras && extras.metric && /^(views|er|price)-(desc|asc)$/.exec(s);
+          if (m) {
+            var va = extras.metric(a, m[1]), vb = extras.metric(b, m[1]);
+            if (va == null && vb == null) return f(b) - f(a);
+            if (va == null) return 1;
+            if (vb == null) return -1;
+            return (m[2] === "desc" ? vb - va : va - vb) || f(b) - f(a);
+          }
           return 0;
         });
       },
@@ -1276,10 +1416,12 @@
       query: function () {
         return { industry: state.industry.slice(), sub: state.sub.slice(), tier: state.tier.slice(), platform: state.platform.slice(), place: state.place.slice(),
                  interest: state.interest.slice(), followers: state.followers.slice(), sort: state.sort, q: state.q,
+                 aud: JSON.parse(JSON.stringify(state.aud)),
                  text: (bar.querySelector(".cat-search__input") || {}).value || "" };
       },
       restore: function (st) {
         ["industry", "sub", "tier", "platform", "place", "interest", "followers"].forEach(function (d) { if (st && Array.isArray(st[d])) state[d] = st[d].slice(); });
+        if (st) audSet(st.aud);
         if (st && typeof st.sort === "string") state.sort = st.sort;
         if (st && typeof st.q === "string") state.q = st.q;
         var sbox = bar.querySelector(".cat-search__input");
@@ -1411,6 +1553,10 @@
       if (st.q) p.set("q", st.q);
       if (st.followers[0]) p.set("fmin", st.followers[0]);
       if (st.followers[1]) p.set("fmax", st.followers[1]);
+      var sa = st.aud || {};
+      if (sa.c) { p.set("ac", sa.c); p.set("acp", sa.cp); }
+      if (sa.g) { p.set("ag", sa.g); p.set("agp", sa.gp); }
+      if (sa.a) { p.set("aa", sa.a); p.set("aap", sa.ap); }
       p.set("sort", st.sort || "");
       if (gBy) p.set("group", gBy);
       EXTRA.lic.forEach(function (v) { p.append("lic", v); });
@@ -2347,7 +2493,9 @@
     var typeTimer = null;
 
     // ---- Item 242 (2026-10-24): what each creator is, for the selection's filters and groups. ----
-    var XDIMS = ["fit", "role", "tag", "reason", "decided", "flags", "licence", "gender", "nat", "ver", "price", "er", "views", "data", "aud", "audg"];
+    // "aud" / "audg" (HelloVoice's top-country and mostly-women lists) gave way to the Audience share
+    // control for everyone (Bido, 2026-10-25); "aud" stays a Group-by option.
+    var XDIMS = ["fit", "role", "tag", "reason", "decided", "flags", "licence", "gender", "nat", "ver", "price", "er", "views", "data"];
     var XTITLES = { fit: "Fit", role: "Role", tag: "Tags", reason: "Rejection reason", decided: "Decided by", flags: "More",
                     licence: "Licence", gender: "Gender", nat: "Nationality", ver: "Account",
                     price: "Price per creator", er: "Engagement rate", views: "Average views", data: "Data",
@@ -2444,9 +2592,19 @@
           panels: [{ id: "p-fit", title: "Fit", dims: ["fit", "role"] },
                    { id: "p-decision", title: "Decision", dims: ["reason", "decided", "flags"] },
                    { id: "p-profile", title: "Profile", dims: ["licence", "gender", "nat", "ver"] },
-                   { id: "p-perf", title: "Performance", dims: ["price", "er", "views", "data"] },
-                   { id: "p-aud", title: "Audience", dims: ["aud", "audg"] }],
+                   { id: "p-perf", title: "Performance", dims: ["price", "er", "views", "data"] }],
           of: function (card, dim) { return xval(card.dataset.code, dim); },
+          // Audience shares per creator (best analysed platform; a client's rounded down to 5 points).
+          aud: function (card) { return factsOf(card.dataset.code).au || null; },
+          // Numbers the selection sorts on: average views, engagement rate, price per creator.
+          metric: function (card, key) {
+            var code = card.dataset.code, f = factsOf(code);
+            if (key === "er") return f.er != null ? f.er : null;
+            if (key === "price") { var p = priceOf(code, byCode[code]); return p && p[0] ? p[0] : null; }
+            var v = f.v || 0;
+            if (!v && CURATED && CURATED.reach && CURATED.reach[code] && !CURATED.reach[code][2]) v = CURATED.reach[code][0];
+            return v || null;
+          },
           label: function (dim, v) { return XPILL[dim] ? XPILL[dim] + ": " + v : ""; },
           values: function (dim) {
             var n = {}, order = [];

@@ -25,7 +25,7 @@ from datetime import date
 import db
 
 _lock = threading.Lock()
-_cache = {"sig": None, "docs": {}, "facets": None}
+_cache = {"sig": None, "docs": {}, "facets": None, "best": None}
 
 AGE_ORDER = ["13-17", "18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
 
@@ -147,7 +147,7 @@ def _load():
             continue
         docs.setdefault(code, []).append(summary(d, platform or "Instagram"))
     with _lock:
-        _cache.update(sig=sig, docs=docs, facets=None)
+        _cache.update(sig=sig, docs=docs, facets=None, best=None)
     return docs
 
 
@@ -322,6 +322,35 @@ def top_markets():
         if got:
             out[code] = got
     return out
+
+
+def audience_best():
+    """{code: {"c": {country code: %}, "f": %, "m": %, "a": {age band: %}}}: each share at its highest on
+    any of the creator's analysed platforms (Bido, 2026-10-25: a creator matches "Saudi audience at least
+    40%" when one of their accounts reaches it). Only creators with audience data are listed."""
+    docs = _load()
+    best = _cache.get("best")
+    if best is not None:
+        return best
+    best = {}
+    for code, lst in docs.items():
+        b = {"c": {}, "a": {}}
+        for s in lst:
+            for k, v in (s.get("countries") or {}).items():
+                if v > b["c"].get(k, 0):
+                    b["c"][k] = v
+            for k, v in (s.get("ages") or {}).items():
+                if v > b["a"].get(k, 0):
+                    b["a"][k] = v
+            for g in ("female", "male"):
+                v = s.get(g)
+                if v is not None and v > b.get(g[0], -1):
+                    b[g[0]] = v
+        if b["c"] or b["a"] or "f" in b:
+            best[code] = b
+    with _lock:
+        _cache["best"] = best
+    return best
 
 
 def market_counts():
