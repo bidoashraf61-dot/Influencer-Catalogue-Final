@@ -829,37 +829,11 @@
       var role = S.role();
       var grid = document.querySelector(".cat-grid-section");
       if (role !== "owner" && role !== "admin") {
-        // A colleague (same company) or a link holder: the AI tools belong to the owner, so say so
-        // and offer a copy they own, instead of a card that is simply missing.
-        if (grid && !document.getElementById("cx-viewer")) {
-          var tries0 = 0;
-          (function placeNote() {
-            if (!document.getElementById("sel-statusbar") && tries0++ < 30) { setTimeout(placeNote, 150); return; }
-            if (!document.getElementById("cx-viewer")) grid.parentNode.insertBefore(viewerNote(S), grid);
-          })();
-        }
+        // A colleague or a link holder just reads the selection; the AI tools stay with its
+        // owner. The "Viewing a colleague's selection" banner was removed (Bido, 25 Oct 2026).
         return;
       }
       // "Add more like these" was retired for "Add creators with AI" in the header (item 178, Bido 2026-10-20).
-    }
-    // What a colleague sees where the owner's AI card sits.
-    function viewerNote(S) {
-      var cur = S.curated() || {};
-      var owner = (cur.owner || "").trim();
-      var who = owner ? h("b", null, owner) : document.createTextNode("the person who made it");
-      var msg = h("p", { class: "cx-viewer__msg" }, who, " owns this selection. Only they can add more creators, score it with an objective or request its quote. You can look at everything here.");
-      var go = h("button", { class: "cx-btn", type: "button", html: ic("save") + "<span>Make my own copy</span>" });
-      var note = h("p", { class: "cx-viewer__note", "aria-live": "polite" }, "A copy is yours to score, add to and quote. Your colleague’s selection stays as it is.");
-      go.addEventListener("click", function () {
-        go.disabled = true;
-        var name = ("Copy of " + (S.name() || "selection")).slice(0, 120);
-        api("POST", "/api/selection", { name: name, codes: S.codes() }).then(function (r) {
-          if (r.b && r.b.ok && r.b.token) { location.href = ROOT + "selection/#s=" + encodeURIComponent(r.b.token); location.reload(); return; }
-          go.disabled = false; note.textContent = "Couldn’t make the copy just now. Try again in a moment.";
-        });
-      });
-      var card = h("div", { class: "cx-viewer" }, h("div", { class: "cx-viewer__tx" }, h("h2", null, "Viewing a colleague’s selection"), msg, note), go);
-      return h("section", { class: "cx-moresec", id: "cx-viewer" }, h("div", { class: "cat-pad" }, h("div", { class: "cat-container" }, card)));
     }
     /* -- One side panel for Helvi's suggestions on a selection: "Creators like this" and, since
        fix batch 3, "Find a replacement" (which used to open a cramped list inside the rejected
