@@ -24,7 +24,13 @@ def page_html(query=None):
             "<option value='%s'%s>%s</option>" % (lv, " selected" if lv == cur else "", e(modules.LEVEL_LABEL[lv]))
             for lv in modules.LEVELS)
 
-    head = "".join("<th>" + e(m["name"]) + "</th>" for m in modules.MODULES)
+    def mark(m, h):
+        """The module's own logo, with its name under it. alt carries the name, so the column
+        still reads if the image does not load."""
+        return ("<img src='" + e(m.get("logo") or "") + "' alt='" + e(m["name"]) + "' height='" + str(h) +
+                "' style='display:block;margin:0 auto 2px;height:" + str(h) + "px;width:auto'>") if m.get("logo") else ""
+
+    head = "".join("<th style='text-align:center'>" + mark(m, 34) + e(m["name"]) + "</th>" for m in modules.MODULES)
     rows = []
     for c in codes:
         cid = c["id"]
@@ -75,7 +81,10 @@ def page_html(query=None):
 
     legend = "".join("<li><b>%s</b> — %s</li>" % (e(modules.LEVEL_LABEL[lv]), e(modules.LEVEL_HELP[lv]))
                      for lv in modules.LEVELS)
-    what = "".join("<li><b>%s</b> — %s</li>" % (e(m["name"]), e(m["what"])) for m in modules.MODULES)
+    what = "".join(
+        "<li style='display:flex;align-items:center;gap:10px;margin-bottom:6px'>%s<span><b>%s</b> — %s</span></li>"
+        % (mark(m, 28).replace("margin:0 auto 2px", "margin:0"), e(m["name"]), e(m["what"]))
+        for m in modules.MODULES)
 
     note = ""
     if query.get("ok"):
