@@ -2606,7 +2606,9 @@ def selection_fit_panel(sel, creators, scores=None, interests=()):
     # Item 3c (Bido, 25 Oct 2026): which tags open a section of their own on the client's page.
     all_tags, seen_tg = [], set()
     for code in codes:
-        for t_ in (tags_of.get(code) or []):
+        # Tags HelloVoice set, and the ones put on from the selection page itself: the client's
+        # page groups by both together, so both belong in this panel.
+        for t_ in list(tags_of.get(code) or []) + list(client_tags_of.get(code) or []):
             if t_.lower() not in seen_tg:
                 seen_tg.add(t_.lower()); all_tags.append(t_)
     subs_now = set(_db2.setting("tag_subs") or [])
