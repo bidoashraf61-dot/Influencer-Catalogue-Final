@@ -2603,10 +2603,31 @@ def selection_fit_panel(sel, creators, scores=None, interests=()):
         verdicts_of.get(code) or {}, tags_of.get(code) or [], _fit, client_tags_of.get(code) or [], (scores or {}).get(code),
         assigned=plat_assign_of.get(code, ""), client_pick=client_plat_of.get(code, ""), segs=segs_of.get(code) or [])
         for code in codes) or ui.empty("users", "No creators yet", "Add creators on the Creators & prices tab first.")
+    # Item 3c (Bido, 25 Oct 2026): which tags open a section of their own on the client's page.
+    all_tags, seen_tg = [], set()
+    for code in codes:
+        for t_ in (tags_of.get(code) or []):
+            if t_.lower() not in seen_tg:
+                seen_tg.add(t_.lower()); all_tags.append(t_)
+    subs_now = set(_db2.setting("tag_subs") or [])
+    tag_roles = ""
+    if all_tags:
+        tag_roles = ("<div class='card' style='background:#f7f5f0;margin:0 0 14px'><strong>Tag roles</strong>"
+                     "<div class='price-hint' style='margin:4px 0 8px'>When the client groups the selection by <b>Tags</b>, "
+                     "a main tag opens a section of its own. Tick a tag to make it a sub-tag: it then shows only inside a main "
+                     "tag's section, under <b>Then by: Tags</b>. A creator with no main tag lands in \u201cNo main tag\u201d. "
+                     "The marks are shared by every selection.</div>"
+                     "<div style='display:flex;flex-wrap:wrap;gap:8px'>"
+                     + "".join("<label class='pill' style='cursor:pointer;display:inline-flex;align-items:center;gap:6px'>"
+                               "<input type='checkbox' name='tagsub' value='" + e(t_) + "'"
+                               + (" checked" if t_.lower() in subs_now else "") + ">" + e(t_) + "</label>"
+                               for t_ in sorted(all_tags, key=str.lower))
+                     + "</div></div>")
     return ("<div class='card'><div class='hd'><h2>Fit &amp; tags</h2></div>"
             "<p class='sec-desc'>Tell the client whether each creator suits this campaign, and what part they play. "
             "The client sees the fit, the roles, your reason and the tags on each creator's card, and can filter the selection by them. "
             "Everything here belongs to this selection only.</p>"
+            + tag_roles +
             "<div class='vd-bar'><div><label for='vd-obj' style='display:block;font-weight:600;font-size:var(--t-sm,13px);margin-bottom:4px'>Judge fit for this objective</label>"
             "<select name='sel_objective' id='vd-obj'>" + "".join(
                 "<option" + (" selected" if o_ == obj_now else "") + ">" + o_ + "</option>" for o_ in _fit.OBJECTIVES) + "</select></div>"

@@ -3274,6 +3274,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                     seen_t.add(t.lower()); mine.append(t)
             if mine:
                 tags[code_.strip().upper()] = mine
+        if fit_loaded:
+            # Item 3c (Bido, 25 Oct 2026): a tag opens a section of its own when the client groups
+            # by Tags, unless it is ticked here as a sub-tag -- then it only ever shows inside a main
+            # tag's section, under "Then by: Tags". One mark per tag, shared by every selection.
+            subs_in = f.get("tagsub") or []
+            subs_in = [subs_in] if isinstance(subs_in, str) else list(subs_in)
+            db.set_setting("tag_subs", sorted({re.sub(r"\s+", " ", t_).strip().lower()
+                                               for t_ in subs_in if t_ and t_.strip()}))
         seg_in = f.get("segs") or []
         seg_in = [seg_in] if isinstance(seg_in, str) else list(seg_in)
         seg_in = seg_in + [""] * (len(vc) - len(seg_in))
@@ -5880,6 +5888,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                                     "tags": {k: v for k, v in json.loads((sel["tags"] if "tags" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "segments": {k: v for k, v in json.loads((sel["segments"] if "segments" in sel.keys() else None) or "{}").items() if k in by and k in codes},
                                     "group_by": (sel["group_by"] if "group_by" in sel.keys() else None) or "",
+                                    "tag_subs": db.setting("tag_subs") or [],
                                     "brief": {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
                                               "client": self.selection_client(sel)},
                                     "scores": {k: {"score": v["score"], "tag": v["tag"], "score_range": v.get("score_range"),

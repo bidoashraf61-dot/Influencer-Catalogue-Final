@@ -2439,6 +2439,8 @@
                         prices: b.prices || {}, total: b.total,
                         tags: b.tags || {}, verdicts: b.verdicts || {}, clientTags: b.client_tags || {}, scores: b.scores || {}, brief: b.brief || null, clientPlatforms: b.client_platforms || {},
                         segments: b.segments || {}, groupBy: b.group_by || "", reach: b.reach || {},
+                        // Item 3c (Bido, 25 Oct 2026): tags marked as sub-tags in the admin.
+                        tagSubs: b.tag_subs || [],
                         // Views for awareness, likes + comments for engagement / conversion (owner, 2026-10-15).
                         metric: b.metric || "views", engagement: b.engagement || {},
                         platform: b.platform || "",
@@ -2635,6 +2637,10 @@
                       ["interest", "Interest"], ["decided", "Decided by"], ["reason", "Rejection reason"], ["licence", "Licence"],
                       ["price", "Price"], ["er", "Engagement rate"], ["views", "Average views"], ["aud", "Top audience country"]];
     var NO_OTHER = "No other tag";
+    // Item 3c (Bido, 25 Oct 2026): a sub-tag never opens a section of its own. It shows inside a
+    // main tag's section under "Then by: Tags". A creator with only sub-tags goes to "No main tag".
+    var NO_MAIN = "No main tag";
+    function isSubTag(t) { return ((CURATED && CURATED.tagSubs) || []).indexOf(String(t).toLowerCase()) >= 0; }
     var NONE_LABEL = { segment: "No segment", country: "Location not specified", interest: "No interest listed",
                        fit: "Not rated", role: "No role set", tag: "Untagged", platform: "No platform", tier: "No tier",
                        decided: "Not decided yet", reason: "No reason given", licence: "No licence listed", price: "No price",
@@ -2722,13 +2728,17 @@
         return (count[b] - count[a]) || a.localeCompare(b);
       });
     }
-    function split(list, dim, exclude) {
+    function split(list, dim, exclude, mainOnly) {
       var members = {}, count = {};
       list.forEach(function (card) {
         var ks = groupKeys(card.dataset.code, dim);
         if (exclude) {
           ks = ks.filter(function (x) { return x !== exclude; });
           if (!ks.length) ks = [NO_OTHER];
+        }
+        if (mainOnly && dim === "tag") {
+          var mains = ks.filter(function (x) { return !isSubTag(x); });
+          ks = mains.length ? mains : [NO_MAIN];
         }
         ks.forEach(function (k) {
           (members[k] = members[k] || []).push(card);
@@ -2792,7 +2802,7 @@
           else { var cp = card.cloneNode(true); cp.classList.add("cat-card--copy"); cp.removeAttribute("id"); inner.appendChild(cp); }
         });
       }
-      var top = split(visible, groupBy);
+      var top = split(visible, groupBy, null, true);     // sub-tags open no section of their own
       top.keys.forEach(function (k) {
         var id = groupBy + ":" + k;
         var sec = document.createElement("section");
@@ -2801,8 +2811,11 @@
         var body = document.createElement("div");
         body.className = "cat-group__body";
         body.hidden = !!collapsed[id];
-        if (groupBy2) {
-          var sub = split(top.members[k], groupBy2, groupBy2 === groupBy ? k : null);
+        // Nobody in this section carries a second tag, so there is nothing to split by: the cards
+        // sit straight under the main tag rather than in a lone "No other tag" box (Bido, 25 Oct 2026).
+        var sub = groupBy2 ? split(top.members[k], groupBy2, groupBy2 === groupBy ? k : null) : null;
+        if (sub && sub.keys.length === 1 && sub.keys[0] === NO_OTHER) sub = null;
+        if (sub) {
           sub.keys.forEach(function (k2) {
             var id2 = id + ">" + groupBy2 + ":" + k2;
             var s2 = document.createElement("section");
