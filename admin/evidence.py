@@ -1016,7 +1016,7 @@ def _in_post(item):
     """Every creator handle a post credits: tagged users, co-authors, and @mentions in the
     caption. The brand's own handle is dropped by the caller — a brand is not evidence."""
     out = []
-    for key in ("taggedUsers", "coauthorProducers", "usersTagged", "taggedAccounts"):
+    for key in ("mentions", "taggedUsers", "coauthorProducers", "usersTagged", "taggedAccounts"):
         for u in item.get(key) or []:
             h = (u.get("username") or u.get("handle") or "") if isinstance(u, dict) else str(u or "")
             if h:
@@ -1040,7 +1040,16 @@ def ingest_competitor_posts(job, items):
     if comp is None:
         return 0
     brand = (db.get_code(comp["code_id"]) or {"label": "Client"})["label"]
+    # The brand's own network is not evidence. A real run on Garnier returned garnier.arg.uy and
+    # garnieritalia before this: their country accounts, not creators who worked with them. So the
+    # handles the tenant typed go, and so does anything carrying a word from the competitor's name.
     own = {str(h).lower() for h in (comp["handles"] or {}).values()}
+    words = {w for w in re.split(r"[^a-z0-9]+", comp["name"].lower()) if len(w) >= 4}
+    words |= {h for h in own if len(h) >= 4}
+
+    def theirs(handle):
+        return handle in own or any(w in handle for w in words)
+
     plat = (job["platform"] or "Instagram")
     rows, saved = [], 0
     for it in items:
@@ -1049,7 +1058,7 @@ def ingest_competitor_posts(job, items):
         url = str(it.get("url") or it.get("postUrl") or it.get("link") or "").strip()
         if not url.startswith("http"):
             continue
-        who = [h for h in _in_post(it) if h not in own]
+        who = [h for h in _in_post(it) if not theirs(h)]
         if not who:
             continue
         n = apify.post_numbers(it) or {}
@@ -1062,13 +1071,21 @@ def ingest_competitor_posts(job, items):
                          "collab_type": "credited on the brand's post", "relevance": "collected"})
         saved += 1
     if not rows:
+        # The actor answered but there was nothing to keep. A wrong handle says so plainly;
+        # anything else is recorded as "nothing found" rather than passing for success.
+        bad = [str(it.get("errorDescription") or it.get("error")) for it in items
+               if isinstance(it, dict) and it.get("error")]
+        if bad:
+            _comp.mark_run(comp["id"], note="That handle did not open: %s" % bad[0][:80])
+        elif items:
+            _comp.mark_run(comp["id"], note="Nothing to keep: none of those posts credited a creator.")
         return 0
     study = {"brands": [{"brand": brand, "competitors": [
         {"competitor": comp["name"], "fit": "collected", "posts_detail": rows}]}],
         "meta": {"source": "competitor run"}}
     pack_id, _, _ = import_pack(json.dumps(study), "%s · collected" % comp["name"], comp["code_id"],
                                 None, by="collection run", pack_id=comp.get("pack_id"))
-    _comp.mark_run(comp["id"], pack_id)
+    _comp.mark_run(comp["id"], pack_id, note=None)
     return saved
 
 

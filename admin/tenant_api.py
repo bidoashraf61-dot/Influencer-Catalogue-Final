@@ -94,6 +94,7 @@ def competitors_list(h):
     if err:
         return err
     import competitors
+    # Each item carries last_run_at and last_note, so the tenant sees why a run came back empty.
     return 200, {"ok": True, "items": competitors.listing(cid), "platforms": list(competitors.PLATFORMS),
                  # Said plainly rather than implied: naming one does not start a collection.
                  "note": "HelloVoice studies the competitors you name here and files the evidence under your account."}

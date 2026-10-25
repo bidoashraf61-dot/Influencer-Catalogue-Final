@@ -120,6 +120,21 @@ What it finds: creators a brand posted with, tagged or credited. Not every paid 
 made for them — that is still what a full study is for. Instagram only; TikTok needs a
 second preset.
 
+**Proven on a real run, 25 October 2026.** Garnier, 30 posts, $0.081. It found three things
+worth writing down:
+
+- `save_job` silently turned any unknown `kind` into `"other"`, so the competitor job was
+  never recognised by `ingest`. The kind is registered now.
+- `apify/instagram-scraper` credits people in `mentions`; `taggedUsers` belongs to a
+  different actor. Both are read.
+- A brand's own country accounts (garnier.arg.uy, garnieritalia) came back as "creators".
+  Anything carrying a word from the competitor's name is now dropped, which left the two
+  genuine credits on that run.
+
+A run that finds nothing says why — a handle that does not open, or posts crediting nobody —
+on the competitor itself (`last_note`), because the tenant is the one who can fix it. A
+global corporate account yields little; the local brand account is the one to name.
+
 ### Intelligence at `manage`
 
 There is no competitor object today. A pack exists only because somebody ran

@@ -489,7 +489,7 @@ def save_job(f):
     except ValueError:
         est = 0.01
     vals = ((f.get("name") or "").strip() or "Untitled job", actor,
-            f.get("kind") if f.get("kind") in ("profiles", "analysis", "posts", "post_urls", "other") else "other",
+            f.get("kind") if f.get("kind") in ("profiles", "analysis", "posts", "post_urls", "competitor", "other") else "other",
             (f.get("platform") or "").strip(), (f.get("source") or "all").strip(),
             tmpl, max(1, min(mh, HARD_MAX_HANDLES)), sched, at, wd, est)
     with db.connect() as conn:

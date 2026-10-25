@@ -40,7 +40,7 @@ def init():
     with db.connect() as conn:
         conn.executescript(SCHEMA)
         have = {r["name"] for r in conn.execute("PRAGMA table_info(competitors)")}
-        for col, ddl in (("pack_id", "INTEGER"), ("last_run_at", "INTEGER")):
+        for col, ddl in (("pack_id", "INTEGER"), ("last_run_at", "INTEGER"), ("last_note", "TEXT")):
             if col not in have:
                 conn.execute("ALTER TABLE competitors ADD COLUMN %s %s" % (col, ddl))
     _ready = True
@@ -88,16 +88,18 @@ def get(cid):
     return {"id": r["id"], "code_id": r["code_id"], "name": r["name"],
             "handles": json.loads(r["handles"] or "{}"), "note": r["note"] or "",
             "pack_id": r["pack_id"] if "pack_id" in r.keys() else None,
-            "last_run_at": r["last_run_at"] if "last_run_at" in r.keys() else None}
+            "last_run_at": r["last_run_at"] if "last_run_at" in r.keys() else None,
+            "last_note": r["last_note"] if "last_note" in r.keys() else None}
 
 
-def mark_run(cid, pack_id=None):
+def mark_run(cid, pack_id=None, note=None):
+    """note carries why a run found nothing — a wrong handle is the usual reason, and the
+    tenant is the only one who can fix it, so they are told rather than left guessing."""
     with _conn() as conn:
-        if pack_id is None:
-            conn.execute("UPDATE competitors SET last_run_at = ? WHERE id = ?", (db.now(), int(cid)))
-        else:
-            conn.execute("UPDATE competitors SET last_run_at = ?, pack_id = ? WHERE id = ?",
-                         (db.now(), int(pack_id), int(cid)))
+        conn.execute("UPDATE competitors SET last_run_at = ?, last_note = ? WHERE id = ?",
+                     (db.now(), note, int(cid)))
+        if pack_id is not None:
+            conn.execute("UPDATE competitors SET pack_id = ? WHERE id = ?", (int(pack_id), int(cid)))
 
 
 def runs_today(code_id):
@@ -124,7 +126,8 @@ def listing(code_id):
     return [{"id": r["id"], "name": r["name"], "handles": json.loads(r["handles"] or "{}"),
              "note": r["note"] or "", "added_by": r["added_by"] or "",
              "pack_id": r["pack_id"] if "pack_id" in r.keys() else None,
-             "last_run_at": r["last_run_at"] if "last_run_at" in r.keys() else None} for r in rows]
+             "last_run_at": r["last_run_at"] if "last_run_at" in r.keys() else None,
+             "last_note": r["last_note"] if "last_note" in r.keys() else None} for r in rows]
 
 
 def count(code_id):
