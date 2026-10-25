@@ -59,7 +59,7 @@ One tenant, one page, three panels:
 
 | Panel | What the owner sets |
 |---|---|
-| **Modules** | Helvi Intelligence and Helvi Track on or off. Off hides, never deletes. |
+| **Modules** | Helvi Intelligence and Helvi Track at `off` / `view` / `manage`. Off hides, never deletes. |
 | **Limits and credits** | AI credits, seats, campaign and selection caps, capture jobs per day |
 | **Branding** | Logo, colours, the name on reports and in the client app; its domain later |
 
@@ -71,12 +71,63 @@ and when. Nothing here is editable by an admin, a KAM or the tenant.
 Limits are enforced **server-side at the point of spend**, the way the AI monthly
 caps already are: a cap that only greys out a button is not a cap.
 
+## What a tenant runs themselves
+
+A tenant has **full control of their own data**. There is no approval step: what
+they add is live the moment they add it. The brake is the per-tenant caps, and a
+cap only counts where it is enforced — at the point of spend, server-side.
+
+So a module switch is **not a boolean**. Each module is set per tenant to one of:
+
+| Level | Means |
+|---|---|
+| `off` | the routes refuse, nothing is shown, the data is kept |
+| `view` | they read what HelloVoice produced (today's behaviour) |
+| `manage` | they add, edit and delete their own, inside their caps |
+
+### Track at `manage`
+
+Today every write to a campaign is team-only — `contentedit.py` says so in as
+many words: *"Clients and view-only team logins never get these routes."* The
+tenant gets their own endpoints, not those: add and edit their posts and links,
+add creators to their campaign, trigger a refresh. The existing `pending` queue
+stops being an approval gate and becomes the tenant's own draft state.
+
+### Intelligence at `manage`
+
+There is no competitor object today. A pack exists only because somebody ran
+`build_evidence_pack.py` offline and uploaded the sheet at `/evidence`. For a
+tenant to add their own competitor this has to be built:
+
+1. `competitors` per tenant — name, handles per platform
+2. an intake that runs the collection (the Apify path the capture jobs use)
+3. the result landing as a pack, filed under that tenant
+
+That run **spends real money**, and with no approval in front of it the per-tenant
+monthly cap is the only thing standing between a tenant and the bill. It is
+checked before the job is queued, the way the AI helper caps already work.
+
+## What the super admin sees and overrides
+
+The owner sees every tenant's configuration on that tenant's page, and can
+override any of it: module levels, caps, credits, branding — and the data the
+tenant manages, where it is wrong.
+
+- **See it as they do.** The "View as client" ticket already exists
+  (`as_client`): the owner opens the tenant's own surfaces without a second login.
+- **Override, with the trail.** Every override is written to History with who,
+  when and the value before — a tenant's own change and an owner's override are
+  told apart.
+- **An override sticks** until it is cleared; it does not get overwritten the
+  next time the tenant edits their settings.
+- A tenant never sees, and never sets, another tenant's anything.
+
 ## Phase 1 — the gate
 
 1. `modules.py`: one declarative registry — per module, its route prefixes, nav
    entries, tables, client-API payload keys and background jobs. The same shape
    as `ui.NAV` / `ui.STAFF_ONLY` / `ui.KAM_HIDDEN`, which already work this way.
-2. `tenant_modules` table: tenant, module, on/off, changed_at, changed_by.
+2. `tenant_modules` table: tenant, module, level (`off`/`view`/`manage`), changed_at, changed_by.
 3. One gate: a thread-local tenant (as `ui.set_role` does for roles), one check
    in the router, one in the nav builder, one in the client API payload.
 4. The **Tenants** section above: one page per tenant, the three panels, History
@@ -102,6 +153,6 @@ cannot be copied 47 times. The split is therefore:
 
 ## Out of scope for now
 
-Tenant self-service (the tenant configures nothing themselves), billing and
+Billing and
 invoicing, cross-tenant reporting, per-tenant API keys and background-job
 control, and any split of the roster.
