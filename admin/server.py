@@ -4038,6 +4038,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if len(name) < 3:
             return self.send_json(400, {"ok": False, "reason": "name", "message": "Give the campaign a name (3 letters or more)."}, self.cors())
         note = " ".join(str(b.get("note") or "").split())[:500]
+        # The tenant's own cap (Tenants -> Limits). Counted here, where they create one.
+        if modules.over(cid, "campaigns_max", modules.count(cid, "campaigns")):
+            return self.send_json(403, {"ok": False, "reason": "limit", "message":
+                                        "You have as many campaigns as your plan allows. Ask your account manager for more."},
+                                  self.cors())
         k = db.create_campaign(name, client=user["company"] or None, code_id=cid, origin="client")
         if note:
             db.save_campaign(k, notes="Client's note: " + note)
@@ -6653,6 +6658,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if sel is None:
             sel = db.selection_for_link(name, codes, viewer)
         if sel is None:
+            if modules.over(viewer, "selections_max", modules.count(viewer, "selections")):
+                return self.send_json(403, {"ok": False, "reason": "limit", "message":
+                                            "You have as many selections as your plan allows. Ask your account manager for more."},
+                                      self.cors())
             sid = db.save_selection(None, name, codes, {}, None, None, None, viewer, origin="client")
             return self.send_json(200, {"ok": True, "token": db.selection(sid)["token"],
                                         "capped": SELECTION_MAX if len(asked) > SELECTION_MAX else None},

@@ -38,6 +38,31 @@ def page_html(query=None):
                                                    c["n_campaigns"], "" if c["n_campaigns"] == 1 else "s"))
             + "</div></td>" + cells + "</tr>")
 
+    # Limits and branding: one row per tenant, the platform default showing through as the
+    # placeholder so an empty box plainly means "whatever everyone else gets".
+    setn = modules.all_settings()
+
+    def fields(group, cid):
+        have = setn.get(cid) or {}
+        return "".join(
+            "<td><input name='set:%d:%s' value='%s' placeholder='%s' size='%d'%s></td>"
+            % (cid, f["key"], e(have.get(f["key"]) or ""), e(_default_hint(f)), 8 if f["kind"] == "int" else 14,
+               " inputmode='numeric'" if f["kind"] == "int" else "")
+            for f in group)
+
+    def table(group, title, intro):
+        head2 = "".join("<th title='%s'>%s%s</th>" % (e(f["help"]), e(f["label"]),
+                                                      "" if f["enforced"] else " <span class='muted'>*</span>")
+                        for f in group)
+        body2 = "".join("<tr><td><b>" + e(c["label"]) + "</b></td>" + fields(group, c["id"]) + "</tr>" for c in codes)
+        starred = [f for f in group if not f["enforced"]]
+        foot = ("<p class='price-hint'>* recorded, not enforced yet: "
+                + e(", ".join(f["label"].lower() for f in starred)) + ".</p>") if starred else ""
+        return ("<div class='card'><div class='hd'><h2>" + e(title) + "</h2></div>"
+                "<p class='sec-desc'>" + intro + "</p>"
+                "<table class='tbl'><thead><tr><th>Client</th>" + head2 + "</tr></thead><tbody>"
+                + (body2 or "<tr><td>No clients yet.</td></tr>") + "</tbody></table>" + foot + "</div>")
+
     legend = "".join("<li><b>%s</b> — %s</li>" % (e(modules.LEVEL_LABEL[lv]), e(modules.LEVEL_HELP[lv]))
                      for lv in modules.LEVELS)
     what = "".join("<li><b>%s</b> — %s</li>" % (e(m["name"]), e(m["what"])) for m in modules.MODULES)
@@ -60,8 +85,23 @@ def page_html(query=None):
         "<form method='post' action='" + u("/tenants/save") + "'>"
         "<table class='tbl'><thead><tr><th>Client</th>" + head + "</tr></thead>"
         "<tbody>" + ("".join(rows) or "<tr><td colspan='9'>No clients yet.</td></tr>") + "</tbody></table>"
-        "<div style='margin-top:14px'><button class='btn'>Save</button></div></form></div>")
+        "<p class='price-hint'>Manage is stored but still behaves as view: the screens a tenant would "
+        "add their own posts and competitors with are the next slice.</p>"
+        "</div>"
+        + table(modules.LIMITS, "Limits and credits",
+                "Empty means the platform default. A cap counts what they have now and refuses the next one.")
+        + table(modules.BRAND, "Branding",
+                "What a tenant is called and coloured on their own report and app.")
+        + "<div style='margin:14px 0 40px'><button class='btn'>Save everything</button></div></form>")
     return views.page("Tenants", body, "/tenants")
+
+
+def _default_hint(f):
+    """What shows through an empty box: the platform default, in words."""
+    if f["key"] == "credits_month":
+        import db as _db
+        return str(_db.setting("monthly_credits", 0) or 0)
+    return "no limit" if f["kind"] == "int" else "default"
 
 
 def save(form, by, ip=None):
@@ -69,6 +109,20 @@ def save(form, by, ip=None):
     import team
     changed = []
     for name, val in form.items():
+        if name.startswith("set:"):
+            try:
+                _, cid, key = name.split(":", 2)
+                cid = int(cid)
+            except ValueError:
+                continue
+            v = val[0] if isinstance(val, list) else val
+            was = (modules.settings(cid).get(key) or "")
+            if (v or "").strip() == was:
+                continue
+            if modules.set_value(cid, key, v, by) is None:
+                continue
+            changed.append((cid, key, was or "default", (v or "").strip() or "default"))
+            continue
         if not name.startswith("lvl:"):
             continue
         try:
@@ -83,7 +137,23 @@ def save(form, by, ip=None):
         changed.append((cid, key, was, val))
 
     for cid, key, was, now_ in changed:
-        team.log("tenant_module", by, "code %d · %s · %s -> %s" % (cid, key, was, now_), ip)
+        team.log("tenant_config", by, "code %d · %s · %s -> %s" % (cid, key, was, now_), ip)
+        if key == "credits_month":
+            _apply_credits(cid, now_)
     if not changed:
         return "Nothing changed."
     return "Saved %d change%s." % (len(changed), "" if len(changed) == 1 else "s")
+
+
+def _apply_credits(code_id, val):
+    """Monthly credits are already a per-client field the refill reads (`users.monthly_credits`),
+    so the panel writes there rather than growing a second allowance nobody enforces."""
+    import portal
+    u = portal.user_for_code(code_id)
+    if u is None:
+        return
+    try:
+        n = None if val in ("", "default", None) else max(0, int(val))
+    except (TypeError, ValueError):
+        return
+    portal.update_profile(u["id"], monthly_credits=n)

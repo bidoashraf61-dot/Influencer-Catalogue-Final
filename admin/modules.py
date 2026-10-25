@@ -58,7 +58,47 @@ MODULES = [
 ]
 BY_KEY = {m["key"]: m for m in MODULES}
 
+# What an owner can set for one tenant besides its modules. Each field has a platform
+# default and the tenant row holds only what differs from it, so a new tenant works
+# before anyone configures anything and a default can be moved in one place.
+#
+# `enforced` is the honest part: a cap is only real where something checks it. Credits,
+# campaigns and selections are checked where a tenant creates one. Seats and captures a
+# day are stored and wait for the tenant-side screens that can spend them -- today no
+# tenant can trigger a capture at all, so there is nothing to refuse.
+LIMITS = [
+    {"key": "credits_month", "label": "AI credits a month", "kind": "int", "enforced": True,
+     "help": "Tops the balance up on the 1st. Empty uses the platform's monthly credits setting."},
+    {"key": "campaigns_max", "label": "Campaigns", "kind": "int", "enforced": True,
+     "help": "How many campaigns they may have. Empty means no limit."},
+    {"key": "selections_max", "label": "Selections", "kind": "int", "enforced": True,
+     "help": "How many selections they may keep. Empty means no limit."},
+    {"key": "seats", "label": "Seats", "kind": "int", "enforced": False,
+     "help": "People on their account. Recorded; invites do not check it yet."},
+    {"key": "captures_day", "label": "Captures a day", "kind": "int", "enforced": False,
+     "help": "Collection runs a day once they can start their own. Nothing spends on their behalf yet."},
+]
+
+BRAND = [
+    {"key": "brand_name", "label": "Name on reports", "kind": "text", "enforced": False,
+     "help": "What they are called on the report and in the app. Empty uses their account name."},
+    {"key": "brand_colour", "label": "Colour", "kind": "text", "enforced": False,
+     "help": "Hex, e.g. #1b9b52. Empty uses the HELVi Connect colours."},
+    {"key": "brand_logo", "label": "Logo", "kind": "text", "enforced": False,
+     "help": "A link to their logo. Empty uses the one on each campaign."},
+]
+FIELDS = {f["key"]: f for f in LIMITS + BRAND}
+
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS tenant_settings (
+    code_id    INTEGER NOT NULL,
+    key        TEXT NOT NULL,             -- a key from LIMITS or BRAND
+    value      TEXT,                      -- "" / NULL means "use the platform default"
+    changed_at INTEGER NOT NULL,
+    changed_by TEXT,
+    PRIMARY KEY (code_id, key)
+);
+
 CREATE TABLE IF NOT EXISTS tenant_modules (
     code_id    INTEGER NOT NULL,          -- the client's codes row: the tenant
     module     TEXT NOT NULL,             -- a key from MODULES
@@ -124,6 +164,84 @@ def all_levels():
         for r in conn.execute("SELECT code_id, module, level FROM tenant_modules"):
             out.setdefault(r["code_id"], {})[r["module"]] = r["level"]
     return out
+
+
+# ------------------------------------------------------- limits and brand --
+
+def settings(code_id):
+    """{key: value} for one tenant — only what an owner has actually set."""
+    if code_id is None:
+        return {}
+    with _conn() as conn:
+        return {r["key"]: r["value"] for r in
+                conn.execute("SELECT key, value FROM tenant_settings WHERE code_id = ?", (int(code_id),))
+                if r["key"] in FIELDS}
+
+
+def value(code_id, key, default=None):
+    """What this tenant's field is set to, or `default` when they are on the platform's."""
+    v = settings(code_id).get(key)
+    return default if v in (None, "") else v
+
+
+def number(code_id, key):
+    """An int limit, or None for no limit."""
+    try:
+        v = value(code_id, key)
+        return None if v in (None, "") else max(0, int(v))
+    except (TypeError, ValueError):
+        return None
+
+
+def set_value(code_id, key, val, by=""):
+    """Store one field. An empty value clears the override and returns the tenant to the
+    platform default rather than writing a zero."""
+    if key not in FIELDS:
+        return None
+    val = (str(val) if val is not None else "").strip()
+    if FIELDS[key]["kind"] == "int" and val:
+        try:
+            val = str(max(0, int(val)))
+        except ValueError:
+            return None
+    with _conn() as conn:
+        if val == "":
+            conn.execute("DELETE FROM tenant_settings WHERE code_id = ? AND key = ?", (int(code_id), key))
+        else:
+            conn.execute("INSERT INTO tenant_settings (code_id, key, value, changed_at, changed_by) "
+                         "VALUES (?,?,?,?,?) ON CONFLICT(code_id, key) DO UPDATE SET "
+                         "value = excluded.value, changed_at = excluded.changed_at, changed_by = excluded.changed_by",
+                         (int(code_id), key, val, db.now(), by or ""))
+    return val
+
+
+def all_settings():
+    """{code_id: {key: value}} — the Tenants list, in one read."""
+    out = {}
+    with _conn() as conn:
+        for r in conn.execute("SELECT code_id, key, value FROM tenant_settings"):
+            if r["key"] in FIELDS:
+                out.setdefault(r["code_id"], {})[r["key"]] = r["value"]
+    return out
+
+
+COUNTABLE = {"campaigns", "selections"}
+
+
+def count(code_id, table):
+    """How many of a thing this tenant has. Only the two tables a cap is checked against,
+    named here rather than passed in, so this can never become a way to read anything else."""
+    if table not in COUNTABLE or code_id is None:
+        return 0
+    with _conn() as conn:
+        r = conn.execute("SELECT COUNT(*) n FROM %s WHERE code_id = ?" % table, (int(code_id),)).fetchone()
+    return r["n"] if r else 0
+
+
+def over(code_id, key, have):
+    """True when a tenant is at or past a cap and must be refused. No cap set = never."""
+    cap = number(code_id, key)
+    return cap is not None and have >= cap
 
 
 # ----------------------------------------------------------------- the gate --
