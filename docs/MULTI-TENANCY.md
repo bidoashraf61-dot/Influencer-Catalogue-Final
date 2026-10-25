@@ -48,6 +48,29 @@ Intelligence as the pilot and Track as the project.
 5. **The core is not switchable.** A tenant with both modules off still has a
    roster, selections and quotes.
 
+## The super admin dashboard
+
+Everything a tenant has is configured in one place: **Tenants**, a new section in
+the admin sidebar. No new role — the existing **owner** holds it, so 2FA, History
+and the idle limit apply unchanged. Admins run the business; owners configure the
+platform.
+
+One tenant, one page, three panels:
+
+| Panel | What the owner sets |
+|---|---|
+| **Modules** | Helvi Intelligence and Helvi Track on or off. Off hides, never deletes. |
+| **Limits and credits** | AI credits, seats, campaign and selection caps, capture jobs per day |
+| **Branding** | Logo, colours, the name on reports and in the client app; its domain later |
+
+Rules: every value has a **platform default**, and a tenant row only records what
+differs from it — so a new tenant works before anyone configures anything, and a
+default can be changed in one place. Every change is written to History with who
+and when. Nothing here is editable by an admin, a KAM or the tenant.
+
+Limits are enforced **server-side at the point of spend**, the way the AI monthly
+caps already are: a cap that only greys out a button is not a cap.
+
 ## Phase 1 — the gate
 
 1. `modules.py`: one declarative registry — per module, its route prefixes, nav
@@ -56,8 +79,11 @@ Intelligence as the pilot and Track as the project.
 2. `tenant_modules` table: tenant, module, on/off, changed_at, changed_by.
 3. One gate: a thread-local tenant (as `ui.set_role` does for roles), one check
    in the router, one in the nav builder, one in the client API payload.
-4. Switches on the client's page in the admin, with History.
-5. Carve out Intelligence end to end as the pilot, then Track module by module.
+4. The **Tenants** section above: one page per tenant, the three panels, History
+   on every change, owner only.
+5. `tenant_limits` and `tenant_brand` beside `tenant_modules`, each row holding
+   only what differs from the platform default.
+6. Carve out Intelligence end to end as the pilot, then Track module by module.
 
 ## Phase 2 — the data split
 
@@ -76,5 +102,6 @@ cannot be copied 47 times. The split is therefore:
 
 ## Out of scope for now
 
-Tenant self-service, per-tenant branding, billing, cross-tenant reporting, and
-any split of the roster.
+Tenant self-service (the tenant configures nothing themselves), billing and
+invoicing, cross-tenant reporting, per-tenant API keys and background-job
+control, and any split of the roster.
