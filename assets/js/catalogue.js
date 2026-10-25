@@ -2713,7 +2713,7 @@
       var cl = $("sel-client");
       if (cl) { cl.hidden = !(br && br.client); cl.textContent = br && br.client ? "Prepared for " + br.client : ""; }
       var bx = $("sel-brief");
-      var scored = !!(CURATED && CURATED.scores && Object.keys(CURATED.scores).length);
+      var scored = !scoresHidden() && !!(CURATED && CURATED.scores && Object.keys(CURATED.scores).length);
       if (bx) {
         if (!br && !scored) { bx.hidden = true; }
         else if (!br) { bx.hidden = false; bx.textContent = ""; }
@@ -3089,7 +3089,8 @@
     function rolesOf(code) { var v = verdictOf(code); return v && v.roles ? v.roles : []; }
     // The matching score is worked out by the server from the creator's analysis; a fit
     // tag the admin chose by hand wins over the one the score implies.
-    function rawScore(code) { return (CURATED && CURATED.scores && CURATED.scores[code]) || null; }
+    function scoresHidden() { var g = CURATED && CURATED.scoresGate; return !!(g && g.applies && !g.published); }
+    function rawScore(code) { return (!scoresHidden() && CURATED && CURATED.scores && CURATED.scores[code]) || null; }
     // The platform to read a creator's score from: the client's own pick, else the admin's
     // assignment, else (none) the best one the server chose.
     function pickOf(code) {
@@ -3136,6 +3137,7 @@
     }
     var PLAT_SHORT = { Instagram: "IG", TikTok: "TT", Snapchat: "SC", YouTube: "YT" };
     function fitOf(code) {
+      if (scoresHidden()) return "";
       var v = verdictOf(code), s = scoreOf(code);
       return (v && v.fit) ? v.fit : (s && s.score != null ? s.tag : "");
     }
@@ -3605,7 +3607,7 @@
         btn.setAttribute("data-publish", state ? "0" : "1");
         var st = btn.querySelector(".sel-obj__swst"); if (st) st.textContent = state ? "On for client" : "Off for client";
       };
-      var keep = function (state) { if (what === "analysis") CURATED.scoresGate.analysis = state; else CURATED.scoresGate.published = state; scoreView(); };
+      var keep = function (state) { if (what === "analysis") CURATED.scoresGate.analysis = state; else CURATED.scoresGate.published = state; scoreView(); if (what !== "analysis") render(); };
       paint(on); keep(on);
       fetch(CFG.api + "/api/selection/scores", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ token: CURATED.token, publish: on, what: what }) })
@@ -4303,14 +4305,36 @@
             if (!b || !b.ok) return;
             CURATED.scores = b.scores || {}; CURATED.brief = b.brief || null; CURATED.verdicts = b.verdicts || CURATED.verdicts;
             CURATED.needsObjective = !!b.needs_objective;
+            if (b.scores_gate) CURATED.scoresGate = b.scores_gate;
             if (b.status) CURATED.status = b.status;
             if (b.facts) CURATED.facts = b.facts;
             if (b.lifecycle) CURATED.lifecycle = b.lifecycle;
+            scoreView();
             render();
           })
           .catch(function () { /* the old view stays */ });
       }
     };
+    // An open page follows the "Client sees" switch (Bido, 2026-10-25): a tiny check every 20s while the
+    // tab is visible and on coming back to it; the full data reloads only when a switch has changed.
+    (function watchGate() {
+      if (!CURATED || !CURATED.token || !CFG.api) return;
+      var busy = false;
+      var check = function () {
+        if (busy || document.visibilityState !== "visible" || !CURATED.scoresGate) return;
+        busy = true;
+        fetch(CFG.api + "/api/selection/gate?s=" + encodeURIComponent(CURATED.token), { credentials: "include", cache: "no-store" })
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .then(function (j) {
+            var g = CURATED.scoresGate;
+            if (j && j.ok && (j.scores !== !!g.published || (g.team && j.analysis !== !!g.analysis))) return window.hvSelection.refresh();
+          })
+          .catch(function () { /* next tick */ })
+          .then(function () { busy = false; });
+      };
+      setInterval(check, 20000);
+      document.addEventListener("visibilitychange", check);
+    })();
     try { document.dispatchEvent(new CustomEvent("hv:selection")); } catch (e) { /* old browser */ }
     if (STATUS_ON) {
       // A selection that has statuses opens grouped by them, unless the client chose otherwise.

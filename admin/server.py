@@ -770,6 +770,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_evidence(query.get("s") or "", None, kam_scope._int(query.get("p")))
         if path == "/api/evidence/creator":
             return self.api_evidence(query.get("s") or "", (query.get("c") or "").strip().upper())
+        if path == "/api/selection/gate":
+            gs = db.selection(token=query.get("s") or "")
+            if gs is None:
+                return self.send_json(404, {"ok": False}, self.cors())
+            return self.send_json(200, {"ok": True, "scores": bool(gs["scores_published"]),
+                                        "analysis": bool(gs["analysis_published"])}, self.cors())
         if path == "/api/selection":
             return self.api_selection(
                 query.get("s") or "", query.get("n") or "",
@@ -5928,9 +5934,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                               "analysis": bool(sel["analysis_published"] if "analysis_published" in sel.keys() else 0) if team else False}
         import selfilters as _sf             # item 248: the "Client sees" switches, owner and admin accounts only
         out["scores_gate"]["can_publish"] = bool(team) and _sf.can_publish(self)
-        if not team:
-            # No score and no fit badge (or its reason) for a client or a KAM, published or not (owner,
-            # 2026-10-20; it was "until published" since 2026-10-15).
+        if not team and gated:
+            # No score and no fit badge (or its reason) for a client or a KAM until HelloVoice switches
+            # "Scores & fit" on for the client (Bido, 2026-10-25; it was "never" since 2026-10-20).
             out["scores"] = {}
             out["scores_pending"] = False
             out["verdicts"] = {k: {kk: vv for kk, vv in (v or {}).items() if kk not in ("fit", "reason")}
