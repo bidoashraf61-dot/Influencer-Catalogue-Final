@@ -5969,6 +5969,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return "admin"
         if portal.sample_member(reader, sel) and not self.as_client():
             return "admin"           # the sample selection: every control on for BlueHolding and HelloVoice accounts
+        if self.staff_viewer() and self.kam_clients() is None:
+            return "admin"           # HelloVoice staff signed in to the portal: same controls as the admin
         if reader is not None and sel["code_id"] is not None and portal.owns(int(reader), sel["code_id"]):
             return "owner"
         if reader is not None and db.selection_granted(sel["id"], reader):
@@ -6410,8 +6412,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
             return None
         sel = db.selection(token=token) if token else None
+        staff = self.staff_viewer() and self.kam_clients() is None
         if sel is None or (sel["code_id"] is not None and int(reader) != db.admin_code_id()
-                           and not portal.opens(int(reader), sel)):
+                           and not staff and not portal.opens(int(reader), sel)):
             self.send_json(404, {"ok": False}, self.cors())
             return None
         code = str(b.get("code") or "").strip().upper()
@@ -6423,6 +6426,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def _status_who(self, role, reader):
         if role == "admin":
             a = self.admin()
+            u = portal.user_for_code(reader) if a is None else None
+            if u is not None and u["name"]:
+                return "hv", u["name"], None   # staff signed in to the portal: their own name
             name = (a["name"] if a is not None and "name" in a.keys() and a["name"] else None) or \
                    ((a["email"].split("@")[0].replace(".", " ").title()) if a is not None else "HelloVoice")
             return "hv", name, None
