@@ -2445,6 +2445,8 @@
                         status: b.status || {}, statusCounts: b.status_counts || null, role: b.role || "viewer",
                         owner: b.owner || "", kam: b.kam || "", credits: b.credits, lifecycle: b.lifecycle || null,
                         canRename: !!b.can_rename,   // item 173: owner, its KAM, HelloVoice
+                        // Item 3b (Bido, 25 Oct 2026): arrange the cards here, HelloVoice owners and admins only.
+                        canArrange: !!b.can_arrange,
                         // 0 while AI is free (active campaign); null only on an old server.
                         replaceCost: b.replace_cost != null ? b.replace_cost : 2,
                         alikeCost: b.alike_cost != null ? b.alike_cost : 2, aiFree: b.ai_free || null,
@@ -2632,6 +2634,7 @@
                       ["fit", "Fit"], ["role", "Role"], ["tier", "Creator size"], ["platform", "Platform"], ["country", "Country"],
                       ["interest", "Interest"], ["decided", "Decided by"], ["reason", "Rejection reason"], ["licence", "Licence"],
                       ["price", "Price"], ["er", "Engagement rate"], ["views", "Average views"], ["aud", "Top audience country"]];
+    var NO_OTHER = "No other tag";
     var NONE_LABEL = { segment: "No segment", country: "Location not specified", interest: "No interest listed",
                        fit: "Not rated", role: "No role set", tag: "Untagged", platform: "No platform", tier: "No tier",
                        decided: "Not decided yet", reason: "No reason given", licence: "No licence listed", price: "No price",
@@ -2675,9 +2678,11 @@
     function syncGroupMenus() {
       if (!groupSel) return;
       if (!groupHas(groupBy)) groupBy = "";
-      if (!groupBy || groupBy2 === groupBy || !groupHas(groupBy2)) groupBy2 = "";
+      // Tags may be chosen twice (Bido, 25 Oct 2026): inside a tag section the second level
+      // groups by the creator's other tags. Every other dimension still refuses itself.
+      if (!groupBy || (groupBy2 === groupBy && groupBy !== "tag") || !groupHas(groupBy2)) groupBy2 = "";
       groupOptions(groupSel, groupBy);
-      groupOptions(groupSel2, groupBy2, groupBy || "-");
+      groupOptions(groupSel2, groupBy2, (groupBy === "tag" ? "-" : groupBy) || "-");
       groupSel2.closest(".cat-group-by").hidden = !groupBy;
     }
     if (controls) {
@@ -2717,10 +2722,15 @@
         return (count[b] - count[a]) || a.localeCompare(b);
       });
     }
-    function split(list, dim) {
+    function split(list, dim, exclude) {
       var members = {}, count = {};
       list.forEach(function (card) {
-        groupKeys(card.dataset.code, dim).forEach(function (k) {
+        var ks = groupKeys(card.dataset.code, dim);
+        if (exclude) {
+          ks = ks.filter(function (x) { return x !== exclude; });
+          if (!ks.length) ks = [NO_OTHER];
+        }
+        ks.forEach(function (k) {
           (members[k] = members[k] || []).push(card);
           count[k] = (count[k] || 0) + 1;
         });
@@ -2792,7 +2802,7 @@
         body.className = "cat-group__body";
         body.hidden = !!collapsed[id];
         if (groupBy2) {
-          var sub = split(top.members[k], groupBy2);
+          var sub = split(top.members[k], groupBy2, groupBy2 === groupBy ? k : null);
           sub.keys.forEach(function (k2) {
             var id2 = id + ">" + groupBy2 + ":" + k2;
             var s2 = document.createElement("section");
@@ -4319,6 +4329,7 @@
         if (e.target.closest(".sel-tb__clear")) { clearAll(); return; }
         if (e.target.closest(".sel-more__views")) { tbMenu = ""; viewsOpen = true; viewsMsg = ""; renderToolbar(); return; }
         if (e.target.closest(".sel-more__link")) { tbMenu = ""; paintMenus(); copyViewLink(); return; }
+        if (e.target.closest(".sel-more__arrange")) { tbMenu = ""; paintMenus(); startArrange(); return; }
         var fb = e.target.closest(".sel-more__fold");
         if (fb) { tbMenu = ""; foldAllNow(fb.getAttribute("data-fold") === "close"); renderToolbar(); return; }
       });
@@ -4337,6 +4348,86 @@
         tb.querySelector(m[2]).hidden = !on;
       });
     }
+    // ---- Item 3b (Bido, 25 Oct 2026): arrange the cards on the selection page itself.
+    // HelloVoice owners and admins only (the server says so: can_arrange, same gate as "Client sees").
+    // Drag a card to its exact place, Save, and that order becomes the selection's codes — the order
+    // every reader opens in. Filters, sort and grouping have to be off: the saved order is what is on screen.
+    var arranging = false, arrDrag = null;
+    function arrGrid() { return document.getElementById("cat-grid"); }
+    function arrCards() { return Array.prototype.slice.call(arrGrid().querySelectorAll(".cat-card")); }
+    function arrBar(msg, busy) {
+      var bar = document.getElementById("sel-arrange");
+      if (!arranging) { if (bar) bar.remove(); return; }
+      if (!bar) {
+        bar = document.createElement("div");
+        bar.id = "sel-arrange"; bar.className = "sel-arr";
+        document.body.appendChild(bar);
+      }
+      bar.innerHTML = '<span class="sel-arr__t">Drag a card to its place</span>' +
+        '<span class="sel-arr__m">' + esc(msg || "") + "</span>" +
+        '<button type="button" class="sel-arr__cancel">Cancel</button>' +
+        '<button type="button" class="sel-arr__save"' + (busy ? " disabled" : "") + ">" + (busy ? "Saving…" : "Save order") + "</button>";
+    }
+    function startArrange() {
+      if (!CURATED || !CURATED.canArrange || !CFG.api) return;
+      // Grouping is fine: the groups hold every card, so the order on screen is still a complete order.
+      // A filter or a sort is not: one hides cards, the other is not an order anybody arranged.
+      if (anyFilter() || (controls && controls.sorted())) {
+        window.alert("Turn the filters and the sort off first: the order you save is the order on screen.");
+        return;
+      }
+      arranging = true;
+      arrGrid().classList.add("is-arranging");
+      arrCards().forEach(function (c) { c.setAttribute("draggable", "true"); });
+      arrBar("");
+    }
+    function stopArrange() {
+      arranging = false; arrDrag = null;
+      var g = arrGrid();
+      if (g) { g.classList.remove("is-arranging"); arrCards().forEach(function (c) { c.removeAttribute("draggable"); }); }
+      arrBar("");
+    }
+    function saveArrange() {
+      var codes = arrCards().map(function (c) { return c.dataset.code; });
+      arrBar("", true);
+      fetch(CFG.api + "/api/selection/order", { method: "POST", credentials: "include",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token: CURATED.token, codes: codes }) })
+        .then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (b) {
+          if (!b || !b.ok) { arrBar(b && b.message ? b.message : "Could not save. Try again."); return; }
+          CURATED.codes = b.codes || codes;
+          selected = CURATED.codes.slice();
+          arrCards().forEach(function (c) { c.dataset.idx = String(CURATED.codes.indexOf(c.dataset.code)); });
+          stopArrange();
+        }, function () { arrBar("Could not save. Try again."); });
+    }
+    document.addEventListener("click", function (e) {
+      if (!arranging || !e.target.closest) return;
+      if (e.target.closest(".sel-arr__cancel")) { e.preventDefault(); window.location.reload(); return; }
+      if (e.target.closest(".sel-arr__save")) { e.preventDefault(); saveArrange(); }
+    });
+    document.addEventListener("dragstart", function (e) {
+      if (!arranging) return;
+      var c = e.target.closest && e.target.closest(".cat-card");
+      if (!c) return;
+      arrDrag = c; c.classList.add("is-dragging");
+      e.dataTransfer.effectAllowed = "move";
+      try { e.dataTransfer.setData("text/plain", c.dataset.code || ""); } catch (err) {}
+    });
+    document.addEventListener("dragover", function (e) {
+      if (!arranging || !arrDrag) return;
+      var over = e.target.closest && e.target.closest(".cat-card");
+      if (!over || over === arrDrag) return;
+      e.preventDefault(); e.dataTransfer.dropEffect = "move";
+      var r = over.getBoundingClientRect();
+      var after = (e.clientX - r.left) > r.width / 2;
+      over.parentNode.insertBefore(arrDrag, after ? over.nextSibling : over);
+    });
+    document.addEventListener("drop", function (e) { if (arranging && arrDrag) e.preventDefault(); });
+    document.addEventListener("dragend", function () {
+      if (!arrDrag) return;
+      arrDrag.classList.remove("is-dragging"); arrDrag = null;
+    });
     function renderToolbar() {
       var tb = ensureToolbar();
       if (!tb) return;
@@ -4355,6 +4446,8 @@
       setIH(tb.querySelector(".sel-tb__pop--more"),
         '<button type="button" role="menuitem" class="sel-more__views">' + hvIcon("save") + "Saved views" + (VIEWS.length ? " <b>" + VIEWS.length + "</b>" : "") + "</button>" +
         '<button type="button" role="menuitem" class="sel-more__link">' + hvIcon("copy") + "Copy link</button>" +
+        // Item 3b (Bido, 25 Oct 2026): admins only — the server decides (can_arrange).
+        (CURATED && CURATED.canArrange ? '<button type="button" role="menuitem" class="sel-more__arrange">' + hvIcon("filter") + "Arrange cards</button>" : "") +
         (groupBy ? '<button type="button" role="menuitem" class="sel-more__fold" data-fold="' + (anyOpen ? "close" : "open") + '">' + hvIcon("minus") +
           (anyOpen ? "Collapse all groups" : "Expand all groups") + "</button>" : ""));
       var filt = anyFilter();
@@ -5089,6 +5182,9 @@
 
   ["contextmenu", "dragstart", "selectstart", "copy", "cut"].forEach(function (evt) {
     document.addEventListener(evt, function (e) {
+      // While HelloVoice arranges the cards (item 3b) the drag has to be allowed to start,
+      // or this deterrence cancels it the moment the arrange handler has set it up.
+      if (evt === "dragstart" && e.target.closest && e.target.closest(".is-arranging .cat-card")) return;
       if (e.target.closest && e.target.closest(".cat-form, .cat-gate__form, .cat-range, .cat-search, [data-noselect]")) return;
       e.preventDefault();
     });
