@@ -763,6 +763,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "licences": licence.for_roster()}, self.cors())
         if path == "/api/discover/facets":
             return self.api_discover("facets")
+        if path == "/api/my/competitors":
+            # The tenant's own list (Helvi Intelligence at manage). tenant_api does the gating.
+            import tenant_api
+            st, payload = tenant_api.competitors_list(self)
+            return self.send_json(st, payload, self.cors())
         if path == "/api/evidence":
             return self.api_evidence(query.get("s") or "")
         if path == "/api/brand-logo":
@@ -1333,6 +1338,20 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_tags()
         if path == "/api/selection/platform":
             return self.api_selection_platform()
+        if path.startswith("/api/my/"):
+            # A tenant writing their own, when their module is set to manage (tenant_api.py).
+            import tenant_api
+            b = self.json_body()
+            if path == "/api/my/post":
+                st, payload = tenant_api.add_post(self, b)
+            elif path == "/api/my/post/update":
+                st, payload = tenant_api.update_post(self, b)
+            elif path == "/api/my/competitor":
+                st, payload = tenant_api.competitor_save(self, b)
+            else:
+                st, payload = 404, {"ok": False}
+            return self.send_json(st, payload, self.cors())
+
         if path == "/api/evidence/add":
             return self.api_evidence_add()
         if path == "/api/evidence/request":

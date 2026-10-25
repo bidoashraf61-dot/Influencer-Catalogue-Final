@@ -93,6 +93,23 @@ tenant gets their own endpoints, not those: add and edit their posts and links,
 add creators to their campaign, trigger a refresh. The existing `pending` queue
 stops being an approval gate and becomes the tenant's own draft state.
 
+### Built on 25 October 2026
+
+`tenant_api.py` holds the tenant's own endpoints — `/api/my/post`, `/api/my/post/update`,
+`/api/my/competitor`, `/api/my/competitors` — each refusing unless the module is `manage`
+for that tenant, the campaign is theirs, and they are signed in as that client. They call
+the same `contentedit.py` functions the team uses; the team's own routes stay closed to
+clients. Every change is in History with `client: <email>` as the actor, so a post a
+client added is told apart from one the team added.
+
+`competitors.py` holds a tenant's named competitors (name + handles per platform, 40 max,
+handles accepted as links and reduced). The admin sees them on `/evidence` under
+"Competitors clients named", scoped to a KAM's own clients.
+
+**Still not collecting.** Naming a competitor starts nothing: an evidence pack is still a
+study imported in the admin. The run that would fill a pack from these handles is the next
+slice, and it is what the captures-a-day cap is waiting for.
+
 ### Intelligence at `manage`
 
 There is no competitor object today. A pack exists only because somebody ran

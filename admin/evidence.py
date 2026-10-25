@@ -1010,6 +1010,27 @@ def list_page(scope, clients, selections, ok=None, err=None):
     body = [CSS, "<div class='ev-top'><div><h1>Competitor evidence</h1><p>Which creators already worked with a "
             "client's competitors, and how each post did. Import a study, file it under the client and a selection, "
             "then add the strongest creators to the proposal.</p></div></div>", _msgs(ok, err)]
+    # What clients have asked for (Helvi Intelligence at manage): the competitors they named
+    # themselves. Naming one starts no collection -- it is the queue of studies to run.
+    try:
+        import competitors as _comp
+        named = _comp.all_named()
+    except Exception:
+        named = {}
+    if named:
+        label = {c["id"]: c["label"] for c in clients}
+        body.append("<div class='ev-card'><h2>Competitors clients named</h2>"
+                    "<p class='ev-sub'>Named by the client on their own account. Study them, then import the pack below.</p>"
+                    "<div class='ev-wrap'><table class='ev-t'><tr><th>Client</th><th>Competitor</th><th>Handles</th><th>Note</th></tr>")
+        for cid, items in sorted(named.items()):
+            if scope is not None and cid not in scope:
+                continue                       # a KAM sees her own clients only
+            for it in items:
+                body.append("<tr><td>%s</td><td><b>%s</b></td><td>%s</td><td>%s</td></tr>" % (
+                    e(label.get(cid, "Client %d" % cid)), e(it["name"]),
+                    e(" · ".join("%s @%s" % (p_, h_) for p_, h_ in sorted(it["handles"].items()))),
+                    e(it["note"] or "—")))
+        body.append("</table></div></div>")
     body.append("<div class='ev-card'><h2>Packs</h2>")
     if rows:
         body.append("<div class='ev-wrap'><table class='ev-t'><tr><th>Pack</th><th>Client</th><th>Selection</th>"
