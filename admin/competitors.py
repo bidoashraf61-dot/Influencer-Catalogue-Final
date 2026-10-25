@@ -102,6 +102,31 @@ def mark_run(cid, pack_id=None, note=None):
             conn.execute("UPDATE competitors SET pack_id = ? WHERE id = ?", (int(pack_id), int(cid)))
 
 
+def _month_start():
+    import time
+    t = time.gmtime()
+    return int(time.mktime((t.tm_year, t.tm_mon, 1, 0, 0, 0, 0, 0, 0))) - time.timezone
+
+
+def _my_sources(code_id):
+    return ["competitor:%d" % c["id"] for c in listing(code_id)]
+
+
+def spend_month(code_id):
+    """What this tenant's collection runs have cost since the 1st, in dollars. Read from the
+    runs themselves — Apify's own figure once a run finishes — so it is the real bill, not an
+    estimate that drifts."""
+    srcs = _my_sources(code_id)
+    if not srcs:
+        return 0.0
+    with _conn() as conn:
+        r = conn.execute(
+            "SELECT COALESCE(SUM(r.cost), 0) c FROM api_runs r JOIN api_jobs j ON j.id = r.job_id "
+            "WHERE r.started_at >= ? AND j.source IN (%s)" % ",".join("?" * len(srcs)),
+            [_month_start()] + srcs).fetchone()
+    return round(float(r["c"] or 0), 4)
+
+
 def runs_today(code_id):
     """Collection runs started for this tenant since midnight — what the captures-a-day cap counts."""
     import time

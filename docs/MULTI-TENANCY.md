@@ -113,8 +113,13 @@ co-authors and @mentions, minus the brand's own handles — and
 `evidence.ingest_competitor_posts` files them as an evidence pack through the same
 `import_pack` an uploaded study uses, so roster matching and the pack page are unchanged.
 
-Three brakes, in order: the tenant's **captures a day** (now enforced, which is what it was
-waiting for), Apify's **monthly budget**, and one run at a time per competitor.
+Four brakes, in order: the tenant's **captures a day**, the tenant's **monthly spend**,
+Apify's **monthly budget** (shared by everyone), and one run at a time per competitor.
+
+The spend cap is the one that matters. A day cap limits how often a tenant runs, not what
+it costs, and the Apify budget is shared — without a per-tenant cap one tenant can spend
+everybody's. It is checked against **what Apify actually billed** their runs (`api_runs.cost`
+since the 1st), not an estimate, and the Tenants page shows the figure beside the box.
 
 What it finds: creators a brand posted with, tagged or credited. Not every paid post ever
 made for them — that is still what a full study is for. Instagram only; TikTok needs a

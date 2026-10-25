@@ -125,9 +125,13 @@ def collect(h, b):
     """Start a collection run for one of the tenant's competitors (Helvi Intelligence at manage).
 
     Three brakes, in this order, because each costs more to find out the hard way:
-      the tenant's captures-a-day cap   (Tenants -> Limits; 0 or unset means none)
-      Apify's own monthly budget        (apify.start_job refuses past it)
+      the tenant's captures-a-day cap   (Tenants -> Limits; unset means none)
+      the tenant's monthly spend cap    (what Apify actually billed their runs, not an estimate)
+      Apify's own monthly budget        (apify.start_job refuses past it, for everyone together)
       one run at a time per competitor  (a job already running is not started twice)
+
+    The spend cap is the one that matters: a day cap limits how often a tenant runs, not what
+    they cost, and the Apify budget is shared -- without this, one tenant can spend everybody's.
     """
     cid, _, err = gate(h, INTEL)
     if err:
@@ -141,6 +145,14 @@ def collect(h, b):
     if cap is not None and competitors.runs_today(cid) >= cap:
         return 403, {"ok": False, "reason": "limit",
                      "message": "You have used today's %d collection%s. It resets tomorrow." % (cap, "" if cap == 1 else "s")}
+    spend_cap = modules.number(cid, "spend_month")
+    if spend_cap is not None:
+        used = competitors.spend_month(cid)
+        est = float(apify.PRESETS["comp_ig"]["est"])
+        if used + est > spend_cap:
+            return 403, {"ok": False, "reason": "limit",
+                         "message": "Collections have used $%.2f of this month's $%d. "
+                                    "Ask your account manager to raise it." % (used, spend_cap)}
     plat = "Instagram"                       # the only platform a collection reads for now
     if not (comp["handles"] or {}).get(plat):
         return 400, {"ok": False, "message": "Add their %s handle first." % plat}

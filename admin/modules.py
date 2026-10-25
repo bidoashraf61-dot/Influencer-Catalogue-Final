@@ -73,6 +73,9 @@ LIMITS = [
      "help": "How many campaigns they may have. Empty means no limit."},
     {"key": "selections_max", "label": "Selections", "kind": "int", "enforced": True,
      "help": "How many selections they may keep. Empty means no limit."},
+    {"key": "spend_month", "label": "Collection $ a month", "kind": "int", "enforced": True,
+     "help": "What their collection runs may cost in a month, in dollars. Checked against what Apify "
+             "actually billed, before a run starts. Empty means only the shared budget stops them."},
     {"key": "seats", "label": "Seats", "kind": "int", "enforced": False,
      "help": "People on their account. Recorded; invites do not check it yet."},
     {"key": "captures_day", "label": "Captures a day", "kind": "int", "enforced": False,

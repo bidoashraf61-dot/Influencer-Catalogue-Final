@@ -42,12 +42,22 @@ def page_html(query=None):
     # placeholder so an empty box plainly means "whatever everyone else gets".
     setn = modules.all_settings()
 
+    def spent(cid):
+        """What this tenant has actually spent on collections this month, beside the cap."""
+        try:
+            import competitors
+            v = competitors.spend_month(cid)
+        except Exception:
+            return ""
+        return " <span class='muted'>$%.2f used</span>" % v if v else ""
+
     def fields(group, cid):
         have = setn.get(cid) or {}
         return "".join(
-            "<td><input name='set:%d:%s' value='%s' placeholder='%s' size='%d'%s></td>"
+            "<td><input name='set:%d:%s' value='%s' placeholder='%s' size='%d'%s>%s</td>"
             % (cid, f["key"], e(have.get(f["key"]) or ""), e(_default_hint(f)), 8 if f["kind"] == "int" else 14,
-               " inputmode='numeric'" if f["kind"] == "int" else "")
+               " inputmode='numeric'" if f["kind"] == "int" else "",
+               spent(cid) if f["key"] == "spend_month" else "")
             for f in group)
 
     def table(group, title, intro):
