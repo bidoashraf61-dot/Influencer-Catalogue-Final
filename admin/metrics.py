@@ -221,7 +221,7 @@ def post_numbers(c, f, all_eng=True):
 
 
 def _piece_dates(posts):
-    """When each piece of content went up, oldest first - one date per piece (a carousel
+    """When each piece of content went up, oldest first — one date per piece (a carousel
     counts once). Used by the publishing plan to date videos that are already published."""
     first = {}
     for p in posts:
@@ -479,15 +479,9 @@ def report(campaign, internal=False, raw=False):
             safe = {}
         targets = {k: safe[k] for k in db.TARGET_KEYS if k != "er" and isinstance(safe.get(k), (int, float)) and safe[k] > 0}
         targets_auto = bool(targets)
-    # Only the platforms the goals were set for feed the targets; add-ons are tracked beside them.
-    gp = goal_platforms(plans.plan_of(campaign))
+    # Every platform counts towards the targets, the bonus ones too, so the goals read the same totals as the rest of the
+    # dashboard (owner, 2026-10-23: the Goals tab showed 3M views beside 5.7M on the dashboard).
     tot_goal = total
-    if gp and any(p["platform"] not in gp for p in camp):
-        gt = totals([p for p in camp if p["platform"] in gp], clicks["clicks"])
-        tot_goal = dict(total)
-        for k in ("views", "engagement", "reach", "er", "video_er", "posts"):
-            if k not in total["adjusted"]:
-                tot_goal[k] = gt[k]
     progress = target_progress(campaign, tot_goal, targets, plan_fraction(campaign, creators))
     planned = sum(c["planned"] or 0 for c in creators)
     total["planned"] = planned or None
@@ -1130,10 +1124,15 @@ def goals_view(campaign, r, photo=None):
                           "views": sum(p.get("views") or 0 for p in mine), "engagement": sum(p.get("engagement") or 0 for p in mine)})
     # ---- forecast
     planned = sum(int(c.get("planned") or 0) for c in r["creators"])
-    done_pieces = len({p["pk"] for p in camp if p["platform"] in gp})
+    # the forecast runs on every platform, like the targets (2026-10-23)
+    done_pieces = len({p["pk"] for p in camp})
     fc = {"planned": planned, "live": done_pieces}
-    gv = sum(p.get("views") or 0 for p in camp if p["platform"] in gp)
-    ge = sum(p.get("engagement") or 0 for p in camp if p["platform"] in gp)
+    gv = sum(p.get("views") or 0 for p in camp)
+    ge = sum(p.get("engagement") or 0 for p in camp)
+    # what is still owed is estimated on the goal platforms; the bonus platforms add their share on top
+    gv_gp = sum(p.get("views") or 0 for p in camp if p["platform"] in gp)
+    ge_gp = sum(p.get("engagement") or 0 for p in camp if p["platform"] in gp)
+    lift = {"views": gv / float(gv_gp) if gv_gp else 1.0, "engagement": ge / float(ge_gp) if ge_gp else 1.0}
     for key, got, aim, per in (("views", gv, tot_v[1], "views"), ("engagement", ge, tot_e[1], "engagement")):
         it = prog.get(key)
         if not it or not done_pieces or not planned:
@@ -1149,7 +1148,7 @@ def goals_view(campaign, r, photo=None):
                     if foll.get(pl):
                         v, e, _ = expect(pl, foll[pl])
                         left += owed * (v[1] if key == "views" else e[1])
-        high = got + left
+        high = got + left * lift[key]
         lo, hi = sorted((run, high))
         goal = it["goal"]
         fc[key] = {"low": _ri(lo, -2 if lo >= 1000 else 0), "high": _ri(hi, -2 if hi >= 1000 else 0), "target": goal,
@@ -1180,7 +1179,7 @@ def goals_view(campaign, r, photo=None):
         notes.append("Follower counts are missing on a goal platform for %s, so their benchmark is partial." % ", ".join(missing))
     addons = [p["platform"] for p in platforms if not p["goal"]]
     if addons:
-        notes.append("%s %s tracked as a bonus: no goal, and not counted in the targets." % (" and ".join(addons) if len(addons) < 3 else ", ".join(addons), "is" if len(addons) == 1 else "are"))
+        notes.append("%s %s tracked as a bonus: no goal of their own, but their views and engagement count towards the targets." % (" and ".join(addons) if len(addons) < 3 else ", ".join(addons), "is" if len(addons) == 1 else "are"))
     if any(len(c["by_platform"]) > 1 or any(not x["booked"] for x in c["by_platform"]) for c in creators):
         notes.append("A creator's results count on every platform they posted on, so a video also pushed to another "
                      "platform adds its views and engagement to their target.")
