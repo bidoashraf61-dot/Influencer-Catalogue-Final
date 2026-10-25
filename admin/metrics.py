@@ -220,6 +220,20 @@ def post_numbers(c, f, all_eng=True):
     return out
 
 
+def _piece_dates(posts):
+    """When each piece of content went up, oldest first - one date per piece (a carousel
+    counts once). Used by the publishing plan to date videos that are already published."""
+    first = {}
+    for p in posts:
+        t = p.get("posted_at")
+        if not t:
+            continue
+        pk = p["pk"]
+        if pk not in first or t < first[pk]:
+            first[pk] = t
+    return sorted(first.values())
+
+
 def post_health(n, followers, bm):
     """The one signal a post card shows, with the benchmark it was judged by."""
     if n["story"]:
@@ -425,6 +439,7 @@ def report(campaign, internal=False, raw=False):
         if not rates:
             t["emv"] = None
         delivered = len({p["pk"] for p in mine})
+        posted_ats = _piece_dates(mine)
         # Graded on the followers of the campaign's platform when the creator has them there (a TikTok-sized
         # count made an Instagram creator "mega", 2026-10-19), else on their main count.
         # A multi-platform campaign grades each creator on the platform they post on there (plan.creator_platforms,
@@ -433,6 +448,7 @@ def report(campaign, internal=False, raw=False):
         followers = (foll_by.get(code) or {}).get(plat_here) or m["followers"]
         row = {"code": code, "name": m["name"] or code, "photo": m["photo"],
                "followers": followers, "planned": m["planned"], "delivered": delivered,
+               "posted_ats": posted_ats,
                "pending_status": (m["pending_status"] if "pending_status" in m.keys() else None),
                "pending_date": (m["pending_date"] if "pending_date" in m.keys() else None),
                "profiles": db.split_profiles(m["profiles"]) if m["code"] else [],
@@ -819,11 +835,17 @@ def plan_fraction(campaign, creators, now=None):
     for c in creators:
         n = int(c.get("planned") or 0)
         got = int(c.get("delivered") or 0)
+        posted = sorted(x for x in (c.get("posted_ats") or []) if x)
         for i in range(1, n + 1):
             # First video due on the first publishing day, the last on the last day, evenly between
             # (a creator with one video owes it on the last day).
             t = start + (end - start) * ((i - 1) / float(n - 1) if n > 1 else 1.0)
-            if i == got + 1 and c.get("pending_date"):
+            if i <= len(posted):
+                # It is published: the day it went up IS its due date. Without this a creator
+                # with one video is dated to the last day of the window however long ago they
+                # posted, so the plan shows nothing due (2026-10-25, Ivatherm).
+                t = posted[i - 1]
+            elif i == got + 1 and c.get("pending_date"):
                 try:
                     t = ts(c["pending_date"])
                 except ValueError:
@@ -927,8 +949,10 @@ def _platform_goals(campaign, plan, gp, r, camp, members, sched, window):
         # ---- the publishing plan for the videos on this platform
         cs = []
         for c in mine:
-            got = len({p["pk"] for p in posts_pl if p["code"] == c["code"]})
-            cs.append(dict(c, planned=int(c.get("planned") or 0) or 1, delivered=got))
+            his = [p for p in posts_pl if p["code"] == c["code"]]
+            got = len({p["pk"] for p in his})
+            cs.append(dict(c, planned=int(c.get("planned") or 0) or 1, delivered=got,
+                           posted_ats=_piece_dates(his)))
         planf = plan_fraction(campaign, cs)
         progress = target_progress(campaign, tot, tgt, planf)
         # ---- creators on this platform
