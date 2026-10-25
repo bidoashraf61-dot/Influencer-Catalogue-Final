@@ -2636,7 +2636,6 @@
                       ["fit", "Fit"], ["role", "Role"], ["tier", "Creator size"], ["platform", "Platform"], ["country", "Country"],
                       ["interest", "Interest"], ["decided", "Decided by"], ["reason", "Rejection reason"], ["licence", "Licence"],
                       ["price", "Price"], ["er", "Engagement rate"], ["views", "Average views"], ["aud", "Top audience country"]];
-    var NO_OTHER = "No other tag";
     // Item 3c (Bido, 25 Oct 2026): a sub-tag never opens a section of its own. It shows inside a
     // main tag's section under "Then by: Tags". A creator with only sub-tags goes to "No main tag".
     var NO_MAIN = "No main tag";
@@ -2733,8 +2732,10 @@
       list.forEach(function (card) {
         var ks = groupKeys(card.dataset.code, dim);
         if (exclude) {
+          // A creator with no second tag keeps the section's own tag (Bido, 25 Oct 2026), so the
+          // sub-section reads "Reach Influencers" rather than "No other tag".
           ks = ks.filter(function (x) { return x !== exclude; });
-          if (!ks.length) ks = [NO_OTHER];
+          if (!ks.length) ks = [exclude];
         }
         if (mainOnly && dim === "tag") {
           var mains = ks.filter(function (x) { return !isSubTag(x); });
@@ -2814,7 +2815,7 @@
         // Nobody in this section carries a second tag, so there is nothing to split by: the cards
         // sit straight under the main tag rather than in a lone "No other tag" box (Bido, 25 Oct 2026).
         var sub = groupBy2 ? split(top.members[k], groupBy2, groupBy2 === groupBy ? k : null) : null;
-        if (sub && sub.keys.length === 1 && sub.keys[0] === NO_OTHER) sub = null;
+        if (sub && sub.keys.length === 1 && sub.keys[0] === k) sub = null;
         if (sub) {
           sub.keys.forEach(function (k2) {
             var id2 = id + ">" + groupBy2 + ":" + k2;
