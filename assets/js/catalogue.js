@@ -4752,6 +4752,35 @@
     }
     function selCards() { return selected.map(function (code) { return byCode[code]; }).filter(Boolean); }
     var lastLayout = "";
+    // Item 3d (Bido, 25 Oct 2026): a HelloVoice owner or admin reading a selection somebody else
+    // made can take their own copy to score, add to and quote. It sits quietly at the foot of the
+    // page -- the client never sees it, and neither does the person who owns the selection.
+    function footerCopy() {
+      if (!CURATED || !CURATED.canArrange || !CFG.api || CURATED.role === "owner") return;
+      var base = document.querySelector(".cat-footer__base");
+      if (!base || document.getElementById("sel-copy")) return;
+      var row = document.createElement("div");
+      row.className = "cat-footer__copy";
+      row.innerHTML = '<button type="button" id="sel-copy" class="cat-footer__copy-btn">' + hvIcon("save") +
+        "<span>Make my own copy</span></button>" +
+        '<span class="cat-footer__copy-tx" aria-live="polite">A copy is yours to score, add to and quote. ' +
+        "This selection stays as it is.</span>";
+      base.parentNode.insertBefore(row, base);
+      var btn = row.querySelector("#sel-copy"), say = row.querySelector(".cat-footer__copy-tx");
+      btn.addEventListener("click", function () {
+        btn.disabled = true;
+        say.textContent = "Making your copy\u2026";
+        fetch(CFG.api + "/api/selection", { method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: ("Copy of " + (CURATED.name || "selection")).slice(0, 120), codes: CURATED.codes || [] }) })
+          .then(function (r) { return r.json().catch(function () { return {}; }); })
+          .then(function (b) {
+            if (b && b.ok && b.token) { location.hash = "#s=" + encodeURIComponent(b.token); location.reload(); return; }
+            btn.disabled = false; say.textContent = "Could not make the copy just now. Try again in a moment.";
+          }, function () { btn.disabled = false; say.textContent = "Could not make the copy just now. Try again in a moment."; });
+      });
+    }
+
     // ---- Item 244 (Bido, 2026-10-24): page layout, done once ----
     var laidOut = false, vizOpen = {};
     function layoutPage() {
@@ -4761,6 +4790,7 @@
       // Item 254 (Bido): the logos sit above "Happy with this selection", not under it.
       var logos = document.querySelector(".cat-clients"), foot = $("cat-close") || document.querySelector("footer, .cat-footer");
       if (logos && foot && foot.parentNode) foot.parentNode.insertBefore(logos, foot);
+      footerCopy();
       // "Please note" leaves its own section for one line in the selection tray; (i) opens the full text.
       var note = document.querySelector(".cat-summary .cat-price-notice"), trayIn = document.querySelector("#cat-tray .cat-tray__inner");
       if (note && trayIn) {
