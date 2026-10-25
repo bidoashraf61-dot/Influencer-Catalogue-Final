@@ -10,6 +10,8 @@ an exception to the logos-only collab rule, for packs an admin chooses to share)
 
 The study data is confidential: it lives in the database only, never in the (public) repo."""
 import json
+import time
+import re
 import statistics
 import urllib.parse
 
@@ -1003,6 +1005,71 @@ CSS = ("<style>"
 
 def _msgs(ok, err):
     return ((("<p class='ok'>%s</p>" % e(ok)) if ok else "") + (("<p class='err'>%s</p>" % e(err)) if err else ""))
+
+
+# ------------------------------------------- a run, turned into a pack --
+
+_MENTION = re.compile(r"@([A-Za-z0-9._]{2,40})")
+
+
+def _in_post(item):
+    """Every creator handle a post credits: tagged users, co-authors, and @mentions in the
+    caption. The brand's own handle is dropped by the caller — a brand is not evidence."""
+    out = []
+    for key in ("taggedUsers", "coauthorProducers", "usersTagged", "taggedAccounts"):
+        for u in item.get(key) or []:
+            h = (u.get("username") or u.get("handle") or "") if isinstance(u, dict) else str(u or "")
+            if h:
+                out.append(h.lstrip("@").lower())
+    cap = item.get("caption") or item.get("text") or ""
+    out += [m.lower() for m in _MENTION.findall(cap if isinstance(cap, str) else "")]
+    seen, uniq = set(), []
+    for h in out:
+        if h not in seen:
+            seen.add(h); uniq.append(h)
+    return uniq
+
+
+def ingest_competitor_posts(job, items):
+    """One page of a competitor run -> rows in that competitor's pack. Returns how many
+    posts carried a creator; a post crediting nobody is not evidence and is skipped."""
+    import apify
+    import competitors as _comp
+    src = job["source"] or ""
+    comp = _comp.get(int(src.split(":", 1)[1])) if src.startswith("competitor:") and src.split(":", 1)[1].isdigit() else None
+    if comp is None:
+        return 0
+    brand = (db.get_code(comp["code_id"]) or {"label": "Client"})["label"]
+    own = {str(h).lower() for h in (comp["handles"] or {}).values()}
+    plat = (job["platform"] or "Instagram")
+    rows, saved = [], 0
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        url = str(it.get("url") or it.get("postUrl") or it.get("link") or "").strip()
+        if not url.startswith("http"):
+            continue
+        who = [h for h in _in_post(it) if h not in own]
+        if not who:
+            continue
+        n = apify.post_numbers(it) or {}
+        when = apify._posted_at(it)
+        for h in who[:10]:
+            rows.append({"url": url, "platform": plat.lower(), "handle": h,
+                         "date": time.strftime("%Y-%m-%d", time.gmtime(when)) if when else "",
+                         "views": n.get("views"), "likes": n.get("likes"), "comments": n.get("comments"),
+                         "shares": n.get("shares"), "saves": n.get("saves"),
+                         "collab_type": "credited on the brand's post", "relevance": "collected"})
+        saved += 1
+    if not rows:
+        return 0
+    study = {"brands": [{"brand": brand, "competitors": [
+        {"competitor": comp["name"], "fit": "collected", "posts_detail": rows}]}],
+        "meta": {"source": "competitor run"}}
+    pack_id, _, _ = import_pack(json.dumps(study), "%s · collected" % comp["name"], comp["code_id"],
+                                None, by="collection run", pack_id=comp.get("pack_id"))
+    _comp.mark_run(comp["id"], pack_id)
+    return saved
 
 
 def list_page(scope, clients, selections, ok=None, err=None):

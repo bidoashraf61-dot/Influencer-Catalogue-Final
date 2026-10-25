@@ -57,6 +57,13 @@ PRESETS = {
     "post_ig": {"label": "Campaign posts · Instagram reels", "platform": "Instagram", "kind": "post_urls",
                 "actor": "codenest/instagram-reels-scraper", "est": 0.004,
                 "input": '{"reel_urls": "{{url_objs}}"}'},
+    # A competitor's own recent posts, read for the creators in them (source "competitor:<id>", 2026-10-25).
+    # The handles are profile URLs, so {{urls}} feeds directUrls; every result belongs to the one competitor
+    # the job names, which is why this kind never goes through _match.
+    "comp_ig": {"label": "Competitor · Instagram posts and the creators in them", "platform": "Instagram",
+                "kind": "competitor", "actor": "apify/instagram-scraper", "est": 0.012,
+                "input": '{"directUrls": "{{urls}}", "resultsType": "posts", "resultsLimit": 30, '
+                         '"addParentData": false, "searchType": "user"}'},
     "post_tt": {"label": "Campaign posts · TikTok videos", "platform": "TikTok", "kind": "post_urls",
                 "actor": "maximedupre/tiktok-audio-downloader", "est": 0.002,
                 "input": '{"videoUrls": "{{url_objs}}"}'},
@@ -428,6 +435,12 @@ def build_handles(job):
             have = {r["code"] for r in conn.execute(
                 "SELECT DISTINCT code FROM profile_snapshots WHERE platform = ?", (plat,))}
             allowed = {c["code"] for c in rows} - have
+        elif src.startswith("competitor:") and src[11:].isdigit():
+            # Not a creator at all: the competitor's own profile, as a URL the actor can open.
+            import competitors as _comp
+            c_ = _comp.get(int(src[11:]))
+            h_ = (c_ or {}).get("handles", {}).get(plat or "Instagram")
+            return [("COMP:%s" % src[11:], _comp.profile_url(plat or "Instagram", h_))] if h_ else []
         elif src.startswith("campaign:") and src[9:].isdigit():
             allowed = {r["code"] for r in conn.execute(
                 "SELECT code FROM campaign_creators WHERE campaign_id = ?", (int(src[9:]),))}
@@ -1028,6 +1041,11 @@ def ingest(run, job, items, store_raw=True):
     plat = job["platform"] if job else ""
     if job and job["kind"] == "post_urls":
         return ingest_posts(run, job, items, hmap, store_raw)
+    if job and job["kind"] == "competitor":
+        # Every item is one of the competitor's posts; evidence.py turns the creators in them
+        # into pack rows, so the result reads exactly like an imported study.
+        import evidence as _ev
+        return _ev.ingest_competitor_posts(job, items)
     saved = 0
     with db.connect() as conn:
         for it in items:

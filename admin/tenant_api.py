@@ -120,6 +120,50 @@ def competitor_save(h, b):
     return 200, {"ok": True, "id": new, "items": competitors.listing(cid)}
 
 
+def collect(h, b):
+    """Start a collection run for one of the tenant's competitors (Helvi Intelligence at manage).
+
+    Three brakes, in this order, because each costs more to find out the hard way:
+      the tenant's captures-a-day cap   (Tenants -> Limits; 0 or unset means none)
+      Apify's own monthly budget        (apify.start_job refuses past it)
+      one run at a time per competitor  (a job already running is not started twice)
+    """
+    cid, _, err = gate(h, INTEL)
+    if err:
+        return err
+    import apify
+    import competitors
+    comp = competitors.get(b.get("id"))
+    if comp is None or comp["code_id"] != cid:
+        return 404, {"ok": False, "message": "That competitor is not on your list."}
+    cap = modules.number(cid, "captures_day")
+    if cap is not None and competitors.runs_today(cid) >= cap:
+        return 403, {"ok": False, "reason": "limit",
+                     "message": "You have used today's %d collection%s. It resets tomorrow." % (cap, "" if cap == 1 else "s")}
+    plat = "Instagram"                       # the only platform a collection reads for now
+    if not (comp["handles"] or {}).get(plat):
+        return 400, {"ok": False, "message": "Add their %s handle first." % plat}
+    jid = _collection_job(comp, plat)
+    ok, said = apify.start_job(jid, trigger="client")
+    if ok:
+        competitors.mark_run(comp["id"])
+    return (200 if ok else 400), {"ok": bool(ok), "message": said if not ok else
+                                  "Collecting. The evidence appears on your account when it finishes."}
+
+
+def _collection_job(comp, platform):
+    """The Apify job for this competitor, made once and reused so its runs stay together."""
+    import apify
+    src = "competitor:%d" % comp["id"]
+    for j in apify.list_jobs():
+        if j["source"] == src and j["platform"] == platform:
+            return j["id"]
+    p = apify.PRESETS["comp_ig"]
+    return apify.save_job({"name": "Competitor · %s" % comp["name"], "actor": p["actor"], "kind": p["kind"],
+                           "platform": platform, "source": src, "input": p["input"],
+                           "max_handles": "1", "schedule": "manual", "est_each": str(p["est"])})
+
+
 def _tell_the_team(cid, name):
     """A named competitor is a job for somebody: it reaches the account manager the same way a
     creator request does. Quietly ignored if the notify path is unavailable."""

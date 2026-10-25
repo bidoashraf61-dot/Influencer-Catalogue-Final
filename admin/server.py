@@ -1348,6 +1348,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 st, payload = tenant_api.update_post(self, b)
             elif path == "/api/my/competitor":
                 st, payload = tenant_api.competitor_save(self, b)
+            elif path == "/api/my/competitor/collect":
+                st, payload = tenant_api.collect(self, b)
             else:
                 st, payload = 404, {"ok": False}
             return self.send_json(st, payload, self.cors())

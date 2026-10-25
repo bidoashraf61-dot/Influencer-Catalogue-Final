@@ -106,9 +106,19 @@ client added is told apart from one the team added.
 handles accepted as links and reduced). The admin sees them on `/evidence` under
 "Competitors clients named", scoped to a KAM's own clients.
 
-**Still not collecting.** Naming a competitor starts nothing: an evidence pack is still a
-study imported in the admin. The run that would fill a pack from these handles is the next
-slice, and it is what the captures-a-day cap is waiting for.
+**Collection, built 25 October 2026.** `/api/my/competitor/collect` starts an Apify run on
+the competitor's own Instagram profile (`apify/instagram-scraper`, preset `comp_ig`, job
+source `competitor:<id>`). Each post is read for the creators credited in it — tagged users,
+co-authors and @mentions, minus the brand's own handles — and
+`evidence.ingest_competitor_posts` files them as an evidence pack through the same
+`import_pack` an uploaded study uses, so roster matching and the pack page are unchanged.
+
+Three brakes, in order: the tenant's **captures a day** (now enforced, which is what it was
+waiting for), Apify's **monthly budget**, and one run at a time per competitor.
+
+What it finds: creators a brand posted with, tagged or credited. Not every paid post ever
+made for them — that is still what a full study is for. Instagram only; TikTok needs a
+second preset.
 
 ### Intelligence at `manage`
 

@@ -4,10 +4,10 @@ A competitor is a brand the client wants watched: a name and the handles it post
 It belongs to the tenant — the `codes` row — not to a selection, because the same rival
 matters across every campaign they run.
 
-What this does NOT do yet: collect anything. An evidence pack is still built from a
-competitor study and uploaded in the admin, so naming a competitor here tells HelloVoice
-what to go and study. The collection run that would fill a pack straight from these
-handles is the next slice, and it is the thing the captures-a-day cap is waiting for.
+A collection run (2026-10-25) reads the competitor's own recent posts through Apify and
+files the creators in them as an evidence pack: see `collect()` in tenant_api.py and
+`evidence.ingest_competitor_posts`. It finds the creators a brand posted with, tagged or
+credited — not every paid post ever made for them, which is still what a full study is for.
 """
 import json
 import re
@@ -39,6 +39,10 @@ def init():
     global _ready
     with db.connect() as conn:
         conn.executescript(SCHEMA)
+        have = {r["name"] for r in conn.execute("PRAGMA table_info(competitors)")}
+        for col, ddl in (("pack_id", "INTEGER"), ("last_run_at", "INTEGER")):
+            if col not in have:
+                conn.execute("ALTER TABLE competitors ADD COLUMN %s %s" % (col, ddl))
     _ready = True
 
 
@@ -68,12 +72,59 @@ def clean_handles(raw):
     return out
 
 
+PROFILE = {"Instagram": "https://www.instagram.com/%s/", "TikTok": "https://www.tiktok.com/@%s",
+           "Snapchat": "https://www.snapchat.com/add/%s", "YouTube": "https://www.youtube.com/@%s"}
+
+
+def profile_url(platform, handle):
+    return (PROFILE.get(platform) or "%s") % str(handle or "").lstrip("@")
+
+
+def get(cid):
+    with _conn() as conn:
+        r = conn.execute("SELECT * FROM competitors WHERE id = ?", (int(cid),)).fetchone()
+    if r is None:
+        return None
+    return {"id": r["id"], "code_id": r["code_id"], "name": r["name"],
+            "handles": json.loads(r["handles"] or "{}"), "note": r["note"] or "",
+            "pack_id": r["pack_id"] if "pack_id" in r.keys() else None,
+            "last_run_at": r["last_run_at"] if "last_run_at" in r.keys() else None}
+
+
+def mark_run(cid, pack_id=None):
+    with _conn() as conn:
+        if pack_id is None:
+            conn.execute("UPDATE competitors SET last_run_at = ? WHERE id = ?", (db.now(), int(cid)))
+        else:
+            conn.execute("UPDATE competitors SET last_run_at = ?, pack_id = ? WHERE id = ?",
+                         (db.now(), int(pack_id), int(cid)))
+
+
+def runs_today(code_id):
+    """Collection runs started for this tenant since midnight — what the captures-a-day cap counts."""
+    import time
+    t = time.gmtime()
+    midnight = int(time.mktime((t.tm_year, t.tm_mon, t.tm_mday, 0, 0, 0, 0, 0, 0))) - time.timezone
+    ids = [str(c["id"]) for c in listing(code_id)]
+    if not ids:
+        return 0
+    srcs = ["competitor:" + i for i in ids]
+    with _conn() as conn:
+        r = conn.execute(
+            "SELECT COUNT(*) n FROM api_runs r JOIN api_jobs j ON j.id = r.job_id "
+            "WHERE r.started_at >= ? AND j.source IN (%s)" % ",".join("?" * len(srcs)),
+            [midnight] + srcs).fetchone()
+    return r["n"] if r else 0
+
+
 def listing(code_id):
     with _conn() as conn:
         rows = conn.execute("SELECT * FROM competitors WHERE code_id = ? ORDER BY name COLLATE NOCASE",
                             (int(code_id),)).fetchall()
     return [{"id": r["id"], "name": r["name"], "handles": json.loads(r["handles"] or "{}"),
-             "note": r["note"] or "", "added_by": r["added_by"] or ""} for r in rows]
+             "note": r["note"] or "", "added_by": r["added_by"] or "",
+             "pack_id": r["pack_id"] if "pack_id" in r.keys() else None,
+             "last_run_at": r["last_run_at"] if "last_run_at" in r.keys() else None} for r in rows]
 
 
 def count(code_id):
