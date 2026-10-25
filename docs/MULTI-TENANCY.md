@@ -124,6 +124,15 @@ tenant manages, where it is wrong.
 
 ## Phase 1 — the gate
 
+**Built on 25 October 2026.** `modules.py` (registry, levels, the gate), `tenants.py`
+(the page), `tenant_modules` (the table), one check in `_do_get` and one in `_do_post`,
+and **Tenants** in the sidebar under Control, owner only. Every client is on `view` for
+both modules, which is how they already worked, so nothing changed for anyone on the day
+it shipped. Limits, credits and branding are the next slice; `manage` is accepted and
+stored but still behaves as `view` until the tenant-side endpoints exist.
+
+### The original plan
+
 1. `modules.py`: one declarative registry — per module, its route prefixes, nav
    entries, tables, client-API payload keys and background jobs. The same shape
    as `ui.NAV` / `ui.STAFF_ONLY` / `ui.KAM_HIDDEN`, which already work this way.

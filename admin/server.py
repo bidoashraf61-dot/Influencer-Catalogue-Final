@@ -94,6 +94,7 @@ import apify
 import profile_thumbs
 import apis_view
 import evidence
+import modules
 import reference_view
 import views  # noqa: E402
 import ui  # noqa: E402
@@ -706,6 +707,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         path = self.route(urllib.parse.urlparse(self.path).path)
         query = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query))
 
+        # One gate for every module (phase 1, 2026-10-25): a tenant whose module is off is
+        # refused here, before any handler runs. Staff are never gated; see modules.py.
+        off = modules.blocked(self, path, query)
+        if off is not None:
+            return self.send_json(404, {"ok": False, "reason": "module_off", "module": off["key"]}, self.cors())
+
         if path.startswith("/go/"):
             return self.go(path[len("/go/"):])
         if path.startswith("/insights/"):
@@ -1004,6 +1011,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/licences":
             import licence
             return self.send(200, licence.page_html(query))
+        if path == "/tenants":
+            # Who has which module. Owners configure the platform; admins run the business.
+            if team.role_of(who) != "owner":
+                return self.send(403, team_views.forbidden_page(team.role_of(who)))
+            import tenants
+            return self.send(200, tenants.page_html(query))
         if path == "/requests":
             return self.send(200, views.requests_page(db.list_requests(),
                                                       db.list_creators(), db.tier_prices()))
@@ -1281,6 +1294,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def _do_post(self):
         path = self.route(urllib.parse.urlparse(self.path).path)
         history.start_request()
+        off = modules.blocked(self, path, dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query)))
+        if off is not None:
+            return self.send_json(404, {"ok": False, "reason": "module_off", "module": off["key"]}, self.cors())
 
         # CSRF: a cross-site form post cannot forge Origin / Sec-Fetch-Site.
         if not guard.origin_ok(self.headers, ALLOWED_ORIGINS):
@@ -1403,6 +1419,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_client_preview()
         if path.startswith("/app-alerts/"):
             return self.post_app_alerts(path, who)
+        if path == "/tenants/save":
+            if team.role_of(who) != "owner":
+                return self.send(403, team_views.forbidden_page(team.role_of(who)))
+            import tenants
+            said = tenants.save(self.form_body(), who["email"] if "email" in who.keys() else "", self.client_ip())
+            return self.redirect("/tenants?ok=" + urllib.parse.quote(said))
+
         if path.startswith("/evidence/"):
             return self.post_evidence(path, who)
         if path == "/campaigns/invite":
