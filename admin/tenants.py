@@ -1,55 +1,68 @@
-"""The Tenants page: which modules each client company has, and at what level.
+"""The Tenants page: which modules each client company has, at what level, and inside what caps.
 
-Owners only — admins run the business, owners configure the platform. Every change is
-written to the security log with who, when and what it was before, so a tenant's own
-settings and an owner's override are told apart later.
+Owners only — admins run the business, owners configure the platform. Every change is written to
+the security log with who, when and the value it replaced.
 
-The page shows every client, not only the ones with a row in `tenant_modules`: a client
-nobody has configured is on `view` for everything, which is exactly how the product
-worked before any of this existed.
+One company, one block. A company usually signs in under several emails, and each of those is its
+own `codes` row with its own selections and campaigns, so the controls stay per account; the block
+simply gathers them under the company's name and keeps them folded away until wanted. Companies are
+matched on a flattened name, so "Blue holding" and "Blueholding" are one company, and a passcode
+with no account behind it is grouped by its own label.
 """
+import re
+
 import db
 import modules
+
+
+def _key(name):
+    """What makes two spellings the same company."""
+    return re.sub(r"[^a-z0-9]+", "", str(name or "").lower()) or "—"
+
+
+def _groups(codes):
+    """[(company, [code rows])], companies alphabetical, biggest account first inside."""
+    import portal
+    out, names = {}, {}
+    for c in codes:
+        u = portal.user_for_code(c["id"])
+        raw = (u["company"] if u is not None and u["company"] else "") or c["label"]
+        k = _key(raw)
+        names.setdefault(k, {}).setdefault(raw, 0)
+        names[k][raw] += 1
+        out.setdefault(k, []).append((c, u))
+    rows = []
+    for k, members in out.items():
+        best = sorted(names[k].items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
+        members.sort(key=lambda m: -(m[0]["n_selections"] + m[0]["n_campaigns"]))
+        rows.append((best, members))
+    rows.sort(key=lambda r: r[0].lower())
+    return rows
+
+
+def _who(code, user):
+    """How one account reads inside its company: the person, then what they hold."""
+    import views
+    e = views.e
+    who = (user["email"] if user is not None else "") or code["label"]
+    who = re.sub(r"^Client:\s*", "", who)
+    n = "%d selection%s · %d campaign%s" % (code["n_selections"], "" if code["n_selections"] == 1 else "s",
+                                            code["n_campaigns"], "" if code["n_campaigns"] == 1 else "s")
+    return "<b>" + e(who) + "</b><div class='muted'>" + e(n) + "</div>"
 
 
 def page_html(query=None):
     import views
     e, u = views.e, views.u
     query = query or {}
-    codes = db.list_codes()
-    stored = modules.all_levels()
-
-    def opts(cur, key, cid):
-        return "".join(
-            "<option value='%s'%s>%s</option>" % (lv, " selected" if lv == cur else "", e(modules.LEVEL_LABEL[lv]))
-            for lv in modules.LEVELS)
+    groups = _groups(db.list_codes())
+    stored, setn = modules.all_levels(), modules.all_settings()
 
     def mark(m, h):
-        """The module's own logo, with its name under it. alt carries the name, so the column
-        still reads if the image does not load."""
         return ("<img src='" + e(m.get("logo") or "") + "' alt='" + e(m["name"]) + "' height='" + str(h) +
                 "' style='display:block;margin:0 auto 2px;height:" + str(h) + "px;width:auto'>") if m.get("logo") else ""
 
-    head = "".join("<th style='text-align:center'>" + mark(m, 34) + e(m["name"]) + "</th>" for m in modules.MODULES)
-    rows = []
-    for c in codes:
-        cid = c["id"]
-        have = dict({m["key"]: modules.DEFAULT for m in modules.MODULES}, **(stored.get(cid) or {}))
-        cells = "".join(
-            "<td><select name='lvl:%d:%s'>%s</select></td>" % (cid, m["key"], opts(have.get(m["key"], modules.DEFAULT), m["key"], cid))
-            for m in modules.MODULES)
-        rows.append(
-            "<tr><td><b>" + e(c["label"]) + "</b><div class='muted'>"
-            + ("%d selection%s · %d campaign%s" % (c["n_selections"], "" if c["n_selections"] == 1 else "s",
-                                                   c["n_campaigns"], "" if c["n_campaigns"] == 1 else "s"))
-            + "</div></td>" + cells + "</tr>")
-
-    # Limits and branding: one row per tenant, the platform default showing through as the
-    # placeholder so an empty box plainly means "whatever everyone else gets".
-    setn = modules.all_settings()
-
     def spent(cid):
-        """What this tenant has actually spent on collections this month, beside the cap."""
         try:
             import competitors
             v = competitors.spend_month(cid)
@@ -57,34 +70,53 @@ def page_html(query=None):
             return ""
         return " <span class='muted'>$%.2f used</span>" % v if v else ""
 
-    def fields(group, cid):
+    def level_cells(cid):
+        have = dict({m["key"]: modules.DEFAULT for m in modules.MODULES}, **(stored.get(cid) or {}))
+        out = ""
+        for m in modules.MODULES:
+            cur = have.get(m["key"], modules.DEFAULT)
+            out += ("<td><select name='lvl:%d:%s'>%s</select></td>"
+                    % (cid, m["key"], "".join(
+                        "<option value='%s'%s>%s</option>" % (lv, " selected" if lv == cur else "", e(modules.LEVEL_LABEL[lv]))
+                        for lv in modules.LEVELS)))
+        return out
+
+    def field_cells(group, cid):
         have = setn.get(cid) or {}
         return "".join(
             "<td><input name='set:%d:%s' value='%s' placeholder='%s' size='%d'%s>%s</td>"
-            % (cid, f["key"], e(have.get(f["key"]) or ""), e(_default_hint(f)), 8 if f["kind"] == "int" else 14,
+            % (cid, f["key"], e(have.get(f["key"]) or ""), e(_default_hint(f)), 9 if f["kind"] == "int" else 14,
                " inputmode='numeric'" if f["kind"] == "int" else "",
                spent(cid) if f["key"] == "spend_month" else "")
             for f in group)
 
-    def table(group, title, intro):
-        head2 = "".join("<th title='%s'>%s%s</th>" % (e(f["help"]), e(f["label"]),
-                                                      "" if f["enforced"] else " <span class='muted'>*</span>")
-                        for f in group)
-        body2 = "".join("<tr><td><b>" + e(c["label"]) + "</b></td>" + fields(group, c["id"]) + "</tr>" for c in codes)
-        starred = [f for f in group if not f["enforced"]]
-        foot = ("<p class='price-hint'>* recorded, not enforced yet: "
-                + e(", ".join(f["label"].lower() for f in starred)) + ".</p>") if starred else ""
-        return ("<div class='card'><div class='hd'><h2>" + e(title) + "</h2></div>"
-                "<p class='sec-desc'>" + intro + "</p>"
-                "<table class='tbl'><thead><tr><th>Client</th>" + head2 + "</tr></thead><tbody>"
-                + (body2 or "<tr><td>No clients yet.</td></tr>") + "</tbody></table>" + foot + "</div>")
+    def summary_of(members):
+        """What the fold says without being opened: the levels inside, and how many accounts."""
+        seen = []
+        for code, _ in members:
+            have = dict({m["key"]: modules.DEFAULT for m in modules.MODULES}, **(stored.get(code["id"]) or {}))
+            seen.append(tuple(have[m["key"]] for m in modules.MODULES))
+        n = len(members)
+        who = "%d account%s" % (n, "" if n == 1 else "s")
+        if len(set(seen)) == 1:
+            lv = " · ".join("%s: %s" % (m["name"].replace("Helvi ", ""), modules.LEVEL_LABEL[l])
+                            for m, l in zip(modules.MODULES, seen[0]))
+            return who + " · " + lv
+        return who + " · mixed levels"
 
-    legend = "".join("<li><b>%s</b> — %s</li>" % (e(modules.LEVEL_LABEL[lv]), e(modules.LEVEL_HELP[lv]))
-                     for lv in modules.LEVELS)
-    what = "".join(
-        "<li style='display:flex;align-items:center;gap:10px;margin-bottom:6px'>%s<span><b>%s</b> — %s</span></li>"
-        % (mark(m, 28).replace("margin:0 auto 2px", "margin:0"), e(m["name"]), e(m["what"]))
-        for m in modules.MODULES)
+    def block(title, intro, head, body_for):
+        out = []
+        for company, members in groups:
+            rows = "".join("<tr><td>" + _who(c, usr) + "</td>" + body_for(c["id"]) + "</tr>" for c, usr in members)
+            out.append(
+                "<details class='tn-co'" + (" open" if len(members) == 1 and len(groups) < 4 else "") + ">"
+                "<summary><b>" + e(company) + "</b> <span class='muted'>" + e(summary_of(members)) + "</span></summary>"
+                "<table class='tbl'><thead><tr><th>Account</th>" + head + "</tr></thead><tbody>" + rows + "</tbody></table>"
+                "</details>")
+        return ("<div class='card'><div class='hd'><h2>" + e(title) + "</h2>"
+                "<div><button type='button' class='btn tiny ghost' data-fold='open'>Expand all</button> "
+                "<button type='button' class='btn tiny ghost' data-fold='close'>Collapse all</button></div></div>"
+                "<p class='sec-desc'>" + intro + "</p>" + ("".join(out) or "<p>No clients yet.</p>") + "</div>")
 
     note = ""
     if query.get("ok"):
@@ -92,39 +124,69 @@ def page_html(query=None):
     elif query.get("e"):
         note = "<div class='err'>" + e(query.get("e")) + "</div>"
 
+    legend = "".join("<li><b>%s</b> — %s</li>" % (e(modules.LEVEL_LABEL[lv]), e(modules.LEVEL_HELP[lv]))
+                     for lv in modules.LEVELS)
+    what = "".join(
+        "<li style='display:flex;align-items:center;gap:10px;margin-bottom:6px'>%s<span><b>%s</b> — %s</span></li>"
+        % (mark(m, 28).replace("margin:0 auto 2px", "margin:0"), e(m["name"]), e(m["what"]))
+        for m in modules.MODULES)
+    mod_head = "".join("<th style='text-align:center'>" + mark(m, 30) + e(m["name"]) + "</th>" for m in modules.MODULES)
+
     body = (
-        "<div class='card'><div class='hd'><h2>Tenants</h2></div>"
-        + note +
-        "<p class='sec-desc'>Each client company is a tenant. Set what each of them has; the core — "
-        "the roster, selections and quotes — is always on and is not listed here. "
+        "<div class='card'><div class='hd'><h2>Tenants</h2></div>" + note +
+        "<p class='sec-desc'>Each client company is a tenant, with every account they sign in under folded "
+        "beneath it. The core — the roster, selections and quotes — is always on and is not listed here. "
         "HelloVoice always sees everything, whatever is set below.</p>"
-        "<div class='row' style='gap:28px;flex-wrap:wrap;margin-bottom:14px'>"
-        "<ul class='muted' style='margin:0'>" + what + "</ul>"
-        "<ul class='muted' style='margin:0'>" + legend + "</ul></div>"
+        "<div class='row' style='gap:28px;flex-wrap:wrap'><ul class='muted' style='margin:0'>" + what + "</ul>"
+        "<ul class='muted' style='margin:0'>" + legend + "</ul></div></div>"
         "<form method='post' action='" + u("/tenants/save") + "'>"
-        "<table class='tbl'><thead><tr><th>Client</th>" + head + "</tr></thead>"
-        "<tbody>" + ("".join(rows) or "<tr><td colspan='9'>No clients yet.</td></tr>") + "</tbody></table>"
-        "<p class='price-hint'>Manage is stored but still behaves as view: the screens a tenant would "
-        "add their own posts and competitors with are the next slice.</p>"
-        "</div>"
-        + table(modules.LIMITS, "Limits and credits",
-                "Empty means the platform default. A cap counts what they have now and refuses the next one.")
-        + table(modules.BRAND, "Branding",
-                "What a tenant is called and coloured on their own report and app.")
-        + "<div style='margin:14px 0 40px'><button class='btn'>Save everything</button></div></form>")
+        + block("Modules", "What each account has. Manage is stored but still behaves as view: the screens a "
+                           "tenant would add their own posts and competitors with are the next slice.",
+                mod_head, level_cells)
+        + block("Limits and credits", "Empty means the platform default. A cap counts what they have now and "
+                                      "refuses the next one.",
+                "".join("<th title='%s'>%s%s</th>" % (e(f["help"]), e(f["label"]), "" if f["enforced"] else " <span class='muted'>*</span>")
+                        for f in modules.LIMITS),
+                lambda cid: field_cells(modules.LIMITS, cid))
+        + "<p class='price-hint'>* recorded, not enforced yet: "
+        + e(", ".join(f["label"].lower() for f in modules.LIMITS if not f["enforced"])) + ".</p>"
+        + block("Branding", "What a tenant is called and coloured on their own report and app.",
+                "".join("<th title='%s'>%s</th>" % (e(f["help"]), e(f["label"])) for f in modules.BRAND),
+                lambda cid: field_cells(modules.BRAND, cid))
+        + "<div style='margin:14px 0 40px'><button class='btn'>Save everything</button></div></form>"
+        + """<style>
+  .tn-co { border:1px solid var(--line,#e7e4dd); border-radius:12px; margin-bottom:8px; background:#fff }
+  .tn-co > summary { cursor:pointer; padding:11px 14px; list-style:none; display:flex; gap:10px;
+                     align-items:baseline; flex-wrap:wrap; border-radius:12px }
+  .tn-co > summary::-webkit-details-marker { display:none }
+  .tn-co > summary::before { content:'▸'; color:#9a9a9a; font-size:12px }
+  .tn-co[open] > summary::before { content:'▾' }
+  .tn-co > summary:hover { background:#faf8f3 }
+  .tn-co table { margin:0 14px 12px }
+</style>
+<script>
+  // Expand all / Collapse all, per card: the folds are plain <details>, so nothing else is needed.
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-fold]');
+    if (!b) return;
+    var card = b.closest('.card');
+    Array.prototype.forEach.call((card || document).querySelectorAll('details.tn-co'), function (d) {
+      d.open = b.getAttribute('data-fold') === 'open';
+    });
+  });
+</script>""")
     return views.page("Tenants", body, "/tenants")
 
 
 def _default_hint(f):
     """What shows through an empty box: the platform default, in words."""
     if f["key"] == "credits_month":
-        import db as _db
-        return str(_db.setting("monthly_credits", 0) or 0)
+        return str(db.setting("monthly_credits", 0) or 0)
     return "no limit" if f["kind"] == "int" else "default"
 
 
 def save(form, by, ip=None):
-    """Apply the posted levels. Returns a sentence for the page."""
+    """Apply the posted levels and settings. Returns a sentence for the page."""
     import team
     changed = []
     for name, val in form.items():

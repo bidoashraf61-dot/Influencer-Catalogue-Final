@@ -1983,7 +1983,9 @@
   /* PDF print (2026-10-23): the client field stays on the dashboard and report, never in the PDF (owner). The PDF is built from this dashboard, every panel opened out behind a cover, so it holds
      all the data the dashboard can show. A4, no browser header or footer (page margin 0); a table's repeating head and
      foot keep the space for our own running header and footer on every page. Post and video links stay clickable. */
-  var PP_LOGO = "../../assets/brand/helvy-connect/helvy-connect-light-640.webp?v=c5";
+  // The report belongs to Helvi Track, so it is Track's mark on the cover and in the running
+  // header, beside the client's own (Bido, 26 Oct 2026).
+  var PP_LOGO = "../../assets/brand/modules/helvi-track-480.png?v=1";
   function ppName(n) {   // "Dr Name | د. الاسم" → the Latin part leads, the Arabic part is kept beside it
     var s = String(n || ""), i = s.search(/[؀-ۿ]/);
     if (i <= 0) return { en: s.replace(/\s*\|\s*$/, ""), ar: "" };

@@ -442,3 +442,6 @@
   .ev-dec__row .ev-dec__b { flex: 1 1 140px; }
 }
 @media (prefers-reduced-motion: reduce) { .ev-dec__r { transition: none; } }
+
+/* The module's mark above the headline on the competitor map (Bido, 26 Oct 2026). */
+.ev-mi__logo { display: block; height: 34px; width: auto; margin: 0 0 6px; }
