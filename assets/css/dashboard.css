@@ -15,7 +15,7 @@
 
 /* ---------------------------------------------------------------- header */
 .db-head { display: flex; align-items: center; gap: 16px; padding: 12px 0 10px; }
-.db-head__logo img { width: 104px; height: auto; display: block; }
+.db-head__logo img { width: 146px; height: auto; display: block; }
 .db-head__brands { display: flex; align-items: center; gap: 8px; }
 .db-head__brands img { height: 40px; width: auto; max-width: 130px; object-fit: contain; }
 .db-head__brands span { color: var(--gray); font-family: var(--heading); font-size: 18px; }
@@ -1007,7 +1007,7 @@
   /* header: logos on one row (room kept on the right for the account chip), the title full width, then the buttons */
   .db-head { flex-wrap: wrap; align-items: flex-start; gap: 6px 12px; padding: 8px 0 6px; }
   .db-head__logo, .db-head__brands { min-height: 64px; display: flex; align-items: center; }
-  .db-head__logo img { width: 88px; }
+  .db-head__logo img { width: 116px; }
   .db-head__brands { gap: 6px; }
   .db-head__brands img { height: 30px; max-width: 96px; }
   .db-head__title { flex: 1 1 100%; min-width: 0; }
