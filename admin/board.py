@@ -451,7 +451,9 @@ def board(h, logo_dir):
             "locked_stages": [] if role == "admin" else ["live", "completed"],
             # the account managers an admin can pick on a card (item 197)
             "kams": _kams() if role == "admin" else [],
-            "can_start": role in ("admin", "kam") or _client_user(h, who) is not None,
+            # Only a client viewer carries a code id in ``who``; a staff one carries their session row,
+            # and _client_user would int() it and take the whole board down with a 500 (owner, 26 Oct 2026).
+            "can_start": role in ("admin", "kam") or (role == "client" and _client_user(h, who) is not None),
             "stages": [{"key": s, "label": LABEL[s], "hint": HINT[s]} for s in STAGES], "campaigns": cards}
 
 

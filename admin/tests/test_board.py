@@ -248,6 +248,23 @@ class Board(unittest.TestCase):
                            "link_code": lambda s, k: None})()
         self.assertEqual(board.pin_key(h), "a:%d" % adm["id"])
 
+    def test_05c_board_loads_for_a_team_member(self):
+        """A staff viewer who is neither owner/admin nor a KAM with clients reads role "team", and
+        ``who`` is then their session row, not a code id. can_start used to hand that row to
+        _client_user, which int()s it: TypeError, 500, and a blank campaign tracking page."""
+        adm = db.admin_by_email(KAM)
+        row = db.session(db.create_session(adm["id"], 3600))
+        h = type("H", (), {
+            "viewer_cookie_id": lambda s: None, "admin": lambda s: row,
+            "link_code": lambda s, k: None, "kam_clients": lambda s: None,
+            "signed_in_client": lambda s: None, "cookies": lambda s: {}, "as_client": lambda s: False,
+            "logo_url": lambda s, ref, token: "", "site_origin": lambda s: "",
+        })()
+        got = board.board(h, None)
+        self.assertEqual(got["role"], "team")
+        self.assertFalse(got["can_start"])          # a team member does not start campaigns
+        self.assertTrue(got["campaigns"])
+
     # ----------------------------------------------------------- admin hub (177)
     def test_06_hub_rows_carry_the_stage(self):
         s, d, _ = self.boss.get("/api/hub/company?k=polyco.com")
