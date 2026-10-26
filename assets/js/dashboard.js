@@ -183,7 +183,7 @@
     var now = Date.now() / 1000, dd = k(t) === k(now) ? "Today" : k(t) === k(now + 86400) ? "Tomorrow" : d.toLocaleDateString("en-GB", { timeZone: "Asia/Riyadh", weekday: "short", day: "numeric", month: "short" });
     return (withDay === false ? "" : dd + ", ") + hm;
   }
-  function soon(t) { var s = t - Date.now() / 1000; return s <= 60 ? "any minute" : s < 3600 ? "in " + Math.round(s / 60) + " min" : s < 86400 ? "in " + Math.round(s / 3600) + " h" : (Math.round(s / 86400) === 1 ? "tomorrow" : "in " + Math.round(s / 86400) + " days"); }
+  function soon(t) { var s = t - Date.now() / 1000; return s <= 60 ? "any minute" : s < 3600 ? "in " + Math.round(s / 60) + " min" : s < 86400 ? "in " + Math.round(s / 3600) + " h" : "in " + Math.round(s / 86400) + " days"; }
   function usd(v) { return "$" + (v < 0.1 ? v.toFixed(3).replace(/0$/, "") : v.toFixed(2)); }
   function mountUpdate(host) {
     var box = document.createElement("div"); box.className = "db-upd";
@@ -199,7 +199,6 @@
       var x = S && S[w]; if (S && S.demo) return "Sample data";
       if (!x) return "";
       if (x.running) return w === "posts" ? "Updating now…" : "Reading now…";
-      if (w === "comments" && x.next_at) return "Weekly · next " + soon(x.next_at);     // read once a week (owner, 2026-10-23)
       return x.next_at ? "Next " + soon(x.next_at) : x.last_at ? "Last " + ago(x.last_at) : "Not scheduled";
     }
     function paint(s) {
@@ -767,7 +766,7 @@
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI once a week, every 7 days from the first video. Commenters' names are never stored.";
-  var CM_COL = { pos: "#14884a", neu: "#ff691e", neg: "#ee1515" };
+  var CM_COL = { pos: "#14884a", neu: "#ff691e", neg: "#ee1515" };   // neutral in orange (owner, 2026-10-23)
   // One drawn icon per theme, picked from the words of the AI's label.
   var CM_TI = [
     [/avail|where|find|stock|pharmac|store|shop|country|egypt|kuwait|saudi/i, '<path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10" r="2.4"/>'],
@@ -1213,6 +1212,10 @@
   function platIcons(p) { return (p.parts || [p]).map(function (x) { return ICONS[x.platform] || ""; }).join(""); }
   function seen(p) { return p.exposure != null ? p.exposure : (p.video ? (p.views || 0) : (p.reach || 0)); }
   function topPosts(list) { return list.slice().sort(function (a, b) { return seen(b) - seen(a); }); }
+  function eng(p) { return p.engagement || 0; }
+  // Top videos leads on interactions, not views: a reel that is seen and ignored is not
+  // the work we want to show first (owner, 2026-10-25).
+  function topByEngagement(list) { return list.slice().sort(function (a, b) { return eng(b) - eng(a) || seen(b) - seen(a); }); }
   function weights() { var w = (R.objective || {}).weights || { exposure: 0.35, engagement: 0.25, er: 0.25, clicks: 0.15 }; return w; }
   // The scoring as one bar: each part's share of the 100 points. Clicks only
   // when the campaign tracks links. `small` is the compact form for the card.
@@ -1247,12 +1250,12 @@
       + ". Each is the creator's result as a share of the best creator's: it rewards what they delivered for the campaign, not their follower count.";
   }
   function renderPosts(list) {
-    var top = topPosts(mergePieces(list)).slice(0, 3);
-    $("w-posts").innerHTML = head(IC.img, "Top videos", "The three videos that reached the most people in this view. A video on several platforms counts once, with every platform added together.", "posts")
+    var top = topByEngagement(mergePieces(list)).slice(0, 3);
+    $("w-posts").innerHTML = head(IC.img, "Top videos", "The three videos people interacted with most in this view \u2014 likes, comments, shares and saves together. A video on several platforms counts once, with every platform added together.", "posts")
       + '<div class="db-card__body"><div class="db-thumbs">' + (top.map(function (p, i) {
         return '<a class="db-thumb" href="' + esc(p.url) + '" target="_blank" rel="noopener">' + fit(p.thumb)
           + '<svg class="db-thumb__n" viewBox="0 0 40 50" aria-hidden="true">' + medalBody(i + 1) + "</svg>"
-          + "<span><em>" + esc(p.creator) + "</em>" + (p.parts ? '<b class="db-thumb__plats">' + platIcons(p) + "</b>" : "") + "<i>" + (p.parts ? "" : (ICONS[p.platform] || "")) + (p.views_hidden && !p.parts ? num(p.likes) : num(p.parts ? seen(p) : (p.video ? p.views : p.reach))) + "<small style=\"font:600 10px var(--body);color:#fff;opacity:.7\">" + (p.views_hidden && !p.parts ? "likes" : p.video || p.parts ? "views" : "reached") + "</small></i></span></a>";
+          + "<span><em>" + esc(p.creator) + "</em>" + (p.parts ? '<b class="db-thumb__plats">' + platIcons(p) + "</b>" : "") + "<i>" + (p.parts ? "" : (ICONS[p.platform] || "")) + num(eng(p)) + "<small style=\"font:600 10px var(--body);color:#fff;opacity:.7\">interactions</small></i></span></a>";
       }).join("") || '<p class="db-note">No posts in this view.</p>') + "</div></div>";
   }
 
@@ -1529,7 +1532,7 @@
         + extra.map(function (p) { return '<p class="db-ps__add">' + (ICONS[p.platform] || "") + "<b>" + esc(p.platform) + "</b><span><strong>" + num(p.views) + "</strong> views · <strong>" + num(p.engagement) + "</strong> engagement · " + p.videos + (p.videos === 1 ? " video" : " videos") + "</span></p>"; }).join("")
         + (extra.length > 1 ? '<p class="db-ps__add db-ps__add--tot"><b>Total</b><span><strong>' + num(v) + "</strong> views · <strong>" + num(e) + "</strong> engagement</span></p>" : "") + "</div>";
     }
-    return sec("platforms", "Platform split", "Views and engagement on each platform the goals were set for, against what is typical there. Bonus platforms are tracked too, but have no goal and do not count towards the targets or the All targets %.",
+    return sec("platforms", "Platform split", "Views and engagement on each platform the goals were set for, against what is typical there. Bonus platforms have no goal of their own, but their views and engagement count towards the targets and the All targets %.",
       '<div class="db-pss' + (goals.length + (extra.length ? 1 : 0) === 1 ? " db-pss--one" : "") + '">' + cards + "</div>");
   }
   function stillToCome() {
@@ -1759,6 +1762,9 @@
       function share(x) { return tot && x.shown ? Math.round(x.views / tot * 100) : null; }
       var strip = '<div class="db-pl__strip" role="img" aria-label="' + esc(rows.map(function (x) { var s = share(x); return x.k + " " + (s == null ? "views not shown" : s + "% of views"); }).join(", ")) + '">'
         + rows.map(function (x) { var s = share(x); return s ? '<i data-p="' + esc(x.k) + '" style="flex:' + s + ";--c:" + (PCOL[x.k] || COL[0]) + '">' + (s >= 22 ? "<span>" + esc(x.k) + " " + s + "%</span>" : "") + "</i>" : ""; }).join("") + "</div>";
+      // the slices too narrow for their name are named under the bar (design audit, 2026-10-23)
+      var small = rows.filter(function (x) { var s = share(x); return s && s < 22; });
+      if (small.length) strip += '<p class="db-pl__key">' + small.map(function (x) { return '<span style="--c:' + (PCOL[x.k] || COL[0]) + '"><i></i>' + esc(x.k) + " <b>" + share(x) + "%</b></span>"; }).join("") + "</p>";
       var list = rows.map(function (x) {
         var s = share(x), er = x.shown && x.views ? x.eng / x.views * 100 : null, b = band(x.k);
         var grade = er == null ? null : erGoal() ? goalGrade(er) : !b ? null : er >= b[1] ? "good" : er >= b[0] ? "moderate" : "low";
@@ -1985,7 +1991,7 @@
      foot keep the space for our own running header and footer on every page. Post and video links stay clickable. */
   // The report belongs to Helvi Track, so it is Track's mark on the cover and in the running
   // header, beside the client's own (Bido, 26 Oct 2026).
-  var PP_LOGO = "../../assets/brand/modules/helvi-track-480.png?v=1";
+  var PP_LOGO = "../../assets/brand/modules/helvi-track-480.png?v=2";
   function ppName(n) {   // "Dr Name | د. الاسم" → the Latin part leads, the Arabic part is kept beside it
     var s = String(n || ""), i = s.search(/[؀-ۿ]/);
     if (i <= 0) return { en: s.replace(/\s*\|\s*$/, ""), ar: "" };
@@ -2035,6 +2041,192 @@
         + (p.views_hidden ? "—" : num(seen(p))) + '</td><td><a href="' + esc(u) + '" target="_blank" rel="noopener">' + esc(short) + " ↗</a></td></tr>";
     }).join("") + "</tbody></table>";
   }
+  // Page 1 of the PDF: the campaign, where it stands, every target and what is inside (design audit, 2026-10-23).
+  function ppSummary() {
+    var c = R.campaign, items = SP().items || [], top = (R.creators || []).filter(function (x) { return x.rank === 1; })[0];
+    var step = (c.steps || []).filter(function (s) { return s.on !== false && s.state === "active"; }).map(function (s) { return s.label; }).join(" · ");
+    var t = R.comments ? cmPick() : null, nm = top ? ppName(top.name) : null;
+    var facts = [];
+    if (top) facts.push('<div class="pp-sum__f"><span>Top creator</span><b>' + esc(nm.en) + "</b><small>" + scoreTxt(top.score) + " score · " + num(top.seen != null ? top.seen : top.views) + " views</small></div>");
+    if (t && t.n) facts.push('<div class="pp-sum__f"><span>Comments read</span><b>' + full(t.n) + "</b><small>" + cmPct(t.intent, t.n) + "% ask how to buy · " + cmPct(t.pos, t.n) + "% positive</small></div>");
+    return '<section class="pp-sum"><div class="pp-sum__brand"><img src="' + PP_LOGO + '" alt="Helvi Track">'
+      + (c.logos || []).slice(0, 3).map(function (u) { return '<span>×</span><img src="' + esc(u) + '" alt="">'; }).join("") + "</div>"
+      + '<p class="pp-sum__k">Campaign report · ' + esc(day(Date.now() / 1000, true)) + "</p><h1>" + esc(c.name) + "</h1>"
+      + '<p class="pp-sum__m">' + [c.client ? esc(c.client) : "", c.starts_at && c.ends_at ? esc(day(c.starts_at, true) + " – " + day(c.ends_at, true)) : "", step ? "Now: " + esc(step) : ""].filter(Boolean).join(" · ") + "</p>"
+      + (c.status_note ? '<p class="pp-sum__note">' + esc(c.status_note) + "</p>" : "")
+      + (items.length ? "<h3>Targets</h3>" + '<div class="pp-sum__t">' + items.map(function (i) { var st = tvStatus(i);
+          return "<div><span>" + esc(KEYN[i.key]) + "</span><b>" + tvFmt(i.key, i.actual) + "</b><small>of " + tvFmt(i.key, i.goal) + "</small>" + stPill(st[0], st[1]) + "</div>"; }).join("") + "</div>" : "")
+      + (facts.length ? '<div class="pp-sum__fs">' + facts.join("") + "</div>" : "")
+      + '<h3>Inside</h3><ol class="pp-toc"></ol></section>';
+  }
+  // What the PDF leaves out or regroups (owner, 2026-10-23): the goal bars without their pace charts, no bonus-platforms
+  // box, no data notes, no score table; "Videos by creator" as a section of its own; sections and their sub-headings numbered.
+  function ppTidy(wrap) {
+    function drop(el) { if (el && el.parentNode) el.parentNode.removeChild(el); }
+    [].slice.call(wrap.querySelectorAll(".db-tv__pace, .db-tv__chev, .db-ps--add")).forEach(drop);
+    var notes = wrap.querySelector("#sec-notes"); if (notes) drop(notes.closest(".db-sec"));
+    // comments: the numbers, the insight and the topics, not the comments themselves; each topic a closed, compact box
+    [].slice.call(wrap.querySelectorAll(".cmp-tl__body, .cmb__load, .cmp-secbar")).forEach(drop);
+    [].forEach.call(wrap.querySelectorAll(".cmp-tl__r"), function (d) { d.open = false; });
+    [].slice.call(wrap.querySelectorAll("details.cmp-sec")).forEach(function (d) {
+      var sm = d.querySelector(":scope > summary"), body = d.querySelector(":scope > .cmp-sec__b"), h = document.createElement("h3"), box = document.createElement("div");
+      h.textContent = sm ? sm.textContent.trim() : ""; box.className = "cmp-sec"; box.appendChild(h);
+      if (body) while (body.firstChild) box.appendChild(body.firstChild);
+      d.parentNode.replaceChild(box, d);
+      if (/^in their words$/i.test(h.textContent)) drop(box);          // single comments stay out of the PDF
+    });
+    [].slice.call(wrap.querySelectorAll("h3")).forEach(function (h) {
+      var t = h.textContent.trim();
+      if (t === "Score breakdown") { var tb = h.nextElementSibling; if (tb && tb.tagName === "TABLE") drop(tb); drop(h); }
+      if (t === "Videos by creator") {
+        var sec = h.closest(".pp-sec"), box = document.createElement("div");
+        box.innerHTML = ppSec("00", "Videos by creator", "Every video each creator published, and its views on each platform.", "");
+        var ns = box.firstChild, body = ns.querySelector(".pp-b");
+        while (h.nextSibling) body.appendChild(h.nextSibling);
+        drop(h); sec.parentNode.insertBefore(ns, sec.nextSibling);
+      }
+    });
+    [].forEach.call(wrap.querySelectorAll(".pp-sec"), function (sec, i) {
+      var n = i + 1; sec.querySelector(".pp-h__n").textContent = (n < 10 ? "0" : "") + n;
+      var k = 0;
+      [].forEach.call(sec.querySelectorAll(".pp-b h3"), function (h) {
+        if (h.closest(".pp-sum, summary, .cmp-insight, .cmp-say") || !h.textContent.trim()) return;
+        h.classList.add("pp-sub"); h.insertAdjacentHTML("afterbegin", '<span class="pp-sn">' + n + "." + (++k) + "</span>");
+      });
+    });
+  }
+  // The campaign stages as a timeline: one bar per step on a shared date axis, today marked (owner, 2026-10-23).
+  function ppStage() {
+    var c = R.campaign, steps = (c.steps || []).filter(function (s) { return s.on !== false && s.start && s.end; });
+    var ST = { done: "Done", active: "In progress", pending: "Not started" }, D = function (x) { return Date.parse(x + "T00:00:00Z") / 1000; };
+    if (!steps.length) return PANEL.stage();
+    var a = Math.min.apply(null, steps.map(function (s) { return D(s.start); })), z = Math.max.apply(null, steps.map(function (s) { return D(s.end) + 86400; })), span = z - a;
+    var pct = function (t) { return Math.max(0, Math.min(100, (t - a) / span * 100)); }, now = Date.now() / 1000, months = [];
+    for (var m = new Date(a * 1000); m.getTime() / 1000 < z; m = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1))) {
+      var t0 = Math.max(a, Date.UTC(m.getUTCFullYear(), m.getUTCMonth(), 1) / 1000);
+      months.push('<span style="left:' + pct(t0).toFixed(2) + '%">' + new Date(t0 * 1000).toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" }) + "</span>");
+    }
+    var rows = steps.map(function (s) {
+      var pub = s.key === "publishing" && R.total.planned ? " · " + R.total.delivered + "/" + R.total.planned + " videos" : "", l = pct(D(s.start)), r = pct(D(s.end) + 86400);
+      return '<div class="pp-gt__r is-' + s.state + '"><div class="pp-gt__l"><b>' + esc(s.label) + esc(pub) + "</b><small>" + esc(day(s.start) + " – " + day(s.end, true)) + " · " + ST[s.state] + "</small></div>"
+        + '<div class="pp-gt__t"><i style="left:' + l.toFixed(2) + "%;width:" + Math.max(1.2, r - l).toFixed(2) + '%"></i></div></div>'; }).join("");
+    return (c.status_note ? "<p>" + esc(c.status_note) + "</p>" : "") + '<div class="pp-gt"><div class="pp-gt__m"><div></div><div class="pp-gt__ax">' + months.join("") + "</div></div>" + rows
+      + (now > a && now < z ? '<div class="pp-gt__now" style="--x:' + pct(now).toFixed(2) + '"><span>Today</span></div>' : "")
+      + '<p class="pp-gt__k"><span class="is-done"><i></i>Done</span><span class="is-active"><i></i>In progress</span><span class="is-pending"><i></i>Not started</span></p></div>';
+  }
+  // Lays the report out as A4 pages before printing: a card that would cross a page edge moves to the next page, a
+  // heading moves with what follows it, every section opens a page, and each page gets the header, the footer and its
+  // number. Browsers apply break rules differently (Safari splits cards and drops repeated headers), this does not.
+  function ppPaginate(wrap) {
+    var MM = 96 / 25.4, PH = Math.round(297 * MM), HT = 20 * MM, FT = 16 * MM, BODY = PH - HT - FT; var SLACK = 40;   // Chrome rounds an A4 page to 1123px
+    var ATOM = ".pp-h, .pp-q, .pp-pod, .pp-sum__t > div, .pp-sum__f, h3, h4, tr, svg, img, .db-tv__row, .db-gauge, .db-pl, .db-post, .db-vids, .db-vid, .db-cb__row, .pp-gt, .cmp-tl__r, .db-cw__h, .db-cb__row, .db-goal-sum > div, .db-obj__t, .db-bar, .db-dn, .db-note, .db-big, .db-donut, .db-trendbox, .db-fc, .db-scorebar, .db-scorekey, .db-pl__strip, .db-pl__key, "
+      + ".cmp-quote, .cmp-who__r, .cmp-plat, .cmp-insight, .cmp-box, .cmp-mood, .cmp-say, .cmp-src, .cmp-share, .cmp-heat, .cmp-rank li, .cmp-curve, .cmp-chips, .cmp-tl__r > summary, .cmb-c, .wpd-row, .wpd-panel-hero, .wpd-insight, [class^='sl-'], p, li";
+    var HEAD = "h3, h4, .pp-h, .db-sec__h, .db-sec__h--s, .db-table-title, summary, .db-cw__h";
+    var flow = wrap.querySelector(".pp-flow"), toc = wrap.querySelector(".pp-toc"), secs = wrap.querySelectorAll(".pp-sec");
+    // the contents list is filled first so page 1 keeps its height; the page numbers go in at the end
+    if (toc) toc.innerHTML = [].map.call(secs, function (s) {
+      return "<li><span>" + esc(s.querySelector(".pp-h__n").textContent) + "</span><b>" + esc(s.querySelector("h2").textContent) + "</b><em>00</em></li>"; }).join("");
+    function base() { return wrap.getBoundingClientRect().top; }
+    function box(el) { var r = el.getBoundingClientRect(), b = base(); return { top: r.top - b, bottom: r.bottom - b, height: r.height }; }
+    function px(el, p) { return parseFloat(getComputedStyle(el)[p]) || 0; }
+    // Space goes in as an empty spacer before the thing that moves, never as a margin: a margin that meets a page edge is
+    // dropped when printing, which would shift every page after it.
+    function spacer(el) {
+      var p = el.parentElement, ps = getComputedStyle(p), sp;
+      var prev = el.previousElementSibling;
+      if (prev && prev.classList.contains("pp-gap") && !prev.classList.contains("pp-pb")) return { el: prev, h: prev.tagName === "TR" ? prev.firstChild : prev, reused: true };   // one spacer per place
+      if (el.tagName === "TR") { var tr = document.createElement("tr"); tr.className = "pp-gap"; tr.innerHTML = '<td colspan="99" style="padding:0;border:0;height:0"></td>'; sp = { el: tr, h: tr.firstChild }; }
+      else if (/grid|flex/.test(ps.display) && !/column/.test(ps.flexDirection)) {
+        var b = box(el), pb = box(p), inner = pb.top + px(p, "paddingTop") + px(p, "borderTopWidth");
+        if (b.top - inner < 2 && p !== flow) return spacer(p);              // the first row of cards: the whole group moves
+        var first = [].filter.call(p.children, function (x) { var r = box(x); return r.height && r.top < b.bottom - 1 && r.bottom > b.top + 1; })[0] || el;
+        var fp = first.previousElementSibling; if (fp && fp.classList.contains("pp-gap")) return { el: fp, h: fp, reused: true };
+        var d = document.createElement("div"); d.className = "pp-gap"; d.style.cssText = /grid/.test(ps.display) ? "grid-column:1/-1;height:0" : "flex:0 0 100%;height:0";
+        p.insertBefore(d, first); return { el: d, h: d };
+      } else { var dv = document.createElement("div"); dv.className = "pp-gap"; dv.style.cssText = "display:block;height:0"; sp = { el: dv, h: dv }; }
+      el.parentElement.insertBefore(sp.el, el); return sp;
+    }
+    function moveTo(el, y) {
+      var t0 = box(el).top; if (Math.abs(y - t0) < 0.5) return;
+      var sp = spacer(el), h0 = parseFloat(sp.h.style.height) || 0, h = Math.max(0, h0 + y - t0);
+      sp.h.style.height = h + "px";
+      if (Math.abs(box(el).top - t0) < 0.5) {
+        // the spacer did not move it (a grid with named areas puts it elsewhere): undo, and move the group around it
+        sp.h.style.height = h0 + "px"; if (!sp.reused) sp.el.remove();
+        var p = el.parentElement; if (p && p !== flow) moveTo(p, box(p).top + y - t0);
+        return;
+      }
+      for (var k = 0; k < 5; k++) { var dlt = y - box(el).top; if (Math.abs(dlt) < 0.5) break; h = Math.max(0, h + dlt); sp.h.style.height = h + "px"; }
+    }
+    // To the next page. Where the spacer sits in a plain column of blocks it becomes a real page break: printed text runs
+    // a little taller than on screen (2-3px a page), and a real break lets that start again at zero on every page. The
+    // spacer ends SLACK px before the page edge; a second one after the break holds the header room.
+    function toNext(el) {
+      var b = box(el), n = Math.floor(b.top / PH), edge = (n + 1) * PH, y = edge + HT;
+      var p = el.parentElement, ps = p && getComputedStyle(p);
+      var flowing = el.tagName !== "TR" && ps && !/grid|flex|table/.test(ps.display);
+      if (!flowing) { moveTo(el, y); return; }
+      var a = spacer(el);                               // a plain block before el
+      a.h.style.height = "0px"; a.h.style.height = Math.max(0, edge - SLACK - box(a.el).top) + "px";
+      var brk = document.createElement("div"); brk.className = "pp-gap pp-pb"; brk.style.cssText = "display:block;height:0";
+      el.parentElement.insertBefore(brk, el);
+      var h = 0;
+      for (var k = 0; k < 5; k++) { var d = y - box(el).top; if (Math.abs(d) < 0.5) break; h = Math.max(0, h + d); brk.style.height = h + "px"; }
+      // in print the break puts it at the top of the next page: only the part below the page edge stays
+      brk.style.setProperty("--pp-pb", Math.max(0, h - (edge - box(brk).top)) + "px");
+    }
+    function fit(el) {
+      var kept = false;
+      for (var k = 0; k < 4; k++) {
+        var b = box(el), n = Math.floor(b.top / PH), bt = n * PH + HT, bb = (n + 1) * PH - FT;
+        if (b.top < bt - 0.5) { moveTo(el, bt); continue; }                // in the header band
+        if (b.bottom <= bb + 0.5 || b.height > BODY) return;
+        var x = el;                                                       // keep a heading with what follows it, also when
+        while (x.parentElement && x.parentElement !== flow && !x.previousElementSibling) x = x.parentElement;   // that opens a group
+        var h = x.previousElementSibling;
+        if (!kept && h && h.matches(HEAD) && Math.floor(box(h).top / PH) === n && box(h).top > bt + 60 && b.bottom - box(h).top <= BODY) {
+          kept = true; toNext(h); continue;          // once, not one already at the top, and only when both fit on one page
+        }
+        toNext(el);
+      }
+    }
+    function inlineKids(el) {
+      for (var i = 0; i < el.childNodes.length; i++) { var x = el.childNodes[i];
+        if (x.nodeType === 3 && /\S/.test(x.nodeValue)) return true;
+        if (x.nodeType === 1 && /^inline$/.test(getComputedStyle(x).display) && x.tagName !== "svg" && x.tagName !== "BR") return true; }
+      return false;
+    }
+    function walk(el) {
+      var cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.position === "absolute" || cs.position === "fixed") return;
+      if (/^inline$/.test(cs.display) && el.tagName !== "svg" && el.tagName !== "IMG") return;
+      var b = box(el); if (!b.height) return;
+      if (el.matches(".pp-sec")) {
+        // a real page break before every section, so any rounding between this layout and the printer starts again at
+        // zero. On screen the section starts SLACK px before the page edge (with that much more padding), so a few px of
+        // rounding over a long section can never push it a page further; in print it starts at the top of its page.
+        var pt = px(el, "paddingTop"); el.classList.add("pp-brk");
+        el.style.setProperty("--pp-ps", pt + HT + SLACK + "px"); el.style.setProperty("--pp-pp", pt + HT + "px");
+        moveTo(el, (Math.floor((box(el).top - 1) / PH) + 1) * PH - SLACK); b = box(el);
+      }
+      if (el.matches(".db-cw") && el.previousElementSibling && el.previousElementSibling.matches(".db-cw")) {   // every creator's posts open a page
+        if (Math.abs(b.top - (Math.floor(b.top / PH) * PH + HT)) > 2) { toNext(el); b = box(el); }
+      }
+      if ((el.matches(ATOM) || !el.children.length || inlineKids(el)) && b.height <= BODY) { fit(el); return; }
+      [].slice.call(el.children).forEach(walk);       // a copy: the spacers put in on the way are not walked
+    }
+    [].slice.call(flow.children).forEach(walk);
+    // trailing page and the frame
+    var H = Math.max(flow.getBoundingClientRect().height, PH), N = Math.max(1, Math.ceil((H - FT - 1) / PH));
+    wrap.style.height = N * PH + "px";
+    var c = R.campaign, today = esc(day(Date.now() / 1000, true)), run = "";
+    for (var i = 0; i < N; i++) {
+      if (i) run += '<div class="pp-run pp-run--h" style="top:' + (i * PH + 6 * MM).toFixed(2) + 'px"><img src="' + PP_LOGO + '" alt=""><span>' + esc(c.name) + " · Campaign report</span><span>" + today + "</span></div>";
+      run += '<div class="pp-run pp-run--f" style="top:' + ((i + 1) * PH - 12 * MM).toFixed(2) + 'px"><span>HELVi Connect by HelloVoice · hellovoice.co.uk</span><span>Confidential · Page ' + (i + 1) + " of " + N + "</span></div>";
+    }
+    wrap.insertAdjacentHTML("beforeend", run);
+    if (toc) [].forEach.call(toc.querySelectorAll("em"), function (em, k) { em.textContent = Math.floor((box(secs[k]).top + SLACK + 5) / PH) + 1; });
+  }
   function printAll() {
     if (!R) return;
     var keep = { platform: F.platform, range: F.range, from: F.from, to: F.to, creators: F.creators.slice() };
@@ -2048,31 +2240,28 @@
         var parts = Object.keys(by).map(function (k) { return { k: k, n: by[k] }; }).sort(function (a, b) { return b.n - a.n; });
         return parts.length ? '<div class="db-donut pp-mix">' + donut(parts) + '<div class="db-key">' + parts.map(function (p, i) { return '<div><span class="db-sw" style="background:' + COL[i % COL.length] + '"></span>' + esc(KIND[p.k] || p.k) + "<b>" + p.n + "</b></div>"; }).join("") + "</div></div>" : ""; })();
       var geo = R.comments && cmPick().n ? PANEL.geo() : "";
-      // No cover page (owner, 2026-10-23): the PDF opens on its first section; every section starts on a new page.
-      var body = ppSec(num2(), "Goals & benchmarks", "Every target, where it should be today, the forecast and the benchmarks for creators of this size.", PANEL.kpi())
+      // A summary page first (design audit, 2026-10-23), then every section on a new page.
+      var body = ppSummary() + ppSec(num2(), "Goals & benchmarks", "Every target, where it should be today, the forecast and the benchmarks for creators of this size.", PANEL.kpi())
         + ppSec(num2(), "Creators leaderboard", "Score out of 100 for the campaign's objective, what each creator delivered and every video.", ppPodium() + PANEL.creators())
         + ppSec(num2(), "Views & engagement", "How the campaign grew, day by day.", PANEL.trend())
         + (PANEL.did ? ppSec(num2(), "What people did", "Likes, comments, saves and shares, by platform and by creator.", PANEL.did()) : "")
         + ppSec(num2(), "Platforms & content", "Views, reach and engagement rate on each platform, and the formats published.", PANEL.plat() + (mixT ? "<h3>Content mix</h3>" + mixT : ""))
-        + (geo ? ppSec(num2(), "What people say", "Viewers' comments under the campaign videos, read by AI. Commenters' names are never stored.", geo + (ppHighlights() ? "<h3>Comment highlights</h3>" + ppHighlights() : ""), "pp-sec--geo") : "")
+        + (geo ? ppSec(num2(), "What people say", "Viewers' comments under the campaign videos, read by AI. Commenters' names are never stored.", geo, "pp-sec--geo") : "")
         + ppSec(num2(), "Every post", "Each creator's posts with their numbers. Every card opens the post.", PANEL.posts())
         + (R.visibility.clicks === false || (!clicksFor() && !(R.sales && R.sales.totals)) ? "" : ppSec(num2(), R.sales && R.sales.totals ? "Clicks to sales" : "Affiliate clicks", "", PANEL.clicks()))
-        + ppSec(num2(), "Campaign stage", "The scope of work, step by step.", PANEL.stage())
+        + ppSec(num2(), "Campaign stage", "The scope of work, step by step.", ppStage())
         + (ppLinks() ? ppSec(num2(), "Video links", "Open any campaign video straight from this PDF.", ppLinks()) : "");
       var c = R.campaign;
       var wrap = document.createElement("div"); wrap.id = "pp"; wrap.className = "pp";
-      wrap.innerHTML = '<div class="pp-run pp-run--h"><img src="' + PP_LOGO + '" alt=""><span>' + esc(c.name) + " · Campaign report</span><span>" + esc(day(Date.now() / 1000, true)) + "</span></div>"
-        + '<div class="pp-run pp-run--f"><span>HelloVoice · hellovoice.co.uk · info@hellovoice.co.uk</span><span>Confidential</span></div>'
-        + '<table class="pp-frame"><thead><tr><td><div class="pp-sp pp-sp--h"></div></td></tr></thead><tfoot><tr><td><div class="pp-sp pp-sp--f"></div></td></tr></tfoot><tbody><tr><td>' + body + "</td></tr></tbody></table>";
+      // The pages are laid out here, not by the browser (ppPaginate), so Safari and Chrome print the same PDF.
+      wrap.innerHTML = '<div class="pp-flow">' + body + "</div>";
       document.body.appendChild(wrap);
       // drawers that open on a tap are opened: pace charts drawn, every section and topic shown, the comment browser left out
-      var it = {}; (SP().items || []).forEach(function (i) { it[i.key] = i; });
-      wrap.querySelectorAll(".db-tv__row").forEach(function (row) { var pace = row.querySelector(".db-tv__pace"), k = row.getAttribute("data-k");
-        if (pace && it[k]) { pace.hidden = false; pace.innerHTML = tvPace(it[k], PRINT_W - 40); } });
       wrap.querySelectorAll("details").forEach(function (d) { d.open = true; });
       var cmb = wrap.querySelector("#cmb"); if (cmb) { var d = cmb.closest("details") || cmb; d.remove(); }
       var tv = wrap.querySelector("#db-tv"); if (tv) { tv.id = "pp-tv"; tv.classList.add("is-in"); }
       cmSamples();
+      ppTidy(wrap);
       wrap.querySelectorAll("img").forEach(function (i) { i.loading = "eager"; });
       var waits = [].slice.call(wrap.querySelectorAll("img")).filter(function (i) { return !i.complete; }).map(function (i) {
         return new Promise(function (ok) { i.addEventListener("load", ok); i.addEventListener("error", function () { i.remove(); ok(); }); }); });
@@ -2081,8 +2270,19 @@
       function go() {
         if (done) return; done = true;
         document.body.classList.remove("pp-busy"); document.body.classList.add("pp-on");
-        document.title = c.name + " — Campaign report";        // the PDF's file name
-        window.print();
+        window.scrollTo(0, 0);
+        // the Arabic face only starts loading once the report is shown, and the page breaks need its final sizes
+        var ar = document.fonts && document.fonts.load ? Promise.all(["400", "700"].map(function (w) { return document.fonts.load(w + ' 12px "HV Arabic"', "ع"); })) : Promise.resolve();
+        ar.then(null, function () {}).then(function () {
+          try { ppPaginate(wrap); } catch (e) { if (window.console) console.error(e); }
+          // the page headers went in just now: their logo is loaded before the print dialog opens
+          var heads = [].filter.call(wrap.querySelectorAll(".pp-run img"), function (i) { return !i.complete; }).map(function (i) {
+            return new Promise(function (ok) { i.addEventListener("load", ok); i.addEventListener("error", ok); }); });
+          Promise.race([Promise.all(heads), new Promise(function (ok) { setTimeout(ok, 4000); })]).then(function () {
+            document.title = c.name + " — Campaign report";        // the PDF's file name
+            window.print();
+          });
+        });
       }
       window.addEventListener("afterprint", function once() {
         window.removeEventListener("afterprint", once);
