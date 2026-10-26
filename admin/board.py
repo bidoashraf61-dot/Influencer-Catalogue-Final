@@ -102,7 +102,7 @@ def pin_key(h):
         return "u:%d" % u["id"]
     a = h.admin()
     if a is not None:
-        return "a:%d" % a["id"]
+        return "a:%d" % a["admin_id"]     # a sessions row: it carries admin_id, never id
     cid = h.link_code("c:list")
     return ("c:%d" % int(cid)) if cid is not None else None
 

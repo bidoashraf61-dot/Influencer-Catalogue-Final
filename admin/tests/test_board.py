@@ -237,6 +237,17 @@ class Board(unittest.TestCase):
         self.assertFalse(next(c for c in self.lead.get("/api/board")[1]["campaigns"] if c["name"] == "Poly done")["my_pin"])
         self.assertEqual(self.rival.post("/api/board/pin", {"t": tok, "on": True})[0], 404)
 
+    def test_05b_pin_key_reads_an_admin_login(self):
+        """The board 500'd on 2026-10-26: h.admin() hands back a sessions row, which has
+        admin_id and no id, so an admin with no portal account broke every /api/board call."""
+        adm = db.admin_by_email(BOSS)
+        token = db.create_session(adm["id"], 3600)
+        row = db.session(token)
+        self.assertNotIn("id", row.keys())
+        h = type("H", (), {"viewer_cookie_id": lambda s: None, "admin": lambda s: row,
+                           "link_code": lambda s, k: None})()
+        self.assertEqual(board.pin_key(h), "a:%d" % adm["id"])
+
     # ----------------------------------------------------------- admin hub (177)
     def test_06_hub_rows_carry_the_stage(self):
         s, d, _ = self.boss.get("/api/hub/company?k=polyco.com")
