@@ -43,6 +43,15 @@ CATALOGUE_API="/admin" CATALOGUE_DB=/home/ubuntu/influencer-catalogue-admin/admi
   python3 build/influencer_catalogue.py
 python3 build/catalogue_dist.py
 
+# Refuse a link that does not line up with the tag it sits in, BEFORE anything is copied to
+# the live directory: a <link rel="stylesheet"> naming a .js, a <script src> naming a .css,
+# or an assets/ file that is simply not there. On 2026-10-26 a publish stamped by hand pasted
+# "dashboard.js?v=626f6b2f" over the dashboard's stylesheet link and the page went live with
+# no CSS at all; the stamper rewrites the ?v= and never the path, so it had nothing to say.
+# Checked here on the source, and again on the copy after stamping as a backstop.
+python3 "$SRC/deploy/catalogue/stamp_assets.py" "$SRC" --links-only \
+  || { echo "ABORTING: fix the link(s) above. Nothing has been published." >&2; exit 2; }
+
 # Assets are rsynced from the repo; dist ships none, and the pages still point
 # at assets/ for css, js, brand and the creator photos.
 # NOTE: never --delete assets/catalogue — the dashboard writes uploaded photos
@@ -82,8 +91,15 @@ cp "$SRC/offline.html"              "$DST/offline.html"
 # fixed list of files and pages (hv-drag.js and any new page were never stamped).
 # The script covers every page and file, then --check proves nothing is stale.
 python3 "$SRC/deploy/catalogue/stamp_assets.py" "$DST"
-python3 "$SRC/deploy/catalogue/stamp_assets.py" "$DST" --check \
-  || echo "WARNING: stale ?v= stamps above: installed apps may keep old files" >&2
+# A stale stamp is a warning; a broken link is not, so keep the two exit codes apart.
+STAMP_RC=0
+python3 "$SRC/deploy/catalogue/stamp_assets.py" "$DST" --check || STAMP_RC=$?
+if [ "$STAMP_RC" -ge 2 ]; then
+  echo "ABORTING: the broken link(s) above are in $DST and are live now. Fix and re-run." >&2
+  exit "$STAMP_RC"
+elif [ "$STAMP_RC" -eq 1 ]; then
+  echo "WARNING: stale ?v= stamps above: installed apps may keep old files" >&2
+fi
 
 # The banner failing is silent by design upstream, so check it here.
 LOGOS=$(grep -o 'cat-clients__logo' "$DST/index.html" | wc -l)
