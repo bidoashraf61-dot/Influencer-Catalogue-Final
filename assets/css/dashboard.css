@@ -1036,6 +1036,10 @@
 /* Platforms panel (2026-10-19): one ledger row per platform, views and share lead */
 .db-pl__strip { display: flex; gap: 3px; height: 30px; margin: 0 0 18px; border-radius: 8px; overflow: hidden; }
 .db-pl__strip i { position: relative; min-width: 0; background: var(--c); display: flex; align-items: center; padding: 0 10px; }
+.db-pl__key { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: -10px 0 16px; font-size: 12px; color: var(--gray); }
+.db-pl__key span { display: inline-flex; align-items: center; gap: 6px; }
+.db-pl__key i { width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+.db-pl__key b { color: var(--ink); }
 .db-pl__strip span { font: 600 11px/1 var(--body); color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
 .db-pls { display: grid; }
 .db-pl { padding: 18px 0 20px; border-top: 1px solid var(--line); }
@@ -1879,20 +1883,124 @@ details[open] > summary > .cmp-chev { transform: rotate(-135deg); margin-top: 4p
 /* PDF print (2026-10-23): the cover and every panel, built by printAll() in dashboard.js. Hidden on screen. */
 .pp, .db-post__open { display: none; }
 body.pp-busy { cursor: progress; }
-@media print {
-  @page { size: A4; margin: 0; }
+/* Arabic in the PDF: one embedded face, so the report reads the same on every computer (design audit, 2026-10-23) */
+@font-face {
+  font-family: "HV Arabic";
+  src: url("../ref/NotoKufiArabic-arabic.woff2") format("woff2");
+  font-weight: 400 700; font-style: normal; font-display: block;
+  unicode-range: U+0600-06FF, U+0750-077F, U+0870-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FEFC;
+}
+@media print { @page { size: A4; margin: 0; } html, body.pp-on { margin: 0 !important; padding: 0 !important; } }
+/* The PDF is laid out on screen first (ppPaginate in dashboard.js) at the A4 width, then printed: every rule below
+   holds on screen and in print, so the measured pages are the printed pages. */
+body.pp-on { margin: 0 !important; padding: 0 !important; background: #fff; }
+@media all {
   html, body { background: #fff !important; height: auto !important; overflow: visible !important; }
   body.pp-on { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body.pp-on > *:not(.pp):not(svg) { display: none !important; }   /* the svg keeps the Instagram gradient */
-  body.pp-on .pp { display: block; color: var(--ink); font-family: var(--body); font-size: 12px; line-height: 1.45; }
-  .pp-frame { width: 100%; border-collapse: collapse; }
-  .pp-frame > thead > tr > td, .pp-frame > tfoot > tr > td, .pp-frame > tbody > tr > td { padding: 0 14mm; vertical-align: top; }
-  .pp-sp--h { height: 18mm; } .pp-sp--f { height: 14mm; }
-  .pp-run { position: fixed; left: 14mm; right: 14mm; display: flex; align-items: center; gap: 12px; font-size: 9.5px; color: #6a665f; }
-  .pp-run--h { top: 6mm; height: 9mm; border-bottom: 1px solid rgba(18,18,18,.12); }
+  body.pp-on .pp { display: block; position: relative; width: 794px; overflow: hidden; background: #fff; color: var(--ink); font-family: "DM Sans", "HV Arabic", Arial, sans-serif; font-size: 12px; line-height: 1.45; }
+  .pp-flow { padding: 20mm 16mm 0; }
+  .pp-flow::after { content: ""; display: block; height: 1px; }
+  .pp-run { position: absolute; left: 16mm; right: 16mm; display: flex; align-items: center; gap: 12px; font-size: 9.5px; color: #6a665f; }
+  .pp-run--h { height: 9mm; border-bottom: 1px solid rgba(18,18,18,.12); }
   .pp-run--h img { height: 7mm; width: auto; }
   .pp-run--h span:first-of-type { flex: 1; font-weight: 600; color: var(--ink); }
-  .pp-run--f { bottom: 5mm; height: 7mm; border-top: 1px solid rgba(18,18,18,.12); justify-content: space-between; }
+  .pp-run--f { height: 7mm; border-top: 1px solid rgba(18,18,18,.12); justify-content: space-between; }
+  /* the pages are set by ppPaginate: the browser's own break rules would move things it has already placed */
+  .pp *, .pp-sec { break-before: auto !important; break-after: auto !important; break-inside: auto !important; }
+  .pp .pp-sec.pp-brk { break-before: page !important; page-break-before: always !important; padding-top: var(--pp-ps) !important; }
+  /* Arabic: the embedded face everywhere in the PDF, Geeza Pro on a Mac screen stays as it was */
+  .pp q, .pp .cmp-insight__ar, .pp .cm-ar, .pp .cmp-say__s q, .pp .pp-ar, .pp [lang="ar"], .pp [dir="rtl"], .pp [dir="auto"] { font-family: "DM Sans", "HV Arabic", Arial, sans-serif !important; }
+  /* highlights as a solid block: Safari prints a transparent-to-lime gradient as black (design audit, 2026-10-23) */
+  .pp mark { background: var(--lime) !important; color: var(--ink) !important; padding: 0 4px; border-radius: 4px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
+  .pp .sl-hero mark { background: none !important; color: #14884a !important; padding: 0; }
+  /* what the 900px breakpoint does to the creator headers in print, kept when the layout is measured on a wide screen */
+  .pp .db-cw__h { grid-template-columns: 56px minmax(0, 1fr); }
+  .pp .db-cw__pic, .pp .db-cw__pic > img, .pp .db-cw__pic > .db-ava { width: 56px; height: 56px; }
+  .pp .db-cw__st { grid-column: 1 / -1; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .pp .db-cw__st > div { padding: 0 10px; text-align: left; }
+  .pp .db-cw__st > div:first-child { padding-left: 0; }
+  .pp .db-cw__st dd { font-size: 22px; }
+
+  /* headings (owner, 2026-10-23): the section title as a dark band with its number, sub-headings numbered and marked */
+  .pp-h { align-items: center; padding: 5mm 6mm; border-radius: 16px; background: var(--ink); color: #fff; margin-bottom: 6mm; }
+  .pp .pp-h h2 { color: #fff !important; }
+  .pp .pp-h p { color: #d8d3c9 !important; }
+  /* wide tables fit the page: smaller type, tighter cells, names may wrap */
+  .pp .pp-b .db-table { table-layout: auto; font-size: 9.5px; }
+  .pp .pp-b .db-table th, .pp .pp-b .db-table td { padding: 5px 4px; white-space: normal; }
+  .pp-h__n { color: var(--ink); }
+  .pp .pp-b h3.pp-sub, .pp .pp-b .db-sec__t.pp-sub { display: flex; align-items: center; gap: 3mm; margin: 8mm 0 4mm; padding: 2.5mm 4mm; border-radius: 10px; background: #f3f0e9; border-left: 6px solid var(--lime);
+    font-family: var(--heading); font-weight: 400; font-size: 22px; line-height: 1; letter-spacing: .02em; text-transform: uppercase; color: var(--ink); }
+  .pp .pp-b h3.pp-sub:first-child { margin-top: 0; }
+  .pp .db-sec__h:has(.pp-sub) { margin: 8mm 0 4mm; }
+  .pp .db-sec__h .db-sec__t.pp-sub { margin: 0; flex: 1; }
+  .pp-sn { flex: none; padding: 1.2mm 2.2mm .8mm; border-radius: 6px; background: var(--ink); color: var(--lime); font-size: 16px; line-height: 1; }
+  .pp .pp-b .db-sec__s { display: inline-block; padding-bottom: 1mm; border-bottom: 3px solid var(--lime); font-size: 20px; }
+  .pp .db-sec__h--s { margin: 6mm 0 3mm; }
+
+  /* nothing moves in the PDF: an animation caught at its first frame printed the comments curve invisible */
+  .pp *, .pp *::before, .pp *::after { animation: none !important; transition: none !important; }
+  .pp .cmp-curve__l { stroke-dasharray: none !important; }
+  /* comment topics as compact boxes, two a row */
+  .pp .cmp-tl { grid-template-columns: 1fr 1fr; gap: 3mm; }
+  .pp .cmp-tl__r summary { grid-template-columns: 28px minmax(0, 1fr) auto; grid-template-areas: "ic t t" "bar bar p" "bar bar n"; gap: 1.5mm 3mm; padding: 3.5mm 4mm; }
+  .pp .cmp-tl__ic { grid-area: ic; } .pp .cmp-tl__t { grid-area: t; } .pp .cmp-tl__bar { grid-area: bar; align-self: center; } .pp .cmp-tl__p { grid-area: p; text-align: right; } .pp .cmp-tl__n { grid-area: n; text-align: right; }
+  .pp .cmp-tl__chev { display: none; }
+  .pp .cmp-sec > h3.pp-sub { margin-top: 8mm; }
+  /* campaign stage timeline */
+  .pp-gt { position: relative; margin-top: 6mm; }
+  .pp-gt__m, .pp-gt__r { display: grid; grid-template-columns: 58mm minmax(0, 1fr); gap: 4mm; align-items: center; }
+  .pp-gt__ax { position: relative; height: 6mm; border-bottom: 1px solid rgba(18,18,18,.15); }
+  .pp-gt__ax span { position: absolute; bottom: 1.5mm; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #6a665f; padding-left: 1.5mm; border-left: 1px solid rgba(18,18,18,.25); }
+  .pp-gt__r { padding: 2.2mm 0; border-bottom: 1px solid rgba(18,18,18,.07); }
+  .pp-gt__l b { display: block; font-size: 12px; }
+  .pp-gt__l small { font-size: 10px; color: #6a665f; }
+  .pp-gt__t { position: relative; height: 7mm; border-radius: 6px; background: #f3f0e9; }
+  .pp-gt__t i { position: absolute; top: 0; bottom: 0; border-radius: 6px; background: #14884a; }
+  .pp-gt__r.is-active .pp-gt__t i { background: var(--lime); box-shadow: inset 0 0 0 1.5px #9db800; }
+  .pp-gt__r.is-pending .pp-gt__t i { background: #cfcac0; }
+  .pp-gt__now { position: absolute; top: 0; bottom: 9mm; left: calc(58mm + 4mm + (100% - 62mm) * var(--x) / 100); border-left: 2px dashed var(--vivid-red, #ee1515); }
+  .pp-gt__now span { position: absolute; top: -1mm; left: 1.5mm; font-size: 10px; font-weight: 700; color: var(--vivid-red, #ee1515); }
+  .pp-gt__k { display: flex; gap: 5mm; margin: 4mm 0 0; font-size: 10.5px; color: #4a4741; }
+  .pp-gt__k span { display: inline-flex; align-items: center; gap: 2mm; }
+  .pp-gt__k i { width: 4mm; height: 3mm; border-radius: 2px; background: #14884a; }
+  .pp-gt__k .is-active i { background: var(--lime); } .pp-gt__k .is-pending i { background: #cfcac0; }
+
+  /* creators as compact boxes, two a row (owner, 2026-10-23) */
+  .pp .db-cb { grid-template-columns: 1fr 1fr; gap: 3mm; border-top: 0; }
+  .pp .db-cb__row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-areas: "who st" "size size" "exp act"; gap: 2.5mm 4mm; padding: 4mm; border: 1px solid rgba(18,18,18,.09); border-radius: 14px; background: #faf8f4; }
+  .pp .db-cb__who b { font-size: 12.5px; }
+  .pp .db-cb__exp b, .pp .db-cb__act strong { font-size: 18px; }
+  .pp .db-cb__st { justify-self: end; align-self: start; }
+  /* videos by creator: one box per creator */
+  .pp .db-vids { margin: 0 0 4mm; padding: 4mm 5mm; border: 1px solid rgba(18,18,18,.09); border-radius: 14px; background: #faf8f4; }
+  .pp .db-vid:first-of-type { border-top: 0; }
+
+  /* page 1: the summary */
+  .pp-sum__brand { display: flex; align-items: center; gap: 10px; margin: 0 0 9mm; }
+  .pp-sum__brand img { height: 12mm; width: auto; max-width: 40mm; object-fit: contain; }
+  .pp-sum__brand span { color: #a29d93; font-size: 16px; }
+  .pp-sum__k { margin: 0; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #6a665f; }
+  .pp-sum h1 { margin: 2mm 0 2mm; font-family: var(--heading); font-weight: 400; font-size: 54px; line-height: .92; }
+  .pp-sum__m { margin: 0; font-size: 13px; color: #4a4741; }
+  .pp-sum__note { margin: 5mm 0 0; padding: 4mm 5mm; border-radius: 14px; background: var(--linen, #f3efe8); font-size: 13px; line-height: 1.5; }
+  .pp-sum h3 { margin: 6mm 0 2.5mm; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: #383838; }
+  .pp-sum__t { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3mm; }
+  .pp-sum__t > div { display: grid; gap: 1px; justify-items: start; padding: 3mm 4mm; border-radius: 14px; background: #faf8f4; border: 1px solid rgba(18,18,18,.08); }
+  .pp-sum__t span { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #6a665f; }
+  .pp-sum__t b { font-family: var(--heading); font-weight: 400; font-size: 30px; line-height: 1; margin-top: 2px; }
+  .pp-sum__t small { font-size: 11px; color: #4a4741; margin-bottom: 4px; }
+  .pp-sum__fs { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin-top: 3mm; }
+  .pp-sum__f { display: grid; gap: 1px; padding: 3mm 4mm; border-radius: 14px; background: var(--lime); }
+  .pp-sum__f span { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
+  .pp-sum__f b { font-family: var(--heading); font-weight: 400; font-size: 28px; line-height: 1.05; }
+  .pp-sum__f small { font-size: 11px; }
+  .pp-toc { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; column-gap: 8mm; }
+  .pp-toc li { display: flex; align-items: baseline; gap: 8px; padding: 1.6mm 0; border-bottom: 1px solid rgba(18,18,18,.1); break-inside: avoid; }
+  .pp-toc span { font-family: var(--heading); font-size: 16px; color: #6a665f; }
+  .pp-toc b { flex: 1; font-size: 12.5px; }
+  .pp-toc em { font-style: normal; font-size: 11px; color: #6a665f; }
   .pp a { color: inherit; }
 
   .pp-ar { font-size: 10.5px; color: #6a665f; line-height: 1.3; }
@@ -1964,3 +2072,6 @@ body.pp-busy { cursor: progress; }
   .pp-links__p svg { width: 13px; height: 13px; }
 }
 /* end PDF print */
+/* in print a section starts at the top of its page: only the header room above it (see ppPaginate) */
+@media print { .pp .pp-sec.pp-brk { padding-top: var(--pp-pp) !important; } }
+@media print { .pp .pp-pb { break-before: page !important; page-break-before: always !important; height: var(--pp-pb) !important; } }
