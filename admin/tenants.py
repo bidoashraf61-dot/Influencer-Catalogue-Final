@@ -75,8 +75,8 @@ def page_html(query=None):
         out = ""
         for m in modules.MODULES:
             cur = have.get(m["key"], modules.DEFAULT)
-            out += ("<td><select name='lvl:%d:%s'>%s</select></td>"
-                    % (cid, m["key"], "".join(
+            out += ("<td data-l=\"%s\"><select name='lvl:%d:%s'>%s</select></td>"
+                    % (e(m["name"]), cid, m["key"], "".join(
                         "<option value='%s'%s>%s</option>" % (lv, " selected" if lv == cur else "", e(modules.LEVEL_LABEL[lv]))
                         for lv in modules.LEVELS)))
         return out
@@ -84,8 +84,8 @@ def page_html(query=None):
     def field_cells(group, cid):
         have = setn.get(cid) or {}
         return "".join(
-            "<td><input name='set:%d:%s' value='%s' placeholder='%s' size='%d'%s>%s</td>"
-            % (cid, f["key"], e(have.get(f["key"]) or ""), e(_default_hint(f)), 9 if f["kind"] == "int" else 14,
+            "<td data-l=\"%s\"><input name='set:%d:%s' value='%s' placeholder='%s' size='%d'%s>%s</td>"
+            % (e(f["label"]), cid, f["key"], e(have.get(f["key"]) or ""), e(_default_hint(f)), 9 if f["kind"] == "int" else 14,
                " inputmode='numeric'" if f["kind"] == "int" else "",
                spent(cid) if f["key"] == "spend_month" else "")
             for f in group)
@@ -137,8 +137,9 @@ def page_html(query=None):
         "<p class='sec-desc'>Each client company is a tenant, with every account they sign in under folded "
         "beneath it. The core — the roster, selections and quotes — is always on and is not listed here. "
         "HelloVoice always sees everything, whatever is set below.</p>"
-        "<div class='row' style='gap:28px;flex-wrap:wrap'><ul class='muted' style='margin:0'>" + what + "</ul>"
-        "<ul class='muted' style='margin:0'>" + legend + "</ul></div></div>"
+        "<div class='row tn-key' style='gap:22px;flex-wrap:wrap'>"
+        "<ul class='muted' style='margin:0;min-width:0'>" + what + "</ul>"
+        "<ul class='muted' style='margin:0;min-width:0'>" + legend + "</ul></div></div>"
         "<form method='post' action='" + u("/tenants/save") + "'>"
         + block("Modules", "What each account has. Manage is stored but still behaves as view: the screens a "
                            "tenant would add their own posts and competitors with are the next slice.",
@@ -163,6 +164,23 @@ def page_html(query=None):
   .tn-co[open] > summary::before { content:'▾' }
   .tn-co > summary:hover { background:#faf8f3 }
   .tn-co table { margin:0 14px 12px }
+  /* A phone cannot hold three columns of controls, so each account becomes a stacked block and
+     every cell carries the column's name with it (Bido, 26 Oct 2026). */
+  @media (max-width: 720px) {
+    /* .row is a two-column grid at this width; the key reads better as one. */
+    .tn-key { grid-template-columns: 1fr }
+    .card { padding: 16px }
+    .tn-co > summary { padding:10px 12px }
+    .tn-co table, .tn-co tbody, .tn-co tr, .tn-co td { display:block; width:auto }
+    .tn-co thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0) }
+    .tn-co table { margin:0 12px 10px }
+    .tn-co tr { padding:10px 0; border-bottom:1px solid var(--line,#e7e4dd) }
+    .tn-co tr:last-child { border-bottom:0 }
+    .tn-co td { padding:6px 0 0 }
+    .tn-co td[data-l]::before { content:attr(data-l); display:block; font-size:11px; letter-spacing:.06em;
+                                text-transform:uppercase; color:#8a8a8a; margin-bottom:3px }
+    .tn-co td select, .tn-co td input { width:100%; max-width:none; box-sizing:border-box }
+  }
 </style>
 <script>
   // Expand all / Collapse all, per card: the folds are plain <details>, so nothing else is needed.
