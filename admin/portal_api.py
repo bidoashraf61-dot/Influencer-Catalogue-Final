@@ -2094,7 +2094,7 @@ class PortalMixin(connect_api.ConnectMixin):
             return self.ai_chat(email)
         if path == "/ai/confirm":
             token = str(self.json_body().get("token") or "")
-            return self.send_json(200, assistant.confirm(token, email))
+            return self.send_json(200, assistant.confirm(token, email, self.headers.get("Cookie")))
         if path == "/ai/dismiss":
             return self.send_json(200, {"ok": assistant.dismiss(str(self.json_body().get("token") or ""), email)})
         if path.startswith("/portal/"):

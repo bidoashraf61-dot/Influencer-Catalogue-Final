@@ -77,6 +77,7 @@ import kam_scope  # noqa: E402
 import team_views  # noqa: E402
 import importer  # noqa: E402
 import db  # noqa: E402
+import actions  # noqa: E402
 import history  # noqa: E402
 import fx  # noqa: E402
 import analysis  # noqa: E402
@@ -7030,6 +7031,7 @@ def main():
     ALLOWED_ORIGINS.update(args.origin)
     global BASE
     BASE = "/" + args.base_path.strip("/") if args.base_path.strip("/") else ""
+    actions.configure(port=args.port, base=BASE)   # where the copilot's bridge knocks
     views.set_base(BASE)
 
     if db.admin_count() == 0:
