@@ -89,7 +89,10 @@ REGISTRY = {
         "/campaigns/content/add",
         "Add one published post to a campaign from its link ALONE. Send only id and url: the platform, kind, creator, date and "
         "numbers are worked out from the link and read from the platform. Add code, platform, kind, posted or counts only "
-        "when the admin gave them or the portal asked.",
+        "when the admin gave them or the portal asked. One video shared on several platforms is ONE video: the portal joins "
+        "a new link to the creator's same video on another platform (same creator, posted within 12 hours). If it could "
+        "not tell, the post is added as its own video: ask the admin whether it is the same video as another post, and if so "
+        "group them with post.group. Never leave one video counted twice.",
         "Add the post {url} to campaign {id}",
         dict({"id": "Campaign id.", "url": "The post link, starting https://",
               "code": "Creator code on this campaign (optional: found from the link).",

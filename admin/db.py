@@ -17,6 +17,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 import overlap
+import pieces
 
 DB_PATH = Path(__file__).resolve().parent / "catalogue.db"
 
@@ -3222,6 +3223,8 @@ def add_content(cid, item, source="capture", conn=None):
              item.get("posted_at"), disc, content_id))
     if any(item.get(m) is not None for m in METRICS):
         add_snapshot(content_id, item, source, conn)
+    if created:
+        pieces.auto_piece(conn, content_id)       # the same video on another platform is one video, not two
     fire("campaign_content", conn, cid)
     return content_id, created
 

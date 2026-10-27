@@ -1073,6 +1073,8 @@ def ingest_posts(run, job, items, hmap, store_raw=True):
                 when, cap = _posted_at(it), _caption(it)
                 if row is not None and row["posted_at"] is None and when:
                     conn.execute("UPDATE content SET posted_at = ? WHERE id = ?", (when, int(cid)))
+                    import pieces
+                    pieces.auto_piece(conn, int(cid))     # now the time is known, join the creator's same video
                 if row is not None and not row["caption"] and cap:
                     _sec, disc = db.match_rules(db.rules_of(row), cap)
                     conn.execute("UPDATE content SET caption = ?, disclosure_ok = ? WHERE id = ?", (cap, disc, int(cid)))
