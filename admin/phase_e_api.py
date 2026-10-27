@@ -146,8 +146,8 @@ class PhaseEMixin:
             if not reader:
                 self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
                 return None
-            if sel is None or (sel["code_id"] is not None and int(reader) != db.admin_code_id()
-                               and sel["code_id"] not in portal.team_codes(int(reader))):
+            if sel is None or (int(reader) != db.admin_code_id()
+                           and not portal.opens(int(reader), sel)):
                 self.send_json(404, {"ok": False}, self.cors())
                 return None
             if code not in json.loads(sel["codes"] or "[]"):

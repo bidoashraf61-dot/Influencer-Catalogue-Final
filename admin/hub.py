@@ -217,6 +217,15 @@ def _name_of(key, g):
     return max(g["names"], key=g["names"].get) if g["names"] else key
 
 
+def _mine(a, person):
+    """A KAM sees BlueHolding-team work only when it is under her own account (owner, 2026-10-18): other people's
+    selections and campaigns are not hers, even on the same company domain."""
+    try:
+        return (person.get("email") or "").strip().lower() == (a["email"] or "").strip().lower()
+    except (KeyError, TypeError, IndexError):
+        return False
+
+
 def companies(role, a):
     import peoplectl
     peoplectl.ensure()
@@ -246,7 +255,7 @@ def companies(role, a):
                          "people": 0, "selections": sum(1 for r in hs.values() if r["code_id"] not in own),
                          "campaigns": sum(1 for r in hc.values() if r["code_id"] not in own), "live": 0})
     if role == "kam":
-        tw = [p for p in _unassigned_people() if p.get("staff") and p.get("id")]
+        tw = [p for p in _unassigned_people() if p.get("staff") and p.get("id") and _mine(a, p)]
         if tw:
             rows.append({"key": "team", "name": "BlueHolding team work", "domain": "", "kam": {"email": "", "name": ""},
                          "people": len(tw), "selections": sum(len(p["selections"]) for p in tw),
@@ -261,6 +270,8 @@ def companies(role, a):
                          "campaigns": sum(len(p["campaigns"]) for p in un),
                          "live": sum(1 for p in un for k in p["campaigns"] if k["status"] == "live"),
                          "note": "Filed under team accounts or plain access codes. Open one and Move it to its client."})
+    if role == "kam":                       # her assigned companies only (owner, 2026-10-18): no team or handed-over groups here
+        rows = [r for r in rows if r["key"] not in ("handed", "team")]
     rows.sort(key=lambda r: (r["key"] != UNASSIGNED, r["key"] == "handed", r["name"].lower()))
     return {"companies": rows, "kams": kam_options(), "role": role}
 
@@ -269,11 +280,13 @@ def company(role, a, key):
     import crm, peoplectl, portal
     peoplectl.ensure()
     crm.ensure()
+    if role == "kam" and key in ("team", "handed"):
+        return None
     dmap = kam_scope.domain_map()
     kam = _item_kams()
     if key == "team" and role == "kam":
         return {"key": key, "name": "BlueHolding team work", "domain": "", "kam": {"email": "", "name": ""},
-                "people": _annotate(role, a, [p for p in _unassigned_people() if p.get("staff") and p.get("id")])}
+                "people": _annotate(role, a, [p for p in _unassigned_people() if p.get("staff") and p.get("id") and _mine(a, p)])}
     if key == UNASSIGNED:
         return {"key": key, "name": "Not filed under a client", "domain": "", "kam": {"email": "", "name": ""},
                 "people": _annotate(role, a, _unassigned_people())} if role == "admin" else None
@@ -400,6 +413,8 @@ def set_kam(role, a, kind, ref, email, by=""):
             return False, "That person no longer exists."
         with db.connect() as conn:
             conn.execute("UPDATE users SET kam = ? WHERE id = ?", (k or None, u["id"]))
+        if k:
+            kam_scope.ensure_kam_login(k)
         return True, ("%s now looks after %s." % (_kam_name(k), u["name"] or u["email"])) if k else "%s follows the company's account manager." % (u["name"] or u["email"])
     if kind in ("selection", "campaign"):
         import kam_items

@@ -123,7 +123,8 @@ class PortalMixin(connect_api.ConnectMixin):
         out = {"signed_in": True, "kind": kind, "credits": portal.balance(cid) if kind != "admin" else None,
                "preview": bool(self.preview_mode()),
                # A person with admin access: their own account, plus a switch that reveals locked data.
-               "staff": bool(self.staff_viewer(cid)),
+               # Only a real admin (owner or admin) is "staff" in the page: a key account manager is not (owner, 2026-10-18).
+               "staff": bool(self.staff_viewer(cid)) and self.kam_clients() is None,
                # View as client is on: the page is the client's; the menu still offers the way back.
                "as_client": bool(self.as_client() and self.staff_account(cid)),
                "unlock": bool(self.staff_unlocked() or (self.kam_clients() is not None and self.cookies().get(self.UNLOCK_COOKIE, "") == "1")),
@@ -207,6 +208,12 @@ class PortalMixin(connect_api.ConnectMixin):
         sel = db.selection(sid) if sid else None
         return sel["token"] if sel is not None and not sel["deleted_at"] else None
 
+    def _public_sample(self):
+        """True for an anonymous reader while public_links ('sample', 'analysis') is on: the anonymised sample
+        full analysis (and its blurred covers) only. Signed-in readers keep their normal path."""
+        import db as _db
+        return self._identity()[0] is None and _db.public_link_on("sample", "analysis")
+
     def _need_viewer(self):
         cid, user, kind = self._identity()
         if cid is None:
@@ -269,7 +276,7 @@ class PortalMixin(connect_api.ConnectMixin):
                 role, team_row = hub.viewer(user)
                 self.send_json(200, dict(account.summary(user, cid, self._srv().SECRET, getattr(self._srv(), "CLIENT_LOGOS", None)), ok=True,
                                          is_kam=bool(a is not None and kam_scope.is_kam(a) and not a["disabled_at"]),
-                                         hub=role, cc=self._cc_block(role, team_row, user)),
+                                         hub=(None if (a is not None and kam_scope.is_kam(a)) else role), cc=self._cc_block(role, team_row, user)),
                                self.cors() + [("Cache-Control", "no-store")])
             return True
         if path == "/api/needs":
@@ -365,7 +372,7 @@ class PortalMixin(connect_api.ConnectMixin):
             if who:
                 import hub
                 role, a = hub.viewer(who[1])
-                if role is None:
+                if role is None or role == "kam":            # a key account manager has "My clients", not the company list
                     self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
                 elif path == "/api/hub/companies":
                     self.send_json(200, dict(hub.companies(role, a), ok=True), self.cors() + [("Cache-Control", "no-store")])
@@ -490,7 +497,7 @@ class PortalMixin(connect_api.ConnectMixin):
             who = self._need_viewer()
             if who:
                 sel = db.selection(token=query.get("s") or "") if query.get("s") else None
-                if sel is None or (sel["code_id"] is not None and not portal.opens(who[0], sel)
+                if sel is None or (not portal.opens(who[0], sel)
                                    and who[0] != db.admin_code_id()):
                     self.send_json(404, {"ok": False}, self.cors())
                 else:
@@ -569,7 +576,8 @@ class PortalMixin(connect_api.ConnectMixin):
         if path == "/api/analysis/sample":
             # The sample full analysis (item 39): the one configured creator, anonymised. No creator
             # code is read from the request, so nothing else can be asked for through it.
-            who = self._need_viewer()
+            # Public when public_links ('sample', 'analysis') is on (2026-10-19).
+            who = True if self._public_sample() else self._need_viewer()
             if who:
                 import sample_analysis
                 got = sample_analysis.payload()
@@ -581,13 +589,15 @@ class PortalMixin(connect_api.ConnectMixin):
         if path == "/api/analysis/template":
             # The full-analysis template (owner, 2026-10-15): every section filled with invented data and the
             # dummy pictures, for the "Preview with sample data" button on every profile-analysis page.
-            if self._need_viewer():
+            # Invented from start to finish; public with the sample analysis (public_links sample/analysis,
+            # 2026-10-19) because creator.js #sample=1 draws this payload.
+            if self._public_sample() or self._need_viewer():
                 import analysis_template
                 self.send_json(200, analysis_template.payload(), self.cors() + [("Cache-Control", "private, max-age=300")])
             return True
         if path == "/api/analysis/sample/cover":
             # One blurred popular-post cover of the configured sample creator (never an original).
-            who = self._need_viewer()
+            who = True if self._public_sample() else self._need_viewer()
             if who:
                 import sample_analysis
                 on, code = sample_analysis.config()
@@ -772,7 +782,7 @@ class PortalMixin(connect_api.ConnectMixin):
         who = self._need_viewer()
         if not who:
             return
-        if not self.staff_viewer(who[0]):
+        if not self.staff_viewer(who[0]) or self.kam_clients() is not None:         # real admins only, never a key account manager
             return self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
         on = bool(self.json_body().get("on"))
         srv = self._srv()
@@ -787,7 +797,7 @@ class PortalMixin(connect_api.ConnectMixin):
         who = self._need_viewer()
         if not who:
             return
-        if not self.staff_account(who[0]):
+        if not self.staff_account(who[0]) or self.kam_clients() is not None:       # real admins only, never a key account manager
             return self.send_json(403, {"ok": False, "reason": "not_staff"}, self.cors())
         on = bool(self.json_body().get("on"))
         srv = self._srv()
@@ -927,7 +937,7 @@ class PortalMixin(connect_api.ConnectMixin):
         cid, user, kind = who
         b = self.json_body()
         sel = db.selection(token=str(b.get("token") or "")) if b.get("token") else None
-        if sel is None or (sel["code_id"] is not None and not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"])):
+        if sel is None or (not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"])):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         if not portal.may_edit(cid, sel, db.admin_code_id()):
             return self.send_json(403, {"ok": False, "reason": "not_owner", "message": "Only the person who owns this selection can change it. Colleagues on the same company can view it."}, self.cors())
@@ -973,7 +983,7 @@ class PortalMixin(connect_api.ConnectMixin):
             return
         token = str(self.json_body().get("token") or "").strip()[:80]
         sel = db.selection(token=token, deleted=True) if token else None
-        if sel is None or (sel["code_id"] is not None and not portal.opens(cid, sel)):
+        if sel is None or (not portal.opens(cid, sel)):
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         if not self._may_delete_selection(sel, cid):
             return self.send_json(403, {"ok": False, "reason": "not_yours"}, self.cors())
@@ -1862,7 +1872,7 @@ class PortalMixin(connect_api.ConnectMixin):
         sel = db.selection(token=str(token or "")) if token else None
         if sel is None:
             return None
-        if sel["code_id"] is not None and not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"]) and not self.admin_like_for(sel["code_id"]):
+        if not portal.opens(cid, sel) and cid != db.admin_code_id() and not portal.unlock_client(sel["code_id"]) and not self.admin_like_for(sel["code_id"]):
             return None
         with db.connect() as conn:
             br = conn.execute("SELECT * FROM briefs WHERE selection_id = ? AND deleted_at IS NULL ORDER BY id DESC LIMIT 1",

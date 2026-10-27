@@ -36,8 +36,8 @@ class LifecycleMixin(phase_e_api.PhaseEMixin):
         if not reader:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         sel = db.selection(token=token) if token else None
-        if sel is None or (sel["code_id"] is not None and int(reader) != db.admin_code_id()
-                           and sel["code_id"] not in portal.team_codes(int(reader))):
+        if sel is None or (int(reader) != db.admin_code_id()
+                           and not portal.opens(int(reader), sel)):
             return self.send_json(404, {"ok": False}, self.cors())
         role = self.selection_role(sel, reader)
         if role != "owner":

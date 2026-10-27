@@ -33,6 +33,19 @@ def _name(email):
     return email
 
 
+def _open_link(kind, item, admin_path):
+    """The catalogue page itself (the selection, or the campaign dashboard), not the admin editor (owner,
+    2026-10-18). Falls back to the admin editor when the item has no token."""
+    import mailer
+    try:
+        tok = item["token"]
+    except (KeyError, IndexError, TypeError):
+        tok = None
+    if tok:
+        return mailer.SITE + (("/selection/#s=" if kind == "selection" else "/campaign/dashboard/#t=") + str(tok))
+    return mailer.SITE + "/admin" + admin_path
+
+
 def _tell(kind, item, email, by):
     """Email + bell. Never raises."""
     import mailer
@@ -43,7 +56,7 @@ def _tell(kind, item, email, by):
         notify.send("kam_assign", ['%s gave you the %s "%s".' % (by or "HelloVoice", label, item["name"]),
                                    "Open it, then invite the client's email from its Share tab." if kind == "selection"
                                    else "Open it to follow it and invite the client."],
-                    kam=email, link=mailer.SITE + "/admin" + path, also=[])
+                    kam=email, link=_open_link(kind, item, path), also=[])
     except Exception:
         pass
     try:
@@ -65,6 +78,9 @@ def assign(kind, item_id, email, by=""):
     if email and email not in {m for _, m in kam_options()}:
         return item, "kam"
     was = db.kam_assign(kind, item["id"], email, by)
+    if email:
+        import kam_scope
+        kam_scope.ensure_kam_login(email)
     if email and email != was:
         _tell(kind, item, email, by)
     return item, None

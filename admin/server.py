@@ -603,6 +603,34 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return None
         return row["id"]
 
+    # ----------------------------------------- public read-only links (2026-10-18) --
+    # A link on the public_links allowlist opens for anyone, signed in or not, read-only: the
+    # client's view with every price, total and cost taken out. Only used when the normal checks
+    # refuse, so signed-in, admin and KAM readers are unchanged; every write stays refused.
+    PUBLIC_MONEY_KEYS = frozenset(("price", "prices", "total_from", "total_to", "cost", "costs", "margin",
+                                   "margin_max", "margins", "fee", "fees", "budget", "cpm", "cpe", "cpc", "emv",
+                                   "price_from", "price_to", "replace_cost", "more_cost", "alike_cost",
+                                   "credits", "ai_free", "campaign_cost", "spend"))
+
+    def public_link(self, kind, token):
+        return bool(token) and db.public_link_on(kind, token)
+
+    @classmethod
+    def public_strip(cls, obj):
+        """A copy of ``obj`` with every money key removed, at any depth."""
+        if isinstance(obj, dict):
+            return {k: cls.public_strip(v) for k, v in obj.items() if k not in cls.PUBLIC_MONEY_KEYS}
+        if isinstance(obj, list):
+            return [cls.public_strip(v) for v in obj]
+        return obj
+
+    def public_selection(self, token):
+        """The selection behind a public link token, or None (not public, unknown or deleted)."""
+        if not token or not self.public_link("selection", token):
+            return None
+        sel = db.selection(token=token)
+        return sel if sel is not None and not sel["deleted_at"] else None
+
     def selection_viewer(self, token):
         """Who acts on a selection page: the admin, else the code typed for that
         link, else this browser's general pass."""
@@ -610,7 +638,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return db.admin_code_id()
         if token and self.kam_clients() is not None:
             sel = db.selection(token=token, deleted=True)
-            if sel is not None and self.admin_like_for(sel["code_id"]):
+            if sel is not None and self.admin_like_for(sel["code_id"], sel["id"]):
                 return db.admin_code_id()          # a key account manager on her own client's selection
         return (self.link_code("s:" + token) if token else None) or self.viewer_code_id()
 
@@ -1208,6 +1236,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send(200, json.dumps(data, indent=2, ensure_ascii=False).encode(),
                              "application/json; charset=utf-8",
                              [("Content-Disposition", "attachment; filename=run-%s.json" % query["id"])])
+        if path == "/reference/goal-formulas":
+            import goal_docs
+            return self.send(200, goal_docs.page_html())
         if path == "/reference":
             return self.send(200, reference_view.reference_page(query))
         if path == "/apis":
@@ -1367,6 +1398,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/api/selection/views":
             import selfilters
             return selfilters.api_views(self)
+        if path == "/api/selection/order":          # item 3b (Bido, 25 Oct 2026): card order, set on the selection page
+            return self.api_selection_order()
         if path == "/api/selection/status":
             return self.api_selection_status()
         if path == "/api/selection/scores":
@@ -1463,7 +1496,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             sel = db.selection(k["selection_id"]) if k["selection_id"] else None
             if f.get("do") == "remove" and sel is not None:
                 access.uninvite(sel, f.get("email") or "")
+                db.cinvite_remove(k["id"], f.get("email") or "")
                 return self.redirect(back + "&ok=" + urllib.parse.quote("Access removed for %s." % (f.get("email") or "that email")))
+            if f.get("do") == "add" and not access.known_email(f.get("email") or ""):
+                return self.redirect(back + "&e=" + urllib.parse.quote("%s has no portal account yet. Use Send invite: we email them the link." % (f.get("email") or "").strip()))
             state, err = access.invite_campaign(k, f.get("email") or "", who["email"])
             msgs = {"email": "That does not look like an email address.", "self": "That is the owner: they already have it.",
                     "limit": "This already has %d invited people." % access.MAX_INVITES,
@@ -1488,6 +1524,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if f.get("do") == "remove":
                 access.uninvite(sel, f.get("email") or "")
                 return self.redirect(back + "&ok=" + urllib.parse.quote("Access removed for %s." % (f.get("email") or "that email")) + "#st=share")
+            if f.get("do") == "add" and not access.known_email(f.get("email") or ""):
+                return self.redirect(back + "&e=" + urllib.parse.quote("%s has no portal account yet. Use Send invite: we email them the link." % (f.get("email") or "").strip()) + "#st=share")
             state, err = access.invite(sel, f.get("email") or "", who["email"])
             msgs = {"email": "That does not look like an email address.", "self": "That is the selection's owner: they already have it.",
                     "limit": "That selection already has %d invited people." % access.MAX_INVITES}
@@ -1504,7 +1542,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             if r is None:
                 return self.redirect("/access-requests?e=" + urllib.parse.quote("That request no longer exists."))
             sel = db.selection(r["selection_id"])
-            if sel is not None and not self.admin_like_for(sel["code_id"]):
+            if sel is not None and not self.admin_like_for(sel["code_id"], sel["id"]):
                 return self.redirect("/access-requests?e=" + urllib.parse.quote("That selection belongs to a client you do not manage."))
             ok = access.grant(rid, who["email"]) if f.get("do") == "grant" else access.deny(rid, who["email"])
             return self.redirect("/access-requests?ok=" + urllib.parse.quote(
@@ -2463,7 +2501,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     # ---- quick edit from the catalogue (Control Centre step 3): team members who may edit creators only --
     def _creator_editor(self):
         who = self.admin()
-        if not who or not team.can(who, "POST", "/roster/save"):
+        if not who or not team.can(who, "POST", "/roster/save") or team.role_of(who) == "kam":
             self.send_json(403, {"ok": False, "reason": "not_allowed", "message": "Only the HelloVoice team can edit creators."}, self.cors())
             return None
         return who
@@ -2547,6 +2585,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         who = self.admin()
         if not who or not team.can(who, "POST", "/campaigns/status"):
             return self.send_json(403, {"ok": False, "message": "Only the HelloVoice team can move cards."}, self.cors())
+        kam_scope.begin(kam_scope.clients(who))             # a key account manager moves only her own cards
         b = self.json_body() or {}
         kind, to = b.get("kind"), b.get("to")
         try:
@@ -3215,7 +3254,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 return self.redirect("/campaigns/edit?id=%d&e=%s" % (k["id"], urllib.parse.quote("Add creators to the campaign first.")))
             name = (k["name"] + " — selection")[:120]
             with history.tracked("selection", None, "Created selection " + name) as t:
-                sid = db.save_selection(None, name, codes, {}, None, None, code_id=k["code_id"],
+                sid = db.save_selection(None, name, codes, {}, None, None, code_id=k["code_id"], auto_campaign=False,
                                         platform=k["platform"] if k["platform"] in db.PLATFORMS else None)
                 t["key"] = sid
             return self.redirect("/selections/edit?id=%d&ok=%s#st=creators" % (
@@ -3425,6 +3464,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 "gender": f.get("t_gender") if f.get("t_gender") in _fit_mod.GENDERS else "Any",
                 "age": self.clean_multi(f.get("t_age"), _fit_mod.AGE_BANDS, "Any"),
                 "category": self.clean_categories(f.get("t_category"))})
+        if db.zero_priced(sel["id"]) and (any(v and max(v) > 0 for v in prices.values()) or costs):
+            db.unzero_selection(sel["id"])                  # prices typed by hand in the admin: they apply from now on
         db.save_selection(sel["id"], name, codes, prices, t_from, t_to, platform=platform,
                           margin=margin, costs=costs, margin_max=margin_max,
                           tags=({k: v for k, v in tags.items() if k in codes} if fit_loaded else None),
@@ -3721,6 +3762,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if dest and not re.match(r"^https?://[^\s/]+\.[^\s]+$", dest):
             return self.redirect(back + "&e=" + urllib.parse.quote(
                 "The destination must be a full web address starting with https://"))
+        with db.connect() as _c:
+            _own = _c.execute("SELECT campaign_id FROM links WHERE slug = ?", (slug,)).fetchone()
+        if _own is None or str(_own[0]) != cid:
+            return self.redirect(back + "&e=" + urllib.parse.quote("That link is not on this campaign."))
         problem = db.save_link(slug, dest, (f.get("new_slug") or "").strip().lower() or None)
         if problem:
             return self.redirect(back + "&e=" + urllib.parse.quote(problem))
@@ -3889,6 +3934,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         back = "/campaigns/content?id=" + cid
         q = urllib.parse.quote
         picks = [int(x) for x in (f.get("pick") or []) if str(x).isdigit()]
+        with db.connect() as _c:
+            mine_ids = {r[0] for r in _c.execute("SELECT id FROM content WHERE campaign_id = ?", (k["id"],))}
+        picks = [i for i in picks if i in mine_ids]
         if f.get("do") == "split":
             for i in picks:
                 db.ungroup_content(i)
@@ -4084,7 +4132,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if k["selection_id"]:
             sel = db.selection(k["selection_id"])
             return self.send_json(200, {"ok": True, "token": sel["token"] if sel else None, "name": k["name"], "existing": True}, self.cors())
-        sid = db.save_selection(None, k["name"], [], {}, None, None, None, k["code_id"], origin="client")
+        sid = db.save_selection(None, k["name"], [], {}, None, None, None, k["code_id"], origin="client", auto_campaign=False)
         db.save_campaign(k["id"], selection_id=sid)
         return self.send_json(200, {"ok": True, "token": db.selection(sid)["token"], "name": k["name"]}, self.cors())
 
@@ -4134,7 +4182,50 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return self.send_json(200, {"ok": True, "can_start": portal.user_for_code(code_id) is not None, "campaigns": out},
                               self.cors() + [("Cache-Control", "no-store")])
 
-    def viewer_campaign(self, token):
+    def _pin_campaigns(self, out, code_id):
+        """Pinned campaigns (setting pinned_campaigns, owner 2026-10-20: the Demo Campaign) lead the list of every
+        BlueHolding / HelloVoice account and of admins, marked pinned. Others see their list unchanged."""
+        try:
+            pins = [int(x) for x in (db.setting("pinned_campaigns") or [])]
+        except (TypeError, ValueError):
+            pins = []
+        u = portal.user_for_code(code_id) if code_id is not None else None
+        if not pins or not (self.admin_like() or (u is not None and (u["domain"] or "").lower() in portal.SAMPLE_DOMAINS)):
+            for d in out:
+                d.pop("id", None)
+            return out
+        have = {d.get("token") for d in out}
+        with db.connect() as conn:
+            rows = conn.execute("SELECT id, token, name, client, status, phase, starts_at, ends_at, logos, selection_id FROM campaigns "
+                                "WHERE id IN (%s) AND status != 'draft'" % ",".join("?" * len(pins)), pins).fetchall()
+        tokens = set()
+        for r in rows:
+            tokens.add(r["token"])
+            if r["token"] in have:
+                continue
+            d = {k: r[k] for k in ("token", "name", "client", "status", "phase", "starts_at", "ends_at")}
+            d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
+            d["draft"] = False
+            d["has_selection"] = bool(r["selection_id"])
+            out.append(d)
+        for d in out:
+            d.pop("id", None)
+            if d.get("token") in tokens:
+                d["pinned"] = True
+        order = {r["token"]: pins.index(r["id"]) for r in rows}
+        return sorted(out, key=lambda d: (0, order[d["token"]]) if d.get("pinned") else (1, 0))
+
+    def viewer_campaign(self, token, public_ok=False):
+        k, status = self._viewer_campaign(token)
+        self._public_view = False
+        if k is None and public_ok and token and self.public_link("campaign", token):
+            pk = db.campaign(token=token)
+            if pk is not None and pk["status"] != "draft":
+                self._public_view = True          # anyone, read-only (public_links)
+                return pk, 200
+        return k, status
+
+    def _viewer_campaign(self, token):
         k = db.campaign(token=token) if token else None
         if k is not None and self.admin_like_for(k["code_id"] if k["code_id"] is not None else kam_scope.campaign_code(k["id"])[1],
                                                  k["selection_id"], k["id"]):
@@ -4172,49 +4263,23 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         u = portal.user_for_code(acct) if acct is not None else None
         return db.cinvite_role(k["id"], u["email"]) if u is not None else None
 
-    def _pin_campaigns(self, out, code_id):
-        """Pinned campaigns (setting pinned_campaigns, owner 2026-10-20: the Demo Campaign) lead the list of every
-        BlueHolding / HelloVoice account and of admins, marked pinned. Others see their list unchanged."""
-        try:
-            pins = [int(x) for x in (db.setting("pinned_campaigns") or [])]
-        except (TypeError, ValueError):
-            pins = []
-        u = portal.user_for_code(code_id) if code_id is not None else None
-        if not pins or not (self.admin_like() or (u is not None and (u["domain"] or "").lower() in portal.SAMPLE_DOMAINS)):
-            for d in out:
-                d.pop("id", None)
-            return out
-        have = {d.get("token") for d in out}
-        with db.connect() as conn:
-            rows = conn.execute("SELECT id, token, name, client, status, phase, starts_at, ends_at, logos, selection_id FROM campaigns "
-                                "WHERE id IN (%s) AND status != 'draft'" % ",".join("?" * len(pins)), pins).fetchall()
-        tokens = set()
-        for r in rows:
-            tokens.add(r["token"])
-            if r["token"] in have:
-                continue
-            d = {k: r[k] for k in ("token", "name", "client", "status", "phase", "starts_at", "ends_at")}
-            d["logos"] = [self.logo_url(x, r["token"]) for x in db.campaign_logos(r)][:3]
-            d["draft"] = False
-            d["has_selection"] = bool(r["selection_id"])
-            out.append(d)
-        for d in out:
-            d.pop("id", None)
-            if d.get("token") in tokens:
-                d["pinned"] = True
-        order = {r["token"]: pins.index(r["id"]) for r in rows}
-        return sorted(out, key=lambda d: (0, order[d["token"]]) if d.get("pinned") else (1, 0))
-
     def api_campaign(self, token):
-        k, status = self.viewer_campaign(token)
+        k, status = self.viewer_campaign(token, public_ok=True)
         if k is None:
             return self.send_json(status, {"ok": False, "signin": status == 401}, self.cors())
-        db.log("view", self.viewer_code_id(), self.client_ip(), self.headers.get("User-Agent"),
-               "campaign:" + k["name"][:60])
+        public = bool(getattr(self, "_public_view", False))
+        db.log("view", None if public else self.viewer_code_id(), self.client_ip(), self.headers.get("User-Agent"),
+               ("public " if public else "") + "campaign:" + k["name"][:60])
         rep = metrics.client_report(k, photo=links.thumb, photo_large=links.photo)
         rep["campaign"]["logos"] = [self.logo_url(x, k["token"]) for x in rep["campaign"]["logos"]]
         for p in rep["posts"]:
             p["thumb"] = self.thumb_url(p.get("thumb"), k["token"])
+        if public:
+            # Read-only for anyone: the client's report, no share controls, no money fields.
+            rep = self.public_strip(rep)
+            rep["public"] = True
+            return self.send_json(200, {"ok": True, "report": rep, "public": True},
+                                  self.cors() + [("Cache-Control", "no-store")])
         role = self.campaign_role(k)
         # Every selection the campaign holds (item 174), the ones this reader may open.
         try:
@@ -4249,9 +4314,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         comments again. GET = the state ({left, running, last_at, posts{...}, comments{...}}); POST {what} = start.
         Clients share one count of free fetches across both; the team has no limit and sees the Apify cost."""
         import apify
-        k, status = self.viewer_campaign(token)
+        k, status = self.viewer_campaign(token, public_ok=not start)
         if k is None:
             return self.send_json(status, {"ok": False, "signin": status == 401}, self.cors())
+        if getattr(self, "_public_view", False):
+            # A public read-only reader: no Update now, and nothing is polled or started for them.
+            return self.send_json(200, {"ok": True, "limit": 0, "used": 0, "unlimited": False, "left": 0,
+                                        "running": False, "last_at": db.refresh_last(k["id"]), "public": True},
+                                  self.cors() + [("Cache-Control", "no-store")])
         team = self.campaign_role(k) in ("admin", "edit")
         import comments as _cm
         if _cm._is_sample(k):
@@ -4819,7 +4889,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             brief = {"objective": metrics.objective_of(k), "platform": k["platform"] or "Instagram",
                      "budget": "", "links": "1" if k["destination"] else "",
                      "source": "campaign"}
-        for key in ("template", "objective", "platform", "category", "budget", "links", "source") + \
+        for key in ("template", "objective", "platform", "category", "budget", "links", "stories", "source") + \
                 tuple("n_" + t for t in plans.TIERS):
             if key in query:
                 brief[key] = query[key]
@@ -4834,12 +4904,22 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         b = {"platform": brief.get("platform"), "objective": brief.get("objective"),
              "category": brief.get("category"), "budget": float(budget) if budget else 0,
              "tracked_links": brief.get("links") == "1"}
-        if k and brief.get("source") != "tiers":
-            mix = plans.mix_from_campaign(k)
+        # Platforms: the ticked ones when the form was sent, else the saved brief's, else the main platform.
+        if query.get("sub") == "1":
+            plats = [p for p in plans.PLATFORMS if query.get("p_" + p) == "1"]
         else:
-            mix = plans.mix_from_counts({t: (str(brief.get("n_" + t) or "").strip() or "0")
-                                         for t in plans.TIERS if str(brief.get("n_" + t) or "0").strip().isdigit()})
-        plan = plans.calculate(b, mix)
+            plats = [p for p in (brief.get("platforms") or []) if p in plans.PLATFORMS]
+        if not plats:
+            plats = [brief.get("platform") if brief.get("platform") in plans.PLATFORMS else "Instagram"]
+        brief["platforms"] = plats
+        brief["platform"] = plats[0]
+        b["platform"] = plats[0]
+        if k and brief.get("source") != "tiers":
+            mix = plans.mix_platforms_from_campaign(k, plats)
+        else:
+            mix = plans.mix_platforms_from_counts({t: (str(brief.get("n_" + t) or "").strip() or "0")
+                                                   for t in plans.TIERS if str(brief.get("n_" + t) or "0").strip().isdigit()}, plats)
+        plan = plans.calculate_platforms(b, mix)
         plan["brief"] = brief
         plan["template"] = brief.get("template") or None
         return self.send(200, views.planner_page(k, brief, plan, plans.house_benchmarks(), plans.library(),
@@ -4956,7 +5036,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return ref
 
     def api_campaign_thumb(self, token, name):
-        k, status = self.viewer_campaign(token)
+        k, status = self.viewer_campaign(token, public_ok=True)
         name = Path(name).name
         if k is None:
             return self.send(404, b"", "text/plain")
@@ -4971,7 +5051,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                          [("Cache-Control", "private, max-age=604800")])
 
     def api_campaign_logo(self, token, name):
-        k, status = self.viewer_campaign(token)
+        k, status = self.viewer_campaign(token, public_ok=True)
         if k is None:
             # Item 214: whoever sees the card on the board sees its logo, drafts included (a client's draft
             # report stays closed to them; its logo is not).
@@ -5131,7 +5211,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
         reader = self.selection_viewer(sel["token"])
-        if self.kam_clients() is not None or not (self.admin_like_for(sel["code_id"]) or self.selection_role(sel, reader) == "admin"):
+        if self.kam_clients() is not None or not (self.admin_like_for(sel["code_id"], sel["id"]) or self.selection_role(sel, reader) == "admin"):
             # Never a key account manager (owner, 2026-10-20): scores and analysis are published by HelloVoice admins.
             return self.send_json(403, {"ok": False, "reason": "hv_only", "message": "Only HelloVoice publishes scores."}, self.cors())
         import selfilters as _sf
@@ -5145,6 +5225,37 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             conn.execute("UPDATE selections SET %s = ? WHERE id = ?" % col, (1 if on else 0, sel["id"]))
         db.log("shortlist", reader, self.client_ip(), self.headers.get("User-Agent"), "%s:%s:%s" % (col, sel["id"], "publish" if on else "hide"))
         return self.send_json(200, {"ok": True, "published": on, "what": "analysis" if col == "analysis_published" else "scores"}, self.cors())
+
+    def api_selection_order(self):
+        """Item 3b (Bido, 25 Oct 2026): save the exact card order a HelloVoice admin arranged on the
+        selection page itself. The order IS selections.codes, which is what every reader opens in."""
+        b = self.json_body()
+        sel = db.selection(token=str(b.get("token") or ""))
+        if sel is None:
+            return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+        reader = self.selection_viewer(sel["token"])
+        if self.kam_clients() is not None or not (self.admin_like_for(sel["code_id"], sel["id"])
+                                                  or self.selection_role(sel, reader) == "admin"):
+            return self.send_json(403, {"ok": False, "reason": "hv_only", "message": "Only HelloVoice arranges the cards."}, self.cors())
+        import selfilters as _sf
+        if not _sf.can_publish(self):
+            return self.send_json(403, {"ok": False, "reason": "hv_admin_only",
+                                        "message": "Only HelloVoice owners and admins change the order the client sees."}, self.cors())
+        want = [str(c).strip().upper() for c in (b.get("codes") or []) if str(c).strip()]
+        listed = json.loads(sel["codes"] or "[]")
+        known, seen, order = set(listed), set(), []
+        for c in want:                     # only creators already on this selection, each once
+            if c in known and c not in seen:
+                seen.add(c); order.append(c)
+        if len(order) != len(listed):      # anything the page did not send keeps its place at the end
+            order += [c for c in listed if c not in seen]
+        if order == listed:
+            return self.send_json(200, {"ok": True, "codes": order, "changed": False}, self.cors())
+        with db.connect() as conn:
+            conn.execute("UPDATE selections SET codes = ?, updated_at = ? WHERE id = ?",
+                         (json.dumps(order), int(time.time()), sel["id"]))
+        db.log("shortlist", reader, self.client_ip(), self.headers.get("User-Agent"), "order:%s:%d" % (sel["id"], len(order)))
+        return self.send_json(200, {"ok": True, "codes": order, "changed": True}, self.cors())
 
     def selection_scoring_off(self, sel):
         """True when a selection shows no scores (setting selections_unscored: a list of
@@ -5566,7 +5677,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         # Never locked for anyone on the HelloVoice team (owner, 2026-10-15): an admin session, or a portal
         # sign-in with an admin email, sees every analysis without the "Show locked data" switch.
         # A key account manager never sees a creator's locked analysis (owner, 2026-10-20, item 174).
-        staff = (self.admin_like() or bool(self.admin()) or self.staff_viewer()) and self.kam_clients() is None
+        staff = ((self.admin_like() or (bool(self.admin()) and not kam_scope.is_kam(self.admin())) or self.staff_viewer())
+                 and self.kam_clients() is None)
         gate = {"state": "unlocked"} if staff else gating.state(code_id, code)
         gate["headline"] = gating.headline(card, every)
         import sample_analysis                       # item 39: is "See a sample full analysis" on?
@@ -5714,7 +5826,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         sel = db.selection(token=token) if token else None
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
-        staff = self.admin_like_for(sel["code_id"])
+        staff = self.admin_like_for(sel["code_id"], sel["id"])
         reader = self.selection_viewer(token)
         if not staff and not (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())):
             return self.send_json(403, {"ok": False, "reason": "not_owner"}, self.cors())
@@ -5736,11 +5848,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         sel = db.selection(token=token) if token else None
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
-        staff = self.admin_like_for(sel["code_id"]) or (self.staff_viewer() and self.kam_clients() is None)
+        staff = self.admin_like_for(sel["code_id"], sel["id"]) or (self.staff_viewer() and self.kam_clients() is None)
         cid = None
         if not staff:
             cid = self.link_code("s:" + token) or self.signed_in_client()
-            if cid is None or (sel["code_id"] is not None and not portal.opens(int(cid), sel)
+            if cid is None or (not portal.opens(int(cid), sel)
                                and int(cid) != db.admin_code_id()):
                 return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
         pk = evidence.for_selection(sel["id"], client_only=not staff)
@@ -5771,12 +5883,15 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         sel = db.selection(token=token) if token else None
         if sel is None:
             return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
-        staff = self.admin_like_for(sel["code_id"]) or (self.staff_viewer() and self.kam_clients() is None)
+        staff = self.admin_like_for(sel["code_id"], sel["id"]) or (self.staff_viewer() and self.kam_clients() is None)
+        public = False
         if not staff:
             cid = self.link_code("s:" + token) or self.signed_in_client()
-            if cid is None or (sel["code_id"] is not None and not portal.opens(int(cid), sel)
+            if cid is None or (not portal.opens(int(cid), sel)
                                and int(cid) != db.admin_code_id()):
-                return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
+                if self.public_selection(token) is None:
+                    return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
+                public = True                   # public read-only link: the client's view, no actions
         pk = evidence.for_selection(sel["id"], client_only=not staff)
         if pk is None:
             if creator is not None or thumb_post is not None or as_map:
@@ -5790,7 +5905,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             rejected = {c for c, st in status.items() if st["s"] == "rejected"}
             locked = {c for c, st in status.items() if st["s"] == "unavailable"}
             approved = {c for c, st in status.items() if st["s"] == "approved"}
-            reader = self.selection_viewer(sel["token"])
+            reader = None if public else self.selection_viewer(sel["token"])
             out = evidence.map_payload(pk, codes, self.selection_objective(sel), (), locked, rejected, approved)
             out["can_add"] = bool(staff or (reader is not None and portal.may_edit(int(reader), sel, db.admin_code_id())))
             # Approve / Reject on the panel (owner, 2026-10-15): the same rule as the status API, so only the
@@ -5799,6 +5914,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             out["can_decide"] = out["role"] in ("admin", "owner")
             out["reasons"] = {c: st.get("reason") or "" for c, st in status.items() if st["s"] == "rejected"}
             out["preview"] = bool(staff and not pk["client_visible"])
+            if public:
+                out = self.public_strip(out)
+                out["can_add"] = False
+                out["can_decide"] = False
+                out["role"] = "viewer"
             return self.send_json(200, {"ok": True, "map": out}, self.cors())
         if thumb_post is not None:
             url = evidence.post_for_thumb(pk["id"], thumb_post)
@@ -5811,9 +5931,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             tr = evidence.creator_payload(pk, creator) if creator in codes else None
             if tr is None:
                 return self.send_json(404, {"ok": False, "reason": "unknown"}, self.cors())
+            if public:
+                tr = self.public_strip(tr)
             return self.send_json(200, {"ok": True, "creator": tr, "preview": bool(staff and not pk["client_visible"])}, self.cors())
         out = evidence.client_payload(pk, codes)
         out["preview"] = bool(staff and not pk["client_visible"])
+        if public:
+            out = self.public_strip(out)
         return self.send_json(200, {"ok": True, "evidence": out}, self.cors())
 
     @staticmethod
@@ -5890,11 +6014,12 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         name and creators of a link the client already holds. Behind the same
         passcode as the roster: the link alone shows nothing."""
         viewer = self.viewer_code_id()
+        public = False
         if token:
             # A selection its client deleted is "unknown" to clients; HelloVoice still opens it.
             sel = db.selection(token=token, deleted=bool(self.admin_like() or self.kam_clients() is not None))
             # An admin opens every selection, whether signed in to the admin or to the portal with an admin email.
-            staff = sel is not None and (self.admin_like_for(sel["code_id"])
+            staff = sel is not None and (self.admin_like_for(sel["code_id"], sel["id"])
                                          or (self.staff_viewer() and self.kam_clients() is None))
             if sel is not None and sel["deleted_at"] and not staff:
                 sel = None                      # a KAM opens deleted selections of her own clients only
@@ -5903,9 +6028,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             # identifies who is reading it. Admins signed in open any link.
             if sel is not None and not staff:
                 cid = self.link_code("s:" + token) or self.signed_in_client()
-                if cid is None or (sel["code_id"] is not None and not portal.opens(int(cid), sel)
+                if cid is None or (not portal.opens(int(cid), sel)
                                    and int(cid) != db.admin_code_id()):
-                    return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
+                    if self.public_selection(token) is None:
+                        return self.send_json(401, {"ok": False, "reason": "link"}, self.cors())
+                    public = True               # public read-only link (public_links): anyone, no prices
         elif not viewer:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         elif codes:
@@ -5983,15 +6110,19 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                     v["fit"] = "Matching"
         # Scores gate (owner, 2026-10-15): on a selection HelloVoice made, the client sees no scores until
         # HelloVoice publishes them; HelloVoice (and the client's KAM) always see them, marked as a preview.
-        reader0 = self.selection_viewer(sel["token"])
+        reader0 = None if public else self.selection_viewer(sel["token"])
         # Clients and key account managers never see scores, never preview them and never publish or hide
         # them (owner, 2026-10-20, item 174): the scores are HelloVoice admins' alone, checked here.
-        team = (self.selection_role(sel, reader0) == "admin" or self.admin_like_for(sel["code_id"])) and self.kam_clients() is None
+        team = ((not public) and (self.selection_role(sel, reader0) == "admin" or self.admin_like_for(sel["code_id"], sel["id"]))
+                and self.kam_clients() is None)
         gated = self.scores_gated(sel)
         out["scores_gate"] = {"applies": self.scores_gate_applies(sel), "published": not gated, "team": bool(team),
                               "analysis": bool(sel["analysis_published"] if "analysis_published" in sel.keys() else 0) if team else False}
         import selfilters as _sf             # item 248: the "Client sees" switches, owner and admin accounts only
         out["scores_gate"]["can_publish"] = bool(team) and _sf.can_publish(self)
+        # Item 3b (Bido, 25 Oct 2026): arranging the cards by hand on the selection page is for
+        # HelloVoice owner and admin accounts only — the same gate as the "Client sees" switches.
+        out["can_arrange"] = bool(team) and _sf.can_publish(self)
         if not team and gated:
             # No score and no fit badge (or its reason) for a client or a KAM until HelloVoice switches
             # "Scores & fit" on for the client (Bido, 2026-10-25; it was "never" since 2026-10-20).
@@ -6010,10 +6141,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             out["engagement"] = self.selection_engagement(codes, by, platform) if out["metric"] == "engagement" else {}
         except Exception:
             out["engagement"] = {}
-        reader = self.selection_viewer(sel["token"])
+        reader = None if public else self.selection_viewer(sel["token"])
         # Analysis gating: a score keeps its number, but the evidence that quotes locked
         # figures (audience shares, fake followers) waits until that creator is unlocked.
-        open_ = None if self.admin_like() or portal.sample_member(reader, sel) else gating.unlocked_set(reader, codes)
+        open_ = None if (not public) and (self.admin_like() or portal.sample_member(reader, sel)) else gating.unlocked_set(reader, codes)
         if open_ is not None:
             out["scores"] = {k: (v if k in open_ else gating.redact_score(v)) for k, v in out["scores"].items()}
         out.update(self.selection_status_payload(sel, codes, reader, by))
@@ -6023,7 +6154,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         except Exception:
             out["facts"] = {}
         import selrename        # item 173: who may rename (owner, KAM, HelloVoice; never a colleague or an invitee)
-        out["can_rename"] = bool(sel["token"]) and selrename.client_may(reader, sel, db.admin_code_id())
+        out["can_rename"] = (not public) and bool(sel["token"]) and selrename.client_may(reader, sel, db.admin_code_id())
+        if public:
+            # Read-only for anyone: no prices, totals or costs, no owner name, no actions.
+            out = self.public_strip(out)
+            out.pop("total", None)
+            out["owner"] = None
+            if isinstance(out.get("lifecycle"), dict):
+                out["lifecycle"]["owner"] = ""
+            out["role"] = "viewer"
+            out["public"] = True
+            db.log("view", None, self.client_ip(), self.headers.get("User-Agent"), "public selection:" + sel["name"][:60])
         return self.send_json(200, out, self.cors())
 
     def selection_role(self, sel, reader):
@@ -6208,6 +6349,17 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         import paging
         one = lambda k: (q.get(k) or [""])[0]
         why = self.roster_refusal(one("link").strip()[:80])
+        if why and job == "cards" and one("link").strip()[:2] == "s:":
+            psel = self.public_selection(one("link").strip()[2:80])
+            if psel is not None:
+                # A public read-only selection link: the cards of that selection's creators only, no prices.
+                allowed = set(json.loads(psel["codes"] or "[]"))
+                codes = [c.strip().upper() for c in ",".join(q.get("codes") or []).split(",") if c.strip()]
+                codes = [c for c in codes if c in allowed][:200]
+                tiers = [{"name": x["name"], "from": None, "to": None, "reach": x["reach"]} for x in self.tier_payload()]
+                return self.send_json(200, {"ok": True, "cards": self.public_strip(paging.cards(self.roster_index(), codes)),
+                                            "tiers": tiers, "fx": fx.rates(), "exp": links.expires_at(), "public": True},
+                                      self.cors() + [("Cache-Control", "private, no-cache"), ("Vary", "Cookie")])
         if why:
             return self.send_json(401, {"ok": False, "reason": why}, self.cors())
         idx = self.roster_index()
@@ -6457,7 +6609,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not viewer:
             return self.send_json(401, {"ok": False, "reason": "locked"}, self.cors())
         sel = db.selection(token=str(b.get("token") or ""))
-        if sel is None or (sel["code_id"] is not None and int(viewer) != db.admin_code_id() and not portal.owns(int(viewer), sel["code_id"]) and not portal.sample_member(viewer, sel)):
+        if sel is None or (int(viewer) != db.admin_code_id() and not portal.owns(int(viewer), sel["code_id"]) and not portal.sample_member(viewer, sel)):
             return self.send_json(404, {"ok": False}, self.cors())
         code = str(b.get("code") or "").strip().upper()
         if code not in json.loads(sel["codes"] or "[]"):

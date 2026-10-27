@@ -331,6 +331,18 @@ _POST_CODE = {"/codes/revoke", "/codes/restore", "/codes/archive", "/codes/unarc
 _POST_USER = {"/portal/user/status", "/portal/user/credits", "/portal/user/save"}
 
 
+# A key account manager runs HER selections and campaigns and their sharing, and nothing else (owner,
+# 2026-10-18): no creator roster, client accounts or codes, analyses, licences, competitor evidence, AI copilot,
+# calculator index, quote inbox or admin catalogue view. Refused before any other rule.
+_NEVER_GET = ("/portal", "/evidence", "/roster", "/licences", "/clients", "/codes", "/requests", "/open-catalogue",
+              "/ai", "/calculator", "/analysis")
+_NEVER_POST = ("/portal", "/evidence", "/roster", "/licences", "/clients", "/codes", "/requests", "/ai", "/analysis")
+
+
+def _never(prefixes, path):
+    return any(path == p or path.startswith(p + "/") for p in prefixes)
+
+
 def check(scope, method, path, query=None, form=None):
     """None when the request may go ahead for this scope, else the reason (shown on a 403).
     ``scope`` None means unscoped (owner, admin, viewer): always None."""
@@ -338,6 +350,12 @@ def check(scope, method, path, query=None, form=None):
         return None
     query = query or {}
     form = form or {}
+    if method == "GET":
+        if path != "/analysis/json" and _never(_NEVER_GET, path) and not (path == "/calculator" and query.get("id")):
+            return NOT_YOURS
+    else:
+        if _never(_NEVER_POST, path) or (path == "/archive" and form.get("kind") == "client"):
+            return NOT_YOURS
 
     def code_ok(found_code):
         found, code_id = found_code
@@ -377,12 +395,16 @@ def check(scope, method, path, query=None, form=None):
     if path in _POST_SELECTION:
         if not code_ok(selection_code(_int(form.get("id")))):
             return NOT_YOURS
+        if path == "/selections/save" and (form.get("sel_client") or "").strip().isdigit() and not allows(_int(form.get("sel_client")), scope):
+            return NOT_YOURS                        # and she files it only under her own clients
         return None
     if path in _POST_CAMPAIGN:
         if not code_ok(campaign_code(_int(form.get("id")))):
             return NOT_YOURS
         if path == "/campaigns/save" and (form.get("code_id") or "").strip() and not allows(_int(form.get("code_id")), scope):
             return NOT_YOURS
+        if path == "/campaigns/save" and (form.get("selection_id") or "").strip() and not code_ok(selection_code(_int(form.get("selection_id")))):
+            return NOT_YOURS                        # her campaign may only point at her own selection
         return None
     if path in _POST_CODE:
         cid = _int(form.get("id"))
@@ -452,6 +474,25 @@ def check(scope, method, path, query=None, form=None):
 
 # ------------------------------------------------------- domain -> KAM --
 
+def ensure_kam_login(email, name=""):
+    """Whoever is made a key account manager gets the KAM login that gives her "My clients" and her scoped
+    lists (owner, 2026-10-18). No password is sent: she signs in by email code. Existing logins keep their role.
+    Returns True when a login was created."""
+    import db
+    em = _norm(email)
+    if "@" not in em:
+        return False
+    try:
+        if db.admin_by_email(em):
+            return False
+        import team
+        nm = (name or "").strip() or em.split("@")[0].replace(".", " ").title()
+        team.invite(em, nm, "kam")
+        return True
+    except Exception:
+        return False
+
+
 def set_domain_map(mapping, by=""):
     """Save {domain: kam email} and bring users.kam in line for every account on those domains.
     Returns (saved mapping, accounts updated)."""
@@ -462,6 +503,8 @@ def set_domain_map(mapping, by=""):
         if d and k and "." in d and "@" in k:
             clean[d] = k
     db.set_setting("domain_kam", clean)
+    for k in set(clean.values()):
+        ensure_kam_login(k)
     n = 0
     with db.connect() as conn:
         for d, k in clean.items():
@@ -519,7 +562,7 @@ def my_clients(email, name=None, admin_base=""):
                                     "AND detail IN ('chat handoff', 'voice handoff')", (cid,)).fetchone()[0]
         selections = []
         for s in sels:
-            selections.append({"name": s["name"], "token": s["token"], "updated_at": s["updated_at"],
+            selections.append({"id": s["id"], "name": s["name"], "token": s["token"], "updated_at": s["updated_at"],
                                "quote": lifecycle.chip(s), "counts": _counts_for(s),
                                "admin": admin_base + "/selections/edit?id=%d" % s["id"]})
         campaigns = []
@@ -529,7 +572,7 @@ def my_clients(email, name=None, admin_base=""):
                 t = rep["total"] if rep else {}
             except Exception:
                 t = {}
-            campaigns.append({"name": k["name"], "token": k["token"], "status": k["status"],
+            campaigns.append({"id": k["id"], "name": k["name"], "token": k["token"], "status": k["status"],
                               "starts_at": k["starts_at"], "ends_at": k["ends_at"],
                               "posts": t.get("delivered") or 0, "planned": t.get("planned") or 0,
                               "views": t.get("views") or 0,

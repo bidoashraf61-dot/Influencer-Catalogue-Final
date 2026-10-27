@@ -91,11 +91,13 @@ CHILDREN = {
               ("/evidence", "Competitor evidence", None), ("/calculator", "ROI calculator", None)],
     "/settings": [("/settings#kams", "Key account managers", None), ("/apis", "APIs & keys", None)],
     "/team": [("/history", "History & undo", None)],
+    "/reference": [("/reference/goal-formulas", "Goal formulas and benchmarks", None)],
 }
 STAFF_ONLY = {"/apis", "/reference", "/settings", "/app-alerts", "/tenants"}   # /tenants is owner-only, checked again in the router          # hidden from KAMs and viewers (the server refuses them anyway)
 # Pages that read across every client: a key account manager (kam_scope) is refused them, so the
 # sidebar does not offer them either.
-KAM_HIDDEN = {"/analytics", "/history"}
+KAM_HIDDEN = {"/analytics", "/history", "/roster", "/analysis", "/licences", "/clients", "/portal", "/codes", "/requests",
+              "/evidence", "/ai", "/calculator", "/tenants"}
 
 import threading as _threading
 _role = _threading.local()
@@ -531,6 +533,10 @@ table.sel-table{width:100%;border-collapse:collapse}
 .sel-table tr.sr.is-dropped td{opacity:.45}
 .sel-table tr.sr.is-dropped .sr-who b{text-decoration:line-through}
 .sel-table tr.sr.is-dropped .sr-gain::after{content:"Removed on save";font-size:var(--t-xs,12px);color:var(--red);font-weight:600}
+.sr-grab{flex:none;cursor:grab;background:none;border:0;padding:0 2px;line-height:1;letter-spacing:-3px;font-size:17px;color:#9aa0a6;border-radius:6px}
+.sr-grab:hover,.sr-grab:focus-visible{color:#111;background:#f0efeb}
+.sr-grab:active{cursor:grabbing}
+.sel-table tr.sr-dragging{opacity:.45;background:#f6f5f1}
 .sr-who{display:flex;align-items:center;gap:12px;min-width:0}
 .sr-who .thumb.sm{width:40px;height:40px;flex:none}
 .sr-who span{min-width:0}
@@ -893,7 +899,7 @@ def shell(title, body, active, u, name, pulse, pulse_payload, pulse_js, user_ema
         + crumb +
         '<span class="grow"></span>'
         '<button class="search-btn" type="button" data-open-search aria-label="Search">' + icon("search", 17) + '<span>Search creators, selections…</span><kbd>⌘K</kbd></button>'
-        '<a class="iconbtn" href="' + u("/requests") + '" aria-label="Inbox">' + icon("bell", 20)
+        '<a class="iconbtn" href="' + u("/access-requests" if getattr(_role, "value", "owner") == "kam" else "/requests") + '" aria-label="Inbox">' + icon("bell", 20)
         + ('<span class="badge">%d</span>' % bell_n if bell_n else "") + '</a>'
         '<button class="iconbtn" id="help-toggle" type="button" aria-label="Guides" aria-expanded="false" aria-controls="help">' + icon("help", 20) + '</button>'
         '</header><main class="page" id="main">' + body + '</main></div></div>'

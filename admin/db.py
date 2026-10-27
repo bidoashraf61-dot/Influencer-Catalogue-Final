@@ -372,6 +372,8 @@ def init():
         conn.executescript(SCHEMA)
         migrate(conn)
         conn.executescript(ACCESS_SCHEMA)
+        conn.executescript(PUBLIC_LINKS_SCHEMA)
+        _public_links_widen(conn)
 
 
 def migrate(conn):
@@ -1912,7 +1914,7 @@ def zero_prices(codes):
     return {c: [0, 0] for c in codes}
 
 
-def save_selection(sid, name, codes, prices, total_from, total_to, request_id=None,
+def _save_selection_raw(sid, name, codes, prices, total_from, total_to, request_id=None,
                    code_id=None, platform=None, margin=None, costs=None, margin_max=False,
                    tags=None, verdicts=None, platforms=None, segments=None, origin="admin"):
     """Create (sid None) or update one priced selection. Returns its id.
@@ -1992,7 +1994,10 @@ def set_selection_group(sid, group_by):
 def set_selection_client(sid, code_id, client_name):
     """Move a selection to another client (access code) and/or rename the client it shows."""
     with connect() as conn:
+        old = conn.execute("SELECT code_id FROM selections WHERE id = ?", (sid,)).fetchone()
         conn.execute("UPDATE selections SET code_id = ?, client_name = ? WHERE id = ?", (code_id, client_name or None, sid))
+    if old is not None and old["code_id"] != code_id:
+        clear_selection_sharing(sid)
 
 
 def set_selection_target(sid, target):
@@ -2116,8 +2121,8 @@ def selection_for_link(name, codes, code_id=None):
     for r in rows:
         if sorted(json.loads(r["codes"] or "[]")) != want:
             continue
-        if r["code_id"] is not None and code_id is not None and r["code_id"] != code_id:
-            continue
+        if code_id is not None and r["code_id"] != code_id:
+            continue                                  # a client re-saving a shortlist matches their own, never an unfiled one
         return r
     return None
 
@@ -2152,6 +2157,57 @@ CREATE TABLE IF NOT EXISTS item_kam (
     PRIMARY KEY (kind, item_id));
 CREATE INDEX IF NOT EXISTS item_kam_email ON item_kam(kam_email);
 """
+
+
+# Public read-only links (2026-10-18): ONE selection or campaign link, by its token, opens for anyone with
+# no sign-in (e.g. a button in a client proposal PDF). Opt-in per link, off unless a row says enabled = 1.
+# The server strips prices, totals and costs and refuses every write for such a reader.
+# kind 'sample', token 'analysis' (2026-10-19): the anonymised sample full analysis (/api/analysis/sample).
+# Turn one off:  UPDATE public_links SET enabled = 0 WHERE kind = 'selection' AND token = '<token>';
+#           or:  db.public_link_set('selection', '<token>', False)
+PUBLIC_LINKS_SCHEMA = """
+CREATE TABLE IF NOT EXISTS public_links (
+    kind TEXT NOT NULL CHECK (kind IN ('selection', 'campaign', 'sample')), token TEXT NOT NULL,
+    enabled INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL, note TEXT,
+    PRIMARY KEY (kind, token));
+"""
+
+
+def _public_links_widen(conn):
+    """A public_links table made before kind 'sample' existed: rebuild it with the wider CHECK, rows kept."""
+    r = conn.execute("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'public_links'").fetchone()
+    if r is None or "'sample'" in (r[0] or ""):
+        return
+    conn.execute("ALTER TABLE public_links RENAME TO public_links_old")
+    conn.executescript(PUBLIC_LINKS_SCHEMA)
+    conn.execute("INSERT INTO public_links (kind, token, enabled, created_at, note) "
+                 "SELECT kind, token, enabled, created_at, note FROM public_links_old")
+    conn.execute("DROP TABLE public_links_old")
+
+
+def public_link_on(kind, token):
+    """True when this selection / campaign token is on the public allowlist and switched on."""
+    if kind not in ("selection", "campaign", "sample") or not token:
+        return False
+    try:
+        with connect() as conn:
+            r = conn.execute("SELECT enabled FROM public_links WHERE kind = ? AND token = ?", (kind, str(token))).fetchone()
+    except sqlite3.OperationalError:
+        return False                       # table not created yet: nothing is public
+    return bool(r and r["enabled"])
+
+
+def public_link_set(kind, token, on=True, note=None):
+    """Switch a public read-only link on or off (creates the row the first time)."""
+    if kind not in ("selection", "campaign", "sample") or not token:
+        raise ValueError("kind must be selection, campaign or sample, with a token")
+    with connect() as conn:
+        conn.executescript(PUBLIC_LINKS_SCHEMA)
+        _public_links_widen(conn)
+        conn.execute("INSERT INTO public_links (kind, token, enabled, created_at, note) VALUES (?,?,?,?,?) "
+                     "ON CONFLICT(kind, token) DO UPDATE SET enabled = excluded.enabled, "
+                     "note = COALESCE(excluded.note, public_links.note)",
+                     (kind, str(token), 1 if on else 0, now(), note))
 
 
 # A campaign can be shared by link: anyone who signs in (or signs up) with the link is let in to read it,
@@ -2244,6 +2300,8 @@ def share_disable(cid):
     _share_tables()
     with connect() as conn:
         conn.execute("UPDATE campaign_shares SET enabled = 0 WHERE campaign_id = ?", (int(cid),))
+        # Turning the link off also removes everyone who got in through it (owner, 2026-10-18).
+        conn.execute("DELETE FROM campaign_viewers WHERE campaign_id = ?", (int(cid),))
 
 
 def share_valid(cid, token):
@@ -2306,16 +2364,29 @@ def selection_grants(sel_id):
                             "WHERE a.selection_id = ? ORDER BY a.granted_at", (int(sel_id),)).fetchall()
 
 
+def _linked_items(conn, kind, item_id):
+    """The items that travel with this one: a selection and the campaigns made from it (owner, 2026-10-18)."""
+    if kind == "selection":
+        return [("campaign", r["id"]) for r in conn.execute("SELECT id FROM campaigns WHERE selection_id = ?", (int(item_id),))]
+    row = conn.execute("SELECT selection_id FROM campaigns WHERE id = ?", (int(item_id),)).fetchone()
+    if row is None or not row["selection_id"]:
+        return []
+    sid = int(row["selection_id"])
+    return [("selection", sid)] + [("campaign", r["id"]) for r in conn.execute("SELECT id FROM campaigns WHERE selection_id = ? AND id != ?", (sid, int(item_id)))]
+
+
 def kam_assign(kind, item_id, kam_email, by=""):
-    """Give one selection or campaign to a KAM (an empty email takes it back). Returns the previous KAM email or None."""
+    """Give one selection or campaign to a KAM (an empty email takes it back), and with it the selection or campaigns
+    it is linked to. Returns the previous KAM email or None."""
     kam_email = (kam_email or "").strip().lower()
     with connect() as conn:
         r = conn.execute("SELECT kam_email FROM item_kam WHERE kind = ? AND item_id = ?", (kind, int(item_id))).fetchone()
-        if kam_email:
-            conn.execute("INSERT OR REPLACE INTO item_kam (kind, item_id, kam_email, assigned_by, assigned_at) VALUES (?,?,?,?,?)",
-                         (kind, int(item_id), kam_email, by, now()))
-        else:
-            conn.execute("DELETE FROM item_kam WHERE kind = ? AND item_id = ?", (kind, int(item_id)))
+        for k, i in [(kind, int(item_id))] + _linked_items(conn, kind, item_id):
+            if kam_email:
+                conn.execute("INSERT OR REPLACE INTO item_kam (kind, item_id, kam_email, assigned_by, assigned_at) VALUES (?,?,?,?,?)",
+                             (k, int(i), kam_email, by, now()))
+            else:
+                conn.execute("DELETE FROM item_kam WHERE kind = ? AND item_id = ?", (k, int(i)))
         return r[0] if r else None
 
 
@@ -2475,7 +2546,7 @@ def campaigns_for_selection(sid):
                             "ORDER BY created_at DESC", (sid,)).fetchall()
 
 
-def create_campaign(name, client=None, code_id=None, selection_id=None, platform=None,
+def _create_campaign_raw(name, client=None, code_id=None, selection_id=None, platform=None,
                     codes=(), costs=None, origin=None):
     """A new draft campaign, optionally filled from a selection. Returns its id."""
     costs = costs or {}
@@ -2509,10 +2580,12 @@ def save_campaign(cid, **fields):
         return
     cols = sorted(fields)
     with connect() as conn:
-        was = conn.execute("SELECT status FROM campaigns WHERE id = ?", (cid,)).fetchone()
+        was = conn.execute("SELECT status, code_id FROM campaigns WHERE id = ?", (cid,)).fetchone()
         conn.execute("UPDATE campaigns SET " + ", ".join(c + " = ?" for c in cols)
                      + ", updated_at = ? WHERE id = ?",
                      [fields[c] for c in cols] + [now(), cid])
+    if "code_id" in fields and was is not None and was["code_id"] != fields["code_id"]:
+        clear_campaign_sharing(cid)
     if fields.get("status") and was is not None and was["status"] != fields["status"]:
         fire("campaign_status", cid, was["status"], fields["status"])
 
@@ -2768,7 +2841,7 @@ def by_date(steps):
         keyed.append(((when or last), 0 if when else 1, i, x))
     keyed.sort(key=lambda t: (t[0], t[1], t[2]))
     return [t[3] for t in keyed]
-TARGET_KEYS = ["posts", "views", "reach", "engagement", "er", "clicks"]
+TARGET_KEYS = ["posts", "views", "engagement", "er", "clicks"]      # reach removed 2026-10-18
 
 
 def campaign_targets(campaign):
@@ -3502,14 +3575,50 @@ def cinvite_add(cid, email, role, by=""):
             return True, True
         if r["role"] != role:
             conn.execute("UPDATE campaign_invites SET role = ? WHERE campaign_id = ? AND email = ?", (role, int(cid), email))
+            if r["role"] == "edit" and role == "view":
+                _drop_selection_grant(conn, cid, email)     # the silent selection access came with the edit role
             return False, True
         return False, False
 
 
+def _drop_selection_grant(conn, cid, email):
+    """Take back the selection access an edit invite to a campaign brought with it."""
+    row = conn.execute("SELECT selection_id FROM campaigns WHERE id = ?", (int(cid),)).fetchone()
+    if row is None or not row["selection_id"]:
+        return
+    sid = int(row["selection_id"])
+    r = conn.execute("SELECT claimed_code_id FROM selection_invites WHERE selection_id = ? AND email = ?", (sid, email)).fetchone()
+    conn.execute("DELETE FROM selection_invites WHERE selection_id = ? AND email = ?", (sid, email))
+    if r and r[0] is not None:
+        conn.execute("DELETE FROM selection_access WHERE selection_id = ? AND code_id = ?", (sid, r[0]))
+
+
 def cinvite_remove(cid, email):
     _share_tables()
+    email = (email or "").strip().lower()
     with connect() as conn:
-        conn.execute("DELETE FROM campaign_invites WHERE campaign_id = ? AND email = ?", (int(cid), (email or "").strip().lower()))
+        r = conn.execute("SELECT role FROM campaign_invites WHERE campaign_id = ? AND email = ?", (int(cid), email)).fetchone()
+        conn.execute("DELETE FROM campaign_invites WHERE campaign_id = ? AND email = ?", (int(cid), email))
+        if r is not None and r["role"] == "edit":
+            _drop_selection_grant(conn, cid, email)
+
+
+def clear_selection_sharing(sid):
+    """A selection (and its campaigns) moved to another client: nobody invited before keeps access (owner, 2026-10-18)."""
+    _share_tables()
+    with connect() as conn:
+        conn.execute("DELETE FROM selection_invites WHERE selection_id = ?", (int(sid),))
+        conn.execute("DELETE FROM selection_access WHERE selection_id = ?", (int(sid),))
+        for r in conn.execute("SELECT id FROM campaigns WHERE selection_id = ?", (int(sid),)).fetchall():
+            conn.execute("DELETE FROM campaign_invites WHERE campaign_id = ?", (r["id"],))
+            conn.execute("DELETE FROM campaign_viewers WHERE campaign_id = ?", (r["id"],))
+
+
+def clear_campaign_sharing(cid):
+    _share_tables()
+    with connect() as conn:
+        conn.execute("DELETE FROM campaign_invites WHERE campaign_id = ?", (int(cid),))
+        conn.execute("DELETE FROM campaign_viewers WHERE campaign_id = ?", (int(cid),))
 
 
 def cinvites_for(cid):
@@ -3534,3 +3643,96 @@ def cinvite_seen(cid, email):
     with connect() as conn:
         conn.execute("UPDATE campaign_invites SET seen_at = ? WHERE campaign_id = ? AND email = ? AND seen_at IS NULL",
                      (now(), int(cid), str(email).strip().lower()))
+
+
+def _auto_kam(kind, item_id):
+    """A key account manager's own new selection or campaign is handed to her (owner, 2026-10-18), so she
+    sees what she makes and nobody else on her team does. No email: she made it."""
+    try:
+        import kam_scope
+        sc = kam_scope.current()
+        em = getattr(sc, "email", "") if sc is not None else ""
+        if em and item_id:
+            kam_assign(kind, item_id, em, em)
+    except Exception:
+        pass
+
+
+def unzero_selection(sid):
+    """Prices entered by hand in the admin: this selection is no longer held at zero."""
+    cur = [int(x) for x in (setting("selections_zero_price") or [])]
+    if int(sid) in cur:
+        set_setting("selections_zero_price", [x for x in cur if x != int(sid)])
+
+
+def _zero_new_selection(sid):
+    """Every new selection starts at zero until prices are entered by hand in the admin (owner, 2026-10-18)."""
+    try:
+        cur = [int(x) for x in (setting("selections_zero_price") or [])]
+        if int(sid) not in cur:
+            set_setting("selections_zero_price", cur + [int(sid)])
+        with connect() as conn:
+            row = conn.execute("SELECT codes FROM selections WHERE id = ?", (int(sid),)).fetchone()
+            codes = json.loads((row["codes"] if row else None) or "[]")
+            conn.execute("UPDATE selections SET prices = ?, total_from = 0, total_to = 0 WHERE id = ?",
+                         (json.dumps(zero_prices(codes)), int(sid)))
+    except Exception:
+        pass
+
+
+def _sync_selection_campaigns(sid):
+    """The selection drives its campaigns (owner, 2026-10-18): creators added to it are added to each campaign; while a
+    campaign is still a draft, creators taken off the selection leave it too. Once it is live nobody is removed."""
+    try:
+        sel = selection(sid)
+        if sel is None:
+            return
+        codes = [c for c in json.loads(sel["codes"] or "[]")]
+        with connect() as conn:
+            camps = conn.execute("SELECT id, status, objective FROM campaigns WHERE selection_id = ?", (int(sid),)).fetchall()
+        for k in camps:
+            sync_from_selection(k["id"])
+            with connect() as conn:
+                if k["status"] == "draft":
+                    marks = ",".join("?" * len(codes)) or "''"
+                    conn.execute("DELETE FROM campaign_creators WHERE campaign_id = ? AND code NOT IN (%s)" % marks, [int(k["id"])] + list(codes))
+                sel_obj = sel["objective"] if "objective" in sel.keys() else None
+                if sel_obj and not k["objective"]:
+                    conn.execute("UPDATE campaigns SET objective = ? WHERE id = ?", (sel_obj, int(k["id"])))
+    except Exception:
+        pass
+
+
+def _auto_campaign(sid):
+    """Every new selection opens a draft campaign linked to it, with the same creators, owner and key account manager."""
+    try:
+        sel = selection(sid)
+        if sel is None:
+            return
+        with connect() as conn:
+            if conn.execute("SELECT 1 FROM campaigns WHERE selection_id = ? LIMIT 1", (int(sid),)).fetchone():
+                return
+        codes = json.loads(sel["codes"] or "[]")
+        create_campaign(sel["name"], client=(sel["client_name"] if "client_name" in sel.keys() else None) or None,
+                        code_id=sel["code_id"], selection_id=int(sid), platform=sel["platform"], codes=codes)
+    except Exception:
+        pass
+
+
+def save_selection(sid, *args, **kw):
+    auto = kw.pop("auto_campaign", False)   # owner 2026-10-20 (item 174): no automatic Draft campaign per new selection
+    out = _save_selection_raw(sid, *args, **kw)
+    if sid is None:
+        _auto_kam("selection", out)
+        _zero_new_selection(out)
+        if auto:
+            _auto_campaign(out)
+    else:
+        _sync_selection_campaigns(sid)
+    return out
+
+
+def create_campaign(*args, **kw):
+    out = _create_campaign_raw(*args, **kw)
+    _auto_kam("campaign", out)
+    return out
