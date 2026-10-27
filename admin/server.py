@@ -738,10 +738,15 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
         # One gate for every module (phase 1, 2026-10-25): a tenant whose module is off is
         # refused here, before any handler runs. Staff are never gated; see modules.py.
-        off = modules.blocked(self, path, query)
+        off = modules.refusal_for(self, path, query)
         if off is not None:
-            return self.send_json(404, {"ok": False, "reason": "module_off", "module": off["key"]}, self.cors())
+            return self.send_json(off["status"], off["body"], self.cors())
 
+        if path == "/api/access/state":
+            # What a person meets in a module they cannot open (the locked page): access_api.py.
+            import access_api
+            st, payload = access_api.state(self, query)
+            return self.send_json(st, payload, self.cors() + [("Cache-Control", "no-store")])
         if path.startswith("/go/"):
             return self.go(path[len("/go/"):])
         if path.startswith("/insights/"):
@@ -1339,9 +1344,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
     def _do_post(self):
         path = self.route(urllib.parse.urlparse(self.path).path)
         history.start_request()
-        off = modules.blocked(self, path, dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query)))
+        off = modules.refusal_for(self, path, dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.path).query)))
         if off is not None:
-            return self.send_json(404, {"ok": False, "reason": "module_off", "module": off["key"]}, self.cors())
+            return self.send_json(off["status"], off["body"], self.cors())
 
         # CSRF: a cross-site form post cannot forge Origin / Sec-Fetch-Site.
         if not guard.origin_ok(self.headers, ALLOWED_ORIGINS):
@@ -1378,6 +1383,11 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.api_selection_tags()
         if path == "/api/selection/platform":
             return self.api_selection_platform()
+        if path == "/api/access/request":
+            # "Request this module" / "Request access" on a locked page: access_api.py files it in the Tenants inbox.
+            import access_api
+            st, payload = access_api.request(self, self.json_body())
+            return self.send_json(st, payload, self.cors())
         if path.startswith("/api/my/"):
             # A tenant writing their own, when their module is set to manage (tenant_api.py).
             import tenant_api

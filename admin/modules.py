@@ -24,6 +24,7 @@ Where a request carries no token and nobody is signed in (a /go/ click from a st
 phone, say) there is no tenant to check and the request passes; the dashboards and the
 packs behind it are still gated.
 """
+import access_rules
 import db
 
 LEVELS = ("off", "view", "manage")
@@ -36,6 +37,20 @@ LEVEL_HELP = {
 }
 
 MODULES = [
+    {
+        # The catalogue (owner, 2026-10-28): the roster, creator pages and analysis, selections, quotes. It used to be
+        # the core and never switchable; it is a module now so a company can own Track or Intelligence without it.
+        # Everyone starts with it on, so nothing changes for anybody the day it ships.
+        "key": "helvi-selection",
+        "name": "Helvi Selection",
+        "what": "The creator catalogue: browse the roster, creator pages and analysis, shortlists, selections and quotes.",
+        "logo": "/assets/brand/modules/helvi-selection-480.png",
+        "client": ("/api/roster", "/api/creator", "/api/creator-media", "/api/licences", "/api/discover", "/api/search",
+                   "/api/selection"),
+        "admin": ("/creators", "/selections"),
+        "tables": ("selections",),
+        "tenant": "selection",
+    },
     {
         "key": "helvi-intelligence",
         "name": "Helvi Intelligence",
@@ -290,6 +305,123 @@ def set_role(user_id, code_id, module, role):
     except Exception:
         return None
     return role
+
+
+# ------------------------------------------------------- people and the gate --
+# What a person may do is the lower of the company's level and their own role (docs/SAAS-MODEL.md). The decision
+# itself is access_rules.refusal(), which has no imports and is tested on its own; this part finds the facts.
+
+def paused(code_id, key):
+    """True when HelloVoice paused this module for the company, as against the company never having had it.
+    Both read as level off; the locked page differs (paused: your data is safe; never had: request it)."""
+    try:
+        with _conn() as conn:
+            r = conn.execute("SELECT value FROM tenant_settings WHERE code_id = ? AND key = ?",
+                             (int(code_id), "paused:" + key)).fetchone()
+        return bool(r and r["value"] == "1")
+    except Exception:
+        return False
+
+
+def set_paused(code_id, key, flag, by=""):
+    if key not in BY_KEY:
+        return None
+    with _conn() as conn:
+        if flag:
+            conn.execute("INSERT INTO tenant_settings (code_id, key, value, changed_at, changed_by) VALUES (?,?,?,?,?) "
+                         "ON CONFLICT(code_id, key) DO UPDATE SET value = excluded.value, changed_at = excluded.changed_at, "
+                         "changed_by = excluded.changed_by", (int(code_id), "paused:" + key, "1", db.now(), by or ""))
+        else:
+            conn.execute("DELETE FROM tenant_settings WHERE code_id = ? AND key = ?", (int(code_id), "paused:" + key))
+    return bool(flag)
+
+
+def person_of(h):
+    """The signed-in portal person behind this request, or None (a staff session, a passcode pass, a public link)."""
+    try:
+        cid = h.viewer_cookie_id()
+    except Exception:
+        return None
+    if cid is None:
+        return None
+    import portal
+    return portal.user_for_code(cid)
+
+
+def company_of(user):
+    """The company a person works in: their company's code, or their own code when they are the account holder."""
+    k = user.keys()
+    return user["company_code_id"] if "company_code_id" in k and user["company_code_id"] else user["code_id"]
+
+
+def is_colleague(user):
+    return company_of(user) != user["code_id"]
+
+
+def role_of(user, key):
+    """none | viewer | editor | admin. A person with no row gets access_rules.default_role()."""
+    try:
+        with _roles_conn() as conn:
+            r = conn.execute("SELECT role FROM user_modules WHERE user_id = ? AND module = ?",
+                             (int(user["id"]), key)).fetchone()
+        if r and r["role"] in ROLES:
+            return r["role"]
+    except Exception:                        # no roles table yet: every account holder stays admin
+        pass
+    return access_rules.default_role(is_colleague(user))
+
+
+def company_admin(code_id, key):
+    """First name of someone at the company who can give roles in this module, or None."""
+    try:
+        with _roles_conn() as conn:
+            rows = conn.execute("SELECT id, name, code_id, company_code_id FROM users WHERE (code_id = ? OR company_code_id = ?) "
+                                "AND status = 'active' ORDER BY (company_code_id IS NULL) DESC, id", (int(code_id), int(code_id))).fetchall()
+            for u in rows:
+                if role_of(u, key) == "admin":
+                    return (u["name"] or "").split(" ")[0] or None
+    except Exception:
+        pass
+    return None
+
+
+def state_for(user, key):
+    """What this person meets in this module: {code, level, role, paused}. code is None when it opens."""
+    cid = company_of(user)
+    lvl, role, p = level(cid, key), role_of(user, key), paused(cid, key)
+    return {"code": access_rules.refusal(lvl, p, role, "GET"), "level": lvl, "role": role, "paused": p, "company": cid}
+
+
+REASON = {"locked": "module_off", "paused": "module_off", "no_role": "module_no_role", "read_only": "module_read_only"}
+
+
+def refusal_for(h, path, query=None):
+    """None, or {status, body}: the module refusing this request, for this person. HelloVoice staff are never
+    refused. A request with nobody behind it (a /go/ click, a public report link) is checked on the company only."""
+    mod = for_path(path)
+    if mod is None:
+        return None
+    try:
+        if h.admin_like():
+            return None
+    except Exception:
+        pass
+    cid = tenant_of(h, mod, query or {})
+    if cid is None:
+        return None
+    person = None
+    try:
+        person = person_of(h)
+    except Exception:
+        person = None
+    role = "editor"                          # no person, or acting inside somebody else's shared link: company level only
+    if person is not None and (cid == company_of(person) or cid == person["code_id"]):
+        cid = company_of(person)
+        role = role_of(person, mod["key"])
+    code = access_rules.refusal(level(cid, mod["key"]), paused(cid, mod["key"]), role, getattr(h, "command", "GET"))
+    if code is None:
+        return None
+    return {"status": 403, "body": {"ok": False, "code": code, "reason": REASON[code], "module": mod["key"], "name": mod["name"]}}
 
 
 # ----------------------------------------------------------------- the gate --
