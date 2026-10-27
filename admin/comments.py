@@ -28,11 +28,13 @@ import db
 READ_DAYS = (2, 7)            # the old per-video schedule (before 2026-10-23); kept only to label its rows
 WEEK = 7 * 86400              # owner, 2026-10-23: comments are read once a week, every video of the campaign together
 WEEK_NO = 100                 # weekly reads are read_no 101, 102, ... (week 1, 2, ...), clear of the old 1 / 2
-MAX_PER_POST = 300
+DEFAULT_READ = 300           # only when the platform has not told us how many there are
 FRESH_DAYS = 30              # posts older than this when first seen are not read
 INTERVAL = 900
 BATCH = 60                   # comments per Gemini call
 MIN_SAMPLE = 30              # under this the client sees counts, not percentages
+EMPTY_TRIES = 2              # how often a post is read again after a run came back empty
+EMPTY_WAIT = 6 * 3600        # and how long to leave it before trying
 MAX_QUOTES = 6
 WEEKLY_KEY = "comments_weekly"   # setting {campaign id: "YYYY-MM-DD"}: re-read every video weekly until that day
 
@@ -75,6 +77,8 @@ CREATE TABLE IF NOT EXISTS comment_reads (
   apify_run   TEXT,
   run_row     INTEGER,                          -- api_runs.id (the cost is counted there)
   found       INTEGER NOT NULL DEFAULT 0,
+  tries       INTEGER NOT NULL DEFAULT 0,      -- runs that came back with nothing for this post
+
   message     TEXT,
   started_at  INTEGER,
   finished_at INTEGER,
@@ -120,6 +124,8 @@ def init():
         return
     with db.connect() as conn:
         conn.executescript(SCHEMA)
+        if "tries" not in {r["name"] for r in conn.execute("PRAGMA table_info(comment_reads)")}:
+            conn.execute("ALTER TABLE comment_reads ADD COLUMN tries INTEGER NOT NULL DEFAULT 0")
     _ready = True
 
 
@@ -303,11 +309,11 @@ def _plan(conn, platform, content_ids):
     if platform in NEW_ONLY and needs and all(last for _, _, last in needs):
         new = [max(0, exp - got) for exp, got, _ in needs]
         if platform == "Instagram":
-            n = min(MAX_PER_POST, max(new) + MARGIN)
+            n = max(new) + MARGIN
             return n, None, n * len(needs) * each
         since = max(1, int((time.time() - min(last for _, _, last in needs)) // 86400) + 1)
-        return MAX_PER_POST, since, (sum(new) + len(needs)) * each
-    n = min(MAX_PER_POST, max(exp for exp, _, _ in needs)) if needs else MAX_PER_POST
+        return max(new) + MARGIN, since, (sum(new) + len(needs)) * each
+    n = max(exp for exp, _, _ in needs) if needs else DEFAULT_READ
     return n, None, sum(exp for exp, _, _ in needs) * each
 
 
@@ -387,9 +393,12 @@ def schedule_info(k, since=None):
 
 
 def _expected(conn, content_id):
+    """How many comments the platform says the post holds. No ceiling (owner, 2026-10-27):
+    a reel with 800 comments is read for all 800. What stops a runaway is the monthly budget
+    guard in start_due, which refuses the run outright, not a cap that quietly drops the rest."""
     r = conn.execute("SELECT comments FROM snapshots WHERE content_id = ? AND comments IS NOT NULL ORDER BY at DESC LIMIT 1",
                      (content_id,)).fetchone()
-    return min(MAX_PER_POST, int(r["comments"])) if r and r["comments"] else 40
+    return int(r["comments"]) if r and r["comments"] else 40
 
 
 def start_due(now=None):
@@ -449,6 +458,12 @@ def _items(apify, dataset):
         offset += 1000
 
 
+def _still_short(conn, content_id):
+    """The platform says this post has more comments than we hold."""
+    exp, got, _ = _need(conn, content_id)
+    return exp > got
+
+
 def poll_runs():
     """Finished runs: keep the comments, record the cost, delete Apify's copy."""
     import apify
@@ -497,8 +512,21 @@ def poll_runs():
                 found[r["id"]] = found.get(r["id"], 0) + 1
             ok = status == "SUCCEEDED"
             for r in reads:
+                got = found.get(r["id"], 0)
+                # A run that brings nothing back used to be filed as "read, nothing new", which is
+                # how two Jamjoom reels with 1,104 comments between them sat at zero for a week
+                # (owner, 2026-10-27). Nothing back, while the post still reports more comments
+                # than we hold, is a failed read: leave it due and come back to it.
+                tries = (r["tries"] if "tries" in r.keys() else 0) or 0
+                if ok and not got and tries < EMPTY_TRIES and _still_short(conn, r["content_id"]):
+                    conn.execute("UPDATE comment_reads SET status = 'due', due_at = ?, tries = ?, started_at = NULL, "
+                                 "message = ? WHERE id = ?",
+                                 (db.now() + EMPTY_WAIT, tries + 1,
+                                  "The run came back empty though the post reports more comments. Reading it again.",
+                                  r["id"]))
+                    continue
                 conn.execute("UPDATE comment_reads SET status = ?, found = ?, finished_at = ?, message = ? WHERE id = ?",
-                             ("done" if ok else "failed", found.get(r["id"], 0), db.now(),
+                             ("done" if ok else "failed", got, db.now(),
                               None if ok else ("Apify ended the run as %s." % status), r["id"]))
             conn.execute("UPDATE api_runs SET status = ?, results = ?, saved = ?, cost = ?, finished_at = ? WHERE id = ?",
                          (status if status in ("SUCCEEDED", "FAILED") else "FAILED", len(items), saved, apify.run_cost(d),
@@ -808,9 +836,9 @@ def admin_page(k, error=None, message=None):
                  tot["unread"], "" if gemini.configured() else " Gemini is not set up (Client portal → Settings & keys)") if tot["unread"] else "")
              + ("" if apify.get_token() else "<p class='err'>No Apify token is saved, so comments cannot be fetched.</p>")
              + "<div style='margin-top:10px'>" + form("read_now", "Read comments now", "btn small lime")
-             + " <span class='price-hint'>Comments are read once a week, every 7 days from the first video (up to %d per post). This brings the "
+             + " <span class='price-hint'>Comments are read once a week, every 7 days from the first video, all of them however many there are. This brings the "
                "next read forward. A full update of every video (new comments only where the platform allows it) costs about "
-               "<b>$%.2f</b> on Apify.</span></div></div>" % (MAX_PER_POST, fetch_estimate(k["id"])))
+               "<b>$%.2f</b> on Apify.</span></div></div>" % fetch_estimate(k["id"]))
 
     def who(r):
         return "<b>%s</b> <span class='muted'>· %s</span>" % (e(r["name"] or r["code"] or ""), e(r["platform"]))
