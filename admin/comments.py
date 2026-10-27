@@ -46,7 +46,11 @@ ACTORS = {
                   lambda urls, n, since: {"postUrls": urls, "maxCommentsPerPost": n, "sortOrder": "recent"}),
     "TikTok": ("apidojo~tiktok-comments-scraper", 0.0003,
                lambda urls, n, since: {"startUrls": urls, "includeReplies": False, "maxItems": n * len(urls)}),
-    "Facebook": ("apify~facebook-comments-scraper", 0.0025,
+    # Facebook (owner, 2026-10-27): dami_studio takes the same input and returns the same comment ids as
+    # apify~facebook-comments-scraper (tested on Jamjoom content 517: all 31 comments that existed at the last
+    # read matched by id, text and timestamp; the rest were newer), at $0.00025 instead of $0.0025 and with no
+    # add-on fee for the date filter. Replies stay off, as before.
+    "Facebook": ("dami_studio~facebook-comments-scraper", 0.00025,
                  lambda urls, n, since: dict({"startUrls": [{"url": x} for x in urls], "resultsLimit": n},
                                              **({"onlyCommentsNewerThan": "%d days" % since} if since else {}))),
     "YouTube": ("streamers~youtube-comments-scraper", 0.002,
