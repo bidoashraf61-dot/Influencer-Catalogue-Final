@@ -110,7 +110,8 @@ def verdict(k, r=None):
         or next(iter(items), None)
     if main:
         i = items[main]
-        due = (" (%d%% due by now)" % round(min(100.0, i["expected"] / i["goal"] * 100))) if main != "er" and i["goal"] else ""
+        due = (" (%d%% due for the posts so far)" % round(min(100.0, i["expected"] / i["goal"] * 100))) \
+            if main != "er" and i["goal"] and i["expected"] is not None else ""
         l1 = "%s %s of the %s goal: %d%%%s." % (KPI_NAME.get(main, main).capitalize(), _kpi(main, i["actual"]),
                                                 _kpi(main, i["goal"]), round(i["pct"]), due)
     else:

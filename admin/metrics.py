@@ -1195,8 +1195,8 @@ def goals_view(campaign, r, photo=None):
 
 
 def target_progress(campaign, total, targets, plan=None):
-    """Each target against what is done, and against where the campaign
-    should be by now (straight-line through its dates), graded."""
+    """Each target against what is done, and against where the posts published
+    so far should have taken it, graded."""
     start, end = campaign["starts_at"], campaign["ends_at"]
     now = db.now()
     if start and end and end > start:
@@ -1208,18 +1208,29 @@ def target_progress(campaign, total, targets, plan=None):
     er = total["video_er"] if total.get("video_er") is not None else total["er"]
     actual = {"posts": total["posts"], "views": total["views"], "reach": total["reach"],
               "engagement": total["engagement"], "er": er, "clicks": total["clicks"]}
+    # Where a target should be is set by the posts published, not by the calendar (owner,
+    # 2026-10-27): with 6 of the 10 videos out, the campaign should hold 6/10 of the views,
+    # engagement and clicks those videos were booked to bring. The posts row is that yardstick,
+    # so it carries no mark of its own; it is still graded against the publishing plan, which
+    # answers the other question - are the videos arriving when they were promised?
+    posts_goal = targets.get("posts") or 0
+    delivered = min(1.0, (actual.get("posts") or 0) / float(posts_goal)) if posts_goal else None
     out = []
     for key, goal in targets.items():
         if key == "reach":                    # reach is no longer a target (owner, 2026-10-18)
             continue
         got = actual.get(key) or 0
-        if key == "er":                       # a rate is judged as is, not pro-rata
-            expected = goal
-        elif plan is not None:                # follow the publishing plan: no minimum, nothing due = nothing expected
-            expected = goal * (plan[0] if key == "posts" else plan[1])
+        if key == "posts":                    # the yardstick itself: graded on the plan, no mark drawn
+            expected, basis = None, goal * (plan[0] if plan is not None else max(elapsed, 0.15))
+        elif key == "er":                     # a rate is judged as is, not pro-rata
+            expected = basis = goal
+        elif delivered is not None:           # the share of the posts that are out
+            expected = basis = goal * delivered
+        elif plan is not None:                # no posts goal to measure against: fall back to the plan
+            expected = basis = goal * plan[1]
         else:
-            expected = goal * max(elapsed, 0.15)   # the first days are not judged as failure
-        ratio = got / float(expected) if expected else (1.0 if plan is not None else 0)
+            expected = basis = goal * max(elapsed, 0.15)   # the first days are not judged as failure
+        ratio = got / float(basis) if basis else (1.0 if (plan is not None or delivered is not None) else 0)
         out.append({"key": key, "goal": goal, "actual": got, "pct": got / float(goal) * 100 if goal else 0,
                     "expected": expected,
                     "grade": "good" if ratio >= 1 else ("moderate" if ratio >= 0.7 else "low")})
@@ -1227,7 +1238,8 @@ def target_progress(campaign, total, targets, plan=None):
     # goal, so it reads 100% only when views, reach, engagement and rate
     # are ALL met — beating one target cannot hide another that is short.
     overall = (sum(min(100.0, i["pct"]) for i in out) / len(out)) if out else None
-    due = (sum(min(100.0, i["expected"] / i["goal"] * 100) for i in out) / len(out)) if out else None
+    marks = [i for i in out if i["expected"] is not None and i["goal"]]
+    due = (sum(min(100.0, i["expected"] / i["goal"] * 100) for i in marks) / len(marks)) if marks else None
     return {"elapsed": elapsed, "items": out, "overall": overall, "due": due,
             "all_met": bool(out) and all(i["actual"] >= i["goal"] for i in out)}
 
@@ -1465,7 +1477,8 @@ def client_report(campaign, photo=None, photo_large=None):
         out["progress"]["items"] = [i for i in out["progress"]["items"] if i["key"] != "clicks"]
     its = out["progress"]["items"]
     out["progress"]["overall"] = (sum(min(100.0, i["pct"]) for i in its) / len(its)) if its else None
-    out["progress"]["due"] = (sum(min(100.0, i["expected"] / i["goal"] * 100) for i in its) / len(its)) if its else None
+    _mk = [i for i in its if i["expected"] is not None and i["goal"]]
+    out["progress"]["due"] = (sum(min(100.0, i["expected"] / i["goal"] * 100) for i in _mk) / len(_mk)) if _mk else None
     out["progress"]["all_met"] = bool(its) and all(i["actual"] >= i["goal"] for i in its)
     reach_by = {c["code"]: (c.get("reach") or 0) + (c.get("views") or 0) for c in r["creators"]}
     out["audience"] = audience_mix(r["creators"], reach_by, target_country(campaign)) if vis["audience"] else None

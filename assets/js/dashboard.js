@@ -624,14 +624,15 @@
     var goals = '<button type="button" class="db-goals" data-area="kpi">' + IC.goal + "<span>Goals &amp; benchmarks</span><b>›</b></button>";
     if (!items.length) { box.innerHTML = '<span class="db-obj__label">Objective · <b>' + esc(o.label) + "</b> — no targets set yet</span>" + goals; return; }
     var done = P.overall != null ? P.overall : items.reduce(function (a, i) { return a + Math.min(100, i.pct); }, 0) / items.length;
-    var due = P.due != null ? P.due : items.reduce(function (a, i) { return a + Math.min(100, i.expected / i.goal * 100); }, 0) / items.length;
+    var marks = items.filter(function (i) { return i.expected != null && i.goal; });
+    var due = P.due != null ? P.due : marks.length ? marks.reduce(function (a, i) { return a + Math.min(100, i.expected / i.goal * 100); }, 0) / marks.length : 0;
     if (!P.all_met) done = Math.min(done, 99);
     var r = due ? done / due : 1, gr = P.all_met ? "good" : r >= 1 ? "good" : r >= 0.7 ? "moderate" : "low";
     box.innerHTML = '<span class="db-obj__label">Objective · <b>' + esc(o.label) + '</b>'
       + (R.targets_auto ? '<span class="db-obj__auto" title="No targets were agreed for this campaign yet, so these come from what its creators usually deliver for the posts booked.">Suggested targets</span>' : "")
       + '</span><div class="db-obj__track" role="img" aria-label="' + Math.round(done) + '% of all targets achieved">'
-      + '<i class="db-obj__fill ' + gr + '" style="width:' + done.toFixed(1) + '%"></i><i class="db-obj__due" style="left:' + due.toFixed(1) + '%" title="Where it should be today"></i></div>'
-      + '<span class="db-obj__pct" title="All targets together, each counted up to its goal">' + Math.round(done) + "%</span>" + sig(gr, "Expected by today: " + Math.round(due) + "%")
+      + '<i class="db-obj__fill ' + gr + '" style="width:' + done.toFixed(1) + '%"></i><i class="db-obj__due" style="left:' + due.toFixed(1) + '%" title="Where it should be for the posts published so far"></i></div>'
+      + '<span class="db-obj__pct" title="All targets together, each counted up to its goal">' + Math.round(done) + "%</span>" + sig(gr, "Expected for the posts published so far: " + Math.round(due) + "%")
       + '<span class="db-obj__parts">' + items.map(function (i) { var met = i.actual >= i.goal; return '<span class="' + (met ? "met" : "short") + '" title="' + (met ? "Met" : "Not met yet") + '">' + KEYN[i.key] + " <b>" + Math.round(i.pct) + "%</b></span>"; }).join("") + "</span>"
       + goals;
   }
@@ -1283,7 +1284,7 @@
 
   /* ------------------------------------------- goals: targets, forecast, benchmarks */
   // The Goals & benchmarks tab, for the client. One list of targets (achieved, benchmark range, where it
-  // should be today, a status in words); click a row for its pace chart, which follows the publishing plan.
+  // should be for the posts published, a status in words); click a row for its pace chart, which follows the publishing plan.
   // One headline per section, with its description in the "i" beside it rather than a paragraph under it.
   function sec(id, title, tip, body, aside) {
     return '<section class="db-sec" aria-labelledby="sec-' + id + '"><header class="db-sec__h"><h3 class="db-sec__t" id="sec-' + id + '">' + esc(title) + "</h3>" + (tip ? info(tip, title) : "")
@@ -1331,17 +1332,17 @@
   function tvRows(items, lead) {
     return items.map(function (i) {
       var met = i.actual >= i.goal, col = TV_COL[met ? "good" : i.grade] || TV_COL.low, isR = i.key === "er", st = tvStatus(i);
-      var w = Math.min(100, i.pct), exp = isR || !i.goal ? null : Math.min(100, i.expected / i.goal * 100);
+      var w = Math.min(100, i.pct), exp = isR || !i.goal || i.expected == null ? null : Math.min(100, i.expected / i.goal * 100);
       var over = met && i.pct > 100.5 ? Math.round(i.pct - 100) : 0;
       var togo = met ? (over ? "Target met, " + over + "% over" : "Target met")
         : tvFmt(i.key, i.goal - i.actual) + (isR ? " points" : "") + " to go";
-      var today = exp == null ? "" : " · should be at " + tvFmt(i.key, i.expected) + " by today";
+      var today = exp == null ? "" : " · should be at " + tvFmt(i.key, i.expected) + " for the posts published so far";
       var rng = planRange(i.key), can = !isR, id = "tv-" + i.key;
-      var label = KEYN[i.key] + ": " + tvFmt(i.key, i.actual) + " of " + tvFmt(i.key, i.goal) + ", " + Math.round(i.pct) + "% of the target" + (exp == null ? "" : ", expected " + Math.round(exp) + "% by today") + ", " + st[1];
+      var label = KEYN[i.key] + ": " + tvFmt(i.key, i.actual) + " of " + tvFmt(i.key, i.goal) + ", " + Math.round(i.pct) + "% of the target" + (exp == null ? "" : ", expected " + Math.round(exp) + "% for the posts published so far") + ", " + st[1];
       var inner = '<span class="db-tv__top"><b>' + KEYN[i.key] + "</b>" + (lead.indexOf(i.key) >= 0 ? ' <span class="db-lead">headline</span>' : "") + stPill(st[0], st[1])
         + '<span class="db-tv__nums"><strong>' + tvFmt(i.key, i.actual) + "</strong> of " + tvFmt(i.key, i.goal) + "</span></span>"
         + '<span class="db-tv__track" role="img" aria-label="' + esc(label) + '"><i style="--w:' + w.toFixed(1) + "%;background:" + col + '"></i>'
-        + (exp == null ? "" : '<em style="left:' + exp.toFixed(1) + '%"><u>today</u></em>') + (over ? '<s style="color:' + col + '">+' + over + "%</s>" : "") + "</span>"
+        + (exp == null ? "" : '<em style="left:' + exp.toFixed(1) + '%"><u>posts so far</u></em>') + (over ? '<s style="color:' + col + '">+' + over + "%</s>" : "") + "</span>"
         + '<span class="db-tv__sub"><span class="db-tv__pct" style="color:' + col + '">' + Math.round(i.pct) + "% met</span>" + esc(togo + today)
         + (can ? '<svg class="db-tv__chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5l3 3 3-3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>' : "") + "</span>"
         + (rng ? '<span class="db-tv__rng">Benchmark range for these creators <b>' + esc(rng) + "</b></span>" : "");
@@ -1351,11 +1352,11 @@
     }).join("");
   }
   function tvInfographic(items, lead) {
-    var tip = "Each row is one target: what is achieved so far, where the plan says it should be today, and the benchmark range, which is what creators of this size typically get. The low end is what we commit to, the high end is what we aim for. Select a row to see its pace over time.";
+    var tip = "Each row is one target: what is achieved so far, where it should be for the posts published so far, and the benchmark range, which is what creators of this size typically get. The low end is what we commit to, the high end is what we aim for. Select a row to see its pace over time.";
     if (!items.length) return sec("targets", "Targets", tip, '<p class="db-empty">No targets set for this campaign yet.</p>');
     return sec("targets", "Targets", tip, '<div class="db-tv" id="db-tv">' + tvRows(items, lead) + "</div>"
       + '<div class="db-legend2"><span><i class="sw" style="background:#14884a"></i>Met / on track</span><span><i class="sw" style="background:#e2780f"></i>Close</span><span><i class="sw" style="background:#ee1515"></i>Behind</span>'
-      + '<span><i class="tick"></i>Where it should be today</span><span class="db-tv__hint">Select a row for its pace</span></div>');
+      + '<span><i class="tick"></i>Where it should be for the posts published</span><span class="db-tv__hint">Select a row for its pace</span></div>');
   }
 
   // The pace curve follows the publishing plan: the share of the target the videos due so far should have reached.
@@ -1417,7 +1418,8 @@
       + '<text x="' + Rr + '" y="' + f1(Y(item.goal) - 6) + '" text-anchor="end" class="lb">Target ' + esc(tvFmt(item.key, item.goal)) + "</text>"
       + '<text x="' + L + '" y="' + (H - 8) + '" class="lb">' + esc(day(t0)) + '</text><text x="' + Rr + '" y="' + (H - 8) + '" text-anchor="end" class="lb">' + esc(day(t1)) + "</text>"
       + '<line class="cur" x1="0" y1="' + T + '" x2="0" y2="' + B + '" style="display:none"/><circle class="dot" r="6" cx="0" cy="0" data-c="' + col + '" fill="' + col + '" stroke="#fff" stroke-width="2" style="display:none"/></svg>';
-    var last = pts.length ? pts[pts.length - 1].v : 0, ahead = item.expected != null ? last - item.expected : null;
+    var last = pts.length ? pts[pts.length - 1].v : 0;
+    var pf = paceFrac(item, now), ahead = pf == null ? null : last - item.goal * pf;
     var read = esc(KEYN[item.key]) + ": <b>" + esc(tvFmt(item.key, last)) + "</b> so far"
       + (ahead == null ? "" : ahead >= 0 ? " · " + esc(tvFmt(item.key, ahead)) + " ahead of the pace" : " · " + esc(tvFmt(item.key, -ahead)) + " behind the pace");
     return '<div class="db-tv__chart" tabindex="0" role="group" aria-label="' + esc(KEYN[item.key] + " pace chart. Use the left and right arrow keys to read each day.") + '" data-k="' + item.key + '" data-f="' + ((now - t0) / span).toFixed(4) + '" data-i="'
@@ -2241,7 +2243,7 @@
         return parts.length ? '<div class="db-donut pp-mix">' + donut(parts) + '<div class="db-key">' + parts.map(function (p, i) { return '<div><span class="db-sw" style="background:' + COL[i % COL.length] + '"></span>' + esc(KIND[p.k] || p.k) + "<b>" + p.n + "</b></div>"; }).join("") + "</div></div>" : ""; })();
       var geo = R.comments && cmPick().n ? PANEL.geo() : "";
       // A summary page first (design audit, 2026-10-23), then every section on a new page.
-      var body = ppSummary() + ppSec(num2(), "Goals & benchmarks", "Every target, where it should be today, the forecast and the benchmarks for creators of this size.", PANEL.kpi())
+      var body = ppSummary() + ppSec(num2(), "Goals & benchmarks", "Every target, where it should be for the posts published, the forecast and the benchmarks for creators of this size.", PANEL.kpi())
         + ppSec(num2(), "Creators leaderboard", "Score out of 100 for the campaign's objective, what each creator delivered and every video.", ppPodium() + PANEL.creators())
         + ppSec(num2(), "Views & engagement", "How the campaign grew, day by day.", PANEL.trend())
         + (PANEL.did ? ppSec(num2(), "What people did", "Likes, comments, saves and shares, by platform and by creator.", PANEL.did()) : "")

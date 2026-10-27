@@ -688,7 +688,7 @@
 
   // The objective bar: how far the campaign is towards the targets its
   // objective cares about (awareness → views and reach, and so on), with a
-  // marker for where it should be by today.
+  // marker for where it should be for the posts published so far.
   var KLABEL = { posts: "Posts", views: "Views", reach: "Reach", engagement: "Engagement", er: "Avg ER", clicks: "Clicks" };
   function renderObjectiveBar() {
     var o = R.objective || { label: "Balanced", kpis: [] }, items = (R.progress && R.progress.items) || [];
@@ -701,12 +701,13 @@
       return;
     }
     var done = P.overall != null ? P.overall : mine.reduce(function (s, i) { return s + Math.min(100, i.pct); }, 0) / mine.length;
-    var due = P.due != null ? P.due : mine.reduce(function (s, i) { return s + Math.min(100, i.expected / i.goal * 100); }, 0) / mine.length;
+    var marks = mine.filter(function (i) { return i.expected != null && i.goal; });
+    var due = P.due != null ? P.due : marks.length ? marks.reduce(function (s, i) { return s + Math.min(100, i.expected / i.goal * 100); }, 0) / marks.length : 0;
     if (!P.all_met) done = Math.min(done, 99);
     var ratio = due ? done / due : 1, g = P.all_met || ratio >= 1 ? "good" : (ratio >= 0.7 ? "moderate" : "low");
     box.innerHTML = '<div class="mx-obj"><div class="mx-obj__label"><span>Campaign objective · <b>' + esc(o.label) + "</b></span>"
-      + '<span class="mx-obj__pct"><b>' + Math.round(done) + "%</b> achieved " + sig(g, "Where it should be by today: " + Math.round(due) + "%") + "</span></div>"
-      + '<div class="mx-obj__track" role="img" aria-label="' + Math.round(done) + "% of the " + esc(o.label) + ' objective achieved; ' + Math.round(due) + '% expected by today">'
+      + '<span class="mx-obj__pct"><b>' + Math.round(done) + "%</b> achieved " + sig(g, "Where it should be for the posts published so far: " + Math.round(due) + "%") + "</span></div>"
+      + '<div class="mx-obj__track" role="img" aria-label="' + Math.round(done) + "% of the " + esc(o.label) + ' objective achieved; ' + Math.round(due) + '% expected for the posts published so far">'
       + '<i class="mx-obj__fill ' + g + '" style="width:' + done.toFixed(1) + '%"></i>'
       + '<i class="mx-obj__due" style="left:' + due.toFixed(1) + '%"><span>today</span></i></div>'
       + '<div class="mx-obj__parts">' + mine.map(function (i) {
@@ -947,11 +948,12 @@
       ? ""
       : "";
     $("mx-bullets").innerHTML = p.items.length ? p.items.map(function (i) {
-      var isRate = i.key === "er", fill = Math.min(100, i.pct), mark = Math.min(100, i.expected / i.goal * 100);
+      var isRate = i.key === "er", fill = Math.min(100, i.pct);
+      var mark = isRate || !i.goal || i.expected == null ? null : Math.min(100, i.expected / i.goal * 100);
       return '<div class="mx-bullet"><div class="mx-bullet__name">' + (IC[i.key] || "") + TLABEL[i.key] + " " + sig(i.grade) + "</div>"
         + '<div class="mx-bullet__track" role="img" aria-label="' + TLABEL[i.key] + " " + Math.round(i.pct) + '% of goal">'
         + '<div class="mx-bullet__fill ' + i.grade + '" style="width:' + fill + '%"></div>'
-        + (isRate ? "" : '<div class="mx-bullet__mark" style="left:' + mark + '%"><span>by today</span></div>') + "</div>"
+        + (mark == null ? "" : '<div class="mx-bullet__mark" style="left:' + mark + '%"><span>posts so far</span></div>') + "</div>"
         + '<div class="mx-bullet__num"><b>' + (isRate ? pct(i.actual) : num(i.actual)) + "</b>of " + (isRate ? pct(i.goal, 1) : num(i.goal)) + " goal</div></div>";
     }).join("") : "";
     var ex = [];
