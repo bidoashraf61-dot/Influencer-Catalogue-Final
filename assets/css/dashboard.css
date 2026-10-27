@@ -2076,4 +2076,3 @@ body.pp-on { margin: 0 !important; padding: 0 !important; background: #fff; }
 @media print { .pp .pp-sec.pp-brk { padding-top: var(--pp-pp) !important; } }
 @media print { .pp .pp-pb { break-before: page !important; page-break-before: always !important; height: var(--pp-pb) !important; } }
 .cmp-box .cmp-of { display: block; font-size: 11.5px; color: var(--gray); margin-top: 2px; }
-.db-uniq { display: block; margin-top: 2px; font-size: 11px; font-weight: 400; letter-spacing: 0; color: var(--gray); }
