@@ -3428,9 +3428,12 @@
       if (!silent) bubble("me", text);
       Array.prototype.forEach.call(log.querySelectorAll(".hv-chips"), function (c) { c.remove(); });
       if (expecting) { var fn = expecting; expecting = null; ta.placeholder = "Type a message…"; fn(text); return; }
-      if (/account manager|talk to (a )?(person|human|someone)|call me/i.test(text)) { handoff("handoff", text); return; }
-      if (/\bquot(e|ation)|عرض سعر|تسعير/i.test(text)) { flowQuote(); return; }
-      if (!selToken() && /my selection|my shortlist|\b(add|remove|rename|compare)\b|قائمتي/i.test(text)) { flowSelection(); return; }
+      // A signed-in owner or admin whose assistant can act in the portal types real requests ("add a post on the
+      // Jamjom campaign"): those go to the assistant, not to the client's tap-through flows below.
+      var actor = !!(ME && ME.staff && ME.ai);
+      if (!actor && /account manager|talk to (a )?(person|human|someone)|call me/i.test(text)) { handoff("handoff", text); return; }
+      if (!actor && /\bquot(e|ation)|عرض سعر|تسعير/i.test(text)) { flowQuote(); return; }
+      if (!actor && !selToken() && /my selection|my shortlist|\b(add|remove|rename|compare)\b|قائمتي/i.test(text)) { flowSelection(); return; }
       if (document.querySelector(".cat-bar") && /^(show|filter|only|display|اعرض|أظهر)\b/i.test(text)) { runShow(text); return; }
       // On a selection's page the client is discussing THAT selection: the assistant answers with its
       // brief and scores. Only elsewhere does a campaign description start the free find-creators taps.
