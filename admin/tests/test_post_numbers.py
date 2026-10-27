@@ -1,4 +1,4 @@
-"""post_numbers must take the Instagram-only figures from data-slayer's combined result (2026-10-27).
+"""post_numbers must take Instagram-only comments from data-slayer's combined result; views stay combined as the app shows them (2026-10-27).
 
     python3 -m unittest admin/tests/test_post_numbers.py
 """
@@ -22,7 +22,8 @@ class PostNumbers(unittest.TestCase):
                             "play_count": 537555, "fb_play_count": 317065, "ig_play_count": 220490,
                             "share_count": 2651, "save_count": 2418}}
         n = apify.post_numbers(item)
-        self.assertEqual((n["comments"], n["views"], n["likes"]), (325, 220490, 5425))
+        # comments: Instagram only; views stay what the app shows (Instagram + Facebook plays combined)
+        self.assertEqual((n["comments"], n["views"], n["likes"]), (325, 537555, 5425))
         self.assertEqual((n["shares"], n["saves"]), (2651, 2418))
 
     def test_other_actors_are_unchanged(self):

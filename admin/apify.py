@@ -952,12 +952,13 @@ def _scalars(obj, out, depth=0):
             _scalars(v, out, depth + 1)
 
 
-# data-slayer/instagram-post-details answers for a reel on Instagram AND for the Facebook copy it was shared to
-# (owner, 2026-10-27): its plain comment_count and play_count are the SUM of both, and the Instagram figures are the
-# ig_* ones. Jamjoom reel 511: comment_count 795 = 470 Facebook + 325 Instagram; play_count 537,555 = 317,065 + 220,490.
-# The Facebook copy is tracked as its own post, so the sum counted those comments and views twice. Whenever a result
-# carries both an ig_* and an fb_* figure, the ig_* one is the Instagram number.
-_PLATFORM_SCOPED = {"comments": "ig_comment_count", "views": "ig_play_count", "likes": "ig_like_count"}
+# data-slayer/instagram-post-details answers for a reel on Instagram AND for the Facebook copy it was shared to, and
+# its plain comment_count is the SUM of both (owner, 2026-10-27): Jamjoom reel 511 comment_count 795 = 470 Facebook +
+# 325 Instagram. The comments under the Facebook copy cannot be read from the Instagram reel and are tracked on their
+# own as a Facebook post, so the Instagram figure is ig_comment_count; likes already equal ig_like_count.
+# Views are NOT split: Instagram itself shows the combined plays on the reel (reel 491 shows 2.5M in the app, which
+# is play_count 2,555,415 = 277,408 Instagram + 2,278,007 Facebook), and the owner wants what the app shows.
+_PLATFORM_SCOPED = {"comments": "ig_comment_count", "likes": "ig_like_count"}
 
 
 def post_numbers(item):
