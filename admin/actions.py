@@ -212,6 +212,11 @@ REGISTRY = {
         "/selections/delete", "Delete a selection. It can be restored from History > Trash.",
         "Delete selection {id}", {"id": "Selection id."}, required=("id",)),
 
+    # ---- undo
+    "history.undo": _a(
+        "/history/undo", "Undo one change from History (the admin's own undo button). id is the History entry's number.",
+        "Undo History entry {id}", {"id": "History entry id.", "kind": "Leave empty."}, required=("id",)),
+
     # ---- the team
     "team.invite": _a(
         "/team/invite", "Give a colleague admin access; they sign in with an email code. Owner only.",
@@ -253,6 +258,7 @@ AREAS = {"campaign": "The campaign itself: create, go live, delete, pull creator
          "code": "Client access codes: issue, rename, limits, passcode, revoke, restore, archive, delete.",
          "selection": "Selections: create an empty one, rename, delete.",
          "team": "The HelloVoice team's admin access: invite, roles, remove, sign out, reset two-step.",
+         "history": "Undo a change from History.",
          "roster": "A creator's industry confirmation. Other creator edits use update_creator."}
 
 
@@ -270,10 +276,156 @@ def catalogue(area=""):
     return {"areas": AREAS, "actions": out} if not area else {"actions": out}
 
 
+# ------------------------------------------------------- any form on a page --
+#
+# The registry names the actions an admin does most. Everything else the admin can do by hand is a form on
+# some page, so the assistant reads that page's forms (names, kinds, choices) and submits one the way a
+# click does, through the same handler. It sees the form's structure, never its data, so nothing a client
+# typed can ride in on it. Forms that save a whole page at once, and anything about sign-in or secrets, stay out.
+
+NEVER = ("/login", "/logout", "/reauth", "/password", "/account/2fa", "/portal/keys", "/apis/token", "/settings/token",
+         "/ai/", "/confirm", "/clients/preview", "/tenants/save")
+WHOLE_PAGE = {"/campaigns/save": "update_campaign (it merges)", "/roster/save": "update_creator or add_creator",
+              "/tiers/save": "set_tier_price", "/selections/save": "create_selection or the selection's own actions",
+              "/settings/save": None, "/evidence/save": None, "/analysis/save": None, "/licences/save": None}
+DESTRUCTIVE = ("delete", "remove", "clear", "reset", "purge", "revoke", "abort", "withdraw")
+
+
+def _path_ok(path):
+    path = (path or "").strip()
+    if not path.startswith("/") or path.startswith("//") or "\\" in path or ".." in path or "?" in path or "#" in path:
+        raise ValueError("path must be a portal path like /requests/handled, with no query string.")
+    if any(path == n.rstrip("/") or path.startswith(n) for n in NEVER):
+        raise ValueError("%s is about sign-in or secrets, so it is not something the assistant does. The admin does it themselves." % path)
+    if path in WHOLE_PAGE:
+        use = WHOLE_PAGE[path]
+        raise ValueError("%s saves a whole page at once and would blank what is not sent. %s"
+                         % (path, ("Use %s." % use) if use else "The admin does this one on the page."))
+    return path
+
+
+def read_forms(page, cookie):
+    """The forms on one admin page, structure only: [{action, label, fields: [{name, kind, choices?}]}]."""
+    from html.parser import HTMLParser
+    page = (page or "").strip()
+    if not page.startswith("/") or page.startswith("//") or ".." in page or "\\" in page:
+        return {"error": "page must be an admin page path such as /requests or /campaigns/content?id=2."}
+    if not cookie:
+        return {"error": "No admin session to read the page with. Open the admin once and sign in, then ask again."}
+    conn = http.client.HTTPConnection(_WHERE["host"], _WHERE["port"], timeout=30)
+    try:
+        conn.request("GET", _WHERE["base"] + page, headers={"Cookie": cookie})
+        res = conn.getresponse()
+        html = res.read(2000000).decode("utf-8", "replace")
+        where = res.getheader("Location") or ""
+    except OSError as exc:
+        return {"error": "The portal did not answer: %s" % exc}
+    finally:
+        conn.close()
+    if res.status in (301, 302, 303):
+        return {"error": "That page sent the call to %s, so there is nothing to read there." % (where or "another page")}
+    if res.status >= 400:
+        return {"error": "The portal answered %d for that page." % res.status}
+
+    class P(HTMLParser):
+        def __init__(self):
+            super().__init__()
+            self.forms, self.cur, self.sel, self.text = [], None, None, []
+            self.label = ""
+
+        def handle_starttag(self, tag, attrs):
+            a = dict(attrs)
+            if tag in ("h1", "h2", "h3"):
+                self.text = []
+            if tag == "form" and (a.get("method") or "get").lower() == "post":
+                self.cur = {"action": (a.get("action") or "").split("?")[0], "label": self.label, "fields": [], "_seen": {}}
+            elif self.cur is not None and tag in ("input", "select", "textarea", "button") and a.get("name"):
+                n = a["name"]
+                kind = a.get("type") or tag
+                if kind in ("submit", "button", "image", "reset", "file"):
+                    if kind == "file":
+                        self.cur["fields"].append({"name": n, "kind": "file (the assistant cannot upload files)"})
+                    elif a.get("value") and a.get("name"):
+                        self.cur["fields"].append({"name": n, "kind": "button", "choices": [a["value"][:60]]})
+                    return
+                if n in self.cur["_seen"]:
+                    f = self.cur["_seen"][n]
+                    if kind in ("radio", "checkbox") and a.get("value"):
+                        f.setdefault("choices", []).append(a["value"][:60])
+                    return
+                f = {"name": n, "kind": kind}
+                if kind == "hidden":
+                    f["fixed"] = (a.get("value") or "")[:80]
+                if kind in ("radio", "checkbox") and a.get("value"):
+                    f["choices"] = [a["value"][:60]]
+                if tag == "select":
+                    self.sel = f
+                    f["choices"] = []
+                self.cur["_seen"][n] = f
+                self.cur["fields"].append(f)
+            elif tag == "option" and self.sel is not None and a.get("value") is not None and len(self.sel["choices"]) < 40:
+                self.sel["choices"].append(a["value"][:60])
+
+        def handle_endtag(self, tag):
+            if tag in ("h1", "h2", "h3"):
+                self.label = " ".join("".join(self.text).split())[:80]
+            if tag == "select":
+                self.sel = None
+            if tag == "form" and self.cur is not None:
+                self.cur.pop("_seen", None)
+                if self.cur["action"] and self.cur["fields"]:
+                    self.forms.append(self.cur)
+                self.cur = None
+
+        def handle_data(self, data):
+            self.text.append(data)
+
+    p = P()
+    try:
+        p.feed(html)
+    except Exception:                      # a page with broken markup still gives what was read so far
+        pass
+    out = []
+    for f in p.forms:
+        act = f["action"]
+        base = _WHERE["base"]
+        if base and act.startswith(base):
+            act = act[len(base):] or "/"
+        try:
+            _path_ok(act)
+        except ValueError:
+            continue
+        out.append({"submit_to": act, "section": f["label"], "fields": f["fields"]})
+    return {"page": page, "forms": out[:40],
+            "how": "Submit one with do_action action=form.submit and fields={\"path\": <submit_to>, \"values\": {<field>: <value>}}. "
+                   "Send only the fields the change needs, plus the hidden ones (their 'fixed' value) and any id. Never invent a field."}
+
+
 # ------------------------------------------------------------------ check --
+
+def _form_action(fields):
+    """form.submit: any form on any admin page, as a registry-shaped action built on the spot."""
+    path = _path_ok(str((fields or {}).get("path") or ""))
+    values = (fields or {}).get("values")
+    if isinstance(values, str):
+        import json
+        try:
+            values = json.loads(values)
+        except ValueError:
+            raise ValueError("values must be a JSON object of field names and values.")
+    if not isinstance(values, dict) or not values:
+        raise ValueError("form.submit needs values: an object of the form's field names and what to put in them.")
+    values = {str(k): v for k, v in values.items() if v not in (None, "") and not isinstance(v, dict)}
+    risky = any(w in path.lower() for w in DESTRUCTIVE)
+    a = {"path": path, "about": "Submit a form", "line": "Submit the form at " + path, "required": (), "multi": tuple(values),
+         "risk": "high" if risky else "normal", "lands": (), "defaults": {}, "fields": {k: "" for k in values}}
+    return a, values
+
 
 def check(action, fields):
     """The action and its fields, or ValueError. Nothing is queued until this passes."""
+    if (action or "").strip() == "form.submit":
+        return _form_action(fields)
     a = REGISTRY.get((action or "").strip())
     if a is None:
         raise ValueError("No such action: %r. Call list_actions first." % action)
@@ -326,6 +478,9 @@ def _has_col(table, col):
 def describe(action, fields):
     """The one sentence the admin reads on the Confirm card."""
     a, fields = check(action, fields)
+    if action == "form.submit":
+        line = "%s: %s" % (a["line"], ", ".join("%s = %s" % (k, _short(v)) for k, v in sorted(fields.items())))
+        return line + (". This may not be undoable" if a["risk"] == "high" else "")
     shown = {k: fields.get(k, "") for k in a["fields"]}
     try:
         line = a["line"].format(**shown)

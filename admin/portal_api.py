@@ -1845,6 +1845,9 @@ class PortalMixin(connect_api.ConnectMixin):
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
         ctx["staff"] = bool(user and (dict(user).get("domain") or "").lower() in portal.SAMPLE_DOMAINS)
         ctx["admin_who"] = self.chat_admin_email(cid)
+        drop_session = None
+        if ctx["admin_who"]:
+            ctx["admin_cookie"], drop_session = self.loopback_admin_cookie(ctx["admin_who"])
         if b.get("selection"):
             ctx["selection"] = self._selection_context(b.get("selection"), cid)
         brief, _ = matcher.clean_answers(b.get("brief")) if isinstance(b.get("brief"), dict) else ({}, [])
@@ -1859,6 +1862,10 @@ class PortalMixin(connect_api.ConnectMixin):
         except gemini.AIError as exc:
             portal.refund(cid, cost, "failed chat")
             return self._ai_fail(exc)
+        finally:
+            if drop_session:
+                with db.connect() as conn:
+                    conn.execute("DELETE FROM sessions WHERE token = ?", (drop_session,))
         portal.add_message(th["id"], "user", text)
         portal.add_message(th["id"], "model", res["reply"], {"cards": res["cards"]})
         db.log("chat", cid, self.client_ip(), self._ua(), text[:60])
@@ -2043,6 +2050,9 @@ class PortalMixin(connect_api.ConnectMixin):
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
         ctx["staff"] = bool(user and (dict(user).get("domain") or "").lower() in portal.SAMPLE_DOMAINS)
         ctx["admin_who"] = self.chat_admin_email(cid)
+        drop_session = None
+        if ctx["admin_who"]:
+            ctx["admin_cookie"], drop_session = self.loopback_admin_cookie(ctx["admin_who"])
         if b.get("selection"):
             ctx["selection"] = self._selection_context(b.get("selection"), cid)       # the page they are on
         ctx["page"] = self._page_context(b, cid)
@@ -2054,6 +2064,10 @@ class PortalMixin(connect_api.ConnectMixin):
             code, msg = AI_FAIL.get(getattr(exc, "reason", ""), (502, "The assistant couldn't answer. You weren't charged."))
             emit({"t": "error", "message": msg, "credits": portal.balance(cid) if kind != "admin" else None})
             return
+        finally:
+            if drop_session:
+                with db.connect() as conn:
+                    conn.execute("DELETE FROM sessions WHERE token = ?", (drop_session,))
         portal.add_message(th["id"], "user", text)
         portal.add_message(th["id"], "model", res["reply"], {"cards": res["cards"]})
         db.log("chat", cid, self.client_ip(), self._ua(), text[:60])
@@ -2123,7 +2137,7 @@ class PortalMixin(connect_api.ConnectMixin):
             return
         th = portal.thread(None, "admin", email, tid=self._int(b.get("thread")) or None)
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 16)]
-        ctx = {"who": email, "code_id": db.admin_code_id()}
+        ctx = {"who": email, "code_id": db.admin_code_id(), "admin_cookie": self.headers.get("Cookie")}
         if kam_scope.current() is not None:
             ctx["kam_creators"] = kam_scope.current_creators()      # her clients' creators only
         try:

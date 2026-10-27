@@ -93,5 +93,17 @@ t("/settings, /portal/keys are not exposed",
   [k for k, v in actions.REGISTRY.items() if v["path"].startswith(("/settings", "/portal/keys", "/apis"))], [])
 t("a step-up redirect says so, not 'sign in'", "confirm it is you" in R(303, "/admin/reauth?again=1", "", "x")["error"], True)
 
+# --- any form, by hand ---
+raises("form.submit refuses sign-in pages", lambda: actions.check("form.submit", {"path": "/login", "values": {"a": "b"}}), "sign-in or secrets")
+raises("form.submit refuses secrets", lambda: actions.check("form.submit", {"path": "/portal/keys", "values": {"a": "b"}}), "sign-in or secrets")
+raises("form.submit refuses whole-page saves", lambda: actions.check("form.submit", {"path": "/campaigns/save", "values": {"a": "b"}}), "whole page")
+raises("form.submit refuses a protocol-relative path", lambda: actions.check("form.submit", {"path": "//x.test/a", "values": {"a": "b"}}), "portal path")
+raises("form.submit needs values", lambda: actions.check("form.submit", {"path": "/requests/handled"}), "needs values")
+t("form.submit sentence", actions.describe("form.submit", {"path": "/requests/handled", "values": {"id": 4}}),
+  "Submit the form at /requests/handled: id = 4")
+t("a delete-looking form is called out", actions.describe("form.submit", {"path": "/roster/delete", "values": {"code": "X"}}).endswith("may not be undoable"), True)
+t("read_forms refuses a missing session", "error" in actions.read_forms("/requests", ""), True)
+t("read_forms refuses an off-site page", "error" in actions.read_forms("//evil.test/", "c=1"), True)
+
 print("\n%d passed, %d failed" % (ok, fail))
 sys.exit(1 if fail else 0)

@@ -59,7 +59,7 @@ admin types  →  Gemini picks list_actions, then do_action
 
 ## What it covers today
 
-33 actions. Campaigns end to end, 13 actions: create a campaign, take it live / offline /
+34 actions plus any form. Campaigns end to end, 13 actions: create a campaign, take it live / offline /
 ended, pull in creators from its selection, delete it; add one post or paste many,
 edit, hide, delete, group, and record what is still expected; edit, add and switch
 tracking links; approve or reject a creator's screenshot numbers.
@@ -70,6 +70,24 @@ rename, limits, passcode, revoke, restore, archive, unarchive, delete), **select
 sign out, resend invite, reset two-step) and **creator industry** (confirm / hide).
 The code handlers now answer with `?ok=` / `?e=` like the rest, and the roster
 review and selection delete refuse an id that does not exist.
+
+## Anything else an admin does by hand: read_forms + form.submit
+
+The registry names the common actions. For the rest the assistant does it the way a
+person does: `read_forms(page)` GETs an admin page as the admin and returns each POST
+form's `submit_to` path and its field names, kinds and choices (structure only, never
+the data on the page, so nothing a client typed can ride in), then `do_action
+action=form.submit fields={"path":…, "values":{…}}` posts it through the portal's own
+handler, behind the same Confirm card, permissions, History entry and read-back.
+
+Kept out, on purpose (`actions.NEVER`, `actions.WHOLE_PAGE`): sign-in, 2FA, passwords,
+API keys and tokens, tenants, view-as-client; and the whole-page saves
+(`/campaigns/save`, `/roster/save`, `/tiers/save`, `/selections/save`, `/settings/save`,
+`/evidence/save`, `/analysis/save`, `/licences/save`), which blank what they are not
+sent. Those have `update_campaign`, `update_creator`/`add_creator`, `set_tier_price`,
+`create_selection`; the rest are done on the page. Also out of reach: file uploads
+(photos, sheets, PDFs) and screens drawn in JavaScript rather than as forms (the
+campaign dashboard and the kanban board).
 
 ## Adding more
 
