@@ -17,7 +17,8 @@
 .ws-mod__t b { font-family: var(--heading); font-weight: 400; font-size: 24px; letter-spacing: .03em; line-height: 1; }
 .ws-mod__t span { font-size: 13px; opacity: .72; }
 .ws-mod[data-state="locked"], .ws-mod[data-state="norole"] { background: transparent; border-style: dashed; }
-.ws-mod[data-state="locked"] .ws-mod__mark img { filter: grayscale(1); opacity: .55; }
+.ws-mod[data-state="locked"][aria-current="true"], .ws-mod[data-state="norole"][aria-current="true"] { background: var(--linen); color: var(--ink); border: 2px dashed var(--ink); }
+.ws-mod[data-state="locked"] .ws-mod__mark img, .ws-mod[data-state="norole"] .ws-mod__mark img { filter: grayscale(1); opacity: .55; }
 .ws-lock { margin-left: auto; width: 18px; height: 18px; flex: none; opacity: .7; }
 
 /* header + tabs */

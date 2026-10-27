@@ -151,7 +151,7 @@
     }
     var T = D.team, used = T.seats[0], cap = T.seats[1];
     var head = h("div", { class: "ws-sec" }, h("h2", null, "People"),
-      h("p", null, used + (cap ? " of " + cap : "") + " seats used. Roles are set per module: none, viewer, editor or admin."));
+      h("p", null, used + (cap ? " of " + cap : "") + (used === 1 && !cap ? " seat" : " seats") + " used. Roles are set per module: none, viewer, editor or admin."));
     p.appendChild(head);
 
     if (T.pending.length) {
