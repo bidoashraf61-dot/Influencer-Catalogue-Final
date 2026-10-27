@@ -479,7 +479,8 @@ def apply_edit(k, field, value, by, ip=None):
             return False, "Not a valid role.", None, False
         if value == before:
             return True, "", value, False
-        modules.set_role(uid, person["code_id"], mod, value)
+        if modules.set_role(uid, person["code_id"], mod, value) is None:
+            return False, "Roles are not switched on yet.", None, False
     else:
         return False, "Unknown field.", None, False
     with _conn() as conn:

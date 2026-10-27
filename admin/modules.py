@@ -255,26 +255,13 @@ def over(code_id, key, have):
 
 # ------------------------------------------------------------------ roles --
 # A person's role in one module: none / viewer / editor / admin. The gate session owns this table
-# (docs/SAAS-MODEL.md); it is declared the same way here so the Tenants page works either side of
-# that landing, and written by delete + insert so it never depends on the primary key it chose.
+# (docs/SAAS-MODEL.md) and creates it; this page only reads and writes it, and treats a missing
+# table as "no roles yet". Written by delete + insert so it never depends on the key it chose.
 
 ROLES = ("none", "viewer", "editor", "admin")
-_ROLES_SCHEMA = """
-CREATE TABLE IF NOT EXISTS user_modules (
-    user_id INTEGER NOT NULL, code_id INTEGER NOT NULL, module TEXT NOT NULL, role TEXT NOT NULL
-);
-"""
-
-
-_roles_ready = False
 
 
 def _roles_conn():
-    global _roles_ready
-    if not _roles_ready:
-        with db.connect() as conn:
-            conn.executescript(_ROLES_SCHEMA)
-        _roles_ready = True
     return db.connect()
 
 
@@ -283,19 +270,25 @@ def user_roles(user_ids):
     ids = [int(i) for i in user_ids]
     if not ids:
         return {}
-    with _roles_conn() as conn:
-        return {(r["user_id"], r["module"]): r["role"] for r in
-                conn.execute("SELECT user_id, module, role FROM user_modules WHERE user_id IN (%s)"
-                             % ",".join("?" * len(ids)), ids)}
+    try:
+        with _roles_conn() as conn:
+            return {(r["user_id"], r["module"]): r["role"] for r in
+                    conn.execute("SELECT user_id, module, role FROM user_modules WHERE user_id IN (%s)"
+                                 % ",".join("?" * len(ids)), ids)}
+    except Exception:                      # the table belongs to the gate session and may not exist yet
+        return {}
 
 
 def set_role(user_id, code_id, module, role):
     if module not in BY_KEY or role not in ROLES:
         return None
-    with _roles_conn() as conn:
-        conn.execute("DELETE FROM user_modules WHERE user_id = ? AND module = ?", (int(user_id), module))
-        conn.execute("INSERT INTO user_modules (user_id, code_id, module, role) VALUES (?,?,?,?)",
-                     (int(user_id), int(code_id), module, role))
+    try:
+        with _roles_conn() as conn:
+            conn.execute("DELETE FROM user_modules WHERE user_id = ? AND module = ?", (int(user_id), module))
+            conn.execute("INSERT INTO user_modules (user_id, code_id, module, role) VALUES (?,?,?,?)",
+                         (int(user_id), int(code_id), module, role))
+    except Exception:
+        return None
     return role
 
 
