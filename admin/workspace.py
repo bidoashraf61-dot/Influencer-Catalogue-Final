@@ -46,24 +46,14 @@ BY_KEY = {m["key"]: m for m in MODS}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS user_modules (
-    user_id INTEGER NOT NULL, code_id INTEGER NOT NULL, module TEXT NOT NULL, role TEXT NOT NULL
+    user_id    INTEGER NOT NULL,
+    code_id    INTEGER NOT NULL,          -- the company
+    module     TEXT NOT NULL,
+    role       TEXT NOT NULL,             -- none | viewer | editor | admin
+    changed_at INTEGER,
+    changed_by TEXT,
+    PRIMARY KEY (user_id, module)
 );
-
-CREATE TABLE IF NOT EXISTS module_requests (
-    id         INTEGER PRIMARY KEY,
-    code_id    INTEGER NOT NULL,
-    user_id    INTEGER,
-    module     TEXT,
-    kind       TEXT NOT NULL,             -- module | role | limit
-    status     TEXT NOT NULL DEFAULT 'pending',   -- pending | approved | declined
-    note       TEXT,
-    detail     TEXT,                      -- JSON, see tenant_requests.py
-    created_at INTEGER NOT NULL,
-    decided_at INTEGER,
-    decided_by TEXT,
-    reply      TEXT
-);
-CREATE INDEX IF NOT EXISTS module_requests_status ON module_requests(status, created_at);
 
 CREATE TABLE IF NOT EXISTS workspace_prefs (
     code_id INTEGER NOT NULL,
@@ -80,10 +70,22 @@ _ready = False
 def init():
     global _ready
     with db.connect() as conn:
+        um = {r["name"]: r["pk"] for r in conn.execute("PRAGMA table_info(user_modules)")}
+        if um and "changed_at" not in um:
+            # An early 4-column table (no key, no stamps) went live on 28 Oct: move it to the spec's shape,
+            # rows kept, the newest row winning where a person had two for one module.
+            conn.executescript("ALTER TABLE user_modules RENAME TO user_modules_v0;")
+            conn.executescript(SCHEMA)
+            conn.execute("INSERT OR REPLACE INTO user_modules (user_id, code_id, module, role) "
+                         "SELECT user_id, code_id, module, role FROM user_modules_v0 ORDER BY rowid")
+            conn.execute("DROP TABLE user_modules_v0")
         conn.executescript(SCHEMA)
         cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
         if "company_code_id" not in cols:
             conn.execute("ALTER TABLE users ADD COLUMN company_code_id INTEGER")
+    import tenant_requests
+    with tenant_requests._conn():             # module_requests is theirs; make sure it exists before we read it
+        pass
     _ready = True
 
 
@@ -198,7 +200,7 @@ def invite(actor, email, name, roles):
         conn.execute("UPDATE users SET company_code_id = ?, kam = ? WHERE id = ?",
                      (tenant, actor["kam"] if "kam" in actor.keys() else None, u["id"]))
         for m in MODS:      # a row for every module, so "no row" never has to mean anything
-            _write_role(conn, u["id"], tenant, m["key"], roles.get(m["key"], "none"))
+            _write_role(conn, u["id"], tenant, m["key"], roles.get(m["key"], "none"), actor["email"])
     _history("invite", tenant, email, actor, None, roles)
     try:
         import mailer
@@ -226,16 +228,16 @@ def set_role(actor, user_id, key, role):
         return False, "Keep at least one admin."
     before = role_of(t, key)
     with _c() as conn:
-        _write_role(conn, t["id"], tenant, key, role)
+        _write_role(conn, t["id"], tenant, key, role, actor["email"])
     _history("role", tenant, t["email"], actor, {key: before}, {key: role})
     return True, "Saved."
 
 
-def _write_role(conn, user_id, tenant, key, role):
-    """Delete + insert: the table is shared with modules.set_role and carries no primary key."""
+def _write_role(conn, user_id, tenant, key, role, by=""):
+    """Delete + insert, so it works whichever session's write reached the row first."""
     conn.execute("DELETE FROM user_modules WHERE user_id = ? AND module = ?", (int(user_id), key))
-    conn.execute("INSERT INTO user_modules (user_id, code_id, module, role) VALUES (?,?,?,?)",
-                 (int(user_id), int(tenant), key, role))
+    conn.execute("INSERT INTO user_modules (user_id, code_id, module, role, changed_at, changed_by) VALUES (?,?,?,?,?,?)",
+                 (int(user_id), int(tenant), key, role, db.now(), by or ""))
 
 
 def _admins(tenant, key):
@@ -270,14 +272,14 @@ def request(user, key, kind, note=""):
         detail.update(role="viewer", user_id=user["id"])
     elif kind == "module":
         detail.update(level="view")
-    d = json.dumps(detail, sort_keys=True)
+    import tenant_requests
     with _c() as conn:
         dup = conn.execute("SELECT 1 FROM module_requests WHERE code_id = ? AND user_id = ? AND module = ? AND kind = ? "
-                           "AND status = 'pending'", (tenant, user["id"], key, kind)).fetchone()
-        if dup:
-            return True, "Already requested. You will hear back."
-        conn.execute("INSERT INTO module_requests (code_id, user_id, module, kind, note, detail, created_at) VALUES (?,?,?,?,?,?,?)",
-                     (tenant, user["id"], key, kind, note, d, db.now()))
+                           "AND status = 'pending'", (tenant, user["id"], key, kind)).fetchone() \
+            if conn.execute("SELECT 1 FROM sqlite_master WHERE name = 'module_requests'").fetchone() else None
+    if dup:
+        return True, "Already requested. You will hear back."
+    tenant_requests.file_request(tenant, user["id"], key, kind, note, detail)
     if kind != "role":
         try:
             import notify
