@@ -321,8 +321,14 @@ def _plan(conn, platform, content_ids):
         if platform == "Instagram":
             n = max(new) + MARGIN
             return n, None, n * len(needs) * each
-        since = max(1, int((time.time() - min(last for _, _, last in needs)) // 86400) + 1)
-        return max(new) + MARGIN, since, (sum(new) + len(needs)) * each
+        # Facebook and YouTube ask only for comments newer than the last read, which never sees an older comment a
+        # past read missed (owner, 2026-10-27: Jamjoom Facebook 494 and 512 were 110 and YouTube 495 24 top-level
+        # comments short, found by a full re-read). While a post still holds fewer than the platform reports it is
+        # read in full instead; the platform's number includes replies, so such a post is read in full every time,
+        # which costs cents on these two actors.
+        if all(got >= exp for exp, got, _ in needs):
+            since = max(1, int((time.time() - min(last for _, _, last in needs)) // 86400) + 1)
+            return max(new) + MARGIN, since, (sum(new) + len(needs)) * each
     n = max(exp for exp, _, _ in needs) if needs else DEFAULT_READ
     return n, None, sum(exp for exp, _, _ in needs) * each
 
