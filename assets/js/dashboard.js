@@ -766,7 +766,9 @@
   /* What people said (owner, 2026-10-19; v20 same day): viewers' comments, read by AI once a week (every 7 days from the first video, since 2026-10-23).
      It takes the audience-countries slot. Totals come per creator and platform, so the page's filters apply. */
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
-  var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI once a week, every 7 days from the first video. Commenters' names are never stored.";
+  // What the platforms report on the posts in this view (comments + replies); the panel shows how many were read of it.
+  function cmRep() { return posts().reduce(function (n, p) { return n + (p.comments || 0); }, 0); }
+  var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI once a week, every 7 days from the first video. Commenters' names are never stored. The platforms' own comment count also includes replies, which are not read.";
   var CM_COL = { pos: "#14884a", neu: "#ff691e", neg: "#ee1515" };   // neutral in orange (owner, 2026-10-23)
   // One drawn icon per theme, picked from the words of the AI's label.
   var CM_TI = [
@@ -849,7 +851,7 @@
     else {
       body = '<div class="cm-hero">' + cmRing(t, "cm-ring--card") + '<div class="cm-legend">'
         + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cm-legend__r" style="--c:' + CM_COL[s[0]] + '">' + '<i class="cm-face">' + CM_FACE[s[0]] + '</i><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + "</small></div>"; }).join("")
-        + '<p class="cm-legend__n">' + full(t.n) + " comments · " + t.videos + " video" + (t.videos === 1 ? "" : "s") + "</p></div></div>";
+        + '<p class="cm-legend__n">' + full(t.n) + (cmRep() > t.n ? " read of " + full(cmRep()) + " (comments + replies) · " : " comments · ") + t.videos + " video" + (t.videos === 1 ? "" : "s") + "</p></div></div>";
     }
     $("w-geo").innerHTML = head(CMI, "What people say", CM_TIP, C && t.n ? "geo" : null) + '<div class="db-card__body cm">' + body + "</div>";
   }
@@ -1669,7 +1671,7 @@
       var sub1 = topA ? 'Most ask <q dir="auto">' + esc(topA) + "</q>" + (t.asks[topA].en ? " (" + esc(t.asks[topA].en.replace(/\?$/, "")) + ")" : "") + " · " + t.asks[topA].n + " times"
         : mainT ? "The talk is mostly about " + esc(mainT.toLowerCase()) : "";
       return cmSections('<section class="cmp-top"><div class="cmp-boxes">'
-        + box(full(t.n), "comments read") + box(v(t.intent), "ask how to buy", "is-hot " + (t.small ? "" : cmTone("buy", share))) + box(v(t.pos), "positive", t.small ? "" : cmTone("pos", p)) + box(t.videos, "video" + (t.videos === 1 ? "" : "s"))
+        + box(full(t.n), "comments read" + (cmRep() > t.n ? '<small class="cmp-of"> of ' + full(cmRep()) + " (comments + replies)</small>" : "")) + box(v(t.intent), "ask how to buy", "is-hot " + (t.small ? "" : cmTone("buy", share))) + box(v(t.pos), "positive", t.small ? "" : cmTone("pos", p)) + box(t.videos, "video" + (t.videos === 1 ? "" : "s"))
         + '</div><aside class="cmp-say" aria-label="The insight from the comments"><img class="cmp-say__av" src="../../assets/brand/helvy-connect/helvy-icon-180.png" alt="" width="48" height="48">'
         + '<div class="cmp-say__b"><p class="cmp-say__k">Helvi read the comments</p><p class="cmp-say__t">' + head1 + "</p>" + (sub1 ? '<p class="cmp-say__s">' + sub1 + "</p>" : "")
         + (C.next_read || C.last_read ? '<p class="cmp-say__d">' + (C.last_read ? "Read " + cmDay(C.last_read) : "") + (C.next_read ? (C.last_read ? " · " : "") + "next read " + cmDay(C.next_read) : "") + "</p>" : "")
@@ -1927,9 +1929,9 @@
   /* What people did ring (2026-10-23): the report's "What people did" stack as a ring (owner). Likes, comments,
      saves and shares of the posts in the current view, each in its fixed colour; the drawer splits them by
      platform and by creator. A platform that does not show a number (saves on Facebook and YouTube) reads "—". */
-  var DID = [["likes", "Likes", "#14884a"], ["comments", "Comments", "#ff691e"], ["saves", "Saves", "#b9d400"], ["shares", "Shares", "#7048e8"]];
+  var DID = [["likes", "Likes", "#14884a"], ["comments", "Comments + replies", "#ff691e"], ["saves", "Saves", "#b9d400"], ["shares", "Shares", "#7048e8"]];
   var DID_IC = ico('<path d="M7 11V5.5a1.5 1.5 0 0 1 3 0V11M10 10V4a1.5 1.5 0 0 1 3 0v6M13 10V5.5a1.5 1.5 0 0 1 3 0V13a7 7 0 0 1-7 7h-.5A5.5 5.5 0 0 1 4 16l-1-3.5a1.5 1.5 0 0 1 2.7-1.2L7 13"/>');
-  var DID_TIP = "Everything people did on the posts in this view: likes, comments, saves and shares, the four parts of engagement. The ring shows each one's share; the middle is the total.";
+  var DID_TIP = "Everything people did on the posts in this view: likes, comments, saves and shares, the four parts of engagement. Comments are the platform’s own count, so they include replies. The ring shows each one's share; the middle is the total.";
   function didSum(list) {
     var t = { likes: 0, comments: 0, saves: 0, shares: 0, n: 0, seen: {} };
     list.forEach(function (p) { DID.forEach(function (d) { var v = p[d[0]]; if (v != null && !(d[0] === "likes" && p.likes_hidden)) { t[d[0]] += v; t.seen[d[0]] = 1; } }); });

@@ -16,6 +16,7 @@ read asks only for comments newer than the first.
 
     docker exec influencer-catalogue-admin python /app/admin/comments.py [tick]   # one pass now
 """
+import hashlib
 import json
 import re
 import sys
@@ -59,6 +60,14 @@ ACTORS = {
                 lambda urls, n, since: dict({"startUrls": [{"url": x} for x in urls], "maxComments": n, "sortCommentsBy": "NEWEST_FIRST"},
                                             **({"oldestCommentDate": time.strftime("%Y-%m-%d", time.gmtime(time.time() - since * 86400))}
                                                if since else {}))),
+    # Snapchat (owner, 2026-10-27): memo23~snapchat-scraper, the cheapest of the three actors that return Spotlight
+    # comments ($0.0002 a comment + $0.00175 a row + $0.001 a run; parseforge $0.0025 a row, maximedupre $0.0045 a
+    # comment). It takes the post URL as it is, returns one row per Spotlight with the comments nested (see
+    # _flatten), has no date filter (every read is a full one, deduplicated by id) and no replies, only a count per
+    # comment. 0.0005 here is a deliberately rounded-up estimate that includes the row and run fees.
+    "Snapchat": ("memo23~snapchat-scraper", 0.0005,
+                 lambda urls, n, since: {"profileUrls": urls, "maxItems": len(urls),
+                                         "includeSpotlightComments": True, "maxCommentsPerSpotlight": 0}),
 }
 NEW_ONLY = ("Instagram", "Facebook", "YouTube")
 MARGIN = 15                  # extra newest comments read on Instagram, for counts that lag
@@ -135,7 +144,8 @@ def post_key(platform, url):
     """What identifies a post inside any URL Apify hands back for it."""
     u = (url or "").strip()
     pats = {"Instagram": r"/(?:p|reel|reels|tv)/([A-Za-z0-9_-]{5,})", "TikTok": r"/video/(\d{8,})",
-            "YouTube": r"(?:shorts/|[?&]v=|youtu\.be/|/live/)([A-Za-z0-9_-]{6,})"}
+            "YouTube": r"(?:shorts/|[?&]v=|youtu\.be/|/live/)([A-Za-z0-9_-]{6,})",
+            "Snapchat": r"/spotlight/([A-Za-z0-9_-]{10,})"}
     m = re.search(pats[platform], u) if platform in pats else None
     if m:
         return m.group(1)
@@ -458,6 +468,26 @@ def _items(apify, dataset):
         offset += 1000
 
 
+def _flatten(platform, items):
+    """Every actor returns one row per comment except Snapchat's, which returns one row per Spotlight with its
+    comments nested and no id of their own (snapId is the Spotlight's). The id here is a hash of the time and the
+    text; the author is not read."""
+    if platform != "Snapchat":
+        return items
+    out = []
+    for row in items:
+        url = row.get("spotlightUrl") or row.get("url")
+        for c in row.get("comments") or []:
+            text, ms = c.get("text"), str(c.get("timestampMs") or "")
+            if not isinstance(text, str) or not text.strip():
+                continue
+            ext = hashlib.sha1(("%s|%s" % (ms, text)).encode("utf-8")).hexdigest()[:20]
+            out.append({"url": url, "id": "snap-" + ext, "text": text,
+                        "timestamp": int(ms) // 1000 if ms.isdigit() else None,
+                        "likesCount": c.get("totalReactions") if isinstance(c.get("totalReactions"), int) else None})
+    return out
+
+
 def _still_short(conn, content_id):
     """The platform says this post has more comments than we hold."""
     exp, got, _ = _need(conn, content_id)
@@ -486,7 +516,7 @@ def poll_runs():
         items, saved, found = [], 0, {}
         if status == "SUCCEEDED" and d.get("defaultDatasetId"):
             try:
-                items = _items(apify, d["defaultDatasetId"])
+                items = _flatten(run["platform"], _items(apify, d["defaultDatasetId"]))
             except Exception as exc:
                 print("comments: dataset read failed:", repr(exc)[:160], flush=True)
                 continue                                   # try again next pass
