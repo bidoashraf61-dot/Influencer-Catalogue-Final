@@ -87,15 +87,17 @@ REGISTRY = {
     # ---- filling in the posts
     "post.add": _a(
         "/campaigns/content/add",
-        "Add one published post to a campaign, by its link, for a creator already on the campaign.",
-        "Add a {platform} {kind} for {code} to campaign {id}",
+        "Add one published post to a campaign from its link ALONE. Send only id and url: the platform, kind, creator, date and "
+        "numbers are worked out from the link and read from the platform. Add code, platform, kind, posted or counts only "
+        "when the admin gave them or the portal asked.",
+        "Add the post {url} to campaign {id}",
         dict({"id": "Campaign id.", "url": "The post link, starting https://",
-              "code": "Creator code, one already on this campaign.",
-              "platform": "One of " + PLATFORMS + ". Default Instagram.",
-              "kind": "One of " + KINDS + ". Default post.",
+              "code": "Creator code on this campaign (optional: found from the link).",
+              "platform": "One of " + PLATFORMS + " (optional: found from the link).",
+              "kind": "One of " + KINDS + " (optional: found from the link).",
               "posted": "The day it went up, YYYY-MM-DD.",
               "caption": "The caption (optional)."}, **COUNTS),
-        required=("id", "url", "code")),
+        required=("id", "url")),
     "post.add_many": _a(
         "/campaigns/content/bulk",
         "Paste many posts at once for one creator (do=links, one link per line), or a block of numbers for posts already "

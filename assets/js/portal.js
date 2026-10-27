@@ -2792,6 +2792,7 @@
     // After every answer: the likely next requests as options, with the box below still open for typing.
     function nextUp(lead) {
       if (lead) say(lead);
+      return;           // no standing option list after an answer: options show only when a question needs one
       var list = [{ label: "Find creators", go: flowFind }];
       if (document.querySelector(".cat-bar")) list.push({ label: "Filter this page", go: flowShow });
       list.push({ label: "My selection", go: flowSelection }, { label: "Get a quote", go: flowQuote },
@@ -2823,9 +2824,7 @@
       });
     }
     function greet() {
-      say("Hi" + (first ? " " + first : "") + ", I'm Helvi 👋");
-      if (selToken()) { aboutSelection(); return; }
-      menu("How can I help you?");
+      say("Hi" + (first ? " " + first : "") + ", I'm Helvi 👋 What can I do for you?");
     }
     // The selection on this page: its brief if one was recorded, else an offer to score it.
     function aboutSelection() {
@@ -3485,7 +3484,6 @@
             (ev.actions || []).forEach(actionCard);
             if (ev.cards && ev.cards.length) creatorCards(ev.cards);
             if (ev.handoff) handoffCard(ev.handoff);
-            followUps(ev.next);
           });
           return;
         }
@@ -3522,8 +3520,8 @@
               else if (m.from === "roi") { if (HV.roiCard) row("ai", HV.roiCard(m.roi)); }
               else bubble(m.from, m.text, false);
             });
-            log.appendChild(h("p", { class: "hv-sep" }, "Earlier in this chat"));
-            if (selToken()) aboutSelection(); else menu("Welcome back. What would you like to do?");
+            // Pick up where they left off: no new greeting and no menu. Options appear only when a question needs one.
+            scroll();
           }
           else greet();
         }

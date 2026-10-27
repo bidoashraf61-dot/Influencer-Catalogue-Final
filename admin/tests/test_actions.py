@@ -49,7 +49,9 @@ t("sentence, simple", actions.describe("campaign.status", {"id": 2, "status": "l
   "Set campaign 2 to live")
 t("sentence, extras appended", actions.describe("post.add", {
     "id": 2, "url": "https://x.com/p/1", "code": "HV-MC-049", "platform": "TikTok", "kind": "reel", "likes": 10}),
-  "Add a TikTok reel for HV-MC-049 to campaign 2 — likes 10, url https://x.com/p/1")
+  "Add the post https://x.com/p/1 to campaign 2 — code HV-MC-049, kind reel, likes 10, platform TikTok")
+t("a link alone is enough to add a post", actions.check("post.add", {"id": 2, "url": "https://www.tiktok.com/@a/video/1"})[1],
+  {"id": 2, "url": "https://www.tiktok.com/@a/video/1"})
 t("delete is called out", actions.describe("campaign.delete", {"id": 7}),
   "DELETE campaign 7 and everything on it. This cannot be undone")
 

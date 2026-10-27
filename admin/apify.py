@@ -1592,3 +1592,22 @@ def _on_campaign_status(cid, was, now_):
 
 
 db.on("campaign_status", _on_campaign_status)
+
+
+def look_up_post(url):
+    """Read one Instagram post or reel right now (about a cent): who posted it, its numbers, date and caption. Used when a
+    link is pasted on its own and nothing in the link names the creator. None when Apify is off, paused or over budget, or
+    the post cannot be read; the caller then asks which creator it is."""
+    if not get_token() or paused() or spent_this_month() + 0.05 > budget():
+        return None
+    try:
+        items = call("POST", "/acts/" + INSTAGRAM_POST_ACTOR.replace("/", "~") + "/run-sync-get-dataset-items",
+                     {"postUrls": [url]}, params={"timeout": "90", "maxTotalChargeUsd": "0.05"}, timeout=100)
+    except ApifyError:
+        return None
+    it = items[0] if isinstance(items, list) and items and isinstance(items[0], dict) else None
+    if it is None:
+        return None
+    user = it.get("user") if isinstance(it.get("user"), dict) else {}
+    return {"owner": (user.get("username") or "").lower() or None, "numbers": post_numbers(it),
+            "posted_at": _posted_at(it), "caption": _caption(it)}

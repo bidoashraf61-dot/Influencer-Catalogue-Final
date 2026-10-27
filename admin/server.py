@@ -3858,6 +3858,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         return out
 
     def post_content_add(self):
+        """Add one post. Only the link is needed: the platform and kind come from the link, the creator from the handle in it
+        (or, for an Instagram link that names nobody, from reading the post), and the numbers and date from the platform."""
         f = self.form_body()
         cid = (f.get("id") or "").strip()
         k = db.campaign(int(cid)) if cid.isdigit() else None
@@ -3865,21 +3867,56 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect("/campaigns")
         back = "/campaigns/content?id=%d" % k["id"]
         url = (f.get("url") or "").strip()
-        code = (f.get("code") or "").strip().upper()
         if not re.match(r"^https://[^\s/]+\.[^\s]+$", url):
             return self.redirect(back + "&e=" + urllib.parse.quote("The post link must start with https://"))
-        if code not in {m["cc_code"] for m in db.campaign_creators(k["id"])}:
-            return self.redirect(back + "&f=code&e=" + urllib.parse.quote("Pick a creator in this campaign."))
-        platform = f.get("platform") if f.get("platform") in db.PLATFORMS else "Instagram"
-        kind = f.get("kind") if f.get("kind") in db.KINDS else "post"
-        posted = db.day_bounds(f.get("posted") or "", None)
+        import postlink
+        plat_i, kind_i, handle = postlink.infer(url)
+        members = db.campaign_creators(k["id"])
+        mine = {m["cc_code"] for m in members}
+        code = (f.get("code") or "").strip().upper()
+        found, how = None, ""
+        if not code:
+            hs = [(m["cc_code"], apify.creator_handles(m)) for m in members if m["code"]]
+            code = postlink.pick_creator(handle, hs) or ""
+            how = "the handle in the link" if code else ""
+            if not code and len(mine) == 1:
+                code, how = next(iter(mine)), "the only creator on the campaign"
+            if not code and (plat_i or "Instagram") == "Instagram":
+                found = apify.look_up_post(url)
+                code = postlink.pick_creator(found["owner"], hs) if found else ""
+                how = "reading the post" if code else ""
+        if code not in mine:
+            who = ", ".join("%s (%s)" % (m["cc_code"], (m["name"] if "name" in m.keys() and m["name"] else "")) for m in members[:15])
+            return self.redirect(back + "&f=code&e=" + urllib.parse.quote(
+                "I could not tell which creator posted this. Tell me one of: %s." % who if code == "" else "Pick a creator in this campaign."))
+        platform = f.get("platform") if f.get("platform") in db.PLATFORMS else (plat_i or "Instagram")
+        kind = f.get("kind") if f.get("kind") in db.KINDS else (kind_i or "post")
+        posted = db.day_bounds(f.get("posted") or "", None) or (found or {}).get("posted_at")
+        counts = self.counts_from(f)
+        for m_, v_ in ((found or {}).get("numbers") or {}).items():
+            if counts.get(m_) is None:
+                counts[m_] = v_
         item = {"code": code, "platform": platform, "kind": kind, "url": url, "posted_at": posted,
-                "caption": (f.get("caption") or "").strip() or None,
-                "followers": db.platform_followers(code, platform), **self.counts_from(f)}
+                "caption": (f.get("caption") or "").strip() or (found or {}).get("caption"),
+                "followers": db.platform_followers(code, platform), **counts}
         _, created = db.add_content(k["id"], item, source="manual")
         thumbs.fill_later(k["id"])
+        tail = ""
+        if found and found.get("numbers"):
+            tail = " Its numbers and date were read from %s." % platform
+        else:
+            # Nothing was read yet: start this campaign's capture for the platform now, when that is only a handful of posts.
+            with db.connect() as conn:
+                job = conn.execute("SELECT id FROM api_jobs WHERE source = ? AND kind = 'post_urls' AND platform = ? LIMIT 1",
+                                   ("campaign:%d" % k["id"], platform)).fetchone()
+                n = conn.execute("SELECT COUNT(*) FROM content WHERE campaign_id = ? AND hidden = 0 AND platform = ?",
+                                 (k["id"], platform)).fetchone()[0]
+            ok_, _msg = apify.start_job(job["id"], "link") if job is not None and n <= 8 else (False, "")
+            tail = (" Its numbers and date are being read from %s now." % platform if ok_
+                    else " Its numbers and date arrive with the next capture.")
         return self.redirect(back + "&ok=" + urllib.parse.quote(
-            "Post added." if created else "That post was already here — its numbers were updated."))
+            ("Post added for %s%s." % (code, " (%s)" % how if how else "") if created
+             else "That post was already here: its numbers were updated.") + tail))
 
     def post_content_pending(self):
         f = self.form_body(multi=("code", "pending_status", "pending_date"))
