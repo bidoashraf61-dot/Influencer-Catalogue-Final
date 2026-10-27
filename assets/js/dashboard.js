@@ -768,13 +768,6 @@
   var CMI = ico('<path d="M4 5.5h16v10.5H9l-5 4z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/>');
   // What the platforms report on the posts in this view (comments + replies); the panel shows how many were read of it.
   function cmRep() { return posts().reduce(function (n, p) { return n + (p.comments || 0); }, 0); }
-  // The note under the comment numbers: why "read" is lower than what the platforms report (owner, 2026-10-27).
-  function cmNote() {
-    var rep = cmRep(), t = cmPick();
-    if (!(rep > t.n)) return "";
-    return '<p class="cm-note"><b>Why the two numbers differ.</b> We read the main comments you can see on each post. The platforms\u2019 count of '
-      + full(rep) + " also includes replies" + ".</p>";
-  }
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI once a week, every 7 days from the first video. Commenters' names are never stored. The platforms' own comment count also includes replies, which are not read.";
   var CM_COL = { pos: "#14884a", neu: "#ff691e", neg: "#ee1515" };   // neutral in orange (owner, 2026-10-23)
   // One drawn icon per theme, picked from the words of the AI's label.
@@ -858,7 +851,7 @@
     else {
       body = '<div class="cm-hero">' + cmRing(t, "cm-ring--card") + '<div class="cm-legend">'
         + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cm-legend__r" style="--c:' + CM_COL[s[0]] + '">' + '<i class="cm-face">' + CM_FACE[s[0]] + '</i><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small>" + full(n) + "</small></div>"; }).join("")
-        + '<p class="cm-legend__n">' + full(t.n) + (cmRep() > t.n ? " read of " + full(cmRep()) + " (comments + replies) · " : " comments · ") + t.videos + " video" + (t.videos === 1 ? "" : "s") + "</p></div></div>" + cmNote();
+        + '<p class="cm-legend__n">' + full(t.n) + (cmRep() > t.n ? " read of " + full(cmRep()) + " (comments + replies) · " : " comments · ") + t.videos + " video" + (t.videos === 1 ? "" : "s") + "</p></div></div>";
     }
     $("w-geo").innerHTML = head(CMI, "What people say", CM_TIP, C && t.n ? "geo" : null) + '<div class="db-card__body cm">' + body + "</div>";
   }
@@ -1682,7 +1675,7 @@
         + '</div><aside class="cmp-say" aria-label="The insight from the comments"><img class="cmp-say__av" src="../../assets/brand/helvy-connect/helvy-icon-180.png" alt="" width="48" height="48">'
         + '<div class="cmp-say__b"><p class="cmp-say__k">Helvi read the comments</p><p class="cmp-say__t">' + head1 + "</p>" + (sub1 ? '<p class="cmp-say__s">' + sub1 + "</p>" : "")
         + (C.next_read || C.last_read ? '<p class="cmp-say__d">' + (C.last_read ? "Read " + cmDay(C.last_read) : "") + (C.next_read ? (C.last_read ? " · " : "") + "next read " + cmDay(C.next_read) : "") + "</p>" : "")
-        + "</div></aside>" + cmNote() + "</section>"
+        + "</div></aside></section>"
         + "<h3>The mood</h3>" + '<div class="cmp-mood">' + cmRing(t, "cm-ring--hero") + '<div class="cmp-mood__k">'
         + cmParts(t).map(function (s) { var n = t[s[0]]; return '<div class="cmp-mood__r" style="--c:' + CM_COL[s[0]] + '">' + '<i class="cm-face">' + CM_FACE[s[0]] + '</i><b>' + (t.small ? n : s[1] + "%") + "</b><span>" + s[2] + "</span><small><em>" + full(n) + "</em> comments</small></div>"; }).join("")
         + "</div></div>"
