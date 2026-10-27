@@ -24,6 +24,7 @@ TOKEN_FILE = Path(__file__).resolve().parent / ".apify-token"
 API = "https://api.apify.com/v2"
 RIYADH = 3 * 3600                      # Saudi time has no daylight saving
 HARD_MAX_HANDLES = 1000                # one run never takes more than this
+RETRY_WAIT = 30 * 60                   # seconds before the scheduler tries a job that got no run again
 DEFAULT_BUDGET = 5.0                   # USD per month, ours; Apify has its own cap
 DEFAULT_RUN_CAP = 1.0                  # USD per run, sent to Apify as maxTotalChargeUsd
 
@@ -1462,7 +1463,19 @@ def _due(job, t):
     if job["schedule"] == "weekly" and local.tm_wday != job["weekday"]:
         return False
     slot = t - (local.tm_hour * 3600 + local.tm_min * 60 + local.tm_sec) + hh * 3600 + mm * 60
-    return t >= slot and (job["last_started"] or 0) < slot
+    if t < slot or (job["last_started"] or 0) >= slot:
+        return False
+    return _waited_since_last_try(job, t)
+
+
+def _waited_since_last_try(job, t):
+    """A job refused or thrown out before it reached Apify never gets last_started,
+    so its slot stayed due and the minute-by-minute loop tried it again all day
+    (2,183 refused rows on 2026-10-26). Hold a repeat attempt to one per
+    RETRY_WAIT, which still picks the job up by itself once the budget is raised."""
+    with db.connect() as conn:
+        last = conn.execute("SELECT MAX(started_at) t FROM api_runs WHERE job_id = ?", (job["id"],)).fetchone()["t"]
+    return not last or t - last >= RETRY_WAIT
 
 
 def tick(t=None):
