@@ -68,8 +68,15 @@ The module switcher shows all three marks. Owned modules open; the others show a
 
 ## Data
 
-New: `user_modules (user_id, code_id, module, role)`; `access_requests (id, code_id, user_id, module,
-kind, status, note, created_at, decided_by)`; `creators.owner_code_id` (NULL = roster).
+New: `users.company_code_id` (NULL = the person's own code; a colleague's row points at the company's code,
+and the gate resolves the tenant as COALESCE(company_code_id, code_id), so every person keeps their own login);
+`user_modules (user_id, code_id, module, role, changed_at, changed_by)`, primary key (user_id, module);
+`module_requests (id, code_id, user_id, module, kind module|role|limit, status, note, detail, created_at,
+decided_at, decided_by)` filed with `tenant_requests.file_request(...)` (the older `access_requests` is the
+selection-access table and stays as it is); `creators.owner_code_id` (NULL = roster).
+
+Today every portal user has a code of their own (23 users, no shared code), so a company of several people
+starts as a single-person company and grows by invites that set `company_code_id`.
 Kept: `tenant_modules` (company level), `tenant_settings` (limits and branding), History for every change.
 Rules that do not move: off hides and never deletes; only HelloVoice owner and admin set entitlements;
 a private creator is never visible outside its company; the roster total is never shown to clients.
