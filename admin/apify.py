@@ -952,6 +952,14 @@ def _scalars(obj, out, depth=0):
             _scalars(v, out, depth + 1)
 
 
+# data-slayer/instagram-post-details answers for a reel on Instagram AND for the Facebook copy it was shared to
+# (owner, 2026-10-27): its plain comment_count and play_count are the SUM of both, and the Instagram figures are the
+# ig_* ones. Jamjoom reel 511: comment_count 795 = 470 Facebook + 325 Instagram; play_count 537,555 = 317,065 + 220,490.
+# The Facebook copy is tracked as its own post, so the sum counted those comments and views twice. Whenever a result
+# carries both an ig_* and an fb_* figure, the ig_* one is the Instagram number.
+_PLATFORM_SCOPED = {"comments": "ig_comment_count", "views": "ig_play_count", "likes": "ig_like_count"}
+
+
 def post_numbers(item):
     """{likes, comments, views, shares, saves} found in one actor result, whatever it calls them."""
     flat = {}
@@ -963,6 +971,11 @@ def post_numbers(item):
             if v is not None and v >= 0:      # -1 means the platform does not show it
                 vals[m] = v
                 break
+    for m, key in _PLATFORM_SCOPED.items():
+        if key in flat and "fb_" + key[3:] in flat:
+            v = _num(flat.get(key))
+            if v is not None and v >= 0:
+                vals[m] = v
     return vals
 
 
