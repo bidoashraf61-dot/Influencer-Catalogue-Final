@@ -7089,6 +7089,8 @@ def main():
     import licence
     licence.init()
     account.init()
+    import workspace
+    workspace.init()
     team.init()
     evidence.init()
     import push

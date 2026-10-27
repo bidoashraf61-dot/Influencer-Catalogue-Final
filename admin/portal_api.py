@@ -267,6 +267,13 @@ class PortalMixin(connect_api.ConnectMixin):
                     self.send_json(200, {"ok": True, "role": role, "requests": _gating.inbox(scope)},
                                    self.cors() + [("Cache-Control", "no-store")])
             return True
+        if path == "/api/workspace":
+            who = self._need_account()
+            if who:
+                import workspace
+                self.send_json(200, workspace.payload(who[1], (query.get("m") or "").strip()),
+                               self.cors() + [("Cache-Control", "no-store")])
+            return True
         if path == "/api/account":
             who = self._need_account()
             if who:
@@ -641,6 +648,9 @@ class PortalMixin(connect_api.ConnectMixin):
             "/api/me/signout-others": self.api_me_signout_others, "/api/team/invite": self.api_team_invite,
             "/api/hub/kam": self.api_hub_kam, "/api/hub/share": self.api_hub_share, "/api/hub/move": self.api_hub_move, "/api/hub/delete": self.api_hub_delete, "/api/hub/assign-kam": self.api_hub_assign_kam,
             "/api/notifications/read": self.api_notifications_read,
+            "/api/workspace/invite": self.api_ws_invite, "/api/workspace/role": self.api_ws_role,
+            "/api/workspace/remove": self.api_ws_remove, "/api/workspace/request": self.api_ws_request,
+            "/api/workspace/decide": self.api_ws_decide, "/api/workspace/pref": self.api_ws_pref,
             "/api/board/stage": self.api_board_stage, "/api/board/live": self.api_board_live,
             "/api/board/pin": self.api_board_pin, "/api/board/attach": self.api_board_attach,
             "/api/board/selection-stage": self.api_board_selection_stage,
@@ -1648,6 +1658,70 @@ class PortalMixin(connect_api.ConnectMixin):
                                     "message": "Sent. Your account manager will set up access for %s." % (name or email)
                                     + ("" if counted else " Invites only earn credits for colleagues on your company email domain.")},
                               self.cors())
+
+    # ------------------------------------------------------------ workspace --
+
+    def _ws_reply(self, res):
+        ok, msg = res
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
+
+    def api_ws_invite(self):
+        who = self._need_account()
+        if not who or self._throttled("wsinv:%d" % who[1]["id"], 30, 86400):
+            return
+        import workspace
+        b = self.json_body()
+        return self._ws_reply(workspace.invite(who[1], b.get("email"), " ".join(str(b.get("name") or "").split())[:120],
+                                               b.get("roles") if isinstance(b.get("roles"), dict) else {}))
+
+    def api_ws_role(self):
+        who = self._need_account()
+        if not who:
+            return
+        import workspace
+        b = self.json_body()
+        return self._ws_reply(workspace.set_role(who[1], b.get("user"), str(b.get("module") or ""), str(b.get("role") or "")))
+
+    def api_ws_remove(self):
+        who = self._need_account()
+        if not who:
+            return
+        import workspace
+        return self._ws_reply(workspace.remove(who[1], self.json_body().get("user")))
+
+    def api_ws_request(self):
+        who = self._need_account()
+        if not who or self._throttled("wsreq:%d" % who[1]["id"], 20, 86400):
+            return
+        import workspace
+        b = self.json_body()
+        return self._ws_reply(workspace.request(who[1], str(b.get("module") or ""), str(b.get("kind") or ""), b.get("note")))
+
+    def api_ws_decide(self):
+        who = self._need_account()
+        if not who:
+            return
+        import workspace
+        b = self.json_body()
+        return self._ws_reply(workspace.decide(who[1], b.get("id"), bool(b.get("approve"))))
+
+    def api_ws_pref(self):
+        """Company admin settings inside the caps: default role, digest, the name and colour on reports."""
+        who = self._need_account()
+        if not who:
+            return
+        import workspace, modules
+        user, b = who[1], self.json_body()
+        key, mod = str(b.get("key") or ""), str(b.get("module") or "")
+        if mod not in workspace.BY_KEY or not workspace._may_admin(user, mod):
+            return self.send_json(403, {"ok": False, "message": "Only an admin of this module can change its settings."}, self.cors())
+        t = workspace.tenant_of(user)
+        if key in ("brand_name", "brand_colour"):
+            v = modules.set_value(t, key, b.get("value"), by=user["email"])
+            ok = v is not None
+        else:
+            ok = workspace.set_pref(t, key, str(b.get("value") or ""), mod)
+        return self.send_json(200 if ok else 400, {"ok": ok, "message": "Saved." if ok else "That value is not allowed."}, self.cors())
 
     def api_me_delete(self):
         who = self._need_viewer()

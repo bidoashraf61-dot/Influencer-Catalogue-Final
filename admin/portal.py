@@ -819,7 +819,10 @@ def team_codes(code_id):
     # account they are assigned to (plus HelloVoice), e.g. polygonpharma.com.
     private = {str(d).strip().lower() for d in (db.setting("team_sharing_off_domains") or [])}
     if True:   # team sharing is always off (owner, 2026-10-18): nobody sees a colleague's work unless it is shared with them
-        return {code_id} | codelinks.linked_for({code_id})
+        # A person invited into a company (users.company_code_id) works inside that company's code too.
+        co = me["company_code_id"] if "company_code_id" in me.keys() else None
+        base = {code_id} | ({int(co)} if co else set())
+        return base | codelinks.linked_for(base)
     with db.connect() as conn:
         rows = conn.execute("SELECT code_id FROM users WHERE domain = ? AND status = 'active' AND deleted_at IS NULL",
                             (me["domain"],)).fetchall()
