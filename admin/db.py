@@ -16,6 +16,8 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+import overlap
+
 DB_PATH = Path(__file__).resolve().parent / "catalogue.db"
 
 SCHEMA = """
@@ -3263,7 +3265,45 @@ def campaign_content(cid, include_hidden=True):
         d = dict(r)
         d["insights"] = approved.get(r["id"])
         out.append(d)
+    _main_comments_and_unique_views(cid, out)
     return out
+
+
+def _main_comments_and_unique_views(cid, rows):
+    """Two corrections on the numbers each post carries (owner, 2026-10-27).
+    comments: the main comments read for the post, replies excluded, once the post has a finished read; the platform's
+      own counter includes replies (and, on Instagram, the Facebook copy's comments). `comments_reported` keeps it.
+      Sample and demo campaigns keep their numbers.
+    views_unique: views with the Instagram/Facebook overlap taken out; `views` stays as the app shows it."""
+    with connect() as conn:
+        camp = conn.execute("SELECT name, client FROM campaigns WHERE id = ?", (cid,)).fetchone()
+        text = ("%s %s" % (camp["name"] or "", camp["client"] or "")).lower() if camp else ""
+        sample = text.startswith("sample") or text.startswith("demo campaign") or "(demo)" in text or "dummy data" in text
+        try:
+            counts = {r[0]: r[1] for r in conn.execute(
+                "SELECT content_id, COUNT(*) FROM comments WHERE campaign_id = ? GROUP BY content_id", (cid,))}
+            read = {r[0] for r in conn.execute(
+                "SELECT DISTINCT content_id FROM comment_reads WHERE campaign_id = ? AND status = 'done'", (cid,))}
+        except sqlite3.OperationalError:          # no comment tables yet
+            counts, read = {}, set()
+        fb_views = {}
+        for d in rows:
+            if d["platform"] == "Facebook" and d.get("views"):
+                fb_views.setdefault(d["code"], []).append(d["views"])
+        for d in rows:
+            d["comments_reported"] = d.get("comments")
+            if not sample and d["id"] in read:
+                d["comments"] = counts.get(d["id"], 0)
+            d["views_unique"] = d.get("views")
+            if d["platform"] == "Instagram" and d.get("views") and d["code"] in fb_views:
+                raw = conn.execute("SELECT data FROM profile_raw WHERE code = ? AND platform = 'Instagram' "
+                                   "ORDER BY at DESC LIMIT 1", ("post:%d" % d["id"],)).fetchone()
+                if raw is not None:
+                    try:
+                        m = (json.loads(raw["data"]).get("metrics") or {})
+                    except ValueError:
+                        m = {}
+                    d["views_unique"] = max(0, d["views"] - overlap.overlap_views(m, fb_views[d["code"]]))
 
 
 def content_history(cid):
@@ -3276,11 +3316,31 @@ def content_history(cid):
             "FROM snapshots s JOIN content c ON c.id = s.content_id "
             "WHERE c.campaign_id = ? AND c.hidden = 0 AND c.section = 'campaign' "
             "ORDER BY s.at", (cid,)).fetchall()
+    # comments over time are the main comments read, by the day each was written (replies excluded)
+    mine = {}
+    with connect() as conn:
+        try:
+            read = {r[0] for r in conn.execute(
+                "SELECT DISTINCT content_id FROM comment_reads WHERE campaign_id = ? AND status = 'done'", (cid,))}
+            for r in conn.execute("SELECT content_id, COALESCE(posted_at, read_at) t FROM comments WHERE campaign_id = ?", (cid,)):
+                if r[0] in read:
+                    mine.setdefault(r[0], []).append(r[1] or 0)
+            for k in read:
+                mine.setdefault(k, [])
+        except sqlite3.OperationalError:
+            mine = {}
+    for v in mine.values():
+        v.sort()
+
+    def main_by(content_id, day):
+        end = calendar.timegm(time.strptime(day, "%Y-%m-%d")) + 86400
+        return sum(1 for t in mine[content_id] if t < end)
+
     latest, days = {}, {}
     for r in rows:
         latest[r["content_id"]] = r
-        days[r["d"]] = {k: sum((v[k] or 0) for v in latest.values())
-                        for k in ("likes", "comments", "views", "shares", "saves")}
+        days[r["d"]] = {k: sum((v[k] or 0) for v in latest.values()) for k in ("likes", "views", "shares", "saves")}
+        days[r["d"]]["comments"] = sum(main_by(i, r["d"]) if i in mine else (v["comments"] or 0) for i, v in latest.items())
     return [dict(d=d, engagement=v["likes"] + v["comments"] + v["shares"] + v["saves"], **v)
             for d, v in sorted(days.items())]
 

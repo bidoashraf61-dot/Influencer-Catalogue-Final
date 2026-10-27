@@ -165,7 +165,9 @@ def post_numbers(c, f, all_eng=True):
     story = c["kind"] == "story"
     followers = c.get("followers") or 0
     views = ins.get("views", c.get("views"))
+    vu = c.get("views_unique")
     out = {"likes": likes, "comments": comments, "engagement": eng, "views": views or 0,
+           "views_unique": (views if (vu is None or ins.get("views") is not None) else vu) or 0,
            "shares": ins.get("shares", c.get("shares")), "saves": ins.get("saves", c.get("saves")),
            "video": video, "story": story, "real": bool(ins)}
     if all_eng:
@@ -193,6 +195,7 @@ def post_numbers(c, f, all_eng=True):
         out["impressions"] = int(round(imp))
         if story:
             out["views"] = 0             # folded into impressions, not double-counted
+            out["views_unique"] = 0
     out["impressions_real"] = "impressions" in ins
     out["er"] = (eng / float(followers) * 100) if (followers and likes is not None
                                                    and not story) else None
@@ -390,7 +393,7 @@ def report(campaign, internal=False, raw=False):
 
     def totals(items, extra_clicks=0):
         t = {k: sum((p.get(k) or 0) for p in items)
-             for k in ("likes", "comments", "engagement", "views", "reach", "impressions",
+             for k in ("likes", "comments", "engagement", "views", "views_unique", "reach", "impressions",
                        "shares", "saves", "emv")}
         t["seen"] = sum(p["exposure"] for p in items)
         t["hidden_likes"] = sum(1 for p in items if p["likes_hidden"])
@@ -1420,7 +1423,7 @@ def client_report(campaign, photo=None, photo_large=None):
             "section", "likes", "comments", "engagement", "views", "reach", "impressions",
             "shares", "saves", "er", "video_er", "imp_er", "view_rate", "story_rate", "real",
             "reach_real", "impressions_real", "video", "story", "health", "likes_hidden", "gaps", "exposure",
-            "pk", "piece_size", "views_hidden")
+            "pk", "piece_size", "views_hidden", "views_unique")
     posts = [{k: p.get(k) for k in keep} for p in r["posts"]
              if vis["all_content"] or p["section"] == "campaign"]
     names = {c["code"]: c["name"] for c in r["creators"]}
