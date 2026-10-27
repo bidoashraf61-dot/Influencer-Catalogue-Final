@@ -773,7 +773,7 @@
     var rep = cmRep(), t = cmPick();
     if (!(rep > t.n)) return "";
     return '<p class="cm-note"><b>Why the two numbers differ.</b> We read the main comments you can see on each post. The platforms\u2019 count of '
-      + full(rep) + " also includes replies" + (!F.platform || /instagram/i.test(F.platform) ? ", and Instagram counts some comments it never shows" : "") + ".</p>";
+      + full(rep) + " also includes replies" + ".</p>";
   }
   var CM_TIP = "What viewers wrote in the comments under the campaign videos, read by AI once a week, every 7 days from the first video. Commenters' names are never stored. The platforms' own comment count also includes replies, which are not read.";
   var CM_COL = { pos: "#14884a", neu: "#ff691e", neg: "#ee1515" };   // neutral in orange (owner, 2026-10-23)
