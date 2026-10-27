@@ -23,6 +23,7 @@ import db
 TOKEN_FILE = Path(__file__).resolve().parent / ".apify-token"
 API = "https://api.apify.com/v2"
 RIYADH = 3 * 3600                      # Saudi time has no daylight saving
+INSTAGRAM_POST_ACTOR = "data-slayer/instagram-post-details"     # the one actor for Instagram post and reel numbers
 HARD_MAX_HANDLES = 1000                # one run never takes more than this
 RETRY_WAIT = 30 * 60                   # seconds before the scheduler tries a job that got no run again
 DEFAULT_BUDGET = 5.0                   # USD per month, ours; Apify has its own cap
@@ -63,9 +64,13 @@ PRESETS = {
                  "input": '{"username": "{{handles}}", "resultsLimit": 12, "skipPinnedPosts": true}'},
     # Campaign posts: one run for all of a campaign's links on one platform (source "campaign:<id>"),
     # numbers stored as a dated snapshot on each post. Each result is matched to its post by the id in its link.
-    "post_ig": {"label": "Campaign posts · Instagram reels", "platform": "Instagram", "kind": "post_urls",
-                "actor": "codenest/instagram-reels-scraper", "est": 0.004,
-                "input": '{"reel_urls": "{{url_objs}}"}'},
+    # Instagram posts and reels (owner, 2026-10-18): THE actor for any Instagram post or reel numbers. It takes the post links
+    # and returns Instagram's own count plus the Facebook plays of a cross-posted reel, so views, likes, comments, shares and
+    # saves match the Instagram app (the older actors read only the public Instagram counter and came out far lower).
+    # Tested 2026-10-18 on three reels: about 45 seconds a run and under a cent for a handful of posts.
+    "post_ig": {"label": "Campaign posts · Instagram reels (matches the Instagram app)", "platform": "Instagram", "kind": "post_urls",
+                "actor": INSTAGRAM_POST_ACTOR, "est": 0.01,
+                "input": '{"postUrls": "{{urls}}"}'},
     # A competitor's own recent posts, read for the creators in them (source "competitor:<id>", 2026-10-25).
     # The handles are profile URLs, so {{urls}} feeds directUrls; every result belongs to the one competitor
     # the job names, which is why this kind never goes through _match.
@@ -583,6 +588,25 @@ def start_job(jid, trigger="manual"):
         return False, _refuse(job, trigger, "About $%.2f for %d creators would pass the monthly budget of $%.2f "
                                             "(already $%.2f this month). Raise the budget or run fewer."
                               % (est, len(pairs), budget(), spent_this_month()))
+    if job["kind"] == "post_urls" and "{{owner}}" in job["input"]:
+        # Instagram's app numbers (owner, 2026-10-18): this actor takes a profile and returns the newest reels, so there is
+        # one run per creator, and each result is matched to the campaign's posts by the id in its link.
+        by_owner = {}
+        with db.connect() as conn:
+            for cid_, url_ in pairs:
+                row = conn.execute("SELECT c.* FROM content t JOIN creators c ON c.code = t.code WHERE t.id = ?", (int(cid_),)).fetchone()
+                h_ = creator_handles(row).get(job["platform"]) if row is not None else None
+                if h_:
+                    by_owner.setdefault(h_.lower(), []).append((cid_, url_))
+            for h_, posts in by_owner.items():
+                conn.execute("INSERT INTO api_runs (job_id, job_name, trigger, status, handles, handle_map, started_at) "
+                             "VALUES (?,?,?,?,?,?,?)", (jid, job["name"], trigger, "QUEUED", len(posts),
+                                                       json.dumps({u: c for c, u in posts}), db.now()))
+            conn.execute("UPDATE api_jobs SET last_started = ? WHERE id = ?", (db.now(), jid))
+        if not by_owner:
+            return False, _refuse(job, trigger, "None of the posts has a creator with an %s handle." % job["platform"])
+        pump()
+        return True, "Queued %d runs, about $%.2f." % (len(by_owner), len(by_owner) * float(job["est_each"] or 0))
     if "{{handle}}" in job["input"]:
         with db.connect() as conn:
             for code, h in pairs:
@@ -617,7 +641,19 @@ def start_job(jid, trigger="manual"):
     return True, "Started with %d handles, about $%.2f." % (len(handles), est)
 
 
+def _owner_input(job, urls):
+    """The job's input for one creator's run: their handle and how many of their newest reels to read."""
+    with db.connect() as conn:
+        row = conn.execute("SELECT c.* FROM content t JOIN creators c ON c.code = t.code WHERE t.url = ? LIMIT 1", (urls[0],)).fetchone()
+    owner = (creator_handles(row).get(job["platform"]) if row is not None else None) or ""
+    t = job["input"].replace('"{{owner}}"', json.dumps(owner)).replace('"{{limit}}"', str(max(3, min(12, len(urls) + 2))))
+    return json.loads(t)
+
+
 def _launch(job, handles):
+    if job["kind"] == "post_urls" and "{{owner}}" in job["input"]:
+        return call("POST", "/acts/" + job["actor"].replace("/", "~") + "/runs", _owner_input(job, handles),
+                    params={"maxTotalChargeUsd": "0.12"})["data"]      # a slow community actor never runs past 12 cents
     return call("POST", "/acts/" + job["actor"].replace("/", "~") + "/runs", render_input(job["input"], handles),
                 params={"maxTotalChargeUsd": "%.2f" % max(run_cap(), float(job["est_each"] or 0) * 1.3 * max(1, len(handles)))})["data"]
 
@@ -887,7 +923,7 @@ _POST_FIELDS = {
     "views": ("videoplaycount", "viewscount", "playcount", "play_count", "videoviewcount", "viewcount", "views", "view_count",
               "plays", "videoplays", "playscount"),
     "shares": ("sharescount", "sharecount", "shares", "share_count", "repostcount", "reposts"),
-    "saves": ("collectcount", "savescount", "savecount", "saves", "bookmarkcount", "favoritecount"),
+    "saves": ("collectcount", "savescount", "savecount", "save_count", "saves", "bookmarkcount", "favoritecount"),
 }
 
 
@@ -1004,7 +1040,7 @@ def ingest_posts(run, job, items, hmap, store_raw=True):
             whole = sorted(((len(k), c) for _u, (c, k) in keys.items() if k and k in text), reverse=True)
             part = {c for _u, (c, k) in keys.items() if k and k[:24] in text}
             cid = whole[0][1] if whole else (next(iter(part)) if len(part) == 1 else None)
-            if cid is None and len(keys) == 1:
+            if cid is None and len(keys) == 1 and "{{owner}}" not in (job["input"] or ""):
                 cid = next(iter(keys.values()))[0]
             if store_raw:
                 small = it if len(json.dumps(it, default=str)) <= 60000 else _compact(it)
