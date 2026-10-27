@@ -31,26 +31,34 @@ DEFAULT_RUN_CAP = 1.0                  # USD per run, sent to Apify as maxTotalC
 # Starting points. The actor id and the input stay editable on every job, so a
 # different actor needs no code change. Only "profiles" jobs are read back into
 # snapshots; any other kind is run and recorded, and its results stay in Apify.
+# The cheapest actor that returns the fields we need comes first, so a new job starts on it (Bido, 2026-10-27).
+# Every label carries what a creator actually costs, measured from api_runs, not the actor's list price: October
+# went on roster jobs picked from this list, not on the campaign capture below.
 PRESETS = {
-    "ig_profiles": {"label": "Instagram · profile numbers", "platform": "Instagram", "kind": "profiles",
+    "ig_posts": {"label": "Instagram · posts for scoring (25 latest, about $0.008 a creator)", "platform": "Instagram",
+                 "kind": "posts", "actor": "sones/instagram-posts-scraper-lowcost", "est": 0.008,
+                 "input": '{"usernames": "{{handles}}", "postsPerProfile": 25}'},
+    "ig_profiles": {"label": "Instagram · profile numbers (about $0.003 a creator)", "platform": "Instagram", "kind": "profiles",
                     "actor": "apify/instagram-profile-scraper", "est": 0.003,
                     "input": '{"usernames": "{{handles}}", "includeAboutSection": false}'},
-    "ig_audience": {"label": "Instagram · audience demographics (one run per creator)", "platform": "Instagram",
+    "ig_audience": {"label": "Instagram · audience demographics (one run per creator, about $1.70 each)", "platform": "Instagram",
                     "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 1.70,
                     "input": '{"influencerHandle": "{{handle}}", "platform": "instagram"}'},
     "ig_audit": {"label": "Instagram · follower audit (about $2 per creator)", "platform": "Instagram",
                  "kind": "analysis", "actor": "seemuapps/instagram-fake-follower-auditor", "est": 2.00,
                  "input": '{"username": "{{handle}}", "sampleSize": 200}'},
-    "tt_profiles": {"label": "TikTok · profile numbers", "platform": "TikTok", "kind": "profiles",
+    "tt_profiles": {"label": "TikTok · profile numbers (about $0.018 a creator in practice)", "platform": "TikTok", "kind": "profiles",
                     "actor": "khadinakbar/tiktok-profile-scraper", "est": 0.002,
                     "input": '{"profiles": "{{handles}}", "maxResults": "{{count}}"}'},
-    "tt_analytics": {"label": "TikTok · engagement analytics", "platform": "TikTok", "kind": "analysis",
+    "tt_analytics": {"label": "TikTok · engagement analytics and follower numbers (about free)", "platform": "TikTok", "kind": "analysis",
                      "actor": "maximedupre/tiktok-creator-analytics", "est": 0.0001,
                      "input": '{"target": "handles", "creatorHandles": "{{handles}}", "postSampleSize": 100}'},
-    "tt_audience": {"label": "TikTok · audience demographics (one run per creator)", "platform": "TikTok",
+    "tt_audience": {"label": "TikTok · audience demographics (one run per creator, about $1.70 each)", "platform": "TikTok",
                     "kind": "analysis", "actor": "hypebridge/influencer-evaluation-agent-instagram-tiktok", "est": 1.70,
                     "input": '{"influencerHandle": "{{handle}}", "platform": "tiktok"}'},
-    "ig_reels": {"label": "Instagram · reel views (12 latest reels)", "platform": "Instagram", "kind": "posts",
+    # Kept for a one-off: 12 reels cost four times 25 posts from "posts for scoring", and 92% of what it
+    # returned in October was never stored. Use it only when reel views alone are what is wanted.
+    "ig_reels": {"label": "Instagram · reel views, 12 latest (about $0.032 a creator — posts for scoring is cheaper)", "platform": "Instagram", "kind": "posts",
                  "actor": "apify/instagram-reel-scraper", "est": 0.032,
                  "input": '{"username": "{{handles}}", "resultsLimit": 12, "skipPinnedPosts": true}'},
     # Campaign posts: one run for all of a campaign's links on one platform (source "campaign:<id>"),

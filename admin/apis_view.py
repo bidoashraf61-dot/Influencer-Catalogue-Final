@@ -56,7 +56,7 @@ def _job_form(job, presets_js=False):
         + "<div><label>Estimated cost per creator (USD)</label><input name='est_each' type='number' step='0.001' min='0' value='"
         + str(g("est_each", 0.003)) + "'></div></div>"
         + "<label>Input sent to the actor (JSON)</label><textarea name='input' rows='3' style='font-family:monospace;width:100%'>"
-        + e(g("input", apify.PRESETS["ig_profiles"]["input"])) + "</textarea>"
+        + e(g("input", apify.PRESETS["ig_posts"]["input"])) + "</textarea>"
         + "<div class='price-hint'><code>{{handles}}</code> sends all the handles in one run. <code>{{handle}}</code> makes "
           "one run per creator (needed by actors that take a single handle). <code>{{count}}</code> is how many. "
           "A run that would pass the monthly budget is refused. Field names differ per actor, so copy them from "
