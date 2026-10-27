@@ -1928,6 +1928,29 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                   f"SameSite=Lax; Max-Age={ADMIN_TTL}{self.secure_flag()}")
         return self.redirect(to or "/", [("Set-Cookie", cookie)] + list(extra_cookies))
 
+    def chat_admin_email(self, cid):
+        """The email of the HelloVoice owner or admin behind this portal sign-in, else None. Only a real admin
+        (never a key account manager, never someone viewing as a client) gets the assistant's admin hands."""
+        if cid is None or self.kam_clients() is not None or not self.staff_viewer(cid):
+            return None
+        u = portal.user_for_code(cid)
+        a = db.admin_by_email(u["email"]) if u is not None and u["email"] else None
+        if a is None or a["disabled_at"] or team.role_of(a) not in ("owner", "admin"):
+            return None
+        return a["email"]
+
+    def loopback_admin_cookie(self, email):
+        """A short admin session for the assistant's own call back into this server, for an admin who is
+        confirming from the portal. Returns (Cookie header, token to drop afterwards), or (None, None) when
+        two-step sign-in is on and they have no admin session open: they sign in to the admin once instead."""
+        if self.admin() is not None and self.headers.get("Cookie"):
+            return self.headers.get("Cookie"), None
+        row = db.admin_by_email(email)
+        if row is None or row["disabled_at"] or row["totp_on"] or team.must_use_2fa(row):
+            return None, None
+        token = db.create_session(row["id"], 300)
+        return "%s=%s" % (ADMIN_COOKIE, auth.sign(token, SECRET)), token
+
     def pending_2fa(self):
         raw = auth.unsign(self.cookies().get("hv_2fa", ""), SECRET)
         if not raw or not raw.startswith("2fa:"):
@@ -2317,36 +2340,51 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.redirect("/apis?tab=apify&e=" + q(str(ex)))
         return self.redirect("/apis?tab=apify")
 
+    def _code_done(self, cid, done, missing="That client code no longer exists."):
+        """A code action answers the way every other page does: ?ok= when it changed, ?e= when it could not."""
+        q = urllib.parse.quote
+        return self.redirect("/codes?" + ("ok=" if done else "e=") + q(done if done else missing))
+
     def post_code_archive(self):
         cid = self.form_body().get("id")
         row = db.get_code(int(cid)) if cid and cid.isdigit() else None
+        if row is None:
+            return self._code_done(cid, "")
         # Revoke first: a live code is never put away by a stray click.
-        if row is not None and not db.code_state(row)[0]:
+        if not db.code_state(row)[0]:
             db.archive_code(row["id"])
-        return self.redirect("/codes")
+            return self._code_done(cid, "Moved %s to the archive." % row["label"])
+        return self._code_done(cid, "", "Revoke %s first; a live code is not archived." % row["label"])
 
     def post_code_unarchive(self):
         cid = self.form_body().get("id")
-        if cid and cid.isdigit():
-            db.unarchive_code(int(cid))
-        return self.redirect("/codes")
+        row = db.get_code(int(cid)) if cid and cid.isdigit() else None
+        if row is None:
+            return self._code_done(cid, "")
+        db.unarchive_code(row["id"])
+        return self._code_done(cid, "Brought %s back from the archive." % row["label"])
 
     def post_code_delete(self):
         cid = self.form_body().get("id")
-        why = db.delete_code(int(cid)) if cid and cid.isdigit() else "Unknown code."
-        return self.redirect("/codes" + ("?e=" + urllib.parse.quote(why) if why else ""))
+        row = db.get_code(int(cid)) if cid and cid.isdigit() else None
+        why = db.delete_code(int(cid)) if row is not None else "That client code no longer exists."
+        return self._code_done(cid, "" if why else "Deleted %s." % row["label"], why or "")
 
     def post_code_restore(self):
         cid = self.form_body().get("id")
-        if cid and cid.isdigit():
-            db.restore_code(int(cid))
-        return self.redirect("/codes")
+        row = db.get_code(int(cid)) if cid and cid.isdigit() else None
+        if row is None:
+            return self._code_done(cid, "")
+        db.restore_code(row["id"])
+        return self._code_done(cid, "Restored %s." % row["label"])
 
     def post_code_revoke(self):
         cid = self.form_body().get("id")
-        if cid and cid.isdigit():
-            db.revoke_code(int(cid))
-        return self.redirect("/codes")
+        row = db.get_code(int(cid)) if cid and cid.isdigit() else None
+        if row is None:
+            return self._code_done(cid, "")
+        db.revoke_code(row["id"])
+        return self._code_done(cid, "Revoked %s. They can no longer sign in with it." % row["label"])
 
     def roster_back(self, f, code=None, ok=None, e=None):
         """Where a roster action returns to: the same search, the same page,
@@ -2659,6 +2697,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         who = self.admin()
         actor = (who["name"] if "name" in who.keys() and who["name"] else who["email"]) if who else ""
         do = f.get("do") or "confirm"
+        if db.creator(code) is None:
+            return self.redirect(back + "e=" + urllib.parse.quote("There is no creator with the code %s." % (code or "(none)")))
         try:
             if do == "skip":
                 return self.redirect(back + "after=" + urllib.parse.quote(f.get("after") or ""))
@@ -3544,8 +3584,9 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
 
     def post_selection_delete(self):
         sid = (self.form_body().get("id") or "").strip()
-        if sid.isdigit():
-            db.delete_selection(int(sid))
+        if not sid.isdigit() or db.selection(int(sid)) is None:
+            return self.redirect("/selections?e=" + urllib.parse.quote("That selection no longer exists."))
+        db.delete_selection(int(sid))
         return self.redirect("/selections?ok=" + urllib.parse.quote(
             "Selection deleted. Changed your mind? Restore it from History → Trash."))
 

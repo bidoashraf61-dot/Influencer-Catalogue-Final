@@ -1844,6 +1844,7 @@ class PortalMixin(connect_api.ConnectMixin):
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
         ctx["staff"] = bool(user and (dict(user).get("domain") or "").lower() in portal.SAMPLE_DOMAINS)
+        ctx["admin_who"] = self.chat_admin_email(cid)
         if b.get("selection"):
             ctx["selection"] = self._selection_context(b.get("selection"), cid)
         brief, _ = matcher.clean_answers(b.get("brief")) if isinstance(b.get("brief"), dict) else ({}, [])
@@ -1928,7 +1929,16 @@ class PortalMixin(connect_api.ConnectMixin):
         if self._throttled("act:%d" % cid, 30, 600):
             return
         b = self.json_body()
-        res = assistant.confirm_client(str(b.get("token") or ""), cid, b.get("name"))
+        cookie = drop = None
+        admin_email = self.chat_admin_email(cid)
+        if admin_email:
+            cookie, drop = self.loopback_admin_cookie(admin_email)
+        try:
+            res = assistant.confirm_client(str(b.get("token") or ""), cid, b.get("name"), cookie)
+        finally:
+            if drop:
+                with db.connect() as conn:
+                    conn.execute("DELETE FROM sessions WHERE token = ?", (drop,))
         if res.get("ok"):
             db.log("chat_action", cid, self.client_ip(), self._ua(), res.get("message", "")[:80])
         return self.send_json(200, res, self.cors())
@@ -2032,6 +2042,7 @@ class PortalMixin(connect_api.ConnectMixin):
         past = [(m["role"], m["content"]) for m in portal.messages(th["id"], 12)]
         ctx = {"code_id": cid, "user": dict(user) if user else {}}
         ctx["staff"] = bool(user and (dict(user).get("domain") or "").lower() in portal.SAMPLE_DOMAINS)
+        ctx["admin_who"] = self.chat_admin_email(cid)
         if b.get("selection"):
             ctx["selection"] = self._selection_context(b.get("selection"), cid)       # the page they are on
         ctx["page"] = self._page_context(b, cid)

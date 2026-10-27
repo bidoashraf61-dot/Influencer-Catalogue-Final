@@ -72,5 +72,21 @@ t("a wordless list page is not a success", R(303, "/admin/campaigns", "", "x")["
 t("a wordless page the action does land on is", R(303, "/admin/campaigns/edit?id=9", "", "x", ("/campaigns/edit",))["ok"], True)
 t("403 is a refusal", R(403, "", "nope", "x")["ok"], False)
 
+# --- codes, selections, team, roster ---
+for area in ("code", "selection", "team", "roster"):
+    t("area %s has actions" % area, bool(actions.catalogue(area)["actions"]), True)
+    t("area %s is described" % area, area in actions.AREAS, True)
+t("code.delete is high risk", actions.describe("code.delete", {"id": 3}), "DELETE client code 3. This cannot be undone")
+t("team reset is high risk", actions.REGISTRY["team.reset_2fa"]["risk"], "high")
+t("selection.create needs only a name", actions.check("selection.create", {"name": "Q4"})[1], {"name": "Q4"})
+t("selection.create fills in the form's mode", actions.REGISTRY["selection.create"]["defaults"], {"mode": "scratch"})
+raises("code.limits refuses a stray field", lambda: actions.check("code.limits", {"id": 1, "label": "x"}), "does not take")
+raises("team.role needs a role", lambda: actions.check("team.role", {"id": 2}), "needs role")
+# Whole-page saves stay out: they replace every field they are sent.
+t("/roster/save is not exposed", [k for k, v in actions.REGISTRY.items() if v["path"] == "/roster/save"], [])
+t("/settings, /portal/keys are not exposed",
+  [k for k, v in actions.REGISTRY.items() if v["path"].startswith(("/settings", "/portal/keys", "/apis"))], [])
+t("a step-up redirect says so, not 'sign in'", "confirm it is you" in R(303, "/admin/reauth?again=1", "", "x")["error"], True)
+
 print("\n%d passed, %d failed" % (ok, fail))
 sys.exit(1 if fail else 0)

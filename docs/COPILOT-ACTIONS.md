@@ -38,27 +38,51 @@ admin types  →  Gemini picks list_actions, then do_action
   (`sql_query`, `client_overview`, `list_clients`, `list_selections`), no write may
   be queued in the same turn. The admin asks again in a fresh message. This is what
   stops text a client typed from steering an action.
-- **Admins only.** `do_action` sits in `ADMIN_WRITE`, which key account managers
-  are already blocked from.
+- **Owners and admins only.** `do_action` sits in `ADMIN_WRITE`, which key account
+  managers are already blocked from. The website chat (Helvi) gets the same two
+  tools only when `Handler.chat_admin_email()` finds that the portal sign-in belongs
+  to an active admin account with role owner or admin, and not a key account
+  manager or someone viewing as a client. Everyone else sees no trace of them.
+
+## Two chat bots, one bridge
+
+- **Admin copilot** (`/admin/ai`): as before.
+- **Website chat** (the catalogue's Helvi bubble): an owner or admin who signs in
+  to the portal with their work email gets `list_actions` + `do_action`, and the
+  prompt says they are staff. Confirm goes to `/api/chat/confirm`, which runs the
+  action as their admin account. If they also have an admin session open it uses
+  that; otherwise `Handler.loopback_admin_cookie()` mints a 5-minute session for the
+  one call and deletes it. With two-step sign-in on and no admin session open it
+  refuses and asks them to sign in to the admin once.
+- Anything the portal asks a fresh sign-in for (Team, deleting a code, tiers) comes
+  back as "confirm it is you first": open the admin, confirm, ask again.
 
 ## What it covers today
 
-Campaigns end to end, 13 actions: create a campaign, take it live / offline /
+33 actions. Campaigns end to end, 13 actions: create a campaign, take it live / offline /
 ended, pull in creators from its selection, delete it; add one post or paste many,
 edit, hide, delete, group, and record what is still expected; edit, add and switch
 tracking links; approve or reject a creator's screenshot numbers.
+
+Added 2026-10-27: **client access codes** (issue with the passcode read back,
+rename, limits, passcode, revoke, restore, archive, unarchive, delete), **selections**
+(create empty, rename, delete), **team** (invite, role, remove/restore access,
+sign out, resend invite, reset two-step) and **creator industry** (confirm / hide).
+The code handlers now answer with `?ok=` / `?e=` like the rest, and the roster
+review and selection delete refuse an id that does not exist.
 
 ## Adding more
 
 Add a row to `REGISTRY` with the path, the fields that form submits, a one-line
 description and a sentence template. No other code changes. The areas not yet
-covered — roster, analysis, codes, evidence, team, alerts, settings, tenants,
-tiers, quotes — are the same shape of work; `/campaigns/save`-style whole-page
+covered — analysis, evidence, alerts, settings, tenants, tiers, quotes, and
+creator edits beyond industry (use `update_creator`; `/roster/save` is a whole-page
+form and stays out) — are the same shape of work; `/campaigns/save`-style whole-page
 forms need a prefill-merge first, or they stay out.
 
 ## Checking it
 
     python3 admin/tests/test_actions.py
 
-18 checks over the guard rails and the read-back protocol. The last hop — Confirm
+35 checks over the guard rails and the read-back protocol. The last hop — Confirm
 with a live admin session — can only be exercised by a signed-in admin.

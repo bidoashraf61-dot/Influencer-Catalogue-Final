@@ -51,10 +51,10 @@ COUNTS = {"likes": "Likes.", "comments": "Comments.", "views": "Views.",
           "shares": "Shares.", "saves": "Saves."}
 
 
-def _a(path, about, line, fields, required=(), multi=(), risk="normal", lands=()):
+def _a(path, about, line, fields, required=(), multi=(), risk="normal", lands=(), defaults=None):
     return {"path": path, "about": about, "line": line, "fields": fields,
             "required": tuple(required), "multi": tuple(multi), "risk": risk,
-            "lands": tuple(lands)}
+            "lands": tuple(lands), "defaults": dict(defaults or {})}
 
 
 REGISTRY = {
@@ -159,12 +159,99 @@ REGISTRY = {
         dict({"id": "Campaign id.", "insight": "The insight's id.", "do": "approve or reject.",
               "post": "Which post id the numbers belong to (needed to approve)."}, **COUNTS),
         required=("id", "insight")),
+
+    # ---- client access codes
+    "code.create": _a(
+        "/codes/new",
+        "Issue a new client access code (the passcode a client types). Leave 'custom' empty and one is generated.",
+        "Issue a new access code for “{label}”",
+        {"label": "The client it is for.", "custom": "A passcode to use instead of a generated one (optional).",
+         "days": "Days until it expires, empty for never (optional).", "max_uses": "Most sign-ins (optional).",
+         "max_devices": "Most devices (optional).", "credits": "AI credits to start with (optional)."},
+        required=("label",), lands=("/codes",)),
+    "code.rename": _a(
+        "/codes/rename", "Rename the client a code is issued to; cascade=1 also renames it on their selections and campaigns.",
+        "Rename client code {id} to “{label}”",
+        {"id": "Code id.", "label": "The new client name.", "cascade": "1 to rename it everywhere it shows (optional)."},
+        required=("id", "label")),
+    "code.limits": _a(
+        "/codes/limits", "Set a code's device limit, use limit and last day. An empty value means no limit.",
+        "Change the limits on client code {id}",
+        {"id": "Code id.", "max_devices": "Most devices.", "max_uses": "Most sign-ins.", "expires": "Last day, YYYY-MM-DD."},
+        required=("id",)),
+    "code.passcode": _a(
+        "/codes/passcode", "Change the passcode a client types. Tell the client the new one afterwards.",
+        "Change the passcode of client code {id}",
+        {"id": "Code id.", "passcode": "The new passcode."}, required=("id", "passcode")),
+    "code.revoke": _a(
+        "/codes/revoke", "Revoke a code: that client can no longer sign in with it until it is restored.",
+        "Revoke client code {id}", {"id": "Code id."}, required=("id",)),
+    "code.restore": _a(
+        "/codes/restore", "Restore a revoked code.", "Restore client code {id}", {"id": "Code id."}, required=("id",)),
+    "code.archive": _a(
+        "/codes/archive", "Move a revoked code to the archive.", "Archive client code {id}", {"id": "Code id."}, required=("id",)),
+    "code.unarchive": _a(
+        "/codes/unarchive", "Bring a code back from the archive.", "Unarchive client code {id}", {"id": "Code id."}, required=("id",)),
+    "code.delete": _a(
+        "/codes/delete", "Delete an archived code that nothing is tied to. Asks the admin to confirm it is them again.",
+        "DELETE client code {id}", {"id": "Code id."}, required=("id",), risk="high"),
+
+    # ---- selections
+    "selection.create": _a(
+        "/selections/new", "Start an empty selection for a client (add creators afterwards with the selection tools).",
+        "Create the selection “{name}”",
+        {"name": "What to call it.", "code_id": "Client code id (optional).",
+         "currency": "SAR, USD, AED... (optional, default SAR).", "platform": "Instagram, TikTok... (optional)."},
+        required=("name",), lands=("/selections",), defaults={"mode": "scratch"}),
+    "selection.rename": _a(
+        "/selections/rename", "Rename a selection.", "Rename selection {id} to “{name}”",
+        {"id": "Selection id.", "name": "The new name."}, required=("id", "name")),
+    "selection.delete": _a(
+        "/selections/delete", "Delete a selection. It can be restored from History > Trash.",
+        "Delete selection {id}", {"id": "Selection id."}, required=("id",)),
+
+    # ---- the team
+    "team.invite": _a(
+        "/team/invite", "Give a colleague admin access; they sign in with an email code. Owner only.",
+        "Invite {email} as {role}",
+        {"email": "Their work email.", "name": "Their name.", "role": "owner, admin, manager, editor or viewer."},
+        required=("email", "role")),
+    "team.role": _a(
+        "/team/role", "Change what a team member may do. Owner only.", "Make team member {id} a {role}",
+        {"id": "Team member id.", "role": "owner, admin, manager, editor or viewer."}, required=("id", "role")),
+    "team.disable": _a(
+        "/team/disable", "Remove a team member's access.", "Remove access for team member {id}", {"id": "Team member id."}, required=("id",)),
+    "team.enable": _a(
+        "/team/enable", "Give a removed team member their access back.", "Restore access for team member {id}",
+        {"id": "Team member id."}, required=("id",)),
+    "team.signout": _a(
+        "/team/signout", "Sign a team member out everywhere.", "Sign team member {id} out everywhere",
+        {"id": "Team member id."}, required=("id",)),
+    "team.reinvite": _a(
+        "/team/reinvite", "Email a team member their sign-in invite again.", "Resend the invite to team member {id}",
+        {"id": "Team member id."}, required=("id",)),
+    "team.reset_2fa": _a(
+        "/team/reset2fa", "Reset a team member's two-step sign-in and sign them out.", "RESET two-step sign-in for team member {id}",
+        {"id": "Team member id."}, required=("id",), risk="high"),
+
+    # ---- roster
+    "roster.industry": _a(
+        "/roster/review", "Confirm which industry a creator belongs to (do=confirm, the default) or hide them from clients "
+        "as not a fit (do=unfit). For anything else about a creator use update_creator.",
+        "{do} industry for creator {code}",
+        {"code": "Creator code.", "do": "confirm or unfit.", "ind_main": "The main industry (to confirm).",
+         "ind_subs": "Sub-industries (optional).", "ind_also": "Also-fits (optional)."},
+        required=("code",), multi=("ind_subs", "ind_also")),
 }
 
 AREAS = {"campaign": "The campaign itself: create, go live, delete, pull creators from its selection.",
          "post": "The posts on a campaign: add one or many, edit, hide, delete, group, and what is still expected.",
          "link": "A campaign's tracking links.",
-         "insight": "Screenshot numbers a creator sent in."}
+         "insight": "Screenshot numbers a creator sent in.",
+         "code": "Client access codes: issue, rename, limits, passcode, revoke, restore, archive, delete.",
+         "selection": "Selections: create an empty one, rename, delete.",
+         "team": "The HelloVoice team's admin access: invite, roles, remove, sign out, reset two-step.",
+         "roster": "A creator's industry confirmation. Other creator edits use update_creator."}
 
 
 def catalogue(area=""):
@@ -228,9 +315,9 @@ def run(action, fields, cookie):
     """Do it, through the portal's own door, as the admin who pressed Confirm."""
     a, fields = check(action, fields)
     if not cookie:
-        return {"ok": False, "error": "No admin session on the confirming request."}
+        return {"ok": False, "error": "No admin session to act with. Open the admin once and sign in (two-step code if asked), then ask again."}
     pairs = []
-    for k, v in fields.items():
+    for k, v in dict(a["defaults"], **fields).items():
         if isinstance(v, (list, tuple)):
             pairs += [(k, str(x)) for x in v]
         else:
@@ -263,7 +350,10 @@ def _read_back(status, where, text, action, lands=()):
     q = urllib.parse.parse_qs(urllib.parse.urlparse(where).query)
     said = (q.get("ok") or [""])[0]
     wrong = (q.get("e") or [""])[0]
-    if any(path.endswith(p) for p in ("/login", "/reauth", "/password")):
+    if path.endswith("/reauth"):
+        return {"ok": False, "error": "The portal wants you to confirm it is you before this one (Team, passcodes and deletes). "
+                                      "Open the admin, confirm when asked, then ask again."}
+    if any(path.endswith(p) for p in ("/login", "/password")):
         return {"ok": False, "error": "Not signed in: the portal sent the call to its sign-in page. "
                                       "Sign in again and ask once more."}
     if status in (401, 403):
@@ -274,6 +364,9 @@ def _read_back(status, where, text, action, lands=()):
         return {"ok": False, "error": "The portal answered %d: %s" % (status, text[:200])}
     if said:
         return {"ok": True, "message": said, "action": action}
+    if q.get("new") and path.endswith("/codes"):
+        # A new access code is shown once, in the redirect: hand it to the admin.
+        return {"ok": True, "message": "Issued. The new passcode is %s. Share it with the client." % q["new"][0], "action": action}
     if lands and any(path.endswith(p) or p in path for p in lands):
         return {"ok": True, "message": "Done.", "action": action}
     return {"ok": False, "error": "The portal did not confirm it - it answered with %s and no message. "
