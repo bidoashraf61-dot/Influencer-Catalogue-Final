@@ -6,6 +6,7 @@ include the username). The numbers and the date come from the campaign's capture
 """
 import re
 import urllib.parse
+import urllib.request
 
 _HOSTS = (("instagram.com", "Instagram"), ("tiktok.com", "TikTok"), ("snapchat.com", "Snapchat"),
           ("youtube.com", "YouTube"), ("youtu.be", "YouTube"), ("x.com", "X"), ("twitter.com", "X"),
@@ -60,3 +61,30 @@ def pick_creator(handle, members):
         return None
     hit = {code for code, hs in members if handle in {str(v).lower() for v in hs.values()}}
     return hit.pop() if len(hit) == 1 else None
+
+
+_SHORT = ("vt.tiktok.com", "vm.tiktok.com", "www.tiktok.com/t/", "tiktok.com/t/", "instagram.com/share/", "www.instagram.com/share/",
+          "fb.watch", "youtu.be", "snapchat.com/t/", "www.snapchat.com/t/")
+
+
+def canonical(url):
+    """The link the capture jobs can match: a share link followed to the post it points at (TikTok vt./vm. links, Instagram
+    /share/ links), youtu.be/<id> written as a watch link, and tracking parameters dropped. Unchanged when it cannot be followed."""
+    url = (url or "").strip()
+    u = urllib.parse.urlparse(url)
+    host = (u.hostname or "").lower()
+    if host == "youtu.be" and u.path.strip("/"):
+        return "https://www.youtube.com/watch?v=" + u.path.strip("/").split("/")[0]
+    short = any((host + u.path).startswith(s) for s in _SHORT) or host in ("vt.tiktok.com", "vm.tiktok.com")
+    if short:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (Macintosh) AppleWebKit/605 Safari/605"})
+            with urllib.request.urlopen(req, timeout=8) as r:
+                final = urllib.parse.urlparse(r.geturl())
+            if (final.hostname or "") and final.path.strip("/") and "/t/" not in final.path:
+                u = final
+        except (OSError, ValueError):
+            return url
+    if any(h in (u.hostname or "") for h in ("instagram.com", "tiktok.com", "facebook.com", "x.com", "twitter.com", "threads")):
+        return urllib.parse.urlunparse((u.scheme, u.netloc, u.path, "", "", ""))
+    return urllib.parse.urlunparse(u)

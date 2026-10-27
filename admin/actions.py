@@ -285,7 +285,42 @@ def check(action, fields):
     missing = [k for k in a["required"] if k not in fields]
     if missing:
         raise ValueError("%s needs %s." % (action, ", ".join(missing)))
+    for k in _ID_FIELDS:
+        if k not in fields or k not in a["fields"]:
+            continue
+        if str(fields[k]).strip().isdigit():
+            fields[k] = str(fields[k]).strip()
+        elif k == "id" and a["fields"][k].startswith("Campaign id"):
+            fields[k] = _campaign_by_name(str(fields[k]))       # the model gave a name: find the number
+        else:
+            raise ValueError("%s: %s must be the number from the portal, not %r." % (action, k, fields[k]))
     return a, fields
+
+
+_ID_FIELDS = ("id", "content", "insight", "post", "code_id", "selection")
+
+
+def _campaign_by_name(name):
+    """A campaign's id from what the admin called it, or ValueError saying which names matched."""
+    import db
+    want = " ".join(name.lower().split())
+    with db.connect() as conn:
+        rows = conn.execute("SELECT id, name, client FROM campaigns WHERE deleted_at IS NULL").fetchall() \
+            if _has_col("campaigns", "deleted_at") else conn.execute("SELECT id, name, client FROM campaigns").fetchall()
+    exact = [r for r in rows if " ".join((r["name"] or "").lower().split()) == want]
+    near = exact or [r for r in rows if want and want in " ".join(((r["name"] or "") + " " + (r["client"] or "")).lower().split())]
+    if len(near) == 1:
+        return str(near[0]["id"])
+    if not near:
+        raise ValueError("No campaign is called %r. Use list_campaigns to find its number." % name)
+    raise ValueError("%d campaigns match %r: %s. Ask which one, or use its number."
+                     % (len(near), name, "; ".join("%s = %s" % (r["id"], r["name"]) for r in near[:8])))
+
+
+def _has_col(table, col):
+    import db
+    with db.connect() as conn:
+        return any(r["name"] == col for r in conn.execute("PRAGMA table_info(%s)" % table))
 
 
 def describe(action, fields):

@@ -51,7 +51,7 @@ t("sentence, extras appended", actions.describe("post.add", {
     "id": 2, "url": "https://x.com/p/1", "code": "HV-MC-049", "platform": "TikTok", "kind": "reel", "likes": 10}),
   "Add the post https://x.com/p/1 to campaign 2 — code HV-MC-049, kind reel, likes 10, platform TikTok")
 t("a link alone is enough to add a post", actions.check("post.add", {"id": 2, "url": "https://www.tiktok.com/@a/video/1"})[1],
-  {"id": 2, "url": "https://www.tiktok.com/@a/video/1"})
+  {"id": "2", "url": "https://www.tiktok.com/@a/video/1"})
 t("delete is called out", actions.describe("campaign.delete", {"id": 7}),
   "DELETE campaign 7 and everything on it. This cannot be undone")
 
@@ -73,6 +73,9 @@ t("the sign-in page is never a success", R(303, "/admin/login", "", "x")["ok"], 
 t("a wordless list page is not a success", R(303, "/admin/campaigns", "", "x")["ok"], False)
 t("a wordless page the action does land on is", R(303, "/admin/campaigns/edit?id=9", "", "x", ("/campaigns/edit",))["ok"], True)
 t("403 is a refusal", R(403, "", "nope", "x")["ok"], False)
+
+raises("a non-number id is refused before anything is queued", lambda: actions.check("code.revoke", {"id": "Acme"}), "must be the number")
+raises("a post id must be a number", lambda: actions.check("post.update", {"id": 2, "content": "the last one", "do": "hide"}), "must be the number")
 
 # --- codes, selections, team, roster ---
 for area in ("code", "selection", "team", "roster"):

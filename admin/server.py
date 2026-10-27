@@ -3870,6 +3870,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if not re.match(r"^https://[^\s/]+\.[^\s]+$", url):
             return self.redirect(back + "&e=" + urllib.parse.quote("The post link must start with https://"))
         import postlink
+        url = postlink.canonical(url)               # a share link is followed to the post, so its numbers can be matched
         plat_i, kind_i, handle = postlink.infer(url)
         members = db.campaign_creators(k["id"])
         mine = {m["cc_code"] for m in members}
