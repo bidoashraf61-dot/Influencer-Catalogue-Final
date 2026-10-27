@@ -1045,12 +1045,20 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path == "/licences":
             import licence
             return self.send(200, licence.page_html(query))
-        if path == "/tenants":
+        if path == "/tenants" or path.startswith("/tenants/"):
             # Who has which module. Owners configure the platform; admins run the business.
             if team.role_of(who) != "owner":
                 return self.send(403, team_views.forbidden_page(team.role_of(who)))
             import tenants
-            return self.send(200, tenants.page_html(query))
+            if path == "/tenants/co":
+                return self.send(200, tenants.company_html((query.get("k") or "").strip(), query))
+            if path == "/tenants/requests":
+                return self.send(200, tenants.requests_html(query))
+            if path == "/tenants/hist":
+                return self.send_json(200, tenants.history_rows((query.get("k") or "").strip(), query.get("f") or ""),
+                                      [("Cache-Control", "no-store")])
+            if path == "/tenants":
+                return self.send(200, tenants.page_html(query))
         if path == "/requests":
             return self.send(200, views.requests_page(db.list_requests(),
                                                       db.list_creators(), db.tier_prices()))
@@ -1474,12 +1482,26 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.post_client_preview()
         if path.startswith("/app-alerts/"):
             return self.post_app_alerts(path, who)
-        if path == "/tenants/save":
+        if path.startswith("/tenants/"):
             if team.role_of(who) != "owner":
                 return self.send(403, team_views.forbidden_page(team.role_of(who)))
             import tenants
-            said = tenants.save(self.form_body(), who["email"] if "email" in who.keys() else "", self.client_ip())
-            return self.redirect("/tenants?ok=" + urllib.parse.quote(said))
+            by = who["email"] if "email" in who.keys() else ""
+            if path == "/tenants/set":
+                b = self.json_body()
+                ok, msg, val, changed = tenants.apply_edit(str(b.get("k") or ""), str(b.get("field") or ""),
+                                                           b.get("value"), by, self.client_ip())
+                return self.send_json(200 if ok else 400, {"ok": ok, "error": msg, "value": val, "changed": changed},
+                                      [("Cache-Control", "no-store")])
+            if path == "/tenants/requests/decide":
+                f = self.form_body()
+                try:
+                    rid = int(f.get("id") or 0)
+                except ValueError:
+                    rid = 0
+                ok, said = tenants.decide(rid, f.get("do") or "", (f.get("value") or "").strip(),
+                                          (f.get("reply") or "").strip(), by, self.client_ip())
+                return self.redirect("/tenants/requests?" + ("ok=" if ok else "e=") + urllib.parse.quote(said))
 
         if path.startswith("/evidence/"):
             return self.post_evidence(path, who)
