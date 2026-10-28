@@ -297,7 +297,10 @@ def _percentile(kind, names, value):
             if v is not None:
                 vals.append(v)
         return sorted(vals)
-    dist = _cached(("pct", kind, tuple(sorted(names))) + _sig(), build)
+    # Keyed on the analyses alone (item 278): a roster save changed _sig() and made every brief rebuild these
+    # distributions over all creators while the team was editing (14-27 s shortlists on 2026-10-29).
+    discover._load()
+    dist = _cached(("pct", kind, tuple(sorted(names)), discover._cache.get("sig")), build)
     if not dist:
         return NEUTRAL
     return round(100.0 * bisect_left(dist, value) / len(dist))

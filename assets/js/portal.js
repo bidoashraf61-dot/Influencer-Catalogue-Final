@@ -1230,7 +1230,8 @@
     if (id === "market") return (f.markets && f.markets.length ? f.markets : a.market ? [a.market] : []).map(function (v) { return lab("market", v); }).join(", ");
     if (id === "goal") return a.goal ? lab("goal", a.goal) : "";
     if (id === "timing") return [f.launch ? "Launch " + f.launch : "", a.timing ? lab("timing", a.timing) : ""].filter(Boolean).join(" · ");
-    if (id === "audience") return [f.audience, a.gender && a.gender !== "Any" ? lab("gender", a.gender) : "", a.age && a.age !== "Any" ? lab("age", a.age) : ""].filter(Boolean).join(" · ");
+    if (id === "audience") return [f.audience, a.gender && a.gender !== "Any" ? lab("gender", a.gender) : "",
+      asList(a.age).filter(function (v) { return v !== "Any"; }).map(function (v) { return lab("age", v); }).join(", ")].filter(Boolean).join(" · ");
     return q ? "" : (f[id] || "");
   }
   // The notes the server wrote, re-made from the fields the client edited (the "From ..." part stays).
