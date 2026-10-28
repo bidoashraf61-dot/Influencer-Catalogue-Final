@@ -430,6 +430,11 @@
     tb.appendChild(body);
     p.appendChild(h("div", { class: "ws-sec ws-scroll" }, tb));
 
+    if (!T.invites) {
+      p.appendChild(h("div", { class: "ws-card ws-note" }, h("h2", null, "Inviting colleagues opens soon"),
+        h("p", null, "Until then your account manager can add colleagues to your account for you.")));
+      return;
+    }
     var f = { name: h("input", { id: "iv-n", autocomplete: "off" }), email: h("input", { id: "iv-e", type: "email", autocomplete: "off" }) }, rs = {};
     var fields = h("div", { class: "ws-invite" },
       h("div", { class: "ws-field" }, h("label", { for: "iv-n" }, "Name"), f.name),

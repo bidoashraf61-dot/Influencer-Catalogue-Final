@@ -176,9 +176,18 @@ def _may_admin(actor, key):
     return effective(actor, key) == "admin"
 
 
+def invites_open(tenant):
+    """Inviting colleagues waits until a colleague sees the company's data everywhere (the gate session's work).
+    Setting `workspace_invites`: "all" opens it for everyone; otherwise a list of company code ids may invite."""
+    v = db.setting("workspace_invites", [55])          # 55 = the QA company
+    return v == "all" or (isinstance(v, list) and int(tenant) in [int(x) for x in v if str(x).isdigit()])
+
+
 def invite(actor, email, name, roles):
     """(ok, message). The actor must be admin of every module they hand out."""
     tenant = tenant_of(actor)
+    if not invites_open(tenant):
+        return False, "Inviting colleagues opens soon. Until then your account manager can add them for you."
     roles = {k: r for k, r in (roles or {}).items() if k in BY_KEY and r in RANK and r != "none"}
     if not roles:
         return False, "Pick a role in at least one module."
@@ -401,7 +410,7 @@ def payload(user, key=None):
         out["limits"] = [{"key": f["key"], "label": f["label"], "value": modules.number(tenant, f["key"])}
                          for f in modules.LIMITS if f["key"] in ("seats", "campaigns_max", "selections_max", "spend_month", "credits_month")]
         if cur["role"] == "admin":
-            out["team"] = {"people": people(tenant), "pending": pending_roles(user), "seats": list(seats(tenant)),
+            out["team"] = {"invites": invites_open(tenant), "people": people(tenant), "pending": pending_roles(user), "seats": list(seats(tenant)),
                            "roles": [{"key": r, "help": ROLE_HELP[r]} for r in ROLES],
                            "modules": [{"key": m["key"], "name": m["short"], "on": level(tenant, m["key"]) != "off"} for m in MODS]}
     return out
