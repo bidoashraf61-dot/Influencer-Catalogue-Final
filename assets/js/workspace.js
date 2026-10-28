@@ -97,7 +97,8 @@
   function meter(m) {
     var pct = m.cap ? Math.min(100, Math.round(m.used * 100 / m.cap)) : null;
     var card = h("div", { class: "ws-card ws-meter" }, h("span", { class: "ws-lab" }, m.label),
-      h("div", null, h("b", null, m.used.toLocaleString()), h("small", null, m.cap ? "of " + m.cap.toLocaleString() : "no limit")));
+      h("div", null, h("b", null, (m.unit === "$" ? "$" : "") + m.used.toLocaleString()),
+        h("small", null, m.cap ? "of " + (m.unit === "$" ? "$" : "") + m.cap.toLocaleString() : "no limit")));
     if (pct !== null) {
       card.appendChild(h("div", { class: "ws-bar" + (pct >= 85 ? " is-hot" : ""), role: "img", "aria-label": pct + " percent used" }, h("i", { style: "width:" + pct + "%" })));
       if (pct >= 80) card.appendChild(requestMore(m.label));
@@ -373,7 +374,7 @@
           body.appendChild(h("tr", null, h("td", { class: "ws-who" }, h("b", null, c.name), h("span", null, c.platform + (c.handle ? " · @" + c.handle.replace(/^@/, "") : ""))),
             h("td", { "data-label": "Worked with" }, c.competitors.join(", ")), h("td", { "data-label": "Posts" }, String(c.posts)),
             h("td", { "data-label": "Best views" }, fmt(c.best_views)), h("td", { "data-label": "Followers" }, fmt(c.followers)),
-            h("td", { "data-label": "Roster", class: "ws-td-tag" }, tag || "–")));
+            h("td", { "data-label": "Roster", class: "ws-td-tag" }, tag || h("span", { class: "ws-dash", "aria-label": "Not on the roster" }, "–"))));
         });
         tb.appendChild(body);
         box.appendChild(h("article", { class: "ws-card ws-pack" }, h("div", { class: "ws-headrow" }, h("h2", null, pk.title),

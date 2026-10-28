@@ -387,6 +387,13 @@ def _overview(tenant, user, key):
             import competitors
             comps = competitors.listing(tenant)
             meters.append(_meter("Competitors", len(comps), 40))
+            # The two caps a collection is refused on (tenant_api.collect), shown before they bite.
+            try:
+                meters.append(_meter("Collections today", competitors.runs_today(tenant), modules.number(tenant, "captures_day")))
+                meters.append(_meter("Collection spend this month", round(competitors.spend_month(tenant), 2),
+                                     modules.number(tenant, "spend_month"), "$"))
+            except Exception:
+                pass
             outputs = [{"title": c.get("name", ""), "sub": ("Last run " + str(c["last_run_at"])) if c.get("last_run_at") else "Not collected yet",
                         "href": ""} for c in comps[:6]]
             checklist = [("Name a competitor", len(comps) > 0), ("Run a first collection", any(c.get("last_run_at") for c in comps)),
