@@ -10,6 +10,31 @@
    guarded: private mode or blocked storage must never break the page. */
 (function () {
   "use strict";
+  // Access (docs/SAAS-MODEL.md): a module that is not open to this person answers 403 {code, module}. The locked screen
+  // is access.js, loaded only when one arrives, so an ordinary page pays nothing for it.
+  (function () {
+    var f = window.fetch;
+    if (!f || window.__hvAccessWatch) return;
+    window.__hvAccessWatch = true;
+    var CODES = { locked: 1, paused: 1, no_role: 1, read_only: 1 }, loading = false;
+    window.fetch = function () {
+      return f.apply(this, arguments).then(function (r) {
+        if (r.status === 403) {
+          r.clone().json().then(function (b) {
+            if (!b || !CODES[b.code] || !b.module) return;
+            if (window.hvAccessRefused) return window.hvAccessRefused(b);
+            window.__hvAccessPending = b;
+            if (loading) return;
+            loading = true;
+            var sc = document.createElement("script");
+            sc.src = "/assets/js/access.js?v=0";
+            document.head.appendChild(sc);
+          }).catch(function () { /* a 403 that is not ours */ });
+        }
+        return r;
+      });
+    };
+  })();
   // Trial share links (item 271): the trial strip, only in a browser opened from /admin/try/<token>.
   if (/(?:^|;\s*)hv_trial_on=1/.test(document.cookie)) {
     var tj = document.createElement("script");
