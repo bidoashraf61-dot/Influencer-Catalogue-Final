@@ -1426,7 +1426,8 @@ def _save_codes(sel, codes, name=None, ctx=None):
     if not same and ctx is not None:
         import lifecycle                       # a quote may exist: record it and tell the account manager
         import portal as _p
-        lifecycle.on_client_edit(sel, before, codes, _p.user_for_code(ctx.get("code_id")))
+        # ctx["user"] is the person who asked (a colleague, not the company's account holder)
+        lifecycle.on_client_edit(sel, before, codes, ctx.get("user") or _p.user_for_code(ctx.get("code_id")))
 
 
 def d_sel_add(a, ctx):
@@ -1480,7 +1481,7 @@ def x_sel_rename(a, ctx):
     sel = _open_sel(ctx)
     if not selrename.client_may(ctx["code_id"], sel, db.admin_code_id()):
         raise ValueError(selrename.MESSAGES["forbidden"])
-    u = portal.user_for_code(ctx["code_id"])
+    u = ctx.get("user") or portal.user_for_code(ctx["code_id"])      # the person who asked, not the account holder
     row, err = selrename.apply(sel, a["name"], "client: " + ((u["email"] if u is not None else None) or "Helvi"))
     if err:
         raise ValueError(selrename.MESSAGES[err])
