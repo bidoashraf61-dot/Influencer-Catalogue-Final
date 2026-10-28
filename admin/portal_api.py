@@ -1709,7 +1709,8 @@ class PortalMixin(connect_api.ConnectMixin):
             return
         import workspace
         b = self.json_body()
-        return self._ws_reply(workspace.request(person, str(b.get("module") or ""), str(b.get("kind") or ""), b.get("note")))
+        return self._ws_reply(workspace.request(person, str(b.get("module") or ""), str(b.get("kind") or ""), b.get("note"),
+                                                str(b.get("level") or "") or None, str(b.get("limit") or "") or None))
 
     def api_ws_decide(self):
         person = self._ws_person()

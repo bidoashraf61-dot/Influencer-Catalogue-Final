@@ -101,14 +101,14 @@
         h("small", null, m.cap ? "of " + (m.unit === "$" ? "$" : "") + m.cap.toLocaleString() : "no limit")));
     if (pct !== null) {
       card.appendChild(h("div", { class: "ws-bar" + (pct >= 85 ? " is-hot" : ""), role: "img", "aria-label": pct + " percent used" }, h("i", { style: "width:" + pct + "%" })));
-      if (pct >= 80) card.appendChild(requestMore(m.label));
+      if (pct >= 80) card.appendChild(requestMore(m.label, m.key));
     }
     return card;
   }
-  function requestMore(label) {
+  function requestMore(label, key) {
     var b = h("button", { class: "ws-btn ws-btn--sm ws-btn--ghost", type: "button", onclick: function () {
       b.disabled = true;
-      api("POST", "/api/workspace/request", { module: D.current, kind: "limit", note: label }).then(function (r) { toast(r.b.message || "Sent."); });
+      api("POST", "/api/workspace/request", { module: D.current, kind: "limit", limit: key || "", note: label }).then(function (r) { toast(r.b.message || "Sent."); });
     } }, "Request more");
     return b;
   }
@@ -147,7 +147,7 @@
   function readOnlyNote(p, what) {
     var b = h("button", { class: "ws-btn ws-btn--sm", type: "button", onclick: function () {
       b.disabled = true;
-      api("POST", "/api/workspace/request", { module: D.current, kind: "module", note: "Manage our own " + what }).then(function (r) { toast(r.b.message || "Sent."); });
+      api("POST", "/api/workspace/request", { module: D.current, kind: "module", level: "manage", note: "Manage our own " + what }).then(function (r) { toast(r.b.message || "Sent."); });
     } }, "Ask to manage your own");
     p.appendChild(h("div", { class: "ws-card ws-note" }, h("h2", null, "HelloVoice runs these for you"),
       h("p", null, "Your plan shows the " + what + " HelloVoice sets up. To create and run your own, ask for it."), b));
@@ -192,7 +192,7 @@
         var full = R.cap != null && R.count >= R.cap;
         var nc = h("details", { class: "ws-card ws-new", open: R.items.length ? false : "open" },
           h("summary", null, h("b", null, "New campaign")));
-        if (full) nc.appendChild(h("p", null, "Your plan's campaigns are all in use. ", requestMore("Campaigns")));
+        if (full) nc.appendChild(h("p", null, "Your plan's campaigns are all in use. ", requestMore("Campaigns", "campaigns_max")));
         else nc.appendChild(campaignForm({}, R.platforms, function (body) {
           body.op = "create";
           return api("POST", "/api/my/campaign", body).then(function (x) { toast(x.b.message || "Done."); if (x.b.ok) draw(); });

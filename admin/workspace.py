@@ -289,7 +289,7 @@ def remove(actor, user_id):
 
 # ----------------------------------------------------------------- requests --
 
-def request(user, key, kind, note=""):
+def request(user, key, kind, note="", level=None, limit=None):
     """kind: role (answered by the company's admin), module or limit (answered by HelloVoice in the
     Tenants inbox). Filed through the same columns tenant_requests.file_request writes."""
     tenant = tenant_of(user)
@@ -299,8 +299,13 @@ def request(user, key, kind, note=""):
     detail = {"module": key}
     if kind == "role":
         detail.update(role="viewer", user_id=user["id"])
+    elif kind == "limit":
+        key_ = str(limit or "")
+        if key_ in modules.FIELDS:
+            detail = {"key": key_}             # HelloVoice types the new value when approving
     elif kind == "module":
-        detail.update(level="view")
+        # "Ask to manage your own" asks for manage; a locked module asks to have it at all (view).
+        detail.update(level=level if level in ("view", "manage") else "view")
     import tenant_requests
     with _c() as conn:
         dup = conn.execute("SELECT 1 FROM module_requests WHERE code_id = ? AND user_id = ? AND module = ? AND kind = ? "
@@ -363,8 +368,13 @@ def _history(action, tenant, who, actor, before, after):
 
 # ------------------------------------------------------------------ payload --
 
+LIMIT_OF = {"Seats": "seats", "Campaigns": "campaigns_max", "Selections": "selections_max",
+            "Collections today": "captures_day", "Collection spend this month": "spend_month", "AI credits": "credits_month"}
+
+
 def _meter(label, used, cap, unit=""):
-    return {"label": label, "used": used, "cap": cap, "unit": unit}
+    # `key` names the Tenants limit a "Request more" on this meter asks to raise.
+    return {"label": label, "used": used, "cap": cap, "unit": unit, "key": LIMIT_OF.get(label)}
 
 
 def _overview(tenant, user, key):
