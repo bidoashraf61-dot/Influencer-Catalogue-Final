@@ -52,6 +52,15 @@ admin. At `view` the Work tab says HelloVoice runs it for them and offers **Ask 
 - Inviting is open to every company (`workspace_invites = "all"`, set 28 October 2026 after the attribution
   audit, f0813eb). A list of company code ids in that setting closes it to all others again.
 
+## HelloVoice shares access (Tenants -> a company -> Share access)
+
+Owners and admins (never a KAM) give anyone a role in a company's modules, optionally until a date. The
+person joins the company as a colleague with their own sign-in, any email including a personal one
+(`portal.check_email` lets an active colleague in whatever the domain; a blocked domain still wins). On the
+end date the role drops to none (`role_grants`, `workspace.expire_due`, hourly and on every workspace load)
+and the login stays. One campaign alone is still shared from the campaign itself (view or edit by email).
+Admins can open the Tenants list and a company's page read-only and use Share access; the rest stays owner-only.
+
 ## Endpoints
 
 | Route | Who |
@@ -61,6 +70,7 @@ admin. At `view` the Work tab says HelloVoice runs it for them and offers **Ask 
 | `GET /api/my/campaigns`, `POST /api/my/campaign` (create, edit, live, end, add_creators, remove_creator) | Track at manage, editor+ |
 | `GET /api/my/competitors`, `POST /api/my/competitor`, `POST /api/my/competitor/collect` | Intelligence at manage, editor+ |
 | `GET /api/my/evidence` | Intelligence on, viewer+ |
+| `POST /admin/tenants/share {k, email, name, roles, until}` | Owner or admin |
 
 HelloVoice staff are never a tenant: with an admin session the `/api/my/*` routes answer "sign in".
 
