@@ -20,12 +20,17 @@ audience qualifies even if their TikTok audience is Egyptian.
 import json
 import re
 import threading
+import time
 from datetime import date
 
 import db
 
 _lock = threading.Lock()
-_cache = {"sig": None, "docs": {}, "facets": None, "best": None}
+_cache = {"sig": None, "docs": {}, "facets": None, "best": None, "checked": 0.0}
+# How long a loaded set is trusted before the table's signature is read again. The signature is a
+# COUNT over creator_analysis (~30 ms); a shortlist with power-ups asks for the summaries once per
+# creator, and re-reading it each time made one brief take minutes (audit 273, 2026-10-29).
+SIG_TTL = 20
 
 AGE_ORDER = ["13-17", "18-24", "25-34", "35-44", "45-54", "55-64", "65+"]
 
@@ -132,10 +137,13 @@ def _collab(v):
 
 def _load():
     """Summaries for every analysis, rebuilt only when an analysis changed."""
+    if _cache["sig"] is not None and time.time() - _cache["checked"] < SIG_TTL:
+        return _cache["docs"]
     with db.connect() as conn:
         cols = {r[1] for r in conn.execute("PRAGMA table_info(creator_analysis)")}
         sig = tuple(conn.execute("SELECT COUNT(*), COALESCE(MAX(updated_at), 0) FROM creator_analysis").fetchone())
         if sig == _cache["sig"]:
+            _cache["checked"] = time.time()
             return _cache["docs"]
         q = "SELECT code, %s, data FROM creator_analysis" % ("platform" if "platform" in cols else "'Instagram'")
         rows = conn.execute(q).fetchall()
@@ -147,7 +155,7 @@ def _load():
             continue
         docs.setdefault(code, []).append(summary(d, platform or "Instagram"))
     with _lock:
-        _cache.update(sig=sig, docs=docs, facets=None, best=None)
+        _cache.update(sig=sig, docs=docs, facets=None, best=None, checked=time.time())
     return docs
 
 

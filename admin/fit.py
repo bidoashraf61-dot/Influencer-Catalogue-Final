@@ -231,7 +231,7 @@ GENDERS = ["Any", "Women", "Men"]
 DEFAULT_TARGET = {"country": "SA", "gender": "Any", "age": "Any", "category": "Any"}
 # What a category looks for in a creator's interests and audience interests.
 CATEGORY_WORDS = {
-    "beauty": ["beauty", "cosmetic", "skin", "makeup", "hair", "fragrance", "personal care", "nail"],
+    "beauty": ["beauty", "cosmetic", "skin", "skincare", "makeup", "make-up", "hair", "fragrance", "personal care", "nail"],
     "health": ["health", "medical", "wellness", "fitness", "nutrition", "pharma", "doctor", "diet", "vitamin", "supplement"],
     "mother & baby": ["baby", "mother", "child", "kids", "family", "parent", "toys"],
     "food": ["food", "restaurant", "cooking", "recipe", "drink", "coffee", "cafe"],
@@ -240,11 +240,13 @@ CATEGORY_WORDS = {
     "technology": ["tech", "gadget", "electronic", "gaming", "software", "phone"],
     "automotive": ["car", "auto", "vehicle", "motor"],
     "travel": ["travel", "tourism", "hotel", "holiday"],
-    "fitness": ["fitness", "sport", "gym", "health", "wellness"],
-    "skincare": ["skin", "beauty", "cosmetic", "derma", "care"],
-    "hair care": ["hair", "beauty", "salon", "care"],
+    # Audit 273 (2026-10-29): "health" made every Health & Medical creator a fitness match, and "beauty"/"care"
+    # made every beauty creator a skincare or hair-care match. Each space now needs its own words.
+    "fitness": ["fitness", "sport", "gym", "wellness"],
+    "skincare": ["skin", "derma"],
+    "hair care": ["hair", "salon"],
     "make-up": ["makeup", "make-up", "beauty", "cosmetic"],
-    "fragrance": ["fragrance", "perfume", "beauty"],
+    "fragrance": ["fragrance", "perfume", "oud"],
     "health care": ["health", "medical", "doctor", "pharma", "wellness", "nutrition", "vitamin", "supplement"],
     "motherhood": ["baby", "mother", "child", "kids", "family", "parent", "toys"],
     "sports": ["sport", "fitness", "gym", "football"],
@@ -410,7 +412,7 @@ def _place_mark(creator, target_cc):
     hits = set()
     for raw in tokens(creator["city"] if creator is not None else "") + tokens(creator["nationality"] if creator is not None else ""):
         for cc, words in PLACE_WORDS.items():
-            if raw in words or any(w == raw or (len(w) > 4 and w in raw) for w in words):
+            if raw in words or any(w == raw or (w in raw if len(w) > 4 else has_word(raw, w)) for w in words):
                 hits.add(cc)
     if not hits:
         return 0.5, None
@@ -829,10 +831,12 @@ def score_core(doc, platform, followers=None, objective="Balanced", target=None,
         top = (ev.get("benchmark") or {}).get("high") or 0
         if top and ev.get("value", 0) > 3 * top:
             rule_notes.append("Engagement is %.0f times the typical top: unusually high, check the posts before booking" % (ev["value"] / top))
+    out["suspicious"] = bool(rule_notes)    # a shortlist ranks these after clean creators of the same score
     fake_lim = (target or {}).get("max_fake") or 30
     fake_now = doc.get("fake_followers_pct")
     if isinstance(fake_now, (int, float)) and fake_now > fake_lim:
         val = min(val, 39)
+        out["fake_capped"] = True           # apply_rules keeps the cap after the power-up blend
         rule_notes.insert(0, "Fake followers %s is over the limit of %d%%: score capped at Not recommended" % (_pct(fake_now), fake_lim))
     out["score"], out["tag"] = val, band_for(val)
     lo_s, hi_s = out["score_range"]

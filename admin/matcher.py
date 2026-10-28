@@ -13,6 +13,7 @@ Two layers, deliberately separate:
 ``score_codes`` is also the engine behind the selection page's fit scores.
 """
 import json
+import re
 
 import analysis
 import db
@@ -229,7 +230,14 @@ def _from_other(qid, text):
         if not n:
             return None
         return "18-24" if n < 25 else "25-34" if n < 35 else "35-44" if n < 45 else "45-54"
-    got, _ = guess(text)                            # goal, platforms, market, category, gender
+    if qid == "market":
+        import re
+        t = " " + " ".join(str(text).lower().split()) + " "
+        for cc, words in fit.PLACE_WORDS.items():
+            if any(re.search(r"(?<![a-z])" + re.escape(w) + r"(?![a-z])", t) for w in words):
+                return cc                           # Kuwait, Qatar...: the scorer knows them (audit 273)
+        return None
+    got, _ = guess(text)                            # goal, platforms, category, gender
     return got.get(qid)
 
 
@@ -277,7 +285,8 @@ def to_brief(answers):
     power = powerups.from_answers(answers)
     out = {
         "objective": objective_for(answers.get("goal")),
-        "target": {"country": "|".join(_values(answers.get("market"), _enum("market"))) or "SA",
+        # Any country the scorer knows: a typed "Other: Kuwait" used to fall back to Saudi Arabia (audit 273).
+        "target": {"country": "|".join(_values(answers.get("market"), [cc for cc, _ in fit.COUNTRIES])) or "SA",
                    "gender": fit.one_gender(answers.get("gender")),
                    "age": "|".join(_values(answers.get("age"), [a for a in _enum("age") if a != "Any"])) or "Any",
                    "category": "|".join(cats) if cats else "Any",
@@ -388,16 +397,27 @@ _EXTRA_CATEGORY = {
 }
 
 
+def _says(t, w):
+    """``w`` is in ``t`` the way fit.has_word reads it (short words whole, longer ones from a word's
+    start: "tech" is not in "biotech", "mom" not in "moment"); Arabic and padded phrases ("car ",
+    " ig ") as plain text."""
+    if w != w.strip() or not any("a" <= ch <= "z" for ch in w):
+        return w in t
+    return fit.has_word(t, w)
+
+
 def guess(text):
     """Answers that the text states plainly. Returns ``(answers, missing_required)``."""
     import re
     t = " " + " ".join(str(text or "").lower().split()) + " "
     raw = {}
-    for goal, words in _GOAL_WORDS.items():
-        if any(w in t for w in words):
-            raw["goal"] = goal
-            break
-    plats = [p for p, words in _PLATFORM_WORDS.items() if any(w in t for w in words)]
+    # The goal the text names most often; on a tie the order awareness, engagement, traffic (a "launch
+    # campaign, link in bio" is a launch).
+    hits = {g: sum(1 for w in words if _says(t, w)) for g, words in _GOAL_WORDS.items()}
+    best = max(("awareness", "engagement", "traffic"), key=lambda g: hits[g])
+    if hits[best]:
+        raw["goal"] = best
+    plats = [p for p, words in _PLATFORM_WORDS.items() if any(_says(t, w) for w in words)]
     if plats:
         raw["platforms"] = plats
     for cc, words in fit.PLACE_WORDS.items():
@@ -410,7 +430,7 @@ def guess(text):
     cats = []
     for value, _label in _BY_ID["category"]["options"]:
         words = _EXTRA_CATEGORY.get(value, []) + [value]
-        if any(w in t for w in words):
+        if any(_says(t, w) for w in words):
             cats.append(value)
     if cats:
         raw["category"] = cats[:3]
@@ -422,7 +442,9 @@ def guess(text):
     if n:
         k = int(n.group(1))
         raw["count"] = "5" if k <= 5 else "8" if k <= 10 else "15" if k <= 20 else "25"
-    money = re.search(r"(\d[\d,\.]*)\s*(k|K|thousand|ألف)?\s*(sar|riyal|ريال|sr)\b", t) or re.search(r"(\d[\d,\.]*)\s*(k)\b", t)
+    # "10k followers" is a size, not a budget: a bare "k" counts as money only when no audience word follows
+    money = re.search(r"(\d[\d,\.]*)\s*(k|K|thousand|ألف)?\s*(sar|riyal|ريال|sr)\b", t) or \
+        re.search(r"(\d[\d,\.]*)\s*(k)\b(?!\s*(?:followers?|views?|fans|subscribers?|likes?|متابع))", t)
     if money:
         try:
             v = float(money.group(1).replace(",", ""))
@@ -436,10 +458,11 @@ def guess(text):
 
 # ----------------------------------------------------------------- scoring --
 
-def score_codes(codes, objective, target, wanted=None):
+def score_codes(codes, objective, target, wanted=None, among=None):
     """``{code: fit score}`` for creators, from their analyses. Creators with no
     analysis come back with ``score`` None. (Moved from the selection page so the
-    shortlist builder and the page score identically.)"""
+    shortlist builder and the page score identically.) ``among``: the platforms a brief asked for;
+    a creator analysed on any of them is scored on the best of those, not on a platform nobody asked for."""
     import profile_pdf as _pp
     codes = list(codes)
     wanted_set = set(codes)
@@ -466,7 +489,8 @@ def score_codes(codes, objective, target, wanted=None):
             out[code] = one(plat)
         elif mine:
             main = analysis.creator_platforms(c)
-            tried = {pl: one(pl) for pl in mine}
+            asked = [pl for pl in mine if among and pl in among]
+            tried = {pl: one(pl) for pl in (asked or mine)}
             full = [pl for pl in tried if not mine[pl]["data"].get("basic") and tried[pl]["score"] is not None]
             pool = full or list(tried)
             best = max(pool, key=lambda pl: (tried[pl]["score"] is not None, tried[pl]["score"] or 0,
@@ -541,6 +565,8 @@ def apply_rules(c, s, val, basis, target):
             new = powerups.blend(val, f["score"])
             if val:
                 factor *= new / float(val)
+            if s.get("fake_capped"):
+                new = min(new, fit.FAKE_CAP)      # a bought audience stays "Not recommended" (audit 273)
             s = dict(s, fit=f, perf=val)
             val = new
     if val != old:
@@ -559,20 +585,27 @@ def _client_limits(brief, items):
 
     max_fake: a creator whose stored fake-follower share is above the limit is removed. A creator
     with no figure stays in, and is marked "fake share not known" so the client can check it.
-    min_engagement: "above_benchmark" keeps creators at or above the typical rate for their platform and
-    size (intl_benchmarks); "top25" keeps the best quarter of the candidates by engagement rate. A creator
+    min_engagement: "above_benchmark" keeps creators at or above the high end of the range the score grades
+    their engagement against (score_v5, by platform and size); "top25" keeps the best quarter by engagement
+    rate within each platform and size band. A creator
     with no engagement rate cannot show it meets the minimum, so is removed."""
     limit = brief.get("max_fake")
     rule = brief.get("min_engagement")
     if limit is None and rule is None or not items:
         return items
-    import intl_benchmarks
+    import score_v5
     every = db.analyses_for([i["code"] for i in items])
 
     def doc_of(it):
         return ((every.get(it["code"]) or {}).get(it["platform"]) or {}).get("data") or {}
-    rates = sorted(doc_of(i).get("er") for i in items if isinstance(doc_of(i).get("er"), (int, float)))
-    top_cut = rates[int(len(rates) * 0.75)] if rates and rule == "top25" else None
+    # "Top 25% of creators their size": the cut is taken within each platform and size band, because an
+    # Instagram rate (per follower) and a TikTok rate (per view) are not on the same scale (audit 273).
+    groups = {}
+    for i in items:
+        er = doc_of(i).get("er")
+        if isinstance(er, (int, float)):
+            groups.setdefault((i["platform"], i.get("band")), []).append(er)
+    top_cut = {k: sorted(v)[int(len(v) * 0.75)] for k, v in groups.items()} if rule == "top25" else {}
     kept = []
     for it in items:
         d = doc_of(it)
@@ -589,10 +622,11 @@ def _client_limits(brief, items):
             if not isinstance(er, (int, float)):
                 continue
             if rule == "above_benchmark":
-                ref = intl_benchmarks.reference(it["platform"], it["followers"])
-                if not ref or er < ref["high"]:
+                # the range the score itself grades engagement against (score_v5), at or above its high end
+                rng = score_v5._range("engagement", it["platform"], it["followers"]) if it["followers"] else None
+                if not rng or er < rng[1]:
                     continue
-            elif rule == "top25" and er < top_cut:
+            elif rule == "top25" and er < top_cut.get((it["platform"], it.get("band")), float("inf")):
                 continue
         kept.append(it)
     return kept
@@ -600,10 +634,32 @@ def _client_limits(brief, items):
 
 AUD_COUNTRY_MIN = 50       # % of the measured audience in the brief's country (owner, 2026-10-14)
 AUD_GENDER_MIN = 60        # % of the asked gender
+# Audit 273 (owner MCQ, 2026-10-29): the score orders the shortlist; a measured audience only adjusts it.
+AUD_MISS_WEIGHT = 0.8      # per miss (country share under 50%, asked gender under 60%)
+AUD_MATCH_WEIGHT = 1.05    # a measured audience that meets the brief
+SUSPICIOUS_WEIGHT = 0.85   # views or engagement over 3x the typical top: ranked after clean creators
 
 
-def score_all(brief, exclude=(), only=None):
-    """Every active creator scored against the brief, best first (no cut for count or budget)."""
+def _based_in(c, want):
+    """True when the roster places the creator in one of the ``want`` countries."""
+    _, hits = fit._place_mark(c, "|".join(want))
+    return bool(hits and (hits & set(want)))
+
+
+def _measured_audience():
+    """Codes with a measured audience country split on any platform (cached with the analyses)."""
+    import discover
+    return {code for code, lst in discover._load().items() if any(x.get("countries") for x in lst)}
+
+
+def score_all(brief, exclude=(), only=None, strict=False):
+    """Every active creator scored against the brief, best first (no cut for count or budget).
+
+    ``strict`` (a shortlist, owner MCQ 2026-10-29): the brief's countries and product space are hard
+    filters. A creator counts for a country when the roster places them there, or when 50% or more of
+    their measured audience is there; for a space when their interest tags name it (healthcare
+    professionals always count for health care). Without ``strict`` (scoring creators already chosen,
+    the catalogue's fit badges) nobody is dropped and the old markdowns apply."""
     objective, target = brief["objective"], brief["target"]
     wanted = [p for p in brief.get("platforms", []) if p in PLATFORMS]
     creators = [c for c in db.list_creators(active_only=True) if c["code"] not in set(exclude)
@@ -612,8 +668,17 @@ def score_all(brief, exclude=(), only=None):
         creators = [c for c in creators if set(analysis.creator_platforms(c)) & set(wanted)]
     if brief.get("size"):
         creators = [c for c in creators if metrics.band_of(c["followers"]) in brief["size"]]
+    cats = [x for x in str(target.get("category") or "").split("|") if x and x.lower() != "any"]
+    want_cc = fit.target_list(target.get("country")) or [fit.DEFAULT_TARGET["country"]]
+    based = {}
+    if strict:
+        if cats:
+            creators = [c for c in creators if _tagged(c, cats)]
+        measured = _measured_audience()
+        based = {c["code"]: _based_in(c, want_cc) for c in creators}
+        creators = [c for c in creators if based[c["code"]] or c["code"] in measured]
     single = wanted[0] if len(wanted) == 1 else None
-    scored = score_codes([c["code"] for c in creators], objective, target, single)
+    scored = score_codes([c["code"] for c in creators], objective, target, single, among=wanted)
     bands = db.tier_prices()
     items = []
     for c in creators:
@@ -628,35 +693,45 @@ def score_all(brief, exclude=(), only=None):
                 s, val, basis = est, est["score"], "roster"
         if val is None:
             continue
+        home, gshare = s.get("aud_home"), s.get("aud_gender")
+        if strict and not based.get(code) and (home is None or home < AUD_COUNTRY_MIN):
+            continue                    # not based there, and the measured audience is not there either
         rank_score = val * (ESTIMATE_WEIGHT if basis == "roster" else 1.0)
         # The brief's two requirements (country for numbers that are only public, the product
         # space for everyone). The selection page applies the same rules, so a creator's number
         # is the same on the shortlist card and on the selection built from it.
         val, factor, s = apply_rules(c, s, val, basis, target)
         rank_score *= factor
-        cats = [x for x in str(target.get("category") or "").split("|") if x and x.lower() != "any"]
         # Healthcare professionals first for a healthcare brief: that is what a pharma client is buying.
         if any(x in ("health care", "health") for x in cats) and str(c["tier"] or "").upper().startswith("HCP"):
             rank_score *= HCP_BOOST
             s = dict(s, strengths=["Healthcare professional"] + list(s.get("strengths") or []))
-        # Audience fit orders the shortlist (owner-approved 2026-10-14), never the score: a measured audience under
-        # 50% in the brief's country, or under 60% of the asked gender, puts the creator after those who match.
-        # Not measured sits in between: it is not counted against them.
+        # Audience fit adjusts the order (owner MCQ, audit 273): a measured audience under 50% in the brief's
+        # country, or under 60% of the asked gender, ranks lower; one that meets the brief a little higher.
+        # Not measured is left as it is.
         aud_lvl, aud_note = 1, None
-        home, gshare = s.get("aud_home"), s.get("aud_gender")
         if home is not None or gshare is not None:
             miss = []
             if home is not None and home < AUD_COUNTRY_MIN:
-                miss.append("%d%% of the audience in %s (the brief needs %d%%)" % (round(home), fit.country_names(fit.target_list(target.get("country")) or ["SA"]), AUD_COUNTRY_MIN))
+                miss.append("%d%% of the audience in %s (the brief needs %d%%)" % (round(home), fit.country_names(want_cc), AUD_COUNTRY_MIN))
             if gshare is not None and str(target.get("gender")) in ("Women", "Men") and gshare < AUD_GENDER_MIN:
                 miss.append("%d%% %s (the brief needs %d%%)" % (round(gshare), str(target.get("gender")).lower(), AUD_GENDER_MIN))
             aud_lvl = 0 if not miss else 2 + (len(miss) > 1)
             aud_note = ("Audience: " + "; ".join(miss)) if miss else None
+            rank_score *= (AUD_MISS_WEIGHT ** len(miss)) if miss else AUD_MATCH_WEIGHT
+        if s.get("suspicious"):
+            rank_score *= SUSPICIOUS_WEIGHT
+        notes = [aud_note] if aud_note else []
+        plat = s.get("platform") or single
+        if wanted and plat and plat not in wanted:
+            # Thin platforms (Snapchat, YouTube, Facebook): the creator is on the asked platform but measured
+            # only on another one, and the card says so (owner MCQ, audit 273).
+            notes.insert(0, "Scored on %s: no %s numbers on file yet" % (plat, " / ".join(wanted)))
         price = db.price_for(c, bands, single or (wanted[0] if wanted else None))
         items.append({
             "code": code, "score": val, "rank_score": round(rank_score, 1), "tag": s.get("tag") or fit.band_for(val),
-            "basis": basis, "platform": s.get("platform") or single, "price": list(price) if price else None,
-            "strengths": (s.get("strengths") or [])[:3], "watchouts": ([aud_note] if aud_note else []) + (s.get("watchouts") or [])[:2],
+            "basis": basis, "platform": plat, "price": list(price) if price else None,
+            "strengths": (s.get("strengths") or [])[:3], "watchouts": notes + (s.get("watchouts") or [])[:2],
             "followers": c["followers"] or 0, "audience_level": aud_lvl,
             "band": metrics.band_of(c["followers"]),
         })
@@ -666,7 +741,7 @@ def score_all(brief, exclude=(), only=None):
     # Equal scores are common on public data; break the tie the way the goal would: reach for
     # awareness, the smaller (cheaper, closer) account otherwise.
     big_first = "Awareness" in str(objective).split("+")
-    items.sort(key=lambda i: (i.get("audience_level", 1), -i["rank_score"], -i["followers"] if big_first else i["followers"], i["code"]))
+    items.sort(key=lambda i: (-i["rank_score"], -i["followers"] if big_first else i["followers"], i["code"]))
     return items
 
 
@@ -677,29 +752,44 @@ BIG, SMALL = ("macro", "mega"), ("nano", "micro")
 def _mix(items, mix):
     """The creator mix (item 172): a soft lift, never a filter. "micro" lifts nano and micro
     accounts, "big" lifts macro and mega; "hero" puts the best macro or mega creator first and
-    lifts the small and mid accounts behind them. Audience fit still orders first."""
+    lifts the small and mid accounts behind them."""
     if mix not in ("hero", "micro", "big") or not items:
         return items
     lift = {"micro": SMALL, "big": BIG, "hero": SMALL + ("mid",)}[mix]
 
     def key(i):
         rs = i["rank_score"] * (MIX_LIFT if i.get("band") in lift else 1.0)
-        return (i.get("audience_level", 1), -rs, i["code"])
+        return (-rs, i["code"])
     out = sorted(items, key=key)
     if mix == "hero":
-        hero = next((i for i in items if i.get("band") in BIG), None)
+        hero = next((i for i in out if i.get("band") in BIG and i.get("audience_level", 1) < 2), None) \
+            or next((i for i in out if i.get("band") in BIG), None)
         if hero is not None:
             out.remove(hero)
             out.insert(0, hero)
     return out
 
 
+# Tags that name a word of a space but are not that space: "Health & Fitness" is not health care.
+NOT_IN_SPACE = {"health care": ("fitness", "wellness", "sport")}
+
+
 def _tagged(c, cats):
+    """The creator's interest tags name one of ``cats`` (healthcare professionals always count for
+    health care). Read tag by tag, so one tag cannot count for a space it only shares a word with."""
     interest = str(c["interest"] or "").lower()
+    tags = [t.strip() for t in re.split(r"[,|/;]", interest) if t.strip()]
     for cat in cats:
-        words = fit.CATEGORY_WORDS.get(cat.lower()) or [cat.lower()]
-        if cat.lower() in interest or any(fit.has_word(interest, w) for w in words):
+        cat = cat.lower()
+        if cat in ("health care", "health") and str(c["tier"] or "").upper().startswith("HCP"):
             return True
+        words = fit.CATEGORY_WORDS.get(cat) or [cat]
+        skip = NOT_IN_SPACE.get(cat, ())
+        for t in tags:
+            if any(x in t for x in skip):
+                continue
+            if cat in t or any(fit.has_word(t, w) for w in words):
+                return True
     return False
 
 
@@ -710,7 +800,7 @@ def rank(brief, exclude=()):
     ``{code, score, rank_score, tag, basis, platform, price, strengths, watchouts}``.
     ``basis`` is "analysis", "basic" (public numbers) or "roster" (an estimate).
     """
-    items = _mix(score_all(brief, exclude), brief.get("mix"))
+    items = _mix(score_all(brief, exclude, strict=True), brief.get("mix"))
 
     count, cap = brief.get("count") or 8, brief.get("budget_max")
     picks, spent = [], 0
@@ -785,7 +875,7 @@ def costs_of(kind):
 def narrate(brief_text, result, code_id=None):
     """Plain-language reasons and a summary for a shortlist. Returns
     ``{"summary": str, "reasons": {code: str}}``; raises ``gemini.AIError``."""
-    picks = result["picks"][:12]
+    picks = result["picks"][:25]          # every pick the form allows (up to 25) gets its reason (audit 273)
     rows = {c["code"]: c for c in db.list_creators(active_only=True) if c["code"] in {p["code"] for p in picks}}
     facts = []
     for p in picks:
@@ -807,7 +897,7 @@ def narrate(brief_text, result, code_id=None):
     prompt = "Client brief: %s\n\nShortlist facts (JSON):\n%s" % (brief_text[:800], json.dumps(facts))
     # Capped well inside the 60-second proxy limit in front of the admin: a slow model answer
     # falls back to the scored shortlist without written reasons rather than a timed-out page.
-    data = gemini.generate_json(prompt, schema, system=system, temperature=0.3, max_tokens=4096,
+    data = gemini.generate_json(prompt, schema, system=system, temperature=0.3, max_tokens=6144,
                                 kind="brief", code_id=code_id, credits=costs_of("brief"), timeout=32, think=0)
     valid = {p["code"] for p in picks}
     reasons = {r["code"]: " ".join(str(r["why"]).split())[:220] for r in data.get("reasons", [])

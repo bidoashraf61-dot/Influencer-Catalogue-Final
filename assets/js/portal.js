@@ -4413,7 +4413,7 @@
         var tls = timingLine(srcRes.timing, { short: true, dark: true });
         if (tls) side.appendChild(tls);
       }
-      side.appendChild(h("p", { class: "ai-sl__hint" }, "We score every creator on each platform, fit your budget and explain each pick."));
+      side.appendChild(h("p", { class: "ai-sl__hint" }, "Only creators in your countries and product space. We score each on every platform and explain each pick."));
       var build = h("button", { class: "ai-sl__build", type: "button" }, "Build my shortlist");
       var cl = costLine();
       // A price in credits is the orange coin chip; "Free" and the admin preview stay plain words.

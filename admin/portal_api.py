@@ -1865,7 +1865,12 @@ class PortalMixin(connect_api.ConnectMixin):
         for plat in (brief["platforms"] or sorted(matcher.PLATFORMS)):
             try:
                 for it in matcher.score_all(dict(brief, platforms=[plat]), only=set(codes)):
-                    plat_scores.setdefault(it["code"], {})[plat] = it["score"]
+                    # Filed under the platform the number was measured on: a creator with no TikTok
+                    # numbers must not show their Instagram score as "TT" (audit 273).
+                    real = it.get("platform") or plat
+                    mine = plat_scores.setdefault(it["code"], {})
+                    if real == plat or real not in mine:
+                        mine[real] = it["score"]
             except Exception:
                 continue
         return self.send_json(200, {

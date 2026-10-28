@@ -7016,7 +7016,7 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             brief = {"objective": self.selection_objective(sel), "target": self.selection_target(sel),
                      "platforms": [plat] if plat else (analysis.creator_platforms(gone)[:1] if gone is not None else [])}
             try:
-                items = matcher.score_all(brief, exclude=set(codes) | set(row["replacements"] or []))
+                items = matcher.score_all(brief, exclude=set(codes) | set(row["replacements"] or []), strict=True)
             except Exception:
                 items = []
             tier_of = {c["code"]: c["tier"] for c in db.list_creators(active_only=True)}
