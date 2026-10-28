@@ -1393,7 +1393,8 @@
       var build = h("button", { class: "ai-sl__build bs-need__build", type: "button" }, "Build my shortlist");
       var why = h("p", { class: "bs-need__why", "aria-live": "polite" });
       function sync() {
-        var left = REQ.filter(function (k) { return !has(k); }).map(function (k) { return (byQ[k] && byQ[k].label || k).replace(/\?$/, "").toLowerCase(); });
+        var SHORT = { goal: "the goal", platforms: "platforms", market: "countries", category: "the product space" };
+        var left = REQ.filter(function (k) { return !has(k); }).map(function (k) { return SHORT[k]; });
         build.disabled = left.length > 0;
         why.textContent = left.length ? "Still needed: " + left.join(", ") + "." : "";
       }
