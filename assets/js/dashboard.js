@@ -121,6 +121,8 @@
     var c = R.campaign;
     document.title = c.name + " — Dashboard — HELVi Connect";
     $("db-title").textContent = c.name;
+    // The company's own colour (set in /workspace/ -> Settings), as the title's underline. Hex only, checked server-side.
+    if (c.brand_colour && /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(c.brand_colour)) $("db-title").style.boxShadow = "inset 0 -0.16em 0 " + c.brand_colour;
     var logos = (c.logos || []).map(function (u) { return '<img src="' + esc(u) + '" alt="">'; }).join("");
     $("db-brands").innerHTML = logos ? "<span>×</span>" + logos : "";   // HELVi × brand (mobile audit 2026-10-19)
     var now = Date.now() / 1000, bits = [];

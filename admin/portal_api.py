@@ -1731,7 +1731,11 @@ class PortalMixin(connect_api.ConnectMixin):
             return self.send_json(403, {"ok": False, "message": "Only an admin of this module can change its settings."}, self.cors())
         t = workspace.tenant_of(user)
         if key in ("brand_name", "brand_colour"):
-            v = modules.set_value(t, key, b.get("value"), by=user["email"])
+            import re as _re
+            val = " ".join(str(b.get("value") or "").split())[:80]
+            if key == "brand_colour" and val and not _re.match(r"^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$", val):
+                return self.send_json(400, {"ok": False, "message": "Use a hex colour such as #1b9b52."}, self.cors())
+            v = modules.set_value(t, key, val, by=user["email"])
             ok = v is not None
         else:
             ok = workspace.set_pref(t, key, str(b.get("value") or ""), mod)

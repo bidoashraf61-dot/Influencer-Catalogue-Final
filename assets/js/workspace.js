@@ -494,7 +494,7 @@
         cb.addEventListener("change", function () {
           api("POST", "/api/workspace/pref", { module: D.current, key: r.key, value: cb.checked ? "on" : "off" }).then(function (x) { toast(x.b.message); });
         });
-        box.appendChild(h("label", { class: "ws-switch", for: "rs-" + r.key }, cb, h("span", null, r.label)));
+        box.appendChild(h("label", { class: "ws-toggle", for: "rs-" + r.key }, cb, h("span", null, r.label)));
       });
       p.appendChild(h("div", { class: "ws-sec" }, h("h2", null, "What your reports show"),
         h("p", { class: "ws-muted" }, "Switched off here, a section is hidden on every campaign report of your account, including links you share."), box));

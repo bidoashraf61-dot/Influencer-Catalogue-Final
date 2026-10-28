@@ -139,6 +139,22 @@ def _rate(rates, platform, action):
     return 0.0
 
 
+def _company_brand(campaign):
+    """(name, colour) the company set for its reports in /workspace/ (Settings: name and colour on reports),
+    each None when not set. The colour is only passed on as a plain #rgb / #rrggbb hex."""
+    try:
+        import modules
+        cid = campaign["code_id"] if "code_id" in campaign.keys() else None
+        if not cid:
+            return None, None
+        name = (modules.value(cid, "brand_name", "") or "").strip() or None
+        colour = (modules.value(cid, "brand_colour", "") or "").strip()
+        ok = len(colour) in (4, 7) and colour.startswith("#") and all(ch in "0123456789abcdefABCDEF" for ch in colour[1:])
+        return name, (colour if ok else None)
+    except Exception:
+        return None, None
+
+
 def visibility(campaign, company=True):
     """What the client's report shows. All on unless switched off. ``company=False`` gives the campaign's own
     switches only, for the admin form that edits them (the company's switches are applied on top)."""
@@ -503,7 +519,9 @@ def report(campaign, internal=False, raw=False):
     er_goal = goal_grading(targets, total, creators, posts, progress)
     verdict = overall_verdict(progress, total)
 
-    out = {"campaign": {"id": cid, "name": campaign["name"], "client": campaign["client"],
+    brand_name, brand_colour = _company_brand(campaign)
+    out = {"campaign": {"id": cid, "name": campaign["name"], "client": brand_name or campaign["client"],
+                        "brand_colour": brand_colour,
                         "status": campaign["status"], "starts_at": campaign["starts_at"],
                         "ends_at": campaign["ends_at"], "platform": campaign["platform"]},
            "total": total, "creators": creators, "posts": posts,
