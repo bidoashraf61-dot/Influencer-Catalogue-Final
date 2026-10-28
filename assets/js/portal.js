@@ -1227,8 +1227,9 @@
     var a = res.answers || {}, f = res.fields || {}, q = (qs || []).filter(function (x) { return x.id === id; })[0];
     var lab = function (qid, v) { var qq = (qs || []).filter(function (x) { return x.id === qid; })[0]; return qq ? optionLabel(qq, v) : v; };
     if (id === "category") return (a.category || []).map(function (v) { return lab("category", v); }).join(", ");
-    if (id === "market") return (f.markets && f.markets.length ? f.markets : a.market ? [a.market] : []).map(function (v) { return lab("market", v); }).join(", ");
-    if (id === "goal") return a.goal ? lab("goal", a.goal) : "";
+    var NAMES = { SA: "Saudi Arabia", AE: "UAE", EG: "Egypt", KW: "Kuwait", QA: "Qatar", BH: "Bahrain", OM: "Oman", JO: "Jordan", LB: "Lebanon", IQ: "Iraq", MA: "Morocco" };
+    if (id === "market") return (f.markets && f.markets.length ? f.markets : asList(a.market)).map(function (v) { var l = lab("market", v); return l === v ? (NAMES[v] || v) : l; }).join(", ");
+    if (id === "goal") return asList(a.goal).map(function (v) { return lab("goal", v); }).join(" + ");      // several goals (item 277)
     if (id === "timing") return [f.launch ? "Launch " + f.launch : "", a.timing ? lab("timing", a.timing) : ""].filter(Boolean).join(" · ");
     if (id === "audience") return [f.audience, a.gender && a.gender !== "Any" ? lab("gender", a.gender) : "",
       asList(a.age).filter(function (v) { return v !== "Any"; }).map(function (v) { return lab("age", v); }).join(", ")].filter(Boolean).join(" · ");
@@ -1343,7 +1344,7 @@
           edits[r[0]] = inp;
           dd = h("dd", null, inp);
           if (r[0] === "audience" && val && val !== inp.value) dd.appendChild(h("small", null, val.replace(inp.value, "").replace(/^ · /, "")));
-        } else dd = h("dd", null, val || "—");
+        } else dd = h("dd", null, String(val || "") || "—");
         dl.appendChild(h("div", { class: "bs-rows__r" }, h("dt", null, r[1]), dd,
           h("span", { class: "bs-conf bs-conf--" + c[1], title: conf === "missing" ? "Not in the source: answer it in the next step" : "How sure Helvi is" }, c[0])));
       });
