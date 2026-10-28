@@ -58,13 +58,21 @@ def _groups():
     with db.connect() as conn:
         for u in conn.execute("SELECT * FROM users WHERE deleted_at IS NULL"):
             users.setdefault(u["code_id"], []).append(u)
-    for c in db.list_codes():
+    codes = list(db.list_codes())
+    key_of = {}
+    for c in codes:
         us = users.get(c["id"]) or [None]
         raw = next((u["company"] for u in us if u is not None and u["company"]), "") or c["label"]
-        raw = re.sub(r"^Client:\s*", "", raw)
-        k = _key(raw)
+        key_of[c["id"]] = (_key(re.sub(r"^Client:\s*", "", raw)), re.sub(r"^Client:\s*", "", raw))
+    for c in codes:
+        us = users.get(c["id"]) or [None]
+        # A colleague invited or shared into a company (users.company_code_id) belongs to that company,
+        # whatever their own company name says.
+        home = next((u["company_code_id"] for u in us if u is not None and "company_code_id" in u.keys()
+                     and u["company_code_id"] and u["company_code_id"] in key_of), None)
+        k, raw = key_of[home] if home else key_of[c["id"]]
         names.setdefault(k, {}).setdefault(raw, 0)
-        names[k][raw] += 1
+        names[k][raw] += 0 if home else 1
         out.setdefault(k, []).extend((c, u) for u in us)
     rows = []
     for k, members in out.items():

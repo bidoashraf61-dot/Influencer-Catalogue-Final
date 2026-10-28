@@ -495,12 +495,14 @@ def staff_share(code_ids, email, name, roles, until=None, by=""):
                               "AND deleted_at IS NULL ORDER BY (status = 'active') DESC, created_at LIMIT 1"
                               % ",".join("?" * len(ids)), ids).fetchone()
     tenant = holder["code_id"] if holder else ids[0]
+    holder_user = portal.user_for_code(tenant)
+    company_name = (holder_user["company"] if holder_user is not None and holder_user["company"] else "") or ""
     u = portal.user_by_email(email)
     if u is not None and tenant_of(u) not in ids and u["code_id"] not in ids:
         return False, "%s already has an account at another company." % email
     created = u is None
     if created:
-        u = portal.create_user(email, name or "", "", ip=None)
+        u = portal.create_user(email, name or "", company_name, ip=None)
         with _c() as conn:
             conn.execute("UPDATE users SET company_code_id = ? WHERE id = ?", (tenant, u["id"]))
         if u["status"] != "active":               # sign-up in approval mode: HelloVoice is the approval
