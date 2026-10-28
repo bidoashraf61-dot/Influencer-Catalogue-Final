@@ -231,6 +231,25 @@
       return api("POST", "/api/my/campaign", body).then(function (x) { toast(x.b.message || "Saved."); if (x.b.ok) draw(); });
     }, "Save"));
     card.appendChild(edit);
+    var cr = h("details", { class: "ws-more", open: c.creators.length ? false : "open" }, h("summary", null, "Creators (" + c.creators.length + ")"));
+    if (c.creators.length) {
+      var cl = h("ul", { class: "ws-list" });
+      c.creators.forEach(function (x) {
+        var rm = h("button", { class: "ws-btn ws-btn--sm ws-btn--ghost", type: "button", onclick: function () {
+          api("POST", "/api/my/campaign", { op: "remove_creator", t: c.t, code: x.code }).then(function (r) { toast(r.b.message || ""); if (r.b.ok) draw(); });
+        } }, "Remove");
+        cl.appendChild(h("li", null, h("div", { class: "ws-who" }, h("b", null, x.name), h("span", null, x.platform + (x.handle ? " · @" + x.handle.replace(/^@/, "") : ""))), rm));
+      });
+      cr.appendChild(cl);
+    }
+    var links = h("textarea", { rows: "3", placeholder: "https://www.instagram.com/handle\nhttps://www.tiktok.com/@handle" });
+    var addc = h("button", { class: "ws-btn", type: "button", onclick: function () {
+      addc.disabled = true;
+      api("POST", "/api/my/campaign", { op: "add_creators", t: c.t, links: links.value }).then(function (r) { toast(r.b.message || ""); addc.disabled = false; if (r.b.ok) draw(); });
+    } }, "Add creators");
+    cr.appendChild(field("Profile links, one a line", links, "They stay private to your company."));
+    cr.appendChild(addc);
+    card.appendChild(cr);
     var post = h("details", { class: "ws-more" }, h("summary", null, "Add a post"));
     if (!c.creators.length) post.appendChild(h("p", { class: "ws-muted" }, "Add a creator to this campaign first."));
     else {

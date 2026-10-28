@@ -300,6 +300,33 @@ def campaign_save(h, b):
         db.save_campaign(k["id"], status="live")
         _log(k, actor(h, cid), "Set the campaign live")
         return 200, {"ok": True, "message": "Live. Posts are collected daily from now on."}
+    if op == "add_creators":
+        # Creators by profile link (one a line): the company's own private creators (creators_private.py),
+        # filed once and reused. A link already on their account comes back as the same creator.
+        import creators_private
+        links = [x.strip() for x in str(b.get("links") or "").replace(",", "\n").splitlines() if x.strip()][:50]
+        if not links:
+            return 400, {"ok": False, "message": "Paste at least one profile link."}
+        codes, bad = [], []
+        for link in links:
+            got = creators_private.add_by_handle(cid, link)
+            if got.get("ok"):
+                codes.append(got["code"])
+            else:
+                bad.append(link)
+        added = db.add_campaign_creators(k["id"], codes) if codes else 0
+        _log(k, actor(h, cid), "Added %d creator(s) by link" % added)
+        msg = "%d creator%s added." % (added, "" if added == 1 else "s")
+        if bad:
+            msg += " Not a profile link: %s." % ", ".join(bad[:3])
+        return (200 if codes else 400), {"ok": bool(codes), "message": msg}
+    if op == "remove_creator":
+        code = str(b.get("code") or "").strip().upper()
+        if code not in {c["cc_code"] for c in db.campaign_creators(k["id"])}:
+            return 404, {"ok": False, "message": "That creator is not in this campaign."}
+        db.save_campaign_creators(k["id"], {}, remove=[code])
+        _log(k, actor(h, cid), "Removed %s" % code)
+        return 200, {"ok": True, "message": "Removed."}
     if op == "end":
         db.save_campaign(k["id"], status="ended")
         _log(k, actor(h, cid), "Ended the campaign")
