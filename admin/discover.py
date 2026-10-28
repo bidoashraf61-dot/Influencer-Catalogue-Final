@@ -26,6 +26,7 @@ from datetime import date
 import db
 
 _lock = threading.Lock()
+_build_lock = threading.Lock()
 _cache = {"sig": None, "docs": {}, "facets": None, "best": None, "checked": 0.0}
 # How long a loaded set is trusted before the table's signature is read again. The signature is a
 # COUNT over creator_analysis (~30 ms); a shortlist with power-ups asks for the summaries once per
@@ -136,15 +137,40 @@ def _collab(v):
 
 
 def _load():
-    """Summaries for every analysis, rebuilt only when an analysis changed."""
+    """Summaries for every analysis, rebuilt only when an analysis changed.
+
+    Item 275 (2026-10-29): the capture jobs change analyses all day, and a rebuild reads every analysis
+    (seconds; 78 s seen when several requests rebuilt at once). So once a set is loaded, a change is
+    rebuilt by ONE background thread while callers keep the previous set (at most a few minutes old);
+    only the very first load, with nothing to serve yet, waits."""
     if _cache["sig"] is not None and time.time() - _cache["checked"] < SIG_TTL:
         return _cache["docs"]
     with db.connect() as conn:
-        cols = {r[1] for r in conn.execute("PRAGMA table_info(creator_analysis)")}
         sig = tuple(conn.execute("SELECT COUNT(*), COALESCE(MAX(updated_at), 0) FROM creator_analysis").fetchone())
-        if sig == _cache["sig"]:
-            _cache["checked"] = time.time()
-            return _cache["docs"]
+    if sig == _cache["sig"]:
+        _cache["checked"] = time.time()
+        return _cache["docs"]
+    if _cache["sig"] is None:
+        with _build_lock:                        # first load: build once, the others wait for it
+            if _cache["sig"] is None:
+                _rebuild(sig)
+        return _cache["docs"]
+    _cache["checked"] = time.time()              # serve the previous set; one thread brings it up to date
+    if _build_lock.acquire(blocking=False):
+        def run():
+            try:
+                _rebuild(sig)
+            except Exception:
+                pass
+            finally:
+                _build_lock.release()
+        threading.Thread(target=run, daemon=True, name="discover-rebuild").start()
+    return _cache["docs"]
+
+
+def _rebuild(sig):
+    with db.connect() as conn:
+        cols = {r[1] for r in conn.execute("PRAGMA table_info(creator_analysis)")}
         q = "SELECT code, %s, data FROM creator_analysis" % ("platform" if "platform" in cols else "'Instagram'")
         rows = conn.execute(q).fetchall()
     docs = {}
@@ -156,7 +182,11 @@ def _load():
         docs.setdefault(code, []).append(summary(d, platform or "Instagram"))
     with _lock:
         _cache.update(sig=sig, docs=docs, facets=None, best=None, checked=time.time())
-    return docs
+
+
+def warm():
+    """Load the summaries in the background at start-up, so the first shortlist does not wait."""
+    threading.Thread(target=lambda: _load(), daemon=True, name="discover-warm").start()
 
 
 # What a client may filter on: the free headline figures of a creator page (gating.headline).

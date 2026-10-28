@@ -7313,6 +7313,7 @@ def main():
     # Prediction log (2026-10-13): freezes each campaign creator's score so it can be tested against the results.
     import scorelog
     scorelog.start()
+    __import__("discover").warm()          # the shortlist's analysis summaries, loaded before the first brief (item 275)
     # What people said (2026-10-19): campaign comments read 2 and 7 days after each video.
     import comments
     comments.start()
