@@ -129,7 +129,12 @@ def _num(v, kind=float):
 def handle_index(conn):
     """lower-case handle -> roster code, from the main handle and every profile link."""
     out = {}
-    for r in conn.execute("SELECT code, handle, profiles FROM creators").fetchall():
+    try:
+        # a company's private creators (creators_private.py) are not on the roster, so a competitor's creator never matches one
+        rows = conn.execute("SELECT code, handle, profiles FROM creators WHERE owner_code_id IS NULL").fetchall()
+    except Exception:                       # the column does not exist yet (a script that ran before the first start)
+        rows = conn.execute("SELECT code, handle, profiles FROM creators").fetchall()
+    for r in rows:
         for pr in db.split_profiles(r["profiles"]):
             h = db.profile_handle(pr.get("url"))
             if h:

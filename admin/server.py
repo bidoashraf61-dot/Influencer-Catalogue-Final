@@ -7107,6 +7107,8 @@ def main():
     account.init()
     import workspace
     workspace.init()
+    import creators_private
+    creators_private.ensure()               # the owner column and the triggers that keep a private creator private
     team.init()
     evidence.init()
     import push
