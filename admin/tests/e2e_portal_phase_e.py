@@ -36,6 +36,7 @@ from http.server import ThreadingHTTPServer  # noqa: E402
 
 DAY = 86400
 CALLS = []
+STATE = {"explode": False}
 
 
 def stub(body):
@@ -45,7 +46,7 @@ def stub(body):
     text = body["contents"][-1]["parts"][0].get("text", "")
     if "claims" in props:
         CALLS.append("source")
-        if "EXPLODE" in text:
+        if "EXPLODE" in text or STATE["explode"]:
             raise gemini.Upstream("boom")
         out = {"product": "GlowSun SPF50", "brand": "Glow", "category": ["skincare", "NOT-REAL"], "audience": "Women 25-34 with oily skin",
                "gender": "Women", "age": "25-34", "market": "SA", "markets": ["SA", "AE", "XX"], "goal": "awareness",
@@ -133,44 +134,44 @@ class PhaseE(unittest.TestCase):
     def upload(self, c, data=BRIEF, name="GlowSun brief.docx"):
         return c.post("/api/brief/source", {"file": {"name": name, "data": "data:application/octet-stream;base64," + base64.b64encode(data).decode()}})
 
-    # ---------------------------------------------------- brief from a file --
-    def test_01_file_fills_the_brief_for_review_and_costs_five(self):
+    # ------------------------------------------- brief from the template (item 277) --
+    def test_01_template_fills_the_brief_exactly_and_free(self):
+        import brief_template
+        from test_brief_template import fill
         c, _ = self.signup("brief@glow-a.com")
-        before = self.credits(c)
+        before, calls = self.credits(c), len(CALLS)
         with db.connect() as conn:
             briefs = conn.execute("SELECT COUNT(*) FROM briefs").fetchone()[0]
-        s, b, _ = self.upload(c)
+        data = fill(brief_template.build(),
+                    ticks=("goal=awareness", "platforms=Instagram", "market=SA", "market=AE", "category=skincare"),
+                    chosen=(("product", "GlowSun SPF50"), ("brand", "Glow"), ("claim", "Dermatologist-tested"),
+                            ("gender", "Mostly women"), ("count", "12"), ("mix", "Many micro")))
+        s, b, _ = self.upload(c, data)
         self.assertEqual(s, 200, b)
-        self.assertTrue(b["ai"])
+        self.assertTrue(b["template"])
         a = b["answers"]
-        self.assertEqual((a["goal"], a["market"], a["category"], a["gender"], a["age"]), ("awareness", ["SA", "AE"], ["skincare"], "Women", "25-34"))   # fix batch 5: the brief takes every country the file names
+        self.assertEqual((a["goal"], a["market"], a["category"], a["gender"], a["count"], a["mix"]),
+                         ("awareness", ["SA", "AE"], ["skincare"], "Women", "other:12", "micro"))
+        self.assertEqual(b["missing"], [])
         self.assertIn("Product: GlowSun SPF50", a["notes"])
-        self.assertIn("uploaded brief", a["notes"])
-        self.assertEqual(b["fields"]["markets"], ["SA", "AE"])                   # unknown markets dropped
-        self.assertEqual(b["claims"], ["Dermatologist-tested"])                  # the invented claim is gone
-        self.assertEqual(b["confidence"]["timing"], "medium")
-        self.assertEqual(b["confidence"]["goal"], "low")
-        self.assertEqual(b["regulated"], "cosmetic")                              # sunscreen, found in the text
-        self.assertEqual({f["kind"] for f in b["flags"]} >= {"claims", "licence"}, True)
-        self.assertTrue(b["timing"]["windows"])
-        self.assertEqual((b["spent"], self.credits(c)), (5, before - 5))
-        self.assertEqual(b["source"]["kind"], "file")
+        self.assertEqual(b["claims"], ["Dermatologist-tested"])
+        self.assertEqual(b["regulated"], "cosmetic")
+        self.assertEqual((b["spent"], self.credits(c), len(CALLS)), (0, before, calls))      # exact read: free, no model
         with db.connect() as conn:
             self.assertEqual(conn.execute("SELECT COUNT(*) FROM briefs").fetchone()[0], briefs)     # nothing saved
-            audit = conn.execute("SELECT detail FROM events WHERE kind = 'brief_source' ORDER BY id DESC LIMIT 1").fetchone()
-        self.assertIn("GlowSun brief.docx", audit["detail"])
-        blob = json.dumps(b)
-        for t in ("SAR", "price", " fee"):
-            self.assertNotIn(t, blob)
+        # a half-filled template says what is still needed
+        s, b, _ = self.upload(c, fill(brief_template.build(), ticks=("category=skincare",)))
+        self.assertEqual(sorted(b["missing"]), ["goal", "market", "platforms"])
 
-    def test_02_unreadable_sources_cost_nothing(self):
+    def test_02_other_files_are_refused_and_cost_nothing(self):
         c, _ = self.signup("bad@glow-b.com")
         calls = len(CALLS)
         before = self.credits(c)
-        for data, name, reason in ((b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\0" * 64, "old.doc", "doc"),
-                                   (bytes(range(256)) * 10, "x.bin", "type"), (b"hi", "a.txt", "empty")):
+        for data, name in ((BRIEF, "own brief.docx"), (b"%PDF-1.4 brief", "brief.pdf"),
+                           (b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\0" * 64, "old.doc"), (b"hi", "a.txt")):
             s, b, _ = self.upload(c, data, name)
-            self.assertEqual((s, b["reason"]), (400, reason))
+            self.assertEqual((s, b["reason"]), (400, "not_template"), name)
+            self.assertEqual(b["template_url"], "api/brief/template")
         for url in ("http://127.0.0.1:%d/admin" % self.httpd.server_address[1], "http://169.254.169.254/latest/meta-data/",
                     "file:///etc/passwd", "https://influencer-catalogue.hellovoice.co.uk/admin/api/me", "http://10.0.0.1/",
                     "http://[::1]/", "http://2130706433/"):
@@ -180,7 +181,7 @@ class PhaseE(unittest.TestCase):
         self.assertEqual(self.credits(c), before)
         self.assertEqual(len(CALLS), calls)                                       # the model was never called
         # a body over the cap is refused before it is read
-        big = {"file": {"name": "big.pdf", "data": "A" * (briefsrc.MAX_FILE * 2)}}
+        big = {"file": {"name": "big.docx", "data": "A" * (briefsrc.MAX_FILE * 2)}}
         s, b, _ = c.post("/api/brief/source", big)
         self.assertEqual((s, b["reason"]), (413, "too_big"))
 
@@ -193,29 +194,36 @@ class PhaseE(unittest.TestCase):
         self.assertEqual(b["source"]["label"], "brand.test")
         self.assertIn("From brand.test", b["answers"]["notes"])
         self.assertEqual(self.credits(c), before - 5)
-        s, b, _ = self.upload(c, docx(["EXPLODE this brief: a long enough text about a sunscreen for women in Riyadh."]))
+        STATE["explode"] = True
+        try:
+            s, b, _ = c.post("/api/brief/source", {"url": "http://brand.test:%d/spf50" % self.site_port})
+        finally:
+            STATE["explode"] = False
         self.assertEqual(s, 502)
         self.assertEqual(self.credits(c), before - 5)                             # refunded
 
     def test_04_free_with_an_active_campaign_and_without_ai(self):
         c, _ = self.signup("free@glow-test.com")
+        briefsrc.TEST_ALLOW_IPS.add("127.0.0.1")
         u = portal.user_by_email("free@glow-test.com")
         k = db.create_campaign("Live one", "Glow", u["code_id"])
         db.save_campaign(k, status="live", starts_at=db.now() - DAY, ends_at=db.now() + 20 * DAY)
         before = self.credits(c)
-        s, b, _ = self.upload(c)
+        link = {"url": "http://brand.test:%d/spf50" % self.site_port}
+        s, b, _ = c.post("/api/brief/source", link)
         self.assertEqual((s, b["spent"], b["free"]), (200, 0, True))
         self.assertEqual(self.credits(c), before)
         gemini.STUB = None
         saved = gemini.key
         gemini.key = lambda: ""
         try:
-            s, b, _ = self.upload(c)
+            s, b, _ = c.post("/api/brief/source", link)
             self.assertEqual((s, b["ai"], b["spent"]), (200, False, 0))
-            self.assertEqual(b["answers"]["market"], "SA")                       # "Riyadh" read for free
+            self.assertNotIn("market", b["answers"])                              # "Riyadh" is a city: not read (item 274)
             self.assertIn("skincare", b["answers"]["category"])
         finally:
             gemini.key = saved
+            gemini.STUB = stub
 
     def test_05_timing_in_the_brief_result_and_on_its_own(self):
         c, _ = self.signup("time@glow-e.com")

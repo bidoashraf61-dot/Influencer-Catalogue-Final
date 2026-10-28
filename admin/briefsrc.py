@@ -91,6 +91,7 @@ MESSAGES = {
     "empty": "We couldn't find readable text in it. If it is a scanned PDF, paste a link or type the brief instead.",
     "encrypted": "That PDF is password-protected. Upload a copy without a password.",
     "broken": "That file couldn't be opened. It may be damaged.",
+    "not_template": "This isn't the HelloVoice brief template. Download the template, fill it in Word and upload it again.",
 }
 
 
@@ -616,18 +617,30 @@ SCHEMA_FIELDS = ("product", "category", "audience", "market", "goal", "timing")
 
 
 def _schema():
+    import fit
     import matcher
+    import powerups
     enum = matcher._enum
     conf = {"type": "STRING", "enum": ["high", "medium", "low"]}
+    pq = {q["id"]: [v for v, _ in q.get("options", [])] for q in powerups.QUESTIONS}
+    countries = [cc for cc, _ in fit.COUNTRIES]
+    # Item 277: every field the brief form asks, every country the scorer knows, several goals and ages.
     return {"type": "OBJECT", "properties": {
         "product": {"type": "STRING"}, "brand": {"type": "STRING"},
         "category": {"type": "ARRAY", "items": {"type": "STRING", "enum": enum("category")}},
         "audience": {"type": "STRING"},
         "gender": {"type": "STRING", "enum": enum("gender")},
-        "age": {"type": "STRING", "enum": enum("age")},
-        "market": {"type": "STRING", "enum": enum("market")},
-        "markets": {"type": "ARRAY", "items": {"type": "STRING", "enum": enum("market")}},
-        "goal": {"type": "STRING", "enum": enum("goal")},
+        "age": {"type": "ARRAY", "items": {"type": "STRING", "enum": [a for a in enum("age") if a != "Any"]}},
+        "market": {"type": "STRING", "enum": countries},
+        "markets": {"type": "ARRAY", "items": {"type": "STRING", "enum": countries}},
+        "goal": {"type": "ARRAY", "items": {"type": "STRING", "enum": enum("goal")}},
+        "count": {"type": "INTEGER"},
+        "budget_sar": {"type": "NUMBER"},
+        "creator_size": {"type": "ARRAY", "items": {"type": "STRING", "enum": enum("creator_size")}},
+        "creator_type": {"type": "ARRAY", "items": {"type": "STRING", "enum": pq["creator_type"]}},
+        "content_lang": {"type": "STRING", "enum": pq["content_lang"]},
+        "mix": {"type": "STRING", "enum": ["hero", "micro", "big"]},
+        "max_fake_pct": {"type": "NUMBER"},
         "platforms": {"type": "ARRAY", "items": {"type": "STRING", "enum": enum("platforms")}},
         "timing": {"type": "STRING", "enum": enum("timing")},
         "launch": {"type": "STRING"},
@@ -643,14 +656,57 @@ SYSTEM = (
     "Fill only what the document states or clearly implies; leave a field out when it does not say. For each of product, "
     "category, audience, market, goal and timing give a confidence: high (stated), medium (clearly implied), low (a guess). "
     "product: the product or service name, under 8 words. brand: the brand. audience: who it is for, under 20 words, as "
-    "written. market: the main country (SA Saudi Arabia, AE UAE, EG Egypt...); markets: every country named. goal: awareness "
-    "for a launch or reach, engagement for community, traffic for website visits, link clicks, sales "
-    "or sign-ups; leave it out when unclear. timing: only "
+    "written. market: the main country (SA Saudi Arabia, AE UAE, EG Egypt, KW Kuwait, QA Qatar...); markets: every country "
+    "named. goal: every goal the document names: awareness for a launch or reach, engagement for community, traffic for "
+    "website visits, link clicks, sales or sign-ups; leave it out when unclear. age: every age band named. count: the number of "
+    "creators asked for. budget_sar: the creator budget in SAR (convert AED x1.02, USD x3.75). creator_size: nano under 20k "
+    "followers, micro 20k-100k, mid 100k-500k, macro 500k-1M, mega 1M+. creator_type: doctor, pharmacist, derm, mom, mua, "
+    "reviewer, fitness, foodie, fashion, comedy, lifestyle, only when the document asks for that kind of creator. content_lang: "
+    "ar, en or both. mix: hero (one big name plus many smaller), micro (many small creators), big (big names). max_fake_pct: the "
+    "highest fake-follower share accepted. timing: only "
     "if a start or launch date is given (asap within 2 weeks, month within 6 weeks, quarter next quarter, later otherwise); "
     "launch: that date as YYYY-MM or YYYY-MM-DD, else empty. claims: COPY, word for word, up to 5 health, efficacy or "
     "benefit claims that the document itself makes; never write, improve or invent a claim, and never add a medical claim. "
     "regulated: medicine, otc, cosmetic, supplement, medical_device or food_health when the product is one, else none. "
     "Never state prices or fees.")
+
+
+def _markets(data):
+    import fit
+    known = {cc for cc, _ in fit.COUNTRIES}
+    ms = [m for m in [data.get("market")] + list(data.get("markets") or []) if m in known]
+    return list(dict.fromkeys(ms))[:4]
+
+
+def _market_answer(markets):
+    """Countries as the brief form stores them: the form's options and legacy codes as they are, any
+    other country the scorer knows as a typed answer ("other:Lebanon"), which matcher reads back."""
+    import fit
+    import matcher
+    allowed = {o[0] for o in matcher._BY_ID["market"]["options"] + matcher._BY_ID["market"].get("legacy", [])}
+    vals = [m if m in allowed else "other:" + dict(fit.COUNTRIES).get(m, m) for m in markets]
+    return vals[0] if len(vals) == 1 else vals
+
+
+def raw_from(data):
+    """A model's (or a template's) answers in the shape matcher.clean_answers reads."""
+    import matcher
+    raw = {k: data.get(k) for k in ("goal", "platforms", "gender", "age", "category", "timing", "creator_size",
+                                    "creator_type", "content_lang", "mix") if data.get(k) not in (None, "", [])}
+    ms = _markets(data)
+    if ms:
+        raw["market"] = _market_answer(ms)
+    n = data.get("count")
+    if isinstance(n, (int, float)) and n > 0:
+        n = int(n)
+        raw["count"] = str(n) if str(n) in matcher.COUNT_OF else "other:%d" % min(n, 50)
+    b = data.get("budget_sar")
+    if isinstance(b, (int, float)) and b > 0:
+        raw["budget"] = "50" if b < 50000 else "150" if b <= 150000 else "400" if b <= 400000 else "400+"
+    f = data.get("max_fake_pct")
+    if isinstance(f, (int, float)) and f > 0:
+        raw["max_fake"] = "15" if f <= 20 else "30" if f <= 35 else "50"
+    return raw
 
 
 def read(text, origin, code_id=None, credits=0):
@@ -659,11 +715,28 @@ def read(text, origin, code_id=None, credits=0):
     import gemini
     import matcher
     import occasions
-    data = gemini.generate_json("SOURCE (%s):\n%s" % (origin, text[:MAX_TEXT]), _schema(), system=SYSTEM,
-                                temperature=0.1, max_tokens=2048, kind="brief_source", code_id=code_id, credits=credits)
+    from datetime import date
+    import brief_template
+    today = date.today().isoformat()
+    prompt = "TODAY: %s\nSOURCE (%s):\n%s" % (today, origin, text[:MAX_TEXT])
+    data = gemini.generate_json(prompt, _schema(), system=SYSTEM, temperature=0.1, max_tokens=4096, think=0,
+                                kind="brief_source", code_id=code_id, credits=credits)
     if not isinstance(data, dict):
         data = {}
-    answers, _ = matcher.clean_answers({k: data.get(k) for k in ("goal", "platforms", "market", "gender", "age", "category", "timing")})
+    core = ("goal", "platforms", "market", "category")
+    if len(re.sub(r"\W", "", text)) > 150 and sum(1 for k in core if not data.get(k)) >= 2:
+        # Item 277: the same file once came back complete and once almost empty. One more careful read,
+        # not charged again; its answers fill only what the first one left out.
+        try:
+            again = gemini.generate_json(prompt, _schema(), system=SYSTEM, temperature=0.0, max_tokens=4096, think=1024,
+                                         kind="brief_source", code_id=code_id, credits=0)
+            if isinstance(again, dict):
+                for k, v in again.items():
+                    if v not in (None, "", []) and data.get(k) in (None, "", []):
+                        data[k] = v
+        except gemini.AIError:
+            pass
+    answers, _ = matcher.clean_answers(raw_from(data))
     if answers.get("platforms") == ["any"]:
         answers.pop("platforms")
     one = lambda v, n: " ".join(str(v or "").split())[:n]
@@ -671,20 +744,27 @@ def read(text, origin, code_id=None, credits=0):
     launch = one(data.get("launch"), 10)
     if not re.match(r"^\d{4}-\d{2}(-\d{2})?$", launch):
         launch = ""
-    markets = [m for m in dict.fromkeys(data.get("markets") or []) if m in dict(matcher._BY_ID["market"]["options"])]
-    if answers.get("market") and answers["market"] not in markets:
-        markets.insert(0, answers["market"])
-    if len(markets) > 1:
-        answers["market"] = markets[:4]          # the brief takes every country the document names (fix batch 5)
+    if launch and brief_template.timing_of(launch):
+        answers["timing"] = brief_template.timing_of(launch)      # from the date, never the model's guess (item 277)
+    markets = _markets(data)
+    if markets:
+        answers["market"] = _market_answer(markets)
     claims = keep_claims(data.get("claims"), text)
     kind = data.get("regulated") if data.get("regulated") in REGULATED else "none"
     if kind == "none":
         kind = regulated_kind(text, answers.get("category"))
     conf_in = data.get("confidence") if isinstance(data.get("confidence"), dict) else {}
+    return finish(answers, product, brand, audience, markets, launch, claims, kind, origin,
+                  lambda f: conf_in.get(f) if conf_in.get(f) in ("high", "medium", "low") else "medium")
+
+
+def finish(answers, product, brand, audience, markets, launch, claims, kind, origin, conf_of):
+    """The review payload, shared by the link reader and the brief template (item 277)."""
+    import fit
+    import occasions
     have = {"product": bool(product), "category": bool(answers.get("category")), "audience": bool(audience or answers.get("gender") or answers.get("age")),
             "market": bool(answers.get("market")), "goal": bool(answers.get("goal")), "timing": bool(answers.get("timing") or launch)}
-    confidence = {f: (conf_in.get(f) if conf_in.get(f) in ("high", "medium", "low") else "medium") if have[f] else "missing"
-                  for f in SCHEMA_FIELDS}
+    confidence = {f: conf_of(f) if have[f] else "missing" for f in SCHEMA_FIELDS}
     # The notes carry what the options cannot hold, for the client to read and edit.
     bits = []
     if product:
@@ -692,17 +772,17 @@ def read(text, origin, code_id=None, credits=0):
     if audience:
         bits.append("Audience: " + audience)
     if len(markets) > 1:
-        bits.append("Markets: " + ", ".join(matcher.answer_label("market", m) for m in markets))
+        bits.append("Markets: " + fit.country_names("|".join(markets)))
     if launch:
         bits.append("Launch: " + launch)
     bits.append("From " + origin)
-    answers["notes"] = ". ".join(bits)[:600]
+    answers["notes"] = ". ".join(bits + ([answers["notes"]] if answers.get("notes") else []))[:600]
     flags = []
     if kind != "none":
         flags.append({"kind": "claims", "title": "Regulated product",
                       "text": "This looks like %s. Health and benefit claims need your medical or regulatory team's approval, and "
                               "HelloVoice checks every script before it is posted. Helvi never adds claims." % REGULATED[kind]})
-    if (not markets and not answers.get("market")) or "SA" in markets or answers.get("market") == "SA":
+    if not markets or "SA" in markets:
         flags.append({"kind": "licence", "title": "Mawthooq licence",
                       "text": "Paid posts in Saudi Arabia need creators with a Mawthooq licence. Filter the catalogue by licence, "
                               "or ask Helvi for licensed creators."})
@@ -710,5 +790,31 @@ def read(text, origin, code_id=None, credits=0):
         flags.append({"kind": "claims_found", "title": "Claims in your source",
                       "text": "Your source makes claims such as “%s”. Creators may only repeat claims your regulatory team approves." % claims[0][:90]})
     timing = occasions.advise(answers.get("category") or [], "SA" if "SA" in markets else (markets[0] if markets else "SA"), answers.get("timing"), launch)
+    import matcher
+    _, missing = matcher.clean_answers(answers)
     return {"answers": answers, "fields": {"product": product, "brand": brand, "audience": audience, "markets": markets, "launch": launch},
-            "confidence": confidence, "claims": claims, "regulated": kind, "flags": flags, "timing": timing}
+            "confidence": confidence, "claims": claims, "regulated": kind, "flags": flags, "timing": timing, "missing": missing}
+
+
+def from_template(data, name):
+    """A filled HelloVoice brief template read exactly: no AI, nothing charged (item 277). Raises
+    SourceError("not_template") for any other file."""
+    import brief_template
+    import matcher
+    try:
+        got = brief_template.read(data)
+    except ValueError:
+        fail("not_template")
+    raw = brief_template.to_raw(got)
+    answers, _ = matcher.clean_answers(raw)
+    text = " ".join(str(got.get(k) or "") for k in ("product", "claim", "notes"))
+    kind = regulated_kind(text, answers.get("category"))
+    if kind != "none" and got.get("claim"):
+        answers["regulated"] = "yes"
+    markets = [m for m in (got.get("market") or [])][:4]
+    if markets:
+        answers["market"] = markets[0] if len(markets) == 1 else markets
+    claims = [" ".join(got["claim"].split())[:200]] if got.get("claim") else []
+    label = re.sub(r"[^\w .()-]", "", str(name or "brief"))[:80] or "brief"
+    return finish(answers, (got.get("product") or "")[:80], (got.get("brand") or "")[:60], "", markets, got.get("launch") or "",
+                  claims, kind, "brief template “%s”" % label, lambda f: "high")

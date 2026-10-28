@@ -28,6 +28,16 @@ MAX_UPLOAD_BODY = briefsrc.MAX_FILE * 4 // 3 + 64 * 1024        # base64 + the J
 class PhaseEMixin:
 
     def phase_e_get(self, path, query):
+        if path == "/api/brief/template":
+            # The HelloVoice brief template (item 277): built on each download, so it always carries the
+            # current questions and options. Anyone signed in to the catalogue may download it.
+            import brief_template
+            if self._need_viewer():
+                self.send(200, brief_template.build(),
+                          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                          self.cors() + [("Content-Disposition", 'attachment; filename="%s"' % brief_template.FILE_NAME),
+                                         ("Cache-Control", "no-store")])
+            return True
         if path == "/api/timing":
             who = self._need_viewer()
             if who:
@@ -94,15 +104,25 @@ class PhaseEMixin:
         # 1. Read the source: free, and nothing is charged when it cannot be read.
         try:
             if f:
+                # Files: the HelloVoice brief template only (Bido, 2026-10-29, item 277). It is read exactly
+                # from its tick boxes and drop-downs: no AI, nothing charged, the file is dropped.
                 data = briefsrc.decode_upload(f.get("data"))
-                got = briefsrc.from_file(f.get("name"), data)
-                del data                                   # the upload is not kept anywhere
-                origin = "uploaded brief “%s”" % got["label"]
+                res = briefsrc.from_template(data, f.get("name"))
+                del data
+                db.log("brief_source", cid, self.client_ip(), self._ua(), "template " + str(f.get("name") or "")[:60])
+                res.update({"ok": True, "ai": True, "template": True, "spent": 0, "free": True,
+                            "source": {"kind": "file", "label": str(f.get("name") or "brief")[:80], "format": "template",
+                                       "chars": 0, "title": ""},
+                            "credits": portal.balance(cid) if kind != "admin" else None})
+                return self.send_json(200, res, self.cors())
             else:
                 got = briefsrc.from_url(url)
                 origin = got["label"]
         except briefsrc.SourceError as exc:
-            return self.send_json(400, {"ok": False, "reason": exc.reason, "message": exc.message}, self.cors())
+            body = {"ok": False, "reason": exc.reason, "message": exc.message}
+            if f:
+                body["template_url"] = "api/brief/template"
+            return self.send_json(400, body, self.cors())
         src = {"kind": "file" if f else "link", "label": got["label"], "format": got["kind"], "chars": got["chars"],
                "title": got.get("title") or ""}
         db.log("brief_source", cid, self.client_ip(), self._ua(), ("file " if f else "link ") + got["label"][:60])

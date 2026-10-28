@@ -32,6 +32,7 @@
     users: '<circle cx="9" cy="8.5" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M15.5 5.6a3 3 0 0 1 0 5.8M17.5 14.3c1.7.6 2.8 2.2 3 4.7"/>',
     bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.6 2H4.4z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/>',
     check: '<path d="M4.5 12.5l5 5 10-11"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
+    download: '<path d="M12 4v11M7.5 10.5l4.5 4.5 4.5-4.5M5 19.5h14"/>',
     lock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><path d="M12 14.5v2.5"/>',
     unlock: '<rect x="4.5" y="10.5" width="15" height="10" rx="2.5"/><path d="M8 10.5V8a4 4 0 0 1 7.6-1.7"/><path d="M12 14.5v2.5"/>',
     clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
@@ -1248,9 +1249,10 @@
     opts = opts || {};
     var dark = !!opts.dark;
     var root = h("div", { class: "bs" + (dark ? " bs--dark" : "") + (opts.chat ? " bs--chat" : "") });
-    var file = h("input", { type: "file", class: "bs__file", accept: ".pdf,.docx,.txt,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain", tabindex: "-1", "aria-hidden": "true" });
+    // Files: the HelloVoice brief template only (item 277). It is read exactly, free, and never kept.
+    var file = h("input", { type: "file", class: "bs__file", accept: ".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document", tabindex: "-1", "aria-hidden": "true" });
     var linkBtn = h("button", { class: "bs__opt", type: "button", "aria-expanded": "false", html: icon("link") + "<span>Paste a product link</span>" });
-    var fileBtn = h("button", { class: "bs__opt", type: "button", html: icon("upload") + "<span>Upload a brief <small>PDF or Word</small></span>" });
+    var fileBtn = h("button", { class: "bs__opt", type: "button", html: icon("upload") + "<span>Upload the filled template <small>HelloVoice brief, Word</small></span>" });
     var pick = h("div", { class: "bs__pick", role: "group", "aria-label": "Start from a link or a file" }, linkBtn, fileBtn, file);
     var urlIn = h("input", { class: "bs__url", type: "url", inputmode: "url", autocomplete: "off", spellcheck: "false", maxlength: "2000",
                              placeholder: "https://brand.com/product", "aria-label": "Product page link" });
@@ -1259,13 +1261,17 @@
     var fine = h("p", { class: "bs__fine" });
     var tag = srcCostTag("source");
     if (tag) fine.appendChild(tag);
-    fine.appendChild(h("span", null, "Helvi reads the page or file and fills the brief for you to check. Files are read, never kept."));
+    fine.appendChild(h("span", null, "Helvi fills the brief for you to check. The template is read exactly, free, and never kept."));
+    fine.appendChild(tplLink());
     var err = h("p", { class: "bs__err", role: "alert", hidden: "" });
     var out = h("div", { class: "bs__out", "aria-live": "polite" });
     if (opts.lead) root.appendChild(h("p", { class: "bs__lead" }, opts.lead));
     root.appendChild(pick); root.appendChild(form); root.appendChild(fine); root.appendChild(err); root.appendChild(out);
 
-    function fail(t) { err.hidden = !t; err.textContent = t || ""; }
+    function fail(t, withTpl) {
+      err.hidden = !t; err.textContent = t || "";
+      if (t && withTpl) { err.appendChild(document.createTextNode(" ")); err.appendChild(tplLink(true)); }
+    }
     function busy(on, label) {
       linkBtn.disabled = fileBtn.disabled = go.disabled = urlIn.disabled = on;
       root.classList.toggle("is-busy", on);
@@ -1287,7 +1293,7 @@
           return;
         }
         fail(r.s === 429 ? "Too many tries. Please wait a few minutes." : r.s === 413 ? "That file is too large. Briefs up to 4 MB can be read." :
-             (r.b && r.b.message) || "That couldn't be read. Please try again.");
+             (r.b && r.b.message) || "That couldn't be read. Please try again.", !!(r.b && r.b.reason === "not_template"));
       });
     }
     linkBtn.addEventListener("click", function () {
@@ -1306,7 +1312,7 @@
     file.addEventListener("change", function () {
       var f = file.files && file.files[0];
       if (!f) return;
-      if (/\.doc$/i.test(f.name)) { fail("Old Word files (.doc) can't be read. Save it as .docx or PDF and upload again."); return; }
+      if (!/\.docx$/i.test(f.name)) { fail("Only the HelloVoice brief template can be uploaded. Download it, fill it in Word and upload it again.", true); return; }
       if (f.size > SRC_MAX) { fail("That file is too large. Briefs up to 4 MB can be read."); return; }
       var rd = new FileReader();
       rd.onload = function () { send({ file: { name: f.name, data: rd.result } }, "Reading " + f.name + "…"); };
@@ -1354,8 +1360,9 @@
       if (tl) card.appendChild(tl);
       var use = h("button", { class: "bs__use", type: "button", html: "<span>Use this brief</span>" + icon("arrow") });
       var again = h("button", { class: "bs__again", type: "button" }, "Try another link or file");
-      card.appendChild(h("div", { class: "bs-res__go" }, again, use));
+      card.appendChild(h("div", { class: "bs-res__go" }, again, opts.complete ? null : use));
       out.appendChild(card);
+      if (opts.complete) out.appendChild(needs(res, qs, edits));
       again.addEventListener("click", function () { out.textContent = ""; pick.hidden = false; fine.hidden = false; urlIn.value = ""; urlIn.focus(); });
       use.addEventListener("click", function () {
         var answers = {};
@@ -1368,6 +1375,88 @@
       linkBtn.classList.remove("is-on"); linkBtn.setAttribute("aria-expanded", "false");
       try { card.scrollIntoView({ block: "nearest", behavior: REDUCE ? "auto" : "smooth" }); } catch (e) { /* old browser */ }
       if (opts.onShow) opts.onShow(res);
+    }
+    // Item 277 (Bido MCQ 2026-10-29): one screen. What the brief said stays above; below it only what is
+    // still needed (goal, platforms, countries, space when missing; creators and mix always), the other
+    // answers it found as removable chips, and Build my shortlist, live once the four required are in.
+    function needs(res, qs, edits) {
+      var answers = {};
+      Object.keys(res.answers || {}).forEach(function (k) { answers[k] = res.answers[k]; });
+      var REQ = ["goal", "platforms", "market", "category"];
+      var byQ = {};
+      (qs || []).forEach(function (q) { byQ[q.id] = q; });
+      var has = function (k) { var v = answers[k]; return Array.isArray(v) ? v.length > 0 : !!v; };
+      var ask = REQ.filter(function (k) { return !has(k); }).concat(["count", "mix"]);
+      var box = h("section", { class: "bs-need", "aria-label": "Finish the brief" });
+      box.appendChild(h("p", { class: "ai-sl__ask bs-need__h" }, ask.length > 2 ? "A few things your brief didn't say" : "Last check before Helvi builds"));
+      box.appendChild(h("p", { class: "ai-sl__hint" }, "Tap to answer. Everything else comes from your brief."));
+      var build = h("button", { class: "ai-sl__build bs-need__build", type: "button" }, "Build my shortlist");
+      var why = h("p", { class: "bs-need__why", "aria-live": "polite" });
+      function sync() {
+        var left = REQ.filter(function (k) { return !has(k); }).map(function (k) { return (byQ[k] && byQ[k].label || k).replace(/\?$/, "").toLowerCase(); });
+        build.disabled = left.length > 0;
+        why.textContent = left.length ? "Still needed: " + left.join(", ") + "." : "";
+      }
+      ask.forEach(function (id) {
+        var q = byQ[id];
+        if (!q) return;
+        var many = q.type === "many" || !!q.multi_ok;
+        var grp = h("div", { class: "bs-need__q", role: "group", "aria-label": q.label });
+        grp.appendChild(h("p", { class: "bs-need__lbl" }, id === "goal" ? "Campaign goals" : q.label + (REQ.indexOf(id) > -1 ? "" : " (optional)")));
+        var row = h("div", { class: "ai-sl__opts bs-need__opts" });
+        (q.options || []).forEach(function (o) {
+          var list = function () { return asList(answers[id]); };
+          var on = many ? list().indexOf(o.value) > -1 : answers[id] === o.value;
+          var b = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(on) }, o.label);
+          b.addEventListener("click", function () {
+            if (many) answers[id] = toggleMulti(q, list(), o.value);
+            else answers[id] = answers[id] === o.value ? null : o.value;
+            if (!answers[id] || (Array.isArray(answers[id]) && !answers[id].length)) delete answers[id];
+            Array.prototype.forEach.call(row.children, function (x, xi) {
+              var v = q.options[xi].value;
+              x.setAttribute("aria-pressed", String(many ? asList(answers[id]).indexOf(v) > -1 : answers[id] === v));
+            });
+            sync();
+          });
+          row.appendChild(b);
+        });
+        grp.appendChild(row);
+        box.appendChild(grp);
+      });
+      // What else the brief set: shown, removable, never asked again.
+      var EXTRA = [["gender", "Audience"], ["age", "Ages"], ["creator_size", "Sizes"], ["creator_type", "Creator type"],
+                   ["content_lang", "Language"], ["tone", "Tone"], ["max_fake", "Fake followers"], ["min_engagement", "Engagement"],
+                   ["licence", "Licence"], ["collab", "Fresh or proven"], ["budget", "Budget"], ["timing", "Starts"]];
+      var chips = h("ul", { class: "bs-need__also", "aria-label": "Also from your brief" });
+      EXTRA.forEach(function (e) {
+        var k = e[0];
+        if (!has(k) || (k === "gender" && answers[k] === "Any")) return;
+        var q = byQ[k] || pwQ(k);
+        var words = asList(answers[k]).map(function (v) { return q ? optionLabel(q, v) : v; }).join(", ");
+        var li = h("li", { class: "bs-need__chip" }, h("span", null, h("b", null, e[1] + " "), words));
+        var x = h("button", { class: "bs-need__x", type: "button", "aria-label": "Remove " + e[1], html: icon("x") });
+        x.addEventListener("click", function () { delete answers[k]; li.remove(); if (!chips.children.length) also.hidden = true; });
+        li.appendChild(x);
+        chips.appendChild(li);
+      });
+      var also = h("div", { class: "bs-need__alsow" }, h("p", { class: "bs-need__lbl" }, "Also from your brief"), chips);
+      if (!chips.children.length) also.hidden = true;
+      box.appendChild(also);
+      box.appendChild(h("div", { class: "bs-need__go" }, build, why));
+      build.addEventListener("click", function () {
+        if (build.disabled) return;
+        var send = {};
+        Object.keys(answers).forEach(function (k) { send[k] = answers[k]; });
+        send.notes = srcNotes(res, edits.product.value.trim(), edits.audience.value.trim());
+        if (!send.notes) delete send.notes;
+        if (opts.onBuild) opts.onBuild(send, res);
+      });
+      sync();
+      return box;
+    }
+    function tplLink(button) {
+      return h("a", { class: button ? "bs__tpl bs__tpl--btn" : "bs__tpl", href: API + "/api/brief/template", download: "HelloVoice-Brief-Template.docx",
+                      html: icon("download") + "<span>Download the brief template (Word)</span>" });
     }
     root.reset = function () { out.textContent = ""; pick.hidden = false; fine.hidden = false; fail(""); };
     return root;
@@ -4221,9 +4310,13 @@
         var p = h("div", { class: "ai-sl__q ai-sl__src" });
         p.appendChild(h("p", { class: "ai-sl__ask" }, "Start from what you have"));
         p.appendChild(h("p", { class: "ai-sl__hint" }, "A product page or your brief. Helvi fills the brief, you check it."));
-        var bs = HV.briefSource({ dark: true, onUse: function (got, res) {
+        var bs = HV.briefSource({ dark: true, complete: true, onUse: function (got, res) {
           answers = Object.assign(profileAnswers(), got); srcRes = res;
           review();
+        }, onBuild: function (got, res) {
+          // Straight to the shortlist (item 277): no ticket, no power-up stage; power-ups found in the brief apply.
+          answers = Object.assign(profileAnswers(), got); srcRes = res;
+          if (!busy) go(nameFor());
         } });
         p.appendChild(bs);
         p.appendChild(h("div", { class: "ai-sl__nav" }, h("button", { class: "ai-sl__back", type: "button", onclick: function () { answers = profileAnswers(); srcRes = null; ask(0); } }, "Answer the questions instead")));
