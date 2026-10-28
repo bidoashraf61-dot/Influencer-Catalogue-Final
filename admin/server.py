@@ -1077,12 +1077,14 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             import licence
             return self.send(200, licence.page_html(query))
         if path == "/tenants" or path.startswith("/tenants/"):
-            # Who has which module. Owners configure the platform; admins run the business.
-            if team.role_of(who) != "owner":
+            # Who has which module. Owners configure the platform; admins run the business, so an admin
+            # reads the list and a company's page and may Share access there (Bido 2026-10-28), nothing more.
+            role_ = team.role_of(who)
+            if role_ != "owner" and not (role_ == "admin" and path in ("/tenants", "/tenants/co")):
                 return self.send(403, team_views.forbidden_page(team.role_of(who)))
             import tenants
             if path == "/tenants/co":
-                return self.send(200, tenants.company_html((query.get("k") or "").strip(), query))
+                return self.send(200, tenants.company_html((query.get("k") or "").strip(), query, owner=role_ == "owner"))
             if path == "/tenants/requests":
                 return self.send(200, tenants.requests_html(query))
             if path == "/tenants/hist":
@@ -1521,6 +1523,28 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
         if path.startswith("/app-alerts/"):
             return self.post_app_alerts(path, who)
         if path.startswith("/tenants/"):
+            if path == "/tenants/share" and team.role_of(who) in ("owner", "admin"):
+                # Share access (Bido 2026-10-28): owners and admins, never a KAM or a viewer.
+                import tenants
+                import workspace
+                import datetime
+                b = self.json_body()
+                c = tenants.company(str(b.get("k") or ""))
+                if c is None:
+                    return self.send_json(404, {"ok": False, "message": "No such company."})
+                until = None
+                if str(b.get("until") or "").strip():
+                    try:
+                        d = datetime.datetime.strptime(str(b["until"])[:10], "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+                        until = int(d.timestamp()) + 86399          # through the end of that day
+                    except ValueError:
+                        return self.send_json(400, {"ok": False, "message": "Pick the end date again."})
+                    if until < db.now():
+                        return self.send_json(400, {"ok": False, "message": "The end date has passed."})
+                ok, msg = workspace.staff_share(c["ids"], b.get("email"), " ".join(str(b.get("name") or "").split())[:120],
+                                                b.get("roles") if isinstance(b.get("roles"), dict) else {}, until,
+                                                who["email"] if "email" in who.keys() else "")
+                return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, [("Cache-Control", "no-store")])
             if team.role_of(who) != "owner":
                 return self.send(403, team_views.forbidden_page(team.role_of(who)))
             import tenants
@@ -7129,6 +7153,7 @@ def main():
     account.init()
     import workspace
     workspace.init()
+    workspace.start()
     import creators_private
     creators_private.ensure()               # the owner column and the triggers that keep a private creator private
     team.init()

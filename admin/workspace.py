@@ -55,6 +55,15 @@ CREATE TABLE IF NOT EXISTS user_modules (
     PRIMARY KEY (user_id, module)
 );
 
+CREATE TABLE IF NOT EXISTS role_grants (
+    user_id    INTEGER NOT NULL,
+    module     TEXT NOT NULL,
+    until      INTEGER,                   -- the role drops to none after this (UTC); NULL = no end
+    granted_by TEXT,
+    granted_at INTEGER NOT NULL,
+    PRIMARY KEY (user_id, module)
+);
+
 CREATE TABLE IF NOT EXISTS workspace_prefs (
     code_id INTEGER NOT NULL,
     module  TEXT NOT NULL,                -- a module key, or "*" for the whole company
@@ -424,6 +433,10 @@ def _overview(tenant, user, key):
 
 
 def payload(user, key=None):
+    try:
+        expire_due()
+    except Exception:
+        pass
     tenant = tenant_of(user)
     mods = []
     for m in MODS:
@@ -453,4 +466,107 @@ def payload(user, key=None):
                            "roles": [{"key": r, "help": ROLE_HELP[r]} for r in ROLES],
                            "modules": [{"key": m["key"], "name": m["short"], "on": level(tenant, m["key"]) != "off"} for m in MODS]}
     return out
+
+
+# ------------------------------------------------- HelloVoice shares a module --
+# From a company's page on Tenants an owner or admin gives anyone a role in that company's modules,
+# optionally until a date. The person joins the company as a colleague (their own login); on the end
+# date their role in that module drops to none and their login stays. Approved by Bido 2026-10-28.
+
+def staff_share(code_ids, email, name, roles, until=None, by=""):
+    """(ok, message). `code_ids`: the company's codes (tenants.company()["ids"]); `roles`: {module: role};
+    `until`: a UTC timestamp or None."""
+    import access_rules
+    roles = {k: r for k, r in (roles or {}).items() if k in BY_KEY and r in RANK}
+    if not any(r != "none" for r in roles.values()):
+        return False, "Pick a role in at least one module."
+    email = " ".join(str(email or "").split()).lower()
+    if "@" not in email:
+        return False, "Add the person's email."
+    # HelloVoice may share with anyone, so the client sign-up rules (company domains, sign-up mode) do not apply.
+    import re
+    if not re.match(r"^[^@\s]+@[^@\s]+\.[a-z]{2,}$", email):
+        return False, "That does not look like an email."
+    ids = [int(i) for i in code_ids]
+    # The company's own code: its first account holder's.
+    holder = None
+    with _c() as conn:
+        holder = conn.execute("SELECT code_id FROM users WHERE code_id IN (%s) AND company_code_id IS NULL "
+                              "AND deleted_at IS NULL ORDER BY (status = 'active') DESC, created_at LIMIT 1"
+                              % ",".join("?" * len(ids)), ids).fetchone()
+    tenant = holder["code_id"] if holder else ids[0]
+    u = portal.user_by_email(email)
+    if u is not None and tenant_of(u) not in ids and u["code_id"] not in ids:
+        return False, "%s already has an account at another company." % email
+    created = u is None
+    if created:
+        u = portal.create_user(email, name or "", "", ip=None)
+        with _c() as conn:
+            conn.execute("UPDATE users SET company_code_id = ? WHERE id = ?", (tenant, u["id"]))
+        if u["status"] != "active":               # sign-up in approval mode: HelloVoice is the approval
+            portal.set_status(u["id"], "active")
+        u = portal.user_by_id(u["id"])
+    elif u["status"] != "active":
+        portal.set_status(u["id"], "active")
+    if is_root(u):
+        return False, "%s holds the company's own account and is admin of every module already." % email
+    with _c() as conn:
+        for k, r in roles.items():
+            _write_role(conn, u["id"], tenant, k, r, by)
+            conn.execute("DELETE FROM role_grants WHERE user_id = ? AND module = ?", (u["id"], k))
+            if until and r != "none":
+                conn.execute("INSERT INTO role_grants (user_id, module, until, granted_by, granted_at) VALUES (?,?,?,?,?)",
+                             (u["id"], k, int(until), by, db.now()))
+    _history("staff_share", tenant, email, {"email": by}, None, dict(roles, until=until))
+    if created:
+        try:
+            import mailer
+            if mailer.configured():
+                mailer.send(email, "You have access to HELVi Connect",
+                            "HelloVoice gave you access to HELVi Connect.\n\nSign in with this email: "
+                            "https://influencer-catalogue.hellovoice.co.uk/workspace/\nYou will get a one-time code by email.")
+        except Exception:
+            pass
+    end = (" until " + __import__("datetime").datetime.utcfromtimestamp(until).strftime("%d %b %Y")) if until else ""
+    return True, ("Shared with %s%s." % (email, end)) + (" They sign in with a code sent to that email." if created else "")
+
+
+def grants_for(user_ids):
+    """{(user_id, module): until} for shares with an end date."""
+    ids = [int(i) for i in user_ids]
+    if not ids:
+        return {}
+    with _c() as conn:
+        return {(r["user_id"], r["module"]): r["until"] for r in conn.execute(
+            "SELECT user_id, module, until FROM role_grants WHERE until IS NOT NULL AND user_id IN (%s)"
+            % ",".join("?" * len(ids)), ids)}
+
+
+def expire_due(now=None):
+    """Drop every share past its end date to none. Returns how many. Runs hourly and on every workspace load."""
+    now = now or db.now()
+    n = 0
+    with _c() as conn:
+        due = conn.execute("SELECT user_id, module FROM role_grants WHERE until IS NOT NULL AND until < ?", (now,)).fetchall()
+        for r in due:
+            conn.execute("UPDATE user_modules SET role = 'none', changed_at = ?, changed_by = 'share ended' "
+                         "WHERE user_id = ? AND module = ?", (now, r["user_id"], r["module"]))
+            conn.execute("DELETE FROM role_grants WHERE user_id = ? AND module = ?", (r["user_id"], r["module"]))
+            n += 1
+    return n
+
+
+def start():
+    """The hourly end-date sweep, from server.main."""
+    import threading
+    import time
+
+    def loop():
+        while True:
+            try:
+                expire_due()
+            except Exception:
+                pass
+            time.sleep(3600)
+    threading.Thread(target=loop, name="share-expiry", daemon=True).start()
 

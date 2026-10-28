@@ -310,6 +310,15 @@ def domain_lists():
 def check_email(raw):
     """(email, None) when this address may sign up, else ('', reason)."""
     allow, block = domain_lists()
+    # Someone HelloVoice gave access to (Tenants -> Share access) may use any address, a personal one too:
+    # an active account that is a company's colleague signs in whatever its domain. A blocked domain still wins.
+    plain = guard.normalise_email(raw)
+    if plain:
+        u = user_by_email(plain)
+        dom = plain.rsplit("@", 1)[1]
+        if (u is not None and u["status"] == "active" and "company_code_id" in u.keys() and u["company_code_id"]
+                and not guard._matches(dom, {d.strip().lower() for d in block if d and d.strip()})):
+            return plain, None
     email, why = guard.company_email(raw, allow, block)
     if why:
         return "", why

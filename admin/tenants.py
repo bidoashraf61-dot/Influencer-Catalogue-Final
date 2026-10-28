@@ -284,7 +284,7 @@ document.getElementById('tn-csv').addEventListener('click',function(){
 
 # --------------------------------------------------------------- company page --
 
-def company_html(k, query=None):
+def company_html(k, query=None, owner=True):
     import views
     e, u = views.e, views.u
     query = query or {}
@@ -346,6 +346,7 @@ def company_html(k, query=None):
               (ppl or "<tr><td colspan='9' class='muted'>No one has signed up under this company yet.</td></tr>") +
               "</tbody></table><p class='muted'>Effective access is the lower of the company's level above and the person's role. "
               "A person with no role set reads as Viewer.</p>")
+    share = _share_card(c, roles)
     pend = [r for r in tenant_requests.listing("pending") if r["code_id"] in c["ids"]]
     reqs = (("<p><a href='%s'><b>%d pending request%s</b></a> from this company.</p>"
              % (e(u("/tenants/requests?k=" + k)), len(pend), "" if len(pend) == 1 else "s")) if pend else "")
@@ -356,12 +357,15 @@ def company_html(k, query=None):
         "<a class='btn small ghost' href='" + e(u("/tenants")) + "'>All tenants</a></div></div>" + note +
         "<p class='sec-desc'>%d account%s · status %s. Every change saves as you make it and is kept in History.</p>"
         % (c["accounts"], "" if c["accounts"] == 1 else "s", e(c["status"])) + reqs + "</div>"
+        + share +
+        ("" if owner else "<div class='card'><p class='muted'>Only the owner changes the settings below; "
+                          "you can share access above.</p></div><fieldset disabled class='tn-ro'>") +
         "<div class='card'><div class='hd'><h2>Modules</h2></div>" + mod_lines + "</div>"
         "<div class='card'><div class='hd'><h2>Limits and credits</h2></div><p class='sec-desc'>Empty means the platform default. "
         "A cap counts what they have now and refuses the next one.</p>" + usage + lim_lines + "</div>"
         "<div class='card'><div class='hd'><h2>Branding</h2></div>" + brand_lines + "</div>"
         "<div class='card'><div class='hd'><h2>People and roles</h2></div>" + kam_line + people + "</div>"
-        "<div class='card'><div class='hd'><h2>Notes</h2></div>" + notes_line + "</div>"
+        "<div class='card'><div class='hd'><h2>Notes</h2></div>" + notes_line + "</div>" + ("" if owner else "</fieldset>")
         + _CO_CSS + "<script>var TN_K=" + json.dumps(k) + ",TN_B=" + json.dumps(views.BASE) + ";</script>" + _CO_JS)
     return views.page(c["name"], body, "/tenants")
 
@@ -622,3 +626,49 @@ def decide(rid, action, value, reply, by, ip=None):
         return False, m or "Could not apply it."
     tenant_requests.close(rid, "approved", by, reply)
     return True, "Approved and applied."
+
+
+# ------------------------------------------------------------ share access --
+# Bido 2026-10-28: an owner or admin gives anyone a role in this company's modules, optionally until a date
+# (workspace.staff_share). The person joins the company as a colleague with their own login.
+
+_SHARE_JS = """<script>(function(){var f=document.getElementById('tn-share');if(!f)return;
+f.addEventListener('submit',function(ev){ev.preventDefault();var roles={};
+[].forEach.call(f.querySelectorAll('select[data-m]'),function(s){roles[s.getAttribute('data-m')]=s.value;});
+var out=f.querySelector('.tn-share-out'),btn=f.querySelector('button[type=submit]');btn.disabled=true;out.textContent='Sharing\u2026';
+fetch(TN_B+'/tenants/share',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+ body:JSON.stringify({k:TN_K,email:f.email.value,name:f.name.value,until:f.until.value,roles:roles})})
+.then(function(r){return r.json().catch(function(){return{};});}).then(function(b){btn.disabled=false;out.textContent=b.message||b.error||'Done.';
+ if(b.ok){setTimeout(function(){location.reload();},900);}});});})();</script>"""
+
+
+def _share_card(c, roles):
+    import views
+    import workspace
+    e = views.e
+    sel = "".join("<label class='tn-sh-m'><span>%s</span><select data-m='%s'>%s</select></label>" % (
+        e(m["name"]), e(m["key"]),
+        "".join("<option value='%s'%s>%s</option>" % (r, " selected" if r == "none" else "", r.capitalize())
+                for r in modules.ROLES)) for m in modules.MODULES)
+    grants = workspace.grants_for([p["id"] for p in c["people"]])
+    names = {p["id"]: (p["name"] or p["email"]) for p in c["people"]}
+    mod_name = {m["key"]: m["name"] for m in modules.MODULES}
+    import datetime
+    rows = "".join("<li>%s · %s · until %s</li>" % (e(names.get(uid, "?")), e(mod_name.get(mk, mk)),
+                                                   datetime.datetime.utcfromtimestamp(t).strftime("%d %b %Y"))
+                   for (uid, mk), t in sorted(grants.items(), key=lambda x: x[1]))
+    return ("<div class='card'><div class='hd'><h2>Share access</h2></div>"
+            "<p class='sec-desc'>Give anyone a role in this company's modules: they join as a colleague with their own "
+            "sign-in and see this company's data in the modules you pick. Any email works, a personal one too. "
+            "With an end date their role drops to none that day; their login stays.</p>"
+            "<form id='tn-share' class='tn-share' autocomplete='off'>"
+            "<label><span>Email</span><input name='email' type='email' required placeholder='name@company.com'></label>"
+            "<label><span>Name</span><input name='name' placeholder='Optional'></label>" + sel +
+            "<label><span>Ends</span><input name='until' type='date'></label>"
+            "<div class='tn-sh-go'><button class='btn' type='submit'>Share</button> <span class='tn-share-out muted' aria-live='polite'></span></div>"
+            "</form>" + (("<p class='muted' style='margin-top:14px'>Shares with an end date:</p><ul class='tn-sh-list'>" + rows + "</ul>") if rows else "") +
+            "<style>.tn-share{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;align-items:end}"
+            ".tn-share label{display:grid;gap:4px}.tn-share label span{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted,#555)}"
+            ".tn-share input,.tn-share select{min-height:40px}.tn-sh-go{grid-column:1/-1}.tn-sh-list{margin:6px 0 0;padding-left:18px}"
+            "fieldset.tn-ro{border:0;padding:0;margin:0;min-width:0}</style>" + _SHARE_JS + "</div>")
+
