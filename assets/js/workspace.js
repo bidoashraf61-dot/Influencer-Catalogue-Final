@@ -73,12 +73,14 @@
     ({ overview: overview, work: work, results: results, team: team, settings: settings })[tab](p);
   }
   function stateLabel(m) {
-    return m.state === "open" ? "Your role: " + m.role : m.state === "norole" ? "Not in your role" : "Not on your account";
+    return m.state === "open" ? "Your role: " + m.role : m.state === "norole" ? "Not in your role" : m.state === "paused" ? "Paused" : "Not on your account";
   }
 
   /* -------------------------------------------------------------- locked */
   function lockedPage(m) {
     var norole = m.state === "norole";
+    if (m.state === "paused") return h("div", { class: "ws-lockpage" }, m.logo ? h("img", { src: m.logo, alt: "" }) : null,
+      h("h2", null, m.name + " is paused"), h("p", null, "HelloVoice paused it for your company. Your data is safe. Contact your account manager to switch it back on."));
     var btn = h("button", { class: "ws-btn", type: "button", onclick: function () {
       btn.disabled = true;
       api("POST", "/api/workspace/request", { module: m.key, kind: norole ? "role" : "module" }).then(function (r) {
@@ -131,12 +133,117 @@
 
   /* -------------------------------------------------------- work, results */
   function work(p) {
+    if (D.current === "helvi-track") return trackWork(p);
     var k = D.current, c = {
       "helvi-selection": ["Open the roster", "Browse creators, shortlist them and build a selection.", "../", "Open the roster"],
-      "helvi-track": ["Your campaigns", "Open a campaign to add posts, creators and tracking links.", "../campaign/dashboard/", "Open campaign tracking"],
       "helvi-intelligence": ["Name a competitor", "Competitors you name are studied and filed here.", "../market/", "Open competitor evidence"]
     }[k];
     p.appendChild(h("div", { class: "ws-card" }, h("h2", null, c[0]), h("p", null, c[1]), h("a", { class: "ws-btn", href: c[2] }, c[3])));
+  }
+
+  /* ---------------------------------------------------- Track: campaigns */
+  function readOnlyNote(p, what) {
+    var b = h("button", { class: "ws-btn ws-btn--sm", type: "button", onclick: function () {
+      b.disabled = true;
+      api("POST", "/api/workspace/request", { module: D.current, kind: "module", note: "Manage our own " + what }).then(function (r) { toast(r.b.message || "Sent."); });
+    } }, "Ask to manage your own");
+    p.appendChild(h("div", { class: "ws-card ws-note" }, h("h2", null, "HelloVoice runs these for you"),
+      h("p", null, "Your plan shows the " + what + " HelloVoice sets up. To create and run your own, ask for it."), b));
+  }
+  function field(label, el, help) {
+    if (!el.id) el.id = "f" + Math.random().toString(36).slice(2, 8);
+    return h("div", { class: "ws-field" }, h("label", { for: el.id }, label), el, help ? h("small", null, help) : null);
+  }
+  function campaignForm(c, plats, onSave, saveLabel) {
+    var f = {
+      name: h("input", { value: c.name || "", maxlength: "120" }),
+      client: h("input", { value: c.client || "", maxlength: "120" }),
+      platform: h("select"),
+      starts: h("input", { type: "date", value: c.starts || "" }),
+      ends: h("input", { type: "date", value: c.ends || "" }),
+      hashtags: h("input", { value: c.hashtags || "", placeholder: "#launch #brand" }),
+      mentions: h("input", { value: c.mentions || "", placeholder: "@brand" })
+    };
+    f.platform.appendChild(h("option", { value: "" }, "All platforms"));
+    plats.forEach(function (x) { var o = h("option", { value: x }, x); if (x === c.platform) o.selected = true; f.platform.appendChild(o); });
+    var go = h("button", { class: "ws-btn", type: "button", onclick: function () {
+      var body = {}; Object.keys(f).forEach(function (k) { body[k] = f[k].value; });
+      go.disabled = true; onSave(body).then(function () { go.disabled = false; });
+    } }, saveLabel);
+    return h("div", null, h("div", { class: "ws-invite" },
+      field("Campaign name", f.name), field("Brand", f.client), field("Platform", f.platform),
+      field("Starts", f.starts), field("Ends", f.ends),
+      field("Hashtags", f.hashtags, "Posts carrying these count."), field("Mentions", f.mentions)), go);
+  }
+  function trackWork(p) {
+    var canWrite = D.module.level === "manage" && (D.module.role === "editor" || D.module.role === "admin");
+    if (D.module.level !== "manage") readOnlyNote(p, "campaigns");
+    var box = h("div", { class: "ws-sec" }, h("p", { class: "ws-muted" }, "Loading your campaigns…"));
+    p.appendChild(box);
+    api("GET", "/api/my/campaigns").then(function (r) {
+      box.textContent = "";
+      if (!r.b.ok) { box.appendChild(h("div", { class: "ws-empty" }, h("b", null, "Campaigns are read-only on your plan"), r.b.message || "")); return; }
+      var R = r.b;
+      box.appendChild(h("div", { class: "ws-headrow" }, h("h2", null, "Your campaigns"),
+        h("span", { class: "ws-pill" }, R.count + (R.cap ? " of " + R.cap : "") + " campaigns")));
+      if (canWrite) {
+        var full = R.cap != null && R.count >= R.cap;
+        var nc = h("details", { class: "ws-card ws-new", open: R.items.length ? false : "open" },
+          h("summary", null, h("b", null, "New campaign")));
+        if (full) nc.appendChild(h("p", null, "Your plan's campaigns are all in use. ", requestMore("Campaigns")));
+        else nc.appendChild(campaignForm({}, R.platforms, function (body) {
+          body.op = "create";
+          return api("POST", "/api/my/campaign", body).then(function (x) { toast(x.b.message || "Done."); if (x.b.ok) draw(); });
+        }, "Create campaign"));
+        box.appendChild(nc);
+      }
+      if (!R.items.length) {
+        box.appendChild(h("div", { class: "ws-empty" }, h("b", null, "No campaigns yet"),
+          canWrite ? "Create your first campaign above: name it, set its dates, add creators and go live." : "Campaigns HelloVoice runs for you appear here."));
+        return;
+      }
+      R.items.forEach(function (c) { box.appendChild(campaignCard(c, R, canWrite)); });
+    });
+  }
+  function campaignCard(c, R, canWrite) {
+    var card = h("article", { class: "ws-card ws-camp" });
+    card.appendChild(h("div", { class: "ws-headrow" },
+      h("div", null, h("h2", null, c.name), h("p", { class: "ws-muted" },
+        [c.client, c.platform || "All platforms", c.starts && c.ends ? c.starts + " → " + c.ends : "No dates yet"].filter(Boolean).join(" · "))),
+      h("span", { class: "ws-status ws-status--" + c.status }, c.status)));
+    card.appendChild(h("p", null, c.creators.length + (c.creators.length === 1 ? " creator · " : " creators · ") + c.posts + (c.posts === 1 ? " post" : " posts")));
+    var row = h("div", { class: "ws-row" }, h("a", { class: "ws-btn ws-btn--sm ws-btn--ghost", href: "../campaign/dashboard/?t=" + encodeURIComponent(c.t) }, "Open dashboard"));
+    card.appendChild(row);
+    if (!canWrite) return card;
+    function act(op, label, cls) {
+      var b = h("button", { class: "ws-btn ws-btn--sm" + (cls || ""), type: "button", onclick: function () {
+        b.disabled = true;
+        api("POST", "/api/my/campaign", { op: op, t: c.t }).then(function (x) { toast(x.b.message || "Done."); b.disabled = false; if (x.b.ok) draw(); });
+      } }, label);
+      return b;
+    }
+    if (c.status === "draft") row.appendChild(act("live", "Go live"));
+    if (c.status === "live") row.appendChild(act("end", "End campaign", " ws-btn--ghost"));
+    var edit = h("details", { class: "ws-more" }, h("summary", null, "Edit details"));
+    edit.appendChild(campaignForm(c, R.platforms, function (body) {
+      body.op = "edit"; body.t = c.t;
+      return api("POST", "/api/my/campaign", body).then(function (x) { toast(x.b.message || "Saved."); if (x.b.ok) draw(); });
+    }, "Save"));
+    card.appendChild(edit);
+    var post = h("details", { class: "ws-more" }, h("summary", null, "Add a post"));
+    if (!c.creators.length) post.appendChild(h("p", { class: "ws-muted" }, "Add a creator to this campaign first."));
+    else {
+      var who = h("select"); c.creators.forEach(function (x) { who.appendChild(h("option", { value: x.code }, x.name + (x.handle ? " (@" + x.handle.replace(/^@/, "") + ")" : ""))); });
+      var url = h("input", { type: "url", placeholder: "https://www.instagram.com/p/…" });
+      var add = h("button", { class: "ws-btn", type: "button", onclick: function () {
+        add.disabled = true;
+        api("POST", "/api/my/post", { t: c.t, code: who.value, url: url.value }).then(function (x) { toast(x.b.message || "Done."); add.disabled = false; if (x.b.ok) draw(); });
+      } }, "Add post");
+      post.appendChild(h("div", { class: "ws-invite" }, field("Creator", who), field("Post link", url)));
+      post.appendChild(add);
+    }
+    card.appendChild(post);
+    return card;
   }
   function results(p) {
     p.appendChild(h("div", { class: "ws-sec" }, h("h2", null, "Results"), outputsList(D.overview.outputs, "No results yet", "Reports and selections show up here as they are made.")));

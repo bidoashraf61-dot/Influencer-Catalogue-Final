@@ -797,6 +797,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "licences": licence.for_roster()}, self.cors())
         if path == "/api/discover/facets":
             return self.api_discover("facets")
+        if path == "/api/my/campaigns":
+            import tenant_api
+            st, payload = tenant_api.campaigns_list(self)
+            return self.send_json(st, payload, self.cors() + [("Cache-Control", "no-store")])
         if path == "/api/my/competitors":
             # The tenant's own list (Helvi Intelligence at manage). tenant_api does the gating.
             import tenant_api
@@ -1396,6 +1400,8 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 st, payload = tenant_api.add_post(self, b)
             elif path == "/api/my/post/update":
                 st, payload = tenant_api.update_post(self, b)
+            elif path == "/api/my/campaign":
+                st, payload = tenant_api.campaign_save(self, b)
             elif path == "/api/my/competitor":
                 st, payload = tenant_api.competitor_save(self, b)
             elif path == "/api/my/competitor/collect":

@@ -38,6 +38,16 @@ def gate(h, module, token=None):
     if cid is None:
         return None, None, (401, {"ok": False, "reason": "signin",
                                   "message": "Sign in with your work email first."})
+    # A person invited into a company works on the company's account, within their role there.
+    import portal
+    import workspace
+    u = portal.user_for_code(cid)
+    if u is not None:
+        h._tenant_user = u
+        cid = workspace.tenant_of(u)
+        if workspace.RANK[workspace.effective(u, module)] < workspace.RANK["editor"]:
+            return None, None, (403, {"ok": False, "reason": "no_role",
+                                      "message": "Your role here reads only. Ask your account admin for editor access."})
     if modules.level(cid, module) != "manage":
         return None, None, (403, {"ok": False, "reason": "not_manage",
                                   "message": "Your account reads this; it does not edit it. "
@@ -53,7 +63,7 @@ def gate(h, module, token=None):
 
 def actor(h, cid):
     import portal
-    u = portal.user_for_code(cid)
+    u = getattr(h, "_tenant_user", None) or portal.user_for_code(cid)
     return ("client: " + (u["email"] if u is not None else "")).strip()
 
 
@@ -189,5 +199,130 @@ def _tell_the_team(cid, name):
         pass
     try:
         db.log("competitor", cid, None, None, "named:%s" % str(name or "")[:80])
+    except Exception:
+        pass
+
+
+# ------------------------------------------------- Track: the tenant's own campaigns --
+# The Work tab of Helvi Track in /workspace/. A company at `manage` sets up and runs its own
+# campaigns here; the team's /campaigns screens stay theirs. Going live is what starts the
+# daily capture jobs, so it is counted against the campaigns cap like a new campaign is.
+
+def _day(s):
+    """'2026-11-03' -> UTC midnight, or None."""
+    import datetime
+    try:
+        d = datetime.datetime.strptime(str(s or "")[:10], "%Y-%m-%d").replace(tzinfo=datetime.timezone.utc)
+        return int(d.timestamp())
+    except ValueError:
+        return None
+
+
+def _iso(ts):
+    import datetime
+    return datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime("%Y-%m-%d") if ts else ""
+
+
+def _words(v):
+    """'#a, #b c' -> ['#a', '#b', 'c'] (hashtags and mentions as the rules hold them)."""
+    out = []
+    for w in str(v or "").replace(",", " ").split():
+        if w not in out:
+            out.append(w[:60])
+    return out[:20]
+
+
+def campaigns_list(h):
+    cid, _, err = gate(h, TRACK)
+    if err:
+        return err
+    out = []
+    with db.connect() as conn:
+        rows = conn.execute("SELECT * FROM campaigns WHERE code_id = ? ORDER BY CASE status WHEN 'live' THEN 0 "
+                            "WHEN 'draft' THEN 1 ELSE 2 END, updated_at DESC LIMIT 50", (cid,)).fetchall()
+        for k in rows:
+            posts = conn.execute("SELECT COUNT(*) n FROM content WHERE campaign_id = ?", (k["id"],)).fetchone()["n"]
+            rules = db.rules_of(k)
+            out.append({"t": k["token"], "name": k["name"], "client": k["client"] or "", "status": k["status"],
+                        "platform": k["platform"] or "", "starts": _iso(k["starts_at"]), "ends": _iso(k["ends_at"]),
+                        "hashtags": " ".join(rules.get("hashtags") or []), "mentions": " ".join(rules.get("mentions") or []),
+                        "posts": posts,
+                        "creators": [{"code": c["cc_code"], "name": c["name"] or c["cc_code"], "handle": c["handle"] or "",
+                                      "platform": c["platform"] or ""} for c in db.campaign_creators(k["id"])]})
+    return 200, {"ok": True, "items": out, "platforms": db.PLATFORMS,
+                 "cap": modules.number(cid, "campaigns_max"), "count": modules.count(cid, "campaigns")}
+
+
+def campaign_save(h, b):
+    """op: create | edit | live | end."""
+    op = str(b.get("op") or "create")
+    if op == "create":
+        cid, _, err = gate(h, TRACK)
+        if err:
+            return err
+        if modules.over(cid, "campaigns_max", modules.count(cid, "campaigns")):
+            return 403, {"ok": False, "reason": "limit",
+                         "message": "You have all %d campaigns your plan includes. Request more to add another."
+                                    % modules.number(cid, "campaigns_max")}
+        name = " ".join(str(b.get("name") or "").split())[:120]
+        if len(name) < 2:
+            return 400, {"ok": False, "message": "Give the campaign a name."}
+        plat = b.get("platform") if b.get("platform") in db.PLATFORMS else None
+        kid = db.create_campaign(name, client=" ".join(str(b.get("client") or "").split())[:120] or None,
+                                 code_id=cid, platform=plat, origin="client")
+        k = db.campaign(kid)
+        _edit(k, b)
+        _log(k, actor(h, cid), "Created the campaign")
+        return 200, {"ok": True, "t": k["token"], "message": "Campaign created as a draft. Add creators, then go live."}
+    cid, k, err = gate(h, TRACK, b.get("t"))
+    if err:
+        return err
+    if op == "edit":
+        _edit(k, b)
+        _log(k, actor(h, cid), "Edited the campaign")
+        return 200, {"ok": True, "message": "Saved."}
+    if op == "live":
+        if not (k["starts_at"] and k["ends_at"]):
+            return 400, {"ok": False, "message": "Set the start and end dates first."}
+        if not db.campaign_creators(k["id"]):
+            return 400, {"ok": False, "message": "Add at least one creator first."}
+        db.save_campaign(k["id"], status="live")
+        _log(k, actor(h, cid), "Set the campaign live")
+        return 200, {"ok": True, "message": "Live. Posts are collected daily from now on."}
+    if op == "end":
+        db.save_campaign(k["id"], status="ended")
+        _log(k, actor(h, cid), "Ended the campaign")
+        return 200, {"ok": True, "message": "Ended. The report stays available."}
+    return 400, {"ok": False, "message": "Say what to do with the campaign."}
+
+
+def _edit(k, b):
+    f = {}
+    if "name" in b and len(" ".join(str(b.get("name") or "").split())) >= 2:
+        f["name"] = " ".join(str(b["name"]).split())[:120]
+    if "client" in b:
+        f["client"] = " ".join(str(b.get("client") or "").split())[:120] or None
+    if "platform" in b:
+        f["platform"] = b.get("platform") if b.get("platform") in db.PLATFORMS else None
+    s, e = _day(b.get("starts")), _day(b.get("ends"))
+    if s:
+        f["starts_at"] = s
+    if e:
+        f["ends_at"] = e + 86399
+    if "hashtags" in b or "mentions" in b:
+        rules = dict(db.rules_of(k))
+        if "hashtags" in b:
+            rules["hashtags"] = _words(b.get("hashtags"))
+        if "mentions" in b:
+            rules["mentions"] = _words(b.get("mentions"))
+        f["rules"] = rules
+    if f:
+        db.save_campaign(k["id"], **f)
+
+
+def _log(k, who, what):
+    try:
+        import history
+        history.record("client_campaign", "campaign", k["id"], "%s: %s" % (who, what), None, k["name"])
     except Exception:
         pass

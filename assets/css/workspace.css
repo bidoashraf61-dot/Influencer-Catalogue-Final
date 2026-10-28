@@ -16,7 +16,7 @@
 .ws-mod__t { display: grid; gap: 2px; min-width: 0; }
 .ws-mod__t b { font-family: var(--heading); font-weight: 400; font-size: 24px; letter-spacing: .03em; line-height: 1; }
 .ws-mod__t span { font-size: 13px; opacity: .72; }
-.ws-mod[data-state="locked"], .ws-mod[data-state="norole"] { background: transparent; border-style: dashed; }
+.ws-mod[data-state="locked"], .ws-mod[data-state="norole"], .ws-mod[data-state="paused"] { background: transparent; border-style: dashed; }
 .ws-mod[data-state="locked"][aria-current="true"], .ws-mod[data-state="norole"][aria-current="true"] { background: var(--linen); color: var(--ink); border: 2px dashed var(--ink); }
 .ws-mod[data-state="locked"] .ws-mod__mark img, .ws-mod[data-state="norole"] .ws-mod__mark img { filter: grayscale(1); opacity: .55; }
 .ws-lock { margin-left: auto; width: 18px; height: 18px; flex: none; opacity: .7; }
@@ -86,6 +86,21 @@
 .ws-lockpage img { width: 96px; height: 96px; object-fit: contain; filter: grayscale(1); opacity: .6; }
 .ws-lockpage h2 { font-family: var(--heading); font-weight: 400; font-size: 44px; margin: 12px 0 6px; line-height: 1; }
 .ws-lockpage p { color: var(--gray); margin: 0 auto 20px; max-width: 46ch; }
+
+/* Track work */
+.ws-muted { color: var(--gray); }
+.ws-headrow { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+.ws-headrow h2 { margin: 0; }
+.ws-sec .ws-card + .ws-card { margin-top: 14px; }
+.ws-new { margin-bottom: 18px; }
+.ws-new summary, .ws-more summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; }
+.ws-new summary b { font-family: var(--heading); font-weight: 400; font-size: 26px; letter-spacing: .03em; }
+.ws-more { border-top: 1px solid rgba(18,18,18,.1); margin-top: 16px; padding-top: 4px; }
+.ws-more[open] { padding-bottom: 8px; }
+.ws-status { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: 5px 12px; border-radius: 99px; background: var(--linen); }
+.ws-status--live { background: var(--lime); }
+.ws-status--ended { background: #efede8; color: var(--gray); }
+.ws-note { margin-bottom: 18px; background: var(--linen); border-color: transparent; }
 
 @media (max-width: 760px) {
   .ws-switch { grid-template-columns: 1fr; }

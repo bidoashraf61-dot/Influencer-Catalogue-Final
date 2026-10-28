@@ -383,7 +383,8 @@ def payload(user, key=None):
         lvl = level(tenant, m["key"])
         eff = effective(user, m["key"])
         # Until the gate split lands, "off" is the only way a company does not own a module.
-        state = "locked" if lvl == "off" else ("norole" if eff == "none" else "open")
+        paused = lvl == "off" and hasattr(modules, "paused") and modules.paused(tenant, m["key"])
+        state = ("paused" if paused else "locked") if lvl == "off" else ("norole" if eff == "none" else "open")
         mods.append({"key": m["key"], "name": m["name"], "short": m["short"], "what": m["what"], "logo": m["logo"],
                      "state": state, "level": lvl, "role": eff})
     first = next((m["key"] for m in mods if m["state"] == "open"), mods[0]["key"])
