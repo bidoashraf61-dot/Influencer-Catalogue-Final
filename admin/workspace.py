@@ -63,7 +63,27 @@ CREATE TABLE IF NOT EXISTS workspace_prefs (
     PRIMARY KEY (code_id, module, key)
 );
 """
-PREFS = {"default_role": ("viewer", "editor"), "digest": ("on", "off")}
+PREFS = {"default_role": ("viewer", "editor"), "digest": ("on", "off"),
+         # What the company's campaign reports may show (Helvi Track). Off hides it on every report of the
+         # company; on leaves each campaign's own switch in charge (metrics.visibility).
+         "show_clicks": ("on", "off"), "show_emv": ("on", "off"), "show_audience": ("on", "off"),
+         "show_all_content": ("on", "off")}
+REPORT_SHOWS = [("show_clicks", "clicks", "Clicks on tracking links"), ("show_emv", "emv", "Earned media value"),
+                ("show_audience", "audience", "What people said"), ("show_all_content", "all_content", "Every post, not only the top ones")]
+
+
+def report_hidden(tenant):
+    """The report sections this company switched off: a set of metrics.visibility keys."""
+    if not tenant:
+        return set()
+    try:
+        with _c() as conn:
+            rows = conn.execute("SELECT key FROM workspace_prefs WHERE code_id = ? AND module = 'helvi-track' "
+                                "AND key LIKE 'show_%' AND value = 'off'", (int(tenant),)).fetchall()
+    except Exception:
+        return set()
+    by = {k: v for k, v, _ in REPORT_SHOWS}
+    return {by[r["key"]] for r in rows if r["key"] in by}
 _ready = False
 
 
@@ -406,6 +426,8 @@ def payload(user, key=None):
         meters, checklist, outputs = _overview(tenant, user, key)
         out["overview"] = {"meters": meters, "checklist": checklist, "outputs": outputs}
         out["settings"] = {"default_role": pref(tenant, "default_role", key, "viewer"), "digest": pref(tenant, "digest", key, "on"),
+                           "report": [{"key": k, "label": label, "value": pref(tenant, k, key, "on")} for k, _, label in REPORT_SHOWS]
+                           if key == "helvi-track" else [],
                            "brand_name": modules.value(tenant, "brand_name", ""), "brand_colour": modules.value(tenant, "brand_colour", "")}
         out["limits"] = [{"key": f["key"], "label": f["label"], "value": modules.number(tenant, f["key"])}
                          for f in modules.LIMITS if f["key"] in ("seats", "campaigns_max", "selections_max", "spend_month", "credits_month")]

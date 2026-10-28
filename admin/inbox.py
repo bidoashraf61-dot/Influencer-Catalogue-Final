@@ -98,8 +98,11 @@ def for_codes(code_ids, team=True, exclude_user=None):
     if not ids:
         return []
     with db.connect() as conn:
-        rows = conn.execute("SELECT id FROM users WHERE status = 'active' AND deleted_at IS NULL AND code_id IN (%s)"
-                            % ",".join("?" * len(ids)), list(ids)).fetchall()
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
+        # A colleague invited into a company (users.company_code_id) hears about the company's work too.
+        extra = (" OR company_code_id IN (%s)" % ",".join("?" * len(ids))) if "company_code_id" in cols else ""
+        rows = conn.execute("SELECT id FROM users WHERE status = 'active' AND deleted_at IS NULL AND (code_id IN (%s)%s)"
+                            % (",".join("?" * len(ids)), extra), list(ids) + (list(ids) if extra else [])).fetchall()
     return [r["id"] for r in rows if r["id"] != exclude_user]
 
 

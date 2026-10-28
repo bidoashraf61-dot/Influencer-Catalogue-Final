@@ -174,6 +174,14 @@ def weekly(k, now=None):
         if not cur.rowcount:
             return None                          # another tick got there first
         label = ("Week %s" % wk) if wk.isdigit() else "This week"
+        # The company switched its weekly update off (/workspace/ -> Track -> Settings): the week is still
+        # recorded, so switching it back on never sends a backlog.
+        try:
+            import workspace
+            if workspace.pref(k["code_id"], "digest", "helvi-track", "on") == "off":
+                return wk
+        except Exception:
+            pass
         inbox.emit(inbox.for_codes([k["code_id"]]), "camp_weekly", v["title"], body="\n".join(v["lines"]),
                    href="campaign/#t=" + k["token"], ref="week:%d:%s" % (k["id"], wk), once=True,
                    meta={"week": wk, "label": label, "verdict": v["key"]}, conn=conn)

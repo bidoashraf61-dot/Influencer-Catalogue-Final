@@ -139,8 +139,9 @@ def _rate(rates, platform, action):
     return 0.0
 
 
-def visibility(campaign):
-    """What the client's report shows. All on unless switched off."""
+def visibility(campaign, company=True):
+    """What the client's report shows. All on unless switched off. ``company=False`` gives the campaign's own
+    switches only, for the admin form that edits them (the company's switches are applied on top)."""
     keys = {"clicks": True, "emv": True, "all_content": False, "reach": False, "audience": True}
     try:
         got = json.loads(campaign["visibility"] or "{}") if "visibility" in campaign.keys() else {}
@@ -148,6 +149,13 @@ def visibility(campaign):
         got = {}
     out = {k: bool(got.get(k, v)) for k, v in keys.items()}
     out["reach"] = False      # reach is not shown on any client report (owner, 2026-10-18)
+    # The company's admin may switch a section off for all their reports (/workspace/ -> Track -> Settings).
+    try:
+        import workspace
+        for k in (() if not company else workspace.report_hidden(campaign["code_id"] if "code_id" in campaign.keys() else None)):
+            out[k] = False
+    except Exception:
+        pass
     return out
 
 

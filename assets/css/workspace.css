@@ -114,6 +114,11 @@
 .ws-list.ws-card { padding: 4px 22px; }
 .ws-who > span:not(.ws-pill) { display: block; }
 
+/* report switches */
+.ws-switches { display: grid; gap: 4px; }
+.ws-switch { display: flex; align-items: center; gap: 12px; min-height: 48px; cursor: pointer; font-weight: 600; }
+.ws-switch input { width: 22px; height: 22px; accent-color: var(--ink); flex: none; }
+
 @media (max-width: 760px) {
   .ws-switch { grid-template-columns: 1fr; }
   .ws-mod { min-height: 64px; }

@@ -3397,7 +3397,7 @@ def campaign_edit_page(k, members, codes, rules, selection=None, error=None, mes
     note = _notes(error, message)
     targets = campaign_targets(k)
     chosen_logos = campaign_logos(k)
-    vis = metrics.visibility(k)
+    vis = metrics.visibility(k, company=False)
 
     checks = [("Client passcode chosen", bool(k["code_id"])),
               ("Dates set", bool(k["starts_at"] and k["ends_at"])),
@@ -3791,7 +3791,7 @@ def _head(k, tab, error=None, message=None):
 
 def client_report_card(k):
     import metrics
-    vis = metrics.visibility(k)
+    vis = metrics.visibility(k, company=False)          # the form edits the campaign's own switches
     own = {}
     try:
         own = (json.loads(k["emv"]) if k["emv"] else {}).get("*", {})

@@ -479,11 +479,26 @@
       i.addEventListener("change", function () { api("POST", "/api/workspace/pref", { module: D.current, key: key, value: i.value }).then(function (r) { toast(r.b.message); }); });
       return h("div", { class: "ws-field" }, h("label", { for: "pf-" + key }, label), i, help ? h("small", null, help) : null);
     }
+    var track = D.current === "helvi-track";
     p.appendChild(h("div", { class: "ws-sec" }, h("h2", null, "Settings"), h("div", { class: "ws-card" },
       pref("Role given when you approve a request", "default_role", S.default_role, [["viewer", "Viewer"], ["editor", "Editor"]]),
-      pref("Weekly digest email", "digest", S.digest, [["on", "On"], ["off", "Off"]]),
+      track ? pref("Weekly campaign update", "digest", S.digest, [["on", "On"], ["off", "Off"]],
+                   "One bell and phone note a week per live campaign, for everyone on your account.") : null,
       text("Name on reports", "brand_name", S.brand_name, "Empty uses your account name."),
       text("Colour on reports", "brand_colour", S.brand_colour, "A hex colour such as #1b9b52."))));
+    if (track && S.report && S.report.length) {
+      var box = h("div", { class: "ws-card ws-switches" });
+      S.report.forEach(function (r) {
+        var cb = h("input", { type: "checkbox", id: "rs-" + r.key });
+        cb.checked = r.value !== "off";
+        cb.addEventListener("change", function () {
+          api("POST", "/api/workspace/pref", { module: D.current, key: r.key, value: cb.checked ? "on" : "off" }).then(function (x) { toast(x.b.message); });
+        });
+        box.appendChild(h("label", { class: "ws-switch", for: "rs-" + r.key }, cb, h("span", null, r.label)));
+      });
+      p.appendChild(h("div", { class: "ws-sec" }, h("h2", null, "What your reports show"),
+        h("p", { class: "ws-muted" }, "Switched off here, a section is hidden on every campaign report of your account, including links you share."), box));
+    }
   }
 
   var start = (location.hash || "").slice(1);
