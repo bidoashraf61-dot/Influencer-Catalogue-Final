@@ -76,6 +76,7 @@ HelloVoice staff are never a tenant: with an admin session the `/api/my/*` route
 
 ## Open
 
-- Private creators have no follower count or photo yet (profile jobs read roster creators only).
+- Private creators get name, followers and photo from one Apify read when added (`private_profile.py`,
+  setting `private_profile_read = "on"` since 28 October 2026), counted in the company's spend cap.
 - Going live starts paid daily collection; the only brake is the campaigns cap.
 - Test company: code 55, `qa.owner@helvi-qa.com` and `qa.member@example.com`, Track and Intelligence at manage.
