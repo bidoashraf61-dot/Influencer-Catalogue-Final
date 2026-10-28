@@ -803,6 +803,8 @@ def from_template(data, name):
     import matcher
     try:
         got = brief_template.read(data)
+    except brief_template.Damaged:
+        fail("broken")
     except ValueError:
         fail("not_template")
     raw = brief_template.to_raw(got)

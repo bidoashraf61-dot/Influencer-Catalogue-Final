@@ -191,15 +191,23 @@ def _text_of(xml):
     return html.unescape("".join(re.findall(r"<w:t(?:\s[^>]*)?>([^<]*)</w:t>", xml))).strip()
 
 
+class Damaged(ValueError):
+    """A Word file whose zip is broken (cut off in the upload, or corrupt)."""
+
+
 def _document(data):
+    """document.xml of a Word file; None when it is not a Word file; Damaged when it is one but broken."""
     try:
         z = zipfile.ZipFile(io.BytesIO(data))
         info = z.getinfo("word/document.xml")
-    except (zipfile.BadZipFile, KeyError):
+    except (zipfile.BadZipFile, KeyError, ValueError):
         return None
     if info.file_size > 20 * 1024 * 1024 or (info.compress_size and info.file_size / float(info.compress_size) > 200):
         return None
-    return z.read("word/document.xml").decode("utf-8", "replace")
+    try:
+        return z.read("word/document.xml").decode("utf-8", "replace")
+    except Exception:            # a truncated or corrupt entry: zlib.error, EOFError, BadZipFile (CRC)
+        raise Damaged("broken")
 
 
 def is_template(data):

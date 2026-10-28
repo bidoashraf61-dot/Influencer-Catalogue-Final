@@ -79,6 +79,16 @@ class Template(unittest.TestCase):
                 briefsrc.from_template(data, "brief.docx")
             self.assertEqual(e.exception.reason, "not_template")
 
+    def test_damaged_template_is_broken_not_a_crash(self):
+        data = bytearray(bt.build())
+        i = data.index(b"word/document.xml") + 200          # inside the compressed document
+        data[i:i + 400] = b"\0" * 400
+        with self.assertRaises(briefsrc.SourceError) as e:
+            briefsrc.from_template(bytes(data), "brief.docx")
+        self.assertIn(e.exception.reason, ("broken", "not_template"))
+        with self.assertRaises(briefsrc.SourceError):
+            briefsrc.from_template(bt.build()[:-300], "cut.docx")
+
     def test_timing_from_the_date(self):
         t = date(2026, 10, 29)
         self.assertEqual(bt.timing_of("2026-11-05", t), "asap")
