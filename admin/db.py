@@ -2518,6 +2518,9 @@ def set_scores_published(token_or_id, on=True):
 def delete_selection(sid):
     with connect() as conn:
         conn.execute("DELETE FROM selections WHERE id = ?", (sid,))
+        # Selection ids are reused once the newest is deleted (INTEGER PRIMARY KEY), so a brief left pointing
+        # at this id would be read as the brief of the next selection made (item 275, 2026-10-29).
+        conn.execute("UPDATE briefs SET selection_id = NULL WHERE selection_id = ?", (sid,))
 
 
 def request(rid):
