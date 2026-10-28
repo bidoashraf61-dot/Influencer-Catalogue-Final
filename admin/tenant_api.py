@@ -316,7 +316,7 @@ def campaign_save(h, b):
                 bad.append(link)
         added = db.add_campaign_creators(k["id"], codes) if codes else 0
         _log(k, actor(h, cid), "Added %d creator(s) by link" % added)
-        msg = "%d creator%s added." % (added, "" if added == 1 else "s")
+        msg = ("%d creator%s added." % (added, "" if added == 1 else "s")) if added else "Already in this campaign."
         if bad:
             msg += " Not a profile link: %s." % ", ".join(bad[:3])
         return (200 if codes else 400), {"ok": bool(codes), "message": msg}
