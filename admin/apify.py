@@ -458,6 +458,13 @@ def build_handles(job):
         elif src.startswith("campaign:") and src[9:].isdigit():
             allowed = {r["code"] for r in conn.execute(
                 "SELECT code FROM campaign_creators WHERE campaign_id = ?", (int(src[9:]),))}
+        elif src.startswith("private:") and src[8:].isdigit():
+            # A company's own creators (creators_private.py) are stored hidden, so they are added here, and only the
+            # ones whose follower count has not been read yet (private_profile.py).
+            import private_profile
+            allowed = set(private_profile.unread_codes(int(src[8:]), plat))
+            rows = list(rows) + [c for c in conn.execute("SELECT * FROM creators WHERE owner_code_id = ?", (int(src[8:]),))
+                                 if c["code"] in allowed]
     out, seen = [], set()
     for c in rows:
         if allowed is not None and c["code"] not in allowed:
@@ -1273,6 +1280,12 @@ def refresh_run(run):
         except Exception as ex:
             note = "Reels kept, but they could not be summed up: " + repr(ex)[:120]
     _finish(run, "SUCCEEDED", total, saved, cost, note)
+    if job and (job["source"] or "").startswith("private:"):
+        try:
+            import private_profile
+            private_profile.apply_run(run, job)       # followers, name and picture onto the company's private creators
+        except Exception as ex:
+            print("private profile apply failed:", repr(ex)[:160], flush=True)
 
 
 def _finish(run, status, results, saved, cost, message):

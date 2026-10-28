@@ -120,7 +120,24 @@ def add_by_handle(company_code_id, url, name=""):
                      "updated_at, created_at, owner_code_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)",
                      (code, (name or "").strip() or handle, handle, plat, None, "Nano", 0, "Private creator", 0,
                       json.dumps([{"platform": plat, "url": clean}]), t, t, company))
+    _read_later(code)
     return {"ok": True, "code": code, "created": True, "platform": plat, "handle": handle}
+
+
+def _read_later(code):
+    """One profile read for the new creator (followers, name, picture), in the background, when the owner has turned
+    it on (private_profile.py). Never lets a failed or refused read break adding the creator."""
+    import threading
+
+    def run():
+        try:
+            import private_profile
+            ok, msg = private_profile.request_read(code)
+            if not ok:
+                print("private profile read not started for %s: %s" % (code, msg), flush=True)
+        except Exception as exc:
+            print("private profile read failed for %s: %r" % (code, exc), flush=True)
+    threading.Thread(target=run, daemon=True).start()
 
 
 def owner_of(code):

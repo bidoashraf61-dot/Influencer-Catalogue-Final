@@ -109,7 +109,8 @@ def _month_start():
 
 
 def _my_sources(code_id):
-    return ["competitor:%d" % c["id"] for c in listing(code_id)]
+    # a company's private creator profile reads (private_profile.py) are collection spend like any other
+    return ["competitor:%d" % c["id"] for c in listing(code_id)] + ["private:%d" % int(code_id)]
 
 
 def spend_month(code_id):
