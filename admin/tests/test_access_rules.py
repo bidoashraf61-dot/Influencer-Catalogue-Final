@@ -7,7 +7,7 @@ import sys
 import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-from access_rules import refusal, default_role  # noqa: E402
+from access_rules import refusal, default_role, company_code  # noqa: E402
 
 
 class Gate(unittest.TestCase):
@@ -39,6 +39,11 @@ class Gate(unittest.TestCase):
 
     def test_an_invited_colleague_has_nothing_until_given_a_role(self):
         self.assertEqual(refusal("view", False, default_role(True), "GET"), "no_role")
+
+    def test_a_colleague_works_on_the_company_data_everyone_else_on_their_own(self):
+        self.assertEqual(company_code(26, 55), 55)        # invited into company 55
+        self.assertEqual(company_code(32, None), 32)      # an account holder
+        self.assertEqual(company_code(32, 0), 32)
 
 
 if __name__ == "__main__":

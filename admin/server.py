@@ -469,7 +469,13 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 u = portal.user_by_email(self.admin()["email"]) if self.admin()["email"] else None
                 return u["code_id"] if u is not None and u["status"] == "active" else None
             cid = db.admin_code_id()
-        return cid
+        # A colleague invited into a company (users.company_code_id) works on the company's data: selections, campaigns,
+        # credits. person_code_id() is still the pass itself, for the places that need who it is, not whose data it is.
+        return modules.data_code_id(cid)
+
+    def person_code_id(self):
+        """The code on this browser's own pass: who is signed in, as against viewer_code_id() = whose data they see."""
+        return self.viewer_cookie_id()
 
     def staff_viewer(self, cid=None):
         """True when this browser is signed in to the portal as someone who ALSO has admin access

@@ -354,6 +354,19 @@ def company_of(user):
     return user["company_code_id"] if "company_code_id" in k and user["company_code_id"] else user["code_id"]
 
 
+def data_code_id(code_id):
+    """The code the data of whoever holds this pass lives under (docs/SAAS-MODEL.md): a colleague invited into a
+    company works on the company's selections, campaigns and credits, so their pass resolves to the company's code.
+    Anyone else, and anything that is not a portal person (the admin preview), resolves to itself."""
+    if code_id is None:
+        return None
+    import portal
+    u = portal.user_for_code(code_id)
+    if u is None:
+        return code_id
+    return access_rules.company_code(u["code_id"], u["company_code_id"] if "company_code_id" in u.keys() else None)
+
+
 def is_colleague(user):
     return company_of(user) != user["code_id"]
 

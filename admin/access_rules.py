@@ -22,6 +22,11 @@ def refusal(level, paused, role, method):
     return None
 
 
+def company_code(own_code_id, company_code_id):
+    """The code a person's data lives under: their company's when they were invited into one, else their own."""
+    return company_code_id if company_code_id else own_code_id
+
+
 def default_role(is_colleague):
     """A person with no role row. The holder of an account is admin of their own company, as they have always
     been; a colleague invited into a company has no access until somebody gives them a role."""
