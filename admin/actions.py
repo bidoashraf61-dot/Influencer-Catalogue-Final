@@ -92,10 +92,13 @@ REGISTRY = {
         "when the admin gave them or the portal asked. One video shared on several platforms is ONE video: the portal joins "
         "a new link to the creator's same video on another platform (same creator, posted within 12 hours). If it could "
         "not tell, the post is added as its own video: ask the admin whether it is the same video as another post, and if so "
-        "group them with post.group. Never leave one video counted twice.",
+        "group them with post.group. Never leave one video counted twice. Facebook share links (facebook.com/share/...) and "
+        "other links without a handle never say who posted: send code with them. When the admin names the creator, or answers "
+        "which creator a post is, ALWAYS put that code in the call.",
         "Add the post {url} to campaign {id}",
         dict({"id": "Campaign id.", "url": "The post link, starting https://",
-              "code": "Creator code on this campaign (optional: found from the link).",
+              "code": "Creator code on this campaign, e.g. HV-MC-137. Needed when the link names nobody (Facebook share links); "
+                      "always send it when the admin named the creator.",
               "platform": "One of " + PLATFORMS + " (optional: found from the link).",
               "kind": "One of " + KINDS + " (optional: found from the link).",
               "posted": "The day it went up, YYYY-MM-DD.",
@@ -481,6 +484,8 @@ def _has_col(table, col):
 def describe(action, fields):
     """The one sentence the admin reads on the Confirm card."""
     a, fields = check(action, fields)
+    if action == "post.add":
+        _post_add_creator(fields)
     if action == "form.submit":
         line = "%s: %s" % (a["line"], ", ".join("%s = %s" % (k, _short(v)) for k, v in sorted(fields.items())))
         return line + (". This may not be undoable" if a["risk"] == "high" else "")
@@ -495,6 +500,26 @@ def describe(action, fields):
     if a["risk"] == "high":
         line += ". This cannot be undone"
     return line
+
+
+def _post_add_creator(fields):
+    """A post link that names nobody needs its creator's code before it is queued. The portal can read the poster off an
+    Instagram link only, so without the code a Facebook share link comes back Not done after Confirm. Refusing here makes
+    the model send the code the admin gave, or ask for it."""
+    if fields.get("code") or not str(fields.get("id") or "").isdigit():
+        return
+    import apify, db, postlink
+    plat, _, handle = postlink.infer(postlink.canonical(str(fields.get("url") or "")))
+    if (plat or "Instagram") == "Instagram":
+        return
+    members = db.campaign_creators(int(fields["id"]))
+    if len({m["cc_code"] for m in members}) <= 1:
+        return
+    if postlink.pick_creator(handle, [(m["cc_code"], apify.creator_handles(m)) for m in members if m["code"]]):
+        return
+    who = ", ".join("%s (%s)" % (m["cc_code"], m["name"] if "name" in m.keys() and m["name"] else "") for m in members[:15])
+    raise ValueError("post.add: this %s link does not say who posted it, so send code too. If the admin already named the "
+                     "creator, use that code; otherwise ask which one: %s." % (plat, who))
 
 
 def _short(v):
