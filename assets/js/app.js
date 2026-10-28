@@ -431,6 +431,7 @@
   // Desktop: every visit (once per browser session) until a phone has the app.
   function maybeWelcome() {
     if (PLATFORM !== "desktop" || STANDALONE || !(ME && ME.user) || ME.as_client || ME.preview || sget("hca-welcome-shown")) return;
+    if (/(?:^|;\s*)hv_trial_on=1/.test(document.cookie)) return;   // a trial visitor (item 271) is not offered the app
     state().then(function (st) {
       if (!st || !st.account || st.phone_app || st.installed) return;
       whenFree(function () { if (!sget("hca-welcome-shown")) { sput("hca-welcome-shown", "1"); showPhoneModal(true); } });

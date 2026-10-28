@@ -776,6 +776,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
                 self.send_json(200, st, self.cors() + [("Cache-Control", "no-store")])
                 trial.end()
                 return True
+            if self.command == "POST" and path.startswith("/api/push/"):
+                self.send_json(200, {"ok": True, "trial": True}, self.cors())   # the phone app is not part of a trial
+                trial.end()
+                return True
             if self.command == "POST" and not trial.post_allowed(path):
                 self.send_json(403, trial.REFUSED, self.cors())
                 trial.end()

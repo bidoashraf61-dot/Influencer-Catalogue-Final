@@ -140,8 +140,10 @@
   // The trial process answers what a trial may not do with 403 {reason: "trial"} and an ended link with 410.
   var _fetch = window.fetch.bind(window);
   window.fetch = function (input, init) {
+    var url = typeof input === "string" ? input : (input && input.url) || "";
+    var asked = ((init && init.method) || "GET").toUpperCase() === "POST" && !/\/api\/(push|event|tour|timing)/.test(url);
     return _fetch(input, init).then(function (r) {
-      if (r.status === 403 || r.status === 410) {
+      if (asked && (r.status === 403 || r.status === 410)) {
         r.clone().json().then(function (j) {
           if (!j) return;
           if (j.reason === "trial") toast(REFUSAL);
