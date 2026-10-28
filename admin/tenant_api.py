@@ -268,8 +268,19 @@ def campaign_save(h, b):
         if len(name) < 2:
             return 400, {"ok": False, "message": "Give the campaign a name."}
         plat = b.get("platform") if b.get("platform") in db.PLATFORMS else None
+        # "Track this campaign" from a selection: its creators come along (only the company's own selection).
+        sel, codes = None, []
+        if b.get("s"):
+            import json as _json
+            sel = db.selection(token=str(b.get("s")))
+            if sel is None or sel["code_id"] != cid:
+                return 404, {"ok": False, "message": "That selection is not on your account."}
+            known = {c["code"] for c in db.list_creators()}
+            codes = [c for c in _json.loads(sel["codes"] or "[]") if c in known]
+            plat = plat or sel["platform"]
         kid = db.create_campaign(name, client=" ".join(str(b.get("client") or "").split())[:120] or None,
-                                 code_id=cid, platform=plat, origin="client")
+                                 code_id=cid, platform=plat, origin="client",
+                                 selection_id=sel["id"] if sel is not None else None, codes=codes)
         k = db.campaign(kid)
         _edit(k, b)
         _log(k, actor(h, cid), "Created the campaign")
@@ -326,3 +337,57 @@ def _log(k, who, what):
         history.record("client_campaign", "campaign", k["id"], "%s: %s" % (who, what), None, k["name"])
     except Exception:
         pass
+
+
+# ------------------------------------------- Intelligence: the tenant's own evidence --
+# The Results tab of Helvi Intelligence in /workspace/. Reading needs only the module on and a
+# role of viewer or better. A creator a competitor used who is also on the HelloVoice roster
+# carries a tag: it opens the creator's card when the company owns Helvi Selection, and is a
+# locked "Available through Helvi Selection" otherwise -- the roster code is not sent then.
+
+def _reader(h, module):
+    """(company code, person) for a read, or an error payload."""
+    cid = _who(h)
+    if cid is None:
+        return None, None, (401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."})
+    import portal
+    import workspace
+    u = portal.user_for_code(cid)
+    if u is None:
+        return None, None, (401, {"ok": False, "reason": "signin", "message": "Sign in with your work email first."})
+    if workspace.effective(u, module) == "none":
+        return None, None, (403, {"ok": False, "reason": "no_role", "message": "This module is not in your role."})
+    return workspace.tenant_of(u), u, None
+
+
+def evidence_list(h):
+    cid, u, err = _reader(h, INTEL)
+    if err:
+        return err
+    import workspace
+    selection_open = workspace.effective(u, "helvi-selection") != "none"
+    out = []
+    with db.connect() as conn:
+        packs = conn.execute("SELECT id, title, created_at, updated_at FROM evidence_packs WHERE code_id = ? "
+                             "AND client_visible = 1 AND deleted_at IS NULL ORDER BY updated_at DESC LIMIT 20", (cid,)).fetchall()
+        for p in packs:
+            rows = conn.execute("SELECT competitor, platform, handle, name, followers, code, views, url FROM evidence_posts "
+                                "WHERE pack_id = ?", (p["id"],)).fetchall()
+            by = {}
+            for r in rows:
+                key = (r["platform"], (r["handle"] or "").lower())
+                c = by.setdefault(key, {"handle": r["handle"] or "", "name": r["name"] or r["handle"] or "",
+                                        "platform": r["platform"], "followers": r["followers"], "posts": 0,
+                                        "best_views": 0, "competitors": [], "on_roster": False, "code": None})
+                c["posts"] += 1
+                c["best_views"] = max(c["best_views"], r["views"] or 0)
+                if r["competitor"] not in c["competitors"]:
+                    c["competitors"].append(r["competitor"])
+                if r["code"]:
+                    c["on_roster"] = True
+                    c["code"] = r["code"] if selection_open else None
+            creators = sorted(by.values(), key=lambda c: (-c["posts"], -(c["best_views"] or 0)))
+            out.append({"id": p["id"], "title": p["title"], "updated": p["updated_at"] or p["created_at"],
+                        "posts": len(rows), "competitors": sorted({r["competitor"] for r in rows}),
+                        "creators": creators[:60], "more": max(0, len(creators) - 60)})
+    return 200, {"ok": True, "packs": out, "selection_open": selection_open}

@@ -134,6 +134,7 @@
   /* -------------------------------------------------------- work, results */
   function work(p) {
     if (D.current === "helvi-track") return trackWork(p);
+    if (D.current === "helvi-intelligence") return intelWork(p);
     var k = D.current, c = {
       "helvi-selection": ["Open the roster", "Browse creators, shortlist them and build a selection.", "../", "Open the roster"],
       "helvi-intelligence": ["Name a competitor", "Competitors you name are studied and filed here.", "../market/", "Open competitor evidence"]
@@ -185,7 +186,7 @@
       if (!r.b.ok) { box.appendChild(h("div", { class: "ws-empty" }, h("b", null, "Campaigns are read-only on your plan"), r.b.message || "")); return; }
       var R = r.b;
       box.appendChild(h("div", { class: "ws-headrow" }, h("h2", null, "Your campaigns"),
-        h("span", { class: "ws-pill" }, R.count + (R.cap ? " of " + R.cap : "") + " campaigns")));
+        h("span", { class: "ws-pill" }, R.count + (R.cap ? " of " + R.cap : "") + (R.count === 1 && !R.cap ? " campaign" : " campaigns"))));
       if (canWrite) {
         var full = R.cap != null && R.count >= R.cap;
         var nc = h("details", { class: "ws-card ws-new", open: R.items.length ? false : "open" },
@@ -246,7 +247,120 @@
     return card;
   }
   function results(p) {
-    p.appendChild(h("div", { class: "ws-sec" }, h("h2", null, "Results"), outputsList(D.overview.outputs, "No results yet", "Reports and selections show up here as they are made.")));
+    if (D.current === "helvi-intelligence") return intelResults(p);
+    if (D.current === "helvi-selection") return selectionResults(p);
+    p.appendChild(h("div", { class: "ws-sec" }, h("h2", null, "Results"), outputsList(D.overview.outputs, "No results yet", "Reports show up here as campaigns run.")));
+  }
+  function mod(key) { return D.modules.filter(function (m) { return m.key === key; })[0]; }
+  function canEdit(m) { return m && m.state === "open" && m.level === "manage" && (m.role === "editor" || m.role === "admin"); }
+
+  /* ------------------------------------- Selection: the Track hand-off */
+  function selectionResults(p) {
+    var outs = D.overview.outputs, track = mod("helvi-track");
+    var sec = h("div", { class: "ws-sec" }, h("h2", null, "Your selections"));
+    p.appendChild(sec);
+    if (!outs.length) { sec.appendChild(h("div", { class: "ws-empty" }, h("b", null, "No selections yet"), "Build one from the roster; it shows up here.")); return; }
+    var ul = h("ul", { class: "ws-list" });
+    outs.forEach(function (o) {
+      var btn;
+      if (canEdit(track)) {
+        btn = h("button", { class: "ws-btn ws-btn--sm", type: "button", onclick: function () {
+          btn.disabled = true;
+          api("POST", "/api/my/campaign", { op: "create", name: o.title, s: o.token }).then(function (r) {
+            toast(r.b.message || "Done."); btn.disabled = false;
+            if (r.b.ok) { tab = "work"; load("helvi-track"); history.replaceState(null, "", "#helvi-track"); }
+          });
+        } }, "Track this campaign");
+      } else {
+        btn = h("button", { class: "ws-btn ws-btn--sm ws-btn--ghost ws-locked", type: "button", title: "Available through Helvi Track", onclick: function () {
+          btn.disabled = true;
+          api("POST", "/api/workspace/request", { module: "helvi-track", kind: track && track.state === "norole" ? "role" : "module",
+            note: "Track this campaign: " + o.title }).then(function (r) { toast(r.b.message || "Sent."); });
+        } }, lockIcon(), "Track this campaign");
+      }
+      ul.appendChild(h("li", null, h("a", { href: o.href }, o.title), btn));
+    });
+    sec.appendChild(ul);
+    if (!canEdit(track)) sec.appendChild(h("p", { class: "ws-muted" }, "Tracking a campaign is part of Helvi Track. The lock sends a request to HelloVoice."));
+  }
+
+  /* -------------------------------------- Intelligence: competitors, evidence */
+  function intelWork(p) {
+    var me = mod("helvi-intelligence");
+    if (me.level !== "manage") { readOnlyNote(p, "competitor studies"); return; }
+    if (!canEdit(me)) { p.appendChild(h("div", { class: "ws-empty" }, h("b", null, "Your role reads only"), "Ask your account admin for editor access to name competitors.")); return; }
+    var box = h("div", { class: "ws-sec" }, h("p", { class: "ws-muted" }, "Loading your competitors…"));
+    p.appendChild(box);
+    api("GET", "/api/my/competitors").then(function (r) {
+      box.textContent = "";
+      if (!r.b.ok) { box.appendChild(h("div", { class: "ws-empty" }, h("b", null, "Not available"), r.b.message || "")); return; }
+      var plats = r.b.platforms || ["Instagram", "TikTok"];
+      box.appendChild(h("div", { class: "ws-headrow" }, h("h2", null, "Your competitors"), h("span", { class: "ws-pill" }, r.b.items.length + " of 40")));
+      var f = { name: h("input", { maxlength: "80" }) }, hs = {};
+      plats.forEach(function (pl) { hs[pl] = h("input", { placeholder: "@handle or link" }); });
+      var grid = h("div", { class: "ws-invite" }, field("Competitor brand", f.name));
+      plats.forEach(function (pl) { grid.appendChild(field(pl, hs[pl])); });
+      var add = h("button", { class: "ws-btn", type: "button", onclick: function () {
+        var handles = {}; plats.forEach(function (pl) { if (hs[pl].value.trim()) handles[pl] = hs[pl].value.trim(); });
+        add.disabled = true;
+        api("POST", "/api/my/competitor", { op: "add", name: f.name.value, handles: handles }).then(function (x) {
+          toast(x.b.message || (x.b.ok ? "Added." : "Could not add.")); add.disabled = false; if (x.b.ok) draw();
+        });
+      } }, "Add competitor");
+      box.appendChild(h("details", { class: "ws-card ws-new", open: r.b.items.length ? false : "open" }, h("summary", null, h("b", null, "Name a competitor")), grid, add));
+      if (!r.b.items.length) { box.appendChild(h("div", { class: "ws-empty" }, h("b", null, "No competitors yet"), "Name one above, then collect: the creators they worked with land in Results.")); return; }
+      var ul = h("ul", { class: "ws-list ws-card" });
+      r.b.items.forEach(function (c) {
+        var hl = Object.keys(c.handles || {}).map(function (k) { return k + " @" + String(c.handles[k]).replace(/^@/, ""); }).join(" · ");
+        var run = h("button", { class: "ws-btn ws-btn--sm", type: "button", onclick: function () {
+          run.disabled = true;
+          api("POST", "/api/my/competitor/collect", { id: c.id }).then(function (x) { toast(x.b.message || "Done."); run.disabled = false; });
+        } }, "Collect now");
+        var rm = h("button", { class: "ws-btn ws-btn--sm ws-btn--ghost", type: "button", onclick: function () {
+          if (!confirm("Remove " + c.name + "?")) return;
+          api("POST", "/api/my/competitor", { op: "remove", id: c.id }).then(function (x) { toast(x.b.ok ? "Removed." : (x.b.message || "")); draw(); });
+        } }, "Remove");
+        ul.appendChild(h("li", null, h("div", { class: "ws-who" }, h("b", null, c.name), h("span", null, hl),
+          h("span", null, c.last_run_at ? "Last collected " + new Date(c.last_run_at * 1000).toLocaleDateString() + (c.last_note ? " · " + c.last_note : "") : "Not collected yet")),
+          h("span", { class: "ws-row" }, run, rm)));
+      });
+      box.appendChild(ul);
+    });
+  }
+  function fmt(n) { return n == null ? "–" : n >= 1e6 ? (n / 1e6).toFixed(1) + "M" : n >= 1e3 ? Math.round(n / 1e3) + "K" : String(n); }
+  function intelResults(p) {
+    var box = h("div", { class: "ws-sec" }, h("p", { class: "ws-muted" }, "Loading your evidence…"));
+    p.appendChild(box);
+    api("GET", "/api/my/evidence").then(function (r) {
+      box.textContent = "";
+      if (!r.b.ok) { box.appendChild(h("div", { class: "ws-empty" }, h("b", null, "Not available"), r.b.message || "")); return; }
+      if (!r.b.packs.length) { box.appendChild(h("div", { class: "ws-empty" }, h("b", null, "No evidence yet"), "Name a competitor in Work and collect; what they posted with creators lands here.")); return; }
+      r.b.packs.forEach(function (pk) {
+        var tb = h("table", { class: "ws-table" }, h("thead", null, h("tr", null, h("th", null, "Creator"), h("th", null, "Worked with"),
+          h("th", null, "Posts"), h("th", null, "Best views"), h("th", null, "Followers"), h("th", null, "HelloVoice roster"))));
+        var body = h("tbody");
+        pk.creators.forEach(function (c) {
+          var tag = null;
+          if (c.on_roster) {
+            if (r.b.selection_open && c.code) tag = h("a", { class: "ws-tag ws-tag--open", href: "../creator/?c=" + encodeURIComponent(c.code) }, "On the roster");
+            else {
+              tag = h("button", { class: "ws-tag ws-tag--locked", type: "button", title: "Available through Helvi Selection", onclick: function () {
+                tag.disabled = true;
+                api("POST", "/api/workspace/request", { module: "helvi-selection", kind: mod("helvi-selection").state === "norole" ? "role" : "module",
+                  note: "Roster creator @" + c.handle }).then(function (x) { toast(x.b.message || "Sent."); });
+              } }, lockIcon(), "Available through Helvi Selection");
+            }
+          }
+          body.appendChild(h("tr", null, h("td", { class: "ws-who" }, h("b", null, c.name), h("span", null, c.platform + (c.handle ? " · @" + c.handle.replace(/^@/, "") : ""))),
+            h("td", null, c.competitors.join(", ")), h("td", null, String(c.posts)), h("td", null, fmt(c.best_views)),
+            h("td", null, fmt(c.followers)), h("td", null, tag || "–")));
+        });
+        tb.appendChild(body);
+        box.appendChild(h("article", { class: "ws-card ws-pack" }, h("div", { class: "ws-headrow" }, h("h2", null, pk.title),
+          h("span", { class: "ws-pill" }, pk.posts + " posts · " + pk.competitors.join(", "))), h("div", { class: "ws-scroll" }, tb),
+          pk.more ? h("p", { class: "ws-muted" }, "+" + pk.more + " more creators") : null));
+      });
+    });
   }
 
   /* ---------------------------------------------------------------- team */

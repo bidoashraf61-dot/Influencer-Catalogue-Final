@@ -90,7 +90,7 @@
 /* Track work */
 .ws-muted { color: var(--gray); }
 .ws-headrow { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
-.ws-headrow h2 { margin: 0; }
+.ws-headrow h2 { margin: 0; font-family: var(--heading); font-weight: 400; font-size: 30px; letter-spacing: .03em; line-height: 1; }
 .ws-sec .ws-card + .ws-card { margin-top: 14px; }
 .ws-new { margin-bottom: 18px; }
 .ws-new summary, .ws-more summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 700; }
@@ -101,6 +101,17 @@
 .ws-status--live { background: var(--lime); }
 .ws-status--ended { background: #efede8; color: var(--gray); }
 .ws-note { margin-bottom: 18px; background: var(--linen); border-color: transparent; }
+
+/* tags: roster match, locked hand-offs */
+.ws-tag { display: inline-flex; align-items: center; gap: 6px; font: inherit; font-size: 12px; font-weight: 700; padding: 5px 11px; border-radius: 99px; white-space: nowrap; text-decoration: none; border: 0; cursor: pointer; min-height: 30px; }
+.ws-tag .ws-lock, .ws-locked .ws-lock { width: 14px; height: 14px; margin: 0; }
+.ws-tag--open { background: var(--lime); color: var(--ink); }
+.ws-tag--locked { background: var(--linen); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(18,18,18,.18); }
+.ws-locked { gap: 8px; }
+.ws-pack + .ws-pack { margin-top: 16px; }
+.ws-pack .ws-scroll { border: 0; }
+.ws-list.ws-card { padding: 4px 22px; }
+.ws-who > span:not(.ws-pill) { display: block; }
 
 @media (max-width: 760px) {
   .ws-switch { grid-template-columns: 1fr; }

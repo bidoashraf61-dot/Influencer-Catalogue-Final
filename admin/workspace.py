@@ -367,7 +367,8 @@ def _overview(tenant, user, key):
                                 "ORDER BY updated_at DESC LIMIT 6", (tenant,)).fetchall()
             n = modules.count(tenant, "selections")
             meters.append(_meter("Selections", n, modules.number(tenant, "selections_max")))
-            outputs = [{"title": s["name"] or "Selection", "sub": "Selection", "href": "/selection/?s=" + s["token"]} for s in sels]
+            outputs = [{"title": s["name"] or "Selection", "sub": "Selection", "href": "/selection/?s=" + s["token"],
+                        "token": s["token"]} for s in sels]
             checklist = [("Open the roster", True), ("Make a selection", n > 0), ("Invite your team", used > 1)]
     try:
         meters.append(_meter("AI credits", portal.balance(tenant) or 0, None))

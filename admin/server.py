@@ -797,6 +797,10 @@ class Handler(portal_api.PortalMixin, BaseHTTPRequestHandler):
             return self.send_json(200, {"ok": True, "licences": licence.for_roster()}, self.cors())
         if path == "/api/discover/facets":
             return self.api_discover("facets")
+        if path == "/api/my/evidence":
+            import tenant_api
+            st, payload = tenant_api.evidence_list(self)
+            return self.send_json(st, payload, self.cors() + [("Cache-Control", "no-store")])
         if path == "/api/my/campaigns":
             import tenant_api
             st, payload = tenant_api.campaigns_list(self)
