@@ -271,7 +271,8 @@ class PortalMixin(connect_api.ConnectMixin):
             who = self._need_account()
             if who:
                 import workspace
-                self.send_json(200, workspace.payload(who[1], (query.get("m") or "").strip()),
+                person = portal.user_for_code(self.person_code_id()) or who[1]
+                self.send_json(200, workspace.payload(person, (query.get("m") or "").strip()),
                                self.cors() + [("Cache-Control", "no-store")])
             return True
         if path == "/api/account":
@@ -1661,57 +1662,67 @@ class PortalMixin(connect_api.ConnectMixin):
 
     # ------------------------------------------------------------ workspace --
 
+    def _ws_person(self):
+        """The signed-in PERSON for the workspace, never the company's account holder: since a colleague's
+        data code resolves to the company's (modules.data_code_id), _need_account() returns the holder's row,
+        and roles, invites and removals must be judged on the person holding the pass."""
+        who = self._need_account()
+        if not who:
+            return None
+        u = portal.user_for_code(self.person_code_id()) if hasattr(self, "person_code_id") else None
+        return u if u is not None else who[1]
+
     def _ws_reply(self, res):
         ok, msg = res
         return self.send_json(200 if ok else 400, {"ok": ok, "message": msg}, self.cors())
 
     def api_ws_invite(self):
-        who = self._need_account()
-        if not who or self._throttled("wsinv:%d" % who[1]["id"], 30, 86400):
+        person = self._ws_person()
+        if person is None or self._throttled("wsinv:%d" % person["id"], 30, 86400):
             return
         import workspace
         b = self.json_body()
-        return self._ws_reply(workspace.invite(who[1], b.get("email"), " ".join(str(b.get("name") or "").split())[:120],
+        return self._ws_reply(workspace.invite(person, b.get("email"), " ".join(str(b.get("name") or "").split())[:120],
                                                b.get("roles") if isinstance(b.get("roles"), dict) else {}))
 
     def api_ws_role(self):
-        who = self._need_account()
-        if not who:
+        person = self._ws_person()
+        if person is None:
             return
         import workspace
         b = self.json_body()
-        return self._ws_reply(workspace.set_role(who[1], b.get("user"), str(b.get("module") or ""), str(b.get("role") or "")))
+        return self._ws_reply(workspace.set_role(person, b.get("user"), str(b.get("module") or ""), str(b.get("role") or "")))
 
     def api_ws_remove(self):
-        who = self._need_account()
-        if not who:
+        person = self._ws_person()
+        if person is None:
             return
         import workspace
-        return self._ws_reply(workspace.remove(who[1], self.json_body().get("user")))
+        return self._ws_reply(workspace.remove(person, self.json_body().get("user")))
 
     def api_ws_request(self):
-        who = self._need_account()
-        if not who or self._throttled("wsreq:%d" % who[1]["id"], 20, 86400):
+        person = self._ws_person()
+        if person is None or self._throttled("wsreq:%d" % person["id"], 20, 86400):
             return
         import workspace
         b = self.json_body()
-        return self._ws_reply(workspace.request(who[1], str(b.get("module") or ""), str(b.get("kind") or ""), b.get("note")))
+        return self._ws_reply(workspace.request(person, str(b.get("module") or ""), str(b.get("kind") or ""), b.get("note")))
 
     def api_ws_decide(self):
-        who = self._need_account()
-        if not who:
+        person = self._ws_person()
+        if person is None:
             return
         import workspace
         b = self.json_body()
-        return self._ws_reply(workspace.decide(who[1], b.get("id"), bool(b.get("approve"))))
+        return self._ws_reply(workspace.decide(person, b.get("id"), bool(b.get("approve"))))
 
     def api_ws_pref(self):
         """Company admin settings inside the caps: default role, digest, the name and colour on reports."""
-        who = self._need_account()
-        if not who:
+        person = self._ws_person()
+        if person is None:
             return
         import workspace, modules
-        user, b = who[1], self.json_body()
+        user, b = person, self.json_body()
         key, mod = str(b.get("key") or ""), str(b.get("module") or "")
         if mod not in workspace.BY_KEY or not workspace._may_admin(user, mod):
             return self.send_json(403, {"ok": False, "message": "Only an admin of this module can change its settings."}, self.cors())
