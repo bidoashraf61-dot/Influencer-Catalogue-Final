@@ -1404,7 +1404,11 @@
         var grp = h("div", { class: "bs-need__q", role: "group", "aria-label": q.label });
         grp.appendChild(h("p", { class: "bs-need__lbl" }, id === "goal" ? "Campaign goals" : q.label + (REQ.indexOf(id) > -1 ? "" : " (optional)")));
         var row = h("div", { class: "ai-sl__opts bs-need__opts" });
-        (q.options || []).forEach(function (o) {
+        // A value the brief typed that is not one of the options (10 creators) leads, already chosen.
+        var opts_ = (q.options || []).slice();
+        if (!many && isOther(answers[id])) opts_.unshift({ value: answers[id], label: answers[id].slice(OTHER.length) + (id === "count" ? " creators" : "") });
+        q = Object.assign({}, q, { options: opts_ });
+        opts_.forEach(function (o) {
           var list = function () { return asList(answers[id]); };
           var on = many ? list().indexOf(o.value) > -1 : answers[id] === o.value;
           var b = h("button", { class: "ai-sl__opt", type: "button", "aria-pressed": String(on) }, o.label);
